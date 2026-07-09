@@ -45,8 +45,6 @@ urlpatterns = [
     path('saved-filters/<int:pk>/', views.SavedFilterDetailView.as_view(), name='savedfilter_detail'),
     path('saved-filters/<int:pk>/edit/', views.SavedFilterEditView.as_view(), name='savedfilter_update'),
     path('saved-filters/<int:pk>/delete/', views.SavedFilterDeleteView.as_view(), name='savedfilter_delete'),
-    # Config Contexts
-    path('config-contexts/', include('extras.urls_contexts')),
 
     # Scheduled Reporting & Alerts UI
     path('alerts/', views.AlertLogListView.as_view(), name='alertlog_list'),
@@ -60,6 +58,7 @@ urlpatterns = [
     path('alerts/rules/<int:pk>/edit/', views.AlertRuleUpdateView.as_view(), name='alertrule_update'),
     path('alerts/rules/<int:pk>/delete/', views.AlertRuleDeleteView.as_view(), name='alertrule_delete'),
     path('alerts/rules/<int:pk>/run/', views.AlertRuleRunNowView.as_view(), name='alertrule_run'),
+    path('alerts/rules/bulk-delete/', views.AlertRuleBulkDeleteView.as_view(), name='alertrule_bulk_delete'),
 
     # Notification Channels
     path('alerts/channels/', views.NotificationChannelListView.as_view(), name='notificationchannel_list'),
@@ -67,6 +66,7 @@ urlpatterns = [
     path('alerts/channels/<int:pk>/edit/', views.NotificationChannelUpdateView.as_view(), name='notificationchannel_update'),
     path('alerts/channels/<int:pk>/delete/', views.NotificationChannelDeleteView.as_view(), name='notificationchannel_delete'),
     path('alerts/channels/<int:pk>/test/', views.NotificationChannelTestView.as_view(), name='notificationchannel_test'),
+    path('alerts/channels/bulk-delete/', views.NotificationChannelBulkDeleteView.as_view(), name='notificationchannel_bulk_delete'),
 
     # Report Templates
     path('reports/templates/', views.ReportTemplateListView.as_view(), name='reporttemplate_list'),
@@ -76,6 +76,7 @@ urlpatterns = [
     path('reports/templates/<int:pk>/edit/', views.ReportTemplateUpdateView.as_view(), name='reporttemplate_update'),
     path('reports/templates/<int:pk>/delete/', views.ReportTemplateDeleteView.as_view(), name='reporttemplate_delete'),
     path('reports/templates/<int:pk>/download/', views.ReportTemplateDownloadView.as_view(), name='reporttemplate_download'),
+    path('reports/templates/bulk-delete/', views.ReportTemplateBulkDeleteView.as_view(), name='reporttemplate_bulk_delete'),
 
     # Scheduled Reports
     path('reports/schedules/', views.ScheduledReportListView.as_view(), name='scheduledreport_list'),
@@ -83,6 +84,7 @@ urlpatterns = [
     path('reports/schedules/<int:pk>/edit/', views.ScheduledReportUpdateView.as_view(), name='scheduledreport_update'),
     path('reports/schedules/<int:pk>/delete/', views.ScheduledReportDeleteView.as_view(), name='scheduledreport_delete'),
     path('reports/schedules/<int:pk>/trigger/', views.ReportTriggerImmediateView.as_view(), name='scheduledreport_trigger'),
+    path('reports/schedules/bulk-delete/', views.ScheduledReportBulkDeleteView.as_view(), name='scheduledreport_bulk_delete'),
 
     # Export Templates
     path('export-templates/', ExportTemplateListView.as_view(), name='exporttemplate_list'),

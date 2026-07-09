@@ -11,7 +11,7 @@ from django.contrib.auth import get_user_model
 from django.utils import timezone
 from model_bakery import baker
 
-from organization.models import Tenant, TenantRole, TenantMembership
+from organization.models import Tenant, Role, Membership
 from subscriptions.models import Subscription, SubscriptionStatusChoices
 from core.models import Notification
 from core.tests.mixins import TenantTestMixin
@@ -26,10 +26,12 @@ class SubscriptionExpiryRecipientTests(TenantTestMixin, TestCase):
 
         # A staff user in each tenant.
         self.staff_a = User.objects.create_user(username='sub_staff_a', password='x', is_staff=True)
-        TenantMembership.objects.create(user=self.staff_a, tenant=self.tenant, role=self.tenant_role)
+        m_a = Membership.objects.create(user=self.staff_a, tenant=self.tenant)
+        m_a.roles.add(self.tenant_role)
         self.staff_b = User.objects.create_user(username='sub_staff_b', password='x', is_staff=True)
-        role_b = TenantRole.objects.create(tenant=self.tenant_b, name='B role', permissions=[])
-        TenantMembership.objects.create(user=self.staff_b, tenant=self.tenant_b, role=role_b)
+        role_b = Role.objects.create(tenant=self.tenant_b, name='B role', permissions=[])
+        m_b = Membership.objects.create(user=self.staff_b, tenant=self.tenant_b)
+        m_b.roles.add(role_b)
 
         self.set_active_tenant(self.tenant)
         # Renewal exactly 30 days out → the reminder branch fires and stays

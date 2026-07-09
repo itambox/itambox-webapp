@@ -31,13 +31,17 @@ class ScheduledReportTaskAuditTests(TransactionTestCase):
     ObjectChange (it runs inside TaskContext)."""
 
     def test_scheduled_report_run_logs_object_change(self):
+        from organization.models import Tenant
+        tenant = Tenant.objects.create(name="Phase3 Tenant", slug="phase3-report-tenant")
         template = ReportTemplate.objects.create(
             name="Phase3 Audit Asset Report",
             report_type=ReportTemplate.REPORT_TYPE_ASSET_SUMMARY,
+            tenant=tenant,
         )
         sched = ScheduledReport.objects.create(
             name="Phase3 Audit Schedule",
             report=template,
+            tenant=tenant,
             format=ScheduledReport.FORMAT_HTML,
             save_to_archive=False,
             recipients='',

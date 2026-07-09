@@ -4,7 +4,7 @@ from rest_framework import status
 from rest_framework.test import APITestCase
 
 from assets.models import Asset, AssetType, StatusLabel, AssetRole, Manufacturer
-from organization.models import AssetHolder, Site, Location, Tenant, TenantRole, TenantMembership
+from organization.models import AssetHolder, Site, Location, Tenant, Role, Membership
 from licenses.models import License, LicenseSeatAssignment
 from software.models import Software
 
@@ -25,19 +25,18 @@ class ITAMBoxAPITestCase(APITestCase):
         self.tenant_a = Tenant.objects.create(name="Tenant A", slug="tenant-a")
         self.tenant_b = Tenant.objects.create(name="Tenant B", slug="tenant-b")
 
-        # Give staff a proper TenantRole + TenantMembership in Tenant A so the
+        # Give staff a proper Role + Membership in Tenant A so the
         # RBAC backend (TenantMembershipBackend) grants permissions through the
         # JSON-role system instead of the removed ModelBackend fallback.
-        self.role_staff_a = TenantRole.objects.create(
+        self.role_staff_a = Role.objects.create(
             tenant=self.tenant_a,
             name='Staff Role A',
             permissions=['assets.view_asset', 'assets.add_asset', 'assets.change_asset'],
         )
-        TenantMembership.objects.create(
-            user=self.staff,
+        _m = Membership.objects.create(user=self.staff,
             tenant=self.tenant_a,
-            role=self.role_staff_a,
         )
+        _m.roles.add(self.role_staff_a)
 
         # Associate staff with Tenant A via AssetHolder profile
         self.holder_staff = AssetHolder.objects.create(
@@ -108,8 +107,8 @@ class ITAMBoxAPITestCase(APITestCase):
             tenant=self.tenant_a
         )
 
-        # Permissions for self.staff are granted via TenantRole.permissions (JSON)
-        # on the TenantMembership created above. The removed ModelBackend fallback
+        # Permissions for self.staff are granted via Role.permissions (JSON)
+        # on the Membership created above. The removed ModelBackend fallback
         # means user_permissions.add(...) no longer grants access through the
         # PasswordLoginOnlyBackend, so those calls are intentionally omitted here.
 
@@ -140,6 +139,37 @@ class ITAMBoxAPITestCase(APITestCase):
         # Verify asset is checked in
         self.asset_a.refresh_from_db()
         self.assertIsNone(self.asset_a.active_assignment)
+
+    def test_checkout_requires_change_not_add_perm(self):
+        """WS1-6: checkout is a state change -> requires assets.change_asset, not the
+        POST-default assets.add_asset."""
+        add_only = User.objects.create_user(username='addonly', password='pw')
+        _m_add = Membership.objects.create(user=add_only, tenant=self.tenant_a)
+        _m_add.roles.add(Role.objects.create(
+            tenant=self.tenant_a, name='Add Only',
+            permissions=['assets.view_asset', 'assets.add_asset'],
+        ))
+        change_only = User.objects.create_user(username='changeonly', password='pw')
+        _m_change = Membership.objects.create(user=change_only, tenant=self.tenant_a)
+        _m_change.roles.add(Role.objects.create(
+            tenant=self.tenant_a, name='Change Only',
+            permissions=['assets.view_asset', 'assets.change_asset'],
+        ))
+        checkout_url = reverse('api:assets_api:asset-checkout', kwargs={'pk': self.asset_a.pk})
+
+        self.client.force_login(add_only)
+        session = self.client.session
+        session['active_tenant_id'] = self.tenant_a.pk
+        session.save()
+        resp = self.client.post(checkout_url, {'holder_id': self.holder_a.id}, format='json')
+        self.assertEqual(resp.status_code, 403, resp.data)
+
+        self.client.force_login(change_only)
+        session = self.client.session
+        session['active_tenant_id'] = self.tenant_a.pk
+        session.save()
+        resp = self.client.post(checkout_url, {'holder_id': self.holder_a.id}, format='json')
+        self.assertEqual(resp.status_code, 200, resp.data)
 
     def test_checkout_multiple_targets_fails(self):
         self.client.force_authenticate(user=self.superuser)

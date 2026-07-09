@@ -3,7 +3,8 @@ import json
 import difflib
 from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib.auth.decorators import login_required
-from django.http import Http404, HttpResponse, HttpResponseRedirect
+from django.http import Http404, HttpResponse, HttpResponseBadRequest, HttpResponseRedirect
+from django.core.exceptions import PermissionDenied
 from django.apps import apps
 from django.urls import reverse, NoReverseMatch
 from django.utils.decorators import method_decorator
@@ -20,29 +21,22 @@ from django_tables2 import RequestConfig
 from core.models import ObjectChange
 from extras.models import WebhookEndpoint, EventRule, ExportTemplate, LabelTemplate, JournalEntry, ImageAttachment, FileAttachment
 from core.tables import (
-    ObjectChangeTable, ExportTemplateTable, WebhookEndpointTable, 
+    ObjectChangeTable, ExportTemplateTable, WebhookEndpointTable,
     EventRuleTable, LabelTemplateTable
 )
+from extras.tables import JournalEntryTable
 from core.forms import JournalEntryForm
-from extras.forms import WebhookEndpointForm, EventRuleForm, LabelTemplateForm, ObjectChangeFilterForm
+from extras.forms import WebhookEndpointForm, EventRuleForm, ExportTemplateForm, LabelTemplateForm, ObjectChangeFilterForm, JournalEntryFilterForm
 from core.filters import ObjectChangeFilterSet
+from extras.filters import JournalEntryFilterSet
 from itambox.registry import registry
 from itambox.panels import Panel
 
 from .generic import BaseHTMXView, ObjectListView, ObjectDetailView, ObjectEditView, ObjectDeleteView
 from itambox.views.generic.utils import safe_return_url
+from core.csv_utils import csv_safe
 
 logger = logging.getLogger(__name__)
-
-
-def _csv_safe(value):
-    """Neutralize CSV formula injection: a cell whose first character is one a
-    spreadsheet treats as a formula trigger is prefixed with a single quote so
-    it is rendered as literal text rather than evaluated."""
-    text = '' if value is None else str(value)
-    if text and text[0] in ('=', '+', '-', '@', '\t', '\r'):
-        return "'" + text
-    return text
 
 
 @method_decorator(login_required, name='dispatch')
@@ -65,6 +59,32 @@ class ObjectChangeListView(ObjectListView):
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         context['title'] = _('Changelog')
+        return context
+
+
+@method_decorator(login_required, name='dispatch')
+class JournalEntryListView(ObjectListView):
+    # Global activity list of journal entries across all objects (NetBox-style
+    # "Journal Entries" under Monitoring › Activity). Tenant scoping is re-applied
+    # per request by TenantScopingViewMixin; allow_global_tenant keeps entries on
+    # shared/global objects visible. content_object is prefetched for the linked
+    # Object column (a GFK cannot be select_related).
+    queryset = JournalEntry.objects.select_related('model', 'user', 'tenant').prefetch_related('content_object')
+    filterset = JournalEntryFilterSet
+    filterset_form = JournalEntryFilterForm
+    table = JournalEntryTable
+    template_name = 'extras/journalentry/journalentry_list.html'
+    action_buttons = ()
+
+    def get_breadcrumbs(self):
+        return [
+            (reverse('dashboard'), _('Dashboard')),
+            (None, _('Journal Entries')),
+        ]
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context['title'] = _('Journal Entries')
         return context
 
 
@@ -202,8 +222,10 @@ class ObjectExportView(LoginRequiredMixin, View):
 
         pks = request.GET.get('pk', '')
         if pks:
-            pks = [int(p) for p in pks.split(',') if p.strip()]
-            queryset = model.objects.filter(pk__in=pks)
+            valid_pks = [int(p) for p in pks.split(',') if p.strip().isdigit()]
+            if not valid_pks:
+                return HttpResponseBadRequest(_("Invalid pk value(s)."))
+            queryset = model.objects.filter(pk__in=valid_pks)
         elif export_scope == 'filtered':
             queryset = model.objects.all()
             filterset_class = get_filterset_for_model(model)
@@ -217,9 +239,14 @@ class ObjectExportView(LoginRequiredMixin, View):
         if template_id == 0:
             _REDACTED_FIELD_SUBSTRINGS = ('secret', 'password', 'token')
 
-            def _is_redacted(field_name):
+            def _is_redacted(field_name, val):
+                # Redact by name, AND auto-redact any encrypted-field ciphertext regardless
+                # of the field's name (enc$ is the Fernet sentinel — covers product_key,
+                # smtp_password, webhook secret, and any future encrypted field).
                 name = field_name.lower()
-                return any(sub in name for sub in _REDACTED_FIELD_SUBSTRINGS)
+                if any(sub in name for sub in _REDACTED_FIELD_SUBSTRINGS):
+                    return True
+                return isinstance(val, str) and val.startswith('enc$')
 
             if export_format == 'yaml':
                 import yaml
@@ -228,10 +255,10 @@ class ObjectExportView(LoginRequiredMixin, View):
                 for obj in queryset:
                     row_dict = {}
                     for field in fields:
-                        if _is_redacted(field.name):
+                        val = getattr(obj, field.name)
+                        if _is_redacted(field.name, val):
                             row_dict[field.name] = '***'
                             continue
-                        val = getattr(obj, field.name)
                         if val is None:
                             val = ''
                         elif isinstance(val, (int, float, bool)):
@@ -256,20 +283,36 @@ class ObjectExportView(LoginRequiredMixin, View):
                 for obj in queryset:
                     row = []
                     for field in fields:
-                        if _is_redacted(field.name):
+                        val = getattr(obj, field.name)
+                        if _is_redacted(field.name, val):
                             row.append('***')
                             continue
-                        val = getattr(obj, field.name)
-                        row.append(_csv_safe(val))
+                        row.append(csv_safe(val))
                     writer.writerow(row)
                 return response
 
         content_type = ContentType.objects.get_for_model(model)
         template = get_object_or_404(ExportTemplate, pk=template_id, content_type=content_type)
-        content = template.render_queryset(queryset)
+        try:
+            content = template.render(queryset)
+        except Exception as exc:
+            # Template code is author-controlled and can fail at render time (undefined
+            # variable, type error, sandbox violation). Never surface a 500 — flash the
+            # error and send the user back where they came from, NetBox-style.
+            logger.warning("Export template %s render failed: %s", template.pk, exc)
+            messages.error(request, _(
+                'There was an error rendering the export template "%(name)s": %(error)s'
+            ) % {'name': template.name, 'error': exc})
+            return HttpResponseRedirect(safe_return_url(
+                request, request.META.get('HTTP_REFERER'), template.get_absolute_url(),
+            ))
 
-        response = HttpResponse(content, content_type=template.mime_type)
-        response['Content-Disposition'] = f'attachment; filename="{model_name}_export.{template.file_extension}"'
+        response = HttpResponse(content, content_type=template.mime_type or ExportTemplate.DEFAULT_MIME_TYPE)
+        # mime_type AND the rendered body are author-controlled (could be HTML/SVG);
+        # stop the browser content-sniffing its way into executing them.
+        response['X-Content-Type-Options'] = 'nosniff'
+        if template.as_attachment:
+            response['Content-Disposition'] = f'attachment; filename="{template.get_export_filename(model)}"'
         return response
 
 
@@ -295,14 +338,36 @@ class ExportTemplateDetailView(ObjectDetailView):
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
-        context['title'] = str(self.get_object())
+        obj = self.get_object()
+        context['title'] = str(obj)
+        # Expose the target model so the panel can link "Run this export" to the
+        # live export endpoint — but only when the viewer actually holds
+        # view_<target_model>. ObjectExportView 404s without it, so showing the
+        # button to a user who lacks the perm would just dead-end on a 404.
+        target_model = obj.content_type.model_class()
+        if target_model is not None:
+            app_label = target_model._meta.app_label
+            model_name = target_model._meta.model_name
+            if self.request.user.has_perm(f'{app_label}.view_{model_name}'):
+                context['target_app_label'] = app_label
+                context['target_model_name'] = model_name
+                context['target_model_verbose'] = target_model._meta.verbose_name_plural
         return context
 
 
 @method_decorator(login_required, name='dispatch')
 class ExportTemplateEditView(ObjectEditView):
     queryset = ExportTemplate.objects.all()
-    fields = ['name', 'description', 'content_type', 'template_code', 'mime_type', 'file_extension']
+    model_form = ExportTemplateForm
+
+    def has_permission(self):
+        # ExportTemplate is a global, admin-managed resource with NO tenant field — its
+        # template_code is server-rendered (Jinja) for EVERY tenant's exports. Gating only on
+        # the model perm let any tenant member create/edit/delete the shared templates,
+        # i.e. tamper with another tenant's export output (a cross-tenant integrity /
+        # stored-template-injection vector). Authoring is restricted to superusers; members
+        # keep read/render access.
+        return self.request.user.is_superuser and super().has_permission()
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
@@ -313,6 +378,10 @@ class ExportTemplateEditView(ObjectEditView):
 @method_decorator(login_required, name='dispatch')
 class ExportTemplateDeleteView(ObjectDeleteView):
     queryset = ExportTemplate.objects.all()
+
+    def has_permission(self):
+        # See ExportTemplateEditView: deleting a shared global template affects every tenant.
+        return self.request.user.is_superuser and super().has_permission()
 
 
 class JournalEntryCreateView(LoginRequiredMixin, View):
@@ -469,12 +538,22 @@ class ImageAttachmentServeView(LoginRequiredMixin, View):
         if not _attachment_within_tenant(attachment.model, attachment.object_id):
             raise Http404
         response = FileResponse(attachment.image.open('rb'))
+        # Force an image/* content-type (defence-in-depth alongside nosniff) so a mislabeled
+        # upload can't be served as HTML/SVG inline. The validator restricts uploads to image
+        # extensions, so a valid image always resolves to image/*; anything else -> download.
+        import mimetypes
+        guessed, _enc = mimetypes.guess_type(attachment.image.name)
+        response['Content-Type'] = guessed if (guessed or '').startswith('image/') else 'application/octet-stream'
         response['X-Content-Type-Options'] = 'nosniff'
         return response
 
 
 class LabelSelectView(LoginRequiredMixin, View):
     def get(self, request, app_label, model_name, object_id):
+        # Require view access to the object's model — printing a label exposes its
+        # name/tag/serial, so a member lacking view_<model> must not reach it.
+        if not request.user.has_perm(f'{app_label}.view_{model_name}'):
+            raise PermissionDenied
         templates = LabelTemplate.objects.all()
         context = {
             'label_templates': templates,
@@ -498,8 +577,12 @@ class LabelPrintView(LoginRequiredMixin, View):
             obj = get_object_or_404(model, pk=object_id)
         else:
             # Dynamic model lookup to break circular dependency
-            Asset = apps.get_model('assets', 'Asset')
-            obj = get_object_or_404(Asset, pk=object_id)
+            model = apps.get_model('assets', 'Asset')
+            obj = get_object_or_404(model, pk=object_id)
+
+        # Require object-level view access — a printed label exposes name/tag/serial.
+        if not request.user.has_perm(f'{model._meta.app_label}.view_{model._meta.model_name}', obj=obj):
+            raise PermissionDenied
 
         # Same engine as the bulk print job — synchronous, no background Job.
         pdf_bytes = render_labels_pdf([obj], label_template)

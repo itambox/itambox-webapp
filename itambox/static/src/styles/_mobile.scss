@@ -86,6 +86,47 @@
         white-space: pre-wrap;
         word-break: break-word;
     }
+
+    // Pagination bar: the 3-up desktop row (per-page | count | page-nav) is too
+    // cramped on a phone. Keep the per-page selector and page nav together on the
+    // top row, and drop the "Showing X-Y of Z" counter onto its own full-width row
+    // below them.
+    .pagination-bar {
+        grid-template-columns: 1fr auto;
+
+        &__per-page {
+            grid-row: 1; // grid-column 1 / justify-self start inherited from base
+        }
+
+        &__nav {
+            grid-row: 1;
+            grid-column: 2; // collapse from the desktop 3rd column onto the 2nd
+        }
+
+        &__count {
+            grid-column: 1 / -1;
+            grid-row: 2;
+        }
+
+        // Trim the page buttons on phones: keep the prev/next chevrons, the first
+        // and last page jumps (with their ellipsis), and the current page with its
+        // immediate neighbours; hide only the further-out (current +/- 2) numbers so
+        // the nav stays on one line.
+        &__nav .pagination > .page-item {
+            display: none;
+        }
+
+        &__nav .pagination > .page-item:first-child,            // prev chevron (or first-page edge)
+        &__nav .pagination > .page-item:last-child,             // next chevron (or last-page edge)
+        &__nav .pagination > .page-item--first,                 // jump to first page
+        &__nav .pagination > .page-item--last,                  // jump to last page
+        &__nav .pagination > .page-item--gap,                   // ellipsis bridging the gap
+        &__nav .pagination > .page-item.active,                 // current page
+        &__nav .pagination > .page-item.active + .page-item,    // current + 1
+        &__nav .pagination > .page-item:has(+ .page-item.active) { // current - 1
+            display: block;
+        }
+    }
 }
 
 // ============================================================

@@ -11,7 +11,10 @@ Coverage:
 import uuid
 
 from django.contrib.contenttypes.models import ContentType
-from django.test import TestCase, RequestFactory
+from django.db import transaction
+from django.test import TestCase, TransactionTestCase, RequestFactory
+from django.test.utils import CaptureQueriesContext
+from django.db import connection
 from django.contrib.auth import get_user_model
 from django.urls import reverse
 
@@ -77,6 +80,10 @@ class WatchNotificationTests(TenantTestMixin, TestCase):
     """
     Watching → notification created on save.
     Bookmarking alone → no notification created.
+
+    Watcher notification is deferred to ``transaction.on_commit`` (WS5-7), so the
+    triggering save is wrapped in ``captureOnCommitCallbacks(execute=True)`` — under a
+    plain ``TestCase`` the on_commit callbacks never fire otherwise.
     """
 
     def setUp(self):
@@ -85,17 +92,15 @@ class WatchNotificationTests(TenantTestMixin, TestCase):
         self.bookmarker = _make_user("bookmarker")
 
         # Associate users with the tenant so they pass the view permission checks
-        from organization.models import TenantMembership
-        TenantMembership.objects.create(
-            user=self.watcher,
+        from organization.models import Membership
+        watcher_membership = Membership.objects.create(user=self.watcher,
             tenant=self.tenant,
-            role=self.tenant_role
         )
-        TenantMembership.objects.create(
-            user=self.bookmarker,
+        watcher_membership.roles.add(self.tenant_role)
+        bookmarker_membership = Membership.objects.create(user=self.bookmarker,
             tenant=self.tenant,
-            role=self.tenant_role
         )
+        bookmarker_membership.roles.add(self.tenant_role)
 
         from extras.models import Tag
         _set_user_context(self.watcher)
@@ -108,9 +113,12 @@ class WatchNotificationTests(TenantTestMixin, TestCase):
 
     def _trigger_save(self):
         _set_user_context(self.watcher)
-        self.tag.name = self.tag.name + "X"
-        self.tag.save()
-        _clear_user_context()
+        try:
+            with self.captureOnCommitCallbacks(execute=True):
+                self.tag.name = self.tag.name + "X"
+                self.tag.save()
+        finally:
+            _clear_user_context()
 
     def test_watcher_receives_notification(self):
         from core.models import Notification
@@ -125,6 +133,60 @@ class WatchNotificationTests(TenantTestMixin, TestCase):
         self._trigger_save()
         after = Notification.objects.filter(user=self.bookmarker).count()
         self.assertEqual(after, before, "Bookmarking alone must not generate notifications")
+
+    def test_rolled_back_save_creates_no_notification(self):
+        """WS5-7: a save inside a rolled-back transaction must spend no watcher work."""
+        from core.models import Notification
+        before = Notification.objects.filter(user=self.watcher).count()
+
+        _set_user_context(self.watcher)
+        try:
+            with self.captureOnCommitCallbacks(execute=True):
+                with transaction.atomic():
+                    self.tag.name = self.tag.name + "Rolled"
+                    self.tag.save()
+                    transaction.set_rollback(True)
+        finally:
+            _clear_user_context()
+
+        after = Notification.objects.filter(user=self.watcher).count()
+        self.assertEqual(after, before, "A rolled-back save must create no watcher notification")
+
+    def test_many_watchers_one_bulk_insert(self):
+        """WS5-7: N surviving watchers → a single INSERT into core_notification."""
+        from extras.models import Tag
+
+        ct = ContentType.objects.get_for_model(Tag)
+        # Three additional watchers (plus self.watcher from setUp) on the same object.
+        from organization.models import Membership
+        extra_watchers = []
+        for i in range(3):
+            u = _make_user(f"watcher_bulk_{i}")
+            m = Membership.objects.create(user=u, tenant=self.tenant)
+            m.roles.add(self.tenant_role)
+            ObjectWatch.objects.create(user=u, model=ct, object_id=self.tag.pk)
+            extra_watchers.append(u)
+
+        _set_user_context(self.watcher)
+        try:
+            with CaptureQueriesContext(connection) as ctx:
+                with self.captureOnCommitCallbacks(execute=True):
+                    self.tag.name = self.tag.name + "Bulk"
+                    self.tag.save()
+        finally:
+            _clear_user_context()
+
+        inserts = [
+            q['sql'] for q in ctx.captured_queries
+            if 'INSERT INTO "core_notification"' in q['sql']
+        ]
+        self.assertEqual(len(inserts), 1, "All watcher notifications must land in one bulk INSERT")
+
+        from core.models import Notification
+        notified = Notification.objects.filter(
+            user__in=[self.watcher, *extra_watchers]
+        ).count()
+        self.assertEqual(notified, 4, "Every watcher with view access must be notified")
 
 
 # ---------------------------------------------------------------------------
@@ -242,3 +304,64 @@ class BookmarksWidgetTenantSafetyTests(TenantTestMixin, TestCase):
         names = [i['name'] for i in ctx['bookmarked_items']]
         # The ghost bookmark (pk=99999999) must not appear
         self.assertNotIn('99999999', str(names))
+
+
+# ---------------------------------------------------------------------------
+# Soft-delete event precision (WS5-10)
+# ---------------------------------------------------------------------------
+
+class SoftDeleteEventActionTests(TransactionTestCase):
+    """
+    event_on_save must map soft-delete transitions precisely:
+      * None -> set deleted_at  → one 'delete' Event
+      * set  -> None deleted_at → a distinct 'restore' Event (not 'update')
+      * set  -> set   (edit of an already-archived row) → 'update', never another 'delete'
+
+    TransactionTestCase so the on_commit-deferred dispatch actually fires.
+    """
+
+    def setUp(self):
+        super().setUp()
+        from extras.models import Tag
+        self.ct = ContentType.objects.get_for_model(Tag)
+        _set_user_context(_make_user("sde_actor"))
+        self.tag = Tag.objects.create(name="Lifecycle", slug="lifecycle")
+
+    def tearDown(self):
+        _clear_user_context()
+        super().tearDown()
+
+    def _events(self, action):
+        from extras.models import Event
+        return Event.objects.filter(model=self.ct, object_id=self.tag.pk, action=action)
+
+    def test_soft_delete_emits_single_delete_event(self):
+        self.tag.soft_delete()
+        self.assertEqual(self._events('delete').count(), 1)
+        self.assertEqual(self._events('restore').count(), 0)
+
+    def test_restore_emits_restore_event_not_update(self):
+        self.tag.soft_delete()
+        delete_count_before = self._events('delete').count()
+        update_count_before = self._events('update').count()
+
+        self.tag.restore()
+
+        self.assertEqual(self._events('restore').count(), 1, "Restore must emit a distinct 'restore' Event")
+        # Restore must NOT masquerade as an update, nor re-fire delete.
+        self.assertEqual(self._events('update').count(), update_count_before)
+        self.assertEqual(self._events('delete').count(), delete_count_before)
+
+    def test_editing_archived_row_does_not_refire_delete(self):
+        self.tag.soft_delete()
+        self.assertEqual(self._events('delete').count(), 1)
+
+        # Edit a field while the row stays soft-deleted (no deleted_at transition).
+        from extras.models import Tag
+        archived = Tag.all_objects.get(pk=self.tag.pk)
+        archived.description = "edited while archived"
+        archived.save()
+
+        self.assertEqual(self._events('delete').count(), 1, "Editing an archived row must NOT re-fire 'delete'")
+        self.assertEqual(self._events('update').count(), 1, "Archived-row edit is an ordinary 'update'")
+        self.assertEqual(self._events('restore').count(), 0)

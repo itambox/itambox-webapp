@@ -15,4 +15,16 @@
              <span class="text-muted"><i>{% translate "None" %}</i></span>
          {% endif %}
     </dd>
+
+    <dt class="col-sm-3">{% translate "Version:" %}</dt>
+    <dd class="col-sm-9">{% if object.version %}<code>{{ object.version }}</code>{% else %}<span class="text-muted"><i>{% translate "Not Set" %}</i></span>{% endif %}</dd>
+
+    <dt class="col-sm-3">{% translate "Category:" %}</dt>
+    <dd class="col-sm-9">{% if object.category %}<span class="badge bg-azure-lt">{{ object.get_category_display }}</span>{% else %}<span class="text-muted"><i>{% translate "Uncategorized" %}</i></span>{% endif %}</dd>
+
+    <dt class="col-sm-3">{% translate "License Type:" %}</dt>
+    <dd class="col-sm-9">{% if object.license_type %}<span class="badge bg-purple-lt text-uppercase">{{ object.get_license_type_display }}</span>{% else %}<span class="text-muted"><i>{% translate "Not Set" %}</i></span>{% endif %}</dd>
+
+    <dt class="col-sm-3">{% translate "Website:" %}</dt>
+    <dd class="col-sm-9">{% if object.website %}<a href="{{ object.website }}" target="_blank" rel="noopener" hx-boost="false">{{ object.website }} <i class="mdi mdi-open-in-new ms-1"></i></a>{% else %}<span class="text-muted"><i>{% translate "Not Set" %}</i></span>{% endif %}</dd>
 </dl>

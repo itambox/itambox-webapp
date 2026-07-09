@@ -55,7 +55,7 @@ class SeedLicensingMixin:
             for sw_name, ltype, seats, cost, has_expiry in plan:
                 expiry = days_ahead(random.choice([18, 25, 40, 90, 180, 365])) if has_expiry else None
                 lic = License.objects.create(
-                    name=f"{code} {sw_name}", software=self._software[sw_name], license_type=ltype,
+                    name=sw_name, software=self._software[sw_name], license_type=ltype,
                     product_key=('' if ltype != 'perpetual_seat' else f"{code}-XXXXX-YYYYY-ZZZZZ"),
                     seats=seats, purchase_cost=cost, purchase_date=days_ago(random.randint(60, 600)),
                     order_number=f"PO-SW-{random.randint(1000, 9999)}", tenant=tenant, expiration_date=expiry)

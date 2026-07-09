@@ -78,6 +78,56 @@ class EventsSystemTestCase(TransactionTestCase):
         self.assertIn("manufacturer", notification.subject)
         self.assertIn("assets", notification.message)
 
+    def test_event_rules_scoped_to_instance_tenant_in_system_context(self):
+        """WS5-1: in a system context (no active tenant/user) a save must fire ONLY the
+        rules belonging to the saved object's OWN tenant (plus global rules), never every
+        tenant's rules. Reproduces the cross-tenant dispatch the unscoped manager allowed.
+        Also covers WS5-2: a tenant rule's notification fans out to the rule's members, not a
+        global user=None broadcast."""
+        from django.contrib.auth import get_user_model
+        from organization.models import Tenant, Location, Role, Membership
+        from core.managers import set_current_tenant
+
+        tenant_a = Tenant.objects.create(name="Tenant A", slug="tenant-a")
+        tenant_b = Tenant.objects.create(name="Tenant B", slug="tenant-b")
+        member_a = get_user_model().objects.create_user(username='member_a', password='pw')
+        m_a = Membership.objects.create(user=member_a, tenant=tenant_a)
+        m_a.roles.add(Role.objects.create(tenant=tenant_a, name='R', permissions=[]))
+        loc_ct = ContentType.objects.get_for_model(Location)
+
+        EventRule.objects.create(
+            name="A rule", tenant=tenant_a, model=loc_ct, events=['create'],
+            action_type=EventRule.ACTION_NOTIFICATION,
+            action_config={'subject': 'A-FIRED', 'body': 'x'}, enabled=True,
+        )
+        EventRule.objects.create(
+            name="B rule", tenant=tenant_b, model=loc_ct, events=['create'],
+            action_type=EventRule.ACTION_NOTIFICATION,
+            action_config={'subject': 'B-FIRED', 'body': 'x'}, enabled=True,
+        )
+        EventRule.objects.create(
+            name="Global rule", tenant=None, model=loc_ct, events=['create'],
+            action_type=EventRule.ACTION_NOTIFICATION,
+            action_config={'subject': 'GLOBAL-FIRED', 'body': 'x'}, enabled=True,
+        )
+
+        # A Location owned by tenant A, dispatched in a no-tenant / no-user system context.
+        set_current_tenant(None)
+        loc = Location(name="Site A", tenant=tenant_a)
+        loc.pk = 987654  # dispatch only needs pk + tenant_id; no real save required
+
+        dispatch_event(Location, loc, 'create')
+
+        # WS5-2: tenant-A rule fans out to tenant-A members (not a global user=None row).
+        self.assertTrue(Notification.objects.filter(subject='A-FIRED', user=member_a).exists())
+        self.assertFalse(Notification.objects.filter(subject='A-FIRED', user__isnull=True).exists())
+        # A truly global (tenant=None) rule still broadcasts as user=None.
+        self.assertTrue(Notification.objects.filter(subject='GLOBAL-FIRED', user__isnull=True).exists())
+        self.assertFalse(
+            Notification.objects.filter(subject='B-FIRED').exists(),
+            "Tenant B's event rule must NOT fire for a tenant-A object in a system context.",
+        )
+
     @patch('requests.request')
     def test_webhook_delivery_with_hmac_signature(self, mock_request):
         mock_response = MagicMock()
@@ -373,3 +423,32 @@ class WebhookRetryTestCase(TransactionTestCase):
         self.assertEqual(retry['retry_count'], 2)
         self.assertEqual(retry['retry_backoff'], 60)
         self.assertEqual(retry['url'], self.BASE_KWARGS['url'])
+
+    @patch('core.tasks.webhooks.requests.request')
+    @patch('core.tasks.webhooks.async_task')
+    @patch('core.tasks.webhooks.Schedule')
+    def test_endpoint_secret_not_persisted_in_retry_schedule(self, mock_schedule, mock_async, mock_request):
+        """WS5-4: an endpoint-linked retry must re-derive the secret from the endpoint, never
+        write it into Schedule.kwargs (which django-q stores plaintext)."""
+        import ast
+        from core.tasks.webhooks import send_webhook_task
+        endpoint = WebhookEndpoint.objects.create(
+            name='WH', url='https://example.com/hook', secret='top-secret',
+        )
+        resp = MagicMock(status_code=503)
+        resp.raise_for_status.side_effect = __import__('requests').HTTPError(response=resp)
+        mock_request.return_value = resp
+
+        kwargs = dict(self.BASE_KWARGS, secret='', webhook_endpoint_id=endpoint.pk,
+                      retry_count=2, retry_backoff=60)
+        send_webhook_task(**kwargs)
+
+        # The HMAC was still computed (secret re-derived from the endpoint at run time).
+        self.assertIn('X-Hub-Signature-256', mock_request.call_args[1]['headers'])
+        # The retry Schedule.kwargs must NOT contain the secret — only the endpoint id.
+        mock_schedule.objects.create.assert_called_once()
+        _, kw = mock_schedule.objects.create.call_args
+        self.assertNotIn('top-secret', kw['kwargs'])
+        retry = ast.literal_eval(kw['kwargs'])
+        self.assertEqual(retry['webhook_endpoint_id'], endpoint.pk)
+        self.assertEqual(retry['secret'], '')

@@ -23,8 +23,8 @@ def _resolve_owner(owner_id, user, active_tenant):
     user_model = get_user_model()
     owner = get_object_or_denied(user_model, owner_id, user)
     if active_tenant is not None:
-        from organization.models import TenantMembership
-        if not TenantMembership.objects.filter(user=owner, tenant=active_tenant).exists():
+        from organization.models import Membership
+        if not Membership.objects.filter(user=owner, tenant=active_tenant).exists():
             raise PermissionDenied(_("Owner must be a member of the active tenant."))
     return owner
 
@@ -398,6 +398,11 @@ class CreateSubscription(graphene.Mutation):
 
         provider = get_object_or_denied(Provider, provider_id, user, tenant=active_tenant)
         subscription = Subscription(provider=provider, tenant=active_tenant)
+
+        # tenant=active_tenant is None in a tenant-group / no-tenant token context, which would
+        # mint a global subscription visible to every tenant — reserve that for superusers.
+        if subscription.tenant is None and not user.is_superuser:
+            raise PermissionDenied(_("Only superusers can create global subscriptions."))
 
         if 'owner_id' in kwargs:
             subscription.owner = _resolve_owner(kwargs.pop('owner_id'), user, active_tenant)

@@ -4,6 +4,9 @@ from core.tables import BaseTable, ActionsColumn, ToggleColumn
 from extras.tables import TagColumn
 from .models import License, LicenseSeatAssignment
 
+from django.urls import reverse
+from django.utils.html import format_html
+
 class LicenseTable(BaseTable):
     """Table for displaying License entitlements."""
     pk = ToggleColumn(accessor='pk')
@@ -19,6 +22,7 @@ class LicenseTable(BaseTable):
     )
     license_type = tables.Column(verbose_name=_("Type"))
     seats = tables.Column(verbose_name=_("Total Seats"))
+    assigned_seats = tables.Column(accessor='assigned_count', verbose_name=_("Assigned Seats"), orderable=False)
     available_seats = tables.Column(verbose_name=_("Available Seats"), orderable=False)
     tenant = tables.LinkColumn('organization:tenant_detail', args=[tables.A('tenant.pk')], accessor='tenant.name', verbose_name=_("Tenant"))
     expiration_date = tables.DateColumn(verbose_name=_("Expiration Date"), format='Y-m-d')
@@ -27,8 +31,26 @@ class LicenseTable(BaseTable):
 
     class Meta(BaseTable.Meta):
         model = License
-        fields = ('pk', 'name', 'software', 'tenant', 'license_type', 'seats', 'available_seats', 'purchase_date', 'expiration_date', 'tags', 'actions')
-        default_columns = ('pk', 'name', 'software', 'tenant', 'license_type', 'seats', 'available_seats', 'expiration_date', 'tags', 'actions')
+        fields = ('pk', 'name', 'software', 'tenant', 'license_type', 'seats', 'assigned_seats', 'available_seats', 'purchase_date', 'expiration_date', 'tags', 'actions')
+        default_columns = ('pk', 'name', 'software', 'tenant', 'license_type', 'seats', 'assigned_seats', 'available_seats', 'expiration_date', 'tags', 'actions')
+
+    def render_seats(self, value, record=None):
+        if record and value:
+            url = f"{reverse('licenses:license_detail', args=[record.pk])}#assignments"
+            return format_html('<a href="{}">{}</a>', url, value)
+        return value or 0
+
+    def render_assigned_seats(self, value, record=None):
+        if record and value:
+            url = f"{reverse('licenses:license_detail', args=[record.pk])}#assignments"
+            return format_html('<a href="{}">{}</a>', url, value)
+        return value or 0
+
+    def render_available_seats(self, value, record=None):
+        if record and value is not None:
+            url = f"{reverse('licenses:license_detail', args=[record.pk])}#assignments"
+            return format_html('<a href="{}">{}</a>', url, value)
+        return value or 0
 
 class LicenseSeatAssignmentTable(BaseTable):
     """Table for displaying individual License Seat Assignments."""

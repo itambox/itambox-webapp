@@ -12,7 +12,7 @@ update, and deactivate user accounts.
 ## Endpoint
 
 ```
-/api/scim/v2/
+/api/tenants/<tenant_slug>/scim/v2/
 ```
 
 Authentication uses **Bearer token** (generate an API token from your user profile).
@@ -32,7 +32,7 @@ Group provisioning is not yet implemented.
 
 1. In Entra ID, create a new **Enterprise Application** → **Non-gallery**.
 2. Under **Provisioning**, set mode to **Automatic**.
-3. Set **Tenant URL** to `https://itam.example.com/api/scim/v2/`.
+3. Set **Tenant URL** to `https://itam.example.com/api/tenants/<tenant_slug>/scim/v2/` (substituting `<tenant_slug>` with your tenant's URL slug).
 4. Set **Secret Token** to a valid ITAMbox API token.
 5. Save and click **Test Connection**.
 6. Enable provisioning and assign users/groups to the application.

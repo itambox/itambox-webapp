@@ -13,31 +13,31 @@
 {# --- Tabs Hook --- #}
 {% block extra_tabs %}
     <li class="nav-item" role="presentation">
-        <a href="?tab=asset-types" data-bs-target="#asset-types" class="nav-link {% if request.GET.tab == 'asset-types' %}active{% endif %}" data-bs-toggle="tab" role="tab">
+        <a href="?tab=asset-types" data-bs-target="#asset-types" class="nav-link {% if request.GET.tab == 'asset-types' %}active{% endif %}" data-bs-toggle="tab" hx-boost="false" role="tab">
             <i class="mdi mdi-application-outline me-1 text-blue"></i>
             {% translate "Asset Types" %} <span class="badge bg-blue-lt ms-2">{{ asset_types_table.rows|length }}</span>
         </a>
     </li>
     <li class="nav-item" role="presentation">
-        <a href="?tab=components" data-bs-target="#components" class="nav-link {% if request.GET.tab == 'components' %}active{% endif %}" data-bs-toggle="tab" role="tab">
+        <a href="?tab=components" data-bs-target="#components" class="nav-link {% if request.GET.tab == 'components' %}active{% endif %}" data-bs-toggle="tab" hx-boost="false" role="tab">
             <i class="mdi mdi-cpu me-1 text-orange"></i>
             {% translate "Components" %} <span class="badge bg-orange-lt ms-2">{{ components_table.rows|length }}</span>
         </a>
     </li>
     <li class="nav-item" role="presentation">
-        <a href="?tab=accessories" data-bs-target="#accessories" class="nav-link {% if request.GET.tab == 'accessories' %}active{% endif %}" data-bs-toggle="tab" role="tab">
+        <a href="?tab=accessories" data-bs-target="#accessories" class="nav-link {% if request.GET.tab == 'accessories' %}active{% endif %}" data-bs-toggle="tab" hx-boost="false" role="tab">
             <i class="mdi mdi-cog-outline me-1 text-purple"></i>
             {% translate "Accessories" %} <span class="badge bg-purple-lt ms-2">{{ accessories_table.rows|length }}</span>
         </a>
     </li>
     <li class="nav-item" role="presentation">
-        <a href="?tab=consumables" data-bs-target="#consumables" class="nav-link {% if request.GET.tab == 'consumables' %}active{% endif %}" data-bs-toggle="tab" role="tab">
+        <a href="?tab=consumables" data-bs-target="#consumables" class="nav-link {% if request.GET.tab == 'consumables' %}active{% endif %}" data-bs-toggle="tab" hx-boost="false" role="tab">
             <i class="mdi mdi-layers-outline me-1 text-yellow"></i>
             {% translate "Consumables" %} <span class="badge bg-yellow-lt ms-2">{{ consumables_table.rows|length }}</span>
         </a>
     </li>
     <li class="nav-item" role="presentation">
-        <a href="?tab=custody-policies" data-bs-target="#custody-policies" class="nav-link {% if request.GET.tab == 'custody-policies' %}active{% endif %}" data-bs-toggle="tab" role="tab">
+        <a href="?tab=custody-policies" data-bs-target="#custody-policies" class="nav-link {% if request.GET.tab == 'custody-policies' %}active{% endif %}" data-bs-toggle="tab" hx-boost="false" role="tab">
             <i class="mdi mdi-hand-heart-outline me-1 text-green"></i>
             {% translate "Custody EULAs &amp; Policies" %} <span class="badge bg-green-lt ms-2">{{ custody_templates|length }}</span>
         </a>

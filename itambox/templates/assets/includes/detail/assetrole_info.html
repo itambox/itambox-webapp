@@ -7,7 +7,4 @@
 
     <dt class="col-sm-3">{% translate "Slug:" %}</dt>
     <dd class="col-sm-9"><code>{{ object.slug }}</code></dd>
-
-    <dt class="col-sm-3">{% translate "Description:" %}</dt>
-    <dd class="col-sm-9 text-secondary">{% if object.description %}{{object.description|linebreaksbr}}{% else %}<i>{% translate "No description provided." %}</i>{% endif %}</dd>
 </dl>

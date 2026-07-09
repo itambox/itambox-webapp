@@ -11106,3 +11106,123 @@ msgstr "Sammel-Entsorgung"
 
 #~ msgid "Null = all tenants/MSP-wide"
 #~ msgstr "Leer = alle Mandanten / MSP-weit"
+
+msgid "Contract Renewals & Expirations"
+msgstr "Vertragsverlängerungen & -abläufe"
+
+msgid "Warranty Expiration"
+msgstr "Garantieablauf"
+
+msgid "Asset Disposal & End-of-Life"
+msgstr "Anlagenentsorgung & End-of-Life"
+
+msgid "Hardware Inventory (Accessories, Consumables, Components)"
+msgstr "Hardware-Bestand (Zubehör, Verbrauchsmaterial, Komponenten)"
+
+msgid "Custody & EULA Sign-off Compliance"
+msgstr "Verwahrungs- & EULA-Bestätigungs-Compliance"
+
+msgid "PDF Attachment"
+msgstr "PDF-Anhang"
+
+msgid "Excel (XLSX) Attachment"
+msgstr "Excel (XLSX)-Anhang"
+
+msgid "Contract #"
+msgstr "Vertragsnr."
+
+msgid "Contract Name"
+msgstr "Vertragsname"
+
+msgid "Contract Status"
+msgstr "Vertragsstatus"
+
+msgid "Days Remaining"
+msgstr "Verbleibende Tage"
+
+msgid "Warranty Cost"
+msgstr "Garantiekosten"
+
+msgid "Sanitization Certificate"
+msgstr "Löschzertifikat"
+
+msgid "Stock Status"
+msgstr "Bestandsstatus"
+
+msgid "Out of Stock"
+msgstr "Nicht vorrätig"
+
+msgid "Low Stock"
+msgstr "Geringer Bestand"
+
+msgid "In Stock"
+msgstr "Vorrätig"
+
+msgid "Uncategorized"
+msgstr "Nicht kategorisiert"
+
+msgid "Created Date"
+msgstr "Erstellungsdatum"
+
+msgid "Active Contracts"
+msgstr "Aktive Verträge"
+
+msgid "Expiring Within 30 Days"
+msgstr "Ablauf innerhalb von 30 Tagen"
+
+msgid "Est. Annual Spend"
+msgstr "Geschätzte Jahresausgaben"
+
+msgid "Total Warranties"
+msgstr "Garantien gesamt"
+
+msgid "Already Expired"
+msgstr "Bereits abgelaufen"
+
+msgid "Total Disposals"
+msgstr "Entsorgungen gesamt"
+
+msgid "WEEE Compliant Count"
+msgstr "Anzahl WEEE-konform"
+
+msgid "Total Proceeds"
+msgstr "Erlöse gesamt"
+
+msgid "Total Receipts"
+msgstr "Belege gesamt"
+
+msgid "Pending Sign-offs"
+msgstr "Ausstehende Bestätigungen"
+
+msgid "Acceptance Rate"
+msgstr "Annahmequote"
+
+msgid "Accessory SKUs"
+msgstr "Zubehör-SKUs"
+
+msgid "Consumable SKUs"
+msgstr "Verbrauchsmaterial-SKUs"
+
+msgid "Component SKUs"
+msgstr "Komponenten-SKUs"
+
+msgid "Items at Zero Stock"
+msgstr "Artikel ohne Bestand"
+
+msgid "Hardware Inventory by Type"
+msgstr "Hardware-Bestand nach Typ"
+
+msgid "Annual Spend by Supplier"
+msgstr "Jährliche Ausgaben nach Lieferant"
+
+msgid "Executive (Branded)"
+msgstr "Executive (mit Branding)"
+
+msgid "Compact (Dense)"
+msgstr "Kompakt (Dicht)"
+
+msgid "Financial (Ledger)"
+msgstr "Finanziell (Hauptbuch)"
+
+msgid "Minimal (Clean)"
+msgstr "Minimal (Schlicht)"

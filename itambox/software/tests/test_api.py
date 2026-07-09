@@ -37,10 +37,10 @@ class SoftwareAPITests(APITestCase):
         )
 
         # Grant specific software permission codenames to staff user via multi-tenant RBAC system
-        from organization.models import Tenant, TenantRole, TenantMembership
+        from organization.models import Tenant, Role, Membership
         self.tenant = baker.make(Tenant, name="Test Tenant", slug="test-tenant")
         self.role = baker.make(
-            TenantRole,
+            Role,
             tenant=self.tenant,
             name="Staff Role",
             permissions=[
@@ -51,11 +51,11 @@ class SoftwareAPITests(APITestCase):
             ]
         )
         self.membership = baker.make(
-            TenantMembership,
+            Membership,
             user=self.staff,
             tenant=self.tenant,
-            role=self.role
         )
+        self.membership.roles.add(self.role)
 
         # Make the catalogue row tenant-owned so this tenant's staff can mutate
         # it. A global (tenant=None) Software is mutable only by superusers

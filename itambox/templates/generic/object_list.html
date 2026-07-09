@@ -155,36 +155,8 @@
         {% include 'core/modals/table_config.html' %}
     {% endif %}
 
-    {# Bulk Assign & Print Modals — only rendered on Asset list page #}
+    {# Bulk Print Modal — only rendered on Asset list page #}
     {% if model_name_str == 'assets.asset' %}
-    <div class="modal modal-blur fade" id="bulk-assign-modal" tabindex="-1" aria-labelledby="bulkAssignModalLabel" aria-hidden="true">
-        <div class="modal-dialog modal-dialog-centered">
-            <div class="modal-content">
-                <form id="bulk-assign-form" method="post" action="{% url 'assets:asset_bulk_assign' %}" hx-boost="false">
-                    {% csrf_token %}
-                    <div class="modal-header">
-                        <h5 class="modal-title" id="bulkAssignModalLabel">{% translate "Bulk Assign Assets" %}</h5>
-                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="{% translate 'Close' %}"></button>
-                    </div>
-                    <div class="modal-body">
-                        <p class="text-muted">{% translate "Select an Asset Holder to assign the selected assets to:" %}</p>
-                        <label for="bulk-assign-holder" class="form-label">{% translate "Asset Holder" %}</label>
-                        <select name="holder_id" id="bulk-assign-holder" class="form-select" required>
-                            <option value="">{% translate "— Select an Asset Holder —" %}</option>
-                            {% for holder in asset_holders %}
-                            <option value="{{ holder.pk }}">{{ holder }}</option>
-                            {% endfor %}
-                        </select>
-                    </div>
-                    <div class="modal-footer">
-                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">{% translate "Cancel" %}</button>
-                        <button type="submit" class="btn btn-primary">{% translate "Assign" %}</button>
-                    </div>
-                </form>
-            </div>
-        </div>
-    </div>
-
     <div class="modal modal-blur fade" id="bulk-print-modal" tabindex="-1" aria-labelledby="bulkPrintModalLabel" aria-hidden="true">
         <div class="modal-dialog modal-dialog-centered">
             <div class="modal-content">
@@ -329,83 +301,14 @@
     <div class="btn-list">
         {% block extra_controls %}{% endblock %}
 
-        {% if is_deleted_view %}
-            {% if has_soft_delete %}
-            <a href="?deleted=false" class="btn btn-ghost-secondary" hx-get="?deleted=false" hx-push-url="true" hx-target="#object-list-dynamic-content">
-                <i class="mdi mdi-arrow-left me-1"></i>
-                {% translate "Back to Active Items" %}
-            </a>
-            {% endif %}
-        {% else %}
-            {% if can_add %}
-                {% if create_url_name %}
-                {# On mobile the label collapses, leaving a compact "+" icon button. #}
-                <a href="{% url create_url_name %}" class="btn btn-primary" title="{% blocktranslate %}Create {{ object_type }}{% endblocktranslate %}">
-                    <i class="mdi mdi-plus"></i>
-                    <span class="d-none d-sm-inline ms-1">{% blocktranslate %}Create {{ object_type }}{% endblocktranslate %}</span>
-                </a>
-                {% endif %}
-
-                {% if import_url %}
-                <a href="{{ import_url }}" class="btn btn-ghost-secondary d-none d-sm-inline-block">
-                    <i class="mdi mdi-upload me-1"></i>
-                    {% translate "Import" %}
-                </a>
-                {% endif %}
-            {% endif %}
-
-            {# Export — desktop dropdown #}
-            {% if can_export %}
-            <div class="dropdown d-none d-sm-inline-block">
-                <button type="button" class="btn btn-ghost-secondary dropdown-toggle" data-bs-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
-                    <i class="mdi mdi-download me-1"></i>
-                    {% translate "Export" %}
-                </button>
-                <div class="dropdown-menu dropdown-menu-end">
-                    {% include 'generic/includes/export_menu_items.html' %}
-                </div>
-            </div>
-            {% endif %}
-
-            {% if has_soft_delete %}
-                {% if request.user.is_superuser or perms.core.view_recyclebin %}
-                {# Neutral on purpose: this navigates to a view — red made it read as bulk-delete #}
-                <a href="?deleted=true" class="btn btn-ghost-secondary d-none d-sm-inline-block" hx-get="?deleted=true" hx-push-url="true" hx-target="#object-list-dynamic-content">
-                    <i class="mdi mdi-trash-can-outline me-1"></i>
-                    {% translate "Recycle Bin" %}
-                </a>
-                {% endif %}
-            {% endif %}
-
-            {# Mobile overflow — folds Import / Export / Recycle Bin into a single [...] menu #}
-            <div class="dropdown d-sm-none">
-                <button type="button" class="btn btn-ghost-secondary btn-icon" data-bs-toggle="dropdown" aria-haspopup="true" aria-expanded="false" aria-label="{% translate 'More actions' %}">
-                    <i class="mdi mdi-dots-vertical"></i>
-                </button>
-                <div class="dropdown-menu dropdown-menu-end">
-                    {% if can_add and import_url %}
-                    <a class="dropdown-item" href="{{ import_url }}">
-                        <i class="mdi mdi-upload me-2 text-muted"></i>
-                        {% translate "Import" %}
-                    </a>
-                    <div class="dropdown-divider"></div>
-                    {% endif %}
-
-                    {% if can_export %}
-                    {% include 'generic/includes/export_menu_items.html' %}
-                    {% endif %}
-
-                    {% if has_soft_delete %}
-                        {% if request.user.is_superuser or perms.core.view_recyclebin %}
-                        <div class="dropdown-divider"></div>
-                        <a class="dropdown-item" href="?deleted=true" hx-get="?deleted=true" hx-push-url="true" hx-target="#object-list-dynamic-content">
-                            <i class="mdi mdi-trash-can-outline me-2 text-muted"></i>
-                            {% translate "Recycle Bin" %}
-                        </a>
-                        {% endif %}
-                    {% endif %}
-                </div>
-            </div>
-        {% endif %}
+        {% comment %}
+        #page-actions-block: OOB target refreshed by htmx/includes/list_oob_header.html on every
+        HTMX list nav, so the toolbar stays in sync (Active / Recycle Bin, filter, paginate)
+        without a full reload. extra_controls (above) live outside it and persist. Nested
+        btn-list keeps button spacing.
+        {% endcomment %}
+        <div id="page-actions-block" class="btn-list">
+            {% include 'generic/includes/list_page_actions.html' %}
+        </div>
     </div>
 {% endblock page_actions %}

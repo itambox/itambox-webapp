@@ -20,11 +20,11 @@ def _tenant_member_user_queryset():
     cannot assign or attribute records to users from another tenant.
     """
     from core.managers import get_current_tenant
-    from organization.models import TenantMembership
+    from organization.models import Membership
     tenant = get_current_tenant()
     if tenant is None:
         return User.objects.all()
-    member_ids = TenantMembership.objects.filter(tenant=tenant).values_list('user_id', flat=True)
+    member_ids = Membership.objects.filter(tenant=tenant).values_list('user_id', flat=True)
     return User.objects.filter(pk__in=member_ids)
 
 

@@ -5,11 +5,11 @@
 {% if paginator.get_page_lengths %}
 {% with paginator.get_page_lengths as page_lengths %}
 <nav aria-label="{% translate "Pagination options" %}">
-    <div class="dropdown dropdown-menu-end">
+    <div class="dropdown dropup">
         <button class="btn btn-sm btn-outline-secondary dropdown-toggle" type="button" data-bs-toggle="dropdown">
             {% translate "Per Page" %}
         </button>
-        <ul class="dropdown-menu">
+        <ul class="dropdown-menu dropdown-menu-start">
             {% for n in page_lengths %}
             <li>
                 <a {% if hx_target %}href="#" hx-get="{{ request.path }}{% update_querystring request per_page=n page=1 %}" hx-target="{{ hx_target }}" hx-swap="innerHTML" hx-push-url="{% if hx_push_url is not None %}{{ hx_push_url }}{% else %}true{% endif %}"{% else %}href="{{ request.path }}{% update_querystring request per_page=n page=1 tab=tab %}{% if tab %}#{{ tab }}{% endif %}"{% endif %}
@@ -25,11 +25,11 @@
 {% else %}
 {% get_pagination_choices as choices %}
 <nav aria-label="{% translate "Pagination options" %}">
-    <div class="dropdown dropdown-menu-end">
+    <div class="dropdown dropup">
         <button class="btn btn-sm btn-outline-secondary dropdown-toggle" type="button" data-bs-toggle="dropdown">
             {% translate "Per Page" %}
         </button>
-        <ul class="dropdown-menu">
+        <ul class="dropdown-menu dropdown-menu-start">
             {% for count, label in choices %}
             <li>
                 <a {% if hx_target %}href="#" hx-get="{{ request.path }}{% update_querystring request per_page=count page=1 %}" hx-target="{{ hx_target }}" hx-swap="innerHTML" hx-push-url="{% if hx_push_url is not None %}{{ hx_push_url }}{% else %}true{% endif %}"{% else %}href="{{ request.path }}{% update_querystring request per_page=count page=1 tab=tab %}{% if tab %}#{{ tab }}{% endif %}"{% endif %}

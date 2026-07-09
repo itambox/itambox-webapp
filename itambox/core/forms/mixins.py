@@ -3,6 +3,7 @@
 # Framework-level form mixins and base classes.
 # No dependency on extras (or any other domain app).
 import json
+import re
 
 from django import forms
 from django.utils.translation import gettext_lazy as _
@@ -40,7 +41,8 @@ class SearchForm(forms.Form):
         ('iexact', _('Exact match')),
         ('istartswith', _('Starts with')),
         ('iendswith', _('Ends with')),
-        ('iregex', _('Regex')),
+        # No 'iregex' — the search view whitelists lookups to the four above (ReDoS guard),
+        # so advertising a regex choice here was dead/misleading config.
     )
     lookup = forms.ChoiceField(
         label=_('Lookup'),
@@ -396,18 +398,13 @@ class ColorFieldFormMixin:
             self.initial['color'] = f"#{self.instance.color}"
 
     def clean_color(self):
-        color = self.cleaned_data.get('color')
-        if color and color.startswith('#'):
-            cleaned_color = color[1:]
-            if len(cleaned_color) == 6:
-                return cleaned_color
-            else:
-                raise forms.ValidationError(_("Ensure the color hex code is 6 characters long (after removing '#')."))
-        elif not color:
+        color = self.cleaned_data.get('color') or ''
+        if color.startswith('#'):
+            color = color[1:]
+        if not color:
             return ''
-        if len(color) == 6:
-            return color
-        elif len(color) == 0:
-            return ''
-        else:
-            raise forms.ValidationError(_("Ensure the color hex code is 6 characters long."))
+        # Enforce 6 HEX digits — not just length. A non-hex 6-char value (e.g. '"><img')
+        # would otherwise be interpolated into a style= attribute by render_color.
+        if not re.fullmatch(r'[0-9A-Fa-f]{6}', color):
+            raise forms.ValidationError(_("Enter a valid 6-digit hex color (0-9, A-F)."))
+        return color

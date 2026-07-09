@@ -4,6 +4,39 @@ from django.utils.translation import gettext_lazy as _
 
 from . import Menu, MenuGroup, MenuItem, MenuItemButton, get_model_item
 
+
+def _provider_layer_active(user):
+    """Whether any Provider exists (cached per-request on the user object)."""
+    cached = getattr(user, '_provider_layer_active_cache', None)
+    if cached is None:
+        from organization.models import Provider
+        cached = Provider.objects.exists()
+        setattr(user, '_provider_layer_active_cache', cached)
+    return cached
+
+
+def _can_admin_provider(user):
+    """Show provider-admin nav only when a Provider exists AND the user can manage one
+    (superuser, or holds ``organization.manage_provider``)."""
+    if not getattr(user, 'is_authenticated', False):
+        return False
+    if not _provider_layer_active(user):
+        return False
+    if user.is_superuser:
+        return True
+    from core.auth.provider import has_provider_capability
+    return has_provider_capability(user, 'manage_provider')
+
+
+def can_manage_user_groups(user):
+    """Menu gate for UserGroup admin — delegates to the canonical RBAC gate so the
+    nav stays in parity with the backend (superuser, provider ``manage_groups``
+    capability, OR the direct single-company ``organization.manage_groups`` grant)."""
+    # inline import: core.auth.provider pulls in organization models; importing at module
+    # top would risk AppRegistryNotReady during navigation module load.
+    from core.auth.provider import can_manage_user_groups as _canonical
+    return _canonical(user)
+
 ORG_MENU = Menu(
     label=_('Organization'),
     icon_class='mdi mdi-domain',
@@ -366,6 +399,12 @@ MONITORING_MENU = Menu(
                     buttons=(),
                 ),
                 MenuItem(
+                    link='journalentry_list',
+                    link_text=_('Journal Entries'),
+                    permissions=['extras.view_journalentry'],
+                    buttons=(),
+                ),
+                MenuItem(
                     link='job_list',
                     link_text=_('Background Jobs'),
                     permissions=['core.view_job'],
@@ -385,12 +424,6 @@ EXTRAS_MENU = Menu(
             items=(
                 get_model_item('extras', 'customfield', _('Custom Fields')),
                 get_model_item('extras', 'customfieldset', _('Custom Fieldsets')),
-                MenuItem(
-                    link='extras:configcontext_list',
-                    link_text=_('Config Contexts'),
-                    permissions=['extras.view_configcontext'],
-                    buttons=(),
-                ),
                 get_model_item('extras', 'savedfilter', _('Saved Filters')),
             ),
         ),
@@ -496,42 +529,83 @@ ADMIN_MENU = Menu(
                 MenuItem(
                     link='users:user_list',
                     link_text=_('Users'),
-                    permissions=['auth.view_user'],
+                    permissions=['users.view_user'],
                     buttons=(
                         MenuItemButton(
                             link='users:user_create',
                             title=_('Add'),
                             icon_class='mdi mdi-plus-thick',
-                            permissions=['auth.add_user'],
+                            permissions=['users.add_user'],
                         ),
                     ),
                 ),
                 MenuItem(
-                    link='organization:tenantrole_list',
+                    link='organization:role_list',
                     link_text=_('Roles'),
-                    permissions=['organization.view_tenantrole'],
+                    permissions=['organization.view_role'],
                     buttons=(
                         MenuItemButton(
-                            link='organization:tenantrole_create',
+                            link='organization:role_create',
                             title=_('Add'),
                             icon_class='mdi mdi-plus-thick',
-                            permissions=['organization.add_tenantrole'],
+                            permissions=['organization.add_role'],
                         ),
                     ),
                 ),
                 MenuItem(
-                    link='organization:tenantmembership_list',
-                    link_text=_('Tenant Assignments'),
-                    permissions=['organization.view_tenantmembership'],
+                    link='organization:membership_list',
+                    link_text=_('Memberships'),
+                    permissions=['organization.view_membership'],
                     buttons=(
                         MenuItemButton(
-                            link='organization:tenantmembership_create',
+                            link='organization:membership_create',
                             title=_('Add'),
                             icon_class='mdi mdi-plus-thick',
-                            permissions=['organization.add_tenantmembership'],
+                            permissions=['organization.add_membership'],
                         ),
                     ),
                 ),
+                MenuItem(
+                    link='users:usergroup_list',
+                    link_text=_('User Groups'),
+                    permissions=(),
+                    condition=can_manage_user_groups,
+                    buttons=(
+                        MenuItemButton(
+                            link='users:usergroup_create',
+                            title=_('Add'),
+                            icon_class='mdi mdi-plus-thick',
+                            permissions=(),
+                        ),
+                    ),
+                ),
+            ),
+        ),
+        MenuGroup(
+            label=_('Provider (MSP)'),
+            items=(
+                MenuItem(
+                    link='organization:provider_list',
+                    link_text=_('Providers'),
+                    permissions=(),
+                    condition=_can_admin_provider,
+                    buttons=(
+                        MenuItemButton(
+                            link='organization:provider_create',
+                            title=_('Add'),
+                            icon_class='mdi mdi-plus-thick',
+                            permissions=(),
+                        ),
+                    ),
+                ),
+                MenuItem(
+                    link='organization:technician_quick_add',
+                    link_text=_('Add Technician'),
+                    permissions=(),
+                    condition=_can_admin_provider,
+                    buttons=(),
+                ),
+
             ),
         ),
         MenuGroup(

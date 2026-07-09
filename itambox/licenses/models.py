@@ -47,6 +47,10 @@ class AllObjectsLicenseManager(AllObjectsManager.from_queryset(LicenseQuerySet))
 class License(CustomFieldDataMixin, BookmarkableMixin, DeletableVaultModel):
     """Represents the specific entitlement/purchase record for software."""
 
+    # product_key is stored encrypted (enc$…); keep even the ciphertext out of
+    # the changelog JSON so it does not accumulate in every ObjectChange row.
+    _change_logging_excluded_fields = ['updated_at', 'product_key']
+
     name = models.CharField(
         max_length=255,
         verbose_name=_("Name"),
@@ -143,6 +147,34 @@ class License(CustomFieldDataMixin, BookmarkableMixin, DeletableVaultModel):
         ):
             raise ValidationError({
                 'subscription': _("Selected subscription belongs to a different tenant."),
+            })
+        # Seats cannot be reduced below the number of currently-assigned seats (which would
+        # silently leave the pool over-allocated with no audit signal).
+        if self.pk and self.seats is not None:
+            self.assert_seat_capacity(seats=self.seats)
+
+    def assert_seat_capacity(self, seats=None):
+        """Raise ValidationError when the proposed seat count is below the number of active assignments.
+
+        Called from clean() (form/admin path) and from LicenseSerializer.validate()
+        (REST PATCH/PUT path) so the invariant is enforced on every write path.
+        ``seats`` defaults to self.seats when not provided.
+        """
+        # LicenseSeatAssignment is defined later in this module; it resolves from the
+        # module globals at call time, so no import is needed here.
+        proposed = seats if seats is not None else self.seats
+        if not self.pk or proposed is None:
+            return
+        assigned = LicenseSeatAssignment.all_objects.filter(
+            license=self,
+            deleted_at__isnull=True,
+        ).count()
+        if proposed < assigned:
+            raise ValidationError({
+                'seats': _("Cannot set seats to %(seats)s — %(n)s are already assigned.") % {
+                    'seats': proposed,
+                    'n': assigned,
+                },
             })
 
     def get_absolute_url(self):
@@ -244,7 +276,20 @@ class LicenseSeatAssignment(SoftDeleteMixin, ChangeLoggingMixin, BaseModel):
                 check=Q(asset__isnull=False, assigned_holder__isnull=True) |
                       Q(asset__isnull=True, assigned_holder__isnull=False),
                 name='chk_assignment_to_one_target'
-            )
+            ),
+            # A target (asset or holder) may hold at most ONE active seat on a given
+            # license — a hard DB backstop against the same target consuming multiple
+            # seats (the API create path also checks this for a friendly error).
+            models.UniqueConstraint(
+                fields=['license', 'asset'],
+                condition=Q(asset__isnull=False, deleted_at__isnull=True),
+                name='unique_active_license_seat_per_asset',
+            ),
+            models.UniqueConstraint(
+                fields=['license', 'assigned_holder'],
+                condition=Q(assigned_holder__isnull=False, deleted_at__isnull=True),
+                name='unique_active_license_seat_per_holder',
+            ),
         ]
 
     def __str__(self):

@@ -23,17 +23,11 @@
         {% translate "Verify Physical Presence" %}
     </button>
 
-    <a href="{% url 'assets:asset_label_print' pk=object.pk %}" 
-       target="_blank" 
+    <a href="{% url 'assets:asset_label_print' pk=object.pk %}"
+       target="_blank"
        class="btn btn-outline-success font-weight-bold">
         <i class="mdi mdi-crop-free me-1"></i>
         {% translate "Print Asset Label" %}
     </a>
 </div>
-{% if object.tags.all %}
-<div class="mt-3">
-    {% for tag in object.tags.all %}
-        {% include 'inc/tags.html' with tag=tag %}
-    {% endfor %}
-</div>
-{% endif %}
+{# Tags are shown once in the right-column "Assigned Tags" card; no duplicate here. #}

@@ -191,6 +191,9 @@ class MultiTenantLDAPBackend(LDAPBackend):
         except ImproperlyConfigured as e:
             logger.debug("LDAP backend skipped — not configured: %s", e)
             return None
+        # ``can_login=False`` bars all interactive login, including LDAP/SSO.
+        if user and not getattr(user, 'can_login', True):
+            return None
         if user:
             self.sync_ldap_user_profile_and_memberships(user)
         return user
@@ -200,7 +203,7 @@ class MultiTenantLDAPBackend(LDAPBackend):
         if not tenant:
             return
 
-        from organization.models import AssetHolder, TenantRole, TenantMembership
+        from organization.models import AssetHolder, Role, Membership
         from django.db.utils import IntegrityError
         from django.db import transaction
 
@@ -268,7 +271,7 @@ class MultiTenantLDAPBackend(LDAPBackend):
                     logger.warning(f"IntegrityError while creating AssetHolder: {e}")
                     holder = None
 
-        # 2. TenantMembership & Role Syncing
+        # 2. Membership & Role Syncing
         groups = []
         if hasattr(user, 'ldap_user') and user.ldap_user:
             try:
@@ -312,7 +315,7 @@ class MultiTenantLDAPBackend(LDAPBackend):
         provision_membership(user, tenant, db_role_name, self.get_permissions_for_role, 'LDAP')
 
     def get_permissions_for_role(self, role_name):
-        from organization.forms.tenantrole_form import MATRIX_MODELS
+        from organization.forms.role_form import MATRIX_MODELS
         from django.contrib.auth.models import Permission
         perms = set()
         for key, info in MATRIX_MODELS.items():

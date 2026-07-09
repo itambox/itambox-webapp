@@ -1,7 +1,8 @@
 from django import forms
 from django.utils.translation import gettext_lazy as _
 from django.contrib.contenttypes.models import ContentType
-from .models import Tag, CustomField, CustomFieldset, SavedFilter, ConfigContext
+from django.db.models import Q
+from .models import Tag, CustomField, CustomFieldset, SavedFilter
 from crispy_forms.helper import FormHelper
 from crispy_forms.layout import Layout, Submit, HTML, Div, Field, Fieldset, Row, Column
 from django.urls import reverse
@@ -188,117 +189,6 @@ class SavedFilterFilterForm(FilterForm):
 
 
 # =============================================================================
-# Config Context
-# =============================================================================
-
-class ConfigContextForm(forms.ModelForm):
-    data = forms.CharField(
-        widget=forms.Textarea(attrs={'class': 'form-control font-monospace', 'rows': 10}),
-        help_text=_("Enter configuration data in valid JSON format.")
-    )
-
-    class Meta:
-        model = ConfigContext
-        fields = ['name', 'description', 'weight', 'regions', 'sites', 'locations', 'tenants', 'data']
-        widgets = {
-            'name': forms.TextInput(attrs={'class': 'form-control'}),
-            'description': forms.Textarea(attrs={'class': 'form-control', 'rows': 3}),
-            'weight': forms.NumberInput(attrs={'class': 'form-control'}),
-            'regions': forms.SelectMultiple(attrs={'class': 'form-select', 'data-tom-select': ''}),
-            'sites': forms.SelectMultiple(attrs={'class': 'form-select', 'data-tom-select': ''}),
-            'locations': forms.SelectMultiple(attrs={'class': 'form-select', 'data-tom-select': ''}),
-            'tenants': forms.SelectMultiple(attrs={'class': 'form-select', 'data-tom-select': ''}),
-        }
-
-    def __init__(self, *args, **kwargs):
-        if 'instance' in kwargs and kwargs['instance'] and kwargs['instance'].pk:
-            import json
-            initial = kwargs.get('initial', {})
-            initial['data'] = json.dumps(kwargs['instance'].data, indent=4)
-            kwargs['initial'] = initial
-        super().__init__(*args, **kwargs)
-        self.helper = FormHelper(self)
-        self.helper.form_method = 'post'
-        self.helper.form_tag = True
-        button_text = _('Update') if self.instance.pk else _('Create')
-        cancel_url = reverse('extras:configcontext_list')
-        self.helper.layout = Layout(
-            'name',
-            'description',
-            'weight',
-            Fieldset(
-                _('Scope (optional)'),
-                Row(
-                    Column('regions', css_class='col-md-6'),
-                    Column('sites', css_class='col-md-6'),
-                    css_class='row g-3',
-                ),
-                Row(
-                    Column('locations', css_class='col-md-6'),
-                    Column('tenants', css_class='col-md-6'),
-                    css_class='row g-3',
-                ),
-            ),
-            Fieldset(
-                _('Configuration Data'),
-                'data',
-            ),
-            HTML('<div class="mt-3">'),
-            Submit('submit', button_text, css_class='btn btn-primary'),
-            HTML(f'<a href="{cancel_url}" class="btn btn-outline-secondary ms-2">{_("Cancel")}</a>'),
-            HTML('</div>')
-        )
-
-    def clean_data(self):
-        data = self.cleaned_data.get('data')
-        try:
-            import json
-            return json.loads(data)
-        except json.JSONDecodeError as e:
-            raise forms.ValidationError(_("Invalid JSON: %(error)s") % {'error': e})
-
-
-import django_filters
-from django.db.models import Q
-
-class ConfigContextFilterSet(django_filters.FilterSet):
-    q = django_filters.CharFilter(method='search', label=_('Search'))
-
-    class Meta:
-        model = ConfigContext
-        fields = ['name', 'weight']
-
-    def search(self, queryset, name, value):
-        if not value.strip():
-            return queryset
-        return queryset.filter(
-            Q(name__icontains=value) |
-            Q(description__icontains=value)
-        ).distinct()
-
-
-class ConfigContextFilterForm(FilterForm):
-    filterset_class = ConfigContextFilterSet
-
-
-import django_tables2 as tables
-from django_tables2.utils import A
-from core.tables import ActionsColumn, BaseTable, ToggleColumn
-
-class ConfigContextTable(BaseTable):
-    pk = ToggleColumn(accessor='pk')
-    name = tables.LinkColumn('extras:configcontext_edit', args=[A('pk')], verbose_name=_('Name'))
-    weight = tables.Column(verbose_name=_('Weight'))
-    description = tables.Column(verbose_name=_('Description'))
-    actions = ActionsColumn()
-
-    class Meta(BaseTable.Meta):
-        model = ConfigContext
-        fields = ('pk', 'name', 'weight', 'description', 'actions')
-        default_columns = ('pk', 'name', 'weight', 'description', 'actions')
-
-
-# =============================================================================
 # Domain forms — moved from core/forms/__init__.py (audit B2).
 # These depend on extras.models and therefore live here rather than in the
 # framework layer.  The old import path (core.forms.XxxForm) has been
@@ -309,8 +199,10 @@ import json as _json
 
 from django.contrib.contenttypes.models import ContentType
 from crispy_forms.layout import Layout, Field, HTML, Div, Submit, Row, Column, Fieldset
-from .models import WebhookEndpoint, EventRule, Event, LabelTemplate, ReportTemplate, ScheduledReport, AlertRule, NotificationChannel
+from .models import WebhookEndpoint, EventRule, Event, ExportTemplate, LabelTemplate, ReportTemplate, ScheduledReport, AlertRule, NotificationChannel
 from itambox.middleware import get_current_user
+from core.forms.import_forms import is_model_importable
+from core.validators import validate_external_url
 
 
 def logged_content_types():
@@ -328,6 +220,25 @@ def logged_content_types():
         if model is None:
             continue
         if issubclass(model, ChangeLoggingMixin) and model.__name__ not in _SIGNAL_SKIP_MODELS:
+            ids.append(ct.id)
+    return ContentType.objects.filter(id__in=ids).order_by('app_label', 'model')
+
+
+def exportable_content_types():
+    """ContentTypes whose model is user-exportable (see ``is_model_importable``).
+
+    An ExportTemplate pointed at a generated-log / UI-only model could never be
+    reached from a list view's export menu, so constraining the dropdown to real
+    domain models keeps authors out of that dead-end — and keeps the picker free
+    of the hundreds of internal ContentTypes (sessions, permissions, tokens, …)
+    that a bare ``content_type`` field would otherwise list.
+    """
+    ids = []
+    for ct in ContentType.objects.all():
+        model = ct.model_class()
+        if model is None:
+            continue
+        if is_model_importable(model):
             ids.append(ct.id)
     return ContentType.objects.filter(id__in=ids).order_by('app_label', 'model')
 
@@ -634,6 +545,101 @@ class LabelTemplateForm(forms.ModelForm):
         )
 
 
+class ExportTemplateForm(forms.ModelForm):
+    """Author a global ExportTemplate (superuser-only; see ExportTemplateEditView).
+
+    Curates ``content_type`` to exportable domain models and validates that
+    ``template_code`` actually compiles in the sandbox used at render time, so a
+    broken template is rejected here rather than 500-ing a member's export later.
+    """
+
+    class Meta:
+        model = ExportTemplate
+        fields = [
+            'name', 'content_type', 'description', 'template_code',
+            'mime_type', 'file_extension', 'as_attachment',
+        ]
+        widgets = {
+            'description': forms.Textarea(attrs={'rows': 2}),
+            'template_code': forms.Textarea(attrs={
+                'rows': 16,
+                'class': 'font-monospace',
+                'spellcheck': 'false',
+                'data-no-dirty-track': 'false',
+            }),
+        }
+        help_texts = {
+            'template_code': _(
+                'Jinja2 template rendered once over the whole result set. The full '
+                'queryset is available as <code>queryset</code> — loop it with '
+                '<code>{% for obj in queryset %}…{% endfor %}</code> and emit your own '
+                'header row. Built-in filters such as <code>|tojson</code> are available.'
+            ),
+            'mime_type': _('Sent as the Content-Type header, e.g. text/csv or application/json.'),
+            'file_extension': _('Appended to the download filename (without a leading dot).'),
+            'as_attachment': _('Download the result as a file. Disable to render inline in the browser (useful for previewing).'),
+        }
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields['content_type'].queryset = exportable_content_types()
+        self.fields['content_type'].label = _('Model')
+        self.fields['content_type'].help_text = _('The object type this template can export.')
+        self.fields['file_extension'].required = False
+
+        self.helper = FormHelper()
+        self.helper.layout = Layout(
+            Fieldset(
+                _('Identity'),
+                Row(
+                    Column('name', css_class='col-md-7'),
+                    Column('content_type', css_class='col-md-5'),
+                    css_class='row g-3',
+                ),
+                'description',
+            ),
+            Fieldset(
+                _('Output'),
+                Row(
+                    Column('mime_type', css_class='col-md-6'),
+                    Column('file_extension', css_class='col-md-3'),
+                    Column('as_attachment', css_class='col-md-3 d-flex align-items-end'),
+                    css_class='row g-3',
+                ),
+            ),
+            Fieldset(
+                _('Template'),
+                'template_code',
+            ),
+            HTML('<div class="mt-4"></div>'),
+            Submit('submit', _('Save Export Template'), css_class='btn btn-primary'),
+            HTML(
+                '<a href="{% url \'extras:exporttemplate_list\' %}" class="btn btn-outline-secondary ms-2" '
+                'data-no-dirty-track="true">' + str(_('Cancel')) + '</a>'
+            ),
+        )
+
+    def clean_file_extension(self):
+        # Normalise: drop a leading dot and lowercase so filenames stay tidy.
+        ext = (self.cleaned_data.get('file_extension') or '').strip().lstrip('.').lower()
+        return ext
+
+    def clean_template_code(self):
+        code = self.cleaned_data.get('template_code') or ''
+        # inline import: jinja2 is only needed when validating template authoring,
+        # not on every forms.py import.
+        from jinja2 import TemplateSyntaxError
+        try:
+            ExportTemplate.get_jinja_environment().from_string(code)
+        except TemplateSyntaxError as exc:
+            raise forms.ValidationError(
+                _('Template syntax error on line %(line)s: %(message)s') % {
+                    'line': exc.lineno, 'message': exc.message,
+                }
+            )
+        return code
+
+
 class ReportTemplateForm(forms.ModelForm):
     COLUMN_CHOICES = [
         # Asset Inventory Summary Columns
@@ -669,6 +675,75 @@ class ReportTemplateForm(forms.ModelForm):
         ('maintenance_start_date', _('Start Date')),
         ('maintenance_completion_date', _('Completion Date')),
         ('maintenance_downtime', _('Downtime (Days)')),
+        # Asset Depreciation Columns
+        ('salvage_value', _('Salvage Value')),
+        ('depreciation_months', _('Depreciation Lifespan (Months)')),
+        ('current_value', _('Depreciated Value')),
+        # Software Inventory Columns
+        ('software_name', _('Software Product')),
+        ('version', _('Version')),
+        ('category', _('Category')),
+        ('license_type', _('License Type')),
+        ('installed_count', _('Installed Count')),
+        # Contract Renewals & Expirations Columns
+        ('contract_number', _('Contract #')),
+        ('contract_name', _('Contract Name')),
+        ('contract_type', _('Contract Type')),
+        ('contract_status', _('Contract Status')),
+        ('contract_supplier', _('Supplier')),
+        ('contract_start_date', _('Start Date')),
+        ('contract_end_date', _('End Date')),
+        ('contract_renewal_date', _('Renewal Date')),
+        ('contract_days_until_expiry', _('Days Until Expiry')),
+        ('contract_cost', _('Contract Cost')),
+        ('contract_billing_cycle', _('Billing Cycle')),
+        ('contract_auto_renew', _('Auto-Renew')),
+        ('contract_covered_assets', _('Covered Assets')),
+        ('contract_sla_response_time', _('SLA Response Time')),
+        ('contract_sla_resolution_time', _('SLA Resolution Time')),
+        ('contract_coverage_hours', _('Coverage Hours')),
+        # Warranty Expiration Columns
+        ('warranty_asset', _('Asset')),
+        ('warranty_type', _('Warranty Type')),
+        ('warranty_provider', _('Provider')),
+        ('warranty_start_date', _('Start Date')),
+        ('warranty_end_date', _('End Date')),
+        ('warranty_days_remaining', _('Days Remaining')),
+        ('warranty_status', _('Status')),
+        ('warranty_cost', _('Warranty Cost')),
+        ('warranty_reference', _('Reference')),
+        # Asset Disposal & End-of-Life Columns
+        ('disposal_asset', _('Asset')),
+        ('disposal_date', _('Disposal Date')),
+        ('disposal_method', _('Disposal Method')),
+        ('disposal_sanitization_method', _('Data Sanitization Method')),
+        ('disposal_sanitization_certificate', _('Sanitization Certificate')),
+        ('disposal_sanitized_by', _('Sanitized By')),
+        ('disposal_recipient', _('Recipient')),
+        ('disposal_proceeds', _('Proceeds')),
+        ('disposal_weee_compliant', _('WEEE Compliant')),
+        ('disposal_notes', _('Notes')),
+        # Hardware Inventory (Accessories, Consumables, Components) Columns
+        ('hw_item_type', _('Item Type')),
+        ('hw_name', _('Name')),
+        ('hw_manufacturer', _('Manufacturer')),
+        ('hw_category', _('Category')),
+        ('hw_part_number', _('Part Number')),
+        ('hw_total_stock', _('Total Stock')),
+        ('hw_available', _('Available')),
+        ('hw_min_qty', _('Safety Threshold')),
+        ('hw_status', _('Stock Status')),
+        # Custody & EULA Sign-off Compliance Columns
+        ('custody_asset', _('Asset')),
+        ('custody_holder', _('Holder')),
+        ('custody_status', _('Acceptance Status')),
+        ('custody_accepted_date', _('Accepted Date')),
+        ('custody_eula_version', _('EULA Version')),
+        ('custody_signature_provider', _('Signature Provider')),
+        ('custody_qms_reference', _('QMS Reference')),
+        ('custody_ip_address', _('IP Address')),
+        ('custody_created_date', _('Created Date')),
+        ('license_count', _('License Count')),
     ]
 
     included_columns = forms.MultipleChoiceField(
@@ -1059,7 +1134,15 @@ class NotificationChannelForm(forms.ModelForm):
             if not url:
                 self.add_error('webhook_url', _('This channel type requires an incoming webhook URL.'))
             else:
-                config['webhook_url'] = url
+                # SSRF guard: apply the same boundary check used by WebhookEndpoint.clean
+                # and the DRF serializer so the UI form cannot persist a loopback/
+                # private/metadata URL.
+                try:
+                    validate_external_url(url)
+                except DjangoValidationError as exc:
+                    self.add_error('webhook_url', exc.message)
+                else:
+                    config['webhook_url'] = url
 
         elif channel_type == NotificationChannel.TYPE_IN_APP:
             users = cleaned.get('in_app_recipient_users')
@@ -1088,4 +1171,29 @@ class NotificationChannelForm(forms.ModelForm):
 class ObjectChangeFilterForm(FilterForm):
     from core.filters import ObjectChangeFilterSet
     filterset_class = ObjectChangeFilterSet
+
+
+class JournalEntryFilterForm(FilterForm):
+    from extras.filters import JournalEntryFilterSet
+    filterset_class = JournalEntryFilterSet
+
+
+class AlertRuleFilterForm(FilterForm):
+    from extras.filters import AlertRuleFilterSet
+    filterset_class = AlertRuleFilterSet
+
+
+class NotificationChannelFilterForm(FilterForm):
+    from extras.filters import NotificationChannelFilterSet
+    filterset_class = NotificationChannelFilterSet
+
+
+class ReportTemplateFilterForm(FilterForm):
+    from extras.filters import ReportTemplateFilterSet
+    filterset_class = ReportTemplateFilterSet
+
+
+class ScheduledReportFilterForm(FilterForm):
+    from extras.filters import ScheduledReportFilterSet
+    filterset_class = ScheduledReportFilterSet
 

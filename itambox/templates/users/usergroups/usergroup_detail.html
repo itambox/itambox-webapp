@@ -1,0 +1,101 @@
+{% extends "generic/object_detail.html" %}
+{% load i18n %}
+{% load rbac_badges %}
+
+{% block extra_page_actions %}
+<a href="{% url 'users:usergroup_assign_users' pk=object.pk %}" class="btn btn-ghost-secondary">
+    <i class="mdi mdi-account-multiple-plus"></i>
+    {% translate "Assign Users" %}
+</a>
+{% endblock extra_page_actions %}
+
+{% block object_details %}
+<div class="alert alert-info d-flex align-items-start mb-4" role="alert">
+    <i class="mdi mdi-information-outline me-2 mt-1"></i>
+    <div class="small">
+        {% blocktranslate trimmed %}
+        A <strong>User Group</strong> grants its roles to every member across one or more
+        containers — no per-container membership is needed. This is the cross-tenant "team"
+        model. Contrast with a <strong>Membership</strong>, which binds one user to exactly
+        one tenant or provider.
+        {% endblocktranslate %}
+    </div>
+</div>
+<div class="row">
+    <div class="col-md-4 mb-3">
+        <label class="form-label text-muted">{% translate "Name" %}</label>
+        <div class="fw-bold fs-3 text-dark">{{ object.name }}</div>
+    </div>
+    <div class="col-md-4 mb-3">
+        <label class="form-label text-muted">{% translate "Provider (SCIM scope)" %}</label>
+        <div>
+            {% if object.provider %}
+                <a href="{% url 'organization:provider_detail' pk=object.provider.pk %}">{{ object.provider.name }}</a>
+            {% else %}
+                <span class="badge bg-secondary-lt">{% translate "Global (UI-managed)" %}</span>
+            {% endif %}
+        </div>
+    </div>
+    <div class="col-md-4 mb-3">
+        <label class="form-label text-muted">{% translate "Active" %}</label>
+        <div>
+            {% if object.is_active %}
+                <span class="badge bg-success">{% translate "Yes" %}</span>
+            {% else %}
+                <span class="badge bg-secondary">{% translate "No" %}</span>
+            {% endif %}
+        </div>
+    </div>
+</div>
+
+{% if object.description %}
+<div class="mb-3">
+    <label class="form-label text-muted">{% translate "Description" %}</label>
+    <div>{{ object.description }}</div>
+</div>
+{% endif %}
+
+<div class="mb-3">
+    <label class="form-label text-muted">{% translate "Members" %}</label>
+    <div>
+        <span class="fw-bold fs-5">{{ member_count }}</span>
+        <span class="text-muted small ms-1">{% translate "user(s) in this group" %}</span>
+    </div>
+</div>
+
+<hr class="my-4">
+
+<h4 class="card-title text-primary mb-3">{% translate "Assigned Roles" %}</h4>
+{% with roles=object.roles.all %}
+{% if roles %}
+<div class="table-responsive">
+    <table class="table table-hover align-middle border mb-0">
+        <thead class="table-light">
+            <tr>
+                <th>{% translate "Role" %}</th>
+                <th>{% translate "Kind" %}</th>
+                <th>{% translate "Container" %}</th>
+                <th>{% translate "Permissions" %}</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for role in roles %}
+            <tr>
+                <td>
+                    <a href="{% url 'organization:role_detail' pk=role.pk %}">{{ role.name }}</a>
+                </td>
+                <td>{% role_scope_badge role %}</td>
+                <td>{% if role.owner %}{{ role.owner }}{% else %}—{% endif %}</td>
+                <td>
+                    <span class="badge bg-secondary-lt">{{ role.permissions|length }} {% translate "permission(s)" %}</span>
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% else %}
+<p class="text-muted"><em>{% translate "No roles assigned to this group." %}</em></p>
+{% endif %}
+{% endwith %}
+{% endblock object_details %}

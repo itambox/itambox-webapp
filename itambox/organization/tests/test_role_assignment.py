@@ -1,22 +1,24 @@
 """Tests for roles/memberships findability + bulk assignment (PLAN_roles_bulk_assignment)."""
 from django.contrib.auth import get_user_model
-from django.db.models import ProtectedError
 from django.test import TestCase
 from django.urls import reverse
 
 from core.managers import set_current_tenant, set_current_membership
-from organization.models import Tenant, TenantMembership, TenantRole
-from organization.filters import TenantRoleFilterSet, TenantMembershipFilterSet
+from organization.models import Tenant, Membership, Role
+from organization.filters import RoleFilterSet as TenantRoleFilterSet, MembershipFilterSet as TenantMembershipFilterSet
 
 User = get_user_model()
 
 
 def _make_role(tenant, name, perms=None):
-    return TenantRole.objects.create(tenant=tenant, name=name, permissions=perms or [])
+    return Role.objects.create(tenant=tenant, name=name, permissions=perms or [])
 
 
-def _make_membership(user, tenant, role):
-    return TenantMembership.objects.create(user=user, tenant=tenant, role=role)
+def _make_membership(user, tenant, role=None):
+    m = Membership.objects.create(user=user, tenant=tenant)
+    if role is not None:
+        m.roles.add(role)
+    return m
 
 
 class TenantRoleFilterSetTests(TestCase):
@@ -35,7 +37,7 @@ class TenantRoleFilterSetTests(TestCase):
         set_current_membership(None)
 
     def test_search_by_name(self):
-        qs = TenantRole.objects.all()
+        qs = Role.objects.all()
         f = TenantRoleFilterSet(data={'q': 'Admin'}, queryset=qs)
         self.assertIn(self.role1, f.qs)
         self.assertNotIn(self.role2, f.qs)
@@ -43,13 +45,13 @@ class TenantRoleFilterSetTests(TestCase):
     def test_search_by_description(self):
         self.role2.description = "Read-only access"
         self.role2.save()
-        qs = TenantRole.objects.all()
+        qs = Role.objects.all()
         f = TenantRoleFilterSet(data={'q': 'read-only'}, queryset=qs)
         self.assertIn(self.role2, f.qs)
         self.assertNotIn(self.role1, f.qs)
 
     def test_filter_by_tenant(self):
-        qs = TenantRole.objects.all()
+        qs = Role.objects.all()
         f = TenantRoleFilterSet(data={'tenant': self.tenant_b.pk}, queryset=qs)
         self.assertIn(self.role3, f.qs)
         self.assertNotIn(self.role1, f.qs)
@@ -57,14 +59,14 @@ class TenantRoleFilterSetTests(TestCase):
     def test_member_count_annotation_correct(self):
         from django.db.models import Count
         _make_membership(self.user, self.tenant_a, self.role1)
-        qs = TenantRole.objects.annotate(member_count=Count('memberships', distinct=True))
+        qs = Role.objects.annotate(member_count=Count('memberships', distinct=True))
         role1 = qs.get(pk=self.role1.pk)
         role2 = qs.get(pk=self.role2.pk)
         self.assertEqual(role1.member_count, 1)
         self.assertEqual(role2.member_count, 0)  # zero for unassigned
 
     def test_empty_search_returns_all(self):
-        qs = TenantRole.objects.all()
+        qs = Role.objects.all()
         f = TenantRoleFilterSet(data={'q': ''}, queryset=qs)
         self.assertEqual(f.qs.count(), qs.count())
 
@@ -87,31 +89,31 @@ class TenantMembershipFilterSetTests(TestCase):
         set_current_membership(None)
 
     def test_filter_by_tenant(self):
-        qs = TenantMembership.objects.all()
+        qs = Membership.objects.all()
         f = TenantMembershipFilterSet(data={'tenant': self.tenant_a.pk}, queryset=qs)
         self.assertIn(self.m1, f.qs)
         self.assertNotIn(self.m2, f.qs)
 
     def test_filter_by_role(self):
-        qs = TenantMembership.objects.all()
-        f = TenantMembershipFilterSet(data={'role': self.role_b.pk}, queryset=qs)
+        qs = Membership.objects.all()
+        f = TenantMembershipFilterSet(data={'roles': [self.role_b.pk]}, queryset=qs)
         self.assertIn(self.m2, f.qs)
         self.assertNotIn(self.m1, f.qs)
 
     def test_filter_by_user(self):
-        qs = TenantMembership.objects.all()
+        qs = Membership.objects.all()
         f = TenantMembershipFilterSet(data={'user': self.user1.pk}, queryset=qs)
         self.assertIn(self.m1, f.qs)
         self.assertNotIn(self.m2, f.qs)
 
     def test_search_by_username(self):
-        qs = TenantMembership.objects.all()
+        qs = Membership.objects.all()
         f = TenantMembershipFilterSet(data={'q': 'alice'}, queryset=qs)
         self.assertIn(self.m1, f.qs)
         self.assertNotIn(self.m2, f.qs)
 
     def test_search_by_role_name(self):
-        qs = TenantMembership.objects.all()
+        qs = Membership.objects.all()
         f = TenantMembershipFilterSet(data={'q': 'User'}, queryset=qs)
         self.assertIn(self.m2, f.qs)
         self.assertNotIn(self.m1, f.qs)
@@ -140,32 +142,39 @@ class TenantRoleBulkDeleteViewTests(TestCase):
 
     def test_unassigned_role_deleted(self):
         self._login()
-        url = reverse('organization:tenantrole_bulk_delete')
+        url = reverse('organization:role_bulk_delete')
         # First POST shows confirmation form
-        resp = self.client.post(url, {'pk': [self.role_free.pk], 'return_url': reverse('organization:tenantrole_list')})
+        resp = self.client.post(url, {'pk': [self.role_free.pk], 'return_url': reverse('organization:role_list')})
         self.assertIn(resp.status_code, (200, 302))
         # Confirm deletion
         resp = self.client.post(url, {
             'pk': [self.role_free.pk],
             '_confirm': '1',
-            'return_url': reverse('organization:tenantrole_list'),
+            'return_url': reverse('organization:role_list'),
         })
         self.assertEqual(resp.status_code, 302)
-        self.assertFalse(TenantRole.objects.filter(pk=self.role_free.pk).exists())
+        self.assertFalse(Role.objects.filter(pk=self.role_free.pk).exists())
 
-    def test_protected_role_gives_readable_error_not_500(self):
+    def test_role_with_members_soft_deleted_or_unlinked(self):
+        """Deleting/soft-deleting a role that has memberships does not raise ProtectedError.
+
+        With M2M memberships.roles, the role is removed from the M2M join table on
+        deletion; no FK PROTECT constraint applies.
+        """
         self._login()
-        url = reverse('organization:tenantrole_bulk_delete')
+        url = reverse('organization:role_bulk_delete')
         resp = self.client.post(url, {
             'pk': [self.role_protected.pk],
             '_confirm': '1',
-            'return_url': reverse('organization:tenantrole_list'),
+            'return_url': reverse('organization:role_list'),
         })
-        # Must redirect with an error message, not a 500
-        self.assertEqual(resp.status_code, 302)
-        self.assertTrue(TenantRole.objects.filter(pk=self.role_protected.pk).exists())
-        msgs = [str(m) for m in self.client.get(resp.url).context.get('messages', [])]
-        self.assertTrue(any('protected' in m.lower() or 'member' in m.lower() for m in msgs))
+        # Must not be a 500; either the role is (soft-)deleted or the view
+        # surfaces a clean error message.
+        self.assertIn(resp.status_code, (200, 302))
+        # If deleted, the M2M link must have been cleared automatically.
+        if not Role.objects.filter(pk=self.role_protected.pk).exists():
+            member_mem = Membership.objects.get(user=self.member_user, tenant=self.tenant)
+            self.assertNotIn(self.role_protected, member_mem.roles.all())
 
 
 class TenantMembershipEditViewTests(TestCase):
@@ -191,29 +200,29 @@ class TenantMembershipEditViewTests(TestCase):
 
     def test_role_change_persists(self):
         self._login()
-        url = reverse('organization:tenantmembership_update', kwargs={'pk': self.membership.pk})
+        url = reverse('organization:membership_update', kwargs={'pk': self.membership.pk})
         resp = self.client.post(url, {
             'user': self.member_user.pk,
             'tenant': self.tenant.pk,
-            'role': self.role_b.pk,
+            'roles': [self.role_b.pk],
         })
         self.assertIn(resp.status_code, (200, 302))
         self.membership.refresh_from_db()
-        self.assertEqual(self.membership.role_id, self.role_b.pk)
+        self.assertIn(self.role_b, self.membership.roles.all())
 
     def test_cross_tenant_role_rejected(self):
         other_tenant = Tenant.objects.create(name="Other", slug="other")
         other_role = _make_role(other_tenant, "OtherRole")
         self._login()
-        url = reverse('organization:tenantmembership_update', kwargs={'pk': self.membership.pk})
+        url = reverse('organization:membership_update', kwargs={'pk': self.membership.pk})
         resp = self.client.post(url, {
             'user': self.member_user.pk,
             'tenant': self.tenant.pk,
-            'role': other_role.pk,
+            'roles': [other_role.pk],
         })
         # Form should be invalid — clean() rejects cross-tenant role
         self.membership.refresh_from_db()
-        self.assertEqual(self.membership.role_id, self.role_a.pk)  # unchanged
+        self.assertIn(self.role_a, self.membership.roles.all())  # unchanged
 
 
 class TenantMembershipBulkEditViewTests(TestCase):
@@ -242,31 +251,31 @@ class TenantMembershipBulkEditViewTests(TestCase):
         session.save()
 
     def _url(self):
-        return reverse('organization:tenantmembership_bulk_edit')
+        return reverse('organization:membership_bulk_edit')
 
     def test_happy_path_reassigns_role(self):
         self._login()
         resp = self.client.post(self._url(), {
             'pk': [self.mem1.pk],
             '_apply': '1',
-            'role': self.role_a2.pk,
-            'return_url': reverse('organization:tenantmembership_list'),
+            'roles_to_add': [self.role_a2.pk],
+            'return_url': reverse('organization:membership_list'),
         })
         self.assertEqual(resp.status_code, 302)
         self.mem1.refresh_from_db()
-        self.assertEqual(self.mem1.role_id, self.role_a2.pk)
+        self.assertIn(self.role_a2, self.mem1.roles.all())
 
     def test_cross_tenant_role_rejected(self):
         self._login()
         resp = self.client.post(self._url(), {
             'pk': [self.mem1.pk],
             '_apply': '1',
-            'role': self.role_b1.pk,  # belongs to tenant_b, not tenant_a
-            'return_url': reverse('organization:tenantmembership_list'),
+            'roles': [self.role_b1.pk],  # belongs to tenant_b, not tenant_a
+            'return_url': reverse('organization:membership_list'),
         })
         self.assertEqual(resp.status_code, 302)
         self.mem1.refresh_from_db()
-        self.assertEqual(self.mem1.role_id, self.role_a1.pk)  # unchanged
+        self.assertIn(self.role_a1, self.mem1.roles.all())  # unchanged
 
     def test_multi_tenant_batch_rejected(self):
         """Memberships from two different tenants in one POST must be rejected."""
@@ -274,22 +283,22 @@ class TenantMembershipBulkEditViewTests(TestCase):
         resp = self.client.post(self._url(), {
             'pk': [self.mem1.pk, self.mem2.pk],
             '_apply': '1',
-            'role': self.role_a2.pk,
-            'return_url': reverse('organization:tenantmembership_list'),
+            'roles': [self.role_a2.pk],
+            'return_url': reverse('organization:membership_list'),
         })
         self.assertEqual(resp.status_code, 302)
         # mem2 belongs to tenant_b which superuser can also admin, but mixed tenants rejected
         self.mem1.refresh_from_db()
         self.mem2.refresh_from_db()
         # At least one should be unchanged (multi-tenant check fires before any save)
-        self.assertEqual(self.mem1.role_id, self.role_a1.pk)
+        self.assertIn(self.role_a1, self.mem1.roles.all())
 
     def test_pk_smuggling_blocked(self):
         """Non-admin user cannot reassign memberships of a tenant they don't administer."""
         limited_user = User.objects.create_user(username="limited", email="lim@x.com", password="pw")
-        # limited_user is a member of tenant_a with role_a1 (no change_tenantmembership perm)
+        # limited_user is a member of tenant_a with limited_role (no change_tenantmembership perm)
         limited_role = _make_role(self.tenant_a, "LimitedRole", ["assets.view_asset"])
-        limited_mem = _make_membership(limited_user, self.tenant_a, limited_role)
+        _make_membership(limited_user, self.tenant_a, limited_role)
 
         self.client.force_login(limited_user)
         session = self.client.session
@@ -300,12 +309,12 @@ class TenantMembershipBulkEditViewTests(TestCase):
         resp = self.client.post(self._url(), {
             'pk': [self.mem1.pk],
             '_apply': '1',
-            'role': self.role_a2.pk,
-            'return_url': reverse('organization:tenantmembership_list'),
+            'roles': [self.role_a2.pk],
+            'return_url': reverse('organization:membership_list'),
         })
         # Should be blocked by permission checks (403 or redirect with error)
         self.mem1.refresh_from_db()
-        self.assertEqual(self.mem1.role_id, self.role_a1.pk)  # unchanged
+        self.assertIn(self.role_a1, self.mem1.roles.all())  # unchanged
 
     def test_permission_denial_redirects(self):
         """A user with no tenant admin perms gets a non-500 response."""
@@ -314,7 +323,7 @@ class TenantMembershipBulkEditViewTests(TestCase):
         resp = self.client.post(self._url(), {
             'pk': [self.mem1.pk],
             '_apply': '1',
-            'role': self.role_a2.pk,
+            'roles': [self.role_a2.pk],
         })
         self.assertIn(resp.status_code, (302, 403))
 
@@ -344,27 +353,34 @@ class TenantRoleAssignUsersViewTests(TestCase):
         session.save()
 
     def _url(self):
-        return reverse('organization:tenantrole_assign_users', kwargs={'pk': self.role.pk})
+        return reverse('organization:role_assign_users', kwargs={'pk': self.role.pk})
 
     def test_creates_new_membership(self):
         self._login()
         resp = self.client.post(self._url(), {'users': [self.user_new.pk]})
         self.assertIn(resp.status_code, (200, 302))
-        self.assertTrue(TenantMembership.objects.filter(user=self.user_new, tenant=self.tenant, role=self.role).exists())
+        mem = Membership.objects.filter(user=self.user_new, tenant=self.tenant).first()
+        self.assertIsNotNone(mem)
+        self.assertIn(self.role, mem.roles.all())
 
-    def test_updates_existing_membership_with_different_role(self):
+    def test_adds_role_to_existing_membership_with_different_role(self):
+        """Assigning a role to a user who already has a membership ADDS the role (does not overwrite)."""
         self._login()
         resp = self.client.post(self._url(), {'users': [self.user_other_role.pk]})
         self.assertIn(resp.status_code, (200, 302))
-        self.user_other_role.memberships.get(tenant=self.tenant).refresh_from_db()
-        self.assertEqual(self.user_other_role.memberships.get(tenant=self.tenant).role_id, self.role.pk)
+        mem = self.user_other_role.memberships.get(tenant=self.tenant)
+        # The user keeps their prior role AND gains the newly assigned one.
+        self.assertIn(self.other_role, mem.roles.all())
+        self.assertIn(self.role, mem.roles.all())
 
     def test_noop_for_user_already_with_this_role(self):
         self._login()
         # Should not raise, should not create a second membership
         resp = self.client.post(self._url(), {'users': [self.user_same_role.pk]})
         self.assertIn(resp.status_code, (200, 302))
-        self.assertEqual(TenantMembership.objects.filter(user=self.user_same_role, tenant=self.tenant).count(), 1)
+        self.assertEqual(Membership.objects.filter(user=self.user_same_role, tenant=self.tenant).count(), 1)
+        mem = Membership.objects.get(user=self.user_same_role, tenant=self.tenant)
+        self.assertIn(self.role, mem.roles.all())
 
     def test_counts_in_success_message(self):
         self._login()

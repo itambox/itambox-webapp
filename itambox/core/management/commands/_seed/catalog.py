@@ -214,16 +214,30 @@ class SeedCatalogMixin:
                                    'ip_address', 'firmware_version')
         self._fs_av = fieldset('AV & Conference Specs', 'screen_size', 'mounted_state')
 
-        # Categories
+        # Categories — (slug, color). Every category ships a distinct colour so
+        # the colour-chipped category cells (asset / asset-type lists, etc.)
+        # always render a swatch instead of a blank.
         self._categories = {}
-        for slug in ['laptops', 'desktops', 'servers', 'monitors', 'mobile-phones', 'tablets',
-                     'network-devices', 'storage-devices', 'conference-systems',
-                     'charger', 'adaptor', 'mouse', 'keyboard', 'webcam', 'headset', 'cable',
-                     'display', 'dock', 'toner', 'ink', 'batteries', 'thermal-paste', 'other',
-                     'ram-memory', 'ssd-nvme', 'hdd', 'nic', 'gpu', 'cpu']:
-            applies = {'asset': True, 'accessory': True, 'consumable': True, 'component': True}
-            obj, _ = Category.objects.get_or_create(slug=slug, defaults={
-                'name': slug.replace('-', ' ').title(), 'applies_to': applies})
+        category_defs = [
+            ('laptops', '4263eb'), ('desktops', '1864ab'), ('servers', '5f3dc4'),
+            ('monitors', '0c8599'), ('mobile-phones', '2b8a3e'), ('tablets', '37b24d'),
+            ('network-devices', 'e8590c'), ('storage-devices', '9c36b5'),
+            ('conference-systems', '1098ad'), ('charger', 'f59f00'), ('adaptor', 'f08c00'),
+            ('mouse', '868e96'), ('keyboard', '495057'), ('webcam', '0ca678'),
+            ('headset', '7048e8'), ('cable', 'adb5bd'), ('display', '15aabf'),
+            ('dock', '3b5bdb'), ('toner', '343a40'), ('ink', '1c7ed6'),
+            ('batteries', '66a80f'), ('thermal-paste', 'c2255c'), ('other', '6c757d'),
+            ('ram-memory', 'e64980'), ('ssd-nvme', 'be4bdb'), ('hdd', '7950f2'),
+            ('nic', 'f76707'), ('gpu', 'e03131'), ('cpu', 'd6336c'),
+        ]
+        applies = {'asset': True, 'accessory': True, 'consumable': True, 'component': True}
+        for slug, color in category_defs:
+            obj, created = Category.objects.get_or_create(slug=slug, defaults={
+                'name': slug.replace('-', ' ').title(), 'applies_to': applies, 'color': color})
+            if not created and not obj.color:
+                # Backfill a category seeded before colours were assigned.
+                obj.color = color
+                obj.save(update_fields=['color'])
             self._categories[slug] = obj
 
         # Asset types: (model, slug, mfr, part_number, eol_months, fieldset, depreciation, category, role, specs)

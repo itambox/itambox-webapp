@@ -1,15 +1,20 @@
+import csv
+import json
+
 import django_tables2 as tables
 from django_tables2.utils import A
-import json
 from django.shortcuts import get_object_or_404, render
-from django.http import HttpResponse
+from django.http import HttpResponse, JsonResponse
 from django.urls import reverse_lazy
+from django.db import transaction
 from django.views.generic import View
 from django.core.exceptions import ValidationError
 from django.contrib.auth import get_user_model
 from django.contrib.auth.mixins import LoginRequiredMixin, PermissionRequiredMixin
 from django.utils.translation import gettext_lazy as _
 from django import forms
+
+from core.csv_utils import csv_safe
 
 from core.tables import BaseTable, ToggleColumn, ActionsColumn
 from itambox.views.generic import ObjectListView, ObjectDetailView, ObjectEditView, ObjectDeleteView
@@ -181,6 +186,141 @@ class AssetAuditScanView(LoginRequiredMixin, PermissionRequiredMixin, View):
         return response
 
 
+class AuditSessionValidateView(LoginRequiredMixin, PermissionRequiredMixin, View):
+    """idempotent, records nothing: given a tag, return classification and details."""
+    permission_required = 'compliance.add_assetaudit'
+
+    def get(self, request, pk, *args, **kwargs):
+        session = get_object_or_404(AuditSession, pk=pk, status='active')
+        code = request.GET.get('code', '').strip()
+        if not code:
+            return JsonResponse({'found': False}, status=400)
+
+        from assets.scanning import resolve_scanned_code
+        asset = resolve_scanned_code(code)
+        if asset is None:
+            return JsonResponse({'found': False}, status=404)
+
+        from assets.models import StatusLabel
+        expected_ids = set(session.expected_assets_queryset.values_list('id', flat=True))
+        observed_location = session.location or asset.location
+
+        if not observed_location:
+            eligible = False
+            warning = str(_("Audit observed location must be specified."))
+            classification = 'unknown'
+        elif asset.status and asset.status.type == StatusLabel.TYPE_ARCHIVED:
+            eligible = False
+            warning = str(_("Archived assets cannot be audited."))
+            classification = 'unknown'
+        elif AssetAudit.objects.filter(session=session, asset=asset).exists():
+            eligible = False
+            warning = str(_("This asset has already been verified in this session."))
+            if asset.id not in expected_ids:
+                classification = 'surprise'
+            elif session.location_id is None or observed_location.id == session.location_id:
+                classification = 'matched'
+            else:
+                classification = 'mismatch'
+        else:
+            eligible = True
+            warning = None
+            if asset.id not in expected_ids:
+                classification = 'surprise'
+            elif session.location_id is None or observed_location.id == session.location_id:
+                classification = 'matched'
+            else:
+                classification = 'mismatch'
+
+        return JsonResponse({
+            'found': True,
+            'pk': asset.pk,
+            'label': str(asset),
+            'asset_tag': asset.asset_tag or '',
+            'serial': asset.serial_number or '',
+            'status': str(asset.status) if asset.status else '',
+            'classification': classification,
+            'observed_location': observed_location.name if observed_location else '',
+            'eligible': eligible,
+            'warning': warning,
+        })
+
+
+class AuditSessionCommitView(LoginRequiredMixin, PermissionRequiredMixin, View):
+    """Create verifications in one transaction.atomic(), attribute to auditor."""
+    permission_required = 'compliance.add_assetaudit'
+
+    def post(self, request, pk, *args, **kwargs):
+        session = get_object_or_404(AuditSession, pk=pk, status='active')
+        asset_pks = request.POST.getlist('pk')
+
+        if not asset_pks:
+            # 204 → htmx won't swap (preserves the basket UI); the toast surfaces the error.
+            response = HttpResponse(status=204)
+            response['HX-Trigger'] = json.dumps({
+                'playAuditFailSound': None,
+                'showMessage': {'message': str(_("No assets in basket to commit.")), 'level': 'danger'},
+            })
+            return response
+
+        from assets.models import Asset
+
+        try:
+            with transaction.atomic():
+                for asset_pk in asset_pks:
+                    try:
+                        asset = Asset.objects.select_for_update().get(pk=asset_pk)
+                    except Asset.DoesNotExist:
+                        raise ValidationError(_("Asset with ID %(pk)s does not exist.") % {'pk': asset_pk})
+
+                    # Skip an asset already verified in this session so re-committing
+                    # a basket is idempotent (audit_asset would otherwise raise on the
+                    # duplicate and abort the whole batch).
+                    if AssetAudit.objects.filter(session=session, asset=asset).exists():
+                        continue
+
+                    observed_location = session.location or asset.location
+                    audit_asset(
+                        asset=asset,
+                        user=request.user,
+                        session=session,
+                        location=observed_location,
+                        status=asset.status,
+                        verification_method='barcode'
+                    )
+        except ValidationError as err:
+            msg = err.message if hasattr(err, 'message') else str(err)
+            # 204 → no swap, basket preserved; surface the failure as a toast.
+            response = HttpResponse(status=204)
+            response['HX-Trigger'] = json.dumps({
+                'playAuditFailSound': None,
+                'showMessage': {'message': str(msg), 'level': 'danger'},
+            })
+            return response
+
+        # Return the updated reconciliation container using a helper-like template render
+        from compliance.reconciliation import classify_session_audits, _audit_to_dict, _missing_asset_to_dict
+        from compliance.forms_audit import AuditBarcodeScanForm
+
+        classified = classify_session_audits(session)
+        expected_loc_name = session.location.name if session.location else 'Global'
+        ctx = {
+            'total_expected': len(classified['matching']) + len(classified['mismatched']) + classified['missing'].count(),
+            'total_scanned': len(classified['matching']) + len(classified['mismatched']) + len(classified['surprise']),
+            'matching': [_audit_to_dict(a, 'matching') for a in classified['matching']],
+            'mismatches': [_audit_to_dict(a, 'mismatched', expected_loc_name) for a in classified['mismatched']],
+            'surprise_finds': [_audit_to_dict(a, 'surprise') for a in classified['surprise']],
+            'missing_assets': [_missing_asset_to_dict(a, session.location) for a in classified['missing']],
+            'report_is_stored': False,
+            'object': session,
+            'scan_form': AuditBarcodeScanForm(),
+        }
+
+        # Basket resets via the #reconciliation-container outerHTML swap — no
+        # auditCommitSuccess trigger needed (it would be an orphan event).
+        return render(request, 'compliance/audits/audit_session_detail.html', ctx)
+
+
 class AuditSessionCloseForm(forms.Form):
     def __init__(self, *args, **kwargs):
         kwargs.pop('instance', None)
@@ -213,7 +353,6 @@ class AuditSessionReportCsvView(LoginRequiredMixin, PermissionRequiredMixin, Vie
     permission_required = 'compliance.view_auditsession'
 
     def get(self, request, pk, *args, **kwargs):
-        import csv
         session = get_object_or_404(AuditSession, pk=pk, status='completed')
         report = session.reconciliation_report or {}
         rows = report.get('rows', [])
@@ -230,13 +369,13 @@ class AuditSessionReportCsvView(LoginRequiredMixin, PermissionRequiredMixin, Vie
         ])
         for row in rows:
             writer.writerow([
-                row.get('category', ''),
-                row.get('asset_tag', ''),
-                row.get('name', ''),
-                row.get('observed_location', ''),
-                row.get('expected_location', ''),
-                row.get('auditor', ''),
-                row.get('timestamp_display', '') or (row.get('timestamp', '') or '')[:16],
+                csv_safe(row.get('category', '')),
+                csv_safe(row.get('asset_tag', '')),
+                csv_safe(row.get('name', '')),
+                csv_safe(row.get('observed_location', '')),
+                csv_safe(row.get('expected_location', '')),
+                csv_safe(row.get('auditor', '')),
+                csv_safe(row.get('timestamp_display', '') or (row.get('timestamp', '') or '')[:16]),
             ])
         return response
 

@@ -11,7 +11,7 @@
 {% endblock %}
 
 {% block content %}
-<div id="report-template-metadata" data-saved-sequence="{{ object.included_columns|safe|default:'[]' }}"></div>
+{{ object.included_columns|json_script:"report-template-saved-sequence" }}
 <div class="row justify-content-center">
     <div class="col-lg-8 col-md-10">
         <div class="card shadow-sm border-0">
@@ -26,7 +26,7 @@
 </div>
 
 <!-- Live Interactive Preview Modal -->
-<div class="modal fade" id="previewModal" tabindex="-1" aria-labelledby="previewModalLabel" aria-hidden="true">
+<div class="modal fade" id="previewModal" data-preview-url="{% url 'extras:reporttemplate_preview' %}" tabindex="-1" aria-labelledby="previewModalLabel" aria-hidden="true">
     <div class="modal-dialog modal-xl modal-dialog-centered modal-dialog-scrollable">
         <div class="modal-content border-0 shadow-lg" style="border-radius: 16px; overflow: hidden;">
             <div class="modal-header bg-dark text-white border-0 py-3 d-flex align-items-center">
@@ -42,7 +42,7 @@
                     <div class="spinner-border text-primary mb-3" role="status" style="width: 3rem; height: 3rem;">
                         <span class="visually-hidden">{% translate "Loading..." %}</span>
                     </div>
-                    <span class="text-secondary fw-semibold">{% translate "Compiling Report Template..." %}</span>
+                    <span class="text-secondary fw-semibold">{% translate "Compiling Report Template.." %}</span>
                     <small class="text-muted mt-1">{% translate "Gathering tenant records &amp; rendering template" %}</small>
                 </div>
                 <!-- Interactive Styled Preview Viewport Frame -->

@@ -6,14 +6,17 @@ An **Accessory** represents a bulk, non-serialized, returnable peripheral tracke
 
 | Field | Description | Type | Required |
 | --- | --- | --- | --- |
-| **Name** | Unique name of the accessory peripheral. | String | Yes |
-| **Slug** | URL-safe name representation. | Slug | Yes |
-| **Manufacturer** | The manufacturer vendor. | Foreign Key | Yes |
-| **Category** | The asset category. Must have `applies_to__accessory` enabled. | Foreign Key | No |
-| **Supplier** | The procurement vendor. | Foreign Key | No |
-| **Part Number / SKU** | Global SKU code. | String | No |
-| **Safety Threshold** | Minimum stock count triggering alerts when inventory gets low. | Integer | Yes |
 | **Allow Over-allocation** | Allows checkout allocation count to exceed stock capacity. | Boolean | Yes |
+| **Category** | The asset category. Must have `applies_to__accessory` enabled. | Foreign Key | No |
+| **Ean** | Barcode (EAN / UPC / GTIN) — scannable to open this item. | String | No |
+| **Manufacturer** | The manufacturer vendor. | Foreign Key | Yes |
+| **Safety Threshold** | Minimum stock count triggering alerts when inventory gets low. | Integer | Yes |
+| **Name** | Unique name of the accessory peripheral. | String | Yes |
+| **Notes** | The notes of the accessory. | Text | No |
+| **Part Number** | SKU or manufacturer part number | String | No |
+| **Slug** | URL-safe name representation. | Slug | Yes |
+| **Supplier** | The procurement vendor. | Foreign Key | No |
+| **Tenant** | The tenant of the accessory. | Foreign Key | No |
 
 ## Lifecycle Workflow
 * Accessories are checked out in discrete bulk counts to `AssetHolders` or `Locations`.

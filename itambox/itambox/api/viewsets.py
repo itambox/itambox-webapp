@@ -102,12 +102,20 @@ class ITAMBoxModelViewSet(
             return super().dispatch(request, *args, **kwargs)
         except (ProtectedError, RestrictedError) as e:
             if type(e) is ProtectedError:
-                protected_objects = list(e.protected_objects)
+                protected_objects = e.protected_objects
             else:
-                protected_objects = list(e.restricted_objects)
-            msg = f'Unable to delete object. {len(protected_objects)} dependent objects were found: '
-            msg += ', '.join([f'{obj} ({obj.pk})' for obj in protected_objects])
-            logger.warning(msg)
+                protected_objects = e.restricted_objects
+            # Report only a COUNT of blocking dependents. Enumerating each as
+            # '{obj} ({obj.pk})' leaked the str()/pk of related rows the caller
+            # may not be entitled to see (e.g. cross-tenant or hidden objects).
+            count = len(protected_objects)
+            # Keep the enumerated detail server-side for diagnostics only.
+            logger.warning(
+                'Unable to delete object: %d dependent object(s): %s',
+                count,
+                ', '.join(f'{obj} ({obj.pk})' for obj in protected_objects),
+            )
+            msg = f'Unable to delete object. {count} dependent object(s) reference it.'
             return self.finalize_response(
                 request,
                 Response({'detail': msg}, status=409),

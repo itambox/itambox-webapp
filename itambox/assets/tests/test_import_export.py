@@ -21,18 +21,17 @@ class ImportExportPermissionTestCase(TestCase):
         )
 
         # Grant staff standard view permission on assets via multi-tenant RBAC
-        from organization.models import Tenant, TenantRole, TenantMembership
+        from organization.models import Tenant, Role, Membership
         self.tenant = Tenant.objects.create(name='Test Tenant', slug='test-tenant')
-        self.role = TenantRole.objects.create(
+        self.role = Role.objects.create(
             tenant=self.tenant,
             name='Staff Role',
             permissions=['assets.view_asset']
         )
-        self.membership = TenantMembership.objects.create(
-            user=self.staff,
+        self.membership = Membership.objects.create(user=self.staff,
             tenant=self.tenant,
-            role=self.role
         )
+        self.membership.roles.add(self.role)
 
     def test_list_view_gating_without_add_permission(self):
         # Log in as staff (with only view permission, no add permission)
@@ -48,7 +47,9 @@ class ImportExportPermissionTestCase(TestCase):
         self.assertNotContains(response, 'Create Asset')
         self.assertNotContains(response, 'Import')
         # Export should be present since it only requires view permission
-        self.assertContains(response, 'Export')
+        # Export needs only view permission. Since the kebab consolidation, the
+        # affordance is the export links in the ⋮ menu (no literal "Export" label).
+        self.assertContains(response, '/export/assets/asset/')
 
     def test_list_view_gating_with_add_permission(self):
         # Grant add permission to staff by updating the role permissions
@@ -67,7 +68,9 @@ class ImportExportPermissionTestCase(TestCase):
         # Verify that Create and Import action buttons are present in HTML output
         self.assertContains(response, 'Create Asset')
         self.assertContains(response, 'Import')
-        self.assertContains(response, 'Export')
+        # Export needs only view permission. Since the kebab consolidation, the
+        # affordance is the export links in the ⋮ menu (no literal "Export" label).
+        self.assertContains(response, '/export/assets/asset/')
 
     def test_list_view_gating_admin(self):
         # Log in as superuser
@@ -80,7 +83,9 @@ class ImportExportPermissionTestCase(TestCase):
         self.assertTrue(response.context['can_add'])
         self.assertContains(response, 'Create Asset')
         self.assertContains(response, 'Import')
-        self.assertContains(response, 'Export')
+        # Export needs only view permission. Since the kebab consolidation, the
+        # affordance is the export links in the ⋮ menu (no literal "Export" label).
+        self.assertContains(response, '/export/assets/asset/')
 
 
 class AdvancedImportExportTestCase(TestCase):

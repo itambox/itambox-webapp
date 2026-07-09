@@ -1,7 +1,7 @@
 from django.urls import path
 from . import views
 
-app_name = 'organization' # Namespace for this app's URLs
+app_name = 'organization'
 
 urlpatterns = [
     # Sites
@@ -57,6 +57,7 @@ urlpatterns = [
     path('tenants/<int:pk>/', views.TenantDetailView.as_view(), name='tenant_detail'),
     path('tenants/<int:pk>/edit/', views.TenantEditView.as_view(), name='tenant_update'),
     path('tenants/<int:pk>/delete/', views.TenantDeleteView.as_view(), name='tenant_delete'),
+    path('tenants/<int:pk>/access/', views.TenantAccessView.as_view(), name='tenant_access'),
     path('tenants/<int:pk>/ldap-sync/', views.tenant_ldap_sync, name='tenant_ldap_sync'),
 
     # Asset Holders
@@ -67,7 +68,6 @@ urlpatterns = [
     path('asset-holders/<int:pk>/', views.AssetHolderDetailView.as_view(), name='assetholder_detail'),
     path('asset-holders/<int:pk>/edit/', views.AssetHolderEditView.as_view(), name='assetholder_update'),
     path('asset-holders/<int:pk>/delete/', views.AssetHolderDeleteView.as_view(), name='assetholder_delete'),
-
 
     # Contacts
     path('contacts/', views.ContactListView.as_view(), name='contact_list'),
@@ -93,15 +93,15 @@ urlpatterns = [
     path('contact-assignments/add/', views.ContactAssignmentCreateView.as_view(), name='contactassignment_create'),
     path('contact-assignments/<int:pk>/delete/', views.ContactAssignmentDeleteView.as_view(), name='contactassignment_delete'),
 
-    # Tenant Roles
-    path('roles/', views.TenantRoleListView.as_view(), name='tenantrole_list'),
-    path('roles/add/', views.TenantRoleEditView.as_view(), name='tenantrole_create'),
-    path('roles/delete/', views.TenantRoleBulkDeleteView.as_view(), name='tenantrole_bulk_delete'),
-    path('roles/<int:pk>/', views.TenantRoleDetailView.as_view(), name='tenantrole_detail'),
-    path('roles/<int:pk>/edit/', views.TenantRoleEditView.as_view(), name='tenantrole_update'),
-    path('roles/<int:pk>/clone/', views.TenantRoleCloneView.as_view(), name='tenantrole_clone'),
-    path('roles/<int:pk>/delete/', views.TenantRoleDeleteView.as_view(), name='tenantrole_delete'),
-    path('roles/<int:pk>/assign/', views.TenantRoleAssignUsersView.as_view(), name='tenantrole_assign_users'),
+    # Roles (unified — tenant- and provider-scoped)
+    path('roles/', views.RoleListView.as_view(), name='role_list'),
+    path('roles/add/', views.RoleEditView.as_view(), name='role_create'),
+    path('roles/delete/', views.RoleBulkDeleteView.as_view(), name='role_bulk_delete'),
+    path('roles/<int:pk>/', views.RoleDetailView.as_view(), name='role_detail'),
+    path('roles/<int:pk>/edit/', views.RoleEditView.as_view(), name='role_update'),
+    path('roles/<int:pk>/clone/', views.RoleCloneView.as_view(), name='role_clone'),
+    path('roles/<int:pk>/delete/', views.RoleDeleteView.as_view(), name='role_delete'),
+    path('roles/<int:pk>/assign/', views.RoleAssignUsersView.as_view(), name='role_assign_users'),
 
     # Cost Centers
     path('cost-centers/', views.CostCenterListView.as_view(), name='costcenter_list'),
@@ -117,13 +117,24 @@ urlpatterns = [
     path('invite-user/', views.InviteUserView.as_view(), name='invite_user'),
     path('accept-invitation/<uuid:token>/', views.AcceptInvitationView.as_view(), name='accept_invitation'),
 
-    # Tenant Memberships
-    path('memberships/', views.TenantMembershipListView.as_view(), name='tenantmembership_list'),
-    path('memberships/add/', views.TenantMembershipCreateView.as_view(), name='tenantmembership_create'),
-    path('memberships/edit/', views.TenantMembershipBulkEditView.as_view(), name='tenantmembership_bulk_edit'),
-    path('memberships/delete/', views.TenantMembershipBulkDeleteView.as_view(), name='tenantmembership_bulk_delete'),
-    path('memberships/<int:pk>/edit/', views.TenantMembershipEditView.as_view(), name='tenantmembership_update'),
-    path('memberships/<int:pk>/delete/', views.TenantMembershipDeleteView.as_view(), name='tenantmembership_delete'),
-]
+    # Providers (MSP)
+    path('providers/', views.ProviderListView.as_view(), name='provider_list'),
+    path('providers/add/', views.ProviderEditView.as_view(), name='provider_create'),
+    path('providers/<int:pk>/', views.ProviderDetailView.as_view(), name='provider_detail'),
+    path('providers/<int:pk>/edit/', views.ProviderEditView.as_view(), name='provider_update'),
+    path('providers/<int:pk>/delete/', views.ProviderDeleteView.as_view(), name='provider_delete'),
 
- 
+    # Quick onboarding
+    path('onboard/technician/', views.TechnicianQuickAddView.as_view(), name='technician_quick_add'),
+
+
+    # Memberships (unified)
+    path('memberships/', views.MembershipListView.as_view(), name='membership_list'),
+    path('memberships/add/', views.MembershipCreateView.as_view(), name='membership_create'),
+    path('memberships/edit/', views.MembershipBulkEditView.as_view(), name='membership_bulk_edit'),
+    path('memberships/delete/', views.MembershipBulkDeleteView.as_view(), name='membership_bulk_delete'),
+    path('memberships/<int:pk>/', views.MembershipDetailView.as_view(), name='membership_detail'),
+    path('memberships/<int:pk>/edit/', views.MembershipEditView.as_view(), name='membership_update'),
+    path('memberships/<int:pk>/send-reset/', views.MembershipSendResetView.as_view(), name='membership_send_reset'),
+    path('memberships/<int:pk>/delete/', views.MembershipDeleteView.as_view(), name='membership_delete'),
+]

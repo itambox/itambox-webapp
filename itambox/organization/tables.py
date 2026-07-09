@@ -1,9 +1,14 @@
 # itambox/organization/tables.py
 import django_tables2 as tables
 from django_tables2.utils import A
-from .models import Site, Region, SiteGroup, Location, Tenant, TenantGroup, AssetHolder, Contact, ContactRole, ContactAssignment, TenantRole, TenantMembership, CostCenter
-from core.tables import ActionsColumn, BaseTable, ToggleColumn
+from .models import (
+    Site, Region, SiteGroup, Location, Tenant, TenantGroup,
+    AssetHolder, Contact, ContactRole, ContactAssignment,
+    Role, Membership, CostCenter, Provider,
+)
+from core.tables import ActionsColumn, BaseTable, CountLinkColumn, ToggleColumn
 from extras.tables import TagColumn
+from .templatetags.rbac_badges import membership_kind_badge, role_scope_badge
 
 from assets.models import Asset, AssetAssignment
 from django.urls import reverse
@@ -15,7 +20,7 @@ from django.utils.translation import gettext_lazy as _
 class RegionTable(BaseTable):
     pk = ToggleColumn(accessor='pk')
     name = tables.LinkColumn('organization:region_detail', args=[A('pk')], verbose_name=_('Name'))
-    site_count = tables.Column(verbose_name=_('Sites'), orderable=False)
+    site_count = CountLinkColumn('organization:site_list', 'region', verbose_name=_('Sites'), orderable=False)
     tags = TagColumn(url_name='organization:region_list')
     actions = ActionsColumn()
 
@@ -24,13 +29,10 @@ class RegionTable(BaseTable):
         fields = ('pk', 'name', 'slug', 'description', 'site_count', 'tags', 'actions')
         default_columns = ('pk', 'name', 'site_count', 'description', 'tags', 'actions')
 
-    def render_site_count(self, value, record=None):
-        return value or 0
-
 class SiteGroupTable(BaseTable):
     pk = ToggleColumn(accessor='pk')
     name = tables.LinkColumn('organization:sitegroup_detail', args=[A('pk')], verbose_name=_('Name'))
-    site_count = tables.Column(verbose_name=_('Sites'), orderable=False)
+    site_count = CountLinkColumn('organization:site_list', 'group', verbose_name=_('Sites'), orderable=False)
     tags = TagColumn(url_name='organization:sitegroup_list')
     actions = ActionsColumn()
 
@@ -39,17 +41,14 @@ class SiteGroupTable(BaseTable):
         fields = ('pk', 'name', 'site_count', 'description', 'tags', 'actions')
         default_columns = ('pk', 'name', 'site_count', 'description', 'tags', 'actions')
 
-    def render_site_count(self, value, record=None):
-        return value or 0
-
 class SiteTable(BaseTable):
     pk = ToggleColumn(accessor='pk')
     name = tables.LinkColumn('organization:site_detail', args=[A('pk')], verbose_name=_('Name'))
     region = tables.LinkColumn('organization:region_detail', args=[A('region_id')], accessor='region')
     group = tables.LinkColumn('organization:sitegroup_detail', args=[A('group_id')], accessor='group')
     tenant = tables.LinkColumn('organization:tenant_detail', args=[A('tenant_id')], accessor='tenant')
-    location_count = tables.Column(verbose_name=_('Locations'), orderable=False)
-    asset_count = tables.Column(verbose_name=_('Assets'), orderable=False)
+    location_count = CountLinkColumn('organization:location_list', 'site', verbose_name=_('Locations'), orderable=False)
+    asset_count = CountLinkColumn('assets:asset_list', 'site', verbose_name=_('Assets'), orderable=False)
     tags = TagColumn(url_name='organization:site_list')
     actions = ActionsColumn()
 
@@ -57,12 +56,6 @@ class SiteTable(BaseTable):
         model = Site
         fields = ('pk', 'name', 'slug', 'status', 'region', 'group', 'tenant', 'description', 'location_count', 'asset_count', 'tags', 'actions')
         default_columns = ('pk', 'name', 'status', 'region', 'group', 'tenant', 'location_count', 'asset_count', 'tags', 'actions')
-
-    def render_location_count(self, value, record=None):
-        return value or 0
-
-    def render_asset_count(self, value, record=None):
-        return value or 0
 
     def render_status(self, value, record):
         if record and record.status:
@@ -81,7 +74,7 @@ class LocationTable(BaseTable):
     name = tables.LinkColumn('organization:location_detail', args=[A('pk')], verbose_name=_('Name'))
     site = tables.LinkColumn('organization:site_detail', args=[A('site_id')], accessor='site')
     tenant = tables.LinkColumn('organization:tenant_detail', args=[A('tenant_id')], accessor='tenant')
-    asset_count = tables.Column(verbose_name=_('Assets'), orderable=False)
+    asset_count = CountLinkColumn('assets:asset_list', 'location', verbose_name=_('Assets'), orderable=False)
     tags = TagColumn(url_name='organization:location_list')
     actions = ActionsColumn()
 
@@ -89,9 +82,6 @@ class LocationTable(BaseTable):
         model = Location
         fields = ('pk', 'name', 'slug', 'status', 'site', 'tenant', 'description', 'asset_count', 'tags', 'actions')
         default_columns = ('pk', 'name', 'status', 'site', 'tenant', 'asset_count', 'tags', 'actions')
-
-    def render_asset_count(self, value, record=None):
-        return value or 0
 
     def render_status(self, value, record):
         if record and record.status:
@@ -108,7 +98,7 @@ class LocationTable(BaseTable):
 class TenantGroupTable(BaseTable):
     pk = ToggleColumn(accessor='pk')
     name = tables.LinkColumn('organization:tenantgroup_detail', args=[A('pk')], verbose_name=_('Name'))
-    tenant_count = tables.Column(verbose_name=_('Tenants'), orderable=False)
+    tenant_count = CountLinkColumn('organization:tenant_list', 'group', verbose_name=_('Tenants'), orderable=False)
     tags = TagColumn(url_name='organization:tenantgroup_list')
     actions = ActionsColumn()
 
@@ -117,28 +107,20 @@ class TenantGroupTable(BaseTable):
         fields = ('pk', 'name', 'slug', 'description', 'tenant_count', 'tags', 'actions')
         default_columns = ('pk', 'name', 'tenant_count', 'description', 'tags', 'actions')
 
-    def render_tenant_count(self, value, record=None):
-        return value or 0
-
 class TenantTable(BaseTable):
     pk = ToggleColumn(accessor='pk')
     name = tables.LinkColumn('organization:tenant_detail', args=[A('pk')], verbose_name=_('Name'))
     group = tables.LinkColumn('organization:tenantgroup_detail', args=[A('group_id')], accessor='group')
-    site_count = tables.Column(verbose_name=_('Sites'), orderable=False)
-    location_count = tables.Column(verbose_name=_('Locations'), orderable=False)
+    provider = tables.LinkColumn('organization:provider_detail', args=[A('provider_id')], accessor='provider', verbose_name=_('Provider'))
+    site_count = CountLinkColumn('organization:site_list', 'tenant', verbose_name=_('Sites'), orderable=False)
+    location_count = CountLinkColumn('organization:location_list', 'tenant', verbose_name=_('Locations'), orderable=False)
     tags = TagColumn(url_name='organization:tenant_list')
     actions = ActionsColumn()
 
     class Meta(BaseTable.Meta):
         model = Tenant
-        fields = ('pk', 'name', 'slug', 'group', 'description', 'site_count', 'location_count', 'tags', 'actions')
-        default_columns = ('pk', 'name', 'group', 'site_count', 'location_count', 'tags', 'actions')
-
-    def render_site_count(self, value, record=None):
-        return value or 0
-
-    def render_location_count(self, value, record=None):
-        return value or 0
+        fields = ('pk', 'name', 'slug', 'group', 'provider', 'description', 'site_count', 'location_count', 'tags', 'actions')
+        default_columns = ('pk', 'name', 'group', 'provider', 'site_count', 'location_count', 'tags', 'actions')
 
 
 # --- AssetHolder Table ---
@@ -148,7 +130,7 @@ class AssetHolderTable(BaseTable):
     first_name = tables.Column()
     last_name = tables.Column()
     tenant = tables.LinkColumn('organization:tenant_detail', args=[A('tenant_id')], accessor='tenant', verbose_name=_('Tenant'))
-    assignment_count = tables.Column(verbose_name=_('Assignments'), orderable=False, accessor='assignment_count')
+    assignment_count = CountLinkColumn('assets:asset_list', 'assigned_to', verbose_name=_('Assignments'), orderable=False, accessor='assignment_count')
     tags = TagColumn(url_name='organization:assetholder_list')
     actions = ActionsColumn()
 
@@ -202,13 +184,14 @@ class ContactTable(BaseTable):
     title = tables.Column()
     phone = tables.Column()
     email = tables.EmailColumn()
+    tenant = tables.Column(verbose_name=_('Tenant'), default=_('Global'))
     tags = TagColumn(url_name='organization:contact_list')
     actions = ActionsColumn()
 
     class Meta(BaseTable.Meta):
         model = Contact
-        fields = ('pk', 'name', 'title', 'phone', 'email', 'web_url', 'description', 'tags', 'actions')
-        default_columns = ('pk', 'name', 'title', 'phone', 'email', 'tags', 'actions')
+        fields = ('pk', 'name', 'title', 'phone', 'email', 'web_url', 'tenant', 'description', 'tags', 'actions')
+        default_columns = ('pk', 'name', 'title', 'phone', 'email', 'tenant', 'tags', 'actions')
 
 
 # --- ContactRole Table ---
@@ -251,37 +234,65 @@ class ContactAssignmentTable(BaseTable):
         return record.content_type.model_class()._meta.verbose_name.title()
 
 
-class TenantRoleTable(BaseTable):
+class RoleTable(BaseTable):
     pk = ToggleColumn(accessor='pk')
-    name = tables.LinkColumn('organization:tenantrole_detail', args=[A('pk')], verbose_name=_('Name'))
-    tenant = tables.LinkColumn('organization:tenant_detail', args=[A('tenant_id')], accessor='tenant')
+    name = tables.LinkColumn('organization:role_detail', args=[A('pk')], verbose_name=_('Name'))
+    kind = tables.Column(verbose_name=_('Kind'), accessor='scope', orderable=True, empty_values=())
+    container = tables.Column(verbose_name=_('Owner'), accessor='owner', orderable=False)
     description = tables.Column()
     member_count = tables.Column(verbose_name=_('Members'), orderable=True, empty_values=[])
     actions = ActionsColumn()
 
     class Meta(BaseTable.Meta):
-        model = TenantRole
-        fields = ('pk', 'name', 'tenant', 'description', 'member_count', 'actions')
-        default_columns = ('pk', 'name', 'tenant', 'description', 'member_count', 'actions')
+        model = Role
+        fields = ('pk', 'name', 'kind', 'container', 'description', 'member_count', 'actions')
+        default_columns = ('pk', 'name', 'kind', 'container', 'description', 'member_count', 'actions')
+
+    def render_kind(self, record):
+        return role_scope_badge(record)
+
+    def render_container(self, value, record):
+        owner = record.owner
+        if owner is None:
+            return '—'
+        return format_html('<a href="{}">{}</a>', owner.get_absolute_url(), owner)
 
     def render_member_count(self, value, record):
         count = getattr(record, 'member_count', 0) or 0
-        url = f"{reverse('organization:tenantmembership_list')}?role={record.pk}"
+        url = f"{reverse('organization:membership_list')}?role={record.pk}"
         return format_html('<a href="{}">{}</a>', url, count)
 
 
-class TenantMembershipTable(BaseTable):
+class MembershipTable(BaseTable):
     pk = ToggleColumn(accessor='pk')
     user = tables.LinkColumn('users:user_detail', args=[A('user.pk')], verbose_name=_('User'))
-    tenant = tables.LinkColumn('organization:tenant_detail', args=[A('tenant_id')], accessor='tenant', verbose_name=_('Tenant'))
-    role = tables.LinkColumn('organization:tenantrole_detail', args=[A('role_id')], accessor='role', verbose_name=_('Role'))
+    kind = tables.Column(verbose_name=_('Kind'), accessor='kind', orderable=False, empty_values=())
+    container = tables.Column(verbose_name=_('Container'), accessor='container', orderable=False)
+    roles = tables.Column(verbose_name=_('Roles'), orderable=False)
+    is_active = tables.BooleanColumn(verbose_name=_('Active'))
     joined_at = tables.DateTimeColumn(format="Y-m-d H:i", verbose_name=_('Joined'))
     actions = ActionsColumn(actions=('edit', 'delete'))
 
     class Meta(BaseTable.Meta):
-        model = TenantMembership
-        fields = ('pk', 'user', 'tenant', 'role', 'joined_at', 'actions')
-        default_columns = ('pk', 'user', 'tenant', 'role', 'joined_at', 'actions')
+        model = Membership
+        fields = ('pk', 'user', 'kind', 'container', 'roles', 'is_active', 'joined_at', 'actions')
+        default_columns = ('pk', 'user', 'kind', 'container', 'roles', 'is_active', 'joined_at', 'actions')
+
+    def render_kind(self, record):
+        return membership_kind_badge(record)
+
+    def render_container(self, value, record):
+        owner = record.container
+        if owner is None:
+            return '—'
+        return format_html('<a href="{}">{}</a>', owner.get_absolute_url(), owner)
+
+    def render_roles(self, value, record):
+        links = []
+        for role in record.roles.all():
+            url = reverse('organization:role_detail', kwargs={'pk': role.pk})
+            links.append(format_html('<a href="{}">{}</a>', url, role.name))
+        return mark_safe(', '.join(links)) if links else _('(none)')
 
 
 class CostCenterTable(BaseTable):
@@ -290,7 +301,7 @@ class CostCenterTable(BaseTable):
     code = tables.Column(verbose_name=_('Code'))
     tenant = tables.LinkColumn('organization:tenant_detail', args=[A('tenant_id')], accessor='tenant', verbose_name=_('Tenant'))
     parent = tables.LinkColumn('organization:costcenter_detail', args=[A('parent_id')], accessor='parent', verbose_name=_('Parent'))
-    child_count = tables.Column(verbose_name=_('Sub-units'), orderable=False)
+    child_count = CountLinkColumn('organization:costcenter_list', 'parent', verbose_name=_('Sub-units'), orderable=False)
     is_active = tables.BooleanColumn(verbose_name=_('Active'))
     actions = ActionsColumn()
 
@@ -299,5 +310,18 @@ class CostCenterTable(BaseTable):
         fields = ('pk', 'code', 'name', 'tenant', 'parent', 'description', 'child_count', 'is_active', 'actions')
         default_columns = ('pk', 'code', 'name', 'tenant', 'parent', 'child_count', 'is_active', 'actions')
 
-    def render_child_count(self, value, record=None):
-        return value or 0
+
+# --- Provider (MSP) Table ---
+class ProviderTable(BaseTable):
+    pk = ToggleColumn(accessor='pk')
+    name = tables.LinkColumn('organization:provider_detail', args=[A('pk')], verbose_name=_('Name'))
+    slug = tables.Column(verbose_name=_('Slug'))
+    description = tables.Column(verbose_name=_('Description'))
+    actions = ActionsColumn()
+
+    class Meta(BaseTable.Meta):
+        model = Provider
+        fields = ('pk', 'name', 'slug', 'description', 'actions')
+        default_columns = ('pk', 'name', 'slug', 'description', 'actions')
+
+

@@ -5,7 +5,7 @@ from django.urls import reverse
 from django.contrib.auth import get_user_model
 from django.contrib.auth.models import Permission
 from django.contrib.contenttypes.models import ContentType
-from organization.models import Tenant, Location, TenantGroup, TenantMembership, TenantRole, Site
+from organization.models import Tenant, Location, TenantGroup, Membership, Role, Site
 from assets.models import Asset, AssetType, StatusLabel, AssetRole, Manufacturer, Category, Supplier
 from software.models import Software
 from licenses.models import License
@@ -36,7 +36,7 @@ class GraphQLTestCase(TestCase):
         self.site = Site.objects.create(name="HQ Site", slug="hq-site")
 
         # Associate staff with Tenant membership/roles
-        self.role_admin_a = TenantRole.objects.create(
+        self.role_admin_a = Role.objects.create(
             tenant=self.tenant_a,
             name='Admin Role A',
             permissions=[
@@ -49,7 +49,7 @@ class GraphQLTestCase(TestCase):
                 'inventory.view_kit', 'inventory.add_kit', 'inventory.change_kit', 'inventory.delete_kit',
             ]
         )
-        self.role_admin_b = TenantRole.objects.create(
+        self.role_admin_b = Role.objects.create(
             tenant=self.tenant_b,
             name='Admin Role B',
             permissions=[
@@ -62,8 +62,10 @@ class GraphQLTestCase(TestCase):
                 'inventory.view_kit', 'inventory.add_kit', 'inventory.change_kit', 'inventory.delete_kit',
             ]
         )
-        self.membership_a = TenantMembership.objects.create(user=self.staff_a, tenant=self.tenant_a, role=self.role_admin_a)
-        self.membership_b = TenantMembership.objects.create(user=self.staff_b, tenant=self.tenant_b, role=self.role_admin_b)
+        self.membership_a = Membership.objects.create(user=self.staff_a, tenant=self.tenant_a)
+        self.membership_a.roles.add(self.role_admin_a)
+        self.membership_b = Membership.objects.create(user=self.staff_b, tenant=self.tenant_b)
+        self.membership_b.roles.add(self.role_admin_b)
 
         # Grant general Django permissions to staff users
         for user in [self.staff_a, self.staff_b]:

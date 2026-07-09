@@ -75,7 +75,7 @@ class LicenseDetailView(ObjectDetailView):
             related_objects_list.append({
                 'label': _('Seat Assignments'),
                 'count': assignment_count,
-                'url': f"{reverse('licenses:license_detail', kwargs={'pk': license_obj.pk})}#assignments"
+                'url': f"{reverse('licenses:license_detail', kwargs={'pk': license_obj.pk})}#seats"
             })
         kit_count = kits_qs.count()
         if kit_count:

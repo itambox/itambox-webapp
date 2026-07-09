@@ -193,6 +193,9 @@ DATABASES = {
     }
 }
 
+# Custom user model: stock AbstractUser + a dedicated ``can_login`` flag (see users.models.User).
+AUTH_USER_MODEL = 'users.User'
+
 AUTH_PASSWORD_VALIDATORS = [
     {'NAME': 'django.contrib.auth.password_validation.UserAttributeSimilarityValidator'},
     {'NAME': 'django.contrib.auth.password_validation.MinimumLengthValidator'},
@@ -225,6 +228,13 @@ STATICFILES_DIRS = [
 
 MEDIA_URL = '/media/'
 MEDIA_ROOT = os.environ.get('ITAMBOX_MEDIA_ROOT', str(BASE_DIR / 'media'))
+
+# Upload size ceilings — kept coherent with the file-attachment validators (10 MB file /
+# 5 MB image). Django's 2.5 MB default DATA_UPLOAD_MAX_MEMORY_SIZE would otherwise reject the
+# non-file portion of a large multipart upload (and the large import_text textarea) before
+# the validators run.
+FILE_UPLOAD_MAX_MEMORY_SIZE = 11 * 1024 * 1024   # 11 MB (> the 10 MB file validator)
+DATA_UPLOAD_MAX_MEMORY_SIZE = 12 * 1024 * 1024   # 12 MB
 
 # Local static end-user documentation root
 DOCS_ROOT = os.environ.get('ITAMBOX_DOCS_ROOT', BASE_DIR / 'docs')
@@ -317,6 +327,8 @@ SAML_CSP_HANDLER = ''
 
 AUTHENTICATION_BACKENDS = [
     'core.auth.TenantMembershipBackend',
+    # GlobalCapabilityBackend removed: provider-level capabilities are now checked directly
+    # via core.auth.provider.has_provider_capability / can_manage_user_groups.
     'core.auth.ldap.MultiTenantLDAPBackend',
     'core.auth.saml.TenantSaml2Backend',
     'core.auth.oidc.TenantOIDCBackend',
@@ -356,6 +368,17 @@ try:
 except Exception as e:
     logging.getLogger(__name__).warning('Failed to parse ITAMBOX_TENANT_OIDC_CONFIGS: %s', e)
     ITAMBOX_TENANT_OIDC_CONFIGS = {}
+
+# Provider-level SSO group → Role mapping (keyed by provider slug). Mirrors the
+# per-tenant configs above but provisions Membership (MSP staff) instead of
+# Membership. Each entry may carry OIDC_GROUP_PROVIDER_ROLE_MAPPING /
+# SAML_GROUP_PROVIDER_ROLE_MAPPING / LDAP_GROUP_PROVIDER_ROLE_MAPPING dicts.
+for _prov_cfg in ('ITAMBOX_PROVIDER_OIDC_CONFIGS', 'ITAMBOX_PROVIDER_SAML_CONFIGS', 'ITAMBOX_PROVIDER_LDAP_CONFIGS'):
+    try:
+        globals()[_prov_cfg] = json.loads(os.environ.get(_prov_cfg, '{}'))
+    except Exception as e:
+        logging.getLogger(__name__).warning('Failed to parse %s: %s', _prov_cfg, e)
+        globals()[_prov_cfg] = {}
 
 # Intune discovery connector — per-tenant config.
 # Keys per tenant slug: azure_tenant_id, client_id, client_secret,

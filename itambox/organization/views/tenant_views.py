@@ -1,10 +1,12 @@
 from django.shortcuts import redirect, render, get_object_or_404
 from django.urls import reverse, reverse_lazy
 from django.contrib import messages
+from django.contrib.auth.mixins import LoginRequiredMixin
 from django.db.models import Count
-from django.http import HttpResponse
+from django.http import Http404, HttpResponse
 from django.utils.translation import gettext_lazy as _
 from django.contrib.auth.decorators import login_required
+from django.views import View
 from django.views.decorators.http import require_POST
 
 from itambox.views.generic import (
@@ -16,15 +18,16 @@ from assets.tables import AssetTable, AccessoryTable, ConsumableTable, KitTable
 from licenses.tables import LicenseTable
 from subscriptions.tables import SubscriptionTable
 
-from ..models import Tenant
+from ..models import Tenant, Provider
 from ..forms import TenantForm, TenantFilterForm
 from ..tables import TenantTable, SiteTable, LocationTable, AssetHolderTable
 from ..filters import TenantFilterSet
+from ..access import tenant_access_report
 from django_tables2 import RequestConfig
 
 
 class TenantListView(ObjectListView):
-    queryset = Tenant.objects.select_related('group').prefetch_related('tags').annotate(
+    queryset = Tenant.objects.select_related('group', 'provider').prefetch_related('tags').annotate(
         site_count=Count('sites', distinct=True),
         location_count=Count('locations', distinct=True),
     )
@@ -32,6 +35,81 @@ class TenantListView(ObjectListView):
     filterset_form = TenantFilterForm
     table = TenantTable
     action_buttons = ('add',)
+
+    def _manageable_provider_ids(self):
+        """Provider PKs the requesting user may administer, or ``None`` meaning *all*.
+
+        Superuser → ``None`` (every provider). Otherwise the set of providers the user
+        holds ``organization.manage_provider`` against — never "any provider grants all",
+        so a single-provider admin can only ever see their OWN provider's tenants.
+        """
+        user = self.request.user
+        if not (user and user.is_authenticated):
+            return set()
+        if user.is_superuser:
+            return None
+        return {
+            p.pk for p in Provider._base_manager.filter(deleted_at__isnull=True)
+            if user.has_perm('organization.manage_provider', obj=p)
+        }
+
+    def _can_view_all_providers(self):
+        """Whether the requesting user may opt into the cross-provider tenant set.
+
+        True for a superuser, or a user holding ``organization.manage_provider`` against
+        at least one Provider. The *scope* of what they then see is still restricted to
+        their own managed providers (see ``get_queryset``). Anyone else stays tenant-scoped.
+        """
+        ids = self._manageable_provider_ids()
+        return ids is None or bool(ids)
+
+    def get_queryset(self):
+        """Default: tenant-scoped (``Tenant.objects``) — never widened for ordinary users.
+
+        A provider-admin may explicitly opt into the cross-provider set of tenants they
+        manage with ``?all_providers=true``; the toggle is honoured ONLY for providers the
+        user actually holds ``manage_provider`` on (a superuser sees every provider-managed
+        tenant). This preserves the MSP cross-tenant capability the removed
+        ``CustomerTenantListView`` provided, without a separate route, without loosening
+        isolation for everyone else, and WITHOUT leaking other MSPs' tenants to a
+        single-provider admin.
+        """
+        if self.request.GET.get('all_providers') == 'true':
+            managed = self._manageable_provider_ids()
+            if managed is None:
+                # Superuser: every provider-managed, non-deleted tenant.
+                base = Tenant._base_manager.filter(
+                    provider__isnull=False, deleted_at__isnull=True,
+                )
+            elif managed:
+                # Provider admin: ONLY tenants under the providers they manage.
+                base = Tenant._base_manager.filter(
+                    provider_id__in=managed, deleted_at__isnull=True,
+                )
+            else:
+                base = None
+            if base is not None:
+                # _base_manager bypasses tenant scoping (a provider admin legitimately
+                # views across their own customer tenants).
+                self.queryset = (
+                    base
+                    .select_related('group', 'provider')
+                    .prefetch_related('tags')
+                    .annotate(
+                        site_count=Count('sites', distinct=True),
+                        location_count=Count('locations', distinct=True),
+                    )
+                )
+        return super().get_queryset()
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context['can_view_all_providers'] = self._can_view_all_providers()
+        context['viewing_all_providers'] = (
+            self.request.GET.get('all_providers') == 'true'
+            and context['can_view_all_providers']
+        )
+        return context
 
 
 class TenantDetailView(ObjectDetailView):
@@ -185,6 +263,28 @@ class TenantDetailView(ObjectDetailView):
             'title': _('Associated Subscriptions'),
             'empty_icon': 'mdi-file-document-outline',
             'empty_text': _('No subscriptions found for this tenant.'),
+        })
+
+
+class TenantAccessView(LoginRequiredMixin, View):
+    """Per-tenant "Who Has Access" audit: lists every user who can reach the tenant,
+    the source(s) of their access, and their effective permission count."""
+
+    def get(self, request, pk):
+        tenant = get_object_or_404(Tenant, pk=pk)
+        has_access = (
+            request.user.is_superuser or
+            request.user.has_perm('organization.view_membership', obj=tenant) or
+            request.user.has_perm('organization.change_tenant', obj=tenant) or
+            request.user.has_perm('organization.manage_staff', obj=tenant)
+        )
+        if not has_access:
+            from django.core.exceptions import PermissionDenied
+            raise PermissionDenied(_("You do not have permission to view the access report for this tenant."))
+        report = tenant_access_report(tenant)
+        return render(request, 'organization/tenants/who_has_access.html', {
+            'tenant': tenant,
+            'access_report': report,
         })
 
 

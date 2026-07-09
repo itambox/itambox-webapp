@@ -18,8 +18,8 @@ from itambox.views.generic import (
 
 class ManufacturerListView(ObjectListView):
     queryset = Manufacturer.objects.prefetch_related('tags').annotate(
-        asset_count=Count('asset_types__assets'),
-        asset_type_count=Count('asset_types'),
+        asset_count=Count('asset_types__assets', distinct=True),
+        asset_type_count=Count('asset_types', distinct=True),
     )
     filterset = filters.ManufacturerFilterSet
     filterset_form = forms.ManufacturerFilterForm

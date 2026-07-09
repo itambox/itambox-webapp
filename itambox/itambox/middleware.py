@@ -11,6 +11,19 @@ def get_current_request_id():
 def get_current_user():
     return _current_user.get()
 
+def set_current_user(user):
+    """Bind the current-user contextvar after the fact.
+
+    DRF authentication runs inside a view's ``initial()`` — *after*
+    ``CurrentUserMiddleware`` has already captured ``request.user`` (which is
+    ``AnonymousUser`` for a token-authenticated request at that point). Token-auth
+    views (e.g. SCIM) call this once authenticated so changelog rows are attributed
+    to the acting principal instead of being recorded as ``user=None`` ('System').
+    The middleware's response phase resets the contextvar via its entry token, so
+    this set is correctly torn down at request end (no cross-request leak).
+    """
+    _current_user.set(user)
+
 class CurrentUserMiddleware:
     """
     Middleware to store the current user and a unique request ID in context variables.
@@ -114,6 +127,7 @@ class CSPMiddleware:
 from core.managers import (
     set_current_tenant, set_current_tenant_group, set_current_membership,
     get_current_tenant, get_current_tenant_group, get_current_membership,
+    set_current_provider_membership, get_current_provider_membership,
 )
 
 class TenantMiddleware:
@@ -141,14 +155,17 @@ class TenantMiddleware:
             get_current_tenant(),
             get_current_tenant_group(),
             get_current_membership(),
+            get_current_provider_membership(),
         )
         if not hasattr(request, 'user') or not request.user.is_authenticated:
             request.active_tenant = None
             request.active_tenant_group = None
             request.active_membership = None
+            request.active_provider_membership = None
             set_current_tenant(None)
             set_current_tenant_group(None)
             set_current_membership(None)
+            set_current_provider_membership(None)
             return prev
 
         # 1. Resolve selected tenant or group from Session or URL Query Parameter
@@ -158,7 +175,7 @@ class TenantMiddleware:
         query_tenant_id = request.GET.get('switch_tenant')
         query_group_id = request.GET.get('switch_tenant_group')
 
-        from organization.models import TenantMembership, Tenant, TenantGroup
+        from organization.models import Membership, Tenant, TenantGroup
 
         # If query parameters are provided to switch, update them
         if query_tenant_id is not None:
@@ -207,40 +224,60 @@ class TenantMiddleware:
                     if 'active_tenant_group_id' in request.session:
                         del request.session['active_tenant_group_id']
         else:
-            # For standard users, validate membership for the selected tenant or group
+            # Standard (non-superuser) users. Accessible tenants = active direct
+            # memberships UNION tenants granted via active cross-tenant user groups.
+            from organization.access import accessible_tenant_ids
+            accessible = accessible_tenant_ids(request.user)
+
+            def _as_int(value):
+                try:
+                    return int(value)
+                except (TypeError, ValueError):
+                    return None
+
             if session_tenant_id:
-                active_membership = TenantMembership.objects.filter(
-                    user=request.user,
-                    tenant_id=session_tenant_id
-                ).select_related('tenant', 'role').first()
-                if active_membership:
-                    active_tenant = active_membership.tenant
-                else:
+                if _as_int(session_tenant_id) in accessible:
+                    active_tenant = Tenant._base_manager.filter(pk=session_tenant_id).first()
+                    # May be None when access is via a group grant (no direct membership).
+                    active_membership = Membership.objects.filter(
+                        user=request.user,
+                        tenant_id=session_tenant_id,
+                        is_active=True,
+                    ).select_related('tenant').first()
+                if active_tenant is None:
                     session_tenant_id = None
 
             elif session_group_id:
-                # Standard user must have membership in at least one tenant of the group
-                memberships = TenantMembership.objects.filter(
-                    user=request.user,
-                    tenant__group_id=session_group_id
-                ).select_related('tenant', 'tenant__group', 'role')
-                if memberships.exists():
+                # Standard user may scope to a tenant-group only if they can access at
+                # least one tenant in it (via membership or a group grant).
+                group_tenant_ids = set(
+                    Tenant._base_manager.filter(group_id=session_group_id).values_list('pk', flat=True)
+                )
+                if accessible & group_tenant_ids:
                     # _base_manager: resolve the active group unscoped (bootstrap —
-                    # the scope isn't established yet; membership access is checked
-                    # separately above for standard users).
+                    # the scope isn't established yet).
                     active_tenant_group = TenantGroup._base_manager.get(pk=session_group_id)
-                    # Use first membership for role-based permission fallback within group
-                    active_membership = memberships.first()
+                    active_membership = Membership.objects.filter(
+                        user=request.user,
+                        tenant__group_id=session_group_id,
+                        is_active=True,
+                    ).select_related('tenant', 'tenant__group').first()
                 else:
                     session_group_id = None
 
-            # If no membership/group is found for the selected choice, default to their first membership
+            # If nothing resolved, default to the first accessible tenant (a direct
+            # membership first, else a group-granted tenant).
             if not active_tenant and not active_tenant_group:
-                active_membership = TenantMembership.objects.filter(
-                    user=request.user
-                ).select_related('tenant', 'role').first()
+                active_membership = Membership.objects.filter(
+                    user=request.user,
+                    is_active=True,
+                ).select_related('tenant').first()
                 if active_membership:
                     active_tenant = active_membership.tenant
+                elif accessible:
+                    active_tenant = Tenant._base_manager.filter(pk__in=accessible).order_by('name').first()
+
+                if active_tenant:
                     request.session['active_tenant_id'] = active_tenant.id
                     if 'active_tenant_group_id' in request.session:
                         del request.session['active_tenant_group_id']
@@ -250,26 +287,44 @@ class TenantMiddleware:
                     if 'active_tenant_group_id' in request.session:
                         del request.session['active_tenant_group_id']
 
+        # Provider membership for the active tenant's provider (optional view context).
+        # Only queried when the active tenant is provider-managed AND the user isn't a
+        # superuser, so single-company installs (no provider) incur zero overhead.
+        active_provider_membership = None
+        if (
+            active_tenant is not None
+            and getattr(active_tenant, 'provider_id', None)
+            and not request.user.is_superuser
+        ):
+            from organization.models import Membership
+            active_provider_membership = Membership.objects.filter(
+                user=request.user, provider_id=active_tenant.provider_id, is_active=True,
+            ).prefetch_related('roles').first()
+
         # Bind to request
         request.active_tenant = active_tenant
         request.active_tenant_group = active_tenant_group
         request.active_membership = active_membership
+        request.active_provider_membership = active_provider_membership
 
         # Call core manager thread context setter
         set_current_tenant(active_tenant)
         set_current_tenant_group(active_tenant_group)
         set_current_membership(active_membership)
+        set_current_provider_membership(active_provider_membership)
 
         return prev
 
     def process_response(self, request, response, prev=None):
         if prev is not None:
-            prev_tenant, prev_group, prev_membership = prev
+            prev_tenant, prev_group, prev_membership, prev_provider_membership = prev
             set_current_tenant(prev_tenant)
             set_current_tenant_group(prev_group)
             set_current_membership(prev_membership)
+            set_current_provider_membership(prev_provider_membership)
         else:
             set_current_tenant(None)
             set_current_tenant_group(None)
             set_current_membership(None)
+            set_current_provider_membership(None)
         return response

@@ -3,14 +3,14 @@
 Covers:
 - G2: open-redirect guard on JournalEntryCreateView (user-supplied return_url
   pointing at a foreign host must NOT be honoured).
-- G3: CSV formula-injection neutralisation (_csv_safe helper).
+- G3: CSV formula-injection neutralisation (csv_safe helper).
 """
 from django.test import TestCase
 from django.urls import reverse
 from django.contrib.auth import get_user_model
 
 from assets.models import Manufacturer
-from itambox.views.features import _csv_safe
+from core.csv_utils import csv_safe
 
 User = get_user_model()
 
@@ -62,16 +62,16 @@ class CsvSafeTests(TestCase):
     def test_formula_leading_chars_are_prefixed(self):
         for trigger in ('=', '+', '-', '@', '\t', '\r'):
             value = trigger + 'CMD()'
-            self.assertEqual(_csv_safe(value), "'" + value)
+            self.assertEqual(csv_safe(value), "'" + value)
 
     def test_equals_cell_is_quoted(self):
-        self.assertEqual(_csv_safe('=SUM(A1:A2)'), "'=SUM(A1:A2)")
+        self.assertEqual(csv_safe('=SUM(A1:A2)'), "'=SUM(A1:A2)")
 
     def test_plain_value_unchanged(self):
-        self.assertEqual(_csv_safe('plain text'), 'plain text')
+        self.assertEqual(csv_safe('plain text'), 'plain text')
 
     def test_none_becomes_empty_string(self):
-        self.assertEqual(_csv_safe(None), '')
+        self.assertEqual(csv_safe(None), '')
 
     def test_non_string_is_stringified(self):
-        self.assertEqual(_csv_safe(42), '42')
+        self.assertEqual(csv_safe(42), '42')

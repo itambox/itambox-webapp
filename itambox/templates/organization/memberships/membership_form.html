@@ -1,0 +1,49 @@
+{% extends base_template|default:"layout.html" %}
+{% load i18n %}
+{% load crispy_forms_tags %}
+
+{% comment %}
+Bespoke create/edit screen for MembershipForm — one of the three RBAC form
+flows (Role / Membership / UserGroup) that should read as a single system.
+The form defines its own FormHelper/Layout (Fieldset sections + standard
+Submit/Cancel buttons via add_standard_buttons), so {% crispy form %} renders
+the whole <form>. We only supply the surrounding page chrome to match
+organization/role_form.html.
+{% endcomment %}
+
+{% block title %}{{ title }} {% translate "- ITAMbox" %}{% endblock %}
+
+{% block page_header %}
+    <h2 class="page-title">
+        {{ title|default:_("Membership") }}
+    </h2>
+{% endblock %}
+
+{% block page_actions %}
+    {% if cancel_url %}
+    <a href="{{ cancel_url }}" class="btn btn-outline-secondary" data-no-dirty-track="true">
+        <i class="mdi mdi-arrow-left"></i>
+        {% translate "Cancel" %}
+    </a>
+    {% endif %}
+{% endblock page_actions %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-lg-10 col-md-12">
+        <div class="card shadow-sm">
+            <div class="card-body">
+                <h4 class="card-title text-primary mb-2">
+                    {% if is_editing %}{% translate "Edit membership" %}{% else %}{% translate "Add membership" %}{% endif %}
+                </h4>
+                <p class="text-muted mb-4 small">
+                    {% translate "A membership grants a user access to a tenant (as a member) or to a provider (as staff). Roles carry the permissions; provider staff can additionally scope which customer tenants they reach." %}
+                </p>
+
+                {# The form's FormHelper renders the <form>, Fieldset sections, and buttons. #}
+                {% crispy form %}
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock content %}

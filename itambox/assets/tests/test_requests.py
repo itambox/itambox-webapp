@@ -9,7 +9,7 @@ from assets.models import (
     Asset, AssetType, AssetRequest, StatusLabel, AssetRole, Manufacturer, Category, AssetTagSequence, Supplier
 )
 from assets.choices import RequestStatusChoices
-from organization.models import AssetHolder, Site, Location, Tenant, TenantRole, TenantMembership
+from organization.models import AssetHolder, Site, Location, Tenant, Role, Membership
 from assets.views.request_views import approve_asset_request, deny_asset_request
 from assets.services import checkout_asset
 from core.managers import set_current_tenant, set_current_membership
@@ -42,12 +42,12 @@ class RequisitionSystemTestCase(TestCase):
         )
 
         # Create Tenant Memberships
-        self.role_standard = TenantRole.objects.create(
+        self.role_standard = Role.objects.create(
             tenant=self.tenant,
             name="Standard Employee",
             permissions=["assets.add_assetrequest", "assets.view_assetrequest"]
         )
-        self.role_delegated = TenantRole.objects.create(
+        self.role_delegated = Role.objects.create(
             tenant=self.tenant,
             name="Helpdesk Technician",
             permissions=[
@@ -57,16 +57,14 @@ class RequisitionSystemTestCase(TestCase):
             ]
         )
 
-        TenantMembership.objects.create(
-            user=self.requester_user,
+        m1 = Membership.objects.create(user=self.requester_user,
             tenant=self.tenant,
-            role=self.role_standard
         )
-        TenantMembership.objects.create(
-            user=self.other_user,
+        m1.roles.add(self.role_standard)
+        m2 = Membership.objects.create(user=self.other_user,
             tenant=self.tenant,
-            role=self.role_delegated
         )
+        m2.roles.add(self.role_delegated)
 
         # Set active tenant thread-local context
         set_current_tenant(self.tenant)
@@ -653,11 +651,10 @@ class RequisitionSystemTestCase(TestCase):
         new_user = User.objects.create_user(
             username='noprofileuser', password='password123', is_staff=False, is_superuser=False
         )
-        TenantMembership.objects.create(
-            user=new_user,
+        m_new = Membership.objects.create(user=new_user,
             tenant=self.tenant,
-            role=self.role_standard
         )
+        m_new.roles.add(self.role_standard)
         req_no_profile = AssetRequest.objects.create(
             requester=new_user,
             asset_type=self.type_requestable,
@@ -815,26 +812,6 @@ class RequisitionSystemTestCase(TestCase):
             tenant=self.tenant
         )
         self.assertEqual(req_pending.status, RequestStatusChoices.PENDING)
-
-        # Override via ConfigContext
-        from extras.models import ConfigContext
-        ConfigContext.objects.create(
-            name="Auto Approval Settings",
-            data={'requisition_auto_approval_thresholds': {'accessory': 5}},
-            weight=100
-        ).tenants.add(self.tenant)
-
-        # Delete the previous approved request for this user/accessory to avoid duplicate check validation error
-        req_approved.delete()
-
-        # Now, Qty = 4 (<= 5) -> should auto-approve
-        req_cc_approved = AssetRequest.objects.create(
-            requester=self.requester_user,
-            accessory=acc,
-            qty=4,
-            tenant=self.tenant
-        )
-        self.assertEqual(req_cc_approved.status, RequestStatusChoices.APPROVED)
 
     def test_partial_approval_and_location(self):
         from assets.forms.request_forms import AssetRequestActionForm

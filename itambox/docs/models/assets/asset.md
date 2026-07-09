@@ -25,27 +25,32 @@ Asset Box utilizes a strict state-governed workflow managed via **Status Labels*
 
 | Field | Description | Type | Required |
 | --- | --- | --- | --- |
-| **Name** | A recognizable name for the asset (e.g. `Jane's Workstation`). | String | Yes |
-| **Asset Tag** | A unique barcode tag (e.g. `ASSET-000102`). Auto-generated if left blank. | String | Yes |
-| **Serial Number** | The manufacturer's unique hardware serial number. | String | No |
-| **Asset Type** | The model template from the Catalog (Manufacturer + Model details). | Foreign Key | Yes |
 | **Asset Role** | The functional category of the asset (e.g. `Developer Laptop`). | Foreign Key | No |
-| **Status** | The current operational Status Label. | Foreign Key | Yes |
-| **Location** | The physical Site / Location room where the asset resides. | Foreign Key | No |
-| **Tenant** | Cost center department owning the asset. | Foreign Key | No |
-| **Purchase Date** | The date the asset was purchased. | Date | No |
-| **Purchase Cost** | The total cost of acquisition. | Decimal | No |
-| **Warranty Expiration** | The date the manufacturer warranty ends. | Date | No |
-| **Salvage Value** | Estimated value at the end of its useful lifespan. | Decimal | No |
-| **Current Book Value**| Materialized current financial value computed via straight-line depreciation. | Decimal | No (Auto) |
-| **Order Number** | The purchase order reference number associated with this procurement. | String | No |
-| **Supplier** | The vendor or supplier from whom the asset was purchased. | Foreign Key | No |
+| **Asset Tag** | A unique barcode tag (e.g. `ASSET-000102`). Auto-generated if left blank. | String | Yes |
+| **Asset Type** | The model template from the Catalog (Manufacturer + Model details). | Foreign Key | Yes |
+| **Cost Center** | The cost center of the asset. | Foreign Key | No |
+| **Currency** | ISO 4217 code. Leave blank to use the tenant default currency. | Choice | No |
+| **Current Book Value** | Materialized current financial value computed via straight-line depreciation. | Decimal | No (Auto) |
+| **Depreciation Override** | Override depreciation policy — leave empty to use the tenant default or asset-type schedule. | Foreign Key | No |
+| **Depreciation Updated At** | The depreciation updated at of the asset. | Date Time | No |
+| **Disposal Value** | The sign-off value of the asset. | Decimal | No |
+| **Disposed At** | The disposed at of the asset. | Date Time | No |
+| **In Service Date** | Depreciation starts here; falls back to purchase date. | Date | No |
 | **Last Audited** | The timestamp when the asset was last verified during an audit session. | DateTime | No (Auto) |
 | **Last Audited By** | The user account of the auditor who last scanned the asset. | Foreign Key | No (Auto) |
+| **Location** | The physical Site / Location room where the asset resides. | Foreign Key | No |
+| **Name** | A recognizable name for the asset (e.g. `Jane's Workstation`). | String | Yes |
+| **Notes** | The notes of the asset. | Text | No |
+| **Order Number** | The purchase order reference number associated with this procurement. | String | No |
+| **Purchase Cost** | The total cost of acquisition. | Decimal | No |
+| **Purchase Date** | The date the asset was purchased. | Date | No |
+| **Purchase Order Line** | The purchase order line of the asset. | Foreign Key | No |
 | **Requestable** | Toggle allowing end-users to request this asset via self-service. | Boolean | Yes |
-| **Custom Values** | Dynamic custom field metadata defined by the asset type's fieldset. | JSON | No |
-
----
+| **Salvage Value** | Estimated value at the end of its useful lifespan. | Decimal | No |
+| **Serial Number** | The manufacturer's unique hardware serial number. | String | No |
+| **Status** | The current operational Status Label. | Foreign Key | Yes |
+| **Supplier** | The vendor or supplier from whom the asset was purchased. | Foreign Key | No |
+| **Tenant** | Cost center department owning the asset. | Foreign Key | No |
 
 ## Lifecycle Workflows
 

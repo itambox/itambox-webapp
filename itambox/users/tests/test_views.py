@@ -88,7 +88,10 @@ class UserViewTests(TestCase):
         notif.refresh_from_db()
         self.assertTrue(notif.is_read)
 
-    def test_view_notification_broadcast(self):
+    def test_view_notification_broadcast_not_openable_by_pk(self):
+        # WS5-2: a global (user=None) broadcast must NOT be openable by an arbitrary user via
+        # ViewNotificationView — it previously redirected any authenticated user (any tenant)
+        # to its target_url, leaking the object's URL/existence.
         from core.models import Notification
         notif = Notification.objects.create(
             user=None,
@@ -98,10 +101,7 @@ class UserViewTests(TestCase):
         )
         self.client.force_login(self.user)
         url = reverse('users:view_notification', kwargs={'pk': notif.pk})
-        response = self.client.get(url)
-        self.assertRedirects(response, "/assets/assets/", fetch_redirect_response=False)
-        notif.refresh_from_db()
-        self.assertFalse(notif.is_read)
+        self.assertEqual(self.client.get(url).status_code, 404)
 
     def test_view_notification_other_user(self):
         from core.models import Notification
@@ -358,7 +358,10 @@ class BookmarkAndNotificationTests(TestCase):
         Notification.objects.filter(user=self.user).delete()
 
         self.tenant.comments = "Updated tenant comment"
-        self.tenant.save()
+        # Watcher notification is deferred to transaction.on_commit, which never fires
+        # under a plain TestCase's wrapping transaction — capture and run the callbacks.
+        with self.captureOnCommitCallbacks(execute=True):
+            self.tenant.save()
 
         notifications = Notification.objects.filter(user=self.user)
         self.assertEqual(notifications.count(), 1)
@@ -369,7 +372,8 @@ class BookmarkAndNotificationTests(TestCase):
 
         notifications.delete()
 
-        self.tenant.delete()
+        with self.captureOnCommitCallbacks(execute=True):
+            self.tenant.delete()
 
         notifications = Notification.objects.filter(user=self.user)
         self.assertEqual(notifications.count(), 1)

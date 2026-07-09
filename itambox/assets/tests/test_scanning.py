@@ -8,7 +8,7 @@ from django.contrib.auth import get_user_model
 from assets.models import Asset, AssetType, StatusLabel, AssetRole, Manufacturer
 from assets.scanning import resolve_scanned_code
 from core.tests.mixins import TenantTestMixin
-from organization.models import Tenant, TenantMembership, TenantRole
+from organization.models import Tenant, Membership, Role
 
 User = get_user_model()
 

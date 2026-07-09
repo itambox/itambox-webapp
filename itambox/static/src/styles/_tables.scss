@@ -262,6 +262,53 @@
 }
 
 // ============================================================
+//  Dark-mode fix: Tabler/Bootstrap contextual row variants
+//  .table-warning / .table-danger hardcode a LIGHT fill + dark text, and
+//  .table-active flashes a light fill — all of which turn muddy and low-
+//  contrast on the dark canvas (seen on the bulk-scan baskets, which flag
+//  reassigned/duplicate rows .table-warning and flash new rows .table-active).
+//  NB: Tabler forks Bootstrap's table vars to the --tblr-table-* prefix (the
+//  cells read --tblr-table-bg / --tblr-table-color), so those are what must be
+//  overridden. Keep the normal dark surface + legible body text and signal the
+//  flagged row with a coloured LEFT ACCENT rather than a full-row fill.
+// ============================================================
+[data-bs-theme="dark"] {
+    .table-warning,
+    .table-danger {
+        // Neutralise the light fill — inherit the normal (transparent) row
+        // surface so text keeps full contrast against the dark card.
+        --tblr-table-color: var(--tblr-body-color);
+        --tblr-table-bg: transparent;
+        --tblr-table-striped-bg: transparent;
+        --tblr-table-striped-color: var(--tblr-body-color);
+        --tblr-table-active-bg: transparent;
+        --tblr-table-active-color: var(--tblr-body-color);
+        --tblr-table-hover-bg: transparent;
+        --tblr-table-hover-color: var(--tblr-body-color);
+        --tblr-table-border-color: var(--tblr-border-color);
+        color: var(--tblr-table-color);
+    }
+
+    // Coloured left accent on the first cell marks the flagged row. An inset
+    // shadow paints over the sticky cell's solid background, so it shows even
+    // when the column is pinned.
+    .card-table tr.table-warning > td:first-child {
+        box-shadow: inset 0.1875rem 0 0 0 rgb(var(--tblr-warning-rgb)) !important;
+    }
+
+    .card-table tr.table-danger > td:first-child {
+        box-shadow: inset 0.1875rem 0 0 0 rgb(var(--tblr-danger-rgb)) !important;
+    }
+
+    // Brief add-flash: a soft neutral wash (inset shadow, so it reads over the
+    // sticky cells) instead of a light background.
+    .table-active {
+        --tblr-table-bg-state: rgba(255, 255, 255, 0.06);
+        --tblr-table-color-state: var(--tblr-body-color);
+    }
+}
+
+// ============================================================
 //  Card-mode tables (≤ 575.98px) — stack row columns into cards
 // ============================================================
 @media (max-width: 575.98px) {

@@ -13,7 +13,7 @@ class UserSerializer(BaseModelSerializer):
 
     class Meta:
         model = User
-        fields = ['id', 'url', 'username', 'first_name', 'last_name', 'email', 'is_staff', 'is_active', 'date_joined']
+        fields = ['id', 'url', 'username', 'first_name', 'last_name', 'email', 'is_staff', 'is_active', 'can_login', 'date_joined']
         brief_fields = ['id', 'url', 'username']
 
 

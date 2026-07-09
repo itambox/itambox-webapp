@@ -1,9 +1,66 @@
+import re
+
 import django_tables2 as tables
 from django.utils.html import format_html
 from django.utils.safestring import mark_safe
 from django.utils.translation import gettext_lazy as _
 from django.urls import reverse, NoReverseMatch
 from itambox.utils import get_model_viewname
+
+class ColorChipColumn(tables.Column):
+    """Renders a colour dot + name linking to the object's detail page. The
+    accessor must resolve to an instance exposing ``.color``, ``.name`` and
+    ``.get_absolute_url()`` (or None) — e.g. Category or AssetRole, both of which
+    carry a user-pickable colour."""
+
+    def __init__(self, *args, **kwargs):
+        kwargs.setdefault('empty_values', ())  # always call render, even for None
+        super().__init__(*args, **kwargs)
+
+    def render(self, value):
+        if not value:
+            return mark_safe('<span class="text-muted">&mdash;</span>')
+        raw_color = value.color or ''
+        # Sanitize: accept only valid 3- or 6-digit hex strings; fall back to a
+        # neutral grey so that an invalid/arbitrary value stored in the DB cannot
+        # inject CSS metacharacters into the style attribute.
+        if re.fullmatch(r'[0-9A-Fa-f]{3,6}', raw_color):
+            safe_color = raw_color
+        else:
+            safe_color = '6c757d'
+        return format_html(
+            '<a href="{}" class="text-reset text-decoration-none d-inline-flex align-items-center">'
+            '<span class="d-inline-block rounded-circle me-1" '
+            'style="width:.6rem;height:.6rem;background-color:#{};"></span>{}</a>',
+            value.get_absolute_url(), safe_color, value.name,
+        )
+
+
+class CountLinkColumn(tables.Column):
+    """A numeric column that links its count to a pre-filtered list view.
+
+    Renders ``value`` as a link to ``reverse(viewname)?<url_param>=<record.pk>``; an
+    empty/zero value — or a row with no record, e.g. a table footer — renders as a plain
+    ``0`` with no link. Replaces the hand-written ``render_<x>_count`` methods that built
+    this identical link inline across the app's tables (so the link format and the
+    empty/zero fallback live in one place).
+
+    Usage::
+
+        asset_count = CountLinkColumn('assets:asset_list', 'status', verbose_name=_('Assets'))
+    """
+
+    def __init__(self, viewname, url_param, *args, **kwargs):
+        self.viewname = viewname
+        self.url_param = url_param
+        super().__init__(*args, **kwargs)
+
+    def render(self, value, record=None):
+        if record is not None and value:
+            url = f"{reverse(self.viewname)}?{self.url_param}={record.pk}"
+            return format_html('<a href="{}">{}</a>', url, value)
+        return value or 0
+
 
 class BooleanColumn(tables.Column):
     TRUE_MARK = mark_safe(

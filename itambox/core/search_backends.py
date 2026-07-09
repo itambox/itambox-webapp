@@ -2,7 +2,7 @@
 import logging
 from django.db.models import F, Value, Q
 from django.contrib.contenttypes.models import ContentType
-from django.core.exceptions import FieldError
+from django.core.exceptions import FieldError, EmptyResultSet
 from django.conf import settings
 
 logger = logging.getLogger(__name__)
@@ -50,6 +50,7 @@ class DatabaseBackend:
                 continue
 
             q_objects = Q()
+            empty_scope = False
             for field_name in search_fields:
                 try:
                     dummy_q = Q(**{f'{field_name}__{lookup}': query})
@@ -59,11 +60,26 @@ class DatabaseBackend:
                 except FieldError:
                     logger.warning("Lookup '%s' not valid for field '%s' on %s. Skipping.", lookup, field_name, model.__name__)
                     continue
+                except EmptyResultSet:
+                    # The model's tenant-scoping manager resolves to no rows for the
+                    # current principal (e.g. an empty pk__in), so query compilation
+                    # short-circuits to "always empty". No matches are possible for this
+                    # model regardless of field — skip it rather than 500 the search.
+                    empty_scope = True
+                    break
+
+            # No valid/searchable scope for this model (all fields invalid, or the scope
+            # is empty). Skip it — filtering on an empty Q() would match every row.
+            if empty_scope or not q_objects:
+                continue
 
             queryset = model.objects.filter(q_objects)
-            
+
             capped_queryset = queryset[:MAX_SEARCH_RESULTS_PER_MODEL]
-            count = min(queryset[:MAX_SEARCH_COUNT_PER_MODEL].count(), MAX_SEARCH_COUNT_PER_MODEL)
+            try:
+                count = min(queryset[:MAX_SEARCH_COUNT_PER_MODEL].count(), MAX_SEARCH_COUNT_PER_MODEL)
+            except EmptyResultSet:
+                continue
 
             if count > 0:
                 results[model] = {

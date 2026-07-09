@@ -4,7 +4,7 @@ from django.contrib.auth import get_user_model
 from unittest.mock import patch
 
 from assets.models import Manufacturer, Asset, AssetType, AssetRole, StatusLabel
-from organization.models import AssetHolder, Tenant
+from organization.models import Tenant
 from core.models import Job
 from extras.models import LabelTemplate
 
@@ -47,45 +47,12 @@ class BulkActionsTestCase(TestCase):
             tenant=self.tenant
         )
 
-        self.holder = AssetHolder.objects.create(
-            first_name="John",
-            last_name="Doe",
-            upn="john.doe@example.com",
-            email="john.doe@example.com",
-            tenant=self.tenant
-        )
-
         self.label_template = LabelTemplate.objects.create(
             name="Standard QR",
             description="Standard QR label",
             barcode_format="qr",
             template_code="<div>{{ asset.name }}</div>"
         )
-
-    @patch('django_q.tasks.async_task')
-    def test_bulk_assign_assets(self, mock_async):
-        url = reverse('assets:asset_bulk_assign')
-        post_data = {
-            'pk': [self.asset1.pk, self.asset2.pk],
-            'holder_id': self.holder.pk,
-        }
-        
-        response = self.client.post(url, post_data)
-        self.assertEqual(response.status_code, 302)
-
-        # Verify Job was created
-        job = Job.objects.filter(name__contains="Bulk Checkout").first()
-        self.assertIsNotNone(job)
-        self.assertEqual(job.status, Job.STATUS_PENDING)
-
-        # Verify async_task was called
-        mock_async.assert_called_once()
-        args = mock_async.call_args[0]
-        self.assertEqual(args[0], 'core.tasks.bulk_checkout_task')
-        self.assertEqual(args[1], job.pk)
-        self.assertEqual(args[2], [str(self.asset1.pk), str(self.asset2.pk)])
-        self.assertEqual(args[3], 'assetholder')
-        self.assertEqual(args[4], self.holder.pk)
 
     @patch('django_q.tasks.async_task')
     def test_bulk_print_labels(self, mock_async):

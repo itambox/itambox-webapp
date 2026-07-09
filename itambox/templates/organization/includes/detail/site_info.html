@@ -42,9 +42,6 @@
         {% endif %}
     </dd>
 
-    <dt class="col-sm-3">{% translate "Description:" %}</dt>
-    <dd class="col-sm-9 text-secondary">{% if object.description %}{{object.description|linebreaksbr}}{% else %}<span class='text-muted'><i>{% translate "Not Set" %}</i></span>{% endif %}</dd>
-
     <dt class="col-sm-3">{% translate "Facility:" %}</dt>
     <dd class="col-sm-9">{% if object.facility %}{{object.facility}}{% else %}<span class='text-muted'><i>{% translate "Not Set" %}</i></span>{% endif %}</dd>
 
@@ -68,16 +65,4 @@
             <span class="text-muted"><i>{% translate "Not Set" %}</i></span>
         {% endif %}
     </dd>
-
-    <dt class="col-sm-3">{% translate "Comments:" %}</dt>
-    <dd class="col-sm-9 text-secondary">{% if object.comments %}{{object.comments|linebreaksbr}}{% else %}<span class='text-muted'><i>{% translate "None" %}</i></span>{% endif %}</dd>
-
-    {% if object.tags.all %}
-    <dt class="col-sm-3">{% translate "Tags:" %}</dt>
-    <dd class="col-sm-9">
-        {% for tag in object.tags.all %}
-            {% include 'inc/tags.html' with tag=tag %}
-        {% endfor %}
-    </dd>
-    {% endif %}
 </dl>

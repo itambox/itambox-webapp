@@ -4,8 +4,8 @@ from django.contrib.auth import get_user_model
 from django.test import TestCase
 from django.urls import reverse
 from django.utils import timezone
-from organization.models import Tenant, TenantMembership, TenantRole, AssetHolder
-from users.models import Token
+from organization.models import Tenant, Membership, Role, AssetHolder
+from users.models import Token, UserGroup
 from rest_framework import status
 
 User = get_user_model()
@@ -17,20 +17,19 @@ class SCIMStressTests(TestCase):
         self.tenant = Tenant.objects.create(name="Acme Corp", slug="acme")
         self.other_tenant = Tenant.objects.create(name="Other Corp", slug="other")
 
-        # Create Admin User and membership
+        # Create Admin User and membership — create first, then add roles (no role= kwarg).
         self.admin_user = User.objects.create_user(
             username="admin", email="admin@acme.com", password="adminpassword"
         )
-        self.role_admin = TenantRole.objects.create(
+        self.role_admin = Role.objects.create(
             tenant=self.tenant,
             name="Admin",
             permissions=["assets.view_asset", "assets.add_asset", "extras.view_dashboard"]
         )
-        TenantMembership.objects.create(
-            user=self.admin_user,
+        admin_membership = Membership.objects.create(user=self.admin_user,
             tenant=self.tenant,
-            role=self.role_admin
         )
+        admin_membership.roles.add(self.role_admin)
 
         # Setup tokens
         self.valid_token = Token.objects.create(
@@ -50,10 +49,10 @@ class SCIMStressTests(TestCase):
     def assertSCIMError(self, response, expected_status_code):
         """Helper to assert that a response conforms to the SCIM error schema."""
         self.assertEqual(response.status_code, expected_status_code)
-        
+
         # Verify JSON content type
         self.assertIn("application/json", response.headers.get("Content-Type", ""))
-        
+
         data = response.json()
         self.assertIn("schemas", data)
         self.assertIn("urn:ietf:params:scim:api:messages:2.0:Error", data["schemas"])
@@ -87,10 +86,11 @@ class SCIMStressTests(TestCase):
         self.assertSCIMError(response, status.HTTP_400_BAD_REQUEST)
 
     def test_empty_payload_group_creation(self):
-        """5. Empty payload on Group creation: check if 400 is returned and if it's SCIM-compliant."""
+        """5. Group creation via tenant SCIM is read-only/rejected: an empty payload
+        returns a SCIM-compliant 403 (not 400/500)."""
         url = reverse('api:scim:group-list', kwargs={'tenant_slug': self.tenant.slug})
         response = self.client.post(url, data={}, content_type='application/json', **self.auth_headers)
-        self.assertSCIMError(response, status.HTTP_400_BAD_REQUEST)
+        self.assertSCIMError(response, status.HTTP_403_FORBIDDEN)
 
     def test_empty_body_raw_user_creation(self):
         """6. Raw empty string body on User creation: check if 400 is returned and if it's SCIM-compliant."""
@@ -124,20 +124,16 @@ class SCIMStressTests(TestCase):
             print("WARNING: Extremely long username caused 500 Internal Server Error.")
 
     def test_long_groupname_creation(self):
-        """9. Extremely long groupname: check behavior."""
+        """9. Extremely long groupname: group creation is rejected (read-only) before any
+        length handling — a SCIM 403, never a 500."""
         url = reverse('api:scim:group-list', kwargs={'tenant_slug': self.tenant.slug})
-        long_groupname = "g" * 5000
         payload = {
             "schemas": ["urn:ietf:params:scim:schemas:core:2.0:Group"],
-            "displayName": long_groupname,
+            "displayName": "g" * 5000,
             "members": []
         }
         response = self.client.post(url, data=payload, content_type='application/json', **self.auth_headers)
-        self.assertIn(response.status_code, [status.HTTP_400_BAD_REQUEST, status.HTTP_500_INTERNAL_SERVER_ERROR])
-        if response.status_code == status.HTTP_400_BAD_REQUEST:
-            self.assertSCIMError(response, status.HTTP_400_BAD_REQUEST)
-        else:
-            print("WARNING: Extremely long group name caused 500 Internal Server Error.")
+        self.assertSCIMError(response, status.HTTP_403_FORBIDDEN)
 
     def test_sql_injection_username_filter(self):
         """10. SQL injection in User query filter: should be handled safely and not crash/leak."""
@@ -157,7 +153,7 @@ class SCIMStressTests(TestCase):
                 data = response.json()
                 self.assertEqual(data["totalResults"], 0)
                 self.assertEqual(len(data["Resources"]), 0)
-            
+
             # Ensure organization_tenant table still exists by verifying tenant counts
             self.assertTrue(Tenant.objects.filter(slug=self.tenant.slug).exists())
 
@@ -216,22 +212,21 @@ class SCIMStressTests(TestCase):
             self.assertEqual(response.status_code, status.HTTP_201_CREATED)
             created_usernames.append(username)
 
-        # Verify that all 50 users exist and have associated AssetHolders
+        # Verify that all 50 users exist and have associated AssetHolders.
         self.assertEqual(User.objects.filter(username__startswith="stress_user_").count(), 50)
         self.assertEqual(AssetHolder.objects.filter(tenant=self.tenant, email__startswith="stress_user_").count(), 50)
 
     def test_stress_group_creation_loop(self):
-        """14. Stress testing group creation: create 50 groups sequentially and verify DB consistency."""
+        """14. SCIM never creates groups (read-only): repeated POSTs all return 403 and
+        create nothing."""
         url = reverse('api:scim:group-list', kwargs={'tenant_slug': self.tenant.slug})
-        for i in range(50):
-            group_name = f"stress_group_{i}"
+        for i in range(10):
             payload = {
                 "schemas": ["urn:ietf:params:scim:schemas:core:2.0:Group"],
-                "displayName": group_name,
+                "displayName": f"stress_group_{i}",
                 "members": []
             }
             response = self.client.post(url, data=payload, content_type='application/json', **self.auth_headers)
-            self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+            self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
 
-        # Verify that all 50 groups/roles exist
-        self.assertEqual(TenantRole.objects.filter(tenant=self.tenant, name__startswith="stress_group_").count(), 50)
+        self.assertEqual(UserGroup.objects.filter(name__startswith="stress_group_").count(), 0)

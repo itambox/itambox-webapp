@@ -7,20 +7,26 @@ from organization.models import Contact, ContactRole, ContactAssignment
 
 User = get_user_model()
 
+
 class ContactsTestCase(TestCase):
     def setUp(self):
+        from django.contrib.contenttypes.models import ContentType
+        ContentType.objects.clear_cache()
+        User.objects.filter(username='testadmin').delete()
         self.user = User.objects.create_user(username='testadmin', password='password123', is_superuser=True, is_staff=True)
         self.client.force_login(self.user)
         
-        self.manufacturer = Manufacturer.objects.create(name='Dell Technologies', slug='dell')
+        self.manufacturer, _ = Manufacturer.objects.get_or_create(slug='dell', defaults={'name': 'Dell Technologies'})
         self.support_role, _ = ContactRole.objects.get_or_create(name='Technical Support')
         self.sales_role, _ = ContactRole.objects.get_or_create(name='Sales Rep')
         
-        self.contact = Contact.objects.create(
-            name='Dell Enterprise Support',
+        self.contact, _ = Contact.objects.get_or_create(
             email='enterprise-support@dell.com',
-            phone='+1-800-456-3355',
-            web_url='https://support.dell.com'
+            defaults={
+                'name': 'Dell Enterprise Support',
+                'phone': '+1-800-456-3355',
+                'web_url': 'https://support.dell.com'
+            }
         )
 
     def test_contact_role_slug_auto_generation(self):
@@ -117,8 +123,12 @@ class ContactsTestCase(TestCase):
 
 class ContactRoleViewTests(TestCase):
     def setUp(self):
+        from django.contrib.contenttypes.models import ContentType
+        ContentType.objects.clear_cache()
+        User.objects.filter(username='roleadmin').delete()
         self.user = User.objects.create_user(username='roleadmin', password='testpassword', is_staff=True, is_superuser=True)
         self.client.force_login(self.user)
+        ContactRole.objects.filter(slug='key-support').delete()
         self.role = ContactRole.objects.create(name='Key Support', slug='key-support')
 
     def test_update_view_post(self):

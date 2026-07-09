@@ -6,11 +6,14 @@ The **Software Catalog** tracks software applications, operating systems, and de
 
 | Field | Description | Type | Required |
 | --- | --- | --- | --- |
-| **Name** | Unique name of the software application. | String | Yes |
-| **Slug** | URL-safe name representation. | Slug | Yes |
-| **Manufacturer** | Software developer (e.g. `Microsoft`). | Foreign Key | Yes |
 | **Category** | Optional classification category. | Foreign Key | No |
-| **Notes** | Description or deployment instructions. | Text | No |
+| **Description** | Optional description of the software product. | Text | No |
+| **License Type** | Default license type | Choice | No |
+| **Manufacturer** | Software developer (e.g. `Microsoft`). | Foreign Key | Yes |
+| **Name** | Unique name of the software application. | String | Yes |
+| **Tenant** | Owning tenant. Null denotes a shared/global catalogue entry visible to all tenants. | Foreign Key | No |
+| **Version** | Current version (e.g., 2021, 16.0) | String | No |
+| **Website** | Product homepage or vendor URL | String | No |
 
 ## Use Cases
 The Software Catalog maps catalog definitions of software titles. It is distinct from individual licenses or subscriptions, serving as a template under which multiple separate licenses (seats) or SaaS subscriptions can be purchased and assigned.

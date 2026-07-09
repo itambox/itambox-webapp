@@ -6,8 +6,8 @@ A **Kit** represents a preconfigured template bundle containing hardware models 
 
 | Field | Description | Type | Required |
 | --- | --- | --- | --- |
-| **Kit Name** | Unique name identifying the kit bundle template. | String | Yes |
 | **Description** | Optional notes describing the target audience or hardware configurations. | Text | No |
+| **Kit Name** | Unique name identifying the kit bundle template. | String | Yes |
 | **Tenant** | Cost center department. | Foreign Key | No |
 
 ## Polymorphic Checkout Fulfillment

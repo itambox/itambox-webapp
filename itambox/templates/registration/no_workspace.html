@@ -1,0 +1,40 @@
+{% extends "base_public.html" %}
+{% load i18n %}
+
+{% block title %}{% translate "No workspace" %} {% translate "- ITAMbox" %}{% endblock %}
+
+{% block content %}
+<div class="container-tight py-4" data-testid="no-workspace-landing">
+    <div class="text-center mb-4">
+        <a href="." class="navbar-brand">
+            {% with brand_height="48px" %}{% include "global_includes/_brand_lockup.html" %}{% endwith %}
+        </a>
+    </div>
+    <div class="card card-md">
+        <div class="card-body text-center">
+            <div class="mb-3 text-secondary">
+                <i class="mdi mdi-domain-off" style="font-size: 3rem;"></i>
+            </div>
+            <h2 class="h2 mb-3">{% translate "No workspace assigned" %}</h2>
+            <p class="text-secondary mb-4">
+                {% blocktranslate trimmed %}
+                    You are signed in, but your account is not currently assigned to any
+                    workspace. Please contact your administrator to be granted access.
+                {% endblocktranslate %}
+            </p>
+            <div class="d-flex justify-content-center">
+                <form method="post" action="{% url 'logout' %}">
+                    {% csrf_token %}
+                    <button type="submit" class="btn btn-outline-secondary">
+                        <i class="mdi mdi-logout me-1"></i>
+                        {% translate "Sign out" %}
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+    <div class="text-center text-muted mt-3 small">
+        {% translate "Access is by invitation — ask your workspace admin." %}
+    </div>
+</div>
+{% endblock %}

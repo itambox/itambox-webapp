@@ -13,10 +13,18 @@ logger = logging.getLogger(__name__)
 
 def send_webhook_task(url, method, headers, secret, event_action, event_model_app_label,
                       event_model_name, event_object_id, event_timestamp_iso, event_data,
-                      attempt=0, retry_count=3, retry_backoff=60):
+                      attempt=0, retry_count=3, retry_backoff=60, webhook_endpoint_id=None):
     """Dispatch a webhook event. Retries on 5xx and connection errors; 4xx are final."""
     from django.core.exceptions import ValidationError
     from core.validators import validate_external_url
+
+    # Re-derive the (encrypted-at-rest) secret from the endpoint at run time so it never has
+    # to be persisted in the django_q payload / retry Schedule.kwargs (both stored plaintext).
+    if webhook_endpoint_id and not secret:
+        from extras.models import WebhookEndpoint
+        endpoint = WebhookEndpoint.all_objects.filter(pk=webhook_endpoint_id).first()
+        if endpoint:
+            secret = endpoint.secret_decrypted
 
     # SSRF guard: never let a tenant-configured URL drive a request to an internal
     # address. Re-checked here at send time (not just at save) to limit DNS
@@ -73,7 +81,12 @@ def send_webhook_task(url, method, headers, secret, event_action, event_model_ap
             return
 
         retry_kwargs = dict(
-            url=url, method=method, headers=headers, secret=secret,
+            url=url, method=method, headers=headers,
+            # Endpoint-linked retries carry only the endpoint pk so the secret is never
+            # written to Schedule.kwargs (re-derived on the next run); legacy webhooks keep
+            # their plaintext config secret.
+            secret='' if webhook_endpoint_id else secret,
+            webhook_endpoint_id=webhook_endpoint_id,
             event_action=event_action, event_model_app_label=event_model_app_label,
             event_model_name=event_model_name, event_object_id=event_object_id,
             event_timestamp_iso=event_timestamp_iso, event_data=event_data,

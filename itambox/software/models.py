@@ -121,10 +121,14 @@ class Software(CustomFieldDataMixin, DeletableVaultModel):
 
     @property
     def installed_count(self):
+        if hasattr(self, '_installed_count'):
+            return self._installed_count
         return InstalledSoftware.objects.filter(software=self).count()
 
     @property
     def license_count(self):
+        if hasattr(self, '_license_count'):
+            return self._license_count
         from licenses.models import License
         return License.objects.filter(software=self, deleted_at__isnull=True).count()
 
@@ -160,6 +164,10 @@ class InstalledSoftware(ChangeLoggingMixin, BaseModel):
     # Tenant scoping via asset FK — asset is non-null (no blank=True/null=True),
     # so every row is always associated with a tenant through its asset.
     tenant_lookup = 'asset__tenant'
+    # ChangeLoggingMixin reads changelog_tenant_lookup (NOT tenant_lookup, which
+    # only scopes the manager) — set both so audit rows are attributed to the
+    # asset's tenant instead of the ambient request tenant.
+    changelog_tenant_lookup = 'asset__tenant'
     objects = TenantScopingManager()
 
     asset = models.ForeignKey(

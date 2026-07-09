@@ -41,7 +41,7 @@ def tenant_switcher_processor(request):
         }
 
     from django.utils.functional import SimpleLazyObject
-    from organization.models import Tenant, TenantMembership
+    from organization.models import Tenant, Membership
     from collections import defaultdict
 
     def get_all_tenants():
@@ -76,25 +76,29 @@ def tenant_switcher_processor(request):
     def get_grouped_memberships():
         if request.user.is_superuser:
             return []
-        memberships = TenantMembership.objects.filter(user=request.user).select_related('tenant', 'tenant__group').order_by('tenant__group__name', 'tenant__name')
-        
+        # Tenants the user may switch into: active direct memberships UNION tenants
+        # granted via active cross-tenant user groups. (A suspended membership cannot
+        # be switched into and is excluded by accessible_tenant_ids.)
+        from organization.access import accessible_tenant_ids
+        ids = accessible_tenant_ids(request.user)
+        if not ids:
+            return []
+        tenants = (
+            Tenant._base_manager.filter(pk__in=ids)
+            .select_related('group')
+            .order_by('group__name', 'name')
+        )
         group_map = defaultdict(list)
-        for m in memberships:
-            group_map[m.tenant.group].append(m)
-            
+        for t in tenants:
+            group_map[t.group].append(t)
+
         sorted_groups = sorted([g for g in group_map.keys() if g is not None], key=lambda g: g.name.lower())
-        
+
         grouped = []
         for g in sorted_groups:
-            grouped.append({
-                'group': g,
-                'memberships': group_map[g]
-            })
+            grouped.append({'group': g, 'tenants': group_map[g]})
         if None in group_map:
-            grouped.append({
-                'group': None,
-                'memberships': group_map[None]
-            })
+            grouped.append({'group': None, 'tenants': group_map[None]})
         return grouped
 
     return {
@@ -125,4 +129,4 @@ def base_template_processor(request):
             base_template = 'base_htmx.html'
 
     return {'base_template': base_template}
-
+

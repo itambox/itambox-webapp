@@ -22,7 +22,7 @@ class UserViewSet(ITAMBoxReadOnlyModelViewSet):
         # User has no `tenant` field, so StrictTenantPermission/filter_by_tenant
         # cannot scope this set and the base queryset would expose every tenant's
         # users (incl. is_staff/email) — cross-tenant user enumeration. Scope to
-        # users who share the requester's active tenant via the TenantMembership
+        # users who share the requester's active tenant via the Membership
         # reverse relation (`memberships`). Superusers remain unscoped.
         from core.managers import get_current_tenant
 
@@ -45,7 +45,7 @@ class GroupViewSet(ITAMBoxReadOnlyModelViewSet):
     def get_queryset(self):
         # Group has no `tenant` field either; scope to groups that have at least
         # one member in the requester's active tenant. The path Group -> User is
-        # the default reverse `user`, then User -> TenantMembership is `memberships`.
+        # the default reverse `user`, then User -> Membership is `memberships`.
         # Superusers remain unscoped; no active tenant fails closed to none().
         from django.db.models import Q
         from core.managers import get_current_tenant

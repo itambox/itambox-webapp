@@ -23,15 +23,6 @@
 
     <dt class="col-sm-3">{% translate "Notes:" %}</dt>
     <dd class="col-sm-9 text-secondary">{{ object.notes|linebreaksbr|default:"—" }}</dd>
-
-    {% if object.tags.all %}
-    <dt class="col-sm-3">{% translate "Tags:" %}</dt>
-    <dd class="col-sm-9">
-        {% for tag in object.tags.all %}
-            {% include 'inc/tags.html' with tag=tag %}
-        {% endfor %}
-    </dd>
-    {% endif %}
 </dl>
 
 {% if object.primary_contact %}

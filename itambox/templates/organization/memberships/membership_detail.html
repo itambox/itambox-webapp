@@ -1,0 +1,138 @@
+{% extends "generic/object_detail.html" %}
+{% load i18n %}
+
+{% block extra_page_actions %}
+    {% if object.user.email %}
+    <form method="post" action="{% url 'organization:membership_send_reset' pk=object.pk %}" class="d-inline">
+        {% csrf_token %}
+        <button type="submit" class="btn btn-outline-primary">
+            <i class="mdi mdi-email-lock-outline me-1"></i>
+            {% translate "Send password reset / set-password link" %}
+        </button>
+    </form>
+    {% endif %}
+{% endblock %}
+
+{% block object_details %}
+<div class="row">
+    <div class="col-md-6 mb-3">
+        <label class="form-label text-muted">{% translate "User" %}</label>
+        <div class="fw-bold fs-4 text-dark">{{ object.user }}</div>
+    </div>
+    <div class="col-md-6 mb-3">
+        <label class="form-label text-muted">{% translate "Active" %}</label>
+        <div>
+            {% if object.is_active %}
+                <span class="badge bg-success">{% translate "Yes" %}</span>
+            {% else %}
+                <span class="badge bg-secondary">{% translate "No" %}</span>
+            {% endif %}
+        </div>
+    </div>
+</div>
+
+<div class="row">
+    <div class="col-md-6 mb-3">
+        <label class="form-label text-muted">{% translate "Provider" %}</label>
+        <div>
+            {% if object.provider %}
+                <a href="{% url 'organization:provider_detail' pk=object.provider.pk %}">{{ object.provider.name }}</a>
+            {% else %}
+                <span class="text-muted">—</span>
+            {% endif %}
+        </div>
+    </div>
+    <div class="col-md-6 mb-3">
+        <label class="form-label text-muted">{% translate "Roles" %}</label>
+        <div>
+            {% for role in object.roles.all %}
+                <a href="{% url 'organization:role_detail' pk=role.pk %}">{{ role.name }}</a>{% if not forloop.last %}, {% endif %}
+            {% empty %}
+                <span class="text-muted">—</span>
+            {% endfor %}
+        </div>
+    </div>
+</div>
+
+{% if object.provider_id %}
+<hr class="my-4">
+
+<h4 class="card-title text-primary mb-3">{% translate "Customer access" %}</h4>
+<div class="mb-3">
+    <span class="badge bg-azure-lt">{{ object.get_tenant_scope_display }}</span>
+</div>
+
+{% if object.tenant_scope == 'tenant_group' %}
+<div class="mb-3">
+    <label class="form-label text-muted">{% translate "Tenant group" %}</label>
+    <div>{% if object.scope_group %}{{ object.scope_group.name }}{% else %}<span class="text-muted">—</span>{% endif %}</div>
+</div>
+{% elif object.tenant_scope == 'explicit' %}
+<div class="mb-3">
+    <label class="form-label text-muted">{% translate "Specific tenants" %}</label>
+    {% with assigned=object.assigned_tenants.all %}
+    {% if assigned %}
+    <ul class="list-inline mb-0">
+        {% for tenant in assigned %}
+        <li class="list-inline-item">
+            <a href="{% url 'organization:tenant_detail' pk=tenant.pk %}" class="badge bg-secondary-lt">{{ tenant.name }}</a>
+        </li>
+        {% endfor %}
+    </ul>
+    {% else %}
+    <p class="text-muted mb-0"><em>{% translate "No tenants assigned yet." %}</em></p>
+    {% endif %}
+    {% endwith %}
+</div>
+{% endif %}
+{% endif %}
+
+<hr class="my-4">
+
+<h4 class="card-title text-primary mb-3">{% translate "Effective grants" %}</h4>
+<p class="text-muted small">{% translate "What this membership grants: the union of permissions from its roles, plus any permission codenames stored directly on the membership. Read-only audit view." %}</p>
+
+<div class="row">
+    <div class="col-md-6 mb-3">
+        <label class="form-label text-muted">{% translate "Role-derived permissions" %}</label>
+        {% with roles=object.roles.all %}
+        {% if roles %}
+        <div class="d-flex flex-column gap-2">
+            {% for role in roles %}
+            <div>
+                <a href="{% url 'organization:role_detail' pk=role.pk %}" class="fw-bold text-decoration-none">{{ role.name }}</a>
+                {% if role.permissions %}
+                <ul class="list-inline mb-0 mt-1">
+                    {% for codename in role.permissions %}
+                    <li class="list-inline-item mb-1">
+                        <code class="badge bg-secondary-lt text-secondary">{{ codename }}</code>
+                    </li>
+                    {% endfor %}
+                </ul>
+                {% else %}
+                <span class="text-muted small"><em>{% translate "No permissions." %}</em></span>
+                {% endif %}
+            </div>
+            {% endfor %}
+        </div>
+        {% else %}
+        <p class="text-muted mb-0"><em>{% translate "No roles assigned." %}</em></p>
+        {% endif %}
+        {% endwith %}
+    </div>
+    <div class="col-md-6 mb-3">
+        <label class="form-label text-muted">{% translate "Direct permissions" %}</label>
+        {% if object.direct_permissions %}
+        <ul class="list-inline mb-0">
+            {% for codename in object.direct_permissions %}
+            <li class="list-inline-item mb-1">
+                <code class="badge bg-yellow-lt text-yellow">{{ codename }}</code>
+            </li>
+            {% endfor %}
+        </ul>
+        {% else %}
+        <p class="text-muted mb-0"><em>{% translate "No direct permissions." %}</em></p>
+        {% endif %}
+    </div>
+</div>
+{% endblock object_details %}

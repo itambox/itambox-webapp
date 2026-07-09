@@ -8,16 +8,13 @@ A **Tenant Invitation** manages the onboarding of new users into a specific Tena
 
 | Field | Description | Type | Required |
 | --- | --- | --- | --- |
-| **Email** | The email address of the user being invited. | Email | Yes |
-| **Tenant** | The Tenant they will be added to upon acceptance. | Foreign Key | Yes |
-| **Role** | The Tenant Role they will be assigned. | Foreign Key | Yes |
-| **Token** | A unique security UUID token (automatically generated). | UUID | Yes |
-| **Invited By** | The User who created and sent the invitation. | Foreign Key | No |
-| **Created At** | Timestamp when the invitation was sent. | DateTime | Yes (Auto) |
-| **Expires At** | Timestamp when the invitation token expires. | DateTime | Yes |
 | **Accepted At** | Timestamp when the user accepted the invitation. | DateTime | No |
-
----
+| **Email** | The email address of the user being invited. | Email | Yes |
+| **Expires At** | Timestamp when the invitation token expires. | DateTime | Yes |
+| **Invited By** | The User who created and sent the invitation. | Foreign Key | No |
+| **Role** | The Tenant Role they will be assigned. | Foreign Key | Yes |
+| **Tenant** | The Tenant they will be added to upon acceptance. | Foreign Key | Yes |
+| **Token** | A unique security UUID token (automatically generated). | UUID | Yes |
 
 ## Acceptance Workflow
 

@@ -5,7 +5,7 @@ from django.test import TestCase, override_settings
 from django.urls import reverse
 from django.contrib.auth import get_user_model
 
-from organization.models import Tenant, Location, TenantGroup, TenantMembership, TenantRole, Site
+from organization.models import Tenant, Location, TenantGroup, Membership, Role, Site
 from assets.models import Asset, AssetType, StatusLabel, Manufacturer
 from users.models import Token
 
@@ -38,14 +38,14 @@ class GraphQLSecurityTestCase(TestCase):
         )
         self.site = Site.objects.create(name="SecGQL Site", slug="secgql-site")
 
-        self.role = TenantRole.objects.create(
+        self.role = Role.objects.create(
             tenant=self.tenant,
             name='SecGQL Role',
             permissions=['assets.view_asset'],
         )
-        self.membership = TenantMembership.objects.create(
-            user=self.staff, tenant=self.tenant, role=self.role
+        self.membership = Membership.objects.create(user=self.staff, tenant=self.tenant
         )
+        self.membership.roles.add(self.role)
 
         self.token = Token.objects.create(user=self.staff)
 

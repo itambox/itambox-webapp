@@ -1,4 +1,5 @@
 from django_filters.rest_framework import DjangoFilterBackend
+from rest_framework.filters import SearchFilter
 from rest_framework.permissions import BasePermission
 
 from itambox.api.permissions import TokenPermissions, StrictTenantPermission
@@ -26,6 +27,9 @@ class InstalledSoftwareViewSet(ITAMBoxReadOnlyModelViewSet):
         'asset', 'software', 'software__manufacturer'
     ).all()
     serializer_class = InstalledSoftwareSerializer
+    # Wire the backends so the declared filterset_fields/search_fields actually apply (there
+    # is no DEFAULT_FILTER_BACKENDS, so without this they were advertised-but-dead config).
+    filter_backends = (DjangoFilterBackend, SearchFilter)
     filterset_fields = ['asset_id', 'software_id', 'software__manufacturer_id', 'version_detected']
     search_fields = ['asset__name', 'software__name', 'version_detected']
 

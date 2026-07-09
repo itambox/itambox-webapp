@@ -44,29 +44,16 @@
             {% translate "Edit" %}
         </a>
         {% endif %}
-         {% if action_urls.clone %}
-        {# Clone — ghost secondary; folds into the [...] menu on mobile. #}
-        <a href="{{ action_urls.clone }}" class="btn btn-ghost-secondary d-none d-sm-inline-flex" title="{% translate 'Copy/Clone' %}">
-            <i class="mdi mdi-content-copy"></i>
-            {% translate "Clone" %}
-        </a>
-        {% endif %}
-         {% if action_urls.delete %}
-        {# Delete stays visible on tablet/desktop; on mobile it folds into the [...] menu below. #}
-        <a href="{{ action_urls.delete }}" class="btn btn-ghost-danger d-none d-sm-inline-flex">
-            <i class="mdi mdi-trash-can-outline"></i>
-            {% translate "Delete" %}
-        </a>
-        {% endif %}
+        {# Clone & Delete live in the [...] overflow menu below (all widths). #}
 
         {# --- Placeholder for Extra Actions (like Check In/Out) --- #}
         {% block extra_page_actions %}{% endblock %}
         {% if object %}{% plugin_template_content object 'buttons' object %}{% endif %}
 
-        {# --- Mobile overflow menu — secondary actions collapse here on small screens --- #}
+        {# --- Overflow menu — secondary actions live here at all widths --- #}
         {% if action_urls.delete or action_urls.clone %}
-        <div class="dropdown d-sm-none">
-            <button type="button" class="btn btn-icon" data-bs-toggle="dropdown" aria-haspopup="true" aria-expanded="false" aria-label="{% translate 'More actions' %}">
+        <div class="dropdown">
+            <button type="button" class="btn btn-ghost-secondary btn-icon" data-bs-toggle="dropdown" aria-haspopup="true" aria-expanded="false" aria-label="{% translate 'More actions' %}">
                 <i class="mdi mdi-dots-vertical"></i>
             </button>
             <div class="dropdown-menu dropdown-menu-end">
@@ -89,34 +76,23 @@
 {% endblock %}
 
 {% block tabs %}
-<ul class="nav nav-tabs page-header-tabs" data-bs-toggle="tabs" role="tablist">
+{# Canonical tab order (see scratch/TAB_CONVENTIONS.md): #}
+{#   Details -> primary children + secondary relations ({% block extra_tabs %}) #}
+{#   -> Subscriptions -> Attachments -> Changelog -> Journal. #}
+{# hx-boost="false" on every tab anchor: panes switch client-side (Bootstrap), #}
+{# never a boosted full-content reload. id="detail-tabs" is the hx-sync abort #}
+{# group shared by lazy tabs. #}
+<ul id="detail-tabs" class="nav nav-tabs page-header-tabs" data-bs-toggle="tabs" role="tablist">
     <li class="nav-item" role="presentation" data-bs-toggle="tooltip" data-bs-placement="top" title="{% translate 'Details' %}">
-        <a href="?tab=details" data-bs-target="#details" class="nav-link {% if not request.GET.tab or request.GET.tab == 'details' %}active{% endif %}" data-bs-toggle="tab" role="tab">
+        <a href="?tab=details" data-bs-target="#details" class="nav-link {% if not request.GET.tab or request.GET.tab == 'details' %}active{% endif %}" data-bs-toggle="tab" hx-boost="false" role="tab">
             <i class="mdi mdi-information-outline me-1"></i>
             <span class="d-none d-xl-inline ms-1">{% translate "Details" %}</span>
         </a>
     </li>
     {% block extra_tabs %}{% endblock extra_tabs %}
-    {% if changelog_table %}
-    <li class="nav-item" role="presentation" data-bs-toggle="tooltip" data-bs-placement="top" title="{% translate 'Changelog' %}">
-        <a href="?tab=changelog" data-bs-target="#changelog" class="nav-link {% if request.GET.tab == 'changelog' %}active{% endif %}" data-bs-toggle="tab" role="tab">
-            <i class="mdi mdi-history me-1"></i>
-            <span class="d-none d-xl-inline ms-1">{% translate "Changelog" %}</span>
-        </a>
-    </li>
-    {% endif %}
-    {% if has_journaling %}
-    <li class="nav-item" role="presentation" data-bs-toggle="tooltip" data-bs-placement="top" title="{% translate 'Journal' %}">
-        <a href="?tab=journal" data-bs-target="#journal" class="nav-link {% if request.GET.tab == 'journal' %}active{% endif %}" data-bs-toggle="tab" role="tab">
-            <i class="mdi mdi-notebook-outline me-1"></i>
-            <span class="d-none d-xl-inline ms-1">{% translate "Journal" %}</span>
-            <span class="badge bg-secondary ms-1">{{ journal_entries_count }}</span>
-        </a>
-    </li>
-    {% endif %}
     {% if has_subscriptions %}
     <li class="nav-item" role="presentation" data-bs-toggle="tooltip" data-bs-placement="top" title="{% translate 'Subscriptions' %}">
-        <a href="?tab=subscriptions" data-bs-target="#subscriptions" class="nav-link {% if request.GET.tab == 'subscriptions' %}active{% endif %}" data-bs-toggle="tab" role="tab">
+        <a href="?tab=subscriptions" data-bs-target="#subscriptions" class="nav-link {% if request.GET.tab == 'subscriptions' %}active{% endif %}" data-bs-toggle="tab" hx-boost="false" role="tab">
             <i class="mdi mdi-receipt-text-outline me-1 text-info"></i>
             <span class="d-none d-xl-inline ms-1">{% translate "Subscriptions" %}</span>
             <span class="badge bg-info-lt ms-1">{{ subscription_assignments_count }}</span>
@@ -125,9 +101,26 @@
     {% endif %}
     {% if has_image_attachments or has_file_attachments %}
     <li class="nav-item" role="presentation" data-bs-toggle="tooltip" data-bs-placement="top" title="{% translate 'Attachments' %}">
-        <a href="?tab=attachments" data-bs-target="#attachments" class="nav-link {% if request.GET.tab == 'attachments' %}active{% endif %}" data-bs-toggle="tab" role="tab">
+        <a href="?tab=attachments" data-bs-target="#attachments" class="nav-link {% if request.GET.tab == 'attachments' %}active{% endif %}" data-bs-toggle="tab" hx-boost="false" role="tab">
             <i class="mdi mdi-paperclip me-1"></i>
             <span class="d-none d-xl-inline ms-1">{% translate "Attachments" %}</span>
+        </a>
+    </li>
+    {% endif %}
+    {% if changelog_table %}
+    <li class="nav-item" role="presentation" data-bs-toggle="tooltip" data-bs-placement="top" title="{% translate 'Changelog' %}">
+        <a href="?tab=changelog" data-bs-target="#changelog" class="nav-link {% if request.GET.tab == 'changelog' %}active{% endif %}" data-bs-toggle="tab" hx-boost="false" role="tab">
+            <i class="mdi mdi-history me-1"></i>
+            <span class="d-none d-xl-inline ms-1">{% translate "Changelog" %}</span>
+        </a>
+    </li>
+    {% endif %}
+    {% if has_journaling %}
+    <li class="nav-item" role="presentation" data-bs-toggle="tooltip" data-bs-placement="top" title="{% translate 'Journal' %}">
+        <a href="?tab=journal" data-bs-target="#journal" class="nav-link {% if request.GET.tab == 'journal' %}active{% endif %}" data-bs-toggle="tab" hx-boost="false" role="tab">
+            <i class="mdi mdi-notebook-outline me-1"></i>
+            <span class="d-none d-xl-inline ms-1">{% translate "Journal" %}</span>
+            <span class="badge bg-secondary ms-1">{{ journal_entries_count }}</span>
         </a>
     </li>
     {% endif %}
@@ -422,7 +415,7 @@
                         <ul class="list-group list-group-flush">
                         {% for file in file_attachments %}
                         <li class="list-group-item d-flex justify-content-between align-items-center">
-                            <a href="{{ file.get_download_url }}" class="text-reset">{{ file.name }}</a>
+                            <a href="{{ file.get_download_url }}" class="text-reset" download hx-boost="false">{{ file.name }}</a>
                             <form method="post" action="{% url 'file_attachment_delete' pk=file.pk %}" class="d-inline">
                                 {% csrf_token %}
                                 <input type="hidden" name="return_url" value="{{ request.get_full_path }}">

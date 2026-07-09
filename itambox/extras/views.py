@@ -10,8 +10,8 @@ from django.utils.http import urlencode
 from django.utils.translation import gettext_lazy as _, gettext
 from django.views.generic import View
 from core.managers import get_current_tenant
-from .models import Tag, CustomField, CustomFieldset, SavedFilter, ConfigContext
-from .forms import TagForm, TagFilterForm, CustomFieldForm, CustomFieldFilterForm, CustomFieldsetForm, CustomFieldsetFilterForm, SavedFilterForm, SavedFilterFilterForm, ConfigContextForm, ConfigContextFilterSet, ConfigContextFilterForm, ConfigContextTable
+from .models import Tag, CustomField, CustomFieldset, SavedFilter
+from .forms import TagForm, TagFilterForm, CustomFieldForm, CustomFieldFilterForm, CustomFieldsetForm, CustomFieldsetFilterForm, SavedFilterForm, SavedFilterFilterForm
 from django_tables2 import RequestConfig
 from .tables import TagTable, CustomFieldTable, CustomFieldsetTable, SavedFilterTable
 from .filters import TagFilter, CustomFieldFilterSet, CustomFieldsetFilterSet, SavedFilterFilterSet
@@ -22,6 +22,7 @@ from django.urls import reverse, reverse_lazy
 from django.views.generic import ListView, DetailView, CreateView, UpdateView, DeleteView
 from django.contrib import messages
 from itambox.views.generic import ObjectListView, ObjectDetailView, ObjectEditView, ObjectDeleteView, ObjectBulkEditView, ObjectBulkDeleteView
+from itambox.views.generic.utils import safe_return_url
 from itambox.panels import Panel
 
 class TagDetailView(ObjectDetailView):
@@ -269,7 +270,8 @@ class SavedFilterSaveView(LoginRequiredMixin, PermissionRequiredMixin, View):
     def _list_url(self, request, model_str):
         return_url = request.POST.get('return_url')
         if return_url:
-            return return_url.split('?', 1)[0]
+            # Same-host only — guard against an attacker-supplied external return_url.
+            return safe_return_url(request, return_url.split('?', 1)[0], reverse('extras:savedfilter_list'))
         content_type = self._resolve_content_type(model_str)
         if content_type is not None:
             model = content_type.model_class()
@@ -296,38 +298,6 @@ class SavedFilterSaveView(LoginRequiredMixin, PermissionRequiredMixin, View):
 
 
 # =============================================================================
-# Config Context Views
-# =============================================================================
-
-class ConfigContextListView(ObjectListView):
-    queryset = ConfigContext.objects.all()
-    filterset = ConfigContextFilterSet
-    filterset_form = ConfigContextFilterForm
-    table = ConfigContextTable
-    action_buttons = ('add',)
-    template_name = 'generic/object_list.html'
-
-
-class ConfigContextCreateView(ObjectEditView):
-    model_form = ConfigContextForm
-    template_name = 'generic/object_edit.html'
-    default_return_url = 'extras:configcontext_list'
-
-
-class ConfigContextEditView(ObjectEditView):
-    queryset = ConfigContext.objects.all()
-    model_form = ConfigContextForm
-    template_name = 'generic/object_edit.html'
-    default_return_url = 'extras:configcontext_list'
-
-
-class ConfigContextDeleteView(ObjectDeleteView):
-    queryset = ConfigContext.objects.all()
-    template_name = 'generic/object_confirm_delete.html'
-    success_url = reverse_lazy('extras:configcontext_list')
-
-
-# =============================================================================
 # Alerting Views
 # =============================================================================
 import logging
@@ -342,8 +312,13 @@ from .tables import (
 )
 from .forms import (
     AlertRuleForm, NotificationChannelForm, ReportTemplateForm, ScheduledReportForm,
+    AlertRuleFilterForm, NotificationChannelFilterForm, ReportTemplateFilterForm,
+    ScheduledReportFilterForm,
 )
-from .filters import AlertLogFilterSet
+from .filters import (
+    AlertLogFilterSet, AlertRuleFilterSet, NotificationChannelFilterSet,
+    ReportTemplateFilterSet, ScheduledReportFilterSet,
+)
 from itambox.views.generic.service_views import SimplePostView
 
 logger = logging.getLogger(__name__)
@@ -352,6 +327,8 @@ logger = logging.getLogger(__name__)
 @method_decorator(login_required, name='dispatch')
 class AlertRuleListView(ObjectListView):
     queryset = AlertRule.objects.all()
+    filterset = AlertRuleFilterSet
+    filterset_form = AlertRuleFilterForm
     table = AlertRuleTable
     template_name = 'core/alerts/alert_rule_list.html'
     action_buttons = ('add',)
@@ -412,6 +389,10 @@ class AlertRuleDeleteView(ObjectDeleteView):
     template_name = 'core/alerts/alert_rule_confirm_delete.html'
 
 
+class AlertRuleBulkDeleteView(ObjectBulkDeleteView):
+    queryset = AlertRule.objects.all()
+
+
 class AlertRuleRunNowView(SimplePostView):
     """Evaluate a single alert rule immediately, on demand.
 
@@ -431,9 +412,10 @@ class AlertRuleRunNowView(SimplePostView):
         return {'message': f"Evaluation queued for '{rule.name}'. New alerts will appear shortly."}
 
     def get_success_redirect(self, obj, result):
-        return redirect(
-            self.request.POST.get('return_url') or reverse('extras:alertrule_detail', kwargs={'pk': obj.pk})
-        )
+        return redirect(safe_return_url(
+            self.request, self.request.POST.get('return_url'),
+            reverse('extras:alertrule_detail', kwargs={'pk': obj.pk}),
+        ))
 
 
 @method_decorator(login_required, name='dispatch')
@@ -481,9 +463,9 @@ class AlertAcknowledgeView(SimplePostView):
         return {'message': f"Alert '{alert.subject}' acknowledged."}
 
     def get_success_redirect(self, obj, result):
-        return redirect(
-            self.request.POST.get('return_url') or reverse('extras:alertlog_list')
-        )
+        return redirect(safe_return_url(
+            self.request, self.request.POST.get('return_url'), reverse('extras:alertlog_list'),
+        ))
 
 
 class AlertResolveView(SimplePostView):
@@ -499,9 +481,9 @@ class AlertResolveView(SimplePostView):
         return {'message': f"Alert '{alert.subject}' marked as resolved."}
 
     def get_success_redirect(self, obj, result):
-        return redirect(
-            self.request.POST.get('return_url') or reverse('extras:alertlog_list')
-        )
+        return redirect(safe_return_url(
+            self.request, self.request.POST.get('return_url'), reverse('extras:alertlog_list'),
+        ))
 
 
 class _BulkAlertActionView(LoginRequiredMixin, PermissionRequiredMixin, View):
@@ -523,7 +505,7 @@ class _BulkAlertActionView(LoginRequiredMixin, PermissionRequiredMixin, View):
 
     def post(self, request, *args, **kwargs):
         pks = request.POST.getlist('pk')
-        return_url = request.POST.get('return_url') or reverse('extras:alertlog_list')
+        return_url = safe_return_url(request, request.POST.get('return_url'), reverse('extras:alertlog_list'))
 
         if not pks:
             return self._respond(request, gettext("No alerts selected."), 'warning', return_url)
@@ -573,6 +555,8 @@ class AlertBulkResolveView(_BulkAlertActionView):
 @method_decorator(login_required, name='dispatch')
 class NotificationChannelListView(ObjectListView):
     queryset = NotificationChannel.objects.all()
+    filterset = NotificationChannelFilterSet
+    filterset_form = NotificationChannelFilterForm
     table = NotificationChannelTable
     template_name = 'core/alerts/notificationchannel_list.html'
     action_buttons = ('add',)
@@ -619,6 +603,10 @@ class NotificationChannelDeleteView(ObjectDeleteView):
     template_name = 'core/alerts/notificationchannel_confirm_delete.html'
 
 
+class NotificationChannelBulkDeleteView(ObjectBulkDeleteView):
+    queryset = NotificationChannel.objects.all()
+
+
 class NotificationChannelTestView(SimplePostView):
     """Send a test notification through a channel and report success/failure inline."""
     queryset = NotificationChannel.objects.all()
@@ -649,6 +637,8 @@ class NotificationChannelTestView(SimplePostView):
 @method_decorator(login_required, name='dispatch')
 class ReportTemplateListView(ObjectListView):
     queryset = ReportTemplate.objects.all()
+    filterset = ReportTemplateFilterSet
+    filterset_form = ReportTemplateFilterForm
     table = ReportTemplateTable
     template_name = 'core/reports/report_template_list.html'
     action_buttons = ('add',)
@@ -709,9 +699,15 @@ class ReportTemplateDeleteView(ObjectDeleteView):
     template_name = 'core/reports/report_template_confirm_delete.html'
 
 
+class ReportTemplateBulkDeleteView(ObjectBulkDeleteView):
+    queryset = ReportTemplate.objects.all()
+
+
 @method_decorator(login_required, name='dispatch')
 class ScheduledReportListView(ObjectListView):
     queryset = ScheduledReport.objects.select_related('report')
+    filterset = ScheduledReportFilterSet
+    filterset_form = ScheduledReportFilterForm
     table = ScheduledReportTable
     template_name = 'core/reports/report_list.html'
     action_buttons = ('add',)
@@ -830,6 +826,10 @@ class ScheduledReportDeleteView(ObjectDeleteView):
     template_name = 'core/reports/report_schedule_confirm_delete.html'
 
 
+class ScheduledReportBulkDeleteView(ObjectBulkDeleteView):
+    queryset = ScheduledReport.objects.all()
+
+
 @method_decorator(login_required, name='dispatch')
 class ReportTriggerImmediateView(PermissionRequiredMixin, LoginRequiredMixin, View):
     permission_required = ('extras.view_scheduledreport',)
@@ -856,7 +856,7 @@ class ReportTriggerImmediateView(PermissionRequiredMixin, LoginRequiredMixin, Vi
             error_msg = sched.last_status or _("Check logs.")
             messages.error(request, _("Failed to generate scheduled report '%(name)s': %(error)s") % {'name': sched.name, 'error': error_msg})
 
-        return redirect(request.POST.get('return_url') or reverse('extras:scheduledreport_list'))
+        return redirect(safe_return_url(request, request.POST.get('return_url'), reverse('extras:scheduledreport_list')))
 
 
 @method_decorator(login_required, name='dispatch')
@@ -917,7 +917,7 @@ class ReportTemplatePreviewView(PermissionRequiredMixin, View):
                 # Sandbox or legacy Django render
                 try:
                     from jinja2.sandbox import SandboxedEnvironment
-                    env = SandboxedEnvironment()
+                    env = SandboxedEnvironment(autoescape=True)
                     jinja_template = env.from_string(template_content)
                     if report_type == ReportTemplate.REPORT_TYPE_ASSET_SUMMARY:
                         context_data.update({
@@ -974,54 +974,69 @@ class ReportTemplateDownloadView(PermissionRequiredMixin, LoginRequiredMixin, Vi
             )
 
             format_type = request.GET.get('format', 'html').lower()
+            from core.csv_utils import safe_csv_filename
+            safe_name = safe_csv_filename(template.name).lower().replace(' ', '_')
+            stamp = f"{timezone.now():%Y%m%d}"
 
             if format_type == 'csv':
                 import io
                 import csv
+                from core.csv_utils import csv_safe
                 csv_buffer = io.StringIO()
                 writer = csv.writer(csv_buffer)
-
-                # Write headers
                 writer.writerow(headers)
-                # Write rows in sequence
+                # Each cell neutralized against CSV formula injection.
                 for r in rows:
-                    writer.writerow([r.get(head, '-') for head in headers])
-
+                    writer.writerow([csv_safe(r.get(head, '-')) for head in headers])
                 response = HttpResponse(csv_buffer.getvalue(), content_type='text/csv')
-                filename = f"{template.name.lower().replace(' ', '_')}_{timezone.now():%Y%m%d}.csv"
-                response['Content-Disposition'] = f'attachment; filename="{filename}"'
+                response['Content-Disposition'] = f'attachment; filename="{safe_name}_{stamp}.csv"'
                 return response
 
+            if format_type == 'xlsx':
+                from core.reports.exporters import report_xlsx_bytes, XLSX_MIME
+                response = HttpResponse(report_xlsx_bytes(headers, rows, sheet_title=template.name), content_type=XLSX_MIME)
+                response['Content-Disposition'] = f'attachment; filename="{safe_name}_{stamp}.xlsx"'
+                return response
+
+            # HTML render — shared by the html and pdf formats.
+            if template.advanced_mode and template.template_content.strip():
+                try:
+                    from jinja2.sandbox import SandboxedEnvironment
+                    # autoescape escapes {{ data }} expressions (e.g. a malicious asset
+                    # name) when rendered into the text/html report; the author's literal
+                    # template markup is unaffected.
+                    env = SandboxedEnvironment(autoescape=True)
+                    jinja_template = env.from_string(template.template_content)
+                    if template.report_type == ReportTemplate.REPORT_TYPE_ASSET_SUMMARY:
+                        context_data.update({
+                            'total_assets': len(rows),
+                            # Currency-correct figure from the summary card — never re-parse
+                            # the per-currency-formatted grid strings ('$'-strip yields 0 for
+                            # non-USD).
+                            'acquisition_sum': next((c.get('value', '') for c in summary_cards if c.get('label') == gettext('Total Acquisition Sum')), ''),
+                            'location_distribution': [{'location': k, 'count': len(v)} for k, v in grouped_data.items()]
+                        })
+                    rendered_html = jinja_template.render(context_data)
+                except Exception as je:
+                    logger.exception(f"Jinja2 sandboxed render failed: {je}")
+                    raise je
             else:
-                # HTML compiler
-                if template.advanced_mode and template.template_content.strip():
-                    try:
-                        from jinja2.sandbox import SandboxedEnvironment
-                        env = SandboxedEnvironment()
-                        jinja_template = env.from_string(template.template_content)
-                        if template.report_type == ReportTemplate.REPORT_TYPE_ASSET_SUMMARY:
-                            context_data.update({
-                                'total_assets': len(rows),
-                                'acquisition_sum': sum(float(r[headers[8]].replace('$', '').replace(',', '')) for r in rows if headers[8] in r and r[headers[8]] != '-') if len(headers) > 8 else 0,
-                                'location_distribution': [{'location': k, 'count': len(v)} for k, v in grouped_data.items()]
-                            })
-                        rendered_html = jinja_template.render(context_data)
-                    except Exception as je:
-                        logger.exception(f"Jinja2 sandboxed render failed: {je}")
-                        raise je
-                else:
-                    html_template_str = get_polished_system_html_template()
-                    django_template = Template(html_template_str)
-                    context_data['request'] = request
-                    rendered_html = django_template.render(Context(context_data))
+                html_template_str = get_polished_system_html_template()
+                django_template = Template(html_template_str)
+                context_data['request'] = request
+                rendered_html = django_template.render(Context(context_data))
 
-                response = HttpResponse(rendered_html, content_type='text/html')
-                filename = f"{template.name.lower().replace(' ', '_')}_{timezone.now():%Y%m%d}.html"
-                if request.GET.get('print') == 'true':
-                    response['Content-Disposition'] = f'inline; filename="{filename}"'
-                else:
-                    response['Content-Disposition'] = f'attachment; filename="{filename}"'
+            if format_type == 'pdf':
+                from core.reports.exporters import report_pdf_bytes, PDF_MIME
+                response = HttpResponse(report_pdf_bytes(rendered_html), content_type=PDF_MIME)
+                disposition = 'inline' if request.GET.get('print') == 'true' else 'attachment'
+                response['Content-Disposition'] = f'{disposition}; filename="{safe_name}_{stamp}.pdf"'
                 return response
+
+            response = HttpResponse(rendered_html, content_type='text/html')
+            disposition = 'inline' if request.GET.get('print') == 'true' else 'attachment'
+            response['Content-Disposition'] = f'{disposition}; filename="{safe_name}_{stamp}.html"'
+            return response
         except Exception as e:
             logger.exception("Template Render Error in download")
             return HttpResponse(f"<h3>{gettext('Template Render Error:')}</h3><pre>{str(e)}</pre>", status=400)

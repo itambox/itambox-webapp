@@ -1,4 +1,5 @@
 from django.shortcuts import render, redirect
+from django.core.exceptions import ValidationError
 from django.http import HttpResponse
 from django.views.generic import View, UpdateView, TemplateView
 from django.contrib.auth.mixins import LoginRequiredMixin
@@ -40,8 +41,8 @@ class UserProfileView(LoginRequiredMixin, BaseHTMXView, UpdateView):
         context = super().get_context_data(**kwargs)
         context['active_tab'] = 'profile'
         context['user'] = self.request.user
-        from organization.models import TenantMembership
-        context['user_memberships'] = TenantMembership.objects.filter(user=self.request.user).select_related('tenant', 'role')
+        from organization.models import Membership
+        context['user_memberships'] = Membership.objects.filter(user=self.request.user).select_related('tenant').prefetch_related('roles')
         activity_qs = ObjectChange.objects.filter(user=self.request.user)[:15]
         activity_table = ObjectChangeTable(activity_qs, request=self.request)
         activity_table.configure(self.request, paginate=False)
@@ -230,13 +231,15 @@ class MarkNotificationReadView(LoginRequiredMixin, View):
 class ViewNotificationView(LoginRequiredMixin, View):
     def get(self, request, pk):
         from core.models import Notification
-        from django.db.models import Q
-        notification = get_object_or_404(Notification, Q(user=request.user) | Q(user__isnull=True), pk=pk)
-        
-        if notification.user == request.user:
-            notification.is_read = True
-            notification.save()
-            
+        # Only the recipient may open a notification by pk. The previous
+        # Q(user__isnull=True) clause let ANY authenticated user (any tenant) open a global
+        # broadcast row by pk and follow its target_url — a cross-tenant info leak. Tenant
+        # EventRule notifications now fan out per-user instead of creating user=None rows.
+        notification = get_object_or_404(Notification, pk=pk, user=request.user)
+
+        notification.is_read = True
+        notification.save()
+
         if notification.target_url:
             return redirect(notification.target_url)
         return redirect('users:user_notifications')
@@ -445,10 +448,11 @@ class WatchToggleView(LoginRequiredMixin, View):
 
 
 # User Management Views (Frontend Admin)
-from itambox.views.generic import ObjectListView, ObjectDetailView, ObjectEditView, ObjectDeleteView
+from itambox.views.generic import ObjectListView, ObjectDetailView, ObjectEditView, ObjectDeleteView, ObjectBulkEditView, safe_return_url
+from django.http import HttpResponseRedirect
 from .tables import UserTable
 from .filters import UserFilterSet
-from .forms import UserFilterForm, UserForm
+from .forms import UserFilterForm, UserForm, UserBulkEditForm
 
 class UserListView(ObjectListView):
     queryset = User.objects.all()
@@ -457,9 +461,109 @@ class UserListView(ObjectListView):
     table = UserTable
     action_buttons = ('add',)
 
+    def get_queryset(self):
+        qs = super().get_queryset()
+        if self.request.user.is_superuser:
+            return qs
+        from core.managers import get_current_tenant
+        active_tenant = get_current_tenant()
+        if active_tenant is None:
+            return qs.none()
+        return qs.filter(memberships__tenant=active_tenant).distinct()
+
+
+class UserBulkEditView(ObjectBulkEditView):
+    queryset = User.objects.all()
+    form_class = UserBulkEditForm
+    table = UserTable
+    template_name = 'generic/object_bulk_edit.html'
+
+    def _get_bulk_edit_form(self, data=None, model=None):
+        return self.form_class(data, model=model, request_user=self.request.user)
+
+    def _get_queryset(self, pks):
+        qs = super()._get_queryset(pks)
+        if self.request.user.is_superuser:
+            return qs
+        from core.managers import get_current_tenant
+        active_tenant = get_current_tenant()
+        if active_tenant is None:
+            return qs.none()
+        return qs.filter(memberships__tenant=active_tenant).distinct()
+
+    def post(self, request, *args, **kwargs):
+        pks = request.POST.getlist('pk')
+        model = self._get_model()
+        return_url = safe_return_url(
+            request,
+            request.POST.get('return_url') or request.META.get('HTTP_REFERER'),
+            reverse('dashboard'),
+        )
+        raw_selected_fields = request.POST.getlist('_selected_fields')
+        selected_fields = [f for f in raw_selected_fields if f not in ('add_tags', 'remove_tags')]
+
+        if not pks:
+            messages.warning(request, _("No %(objects)s were selected.") % {'objects': model._meta.verbose_name_plural})
+            return HttpResponseRedirect(return_url)
+
+        queryset = self._get_queryset(pks)
+
+        if '_apply' in request.POST:
+            form = self._get_bulk_edit_form(request.POST, model)
+            if form.is_valid():
+                # Self-lockout check
+                if request.user in queryset:
+                    is_active = form.cleaned_data.get('is_active')
+                    is_superuser = form.cleaned_data.get('is_superuser')
+                    is_staff = form.cleaned_data.get('is_staff')
+                    can_login = form.cleaned_data.get('can_login')
+
+                    if 'can_login' in selected_fields and can_login is False:
+                        messages.error(request, _("You cannot revoke your own login ability in a bulk edit operation."))
+                        context = self.get_context_data_compat(form, queryset, pks, return_url, selected_fields, model)
+                        return self.render_to_response(context)
+
+                    if 'is_active' in selected_fields and is_active is False:
+                        messages.error(request, _("You cannot deactivate your own user account in a bulk edit operation."))
+                        context = self.get_context_data_compat(form, queryset, pks, return_url, selected_fields, model)
+                        return self.render_to_response(context)
+
+                    if 'is_superuser' in selected_fields and is_superuser is False:
+                        messages.error(request, _("You cannot revoke your own superuser status in a bulk edit operation."))
+                        context = self.get_context_data_compat(form, queryset, pks, return_url, selected_fields, model)
+                        return self.render_to_response(context)
+
+                    if 'is_staff' in selected_fields and is_staff is False:
+                        messages.error(request, _("You cannot revoke your own staff status in a bulk edit operation."))
+                        context = self.get_context_data_compat(form, queryset, pks, return_url, selected_fields, model)
+                        return self.render_to_response(context)
+
+        return super().post(request, *args, **kwargs)
+
+    def get_context_data_compat(self, form, queryset, pks, return_url, selected_fields, model):
+        return {
+            'form': form,
+            'model': model,
+            'model_name': f'{model._meta.app_label}.{model._meta.model_name}',
+            'objects': queryset,
+            'object_pks': pks,
+            'return_url': return_url,
+            'selected_fields': selected_fields,
+            'verbose_name': model._meta.verbose_name,
+            'verbose_name_plural': model._meta.verbose_name_plural,
+            'title': _('Bulk Edit %(objects)s') % {'objects': str(model._meta.verbose_name_plural).title()},
+            'breadcrumbs': [
+                (reverse('dashboard'), _('Dashboard')),
+                (return_url, str(model._meta.verbose_name_plural).title()),
+                (None, _('Bulk Edit (%(count)s)') % {'count': len(pks)}),
+            ],
+        }
+
 
 class UserDetailView(ObjectDetailView):
-    queryset = User.objects.prefetch_related('memberships__tenant', 'memberships__role')
+    queryset = User.objects.prefetch_related(
+        'memberships__tenant', 'memberships__provider', 'memberships__roles',
+    )
     template_name = 'users/user_detail.html'
 
     def has_permission(self):
@@ -496,3 +600,205 @@ class UserDeleteView(ObjectDeleteView):
             messages.error(request, _("You cannot delete your own user account."))
             return redirect(reverse('users:user_detail', kwargs={'pk': user_to_delete.pk}))
         return super().post(request, *args, **kwargs)
+
+
+# --------------------------------------------------------------------------- UserGroup
+# Relocated from organization/ — UserGroup is an identity-layer construct.
+from django.contrib.auth.mixins import UserPassesTestMixin
+from django.db import transaction
+from django.db.models import Count, Prefetch
+from itambox.views.generic import ObjectBulkDeleteView
+from organization.models import Role, Membership
+from core.auth.guards import validate_group_membership_grant
+from .models import UserGroup
+from .tables import UserGroupTable
+from .filters import UserGroupFilterSet
+from .forms import UserGroupForm, UserGroupFilterForm, UserGroupAssignUsersForm
+
+
+def is_global_group_admin(user):
+    """User groups are global and can grant cross-tenant access, so only global admins
+    may manage them: superusers, provider staff holding ``can_manage_groups``, OR a user
+    directly granted the legacy ``organization.manage_groups`` capability (single-company
+    backward compat). Delegates to core.auth.provider.can_manage_user_groups."""
+    from core.auth.provider import can_manage_user_groups
+    return can_manage_user_groups(user)
+
+
+class GlobalGroupAdminMixin(UserPassesTestMixin):
+    """Restrict a UserGroup view to global admins (see is_global_group_admin).
+
+    Group management is gated SOLELY on the global group-management capability — never on
+    the per-model ``view/add/change_usergroup`` permissions. ``test_func`` enforces the
+    capability; ``get_permission_required`` returns an empty set so the generic
+    PermissionRequiredMixin in the MRO does not additionally require ``view_usergroup``."""
+    def test_func(self):
+        return is_global_group_admin(self.request.user)
+
+    def get_permission_required(self):
+        return ()
+
+
+class UserGroupListView(GlobalGroupAdminMixin, ObjectListView):
+    queryset = UserGroup.objects.annotate(
+        member_count=Count('members', distinct=True),
+        role_count=Count('roles', distinct=True),
+    )
+    filterset = UserGroupFilterSet
+    filterset_form = UserGroupFilterForm
+    table = UserGroupTable
+    action_buttons = ('add',)
+
+
+class UserGroupDetailView(GlobalGroupAdminMixin, ObjectDetailView):
+    queryset = UserGroup.objects.prefetch_related(
+        Prefetch('roles', queryset=Role.objects.order_by('scope', 'name')),
+        'members',
+    ).annotate(
+        member_count=Count('members', distinct=True),
+    )
+    template_name = 'users/usergroups/usergroup_detail.html'
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        group = self.get_object()
+
+        # Build union of permissions across all attached roles (for detail display).
+        all_perms = set()
+        for role in group.roles.all():
+            all_perms.update(role.permissions or [])
+        context['effective_permissions'] = sorted(all_perms)
+
+        context['members'] = group.members.all().order_by('username')
+        context['roles'] = group.roles.all()
+        context['member_count'] = getattr(group, 'member_count', 0) or 0
+        return context
+
+
+class UserGroupEditView(GlobalGroupAdminMixin, ObjectEditView):
+    queryset = UserGroup.objects.all()
+    model = UserGroup
+    model_form = UserGroupForm
+    template_name = 'users/usergroups/usergroup_form.html'
+
+    def get_form_kwargs(self):
+        kwargs = super().get_form_kwargs()
+        kwargs['user'] = self.request.user
+        kwargs['tenant'] = getattr(self.request, 'active_tenant', None)
+        return kwargs
+
+
+class UserGroupDeleteView(GlobalGroupAdminMixin, ObjectDeleteView):
+    queryset = UserGroup.objects.all()
+    model = UserGroup
+    template_name = 'generic/object_confirm_delete.html'
+    success_url = reverse_lazy('users:usergroup_list')
+
+
+class UserGroupBulkDeleteView(GlobalGroupAdminMixin, ObjectBulkDeleteView):
+    queryset = UserGroup.objects.all()
+
+    def post(self, request, *args, **kwargs):
+        from django.http import HttpResponseRedirect
+
+        pks = request.POST.getlist('pk')
+        model = self._get_model()
+        return_url = safe_return_url(
+            request,
+            request.POST.get('return_url') or request.META.get('HTTP_REFERER'),
+            reverse('users:usergroup_list'),
+        )
+
+        if not pks:
+            messages.warning(request, _("No user groups were selected."))
+            return HttpResponseRedirect(return_url)
+
+        queryset = self._get_queryset(pks)
+        objects_to_delete = list(queryset)
+
+        if not objects_to_delete:
+            messages.warning(request, _("No valid user groups selected for deletion."))
+            return HttpResponseRedirect(return_url)
+
+        if '_confirm' in request.POST:
+            deleted_count = 0
+            with transaction.atomic():
+                for obj in objects_to_delete:
+                    obj.delete()
+                    deleted_count += 1
+            messages.success(
+                request,
+                _("Successfully deleted %(count)d user group(s).") % {'count': deleted_count},
+            )
+            return HttpResponseRedirect(return_url)
+        else:
+            context = {
+                'model': model,
+                'model_name': f'{model._meta.app_label}.{model._meta.model_name}',
+                'model_verbose_name': model._meta.verbose_name,
+                'model_verbose_name_plural': model._meta.verbose_name_plural,
+                'objects': objects_to_delete,
+                'object_pks': pks,
+                'return_url': return_url,
+                'title': _('Confirm Bulk Deletion'),
+                'breadcrumbs': [
+                    (reverse('dashboard'), _('Dashboard')),
+                    (return_url, _('User Groups')),
+                    (None, _('Delete (%(count)d)') % {'count': len(objects_to_delete)}),
+                ],
+            }
+            return self.render_to_response(context)
+
+
+class UserGroupAssignUsersView(GlobalGroupAdminMixin, LoginRequiredMixin, View):
+    """Add one or more users to a (global) UserGroup's members (idempotent).
+
+    Groups are global, so any user may be a member; management is restricted to
+    global admins (GlobalGroupAdminMixin).
+    """
+    template_name = 'users/usergroups/usergroup_assign_users.html'
+
+    def _get_group(self, pk):
+        return get_object_or_404(UserGroup, pk=pk)
+
+    def get(self, request, pk, *args, **kwargs):
+        group = self._get_group(pk)
+        form = UserGroupAssignUsersForm()
+        return render(request, self.template_name, {'group': group, 'form': form})
+
+    def post(self, request, pk, *args, **kwargs):
+        group = self._get_group(pk)
+        form = UserGroupAssignUsersForm(request.POST)
+        if form.is_valid():
+            # Escalation guard (§3-C): adding a member confers every role the group carries
+            # (permissions + tenant access). A non-superuser may only add members to a group
+            # whose roles they could themselves grant in each role's container. Superuser
+            # bypasses inside the helper.
+            try:
+                validate_group_membership_grant(request.user, group)
+            except ValidationError as exc:
+                for msg in exc.messages:
+                    messages.error(request, msg)
+                return render(request, self.template_name, {'group': group, 'form': form})
+
+            users = form.cleaned_data['users']
+            added = 0
+            already_member = 0
+            with transaction.atomic():
+                for user in users:
+                    if group.members.filter(pk=user.pk).exists():
+                        already_member += 1
+                    else:
+                        group.members.add(user)
+                        added += 1
+            messages.success(
+                request,
+                _("User group '%(group)s': %(added)d added, %(already)d already member.") % {
+                    'group': group.name,
+                    'added': added,
+                    'already': already_member,
+                },
+            )
+            return redirect(reverse('users:usergroup_detail', kwargs={'pk': group.pk}))
+
+        return render(request, self.template_name, {'group': group, 'form': form})

@@ -1,9 +1,8 @@
 from django.test import TestCase
 from django.core.exceptions import ValidationError
-from django.db.models import ProtectedError
 from django.contrib.auth import get_user_model
-from organization.models import Tenant, TenantMembership, TenantRole
-from organization.forms import TenantRoleForm
+from organization.models import Tenant, Membership, Role
+from organization.forms import RoleForm as TenantRoleForm
 from core.managers import set_current_tenant, set_current_membership
 
 User = get_user_model()
@@ -27,23 +26,27 @@ class TenantRoleSecurityTests(TestCase):
         )
 
     def test_role_scoping_to_tenant(self):
-        # Create role in Tenant A
-        role_a = TenantRole.objects.create(
+        # The unified Role lives on its container (tenant/provider). It's no longer hidden
+        # by a tenant-scoping manager — instead the auth backend gates effective perms per
+        # tenant. We assert: a role's tenant FK pins it to one container, and the backend
+        # refuses to grant the role's perms inside a tenant the user does NOT have a
+        # membership in.
+        role_a = Role.objects.create(
             tenant=self.tenant_a,
             name="Alpha Admin",
-            permissions=["assets.view_asset"]
+            permissions=["assets.view_asset"],
         )
-        
-        # Scoped to Tenant A
-        set_current_tenant(self.tenant_a)
-        self.assertIn(role_a, TenantRole.objects.all())
-        
-        # Scoped to Tenant B (should be invisible)
-        set_current_tenant(self.tenant_b)
-        self.assertNotIn(role_a, TenantRole.objects.all())
-        
-        # Reset context
-        set_current_tenant(None)
+        self.assertEqual(role_a.tenant, self.tenant_a)
+        self.assertIn(role_a, Role.objects.filter(tenant=self.tenant_a))
+        self.assertNotIn(role_a, Role.objects.filter(tenant=self.tenant_b))
+        membership = Membership.objects.create(
+            user=self.user_a, tenant=self.tenant_a,
+        )
+        membership.roles.add(role_a)
+        from core.auth import MembershipBackend
+        backend = MembershipBackend()
+        self.assertIn('assets.view_asset', backend._effective_perms_for_tenant(self.user_a, self.tenant_a))
+        self.assertNotIn('assets.view_asset', backend._effective_perms_for_tenant(self.user_a, self.tenant_b))
 
     def test_form_serialization_and_deserialization(self):
         # Create role using TenantRoleForm
@@ -79,26 +82,97 @@ class TenantRoleSecurityTests(TestCase):
         self.assertTrue(edit_form.fields['perm_add_delegated_assetrequest'].initial)
 
     def test_permission_backend_resolution(self):
-        role = TenantRole.objects.create(
+        role = Role.objects.create(
             tenant=self.tenant_a,
             name="ReadOnly Member",
             permissions=["assets.view_asset", "extras.view_dashboard"]
         )
-        membership = TenantMembership.objects.create(
-            user=self.user_a,
+        membership = Membership.objects.create(user=self.user_a,
             tenant=self.tenant_a,
-            role=role
         )
-        
+        membership.roles.add(role)
+
         set_current_membership(membership)
         set_current_tenant(self.tenant_a)
         
         self.assertTrue(self.user_a.has_perm('assets.view_asset'))
         self.assertFalse(self.user_a.has_perm('assets.add_asset'))
         self.assertFalse(self.user_a.has_perm('assets.delete_asset'))
+        set_current_membership(None)
+        set_current_tenant(None)
+
+    def test_provider_staff_tenant_projection(self):
+        # H4 (High): Test that provider-scoped role permissions project onto
+        # a customer tenant if a provider staff membership exists and has the tenant in scope.
+        from organization.models import Provider
+        provider = Provider.objects.create(name="MSP Provider", slug="msp-provider")
+        
+        # Link tenant_a to the provider
+        self.tenant_a.provider = provider
+        self.tenant_a.save()
+        
+        # Create provider staff membership
+        staff_user = User.objects.create_user(
+            username='staffuser', email='staff@example.com', password='password123'
+        )
+        
+        staff_role = Role.objects.create(
+            provider=provider,
+            name="MSP Tech",
+            permissions=["assets.view_asset", "assets.change_asset", "organization.manage_staff"],
+        )
+        
+        staff_membership = Membership.objects.create(
+            user=staff_user,
+            provider=provider,
+            tenant_scope=Membership.SCOPE_ALL,
+            is_active=True,
+        )
+        staff_membership.roles.add(staff_role)
+        
+        from core.auth import MembershipBackend
+        backend = MembershipBackend()
+        
+        # 1. Scope = SCOPE_ALL -> Should have permission in tenant_a (which belongs to the provider)
+        # but NOT in tenant_b (which does not belong to the provider)
+        self.assertTrue(backend.has_perm(staff_user, 'assets.view_asset', self.tenant_a))
+        self.assertFalse(backend.has_perm(staff_user, 'assets.view_asset', self.tenant_b))
+        # L4: Provider capabilities should be stripped in the tenant projection
+        self.assertFalse(backend.has_perm(staff_user, 'organization.manage_staff', self.tenant_a))
+        
+        # 2. Scope = SCOPE_EXPLICIT without tenant_a assigned -> Should NOT have permission in tenant_a
+        staff_membership.tenant_scope = Membership.SCOPE_EXPLICIT
+        staff_membership.save()
+        # clear cache
+        if hasattr(staff_user, f'_perms_tenant_{self.tenant_a.pk}'):
+            delattr(staff_user, f'_perms_tenant_{self.tenant_a.pk}')
+        self.assertFalse(backend.has_perm(staff_user, 'assets.view_asset', self.tenant_a))
+        
+        # 3. Scope = SCOPE_EXPLICIT with tenant_a assigned -> Should have permission in tenant_a
+        staff_membership.assigned_tenants.add(self.tenant_a)
+        if hasattr(staff_user, f'_perms_tenant_{self.tenant_a.pk}'):
+            delattr(staff_user, f'_perms_tenant_{self.tenant_a.pk}')
+        self.assertTrue(backend.has_perm(staff_user, 'assets.view_asset', self.tenant_a))
         
         set_current_membership(None)
         set_current_tenant(None)
+
+    def test_role_permissions_tolerated_at_model_layer(self):
+        # M6 (design): Role.permissions is deliberately NOT hard-validated at the model layer.
+        # A global pre_save signal (core/signals.py) runs clean() on every save, so a hard
+        # codename check would break the seed (whose tenant Administrator role is granted the
+        # full permission set, including organization.manage_*) and the validate_role_permissions
+        # audit command (which must be able to persist a stale codename in order to detect it).
+        # Codename hygiene is enforced by the form (drops unknown codenames) and audited
+        # post-hoc by validate_role_permissions; manage_* is kept off tenant projections by the
+        # backend (L4), not by rejecting the write.
+        role = Role.objects.create(
+            tenant=self.tenant_a,
+            name="Tolerant Role",
+            permissions=["assets.view_asset", "nonexistent.permission_codename"],
+        )
+        role.refresh_from_db()
+        self.assertIn("nonexistent.permission_codename", role.permissions)
 
     def test_purchase_order_permissions_form_and_backend(self):
         # Create a role with PO permissions using TenantRoleForm
@@ -135,11 +209,10 @@ class TenantRoleSecurityTests(TestCase):
         self.assertTrue(edit_form.fields['perm_receive_purchaseorder'].initial)
         
         # Verify backend resolution for user
-        membership = TenantMembership.objects.create(
-            user=self.user_a,
+        membership = Membership.objects.create(user=self.user_a,
             tenant=self.tenant_a,
-            role=role
         )
+        membership.roles.add(role)
         set_current_membership(membership)
         set_current_tenant(self.tenant_a)
         
@@ -155,20 +228,19 @@ class TenantRoleSecurityTests(TestCase):
 
     def test_privilege_escalation_validation(self):
         # User A is a ReadOnly member
-        reader_role = TenantRole.objects.create(
+        reader_role = Role.objects.create(
             tenant=self.tenant_a,
             name="Reader",
             permissions=["assets.view_asset", "extras.view_dashboard"]
         )
-        membership_a = TenantMembership.objects.create(
-            user=self.user_a,
+        membership_a = Membership.objects.create(user=self.user_a,
             tenant=self.tenant_a,
-            role=reader_role
         )
-        
+        membership_a.roles.add(reader_role)
+
         set_current_membership(membership_a)
         set_current_tenant(self.tenant_a)
-        
+
         # User A tries to create a role with Delete Asset permission (Privilege Escalation!)
         form_data = {
             'name': 'Rogue Admin',
@@ -185,45 +257,59 @@ class TenantRoleSecurityTests(TestCase):
         set_current_membership(None)
         set_current_tenant(None)
 
-    def test_invalid_codename_whitelist_validation(self):
-        # Form clean handles parsing, but let's test invalid permissions by patching MATRIX_MODELS in test
-        from organization.forms.tenantrole_form import MATRIX_MODELS
-        
-        # Add an invalid mock model definition to MATRIX_MODELS
+    def test_invalid_codenames_are_dropped_not_blocking(self):
+        """A matrix row that maps to a permission which doesn't exist (a model without
+        that action, an uninstalled plugin, or an app-label typo) must NOT block the
+        save. The bogus codename is dropped; valid permissions still save. (Previously
+        the whole save was rejected, which blocked legitimate roles on any matrix bug.)"""
+        from organization.forms.role_form import MATRIX_MODELS
+
         MATRIX_MODELS['mock_invalid'] = {
             'label': 'Invalid Model',
             'app': 'nonexistentapp',
-            'model_name': 'do_magic'
+            'model_name': 'do_magic',
         }
-        
         try:
             form_data = {
                 'name': 'Magician',
-                'description': 'Uses nonexistent permissions',
-                'perm_mock_invalid_read': True,
+                'description': 'Uses a nonexistent permission alongside a real one',
+                'perm_mock_invalid_read': True,   # nonexistentapp.view_do_magic -> dropped
+                'perm_asset_read': True,          # assets.view_asset -> kept
             }
             form = TenantRoleForm(data=form_data, tenant=self.tenant_a, user=self.super_user)
-            self.assertFalse(form.is_valid())
-            self.assertIn('__all__', form.errors)
-            self.assertTrue(any("Invalid permission codenames" in e for e in form.errors['__all__']))
+            self.assertTrue(form.is_valid(), form.errors)
+            self.assertNotIn('nonexistentapp.view_do_magic', form.instance.permissions)
+            self.assertIn('assets.view_asset', form.instance.permissions)
         finally:
             del MATRIX_MODELS['mock_invalid']
 
-    def test_role_deletion_protection(self):
-        role = TenantRole.objects.create(
+    def test_role_deletion_clears_membership_m2m(self):
+        """Deleting a Role removes it from the M2M join table.
+
+        With roles as a ManyToManyField on Membership, there is no FK PROTECT
+        constraint — deleting (or soft-deleting) a role simply removes the M2M rows so
+        the membership continues to exist but no longer carries that role's permissions.
+        """
+        role = Role.objects.create(
             tenant=self.tenant_a,
             name="Deletable?",
             permissions=["assets.view_asset"]
         )
-        TenantMembership.objects.create(
-            user=self.user_a,
+        membership = Membership.objects.create(user=self.user_a,
             tenant=self.tenant_a,
-            role=role
         )
-        
-        # Since membership.role on_delete=models.PROTECT, we should get a ProtectedError on deletion
-        with self.assertRaises(ProtectedError):
-            role.delete()
+        membership.roles.add(role)
+
+        self.assertIn(role, membership.roles.all())
+
+        # Deleting the role must not raise — M2M rows are cascaded by the DB.
+        role.delete()
+
+        membership.refresh_from_db()
+        # Role is gone from the membership's effective role set.
+        self.assertNotIn(role, membership.roles.all())
+        # The membership itself still exists.
+        self.assertTrue(Membership.objects.filter(pk=membership.pk).exists())
 
     def test_global_mode_tenant_selection(self):
         # In global mode (no tenant in kwargs), tenant is selected in form fields
@@ -253,28 +339,26 @@ class TenantRoleSecurityTests(TestCase):
         )
         
         # User A is a Reader (only has view_asset)
-        reader_role = TenantRole.objects.create(
+        reader_role = Role.objects.create(
             tenant=self.tenant_a,
             name="Reader",
             permissions=["assets.view_asset"]
         )
-        membership_a = TenantMembership.objects.create(
-            user=self.user_a,
+        membership_a = Membership.objects.create(user=self.user_a,
             tenant=self.tenant_a,
-            role=reader_role
         )
-        
+        membership_a.roles.add(reader_role)
+
         # User B is a Software Manager (only has view_software, no view_asset)
-        sw_role = TenantRole.objects.create(
+        sw_role = Role.objects.create(
             tenant=self.tenant_a,
             name="SW Manager",
             permissions=["software.view_software"]
         )
-        membership_b = TenantMembership.objects.create(
-            user=self.user_b,
+        membership_b = Membership.objects.create(user=self.user_b,
             tenant=self.tenant_a,
-            role=sw_role
         )
+        membership_b.roles.add(sw_role)
         
         # Login User A (with view_asset permission)
         self.client.force_login(self.user_a)
@@ -316,28 +400,26 @@ class TenantRoleSecurityTests(TestCase):
         )
         
         # User A has change_alertlog
-        alert_admin_role = TenantRole.objects.create(
+        alert_admin_role = Role.objects.create(
             tenant=self.tenant_a,
             name="Alert Admin",
             permissions=["extras.change_alertlog"]
         )
-        membership_a = TenantMembership.objects.create(
-            user=self.user_a,
+        membership_a = Membership.objects.create(user=self.user_a,
             tenant=self.tenant_a,
-            role=alert_admin_role
         )
-        
+        membership_a.roles.add(alert_admin_role)
+
         # User B does not have change_alertlog
-        reader_role = TenantRole.objects.create(
+        reader_role = Role.objects.create(
             tenant=self.tenant_a,
             name="Reader",
             permissions=["assets.view_asset"]
         )
-        membership_b = TenantMembership.objects.create(
-            user=self.user_b,
+        membership_b = Membership.objects.create(user=self.user_b,
             tenant=self.tenant_a,
-            role=reader_role
         )
+        membership_b.roles.add(reader_role)
         
         # Login User A
         self.client.force_login(self.user_a)
@@ -380,28 +462,26 @@ class TenantRoleSecurityTests(TestCase):
         )
         
         # User A has view_reporttemplate and view_scheduledreport
-        report_admin_role = TenantRole.objects.create(
+        report_admin_role = Role.objects.create(
             tenant=self.tenant_a,
             name="Report Admin",
             permissions=["extras.view_reporttemplate", "extras.view_scheduledreport"]
         )
-        membership_a = TenantMembership.objects.create(
-            user=self.user_a,
+        membership_a = Membership.objects.create(user=self.user_a,
             tenant=self.tenant_a,
-            role=report_admin_role
         )
-        
+        membership_a.roles.add(report_admin_role)
+
         # User B does not have report permissions
-        reader_role = TenantRole.objects.create(
+        reader_role = Role.objects.create(
             tenant=self.tenant_a,
             name="Reader",
             permissions=["assets.view_asset"]
         )
-        membership_b = TenantMembership.objects.create(
-            user=self.user_b,
+        membership_b = Membership.objects.create(user=self.user_b,
             tenant=self.tenant_a,
-            role=reader_role
         )
+        membership_b.roles.add(reader_role)
         
         # Login User A
         self.client.force_login(self.user_a)
@@ -481,16 +561,15 @@ class TenantRoleSecurityTests(TestCase):
         view_reporttemplate_str = f"{view_reporttemplate_perm.content_type.app_label}.{view_reporttemplate_perm.codename}"
 
         # Create role with real-sourced perm strings and verify auth backend accepts them.
-        role = TenantRole.objects.create(
+        role = Role.objects.create(
             tenant=self.tenant_a,
             name="Extras Regression Role",
             permissions=[change_alertlog_str, view_reporttemplate_str],
         )
-        membership = TenantMembership.objects.create(
-            user=self.user_a,
+        membership = Membership.objects.create(user=self.user_a,
             tenant=self.tenant_a,
-            role=role,
         )
+        membership.roles.add(role)
         set_current_tenant(self.tenant_a)
         set_current_membership(membership)
         self.assertTrue(
@@ -529,3 +608,236 @@ class TenantRoleSecurityTests(TestCase):
         saved = form2.save()
         self.assertIn(change_alertlog_str, saved.permissions)
         self.assertIn(view_reporttemplate_str, saved.permissions)
+
+
+class RBACCoverageTests(TestCase):
+    def setUp(self):
+        set_current_tenant(None)
+        set_current_membership(None)
+        
+        self.super_user = User.objects.create_superuser(
+            username='superuser', email='super@example.com', password='password123'
+        )
+        from organization.models import Provider
+        self.provider, _ = Provider.objects.get_or_create(slug="msp-provider-coverage", defaults={"name": "MSP Provider Coverage"})
+        self.tenant_a, _ = Tenant.objects.get_or_create(slug="tenant-a-coverage", defaults={"name": "Tenant A Coverage", "provider": self.provider})
+
+    def test_tenant_group_hierarchy_and_cycle(self):
+        # M7: Test get_descendant_tenant_group_ids with hierarchy and cycle
+        from organization.models import TenantGroup
+        from organization.access import get_descendant_tenant_group_ids
+        
+        g1 = TenantGroup.objects.create(name="Group 1", slug="g1")
+        g2 = TenantGroup.objects.create(name="Group 2", slug="g2", parent=g1)
+        g3 = TenantGroup.objects.create(name="Group 3", slug="g3", parent=g2)
+        
+        # Verify hierarchy walk
+        descendants = get_descendant_tenant_group_ids(g1.pk)
+        self.assertEqual(descendants, {g1.pk, g2.pk, g3.pk})
+        
+        # Introduce a cycle manually (parent=g3 for g1)
+        TenantGroup.objects.filter(pk=g1.pk).update(parent=g3)
+        
+        # Verify it doesn't infinite loop and returns the cycle set
+        descendants_cycle = get_descendant_tenant_group_ids(g1.pk)
+        self.assertEqual(descendants_cycle, {g1.pk, g2.pk, g3.pk})
+
+    def test_tenant_in_scope_tenant_groups(self):
+        # M7: Test _tenant_in_scope for SCOPE_TENANT_GROUP
+        from organization.models import TenantGroup
+        from core.auth import MembershipBackend
+        
+        g1 = TenantGroup.objects.create(name="Group 1", slug="g1")
+        g2 = TenantGroup.objects.create(name="Group 2", slug="g2", parent=g1)
+        
+        tenant_in_g2 = Tenant.objects.create(name="Tenant in G2", slug="t-g2", group=g2, provider=self.provider)
+        tenant_sibling = Tenant.objects.create(name="Tenant Sibling", slug="t-sib", provider=self.provider)
+        
+        user = User.objects.create_user(username='tech', email='tech@example.com')
+        staff_membership = Membership.objects.create(
+            user=user,
+            provider=self.provider,
+            tenant_scope=Membership.SCOPE_TENANT_GROUP,
+            scope_group=g1,
+            is_active=True,
+        )
+        
+        backend = MembershipBackend()
+        self.assertTrue(backend._tenant_in_scope(staff_membership, tenant_in_g2))
+        self.assertFalse(backend._tenant_in_scope(staff_membership, tenant_sibling))
+
+    def test_instantiate_default_provider_roles(self):
+        # M8: Test instantiate_default_provider_roles
+        default_role = Role.objects.create(
+            provider=self.provider,
+            name="Default Tech Role",
+            permissions=["assets.view_asset", "organization.manage_staff"],
+            is_default=True,
+        )
+        
+        # Create a new tenant under this provider
+        new_tenant = Tenant.objects.create(name="New Tenant", slug="new-tenant", provider=self.provider)
+        
+        # Verify that the role was cloned into the new tenant
+        cloned_role = Role.objects.filter(tenant=new_tenant, name=default_role.name).first()
+        self.assertIsNotNone(cloned_role)
+        self.assertEqual(cloned_role.description, default_role.description)
+        self.assertIn("assets.view_asset", cloned_role.permissions)
+        self.assertNotIn("organization.manage_staff", cloned_role.permissions)
+
+    def test_cache_invalidation_signals_and_m2m(self):
+        # M9: Test cache-invalidation signals including M2M updates
+        from core.auth import MembershipBackend
+        backend = MembershipBackend()
+        
+        user = User.objects.create_user(username='memberuser', email='member@example.com')
+        role = Role.objects.create(
+            tenant=self.tenant_a,
+            name="Viewer",
+            permissions=["assets.view_asset"]
+        )
+        membership = Membership.objects.create(
+            user=user,
+            tenant=self.tenant_a,
+            is_active=True,
+        )
+        
+        self.assertNotIn("assets.view_asset", backend._effective_perms_for_tenant(user, self.tenant_a))
+        
+        # Add role (M2M change)
+        membership.roles.add(role)
+        self.assertIn("assets.view_asset", backend._effective_perms_for_tenant(user, self.tenant_a))
+        
+        # Remove role (M2M change)
+        membership.roles.remove(role)
+        self.assertNotIn("assets.view_asset", backend._effective_perms_for_tenant(user, self.tenant_a))
+
+    def test_technician_quick_form(self):
+        # M10: Test TechnicianQuickForm validation, scoping, and privilege escalation guards
+        from organization.forms import TechnicianQuickForm
+        
+        role = Role.objects.create(
+            provider=self.provider,
+            name="MSP Admin Role",
+            permissions=["assets.view_asset", "organization.manage_staff"]
+        )
+        
+        non_admin_user = User.objects.create_user(username='nonadmin', email='nonadmin@example.com')
+        
+        form = TechnicianQuickForm(
+            user=non_admin_user,
+            data={
+                'email': 'newtech@example.com',
+                'first_name': 'New',
+                'last_name': 'Tech',
+                'provider': self.provider.pk,
+                'role': role.pk,
+                'tenant_scope': Membership.SCOPE_ALL,
+            }
+        )
+        self.assertFalse(form.is_valid())
+        self.assertIn('role', form.errors)
+        
+        form_super = TechnicianQuickForm(
+            user=self.super_user,
+            data={
+                'email': 'newtech@example.com',
+                'first_name': 'New',
+                'last_name': 'Tech',
+                'provider': self.provider.pk,
+                'role': role.pk,
+                'tenant_scope': Membership.SCOPE_ALL,
+            }
+        )
+        self.assertTrue(form_super.is_valid(), form_super.errors)
+        user, membership = form_super.save()
+        self.assertEqual(user.email, 'newtech@example.com')
+        self.assertEqual(membership.provider, self.provider)
+        self.assertIn(role, membership.roles.all())
+
+
+class ProviderRoleCapabilityRoundTripTests(TestCase):
+    """Regression: editing a provider-scoped role through the UI must NOT strip its
+    provider capabilities (``organization.manage_*``).
+
+    The ``RoleForm`` always carried the ``cap_*`` checkbox fields, but the template never
+    rendered them — so a browser POST omitted every capability and ``RoleForm.clean()``
+    rebuilt ``permissions`` without them, silently deleting ``manage_*`` on the first save.
+    """
+    def setUp(self):
+        from django.urls import reverse
+        from organization.models import Provider
+        set_current_tenant(None)
+        set_current_membership(None)
+        self.reverse = reverse
+        self.tenant = Tenant.objects.create(name="Home", slug="home")
+        self.provider = Provider.objects.create(name="Northwind MSP", slug="northwind")
+        self.superuser = User.objects.create_superuser(
+            username='su', email='su@example.com', password='password123',
+        )
+        self.role = Role.objects.create(
+            provider=self.provider, scope=Role.SCOPE_PROVIDER, name="Provider Administrator",
+            permissions=[
+                'organization.manage_provider', 'organization.manage_tenants',
+                'organization.manage_staff', 'organization.manage_groups',
+                'assets.view_asset',
+            ],
+        )
+
+    def test_edit_page_renders_capability_checkboxes(self):
+        # Template regression guard: the four provider-capability inputs must appear in
+        # the rendered edit page. Their absence is the root cause of the silent strip.
+        self.client.force_login(self.superuser)
+        session = self.client.session
+        session['active_tenant_id'] = self.tenant.pk
+        session.save()
+        resp = self.client.get(self.reverse('organization:role_update', kwargs={'pk': self.role.pk}))
+        self.assertEqual(resp.status_code, 200)
+        for cap in ('cap_manage_provider', 'cap_manage_tenants', 'cap_manage_staff', 'cap_manage_groups'):
+            self.assertContains(resp, f'name="{cap}"')
+
+    def test_unchanged_resubmit_preserves_capabilities(self):
+        # Build the POST a browser sends when opening the form and saving unchanged:
+        # every initially-checked checkbox is submitted, unchecked ones are omitted.
+        from django import forms as djforms
+        seed = TenantRoleForm(instance=self.role, user=self.superuser)
+        data = {'name': self.role.name, 'description': self.role.description or ''}
+        for fname, field in seed.fields.items():
+            if field.disabled:
+                continue
+            if isinstance(field, djforms.BooleanField):
+                if seed[fname].value():
+                    data[fname] = 'on'
+        bound = TenantRoleForm(data=data, instance=self.role, user=self.superuser)
+        self.assertTrue(bound.is_valid(), bound.errors)
+        bound.save()
+        self.role.refresh_from_db()
+        for cap in ('organization.manage_provider', 'organization.manage_tenants',
+                    'organization.manage_staff', 'organization.manage_groups'):
+            self.assertIn(cap, self.role.permissions)
+        self.assertIn('assets.view_asset', self.role.permissions)
+
+    def test_clone_provider_role_requires_provider_picker(self):
+        # Regression: cloning a provider-scoped role must require/render the PROVIDER picker,
+        # not the tenant field (which the template hides for provider scope) — otherwise the
+        # clone is unsubmittable. Mirror RoleCloneView: an unsaved copy keeping scope=provider
+        # with both FKs nulled.
+        clone = Role(
+            name="Provider Administrator (copy)", scope=Role.SCOPE_PROVIDER,
+            permissions=list(self.role.permissions),
+        )
+        form = TenantRoleForm(instance=clone, user=self.superuser)
+        self.assertTrue(form.is_provider_scoped)
+        self.assertTrue(form.fields['provider'].required)
+        self.assertFalse(form.fields['tenant'].required)
+        # Submitting with the provider picked validates and saves a provider-scoped role.
+        data = {
+            'name': clone.name, 'description': '', 'provider': self.provider.pk,
+            'perm_asset_read': 'on', 'cap_manage_staff': 'on',
+        }
+        bound = TenantRoleForm(data=data, instance=clone, user=self.superuser)
+        self.assertTrue(bound.is_valid(), bound.errors)
+        saved = bound.save()
+        self.assertEqual(saved.scope, Role.SCOPE_PROVIDER)
+        self.assertEqual(saved.provider_id, self.provider.pk)
+        self.assertIn('organization.manage_staff', saved.permissions)

@@ -12,7 +12,7 @@
 {# --- Tabs Hook --- #}
 {% block extra_tabs %}
     <li class="nav-item" role="presentation">
-        <a href="?tab=assets" class="nav-link {% if not request.GET.tab or request.GET.tab == 'assets' %}active{% endif %}" data-bs-toggle="tab" data-bs-target="#assets" role="tab" aria-selected="{% if not request.GET.tab or request.GET.tab == 'assets' %}true{% else %}false{% endif %}">
+        <a href="?tab=assets" class="nav-link {% if request.GET.tab == 'assets' %}active{% endif %}" data-bs-toggle="tab" hx-boost="false" data-bs-target="#assets" role="tab" aria-selected="{% if request.GET.tab == 'assets' %}true{% else %}false{% endif %}">
             <i class="mdi mdi-office-building-outline me-1 text-green"></i>
             {% translate "Assets" %} <span class="badge bg-green-lt ms-2">{{ assets_table.rows|length }}</span>
         </a>
@@ -28,7 +28,7 @@
 {# --- Extra Tab Panes --- #}
 {% block extra_tab_panes %}
     {# Assets Tab Pane #}
-    <div class="tab-pane fade {% if not request.GET.tab or request.GET.tab == 'assets' %}show active{% endif %}" id="assets" role="tabpanel">
+    <div class="tab-pane fade {% if request.GET.tab == 'assets' %}show active{% endif %}" id="assets" role="tabpanel">
         <div class="card border-0 shadow-sm">
             <div class="card-header border-0 bg-transparent">
                 <h3 class="card-title">{% blocktranslate with name=object.name %}Assets / Devices with status "{{ name }}"{% endblocktranslate %}</h3>

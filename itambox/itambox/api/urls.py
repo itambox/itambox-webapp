@@ -30,6 +30,7 @@ urlpatterns = [
     path('subscriptions/', include('subscriptions.api.urls', namespace='subscriptions_api')),
     path('users/', include('users.api.urls', namespace='users_api')),
     path('tenants/<slug:tenant_slug>/scim/v2/', include('users.api.scim.urls', namespace='scim')),
+    path('providers/<slug:provider_slug>/scim/v2/', include('users.api.scim.provider_urls', namespace='provider_scim')),
 
     path('schema/openapi.json', SpectacularJSONAPIView.as_view(), name='openapi-schema'),
     path('schema/', SpectacularAPIView.as_view(), name='schema'),

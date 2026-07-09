@@ -152,10 +152,13 @@ def get_help_url(view_instance, app_label=None, model_name=None):
     if not doc_path and app_label and model_name:
         # Resolve path mismatch for components which belong to the inventory app
         resolved_app = 'components' if app_label == 'inventory' and model_name.startswith('component') else app_label
+        # Resolve path mismatch for assetmaintenance (its app_label in model is assets, but docs are in compliance)
+        if app_label == 'assets' and model_name == 'assetmaintenance':
+            resolved_app = 'compliance'
         doc_path = f"models/{resolved_app}/{model_name}"
 
     if not doc_path:
-        return None
+        return f"{settings.STATIC_URL}docs/index.html"
 
     import os
     static_docs_dir = os.path.join(settings.BASE_DIR, 'static', 'docs')
@@ -167,7 +170,7 @@ def get_help_url(view_instance, app_label=None, model_name=None):
         return f"{settings.STATIC_URL}docs/{doc_path}.html"
     elif os.path.exists(dir_target):
         return f"{settings.STATIC_URL}docs/{doc_path}/index.html"
-    return None
+    return f"{settings.STATIC_URL}docs/index.html"
 
 
 def generate_unique_slug(instance, slug_source=None, slug_field='slug'):

@@ -45,7 +45,6 @@ class SeedSubscriptionsMixin:
             primary_slug = org['tenants'][0]['slug']
             tenant = self._tenants[primary_slug]
             currency = self._tenant_meta[primary_slug]['currency']
-            label = org['group'][0] if org['group'] else org['tenants'][0]['name']
             plan = [('Amazon Web Services', random.randint(30000, 150000)),
                     ('Microsoft Azure', random.randint(40000, 200000))]
             if org['kind'] == 'msp' or random.random() < 0.5:
@@ -57,7 +56,7 @@ class SeedSubscriptionsMixin:
                 start = days_ago(random.randint(60, 700))
                 renewal = days_ahead(random.choice([20, 35, 60, 120, 300]))
                 sub = Subscription.objects.create(
-                    name=f"{label} — {prov_name}", provider=self._providers[prov_name], type='saas',
+                    name=prov_name, provider=self._providers[prov_name], type='saas',
                     start_date=start, renewal_date=renewal, renewal_cost=cost, currency=currency,
                     billing_cycle='annual', term_months=12, auto_renewal=True,
                     contract_reference=f"MSA-{prov_name.split()[0].upper()}-{start.year}",

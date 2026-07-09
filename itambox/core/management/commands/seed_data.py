@@ -114,7 +114,7 @@ class Command(SeedCatalogMixin, SeedOrganizationsMixin, SeedAccessMixin, SeedAss
             ('extras', 'WebhookEndpoint'), ('extras', 'LabelTemplate'),
             ('extras', 'ExportTemplate'), ('extras', 'JournalEntry'),
             ('core', 'Notification'), ('core', 'ObjectChange'),
-            ('extras', 'ConfigContext'), ('extras', 'Dashboard'),
+            ('extras', 'Dashboard'),
             ('procurement', 'FulfillmentLink'), ('procurement', 'PurchaseOrderLine'),
             ('procurement', 'PurchaseOrder'), ('procurement', 'Contract'),
             ('assets', 'AssetRequest'), ('compliance', 'AssetAudit'), ('compliance', 'AuditSession'),
@@ -132,8 +132,8 @@ class Command(SeedCatalogMixin, SeedOrganizationsMixin, SeedAccessMixin, SeedAss
             ('inventory', 'Component'), ('inventory', 'Accessory'), ('inventory', 'Consumable'),
             ('licenses', 'License'), ('software', 'Software'),
             ('subscriptions', 'Subscription'), ('subscriptions', 'Provider'),
-            ('organization', 'TenantMembership'), ('organization', 'TenantInvitation'),
-            ('organization', 'TenantRole'),
+            ('organization', 'Membership'), ('organization', 'TenantInvitation'),
+            ('organization', 'Role'),
             ('organization', 'ContactAssignment'), ('organization', 'Contact'),
             ('organization', 'ContactRole'),
             ('organization', 'Location'), ('organization', 'Site'),
@@ -237,11 +237,71 @@ class Command(SeedCatalogMixin, SeedOrganizationsMixin, SeedAccessMixin, SeedAss
             self._seed_lifecycle()             # warranties, reservations, disposals (assets)
             self._seed_contracts_and_costing() # contracts + cost-centre backfill (licenses/subs)
             self._seed_compliance()            # audit sessions + custody receipts
+            self._seed_export_templates()      # global Jinja export templates (no tenant/random)
             self._simulate_history()           # real 2-year change history (last)
 
     # ─────────────────────────────────────────────────────────────────
     # Catalog (shared status-label defs used by both _seed_minimal and _seed_catalog)
     # ─────────────────────────────────────────────────────────────────
+
+    # ─────────────────────────────────────────────────────────────────
+    # Export templates (global, Jinja-rendered; no tenant, no random stream)
+    # ─────────────────────────────────────────────────────────────────
+
+    def _seed_export_templates(self):
+        from django.contrib.contenttypes.models import ContentType
+        from assets.models import Asset
+        from licenses.models import License
+        from extras.models import ExportTemplate
+
+        asset_csv = (
+            "Asset Tag,Name,Serial Number,Status\n"
+            "{% for obj in queryset %}"
+            "{{ obj.asset_tag|csv_safe }},{{ obj.name|csv_safe }},"
+            "{{ obj.serial_number|csv_safe }},{{ obj.status|csv_safe }}\n"
+            "{% endfor %}"
+        )
+        asset_json = (
+            "[\n"
+            "{% for obj in queryset %}"
+            "  {\"asset_tag\": {{ obj.asset_tag|tojson }}, \"name\": {{ obj.name|tojson }}, "
+            "\"serial_number\": {{ obj.serial_number|tojson }}, "
+            "\"status\": {{ obj.status|string|tojson }}}{% if not loop.last %},{% endif %}\n"
+            "{% endfor %}"
+            "]\n"
+        )
+        license_csv = (
+            "License,Software,Seats,Expiration\n"
+            "{% for obj in queryset %}"
+            "{{ obj.name|csv_safe }},{{ obj.software|csv_safe }},"
+            "{{ obj.seats }},{{ obj.expiration_date|csv_safe }}\n"
+            "{% endfor %}"
+        )
+
+        defs = [
+            (Asset, 'Assets — CSV', 'Flat CSV of every asset (tag, name, serial, status).',
+             asset_csv, 'text/csv', 'csv'),
+            (Asset, 'Assets — JSON', 'JSON array of assets for downstream tooling.',
+             asset_json, 'application/json', 'json'),
+            (License, 'Licenses — CSV', 'Flat CSV of licenses with seat counts and expiry.',
+             license_csv, 'text/csv', 'csv'),
+        ]
+        created = 0
+        for model, name, description, code, mime, ext in defs:
+            ct = ContentType.objects.get_for_model(model)
+            _obj, was_created = ExportTemplate.objects.get_or_create(
+                content_type=ct,
+                name=name,
+                defaults={
+                    'description': description,
+                    'template_code': code,
+                    'mime_type': mime,
+                    'file_extension': ext,
+                    'as_attachment': True,
+                },
+            )
+            created += int(was_created)
+        self.stdout.write(f'  Seeded export templates ({created} new).')
 
     @staticmethod
     def _status_label_defs():

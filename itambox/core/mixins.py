@@ -184,9 +184,16 @@ class SoftDeleteMixin(models.Model):
     def delete(self, *args, force_hard_delete=False, **kwargs):
         """
         Overrides Django's standard delete. If force_hard_delete is True,
-        performs a standard physical delete. Otherwise, soft-deletes the record.
+        performs a standard physical delete (still change-logged when a
+        ChangeLoggingMixin sits later in the MRO). Otherwise, soft-deletes.
         """
-        if force_hard_delete:
+        # force_hard_delete may also have been stashed on the instance by
+        # ChangeLoggingMixin earlier in the MRO. Resolve from either source and
+        # re-stash so the partner mixin sees it regardless of MRO order; never
+        # forward the kwarg to super() (models.Model.delete() rejects it).
+        force_hard = force_hard_delete or getattr(self, '_force_hard_delete', False)
+        self._force_hard_delete = force_hard
+        if force_hard:
             super().delete(*args, **kwargs)
         else:
             from django.db import transaction
@@ -228,7 +235,12 @@ class SoftDeleteMixin(models.Model):
                                 instance.delete()
                     
                     if pks_to_soft_delete:
-                        model.objects.filter(pk__in=pks_to_soft_delete).update(deleted_at=now)
+                        # _base_manager (unscoped): these are cascade children of `self`
+                        # collected by the ORM, so they MUST be soft-deleted regardless of
+                        # the active tenant context. The tenant-scoped manager would match
+                        # zero rows for a child in a different/None tenant — leaving it active
+                        # while a 'delete' audit entry was already written above (divergence).
+                        model._base_manager.filter(pk__in=pks_to_soft_delete).update(deleted_at=now)
                 
                 self.soft_delete()
 

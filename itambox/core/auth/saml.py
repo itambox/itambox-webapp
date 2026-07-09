@@ -77,6 +77,10 @@ class TenantSaml2Backend(Saml2Backend):
     """
     def authenticate(self, request, session_info=None, attribute_mapping=None, create_unknown_user=True, **kwargs):
         user = super().authenticate(request, session_info, attribute_mapping, create_unknown_user, **kwargs)
+        # ``can_login=False`` bars ALL interactive login, including SSO (SSO backends do not
+        # route through ModelBackend.user_can_authenticate).
+        if user and not getattr(user, 'can_login', True):
+            return None
         if user and session_info:
             self.sync_saml_user_profile_and_memberships(user, session_info)
         return user
@@ -86,7 +90,7 @@ class TenantSaml2Backend(Saml2Backend):
         if not tenant:
             return
 
-        from organization.models import AssetHolder, TenantRole, TenantMembership
+        from organization.models import AssetHolder, Role, Membership
         from django.db.utils import IntegrityError
         from django.db import transaction
         import logging
@@ -194,7 +198,7 @@ class TenantSaml2Backend(Saml2Backend):
         provision_membership(user, tenant, db_role_name, self.get_permissions_for_role, 'SAML')
 
     def get_permissions_for_role(self, role_name):
-        from organization.forms.tenantrole_form import MATRIX_MODELS
+        from organization.forms.role_form import MATRIX_MODELS
         from django.contrib.auth.models import Permission
         perms = set()
         for key, info in MATRIX_MODELS.items():

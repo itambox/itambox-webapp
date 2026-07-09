@@ -7,7 +7,6 @@ app_name = 'assets'
 
 urlpatterns = [
     # Dashboard path removed, handled in core.urls
-    path('assets/bulk-assign/', views.bulk_assign_assets, name='asset_bulk_assign'),
     path('assets/bulk-print-labels/', views.bulk_print_labels, name='asset_bulk_print_labels'),
 
     # Scanner-driven bulk check-in / check-out / disposal (scan basket)

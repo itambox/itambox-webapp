@@ -14,11 +14,11 @@
 
 | Field | Description | Type | Required |
 | --- | --- | --- | --- |
+| **Color** | Hexadecimal color code for visual badge indicators. | Hex Color | No |
+| **Description** | Optional notes describing when to use this label. | Text | No |
 | **Name** | Unique name of the status label (e.g., `Staged & Ready`). | String | Yes |
 | **Slug** | URL-safe name representation. | Slug | Yes |
 | **Type** | One of the five core Meta-Types. | Choice | Yes |
-| **Description** | Optional notes describing when to use this label. | Text | No |
-| **Color** | Hexadecimal color code for visual badge indicators. | Hex Color | No |
 
 ## Use Cases
 You can create custom, highly detailed labels for your workflows while preserving global compliance:

@@ -1,9 +1,11 @@
 import json
+from django.db import transaction
+from django.http import Http404, HttpResponse, HttpResponseForbidden
 from django.shortcuts import render, get_object_or_404, redirect
 from django.contrib import messages
 from django.contrib.auth.mixins import LoginRequiredMixin
 from django.urls import reverse, reverse_lazy
-from django.http import HttpResponse
+from django.utils.html import format_html
 from django.views.generic import View
 from django.utils.translation import gettext_lazy as _
 
@@ -20,7 +22,7 @@ from inventory.services import checkout_inventory_item, checkin_accessory
 
 
 class AccessoryListView(ObjectListView):
-    queryset = Accessory.objects.with_counts().select_related('tenant', 'manufacturer').prefetch_related('tags')
+    queryset = Accessory.objects.with_counts().select_related('tenant', 'manufacturer', 'category').prefetch_related('tags')
     filterset = filters.AccessoryFilterSet
     filterset_form = forms.AccessoryFilterForm
     table = tables.AccessoryTable
@@ -218,21 +220,22 @@ class AccessoryAssignmentListView(ObjectListView):
 
 class AccessoryStockAdjustView(LoginRequiredMixin, View):
     def post(self, request, pk):
-        from django.http import HttpResponse, HttpResponseForbidden
-        from django.utils.html import format_html
+        with transaction.atomic():
+            try:
+                stock = AccessoryStock.objects.select_for_update().get(pk=pk)
+            except AccessoryStock.DoesNotExist:
+                raise Http404
+            if not request.user.has_perm('inventory.change_accessorystock', obj=stock.accessory):
+                return HttpResponseForbidden(_("Permission denied."))
+            action = request.GET.get('action')
 
-        stock = get_object_or_404(AccessoryStock, pk=pk)
-        if not request.user.has_perm('inventory.change_accessorystock', obj=stock.accessory):
-            return HttpResponseForbidden(_("Permission denied."))
-        action = request.GET.get('action')
-
-        if action == 'increment':
-            stock.qty += 1
-            stock.save()
-        elif action == 'decrement':
-            if stock.qty > 0:
-                stock.qty -= 1
+            if action == 'increment':
+                stock.qty += 1
                 stock.save()
+            elif action == 'decrement':
+                if stock.qty > 0:
+                    stock.qty -= 1
+                    stock.save()
 
         return HttpResponse(format_html(
             '<div class="d-flex align-items-center justify-content-start">'

@@ -1,0 +1,48 @@
+{% extends base_template|default:"layout.html" %}
+{% load i18n %}
+{% load crispy_forms_tags %}
+
+{% block title %}{% translate "Assign Users to" %} {{ group }} {% translate "— ITAMbox" %}{% endblock %}
+
+{% block page_header %}
+<div class="page-pretitle">
+    {% translate "Access Control / User Groups" %}
+</div>
+<h2 class="page-title">
+    {% translate "Assign Users to" %} {{ group.name }}
+</h2>
+{% endblock %}
+
+{% block page_actions %}
+<a href="{% url 'users:usergroup_detail' pk=group.pk %}" class="btn btn-outline-secondary">
+    <i class="mdi mdi-arrow-left"></i>
+    {% translate "Back to Group" %}
+</a>
+{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-md-6 col-lg-5">
+        <div class="card border-0 shadow-sm">
+            <div class="card-body">
+                <p class="text-muted">
+                    {% translate "Select users to add as members of this global group. Members gain each of the group's roles' permissions in those roles' tenants." %}
+                </p>
+                <form method="post">
+                    {% csrf_token %}
+                    {{ form.as_p }}
+                    <div class="mt-3">
+                        <button type="submit" class="btn btn-primary">
+                            <i class="mdi mdi-account-multiple-check"></i>
+                            {% translate "Assign" %}
+                        </button>
+                        <a href="{% url 'users:usergroup_detail' pk=group.pk %}" class="btn btn-outline-secondary ms-2">
+                            {% translate "Cancel" %}
+                        </a>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

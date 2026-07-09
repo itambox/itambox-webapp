@@ -318,8 +318,13 @@ def dispose_asset(
             type=StatusTypeChoices.ARCHIVED
         ).first()
 
-        # Remove any existing disposal record for this asset (idempotent re-run)
-        AssetDisposal.all_objects.filter(asset=asset).delete()
+        # Remove any existing disposal record for this asset (idempotent re-run).
+        # asset is a OneToOne, so the row must be HARD-deleted to free the unique
+        # slot (a soft-delete tombstone would still occupy asset_id). force_hard_delete
+        # is now change-logged by ChangeLoggingMixin, so destroying this
+        # GDPR/WEEE/SOC2 disposal evidence is captured in the audit trail.
+        for existing_disposal in AssetDisposal.all_objects.filter(asset=asset):
+            existing_disposal.delete(force_hard_delete=True)
 
         disposal = AssetDisposal(
             asset=asset,
@@ -345,6 +350,16 @@ def dispose_asset(
         # None, so this is a no-op and first-disposal behavior is unchanged.)
         asset.disposed_at = None
         asset.disposal_value = None
+
+        # Proceeds must be non-negative and in the asset's own currency: there is no FX
+        # source, so a foreign-currency or negative proceeds would corrupt the frozen
+        # book value / TCO it flows into.
+        if proceeds is not None and proceeds < 0:
+            raise ValidationError(_("Disposal proceeds cannot be negative."))
+        if proceeds is not None and currency and getattr(asset, 'currency', None) and currency != asset.currency:
+            raise ValidationError(
+                _("Disposal proceeds currency must match the asset's currency (no conversion is applied).")
+            )
 
         # Update the asset: stamp disposal fields and transition status
         if proceeds is not None:

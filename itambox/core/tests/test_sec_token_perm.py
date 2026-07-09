@@ -7,7 +7,7 @@ production permission code: under the test runner it granted an unscoped,
 unauthorized user access to the first tenant's data.
 
 These tests prove the bypass is gone: an authenticated non-superuser with no
-TenantMembership and no asset-holder profile is denied (403) on a
+Membership and no asset-holder profile is denied (403) on a
 TokenPermissions-protected endpoint, while a legitimately scoped member of a
 tenant still succeeds (200) on the same endpoint.
 """
@@ -15,7 +15,7 @@ from django.test import TestCase
 from django.contrib.auth import get_user_model
 from django.urls import reverse
 
-from organization.models import Tenant, TenantRole, TenantMembership
+from organization.models import Tenant, Role, Membership
 
 User = get_user_model()
 
@@ -26,7 +26,7 @@ class TokenPermissionsBypassRemovedTests(TestCase):
         # something to hand the unscoped user (proving its removal matters).
         self.tenant = Tenant.objects.create(name='Tenant F7', slug='tenant-f7')
 
-        self.role = TenantRole.objects.create(
+        self.role = Role.objects.create(
             tenant=self.tenant,
             name='Viewer-f7',
             permissions=['assets.view_asset'],
@@ -36,9 +36,9 @@ class TokenPermissionsBypassRemovedTests(TestCase):
         self.member = User.objects.create_user(
             username='member-f7', password='password123'
         )
-        self.membership = TenantMembership.objects.create(
-            user=self.member, tenant=self.tenant, role=self.role
+        self.membership = Membership.objects.create(user=self.member, tenant=self.tenant,
         )
+        self.membership.roles.add(self.role)
 
         # Unscoped user: authenticated, NOT a superuser, with NO membership
         # and NO asset-holder profile -> has no resolvable tenant.
@@ -54,7 +54,7 @@ class TokenPermissionsBypassRemovedTests(TestCase):
         tenant's data silently handed over)."""
         # Sanity: the orphan genuinely has no resolvable tenant scope.
         self.assertFalse(
-            TenantMembership.objects.filter(user=self.orphan).exists()
+            Membership.objects.filter(user=self.orphan).exists()
         )
         self.assertFalse(self.orphan.asset_holder_profiles.exists())
         self.assertFalse(self.orphan.is_superuser)

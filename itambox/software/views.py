@@ -8,6 +8,7 @@ from itambox.views.generic import (
     ObjectDeleteView,
     ObjectCloneView,
 )
+from django.db.models import Count, Q
 from itambox.panels import Panel
 from .models import Software, InstalledSoftware
 from .tables import InstalledSoftwareTable
@@ -20,7 +21,10 @@ from . import filters
 # =============================================================================
 
 class SoftwareListView(ObjectListView):
-    queryset = Software.objects.select_related('manufacturer').prefetch_related('tags')
+    queryset = Software.objects.select_related('manufacturer').prefetch_related('tags').annotate(
+        _installed_count=Count('installed_instances', distinct=True),
+        _license_count=Count('licenses', filter=Q(licenses__deleted_at__isnull=True), distinct=True),
+    )
     filterset = filters.SoftwareFilterSet
     filterset_form = forms.SoftwareFilterForm
     table = tables.SoftwareTable
@@ -61,7 +65,7 @@ class SoftwareDetailView(ObjectDetailView):
             related_objects_list.append({
                 'label': _('Installed Instances'),
                 'count': instance_count,
-                'url': f"{reverse('software:software_detail', kwargs={'pk': software.pk})}#instances"
+                'url': f"{reverse('software:software_detail', kwargs={'pk': software.pk})}#installed-instances"
             })
         license_count = license_qs.count()
         if license_count:

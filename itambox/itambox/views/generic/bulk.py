@@ -1,4 +1,3 @@
-import inspect
 import logging
 
 from django.contrib import messages
@@ -32,8 +31,12 @@ class ObjectBulkEditView(BulkViewMixin, PermissionRequiredMixin, LoginRequiredMi
 
     def _get_bulk_edit_form(self, data=None, model=None):
         form_class = getattr(self, 'form_class', None) or BulkEditForm
-        sig = inspect.signature(form_class.__init__)
-        if 'model' in sig.parameters:
+        # Every bulk-edit form derives from BulkEditForm, whose __init__ builds the
+        # per-field edit widgets from `model`. Detect the subclass directly rather than
+        # introspecting __init__: a subclass with a `*args, **kwargs` signature (e.g.
+        # AssetBulkEditForm) hides the `model` parameter from inspect.signature, which
+        # silently dropped `model=` and produced a form with no editable fields.
+        if issubclass(form_class, BulkEditForm):
             return form_class(data, model=model)
         return form_class(data)
 

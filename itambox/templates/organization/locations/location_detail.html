@@ -30,43 +30,43 @@
 {# --- Tabs Hook --- #}
 {% block extra_tabs %}
     <li class="nav-item" role="presentation">
-        <a href="?tab=assets" class="nav-link {% if request.GET.tab == 'assets' %}active{% endif %}" data-bs-toggle="tab" data-bs-target="#assets" role="tab" aria-selected="{% if request.GET.tab == 'assets' %}true{% else %}false{% endif %}">
+        <a href="?tab=assets" class="nav-link {% if request.GET.tab == 'assets' %}active{% endif %}" data-bs-toggle="tab" hx-boost="false" data-bs-target="#assets" role="tab" aria-selected="{% if request.GET.tab == 'assets' %}true{% else %}false{% endif %}">
             <i class="mdi mdi-office-building-outline me-1 text-green"></i>
             {% translate "Assets" %} <span class="badge bg-green-lt ms-2">{{ assets_table.rows|length }}</span>
         </a>
     </li>
     <li class="nav-item" role="presentation">
-        <a href="?tab=accessory-stocks" class="nav-link {% if request.GET.tab == 'accessory-stocks' %}active{% endif %}" data-bs-toggle="tab" data-bs-target="#accessory-stocks" role="tab" aria-selected="{% if request.GET.tab == 'accessory-stocks' %}true{% else %}false{% endif %}">
+        <a href="?tab=accessory-stocks" class="nav-link {% if request.GET.tab == 'accessory-stocks' %}active{% endif %}" data-bs-toggle="tab" hx-boost="false" data-bs-target="#accessory-stocks" role="tab" aria-selected="{% if request.GET.tab == 'accessory-stocks' %}true{% else %}false{% endif %}">
             <i class="mdi mdi-keyboard me-1 text-teal"></i>
             {% translate "Accessories" %} <span class="badge bg-teal-lt ms-2">{{ accessory_stocks_table.rows|length }}</span>
         </a>
     </li>
     <li class="nav-item" role="presentation">
-        <a href="?tab=consumable-stocks" class="nav-link {% if request.GET.tab == 'consumable-stocks' %}active{% endif %}" data-bs-toggle="tab" data-bs-target="#consumable-stocks" role="tab" aria-selected="{% if request.GET.tab == 'consumable-stocks' %}true{% else %}false{% endif %}">
+        <a href="?tab=consumable-stocks" class="nav-link {% if request.GET.tab == 'consumable-stocks' %}active{% endif %}" data-bs-toggle="tab" hx-boost="false" data-bs-target="#consumable-stocks" role="tab" aria-selected="{% if request.GET.tab == 'consumable-stocks' %}true{% else %}false{% endif %}">
             <i class="mdi mdi-layers-outline me-1 text-yellow"></i>
             {% translate "Consumables" %} <span class="badge bg-yellow-lt ms-2">{{ consumable_stocks_table.rows|length }}</span>
         </a>
     </li>
     <li class="nav-item" role="presentation">
-        <a href="?tab=component-stocks" class="nav-link {% if request.GET.tab == 'component-stocks' %}active{% endif %}" data-bs-toggle="tab" data-bs-target="#component-stocks" role="tab" aria-selected="{% if request.GET.tab == 'component-stocks' %}true{% else %}false{% endif %}">
+        <a href="?tab=component-stocks" class="nav-link {% if request.GET.tab == 'component-stocks' %}active{% endif %}" data-bs-toggle="tab" hx-boost="false" data-bs-target="#component-stocks" role="tab" aria-selected="{% if request.GET.tab == 'component-stocks' %}true{% else %}false{% endif %}">
             <i class="mdi mdi-cpu me-1 text-orange"></i>
             {% translate "Components" %} <span class="badge bg-orange-lt ms-2">{{ component_stocks_table.rows|length }}</span>
         </a>
     </li>
     <li class="nav-item" role="presentation">
-        <a href="?tab=checkout-log" class="nav-link {% if request.GET.tab == 'checkout-log' %}active{% endif %}" data-bs-toggle="tab" data-bs-target="#checkout-log" role="tab" aria-selected="{% if request.GET.tab == 'checkout-log' %}true{% else %}false{% endif %}">
+        <a href="?tab=checkout-log" class="nav-link {% if request.GET.tab == 'checkout-log' %}active{% endif %}" data-bs-toggle="tab" hx-boost="false" data-bs-target="#checkout-log" role="tab" aria-selected="{% if request.GET.tab == 'checkout-log' %}true{% else %}false{% endif %}">
             <i class="mdi mdi-clipboard-text-clock-outline me-1 text-purple"></i>
             {% translate "Checkout Log" %} <span class="badge bg-purple-lt ms-2">{{ asset_assignments_table.rows|length }}</span>
         </a>
     </li>
     <li class="nav-item" role="presentation">
-        <a href="?tab=audits" class="nav-link {% if request.GET.tab == 'audits' %}active{% endif %}" data-bs-toggle="tab" data-bs-target="#audits" role="tab" aria-selected="{% if request.GET.tab == 'audits' %}true{% else %}false{% endif %}">
+        <a href="?tab=audits" class="nav-link {% if request.GET.tab == 'audits' %}active{% endif %}" data-bs-toggle="tab" hx-boost="false" data-bs-target="#audits" role="tab" aria-selected="{% if request.GET.tab == 'audits' %}true{% else %}false{% endif %}">
             <i class="mdi mdi-file-check-outline me-1 text-green"></i>
             {% translate "Audit Campaigns" %} <span class="badge bg-green-lt ms-2">{{ audits_table.rows|length }}</span>
         </a>
     </li>
     <li class="nav-item" role="presentation">
-        <a href="?tab=child-locations" class="nav-link {% if request.GET.tab == 'child-locations' %}active{% endif %}" data-bs-toggle="tab" data-bs-target="#child-locations" role="tab" aria-selected="{% if request.GET.tab == 'child-locations' %}true{% else %}false{% endif %}">
+        <a href="?tab=child-locations" class="nav-link {% if request.GET.tab == 'child-locations' %}active{% endif %}" data-bs-toggle="tab" hx-boost="false" data-bs-target="#child-locations" role="tab" aria-selected="{% if request.GET.tab == 'child-locations' %}true{% else %}false{% endif %}">
             <i class="mdi mdi-account-outline me-1 text-azure"></i>
             {% translate "Child Locations" %} <span class="badge bg-azure-lt ms-2">{{ object.children.count }}</span>
         </a>

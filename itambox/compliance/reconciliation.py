@@ -1,4 +1,4 @@
-from django.db import transaction
+from django.db import transaction, IntegrityError
 from django.core.exceptions import ValidationError
 from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
@@ -60,6 +60,10 @@ def classify_session_audits(session: AuditSession) -> dict:
 
 @transaction.atomic
 def audit_asset(asset: Asset, user=None, session=None, location=None, status=None, notes='', verification_method='manual', request=None, **kwargs) -> AssetAudit:
+    # Lock the asset row so concurrent scans of the same asset serialize: the second one
+    # then sees the first's committed audit (friendly ValidationError) instead of racing
+    # the (session, asset) unique constraint into a 500.
+    asset = Asset.objects.select_for_update().get(pk=asset.pk)
     location = location or asset.location
     status = status or asset.status
 
@@ -74,15 +78,20 @@ def audit_asset(asset: Asset, user=None, session=None, location=None, status=Non
     if session and AssetAudit.objects.filter(session=session, asset=asset).exists():
         raise ValidationError(_("This asset has already been verified in this session."))
 
-    audit_record = AssetAudit.objects.create(
-        session=session,
-        asset=asset,
-        auditor=user,
-        location=location,
-        status=status,
-        notes=notes,
-        verification_method=verification_method
-    )
+    try:
+        audit_record = AssetAudit.objects.create(
+            session=session,
+            asset=asset,
+            auditor=user,
+            location=location,
+            status=status,
+            notes=notes,
+            verification_method=verification_method
+        )
+    except IntegrityError:
+        # Lost the race on the (session, asset) unique constraint — return the friendly
+        # error rather than a 500.
+        raise ValidationError(_("This asset has already been verified in this session."))
 
     asset.last_audited = timezone.now()
     asset.last_audited_by = user

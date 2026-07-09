@@ -4,13 +4,47 @@ import hashlib
 import logging
 
 import requests
+from django.contrib.auth import get_user_model
 from django.contrib.contenttypes.models import ContentType
+from django.db.models import Q
 from django.utils.translation import gettext_lazy as _
 
 from core.models import ChangeLoggingMixin
 from extras.models import Event, EventRule, NotificationChannel, WebhookEndpoint
 
 logger = logging.getLogger(__name__)
+
+
+def _resolve_instance_tenant_id(instance):
+    """Resolve the tenant that owns ``instance`` so event rules are matched against the
+    object's OWN tenant rather than the ambient tenant contextvar.
+
+    The contextvar is unset in system contexts (management commands, the django-q worker
+    after a ``TaskContext`` exits, the shell). There the tenant-scoping manager fails *open*
+    (``filter_by_tenant`` returns the unscoped queryset), so matching rules by the contextvar
+    would fire EVERY tenant's rules for the object's ContentType — a cross-tenant dispatch
+    (foreign webhooks/notifications about another tenant's object). Resolving the tenant from
+    the instance itself closes that regardless of context. Returns the tenant pk, or ``None``
+    for a tenant-less/global object (in which case only global ``tenant=None`` rules fire).
+    """
+    tenant_id = getattr(instance, 'tenant_id', None)
+    if tenant_id is not None:
+        return tenant_id
+    # Models that derive their tenant through a relation (assignments/stock) declare a
+    # ``tenant_lookup`` ORM path (e.g. 'asset__tenant'); walk it to the owning tenant.
+    # Fall back to ``changelog_tenant_lookup`` (used by models such as AssetAudit that
+    # only declare the changelog attribute) so their events match tenant EventRules.
+    lookup = getattr(type(instance), 'tenant_lookup', None) or getattr(
+        type(instance), 'changelog_tenant_lookup', None
+    )
+    if lookup:
+        obj = instance
+        for part in lookup.split('__'):
+            obj = getattr(obj, part, None)
+            if obj is None:
+                return None
+        return getattr(obj, 'pk', None)
+    return None
 
 
 def dispatch_event(sender, instance, action, created=None):
@@ -28,18 +62,28 @@ def dispatch_event(sender, instance, action, created=None):
         data={'app_label': ct.app_label, 'model_name': ct.model},
     )
 
-    process_event_rules(event)
+    process_event_rules(event, _resolve_instance_tenant_id(instance))
 
 
-def process_event_rules(event):
-    """Match and execute event rules for the given event."""
+def process_event_rules(event, instance_tenant_id=None):
+    """Match and execute event rules for the given event.
 
-    rules = EventRule.objects.filter(
+    Rules are scoped to the triggering object's OWN tenant (plus global ``tenant=None``
+    rules), read through the unscoped ``_base_manager`` so the result NEVER depends on the
+    ambient tenant contextvar (which fails open in system contexts). See
+    ``_resolve_instance_tenant_id``.
+    """
+    rules = EventRule._base_manager.filter(
         model=event.model,
         enabled=True,
+        deleted_at__isnull=True,
+    ).filter(
+        Q(tenant_id=instance_tenant_id) | Q(tenant__isnull=True)
     ).select_related('webhook')
 
     if not rules.exists():
+        event.processed = True
+        event.save(update_fields=['processed'])
         return
 
     for rule in rules:
@@ -50,7 +94,12 @@ def process_event_rules(event):
         if not _check_conditions(rule.conditions, event):
             continue
 
-        _execute_event_action(rule, event)
+        # Per-rule isolation: one rule's action raising must not abort the remaining rules
+        # for this event.
+        try:
+            _execute_event_action(rule, event)
+        except Exception:
+            logger.exception("Event rule %s action failed for event %s", rule.pk, event.pk)
 
     event.processed = True
     event.save(update_fields=['processed'])
@@ -171,8 +220,14 @@ def _send_webhook(rule, event):
     from django.db import transaction
     from django.conf import settings
 
+    # For an endpoint-linked webhook, pass the endpoint pk (NOT the decrypted secret) so the
+    # task re-derives it at run time — this keeps the secret out of the django_q payload /
+    # the retry Schedule.kwargs (which are stored plaintext). Legacy action_config webhooks
+    # have no endpoint and their secret already lives plaintext in the rule config.
     task_kwargs = dict(
-        url=url, method=method, headers=headers, secret=secret,
+        url=url, method=method, headers=headers,
+        secret='' if endpoint is not None else secret,
+        webhook_endpoint_id=endpoint.pk if endpoint is not None else None,
         event_action=event.action,
         event_model_app_label=event.model.app_label,
         event_model_name=event.model.model,
@@ -247,13 +302,23 @@ def _send_notification(rule, event):
     except Exception:
         pass
 
-    Notification.objects.create(
-        user=None,
-        subject=subject,
-        message=body,
-        level=level,
-        target_url=target_url,
-    )
+    if rule.tenant_id:
+        # A tenant-scoped rule must fan out to the rule's tenant members, NOT create a global
+        # user=None row that any authenticated user could open by pk (cross-tenant leak of the
+        # rule's subject/body + the target object's URL). Mirrors the IN_APP channel branch.
+        User = get_user_model()
+        users = User.objects.filter(
+            memberships__tenant_id=rule.tenant_id, is_active=True
+        ).distinct()
+        Notification.objects.bulk_create([
+            Notification(user=u, subject=subject, message=body, level=level, target_url=target_url)
+            for u in users
+        ])
+    else:
+        # Truly system-wide (tenant=None) rule may broadcast.
+        Notification.objects.create(
+            user=None, subject=subject, message=body, level=level, target_url=target_url,
+        )
 
 
 def _is_safe_outbound_url(url):
@@ -379,7 +444,6 @@ def send_notification_to_channel(channel, subject, body):
 
     elif channel.channel_type == NotificationChannel.TYPE_IN_APP:
         from core.models import Notification
-        from django.contrib.auth import get_user_model
         User = get_user_model()
 
         # Resolve target users: explicit list in config → tenant members → global staff
@@ -387,7 +451,7 @@ def send_notification_to_channel(channel, subject, body):
         if user_ids:
             users = list(User.objects.filter(pk__in=user_ids, is_active=True))
         elif channel.tenant_id:
-            # Members of the channel's tenant (via TenantMembership) — covers
+            # Members of the channel's tenant (via Membership) — covers
             # users with no AssetHolder profile, unlike the old
             # asset_holder_profiles join.
             users = list(

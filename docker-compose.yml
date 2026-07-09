@@ -27,6 +27,11 @@ x-app-env: &app-env
   ITAMBOX_DEBUG: "False"
   ITAMBOX_DB_HOST: db
   ITAMBOX_DB_PORT: "5432"
+  # The bundled `db` is stock postgres:16 with no TLS, and app<->db traffic stays on the
+  # internal docker network — so disable the libpq sslmode=require default (which would make
+  # a from-scratch `docker compose up` fail to connect). External/managed Postgres should set
+  # ITAMBOX_DB_SSLMODE=require (or verify-full) via the environment instead.
+  ITAMBOX_DB_SSLMODE: disable
   ITAMBOX_CACHE_BACKEND: redis
   # Valkey (BSD-licensed Redis fork) speaks the Redis wire protocol, so the
   # redis:// URL and django-redis client are unchanged — only the server differs.

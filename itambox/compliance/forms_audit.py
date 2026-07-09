@@ -58,9 +58,9 @@ class AuditSessionForm(forms.ModelForm):
 
         # Restrict tenant choices to the current user's memberships.
         if request and request.user.is_authenticated and not request.user.is_superuser:
-            from organization.models import TenantMembership
-            member_tenant_ids = TenantMembership.objects.filter(
-                user=request.user
+            from organization.models import Membership
+            member_tenant_ids = Membership.objects.filter(
+                user=request.user, is_active=True
             ).values_list('tenant_id', flat=True)
             self.fields['tenant'] = forms.ModelChoiceField(
                 queryset=Tenant.objects.filter(pk__in=member_tenant_ids),

@@ -8,7 +8,7 @@ from core.choices import ObjectChangeActionChoices
 from core.managers import set_current_tenant
 from core.models import ObjectChange
 
-from organization.models import Tenant, TenantRole, TenantMembership, Site, Location
+from organization.models import Tenant, Role, Membership, Site, Location
 from users.models import Token
 from assets.models import StatusLabel, AssetRole, Asset
 from compliance.models import AssetAudit
@@ -17,7 +17,7 @@ User = get_user_model()
 
 
 class Phase3ChangeLoggingModelsTestCase(TestCase):
-    """C4 — TenantMembership, Token and AssetAudit gained ChangeLoggingMixin.
+    """C4 — Membership, Token and AssetAudit gained ChangeLoggingMixin.
 
     Saving each model inside an active request context must record an
     ObjectChange with action 'create' referencing that model, attributed to the
@@ -31,7 +31,7 @@ class Phase3ChangeLoggingModelsTestCase(TestCase):
             is_superuser=True,
         )
         self.tenant = Tenant.objects.create(name='Changelog C4 Tenant', slug='changelog-c4')
-        self.role = TenantRole.objects.create(tenant=self.tenant, name='Member C4')
+        self.role = Role.objects.create(tenant=self.tenant, name='Member C4')
 
         # Establish an active request context so ChangeLoggingMixin logs.
         _current_user.set(self.user)
@@ -67,13 +67,12 @@ class Phase3ChangeLoggingModelsTestCase(TestCase):
 
     def test_tenant_membership_create_is_logged(self):
         before = ObjectChange._base_manager.count()
-        membership = TenantMembership.objects.create(
-            user=self.user,
+        membership = Membership.objects.create(user=self.user,
             tenant=self.tenant,
-            role=self.role,
         )
+        membership.roles.add(self.role)
         self.assertGreater(ObjectChange._base_manager.count(), before)
-        # TenantMembership has a direct tenant FK -> attributed to that tenant.
+        # Membership has a direct tenant FK -> attributed to that tenant.
         self._assert_create_logged(membership, self.tenant)
 
     def test_token_create_is_logged(self):

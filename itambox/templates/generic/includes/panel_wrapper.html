@@ -11,7 +11,8 @@
     <div class="card-body">
         {% if panel_template %}
             {% include panel_template %}
-        {% else %}
+        {% elif debug %}
+            {# Dev-only hint; in prod a misconfigured panel degrades to an empty card, not an error string. #}
             <p class="text-muted"><em>{% translate 'No template found for panel "' %}{{ panel.name }}".</em></p>
         {% endif %}
     </div>

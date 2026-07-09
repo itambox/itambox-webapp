@@ -181,6 +181,94 @@ class ProcurementStatusTransitionTests(TestCase):
         self.po.refresh_from_db()
         self.assertEqual(self.po.status, PurchaseOrder.STATUS_RECEIVED)
 
+    def test_receive_license_line_does_not_grow_seat_pool(self):
+        """WS2-9: receiving a license PO line must NOT increment License.seats.
+
+        License.seats is a manually-entered entitlement, not a quantity materialised
+        from receipts. Receiving a license line only transitions its linked requests
+        from procurement to approved; the seat pool is left untouched. This codifies
+        that documented contract."""
+        line = PurchaseOrderLine.objects.create(
+            purchase_order=self.po,
+            license=self.license,
+            qty_ordered=5,
+            unit_price=50.00,
+        )
+        # Link a request awaiting procurement to the license line.
+        request = AssetRequest.objects.create(
+            requester=self.user,
+            asset_type=self.asset_type,
+            qty=3,
+            status=RequestStatusChoices.PROCUREMENT,
+        )
+        FulfillmentLink.objects.create(
+            asset_request=request,
+            purchase_order_line=line,
+            qty_allocated=3,
+        )
+
+        seats_before = self.license.seats
+
+        from procurement.services import (
+            approve_purchase_order, order_purchase_order, receive_purchase_order,
+        )
+        approve_purchase_order(self.po)
+        order_purchase_order(self.po)
+        receive_purchase_order(self.po, {line.pk: 5})
+
+        # Seat pool is entitlement-driven: unchanged by receipt.
+        self.license.refresh_from_db()
+        self.assertEqual(
+            self.license.seats, seats_before,
+            "Receiving a license PO line must not auto-grow License.seats",
+        )
+        # The receipt still records progress on the line and approves the request.
+        line.refresh_from_db()
+        self.assertEqual(line.qty_received, 5)
+        request.refresh_from_db()
+        self.assertEqual(request.status, RequestStatusChoices.APPROVED)
+
+    def test_receive_component_locks_stock_row(self):
+        """WS2-2: the component-stock read-modify-write must hold a row lock
+        (SELECT ... FOR UPDATE) so concurrent receipts cannot lose an increment.
+        Fails before the fix — plain get_or_create emits no FOR UPDATE on the stock row."""
+        from django.db import connection
+        from django.test.utils import CaptureQueriesContext
+        from assets.models import StatusLabel, Category
+        from inventory.models import Component, ComponentStock
+        from procurement.services import (
+            approve_purchase_order, order_purchase_order, receive_purchase_order,
+        )
+
+        StatusLabel.objects.get_or_create(
+            name='Deployable', defaults={'type': 'deployable', 'slug': 'deployable'}
+        )
+        category = Category.objects.create(
+            name='Comp Cat', slug='comp-cat', applies_to={'component': True}
+        )
+        component = Component.objects.create(
+            name='RAM', manufacturer=self.manufacturer, category=category
+        )
+        line = PurchaseOrderLine.objects.create(
+            purchase_order=self.po, component=component, qty_ordered=10, unit_price=5.00,
+        )
+        approve_purchase_order(self.po)
+        order_purchase_order(self.po)
+
+        with CaptureQueriesContext(connection) as ctx:
+            receive_purchase_order(self.po, {line.pk: 5})
+
+        stock = ComponentStock.objects.get(component=component, location=self.location)
+        self.assertEqual(stock.qty, 5)
+
+        locked = any(
+            'componentstock' in q['sql'].lower() and 'for update' in q['sql'].lower()
+            for q in ctx.captured_queries
+        )
+        self.assertTrue(
+            locked, "receive_purchase_order must lock the component stock row (FOR UPDATE)"
+        )
+
     def test_receiving_status_guards(self):
         line = PurchaseOrderLine.objects.create(
             purchase_order=self.po,
@@ -975,4 +1063,3 @@ class ContractAPITests(TestCase):
         )
         self.assertEqual(response.status_code, 201, response.content)
         self.assertEqual(response.json()['contract_number'], 'CTR-API-NEW')
-

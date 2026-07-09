@@ -12,7 +12,7 @@
         <div class="bulk-pks-container d-inline"></div>
         <button type="button" class="btn btn-sm btn-success bulk-action-btn btn-bulk-restore" disabled>
             <i class="mdi mdi-backup-restore me-1"></i>
-            {% translate "Restore Selected" %}
+            {% translate "Restore" %}
         </button>
     </form>
     <form method="post" action="{{ bulk_purge_url }}" class="bulk-purge-form d-inline" hx-boost="false">
@@ -20,17 +20,11 @@
         <div class="bulk-pks-container d-inline"></div>
         <button type="button" class="btn btn-sm btn-outline-danger bulk-action-btn btn-bulk-purge" disabled>
             <i class="mdi mdi-delete-forever me-1"></i>
-            {% translate "Purge Selected" %}
+            {% translate "Purge" %}
         </button>
     </form>
     {% else %}
     {% if model_name_str == 'assets.asset' %}
-    <button type="button" class="btn btn-sm btn-primary bulk-action-btn" id="btn-bulk-assign"
-            data-bs-toggle="modal" data-bs-target="#bulk-assign-modal" disabled
-            title="{% translate 'Assign selected assets to a holder' %}">
-        <i class="mdi mdi-account-plus-outline me-1"></i>
-        {% translate "Assign Selected" %}
-    </button>
     <button type="button" class="btn btn-sm btn-info text-white bulk-action-btn" id="btn-bulk-print"
             data-bs-toggle="modal" data-bs-target="#bulk-print-modal" disabled
             title="{% translate 'Print labels for selected assets' %}">
@@ -41,19 +35,19 @@
             data-scan-url="{% url 'assets:asset_bulk_checkout_scan' %}"
             title="{% translate 'Check out selected assets via the scan basket' %}">
         <i class="mdi mdi-logout me-1"></i>
-        {% translate "Check-out Selected" %}
+        {% translate "Check-out" %}
     </button>
     <button type="button" class="btn btn-sm btn-success bulk-action-btn btn-bulk-scan-seed" disabled
             data-scan-url="{% url 'assets:asset_bulk_checkin_scan' %}"
             title="{% translate 'Check in selected assets via the scan basket' %}">
         <i class="mdi mdi-inbox-arrow-down me-1"></i>
-        {% translate "Check-in Selected" %}
+        {% translate "Check-in" %}
     </button>
     <button type="button" class="btn btn-sm btn-warning bulk-action-btn btn-bulk-scan-seed" disabled
             data-scan-url="{% url 'assets:asset_bulk_dispose_scan' %}"
             title="{% translate 'Dispose selected assets via the scan basket' %}">
         <i class="mdi mdi-delete-outline me-1"></i>
-        {% translate "Dispose Selected" %}
+        {% translate "Dispose" %}
     </button>
     {% endif %}
     {% if model_name_str == 'assets.assetrequest' %}
@@ -67,7 +61,7 @@
             data-bs-toggle="modal" data-bs-target="#bulk-checkout-inventory-modal" disabled
             title="{% translate 'Check-out selected items' %}">
         <i class="mdi mdi-logout me-1"></i>
-        {% translate "Check-out Selected" %}
+        {% translate "Check-out" %}
     </button>
     {% endif %}
 
@@ -78,7 +72,7 @@
         <div class="bulk-pks-container d-inline"></div>
         <button type="button" class="btn btn-sm btn-outline-warning bulk-action-btn btn-bulk-acknowledge" disabled>
             <i class="mdi mdi-eye-outline me-1"></i>
-            {% translate "Acknowledge Selected" %}
+            {% translate "Acknowledge" %}
         </button>
     </form>
     <form method="post" action="{% url 'extras:alertlog_bulk_resolve' %}" class="bulk-resolve-form d-inline" hx-boost="false">
@@ -87,7 +81,7 @@
         <div class="bulk-pks-container d-inline"></div>
         <button type="button" class="btn btn-sm btn-outline-success bulk-action-btn btn-bulk-resolve" disabled>
             <i class="mdi mdi-check me-1"></i>
-            {% translate "Resolve Selected" %}
+            {% translate "Resolve" %}
         </button>
     </form>
     {% else %}
@@ -98,7 +92,7 @@
         <div class="bulk-pks-container d-inline"></div>
         <button type="button" class="btn btn-sm btn-outline-primary bulk-action-btn btn-bulk-edit" disabled>
             <i class="mdi mdi-pencil-outline me-1"></i>
-            {% translate "Edit Selected" %}
+            {% translate "Edit" %}
         </button>
     </form>
     <form method="post" action="{{ bulk_delete_url }}" class="bulk-delete-form d-inline" hx-boost="false">
@@ -108,7 +102,7 @@
         <div class="bulk-pks-container d-inline"></div>
         <button type="button" class="btn btn-sm btn-outline-danger bulk-action-btn btn-bulk-delete" disabled>
             <i class="mdi mdi-trash-can-outline me-1"></i>
-            {% translate "Delete Selected" %}
+            {% translate "Delete" %}
         </button>
     </form>
     {% endif %}

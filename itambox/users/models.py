@@ -4,13 +4,17 @@ import ipaddress
 import secrets
 
 from django.conf import settings
+from django.contrib.auth.models import AbstractUser
 from django.contrib.postgres.fields import ArrayField
 from django.core.exceptions import ValidationError
 from django.db import models
+from django.urls import reverse
 from django.utils.translation import gettext_lazy as _
 from django.utils import timezone
 
-from core.models import ChangeLoggingMixin
+from core.models import ChangeLoggingMixin, StandardModel
+from core.managers import SoftDeleteManager, AllObjectsManager
+from core.mixins import AutoSlugMixin, SoftDeleteMixin
 
 
 def token_peppers():
@@ -54,6 +58,26 @@ def validate_cidr_list(value):
             )
 
 
+class User(AbstractUser):
+    """Project user model — stock ``AbstractUser`` plus a dedicated ``can_login`` flag.
+
+    ``can_login`` controls whether the person may perform *interactive* login (password or
+    SSO). It is a separate axis from ``is_active`` (account / membership status, which must
+    not be overloaded) and from API-token access. A person who is tracked in the directory
+    but must never sign in simply has ``can_login=False`` — there is no separate "contact"
+    person type.
+    """
+    can_login = models.BooleanField(
+        default=True,
+        db_index=True,
+        verbose_name=_("Can log in"),
+        help_text=_(
+            "If unchecked, this user cannot perform interactive login (password or SSO). "
+            "API tokens and account status (is_active) are unaffected."
+        ),
+    )
+
+
 class UserPreference(models.Model):
     """
     Stores user-specific preferences, including table configurations.
@@ -94,6 +118,10 @@ class Token(ChangeLoggingMixin, models.Model):
     and available on the in-memory instance via the ``key`` property until the
     object is reloaded from the database.
     """
+    # Never serialize the at-rest credential (digest), its pepper id, or the
+    # high-frequency last_used heartbeat into the changelog JSON.
+    _change_logging_excluded_fields = ['updated_at', 'digest', 'pepper', 'last_used']
+
     # HMAC-SHA256(pepper, plaintext) — the only at-rest representation of the
     # secret. `pepper` records which configured pepper produced this digest so
     # peppers can be rotated without rehashing.
@@ -112,6 +140,18 @@ class Token(ChangeLoggingMixin, models.Model):
         related_name='tokens',
         db_index=True,
         verbose_name=_("Tenant"),
+    )
+    # Provider-scoped tokens (nullable): a token with a provider set may drive the
+    # provider-level SCIM endpoint (provision provider staff / provider-scoped groups).
+    # NULL = an ordinary tenant-scoped token (the default), unchanged behaviour.
+    provider = models.ForeignKey(
+        to='organization.Provider',
+        on_delete=models.CASCADE,
+        related_name='tokens',
+        blank=True,
+        null=True,
+        db_index=True,
+        verbose_name=_("Provider"),
     )
     created = models.DateTimeField(auto_now_add=True)
     expires = models.DateTimeField(blank=True, null=True, db_index=True, verbose_name=_("Expires"))
@@ -212,3 +252,93 @@ class Token(ChangeLoggingMixin, models.Model):
             except (ValueError, TypeError):
                 continue
         return False
+
+
+class UserGroup(AutoSlugMixin, StandardModel, SoftDeleteMixin):
+    """A global, cross-cutting group of users granted one or more Roles.
+
+    A group is NOT bound to a single tenant: its ``roles`` may reference roles from
+    any number of tenants or providers, and a member is granted each role's permissions
+    in that role's container — which in turn grants access to those containers (no
+    per-tenant Membership required). This models MSP teams (e.g. "Senior Technicians"
+    holding admin roles across customers A, B and C) as well as single-tenant groups.
+
+    A user's effective permissions in a tenant are the additive union of every group
+    role for that tenant plus the user's own Membership roles/direct_permissions there.
+    Lives in the identity layer (``users``) because it answers "who can do what",
+    not "what exists in the business". Group management is gated by the standard
+    Django permission ``users.change_usergroup`` / ``users.add_usergroup`` —
+    superusers and provider admins (via the ``organization.manage_groups`` capability
+    attached to a provider-scoped Role) grant it through the unified RBAC.
+    """
+    objects = SoftDeleteManager()
+    all_objects = AllObjectsManager()
+
+    name = models.CharField(max_length=100, verbose_name=_("Name"))
+    slug = models.SlugField(max_length=100, verbose_name=_("Slug"))
+    description = models.TextField(blank=True, verbose_name=_("Description"))
+    roles = models.ManyToManyField(
+        'organization.Role',
+        related_name='user_groups',
+        blank=True,
+        verbose_name=_("Roles"),
+        help_text=_("Roles granted to members. Roles may span multiple tenants or "
+                    "providers; a member gets each role's permissions in its container."),
+    )
+    members = models.ManyToManyField(
+        settings.AUTH_USER_MODEL,
+        related_name='user_groups',
+        blank=True,
+        verbose_name=_("Members"),
+    )
+    # SCIM provisioning scope (functional, not decorative): every provider-SCIM group
+    # operation filters ``UserGroup.objects.filter(provider=self.provider)``, so a group's
+    # ``provider`` decides which provider's SCIM token may list/create/update/delete it, and
+    # name/slug uniqueness is scoped to it. NULL = a global group (managed in the UI by
+    # superusers / global group admins, outside provider SCIM). It does not affect permission
+    # *resolution* — that is driven entirely by the group's ``roles``.
+    provider = models.ForeignKey(
+        'organization.Provider',
+        on_delete=models.SET_NULL,
+        related_name='user_groups',
+        blank=True,
+        null=True,
+        verbose_name=_("Provider"),
+    )
+    is_active = models.BooleanField(default=True, db_index=True, verbose_name=_("Active"))
+
+    class Meta:
+        ordering = ['name']
+        verbose_name = _("User Group")
+        verbose_name_plural = _("User Groups")
+        constraints = [
+            # Unique (provider, name) for provider-specific groups
+            models.UniqueConstraint(
+                fields=['provider', 'name'],
+                condition=models.Q(deleted_at__isnull=True) & models.Q(provider__isnull=False),
+                name='users_usergroup_unique_provider_name_active',
+            ),
+            # Unique name for global groups (where provider is NULL)
+            models.UniqueConstraint(
+                fields=['name'],
+                condition=models.Q(deleted_at__isnull=True) & models.Q(provider__isnull=True),
+                name='users_usergroup_unique_global_name_active',
+            ),
+            # Same for slug
+            models.UniqueConstraint(
+                fields=['provider', 'slug'],
+                condition=models.Q(deleted_at__isnull=True) & models.Q(provider__isnull=False),
+                name='users_usergroup_unique_provider_slug_active',
+            ),
+            models.UniqueConstraint(
+                fields=['slug'],
+                condition=models.Q(deleted_at__isnull=True) & models.Q(provider__isnull=True),
+                name='users_usergroup_unique_global_slug_active',
+            ),
+        ]
+
+    def __str__(self):
+        return self.name
+
+    def get_absolute_url(self):
+        return reverse('users:usergroup_detail', kwargs={'pk': self.pk})

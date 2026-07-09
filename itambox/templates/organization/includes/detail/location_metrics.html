@@ -8,6 +8,6 @@
     {% include "generic/includes/stat_card.html" with color="azure" icon="mdi mdi-map-marker-multiple-outline" label=l_children value=object.children.count %}
 </div>
 <div class="row g-3">
-    {% include "generic/includes/stat_card.html" with color="teal" icon="mdi mdi-keyboard-outline" label=l_acc value=object.accessory_assignments.count size="h3" compact="1" %}
-    {% include "generic/includes/stat_card.html" with color="cyan" icon="mdi mdi-water-outline" label=l_cons value=object.consumable_consumptions.count size="h3" compact="1" %}
+    {% include "generic/includes/stat_card.html" with color="teal" icon="mdi mdi-keyboard-outline" label=l_acc value=object.accessoryassignment_assignments.count size="h3" compact="1" %}
+    {% include "generic/includes/stat_card.html" with color="cyan" icon="mdi mdi-water-outline" label=l_cons value=object.consumableassignment_assignments.count size="h3" compact="1" %}
 </div>

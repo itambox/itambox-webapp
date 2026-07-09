@@ -27,18 +27,5 @@
         {% endif %}
     </dd>
 
-    <dt class="col-sm-4">{% translate "Description:" %}</dt>
-    <dd class="col-sm-8 text-secondary">{{ object.description|linebreaksbr|default:"—" }}</dd>
 
-
-
-    {% if object.tags.all %}
-    <hr class="my-3 text-muted">
-    <dt class="col-sm-4">{% translate "Tags:" %}</dt>
-    <dd class="col-sm-8">
-        {% for tag in object.tags.all %}
-            {% include 'inc/tags.html' with tag=tag %}
-        {% endfor %}
-    </dd>
-    {% endif %}
 </dl>

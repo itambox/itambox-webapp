@@ -74,7 +74,7 @@ class SeedProcurementMixin:
                     for n in range(min(received, 3)):
                         cost = round(float(line.unit_price or 0) * random.uniform(0.97, 1.03), 2)
                         a = Asset(
-                            name=f"{atype.model} (receiving)", asset_tag='', asset_type=atype,
+                            name=atype.model, asset_tag='', asset_type=atype,
                             asset_role=atype.asset_role, status=self._status_labels['available'],
                             location=locs[0], tenant=tenant, purchase_order_line=line,
                             serial_number=f"{meta['code']}{random.randint(100000, 999999)}",
@@ -83,8 +83,6 @@ class SeedProcurementMixin:
                             order_number=po.order_number,
                             supplier=po.supplier, notes='Received against purchase order; awaiting deployment.')
                         a.save()  # asset_tag drawn from the tenant's AssetTagSequence
-                        a.name = f"{atype.model} ({a.asset_tag})"
-                        a.save(update_fields=['name'])
                         fulfilled += 1
         self.stdout.write(f'  {po_count} purchase orders, {line_count} order lines, '
                           f'{fulfilled} assets received against PO lines.')

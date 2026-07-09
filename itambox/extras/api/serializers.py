@@ -87,6 +87,18 @@ class WebhookEndpointSerializer(BaseModelSerializer):
         ]
         brief_fields = ['id', 'url', 'name', 'enabled']
 
+    def validate_target_url(self, value):
+        # SSRF guard at the API write boundary (BaseModelSerializer does not run full_clean,
+        # so WebhookEndpoint.clean() would not fire otherwise). Reject internal targets at
+        # create/update instead of only at dispatch time.
+        from django.core.exceptions import ValidationError as DjangoValidationError
+        from core.validators import validate_external_url
+        try:
+            validate_external_url(value)
+        except DjangoValidationError as exc:
+            raise serializers.ValidationError(exc.messages)
+        return value
+
 
 class EventRuleSerializer(BaseModelSerializer):
     url = serializers.HyperlinkedIdentityField(view_name='api:extras_api:eventrule-detail')
@@ -150,6 +162,16 @@ class NotificationChannelSerializer(BaseModelSerializer):
                     # else: nothing to restore -> drop the placeholder
                 else:
                     cleaned[k] = v
+            # SSRF guard: a Slack/Teams channel's webhook_url is an outbound target — reject
+            # internal URLs at write time (a newly-supplied value, not a restored placeholder).
+            url_val = cleaned.get('webhook_url')
+            if url_val and url_val != _REDACTED_PLACEHOLDER:
+                from django.core.exceptions import ValidationError as DjangoValidationError
+                from core.validators import validate_external_url
+                try:
+                    validate_external_url(url_val)
+                except DjangoValidationError as exc:
+                    raise serializers.ValidationError({'webhook_url': exc.messages})
             return cleaned
         return value
 
@@ -198,7 +220,7 @@ class JournalEntrySerializer(BaseModelSerializer):
             # within the active tenant. validate_gfk_target_tenant resolves via
             # the target's default manager AND compares obj.tenant to the active
             # tenant, so it also guards tenant-owned models whose default manager
-            # is NOT tenant-scoping (Dashboard, Job, Token, TenantMembership) — a
+            # is NOT tenant-scoping (Dashboard, Job, Token, Membership) — a
             # plain .exists() check would let those through cross-tenant.
             request = self.context.get('request')
             if request is not None and request.user.is_authenticated:

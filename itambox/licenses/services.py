@@ -26,18 +26,38 @@ def checkout_license(
         
         if lic.available_seats < 1:
             raise ValidationError(_("No available seats left for this software license."))
-            
+
+        # Reject a second active seat for the same target. The DB enforces this with
+        # a partial UniqueConstraint, but checking here turns a duplicate request into
+        # a clean ValidationError (HTTP 400) instead of an IntegrityError (HTTP 500).
+        duplicate = LicenseSeatAssignment.objects.filter(license=lic)
+        duplicate = (
+            duplicate.filter(asset=asset) if asset is not None
+            else duplicate.filter(assigned_holder=assigned_holder)
+        )
+        if duplicate.exists():
+            raise ValidationError(
+                _("%(target)s already holds a seat on this license.") % {
+                    'target': asset or assigned_holder,
+                }
+            )
+
         assignment = LicenseSeatAssignment.objects.create(
             license=lic,
             asset=asset,
             assigned_holder=assigned_holder,
             notes=notes
         )
-        
-        # Symmetrically record transaction action message on changelog logger mixin
-        lic._changelog_action = 'update'
-        lic._changelog_message = f"Checked out seat to {asset or assigned_holder}."
-        lic.save(update_fields=[]) # Trigger pre_save/post_save signals for change logging
+
+        # Record a changelog entry for the seat checkout. Nothing on the license row
+        # itself changed, so a no-op save() would be short-circuited by
+        # ChangeLoggingMixin (prechange == postchange) and the entry silently dropped.
+        # Emit it directly via _log_change(), which is not subject to that equality
+        # short-circuit, so the audit trail always captures the checkout.
+        lic._log_change(
+            action='update',
+            message=f"Checked out seat to {asset or assigned_holder}.",
+        )
 
         return assignment
 
@@ -55,10 +75,13 @@ def checkin_license_seat(
         
         target = asgn.asset or asgn.assigned_holder
         asgn.delete()
-        
-        # Symmetrically record transaction action message on changelog logger mixin
-        lic._changelog_action = 'update'
-        lic._changelog_message = f"Checked in seat from {target}."
-        lic.save(update_fields=[]) # Trigger pre_save/post_save signals for change logging
+
+        # The license row is unchanged by a check-in, so rely on _log_change() rather
+        # than a no-op save() that ChangeLoggingMixin would short-circuit away (see
+        # checkout_license above). This guarantees the audit trail records the check-in.
+        lic._log_change(
+            action='update',
+            message=f"Checked in seat from {target}.",
+        )
 
         return {'message': _("License seat for '%(name)s' checked in.") % {"name": lic.name}}

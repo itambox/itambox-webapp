@@ -11,7 +11,7 @@
 {# --- Tabs Hook --- #}
 {% block extra_tabs %}
     <li class="nav-item" role="presentation">
-        <a href="?tab=contacts" class="nav-link {% if request.GET.tab == 'contacts' %}active{% endif %}" data-bs-toggle="tab" data-bs-target="#contacts" role="tab" aria-selected="{% if request.GET.tab == 'contacts' %}true{% else %}false{% endif %}">
+        <a href="?tab=contacts" class="nav-link {% if request.GET.tab == 'contacts' %}active{% endif %}" data-bs-toggle="tab" hx-boost="false" data-bs-target="#contacts" role="tab" aria-selected="{% if request.GET.tab == 'contacts' %}true{% else %}false{% endif %}">
             <i class="mdi mdi-account-circle-outline me-1 text-purple"></i>
             {% translate "Contacts" %} <span class="badge bg-purple-lt ms-2">{{ object.contacts.count }}</span>
         </a>

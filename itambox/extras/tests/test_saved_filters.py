@@ -11,7 +11,7 @@ from django.contrib.contenttypes.models import ContentType
 from django.test import TestCase, RequestFactory
 
 from core.tests.mixins import TenantTestMixin
-from organization.models import Tenant, TenantMembership, TenantRole
+from organization.models import Tenant, Membership, Role
 from extras.models import SavedFilter, Tag, CustomField
 from extras.views import SavedFilterSaveView
 from itambox.views.generic import ObjectListView
@@ -27,9 +27,8 @@ class SavedFilterVisibilityTests(TenantTestMixin, TestCase):
         self.user_a2 = User.objects.create_user(
             username="user_a2", email="a2@example.com", password="password"
         )
-        TenantMembership.objects.create(
-            user=self.user_a2, tenant=self.tenant, role=self.tenant_role
-        )
+        m = Membership.objects.create(user=self.user_a2, tenant=self.tenant)
+        m.roles.add(self.tenant_role)
         # Tenant B + a member.
         self.tenant_b = Tenant.objects.create(name="Tenant B", slug="tenant-b")
         self.user_b = User.objects.create_user(

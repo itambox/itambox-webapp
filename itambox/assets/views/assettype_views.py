@@ -17,7 +17,7 @@ from itambox.quick_add import QuickAddMixin
 
 
 class AssetTypeListView(ObjectListView):
-    queryset = AssetType.objects.select_related('manufacturer').prefetch_related('tags')
+    queryset = AssetType.objects.select_related('manufacturer', 'category').prefetch_related('tags')
     filterset = filters.AssetTypeFilterSet
     filterset_form = forms.AssetTypeFilterForm
     table = tables.AssetTypeTable

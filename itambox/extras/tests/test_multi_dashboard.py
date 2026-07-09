@@ -5,7 +5,7 @@ from django.urls import reverse
 from django.contrib.sessions.middleware import SessionMiddleware
 from django.core.exceptions import PermissionDenied
 
-from organization.models import Tenant, AssetHolder
+from organization.models import Tenant, AssetHolder, Role, Membership
 from assets.models import Asset, StatusLabel, AssetType, Manufacturer
 from extras.models import Dashboard
 from extras.dashboard.widgets import (
@@ -65,6 +65,12 @@ class MultiDashboardViewsTests(TestCase):
         self.user = User.objects.create_user(username="test_user", password="password")
         self.client.login(username="test_user", password="password")
         self.tenant = Tenant.objects.create(name="Acme Corp", slug="acme-corp")
+
+        # The user must be a member of the tenant to bind a dashboard to it
+        # (DashboardCreateView rejects non-member tenants).
+        self.role = Role.objects.create(tenant=self.tenant, name="Member", permissions=[])
+        m = Membership.objects.create(user=self.user, tenant=self.tenant)
+        m.roles.add(self.role)
 
         # Create two dashboards
         self.db_default = Dashboard.objects.create(

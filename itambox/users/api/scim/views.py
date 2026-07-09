@@ -9,7 +9,9 @@ from rest_framework.views import APIView
 from rest_framework.permissions import IsAuthenticated
 
 from core.managers import set_current_tenant
-from organization.models import Tenant, TenantRole, TenantMembership, AssetHolder
+from itambox.middleware import set_current_user
+from organization.models import Tenant, Membership, AssetHolder, Role
+from users.models import UserGroup
 from users.api.scim.serializers import (
     SCIMUserSerializer, SCIMGroupSerializer, SCIMServiceProviderConfigSerializer
 )
@@ -18,6 +20,10 @@ from users.api.scim.authentication import SCIMBearerTokenAuthentication
 
 logger = logging.getLogger('itambox.scim.views')
 User = get_user_model()
+
+# Sentinel for "attribute not supplied by this SCIM request" (distinct from an explicit
+# empty/false value) so partial PATCH/PUT updates only touch the fields actually sent.
+_UNSET = object()
 
 
 def link_or_create_assetholder(user, tenant):
@@ -61,25 +67,34 @@ def link_or_create_assetholder(user, tenant):
             logger.warning(f"Constraint or validation error creating AssetHolder for user {user.username}: {e}")
 
 
-def sync_group_members(tenant, role, member_ids):
-    # 1. For users in member_ids, ensure they have TenantMembership with this role
+def sync_group_members(tenant, group, member_ids):
+    # 1. Add to UserGroup.members only users who ALREADY have a Membership in this
+    #    tenant. A SCIM token is scoped to a single tenant, so group sync must never write
+    #    cross-tenant membership or expose whether a global user id exists — that would be
+    #    a cross-tenant access-control write and a username-enumeration oracle. New members
+    #    are provisioned exclusively through SCIM /Users; unknown or non-member ids are skipped.
+    valid_member_ids = set()
     for uid in member_ids:
-        try:
-            user = User.objects.get(id=uid)
-            membership = TenantMembership.objects.filter(user=user, tenant=tenant).first()
-            if membership:
-                membership.role = role
-                membership.save()
-            else:
-                TenantMembership.objects.create(user=user, tenant=tenant, role=role)
-            # Ensure they have matching AssetHolder profile
-            link_or_create_assetholder(user, tenant)
-        except User.DoesNotExist:
-            logger.warning(f"SCIM Group member user ID {uid} not found.")
+        membership = Membership.objects.filter(user_id=uid, tenant=tenant).first()
+        if membership:
+            valid_member_ids.add(uid)
+            link_or_create_assetholder(membership.user, tenant)
+        else:
+            logger.warning(
+                "SCIM group sync skipped user id %s: not a member of tenant %s "
+                "(provision via SCIM /Users first).", uid, tenant.slug
+            )
 
-    # 2. For users who currently have TenantMembership with this role, but are NOT in member_ids:
-    to_remove = TenantMembership.objects.filter(tenant=tenant, role=role).exclude(user_id__in=member_ids)
-    to_remove.delete()
+    # 2. Reconcile group.members to match valid_member_ids (within this tenant only).
+    #    Use add/remove rather than set() so only the delta is applied; this keeps
+    #    ChangeLoggingMixin from firing unnecessarily on unchanged members.
+    current_members = set(group.members.filter(memberships__tenant=tenant).values_list('id', flat=True))
+    to_add = valid_member_ids - current_members
+    to_remove = current_members - valid_member_ids
+    if to_add:
+        group.members.add(*to_add)
+    if to_remove:
+        group.members.remove(*to_remove)
 
 
 class SCIMTenantMixin:
@@ -115,8 +130,14 @@ class SCIMTenantMixin:
             self.tenant = Tenant._base_manager.get(slug=tenant_slug)
         except Tenant.DoesNotExist:
             raise exceptions.NotFound("Tenant not found.")
-            
+
         set_current_tenant(self.tenant)
+        # DRF authenticated the bearer token in super().initial(); bind the token's
+        # owner as the current user so SCIM-driven changelog rows are attributed to
+        # the acting service account rather than 'System' (CurrentUserMiddleware
+        # captured AnonymousUser before DRF auth ran).
+        if getattr(request, 'user', None) and request.user.is_authenticated:
+            set_current_user(request.user)
 
 
 class ServiceProviderConfigView(SCIMTenantMixin, APIView):
@@ -266,7 +287,7 @@ class SCIMUserListView(SCIMTenantMixin, APIView):
 
         user = User.objects.filter(username=username).first()
         if user:
-            membership = TenantMembership.objects.filter(user=user, tenant=self.tenant).first()
+            membership = Membership.objects.filter(user=user, tenant=self.tenant).first()
             if membership:
                 return Response({
                     "schemas": ["urn:ietf:params:scim:api:messages:2.0:Error"],
@@ -275,15 +296,9 @@ class SCIMUserListView(SCIMTenantMixin, APIView):
                 }, status=status.HTTP_409_CONFLICT)
             
             with transaction.atomic():
-                role, _ = TenantRole.objects.get_or_create(
-                    tenant=self.tenant,
-                    name="Member",
-                    defaults={
-                        "description": "Default member role",
-                        "permissions": ["assets.view_asset", "extras.view_dashboard"]
-                    }
-                )
-                TenantMembership.objects.create(user=user, tenant=self.tenant, role=role)
+                # Roles are assigned in-app via UserGroup; SCIM provisioning creates the
+                # membership with an empty roles set (no get_or_create of a default role).
+                Membership.objects.create(user=user, tenant=self.tenant, is_active=active)
                 link_or_create_assetholder(user, self.tenant)
         else:
             with transaction.atomic():
@@ -297,15 +312,9 @@ class SCIMUserListView(SCIMTenantMixin, APIView):
                 user.set_unusable_password()
                 user.save()
 
-                role, _ = TenantRole.objects.get_or_create(
-                    tenant=self.tenant,
-                    name="Member",
-                    defaults={
-                        "description": "Default member role",
-                        "permissions": ["assets.view_asset", "extras.view_dashboard"]
-                    }
-                )
-                TenantMembership.objects.create(user=user, tenant=self.tenant, role=role)
+                # Roles are assigned in-app via UserGroup; SCIM provisioning creates the
+                # membership with an empty roles set (no get_or_create of a default role).
+                Membership.objects.create(user=user, tenant=self.tenant, is_active=active)
                 link_or_create_assetholder(user, self.tenant)
 
         serializer = SCIMUserSerializer(
@@ -319,10 +328,71 @@ class SCIMUserDetailView(SCIMTenantMixin, APIView):
     def get(self, request, pk, *args, **kwargs):
         user = get_object_or_404(User.objects.filter(memberships__tenant=self.tenant).distinct(), id=pk)
         serializer = SCIMUserSerializer(
-            user, 
+            user,
             context={'request': request, 'tenant_slug': self.tenant.slug, 'tenant': self.tenant}
         )
         return Response(serializer.data, status=status.HTTP_200_OK)
+
+    def _apply_scim_identity(self, user, *, username=_UNSET, email=_UNSET,
+                             first_name=_UNSET, last_name=_UNSET, active=_UNSET):
+        """Apply SCIM-provisioned identity/active changes to the User.
+
+        A SCIM token is bound to exactly one tenant.
+
+        - ``active`` is applied PER-TENANT: it (de)activates this tenant's membership only.
+          A multi-tenant user is therefore never globally locked out by one tenant's token
+          (which would deny access in the other tenant). The global ``User.is_active`` is
+          reconciled to mirror whether the user has any active membership left, so a fully
+          de-provisioned user can no longer authenticate at all. Access gates
+          (TenantMembershipBackend, TenantMiddleware) honour the membership flag, so an
+          ``active=false`` here genuinely revokes access in this tenant — unlike before,
+          when it was silently dropped for shared users.
+        - identity (username/email/name) must NEVER be rewritten for a user who is also a
+          member of another tenant — that is a cross-tenant write on a shared principal
+          (it would hijack their identity in the other tenant). Those changes apply only to
+          a user whose sole membership is this tenant. (DELETE still drops the membership.)
+        """
+        has_other = (
+            Membership.objects.filter(user=user)
+            .exclude(tenant=self.tenant)
+            .exists()
+        )
+
+        if active is not _UNSET:
+            membership = Membership.objects.filter(user=user, tenant=self.tenant).first()
+            if membership is not None and membership.is_active != active:
+                membership.is_active = active
+                membership.save(update_fields=['is_active'])
+            # Mirror the global flag to "has any active membership anywhere": clears login
+            # only when the user is fully de-provisioned, never from a single tenant's token.
+            any_active = Membership.objects.filter(user=user, is_active=True).exists()
+            if user.is_active != any_active:
+                user.is_active = any_active
+                user.save(update_fields=['is_active'])
+
+        if has_other:
+            # Keep this tenant's AssetHolder linked, but leave the shared global identity alone.
+            link_or_create_assetholder(user, self.tenant)
+            return user
+
+        # Sole-tenant user: the global identity is safe to update.
+        identity_fields = []
+        if username is not _UNSET:
+            user.username = username
+            identity_fields.append('username')
+        if email is not _UNSET:
+            user.email = email
+            identity_fields.append('email')
+        if first_name is not _UNSET:
+            user.first_name = first_name
+            identity_fields.append('first_name')
+        if last_name is not _UNSET:
+            user.last_name = last_name
+            identity_fields.append('last_name')
+        if identity_fields:
+            user.save(update_fields=identity_fields)
+        link_or_create_assetholder(user, self.tenant)
+        return user
 
     def put(self, request, pk, *args, **kwargs):
         user = get_object_or_404(User.objects.filter(memberships__tenant=self.tenant).distinct(), id=pk)
@@ -382,76 +452,83 @@ class SCIMUserDetailView(SCIMTenantMixin, APIView):
             active = bool(active)
 
         with transaction.atomic():
-            user.username = username
-            user.email = email
-            user.first_name = first_name
-            user.last_name = last_name
-            user.is_active = active
-            user.save()
-            
-            link_or_create_assetholder(user, self.tenant)
+            user = self._apply_scim_identity(
+                user, username=username, email=email,
+                first_name=first_name, last_name=last_name, active=active,
+            )
 
         serializer = SCIMUserSerializer(
-            user, 
+            user,
             context={'request': request, 'tenant_slug': self.tenant.slug, 'tenant': self.tenant}
         )
         return Response(serializer.data, status=status.HTTP_200_OK)
 
     def patch(self, request, pk, *args, **kwargs):
         user = get_object_or_404(User.objects.filter(memberships__tenant=self.tenant).distinct(), id=pk)
-        
+
+        # Parse the requested attribute changes into locals (sentinel = not supplied), then
+        # apply them through the tenant-boundary guard so a shared multi-tenant user's global
+        # identity/active is never rewritten from one tenant's SCIM token.
+        new_username = _UNSET
+        new_email = _UNSET
+        new_first = _UNSET
+        new_last = _UNSET
+        new_active = _UNSET
+
+        for op in request.data.get('Operations', []):
+            op_type = op.get('op', '').lower()
+            path = op.get('path', '')
+            value = op.get('value')
+
+            if op_type in ('add', 'replace'):
+                if isinstance(value, dict) and not path:
+                    for k, v in value.items():
+                        if k == 'active':
+                            new_active = bool(v)
+                        elif k == 'userName':
+                            new_username = v
+                        elif k == 'emails':
+                            if isinstance(v, list) and v:
+                                new_email = v[0].get('value', '')
+                            elif isinstance(v, str):
+                                new_email = v
+                        elif k == 'name':
+                            if isinstance(v, dict):
+                                new_first = v.get('givenName', user.first_name)
+                                new_last = v.get('familyName', user.last_name)
+                else:
+                    path_lower = path.lower() if path else ""
+                    if path_lower == 'active':
+                        if isinstance(value, str):
+                            new_active = (value.lower() == 'true')
+                        else:
+                            new_active = bool(value)
+                    elif path_lower == 'username':
+                        new_username = str(value)
+                    elif path_lower in ('email', 'emails', 'emails.value'):
+                        if isinstance(value, list) and value:
+                            new_email = value[0].get('value', '')
+                        else:
+                            new_email = str(value)
+                    elif path_lower.startswith('name.'):
+                        sub = path_lower.split('.')[1]
+                        if sub == 'givenname':
+                            new_first = str(value)
+                        elif sub == 'familyname':
+                            new_last = str(value)
+                    elif path_lower == 'name':
+                        if isinstance(value, dict):
+                            new_first = value.get('givenName', user.first_name)
+                            new_last = value.get('familyName', user.last_name)
+
         with transaction.atomic():
-            for op in request.data.get('Operations', []):
-                op_type = op.get('op', '').lower()
-                path = op.get('path', '')
-                value = op.get('value')
-                
-                if op_type in ('add', 'replace'):
-                    if isinstance(value, dict) and not path:
-                        for k, v in value.items():
-                            if k == 'active':
-                                user.is_active = bool(v)
-                            elif k == 'userName':
-                                user.username = v
-                            elif k == 'emails':
-                                if isinstance(v, list) and v:
-                                    user.email = v[0].get('value', '')
-                                elif isinstance(v, str):
-                                    user.email = v
-                            elif k == 'name':
-                                if isinstance(v, dict):
-                                    user.first_name = v.get('givenName', user.first_name)
-                                    user.last_name = v.get('familyName', user.last_name)
-                    else:
-                        path_lower = path.lower() if path else ""
-                        if path_lower == 'active':
-                            if isinstance(value, str):
-                                user.is_active = (value.lower() == 'true')
-                            else:
-                                user.is_active = bool(value)
-                        elif path_lower == 'username':
-                            user.username = str(value)
-                        elif path_lower in ('email', 'emails', 'emails.value'):
-                            if isinstance(value, list) and value:
-                                user.email = value[0].get('value', '')
-                            else:
-                                user.email = str(value)
-                        elif path_lower.startswith('name.'):
-                            sub = path_lower.split('.')[1]
-                            if sub == 'givenname':
-                                user.first_name = str(value)
-                            elif sub == 'familyname':
-                                user.last_name = str(value)
-                        elif path_lower == 'name':
-                            if isinstance(value, dict):
-                                user.first_name = value.get('givenName', user.first_name)
-                                user.last_name = value.get('familyName', user.last_name)
-            
-            user.save()
-            link_or_create_assetholder(user, self.tenant)
+            user = self._apply_scim_identity(
+                user, username=new_username, email=new_email,
+                first_name=new_first, last_name=new_last, active=new_active,
+            )
 
         serializer = SCIMUserSerializer(
-            user, 
+            user,
             context={'request': request, 'tenant_slug': self.tenant.slug, 'tenant': self.tenant}
         )
         return Response(serializer.data, status=status.HTTP_200_OK)
@@ -459,12 +536,16 @@ class SCIMUserDetailView(SCIMTenantMixin, APIView):
     def delete(self, request, pk, *args, **kwargs):
         user = get_object_or_404(User.objects.filter(memberships__tenant=self.tenant).distinct(), id=pk)
         with transaction.atomic():
-            # Remove only the membership for the current tenant (soft-delete)
-            TenantMembership.objects.filter(user=user, tenant=self.tenant).delete()
-            # Delete the associated AssetHolder for this tenant if one exists
-            AssetHolder.objects.filter(user=user, tenant=self.tenant).delete()
+            # Remove only the membership for the current tenant. Delete per-instance
+            # so each removal is change-logged (QuerySet.delete() bypasses
+            # ChangeLoggingMixin / SoftDeleteMixin entirely).
+            for membership in Membership.objects.filter(user=user, tenant=self.tenant):
+                membership.delete()
+            # Soft-delete the associated AssetHolder for this tenant if one exists.
+            for holder in AssetHolder.objects.filter(user=user, tenant=self.tenant):
+                holder.delete()
             # If user has no remaining memberships, deactivate instead of hard-deleting
-            if not TenantMembership.objects.filter(user=user).exists():
+            if not Membership.objects.filter(user=user).exists():
                 user.is_active = False
                 user.save()
         return Response(status=status.HTTP_204_NO_CONTENT)
@@ -482,7 +563,9 @@ class SCIMGroupListView(SCIMTenantMixin, APIView):
                 "detail": str(e)
             }, status=status.HTTP_400_BAD_REQUEST)
         
-        queryset = TenantRole.objects.filter(tenant=self.tenant).filter(q_obj).distinct()
+        # Groups are global; a tenant's SCIM endpoint sees (read-only) the groups that
+        # grant a role in THIS tenant.
+        queryset = UserGroup.objects.filter(roles__scope=Role.SCOPE_TENANT, roles__tenant=self.tenant).filter(q_obj).distinct()
         
         try:
             start_index = int(request.query_params.get('startIndex', 1))
@@ -500,7 +583,7 @@ class SCIMGroupListView(SCIMTenantMixin, APIView):
         total_results = queryset.count()
         sliced_queryset = queryset[start_index - 1 : start_index - 1 + count]
         
-        serializer = SCIMGroupSerializer(sliced_queryset, many=True, context={'request': request})
+        serializer = SCIMGroupSerializer(sliced_queryset, many=True, context={'request': request, 'tenant_slug': self.tenant.slug})
         
         return Response({
             "schemas": ["urn:ietf:params:scim:api:messages:2.0:ListResponse"],
@@ -511,6 +594,15 @@ class SCIMGroupListView(SCIMTenantMixin, APIView):
         }, status=status.HTTP_200_OK)
 
     def post(self, request, *args, **kwargs):
+        # User groups are global and grant cross-tenant access; they are managed
+        # centrally by global admins, not provisioned per-tenant via SCIM.
+        return Response({
+            "schemas": ["urn:ietf:params:scim:api:messages:2.0:Error"],
+            "status": "403",
+            "detail": "User groups are managed centrally and cannot be created via tenant SCIM.",
+        }, status=status.HTTP_403_FORBIDDEN)
+
+    def _disabled_post(self, request, *args, **kwargs):
         name = request.data.get('displayName')
         if not name:
             return Response({
@@ -526,8 +618,8 @@ class SCIMGroupListView(SCIMTenantMixin, APIView):
                 "detail": "displayName exceeds maximum length of 100 characters."
             }, status=status.HTTP_400_BAD_REQUEST)
 
-        role = TenantRole.objects.filter(tenant=self.tenant, name=name).first()
-        if role:
+        group = UserGroup.objects.filter(tenant=self.tenant, name=name).first()
+        if group:
             return Response({
                 "schemas": ["urn:ietf:params:scim:api:messages:2.0:Error"],
                 "status": "409",
@@ -550,26 +642,34 @@ class SCIMGroupListView(SCIMTenantMixin, APIView):
                         }, status=status.HTTP_400_BAD_REQUEST)
 
         with transaction.atomic():
-            role = TenantRole.objects.create(
+            group = UserGroup.objects.create(
                 tenant=self.tenant,
                 name=name,
-                permissions=["assets.view_asset", "extras.view_dashboard"]
             )
-            sync_group_members(self.tenant, role, member_ids)
+            sync_group_members(self.tenant, group, member_ids)
 
-        serializer = SCIMGroupSerializer(role, context={'request': request})
+        serializer = SCIMGroupSerializer(group, context={'request': request, 'tenant_slug': self.tenant.slug})
         return Response(serializer.data, status=status.HTTP_201_CREATED)
 
 
 class SCIMGroupDetailView(SCIMTenantMixin, APIView):
     def get(self, request, pk, *args, **kwargs):
-        role = get_object_or_404(TenantRole.objects.filter(tenant=self.tenant), id=pk)
-        serializer = SCIMGroupSerializer(role, context={'request': request})
+        group = get_object_or_404(
+            UserGroup.objects.filter(roles__scope=Role.SCOPE_TENANT, roles__tenant=self.tenant).distinct(), id=pk,
+        )
+        serializer = SCIMGroupSerializer(group, context={'request': request, 'tenant_slug': self.tenant.slug})
         return Response(serializer.data, status=status.HTTP_200_OK)
 
     def put(self, request, pk, *args, **kwargs):
-        role = get_object_or_404(TenantRole.objects.filter(tenant=self.tenant), id=pk)
-        
+        return Response({
+            "schemas": ["urn:ietf:params:scim:api:messages:2.0:Error"],
+            "status": "403",
+            "detail": "User groups are managed centrally and cannot be modified via tenant SCIM.",
+        }, status=status.HTTP_403_FORBIDDEN)
+
+    def _disabled_put(self, request, pk, *args, **kwargs):
+        group = get_object_or_404(UserGroup.objects.filter(tenant=self.tenant), id=pk)
+
         name = request.data.get('displayName')
         if not name:
             return Response({
@@ -601,30 +701,40 @@ class SCIMGroupDetailView(SCIMTenantMixin, APIView):
                         }, status=status.HTTP_400_BAD_REQUEST)
 
         with transaction.atomic():
-            role.name = name
-            role.save()
-            sync_group_members(self.tenant, role, member_ids)
+            group.name = name
+            group.save()
+            sync_group_members(self.tenant, group, member_ids)
 
-        serializer = SCIMGroupSerializer(role, context={'request': request})
+        serializer = SCIMGroupSerializer(group, context={'request': request, 'tenant_slug': self.tenant.slug})
         return Response(serializer.data, status=status.HTTP_200_OK)
 
     def patch(self, request, pk, *args, **kwargs):
-        role = get_object_or_404(TenantRole.objects.filter(tenant=self.tenant), id=pk)
-        
-        current_member_ids = set(role.memberships.values_list('user_id', flat=True))
-        
+        return Response({
+            "schemas": ["urn:ietf:params:scim:api:messages:2.0:Error"],
+            "status": "403",
+            "detail": "User groups are managed centrally and cannot be modified via tenant SCIM.",
+        }, status=status.HTTP_403_FORBIDDEN)
+
+    def _disabled_patch(self, request, pk, *args, **kwargs):
+        group = get_object_or_404(UserGroup.objects.filter(tenant=self.tenant), id=pk)
+
+        # Build the desired member id set from the current group state, then apply PATCH ops.
+        current_member_ids = set(
+            group.members.filter(memberships__tenant=self.tenant).values_list('id', flat=True)
+        )
+
         with transaction.atomic():
             for op in request.data.get('Operations', []):
                 op_type = op.get('op', '').lower()
                 path = op.get('path', '')
                 value = op.get('value')
-                
+
                 val_list = []
                 if isinstance(value, list):
                     val_list = value
                 elif isinstance(value, dict):
                     val_list = [value]
-                    
+
                 if op_type == 'add':
                     for item in val_list:
                         uid = item.get('value')
@@ -672,7 +782,7 @@ class SCIMGroupDetailView(SCIMTenantMixin, APIView):
                                 "status": "400",
                                 "detail": "displayName exceeds maximum length of 100 characters."
                             }, status=status.HTTP_400_BAD_REQUEST)
-                        role.name = value
+                        group.name = value
                     elif isinstance(value, dict) and 'displayName' in value:
                         display_name = value['displayName']
                         if display_name and len(display_name) > 100:
@@ -681,7 +791,7 @@ class SCIMGroupDetailView(SCIMTenantMixin, APIView):
                                 "status": "400",
                                 "detail": "displayName exceeds maximum length of 100 characters."
                             }, status=status.HTTP_400_BAD_REQUEST)
-                        role.name = display_name
+                        group.name = display_name
                     elif path == 'members' or not path:
                         current_member_ids = set()
                         for item in val_list:
@@ -695,16 +805,25 @@ class SCIMGroupDetailView(SCIMTenantMixin, APIView):
                                         "status": "400",
                                         "detail": f"Invalid member ID: {uid}"
                                     }, status=status.HTTP_400_BAD_REQUEST)
-            
-            role.save()
-            sync_group_members(self.tenant, role, current_member_ids)
 
-        serializer = SCIMGroupSerializer(role, context={'request': request})
+            group.save()
+            sync_group_members(self.tenant, group, current_member_ids)
+
+        serializer = SCIMGroupSerializer(group, context={'request': request, 'tenant_slug': self.tenant.slug})
         return Response(serializer.data, status=status.HTTP_200_OK)
 
     def delete(self, request, pk, *args, **kwargs):
-        role = get_object_or_404(TenantRole.objects.filter(tenant=self.tenant), id=pk)
+        return Response({
+            "schemas": ["urn:ietf:params:scim:api:messages:2.0:Error"],
+            "status": "403",
+            "detail": "User groups are managed centrally and cannot be deleted via tenant SCIM.",
+        }, status=status.HTTP_403_FORBIDDEN)
+
+    def _disabled_delete(self, request, pk, *args, **kwargs):
+        group = get_object_or_404(UserGroup.objects.filter(tenant=self.tenant), id=pk)
         with transaction.atomic():
-            TenantMembership.objects.filter(tenant=self.tenant, role=role).delete()
-            role.delete()
+            # Deleting a UserGroup removes the group and its M2M links; it does NOT remove
+            # TenantMemberships — users remain members of the tenant with whatever direct
+            # roles/grants they have. Soft-delete via the model's delete() for change-logging.
+            group.delete()
         return Response(status=status.HTTP_204_NO_CONTENT)

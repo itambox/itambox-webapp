@@ -8,6 +8,7 @@ Covers:
 - Surprise finds: assets scanned that are not in expected_ids.
 - Missing: expected assets not scanned.
 """
+from django.core.exceptions import ValidationError
 from django.test import TestCase
 from django.contrib.auth import get_user_model
 from model_bakery import baker
@@ -18,6 +19,28 @@ from compliance.reconciliation import classify_session_audits, audit_asset
 from organization.models import Location
 
 User = get_user_model()
+
+
+class AuditDuplicateGuardTests(TestCase):
+    """WS6-6: a duplicate (session, asset) audit must raise a friendly ValidationError, not
+    surface the unique-constraint IntegrityError as a 500."""
+
+    def setUp(self):
+        self.user = User.objects.create_superuser(username='dup_auditor', email='d@t.com', password='pw')
+        self.status = baker.make(StatusLabel, type=StatusLabel.TYPE_DEPLOYABLE)
+        self.loc = baker.make(Location, name='Berlin')
+        self.session = AuditSession.objects.create(
+            name='Stocktake', status='active', location=self.loc, created_by=self.user,
+        )
+        self.asset = baker.make(Asset, status=self.status, location=self.loc)
+
+    def test_duplicate_session_audit_raises_validationerror(self):
+        audit_asset(self.asset, user=self.user, session=self.session)
+        with self.assertRaises(ValidationError):
+            audit_asset(self.asset, user=self.user, session=self.session)
+        self.assertEqual(
+            AssetAudit.objects.filter(session=self.session, asset=self.asset).count(), 1
+        )
 
 
 def _superuser():

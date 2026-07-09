@@ -1,11 +1,15 @@
 from datetime import date, timedelta
+from html import unescape
 import json
+import re
+import markdown as md
 from django import forms
 from django.conf import settings
 from django.db.models import Sum, Count, Q, Avg, F, Case, When, Value, IntegerField, Subquery, OuterRef
 from django.db.models.functions import Extract, Coalesce
 
 from django.urls import reverse
+from django.utils.html import escape
 from django.utils.safestring import mark_safe
 from django.template.loader import render_to_string
 from django.core.exceptions import PermissionDenied
@@ -220,10 +224,6 @@ class NoteWidget(DashboardWidget):
         )
 
     def get_context(self, request):
-        import markdown as md
-        from django.utils.html import escape
-        from django.utils.safestring import mark_safe
-
         raw = self.get_config_value('content', '')
         content_html = ''
         if raw:
@@ -231,10 +231,41 @@ class NoteWidget(DashboardWidget):
             # then let markdown add formatting on top of the escaped text.
             # (Tradeoff: the blockquote '>' prefix is escaped away — acceptable
             # in exchange for XSS safety without a sanitizer dependency.)
-            content_html = mark_safe(md.markdown(
+            rendered = md.markdown(
                 escape(raw),
                 extensions=['extra', 'sane_lists', 'nl2br'],
-            ))
+            )
+            # escape() does not touch markdown link syntax, so [x](javascript:…)/[y](data:…)
+            # still emit a dangerous href/src. Neutralize those schemes to '#'.
+            #
+            # Bypass hardening: browsers strip ASCII control characters (tabs,
+            # newlines, \x00-\x1f) from inside a URL scheme before evaluating
+            # it, so "java\tscript:" is treated as "javascript:" by the browser
+            # even though the raw pattern match would miss it. Additionally,
+            # HTML entities (e.g. &#106;avascript:) can encode scheme chars.
+            # Mitigation: decode HTML entities and strip ASCII control characters
+            # from each URL value before scheme-checking, then re-block on the
+            # normalised form.
+            def _neutralize_url(m):
+                attr_prefix = m.group(1)   # e.g. 'href="'
+                url_value = m.group(2)     # everything up to the closing '"'
+                # 1. Decode HTML entities that may encode scheme characters.
+                decoded = unescape(url_value)
+                # 2. Strip ASCII control characters (\x00–\x1f) from the URL
+                #    so "java\x09script:" normalises to "javascript:".
+                stripped = re.sub(r'[\x00-\x1f]', '', decoded)
+                # 3. Check the normalised scheme against the blocklist.
+                if re.match(r'\s*(?:javascript|data|vbscript)\s*:', stripped, re.IGNORECASE):
+                    return attr_prefix + '#"'
+                return m.group(0)
+
+            rendered = re.sub(
+                r'((?:href|src)\s*=\s*")([^"]*)"',
+                _neutralize_url,
+                rendered,
+                flags=re.IGNORECASE,
+            )
+            content_html = mark_safe(rendered)
         return {
             'content': raw,
             'content_html': content_html,

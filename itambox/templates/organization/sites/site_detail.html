@@ -13,13 +13,13 @@
 {# --- Tabs --- #}
 {% block extra_tabs %}
     <li class="nav-item" role="presentation">
-        <a href="?tab=locations" class="nav-link {% if request.GET.tab == 'locations' %}active{% endif %}" data-bs-toggle="tab" data-bs-target="#locations" role="tab" aria-selected="{% if request.GET.tab == 'locations' %}true{% else %}false{% endif %}">
+        <a href="?tab=locations" class="nav-link {% if request.GET.tab == 'locations' %}active{% endif %}" data-bs-toggle="tab" hx-boost="false" data-bs-target="#locations" role="tab" aria-selected="{% if request.GET.tab == 'locations' %}true{% else %}false{% endif %}">
             <i class="mdi mdi-account-outline me-1 text-purple"></i>
             {% translate "Locations" %} <span class="badge bg-purple-lt ms-2">{{ locations_table.rows|length }}</span>
         </a>
     </li>
     <li class="nav-item" role="presentation">
-        <a href="?tab=assets" class="nav-link {% if request.GET.tab == 'assets' %}active{% endif %}" data-bs-toggle="tab" data-bs-target="#assets" role="tab" aria-selected="{% if request.GET.tab == 'assets' %}true{% else %}false{% endif %}">
+        <a href="?tab=assets" class="nav-link {% if request.GET.tab == 'assets' %}active{% endif %}" data-bs-toggle="tab" hx-boost="false" data-bs-target="#assets" role="tab" aria-selected="{% if request.GET.tab == 'assets' %}true{% else %}false{% endif %}">
             <i class="mdi mdi-office-building-outline me-1 text-green"></i>
             {% translate "Assets" %} <span class="badge bg-green-lt ms-2">{{ assets_table.rows|length }}</span>
         </a>

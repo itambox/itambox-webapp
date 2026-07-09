@@ -183,23 +183,19 @@ class AssetRequest(JournalingMixin, TaggableMixin, ChangeLoggingMixin, BaseModel
             from core.managers import get_current_tenant
             self.tenant = get_current_tenant()
 
-        # Auto-approval check for Accessories and Consumables
+        # Auto-approval check for Accessories and Consumables.
+        # NOTE: auto-approval is advisory — it reserves no stock. Capacity is
+        # enforced at fulfilment, so a generous (or malformed) threshold here can
+        # only over-approve, never over-allocate.
         if not self.pk and self.status == RequestStatusChoices.PENDING:
             from django.conf import settings
             from django.utils import timezone
-            from extras.models import ConfigContext
 
-            # Default thresholds
+            # Auto-approval thresholds come from settings (sane defaults below).
             thresholds = getattr(settings, 'REQUISITION_AUTO_APPROVAL_THRESHOLDS', {
                 'accessory': 3,
                 'consumable': 5,
             })
-
-            # Look up tenant config contexts for overrides
-            if self.tenant:
-                cc = ConfigContext.objects.filter(tenants=self.tenant).order_by('-weight').first()
-                if cc and isinstance(cc.data, dict) and 'requisition_auto_approval_thresholds' in cc.data:
-                    thresholds = cc.data['requisition_auto_approval_thresholds']
 
             if self.accessory:
                 max_qty = thresholds.get('accessory', 0)

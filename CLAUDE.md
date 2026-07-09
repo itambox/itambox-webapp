@@ -27,6 +27,47 @@ itambox/          # Django project root
   static/dist/    # Compiled frontend (git-ignored, rebuild with npm)
 ```
 
+### Standard app layout
+
+Domain apps follow a consistent internal layout. Large apps split `models`, `forms`, and `views` into packages; smaller apps keep them as single modules — both are fine, match the neighbouring app rather than imposing a structure.
+
+```text
+<app>/
+  models.py | models/    # ORM models (package when large — only assets/ splits today)
+  forms.py  | forms/     # ModelForms + filter forms; CSV import forms in forms/import_forms.py
+  views.py  | views/     # UI views subclassing itambox.views.generic.*
+  tables.py              # django-tables2 table classes
+  filters.py             # django-filter FilterSet classes (this repo uses filters.py, NOT filtersets.py)
+  api/                   # serializers.py / views.py / urls.py — bases imported from itambox.api.*
+  schema.py              # GraphQL (graphene) Query/Mutation — GraphQL-exposed apps only
+  search.py              # @register_search SearchIndex classes (global search)
+  services.py            # domain/service-layer logic — only where a service layer is warranted
+  tasks.py               # django-q2 task functions — only where the app enqueues work
+  signals.py             # signal receivers — only where needed
+  choices.py             # ChoiceSet / enum-style choices
+  urls.py                # pk-based routes; app_name set
+  admin.py, apps.py
+  tests/    | tests.py    # pytest-django tests
+```
+
+Not every app has every file: `services.py`, `schema.py`, `tasks.py`, `signals.py`, and `search.py` exist only where the feature is used. `api/` is always a package.
+
+## Tech stack
+
+Django + PostgreSQL (SQLite is rejected at settings load). Beyond Django itself:
+
+- **REST API** — Django REST Framework + drf-spectacular (OpenAPI schema/sidecar).
+- **GraphQL** — graphene-django (see "Architecture: GraphQL").
+- **Lists & filtering** — django-tables2 (tables) + django-filter (FilterSets).
+- **Forms** — django-crispy-forms + crispy-bootstrap5.
+- **Frontend interactivity** — HTMX (django-htmx); TypeScript + SCSS compiled via npm into `static/dist/`.
+- **Background jobs** — django-q2 (NOT Celery); worker via `manage.py qcluster`.
+- **Cache / queue broker** — Valkey/Redis in prod, locmem in dev.
+- **Tests** — pytest-django + model_bakery. pytest-xdist is installed but NOT enabled: the suite isn't xdist-safe yet (cross-test shared state — MEDIA_ROOT, requests-mock + django-q timing).
+- **Docs** — MkDocs.
+
+Version pins live in `itambox/requirements.txt` and `pyproject.toml` — check there rather than trusting a number quoted here.
+
 ## Development commands
 
 All commands run from `itambox/`.
@@ -152,9 +193,30 @@ The canonical API implementation lives in `itambox/api/`. All app-level API code
 
 `CSPMiddleware` (`itambox/middleware.py`) sets the CSP header. Inline scripts are nonce'd per request (`request.csp_nonce`) — `script-src` does not allow `'unsafe-inline'`. Styles still rely on `'unsafe-inline'` in `style-src`: the ~675 inline `style=` attributes across templates can't carry a nonce, so this is tracked tech-debt pending an inline-style refactor (move inline styles to CSS classes).
 
+## Architecture: GraphQL
+
+GraphQL uses **graphene-django** (not Strawberry). Each exposed app declares `Query`/`Mutation` classes in `<app>/schema.py`; the root schema in `core/schema.py` combines them (currently `assets`, `inventory`, `licenses`, `software`, `subscriptions`) plus any plugin schema (a plugin opts in via a `graphql_schema` attr on its app config). The endpoint is served by `core/views/graphql.py` — a `GraphQLView` subclass wired through `TenantMiddleware`/`CurrentUserMiddleware` and token auth, with **query-complexity guards**: a depth limit plus a field/alias-count validator (`field_count_limit_validator`) that stops alias-amplification DoS (`a1: assets(...) a2: assets(...) …`). To expose a new app: add `<app>/schema.py` with `Query`/`Mutation`, then add those to the bases in `core/schema.py`. Coverage is tested by `test_graphql.py`, `test_graphql_adversarial.py`, and `test_sec_graphql.py`.
+
 ## Architecture: background tasks
 
 Tasks live in `core/tasks/`. Each task function should be wrapped in `TaskContext(tenant_id=..., user_id=...)` to wire up tenant scoping and change-log attribution. Tasks are enqueued with django-q2's `async_task()`, dispatched via `transaction.on_commit()` to avoid running before the triggering transaction commits.
+
+## Common tasks: add a model end-to-end
+
+A fully-wired model touches every layer below. Skipping one leaves a half-wired feature (a model with no API, a list view with no filter, an object missing from search). Mirror an existing model in the same app rather than inventing structure.
+
+1. **Model** — add to `<app>/models.py` (or `models/`). Inherit `BaseModel`; add `ChangeLoggingMixin` for audit history and `AutoSlugMixin` if it needs a slug. Tenant-scoped models get the tenant FK + the appropriate manager (see "Architecture: tenant scoping"); soft-delete uniqueness uses `UniqueConstraint(condition=Q(deleted_at__isnull=True))`, never `unique=True`.
+2. **Migration** — `python manage.py makemigrations <app>` (never hand-write).
+3. **Filtering** — add a `FilterSet` to `<app>/filters.py` and a filter form to `<app>/forms/` (the list view wires them as `filterset` / `filterset_form`).
+4. **Form** — add a crispy `ModelForm` to `<app>/forms/`; for CSV import add a form to `<app>/forms/import_forms.py` decorated with `@register_import_form` (auto-wires to the centralized import view).
+5. **Table** — add a `django_tables2` table to `<app>/tables.py`.
+6. **REST API** — serializer in `<app>/api/serializers.py`, viewset in `<app>/api/views.py`, route in `<app>/api/urls.py` (bases from `itambox.api.*`); then regenerate the schema with `python manage.py spectacular --file schema.yaml`.
+7. **UI views** — subclass the generics in `<app>/views.py` (or `views/`): `ObjectListView` / `ObjectDetailView` / `ObjectEditView` / `ObjectDeleteView` / `ObjectCloneView` / `ObjectBulkEditView` / `ObjectBulkDeleteView`; set `queryset`, `filterset`, `filterset_form`, `table`, and detail `Panel`s.
+8. **URLs** — add the pk-based route set to `<app>/urls.py` (`list` / `add` / `<pk>/` / `<pk>/edit/` / `<pk>/clone/` / `<pk>/delete/` + bulk + any custom actions).
+9. **Search** — register a `SearchIndex` in `<app>/search.py` with `@register_search()` if the model should appear in global search.
+10. **GraphQL** (optional) — expose via `<app>/schema.py` and wire into `core/schema.py` (see "Architecture: GraphQL").
+11. **Navigation** — wire the list view into the sidebar navigation so the model is reachable in the UI.
+12. **Tests** — add to `<app>/tests/` using `TenantTestMixin`; mirror the existing `test_api.py` / `test_filter_forms.py` / `test_views.py` coverage.
 
 ## Settings
 
@@ -178,7 +240,6 @@ Tasks live in `core/tasks/`. Each task function should be wrapped in `TaskContex
 | `ITAMBOX_REQUIRE_CUSTODY_SIGNIN` | Require digital signature on custody receipt sign-off | `True` |
 | `ITAMBOX_ALLOW_GLOBAL_CUSTODY_TEMPLATES` | Allow custody templates not scoped to a tenant | `True` |
 | `ITAMBOX_SERVER_EMAIL` | From-address for error emails (prod only) | `DEFAULT_FROM_EMAIL` |
-| `ITAMBOX_ENABLE_EXTENDED_ORG_HIERARCHY` | Show Regions & Site Groups in sidebar nav | `False` |
 | `ITAMBOX_PAGINATOR_COUNT_CAP` | Upper bound for the list-page row counter (`EnhancedPaginator`). A plain `SELECT COUNT(*)` scans the whole filtered table on every list view (slow at NetBox scale); the paginator counts only up to this many rows. At or below the cap the total is exact (small tables and tests are unaffected); above it the UI shows "<cap>+". Set `0` to disable capping (stock unbounded count). | `100000` |
 
 Reads `.env` from `BASE_DIR` or `BASE_DIR/../` at startup (hand-rolled parser; no `python-dotenv`).

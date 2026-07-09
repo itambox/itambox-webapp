@@ -60,13 +60,25 @@ class SubscriptionAdmin(admin.ModelAdmin):
 
     @admin.action(description=_('Mark selected as Expired'))
     def mark_expired(self, request, queryset):
-        updated = queryset.update(status='expired')
+        # Save per-instance so each status change is change-logged
+        # (QuerySet.update() bypasses ChangeLoggingMixin.save()).
+        updated = 0
+        for subscription in queryset:
+            subscription.status = 'expired'
+            subscription.save(update_fields=['status'])
+            updated += 1
         self.message_user(request, f'{updated} subscription(s) marked as expired.')
 
     @admin.action(description=_('Mark selected as Cancelled'))
     def mark_cancelled(self, request, queryset):
         from django.utils import timezone
-        updated = queryset.update(status='cancelled', cancellation_date=timezone.now().date())
+        cancellation_date = timezone.now().date()
+        updated = 0
+        for subscription in queryset:
+            subscription.status = 'cancelled'
+            subscription.cancellation_date = cancellation_date
+            subscription.save(update_fields=['status', 'cancellation_date'])
+            updated += 1
         self.message_user(request, f'{updated} subscription(s) cancelled.')
 
 

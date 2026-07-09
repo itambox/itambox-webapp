@@ -137,11 +137,16 @@ def generate_bar_chart(data, title=""):
         # Actual colored bar
         svg_parts.append(f'<rect x="140" y="{y_pos}" width="{bar_width}" height="16" rx="4" fill="{color}" />')
         
-        # Value label (right of bar)
-        val_str = f"${val:,.2f}" if (val >= 100 or isinstance(val, float)) and '.' in str(val) else f"{int(val):,}"
-        if not val_str.startswith('$') and isinstance(val, float):
-             val_str = f"${val:,.2f}"
-        svg_parts.append(f'<text x="{145 + bar_width}" y="{y_pos + 12}" font-size="11" font-weight="700" fill="#0f172a" text-anchor="start">{val_str}</text>')
+        # Value label (right of bar). Prefer a caller-supplied per-currency display
+        # string (the compiler formats money via the money templatetag); fall back to
+        # a plain number for count charts — never hardcode a '$'.
+        if item.get('display'):
+            val_str = str(item['display'])
+        elif isinstance(val, float):
+            val_str = f"{val:,.2f}"
+        else:
+            val_str = f"{int(val):,}"
+        svg_parts.append(f'<text x="{145 + bar_width}" y="{y_pos + 12}" font-size="11" font-weight="700" fill="#0f172a" text-anchor="start">{escape(val_str)}</text>')
         
     svg_parts.append('</svg>')
     return '\n'.join(svg_parts)

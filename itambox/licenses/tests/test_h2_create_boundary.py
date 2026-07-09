@@ -17,8 +17,8 @@ from django.test import TestCase
 from django.contrib.auth import get_user_model
 from django.urls import reverse
 
-from organization.models import Tenant, TenantRole, TenantMembership, AssetHolder
-from assets.models import Manufacturer
+from organization.models import Tenant, Role, Membership, AssetHolder
+from assets.models import Manufacturer, StatusLabel, Asset
 from software.models import Software
 from licenses.models import License, LicenseSeatAssignment, LicenseTypeChoices
 
@@ -31,14 +31,14 @@ class SeatCreateCrossTenantTests(TestCase):
         self.tenant_b = Tenant.objects.create(name='Tenant B', slug='tenant-b')
 
         self.user_b = User.objects.create_user(username='user_b', password='password123')
-        self.role_b = TenantRole.objects.create(
+        self.role_b = Role.objects.create(
             tenant=self.tenant_b,
             name='Admin',
             permissions=['licenses.add_licenseseatassignment', 'licenses.view_licenseseatassignment'],
         )
-        self.membership_b = TenantMembership.objects.create(
-            user=self.user_b, tenant=self.tenant_b, role=self.role_b
+        self.membership_b = Membership.objects.create(user=self.user_b, tenant=self.tenant_b,
         )
+        self.membership_b.roles.add(self.role_b)
 
         self.mfr = Manufacturer.objects.create(name='Microsoft', slug='microsoft')
 
@@ -84,14 +84,14 @@ class GlobalLicenseMintTests(TestCase):
     def setUp(self):
         self.tenant_b = Tenant.objects.create(name='Tenant B', slug='tenant-b')
         self.user_b = User.objects.create_user(username='user_b', password='password123')
-        self.role_b = TenantRole.objects.create(
+        self.role_b = Role.objects.create(
             tenant=self.tenant_b,
             name='Admin',
             permissions=['licenses.add_license', 'licenses.view_license'],
         )
-        self.membership_b = TenantMembership.objects.create(
-            user=self.user_b, tenant=self.tenant_b, role=self.role_b
+        self.membership_b = Membership.objects.create(user=self.user_b, tenant=self.tenant_b,
         )
+        self.membership_b.roles.add(self.role_b)
         self.mfr = Manufacturer.objects.create(name='Microsoft', slug='microsoft')
         self.software_b = Software.objects.create(
             name='Office B', manufacturer=self.mfr, tenant=self.tenant_b
@@ -120,3 +120,61 @@ class GlobalLicenseMintTests(TestCase):
         created = License.all_objects.get(pk=response.json()['id'])
         # Must NOT be a global (tenant=None) row — it is bound to the active tenant.
         self.assertEqual(created.tenant, self.tenant_b)
+
+
+class SeatOverAllocationTests(TestCase):
+    """WS2-1: the REST seat-assignment CRUD path must enforce the same availability +
+    no-duplicate-target invariants as checkout_license(); previously it could over-allocate."""
+
+    def setUp(self):
+        self.tenant = Tenant.objects.create(name='Tenant', slug='t-seat')
+        self.user = User.objects.create_user(username='seatuser', password='pw')
+        role = Role.objects.create(
+            tenant=self.tenant, name='Admin',
+            permissions=['licenses.add_licenseseatassignment', 'licenses.view_licenseseatassignment'],
+        )
+        m = Membership.objects.create(user=self.user, tenant=self.tenant)
+        m.roles.add(role)
+        self.mfr = Manufacturer.objects.create(name='MS', slug='ms-seat')
+        self.software = Software.objects.create(name='Office', manufacturer=self.mfr, tenant=self.tenant)
+        self.status = StatusLabel.objects.create(name='Deployable Seat', slug='dep-seat', type='deployable')
+        self.asset1 = Asset.objects.create(name='A1', asset_tag='SEAT-A1', status=self.status, tenant=self.tenant)
+        self.asset2 = Asset.objects.create(name='A2', asset_tag='SEAT-A2', status=self.status, tenant=self.tenant)
+
+    def _activate(self):
+        self.client.force_login(self.user)
+        session = self.client.session
+        session['active_tenant_id'] = self.tenant.pk
+        session.save()
+
+    def test_cannot_over_allocate_seats_via_api(self):
+        self._activate()
+        url = reverse('api:licenses_api:licenseseatassignment-list')
+        one_seat = License.objects.create(
+            name='OneSeat', software=self.software, seats=1, tenant=self.tenant,
+        )
+        r1 = self.client.post(
+            url, {'license_id': one_seat.pk, 'asset_id': self.asset1.pk}, content_type='application/json'
+        )
+        self.assertEqual(r1.status_code, 201, r1.content)
+        r2 = self.client.post(
+            url, {'license_id': one_seat.pk, 'asset_id': self.asset2.pk}, content_type='application/json'
+        )
+        self.assertEqual(r2.status_code, 400, r2.content)
+        self.assertEqual(LicenseSeatAssignment.objects.filter(license=one_seat).count(), 1)
+
+    def test_cannot_assign_same_asset_twice(self):
+        self._activate()
+        url = reverse('api:licenses_api:licenseseatassignment-list')
+        two_seat = License.objects.create(
+            name='TwoSeat', software=self.software, seats=2, tenant=self.tenant,
+        )
+        r1 = self.client.post(
+            url, {'license_id': two_seat.pk, 'asset_id': self.asset1.pk}, content_type='application/json'
+        )
+        self.assertEqual(r1.status_code, 201, r1.content)
+        r2 = self.client.post(
+            url, {'license_id': two_seat.pk, 'asset_id': self.asset1.pk}, content_type='application/json'
+        )
+        self.assertEqual(r2.status_code, 400, r2.content)
+        self.assertEqual(LicenseSeatAssignment.objects.filter(license=two_seat).count(), 1)

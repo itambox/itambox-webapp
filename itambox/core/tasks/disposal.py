@@ -36,9 +36,11 @@ def _parse_proceeds(value):
     if value in (None, ''):
         return None
     try:
-        return Decimal(str(value))
+        parsed = Decimal(str(value))
     except (InvalidOperation, TypeError, ValueError):
         return None
+    # Negative proceeds are invalid (would push book value negative) — drop them.
+    return parsed if parsed >= 0 else None
 
 
 def bulk_dispose_task(job_id, asset_pks, user_id, tenant_id=None,

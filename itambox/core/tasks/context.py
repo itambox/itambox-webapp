@@ -5,7 +5,7 @@ from core.managers import (
     set_current_tenant, set_current_membership,
     get_current_tenant, get_current_membership,
 )
-from organization.models import Tenant, TenantMembership
+from organization.models import Tenant, Membership
 
 logger = logging.getLogger(__name__)
 
@@ -56,7 +56,7 @@ class TaskContext:
         if self.tenant:
             set_current_tenant(self.tenant)
             if self.user:
-                membership = TenantMembership.objects.filter(user=self.user, tenant=self.tenant).first()
+                membership = Membership.objects.filter(user=self.user, tenant=self.tenant).first()
                 if membership:
                     set_current_membership(membership)
 

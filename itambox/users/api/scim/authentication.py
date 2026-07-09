@@ -4,7 +4,7 @@ from rest_framework.authentication import BaseAuthentication, get_authorization_
 from rest_framework import exceptions
 from django.utils import timezone
 from users.models import Token
-from organization.models import Tenant, TenantMembership
+from organization.models import Tenant, Membership
 
 logger = logging.getLogger('itambox.scim.auth')
 
@@ -66,14 +66,13 @@ class SCIMBearerTokenAuthentication(BaseAuthentication):
 
             # Verify tenant membership with admin/owner role
             if not user.is_superuser:
-                membership = TenantMembership.objects.filter(user=user, tenant=tenant).select_related('role').first()
+                membership = Membership.objects.filter(user=user, tenant=tenant).prefetch_related('roles').first()
                 if not membership:
                     raise exceptions.AuthenticationFailed('User does not have a membership in this tenant.')
-                # Fail closed when the membership has no role (nullable FK) instead of
-                # raising AttributeError (500). Authorise admin/owner only.
-                role = membership.role
-                role_name = (role.name or '').lower() if role else ''
-                if not role or role_name not in ('admin', 'owner'):
+                # Authorise admin/owner only. Roles are now an M2M: accept if ANY attached
+                # role is named 'admin' or 'owner'. Fail closed when none qualifies.
+                role_names = {(r.name or '').lower() for r in membership.roles.all()}
+                if not role_names & {'admin', 'owner'}:
                     raise exceptions.AuthenticationFailed('User does not have sufficient permissions (admin or owner role required).')
 
             # Enforce write_enabled token flag for write methods

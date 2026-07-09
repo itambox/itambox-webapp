@@ -9,7 +9,7 @@ from .models.choices import (
     ReservationStatusChoices,
 )
 from assets.choices import RequestStatusChoices
-from organization.models import Location, Tenant, AssetHolder
+from organization.models import Location, Tenant, AssetHolder, Site
 from extras.models import Tag
 from django import forms
 from django.db.models import Q
@@ -60,6 +60,12 @@ class AssetFilterSet(BaseFilterSet):
     )
     location = django_filters.ModelChoiceFilter(
         queryset=Location.objects.all().select_related('site'),
+        widget=forms.Select(attrs={'class': 'form-select'})
+    )
+    site = django_filters.ModelChoiceFilter(
+        field_name='location__site',
+        queryset=Site.objects.all(),
+        label=_('Site'),
         widget=forms.Select(attrs={'class': 'form-select'})
     )
     tenant = django_filters.ModelChoiceFilter(
@@ -222,6 +228,11 @@ class AssetTypeFilterSet(BaseFilterSet):
         field_name='manufacturer',
         label=_('Manufacturer')
     )
+    category = django_filters.ModelChoiceFilter(
+        queryset=Category.objects.all(),
+        label=_('Category'),
+        widget=forms.Select(attrs={'class': 'form-select'})
+    )
     requestable = django_filters.BooleanFilter(
         label=_('Requestable'),
         widget=forms.Select(choices=[('', _('Any')), ('true', _('Yes')), ('false', _('No'))], attrs={'class': 'form-select'})
@@ -229,7 +240,7 @@ class AssetTypeFilterSet(BaseFilterSet):
 
     class Meta:
         model = AssetType
-        fields = ['manufacturer', 'model', 'part_number', 'requestable']
+        fields = ['manufacturer', 'model', 'part_number', 'category', 'requestable']
 
     def search(self, queryset, name, value):
         if not value.strip():

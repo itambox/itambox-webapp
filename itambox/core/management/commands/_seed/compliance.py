@@ -93,12 +93,26 @@ class SeedComplianceMixin:
                     completed_at = _as_dt(close_date)
 
                 quarter_label = f"Q{((audit_date.month - 1) // 3) + 1} {audit_date.year}"
-                session_name = f"{tenant.name} — {quarter_label} Asset Audit"
                 engineer = random.choice(actors)
+
+                # ~40% of sessions are scoped to a single location (a site / stockroom
+                # walk-through); the rest are tenant-wide. Prefer a location that has
+                # assets physically sitting there so the session isn't empty.
+                session_location = None
+                if locs and random.random() < 0.4:
+                    loc_candidates = [l for l in locs
+                                      if any(a.location_id == l.pk for a in tenant_assets)]
+                    session_location = random.choice(loc_candidates or locs)
+
+                if session_location:
+                    session_name = f"{quarter_label} — {session_location.name} Audit"
+                else:
+                    session_name = f"{quarter_label} Asset Audit"
 
                 session = AuditSession.objects.create(
                     name=session_name,
                     tenant=tenant,
+                    location=session_location,
                     status=AuditSessionStatusChoices.PLANNED,
                     created_by=engineer,
                     completed_at=completed_at if status == AuditSessionStatusChoices.COMPLETED else None,
@@ -121,13 +135,18 @@ class SeedComplianceMixin:
                         status=AuditSessionStatusChoices.COMPLETED,
                     )
 
-                # Sample ~60 % of tenant assets (min 3, max 40) for this session.
-                sample_size = max(3, min(40, int(len(tenant_assets) * 0.6)))
-                audited_assets = random.sample(tenant_assets, k=min(sample_size, len(tenant_assets)))
+                # A location-scoped session audits the assets physically at that location;
+                # a tenant-wide session samples ~60 % of the tenant's assets (min 3, max 40).
+                if session_location:
+                    pool = [a for a in tenant_assets if a.location_id == session_location.pk]
+                    audited_assets = pool or random.sample(tenant_assets, k=min(3, len(tenant_assets)))
+                else:
+                    sample_size = max(3, min(40, int(len(tenant_assets) * 0.6)))
+                    audited_assets = random.sample(tenant_assets, k=min(sample_size, len(tenant_assets)))
 
                 for asset in audited_assets:
                     # Determine observed location — asset's own location or fallback.
-                    obs_loc = asset.location or fallback_loc
+                    obs_loc = session_location or asset.location or fallback_loc
                     if obs_loc is None:
                         continue  # AssetAudit.location is required — skip if we have none
 

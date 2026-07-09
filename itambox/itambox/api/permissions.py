@@ -60,8 +60,8 @@ class TokenPermissions(BasePermission):
         # Ensure active tenant context is set and valid
         from core.managers import get_current_tenant, set_current_tenant, set_current_membership
         if not get_current_tenant():
-            from organization.models import TenantMembership
-            membership = TenantMembership.objects.filter(user=request.user).select_related('tenant', 'role').first()
+            from organization.models import Membership
+            membership = Membership.objects.filter(user=request.user, is_active=True).select_related('tenant').first()
             if membership:
                 set_current_tenant(membership.tenant)
                 set_current_membership(membership)
@@ -93,7 +93,10 @@ class TokenPermissions(BasePermission):
         if not perms:
             return True
 
-        return request.user.has_perms(perms)
+        # Pass the object so the permission check resolves against the object's own
+        # tenant (TenantMembershipBackend._resolve_tenant), making it self-sufficient
+        # rather than relying on StrictTenantPermission to catch a tenant mismatch.
+        return request.user.has_perms(perms, obj)
 
 
 class IsAuthenticatedOrLoginNotRequired(BasePermission):
