@@ -14,6 +14,7 @@ logger = logging.getLogger(__name__)
 User = get_user_model()
 from crispy_forms.helper import FormHelper
 from crispy_forms.layout import Layout, Row, Column, Fieldset, Submit, HTML
+from organization.forms.helpers import add_standard_buttons
 
 class UserProfileForm(forms.ModelForm):
     class Meta:
@@ -109,7 +110,6 @@ class UserForm(forms.ModelForm):
                 ),
             ),
         )
-        from organization.forms.helpers import add_standard_buttons
         add_standard_buttons(self.helper, self.instance, 'users:user_list')
 
     def clean_is_superuser(self):
@@ -616,7 +616,6 @@ class UserGroupForm(forms.ModelForm):
             Fieldset(str(_("Access grants")), 'roles', 'members'),
             Fieldset(str(_("Scope")), 'provider'),
         )
-        from organization.forms.helpers import add_standard_buttons
         add_standard_buttons(self.helper, self.instance, 'users:usergroup_list')
 
     def clean(self):

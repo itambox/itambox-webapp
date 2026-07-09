@@ -486,8 +486,8 @@ class Role(AutoSlugMixin, StandardModel, SoftDeleteMixin):
     SCOPE_TENANT = 'tenant'
     SCOPE_PROVIDER = 'provider'
     SCOPE_CHOICES = [
-        (SCOPE_TENANT, _('Tenant')),
-        (SCOPE_PROVIDER, _('Provider')),
+        (SCOPE_TENANT, _('Tenant role')),
+        (SCOPE_PROVIDER, _('Provider role')),
     ]
 
     # Tenant-scoped roles ride the standard tenant-scoping managers; provider-scoped
@@ -636,6 +636,10 @@ class Membership(ChangeLoggingMixin, models.Model):
     # label the two kinds for display/report code, not a stored discriminator.
     KIND_STAFF = 'staff'
     KIND_MEMBER = 'member'
+    KIND_CHOICES = [
+        (KIND_MEMBER, _('Tenant member')),
+        (KIND_STAFF, _('Provider staff (technician)')),
+    ]
 
     SCOPE_EXPLICIT = 'explicit'
     SCOPE_TENANT_GROUP = 'tenant_group'
@@ -763,7 +767,7 @@ class Membership(ChangeLoggingMixin, models.Model):
     @property
     def is_provider_staff(self):
         """A membership bound to a Provider is, by definition, provider staff."""
-        return self.provider_id is not None
+        return bool(self.provider_id)
 
     @property
     def kind(self):
@@ -772,7 +776,7 @@ class Membership(ChangeLoggingMixin, models.Model):
 
     def get_kind_display(self):
         """Human label for ``kind`` (mirrors Django's ``get_<field>_display`` ergonomics)."""
-        return _("Provider staff (technician)") if self.provider_id else _("Tenant member")
+        return dict(self.KIND_CHOICES)[self.kind]
 
     def save(self, *args, **kwargs):
         # A provider-staff membership always needs a tenant_scope; default it on first save

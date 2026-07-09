@@ -1,5 +1,6 @@
 {% extends "generic/object_detail.html" %}
 {% load i18n %}
+{% load rbac_badges %}
 
 {% block extra_page_actions %}
 <a href="{% url 'organization:role_assign_users' pk=object.pk %}" class="btn btn-ghost-secondary">
@@ -14,11 +15,7 @@
         <label class="form-label text-muted">{% translate "Name" %}</label>
         <div class="fw-bold fs-3 text-dark">
             {{ object.name }}
-            {% if object.scope == 'provider' %}
-            <span class="badge bg-purple-lt text-purple align-middle ms-2"><i class="mdi mdi-domain me-1"></i>{% translate "Provider role" %}</span>
-            {% else %}
-            <span class="badge bg-blue-lt text-blue align-middle ms-2"><i class="mdi mdi-office-building me-1"></i>{% translate "Tenant role" %}</span>
-            {% endif %}
+            {% role_scope_badge object icon=True extra_class="align-middle ms-2" %}
         </div>
         <div class="text-muted small mt-1">
             {% if object.owner %}<a href="{{ object.owner.get_absolute_url }}">{{ object.owner }}</a>{% endif %}

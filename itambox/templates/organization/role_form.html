@@ -1,6 +1,7 @@
 {% extends base_template|default:"layout.html" %}
 {% load i18n %}
 {% load crispy_forms_tags %}
+{% load rbac_badges %}
 
 {% block title %}{{ title }} {% translate "- ITAMbox" %}{% endblock %}
 
@@ -47,11 +48,7 @@
                         {% else %}
                         <label class="form-label">{% translate "Kind" %}</label>
                         <div class="mb-2">
-                            {% if form.is_provider_scoped %}
-                            <span class="badge bg-purple-lt text-purple"><i class="mdi mdi-domain me-1"></i>{% translate "Provider role" %}</span>
-                            {% else %}
-                            <span class="badge bg-blue-lt text-blue"><i class="mdi mdi-office-building me-1"></i>{% translate "Tenant role" %}</span>
-                            {% endif %}
+                            {% role_scope_badge form.is_provider_scoped icon=True %}
                         </div>
                         {% if form.is_provider_scoped %}
                             {% if not form.provider.is_hidden %}

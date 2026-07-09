@@ -22,7 +22,11 @@ from ..filters import RoleFilterSet
 
 
 class RoleListView(ObjectListView):
-    queryset = Role.objects.annotate(member_count=Count('memberships', distinct=True))
+    # select_related the two FKs RoleTable.render_container dereferences via Role.owner
+    # (tenant XOR provider) -- avoids an N+1 query per row on the list page.
+    queryset = Role.objects.annotate(
+        member_count=Count('memberships', distinct=True)
+    ).select_related('tenant', 'provider')
     filterset = RoleFilterSet
     filterset_form = RoleFilterForm
     table = RoleTable

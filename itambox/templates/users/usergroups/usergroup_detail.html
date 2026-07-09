@@ -1,5 +1,6 @@
 {% extends "generic/object_detail.html" %}
 {% load i18n %}
+{% load rbac_badges %}
 
 {% block extra_page_actions %}
 <a href="{% url 'users:usergroup_assign_users' pk=object.pk %}" class="btn btn-ghost-secondary">
@@ -83,13 +84,7 @@
                 <td>
                     <a href="{% url 'organization:role_detail' pk=role.pk %}">{{ role.name }}</a>
                 </td>
-                <td>
-                    {% if role.scope == 'provider' %}
-                    <span class="badge bg-purple-lt text-purple">{% translate "Provider role" %}</span>
-                    {% else %}
-                    <span class="badge bg-blue-lt text-blue">{% translate "Tenant role" %}</span>
-                    {% endif %}
-                </td>
+                <td>{% role_scope_badge role %}</td>
                 <td>{% if role.owner %}{{ role.owner }}{% else %}—{% endif %}</td>
                 <td>
                     <span class="badge bg-secondary-lt">{{ role.permissions|length }} {% translate "permission(s)" %}</span>

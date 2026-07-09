@@ -17,6 +17,7 @@ from crispy_forms.layout import Layout
 
 from core.forms import FilterForm
 
+from .helpers import add_standard_buttons
 from ..models import Provider, Tenant, TenantGroup, Role, Membership, AssetHolder
 from ..filters import ProviderFilterSet
 
@@ -51,7 +52,6 @@ class ProviderForm(forms.ModelForm):
         self.helper.layout = Layout(
             'name', 'slug', 'description', 'comments', 'internal_tenant',
         )
-        from .helpers import add_standard_buttons
         add_standard_buttons(self.helper, self.instance, 'organization:provider_list')
 
 
@@ -128,7 +128,6 @@ class TechnicianQuickForm(forms.Form):
             'provider', 'role',
             'tenant_scope', 'scope_group', 'assigned_tenants',
         )
-        from .helpers import add_standard_buttons
         add_standard_buttons(self.helper, instance=None, list_url_name='organization:membership_list')
 
         # Scope querysets based on the requesting user. Use _base_manager throughout: this is a

@@ -247,7 +247,7 @@ class MembershipBulkEditView(ObjectBulkEditView):
 
                 # Memberships must share one container; roles must match.
                 tenant_pks = {m.tenant_id for m in objects if m.tenant_id}
-                provider_pks = {m.provider_id for m in objects if m.provider_id}
+                provider_pks = {m.provider_id for m in objects if m.is_provider_staff}
                 if (len(tenant_pks) + len(provider_pks)) != 1:
                     messages.error(
                         request,

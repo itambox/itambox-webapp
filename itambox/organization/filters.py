@@ -316,10 +316,7 @@ class RoleFilterSet(BaseOrgFilterSet):
     tag = None  # Role has no tags field
     scope = django_filters.ChoiceFilter(
         label=_('Kind'),
-        choices=[
-            (Role.SCOPE_TENANT, _('Tenant role')),
-            (Role.SCOPE_PROVIDER, _('Provider role')),
-        ],
+        choices=Role.SCOPE_CHOICES,
         widget=forms.Select(attrs={'class': 'form-select'}),
     )
     tenant = django_filters.ModelChoiceFilter(
@@ -349,10 +346,7 @@ class MembershipFilterSet(BaseOrgFilterSet):
     # no stored discriminator, so this is a method filter, not a model-field filter.
     kind = django_filters.ChoiceFilter(
         label=_('Kind'),
-        choices=[
-            (Membership.KIND_MEMBER, _('Tenant member')),
-            (Membership.KIND_STAFF, _('Provider staff (technician)')),
-        ],
+        choices=Membership.KIND_CHOICES,
         method='filter_kind',
         widget=forms.Select(attrs={'class': 'form-select'}),
     )

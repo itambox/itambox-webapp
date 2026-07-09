@@ -8,6 +8,7 @@ from .models import (
 )
 from core.tables import ActionsColumn, BaseTable, CountLinkColumn, ToggleColumn
 from extras.tables import TagColumn
+from .templatetags.rbac_badges import membership_kind_badge, role_scope_badge
 
 from assets.models import Asset, AssetAssignment
 from django.urls import reverse
@@ -248,9 +249,7 @@ class RoleTable(BaseTable):
         default_columns = ('pk', 'name', 'kind', 'container', 'description', 'member_count', 'actions')
 
     def render_kind(self, record):
-        if record.scope == Role.SCOPE_PROVIDER:
-            return format_html('<span class="badge bg-purple-lt text-purple">{}</span>', _('Provider role'))
-        return format_html('<span class="badge bg-blue-lt text-blue">{}</span>', _('Tenant role'))
+        return role_scope_badge(record)
 
     def render_container(self, value, record):
         owner = record.owner
@@ -280,9 +279,7 @@ class MembershipTable(BaseTable):
         default_columns = ('pk', 'user', 'kind', 'container', 'roles', 'is_active', 'joined_at', 'actions')
 
     def render_kind(self, record):
-        if record.provider_id:
-            return format_html('<span class="badge bg-purple-lt text-purple">{}</span>', _('Provider staff'))
-        return format_html('<span class="badge bg-blue-lt text-blue">{}</span>', _('Tenant member'))
+        return membership_kind_badge(record)
 
     def render_container(self, value, record):
         owner = record.container
