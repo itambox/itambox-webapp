@@ -111,6 +111,18 @@ class TestProdSettingsPosture:
         # Token + session auth must still be present.
         assert any('TokenAuthentication' in cls for cls in auth_classes)
 
+    def test_debug_is_never_true_in_prod(self):
+        """
+        DEBUG must be hardcoded False in prod.py, not env-toggleable. A stray
+        ITAMBOX_DEBUG=True in a leftover/templated .env (e.g. copied from
+        .env.example and only half-edited when switching to prod) must not be
+        able to flip it on.
+        """
+        assert _load_prod({}).DEBUG is False
+        assert _load_prod({'ITAMBOX_DEBUG': 'True'}).DEBUG is False
+        assert _load_prod({'ITAMBOX_DEBUG': 'true'}).DEBUG is False
+        assert _load_prod({'ITAMBOX_DEBUG': '1'}).DEBUG is False
+
     def test_sentinel_secret_key_raises(self):
         """An unset (sentinel) SECRET_KEY must refuse to boot in prod."""
         with pytest.raises(RuntimeError, match='ITAMBOX_SECRET_KEY'):
@@ -155,7 +167,8 @@ class TestProdSettingsPosture:
         logger = logging.getLogger('core.settings.prod')
         logger.addHandler(handler)
         try:
-            _load_prod({})
+            prod = _load_prod({})
         finally:
             logger.removeHandler(handler)
         assert records == [], f'Unexpected prod warnings: {records}'
+        assert prod.DEBUG is False

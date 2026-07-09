@@ -4,7 +4,7 @@ from rest_framework.authentication import BaseAuthentication, get_authorization_
 from rest_framework import exceptions
 from django.utils import timezone
 from users.models import Token
-from organization.models import Tenant, Membership
+from organization.models import Tenant
 
 logger = logging.getLogger('itambox.scim.auth')
 
@@ -64,16 +64,20 @@ class SCIMBearerTokenAuthentication(BaseAuthentication):
             if not user.is_active:
                 raise exceptions.AuthenticationFailed('User inactive or deleted.')
 
-            # Verify tenant membership with admin/owner role
+            # Authorization: superusers always pass. Everyone else must BOTH (a) present a
+            # token scoped to THIS tenant and (b) hold the organization.change_membership
+            # permission for it — a real has_perm check against the role's actual JSON
+            # permissions, never a Role.name string match (that magic-string pattern was a
+            # backdoor: any role literally named 'admin'/'owner' granted access regardless
+            # of its permissions — see the equivalent fix in InviteUserMixin). Fail closed
+            # otherwise.
             if not user.is_superuser:
-                membership = Membership.objects.filter(user=user, tenant=tenant).prefetch_related('roles').first()
-                if not membership:
-                    raise exceptions.AuthenticationFailed('User does not have a membership in this tenant.')
-                # Authorise admin/owner only. Roles are now an M2M: accept if ANY attached
-                # role is named 'admin' or 'owner'. Fail closed when none qualifies.
-                role_names = {(r.name or '').lower() for r in membership.roles.all()}
-                if not role_names & {'admin', 'owner'}:
-                    raise exceptions.AuthenticationFailed('User does not have sufficient permissions (admin or owner role required).')
+                if token.tenant_id != tenant.pk:
+                    raise exceptions.AuthenticationFailed('Token is not scoped to this tenant.')
+                if not user.has_perm('organization.change_membership', obj=tenant):
+                    raise exceptions.AuthenticationFailed(
+                        'User does not have sufficient permissions (organization.change_membership required).'
+                    )
 
             # Enforce write_enabled token flag for write methods
             if request.method in ('POST', 'PUT', 'PATCH', 'DELETE'):

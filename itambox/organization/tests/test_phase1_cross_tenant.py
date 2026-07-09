@@ -192,3 +192,57 @@ class ContactAssignmentCrossTenantTestCase(TestCase):
         self.assertEqual(response.status_code, 200)
         returned_ids = {row['id'] for row in response.json()['results']}
         self.assertIn(ca_global.pk, returned_ids)
+
+    def test_create_rejects_cross_tenant_private_contact(self):
+        """D6-1: `contact_id` must not accept another tenant's private Contact.
+
+        `ContactAssignmentSerializer.contact_id` used to be built from
+        `Contact.objects.all()` — evaluated once at import time, before any
+        tenant context exists, so it froze unfiltered forever (`.all()` on an
+        already-baked queryset just clones it; it never re-invokes the
+        manager's tenant-scoped `get_queryset()`). A Tenant-A user could then
+        attach a private Tenant-B contact to their own (Tenant-A) asset, and
+        the 201 response leaked that contact's PII.
+        """
+        private_contact_b = Contact.objects.create(
+            name='P1CT Private Contact B', email='p1ct-private-b@example.com',
+            tenant=self.tenant_b,
+        )
+
+        self._login_tenant_a()
+        response = self.client.post(self.list_url, {
+            'contact_id': private_contact_b.pk,
+            'role_id': self.contact_role.pk,
+            'assigned_object_type': 'assets.asset',
+            'object_id': self.asset_a.pk,
+            'priority': 'secondary',
+        })
+        self.assertEqual(response.status_code, 400)
+        self.assertIn('contact_id', response.json())
+        self.assertFalse(
+            ContactAssignment.objects.filter(
+                contact=private_contact_b, object_id=self.asset_a.pk,
+            ).exists()
+        )
+
+    def test_create_accepts_same_tenant_private_contact(self):
+        """The fix must not over-scope: a tenant's own private contact stays assignable."""
+        private_contact_a = Contact.objects.create(
+            name='P1CT Private Contact A', email='p1ct-private-a@example.com',
+            tenant=self.tenant_a,
+        )
+
+        self._login_tenant_a()
+        response = self.client.post(self.list_url, {
+            'contact_id': private_contact_a.pk,
+            'role_id': self.contact_role.pk,
+            'assigned_object_type': 'assets.asset',
+            'object_id': self.asset_a.pk,
+            'priority': 'secondary',
+        })
+        self.assertEqual(response.status_code, 201)
+        self.assertTrue(
+            ContactAssignment.objects.filter(
+                contact=private_contact_a, object_id=self.asset_a.pk,
+            ).exists()
+        )

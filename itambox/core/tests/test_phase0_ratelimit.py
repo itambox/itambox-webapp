@@ -1,3 +1,5 @@
+from unittest import mock
+
 from django.test import TestCase, override_settings
 from django.contrib.auth import get_user_model
 from django.core.cache import caches
@@ -64,3 +66,36 @@ class AuthenticatedRateLimitTestCase(TestCase):
                 self.client.get(self.LIMITED_PATH).status_code, 429
             )
         self.assertEqual(self.client.get(self.LIMITED_PATH).status_code, 429)
+
+
+@override_settings(
+    RATELIMIT_LIMIT=5,
+    RATELIMIT_PERIOD=60,
+    RATELIMIT_CACHE='default',
+)
+class RateLimitCacheOutageTestCase(TestCase):
+    """
+    Regression: RateLimitMiddleware must fail OPEN when the cache backend
+    (Redis/Valkey) is unreachable, not propagate the exception into a 500.
+
+    Before the fix, rl_cache.get()/add()/incr() were called with no try/except
+    around them, so a cache-backend outage on a rate-limited path (login,
+    password reset, invite) 500'd every request across all tenants.
+    """
+
+    LIMITED_PATH = '/accounts/login/'
+
+    def test_cache_outage_fails_open_not_500(self):
+        broken_cache = mock.Mock()
+        broken_cache.get.side_effect = ConnectionError('cache backend unreachable')
+
+        with mock.patch('itambox.ratelimit._get_cache', return_value=broken_cache):
+            response = self.client.get(self.LIMITED_PATH)
+
+        self.assertEqual(
+            response.status_code, 200,
+            msg=(
+                'A cache backend outage must not 500 a rate-limited request; '
+                f'got {response.status_code} instead of the expected fail-open 200.'
+            ),
+        )

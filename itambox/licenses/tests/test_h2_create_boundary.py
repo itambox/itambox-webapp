@@ -131,7 +131,10 @@ class SeatOverAllocationTests(TestCase):
         self.user = User.objects.create_user(username='seatuser', password='pw')
         role = Role.objects.create(
             tenant=self.tenant, name='Admin',
-            permissions=['licenses.add_licenseseatassignment', 'licenses.view_licenseseatassignment'],
+            permissions=[
+                'licenses.add_licenseseatassignment', 'licenses.view_licenseseatassignment',
+                'licenses.change_licenseseatassignment',
+            ],
         )
         m = Membership.objects.create(user=self.user, tenant=self.tenant)
         m.roles.add(role)
@@ -162,6 +165,36 @@ class SeatOverAllocationTests(TestCase):
         )
         self.assertEqual(r2.status_code, 400, r2.content)
         self.assertEqual(LicenseSeatAssignment.objects.filter(license=one_seat).count(), 1)
+
+    def test_cannot_over_allocate_seats_via_patch_transfer(self):
+        # D5-1: the seat-capacity guard was create-only. A PATCH repointing
+        # license_id at a different (fully-seated) License bypassed it entirely —
+        # default ModelSerializer.update() just reassigned the FK and saved.
+        self._activate()
+        list_url = reverse('api:licenses_api:licenseseatassignment-list')
+        license_a = License.objects.create(
+            name='LicenseA', software=self.software, seats=1, tenant=self.tenant,
+        )
+        license_b = License.objects.create(
+            name='LicenseB', software=self.software, seats=1, tenant=self.tenant,
+        )
+        r1 = self.client.post(
+            list_url, {'license_id': license_a.pk, 'asset_id': self.asset1.pk}, content_type='application/json'
+        )
+        self.assertEqual(r1.status_code, 201, r1.content)
+        assignment_a_id = r1.json()['id']
+        etag = r1['ETag']
+        r2 = self.client.post(
+            list_url, {'license_id': license_b.pk, 'asset_id': self.asset2.pk}, content_type='application/json'
+        )
+        self.assertEqual(r2.status_code, 201, r2.content)
+
+        detail_url = reverse('api:licenses_api:licenseseatassignment-detail', kwargs={'pk': assignment_a_id})
+        patch_resp = self.client.patch(
+            detail_url, {'license_id': license_b.pk}, content_type='application/json', HTTP_IF_MATCH=etag
+        )
+        self.assertEqual(patch_resp.status_code, 400, patch_resp.content)
+        self.assertEqual(LicenseSeatAssignment.objects.filter(license=license_b).count(), 1)
 
     def test_cannot_assign_same_asset_twice(self):
         self._activate()
