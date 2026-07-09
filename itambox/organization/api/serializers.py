@@ -270,7 +270,7 @@ class ContactAssignmentSerializer(BaseModelSerializer):
     url = serializers.HyperlinkedIdentityField(view_name='api:organization_api:contactassignment-detail')
     contact = ContactSerializer(read_only=True)
     contact_id = serializers.PrimaryKeyRelatedField(
-        queryset=Contact.objects.all(), source='contact', write_only=True
+        queryset=Contact.objects, source='contact', write_only=True
     )
     role = ContactRoleSerializer(read_only=True)
     role_id = serializers.PrimaryKeyRelatedField(

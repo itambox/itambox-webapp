@@ -15,10 +15,11 @@ from itambox.views.generic import (
     ObjectListView, ObjectDetailView, ObjectEditView, ObjectDeleteView,
     ObjectBulkEditView, ObjectBulkDeleteView,
 )
-from ..models import Membership, Tenant, Provider
+from ..models import Membership, Provider
 from ..forms import MembershipForm, MembershipFilterForm, MembershipBulkRoleForm
 from ..tables import MembershipTable
 from ..filters import MembershipFilterSet
+from ..services import visible_to_containers
 
 User = get_user_model()
 
@@ -34,6 +35,10 @@ class MembershipListView(ObjectListView):
     table = MembershipTable
     action_buttons = ('add',)
 
+    def get_queryset(self):
+        qs = super().get_queryset()
+        return visible_to_containers(self.request.user, qs, 'organization.view_membership')
+
 
 class MembershipDetailView(ObjectDetailView):
     queryset = (
@@ -42,6 +47,10 @@ class MembershipDetailView(ObjectDetailView):
         .prefetch_related('roles', 'assigned_tenants')
     )
     template_name = 'organization/memberships/membership_detail.html'
+
+    def get_queryset(self):
+        qs = super().get_queryset()
+        return visible_to_containers(self.request.user, qs, 'organization.view_membership')
 
 
 class _SetInitialOrResetPasswordForm(PasswordResetForm):
@@ -202,23 +211,9 @@ class MembershipBulkEditView(ObjectBulkEditView):
     queryset = Membership.objects.all()
     form_class = MembershipBulkRoleForm
 
-    def _allowed_pks(self):
-        # Tenant-membership PKs the user can administer.
-        allowed_tenants = [
-            t.pk for t in Tenant._base_manager.filter(deleted_at__isnull=True)
-            if self.request.user.has_perm('organization.change_membership', obj=t)
-        ]
-        allowed_providers = [
-            p.pk for p in Provider._base_manager.filter(deleted_at__isnull=True)
-            if self.request.user.has_perm('organization.change_membership', obj=p)
-        ]
-        return allowed_tenants, allowed_providers
-
     def _get_queryset(self, pks):
         qs = Membership.objects.filter(pk__in=pks)
-        allowed_tenants, allowed_providers = self._allowed_pks()
-        from django.db.models import Q
-        return qs.filter(Q(tenant_id__in=allowed_tenants) | Q(provider_id__in=allowed_providers))
+        return visible_to_containers(self.request.user, qs, 'organization.change_membership')
 
     def post(self, request, *args, **kwargs):
         pks = request.POST.getlist('pk')
@@ -320,13 +315,4 @@ class MembershipBulkDeleteView(ObjectBulkDeleteView):
 
     def _get_queryset(self, pks):
         qs = Membership.objects.filter(pk__in=pks)
-        allowed_tenants = [
-            t.pk for t in Tenant._base_manager.filter(deleted_at__isnull=True)
-            if self.request.user.has_perm('organization.delete_membership', obj=t)
-        ]
-        allowed_providers = [
-            p.pk for p in Provider._base_manager.filter(deleted_at__isnull=True)
-            if self.request.user.has_perm('organization.delete_membership', obj=p)
-        ]
-        from django.db.models import Q
-        return qs.filter(Q(tenant_id__in=allowed_tenants) | Q(provider_id__in=allowed_providers))
+        return visible_to_containers(self.request.user, qs, 'organization.delete_membership')

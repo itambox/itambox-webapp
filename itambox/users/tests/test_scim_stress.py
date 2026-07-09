@@ -24,20 +24,27 @@ class SCIMStressTests(TestCase):
         self.role_admin = Role.objects.create(
             tenant=self.tenant,
             name="Admin",
-            permissions=["assets.view_asset", "assets.add_asset", "extras.view_dashboard"]
+            permissions=[
+                "assets.view_asset", "assets.add_asset", "extras.view_dashboard",
+                # SCIM auth authorizes on real permissions, not the "Admin" name —
+                # this role must actually grant membership-management to pass it.
+                "organization.change_membership",
+            ]
         )
         admin_membership = Membership.objects.create(user=self.admin_user,
             tenant=self.tenant,
         )
         admin_membership.roles.add(self.role_admin)
 
-        # Setup tokens
+        # Setup tokens — tenant explicit so it unambiguously matches self.tenant's URLs.
         self.valid_token = Token.objects.create(
             user=self.admin_user,
+            tenant=self.tenant,
             expires=timezone.now() + timezone.timedelta(days=1)
         )
         self.expired_token = Token.objects.create(
             user=self.admin_user,
+            tenant=self.tenant,
             expires=timezone.now() - timezone.timedelta(hours=1)
         )
 

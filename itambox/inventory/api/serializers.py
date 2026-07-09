@@ -5,13 +5,14 @@ from itambox.api.base import BaseModelSerializer
 
 
 class _AssignmentAvailabilityMixin:
-    """Re-applies the availability + row-lock invariant on the REST create path.
+    """Re-applies the availability + row-lock invariant on the REST create/update path.
 
     The over-allocation guard lives only in checkout_inventory_item(); the CRUD viewsets
-    create assignments straight through the serializer, and adjust_inventory_stock only
-    checks/deducts stock when ``from_location`` is set — so a POST with ``from_location``
-    omitted (or qty > available) bypassed every check. Lock the parent item and re-check
-    ``available`` here (held through perform_create's transaction), mirroring the service.
+    create/update assignments straight through the serializer, and adjust_inventory_stock
+    only checks/deducts stock when ``from_location`` is set — so a POST/PATCH with
+    ``from_location`` omitted (or qty > available) bypassed every check. Lock the parent
+    item and re-check ``available`` here (held through perform_create's/perform_update's
+    transaction), mirroring the service.
     """
 
     item_source_field = None  # 'accessory' | 'consumable' | 'component'
@@ -38,6 +39,47 @@ class _AssignmentAvailabilityMixin:
                 validated_data[self.item_source_field] = locked
                 return super().create(validated_data)
         return super().create(validated_data)
+
+    def update(self, instance, validated_data):
+        # D5-1: create() re-checks availability under a row lock, but the default
+        # ModelSerializer.update() bypassed it entirely — a PATCH/PUT (or bulk-update,
+        # which calls perform_update per row) could raise qty (or repoint the item FK)
+        # with no capacity check at all, driving Accessory/Consumable/Component
+        # `available` negative. Mirror create()'s lock-then-check here.
+        old_item = getattr(instance, self.item_source_field)
+        new_item = validated_data.get(self.item_source_field)
+        item_changing = new_item is not None and new_item.pk != old_item.pk
+        target_item = new_item if item_changing else old_item
+
+        qty = validated_data.get('qty', instance.qty)
+        if qty is None:
+            qty = 1  # mirrors AbstractAssignment.qty default=1
+
+        if target_item is not None:
+            with transaction.atomic():
+                locked = type(target_item).objects.select_for_update().get(pk=target_item.pk)
+                # Credit back what this row already holds against `locked.available`,
+                # but only when the item is unchanged AND the instance's current demand
+                # is actually counted in `available` — i.e. it has no `from_location`.
+                # A from_location-bearing row's demand is deducted separately via the
+                # per-location Accessory/Consumable/ComponentStock row (governed by
+                # adjust_inventory_stock's own check); crediting it back here would
+                # double-count and over-permit.
+                credit = 0
+                if not item_changing and instance.from_location_id is None:
+                    credit = instance.qty
+                effective_available = locked.available + credit
+                if not locked.allow_overallocate and effective_available < qty:
+                    raise serializers.ValidationError({
+                        'qty': _(
+                            "Not enough stock for %(item)s: %(available)s available, "
+                            "%(qty)s requested."
+                        ) % {'item': locked.name, 'available': effective_available, 'qty': qty}
+                    })
+                if item_changing:
+                    validated_data[self.item_source_field] = locked
+                return super().update(instance, validated_data)
+        return super().update(instance, validated_data)
 from itambox.api.nested_serializers import NestedManufacturerSerializer, NestedAssetTypeSerializer, NestedAssetSerializer
 from inventory.models import (
     Accessory, AccessoryStock, AccessoryAssignment,

@@ -20,7 +20,10 @@ class InventoryAssignmentOverAllocationTests(TestCase):
         self.user = User.objects.create_user(username='invuser', password='pw')
         role = Role.objects.create(
             tenant=self.tenant, name='Admin',
-            permissions=['inventory.add_accessoryassignment', 'inventory.view_accessoryassignment'],
+            permissions=[
+                'inventory.add_accessoryassignment', 'inventory.view_accessoryassignment',
+                'inventory.change_accessoryassignment',
+            ],
         )
         membership = Membership.objects.create(user=self.user, tenant=self.tenant)
         membership.roles.add(role)
@@ -64,3 +67,26 @@ class InventoryAssignmentOverAllocationTests(TestCase):
             'qty': 2,
         }, content_type='application/json')
         self.assertEqual(resp.status_code, 201, resp.content)
+
+    def test_cannot_over_allocate_on_patch_without_from_location(self):
+        # D5-1: the over-allocation guard was create-only. A PATCH raising `qty`
+        # on an existing assignment (from_location still omitted) bypassed it
+        # entirely and drove Accessory.available negative with no error.
+        self._activate()
+        list_url = reverse('api:inventory_api:accessoryassignment-list')
+        create_resp = self.client.post(list_url, {
+            'accessory_id': self.accessory.pk,
+            'assigned_holder_id': self.holder.pk,
+            'qty': 2,  # == available (2) -> succeeds
+        }, content_type='application/json')
+        self.assertEqual(create_resp.status_code, 201, create_resp.content)
+        assignment_id = create_resp.json()['id']
+        etag = create_resp['ETag']
+
+        detail_url = reverse('api:inventory_api:accessoryassignment-detail', kwargs={'pk': assignment_id})
+        patch_resp = self.client.patch(
+            detail_url, {'qty': 1000}, content_type='application/json', HTTP_IF_MATCH=etag
+        )
+        self.assertEqual(patch_resp.status_code, 400, patch_resp.content)
+        self.accessory.refresh_from_db()
+        self.assertEqual(self.accessory.available, 0)

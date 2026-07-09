@@ -4,7 +4,7 @@ from rest_framework import serializers
 from itambox.api.base import BaseModelSerializer
 from itambox.api.nested_serializers import NestedManufacturerSerializer, NestedAssetSerializer
 from licenses.models import License, LicenseSeatAssignment
-from licenses.services import checkout_license
+from licenses.services import checkout_license, transfer_license_seat
 from extras.api.serializers import TagSerializer
 from software.api.serializers import SoftwareSerializer
 from organization.api.serializers import AssetHolderSerializer, NestedTenantSerializer
@@ -124,4 +124,19 @@ class LicenseSeatAssignmentSerializer(BaseModelSerializer):
             assignment.installed_software = installed_software
             assignment.save(update_fields=['installed_software'])
         return assignment
+
+    def update(self, instance, validated_data):
+        # D5-1: the default ModelSerializer.update() would just reassign `license`
+        # and save — no seat-capacity check at all — letting a PATCH that repoints
+        # license_id at a different License silently over-fill it. Delegate to
+        # transfer_license_seat(), which locks the destination License and re-checks
+        # available_seats + the no-duplicate-target invariant, exactly as create()
+        # already delegates to checkout_license().
+        new_license = validated_data.pop('license', None)
+        if new_license is not None and new_license.pk != instance.license_id:
+            try:
+                instance = transfer_license_seat(instance, new_license)
+            except DjangoValidationError as exc:
+                raise serializers.ValidationError(exc.messages)
+        return super().update(instance, validated_data)
 

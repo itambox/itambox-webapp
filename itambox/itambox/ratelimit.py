@@ -1,8 +1,11 @@
+import logging
 import time
 from django.conf import settings
 from django.core.cache import caches
 from django.http import HttpResponse
 from django.utils.translation import gettext_lazy as _
+
+logger = logging.getLogger('itambox.ratelimit')
 
 
 def _get_cache():
@@ -62,23 +65,38 @@ class RateLimitMiddleware:
             period = getattr(settings, 'RATELIMIT_PERIOD', 60)
 
             rl_cache = _get_cache()
-            request_count = rl_cache.get(key)
-            if request_count is None:
-                # Key does not exist, initialize it with absolute period timeout
-                rl_cache.add(key, 1, period)
-            else:
-                if request_count >= limit:
-                    return HttpResponse(
-                        _("Too many requests. Please try again in a minute."),
-                        status=429,
-                        content_type="text/plain"
-                    )
-                try:
-                    rl_cache.incr(key)
-                except ValueError:
-                    # Fallback in case key expired between get and incr
+            # Fail OPEN, not closed: a cache-backend outage (Redis/Valkey blip,
+            # connection reset, ...) must not 500 every login/password-reset/
+            # invite request across all tenants. Skipping the rate-limit check
+            # for the duration of an outage is the safer tradeoff here — the
+            # alternative (fail closed / 503) would turn a transient cache
+            # hiccup into a full authentication outage, which is worse than
+            # briefly relaxing the rate limiter. This only affects the four
+            # sensitive paths above; it does not touch cache usage elsewhere.
+            try:
+                request_count = rl_cache.get(key)
+                if request_count is None:
+                    # Key does not exist, initialize it with absolute period timeout
                     rl_cache.add(key, 1, period)
-            
+                else:
+                    if request_count >= limit:
+                        return HttpResponse(
+                            _("Too many requests. Please try again in a minute."),
+                            status=429,
+                            content_type="text/plain"
+                        )
+                    try:
+                        rl_cache.incr(key)
+                    except ValueError:
+                        # Fallback in case key expired between get and incr
+                        rl_cache.add(key, 1, period)
+            except Exception:
+                logger.exception(
+                    'RateLimitMiddleware: cache backend error on %s; '
+                    'failing open (request allowed without rate-limit check).',
+                    path,
+                )
+
         return self.get_response(request)
 
     def get_client_ip(self, request):

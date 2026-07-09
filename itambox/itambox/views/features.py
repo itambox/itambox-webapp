@@ -20,6 +20,7 @@ from django_tables2 import RequestConfig
 
 from core.models import ObjectChange
 from extras.models import WebhookEndpoint, EventRule, ExportTemplate, LabelTemplate, JournalEntry, ImageAttachment, FileAttachment
+from organization.services import visible_to_containers, is_container_scoped_unfiltered
 from core.tables import (
     ObjectChangeTable, ExportTemplateTable, WebhookEndpointTable,
     EventRuleTable, LabelTemplateTable
@@ -235,6 +236,16 @@ class ObjectExportView(LoginRequiredMixin, View):
                     queryset = filterset.qs
         else:
             queryset = model.objects.all()
+
+        if is_container_scoped_unfiltered(model):
+            # Membership/Token-shaped models: the default manager has no
+            # filter_by_tenant, so the queryset built above is not tenant-scoped
+            # at all — an ambient view_<model> permission (granted by every
+            # seeded role, including Read-Only) would otherwise dump every
+            # tenant's/provider's rows. Mirrors the restriction
+            # MembershipListView/MembershipDetailView apply on top of the same
+            # unscoped manager.
+            queryset = visible_to_containers(request.user, queryset, f'{app_label}.view_{model_name}')
 
         if template_id == 0:
             _REDACTED_FIELD_SUBSTRINGS = ('secret', 'password', 'token')

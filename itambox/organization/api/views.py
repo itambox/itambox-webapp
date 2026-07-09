@@ -117,14 +117,15 @@ class ContactAssignmentViewSet(ITAMBoxModelViewSet):
 
     def get_queryset(self):
         # ContactAssignment is a generic-FK assignment model with no direct or
-        # relational `tenant` field (Contact itself is not tenant-scoped), so it
-        # uses the unscoped default manager and filter_by_tenant() is a no-op:
-        # super().get_queryset() returns every tenant's rows. This method is the
-        # SOLE list gate. A generic FK cannot be ORM-joined to a tenant column,
-        # so for every target ContentType present we collect that model's
-        # visible object ids and OR the matches together. Object-level
-        # (detail/mutation) boundary is enforced separately by
-        # StrictTenantPermission via the model's `tenant` property.
+        # relational `tenant` field of its own (its tenant is derived from the
+        # generic-FK *target*, not from `contact.tenant` — see the `tenant`
+        # property on the model), so it uses the unscoped default manager and
+        # filter_by_tenant() is a no-op: super().get_queryset() returns every
+        # tenant's rows. This method is the SOLE list gate. A generic FK cannot
+        # be ORM-joined to a tenant column, so for every target ContentType
+        # present we collect that model's visible object ids and OR the matches
+        # together. Object-level (detail/mutation) boundary is enforced
+        # separately by StrictTenantPermission via the model's `tenant` property.
         qs = super().get_queryset()
 
         if self.request.user.is_superuser:

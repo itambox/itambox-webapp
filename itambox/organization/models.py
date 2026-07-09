@@ -443,8 +443,10 @@ class ContactAssignment(ChangeLoggingMixin, BaseModel):
 
     @property
     def tenant(self):
-        # Contact is NOT tenant-scoped (no `tenant` field; SoftDeleteManager),
-        # so the only tenant signal for an assignment is the generic-FK target.
+        # Contact is hybrid-tenant-scoped (a `tenant` field, tenant=None for
+        # global/shared rows), but an assignment's own tenant is still derived
+        # from the generic-FK target, not from `self.contact.tenant` — the
+        # target is what StrictTenantPermission must bound the assignment to.
         # Exposing `tenant` lets StrictTenantPermission enforce the object-level
         # boundary on detail/mutation: it compares obj.tenant to the request's
         # active tenant. Targets with no tenant (global/shared catalogue rows)

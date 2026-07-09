@@ -6,7 +6,12 @@ To use: set DJANGO_SETTINGS_MODULE=core.settings.prod or ITAMBOX_ENV=prod
 import os
 from .base import *
 
-DEBUG = os.environ.get('ITAMBOX_DEBUG', 'False').lower() in ('true', '1', 't')
+# Hardcoded, not env-toggleable — unlike every other flag in this file, DEBUG
+# has no legitimate production use. A leftover/templated .env with
+# ITAMBOX_DEBUG=True (e.g. copied from .env.example and only half-edited when
+# switching ITAMBOX_ENV to prod) must not be able to flip this on. An operator
+# who needs DEBUG=True should run core.settings.dev instead.
+DEBUG = False
 
 if SECRET_KEY == 'django-insecure-dev-only-change-me-in-production':
     raise RuntimeError(

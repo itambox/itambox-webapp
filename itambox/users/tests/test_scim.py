@@ -36,7 +36,12 @@ class SCIMProvisioningTests(TestCase):
         self.role_admin = Role.objects.create(
             tenant=self.tenant,
             name="Admin",
-            permissions=["assets.view_asset", "assets.add_asset", "extras.view_dashboard"]
+            permissions=[
+                "assets.view_asset", "assets.add_asset", "extras.view_dashboard",
+                # SCIM auth authorizes on real permissions, not the "Admin" name —
+                # this role must actually grant membership-management to pass it.
+                "organization.change_membership",
+            ]
         )
 
         # Create Tenant Memberships — create first, then add roles (no role= kwarg).
@@ -45,21 +50,27 @@ class SCIMProvisioningTests(TestCase):
         )
         admin_membership.roles.add(self.role_admin)
 
-        # Setup tokens
+        # Setup tokens — tenant is explicit (not left to the model's current-tenant-context
+        # fallback) so each token is unambiguously scoped to self.tenant, matching the URLs
+        # these tests hit.
         self.valid_token = Token.objects.create(
             user=self.admin_user,
+            tenant=self.tenant,
             expires=timezone.now() + timezone.timedelta(days=1)
         )
         self.expired_token = Token.objects.create(
             user=self.admin_user,
+            tenant=self.tenant,
             expires=timezone.now() - timezone.timedelta(hours=1)
         )
         self.inactive_token = Token.objects.create(
             user=self.inactive_user,
+            tenant=self.tenant,
             expires=timezone.now() + timezone.timedelta(days=1)
         )
         self.no_membership_token = Token.objects.create(
             user=self.no_membership_user,
+            tenant=self.tenant,
             expires=timezone.now() + timezone.timedelta(days=1)
         )
 

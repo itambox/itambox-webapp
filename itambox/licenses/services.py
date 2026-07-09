@@ -62,6 +62,61 @@ def checkout_license(
         return assignment
 
 
+def transfer_license_seat(
+    assignment: LicenseSeatAssignment,
+    new_license: License,
+    user = None,
+    request = None,
+    **kwargs
+) -> LicenseSeatAssignment:
+    """Move an existing seat assignment onto a different License.
+
+    D5-1: checkout_license()'s lock-then-check guard only ever ran when a seat was
+    first created — a PATCH that repointed ``license_id`` at a different License went
+    through the default ModelSerializer.update() with no capacity check at all,
+    letting a target with fewer seats than active assignments silently over-fill.
+    Mirrors checkout_license(): lock the destination License row, re-check
+    available_seats and the no-duplicate-target invariant under that lock.
+    """
+    with transaction.atomic():
+        # Lock the destination license row to prevent TOCTOU race conditions under
+        # concurrent load, same as checkout_license().
+        lic = License.objects.select_for_update().get(pk=new_license.pk)
+
+        if lic.available_seats < 1:
+            raise ValidationError(_("No available seats left for this software license."))
+
+        target = assignment.asset or assignment.assigned_holder
+        duplicate = LicenseSeatAssignment.objects.filter(license=lic).exclude(pk=assignment.pk)
+        duplicate = (
+            duplicate.filter(asset=assignment.asset) if assignment.asset_id is not None
+            else duplicate.filter(assigned_holder=assignment.assigned_holder)
+        )
+        if duplicate.exists():
+            raise ValidationError(
+                _("%(target)s already holds a seat on this license.") % {'target': target}
+            )
+
+        old_license = assignment.license
+        assignment.license = lic
+        assignment.save(update_fields=['license'])
+
+        # Record on both sides of the transfer. Nothing about either License row
+        # itself changed (only the assignment's FK), so a no-op save() would be
+        # short-circuited by ChangeLoggingMixin (see checkout_license() above) —
+        # emit directly via _log_change() so both audit trails capture the move.
+        lic._log_change(
+            action='update',
+            message=f"Received transferred seat for {target} from {old_license}.",
+        )
+        old_license._log_change(
+            action='update',
+            message=f"Seat for {target} transferred to {lic}.",
+        )
+
+        return assignment
+
+
 def checkin_license_seat(
     assignment: LicenseSeatAssignment,
     user = None,
