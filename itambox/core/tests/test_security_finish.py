@@ -48,13 +48,13 @@ class UploadJournalPermTests(TestCase):
         # User with change_asset on tenant_a
         self.user_chg = User.objects.create_user("chg", password="pw")
         role_chg = _make_role(self.tenant_a, "changer", ["assets.change_asset"])
-        m_chg = Membership.objects.create(person_type=Membership.PERSON_MEMBER, user=self.user_chg, tenant=self.tenant_a)
+        m_chg = Membership.objects.create(user=self.user_chg, tenant=self.tenant_a)
         m_chg.roles.add(role_chg)
 
         # User with view-only on tenant_a (no change)
         self.user_view = User.objects.create_user("view", password="pw")
         role_view = _make_role(self.tenant_a, "viewer", ["assets.view_asset"])
-        m_view = Membership.objects.create(person_type=Membership.PERSON_MEMBER, user=self.user_view, tenant=self.tenant_a)
+        m_view = Membership.objects.create(user=self.user_view, tenant=self.tenant_a)
         m_view.roles.add(role_view)
 
         mfr = Manufacturer.objects.create(name="Dell", slug="dell")
@@ -188,7 +188,7 @@ class SearchTenantScopingTests(TestCase):
 
         self.user_a = User.objects.create_user("srch_a", password="pw")
         role_a = _make_role(self.tenant_a, "viewer", ["assets.view_asset"])
-        m_a = Membership.objects.create(person_type=Membership.PERSON_MEMBER, user=self.user_a, tenant=self.tenant_a)
+        m_a = Membership.objects.create(user=self.user_a, tenant=self.tenant_a)
         m_a.roles.add(role_a)
 
         mfr = Manufacturer.objects.create(name="HP", slug="hp")
@@ -248,7 +248,7 @@ class RESTCrossTenantTests(TestCase):
                 "subscriptions.view_subscription",
             ],
         )
-        m_a = Membership.objects.create(person_type=Membership.PERSON_MEMBER, user=self.user_a, tenant=self.tenant_a)
+        m_a = Membership.objects.create(user=self.user_a, tenant=self.tenant_a)
         m_a.roles.add(role_a)
         self.token_a = Token.objects.create(user=self.user_a)
 

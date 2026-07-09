@@ -149,8 +149,7 @@ class ProviderServiceProviderConfigView(SCIMProviderMixin, APIView):
 class SCIMProviderUserListView(SCIMProviderMixin, APIView):
     def get(self, request, *args, **kwargs):
         queryset = User.objects.filter(
-            memberships__provider=self.provider, memberships__person_type=Membership.PERSON_STAFF,
-            memberships__is_active=True,
+            memberships__provider=self.provider, memberships__is_active=True,
         ).distinct()
 
         try:
@@ -240,7 +239,7 @@ class SCIMProviderUserListView(SCIMProviderMixin, APIView):
 
         user = User.objects.filter(username=username).first()
         if user:
-            existing = Membership.objects.filter(user=user, provider=self.provider, person_type=Membership.PERSON_STAFF).first()
+            existing = Membership.objects.filter(user=user, provider=self.provider).first()
             if existing:
                 return Response({
                     "schemas": ["urn:ietf:params:scim:api:messages:2.0:Error"],
@@ -249,7 +248,7 @@ class SCIMProviderUserListView(SCIMProviderMixin, APIView):
                 }, status=status.HTTP_409_CONFLICT)
 
             with transaction.atomic():
-                Membership.objects.create(user=user, provider=self.provider, person_type=Membership.PERSON_STAFF, tenant_scope=Membership.SCOPE_EXPLICIT, is_active=active)
+                Membership.objects.create(user=user, provider=self.provider, tenant_scope=Membership.SCOPE_EXPLICIT, is_active=active)
         else:
             with transaction.atomic():
                 user = User.objects.create_user(
@@ -262,7 +261,7 @@ class SCIMProviderUserListView(SCIMProviderMixin, APIView):
                 user.set_unusable_password()
                 user.save()
 
-                Membership.objects.create(user=user, provider=self.provider, person_type=Membership.PERSON_STAFF, tenant_scope=Membership.SCOPE_EXPLICIT, is_active=active)
+                Membership.objects.create(user=user, provider=self.provider, tenant_scope=Membership.SCOPE_EXPLICIT, is_active=active)
 
         serializer = SCIMUserSerializer(
             user,
@@ -274,8 +273,7 @@ class SCIMProviderUserListView(SCIMProviderMixin, APIView):
 class SCIMProviderUserDetailView(SCIMProviderMixin, APIView):
     def _staff_queryset(self):
         return User.objects.filter(
-            memberships__provider=self.provider, memberships__person_type=Membership.PERSON_STAFF,
-            memberships__is_active=True,
+            memberships__provider=self.provider, memberships__is_active=True,
         ).distinct()
 
     def get(self, request, pk, *args, **kwargs):
@@ -304,7 +302,7 @@ class SCIMProviderUserDetailView(SCIMProviderMixin, APIView):
         from organization.models import Membership as _M
 
         has_other_provider = (
-            Membership.objects.filter(user=user, provider__isnull=False, person_type=Membership.PERSON_STAFF)
+            Membership.objects.filter(user=user, provider__isnull=False)
             .exclude(provider=self.provider)
             .exists()
         )
@@ -312,13 +310,13 @@ class SCIMProviderUserDetailView(SCIMProviderMixin, APIView):
         has_other = has_other_provider or has_tenant
 
         if active is not _UNSET:
-            membership = Membership.objects.filter(user=user, provider=self.provider, person_type=Membership.PERSON_STAFF).first()
+            membership = Membership.objects.filter(user=user, provider=self.provider).first()
             if membership is not None and membership.is_active != active:
                 membership.is_active = active
                 membership.save(update_fields=['is_active'])
             # Mirror the global flag to "has any active provider membership". (Tenant-only
             # users are governed by their tenant memberships, not by this provider token.)
-            any_active = Membership.objects.filter(user=user, provider__isnull=False, person_type=Membership.PERSON_STAFF, is_active=True).exists()
+            any_active = Membership.objects.filter(user=user, provider__isnull=False, is_active=True).exists()
             if not any_active and not has_tenant:
                 if user.is_active:
                     user.is_active = False
@@ -490,7 +488,7 @@ class SCIMProviderUserDetailView(SCIMProviderMixin, APIView):
         with transaction.atomic():
             # Remove only the membership for this provider. Delete per-instance so each
             # removal is change-logged (QuerySet.delete() bypasses ChangeLoggingMixin).
-            for membership in Membership.objects.filter(user=user, provider=self.provider, person_type=Membership.PERSON_STAFF):
+            for membership in Membership.objects.filter(user=user, provider=self.provider):
                 membership.delete()
         return Response(status=status.HTTP_204_NO_CONTENT)
 

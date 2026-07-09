@@ -27,7 +27,7 @@ class ExportTemplateSuperuserGateTests(TestCase):
             ],
         )
         self.member = User.objects.create_user(username='member', password='pw')
-        m = Membership.objects.create(person_type=Membership.PERSON_MEMBER, user=self.member, tenant=self.tenant)
+        m = Membership.objects.create(user=self.member, tenant=self.tenant)
         m.roles.add(self.role)
         self.superuser = User.objects.create_superuser(
             username='root', email='root@example.com', password='pw'

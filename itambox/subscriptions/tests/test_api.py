@@ -59,7 +59,7 @@ class SubscriptionAPITests(APITestCase):
                 'subscriptions.change_subscriptionassignment', 'subscriptions.delete_subscriptionassignment',
             ],
         )
-        membership = Membership.objects.create(person_type=Membership.PERSON_MEMBER, user=self.staff, tenant=self.tenant)
+        membership = Membership.objects.create(user=self.staff, tenant=self.tenant)
         membership.roles.add(role)
 
     def test_provider_api_crud(self):

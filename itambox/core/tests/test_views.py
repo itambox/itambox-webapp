@@ -293,7 +293,7 @@ class CoreViewsTestCase(TestCase):
                 'assets.view_asset',
             ]
         )
-        membership = Membership.objects.create(person_type=Membership.PERSON_MEMBER, user=std_user, tenant=tenant)
+        membership = Membership.objects.create(user=std_user, tenant=tenant)
         membership.roles.add(std_role)
         
         # Setup asset

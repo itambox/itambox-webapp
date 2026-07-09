@@ -299,7 +299,6 @@ class TenantMiddleware:
             from organization.models import Membership
             active_provider_membership = Membership.objects.filter(
                 user=request.user, provider_id=active_tenant.provider_id, is_active=True,
-                person_type=Membership.PERSON_STAFF,
             ).prefetch_related('roles').first()
 
         # Bind to request

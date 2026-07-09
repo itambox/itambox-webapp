@@ -67,7 +67,7 @@ class Phase3ChangeLoggingModelsTestCase(TestCase):
 
     def test_tenant_membership_create_is_logged(self):
         before = ObjectChange._base_manager.count()
-        membership = Membership.objects.create(person_type=Membership.PERSON_MEMBER, user=self.user,
+        membership = Membership.objects.create(user=self.user,
             tenant=self.tenant,
         )
         membership.roles.add(self.role)

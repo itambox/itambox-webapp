@@ -179,7 +179,7 @@ class MitigationsPhase4Tests(TestCase):
             name='Tenant Staff',
             permissions=['assets.change_asset']
         )
-        membership_staff = Membership.objects.create(person_type=Membership.PERSON_MEMBER, user=staff_user, tenant=self.tenant)
+        membership_staff = Membership.objects.create(user=staff_user, tenant=self.tenant)
         membership_staff.roles.add(role)
         
         factory = RequestFactory()

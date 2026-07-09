@@ -33,19 +33,47 @@
                     <div class="col-md-4 mb-3">
                         {{ form.name|as_crispy_field }}
                     </div>
-                    {% if not form.tenant.is_hidden %}
                     <div class="col-md-4 mb-3">
-                        {{ form.tenant|as_crispy_field }}
+                        {% if form.is_container_chooser %}
+                        <label class="form-label">{% translate "Role kind" %}</label>
+                        <div id="role-container-chooser">
+                            <div class="mb-2">{{ form.tenant|as_crispy_field }}</div>
+                            <div class="text-center text-muted small my-1">{% translate "— or —" %}</div>
+                            <div class="mb-2">{{ form.provider|as_crispy_field }}</div>
+                            <small class="form-hint text-muted d-block">
+                                {% translate "Pick a tenant for a tenant role, or a provider for a provider role — choose exactly one." %}
+                            </small>
+                        </div>
+                        {% else %}
+                        <label class="form-label">{% translate "Kind" %}</label>
+                        <div class="mb-2">
+                            {% if form.is_provider_scoped %}
+                            <span class="badge bg-purple-lt text-purple"><i class="mdi mdi-domain me-1"></i>{% translate "Provider role" %}</span>
+                            {% else %}
+                            <span class="badge bg-blue-lt text-blue"><i class="mdi mdi-office-building me-1"></i>{% translate "Tenant role" %}</span>
+                            {% endif %}
+                        </div>
+                        {% if form.is_provider_scoped %}
+                            {% if not form.provider.is_hidden %}
+                            {{ form.provider|as_crispy_field }}
+                            {% else %}
+                            <input type="text" class="form-control" value="{{ form.instance.provider.name|default:"—" }}" disabled readonly style="background-color: var(--tblr-bg-surface-secondary, #f6f8fb); opacity: 0.8;">
+                            <small class="form-hint text-muted mt-1" style="display: block; font-size: 0.75rem;">
+                                {% translate "Provider cannot be changed after creation." %}
+                            </small>
+                            {% endif %}
+                        {% else %}
+                            {% if not form.tenant.is_hidden %}
+                            {{ form.tenant|as_crispy_field }}
+                            {% else %}
+                            <input type="text" class="form-control" value="{{ form.instance.tenant.name|default:"—" }}" disabled readonly style="background-color: var(--tblr-bg-surface-secondary, #f6f8fb); opacity: 0.8;">
+                            <small class="form-hint text-muted mt-1" style="display: block; font-size: 0.75rem;">
+                                {% translate "Tenant cannot be changed after creation. To use a different tenant, please create a new role." %}
+                            </small>
+                            {% endif %}
+                        {% endif %}
+                        {% endif %}
                     </div>
-                    {% else %}
-                    <div class="col-md-4 mb-3">
-                        <label class="form-label">{% translate "Tenant" %}</label>
-                        <input type="text" class="form-control" value="{{ form.instance.tenant.name|default:"-" }}" disabled readonly style="background-color: var(--tblr-bg-surface-secondary, #f6f8fb); opacity: 0.8;">
-                        <small class="form-hint text-muted mt-1" style="display: block; font-size: 0.75rem;">
-                            {% translate "Tenant cannot be changed after creation. To use a different tenant, please create a new role." %}
-                        </small>
-                    </div>
-                    {% endif %}
                     <div class="col-md-4 mb-3">
                         {{ form.description|as_crispy_field }}
                     </div>
@@ -53,10 +81,32 @@
 
                 <hr class="my-4">
 
+                {% if form.is_provider_scoped %}
+                <h4 class="card-title text-primary mb-3">{% translate "Permissions in customer tenants" %}</h4>
+                <p class="text-muted mb-4 small">
+                    {% translate "These object permissions project into every customer tenant this provider's staff can reach. Granular permissions allow separation of Create and Edit capabilities." %}
+                </p>
+                {% else %}
                 <h4 class="card-title text-primary mb-3">{% translate "Permissions Matrix" %}</h4>
                 <p class="text-muted mb-4 small">
                     {% translate "Configure role-specific access by checking permissions below. Granular permissions allow separation of Create and Edit capabilities." %}
                 </p>
+                {% endif %}
+
+                {{ form.preset_field_map|json_script:"role-preset-field-map" }}
+                <div class="row mb-4">
+                    <div class="col-md-5">
+                        <label class="form-label fw-semibold" for="role-preset-picker">{% translate "Start from a preset" %}</label>
+                        <select id="role-preset-picker" class="form-select" data-role-preset-picker>
+                            {% for value, label in form.preset_definitions %}
+                            <option value="{{ value }}">{{ label }}</option>
+                            {% endfor %}
+                        </select>
+                        <small class="form-hint text-muted mt-1 d-block">
+                            {% translate "Pre-checks the matrix below. You can still adjust individual permissions afterwards." %}
+                        </small>
+                    </div>
+                </div>
 
                 <div class="table-responsive">
                     <table class="table table-hover align-middle border mb-4">
@@ -176,6 +226,45 @@
                         </div>
                     </div>
                 </div>
+
+                {% if form.is_provider_scoped or form.is_container_chooser %}
+                {# In chooser mode this section is hidden until a provider is selected (JS in
+                   permission-matrix.ts toggles it); provider capabilities + "clone to new
+                   tenants" only apply to provider-scoped roles and are ignored otherwise. #}
+                <div id="provider-capabilities-section"{% if form.is_container_chooser %} style="display: none;"{% endif %}>
+                <hr class="my-4">
+
+                <h4 class="card-title text-primary mb-3">{% translate "Provider capabilities" %}</h4>
+                <p class="text-muted mb-4 small">
+                    {% translate "MSP-level capabilities that apply to the provider organization itself (managing customer tenants, staff, and groups). These never project into customer tenants." %}
+                </p>
+
+                <div class="row">
+                    {% for label, field in form.provider_capability_fields %}
+                    <div class="col-md-6 mb-3">
+                        <div class="form-check">
+                            {{ field }}
+                            <label class="form-check-label" for="{{ field.id_for_label }}">
+                                <strong>{{ label }}</strong>
+                            </label>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+
+                <div class="row">
+                    <div class="col-12 mb-3">
+                        <div class="form-check">
+                            {{ form.is_default }}
+                            <label class="form-check-label" for="{{ form.is_default.id_for_label }}">
+                                <strong>{% translate "Clone to new tenants" %}</strong>
+                                <span class="d-block text-muted small">{% translate "Automatically copy this role into every new customer tenant created under this provider." %}</span>
+                            </label>
+                        </div>
+                    </div>
+                </div>
+                </div>
+                {% endif %}
 
                 <div class="d-flex justify-content-end mt-4">
                     <button type="submit" class="btn btn-primary">

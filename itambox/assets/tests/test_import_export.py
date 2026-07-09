@@ -28,7 +28,7 @@ class ImportExportPermissionTestCase(TestCase):
             name='Staff Role',
             permissions=['assets.view_asset']
         )
-        self.membership = Membership.objects.create(person_type=Membership.PERSON_MEMBER, user=self.staff,
+        self.membership = Membership.objects.create(user=self.staff,
             tenant=self.tenant,
         )
         self.membership.roles.add(self.role)

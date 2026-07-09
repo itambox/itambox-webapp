@@ -27,7 +27,7 @@ class InAppChannelRecipientTests(TestCase):
         self.member = User.objects.create_user(
             username='member', password='pw', is_active=True
         )
-        m = Membership.objects.create(person_type=Membership.PERSON_MEMBER, user=self.member, tenant=self.tenant)
+        m = Membership.objects.create(user=self.member, tenant=self.tenant)
         m.roles.add(role)
 
         # A member of a DIFFERENT tenant — must NOT receive this channel's notice.
@@ -35,7 +35,7 @@ class InAppChannelRecipientTests(TestCase):
         self.outsider = User.objects.create_user(
             username='outsider', password='pw', is_active=True
         )
-        m2 = Membership.objects.create(person_type=Membership.PERSON_MEMBER, user=self.outsider, tenant=self.other_tenant)
+        m2 = Membership.objects.create(user=self.outsider, tenant=self.other_tenant)
         m2.roles.add(other_role)
 
         self.channel = NotificationChannel.objects.create(

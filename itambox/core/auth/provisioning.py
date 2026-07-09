@@ -107,7 +107,7 @@ def provision_provider_membership(user, provider, provider_role_name, source):
     )
     membership, _ = Membership.objects.get_or_create(
         user=user, provider=provider,
-        defaults={'person_type': Membership.PERSON_STAFF, 'tenant_scope': Membership.SCOPE_EXPLICIT},
+        defaults={'tenant_scope': Membership.SCOPE_EXPLICIT},
     )
     membership.roles.add(role)
     if not membership.is_active:

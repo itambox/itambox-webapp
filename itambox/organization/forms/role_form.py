@@ -154,6 +154,9 @@ class RoleForm(forms.ModelForm):
         self.current_user = kwargs.pop('user', None)
         self.tenant = kwargs.pop('tenant', None)
         self.provider = kwargs.pop('provider', None)
+        # Set by RoleEditView on a fresh add with no bound container: render both container
+        # pickers and let the user choose tenant vs provider (scope derived from the choice).
+        self.allow_container_choice = kwargs.pop('allow_container_choice', False)
         super().__init__(*args, **kwargs)
 
         # Scope is decided by which container the form is bound to (tenant vs provider),
@@ -192,22 +195,31 @@ class RoleForm(forms.ModelForm):
             self.fields['tenant'].widget = forms.HiddenInput()
             self.fields['tenant'].disabled = True
         else:
-            # Creating
-            self.fields['tenant'].queryset = Tenant.objects.all()
-            self.fields['provider'].queryset = Provider.objects.all()
+            # Creating (fresh add or clone). Use the unscoped base manager so the pickers
+            # populate regardless of active-tenant context (the tenant-scoping default manager
+            # fails closed to empty when the form runs without a resolved tenant).
+            self.fields['tenant'].queryset = Tenant._base_manager.filter(deleted_at__isnull=True).order_by('name')
+            self.fields['provider'].queryset = Provider._base_manager.filter(deleted_at__isnull=True).order_by('name')
             if self.tenant is not None:
                 self.fields['tenant'].initial = self.tenant.pk
                 self.fields['tenant'].widget = forms.HiddenInput()
                 self.fields['tenant'].disabled = True
-            elif self.provider is None:
-                # No container context — the user picks one, and which one is required
-                # follows the scope they pick. We default scope to 'tenant', so the
-                # tenant field starts out as the visible, required picker.
-                self.fields['tenant'].required = True
             if self.provider is not None:
                 self.fields['provider'].initial = self.provider.pk
                 self.fields['provider'].widget = forms.HiddenInput()
                 self.fields['provider'].disabled = True
+            if self.tenant is None and self.provider is None and not self.allow_container_choice:
+                # No container context and NOT the chooser (e.g. a clone): make the REQUIRED
+                # visible picker match the resolved scope, so the template renders the field the
+                # user must fill. A cloned provider role keeps scope='provider', so it must
+                # require the provider picker — requiring tenant (which the template then hides)
+                # made provider-role clones unsubmittable.
+                if self.is_provider_scoped:
+                    self.fields['provider'].required = True
+                else:
+                    self.fields['tenant'].required = True
+            # Chooser mode leaves BOTH pickers optional; clean() enforces exactly-one and
+            # derives the scope from whichever container the user selects.
 
         # Build the CRUD matrix and pre-check from the instance's permission set.
         existing_perms = set(self.instance.permissions or [])
@@ -260,8 +272,28 @@ class RoleForm(forms.ModelForm):
     def clean(self):
         cleaned_data = super().clean()
 
-        # Resolve scope (editing-locked or from cleaned data).
-        scope = self.instance.scope if self.instance.pk else cleaned_data.get('scope') or Role.SCOPE_TENANT
+        # Resolve scope. On edit it's locked to the instance. In chooser mode it's DERIVED from
+        # whichever container the user picked (exactly one required — the field is disabled and
+        # so cannot be user-set directly). Otherwise it comes from the context-derived scope.
+        if self.instance.pk:
+            scope = self.instance.scope
+        elif self.is_container_chooser:
+            picked_tenant = cleaned_data.get('tenant')
+            picked_provider = cleaned_data.get('provider')
+            if picked_tenant and picked_provider:
+                raise forms.ValidationError(
+                    _("Pick either a tenant or a provider for this role, not both.")
+                )
+            if picked_provider:
+                scope = Role.SCOPE_PROVIDER
+            elif picked_tenant:
+                scope = Role.SCOPE_TENANT
+            else:
+                raise forms.ValidationError(
+                    _("Choose a tenant (for a tenant role) or a provider (for a provider role).")
+                )
+        else:
+            scope = cleaned_data.get('scope') or Role.SCOPE_TENANT
         cleaned_data['scope'] = scope
 
         # Build permission set from matrix + custom + provider capability checkboxes.
@@ -286,12 +318,15 @@ class RoleForm(forms.ModelForm):
                 if cleaned_data.get(f'cap_{codename}'):
                     assigned_perms.add(f'organization.{codename}')
 
-        # If any permission is granted, also auto-grant dashboard perms so the user has a
-        # functioning landing page.
+        # If any permission is granted, also auto-grant the dashboard perms needed for a
+        # functioning landing page (view + create/customize own dashboards). Deliberately NOT
+        # delete_dashboard: it isn't needed for a landing page, and auto-adding it would make
+        # every non-empty role carry a delete_* permission — breaking role presets like
+        # "Technician" whose whole point is to exclude delete_*.
         if assigned_perms:
             assigned_perms |= {
                 'extras.view_dashboard', 'extras.change_dashboard',
-                'extras.add_dashboard',  'extras.delete_dashboard',
+                'extras.add_dashboard',
             }
 
         # Filter against the live permission table to drop codenames that don't exist
@@ -320,7 +355,7 @@ class RoleForm(forms.ModelForm):
             if provider is None and self.instance.provider_id:
                 provider = self.instance.provider
             if provider is None:
-                raise forms.ValidationError(_("A provider is required for provider-scoped roles."))
+                raise forms.ValidationError(_("A provider is required for provider roles."))
             self.instance.provider = provider
             self.instance.tenant = None
             cleaned_data['provider'] = provider
@@ -336,6 +371,49 @@ class RoleForm(forms.ModelForm):
         return cleaned_data
 
     # ---------------------------------------------------------------- template helpers
+    @property
+    def preset_definitions(self):
+        """Built-in preset choices offered by the client-side preset picker.
+
+        Returns a list of ``(value, label)`` pairs. ``value`` keys into
+        ``preset_field_map``; ``blank`` is always first (clears the grid). Kept in
+        sync with the seed's role catalog (``_seed/access.py``): Administrator = all,
+        Technician = all non-delete op perms, Read-Only = all view_*.
+        """
+        return [
+            ('blank', _('Blank (start from scratch)')),
+            ('administrator', _('Administrator (full access)')),
+            ('technician', _('Technician (all except delete)')),
+            ('readonly', _('Read-Only (view only)')),
+        ]
+
+    @property
+    def preset_field_map(self):
+        """Map each preset to the matrix checkbox field names it pre-checks.
+
+        Computed over *this form's* matrix models only (so presets stay scoped to
+        the grid actually rendered — dropped plugin rows never appear). The values
+        are matrix field names (``perm_<key>_<action>``), never permission
+        codenames, so the client only toggles checkboxes and the server-side
+        escalation guard in ``clean()`` still validates the final grant. Selecting
+        a preset is a convenience only and never bypasses that guard.
+        """
+        administrator, technician, readonly = [], [], []
+        for key in MATRIX_MODELS:
+            for action in ('read', 'create', 'edit', 'delete'):
+                fname = f'perm_{key}_{action}'
+                administrator.append(fname)
+                if action != 'delete':
+                    technician.append(fname)
+                if action == 'read':
+                    readonly.append(fname)
+        return {
+            'blank': [],
+            'administrator': administrator,
+            'technician': technician,
+            'readonly': readonly,
+        }
+
     @property
     def matrix_items(self):
         return [
@@ -371,6 +449,37 @@ class RoleForm(forms.ModelForm):
     @property
     def provider_capability_fields(self):
         return [(label, self[f'cap_{codename}']) for codename, label in PROVIDER_CAPABILITIES]
+
+    @property
+    def is_provider_scoped(self):
+        """Whether this form is editing/creating a provider-scoped role.
+
+        Drives which sections the template renders. On edit the scope is locked to the
+        instance; on create it follows the resolved ``scope`` field initial (which the
+        ``__init__`` derives from the bound container).
+        """
+        if self.instance.pk:
+            return self.instance.scope == Role.SCOPE_PROVIDER
+        # Create / clone: a cloned provider role carries scope on the unsaved instance;
+        # a fresh create falls back to the field initial derived in ``__init__``.
+        if getattr(self.instance, 'scope', None):
+            return self.instance.scope == Role.SCOPE_PROVIDER
+        return self.fields['scope'].initial == Role.SCOPE_PROVIDER
+
+    @property
+    def is_container_chooser(self):
+        """Fresh add with no bound container and the view opted in → render the
+        tenant-vs-provider chooser (the user picks scope by choosing a container).
+
+        False on edit (container locked to the instance) and on clone (scope carried from
+        the source role), so only the plain ``/roles/add/`` page shows both pickers.
+        """
+        return (
+            self.allow_container_choice
+            and not self.instance.pk
+            and self.tenant is None
+            and self.provider is None
+        )
 
 
 class RoleFilterForm(FilterForm):

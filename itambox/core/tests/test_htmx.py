@@ -17,7 +17,7 @@ class HTMXViewsTestCase(TestCase):
                 'assets.view_manufacturer',
             ]
         )
-        self.membership = Membership.objects.create(person_type=Membership.PERSON_MEMBER, user=self.user,
+        self.membership = Membership.objects.create(user=self.user,
             tenant=self.tenant,
         )
         self.membership.roles.add(self.role)

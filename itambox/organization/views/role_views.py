@@ -15,7 +15,7 @@ from itambox.views.generic import (
 )
 from itambox.views.generic.utils import safe_return_url
 
-from ..models import Role, Membership
+from ..models import Role, Membership, Provider, Tenant
 from ..forms import RoleForm, RoleFilterForm, RoleAssignUsersForm
 from ..tables import RoleTable
 from ..filters import RoleFilterSet
@@ -64,7 +64,31 @@ class RoleEditView(ObjectEditView):
     def get_form_kwargs(self):
         kwargs = super().get_form_kwargs()
         kwargs['user'] = self.request.user
-        kwargs['tenant'] = getattr(self.request, 'active_tenant', None)
+        is_create = self.kwargs.get('pk') is None
+        # A container deep-link pre-binds the new role's scope. ?provider=<pk> (e.g. role-less
+        # technician onboarding) makes a provider role; ?tenant=<pk> makes a tenant role. On
+        # edit the form locks to the instance's own container, so these are create-only.
+        if is_create:
+            provider_id = self.request.GET.get('provider')
+            if provider_id:
+                provider = Provider._base_manager.filter(
+                    pk=provider_id, deleted_at__isnull=True,
+                ).first()
+                if provider is not None:
+                    kwargs['provider'] = provider
+                    return kwargs
+            tenant_id = self.request.GET.get('tenant')
+            if tenant_id:
+                tenant = Tenant._base_manager.filter(
+                    pk=tenant_id, deleted_at__isnull=True,
+                ).first()
+                if tenant is not None:
+                    kwargs['tenant'] = tenant
+                    return kwargs
+            # No container context on a fresh add → present the tenant-vs-provider chooser so
+            # the user selects the role's scope explicitly (rather than being forced onto the
+            # active tenant, which made provider roles uncreatable from the UI).
+            kwargs['allow_container_choice'] = True
         return kwargs
 
 
@@ -204,18 +228,18 @@ class RoleAssignUsersView(LoginRequiredMixin, View):
                         existing = Membership.objects.filter(user=user, tenant=role.tenant).first()
                         if existing is None:
                             mem = Membership.objects.create(
-                                user=user, tenant=role.tenant, person_type=Membership.PERSON_MEMBER,
+                                user=user, tenant=role.tenant,
                             )
                             mem.roles.add(role)
                             added += 1
                             continue
                     else:
                         existing = Membership.objects.filter(
-                            user=user, provider=role.provider, person_type=Membership.PERSON_STAFF,
+                            user=user, provider=role.provider,
                         ).first()
                         if existing is None:
                             mem = Membership.objects.create(
-                                user=user, provider=role.provider, person_type=Membership.PERSON_STAFF,
+                                user=user, provider=role.provider,
                                 tenant_scope=Membership.SCOPE_EXPLICIT,
                             )
                             mem.roles.add(role)

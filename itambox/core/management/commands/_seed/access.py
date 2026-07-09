@@ -121,7 +121,7 @@ class SeedAccessMixin:
                 scope = Membership.SCOPE_ALL if group_scope is None else Membership.SCOPE_EXPLICIT
                 pm, _ = Membership.objects.get_or_create(
                     user=user, provider=self._provider,
-                    defaults={'person_type': Membership.PERSON_STAFF, 'tenant_scope': scope})
+                    defaults={'tenant_scope': scope})
                 if pm.tenant_scope != scope:
                     pm.tenant_scope = scope
                     pm.save(update_fields=['tenant_scope'])
@@ -198,7 +198,7 @@ class SeedAccessMixin:
 
         if self._provider_roles:
             staff_ct = Membership.objects.filter(
-                provider=self._provider, person_type=Membership.PERSON_STAFF).count()
+                provider=self._provider).count()
             self.stdout.write(f'  Provider (MSP) layer: 1 provider, {len(self._provider_roles)} '
                               f'provider roles, {staff_ct} provider-staff memberships.')
 

@@ -28,7 +28,7 @@ class TenantTestMixin:
             name="Test Role",
             permissions=permissions
         )
-        self.tenant_membership = Membership.objects.create(person_type=Membership.PERSON_MEMBER, user=self.tenant_user,
+        self.tenant_membership = Membership.objects.create(user=self.tenant_user,
             tenant=self.tenant,
         )
         self.tenant_membership.roles.add(self.tenant_role)
@@ -79,7 +79,7 @@ class TenantTestMixin:
                     name="Dynamic Role",
                     permissions=role_permissions
                 )
-                membership = Membership.objects.create(person_type=Membership.PERSON_MEMBER, user=user,
+                membership = Membership.objects.create(user=user,
                     tenant=tenant,
                 )
                 membership.roles.add(role)

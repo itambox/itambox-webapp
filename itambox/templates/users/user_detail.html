@@ -88,7 +88,7 @@
                 <div>
                     <i class="mdi mdi-domain me-1"></i>
                     <strong>{% if membership.tenant_id %}{{ membership.tenant.name }}{% else %}{{ membership.provider.name }}{% endif %}</strong>
-                    <span class="badge bg-secondary-lt ms-1">{{ membership.get_person_type_display }}</span>
+                    <span class="badge bg-secondary-lt ms-1">{{ membership.get_kind_display }}</span>
                     {% with roles=membership.roles.all %}
                     {% if roles %}
                     ({% for r in roles %}{{ r.name }}{% if not forloop.last %}, {% endif %}{% endfor %})

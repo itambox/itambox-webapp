@@ -79,7 +79,7 @@ class MFAPolicyHelperTests(TestCase):
         manager_role = Role.objects.create(
             tenant=self.tenant, name='Manager', permissions=self.WRITE_PERMS,
         )
-        m_manager = Membership.objects.create(person_type=Membership.PERSON_MEMBER, user=self.manager_user, tenant=self.tenant,
+        m_manager = Membership.objects.create(user=self.manager_user, tenant=self.tenant,
         )
         m_manager.roles.add(manager_role)
 
@@ -91,7 +91,7 @@ class MFAPolicyHelperTests(TestCase):
             tenant=self.tenant, name='Admin',
             permissions=self.WRITE_PERMS + ['assets.delete_asset'],
         )
-        m_admin = Membership.objects.create(person_type=Membership.PERSON_MEMBER, user=self.admin_user, tenant=self.tenant,
+        m_admin = Membership.objects.create(user=self.admin_user, tenant=self.tenant,
         )
         m_admin.roles.add(admin_role)
 
@@ -103,7 +103,7 @@ class MFAPolicyHelperTests(TestCase):
         custom_role = Role.objects.create(
             tenant=self.tenant, name='Fleet Steward', permissions=self.WRITE_PERMS,
         )
-        m_custom = Membership.objects.create(person_type=Membership.PERSON_MEMBER, user=self.custom_user, tenant=self.tenant,
+        m_custom = Membership.objects.create(user=self.custom_user, tenant=self.tenant,
         )
         m_custom.roles.add(custom_role)
 
@@ -114,7 +114,7 @@ class MFAPolicyHelperTests(TestCase):
         viewer_role = Role.objects.create(
             tenant=self.tenant, name='Viewer', permissions=self.READ_ONLY_PERMS,
         )
-        m_viewer = Membership.objects.create(person_type=Membership.PERSON_MEMBER, user=self.viewer_user, tenant=self.tenant,
+        m_viewer = Membership.objects.create(user=self.viewer_user, tenant=self.tenant,
         )
         m_viewer.roles.add(viewer_role)
 
@@ -153,7 +153,7 @@ class MFAPolicyNoStaleCacheTests(TestCase):
         self.viewer_role = Role.objects.create(
             tenant=self.tenant, name='Viewer', permissions=['assets.view_asset'],
         )
-        self.membership = Membership.objects.create(person_type=Membership.PERSON_MEMBER, user=self.user, tenant=self.tenant,
+        self.membership = Membership.objects.create(user=self.user, tenant=self.tenant,
         )
         self.membership.roles.add(self.viewer_role)
 
@@ -196,7 +196,7 @@ class MFAEnforcementMiddlewareTests(TestCase):
             username='enforce-admin-mfa', email='enforce-admin-mfa@example.com', password='pw-mfa',
         )
         admin_role = Role.objects.create(tenant=self.tenant, name='Admin', permissions=[])
-        m_admin = Membership.objects.create(person_type=Membership.PERSON_MEMBER, user=self.admin_user, tenant=self.tenant)
+        m_admin = Membership.objects.create(user=self.admin_user, tenant=self.tenant)
         m_admin.roles.add(admin_role)
 
         # H4: a Manager (the SSO-provisioned privileged role) must be gated too.
@@ -207,7 +207,7 @@ class MFAEnforcementMiddlewareTests(TestCase):
             tenant=self.tenant, name='Manager',
             permissions=['assets.view_asset', 'assets.add_asset', 'assets.change_asset'],
         )
-        m_manager = Membership.objects.create(person_type=Membership.PERSON_MEMBER, user=self.manager_user, tenant=self.tenant)
+        m_manager = Membership.objects.create(user=self.manager_user, tenant=self.tenant)
         m_manager.roles.add(manager_role)
 
         self.member_user = User.objects.create_user(
@@ -217,7 +217,7 @@ class MFAEnforcementMiddlewareTests(TestCase):
         member_role = Role.objects.create(
             tenant=self.tenant, name='Member', permissions=['assets.view_asset'],
         )
-        m_member = Membership.objects.create(person_type=Membership.PERSON_MEMBER, user=self.member_user, tenant=self.tenant)
+        m_member = Membership.objects.create(user=self.member_user, tenant=self.tenant)
         m_member.roles.add(member_role)
 
     def _login_with_backend(self, user, backend):
@@ -329,7 +329,7 @@ class MFAGateViewTests(TestCase):
             username='gate-admin-mfa', email='gate-admin-mfa@example.com', password='pw-mfa',
         )
         admin_role = Role.objects.create(tenant=self.tenant, name='Admin', permissions=[])
-        m_admin = Membership.objects.create(person_type=Membership.PERSON_MEMBER, user=self.admin_user, tenant=self.tenant)
+        m_admin = Membership.objects.create(user=self.admin_user, tenant=self.tenant)
         m_admin.roles.add(admin_role)
 
     def _login_password(self, user):

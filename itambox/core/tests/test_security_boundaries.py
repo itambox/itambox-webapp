@@ -27,7 +27,7 @@ class SecurityBoundariesTestCase(TestCase):
                 'assets.view_asset', 'assets.add_asset', 'assets.change_asset', 'assets.delete_asset'
             ]
         )
-        self.membership_a = Membership.objects.create(person_type=Membership.PERSON_MEMBER, user=self.user_a,
+        self.membership_a = Membership.objects.create(user=self.user_a,
             tenant=self.tenant_a,
         )
         self.membership_a.roles.add(self.role_a)
@@ -40,7 +40,7 @@ class SecurityBoundariesTestCase(TestCase):
                 'assets.view_asset', 'assets.add_asset', 'assets.change_asset', 'assets.delete_asset'
             ]
         )
-        self.membership_b = Membership.objects.create(person_type=Membership.PERSON_MEMBER, user=self.user_b,
+        self.membership_b = Membership.objects.create(user=self.user_b,
             tenant=self.tenant_b,
         )
         self.membership_b.roles.add(self.role_b)
@@ -163,7 +163,7 @@ class MultiRoleSecurityBoundaryTestCase(TestCase):
         )
 
         # Membership in Tenant A
-        self.membership_a = Membership.objects.create(person_type=Membership.PERSON_MEMBER, user=self.user, tenant=self.tenant_a,
+        self.membership_a = Membership.objects.create(user=self.user, tenant=self.tenant_a,
             direct_permissions=['assets.delete_asset'],
         )
         self.membership_a.roles.add(self.role_a)

@@ -291,8 +291,12 @@ class UserGroup(AutoSlugMixin, StandardModel, SoftDeleteMixin):
         blank=True,
         verbose_name=_("Members"),
     )
-    # SCIM provisioning scope: a group with provider=X is shown and managed by provider X's
-    # admins via SCIM. NULL = global group (superuser-managed). Not used for permission resolution.
+    # SCIM provisioning scope (functional, not decorative): every provider-SCIM group
+    # operation filters ``UserGroup.objects.filter(provider=self.provider)``, so a group's
+    # ``provider`` decides which provider's SCIM token may list/create/update/delete it, and
+    # name/slug uniqueness is scoped to it. NULL = a global group (managed in the UI by
+    # superusers / global group admins, outside provider SCIM). It does not affect permission
+    # *resolution* — that is driven entirely by the group's ``roles``.
     provider = models.ForeignKey(
         'organization.Provider',
         on_delete=models.SET_NULL,

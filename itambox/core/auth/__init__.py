@@ -117,15 +117,15 @@ class MembershipBackend:
         # Role attached to that staff membership contributes its permissions.
         if getattr(tenant, 'provider_id', None):
             staff = Membership.objects.filter(
-                user=user_obj, provider_id=tenant.provider_id,
-                person_type=Membership.PERSON_STAFF, is_active=True,
+                user=user_obj, provider_id=tenant.provider_id, is_active=True,
             ).select_related('scope_group').first()
-            if staff is not None and self._tenant_in_scope(staff, tenant):
+            if staff is not None and staff.covers_tenant(tenant):
                 for perm_list in Role._base_manager.filter(
                     memberships=staff, deleted_at__isnull=True, scope=Role.SCOPE_PROVIDER,
                 ).values_list('permissions', flat=True):
-                    # Strip organization.manage_* capabilities in the projection
-                    perms.update([p for p in (perm_list or []) if not p.startswith('organization.manage_')])
+                    # Strip organization.manage_* in the projection via the canonical helper
+                    # (Membership.project_permissions_for_tenant is the single source of truth).
+                    perms.update(Membership.project_permissions_for_tenant(perm_list))
 
         result = frozenset(perms)
         setattr(user_obj, cache_key, result)
@@ -146,8 +146,7 @@ class MembershipBackend:
 
         perms = set()
         staff = Membership.objects.filter(
-            user=user_obj, provider=provider,
-            person_type=Membership.PERSON_STAFF, is_active=True,
+            user=user_obj, provider=provider, is_active=True,
         ).first()
         if staff is not None:
             perms.update(staff.direct_permissions or [])
@@ -164,19 +163,11 @@ class MembershipBackend:
     def _tenant_in_scope(self, staff_membership, tenant):
         """Whether ``tenant`` falls within the provider-staff membership's tenant scope.
 
-        ``all`` → any tenant of the provider; ``tenant_group`` → tenant's group is the
-        scope group or a descendant; ``explicit`` (default) → tenant in ``assigned_tenants``.
+        Thin delegate to the canonical :meth:`organization.models.Membership.covers_tenant`
+        — kept as a method for the existing internal call site; do not re-implement the
+        scope branching here.
         """
-        from organization.models import Membership
-        scope = staff_membership.tenant_scope or Membership.SCOPE_EXPLICIT
-        if scope == Membership.SCOPE_ALL:
-            return True
-        if scope == Membership.SCOPE_TENANT_GROUP:
-            if not staff_membership.scope_group_id or not tenant.group_id:
-                return False
-            from organization.access import get_descendant_tenant_group_ids
-            return tenant.group_id in get_descendant_tenant_group_ids(staff_membership.scope_group_id)
-        return staff_membership.assigned_tenants.filter(pk=tenant.pk).exists()
+        return staff_membership.covers_tenant(tenant)
 
     # ------------------------------------------------------------------ context resolution
     def _resolve_target(self, user_obj, obj):

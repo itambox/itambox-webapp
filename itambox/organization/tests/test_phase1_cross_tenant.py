@@ -45,13 +45,13 @@ class ContactAssignmentCrossTenantTestCase(TestCase):
         self.role_a = Role.objects.create(
             tenant=self.tenant_a, name='Admin', permissions=ca_perms
         )
-        self.membership_a = Membership.objects.create(person_type=Membership.PERSON_MEMBER, user=self.user_a, tenant=self.tenant_a,
+        self.membership_a = Membership.objects.create(user=self.user_a, tenant=self.tenant_a,
         )
         self.membership_a.roles.add(self.role_a)
         self.role_b = Role.objects.create(
             tenant=self.tenant_b, name='Admin', permissions=ca_perms
         )
-        self.membership_b = Membership.objects.create(person_type=Membership.PERSON_MEMBER, user=self.user_b, tenant=self.tenant_b,
+        self.membership_b = Membership.objects.create(user=self.user_b, tenant=self.tenant_b,
         )
         self.membership_b.roles.add(self.role_b)
 

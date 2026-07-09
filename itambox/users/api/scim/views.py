@@ -298,7 +298,7 @@ class SCIMUserListView(SCIMTenantMixin, APIView):
             with transaction.atomic():
                 # Roles are assigned in-app via UserGroup; SCIM provisioning creates the
                 # membership with an empty roles set (no get_or_create of a default role).
-                Membership.objects.create(user=user, tenant=self.tenant, person_type=Membership.PERSON_MEMBER, is_active=active)
+                Membership.objects.create(user=user, tenant=self.tenant, is_active=active)
                 link_or_create_assetholder(user, self.tenant)
         else:
             with transaction.atomic():
@@ -314,7 +314,7 @@ class SCIMUserListView(SCIMTenantMixin, APIView):
 
                 # Roles are assigned in-app via UserGroup; SCIM provisioning creates the
                 # membership with an empty roles set (no get_or_create of a default role).
-                Membership.objects.create(user=user, tenant=self.tenant, person_type=Membership.PERSON_MEMBER, is_active=active)
+                Membership.objects.create(user=user, tenant=self.tenant, is_active=active)
                 link_or_create_assetholder(user, self.tenant)
 
         serializer = SCIMUserSerializer(

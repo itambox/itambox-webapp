@@ -1,4 +1,5 @@
 from django.shortcuts import render, redirect
+from django.core.exceptions import ValidationError
 from django.http import HttpResponse
 from django.views.generic import View, UpdateView, TemplateView
 from django.contrib.auth.mixins import LoginRequiredMixin
@@ -608,6 +609,7 @@ from django.db import transaction
 from django.db.models import Count, Prefetch
 from itambox.views.generic import ObjectBulkDeleteView
 from organization.models import Role, Membership
+from core.auth.guards import validate_group_membership_grant
 from .models import UserGroup
 from .tables import UserGroupTable
 from .filters import UserGroupFilterSet
@@ -677,7 +679,7 @@ class UserGroupEditView(GlobalGroupAdminMixin, ObjectEditView):
     queryset = UserGroup.objects.all()
     model = UserGroup
     model_form = UserGroupForm
-    template_name = 'generic/object_edit.html'
+    template_name = 'users/usergroups/usergroup_form.html'
 
     def get_form_kwargs(self):
         kwargs = super().get_form_kwargs()
@@ -768,6 +770,17 @@ class UserGroupAssignUsersView(GlobalGroupAdminMixin, LoginRequiredMixin, View):
         group = self._get_group(pk)
         form = UserGroupAssignUsersForm(request.POST)
         if form.is_valid():
+            # Escalation guard (§3-C): adding a member confers every role the group carries
+            # (permissions + tenant access). A non-superuser may only add members to a group
+            # whose roles they could themselves grant in each role's container. Superuser
+            # bypasses inside the helper.
+            try:
+                validate_group_membership_grant(request.user, group)
+            except ValidationError as exc:
+                for msg in exc.messages:
+                    messages.error(request, msg)
+                return render(request, self.template_name, {'group': group, 'form': form})
+
             users = form.cleaned_data['users']
             added = 0
             already_member = 0

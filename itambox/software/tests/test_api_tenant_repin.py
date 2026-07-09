@@ -31,7 +31,7 @@ class SoftwareApiTenantRepinTests(APITestCase):
             name='Role A',
             permissions=['software.view_software', 'software.change_software'],
         )
-        _membership = Membership.objects.create(person_type=Membership.PERSON_MEMBER, user=self.user, tenant=self.tenant_a)
+        _membership = Membership.objects.create(user=self.user, tenant=self.tenant_a)
         _membership.roles.add(self.role)
 
         self.mfr = Manufacturer.objects.create(name='MS', slug='ms')

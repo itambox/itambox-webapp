@@ -26,7 +26,7 @@ class CoreTenantSecurityTestCase(TestCase):
                 'assets.view_asset', 'assets.add_asset', 'assets.change_asset', 'assets.delete_asset'
             ]
         )
-        self.membership = Membership.objects.create(person_type=Membership.PERSON_MEMBER, user=self.user, tenant=self.tenant)
+        self.membership = Membership.objects.create(user=self.user, tenant=self.tenant)
         self.membership.roles.add(self.role)
 
     def test_tenant_group_scoping(self):
@@ -93,9 +93,9 @@ class CoreTenantSecurityTestCase(TestCase):
                 'assets.view_asset'
             ]
         )
-        mem_admin = Membership.objects.create(person_type=Membership.PERSON_MEMBER, user=test_user, tenant=tenant_admin)
+        mem_admin = Membership.objects.create(user=test_user, tenant=tenant_admin)
         mem_admin.roles.add(admin_role)
-        mem_readonly = Membership.objects.create(person_type=Membership.PERSON_MEMBER, user=test_user, tenant=tenant_readonly)
+        mem_readonly = Membership.objects.create(user=test_user, tenant=tenant_readonly)
         mem_readonly.roles.add(reader_role)
 
         # Set active context in test client session
@@ -263,7 +263,7 @@ class CrossTenantAttackTestCase(TestCase):
                 'core.change_recyclebin', 'core.delete_recyclebin',
             ]
         )
-        self.membership_b = Membership.objects.create(person_type=Membership.PERSON_MEMBER, user=self.user_b, tenant=self.tenant_b,
+        self.membership_b = Membership.objects.create(user=self.user_b, tenant=self.tenant_b,
         )
         self.membership_b.roles.add(self.role_b)
 
@@ -545,7 +545,7 @@ class MultiRoleUnionTestCase(TestCase):
         )
 
         # Membership: direct role A + direct_permissions granting 'assets.delete_asset'
-        self.membership = Membership.objects.create(person_type=Membership.PERSON_MEMBER, user=self.user,
+        self.membership = Membership.objects.create(user=self.user,
             tenant=self.tenant,
             direct_permissions=['assets.delete_asset'],
         )
@@ -611,7 +611,7 @@ class TenantBoundaryWithGroupsTestCase(TestCase):
         self.group_a.members.add(self.user)
 
         # Membership in tenant A with direct_permissions
-        self.membership_a = Membership.objects.create(person_type=Membership.PERSON_MEMBER, user=self.user,
+        self.membership_a = Membership.objects.create(user=self.user,
             tenant=self.tenant_a,
             direct_permissions=['assets.delete_asset'],
         )
@@ -677,7 +677,7 @@ class IsActiveGatingTestCase(TestCase):
         """is_active=False on a Membership drops that membership's OWN roles and
         direct_permissions. (Group access is a SEPARATE, independent path that is not
         gated by membership — see test_user_groups.MembershipIndependenceTests.)"""
-        membership = Membership.objects.create(person_type=Membership.PERSON_MEMBER, user=self.user, tenant=self.tenant, is_active=False,
+        membership = Membership.objects.create(user=self.user, tenant=self.tenant, is_active=False,
             direct_permissions=['assets.delete_asset'],
         )
         membership.roles.add(self.role)
@@ -692,7 +692,7 @@ class IsActiveGatingTestCase(TestCase):
 
     def test_inactive_usergroup_contributes_nothing(self):
         """An inactive UserGroup must not contribute its roles to the effective perm set."""
-        membership = Membership.objects.create(person_type=Membership.PERSON_MEMBER, user=self.user, tenant=self.tenant, is_active=True,
+        membership = Membership.objects.create(user=self.user, tenant=self.tenant, is_active=True,
         )
         # No direct roles on membership; only an inactive group
         group = UserGroup.objects.create(name='Inactive Group', is_active=False)
@@ -735,7 +735,7 @@ class SoftDeletedRoleGrantsNothingTestCase(TestCase):
             name='Soon Deleted Role',
             permissions=['assets.view_asset', 'assets.change_asset'],
         )
-        self.membership = Membership.objects.create(person_type=Membership.PERSON_MEMBER, user=self.user, tenant=self.tenant,
+        self.membership = Membership.objects.create(user=self.user, tenant=self.tenant,
         )
         self.membership.roles.add(self.role)
 
@@ -788,7 +788,7 @@ class PermCacheTestCase(TestCase):
             name='Cache Role',
             permissions=['assets.view_asset'],
         )
-        self.membership = Membership.objects.create(person_type=Membership.PERSON_MEMBER, user=self.user, tenant=self.tenant,
+        self.membership = Membership.objects.create(user=self.user, tenant=self.tenant,
         )
         self.membership.roles.add(self.role)
 

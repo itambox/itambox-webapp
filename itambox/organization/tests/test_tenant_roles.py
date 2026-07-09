@@ -40,7 +40,7 @@ class TenantRoleSecurityTests(TestCase):
         self.assertIn(role_a, Role.objects.filter(tenant=self.tenant_a))
         self.assertNotIn(role_a, Role.objects.filter(tenant=self.tenant_b))
         membership = Membership.objects.create(
-            person_type=Membership.PERSON_MEMBER, user=self.user_a, tenant=self.tenant_a,
+            user=self.user_a, tenant=self.tenant_a,
         )
         membership.roles.add(role_a)
         from core.auth import MembershipBackend
@@ -87,7 +87,7 @@ class TenantRoleSecurityTests(TestCase):
             name="ReadOnly Member",
             permissions=["assets.view_asset", "extras.view_dashboard"]
         )
-        membership = Membership.objects.create(person_type=Membership.PERSON_MEMBER, user=self.user_a,
+        membership = Membership.objects.create(user=self.user_a,
             tenant=self.tenant_a,
         )
         membership.roles.add(role)
@@ -125,7 +125,6 @@ class TenantRoleSecurityTests(TestCase):
         staff_membership = Membership.objects.create(
             user=staff_user,
             provider=provider,
-            person_type=Membership.PERSON_STAFF,
             tenant_scope=Membership.SCOPE_ALL,
             is_active=True,
         )
@@ -210,7 +209,7 @@ class TenantRoleSecurityTests(TestCase):
         self.assertTrue(edit_form.fields['perm_receive_purchaseorder'].initial)
         
         # Verify backend resolution for user
-        membership = Membership.objects.create(person_type=Membership.PERSON_MEMBER, user=self.user_a,
+        membership = Membership.objects.create(user=self.user_a,
             tenant=self.tenant_a,
         )
         membership.roles.add(role)
@@ -234,7 +233,7 @@ class TenantRoleSecurityTests(TestCase):
             name="Reader",
             permissions=["assets.view_asset", "extras.view_dashboard"]
         )
-        membership_a = Membership.objects.create(person_type=Membership.PERSON_MEMBER, user=self.user_a,
+        membership_a = Membership.objects.create(user=self.user_a,
             tenant=self.tenant_a,
         )
         membership_a.roles.add(reader_role)
@@ -296,7 +295,7 @@ class TenantRoleSecurityTests(TestCase):
             name="Deletable?",
             permissions=["assets.view_asset"]
         )
-        membership = Membership.objects.create(person_type=Membership.PERSON_MEMBER, user=self.user_a,
+        membership = Membership.objects.create(user=self.user_a,
             tenant=self.tenant_a,
         )
         membership.roles.add(role)
@@ -345,7 +344,7 @@ class TenantRoleSecurityTests(TestCase):
             name="Reader",
             permissions=["assets.view_asset"]
         )
-        membership_a = Membership.objects.create(person_type=Membership.PERSON_MEMBER, user=self.user_a,
+        membership_a = Membership.objects.create(user=self.user_a,
             tenant=self.tenant_a,
         )
         membership_a.roles.add(reader_role)
@@ -356,7 +355,7 @@ class TenantRoleSecurityTests(TestCase):
             name="SW Manager",
             permissions=["software.view_software"]
         )
-        membership_b = Membership.objects.create(person_type=Membership.PERSON_MEMBER, user=self.user_b,
+        membership_b = Membership.objects.create(user=self.user_b,
             tenant=self.tenant_a,
         )
         membership_b.roles.add(sw_role)
@@ -406,7 +405,7 @@ class TenantRoleSecurityTests(TestCase):
             name="Alert Admin",
             permissions=["extras.change_alertlog"]
         )
-        membership_a = Membership.objects.create(person_type=Membership.PERSON_MEMBER, user=self.user_a,
+        membership_a = Membership.objects.create(user=self.user_a,
             tenant=self.tenant_a,
         )
         membership_a.roles.add(alert_admin_role)
@@ -417,7 +416,7 @@ class TenantRoleSecurityTests(TestCase):
             name="Reader",
             permissions=["assets.view_asset"]
         )
-        membership_b = Membership.objects.create(person_type=Membership.PERSON_MEMBER, user=self.user_b,
+        membership_b = Membership.objects.create(user=self.user_b,
             tenant=self.tenant_a,
         )
         membership_b.roles.add(reader_role)
@@ -468,7 +467,7 @@ class TenantRoleSecurityTests(TestCase):
             name="Report Admin",
             permissions=["extras.view_reporttemplate", "extras.view_scheduledreport"]
         )
-        membership_a = Membership.objects.create(person_type=Membership.PERSON_MEMBER, user=self.user_a,
+        membership_a = Membership.objects.create(user=self.user_a,
             tenant=self.tenant_a,
         )
         membership_a.roles.add(report_admin_role)
@@ -479,7 +478,7 @@ class TenantRoleSecurityTests(TestCase):
             name="Reader",
             permissions=["assets.view_asset"]
         )
-        membership_b = Membership.objects.create(person_type=Membership.PERSON_MEMBER, user=self.user_b,
+        membership_b = Membership.objects.create(user=self.user_b,
             tenant=self.tenant_a,
         )
         membership_b.roles.add(reader_role)
@@ -567,7 +566,7 @@ class TenantRoleSecurityTests(TestCase):
             name="Extras Regression Role",
             permissions=[change_alertlog_str, view_reporttemplate_str],
         )
-        membership = Membership.objects.create(person_type=Membership.PERSON_MEMBER, user=self.user_a,
+        membership = Membership.objects.create(user=self.user_a,
             tenant=self.tenant_a,
         )
         membership.roles.add(role)
@@ -658,7 +657,6 @@ class RBACCoverageTests(TestCase):
         staff_membership = Membership.objects.create(
             user=user,
             provider=self.provider,
-            person_type=Membership.PERSON_STAFF,
             tenant_scope=Membership.SCOPE_TENANT_GROUP,
             scope_group=g1,
             is_active=True,
@@ -701,7 +699,6 @@ class RBACCoverageTests(TestCase):
         membership = Membership.objects.create(
             user=user,
             tenant=self.tenant_a,
-            person_type=Membership.PERSON_MEMBER,
             is_active=True,
         )
         
@@ -757,3 +754,90 @@ class RBACCoverageTests(TestCase):
         self.assertEqual(user.email, 'newtech@example.com')
         self.assertEqual(membership.provider, self.provider)
         self.assertIn(role, membership.roles.all())
+
+
+class ProviderRoleCapabilityRoundTripTests(TestCase):
+    """Regression: editing a provider-scoped role through the UI must NOT strip its
+    provider capabilities (``organization.manage_*``).
+
+    The ``RoleForm`` always carried the ``cap_*`` checkbox fields, but the template never
+    rendered them — so a browser POST omitted every capability and ``RoleForm.clean()``
+    rebuilt ``permissions`` without them, silently deleting ``manage_*`` on the first save.
+    """
+    def setUp(self):
+        from django.urls import reverse
+        from organization.models import Provider
+        set_current_tenant(None)
+        set_current_membership(None)
+        self.reverse = reverse
+        self.tenant = Tenant.objects.create(name="Home", slug="home")
+        self.provider = Provider.objects.create(name="Northwind MSP", slug="northwind")
+        self.superuser = User.objects.create_superuser(
+            username='su', email='su@example.com', password='password123',
+        )
+        self.role = Role.objects.create(
+            provider=self.provider, scope=Role.SCOPE_PROVIDER, name="Provider Administrator",
+            permissions=[
+                'organization.manage_provider', 'organization.manage_tenants',
+                'organization.manage_staff', 'organization.manage_groups',
+                'assets.view_asset',
+            ],
+        )
+
+    def test_edit_page_renders_capability_checkboxes(self):
+        # Template regression guard: the four provider-capability inputs must appear in
+        # the rendered edit page. Their absence is the root cause of the silent strip.
+        self.client.force_login(self.superuser)
+        session = self.client.session
+        session['active_tenant_id'] = self.tenant.pk
+        session.save()
+        resp = self.client.get(self.reverse('organization:role_update', kwargs={'pk': self.role.pk}))
+        self.assertEqual(resp.status_code, 200)
+        for cap in ('cap_manage_provider', 'cap_manage_tenants', 'cap_manage_staff', 'cap_manage_groups'):
+            self.assertContains(resp, f'name="{cap}"')
+
+    def test_unchanged_resubmit_preserves_capabilities(self):
+        # Build the POST a browser sends when opening the form and saving unchanged:
+        # every initially-checked checkbox is submitted, unchecked ones are omitted.
+        from django import forms as djforms
+        seed = TenantRoleForm(instance=self.role, user=self.superuser)
+        data = {'name': self.role.name, 'description': self.role.description or ''}
+        for fname, field in seed.fields.items():
+            if field.disabled:
+                continue
+            if isinstance(field, djforms.BooleanField):
+                if seed[fname].value():
+                    data[fname] = 'on'
+        bound = TenantRoleForm(data=data, instance=self.role, user=self.superuser)
+        self.assertTrue(bound.is_valid(), bound.errors)
+        bound.save()
+        self.role.refresh_from_db()
+        for cap in ('organization.manage_provider', 'organization.manage_tenants',
+                    'organization.manage_staff', 'organization.manage_groups'):
+            self.assertIn(cap, self.role.permissions)
+        self.assertIn('assets.view_asset', self.role.permissions)
+
+    def test_clone_provider_role_requires_provider_picker(self):
+        # Regression: cloning a provider-scoped role must require/render the PROVIDER picker,
+        # not the tenant field (which the template hides for provider scope) — otherwise the
+        # clone is unsubmittable. Mirror RoleCloneView: an unsaved copy keeping scope=provider
+        # with both FKs nulled.
+        clone = Role(
+            name="Provider Administrator (copy)", scope=Role.SCOPE_PROVIDER,
+            permissions=list(self.role.permissions),
+        )
+        form = TenantRoleForm(instance=clone, user=self.superuser)
+        self.assertTrue(form.is_provider_scoped)
+        self.assertTrue(form.fields['provider'].required)
+        self.assertFalse(form.fields['tenant'].required)
+        # Submitting with the provider picked validates and saves a provider-scoped role.
+        data = {
+            'name': clone.name, 'description': '', 'provider': self.provider.pk,
+            'perm_asset_read': 'on', 'cap_manage_staff': 'on',
+        }
+        bound = TenantRoleForm(data=data, instance=clone, user=self.superuser)
+        self.assertTrue(bound.is_valid(), bound.errors)
+        saved = bound.save()
+        self.assertEqual(saved.scope, Role.SCOPE_PROVIDER)
+        self.assertEqual(saved.provider_id, self.provider.pk)
+        self.assertIn('organization.manage_staff', saved.permissions)

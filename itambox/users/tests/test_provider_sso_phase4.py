@@ -31,7 +31,7 @@ class ProvisionProviderMembershipTests(TestCase):
         self.assertFalse(Membership.objects.filter(user=self.user).exists())
 
     def test_reactivates_and_updates_existing_membership(self):
-        Membership.objects.create(person_type=Membership.PERSON_STAFF, user=self.user, provider=self.provider, is_active=False,
+        Membership.objects.create(user=self.user, provider=self.provider, is_active=False,
         )
         m = provision_provider_membership(self.user, self.provider, "Provider Admin", "OIDC")
         self.assertIsNotNone(m)

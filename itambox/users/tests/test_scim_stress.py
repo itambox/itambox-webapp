@@ -26,7 +26,7 @@ class SCIMStressTests(TestCase):
             name="Admin",
             permissions=["assets.view_asset", "assets.add_asset", "extras.view_dashboard"]
         )
-        admin_membership = Membership.objects.create(person_type=Membership.PERSON_MEMBER, user=self.admin_user,
+        admin_membership = Membership.objects.create(user=self.admin_user,
             tenant=self.tenant,
         )
         admin_membership.roles.add(self.role_admin)

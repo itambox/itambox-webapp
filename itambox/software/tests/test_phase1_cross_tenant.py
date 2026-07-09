@@ -37,7 +37,7 @@ class SoftwareApiCrossTenantTestCase(TestCase):
                 'software.delete_software', 'software.add_software',
             ],
         )
-        self.membership_b = Membership.objects.create(person_type=Membership.PERSON_MEMBER, user=self.user_b, tenant=self.tenant_b,
+        self.membership_b = Membership.objects.create(user=self.user_b, tenant=self.tenant_b,
         )
         self.membership_b.roles.add(self.role_b)
 

@@ -36,7 +36,7 @@ class TokenPermissionsBypassRemovedTests(TestCase):
         self.member = User.objects.create_user(
             username='member-f7', password='password123'
         )
-        self.membership = Membership.objects.create(person_type=Membership.PERSON_MEMBER, user=self.member, tenant=self.tenant,
+        self.membership = Membership.objects.create(user=self.member, tenant=self.tenant,
         )
         self.membership.roles.add(self.role)
 

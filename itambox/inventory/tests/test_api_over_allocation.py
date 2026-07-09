@@ -22,7 +22,7 @@ class InventoryAssignmentOverAllocationTests(TestCase):
             tenant=self.tenant, name='Admin',
             permissions=['inventory.add_accessoryassignment', 'inventory.view_accessoryassignment'],
         )
-        membership = Membership.objects.create(person_type=Membership.PERSON_MEMBER, user=self.user, tenant=self.tenant)
+        membership = Membership.objects.create(user=self.user, tenant=self.tenant)
         membership.roles.add(role)
         self.mfr = Manufacturer.objects.create(name='Logitech', slug='logi-inv')
         self.cat = Category.objects.create(

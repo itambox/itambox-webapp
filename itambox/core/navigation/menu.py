@@ -29,13 +29,13 @@ def _can_admin_provider(user):
 
 
 def can_manage_user_groups(user):
-    """Single gate for UserGroup admin — kept as a callable so the menu can use it."""
-    if not getattr(user, 'is_authenticated', False):
-        return False
-    if user.is_superuser:
-        return True
-    from core.auth.provider import has_provider_capability
-    return has_provider_capability(user, 'manage_groups')
+    """Menu gate for UserGroup admin — delegates to the canonical RBAC gate so the
+    nav stays in parity with the backend (superuser, provider ``manage_groups``
+    capability, OR the direct single-company ``organization.manage_groups`` grant)."""
+    # inline import: core.auth.provider pulls in organization models; importing at module
+    # top would risk AppRegistryNotReady during navigation module load.
+    from core.auth.provider import can_manage_user_groups as _canonical
+    return _canonical(user)
 
 ORG_MENU = Menu(
     label=_('Organization'),
@@ -597,13 +597,6 @@ ADMIN_MENU = Menu(
                             permissions=(),
                         ),
                     ),
-                ),
-                MenuItem(
-                    link='organization:customer_tenant_list',
-                    link_text=_('Customer Tenants'),
-                    permissions=(),
-                    condition=_can_admin_provider,
-                    buttons=(),
                 ),
                 MenuItem(
                     link='organization:technician_quick_add',

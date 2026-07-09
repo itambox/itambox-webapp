@@ -53,3 +53,45 @@ def validate_permission_grant(granting_user, permissions, container):
             _("Privilege escalation detected: you cannot grant permissions you do "
               "not hold: %(perms)s") % {'perms': ', '.join(escalated)}
         )
+
+
+def validate_group_membership_grant(granting_user, group):
+    """Raise ``ValidationError`` if adding a member to ``group`` would let
+    ``granting_user`` confer permissions they do not themselves hold.
+
+    Adding a user to a UserGroup is a grant: the user inherits every role the group
+    carries, plus access to each role's container. So for each role the group carries,
+    the granting user must already hold every one of that role's permissions in the
+    role's OWN container (``role.owner`` — the role's tenant OR provider). Each role is
+    validated independently and the failures are aggregated into one message.
+
+    Superusers and an absent granting user are no-ops (trusted / nothing to check).
+    """
+    if granting_user is None:
+        return
+    if getattr(granting_user, 'is_superuser', False):
+        return
+
+    # Resolve the group's roles tenant-context-independently. For a PERSISTED UserGroup,
+    # ``group.roles.all()`` goes through Role's default (tenant-scoping) manager, which — in a
+    # global/provider context with no matching active tenant (the normal state for a group
+    # admin) — silently returns [], so the guard would iterate nothing and let an
+    # over-privileged grant slip through. Query via Role._base_manager on the M2M reverse
+    # relation instead (tenant-context-independent). The transient ``_RolesHolder`` shim used
+    # by the create/edit form has no pk; its roles already come from Role._base_manager, so use
+    # them directly.
+    # inline import: avoid AppRegistryNotReady at module load.
+    from organization.models import Role
+    if getattr(group, 'pk', None) is not None:
+        roles = Role._base_manager.filter(user_groups=group, deleted_at__isnull=True)
+    else:
+        roles = group.roles.all()
+
+    errors = []
+    for role in roles:
+        try:
+            validate_permission_grant(granting_user, role.permissions or [], role.owner)
+        except ValidationError as exc:
+            errors.extend(exc.messages)
+    if errors:
+        raise ValidationError(errors)

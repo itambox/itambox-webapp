@@ -42,6 +42,7 @@ from .role_views import (
 from .membership_views import (
     MembershipListView, MembershipDetailView, MembershipCreateView, MembershipEditView,
     MembershipDeleteView, MembershipBulkEditView, MembershipBulkDeleteView,
+    MembershipSendResetView,
 )
 from .costcenter_views import (
     CostCenterListView, CostCenterDetailView, CostCenterEditView, CostCenterDeleteView,
@@ -50,6 +51,5 @@ from .costcenter_views import (
 from .provider_views import (
     ProviderAdminMixin,
     ProviderListView, ProviderDetailView, ProviderEditView, ProviderDeleteView,
-    CustomerTenantListView,
     TechnicianQuickAddView,
 )

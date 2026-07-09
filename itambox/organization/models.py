@@ -466,9 +466,9 @@ from django.db import transaction
 #
 # Roles and Memberships replace the prior six-model tangle (TenantRole,
 # ProviderRole, ProviderRoleTemplate, TenantMembership, ProviderMembership,
-# UserGroup-roles-pointer). They are differentiated by ``scope`` / ``person_type``
-# rather than by separate models, so one form, one view, one auth-backend path
-# covers every case.
+# UserGroup-roles-pointer). They are differentiated by their container FK pair
+# (``Role.scope`` / a Membership's tenant-vs-provider) rather than by separate models,
+# so one form, one view, one auth-backend path covers every case.
 # ---------------------------------------------------------------------------
 
 class Role(AutoSlugMixin, StandardModel, SoftDeleteMixin):
@@ -589,8 +589,9 @@ class Role(AutoSlugMixin, StandardModel, SoftDeleteMixin):
     # writes — incompatible with this codebase's deliberate design:
     #   * RoleForm drops unknown codenames and only offers provider capabilities (manage_*)
     #     on provider-scoped roles;
-    #   * MembershipBackend strips ``organization.manage_*`` from the provider→tenant
-    #     projection (so a stray capability cannot project across tenants);
+    #   * the provider→tenant projection strips ``organization.manage_*`` via
+    #     ``Membership.project_permissions_for_tenant`` (so a stray capability cannot
+    #     project across tenants);
     #   * ``validate_role_permissions`` audits persisted stale codenames post-hoc — and the
     #     seed deliberately grants the full permission set to the tenant Administrator role.
     # Real write-time integrity belongs in a future ManyToManyField(auth.Permission) migration,
@@ -610,38 +611,39 @@ class Role(AutoSlugMixin, StandardModel, SoftDeleteMixin):
 
 
 class Membership(ChangeLoggingMixin, models.Model):
-    """A user's binding to either a Tenant or a Provider, with a person type.
+    """A user's binding to either a Tenant or a Provider.
 
-    ``person_type`` distinguishes the two user kinds an admin thinks about:
+    The container FK pair is the *sole* discriminator of the two user kinds an admin
+    thinks about — there is no separate ``person_type`` column:
 
-      - ``staff``   — MSP technician (set on a ``provider``-scoped membership)
-      - ``member``  — tenant user (set on a ``tenant``-scoped membership)
+      - **Provider staff** (MSP technician) — a ``provider``-scoped membership
+        (``provider`` set, ``tenant`` null); ``is_provider_staff`` / ``kind == 'staff'``.
+      - **Tenant member** — a ``tenant``-scoped membership (``tenant`` set, ``provider``
+        null); ``kind == 'member'``.
 
-    Login capability is a property of the ``User`` (a no-login asset holder is just an
-    ``AssetHolder`` with no Membership), not of the Membership.
+    Exactly one of ``tenant`` / ``provider`` is set (enforced by a CheckConstraint).
+    Login capability is a property of the ``User`` (``can_login``), not of the Membership.
 
-    For ``staff`` memberships, ``tenant_scope`` decides which of the provider's tenants
-    the staff member reaches: ``explicit`` → ``assigned_tenants`` only,
+    For provider-staff memberships, ``tenant_scope`` decides which of the provider's
+    tenants the staff member reaches: ``explicit`` → ``assigned_tenants`` only,
     ``tenant_group`` → ``scope_group`` and descendants, ``all`` → every provider tenant.
     """
     # Provider memberships have no tenant of their own; tenant memberships do.
     # ChangeLoggingMixin must accept tenant=None entries for the former.
     changelog_global = True
 
-    PERSON_STAFF = 'staff'
-    PERSON_MEMBER = 'member'
-    PERSON_CHOICES = [
-        (PERSON_STAFF, _('Provider staff')),
-        (PERSON_MEMBER, _('Member')),
-    ]
+    # "staff vs member" is derived from the FK pair (see ``kind``); these constants only
+    # label the two kinds for display/report code, not a stored discriminator.
+    KIND_STAFF = 'staff'
+    KIND_MEMBER = 'member'
 
     SCOPE_EXPLICIT = 'explicit'
     SCOPE_TENANT_GROUP = 'tenant_group'
     SCOPE_ALL = 'all'
     SCOPE_CHOICES = [
-        (SCOPE_EXPLICIT, _('Explicit (assigned tenants only)')),
-        (SCOPE_TENANT_GROUP, _('Tenant group')),
-        (SCOPE_ALL, _('All provider tenants')),
+        (SCOPE_EXPLICIT, _('Specific tenants')),
+        (SCOPE_TENANT_GROUP, _('A tenant group + its descendants')),
+        (SCOPE_ALL, _("All of the provider's tenants")),
     ]
 
     user = models.ForeignKey(
@@ -650,7 +652,7 @@ class Membership(ChangeLoggingMixin, models.Model):
         related_name='memberships',
         verbose_name=_("User"),
     )
-    # Exactly one of these is set; matched by CheckConstraint to person_type.
+    # Exactly one of these is set (CheckConstraint); the populated FK *is* the kind.
     tenant = models.ForeignKey(
         'organization.Tenant',
         on_delete=models.CASCADE,
@@ -666,13 +668,6 @@ class Membership(ChangeLoggingMixin, models.Model):
         blank=True, null=True,
         db_index=True,
         verbose_name=_("Provider"),
-    )
-    person_type = models.CharField(
-        max_length=20,
-        choices=PERSON_CHOICES,
-        default=PERSON_MEMBER,
-        db_index=True,
-        verbose_name=_("Person type"),
     )
     roles = models.ManyToManyField(
         'organization.Role',
@@ -712,8 +707,16 @@ class Membership(ChangeLoggingMixin, models.Model):
     # Per-container activation. False = the user is suspended in THIS tenant/provider
     # (e.g. SCIM ``active=false``) but the row, roles, and any AssetHolder linkage are
     # retained for re-activation. Access gates treat an inactive membership as "not a
-    # member". The global ``User.is_active`` is cleared only when the user has NO active
-    # membership anywhere.
+    # member".
+    #
+    # NOTE: the global ``User.is_active`` / ``User.can_login`` is synced from memberships
+    # ONLY by the SCIM provisioning paths (``users/api/scim/views.py`` and
+    # ``users/api/scim/provider_views.py``), which clear it when a provisioned user has no
+    # active membership left. The interactive UI does NOT auto-clear it: a user whose last
+    # membership is deactivated by an admin stays authenticated (and keeps any API tokens),
+    # but on login lands on a "no accessible workspace" page (see
+    # ``organization/views/dashboard`` + ``templates/registration/no_workspace.html``)
+    # rather than a broken, permission-less dashboard.
     is_active = models.BooleanField(default=True, db_index=True, verbose_name=_("Active"))
     joined_at = models.DateTimeField(auto_now_add=True)
 
@@ -722,13 +725,13 @@ class Membership(ChangeLoggingMixin, models.Model):
         verbose_name = _("Membership")
         verbose_name_plural = _("Memberships")
         constraints = [
-            # Container/person_type consistency: staff↔provider, member↔tenant.
+            # Exactly one container: provider (⇒ staff) XOR tenant (⇒ member).
             models.CheckConstraint(
                 check=(
-                    (models.Q(person_type='staff') & models.Q(provider__isnull=False) & models.Q(tenant__isnull=True))
-                    | (models.Q(person_type='member') & models.Q(tenant__isnull=False) & models.Q(provider__isnull=True))
+                    (models.Q(tenant__isnull=False) & models.Q(provider__isnull=True))
+                    | (models.Q(tenant__isnull=True) & models.Q(provider__isnull=False))
                 ),
-                name='organization_membership_scope_consistency',
+                name='organization_membership_exactly_one_container',
             ),
             models.UniqueConstraint(
                 fields=['user', 'tenant'],
@@ -746,7 +749,7 @@ class Membership(ChangeLoggingMixin, models.Model):
         if self.provider_id:
             return f"{self.user} @ {self.provider} (provider staff)"
         if self.tenant_id:
-            return f"{self.user} @ {self.tenant} ({self.get_person_type_display()})"
+            return f"{self.user} @ {self.tenant} ({self.get_kind_display()})"
         return f"{self.user} (unbound membership)"
 
     def get_absolute_url(self):
@@ -759,17 +762,109 @@ class Membership(ChangeLoggingMixin, models.Model):
 
     @property
     def is_provider_staff(self):
-        return self.person_type == self.PERSON_STAFF
+        """A membership bound to a Provider is, by definition, provider staff."""
+        return self.provider_id is not None
+
+    @property
+    def kind(self):
+        """``'staff'`` if bound to a provider, else ``'member'`` — derived from the FK."""
+        return self.KIND_STAFF if self.provider_id else self.KIND_MEMBER
+
+    def get_kind_display(self):
+        """Human label for ``kind`` (mirrors Django's ``get_<field>_display`` ergonomics)."""
+        return _("Provider staff (technician)") if self.provider_id else _("Tenant member")
 
     def save(self, *args, **kwargs):
-        # Auto-pick person_type from the populated FK on first save when the caller didn't
-        # set it. Provider FK ⇒ staff; tenant FK ⇒ keep the supplied person_type or default
-        # to ``member``. The CheckConstraint still enforces consistency between the two.
-        if self.provider_id and not self.tenant_id and self.person_type != self.PERSON_STAFF:
-            self.person_type = self.PERSON_STAFF
-            if not self.tenant_scope:
-                self.tenant_scope = self.SCOPE_EXPLICIT
+        # A provider-staff membership always needs a tenant_scope; default it on first save
+        # when the caller bound a provider but left the scope blank. Provider/tenant XOR is
+        # enforced by the CheckConstraint, so no discriminator field needs deriving here.
+        if self.provider_id and not self.tenant_id and not self.tenant_scope:
+            self.tenant_scope = self.SCOPE_EXPLICIT
         super().save(*args, **kwargs)
+
+    # ------------------------------------------------------------------ RBAC projection
+    # These three methods are the CANONICAL source of truth for provider-staff tenant
+    # reachability and for the provider→tenant permission projection. Every other place
+    # that used to re-implement the ``tenant_scope`` branching or the ``manage_*`` strip
+    # (``core.auth.MembershipBackend``, ``organization.access``, ``organization.signals``)
+    # now delegates here — do NOT hand-copy this logic elsewhere.
+    #
+    # Provider-level capabilities (``organization.manage_*``) never grant inside a tenant,
+    # so they are stripped whenever provider-scoped role permissions project into tenant
+    # context. This prefix is the invariant those methods enforce.
+    MANAGE_CAPABILITY_PREFIX = 'organization.manage_'
+
+    def covers_tenant(self, tenant):
+        """Whether ``tenant`` falls within this provider-staff membership's tenant scope.
+
+        Provider-staff only (a tenant membership never "covers" other tenants).
+        ``all`` → any tenant of the provider; ``tenant_group`` → the tenant's group is the
+        scope group or a descendant; ``explicit`` (default) → tenant in ``assigned_tenants``.
+        """
+        if not self.provider_id:
+            return False
+        # A staff membership only ever covers tenants of its OWN provider. Without this guard
+        # SCOPE_ALL / SCOPE_TENANT_GROUP would answer True for a foreign provider's tenant that
+        # merely shares a group id — a cross-provider leak. Keeps this canonical helper in step
+        # with scoped_tenant_ids (which filters provider_id in every branch).
+        if tenant.provider_id != self.provider_id:
+            return False
+        scope = self.tenant_scope or self.SCOPE_EXPLICIT
+        if scope == self.SCOPE_ALL:
+            return True
+        if scope == self.SCOPE_TENANT_GROUP:
+            if not self.scope_group_id or not tenant.group_id:
+                return False
+            # inline import: avoid an organization.models <-> organization.access cycle at load
+            from organization.access import get_descendant_tenant_group_ids
+            return tenant.group_id in get_descendant_tenant_group_ids(self.scope_group_id)
+        return self.assigned_tenants.filter(pk=tenant.pk).exists()
+
+    def scoped_tenant_ids(self):
+        """The set of tenant ids this provider-staff membership can reach.
+
+        Set-based counterpart to :meth:`covers_tenant` — used where callers need the whole
+        reachable set at once (e.g. the tenant switcher) rather than testing one tenant.
+        Returns an empty set for tenant memberships or when the scope resolves to nothing.
+        """
+        if not self.provider_id:
+            return set()
+        # inline import: avoid an organization.models <-> organization.access cycle at load
+        from organization.models import Tenant
+
+        scope = self.tenant_scope or self.SCOPE_EXPLICIT
+        if scope == self.SCOPE_ALL:
+            return set(
+                Tenant._base_manager.filter(provider_id=self.provider_id)
+                .values_list('pk', flat=True)
+            )
+        if scope == self.SCOPE_TENANT_GROUP:
+            if not self.scope_group_id:
+                return set()
+            from organization.access import get_descendant_tenant_group_ids
+            group_ids = get_descendant_tenant_group_ids(self.scope_group_id)
+            return set(
+                Tenant._base_manager.filter(
+                    provider_id=self.provider_id, group_id__in=group_ids,
+                ).values_list('pk', flat=True)
+            )
+        return set(
+            self.assigned_tenants.filter(provider_id=self.provider_id)
+            .values_list('pk', flat=True)
+        )
+
+    @classmethod
+    def project_permissions_for_tenant(cls, perm_iterable):
+        """Project provider-scoped role permissions into tenant context.
+
+        Drops ``organization.manage_*`` capabilities (they are provider-level and never
+        grant inside a tenant) and returns the remaining codenames as a list. ``None``
+        entries in the iterable are treated as empty.
+        """
+        return [
+            p for p in (perm_iterable or [])
+            if not p.startswith(cls.MANAGE_CAPABILITY_PREFIX)
+        ]
 
 
 class TenantInvitation(ChangeLoggingMixin, models.Model):
@@ -918,11 +1013,30 @@ def accept_invitation(invitation, user):
     if not invitation.is_valid:
         raise ValidationError(_("This invitation has expired or has already been accepted."))
 
-    # 1. Create the tenant membership (logged-in member, not a contact)
+    # Accept-time escalation re-check (defence in depth): the invite form already guards the
+    # role grant at issuance, but roles/permissions can change between issue and accept, and the
+    # inviter may have lost privileges since. Re-validate the role's permissions against the
+    # inviter's CURRENT effective perms in the tenant; reject if they can no longer grant it.
+    # inline import: core.auth.guards -> core.auth -> organization would cycle at module load.
+    from core.auth.guards import validate_permission_grant
+    if invitation.role is not None:
+        # Fail CLOSED when the inviter no longer exists (invited_by is SET_NULL): total
+        # privilege loss is the strongest case this re-check must catch, but
+        # validate_permission_grant treats a None granting user as a trusted no-op, so guard
+        # it explicitly rather than letting the grant through unverified.
+        if invitation.invited_by is None:
+            raise ValidationError(_(
+                "This invitation can no longer be accepted because the person who issued "
+                "it no longer has an account. Please request a new invitation."
+            ))
+        validate_permission_grant(
+            invitation.invited_by, invitation.role.permissions or [], invitation.tenant,
+        )
+
+    # 1. Create the tenant membership (a tenant member — provider is null)
     membership = Membership.objects.create(
         user=user,
         tenant=invitation.tenant,
-        person_type=Membership.PERSON_MEMBER,
     )
     membership.roles.add(invitation.role)
 
@@ -979,7 +1093,7 @@ class Provider(AutoSlugMixin, StandardModel, SoftDeleteMixin):
         verbose_name_plural = _("Providers")
         permissions = [
             # Provider-level capabilities. Held via a provider-scoped Role attached to a
-            # ``person_type='staff'`` Membership. Gated with ``user.has_perm('organization.<cap>')``.
+            # provider-staff Membership. Gated with ``user.has_perm('organization.<cap>')``.
             ('manage_provider', 'Can manage provider settings'),
             ('manage_tenants', 'Can manage customer tenants under a provider'),
             ('manage_staff', 'Can manage provider staff'),

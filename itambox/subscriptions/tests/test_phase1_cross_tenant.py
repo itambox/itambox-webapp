@@ -36,14 +36,14 @@ class SubscriptionAssignmentCrossTenantTests(TestCase):
         self.role_a = Role.objects.create(
             tenant=self.tenant_a, name='Admin', permissions=list(ASSIGNMENT_PERMS)
         )
-        _membership_a = Membership.objects.create(person_type=Membership.PERSON_MEMBER, user=self.user_a, tenant=self.tenant_a)
+        _membership_a = Membership.objects.create(user=self.user_a, tenant=self.tenant_a)
         _membership_a.roles.add(self.role_a)
 
         # Tenant B membership/role (same perms — block must be from scoping, not perms)
         self.role_b = Role.objects.create(
             tenant=self.tenant_b, name='Admin', permissions=list(ASSIGNMENT_PERMS)
         )
-        _membership_b = Membership.objects.create(person_type=Membership.PERSON_MEMBER, user=self.user_b, tenant=self.tenant_b)
+        _membership_b = Membership.objects.create(user=self.user_b, tenant=self.tenant_b)
         _membership_b.roles.add(self.role_b)
 
         # Shared metadata

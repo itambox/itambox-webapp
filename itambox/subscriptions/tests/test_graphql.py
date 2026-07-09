@@ -44,7 +44,7 @@ class SubscriptionsGraphQLTestCase(TestCase):
                 'assets.view_asset', 'assets.add_asset',
             ],
         )
-        membership = Membership.objects.create(person_type=Membership.PERSON_MEMBER, user=self.user, tenant=self.tenant)
+        membership = Membership.objects.create(user=self.user, tenant=self.tenant)
         membership.roles.add(role)
 
         # Set thread-local tenant context for models creation

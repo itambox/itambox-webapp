@@ -231,7 +231,7 @@ class ExportTemplateTenantIsolationTests(TestCase):
             permissions=['assets.view_asset', 'extras.view_exporttemplate'],
         )
         self.member = User.objects.create_user(username='iso-member', password='pw')
-        m = Membership.objects.create(person_type=Membership.PERSON_MEMBER, user=self.member, tenant=self.tenant_a)
+        m = Membership.objects.create(user=self.member, tenant=self.tenant_a)
         m.roles.add(role)
 
         status = StatusLabel.objects.create(name='Active', slug='active')

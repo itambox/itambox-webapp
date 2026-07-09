@@ -38,7 +38,7 @@ def _superuser(username):
 
 
 def _membership(user, tenant, roles=None):
-    m = Membership.objects.create(person_type=Membership.PERSON_MEMBER, user=user, tenant=tenant, is_active=True)
+    m = Membership.objects.create(user=user, tenant=tenant, is_active=True)
     if roles:
         m.roles.set(roles)
     return m

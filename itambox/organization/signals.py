@@ -131,7 +131,9 @@ def instantiate_default_provider_roles(sender, instance, created, **kwargs):
             scope=Role.SCOPE_TENANT, tenant=instance, name=src.name,
             defaults={
                 'description': src.description,
-                'permissions': [p for p in (src.permissions or []) if not p.startswith('organization.manage_')],
+                # Strip provider capabilities (organization.manage_*) via the canonical
+                # helper — they never grant inside a tenant. See Membership for the source.
+                'permissions': Membership.project_permissions_for_tenant(src.permissions),
                 'slug': f'{src.slug}-{instance.slug}'[:100] if src.slug else None,
             },
         )

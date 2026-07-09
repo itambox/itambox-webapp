@@ -91,7 +91,7 @@ class EventsSystemTestCase(TransactionTestCase):
         tenant_a = Tenant.objects.create(name="Tenant A", slug="tenant-a")
         tenant_b = Tenant.objects.create(name="Tenant B", slug="tenant-b")
         member_a = get_user_model().objects.create_user(username='member_a', password='pw')
-        m_a = Membership.objects.create(person_type=Membership.PERSON_MEMBER, user=member_a, tenant=tenant_a)
+        m_a = Membership.objects.create(user=member_a, tenant=tenant_a)
         m_a.roles.add(Role.objects.create(tenant=tenant_a, name='R', permissions=[]))
         loc_ct = ContentType.objects.get_for_model(Location)
 

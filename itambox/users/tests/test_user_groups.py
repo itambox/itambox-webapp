@@ -44,7 +44,7 @@ def _superuser(username):
 
 
 def _membership(user, tenant, roles=None, direct=None, active=True):
-    m = Membership.objects.create(person_type=Membership.PERSON_MEMBER, user=user, tenant=tenant, is_active=active, direct_permissions=direct or [],
+    m = Membership.objects.create(user=user, tenant=tenant, is_active=active, direct_permissions=direct or [],
     )
     if roles:
         m.roles.set(roles)
@@ -414,21 +414,11 @@ class MembershipDirectPermissionsTests(_PermCacheMixin, TestCase):
         set_current_tenant(self.t); set_current_membership(self.target_m); self._flush(self.target)
         self.assertTrue(self.target.has_perm("assets.view_asset"))
 
-    def test_membership_form_escalation_on_direct_permissions(self):
-        from organization.forms import MembershipForm as TenantMembershipForm
-        set_current_tenant(self.t); set_current_membership(self.limited_m); self._flush(self.limited)
-        data = {'user': self.target.pk, 'tenant': self.t.pk, 'direct_permissions': ["assets.delete_asset"]}
-        form = TenantMembershipForm(data=data, instance=self.target_m, user=self.limited, tenant=self.t)
-        self.assertFalse(form.is_valid())
-        errs = ' '.join(e for el in form.errors.values() for e in el).lower()
-        self.assertIn("escalation", errs)
-
-    def test_superuser_assigns_direct_permissions_freely(self):
-        from organization.forms import MembershipForm as TenantMembershipForm
-        set_current_tenant(self.t)
-        data = {'user': self.target.pk, 'tenant': self.t.pk, 'direct_permissions': ["assets.delete_asset"]}
-        form = TenantMembershipForm(data=data, instance=self.target_m, user=self.superuser, tenant=self.t)
-        self.assertTrue(form.is_valid(), form.errors)
+    # NOTE: the form-level ``direct_permissions`` tests were removed with fix #4 (§3-D): the
+    # raw-JSON ``direct_permissions`` textarea no longer exists on MembershipForm (the model
+    # column and the backend that reads it are retained — see test_direct_permissions_resolve
+    # above). Role-based escalation on the form is covered by
+    # organization/tests/test_membership_form_no_json.py and test_escalation_surface.py.
 
 
 # --------------------------------------------------------------------------- per-request cache

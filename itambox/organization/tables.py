@@ -110,6 +110,7 @@ class TenantTable(BaseTable):
     pk = ToggleColumn(accessor='pk')
     name = tables.LinkColumn('organization:tenant_detail', args=[A('pk')], verbose_name=_('Name'))
     group = tables.LinkColumn('organization:tenantgroup_detail', args=[A('group_id')], accessor='group')
+    provider = tables.LinkColumn('organization:provider_detail', args=[A('provider_id')], accessor='provider', verbose_name=_('Provider'))
     site_count = CountLinkColumn('organization:site_list', 'tenant', verbose_name=_('Sites'), orderable=False)
     location_count = CountLinkColumn('organization:location_list', 'tenant', verbose_name=_('Locations'), orderable=False)
     tags = TagColumn(url_name='organization:tenant_list')
@@ -117,8 +118,8 @@ class TenantTable(BaseTable):
 
     class Meta(BaseTable.Meta):
         model = Tenant
-        fields = ('pk', 'name', 'slug', 'group', 'description', 'site_count', 'location_count', 'tags', 'actions')
-        default_columns = ('pk', 'name', 'group', 'site_count', 'location_count', 'tags', 'actions')
+        fields = ('pk', 'name', 'slug', 'group', 'provider', 'description', 'site_count', 'location_count', 'tags', 'actions')
+        default_columns = ('pk', 'name', 'group', 'provider', 'site_count', 'location_count', 'tags', 'actions')
 
 
 # --- AssetHolder Table ---
@@ -235,7 +236,7 @@ class ContactAssignmentTable(BaseTable):
 class RoleTable(BaseTable):
     pk = ToggleColumn(accessor='pk')
     name = tables.LinkColumn('organization:role_detail', args=[A('pk')], verbose_name=_('Name'))
-    scope = tables.Column(verbose_name=_('Scope'))
+    kind = tables.Column(verbose_name=_('Kind'), accessor='scope', orderable=True, empty_values=())
     container = tables.Column(verbose_name=_('Owner'), accessor='owner', orderable=False)
     description = tables.Column()
     member_count = tables.Column(verbose_name=_('Members'), orderable=True, empty_values=[])
@@ -243,11 +244,13 @@ class RoleTable(BaseTable):
 
     class Meta(BaseTable.Meta):
         model = Role
-        fields = ('pk', 'name', 'scope', 'container', 'description', 'member_count', 'actions')
-        default_columns = ('pk', 'name', 'scope', 'container', 'description', 'member_count', 'actions')
+        fields = ('pk', 'name', 'kind', 'container', 'description', 'member_count', 'actions')
+        default_columns = ('pk', 'name', 'kind', 'container', 'description', 'member_count', 'actions')
 
-    def render_scope(self, value, record):
-        return record.get_scope_display()
+    def render_kind(self, record):
+        if record.scope == Role.SCOPE_PROVIDER:
+            return format_html('<span class="badge bg-purple-lt text-purple">{}</span>', _('Provider role'))
+        return format_html('<span class="badge bg-blue-lt text-blue">{}</span>', _('Tenant role'))
 
     def render_container(self, value, record):
         owner = record.owner
@@ -264,7 +267,7 @@ class RoleTable(BaseTable):
 class MembershipTable(BaseTable):
     pk = ToggleColumn(accessor='pk')
     user = tables.LinkColumn('users:user_detail', args=[A('user.pk')], verbose_name=_('User'))
-    person_type = tables.Column(verbose_name=_('Type'))
+    kind = tables.Column(verbose_name=_('Kind'), accessor='kind', orderable=False, empty_values=())
     container = tables.Column(verbose_name=_('Container'), accessor='container', orderable=False)
     roles = tables.Column(verbose_name=_('Roles'), orderable=False)
     is_active = tables.BooleanColumn(verbose_name=_('Active'))
@@ -273,11 +276,13 @@ class MembershipTable(BaseTable):
 
     class Meta(BaseTable.Meta):
         model = Membership
-        fields = ('pk', 'user', 'person_type', 'container', 'roles', 'is_active', 'joined_at', 'actions')
-        default_columns = ('pk', 'user', 'person_type', 'container', 'roles', 'is_active', 'joined_at', 'actions')
+        fields = ('pk', 'user', 'kind', 'container', 'roles', 'is_active', 'joined_at', 'actions')
+        default_columns = ('pk', 'user', 'kind', 'container', 'roles', 'is_active', 'joined_at', 'actions')
 
-    def render_person_type(self, value, record):
-        return record.get_person_type_display()
+    def render_kind(self, record):
+        if record.provider_id:
+            return format_html('<span class="badge bg-purple-lt text-purple">{}</span>', _('Provider staff'))
+        return format_html('<span class="badge bg-blue-lt text-blue">{}</span>', _('Tenant member'))
 
     def render_container(self, value, record):
         owner = record.container

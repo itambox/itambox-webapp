@@ -23,7 +23,7 @@ class AttachmentCrossTenantIDORTests(TestCase):
         self.asset_a = Asset.objects.create(name='AA', asset_tag='ATT-A', status=self.status, tenant=self.tenant_a)
         self.asset_b = Asset.objects.create(name='BB', asset_tag='ATT-B', status=self.status, tenant=self.tenant_b)
         self.user = User.objects.create_user(username='attuser', password='pw')
-        m = Membership.objects.create(person_type=Membership.PERSON_MEMBER, user=self.user, tenant=self.tenant_a)
+        m = Membership.objects.create(user=self.user, tenant=self.tenant_a)
         m.roles.add(Role.objects.create(tenant=self.tenant_a, name='R', permissions=['assets.view_asset']))
         ct = ContentType.objects.get_for_model(Asset)
         self.file_b = FileAttachment.objects.create(

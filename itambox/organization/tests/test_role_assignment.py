@@ -15,7 +15,7 @@ def _make_role(tenant, name, perms=None):
 
 
 def _make_membership(user, tenant, role=None):
-    m = Membership.objects.create(person_type=Membership.PERSON_MEMBER, user=user, tenant=tenant)
+    m = Membership.objects.create(user=user, tenant=tenant)
     if role is not None:
         m.roles.add(role)
     return m

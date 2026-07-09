@@ -12,7 +12,17 @@
 <div class="row">
     <div class="col-md-6 mb-3">
         <label class="form-label text-muted">{% translate "Name" %}</label>
-        <div class="fw-bold fs-3 text-dark">{{ object.name }}</div>
+        <div class="fw-bold fs-3 text-dark">
+            {{ object.name }}
+            {% if object.scope == 'provider' %}
+            <span class="badge bg-purple-lt text-purple align-middle ms-2"><i class="mdi mdi-domain me-1"></i>{% translate "Provider role" %}</span>
+            {% else %}
+            <span class="badge bg-blue-lt text-blue align-middle ms-2"><i class="mdi mdi-office-building me-1"></i>{% translate "Tenant role" %}</span>
+            {% endif %}
+        </div>
+        <div class="text-muted small mt-1">
+            {% if object.owner %}<a href="{{ object.owner.get_absolute_url }}">{{ object.owner }}</a>{% endif %}
+        </div>
     </div>
     <div class="col-md-6 mb-3">
         <label class="form-label text-muted">{% translate "Description" %}</label>
@@ -134,5 +144,31 @@
 {% endif %}
 {% else %}
 <p class="text-muted"><em>{% translate "This role has no permissions." %}</em></p>
+{% endif %}
+
+{% if object.scope == 'provider' %}
+<hr class="my-4">
+<h4 class="card-title text-primary mb-3">{% translate "Provider capabilities" %}</h4>
+<p class="text-muted mb-3 small">
+    {% translate "MSP-level capabilities that apply to the provider organization itself. These never project into customer tenants." %}
+</p>
+<div class="row">
+    {% for codename, label in provider_capabilities %}
+    <div class="col-md-6 mb-3">
+        <div class="card card-sm border shadow-none bg-transparent">
+            <div class="card-body d-flex align-items-center">
+                {% with full="organization."|add:codename %}
+                {% if full in object.permissions %}
+                <span class="badge bg-success text-success-fg me-3"><i class="mdi mdi-check"></i></span>
+                {% else %}
+                <span class="badge bg-secondary-lt text-muted me-3"><i class="mdi mdi-close"></i></span>
+                {% endif %}
+                {% endwith %}
+                <div><strong>{{ label }}</strong></div>
+            </div>
+        </div>
+    </div>
+    {% endfor %}
+</div>
 {% endif %}
 {% endblock object_details %}

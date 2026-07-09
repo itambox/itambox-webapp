@@ -159,14 +159,59 @@ class TenantGroupFilterSet(BaseOrgFilterSet):
         fields = ['name', 'parent']
 
 # --- Tenant Filter ---
+def _tenant_filter_provider_queryset(request):
+    """Per-request queryset for the tenant list's ``provider`` filter dropdown.
+
+    A static unscoped queryset would render EVERY MSP's name into the filter form for any
+    authenticated user who can reach the tenant list — a (minor) cross-MSP enumeration leak.
+    Scope it: superuser sees all; otherwise only providers relevant to the user (the provider
+    of a tenant they can access, or a provider they hold ``manage_provider`` on). Ordinary
+    tenant users see none (they can still use the boolean "Managed by a provider" filter).
+    """
+    user = getattr(request, 'user', None)
+    if not (user and getattr(user, 'is_authenticated', False)):
+        return Provider._base_manager.none()
+    if user.is_superuser:
+        return Provider._base_manager.filter(deleted_at__isnull=True)
+    # inline import: organization.access imports organization.models; a module-top import here
+    # risks an import cycle during app loading.
+    from organization.access import accessible_tenant_ids
+    provider_ids = set(
+        Tenant._base_manager.filter(
+            pk__in=accessible_tenant_ids(user), provider__isnull=False,
+        ).values_list('provider_id', flat=True)
+    )
+    provider_ids |= {
+        p.pk for p in Provider._base_manager.filter(deleted_at__isnull=True)
+        if user.has_perm('organization.manage_provider', obj=p)
+    }
+    return Provider._base_manager.filter(pk__in=provider_ids, deleted_at__isnull=True)
+
+
 class TenantFilterSet(BaseOrgFilterSet):
     group = django_filters.ModelChoiceFilter(
         queryset=lambda request: TenantGroup.objects.all(),
         widget=forms.Select(attrs={'class': 'form-select'})
     )
+    managed_by_provider = django_filters.BooleanFilter(
+        field_name='provider',
+        lookup_expr='isnull',
+        exclude=True,
+        label=_('Managed by a provider'),
+        widget=forms.Select(
+            choices=[('', _('Any')), ('true', _('Yes')), ('false', _('No'))],
+            attrs={'class': 'form-select'},
+        ),
+    )
+    provider = django_filters.ModelChoiceFilter(
+        queryset=_tenant_filter_provider_queryset,
+        label=_('Provider'),
+        widget=forms.Select(attrs={'class': 'form-select'}),
+    )
+
     class Meta:
         model = Tenant
-        fields = ['name', 'group']
+        fields = ['name', 'group', 'managed_by_provider', 'provider']
 
     # Override default search for Tenant
     def search(self, queryset, name, value):
@@ -270,7 +315,11 @@ def _user_queryset(request):
 class RoleFilterSet(BaseOrgFilterSet):
     tag = None  # Role has no tags field
     scope = django_filters.ChoiceFilter(
-        choices=Role.SCOPE_CHOICES,
+        label=_('Kind'),
+        choices=[
+            (Role.SCOPE_TENANT, _('Tenant role')),
+            (Role.SCOPE_PROVIDER, _('Provider role')),
+        ],
         widget=forms.Select(attrs={'class': 'form-select'}),
     )
     tenant = django_filters.ModelChoiceFilter(
@@ -296,8 +345,15 @@ class RoleFilterSet(BaseOrgFilterSet):
 
 class MembershipFilterSet(BaseOrgFilterSet):
     tag = None
-    person_type = django_filters.ChoiceFilter(
-        choices=Membership.PERSON_CHOICES,
+    # "Kind" is derived from the container FK (provider ⇒ staff, tenant ⇒ member); there is
+    # no stored discriminator, so this is a method filter, not a model-field filter.
+    kind = django_filters.ChoiceFilter(
+        label=_('Kind'),
+        choices=[
+            (Membership.KIND_MEMBER, _('Tenant member')),
+            (Membership.KIND_STAFF, _('Provider staff (technician)')),
+        ],
+        method='filter_kind',
         widget=forms.Select(attrs={'class': 'form-select'}),
     )
     tenant = django_filters.ModelChoiceFilter(
@@ -325,7 +381,14 @@ class MembershipFilterSet(BaseOrgFilterSet):
 
     class Meta:
         model = Membership
-        fields = ['person_type', 'tenant', 'provider', 'roles', 'user', 'is_active']
+        fields = ['tenant', 'provider', 'roles', 'user', 'is_active']
+
+    def filter_kind(self, queryset, name, value):
+        if value == Membership.KIND_STAFF:
+            return queryset.filter(provider__isnull=False)
+        if value == Membership.KIND_MEMBER:
+            return queryset.filter(tenant__isnull=False)
+        return queryset
 
     def search(self, queryset, name, value):
         if not value.strip():

@@ -40,7 +40,7 @@ class SCIMProvisioningTests(TestCase):
         )
 
         # Create Tenant Memberships — create first, then add roles (no role= kwarg).
-        admin_membership = Membership.objects.create(person_type=Membership.PERSON_MEMBER, user=self.admin_user,
+        admin_membership = Membership.objects.create(user=self.admin_user,
             tenant=self.tenant,
         )
         admin_membership.roles.add(self.role_admin)
@@ -127,7 +127,7 @@ class SCIMProvisioningTests(TestCase):
 
         # Create another user in tenant to test filters — create membership, then add role.
         user2 = User.objects.create_user(username="user2", email="user2@acme.com")
-        m2 = Membership.objects.create(person_type=Membership.PERSON_MEMBER, user=user2, tenant=self.tenant)
+        m2 = Membership.objects.create(user=user2, tenant=self.tenant)
         m2.roles.add(self.role_member)
 
         # Total count is 2
@@ -225,7 +225,7 @@ class SCIMProvisioningTests(TestCase):
     def test_user_detail_put_patch_delete(self):
         # Create user — create membership, then add role.
         user = User.objects.create_user(username="testuser", email="test@acme.com")
-        m = Membership.objects.create(person_type=Membership.PERSON_MEMBER, user=user, tenant=self.tenant)
+        m = Membership.objects.create(user=user, tenant=self.tenant)
         m.roles.add(self.role_member)
         AssetHolder.objects.create(
             user=user, first_name="Test", last_name="User", upn="test@acme.com", email="test@acme.com", tenant=self.tenant
@@ -342,7 +342,7 @@ class SCIMProvisioningTests(TestCase):
     def test_filter_parsing_bracketed_emails(self):
         url = reverse('api:scim:user-list', kwargs={'tenant_slug': self.tenant.slug})
         user2 = User.objects.create_user(username="user2", email="user2@acme.com")
-        m2 = Membership.objects.create(person_type=Membership.PERSON_MEMBER, user=user2, tenant=self.tenant)
+        m2 = Membership.objects.create(user=user2, tenant=self.tenant)
         m2.roles.add(self.role_member)
 
         response = self.client.get(f"{url}?filter=emails[type eq \"work\"].value eq \"user2@acme.com\"", **self.auth_headers)
@@ -385,9 +385,9 @@ class SCIMProvisioningTests(TestCase):
         """WS1-3: a tenant-A SCIM token must NOT globally deactivate or rename a user who is
         also a member of tenant B (cross-tenant write on a shared principal)."""
         shared = User.objects.create_user(username="shared", email="shared@x.com", is_active=True)
-        Membership.objects.create(person_type=Membership.PERSON_MEMBER, user=shared, tenant=self.tenant)
+        Membership.objects.create(user=shared, tenant=self.tenant)
         other_role = Role.objects.create(tenant=self.other_tenant, name="Member", permissions=[])
-        other_m = Membership.objects.create(person_type=Membership.PERSON_MEMBER, user=shared, tenant=self.other_tenant)
+        other_m = Membership.objects.create(user=shared, tenant=self.other_tenant)
         other_m.roles.add(other_role)
 
         detail_url = reverse('api:scim:user-detail', kwargs={'tenant_slug': self.tenant.slug, 'pk': shared.id})
@@ -419,12 +419,12 @@ class SCIMProvisioningTests(TestCase):
         backend = TenantMembershipBackend()
 
         shared = User.objects.create_user(username="shared2", email="shared2@x.com", is_active=True)
-        m_this = Membership.objects.create(person_type=Membership.PERSON_MEMBER, user=shared, tenant=self.tenant)
+        m_this = Membership.objects.create(user=shared, tenant=self.tenant)
         m_this.roles.add(self.role_member)
         other_role = Role.objects.create(
             tenant=self.other_tenant, name="Member", permissions=["assets.view_asset"]
         )
-        m_other = Membership.objects.create(person_type=Membership.PERSON_MEMBER, user=shared, tenant=self.other_tenant)
+        m_other = Membership.objects.create(user=shared, tenant=self.other_tenant)
         m_other.roles.add(other_role)
 
         # Baseline: the membership grants access in this tenant.
@@ -463,7 +463,7 @@ class SCIMProvisioningTests(TestCase):
         """Control for WS1-3: a user whose ONLY membership is this tenant is still fully
         updatable (the guard must not over-block single-tenant users)."""
         solo = User.objects.create_user(username="solo", email="solo@acme.com", is_active=True)
-        m = Membership.objects.create(person_type=Membership.PERSON_MEMBER, user=solo, tenant=self.tenant)
+        m = Membership.objects.create(user=solo, tenant=self.tenant)
         m.roles.add(self.role_member)
         detail_url = reverse('api:scim:user-detail', kwargs={'tenant_slug': self.tenant.slug, 'pk': solo.id})
         put_payload = {
@@ -485,7 +485,7 @@ class SCIMProvisioningTests(TestCase):
         leak usernames."""
         foreign_role = Role.objects.create(tenant=self.other_tenant, name="Member", permissions=[])
         foreign_user = User.objects.create_user(username="foreignuser", email="foreign@other.com")
-        fm = Membership.objects.create(person_type=Membership.PERSON_MEMBER, user=foreign_user, tenant=self.other_tenant)
+        fm = Membership.objects.create(user=foreign_user, tenant=self.other_tenant)
         fm.roles.add(foreign_role)
 
         list_url = reverse('api:scim:group-list', kwargs={'tenant_slug': self.tenant.slug})

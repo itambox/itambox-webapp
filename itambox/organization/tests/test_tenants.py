@@ -240,7 +240,7 @@ class MultiTenantMembershipAndInvitationTests(TestCase):
 
     def test_tenant_membership_creation_and_string_representation(self):
         from organization.models import Membership
-        membership = Membership.objects.create(person_type=Membership.PERSON_MEMBER, user=self.user,
+        membership = Membership.objects.create(user=self.user,
             tenant=self.tenant_a,
         )
         membership.roles.add(self.role_member)
@@ -258,11 +258,21 @@ class MultiTenantMembershipAndInvitationTests(TestCase):
             tenant=self.tenant_a
         )
         self.assertIsNone(holder.user)
-        
+
+        # A real inviter who holds the granted role's permissions in the tenant: the
+        # accept-time escalation re-check (RBAC review #1) validates the granted role
+        # against the inviter's current perms and fails closed if invited_by is None.
+        inviter = User.objects.create_user(
+            username='inviter', email='inviter@example.com', password='password123'
+        )
+        inviter_membership = Membership.objects.create(user=inviter, tenant=self.tenant_a)
+        inviter_membership.roles.add(self.role_admin)
+
         invitation = TenantInvitation.objects.create(
             email="beate@example.com",
             tenant=self.tenant_a,
             role=self.role_admin,
+            invited_by=inviter,
             expires_at=timezone.now() + timezone.timedelta(days=7)
         )
         self.assertTrue(invitation.is_valid)
@@ -295,7 +305,7 @@ class MultiTenantMembershipAndInvitationTests(TestCase):
                 if attr.startswith('_perms_tenant_') or attr.startswith('_tenant_membership_'):
                     delattr(self.user, attr)
 
-        reader_mem = Membership.objects.create(person_type=Membership.PERSON_MEMBER, user=self.user,
+        reader_mem = Membership.objects.create(user=self.user,
             tenant=self.tenant_a,
         )
         reader_mem.roles.set([self.role_reader])
@@ -327,7 +337,7 @@ class MultiTenantMembershipAndInvitationTests(TestCase):
         from itambox.middleware import TenantMiddleware
         from django.test import RequestFactory
         
-        mem = Membership.objects.create(person_type=Membership.PERSON_MEMBER, user=self.user,
+        mem = Membership.objects.create(user=self.user,
             tenant=self.tenant_a,
         )
         mem.roles.add(self.role_member)

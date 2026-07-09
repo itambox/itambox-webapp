@@ -1,10 +1,14 @@
 """Views for the unified ``Membership`` model."""
 from django.contrib import messages
+from django.contrib.auth import get_user_model
+from django.contrib.auth.forms import PasswordResetForm
+from django.contrib.auth.mixins import LoginRequiredMixin
 from django.db import transaction
 from django.http import HttpResponseRedirect
-from django.shortcuts import redirect
+from django.shortcuts import get_object_or_404, redirect
 from django.urls import reverse, reverse_lazy
 from django.utils.translation import gettext_lazy as _
+from django.views import View
 
 from itambox.views.generic.utils import safe_return_url
 from itambox.views.generic import (
@@ -15,6 +19,8 @@ from ..models import Membership, Tenant, Provider
 from ..forms import MembershipForm, MembershipFilterForm, MembershipBulkRoleForm
 from ..tables import MembershipTable
 from ..filters import MembershipFilterSet
+
+User = get_user_model()
 
 
 class MembershipListView(ObjectListView):
@@ -38,15 +44,94 @@ class MembershipDetailView(ObjectDetailView):
     template_name = 'organization/memberships/membership_detail.html'
 
 
+class _SetInitialOrResetPasswordForm(PasswordResetForm):
+    """``PasswordResetForm`` that also serves accounts with an unusable password.
+
+    Stock ``PasswordResetForm.get_users()`` drops users whose password is unusable — but
+    onboarding creates staff with ``set_unusable_password()``, so the stock form would
+    silently email nobody. Onboarded staff are exactly who this action must reach (to set an
+    initial password), so include unusable-password users; keep the ``is_active`` filter.
+    """
+
+    def get_users(self, email):
+        email_field_name = User.get_email_field_name()
+        active_users = User._default_manager.filter(
+            **{f'{email_field_name}__iexact': email, 'is_active': True},
+        )
+        return (u for u in active_users if getattr(u, email_field_name))
+
+
+class MembershipSendResetView(LoginRequiredMixin, View):
+    """POST-only action: email a password-reset / set-password link to a membership's user.
+
+    Onboarding creates staff with ``set_unusable_password()`` and no automatic credential
+    issuance (the misleading ``send_invite`` checkbox was removed). This action lets a
+    manager of the membership's container manually send the standard Django password-reset
+    email, which links to the ``password_reset_confirm`` route — usable both to reset a
+    forgotten password and to set an initial one on a fresh ``set_unusable_password()``
+    account.
+    """
+    http_method_names = ['post']
+
+    def post(self, request, pk):
+        membership = get_object_or_404(
+            Membership.objects.select_related('user', 'tenant', 'provider'), pk=pk,
+        )
+        detail_url = reverse('organization:membership_detail', kwargs={'pk': membership.pk})
+
+        # Guard: only a manager of the membership's container (or a superuser) may
+        # trigger credential issuance for its user.
+        container = membership.container
+        if not (
+            request.user.is_superuser
+            or (container is not None
+                and request.user.has_perm('organization.change_membership', obj=container))
+        ):
+            messages.error(
+                request,
+                _("You do not have permission to send a password-reset link for this membership."),
+            )
+            return redirect(detail_url)
+
+        user = membership.user
+        email = (getattr(user, 'email', '') or '').strip()
+        if not email:
+            messages.error(
+                request,
+                _("This user has no email address, so no reset link can be sent."),
+            )
+            return redirect(detail_url)
+
+        # Generate the token + email the standard reset link (to the ``password_reset_confirm``
+        # route). We use a PasswordResetForm subclass that also serves unusable-password
+        # accounts, since freshly-onboarded staff have no usable password yet.
+        reset_form = _SetInitialOrResetPasswordForm(data={'email': email})
+        if reset_form.is_valid():
+            reset_form.save(
+                request=request,
+                use_https=request.is_secure(),
+                from_email=None,
+                email_template_name='registration/password_reset_email.html',
+                subject_template_name='registration/password_reset_subject.txt',
+            )
+            messages.success(
+                request,
+                _("Sent a password-reset link to %(email)s.") % {'email': email},
+            )
+        else:
+            messages.error(request, _("Could not send a reset link to %(email)s.") % {'email': email})
+        return redirect(detail_url)
+
+
 class MembershipCreateView(ObjectEditView):
     queryset = Membership.objects.all()
     model = Membership
     model_form = MembershipForm
-    template_name = 'generic/object_edit.html'
+    template_name = 'organization/memberships/membership_form.html'
 
     def get_initial(self):
         initial = super().get_initial()
-        for key in ('user', 'tenant', 'provider', 'person_type'):
+        for key in ('user', 'tenant', 'provider'):
             val = self.request.GET.get(key)
             if val:
                 initial[key] = val
@@ -69,7 +154,7 @@ class MembershipEditView(ObjectEditView):
     queryset = Membership.objects.all()
     model = Membership
     model_form = MembershipForm
-    template_name = 'generic/object_edit.html'
+    template_name = 'organization/memberships/membership_form.html'
 
     def get_form_kwargs(self):
         kwargs = super().get_form_kwargs()
@@ -78,7 +163,7 @@ class MembershipEditView(ObjectEditView):
 
     def get_form(self, form_class=None):
         form = super().get_form(form_class=form_class)
-        for f in ('user', 'tenant', 'provider', 'person_type'):
+        for f in ('user', 'tenant', 'provider'):
             if f in form.fields:
                 form.fields[f].disabled = True
         return form

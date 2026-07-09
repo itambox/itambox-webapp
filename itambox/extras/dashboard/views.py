@@ -5,6 +5,7 @@ from django.db import transaction
 from django.http import HttpResponse
 from django.shortcuts import get_object_or_404, redirect
 from django.template.loader import render_to_string
+from django.template.response import TemplateResponse
 from django.urls import reverse
 from django.utils.translation import gettext_lazy as _
 from django.views import View
@@ -16,6 +17,7 @@ from extras.dashboard.forms import DashboardWidgetAddForm, DashboardWidgetConfig
 from extras.dashboard.utils import get_dashboard, get_default_dashboard
 from extras.dashboard.widgets import get_widget, get_registered_widgets
 from extras.models import Dashboard
+from organization.access import accessible_provider_ids, accessible_tenant_ids
 from organization.models import Tenant, Membership
 
 
@@ -344,6 +346,22 @@ class DashboardSetDefaultView(LoginRequiredMixin, View):
 class DashboardView(LoginRequiredMixin, BaseHTMXView, TemplateView):
     template_name = 'dashboard.html'
     document_path = 'dashboard'
+
+    def get(self, request, *args, **kwargs):
+        # Login-state coherence (§3-F): an authenticated non-superuser whose last
+        # membership was deactivated (or who was never assigned one) keeps
+        # User.is_active/can_login — the interactive UI does NOT auto-clear them (only
+        # the SCIM paths do). Rather than dropping them into a permission-less,
+        # tenant-less dashboard, show a "no accessible workspace" landing page.
+        # Superusers legitimately operate with no membership, so they are exempt.
+        user = request.user
+        if not user.is_superuser and (
+            not accessible_tenant_ids(user) and not accessible_provider_ids(user)
+        ):
+            return TemplateResponse(
+                request, 'registration/no_workspace.html', status=403,
+            )
+        return super().get(request, *args, **kwargs)
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)

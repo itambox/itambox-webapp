@@ -6,21 +6,23 @@ from django.urls import reverse
 from django.views.generic import CreateView, View
 from django.contrib.auth.mixins import LoginRequiredMixin, UserPassesTestMixin
 from django.utils.translation import gettext_lazy as _
-from ..models import TenantInvitation, Role, accept_invitation
+from ..models import TenantInvitation, accept_invitation
 from ..forms import TenantInvitationForm
 
 class InviteUserMixin(LoginRequiredMixin, UserPassesTestMixin):
     def test_func(self):
         if self.request.user.is_superuser:
             return True
-        membership = getattr(self.request, 'active_membership', None)
-        if membership:
-            for role in membership.roles.all():
-                if 'organization.add_tenantinvitation' in (role.permissions or []):
-                    return True
-                if role.name.lower() == 'admin':
-                    return True
-        return False
+        # Gate strictly on the real permission resolved through the MembershipBackend
+        # against the active tenant. The former ``role.name == 'admin'`` string branch was
+        # a backdoor: any role literally named "admin" (regardless of permissions) granted
+        # invite access. Authorization must flow through has_perm only.
+        active_tenant = getattr(self.request, 'active_tenant', None)
+        if active_tenant is None:
+            return False
+        return self.request.user.has_perm(
+            'organization.add_tenantinvitation', obj=active_tenant
+        )
 
 class InviteUserView(InviteUserMixin, CreateView):
     model = TenantInvitation
@@ -30,6 +32,7 @@ class InviteUserView(InviteUserMixin, CreateView):
     def get_form_kwargs(self):
         kwargs = super().get_form_kwargs()
         kwargs['tenant'] = getattr(self.request, 'active_tenant', None)
+        kwargs['requesting_user'] = self.request.user
         return kwargs
 
     def form_valid(self, form):

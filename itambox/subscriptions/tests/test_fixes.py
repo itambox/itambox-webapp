@@ -54,15 +54,15 @@ class SubscriptionFixesTests(TestCase):
         )
 
         # Create memberships
-        m_a = Membership.objects.create(person_type=Membership.PERSON_MEMBER, user=self.user_a, tenant=self.tenant_a)
+        m_a = Membership.objects.create(user=self.user_a, tenant=self.tenant_a)
         m_a.roles.add(self.role_a)
-        m_b = Membership.objects.create(person_type=Membership.PERSON_MEMBER, user=self.user_b, tenant=self.tenant_b)
+        m_b = Membership.objects.create(user=self.user_b, tenant=self.tenant_b)
         m_b.roles.add(self.role_b)
         # super_user is a platform operator who is also a member of tenant_a, so it
         # receives tenant_a's subscription notifications. Expiry/reminder recipients
         # are scoped to staff who are MEMBERS of the subscription's tenant (B7) —
         # a bare is_staff user with no membership is no longer notified.
-        m_super = Membership.objects.create(person_type=Membership.PERSON_MEMBER, user=self.super_user, tenant=self.tenant_a)
+        m_super = Membership.objects.create(user=self.super_user, tenant=self.tenant_a)
         m_super.roles.add(self.role_a)
 
 

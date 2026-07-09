@@ -124,9 +124,6 @@ urlpatterns = [
     path('providers/<int:pk>/edit/', views.ProviderEditView.as_view(), name='provider_update'),
     path('providers/<int:pk>/delete/', views.ProviderDeleteView.as_view(), name='provider_delete'),
 
-    # Customer Tenants (provider-managed tenant list)
-    path('customer-tenants/', views.CustomerTenantListView.as_view(), name='customer_tenant_list'),
-
     # Quick onboarding
     path('onboard/technician/', views.TechnicianQuickAddView.as_view(), name='technician_quick_add'),
 
@@ -138,5 +135,6 @@ urlpatterns = [
     path('memberships/delete/', views.MembershipBulkDeleteView.as_view(), name='membership_bulk_delete'),
     path('memberships/<int:pk>/', views.MembershipDetailView.as_view(), name='membership_detail'),
     path('memberships/<int:pk>/edit/', views.MembershipEditView.as_view(), name='membership_update'),
+    path('memberships/<int:pk>/send-reset/', views.MembershipSendResetView.as_view(), name='membership_send_reset'),
     path('memberships/<int:pk>/delete/', views.MembershipDeleteView.as_view(), name='membership_delete'),
 ]

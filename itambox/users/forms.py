@@ -490,10 +490,28 @@ class UserBulkEditForm(BulkEditForm):
 # UserGroup is an identity-layer construct (relocated here from organization/): it grants
 # cross-tenant access, so it lives alongside the User model rather than the business-data
 # (organization) layer.
-from organization.models import Role
-from core.auth.guards import validate_permission_grant
+from organization.models import Role, Provider
+from core.auth.guards import validate_permission_grant, validate_group_membership_grant
 from .models import UserGroup
 from .filters import UserGroupFilterSet
+
+
+class _RolesHolder:
+    """Lightweight stand-in exposing ``roles.all()`` for an unsaved role set.
+
+    ``validate_group_membership_grant`` iterates ``group.roles.all()``; on a create (no pk)
+    the submitted roles have no persisted M2M yet, so we wrap the in-memory list to satisfy
+    that contract without saving prematurely.
+    """
+    class _Manager:
+        def __init__(self, roles):
+            self._roles = roles
+
+        def all(self):
+            return self._roles
+
+    def __init__(self, roles):
+        self.roles = self._Manager(roles)
 
 
 class UserGroupForm(forms.ModelForm):
@@ -530,6 +548,14 @@ class UserGroupForm(forms.ModelForm):
         label=_("Members"),
         widget=forms.SelectMultiple(attrs={'class': 'form-select'}),
     )
+    provider = forms.ModelChoiceField(
+        queryset=Provider._base_manager.none(),
+        required=False,
+        label=_("Provider (SCIM scope)"),
+        widget=forms.Select(attrs={'class': 'form-select'}),
+        help_text=_("Set a provider to make this group SCIM-managed by that provider. "
+                    "Leave blank for a global group managed here in the UI."),
+    )
     is_active = forms.BooleanField(
         required=False,
         initial=True,
@@ -538,28 +564,133 @@ class UserGroupForm(forms.ModelForm):
 
     class Meta:
         model = UserGroup
-        fields = ['name', 'description', 'roles', 'members', 'is_active']
+        fields = ['name', 'description', 'roles', 'members', 'provider', 'is_active']
+
+    @staticmethod
+    def _role_label(role):
+        """Prefix each role choice with its container so cross-container roles are legible,
+        e.g. ``[Tenant A] Administrator`` vs ``[Provider Northwind] MSP Technician``."""
+        if role.scope == Role.SCOPE_PROVIDER and role.provider_id:
+            return f"[{role.provider.name}] {role.name}"
+        if role.tenant_id:
+            return f"[{role.tenant.name}] {role.name}"
+        return role.name
 
     def __init__(self, *args, user=None, tenant=None, **kwargs):
         # `tenant` is accepted for call-site compatibility but ignored: groups are global.
         self._requesting_user = user
         super().__init__(*args, **kwargs)
-        # Roles across ALL tenants (unscoped _base_manager overrides the core/apps.py
+        # Roles across ALL containers (unscoped _base_manager overrides the core/apps.py
         # current-tenant scoping applied during super().__init__); any user as member.
         self.fields['roles'].queryset = Role._base_manager.filter(
             deleted_at__isnull=True,
-        ).select_related('tenant').order_by('tenant__name', 'name')
+        ).select_related('tenant', 'provider').order_by('scope', 'tenant__name', 'provider__name', 'name')
+        self.fields['roles'].label_from_instance = self._role_label
         self.fields['members'].queryset = User.objects.all().order_by('username')
+        # Scope the SCIM ``provider`` choice to providers the requesting user may manage:
+        # setting a group's provider hands that provider's SCIM-synced staff every role the
+        # group carries, so a group admin must not be able to point a group at a provider
+        # they do not administer (cross-provider takeover). Superuser sees all; blank (a
+        # global, UI-managed group) always remains allowed via ``required=False``.
+        # Mirrors TechnicianQuickForm.__init__ scoping (organization/forms/provider_form.py).
+        provider_qs = Provider._base_manager.filter(deleted_at__isnull=True).order_by('name')
+        if self._requesting_user is not None and not self._requesting_user.is_superuser:
+            manageable = [
+                p.pk for p in provider_qs
+                if self._requesting_user.has_perm('organization.manage_groups', obj=p)
+            ]
+            # Preserve the current value when editing so the field validates: a non-superuser
+            # editing a group whose provider they cannot manage still sees it (the change
+            # guard in clean() enforces they may not alter it to another unmanaged provider).
+            current_provider_id = getattr(self.instance, 'provider_id', None)
+            if current_provider_id is not None and current_provider_id not in manageable:
+                manageable.append(current_provider_id)
+            provider_qs = provider_qs.filter(pk__in=manageable)
+        self.fields['provider'].queryset = provider_qs
+
+        self.helper = FormHelper(self)
+        self.helper.form_method = 'post'
+        self.helper.form_tag = True
+        self.helper.layout = Layout(
+            Fieldset(str(_("Group details")), 'name', 'description', 'is_active'),
+            Fieldset(str(_("Access grants")), 'roles', 'members'),
+            Fieldset(str(_("Scope")), 'provider'),
+        )
+        from organization.forms.helpers import add_standard_buttons
+        add_standard_buttons(self.helper, self.instance, 'users:usergroup_list')
 
     def clean(self):
         cleaned_data = super().clean()
+        user = self._requesting_user
+        is_superuser = bool(user is not None and user.is_superuser)
+
         # Escalation guard (defence in depth; group management is global-admin only):
-        # a non-superuser may attach a role only if they hold every one of its
-        # permissions in that role's own tenant. Each role is validated against its own
-        # tenant because a group's roles may span tenants.
+        # a non-superuser may attach a role only if they already hold every one of its
+        # permissions in that role's OWN container. A group's roles may span containers, so
+        # each is validated against ``role.owner`` (the role's tenant OR provider) — using
+        # ``role.tenant`` would wrongly reject every provider-scoped role (container=None
+        # holds nothing).
         for role in (cleaned_data.get('roles') or []):
-            validate_permission_grant(self._requesting_user, role.permissions or [], role.tenant)
+            validate_permission_grant(user, role.permissions or [], role.owner)
+
+        # Provider ownership guard (§3-B): setting/changing the SCIM ``provider`` grants
+        # that provider's staff every role the group carries. A non-superuser may only
+        # pick a provider they manage (``organization.manage_groups`` on it), and when
+        # EDITING must be able to manage BOTH the old and the new value — otherwise they
+        # could move a group they don't fully control onto a provider they do.
+        if not is_superuser and user is not None and 'provider' in cleaned_data:
+            new_provider = cleaned_data.get('provider')
+            old_provider = self.instance.provider if self.instance.pk else None
+            changed = getattr(old_provider, 'pk', None) != getattr(new_provider, 'pk', None)
+            # Only guard an actual CHANGE of the SCIM provider. A no-op re-save (editing other
+            # fields while leaving the provider untouched) grants nothing new, so it must not be
+            # blocked — otherwise a legacy single-company admin who holds manage_groups via a
+            # direct user_permissions grant (no Provider membership, so has_perm(obj=provider)
+            # is always False) could never edit an existing provider-scoped group at all.
+            if changed:
+                if new_provider is not None and not user.has_perm(
+                    'organization.manage_groups', obj=new_provider,
+                ):
+                    self.add_error('provider', _(
+                        "You do not have permission to manage groups for this provider."
+                    ))
+                elif old_provider is not None and not user.has_perm(
+                    'organization.manage_groups', obj=old_provider,
+                ):
+                    self.add_error('provider', _(
+                        "You do not have permission to move this group away from its "
+                        "current provider."
+                    ))
+
+        # Member-grant escalation guard (§3-C): adding a member confers every role the
+        # group carries. If the group carries roles (existing or being set on this save)
+        # and members are being set/added, validate each carried role against the actor's
+        # held permissions — the same check enforced in UserGroupAssignUsersView, so the
+        # form write path is covered too. Reuse the shared helper for parity.
+        if not is_superuser and user is not None and cleaned_data.get('members'):
+            group_for_check = self._group_for_membership_check(cleaned_data)
+            if group_for_check is not None:
+                try:
+                    validate_group_membership_grant(user, group_for_check)
+                except forms.ValidationError as exc:
+                    self.add_error('members', exc)
+
         return cleaned_data
+
+    def _group_for_membership_check(self, cleaned_data):
+        """Return an object exposing a ``roles.all()`` accessor reflecting the roles the
+        group will carry after this save, for ``validate_group_membership_grant``.
+
+        On create the group has no pk yet, so ``self.instance.roles`` is empty — use the
+        submitted ``roles`` instead. On edit, the submitted ``roles`` supersede the stored
+        set when the field is present; otherwise fall back to the persisted roles.
+        """
+        if 'roles' in cleaned_data:
+            roles = list(cleaned_data.get('roles') or [])
+            return _RolesHolder(roles)
+        if self.instance.pk:
+            return self.instance
+        return None
 
 
 class UserGroupFilterForm(FilterForm):

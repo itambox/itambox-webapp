@@ -33,7 +33,7 @@ class ITAMBoxAPITestCase(APITestCase):
             name='Staff Role A',
             permissions=['assets.view_asset', 'assets.add_asset', 'assets.change_asset'],
         )
-        _m = Membership.objects.create(person_type=Membership.PERSON_MEMBER, user=self.staff,
+        _m = Membership.objects.create(user=self.staff,
             tenant=self.tenant_a,
         )
         _m.roles.add(self.role_staff_a)
@@ -144,13 +144,13 @@ class ITAMBoxAPITestCase(APITestCase):
         """WS1-6: checkout is a state change -> requires assets.change_asset, not the
         POST-default assets.add_asset."""
         add_only = User.objects.create_user(username='addonly', password='pw')
-        _m_add = Membership.objects.create(person_type=Membership.PERSON_MEMBER, user=add_only, tenant=self.tenant_a)
+        _m_add = Membership.objects.create(user=add_only, tenant=self.tenant_a)
         _m_add.roles.add(Role.objects.create(
             tenant=self.tenant_a, name='Add Only',
             permissions=['assets.view_asset', 'assets.add_asset'],
         ))
         change_only = User.objects.create_user(username='changeonly', password='pw')
-        _m_change = Membership.objects.create(person_type=Membership.PERSON_MEMBER, user=change_only, tenant=self.tenant_a)
+        _m_change = Membership.objects.create(user=change_only, tenant=self.tenant_a)
         _m_change.roles.add(Role.objects.create(
             tenant=self.tenant_a, name='Change Only',
             permissions=['assets.view_asset', 'assets.change_asset'],

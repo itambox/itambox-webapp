@@ -33,7 +33,7 @@ class MitigationsPhase3Tests(TestCase):
                 'licenses.view_license',
             ]
         )
-        self.membership = Membership.objects.create(person_type=Membership.PERSON_MEMBER, user=self.staff, tenant=self.tenant)
+        self.membership = Membership.objects.create(user=self.staff, tenant=self.tenant)
         self.membership.roles.add(self.role)
         self.token = Token.objects.create(user=self.staff)
 

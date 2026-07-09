@@ -10,14 +10,13 @@ from itambox.views.generic import (
     ObjectListView, ObjectDetailView, ObjectEditView, ObjectDeleteView,
 )
 
-from ..models import Provider, Tenant
+from ..models import Provider
 from ..forms import (
     ProviderForm, ProviderFilterForm,
     TechnicianQuickForm,
 )
-from ..tables import ProviderTable, TenantTable
-from ..filters import ProviderFilterSet, TenantFilterSet
-from ..forms import TenantFilterForm
+from ..tables import ProviderTable
+from ..filters import ProviderFilterSet
 
 
 class ProviderAdminMixin(UserPassesTestMixin):
@@ -70,16 +69,10 @@ class ProviderDeleteView(ProviderAdminMixin, ObjectDeleteView):
     success_url = reverse_lazy('organization:provider_list')
 
 
-class CustomerTenantListView(ProviderAdminMixin, ObjectListView):
-    """Provider-managed tenants (provider FK set). Uses _base_manager — a provider
-    admin legitimately views across tenants, guarded by ProviderAdminMixin."""
-    queryset = Tenant._base_manager.filter(
-        provider__isnull=False, deleted_at__isnull=True,
-    ).select_related('provider', 'group')
-    filterset = TenantFilterSet
-    filterset_form = TenantFilterForm
-    table = TenantTable
-    action_buttons = ()
+# The provider-managed cross-tenant view was folded into ``TenantListView`` (the main
+# ``/tenants/`` list): provider-admins opt into the cross-provider set via
+# ``?all_providers=true`` plus a "Managed by provider" filter + Provider column, instead
+# of a separate ``customer-tenants/`` route. See RBAC_STABILIZATION_REVIEW.md §8.
 
 
 # --------------------------------------------------------------------------- Quick onboarding
@@ -100,6 +93,22 @@ class TechnicianQuickAddView(ProviderAdminMixin, FormView):
             return self.form_invalid(form)
 
         user, membership = form.save()
+        if form.cleaned_data.get('role') is None:
+            # No role was chosen (allowed for a first hire): the membership carries zero
+            # permissions until a role is attached. Steer the admin straight into role
+            # creation, deep-linked to this provider so the new role is provider-scoped.
+            messages.warning(
+                self.request,
+                _("Onboarded %(user)s as staff of %(provider)s, but they have NO "
+                  "permissions yet. Create and assign a role to grant access.") % {
+                    'user': user, 'provider': membership.provider,
+                },
+            )
+            role_create_url = (
+                reverse('organization:role_create')
+                + f'?provider={membership.provider.pk}'
+            )
+            return redirect(role_create_url)
         messages.success(
             self.request,
             _("Onboarded %(user)s as staff of %(provider)s.") % {

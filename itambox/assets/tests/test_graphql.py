@@ -62,9 +62,9 @@ class GraphQLTestCase(TestCase):
                 'inventory.view_kit', 'inventory.add_kit', 'inventory.change_kit', 'inventory.delete_kit',
             ]
         )
-        self.membership_a = Membership.objects.create(person_type=Membership.PERSON_MEMBER, user=self.staff_a, tenant=self.tenant_a)
+        self.membership_a = Membership.objects.create(user=self.staff_a, tenant=self.tenant_a)
         self.membership_a.roles.add(self.role_admin_a)
-        self.membership_b = Membership.objects.create(person_type=Membership.PERSON_MEMBER, user=self.staff_b, tenant=self.tenant_b)
+        self.membership_b = Membership.objects.create(user=self.staff_b, tenant=self.tenant_b)
         self.membership_b.roles.add(self.role_admin_b)
 
         # Grant general Django permissions to staff users

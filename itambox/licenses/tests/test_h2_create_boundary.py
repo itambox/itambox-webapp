@@ -36,7 +36,7 @@ class SeatCreateCrossTenantTests(TestCase):
             name='Admin',
             permissions=['licenses.add_licenseseatassignment', 'licenses.view_licenseseatassignment'],
         )
-        self.membership_b = Membership.objects.create(person_type=Membership.PERSON_MEMBER, user=self.user_b, tenant=self.tenant_b,
+        self.membership_b = Membership.objects.create(user=self.user_b, tenant=self.tenant_b,
         )
         self.membership_b.roles.add(self.role_b)
 
@@ -89,7 +89,7 @@ class GlobalLicenseMintTests(TestCase):
             name='Admin',
             permissions=['licenses.add_license', 'licenses.view_license'],
         )
-        self.membership_b = Membership.objects.create(person_type=Membership.PERSON_MEMBER, user=self.user_b, tenant=self.tenant_b,
+        self.membership_b = Membership.objects.create(user=self.user_b, tenant=self.tenant_b,
         )
         self.membership_b.roles.add(self.role_b)
         self.mfr = Manufacturer.objects.create(name='Microsoft', slug='microsoft')
@@ -133,7 +133,7 @@ class SeatOverAllocationTests(TestCase):
             tenant=self.tenant, name='Admin',
             permissions=['licenses.add_licenseseatassignment', 'licenses.view_licenseseatassignment'],
         )
-        m = Membership.objects.create(person_type=Membership.PERSON_MEMBER, user=self.user, tenant=self.tenant)
+        m = Membership.objects.create(user=self.user, tenant=self.tenant)
         m.roles.add(role)
         self.mfr = Manufacturer.objects.create(name='MS', slug='ms-seat')
         self.software = Software.objects.create(name='Office', manufacturer=self.mfr, tenant=self.tenant)

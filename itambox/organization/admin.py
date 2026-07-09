@@ -1,4 +1,5 @@
 from django.contrib import admin
+from django.utils.translation import gettext_lazy as _
 from .models import (
     Region, SiteGroup, Tenant, Location, TenantGroup, Site,
     Contact, ContactRole, ContactAssignment,
@@ -57,9 +58,13 @@ class ContactAssignmentAdmin(admin.ModelAdmin):
 
 
 class MembershipAdmin(admin.ModelAdmin):
-    list_display = ('user', 'person_type', 'tenant', 'provider', 'is_active', 'joined_at')
-    list_filter = ('person_type', 'tenant', 'provider', 'is_active', 'roles')
+    list_display = ('user', 'kind', 'tenant', 'provider', 'is_active', 'joined_at')
+    list_filter = ('tenant', 'provider', 'is_active', 'roles')
     search_fields = ('user__username', 'user__email', 'tenant__name', 'provider__name')
+
+    @admin.display(description=_("Kind"))
+    def kind(self, obj):
+        return obj.get_kind_display()
 
 
 class TenantInvitationAdmin(admin.ModelAdmin):

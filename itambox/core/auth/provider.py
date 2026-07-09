@@ -45,7 +45,7 @@ def is_provider_staff(user):
         return cached
     from organization.models import Membership
     result = Membership.objects.filter(
-        user=user, is_active=True, person_type=Membership.PERSON_STAFF,
+        user=user, is_active=True, provider__isnull=False,
     ).exists()
     setattr(user, '_is_provider_staff_cache', result)
     return result

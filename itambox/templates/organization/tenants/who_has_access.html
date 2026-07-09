@@ -29,7 +29,7 @@
                     <tr>
                         <th>{% translate "User" %}</th>
                         <th>{% translate "Sources" %}</th>
-                        <th>{% translate "# Permissions" %}</th>
+                        <th>{% translate "Permissions" %}</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -38,7 +38,23 @@
                         <td>{{ entry.user }}</td>
                         <td>{{ entry.sources|join:", " }}</td>
                         <td>
-                            <span class="badge bg-secondary-lt">{{ entry.permissions|length }}</span>
+                            {% if entry.permissions %}
+                            <details>
+                                <summary>
+                                    <span class="badge bg-secondary-lt">{{ entry.permissions|length }}</span>
+                                    <span class="text-muted small ms-1">{% translate "show codenames" %}</span>
+                                </summary>
+                                <ul class="list-inline mb-0 mt-2">
+                                    {% for codename in entry.permissions %}
+                                    <li class="list-inline-item mb-1">
+                                        <code class="badge bg-secondary-lt text-secondary">{{ codename }}</code>
+                                    </li>
+                                    {% endfor %}
+                                </ul>
+                            </details>
+                            {% else %}
+                            <span class="badge bg-secondary-lt">0</span>
+                            {% endif %}
                         </td>
                     </tr>
                     {% endfor %}

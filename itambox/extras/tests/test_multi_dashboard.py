@@ -69,7 +69,7 @@ class MultiDashboardViewsTests(TestCase):
         # The user must be a member of the tenant to bind a dashboard to it
         # (DashboardCreateView rejects non-member tenants).
         self.role = Role.objects.create(tenant=self.tenant, name="Member", permissions=[])
-        m = Membership.objects.create(person_type=Membership.PERSON_MEMBER, user=self.user, tenant=self.tenant)
+        m = Membership.objects.create(user=self.user, tenant=self.tenant)
         m.roles.add(self.role)
 
         # Create two dashboards

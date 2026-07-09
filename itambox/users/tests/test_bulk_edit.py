@@ -30,20 +30,20 @@ class UserBulkEditTests(TestCase):
             name='Admin',
             permissions=['users.view_user', 'users.change_user'],
         )
-        m = Membership.objects.create(person_type=Membership.PERSON_MEMBER, user=self.admin_a, tenant=self.tenant_a)
+        m = Membership.objects.create(user=self.admin_a, tenant=self.tenant_a)
         m.roles.add(self.role_a)
 
         # Users belonging to Tenant A
         self.user_a1 = User.objects.create_user(
             username='user_a1', email='a1@test.com', password='password123', is_active=True
         )
-        m = Membership.objects.create(person_type=Membership.PERSON_MEMBER, user=self.user_a1, tenant=self.tenant_a)
+        m = Membership.objects.create(user=self.user_a1, tenant=self.tenant_a)
         m.roles.add(self.role_a)
 
         self.user_a2 = User.objects.create_user(
             username='user_a2', email='a2@test.com', password='password123', is_active=True
         )
-        m = Membership.objects.create(person_type=Membership.PERSON_MEMBER, user=self.user_a2, tenant=self.tenant_a)
+        m = Membership.objects.create(user=self.user_a2, tenant=self.tenant_a)
         m.roles.add(self.role_a)
 
         # User belonging to Tenant B (cross-tenant)
@@ -55,7 +55,7 @@ class UserBulkEditTests(TestCase):
             name='Admin',
             permissions=['users.view_user', 'users.change_user'],
         )
-        m = Membership.objects.create(person_type=Membership.PERSON_MEMBER, user=self.user_b1, tenant=self.tenant_b)
+        m = Membership.objects.create(user=self.user_b1, tenant=self.tenant_b)
         m.roles.add(self.role_b)
 
         # URLs

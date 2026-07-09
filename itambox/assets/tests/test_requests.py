@@ -57,11 +57,11 @@ class RequisitionSystemTestCase(TestCase):
             ]
         )
 
-        m1 = Membership.objects.create(person_type=Membership.PERSON_MEMBER, user=self.requester_user,
+        m1 = Membership.objects.create(user=self.requester_user,
             tenant=self.tenant,
         )
         m1.roles.add(self.role_standard)
-        m2 = Membership.objects.create(person_type=Membership.PERSON_MEMBER, user=self.other_user,
+        m2 = Membership.objects.create(user=self.other_user,
             tenant=self.tenant,
         )
         m2.roles.add(self.role_delegated)
@@ -651,7 +651,7 @@ class RequisitionSystemTestCase(TestCase):
         new_user = User.objects.create_user(
             username='noprofileuser', password='password123', is_staff=False, is_superuser=False
         )
-        m_new = Membership.objects.create(person_type=Membership.PERSON_MEMBER, user=new_user,
+        m_new = Membership.objects.create(user=new_user,
             tenant=self.tenant,
         )
         m_new.roles.add(self.role_standard)

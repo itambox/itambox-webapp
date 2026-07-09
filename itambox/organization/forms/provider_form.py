@@ -66,8 +66,8 @@ class ProviderFilterForm(FilterForm):
 class TechnicianQuickForm(forms.Form):
     """One-step provider technician onboarding.
 
-    Picks (or creates) a User by email, assigns a provider-scoped Role, and binds a staff
-    Membership with the chosen tenant scope — all in one POST. The created/updated User
+    Picks (or creates) a User by email, assigns a Role, and binds a provider-staff
+    Membership with the chosen customer access — all in one POST. The created/updated User
     is returned so the caller can issue an invitation/password-reset link.
     """
     email = forms.EmailField(
@@ -89,27 +89,31 @@ class TechnicianQuickForm(forms.Form):
     role = forms.ModelChoiceField(
         label=_("Role"), queryset=Role._base_manager.filter(scope=Role.SCOPE_PROVIDER, deleted_at__isnull=True),
         required=False,
+        empty_label=_("No role yet — assign later"),
         widget=forms.Select(attrs={'class': 'form-select'}),
-        help_text=_("Provider-scoped role granting what this technician can do."),
+        help_text=_("What this technician can do across the provider's customer tenants. "
+                    "You can assign or change this later."),
     )
     tenant_scope = forms.ChoiceField(
-        label=_("Tenant scope"), choices=Membership.SCOPE_CHOICES,
+        label=_("Customer access"),
+        choices=[
+            (Membership.SCOPE_EXPLICIT, _('Specific tenants')),
+            (Membership.SCOPE_TENANT_GROUP, _('A tenant group + its descendants')),
+            (Membership.SCOPE_ALL, _("All of the provider's tenants")),
+        ],
         initial=Membership.SCOPE_EXPLICIT,
+        help_text=_("Which of the provider's customer tenants this technician can reach."),
         widget=forms.Select(attrs={'class': 'form-select'}),
     )
     scope_group = forms.ModelChoiceField(
-        label=_("Scope group"), queryset=TenantGroup._base_manager.filter(deleted_at__isnull=True),
+        label=_("Tenant group"), queryset=TenantGroup._base_manager.filter(deleted_at__isnull=True),
         required=False,
         widget=forms.Select(attrs={'class': 'form-select'}),
     )
     assigned_tenants = forms.ModelMultipleChoiceField(
-        label=_("Assigned tenants"), queryset=Tenant._base_manager.filter(deleted_at__isnull=True),
+        label=_("Specific tenants"), queryset=Tenant._base_manager.filter(deleted_at__isnull=True),
         required=False,
         widget=forms.SelectMultiple(attrs={'class': 'form-select'}),
-    )
-    send_invite = forms.BooleanField(
-        label=_("Send invitation email"), required=False, initial=True,
-        widget=forms.CheckboxInput(attrs={'class': 'form-check-input'}),
     )
 
     def __init__(self, *args, **kwargs):
@@ -123,20 +127,24 @@ class TechnicianQuickForm(forms.Form):
             'email', 'first_name', 'last_name',
             'provider', 'role',
             'tenant_scope', 'scope_group', 'assigned_tenants',
-            'send_invite',
         )
         from .helpers import add_standard_buttons
         add_standard_buttons(self.helper, instance=None, list_url_name='organization:membership_list')
 
-        # Scope querysets based on the requesting user
+        # Scope querysets based on the requesting user. Use _base_manager throughout: this is a
+        # provider-only onboarding flow that runs with NO active tenant, so the tenant-scoping
+        # default manager (Role.objects / Tenant.objects) fails closed to .none() for a
+        # non-superuser, silently emptying the role/tenant pickers and rejecting a valid
+        # submission as "not one of the available choices". _base_manager is tenant-context-
+        # independent; deleted_at is filtered explicitly to preserve soft-delete semantics.
         if self._requesting_user and not self._requesting_user.is_superuser:
             visible_pks = []
-            for p in Provider.objects.filter(deleted_at__isnull=True):
+            for p in Provider._base_manager.filter(deleted_at__isnull=True):
                 if self._requesting_user.has_perm('organization.manage_staff', obj=p):
                     visible_pks.append(p.pk)
-            self.fields['provider'].queryset = Provider.objects.filter(pk__in=visible_pks)
-            self.fields['role'].queryset = Role.objects.filter(scope=Role.SCOPE_PROVIDER, provider_id__in=visible_pks, deleted_at__isnull=True)
-            self.fields['assigned_tenants'].queryset = Tenant.objects.filter(provider_id__in=visible_pks, deleted_at__isnull=True)
+            self.fields['provider'].queryset = Provider._base_manager.filter(pk__in=visible_pks, deleted_at__isnull=True)
+            self.fields['role'].queryset = Role._base_manager.filter(scope=Role.SCOPE_PROVIDER, provider_id__in=visible_pks, deleted_at__isnull=True)
+            self.fields['assigned_tenants'].queryset = Tenant._base_manager.filter(provider_id__in=visible_pks, deleted_at__isnull=True)
 
     def clean(self):
         cleaned = super().clean()
@@ -146,9 +154,9 @@ class TechnicianQuickForm(forms.Form):
             raise forms.ValidationError(_("Selected role does not belong to the selected provider."))
         scope = cleaned.get('tenant_scope')
         if scope == Membership.SCOPE_TENANT_GROUP and not cleaned.get('scope_group'):
-            self.add_error('scope_group', _("A scope group is required when tenant scope is 'Tenant group'."))
+            self.add_error('scope_group', _("Pick a tenant group when access is 'A tenant group + its descendants'."))
         if scope == Membership.SCOPE_EXPLICIT and not cleaned.get('assigned_tenants'):
-            self.add_error('assigned_tenants', _("Pick at least one tenant for an explicit scope."))
+            self.add_error('assigned_tenants', _("Pick at least one tenant for 'Specific tenants'."))
 
         # Verify requesting user has manage_staff permission on the provider
         if self._requesting_user and provider:
@@ -184,7 +192,6 @@ class TechnicianQuickForm(forms.Form):
             membership, _was_created = Membership.objects.get_or_create(
                 user=user, provider=self.cleaned_data['provider'],
                 defaults={
-                    'person_type': Membership.PERSON_STAFF,
                     'tenant_scope': self.cleaned_data['tenant_scope'],
                     'scope_group': self.cleaned_data.get('scope_group'),
                     'is_active': True,
@@ -192,7 +199,6 @@ class TechnicianQuickForm(forms.Form):
             )
             if not _was_created:
                 membership.is_active = True
-                membership.person_type = Membership.PERSON_STAFF
                 membership.tenant_scope = self.cleaned_data['tenant_scope']
                 membership.scope_group = self.cleaned_data.get('scope_group')
                 membership.save()

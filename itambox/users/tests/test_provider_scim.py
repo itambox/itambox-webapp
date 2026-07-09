@@ -37,7 +37,7 @@ class ProviderSCIMProvisioningTests(TestCase):
             username="provadmin", email="provadmin@msp.com", password="adminpassword"
         )
         m_admin = Membership.objects.create(
-            person_type=Membership.PERSON_STAFF, user=self.admin_user, provider=self.provider,
+            user=self.admin_user, provider=self.provider,
             is_active=True,
         )
         m_admin.roles.add(self.role_staff)
@@ -47,7 +47,7 @@ class ProviderSCIMProvisioningTests(TestCase):
             username="weak", email="weak@msp.com", password="password123"
         )
         m_weak = Membership.objects.create(
-            person_type=Membership.PERSON_STAFF, user=self.weak_user, provider=self.provider,
+            user=self.weak_user, provider=self.provider,
             is_active=True,
         )
         m_weak.roles.add(self.role_readonly)

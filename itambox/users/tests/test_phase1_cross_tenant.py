@@ -32,7 +32,7 @@ class UsersApiCrossTenantTestCase(TestCase):
             name='Admin',
             permissions=['users.view_user', 'auth.view_group'],
         )
-        self.membership_b = Membership.objects.create(person_type=Membership.PERSON_MEMBER, user=self.user_b, tenant=self.tenant_b,
+        self.membership_b = Membership.objects.create(user=self.user_b, tenant=self.tenant_b,
         )
         self.membership_b.roles.add(self.role_b)
 
@@ -43,7 +43,7 @@ class UsersApiCrossTenantTestCase(TestCase):
         self.role_a = Role.objects.create(
             tenant=self.tenant_a, name='Admin', permissions=['users.view_user'],
         )
-        self.membership_a = Membership.objects.create(person_type=Membership.PERSON_MEMBER, user=self.user_a, tenant=self.tenant_a,
+        self.membership_a = Membership.objects.create(user=self.user_a, tenant=self.tenant_a,
         )
         self.membership_a.roles.add(self.role_a)
 
