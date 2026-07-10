@@ -8,7 +8,6 @@ from .assetholder_form import AssetHolderForm, AssetHolderFilterForm
 
 from .contact_form import ContactForm, ContactFilterForm
 from .contactrole_form import ContactRoleForm, ContactAssignmentForm, ContactRoleFilterForm
-from .invitation import TenantInvitationForm
 from .role_form import (
     RoleForm, RoleFilterForm, RoleAssignUsersForm, MATRIX_MODELS,
     PROVIDER_CAPABILITIES, CUSTOM_PERMISSIONS,

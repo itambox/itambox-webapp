@@ -132,7 +132,7 @@ class Command(SeedCatalogMixin, SeedOrganizationsMixin, SeedAccessMixin, SeedAss
             ('inventory', 'Component'), ('inventory', 'Accessory'), ('inventory', 'Consumable'),
             ('licenses', 'License'), ('software', 'Software'),
             ('subscriptions', 'Subscription'), ('subscriptions', 'Provider'),
-            ('organization', 'Membership'), ('organization', 'TenantInvitation'),
+            ('organization', 'Membership'),
             ('organization', 'Role'),
             ('organization', 'ContactAssignment'), ('organization', 'Contact'),
             ('organization', 'ContactRole'),

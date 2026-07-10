@@ -14,14 +14,15 @@ Surfaces covered (one test class per surface):
   1. ``MembershipForm`` (organization/forms/membership_form.py)
   2. ``MembershipBulkRoleForm`` / ``MembershipBulkEditView`` (organization/views/membership_views.py)
   3. ``RoleAssignUsersView`` (organization/views/role_views.py)
-  4. ``TenantInvitationForm`` + ``accept_invitation`` (organization/forms/invitation.py,
-     organization/views/invitation_views.py, organization/models.py)
-  5. ``UserGroupForm`` (users/forms.py) — role grant + provider ownership
-  6. ``UserGroupAssignUsersView`` (users/views.py)
-  7. ``TechnicianQuickForm`` (organization/forms/provider_form.py)
+  4. ``UserGroupForm`` (users/forms.py) — role grant + provider ownership
+  5. ``UserGroupAssignUsersView`` (users/views.py)
+  6. ``TechnicianQuickForm`` (organization/forms/provider_form.py)
 
-Each write path already has its own dedicated regression test module (test_invitation_escalation.py,
-test_usergroup_escalation.py, test_role_assignment.py, etc.) — this module is the SINGLE cohesive
+(The former surface #4, the tenant-invitation flow, was deleted wholesale on 2026-07-10 —
+users are provisioned by admins, SCIM, or SSO JIT; there is no invite write path anymore.)
+
+Each write path already has its own dedicated regression test module (test_usergroup_escalation.py,
+test_role_assignment.py, etc.) — this module is the SINGLE cohesive
 sweep across all of them so a reviewer can see the whole escalation-guard surface at a glance, and
 so a newly-added write path with no guard shows up here as a gap rather than being missed entirely.
 """
@@ -35,13 +36,12 @@ from django.urls import reverse
 from core.managers import set_current_tenant, set_current_membership
 from core.tests.mixins import TenantTestMixin
 from organization.models import (
-    Membership, Role, Tenant, Provider, TenantInvitation, accept_invitation,
+    Membership, Role, Tenant, Provider,
 )
 from organization.forms import (
-    MembershipForm, MembershipBulkRoleForm, TenantInvitationForm,
+    MembershipForm, MembershipBulkRoleForm,
 )
 from organization.forms.provider_form import TechnicianQuickForm
-from organization.views.invitation_views import InviteUserMixin
 from users.models import UserGroup
 from users.forms import UserGroupForm
 
@@ -359,129 +359,7 @@ class RoleAssignUsersViewEscalationTests(EscalationSurfaceTestCase):
 
 
 # --------------------------------------------------------------------------------------------- #
-# 4. TenantInvitationForm + accept_invitation
-# --------------------------------------------------------------------------------------------- #
-class TenantInvitationEscalationSurfaceTests(EscalationSurfaceTestCase):
-    """Surface #4: inviting at an over-privileged role is blocked at form time
-    (``TenantInvitationForm.clean()``) AND the accept-time re-check
-    (``accept_invitation``) rejects if the inviter no longer holds the perms."""
-
-    def setUp(self):
-        super().setUp()
-        self.narrow_role.permissions = [NARROW_PERM, 'organization.add_tenantinvitation']
-        self.narrow_role.save()
-        self.broad_role.permissions = [NARROW_PERM, 'organization.add_tenantinvitation'] + BROAD_PERMS
-        self.broad_role.save()
-
-    def test_low_privilege_inviter_blocked_at_form_time(self):
-        """(form-time) A user holding only add_tenantinvitation + a narrow perm cannot
-        invite into a role carrying permissions they don't hold."""
-        _flush_perm_cache(self.low_priv)
-        form = TenantInvitationForm(
-            data={'email': 'invitee@acme.test', 'role': self.overpriv_role.pk},
-            tenant=self.tenant,
-            requesting_user=self.low_priv,
-        )
-        self.assertFalse(form.is_valid())
-        self.assertIn('__all__', form.errors)
-        self.assertTrue(
-            any('escalation' in e.lower() for e in form.errors['__all__']), form.errors,
-        )
-
-    def test_high_privilege_inviter_can_invite_into_role_within_their_permissions(self):
-        """(form-time positive) An inviter holding the role's permissions may issue the
-        invite."""
-        _flush_perm_cache(self.high_priv)
-        form = TenantInvitationForm(
-            data={'email': 'invitee2@acme.test', 'role': self.overpriv_role.pk},
-            tenant=self.tenant,
-            requesting_user=self.high_priv,
-        )
-        self.assertTrue(form.is_valid(), form.errors)
-
-    def test_accept_time_recheck_rejects_if_inviter_lost_privileges(self):
-        """(accept-time re-check) A role/permission change between issue and accept must be
-        re-validated: if the inviter no longer holds the invited role's permissions when the
-        invite is accepted, ``accept_invitation`` raises and no membership is created."""
-        from django.utils import timezone
-        import datetime
-
-        invitation = TenantInvitation.objects.create(
-            email='latecomer@acme.test',
-            tenant=self.tenant,
-            role=self.overpriv_role,
-            invited_by=self.high_priv,
-            expires_at=timezone.now() + datetime.timedelta(days=7),
-        )
-        # The inviter's privileges are revoked after the invite was issued but before accept.
-        self.high_priv_membership.roles.remove(self.broad_role)
-        _flush_perm_cache(self.high_priv)
-
-        accepting_user = User.objects.create_user(
-            username='latecomer', email='latecomer@acme.test', password='pw',
-        )
-        with self.assertRaises(ValidationError):
-            accept_invitation(invitation, accepting_user)
-        self.assertFalse(
-            Membership.objects.filter(user=accepting_user, tenant=self.tenant).exists()
-        )
-        invitation.refresh_from_db()
-        self.assertIsNone(invitation.accepted_at)
-
-    def test_accept_time_recheck_allows_if_inviter_still_holds_privileges(self):
-        """(accept-time positive) If the inviter still holds the role's permissions, accepting
-        proceeds normally and creates the membership with the invited role."""
-        from django.utils import timezone
-        import datetime
-
-        invitation = TenantInvitation.objects.create(
-            email='ontime@acme.test',
-            tenant=self.tenant,
-            role=self.overpriv_role,
-            invited_by=self.high_priv,
-            expires_at=timezone.now() + datetime.timedelta(days=7),
-        )
-        accepting_user = User.objects.create_user(
-            username='ontime', email='ontime@acme.test', password='pw',
-        )
-        accept_invitation(invitation, accepting_user)
-        membership = Membership.objects.get(user=accepting_user, tenant=self.tenant)
-        self.assertIn(self.overpriv_role, membership.roles.all())
-
-    def test_superuser_inviter_bypasses_form_guard(self):
-        form = TenantInvitationForm(
-            data={'email': 'su_invitee@acme.test', 'role': self.overpriv_role.pk},
-            tenant=self.tenant,
-            requesting_user=self.superuser,
-        )
-        self.assertTrue(form.is_valid(), form.errors)
-
-    def test_invite_mixin_gates_strictly_on_permission_not_role_name(self):
-        """Regression companion: the invite-access gate (``InviteUserMixin.test_func``) must
-        key off the real ``add_tenantinvitation`` permission, not a role literally named
-        'admin' with no such permission — otherwise the form-level guard above can be
-        reached by a user who was never meant to invite at all."""
-        class _StubRequest:
-            def __init__(self, user, active_tenant):
-                self.user = user
-                self.active_tenant = active_tenant
-
-        name_only_role = Role.objects.create(
-            tenant=self.tenant, name="admin", permissions=[NARROW_PERM],
-        )
-        faux_admin = User.objects.create_user(
-            username='faux_admin', email='faux_admin@acme.test', password='pw',
-        )
-        membership = Membership.objects.create(user=faux_admin, tenant=self.tenant, is_active=True)
-        membership.roles.add(name_only_role)
-
-        mixin = InviteUserMixin()
-        mixin.request = _StubRequest(faux_admin, self.tenant)
-        self.assertFalse(mixin.test_func())
-
-
-# --------------------------------------------------------------------------------------------- #
-# 5. UserGroupForm
+# 4. UserGroupForm
 # --------------------------------------------------------------------------------------------- #
 class UserGroupFormEscalationTests(EscalationSurfaceTestCase):
     """Surface #5: ``UserGroupForm`` rejects (a) attaching an over-privileged role, and
@@ -575,7 +453,7 @@ class UserGroupFormEscalationTests(EscalationSurfaceTestCase):
 
 
 # --------------------------------------------------------------------------------------------- #
-# 6. UserGroupAssignUsersView (users)
+# 5. UserGroupAssignUsersView (users)
 # --------------------------------------------------------------------------------------------- #
 class UserGroupAssignUsersViewEscalationTests(EscalationSurfaceTestCase):
     """Surface #6: adding a member to a role-carrying UserGroup the actor can't fully grant
@@ -656,7 +534,7 @@ class UserGroupAssignUsersViewEscalationTests(EscalationSurfaceTestCase):
 
 
 # --------------------------------------------------------------------------------------------- #
-# 7. TechnicianQuickForm
+# 6. TechnicianQuickForm
 # --------------------------------------------------------------------------------------------- #
 class TechnicianQuickFormEscalationTests(EscalationSurfaceTestCase):
     """Surface #7: onboarding a technician with an over-privileged PROVIDER role is

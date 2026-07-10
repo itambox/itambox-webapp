@@ -47,7 +47,6 @@ MATRIX_MODELS = {
     'tenantgroup': {'label': _('Tenant Groups'), 'app': 'organization', 'model_name': 'tenantgroup', 'group': _('Organization & Structure')},
     'contact': {'label': _('Contacts'), 'app': 'organization', 'model_name': 'contact', 'group': _('Organization & Structure')},
     'contactrole': {'label': _('Contact Roles'), 'app': 'organization', 'model_name': 'contactrole', 'group': _('Organization & Structure')},
-    'tenantinvitation': {'label': _('Tenant Invitations'), 'app': 'organization', 'model_name': 'tenantinvitation', 'group': _('Organization & Structure')},
 
     # Metadata & Settings
     'manufacturer': {'label': _('Manufacturers'), 'app': 'assets', 'model_name': 'manufacturer', 'group': _('Metadata & Settings')},

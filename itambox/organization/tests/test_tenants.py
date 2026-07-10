@@ -184,7 +184,7 @@ class TenantGroupViewExpansionTests(TestCase):
         self.group.refresh_from_db()
         self.assertEqual(self.group.name, 'Premium Clients Updated')
 
-class MultiTenantMembershipAndInvitationTests(TestCase):
+class MultiTenantMembershipTests(TestCase):
     def setUp(self):
         self.tenant_a = Tenant.objects.create(name="Tenant A", slug="tenant-a")
         self.tenant_b = Tenant.objects.create(name="Tenant B", slug="tenant-b")
@@ -246,53 +246,61 @@ class MultiTenantMembershipAndInvitationTests(TestCase):
         membership.roles.add(self.role_member)
         self.assertIn(self.role_member, membership.roles.all())
 
-    def test_invitation_acceptance_and_assetholder_linking(self):
-        from organization.models import TenantInvitation, Membership
-        from django.utils import timezone
-        
+    def test_membership_creation_binds_matching_assetholder(self):
+        """The invitation flow is gone — holder binding now fires on membership creation
+        (organization/signals.py bind_asset_holder_on_membership): an unclaimed AssetHolder
+        in the joined tenant with a matching email (case-insensitive) is claimed."""
+        from organization.models import Membership
+
         holder = AssetHolder.objects.create(
             first_name="Beate",
             last_name="Office",
             upn="beate.office",
-            email="beate@example.com",
+            email="Beate@example.com",  # different casing than the account email
             tenant=self.tenant_a
         )
         self.assertIsNone(holder.user)
 
-        # A real inviter who holds the granted role's permissions in the tenant: the
-        # accept-time escalation re-check (RBAC review #1) validates the granted role
-        # against the inviter's current perms and fails closed if invited_by is None.
-        inviter = User.objects.create_user(
-            username='inviter', email='inviter@example.com', password='password123'
-        )
-        inviter_membership = Membership.objects.create(user=inviter, tenant=self.tenant_a)
-        inviter_membership.roles.add(self.role_admin)
-
-        invitation = TenantInvitation.objects.create(
-            email="beate@example.com",
-            tenant=self.tenant_a,
-            role=self.role_admin,
-            invited_by=inviter,
-            expires_at=timezone.now() + timezone.timedelta(days=7)
-        )
-        self.assertTrue(invitation.is_valid)
-        self.assertEqual(str(invitation), "Invite for beate@example.com to Tenant A")
-        
-        invitee_user = User.objects.create_user(
+        joining_user = User.objects.create_user(
             username='beate_user', email='beate@example.com', password='password123'
         )
-        from organization.models import accept_invitation
-        accept_invitation(invitation, invitee_user)
+        membership = Membership.objects.create(user=joining_user, tenant=self.tenant_a)
+        membership.roles.add(self.role_member)
 
-        membership = Membership.objects.get(user=invitee_user, tenant=self.tenant_a)
-        self.assertIn(self.role_admin, membership.roles.all())
-        
-        invitation.refresh_from_db()
-        self.assertFalse(invitation.is_valid)
-        self.assertIsNotNone(invitation.accepted_at)
-        
         holder.refresh_from_db()
-        self.assertEqual(holder.user, invitee_user)
+        self.assertEqual(holder.user, joining_user)
+
+    def test_membership_creation_binding_respects_tenant_claim_and_email(self):
+        """No binding across tenants, onto already-claimed holders, or on email mismatch."""
+        from organization.models import Membership
+
+        other_owner = User.objects.create_user(
+            username='owner', email='owner@example.com', password='password123'
+        )
+        claimed = AssetHolder.objects.create(
+            first_name="Claimed", last_name="Holder", upn="claimed.holder",
+            email="beate@example.com", tenant=self.tenant_a, user=other_owner,
+        )
+        wrong_tenant = AssetHolder.objects.create(
+            first_name="Other", last_name="Tenant", upn="other.tenant",
+            email="beate@example.com", tenant=self.tenant_b,
+        )
+        wrong_email = AssetHolder.objects.create(
+            first_name="Wrong", last_name="Email", upn="wrong.email",
+            email="someone.else@example.com", tenant=self.tenant_a,
+        )
+
+        joining_user = User.objects.create_user(
+            username='beate_user2', email='beate@example.com', password='password123'
+        )
+        Membership.objects.create(user=joining_user, tenant=self.tenant_a)
+
+        claimed.refresh_from_db()
+        wrong_tenant.refresh_from_db()
+        wrong_email.refresh_from_db()
+        self.assertEqual(claimed.user, other_owner)   # not stolen
+        self.assertIsNone(wrong_tenant.user)          # tenant boundary respected
+        self.assertIsNone(wrong_email.user)           # email must match
 
     def test_tenant_membership_backend_permissions(self):
         from organization.models import Membership

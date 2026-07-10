@@ -2,7 +2,34 @@
 from django.db.models.signals import post_save, post_delete, m2m_changed
 from django.dispatch import receiver
 
-from .models import Tenant, Membership, Role
+from .models import AssetHolder, Tenant, Membership, Role
+
+
+@receiver(post_save, sender=Membership)
+def bind_asset_holder_on_membership(sender, instance, created, **kwargs):
+    """Bind an unclaimed AssetHolder profile to the joining user's account.
+
+    Relocated from the deleted invitation-accept flow: whenever a user gains a
+    tenant membership (admin form, SCIM, quick-add, seed), an AssetHolder row in
+    that tenant with a matching email and no linked user is claimed by the
+    account. Uses ``_base_manager``: membership creation often runs outside the
+    joining tenant's context (SCIM, provider flows), where the tenant-scoped
+    default manager would silently return nothing.
+    """
+    if not created or not instance.tenant_id:
+        return
+    email = (instance.user.email or '').strip()
+    if not email:
+        return
+    holder = AssetHolder._base_manager.filter(
+        tenant_id=instance.tenant_id,
+        email__iexact=email,
+        user__isnull=True,
+        deleted_at__isnull=True,
+    ).first()
+    if holder is not None:
+        holder.user = instance.user
+        holder.save(update_fields=['user'])
 
 
 @receiver([post_save, post_delete], sender=Membership)

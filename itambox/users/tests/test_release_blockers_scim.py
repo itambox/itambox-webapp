@@ -7,7 +7,7 @@ D2-1: a bearer token minted under one tenant must not authenticate against a
 D2-2: authorization must flow through the role's actual JSON permissions
       (``organization.change_membership`` via ``has_perm``), never a literal
       ``Role.name`` string match — the same magic-string backdoor pattern
-      already removed from ``InviteUserMixin``.
+      removed from the (since-deleted) invitation flow.
 """
 from django.contrib.auth import get_user_model
 from django.test import TestCase

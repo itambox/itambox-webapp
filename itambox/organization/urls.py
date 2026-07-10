@@ -113,10 +113,6 @@ urlpatterns = [
     path('cost-centers/<int:pk>/clone/', views.CostCenterCloneView.as_view(), name='costcenter_clone'),
     path('cost-centers/<int:pk>/delete/', views.CostCenterDeleteView.as_view(), name='costcenter_delete'),
 
-    # Invitations
-    path('invite-user/', views.InviteUserView.as_view(), name='invite_user'),
-    path('accept-invitation/<uuid:token>/', views.AcceptInvitationView.as_view(), name='accept_invitation'),
-
     # Providers (MSP)
     path('providers/', views.ProviderListView.as_view(), name='provider_list'),
     path('providers/add/', views.ProviderEditView.as_view(), name='provider_create'),

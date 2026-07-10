@@ -458,11 +458,6 @@ class ContactAssignment(ChangeLoggingMixin, BaseModel):
         return f"{self.contact} ({self.role}) assigned to {self.assigned_object}"
 
 
-import uuid
-from django.utils import timezone
-from django.db import transaction
-
-
 # ---------------------------------------------------------------------------
 # Unified RBAC: Role + Membership
 #
@@ -873,38 +868,6 @@ class Membership(ChangeLoggingMixin, models.Model):
         ]
 
 
-class TenantInvitation(ChangeLoggingMixin, models.Model):
-    objects = TenantScopingManager()
-    # Audit invite issuance/acceptance/deletion (security-relevant access grant)
-    # but keep the one-time bearer token out of the changelog JSON.
-    _change_logging_excluded_fields = ['updated_at', 'token']
-
-    email = models.EmailField(verbose_name=_("Email"))
-    tenant = models.ForeignKey('organization.Tenant', on_delete=models.CASCADE, verbose_name=_("Tenant"))
-    role = models.ForeignKey(
-        'organization.Role',
-        on_delete=models.CASCADE,
-        related_name='invitations',
-        verbose_name=_("Role")
-    )
-    token = models.UUIDField(default=uuid.uuid4, unique=True, editable=False)
-    invited_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, verbose_name=_("Invited By"))
-    created_at = models.DateTimeField(auto_now_add=True)
-    expires_at = models.DateTimeField(verbose_name=_("Expires At"))
-    accepted_at = models.DateTimeField(null=True, blank=True, verbose_name=_("Accepted At"))
-
-    @property
-    def is_valid(self):
-        return self.accepted_at is None and self.expires_at > timezone.now()
-
-    class Meta:
-        verbose_name = _("Tenant Invitation")
-        verbose_name_plural = _("Tenant Invitations")
-
-    def __str__(self):
-        return f"Invite for {self.email} to {self.tenant.name}"
-
-
 class CostCenter(AutoSlugMixin, CustomFieldDataMixin, StandardModel, SoftDeleteMixin):
     """
     Represents a cost center or department.  A top-level instance (parent=None)
@@ -1011,55 +974,6 @@ class CostCenter(AutoSlugMixin, CustomFieldDataMixin, StandardModel, SoftDeleteM
                     break
                 visited.add(node.pk)
                 node = node.parent
-
-
-@transaction.atomic
-def accept_invitation(invitation, user):
-    from django.core.exceptions import ValidationError
-    if not invitation.is_valid:
-        raise ValidationError(_("This invitation has expired or has already been accepted."))
-
-    # Accept-time escalation re-check (defence in depth): the invite form already guards the
-    # role grant at issuance, but roles/permissions can change between issue and accept, and the
-    # inviter may have lost privileges since. Re-validate the role's permissions against the
-    # inviter's CURRENT effective perms in the tenant; reject if they can no longer grant it.
-    # inline import: core.auth.guards -> core.auth -> organization would cycle at module load.
-    from core.auth.guards import validate_permission_grant
-    if invitation.role is not None:
-        # Fail CLOSED when the inviter no longer exists (invited_by is SET_NULL): total
-        # privilege loss is the strongest case this re-check must catch, but
-        # validate_permission_grant treats a None granting user as a trusted no-op, so guard
-        # it explicitly rather than letting the grant through unverified.
-        if invitation.invited_by is None:
-            raise ValidationError(_(
-                "This invitation can no longer be accepted because the person who issued "
-                "it no longer has an account. Please request a new invitation."
-            ))
-        validate_permission_grant(
-            invitation.invited_by, invitation.role.permissions or [], invitation.tenant,
-        )
-
-    # 1. Create the tenant membership (a tenant member — provider is null)
-    membership = Membership.objects.create(
-        user=user,
-        tenant=invitation.tenant,
-    )
-    membership.roles.add(invitation.role)
-
-    # 2. Mark Invitation as accepted
-    invitation.accepted_at = timezone.now()
-    invitation.save()
-
-    # 3. Match and bind the User account to an existing AssetHolder record if present
-    holder = AssetHolder.objects.filter(
-        tenant=invitation.tenant,
-        email__iexact=invitation.email,
-        user__isnull=True
-    ).first()
-
-    if holder:
-        holder.user = user
-        holder.save()
 
 
 # --------------------------------------------------------------------------- Provider (MSP)

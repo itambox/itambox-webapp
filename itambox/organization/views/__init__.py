@@ -34,7 +34,6 @@ from .contactrole_views import (
     ContactAssignmentCreateView, ContactAssignmentDeleteView,
     ContactRoleBulkEditView, ContactRoleBulkDeleteView, ContactRoleCloneView,
 )
-from .invitation_views import InviteUserView, AcceptInvitationView
 from .role_views import (
     RoleListView, RoleDetailView, RoleEditView, RoleDeleteView,
     RoleCloneView, RoleBulkDeleteView, RoleAssignUsersView,

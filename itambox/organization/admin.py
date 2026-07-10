@@ -3,7 +3,7 @@ from django.utils.translation import gettext_lazy as _
 from .models import (
     Region, SiteGroup, Tenant, Location, TenantGroup, Site,
     Contact, ContactRole, ContactAssignment,
-    Membership, TenantInvitation, Role, CostCenter, Provider,
+    Membership, Role, CostCenter, Provider,
 )
 
 
@@ -67,12 +67,6 @@ class MembershipAdmin(admin.ModelAdmin):
         return obj.get_kind_display()
 
 
-class TenantInvitationAdmin(admin.ModelAdmin):
-    list_display = ('email', 'tenant', 'role', 'created_at', 'expires_at', 'accepted_at')
-    list_filter = ('tenant', 'role', 'accepted_at')
-    search_fields = ('email', 'tenant__name')
-
-
 class RoleAdmin(admin.ModelAdmin):
     list_display = ('name', 'scope', 'tenant', 'provider', 'is_default')
     list_filter = ('scope', 'tenant', 'provider', 'is_default')
@@ -104,7 +98,6 @@ admin.site.register(Contact, ContactAdmin)
 admin.site.register(ContactRole, ContactRoleAdmin)
 admin.site.register(ContactAssignment, ContactAssignmentAdmin)
 admin.site.register(Membership, MembershipAdmin)
-admin.site.register(TenantInvitation, TenantInvitationAdmin)
 admin.site.register(Role, RoleAdmin)
 admin.site.register(CostCenter, CostCenterAdmin)
 admin.site.register(Provider, ProviderAdmin)
