@@ -9,10 +9,11 @@ from django.urls import reverse
 from django.contrib.auth import get_user_model
 from rest_framework.test import APITestCase
 
-from organization.models import Tenant, Role, Membership
+from organization.models import Tenant, Role
 from assets.models import Manufacturer
 from software.models import Software
 from core.managers import set_current_tenant
+from core.tests.mixins import grant
 
 # Import the API view module at collection time (no tenant context) so its
 # `queryset = Software.objects...all()` class attribute bakes UNSCOPED — see the
@@ -31,8 +32,7 @@ class SoftwareApiTenantRepinTests(APITestCase):
             name='Role A',
             permissions=['software.view_software', 'software.change_software'],
         )
-        _membership = Membership.objects.create(user=self.user, tenant=self.tenant_a)
-        _membership.roles.add(self.role)
+        grant(self.user, self.tenant_a, self.role)
 
         self.mfr = Manufacturer.objects.create(name='MS', slug='ms')
         self.software = Software.objects.create(name='Office', manufacturer=self.mfr, tenant=self.tenant_a)

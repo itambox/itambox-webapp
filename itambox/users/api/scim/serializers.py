@@ -58,8 +58,8 @@ class SCIMUserSerializer(serializers.ModelSerializer):
         tenant = self.context.get('tenant')
         if not tenant:
             return []
-        # Groups are global; report the ones this user belongs to that grant a role in
-        # THIS tenant (SCIM /Groups maps to UserGroup, scoped per tenant for read).
+        # Groups are cross-tenant; report the ones this user belongs to that grant a
+        # role in THIS tenant (SCIM /Groups maps to UserGroup, scoped per tenant for read).
         user_groups = UserGroup.objects.filter(members=obj, roles__tenant=tenant).distinct()
         return [
             {
@@ -96,7 +96,8 @@ class SCIMGroupSerializer(serializers.ModelSerializer):
         return ["urn:ietf:params:scim:schemas:core:2.0:Group"]
 
     def get_members(self, obj):
-        # UserGroup is global (no tenant); URLs use the request's tenant slug from context.
+        # Member $ref URLs are built from the request's tenant slug in context (the
+        # group's own owning tenant is a SCIM-scoping detail, not a URL source here).
         tenant_slug = self.context.get('tenant_slug', '')
         return [
             {

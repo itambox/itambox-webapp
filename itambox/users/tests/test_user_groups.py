@@ -1,22 +1,24 @@
-"""Tests for the GLOBAL, cross-tenant UserGroup model and its access model.
+"""Tests for the cross-tenant UserGroup model and its access model.
 
-Post-redesign semantics (see lucky-swimming-quill.md + the MSP requirement):
-  - UserGroup is GLOBAL — no tenant FK. Its ``roles`` M2M may span tenants.
+Stage-2 RBAC-collapse semantics (RBAC_STAGE2_SPEC.md):
+  - UserGroup has an optional owning/SCIM-scope ``tenant`` FK (NULL = global group);
+    this does NOT constrain its ``roles`` M2M, which may still span any tenant.
   - A user's effective permissions in a tenant T are the additive union of:
-      (a) their ACTIVE Membership in T (its roles' perms + direct_permissions), and
+      (a) own-reach RoleAssignments on their ACTIVE Membership in T, and
       (b) the perms of every role whose ``role.tenant == T`` carried by an ACTIVE
           UserGroup the user belongs to — granted INDEPENDENTLY of any membership.
     So being in a group grants access to each of its roles' tenants, with no
     Membership required (the MSP "team" model).
-  - Group MANAGEMENT is the global ``organization.manage_usergroups`` capability
-    (superusers implicitly, plus explicit grantees), enforced on the group views.
+  - Group MANAGEMENT is gated by holding the real ``users.add_usergroup`` /
+    ``users.change_usergroup`` permissions in any tenant (``is_global_group_admin``),
+    superusers implicitly — the old ``manage_groups`` capability string is gone.
 """
 from django.contrib.auth import get_user_model
-from django.contrib.auth.models import Permission
 from django.test import TestCase
 from django.urls import reverse
 
 from core.managers import set_current_tenant, set_current_membership
+from core.tests.mixins import grant
 from organization.access import accessible_tenant_ids
 from organization.models import Tenant, Membership, Role
 from users.models import UserGroup
@@ -44,10 +46,23 @@ def _superuser(username):
 
 
 def _membership(user, tenant, roles=None, direct=None, active=True):
-    m = Membership.objects.create(user=user, tenant=tenant, is_active=active, direct_permissions=direct or [],
-    )
-    if roles:
-        m.roles.set(roles)
+    """Build a Membership with own-reach RoleAssignments for ``roles``.
+
+    ``direct`` (a list of permission codenames) is the successor of the deleted
+    ``Membership.direct_permissions`` field: it becomes a one-off Role named
+    "Direct grants" that is granted alongside the rest.
+    """
+    m, _ = Membership.objects.get_or_create(user=user, tenant=tenant)
+    for role in (roles or []):
+        grant(user, tenant, role)
+    if direct:
+        direct_role = Role.objects.create(
+            tenant=tenant, name=f"Direct grants ({user.pk})", permissions=direct,
+        )
+        grant(user, tenant, direct_role)
+    if m.is_active != active:
+        m.is_active = active
+        m.save()
     return m
 
 
@@ -61,9 +76,16 @@ def _group(name, roles=None, members=None, active=True):
 
 
 def _grant_group_manager(user):
-    user.user_permissions.add(
-        Permission.objects.get(content_type__app_label='organization', codename='manage_groups')
+    """Give ``user`` the standard usergroup-management perms in a fresh tenant — the
+    successor of the deleted ``organization.manage_groups`` capability grant (§6:
+    ``users.add_usergroup`` / ``users.change_usergroup`` held on any of the user's
+    tenants is what ``is_global_group_admin`` now checks)."""
+    tenant = Tenant.objects.create(name=f"GroupAdminTenant-{user.pk}", slug=f"group-admin-{user.pk}")
+    role = Role.objects.create(
+        tenant=tenant, name="Group Admin",
+        permissions=["users.add_usergroup", "users.change_usergroup"],
     )
+    return grant(user, tenant, role)
 
 
 class _PermCacheMixin:
@@ -100,18 +122,19 @@ class UserGroupModelTests(_PermCacheMixin, TestCase):
         with self.assertRaises(Exception):
             UserGroup.objects.create(name="Ops")
 
-    def test_provider_scoped_group_name_uniqueness(self):
-        from organization.models import Provider
-        provider_a = Provider.objects.create(name="MSP A", slug="msp-a")
-        provider_b = Provider.objects.create(name="MSP B", slug="msp-b")
+    def test_tenant_scoped_group_name_uniqueness(self):
+        # Successor of the deleted Provider model: UserGroup's owning/SCIM-scope FK is
+        # now a Tenant (typically an is_provider one for MSP teams).
+        tenant_a = Tenant.objects.create(name="MSP A", slug="msp-a", is_provider=True)
+        tenant_b = Tenant.objects.create(name="MSP B", slug="msp-b", is_provider=True)
 
-        # 1. Different providers can use the same group name
-        UserGroup.objects.create(name="Ops", provider=provider_a)
-        UserGroup.objects.create(name="Ops", provider=provider_b)
+        # 1. Different tenants can use the same group name
+        UserGroup.objects.create(name="Ops", tenant=tenant_a)
+        UserGroup.objects.create(name="Ops", tenant=tenant_b)
 
-        # 2. Same provider cannot use the same group name
+        # 2. Same tenant cannot use the same group name
         with self.assertRaises(Exception):
-            UserGroup.objects.create(name="Ops", provider=provider_a)
+            UserGroup.objects.create(name="Ops", tenant=tenant_a)
 
     def test_soft_delete_frees_name(self):
         g = UserGroup.objects.create(name="Temp")
@@ -254,15 +277,16 @@ class SoftDeletedRoleTests(_PermCacheMixin, TestCase):
 
 class GroupManagerCapabilityTests(_PermCacheMixin, TestCase):
     def test_capability_resolution(self):
-        # The legacy organization.manage_groups grant is resolved via the group-management
-        # capability gate (can_manage_user_groups / is_global_group_admin), NOT via
-        # has_perm — GlobalCapabilityBackend was removed in the MSP-RBAC redesign.
+        # The legacy organization.manage_groups grant is now resolved via real
+        # users.add_usergroup / users.change_usergroup permissions held in ANY tenant
+        # (is_global_group_admin) — the capability-string vocabulary and
+        # GlobalCapabilityBackend are both gone (stage-2 collapse).
         plain = _user("plain")
         self.assertFalse(is_global_group_admin(plain))
-        _grant_group_manager(plain)
+        assignment = _grant_group_manager(plain)
         plain = User.objects.get(pk=plain.pk)
         self.assertTrue(is_global_group_admin(plain))
-        plain.user_permissions.clear()
+        assignment.delete()
         plain = User.objects.get(pk=plain.pk)
         self.assertFalse(is_global_group_admin(plain))
 
@@ -289,11 +313,16 @@ class UserGroupFormTests(_PermCacheMixin, TestCase):
         self.user_a = _user("ua")
         self.user_b = _user("ub")
 
-    def test_no_tenant_field_and_cross_tenant_choices(self):
+    def test_tenant_field_present_and_cross_tenant_choices(self):
+        """UserGroup now carries an explicit owning/SCIM-scope ``tenant`` (successor of
+        the deleted ``provider`` FK) — present on the form and optional for superusers
+        (blank = global group). It does not narrow ``roles``/``members``: those still
+        span every tenant, since group permission grants are driven by ``roles`` alone."""
         from users.forms import UserGroupForm
         _role(self.ta, "RA"); _role(self.tb, "RB")
         form = UserGroupForm(user=self.superuser)
-        self.assertNotIn('tenant', form.fields)
+        self.assertIn('tenant', form.fields)
+        self.assertFalse(form.fields['tenant'].required)
         # roles span all tenants; members are all users
         self.assertEqual(form.fields['roles'].queryset.count(), Role._base_manager.count())
         self.assertEqual(form.fields['members'].queryset.count(), User.objects.count())
@@ -409,8 +438,12 @@ class MembershipDirectPermissionsTests(_PermCacheMixin, TestCase):
         self.target_m = _membership(self.target, self.t)
 
     def test_direct_permissions_resolve(self):
-        self.target_m.direct_permissions = ["assets.view_asset"]
-        self.target_m.save()
+        # Successor of the deleted Membership.direct_permissions field: a one-off Role
+        # scoped to just this grant, assigned like any other role via RoleAssignment.
+        direct_role = Role.objects.create(
+            tenant=self.t, name="Direct grants", permissions=["assets.view_asset"],
+        )
+        grant(self.target, self.t, direct_role)
         set_current_tenant(self.t); set_current_membership(self.target_m); self._flush(self.target)
         self.assertTrue(self.target.has_perm("assets.view_asset"))
 

@@ -16,6 +16,7 @@ from core.validators import validate_file_attachment, validate_image_attachment
 from core.auth.ldap import MultiTenantLDAPBackend
 from core.auth.saml import TenantSaml2Backend
 from core.managers import set_current_tenant
+from core.tests.mixins import grant
 
 User = get_user_model()
 
@@ -179,8 +180,7 @@ class MitigationsPhase4Tests(TestCase):
             name='Tenant Staff',
             permissions=['assets.change_asset']
         )
-        membership_staff = Membership.objects.create(user=staff_user, tenant=self.tenant)
-        membership_staff.roles.add(role)
+        membership_staff = grant(staff_user, self.tenant, role).membership
         
         factory = RequestFactory()
         
@@ -260,7 +260,7 @@ class MitigationsPhase4Tests(TestCase):
         
         # Verify Membership is provisioned with proper Admin role
         membership = Membership.objects.get(user=ldap_user, tenant=self.tenant)
-        self.assertEqual(membership.roles.first().name, 'Admin')
+        self.assertEqual(membership.assignments.first().role.name, 'Admin')
 
     def test_saml_user_profile_and_membership_syncing(self):
         backend = TenantSaml2Backend()
@@ -298,4 +298,4 @@ class MitigationsPhase4Tests(TestCase):
         
         # Verify Membership is provisioned with Manager role
         membership = Membership.objects.get(user=saml_user, tenant=self.tenant)
-        self.assertEqual(membership.roles.first().name, 'Manager')
+        self.assertEqual(membership.assignments.first().role.name, 'Manager')

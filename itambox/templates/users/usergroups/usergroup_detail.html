@@ -15,9 +15,9 @@
     <div class="small">
         {% blocktranslate trimmed %}
         A <strong>User Group</strong> grants its roles to every member across one or more
-        containers — no per-container membership is needed. This is the cross-tenant "team"
+        tenants — no per-tenant membership is needed. This is the cross-tenant "team"
         model. Contrast with a <strong>Membership</strong>, which binds one user to exactly
-        one tenant or provider.
+        one tenant.
         {% endblocktranslate %}
     </div>
 </div>
@@ -27,10 +27,10 @@
         <div class="fw-bold fs-3 text-dark">{{ object.name }}</div>
     </div>
     <div class="col-md-4 mb-3">
-        <label class="form-label text-muted">{% translate "Provider (SCIM scope)" %}</label>
+        <label class="form-label text-muted">{% translate "SCIM scope / owning tenant" %}</label>
         <div>
-            {% if object.provider %}
-                <a href="{% url 'organization:provider_detail' pk=object.provider.pk %}">{{ object.provider.name }}</a>
+            {% if object.tenant %}
+                <a href="{% url 'organization:tenant_detail' pk=object.tenant.pk %}">{{ object.tenant.name }}</a>
             {% else %}
                 <span class="badge bg-secondary-lt">{% translate "Global (UI-managed)" %}</span>
             {% endif %}
@@ -73,8 +73,8 @@
         <thead class="table-light">
             <tr>
                 <th>{% translate "Role" %}</th>
-                <th>{% translate "Kind" %}</th>
-                <th>{% translate "Container" %}</th>
+                <th>{% translate "Tenant" %}</th>
+                <th>{% translate "Shared" %}</th>
                 <th>{% translate "Permissions" %}</th>
             </tr>
         </thead>
@@ -84,8 +84,8 @@
                 <td>
                     <a href="{% url 'organization:role_detail' pk=role.pk %}">{{ role.name }}</a>
                 </td>
-                <td>{% role_scope_badge role %}</td>
-                <td>{% if role.owner %}{{ role.owner }}{% else %}—{% endif %}</td>
+                <td>{{ role.tenant.name }}</td>
+                <td>{% shared_role_badge role %}</td>
                 <td>
                     <span class="badge bg-secondary-lt">{{ role.permissions|length }} {% translate "permission(s)" %}</span>
                 </td>

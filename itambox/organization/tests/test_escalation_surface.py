@@ -1,46 +1,51 @@
 """Cohesive per-surface privilege-escalation test suite (RBAC_STABILIZATION_REVIEW.md P1 #8).
 
 Thesis under test (review §5): the escalation guard (``core.auth.guards.validate_permission_grant``
-/ ``validate_group_membership_grant``) is enforced *per call-site*, not at the model layer, so
-EVERY role/permission/membership/group-membership WRITE PATH must independently call it. This
-module asserts, for each known write path, that:
+/ ``validate_assignment_grant`` / ``validate_group_membership_grant``) is enforced *per call-site*,
+not at the model layer, so EVERY role/permission/membership/group-membership WRITE PATH must
+independently call it. This module asserts, for each known write path, that:
 
-  * a non-superuser actor who lacks permission P cannot grant a role/group/provider that would
-    confer P to someone else (the guard fires: form invalid / ``ValidationError`` /
-    ``PermissionDenied`` / no DB mutation), and
-  * an actor who already holds those permissions (or a superuser) CAN perform the same grant.
+  * a non-superuser actor who lacks permission P cannot grant a role/group/reach that would
+    confer P (or broader reach) to someone else (the guard fires: form invalid / ``ValidationError``
+    / ``PermissionDenied`` / no DB mutation), and
+  * an actor who already holds those permissions/reach (or a superuser) CAN perform the same grant.
 
 Surfaces covered (one test class per surface):
-  1. ``MembershipForm`` (organization/forms/membership_form.py)
+  1. ``MembershipForm`` (organization/forms/membership_form.py) — assignment authoring (own reach)
   2. ``MembershipBulkRoleForm`` / ``MembershipBulkEditView`` (organization/views/membership_views.py)
   3. ``RoleAssignUsersView`` (organization/views/role_views.py)
-  4. ``UserGroupForm`` (users/forms.py) — role grant + provider ownership
+  4. ``UserGroupForm`` (users/forms.py) — role attach, owning-tenant scope, member grants
   5. ``UserGroupAssignUsersView`` (users/views.py)
-  6. ``TechnicianQuickForm`` (organization/forms/provider_form.py)
+  6. ``TechnicianQuickForm`` (organization/forms/provider_form.py) — managed-reach onboarding
+  7. Reach-grant escalation — ``validate_assignment_grant`` itself (core/auth/guards.py), the guard
+     that stops an actor handing out MANAGED reach broader than their own, independent of whether
+     they hold the role's permission content.
 
-(The former surface #4, the tenant-invitation flow, was deleted wholesale on 2026-07-10 —
-users are provisioned by admins, SCIM, or SSO JIT; there is no invite write path anymore.)
+(The former surface, the tenant-invitation flow, was deleted wholesale on 2026-07-10 — users are
+provisioned by admins, SCIM, or SSO JIT; there is no invite write path anymore.)
+
+Post RBAC structural collapse (RBAC_STAGE2_SPEC.md): ``organization.Provider`` is deleted — a
+"provider"/MSP tenant is now ``Tenant(is_provider=True)`` pointed at via ``managed_by``; grants are
+per-``RoleAssignment`` rows (``reach='own'`` or ``reach='managed'``) hung off a ``Membership``,
+created here via ``core.tests.mixins.grant`` (re-exported as ``self.grant`` on ``TenantTestMixin``).
+There is no capability vocabulary and nothing is stripped in the managed projection — role content
+decides what a grant conveys, and ``validate_assignment_grant`` decides who may create it.
 
 Each write path already has its own dedicated regression test module (test_usergroup_escalation.py,
-test_role_assignment.py, etc.) — this module is the SINGLE cohesive
-sweep across all of them so a reviewer can see the whole escalation-guard surface at a glance, and
-so a newly-added write path with no guard shows up here as a gap rather than being missed entirely.
+test_role_assignment.py, etc.) — this module is the SINGLE cohesive sweep across all of them so a
+reviewer can see the whole escalation-guard surface at a glance, and so a newly-added write path
+with no guard shows up here as a gap rather than being missed entirely.
 """
-import unittest
-
 from django.contrib.auth import get_user_model
 from django.core.exceptions import ValidationError
 from django.test import TestCase
 from django.urls import reverse
 
+from core.auth.guards import validate_assignment_grant
 from core.managers import set_current_tenant, set_current_membership
 from core.tests.mixins import TenantTestMixin
-from organization.models import (
-    Membership, Role, Tenant, Provider,
-)
-from organization.forms import (
-    MembershipForm, MembershipBulkRoleForm,
-)
+from organization.models import Membership, Role, RoleAssignment, Tenant
+from organization.forms import MembershipForm, MembershipBulkRoleForm
 from organization.forms.provider_form import TechnicianQuickForm
 from users.models import UserGroup
 from users.forms import UserGroupForm
@@ -54,11 +59,10 @@ BROAD_PERMS = ['assets.delete_asset', 'organization.delete_tenant']
 
 
 def _flush_perm_cache(user):
-    """Clear any per-request permission caches ``MembershipBackend`` memoizes on the user
-    instance, so a freshly-added role/membership is picked up within the same test."""
+    """Clear the per-request permission caches ``MembershipBackend`` memoizes on the user
+    instance, so a freshly-added assignment/role is picked up within the same test."""
     for attr in list(user.__dict__):
-        if (attr.startswith('_perms_') or attr.startswith('_tenant_membership_')
-                or attr in ('_global_caps_cache', '_is_provider_staff_cache')):
+        if attr.startswith('_perms_') or attr.startswith('_tenant_membership_'):
             delattr(user, attr)
 
 
@@ -72,17 +76,15 @@ class EscalationSurfaceTestCase(TenantTestMixin, TestCase):
 
         self.tenant = Tenant.objects.create(name="Acme", slug="acme-escalation")
 
-        # Low-privilege actor: holds ONLY NARROW_PERM in the tenant.
+        # Low-privilege actor: holds ONLY NARROW_PERM in the tenant (own reach).
         self.narrow_role = Role.objects.create(
             tenant=self.tenant, name="Narrow", permissions=[NARROW_PERM],
         )
         self.low_priv = User.objects.create_user(
             username='low_priv', email='low_priv@acme.test', password='pw',
         )
-        self.low_priv_membership = Membership.objects.create(
-            user=self.low_priv, tenant=self.tenant, is_active=True,
-        )
-        self.low_priv_membership.roles.add(self.narrow_role)
+        self.low_priv_assignment = self.grant(self.low_priv, self.tenant, self.narrow_role)
+        self.low_priv_membership = self.low_priv_assignment.membership
 
         # High-privilege actor: holds NARROW_PERM + BROAD_PERMS in the tenant.
         self.broad_role = Role.objects.create(
@@ -91,10 +93,8 @@ class EscalationSurfaceTestCase(TenantTestMixin, TestCase):
         self.high_priv = User.objects.create_user(
             username='high_priv', email='high_priv@acme.test', password='pw',
         )
-        self.high_priv_membership = Membership.objects.create(
-            user=self.high_priv, tenant=self.tenant, is_active=True,
-        )
-        self.high_priv_membership.roles.add(self.broad_role)
+        self.high_priv_assignment = self.grant(self.high_priv, self.tenant, self.broad_role)
+        self.high_priv_membership = self.high_priv_assignment.membership
 
         # The over-privileged role that a legitimate grant should carry, and that the
         # low-privilege actor must NOT be able to hand out.
@@ -122,7 +122,8 @@ class EscalationSurfaceTestCase(TenantTestMixin, TestCase):
 # --------------------------------------------------------------------------------------------- #
 class MembershipFormEscalationTests(EscalationSurfaceTestCase):
     """Surface #1: attaching a role whose permissions exceed the actor's is rejected by
-    ``MembershipForm.clean()`` (organization/forms/membership_form.py)."""
+    ``MembershipForm.clean()`` (organization/forms/membership_form.py) via
+    ``validate_assignment_grant`` for each selected (own-reach) role."""
 
     def setUp(self):
         super().setUp()
@@ -130,19 +131,21 @@ class MembershipFormEscalationTests(EscalationSurfaceTestCase):
             username='victim', email='victim@acme.test', password='pw',
         )
 
+    def _data(self, role):
+        return {
+            'user': self.victim.pk,
+            'tenant': self.tenant.pk,
+            'roles': [role.pk],
+            'reach': RoleAssignment.REACH_OWN,
+            'is_active': True,
+        }
+
     def test_low_privilege_actor_cannot_grant_overprivileged_role_via_membership_form(self):
         """A narrow-permission actor cannot create a Membership carrying a role whose
         permissions they do not themselves hold."""
         _flush_perm_cache(self.low_priv)
         form = MembershipForm(
-            data={
-                'user': self.victim.pk,
-                'tenant': self.tenant.pk,
-                'roles': [self.overpriv_role.pk],
-                'is_active': True,
-            },
-            user=self.low_priv,
-            tenant=self.tenant,
+            data=self._data(self.overpriv_role), user=self.low_priv, tenant=self.tenant,
         )
         self.assertFalse(form.is_valid())
         self.assertIn('__all__', form.errors)
@@ -152,33 +155,24 @@ class MembershipFormEscalationTests(EscalationSurfaceTestCase):
         self.assertFalse(Membership.objects.filter(user=self.victim, tenant=self.tenant).exists())
 
     def test_high_privilege_actor_can_grant_role_within_their_permissions(self):
-        """An actor holding every permission the role carries CAN create the membership."""
+        """An actor holding every permission the role carries CAN create the membership and
+        its own-reach RoleAssignment."""
         _flush_perm_cache(self.high_priv)
         form = MembershipForm(
-            data={
-                'user': self.victim.pk,
-                'tenant': self.tenant.pk,
-                'roles': [self.overpriv_role.pk],
-                'is_active': True,
-            },
-            user=self.high_priv,
-            tenant=self.tenant,
+            data=self._data(self.overpriv_role), user=self.high_priv, tenant=self.tenant,
         )
         self.assertTrue(form.is_valid(), form.errors)
         membership = form.save()
-        self.assertIn(self.overpriv_role, membership.roles.all())
+        self.assertTrue(
+            membership.assignments.filter(
+                role=self.overpriv_role, reach=RoleAssignment.REACH_OWN,
+            ).exists()
+        )
 
     def test_superuser_bypasses_membership_form_guard(self):
         """A superuser may grant any role via ``MembershipForm`` (guard is a no-op)."""
         form = MembershipForm(
-            data={
-                'user': self.victim.pk,
-                'tenant': self.tenant.pk,
-                'roles': [self.overpriv_role.pk],
-                'is_active': True,
-            },
-            user=self.superuser,
-            tenant=self.tenant,
+            data=self._data(self.overpriv_role), user=self.superuser, tenant=self.tenant,
         )
         self.assertTrue(form.is_valid(), form.errors)
 
@@ -187,8 +181,8 @@ class MembershipFormEscalationTests(EscalationSurfaceTestCase):
 # 2. MembershipBulkRoleForm / MembershipBulkEditView
 # --------------------------------------------------------------------------------------------- #
 class MembershipBulkEditEscalationTests(EscalationSurfaceTestCase):
-    """Surface #2: bulk role-add via ``MembershipBulkEditView`` is guarded (the view calls
-    ``validate_permission_grant`` on the union of ``roles_to_add`` before mutating)."""
+    """Surface #2: bulk own-reach role-add via ``MembershipBulkEditView`` is guarded (the view
+    calls ``validate_assignment_grant`` per role in ``roles_to_add`` before mutating)."""
 
     def setUp(self):
         super().setUp()
@@ -202,9 +196,15 @@ class MembershipBulkEditEscalationTests(EscalationSurfaceTestCase):
     def _url(self):
         return reverse('organization:membership_bulk_edit')
 
+    def _has_overpriv_assignment(self):
+        return RoleAssignment.objects.filter(
+            membership=self.target_membership, role=self.overpriv_role,
+            reach=RoleAssignment.REACH_OWN,
+        ).exists()
+
     def test_low_privilege_actor_cannot_bulk_grant_overprivileged_role(self):
         """A narrow-permission actor's bulk role-add of an over-privileged role is rejected;
-        no role is attached to the target membership."""
+        no assignment is attached to the target membership."""
         self._login(self.low_priv)
         resp = self.client.post(self._url(), {
             'pk': [self.target_membership.pk],
@@ -215,8 +215,7 @@ class MembershipBulkEditEscalationTests(EscalationSurfaceTestCase):
         # Guarded by change_membership perm check first (low_priv lacks it too) OR the
         # escalation guard — either way the mutation must not happen.
         self.assertIn(resp.status_code, (302, 403))
-        self.target_membership.refresh_from_db()
-        self.assertNotIn(self.overpriv_role, self.target_membership.roles.all())
+        self.assertFalse(self._has_overpriv_assignment())
 
     def test_actor_with_change_membership_and_narrow_perms_still_blocked_from_broad_grant(self):
         """Even an actor who can administer memberships in the tenant (has
@@ -232,10 +231,7 @@ class MembershipBulkEditEscalationTests(EscalationSurfaceTestCase):
         manager = User.objects.create_user(
             username='mem_manager', email='mem_manager@acme.test', password='pw',
         )
-        manager_membership = Membership.objects.create(
-            user=manager, tenant=self.tenant, is_active=True,
-        )
-        manager_membership.roles.add(manager_role)
+        self.grant(manager, self.tenant, manager_role)
         _flush_perm_cache(manager)
 
         self._login(manager)
@@ -245,8 +241,7 @@ class MembershipBulkEditEscalationTests(EscalationSurfaceTestCase):
             'roles_to_add': [self.overpriv_role.pk],
             'return_url': reverse('organization:membership_list'),
         }, follow=True)
-        self.target_membership.refresh_from_db()
-        self.assertNotIn(self.overpriv_role, self.target_membership.roles.all())
+        self.assertFalse(self._has_overpriv_assignment())
         content = resp.content.decode().lower()
         self.assertIn('privilege escalation', content)
 
@@ -259,10 +254,7 @@ class MembershipBulkEditEscalationTests(EscalationSurfaceTestCase):
         admin = User.objects.create_user(
             username='bulk_admin', email='bulk_admin@acme.test', password='pw',
         )
-        admin_membership = Membership.objects.create(
-            user=admin, tenant=self.tenant, is_active=True,
-        )
-        admin_membership.roles.add(admin_role)
+        self.grant(admin, self.tenant, admin_role)
         _flush_perm_cache(admin)
 
         self._login(admin)
@@ -273,8 +265,7 @@ class MembershipBulkEditEscalationTests(EscalationSurfaceTestCase):
             'return_url': reverse('organization:membership_list'),
         })
         self.assertEqual(resp.status_code, 302)
-        self.target_membership.refresh_from_db()
-        self.assertIn(self.overpriv_role, self.target_membership.roles.all())
+        self.assertTrue(self._has_overpriv_assignment())
 
     def test_superuser_can_bulk_grant_any_role(self):
         """A superuser bypasses the guard entirely."""
@@ -286,8 +277,7 @@ class MembershipBulkEditEscalationTests(EscalationSurfaceTestCase):
             'return_url': reverse('organization:membership_list'),
         })
         self.assertEqual(resp.status_code, 302)
-        self.target_membership.refresh_from_db()
-        self.assertIn(self.overpriv_role, self.target_membership.roles.all())
+        self.assertTrue(self._has_overpriv_assignment())
 
     def test_bulk_role_form_itself_has_no_field_level_guard(self):
         """Documents that ``MembershipBulkRoleForm`` is a plain field-selection form — the
@@ -323,7 +313,7 @@ class RoleAssignUsersViewEscalationTests(EscalationSurfaceTestCase):
 
     def test_low_privilege_actor_cannot_assign_users_to_overprivileged_role(self):
         """A user with add/change_membership perms but who does not hold the target role's
-        permissions is denied (403) and no membership/role grant occurs."""
+        permissions is denied (403) and no membership/assignment is created."""
         _flush_perm_cache(self.low_priv)
         self._login(self.low_priv)
         resp = self.client.post(self._url(), {'users': [self.target_user.pk]})
@@ -347,7 +337,9 @@ class RoleAssignUsersViewEscalationTests(EscalationSurfaceTestCase):
         self.assertIn(resp.status_code, (200, 302))
         mem = Membership.objects.filter(user=self.target_user, tenant=self.tenant).first()
         self.assertIsNotNone(mem)
-        self.assertIn(self.overpriv_role, mem.roles.all())
+        self.assertTrue(
+            mem.assignments.filter(role=self.overpriv_role, reach=RoleAssignment.REACH_OWN).exists()
+        )
 
     def test_superuser_can_assign_users_to_any_role(self):
         self._login(self.superuser)
@@ -355,98 +347,120 @@ class RoleAssignUsersViewEscalationTests(EscalationSurfaceTestCase):
         self.assertIn(resp.status_code, (200, 302))
         mem = Membership.objects.filter(user=self.target_user, tenant=self.tenant).first()
         self.assertIsNotNone(mem)
-        self.assertIn(self.overpriv_role, mem.roles.all())
+        self.assertTrue(
+            mem.assignments.filter(role=self.overpriv_role, reach=RoleAssignment.REACH_OWN).exists()
+        )
 
 
 # --------------------------------------------------------------------------------------------- #
 # 4. UserGroupForm
 # --------------------------------------------------------------------------------------------- #
 class UserGroupFormEscalationTests(EscalationSurfaceTestCase):
-    """Surface #5: ``UserGroupForm`` rejects (a) attaching an over-privileged role, and
-    (b) setting a provider the actor doesn't manage."""
+    """Surface #4: ``UserGroupForm`` rejects (a) attaching an over-privileged role, (b) setting
+    a ``tenant`` (owning/SCIM-scope, formerly ``provider``) the actor doesn't administer, and
+    (c) adding a member that would confer a role the actor cannot themselves grant."""
 
     def setUp(self):
         super().setUp()
-        self.provider_a = Provider.objects.create(name="MSP A", slug="msp-a-escalation")
-        self.provider_b = Provider.objects.create(name="MSP B", slug="msp-b-escalation")
+        self.msp_a = Tenant.objects.create(name="MSP A", slug="msp-a-escalation", is_provider=True)
+        self.msp_b = Tenant.objects.create(name="MSP B", slug="msp-b-escalation", is_provider=True)
 
-        # Provider-A group admin: manage_groups on provider A only, no broad perms.
+        # MSP-A group admin: holds users.change_usergroup + NARROW_PERM at A only.
         self.group_admin_role = Role.objects.create(
-            provider=self.provider_a, name="A Group Admin",
-            permissions=['organization.manage_groups', NARROW_PERM],
+            tenant=self.msp_a, name="A Group Admin",
+            permissions=['users.change_usergroup', NARROW_PERM],
         )
         self.group_admin = User.objects.create_user(
             username='group_admin', email='group_admin@acme.test', password='pw',
         )
-        self.group_admin_staff = Membership.objects.create(
-            user=self.group_admin, provider=self.provider_a, is_active=True,
-        )
-        self.group_admin_staff.roles.add(self.group_admin_role)
+        self.grant(self.group_admin, self.msp_a, self.group_admin_role)
 
         self.target_user = User.objects.create_user(
             username='ug_target', email='ug_target@acme.test', password='pw',
         )
 
-    def test_low_privilege_group_admin_cannot_attach_overprivileged_tenant_role(self):
-        """(a) A group admin cannot attach a role whose tenant-scoped permissions they do
-        not hold — even though they may manage groups globally."""
+    def test_low_privilege_group_admin_cannot_attach_overprivileged_role(self):
+        """(a) A group admin cannot attach a role whose permissions they do not hold — even
+        though they administer groups (``users.change_usergroup``) at MSP A."""
         _flush_perm_cache(self.group_admin)
         data = {
             'name': 'Takeover Group', 'roles': [self.overpriv_role.pk], 'members': [],
-            'is_active': True,
+            'tenant': self.msp_a.pk, 'is_active': True,
         }
         form = UserGroupForm(data=data, user=self.group_admin)
         self.assertFalse(form.is_valid())
         self.assertFalse(UserGroup.objects.filter(name='Takeover Group').exists())
 
-    def test_low_privilege_group_admin_cannot_set_unmanaged_provider(self):
-        """(b) A provider-A group admin cannot scope a new group to provider B, which they
-        do not manage."""
+    def test_low_privilege_group_admin_cannot_set_unmanaged_tenant(self):
+        """(b) An MSP-A group admin cannot scope a new group to MSP B, which they do not
+        administer."""
         _flush_perm_cache(self.group_admin)
         data = {
-            'name': 'Cross Provider Group', 'roles': [], 'members': [],
-            'provider': self.provider_b.pk, 'is_active': True,
+            'name': 'Cross Tenant Group', 'roles': [], 'members': [],
+            'tenant': self.msp_b.pk, 'is_active': True,
         }
         form = UserGroupForm(data=data, user=self.group_admin)
         self.assertFalse(form.is_valid())
-        self.assertIn('provider', form.errors)
+        self.assertIn('tenant', form.errors)
+
+    def test_low_privilege_group_admin_cannot_add_member_granting_unheld_role(self):
+        """(c) Adding a member confers every role the group carries; a group admin who cannot
+        grant one of those roles' permissions is blocked on the ``members`` write path too
+        (not just a bare role-attach with no members)."""
+        _flush_perm_cache(self.group_admin)
+        data = {
+            'name': 'Overpriv Members Group', 'roles': [self.overpriv_role.pk],
+            'members': [self.target_user.pk],
+            'tenant': self.msp_a.pk, 'is_active': True,
+        }
+        form = UserGroupForm(data=data, user=self.group_admin)
+        self.assertFalse(form.is_valid())
+        self.assertFalse(UserGroup.objects.filter(name='Overpriv Members Group').exists())
 
     def test_high_privilege_group_admin_can_attach_role_within_permissions(self):
-        """Positive (a): a group admin who also holds the role's permissions succeeds.
-
-        The role being attached is tenant-scoped, so the group admin needs an actual
-        tenant Membership carrying that permission (a provider-scoped role cannot be
-        attached to a provider Membership to grant tenant perms — the container kinds
-        don't mix)."""
+        """Positive (a): a group admin who also holds the role's permissions (in that role's
+        OWN tenant) succeeds."""
         narrow_group_role = Role.objects.create(
-            tenant=self.tenant, name="Narrow Group Role", permissions=[NARROW_PERM],
+            tenant=self.msp_a, name="Narrow Group Role", permissions=[NARROW_PERM],
         )
-        tenant_membership = Membership.objects.create(
-            user=self.group_admin, tenant=self.tenant, is_active=True,
-        )
-        tenant_membership.roles.add(self.narrow_role)
         _flush_perm_cache(self.group_admin)
         data = {
             'name': 'Legit Group', 'roles': [narrow_group_role.pk], 'members': [],
-            'is_active': True,
+            'tenant': self.msp_a.pk, 'is_active': True,
         }
         form = UserGroupForm(data=data, user=self.group_admin)
         self.assertTrue(form.is_valid(), form.errors)
 
-    def test_high_privilege_group_admin_can_set_own_provider(self):
-        """Positive (b): setting the provider the actor actually manages succeeds."""
+    def test_high_privilege_group_admin_can_set_own_tenant(self):
+        """Positive (b): setting the tenant the actor actually administers succeeds."""
         _flush_perm_cache(self.group_admin)
         data = {
-            'name': 'Own Provider Group', 'roles': [], 'members': [],
-            'provider': self.provider_a.pk, 'is_active': True,
+            'name': 'Own Tenant Group', 'roles': [], 'members': [],
+            'tenant': self.msp_a.pk, 'is_active': True,
         }
         form = UserGroupForm(data=data, user=self.group_admin)
         self.assertTrue(form.is_valid(), form.errors)
 
-    def test_superuser_bypasses_both_usergroup_form_guards(self):
+    def test_high_privilege_group_admin_can_add_member_granting_held_role(self):
+        """Positive (c): adding a member to a group carrying only a role the actor can
+        themselves grant succeeds."""
+        narrow_group_role = Role.objects.create(
+            tenant=self.msp_a, name="Narrow Member Role", permissions=[NARROW_PERM],
+        )
+        _flush_perm_cache(self.group_admin)
         data = {
-            'name': 'SU Group', 'roles': [self.overpriv_role.pk], 'members': [],
-            'provider': self.provider_b.pk, 'is_active': True,
+            'name': 'Legit Members Group', 'roles': [narrow_group_role.pk],
+            'members': [self.target_user.pk],
+            'tenant': self.msp_a.pk, 'is_active': True,
+        }
+        form = UserGroupForm(data=data, user=self.group_admin)
+        self.assertTrue(form.is_valid(), form.errors)
+
+    def test_superuser_bypasses_all_usergroup_form_guards(self):
+        data = {
+            'name': 'SU Group', 'roles': [self.overpriv_role.pk],
+            'members': [self.target_user.pk],
+            'tenant': self.msp_b.pk, 'is_active': True,
         }
         form = UserGroupForm(data=data, user=self.superuser)
         self.assertTrue(form.is_valid(), form.errors)
@@ -456,33 +470,26 @@ class UserGroupFormEscalationTests(EscalationSurfaceTestCase):
 # 5. UserGroupAssignUsersView (users)
 # --------------------------------------------------------------------------------------------- #
 class UserGroupAssignUsersViewEscalationTests(EscalationSurfaceTestCase):
-    """Surface #6: adding a member to a role-carrying UserGroup the actor can't fully grant
-    is blocked by ``validate_group_membership_grant`` inside the assign view.
-
-    NOTE: the negative case (blocked-grant) is currently ``skip``ped — see its skip reason —
-    because this sweep found the guard has a live tenant-scoping gap for actors with no
-    active-tenant context (typical of pure provider-staff admins). The positive cases
-    (superuser bypass, and a grant the actor genuinely holds) still pass and are exercised
-    below."""
+    """Surface #5: adding a member to a role-carrying UserGroup the actor can't fully grant is
+    blocked by ``validate_group_membership_grant`` inside the assign view — even though (unlike
+    the form surface above) no ``roles`` field is resubmitted here; the guard reads the group's
+    PERSISTED roles via ``Role._base_manager`` (tenant-context-independent)."""
 
     def setUp(self):
         super().setUp()
-        self.provider_a = Provider.objects.create(name="MSP A2", slug="msp-a2-escalation")
+        self.msp_a2 = Tenant.objects.create(name="MSP A2", slug="msp-a2-escalation", is_provider=True)
 
         self.group_admin_role = Role.objects.create(
-            provider=self.provider_a, name="A2 Group Admin",
-            permissions=['organization.manage_groups'],
+            tenant=self.msp_a2, name="A2 Group Admin",
+            permissions=['users.change_usergroup', NARROW_PERM],
         )
         self.group_admin = User.objects.create_user(
             username='ug_assign_admin', email='ug_assign_admin@acme.test', password='pw',
         )
-        self.group_admin_staff = Membership.objects.create(
-            user=self.group_admin, provider=self.provider_a, is_active=True,
-        )
-        self.group_admin_staff.roles.add(self.group_admin_role)
+        self.grant(self.group_admin, self.msp_a2, self.group_admin_role)
 
-        # A group carrying the over-privileged tenant role — the admin above cannot
-        # grant this role's permissions, so adding a member must be blocked.
+        # A group carrying the over-privileged tenant role — the admin above cannot grant this
+        # role's permissions, so adding a member must be blocked.
         self.overpriv_group = UserGroup.objects.create(name="Overpriv Group")
         self.overpriv_group.roles.add(self.overpriv_role)
 
@@ -494,14 +501,9 @@ class UserGroupAssignUsersViewEscalationTests(EscalationSurfaceTestCase):
         return reverse('users:usergroup_assign_users', kwargs={'pk': (group or self.overpriv_group).pk})
 
     def test_low_privilege_group_admin_cannot_add_member_to_overprivileged_group(self):
-        """A group admin (global capability only) cannot add a member to a group carrying
-        a role whose permissions they don't hold — no member is added.
-
-        Regression for the tenant-scoping gap the #8 sweep found: a pure provider-staff group
-        admin (Provider Membership, no Tenant Membership, so no active_tenant is resolved) must
-        still be blocked. core/auth/guards.validate_group_membership_grant now reads the group's
-        roles via Role._base_manager (tenant-context-independent) rather than the scoped default
-        manager, so the guard sees the carried role and rejects the grant."""
+        """A group admin (gated in via ``users.change_usergroup`` at MSP A2) cannot add a
+        member to a group carrying a role whose permissions they don't hold — no member is
+        added."""
         _flush_perm_cache(self.group_admin)
         self.client.force_login(self.group_admin)
         resp = self.client.post(self._url(), {'users': [self.target_user.pk]})
@@ -512,10 +514,9 @@ class UserGroupAssignUsersViewEscalationTests(EscalationSurfaceTestCase):
         """Positive: a group admin who holds the carried role's permissions succeeds."""
         narrow_group = UserGroup.objects.create(name="Narrow Group")
         narrow_tenant_role = Role.objects.create(
-            provider=self.provider_a, name="A2 Narrow", permissions=[NARROW_PERM],
+            tenant=self.msp_a2, name="A2 Narrow", permissions=[NARROW_PERM],
         )
         narrow_group.roles.add(narrow_tenant_role)
-        self.group_admin_staff.roles.add(narrow_tenant_role)
         _flush_perm_cache(self.group_admin)
 
         self.client.force_login(self.group_admin)
@@ -537,55 +538,60 @@ class UserGroupAssignUsersViewEscalationTests(EscalationSurfaceTestCase):
 # 6. TechnicianQuickForm
 # --------------------------------------------------------------------------------------------- #
 class TechnicianQuickFormEscalationTests(EscalationSurfaceTestCase):
-    """Surface #7: onboarding a technician with an over-privileged PROVIDER role is
-    blocked by ``TechnicianQuickForm.clean()``."""
+    """Surface #6: onboarding a technician with an over-privileged MANAGED-reach role
+    assignment is blocked by ``TechnicianQuickForm.clean()`` (organization/forms/provider_form.py),
+    which delegates to ``validate_assignment_grant`` for the managed-reach grant."""
 
     def setUp(self):
         super().setUp()
-        self.provider = Provider.objects.create(name="MSP Onboard", slug="msp-onboard-escalation")
+        self.org = Tenant.objects.create(
+            name="MSP Onboard", slug="msp-onboard-escalation", is_provider=True,
+        )
 
-        # Low-priv onboarder: manage_staff on the provider, but no other provider perms.
+        # Low-priv onboarder: can create memberships at the org, nothing else — in
+        # particular no ``organization.add_roleassignment``, so no managed-reach grant of
+        # ANY role should succeed for them, regardless of the role's own permission content.
         self.onboarder_role = Role.objects.create(
-            provider=self.provider, name="Onboarder", permissions=['organization.manage_staff'],
+            tenant=self.org, name="Onboarder", permissions=['organization.add_membership'],
         )
         self.onboarder = User.objects.create_user(
             username='onboarder', email='onboarder@acme.test', password='pw',
         )
-        self.onboarder_staff = Membership.objects.create(
-            user=self.onboarder, provider=self.provider, is_active=True,
-        )
-        self.onboarder_staff.roles.add(self.onboarder_role)
+        self.grant(self.onboarder, self.org, self.onboarder_role)
 
-        # High-priv onboarder: manage_staff + the broad provider-scoped permissions.
-        self.provider_broad_role = Role.objects.create(
-            provider=self.provider, name="Provider Full Admin",
-            permissions=['organization.manage_staff'] + BROAD_PERMS,
+        # High-priv onboarder: add_membership + add_roleassignment + the broad perms, PLUS a
+        # managed-reach assignment of their own covering ALL managed tenants — you cannot
+        # hand out reach broader than you hold.
+        self.senior_role = Role.objects.create(
+            tenant=self.org, name="Provider Full Admin",
+            permissions=['organization.add_membership', 'organization.add_roleassignment'] + BROAD_PERMS,
         )
         self.senior_onboarder = User.objects.create_user(
             username='senior_onboarder', email='senior_onboarder@acme.test', password='pw',
         )
-        self.senior_staff = Membership.objects.create(
-            user=self.senior_onboarder, provider=self.provider, is_active=True,
+        self.grant(self.senior_onboarder, self.org, self.senior_role)
+        self.grant(
+            self.senior_onboarder, self.org, self.senior_role,
+            reach=RoleAssignment.REACH_MANAGED, managed_scope=RoleAssignment.SCOPE_ALL,
         )
-        self.senior_staff.roles.add(self.provider_broad_role)
 
-        # The over-privileged PROVIDER-scoped role being granted during onboarding.
+        # The over-privileged role being granted during onboarding.
         self.overpriv_provider_role = Role.objects.create(
-            provider=self.provider, name="Overpriv Provider Role", permissions=list(BROAD_PERMS),
+            tenant=self.org, name="Overpriv Provider Role", permissions=list(BROAD_PERMS),
         )
 
     def _form_data(self, role):
         return {
             'email': 'newtech@acme.test',
             'first_name': 'New', 'last_name': 'Tech',
-            'provider': self.provider.pk,
+            'organization': self.org.pk,
             'role': role.pk if role else '',
-            'tenant_scope': Membership.SCOPE_ALL,
+            'managed_scope': RoleAssignment.SCOPE_ALL,
         }
 
-    def test_low_privilege_onboarder_cannot_onboard_with_overprivileged_provider_role(self):
-        """A user who can manage staff but does not hold the provider role's permissions
-        cannot onboard a technician into that role."""
+    def test_low_privilege_onboarder_cannot_onboard_with_overprivileged_role(self):
+        """A user who can create memberships but does not hold the role's permissions (nor
+        ``add_roleassignment``) cannot onboard a technician into that role."""
         _flush_perm_cache(self.onboarder)
         form = TechnicianQuickForm(data=self._form_data(self.overpriv_provider_role), user=self.onboarder)
         self.assertFalse(form.is_valid())
@@ -593,15 +599,209 @@ class TechnicianQuickFormEscalationTests(EscalationSurfaceTestCase):
         self.assertFalse(User.objects.filter(email='newtech@acme.test').exists())
 
     def test_high_privilege_onboarder_can_onboard_with_role_within_their_permissions(self):
-        """An onboarder holding the provider role's permissions can onboard the technician."""
+        """An onboarder holding the role's permissions AND sufficient managed reach can
+        onboard the technician, creating a managed-reach RoleAssignment."""
         _flush_perm_cache(self.senior_onboarder)
         form = TechnicianQuickForm(
             data=self._form_data(self.overpriv_provider_role), user=self.senior_onboarder,
         )
         self.assertTrue(form.is_valid(), form.errors)
         user, membership = form.save()
-        self.assertIn(self.overpriv_provider_role, membership.roles.all())
+        self.assertTrue(
+            membership.assignments.filter(
+                role=self.overpriv_provider_role, reach=RoleAssignment.REACH_MANAGED,
+            ).exists()
+        )
 
-    def test_superuser_can_onboard_with_any_provider_role(self):
+    def test_superuser_can_onboard_with_any_role(self):
         form = TechnicianQuickForm(data=self._form_data(self.overpriv_provider_role), user=self.superuser)
         self.assertTrue(form.is_valid(), form.errors)
+
+
+# --------------------------------------------------------------------------------------------- #
+# 7. Reach-grant escalation — validate_assignment_grant itself
+# --------------------------------------------------------------------------------------------- #
+class ReachGrantEscalationTests(EscalationSurfaceTestCase):
+    """NEW surface: granting MANAGED reach is itself escalation-checked by
+    ``validate_assignment_grant`` (core/auth/guards.py), independent of whether the actor holds
+    the role's own permission content:
+
+      * an actor who holds the role's permissions but lacks
+        ``organization.add_roleassignment`` / ``change_roleassignment`` at the managing tenant
+        cannot create ANY managed-reach assignment there ("the gate");
+      * an actor whose own managed coverage is EXPLICIT and narrower than what's requested (e.g.
+        holds only tenant A, asked to grant [A, B] or SCOPE_ALL) is rejected — "you cannot hand
+        out broader reach than you have" ("the coverage subset check").
+
+    Exercised both directly against the guard function (precise unit coverage of the boundary)
+    and through ``MembershipForm`` (the same semantics via a real write path)."""
+
+    def setUp(self):
+        super().setUp()
+        self.org = Tenant.objects.create(name="Reach MSP", slug="reach-msp", is_provider=True)
+        self.customer_a = Tenant.objects.create(
+            name="Customer A", slug="reach-customer-a", managed_by=self.org,
+        )
+        self.customer_b = Tenant.objects.create(
+            name="Customer B", slug="reach-customer-b", managed_by=self.org,
+        )
+        # A role whose permissions every actor below holds (NARROW_PERM only), so the base
+        # ``validate_permission_grant`` check never fires — isolating the reach-specific checks.
+        self.managed_role = Role.objects.create(
+            tenant=self.org, name="Managed Viewer", permissions=[NARROW_PERM],
+        )
+
+    def _actor(self, name, *, own_perms=(), managed_scope=None, assigned=None):
+        """A user holding ``own_perms`` (+ NARROW_PERM) at ``self.org`` via own reach, and
+        optionally a managed-reach assignment of their own with the given refinement."""
+        role = Role.objects.create(
+            tenant=self.org, name=f"{name}-role", permissions=list(own_perms) + [NARROW_PERM],
+        )
+        user = User.objects.create_user(
+            username=name, email=f'{name}@acme.test', password='pw',
+        )
+        self.grant(user, self.org, role)
+        if managed_scope is not None:
+            self.grant(
+                user, self.org, role, reach=RoleAssignment.REACH_MANAGED,
+                managed_scope=managed_scope, assigned_tenants=assigned,
+            )
+        _flush_perm_cache(user)
+        return user
+
+    # ---- the gate: add/change_roleassignment required for ANY managed-reach grant --------- #
+
+    def test_actor_without_roleassignment_perm_cannot_create_any_managed_grant(self):
+        """Even an actor whose own coverage is ALL cannot grant managed reach at all without
+        holding ``add_roleassignment``/``change_roleassignment`` — the gate comes first."""
+        actor = self._actor('no_gate', own_perms=[], managed_scope=RoleAssignment.SCOPE_ALL)
+        with self.assertRaises(ValidationError):
+            validate_assignment_grant(
+                actor, self.managed_role, self.org, reach=RoleAssignment.REACH_MANAGED,
+                requested_tenant_ids={self.customer_a.pk},
+            )
+
+    def test_actor_with_roleassignment_perm_passes_the_gate(self):
+        actor = self._actor(
+            'gated', own_perms=['organization.add_roleassignment'],
+            managed_scope=RoleAssignment.SCOPE_ALL,
+        )
+        validate_assignment_grant(  # must not raise
+            actor, self.managed_role, self.org, reach=RoleAssignment.REACH_MANAGED,
+            requested_tenant_ids={self.customer_a.pk},
+        )
+
+    # ---- the coverage-subset check: explicit [A] cannot grant [A, B] or ALL --------------- #
+
+    def test_actor_with_explicit_a_cannot_grant_a_and_b(self):
+        actor = self._actor(
+            'explicit_a', own_perms=['organization.add_roleassignment'],
+            managed_scope=RoleAssignment.SCOPE_EXPLICIT, assigned=[self.customer_a],
+        )
+        with self.assertRaises(ValidationError):
+            validate_assignment_grant(
+                actor, self.managed_role, self.org, reach=RoleAssignment.REACH_MANAGED,
+                requested_tenant_ids={self.customer_a.pk, self.customer_b.pk},
+            )
+
+    def test_actor_with_explicit_a_cannot_grant_scope_all(self):
+        actor = self._actor(
+            'explicit_a2', own_perms=['organization.add_roleassignment'],
+            managed_scope=RoleAssignment.SCOPE_EXPLICIT, assigned=[self.customer_a],
+        )
+        with self.assertRaises(ValidationError):
+            validate_assignment_grant(
+                actor, self.managed_role, self.org, reach=RoleAssignment.REACH_MANAGED,
+                requested_tenant_ids=None,  # None == SCOPE_ALL requested
+            )
+
+    def test_actor_with_explicit_a_can_grant_subset_of_own_coverage(self):
+        actor = self._actor(
+            'explicit_subset', own_perms=['organization.add_roleassignment'],
+            managed_scope=RoleAssignment.SCOPE_EXPLICIT,
+            assigned=[self.customer_a, self.customer_b],
+        )
+        validate_assignment_grant(  # must not raise: {A} ⊆ {A, B}
+            actor, self.managed_role, self.org, reach=RoleAssignment.REACH_MANAGED,
+            requested_tenant_ids={self.customer_a.pk},
+        )
+
+    def test_actor_with_scope_all_can_grant_any_subset_or_all(self):
+        actor = self._actor(
+            'scope_all', own_perms=['organization.add_roleassignment'],
+            managed_scope=RoleAssignment.SCOPE_ALL,
+        )
+        validate_assignment_grant(  # subset
+            actor, self.managed_role, self.org, reach=RoleAssignment.REACH_MANAGED,
+            requested_tenant_ids={self.customer_a.pk},
+        )
+        validate_assignment_grant(  # SCOPE_ALL
+            actor, self.managed_role, self.org, reach=RoleAssignment.REACH_MANAGED,
+            requested_tenant_ids=None,
+        )
+
+    def test_superuser_bypasses_reach_grant_guard_entirely(self):
+        validate_assignment_grant(  # no membership/assignment of their own — still a no-op
+            self.superuser, self.managed_role, self.org, reach=RoleAssignment.REACH_MANAGED,
+            requested_tenant_ids=None,
+        )
+
+    # ---- integration: the same semantics through a real write path (MembershipForm) ------- #
+
+    def test_membership_form_blocks_explicit_a_actor_granting_scope_all(self):
+        """End-to-end: ``MembershipForm.clean()`` calls ``validate_assignment_grant`` per
+        selected role, so the same [A] → ALL escalation is rejected through the actual write
+        path, not just the bare guard function."""
+        actor = self._actor(
+            'form_explicit_a', own_perms=['organization.add_roleassignment'],
+            managed_scope=RoleAssignment.SCOPE_EXPLICIT, assigned=[self.customer_a],
+        )
+        victim = User.objects.create_user(
+            username='reach_victim', email='reach_victim@acme.test', password='pw',
+        )
+        form = MembershipForm(
+            data={
+                'user': victim.pk,
+                'tenant': self.org.pk,
+                'roles': [self.managed_role.pk],
+                'reach': RoleAssignment.REACH_MANAGED,
+                'managed_scope': RoleAssignment.SCOPE_ALL,
+                'is_active': True,
+            },
+            user=actor,
+            tenant=self.org,
+        )
+        self.assertFalse(form.is_valid())
+        self.assertFalse(Membership.objects.filter(user=victim, tenant=self.org).exists())
+
+    def test_membership_form_allows_explicit_a_actor_granting_subset(self):
+        """Positive counterpart: granting a subset of the actor's own coverage succeeds."""
+        actor = self._actor(
+            'form_explicit_subset', own_perms=['organization.add_roleassignment'],
+            managed_scope=RoleAssignment.SCOPE_EXPLICIT,
+            assigned=[self.customer_a, self.customer_b],
+        )
+        victim = User.objects.create_user(
+            username='reach_grantee', email='reach_grantee@acme.test', password='pw',
+        )
+        form = MembershipForm(
+            data={
+                'user': victim.pk,
+                'tenant': self.org.pk,
+                'roles': [self.managed_role.pk],
+                'reach': RoleAssignment.REACH_MANAGED,
+                'managed_scope': RoleAssignment.SCOPE_EXPLICIT,
+                'assigned_tenants': [self.customer_a.pk],
+                'is_active': True,
+            },
+            user=actor,
+            tenant=self.org,
+        )
+        self.assertTrue(form.is_valid(), form.errors)
+        membership = form.save()
+        assignment = membership.assignments.get(
+            role=self.managed_role, reach=RoleAssignment.REACH_MANAGED,
+        )
+        self.assertEqual(
+            set(assignment.assigned_tenants.values_list('pk', flat=True)), {self.customer_a.pk},
+        )

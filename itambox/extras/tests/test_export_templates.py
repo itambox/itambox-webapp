@@ -223,7 +223,8 @@ class ExportTemplateTenantIsolationTests(TestCase):
     explicitly so a future regression in scoping is caught here too."""
 
     def setUp(self):
-        from organization.models import Tenant, Role, Membership
+        from organization.models import Tenant, Role
+        from core.tests.mixins import grant
         self.tenant_a = Tenant.objects.create(name='Tenant A', slug='ten-a-exp')
         self.tenant_b = Tenant.objects.create(name='Tenant B', slug='ten-b-exp')
         role = Role.objects.create(
@@ -231,8 +232,7 @@ class ExportTemplateTenantIsolationTests(TestCase):
             permissions=['assets.view_asset', 'extras.view_exporttemplate'],
         )
         self.member = User.objects.create_user(username='iso-member', password='pw')
-        m = Membership.objects.create(user=self.member, tenant=self.tenant_a)
-        m.roles.add(role)
+        grant(self.member, self.tenant_a, role)
 
         status = StatusLabel.objects.create(name='Active', slug='active')
         mfr = Manufacturer.objects.create(name='Dell', slug='dell')

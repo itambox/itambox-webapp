@@ -13,9 +13,49 @@ from decimal import Decimal
 
 User = get_user_model()
 
+
+class _SeededStatusLabelsMixin:
+    """Restore the migration-seeded StatusLabel defaults for this class.
+
+    A TransactionTestCase (here or in an earlier, possibly crashed run against
+    the reused test DB) flushes every table, and flush's post_migrate does NOT
+    re-run data migrations — so the defaults from
+    assets/migrations/0003_seed_status_labels.py can be missing. Each class
+    re-seeds inside its own class-level transaction (idempotent get_or_create;
+    rolls back with the class, so it never pollutes anything else).
+    """
+    @classmethod
+    def setUpTestData(cls):
+        ComponentTrackingTestCase._restore_seeded_status_labels()
+        super().setUpTestData()
+
+
 class ComponentTrackingTestCase(TransactionTestCase):
+    # TransactionTestCase teardown TRUNCATEs every table (flush), which — unlike
+    # TestCase's savepoint rollback — permanently destroys the migration-seeded
+    # StatusLabel defaults (assets/migrations/0003_seed_status_labels.py); flush's
+    # post_migrate does NOT re-run data migrations. serialized_rollback restores
+    # a DB snapshot instead, but in full-suite runs the deserialize collides with
+    # post_migrate-recreated rows (duplicate content types/permissions), so we
+    # deterministically re-seed via the migration's own idempotent function:
+    # before each test here (a prior flush may have emptied the table) and once
+    # after the class for every later module in the session. Unrelated to the
+    # RBAC collapse; found while diagnosing cascading setUp failures.
+
+    @staticmethod
+    def _restore_seeded_status_labels():
+        from importlib import import_module
+        from django.apps import apps as global_apps
+        seed = import_module('assets.migrations.0003_seed_status_labels')
+        seed.seed_status_labels(global_apps, None)
+
+    @classmethod
+    def tearDownClass(cls):
+        super().tearDownClass()
+        cls._restore_seeded_status_labels()
 
     def setUp(self):
+        self._restore_seeded_status_labels()
         self.user = User.objects.create_user(username='testadmin', password='testpassword', is_staff=True, is_superuser=True)
         self.client.login(username='testadmin', password='testpassword')
 
@@ -390,7 +430,7 @@ class ComponentTrackingTestCase(TransactionTestCase):
         self.assertFalse(receipt.accepted)
 
 
-class AssetProcurementTestCase(TestCase):
+class AssetProcurementTestCase(_SeededStatusLabelsMixin, TestCase):
     def setUp(self):
         self.user = User.objects.create_user(username='testadmin', password='testpassword', is_staff=True, is_superuser=True)
         self.client.login(username='testadmin', password='testpassword')
@@ -478,7 +518,7 @@ class AssetProcurementTestCase(TestCase):
         self.assertEqual(minimal_asset.supplier, None)
 
 
-class StatusLabelTestCase(TestCase):
+class StatusLabelTestCase(_SeededStatusLabelsMixin, TestCase):
     def setUp(self):
         self.user = User.objects.create_user(username='testadmin', password='testpassword', is_staff=True, is_superuser=True)
         self.client.login(username='testadmin', password='testpassword')
@@ -536,7 +576,7 @@ class StatusLabelTestCase(TestCase):
         self.assertFalse(StatusLabel.objects.filter(slug='archived-awaiting-disposal').exists())
 
 
-class AssetMaintenanceAndLifecycleTestCase(TestCase):
+class AssetMaintenanceAndLifecycleTestCase(_SeededStatusLabelsMixin, TestCase):
     def setUp(self):
         # Create user
         self.user = User.objects.create_user(username='testadmin', password='testpassword', is_staff=True, is_superuser=True)
@@ -789,7 +829,7 @@ class AssetMaintenanceAndLifecycleTestCase(TestCase):
         self.assertContains(response, 'Dell Technologies')
 
 
-class EnterpriseITAMTestCase(TestCase):
+class EnterpriseITAMTestCase(_SeededStatusLabelsMixin, TestCase):
     def setUp(self):
         # Create superuser to bypass permission checks in CBVs
         self.user = User.objects.create_user(username='testadmin', password='testpassword', is_staff=True, is_superuser=True)
@@ -1136,7 +1176,7 @@ class EnterpriseITAMTestCase(TestCase):
         self.assertNotIn(holder_a, holders_qs_kit)
 
 
-class CategoryTestCase(TestCase):
+class CategoryTestCase(_SeededStatusLabelsMixin, TestCase):
     def setUp(self):
         self.user = User.objects.create_user(username='testadmin', password='testpassword', is_staff=True, is_superuser=True)
         self.client.login(username='testadmin', password='testpassword')

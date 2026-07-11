@@ -21,6 +21,7 @@ from django.contrib.auth import get_user_model
 from django.test import TestCase
 from django.urls import reverse
 
+from core.tests.mixins import grant
 from organization.models import Membership, Role, Tenant
 
 User = get_user_model()
@@ -38,8 +39,7 @@ class MembershipListDetailCrossTenantTestCase(TestCase):
             tenant=self.tenant_a, name='MCTS Read-Only',
             permissions=['organization.view_membership'],
         )
-        self.membership_a = Membership.objects.create(user=self.user_a, tenant=self.tenant_a)
-        self.membership_a.roles.add(self.role_a)
+        self.membership_a = grant(self.user_a, self.tenant_a, self.role_a).membership
 
         # Tenant-B's own membership row — must never be visible to Tenant A.
         self.user_b = User.objects.create_user(username='mcts_user_b', password='password123')
@@ -97,8 +97,7 @@ class MembershipExportCrossTenantTestCase(TestCase):
             tenant=self.tenant_a, name='MECT Read-Only',
             permissions=['organization.view_membership'],
         )
-        self.membership_a = Membership.objects.create(user=self.user_a, tenant=self.tenant_a)
-        self.membership_a.roles.add(self.role_a)
+        self.membership_a = grant(self.user_a, self.tenant_a, self.role_a).membership
 
         self.user_b = User.objects.create_user(username='mect_user_b', password='password123')
         self.membership_b = Membership.objects.create(user=self.user_b, tenant=self.tenant_b)

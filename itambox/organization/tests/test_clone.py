@@ -10,9 +10,12 @@ User = get_user_model()
 
 
 class TenantRoleCloneTests(TestCase):
-    """The Role clone flow supports onboarding a new tenant with an
-    existing role's permission set: the clone is created unsaved with its tenant
-    cleared, and the admin assigns a target tenant on the form."""
+    """The Role clone flow supports copying an existing role's permission set into a
+    fresh (unsaved) instance with its tenant cleared. Post RBAC-collapse ``RoleForm``
+    has no tenant picker (``scratch/RBAC_STAGE2_SPEC.md`` §7): the owner is always
+    resolved from context — a ``?tenant=`` deep-link kwarg, else the active tenant —
+    so "cloning into a chosen tenant" now means switching the active tenant context
+    before opening/submitting the clone form."""
 
     def setUp(self):
         set_current_tenant(None)
@@ -51,22 +54,42 @@ class TenantRoleCloneTests(TestCase):
         # Nothing new was written to the DB on GET.
         self.assertEqual(Role.objects.filter(name="Inventory Manager (Copy)").count(), 0)
 
-    def test_form_on_clone_requires_tenant_and_prechecks_permissions(self):
+    def test_form_without_tenant_context_rejects_clone(self):
+        # No `tenant` kwarg and no active tenant → RoleForm has no picker to fall
+        # back on (it was deleted with the Provider collapse), so it fails closed.
         clone = self.source.clone()
         clone.name = "Inventory Manager (Copy)"
         clone.tenant = None
 
-        # No `tenant` kwarg → form must render a required, full tenant picker.
+        form = TenantRoleForm(
+            data={'name': "Inventory Manager (Copy)", 'description': ''},
+            instance=clone,
+            user=self.superuser,
+        )
+        self.assertFalse(form.is_valid())
+        self.assertIn("No tenant context", str(form.errors))
+
+    def test_form_on_clone_prechecks_permissions_from_active_tenant_context(self):
+        set_current_tenant(self.tenant_a)
+        clone = self.source.clone()
+        clone.name = "Inventory Manager (Copy)"
+        clone.tenant = None
+
+        # No `tenant` kwarg → the form falls back to the active tenant context
+        # rather than rendering a picker (there is none post-collapse).
         form = TenantRoleForm(instance=clone, user=self.superuser)
-        self.assertTrue(form.fields['tenant'].required)
-        self.assertEqual(form.fields['tenant'].queryset.count(), Tenant.objects.count())
+        self.assertNotIn('tenant', form.fields)
+        self.assertEqual(form.owner_tenant, self.tenant_a)
 
         # Permission matrix pre-checked from the cloned permission set.
         self.assertTrue(form.fields['perm_asset_read'].initial)
         self.assertTrue(form.fields['perm_asset_create'].initial)
         self.assertFalse(form.fields['perm_asset_edit'].initial)
 
-    def test_clone_saved_into_chosen_tenant(self):
+    def test_clone_saved_into_active_tenant_context(self):
+        # "Chosen tenant" is now expressed by switching the active tenant context
+        # before submitting the clone form — there is no in-form tenant picker.
+        set_current_tenant(self.tenant_b)
         clone = self.source.clone()
         clone.name = "Inventory Manager (Copy)"
         clone.tenant = None
@@ -75,7 +98,6 @@ class TenantRoleCloneTests(TestCase):
             data={
                 'name': "Inventory Manager (Copy)",
                 'description': '',
-                'tenant': self.tenant_b.pk,
                 'perm_asset_read': True,
                 'perm_asset_create': True,
             },

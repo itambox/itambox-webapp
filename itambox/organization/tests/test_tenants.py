@@ -239,18 +239,21 @@ class MultiTenantMembershipTests(TestCase):
         )
 
     def test_tenant_membership_creation_and_string_representation(self):
-        from organization.models import Membership
-        membership = Membership.objects.create(user=self.user,
-            tenant=self.tenant_a,
+        from organization.models import RoleAssignment
+        from core.tests.mixins import grant
+        membership = grant(self.user, self.tenant_a, self.role_member).membership
+        self.assertTrue(
+            membership.assignments.filter(
+                role=self.role_member, reach=RoleAssignment.REACH_OWN,
+            ).exists()
         )
-        membership.roles.add(self.role_member)
-        self.assertIn(self.role_member, membership.roles.all())
+        self.assertEqual(str(membership), f"{self.user} @ {self.tenant_a}")
 
     def test_membership_creation_binds_matching_assetholder(self):
         """The invitation flow is gone — holder binding now fires on membership creation
         (organization/signals.py bind_asset_holder_on_membership): an unclaimed AssetHolder
         in the joined tenant with a matching email (case-insensitive) is claimed."""
-        from organization.models import Membership
+        from organization.models import Membership, RoleAssignment
 
         holder = AssetHolder.objects.create(
             first_name="Beate",
@@ -265,7 +268,9 @@ class MultiTenantMembershipTests(TestCase):
             username='beate_user', email='beate@example.com', password='password123'
         )
         membership = Membership.objects.create(user=joining_user, tenant=self.tenant_a)
-        membership.roles.add(self.role_member)
+        RoleAssignment.objects.create(
+            membership=membership, role=self.role_member, reach=RoleAssignment.REACH_OWN,
+        )
 
         holder.refresh_from_db()
         self.assertEqual(holder.user, joining_user)
@@ -303,7 +308,7 @@ class MultiTenantMembershipTests(TestCase):
         self.assertIsNone(wrong_email.user)           # email must match
 
     def test_tenant_membership_backend_permissions(self):
-        from organization.models import Membership
+        from organization.models import Membership, RoleAssignment
         from core.managers import set_current_membership
 
         def _flush():
@@ -313,24 +318,34 @@ class MultiTenantMembershipTests(TestCase):
                 if attr.startswith('_perms_tenant_') or attr.startswith('_tenant_membership_'):
                     delattr(self.user, attr)
 
+        def _set_role(membership, role):
+            # Successor to the deleted roles-M2M `.set([...])`: swap the single
+            # own-reach RoleAssignment row for this membership.
+            RoleAssignment.objects.filter(
+                membership=membership, reach=RoleAssignment.REACH_OWN,
+            ).delete()
+            RoleAssignment.objects.create(
+                membership=membership, role=role, reach=RoleAssignment.REACH_OWN,
+            )
+
         reader_mem = Membership.objects.create(user=self.user,
             tenant=self.tenant_a,
         )
-        reader_mem.roles.set([self.role_reader])
+        _set_role(reader_mem, self.role_reader)
 
         set_current_membership(reader_mem)
         _flush()
         self.assertTrue(self.user.has_perm('assets.view_asset'))
         self.assertFalse(self.user.has_perm('assets.add_asset'))
 
-        reader_mem.roles.set([self.role_member])
+        _set_role(reader_mem, self.role_member)
         set_current_membership(reader_mem)
         _flush()
         self.assertTrue(self.user.has_perm('assets.view_asset'))
         self.assertTrue(self.user.has_perm('assets.add_asset'))
         self.assertFalse(self.user.has_perm('assets.delete_asset'))
 
-        reader_mem.roles.set([self.role_admin])
+        _set_role(reader_mem, self.role_admin)
         set_current_membership(reader_mem)
         _flush()
         self.assertTrue(self.user.has_perm('assets.view_asset'))
@@ -340,15 +355,17 @@ class MultiTenantMembershipTests(TestCase):
         set_current_membership(None)
 
     def test_tenant_switching_middleware(self):
-        from organization.models import Membership
+        from organization.models import Membership, RoleAssignment
         from django.contrib.sessions.middleware import SessionMiddleware
         from itambox.middleware import TenantMiddleware
         from django.test import RequestFactory
-        
+
         mem = Membership.objects.create(user=self.user,
             tenant=self.tenant_a,
         )
-        mem.roles.add(self.role_member)
+        RoleAssignment.objects.create(
+            membership=mem, role=self.role_member, reach=RoleAssignment.REACH_OWN,
+        )
 
         factory = RequestFactory()
         

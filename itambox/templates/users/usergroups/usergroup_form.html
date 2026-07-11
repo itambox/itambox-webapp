@@ -37,7 +37,7 @@ organization/role_form.html.
                     {% if is_editing %}{% translate "Edit user group" %}{% else %}{% translate "Add user group" %}{% endif %}
                 </h4>
                 <p class="text-muted mb-4 small">
-                    {% translate "A user group is global — it can carry roles from any tenant or provider and grant them to its members. Setting a provider makes the group SCIM-managed by that provider." %}
+                    {% translate "A user group can carry roles from any tenant and grant them to its members. The owning tenant decides whose admins and whose SCIM provisioning manage the group; leave it blank for a global, superuser-managed group." %}
                 </p>
 
                 {# The form's FormHelper renders the <form>, Fieldset sections, and buttons. #}

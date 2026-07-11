@@ -11,7 +11,8 @@ from django.test import TestCase
 from core.events import send_notification_to_channel
 from core.models import Notification
 from extras.models import NotificationChannel
-from organization.models import Tenant, Role, Membership
+from organization.models import Tenant, Role
+from core.tests.mixins import grant
 
 User = get_user_model()
 
@@ -27,16 +28,14 @@ class InAppChannelRecipientTests(TestCase):
         self.member = User.objects.create_user(
             username='member', password='pw', is_active=True
         )
-        m = Membership.objects.create(user=self.member, tenant=self.tenant)
-        m.roles.add(role)
+        grant(self.member, self.tenant, role)
 
         # A member of a DIFFERENT tenant — must NOT receive this channel's notice.
         other_role = Role.objects.create(tenant=self.other_tenant, name='R', permissions=[])
         self.outsider = User.objects.create_user(
             username='outsider', password='pw', is_active=True
         )
-        m2 = Membership.objects.create(user=self.outsider, tenant=self.other_tenant)
-        m2.roles.add(other_role)
+        grant(self.outsider, self.other_tenant, other_role)
 
         self.channel = NotificationChannel.objects.create(
             name='Acme Feed',

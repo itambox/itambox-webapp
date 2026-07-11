@@ -87,8 +87,8 @@ class ScheduledReportingAndAlertsTests(TestCase):
         self.assertEqual(sched.schedule.next_run.time().minute, 30)
 
     @patch('django.core.mail.EmailMessage')
-    @patch('requests.post')
-    def test_generate_report_task_success(self, mock_post, mock_email_message):
+    @patch('core.http.request_pinned')
+    def test_generate_report_task_success(self, mock_request_pinned, mock_email_message):
         """Test general execution of report generation task, local archiving and dispatches."""
         # A tenant is required now — a tenantless report with no filter_tenants is refused
         # (WS5-6). The channel is scoped to the same tenant so it is visible under the run.
@@ -116,10 +116,10 @@ class ScheduledReportingAndAlertsTests(TestCase):
         )
         sched.channels.add(channel_slack)
 
-        # Mock the requests POST response (used by Slack dispatch)
+        # Mock the pinned-request response (used by Slack dispatch)
         mock_response = MagicMock()
         mock_response.status_code = 200
-        mock_post.return_value = mock_response
+        mock_request_pinned.return_value = mock_response
 
         # Execute task
         from core.tasks import generate_scheduled_report_task
@@ -139,7 +139,7 @@ class ScheduledReportingAndAlertsTests(TestCase):
         self.assertEqual(archive.file.mime_type, 'text/html')
 
         # Verify Slack channel was called
-        mock_post.assert_called_once()
+        mock_request_pinned.assert_called_once()
 
     def test_report_preview_compilation_and_view(self):
         """Test report template context compilation and preview endpoint rendering without ValueError."""

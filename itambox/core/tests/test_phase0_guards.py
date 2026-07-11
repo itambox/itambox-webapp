@@ -15,6 +15,7 @@ from django.test import RequestFactory, TestCase
 
 from core.auth.guards import validate_permission_grant
 from core.managers import set_current_tenant, set_current_membership
+from core.tests.mixins import grant
 from itambox.api.permissions import TokenPermissions
 from organization.models import Tenant, Membership, Role
 
@@ -38,9 +39,9 @@ def _superuser(username):
 
 
 def _membership(user, tenant, roles=None):
-    m = Membership.objects.create(user=user, tenant=tenant, is_active=True)
-    if roles:
-        m.roles.set(roles)
+    m, _ = Membership.objects.get_or_create(user=user, tenant=tenant, defaults={'is_active': True})
+    for role in roles or []:
+        grant(user, tenant, role)
     return m
 
 

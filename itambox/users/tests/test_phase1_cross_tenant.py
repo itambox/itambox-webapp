@@ -15,7 +15,8 @@ from django.contrib.auth import get_user_model
 from django.contrib.auth.models import Group
 from django.urls import reverse
 
-from organization.models import Tenant, Role, Membership
+from organization.models import Tenant, Role
+from core.tests.mixins import grant
 
 User = get_user_model()
 
@@ -32,9 +33,7 @@ class UsersApiCrossTenantTestCase(TestCase):
             name='Admin',
             permissions=['users.view_user', 'auth.view_group'],
         )
-        self.membership_b = Membership.objects.create(user=self.user_b, tenant=self.tenant_b,
-        )
-        self.membership_b.roles.add(self.role_b)
+        self.membership_b = grant(self.user_b, self.tenant_b, self.role_b).membership
 
         # A user that belongs ONLY to tenant A — must be invisible to user_b.
         self.user_a = User.objects.create_user(
@@ -43,9 +42,7 @@ class UsersApiCrossTenantTestCase(TestCase):
         self.role_a = Role.objects.create(
             tenant=self.tenant_a, name='Admin', permissions=['users.view_user'],
         )
-        self.membership_a = Membership.objects.create(user=self.user_a, tenant=self.tenant_a,
-        )
-        self.membership_a.roles.add(self.role_a)
+        self.membership_a = grant(self.user_a, self.tenant_a, self.role_a).membership
 
         # Groups: one whose only member is in tenant A, one with a tenant-B member.
         self.group_a = Group.objects.create(name='Group A only')

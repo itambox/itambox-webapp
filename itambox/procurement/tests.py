@@ -3,7 +3,7 @@ from django.core.exceptions import ValidationError
 from django.contrib.auth import get_user_model
 from django.utils import timezone
 from procurement.models import PurchaseOrder, PurchaseOrderLine, FulfillmentLink
-from assets.models import Supplier, AssetRequest, AssetType, Manufacturer
+from assets.models import Supplier, AssetRequest, AssetType, Manufacturer, StatusLabel
 from assets.choices import RequestStatusChoices
 from organization.models import Location, Site
 from software.models import Software
@@ -15,7 +15,15 @@ class ProcurementStatusTransitionTests(TestCase):
     def setUp(self):
         # Create user
         self.user = User.objects.create_superuser(username='testuser', email='test@example.com', password='password')
-        
+
+        # receive_purchase_order() unconditionally requires a 'deployable' StatusLabel
+        # to exist (it's looked up before branching on asset_type/component/license/etc.),
+        # so every test in this class that calls it — including license-only lines —
+        # needs one available.
+        StatusLabel.objects.get_or_create(
+            name='Deployable', defaults={'type': 'deployable', 'slug': 'deployable'}
+        )
+
         # Create a site and location
         self.site = Site.objects.create(name='Test Site', slug='test-site')
         self.location = Location.objects.create(name='Test Location', slug='test-location', site=self.site)

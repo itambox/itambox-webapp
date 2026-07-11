@@ -1,4 +1,4 @@
-"""Access seed mixin: users, per-tenant roles, cross-tenant memberships.
+"""Access seed mixin: users, per-tenant roles, memberships + role assignments.
 
 Designed to be mixed into ``Command`` in seed_data.py:
 
@@ -9,9 +9,15 @@ Designed to be mixed into ``Command`` in seed_data.py:
 
 ``_seed_access`` must run after ``_seed_organizations`` (it reads
 ``self._tenants`` / ``self._tenant_meta`` / ``self._tenant_holders`` /
-``self._orgs``). It populates ``self._roles``, ``self._users``,
-``self._engineer_users`` and ``self._provisioner`` (consumed by every later
-phase that needs an acting user).
+``self._provider_tenant`` / ``self._orgs``). It populates ``self._roles``,
+``self._users``, ``self._engineer_users`` and ``self._provisioner`` (consumed
+by every later phase that needs an acting user).
+
+Grant shape (per-grant RBAC): a person is anchored to a tenant by ONE
+``Membership``; everything they may do is carried by ``RoleAssignment`` rows on
+that membership. MSP staff hold a single membership at the managing
+(``is_provider``) tenant — reach into the managed tenants is a managed-reach
+assignment, never a second membership.
 """
 
 import random
@@ -28,8 +34,20 @@ class SeedAccessMixin:
     """Mixin for Command(BaseCommand).  Reads/writes self._ registries."""
 
     def _seed_access(self):
-        from organization.models import Role, Membership
-        self.stdout.write('--- Access: users, roles, memberships ---')
+        from organization.models import Role, Membership, RoleAssignment
+        self.stdout.write('--- Access: users, roles, role assignments ---')
+
+        def grant(user, tenant, role, reach=RoleAssignment.REACH_OWN, granted_by=None,
+                  managed_scope=None, assigned_tenants=None):
+            """Local mirror of ``core.tests.mixins.grant`` (seed must not import test code):
+            get_or_create the Membership anchor + one RoleAssignment row per grant."""
+            membership, _ = Membership.objects.get_or_create(user=user, tenant=tenant)
+            assignment, _ = RoleAssignment.objects.get_or_create(
+                membership=membership, role=role, reach=reach,
+                defaults={'granted_by': granted_by, 'managed_scope': managed_scope})
+            if assigned_tenants is not None:
+                assignment.assigned_tenants.set(assigned_tenants)
+            return assignment
 
         # Build permission catalogs from Django's permission table.
         all_perms = list(Permission.objects.select_related('content_type').all())
@@ -48,7 +66,7 @@ class SeedAccessMixin:
         READONLY = [perm_str(p) for p in all_perms if p.codename.startswith('view_')]
         ROLE_PERMS = {'Administrator': ADMIN, 'Technician': TECH, 'Asset Manager': ASSETMGR, 'Read-Only': READONLY}
 
-        # Per-tenant roles
+        # Per-tenant local roles: every tenant owns its own four role definitions.
         self._roles = {}  # (tenant_slug, role_name) -> Role
         for slug, tenant in self._tenants.items():
             for role_name, perms in ROLE_PERMS.items():
@@ -57,25 +75,28 @@ class SeedAccessMixin:
                     defaults={'permissions': perms, 'description': f'{role_name} role for {tenant.name}'})
                 self._roles[(slug, role_name)] = role
 
-        # Provider-scoped roles (MSP layer): an admin role carrying the manage_* capabilities and
-        # a technician role for operating customer tenants. The manage_* capabilities are stripped
-        # from the provider->tenant projection by the backend, so they only grant at provider scope.
-        self._provider_roles = {}
-        provider = getattr(self, '_provider', None)
-        if provider is not None:
-            prov_tech_perms = [p for p in TECH if not p.startswith('organization.manage_')]
-            provider_admin_role, _ = Role.objects.get_or_create(
-                provider=provider, name='Provider Administrator',
-                defaults={'permissions': ADMIN,
-                          'description': 'Full MSP administration: provider settings, staff, user '
-                                         'groups, and all customer tenants.'})
-            provider_tech_role, _ = Role.objects.get_or_create(
-                provider=provider, name='MSP Technician',
-                defaults={'permissions': prov_tech_perms, 'is_default': True,
-                          'description': 'Operate customer tenants (no provider-settings capabilities).'})
-            self._provider_roles = {'admin': provider_admin_role, 'tech': provider_tech_role}
+        # MSP-owned shared roles. The managing tenant additionally owns "MSP Technician"
+        # and shares it (plus its local "Read-Only") with the managed tenants: managed
+        # tenants may assign these to their own members, only the MSP can edit them.
+        # There is no separate provider-admin role any more — the engineers' MSP-wide
+        # power (tenant/membership/group CRUD) is the MSP tenant's local Administrator.
+        msp_tenant = self._provider_tenant
+        msp_slug = msp_tenant.slug
+        msp_tech_role, _ = Role.objects.get_or_create(
+            tenant=msp_tenant, name='MSP Technician',
+            defaults={'permissions': TECH, 'shared_with_managed': True,
+                      'description': 'Operate managed customer tenants. Shared definition: '
+                                     'managed tenants may assign it, only the MSP edits it.'})
+        self._roles[(msp_slug, 'MSP Technician')] = msp_tech_role
+        shared_readonly_role = self._roles[(msp_slug, 'Read-Only')]
+        for shared_role in (msp_tech_role, shared_readonly_role):
+            if not shared_role.shared_with_managed:
+                shared_role.shared_with_managed = True
+                shared_role.save(update_fields=['shared_with_managed'])
 
         # MSP staff (login users). (username, full_name, kind, assigned_group_slugs or None=all)
+        # ONE membership at the MSP tenant per person; reach into managed tenants is a
+        # managed-reach RoleAssignment (no per-customer-tenant staff memberships).
         self._users = {}
         self._engineer_users = []
         msp_domain = 'northwind-it.com'
@@ -89,7 +110,7 @@ class SeedAccessMixin:
             ('nadia.haas', 'Nadia Haas', 'account', ['helix-biopharma', 'sterling-am']),
             ('peter.voss', 'Peter Voss', 'account', ['meridian-bank']),
         ]
-        role_for_kind = {'engineer': 'Administrator', 'helpdesk': 'Technician', 'account': 'Read-Only'}
+        own_role_for_kind = {'engineer': 'Administrator', 'helpdesk': 'Technician', 'account': 'Read-Only'}
         for username, full_name, kind, group_scope in staff:
             first, last = full_name.split(' ', 1)
             user, created = User.objects.get_or_create(username=username, defaults={
@@ -101,33 +122,24 @@ class SeedAccessMixin:
             self._users[username] = user
             if kind == 'engineer':
                 self._engineer_users.append(user)
-            role_name = role_for_kind[kind]
-            assigned_customer_tenants = []
-            for slug, tenant in self._tenants.items():
-                meta = self._tenant_meta[slug]
-                # Account managers are scoped to their assigned customer groups; others span all tenants.
-                if group_scope is not None and meta['group_slug'] not in group_scope:
-                    continue
-                membership, _ = Membership.objects.get_or_create(user=user, tenant=tenant)
-                membership.roles.add(self._roles[(slug, role_name)])
-                if meta['kind'] == 'customer':
-                    assigned_customer_tenants.append(tenant)
 
-            # Provider-staff membership: MSP staff appear in the provider layer and reach customer
-            # tenants via the provider projection. Engineers administer the provider (manage_*);
-            # all-customer staff use 'all' scope, group-scoped account managers use 'explicit'.
-            if self._provider_roles:
-                prov_role = self._provider_roles['admin'] if kind == 'engineer' else self._provider_roles['tech']
-                scope = Membership.SCOPE_ALL if group_scope is None else Membership.SCOPE_EXPLICIT
-                pm, _ = Membership.objects.get_or_create(
-                    user=user, provider=self._provider,
-                    defaults={'tenant_scope': scope})
-                if pm.tenant_scope != scope:
-                    pm.tenant_scope = scope
-                    pm.save(update_fields=['tenant_scope'])
-                pm.roles.add(prov_role)
-                if scope == Membership.SCOPE_EXPLICIT and assigned_customer_tenants:
-                    pm.assigned_tenants.set(assigned_customer_tenants)
+            # Local power inside the MSP tenant itself (engineers = full Administrator).
+            grant(user, msp_tenant, self._roles[(msp_slug, own_role_for_kind[kind])])
+
+            # Reach into the managed tenants.
+            if kind == 'account':
+                # Account managers: read-only, limited to their assigned customer groups.
+                assigned = [t for slug, t in self._tenants.items()
+                            if self._tenant_meta[slug]['group_slug'] in group_scope]
+                grant(user, msp_tenant, shared_readonly_role,
+                      reach=RoleAssignment.REACH_MANAGED,
+                      managed_scope=RoleAssignment.SCOPE_EXPLICIT,
+                      assigned_tenants=assigned)
+            else:
+                # Engineers and helpdesk operate every managed tenant as technicians.
+                grant(user, msp_tenant, msp_tech_role,
+                      reach=RoleAssignment.REACH_MANAGED,
+                      managed_scope=RoleAssignment.SCOPE_ALL)
 
         if not self._engineer_users:
             self._engineer_users = list(self._users.values())
@@ -151,9 +163,8 @@ class SeedAccessMixin:
             customer_admins += 1
             for t in org['tenants']:
                 slug = t['slug']
-                membership, _ = Membership.objects.get_or_create(
-                    user=user, tenant=self._tenants[slug])
-                membership.roles.add(self._roles[(slug, 'Administrator')])
+                grant(user, self._tenants[slug], self._roles[(slug, 'Administrator')],
+                      granted_by=self._provisioner)
                 # Link this login to a holder profile in their first tenant.
                 holders = self._tenant_holders.get(slug, [])
                 if holders and holders[0].user_id is None:
@@ -189,21 +200,24 @@ class SeedAccessMixin:
                 self._users[username] = user
                 holder.user = user
                 holder.save(update_fields=['user'])
-                membership, _ = Membership.objects.get_or_create(user=user, tenant=tenant)
-                membership.roles.add(self._roles[(slug, role_name)])
+                grant(user, tenant, self._roles[(slug, role_name)],
+                      granted_by=self._provisioner)
                 if role_name == 'Asset Manager':
                     team_leads += 1
                 else:
                     end_users += 1
 
-        if self._provider_roles:
-            staff_ct = Membership.objects.filter(
-                provider=self._provider).count()
-            self.stdout.write(f'  Provider (MSP) layer: 1 provider, {len(self._provider_roles)} '
-                              f'provider roles, {staff_ct} provider-staff memberships.')
+        managed_count = sum(1 for t in self._tenants.values()
+                            if t.managed_by_id == msp_tenant.pk)
+        staff_reach = RoleAssignment.objects.filter(
+            reach=RoleAssignment.REACH_MANAGED, membership__tenant=msp_tenant).count()
+        self.stdout.write(f'  MSP layer: 1 managing tenant, {managed_count} managed tenants, '
+                          f'{staff_reach} managed-reach staff assignments.')
 
         total_memberships = Membership.objects.count()
+        total_assignments = RoleAssignment.objects.count()
         self.stdout.write(f'  {team_leads} single-tenant team leads (Asset Manager), '
                           f'{end_users} single-tenant read-only end users.')
-        self.stdout.write(f'  {len(self._roles)} tenant roles, {len(self._users)} login users '
-                          f'({customer_admins} customer admins), {total_memberships} memberships.')
+        self.stdout.write(f'  {len(self._roles)} roles, {len(self._users)} login users '
+                          f'({customer_admins} customer admins), {total_memberships} memberships, '
+                          f'{total_assignments} role assignments.')

@@ -5,7 +5,8 @@ from django.urls import reverse
 
 from assets.models import Asset
 from extras.models import ExportTemplate
-from organization.models import Tenant, Role, Membership
+from organization.models import Tenant, Role
+from core.tests.mixins import grant
 
 User = get_user_model()
 
@@ -27,8 +28,7 @@ class ExportTemplateSuperuserGateTests(TestCase):
             ],
         )
         self.member = User.objects.create_user(username='member', password='pw')
-        m = Membership.objects.create(user=self.member, tenant=self.tenant)
-        m.roles.add(self.role)
+        grant(self.member, self.tenant, self.role)
         self.superuser = User.objects.create_superuser(
             username='root', email='root@example.com', password='pw'
         )

@@ -21,17 +21,16 @@ class ImportExportPermissionTestCase(TestCase):
         )
 
         # Grant staff standard view permission on assets via multi-tenant RBAC
-        from organization.models import Tenant, Role, Membership
+        from organization.models import Tenant, Role
+        from core.tests.mixins import grant
         self.tenant = Tenant.objects.create(name='Test Tenant', slug='test-tenant')
         self.role = Role.objects.create(
             tenant=self.tenant,
             name='Staff Role',
             permissions=['assets.view_asset']
         )
-        self.membership = Membership.objects.create(user=self.staff,
-            tenant=self.tenant,
-        )
-        self.membership.roles.add(self.role)
+        self.assignment = grant(self.staff, self.tenant, self.role)
+        self.membership = self.assignment.membership
 
     def test_list_view_gating_without_add_permission(self):
         # Log in as staff (with only view permission, no add permission)

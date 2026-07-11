@@ -1,21 +1,23 @@
-"""Views for the unified ``Membership`` model."""
+"""Views for the unified ``Membership`` model (thin anchor + RoleAssignment grants)."""
 from django.contrib import messages
 from django.contrib.auth import get_user_model
 from django.contrib.auth.forms import PasswordResetForm
 from django.contrib.auth.mixins import LoginRequiredMixin
+from django.core.exceptions import ValidationError
 from django.db import transaction
 from django.http import HttpResponseRedirect
 from django.shortcuts import get_object_or_404, redirect
-from django.urls import reverse, reverse_lazy
+from django.urls import reverse
 from django.utils.translation import gettext_lazy as _
 from django.views import View
 
+from core.auth.guards import validate_assignment_grant
 from itambox.views.generic.utils import safe_return_url
 from itambox.views.generic import (
     ObjectListView, ObjectDetailView, ObjectEditView, ObjectDeleteView,
     ObjectBulkEditView, ObjectBulkDeleteView,
 )
-from ..models import Membership, Provider
+from ..models import Membership, RoleAssignment, Tenant
 from ..forms import MembershipForm, MembershipFilterForm, MembershipBulkRoleForm
 from ..tables import MembershipTable
 from ..filters import MembershipFilterSet
@@ -27,8 +29,8 @@ User = get_user_model()
 class MembershipListView(ObjectListView):
     queryset = (
         Membership.objects
-        .select_related('user', 'tenant', 'provider', 'scope_group')
-        .prefetch_related('roles')
+        .select_related('user', 'tenant')
+        .prefetch_related('assignments__role')
     )
     filterset = MembershipFilterSet
     filterset_form = MembershipFilterForm
@@ -43,14 +45,24 @@ class MembershipListView(ObjectListView):
 class MembershipDetailView(ObjectDetailView):
     queryset = (
         Membership.objects
-        .select_related('user', 'tenant', 'provider', 'scope_group')
-        .prefetch_related('roles', 'assigned_tenants')
+        .select_related('user', 'tenant')
+        .prefetch_related(
+            'assignments__role',
+            'assignments__scope_group',
+            'assignments__assigned_tenants',
+            'assignments__granted_by',
+        )
     )
     template_name = 'organization/memberships/membership_detail.html'
 
     def get_queryset(self):
         qs = super().get_queryset()
         return visible_to_containers(self.request.user, qs, 'organization.view_membership')
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context['assignments'] = self.get_object().assignments.all()
+        return context
 
 
 class _SetInitialOrResetPasswordForm(PasswordResetForm):
@@ -75,7 +87,7 @@ class MembershipSendResetView(LoginRequiredMixin, View):
 
     Onboarding creates staff with ``set_unusable_password()`` and no automatic credential
     issuance (the misleading ``send_invite`` checkbox was removed). This action lets a
-    manager of the membership's container manually send the standard Django password-reset
+    manager of the membership's tenant manually send the standard Django password-reset
     email, which links to the ``password_reset_confirm`` route — usable both to reset a
     forgotten password and to set an initial one on a fresh ``set_unusable_password()``
     account.
@@ -84,17 +96,15 @@ class MembershipSendResetView(LoginRequiredMixin, View):
 
     def post(self, request, pk):
         membership = get_object_or_404(
-            Membership.objects.select_related('user', 'tenant', 'provider'), pk=pk,
+            Membership.objects.select_related('user', 'tenant'), pk=pk,
         )
         detail_url = reverse('organization:membership_detail', kwargs={'pk': membership.pk})
 
-        # Guard: only a manager of the membership's container (or a superuser) may
+        # Guard: only a manager of the membership's tenant (or a superuser) may
         # trigger credential issuance for its user.
-        container = membership.container
         if not (
             request.user.is_superuser
-            or (container is not None
-                and request.user.has_perm('organization.change_membership', obj=container))
+            or request.user.has_perm('organization.change_membership', obj=membership.tenant)
         ):
             messages.error(
                 request,
@@ -140,7 +150,7 @@ class MembershipCreateView(ObjectEditView):
 
     def get_initial(self):
         initial = super().get_initial()
-        for key in ('user', 'tenant', 'provider'):
+        for key in ('user', 'tenant'):
             val = self.request.GET.get(key)
             if val:
                 initial[key] = val
@@ -149,20 +159,18 @@ class MembershipCreateView(ObjectEditView):
     def get_form_kwargs(self):
         kwargs = super().get_form_kwargs()
         kwargs['user'] = self.request.user
-        # An explicit ?provider=<pk> request (e.g. from a "add provider staff" link) must win
-        # over the ambient active tenant — passing both context kwargs would make the form's
-        # tenant-ctx branch clear the very provider initial the caller asked for.
-        provider = None
-        provider_param = self.request.GET.get('provider')
-        if provider_param:
+        # An explicit ?tenant=<pk> deep-link (e.g. "add member" from a tenant page) wins
+        # over the ambient active tenant.
+        tenant = None
+        tenant_param = self.request.GET.get('tenant')
+        if tenant_param:
             try:
-                provider = Provider._base_manager.filter(pk=provider_param).first()
-            except (TypeError, ValueError):  # non-numeric ?provider= must not 500
-                provider = None
-        if provider is not None:
-            kwargs['provider'] = provider
-        else:
-            kwargs['tenant'] = getattr(self.request, 'active_tenant', None)
+                tenant = Tenant._base_manager.filter(
+                    pk=tenant_param, deleted_at__isnull=True,
+                ).first()
+            except (TypeError, ValueError):  # non-numeric ?tenant= must not 500
+                tenant = None
+        kwargs['tenant'] = tenant or getattr(self.request, 'active_tenant', None)
         return kwargs
 
     def get_success_url(self):
@@ -172,7 +180,7 @@ class MembershipCreateView(ObjectEditView):
 
 
 class MembershipEditView(ObjectEditView):
-    """Edit a membership's roles / scope. User + container are immutable."""
+    """Edit a membership's assignments / active flag. User + tenant are immutable."""
     queryset = Membership.objects.all()
     model = Membership
     model_form = MembershipForm
@@ -185,7 +193,7 @@ class MembershipEditView(ObjectEditView):
 
     def get_form(self, form_class=None):
         form = super().get_form(form_class=form_class)
-        for f in ('user', 'tenant', 'provider'):
+        for f in ('user', 'tenant'):
             if f in form.fields:
                 form.fields[f].disabled = True
         return form
@@ -207,7 +215,11 @@ class MembershipDeleteView(ObjectDeleteView):
 
 
 class MembershipBulkEditView(ObjectBulkEditView):
-    """Bulk role reassignment for memberships sharing one container."""
+    """Bulk role (re-)assignment for memberships sharing one tenant.
+
+    Adds/removes own-reach ``RoleAssignment`` rows; every added role passes
+    :func:`validate_assignment_grant` before anything is written.
+    """
     queryset = Membership.objects.all()
     form_class = MembershipBulkRoleForm
 
@@ -226,7 +238,7 @@ class MembershipBulkEditView(ObjectBulkEditView):
             messages.warning(request, _("No memberships were selected."))
             return HttpResponseRedirect(return_url)
         queryset = self._get_queryset(pks)
-        objects = list(queryset)
+        objects = list(queryset.select_related('tenant'))
         if not objects:
             messages.warning(request, _("No valid memberships selected."))
             return HttpResponseRedirect(return_url)
@@ -234,56 +246,67 @@ class MembershipBulkEditView(ObjectBulkEditView):
         if '_apply' in request.POST:
             form = MembershipBulkRoleForm(request.POST)
             if form.is_valid():
-                roles_to_add = form.cleaned_data.get('roles_to_add') or []
-                roles_to_remove = form.cleaned_data.get('roles_to_remove') or []
+                roles_to_add = list(form.cleaned_data.get('roles_to_add') or [])
+                roles_to_remove = list(form.cleaned_data.get('roles_to_remove') or [])
                 if not roles_to_add and not roles_to_remove:
                     messages.warning(request, _("No roles to add or remove were specified."))
                     return HttpResponseRedirect(return_url)
 
-                # Memberships must share one container; roles must match.
-                tenant_pks = {m.tenant_id for m in objects if m.tenant_id}
-                provider_pks = {m.provider_id for m in objects if m.is_provider_staff}
-                if (len(tenant_pks) + len(provider_pks)) != 1:
+                # Memberships must share one tenant; roles must be assignable there
+                # (owned by the tenant, or shared down by its managing tenant).
+                tenant_pks = {m.tenant_id for m in objects}
+                if len(tenant_pks) != 1:
                     messages.error(
                         request,
-                        _("Cannot bulk reassign: selected memberships span multiple tenants/providers."),
+                        _("Cannot bulk reassign: selected memberships span multiple tenants."),
                     )
                     return HttpResponseRedirect(return_url)
 
-                container_tenant = objects[0].tenant
-                container_provider = objects[0].provider
-                container = container_provider or container_tenant
-                for role in list(roles_to_add) + list(roles_to_remove):
-                    if container_tenant and (role.tenant_id != container_tenant.pk):
-                        messages.error(request, _("Role '%(role)s' does not belong to this tenant.") % {'role': role})
-                        return HttpResponseRedirect(return_url)
-                    if container_provider and (role.provider_id != container_provider.pk):
-                        messages.error(request, _("Role '%(role)s' does not belong to this provider.") % {'role': role})
+                tenant = objects[0].tenant
+                for role in roles_to_add + roles_to_remove:
+                    assignable = role.tenant_id == tenant.pk or (
+                        tenant.managed_by_id
+                        and role.tenant_id == tenant.managed_by_id
+                        and role.shared_with_managed
+                    )
+                    if not assignable:
+                        messages.error(
+                            request,
+                            _("Role '%(role)s' is not assignable in this tenant.") % {'role': role},
+                        )
                         return HttpResponseRedirect(return_url)
 
-                if not request.user.has_perm('organization.change_membership', obj=container):
+                if not request.user.has_perm('organization.change_membership', obj=tenant):
                     messages.error(request, _("You do not have permission to change memberships here."))
                     return HttpResponseRedirect(return_url)
 
-                # Check privilege-escalation guard on the roles being added
-                if roles_to_add:
-                    from core.auth.guards import validate_permission_grant
-                    from django.core.exceptions import ValidationError
-                    perms_to_add = set()
-                    for r in roles_to_add:
-                        perms_to_add.update(r.permissions or [])
-                    try:
-                        validate_permission_grant(request.user, perms_to_add, container)
-                    except ValidationError as e:
-                        messages.error(request, ", ".join(e.messages))
-                        return HttpResponseRedirect(return_url)
+                # Privilege-escalation guard, per role being granted.
+                try:
+                    for role in roles_to_add:
+                        validate_assignment_grant(
+                            request.user, role, tenant, reach=RoleAssignment.REACH_OWN,
+                        )
+                except ValidationError as e:
+                    messages.error(request, ", ".join(e.messages))
+                    return HttpResponseRedirect(return_url)
 
                 with transaction.atomic():
                     for obj in objects:
-                        if roles_to_add:
-                            obj.roles.add(*roles_to_add)
+                        for role in roles_to_add:
+                            RoleAssignment.objects.get_or_create(
+                                membership=obj, role=role, reach=RoleAssignment.REACH_OWN,
+                                defaults={'granted_by': request.user},
+                            )
                         if roles_to_remove:
-                            obj.roles.remove(*roles_to_remove)
+                            # Per-instance delete so each revoke hits the changelog
+                            # (queryset.delete() would bypass ChangeLoggingMixin).
+                            stale = RoleAssignment.objects.filter(
+                                membership=obj,
+                                role__in=roles_to_remove,
+                                reach=RoleAssignment.REACH_OWN,
+                            )
+                            for assignment in stale:
+                                assignment.delete()
                 messages.success(request, _("Updated %(count)d membership(s).") % {'count': len(objects)})
                 return HttpResponseRedirect(return_url)
         else:

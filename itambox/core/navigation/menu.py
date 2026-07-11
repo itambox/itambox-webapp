@@ -5,37 +5,80 @@ from django.utils.translation import gettext_lazy as _
 from . import Menu, MenuGroup, MenuItem, MenuItemButton, get_model_item
 
 
-def _provider_layer_active(user):
-    """Whether any Provider exists (cached per-request on the user object)."""
-    cached = getattr(user, '_provider_layer_active_cache', None)
+def _msp_layer_active(user):
+    """Whether any managing (``is_provider``) tenant exists (cached per-request on the
+    user object). ``_base_manager``: this is cross-tenant machinery — the tenant-scoped
+    default manager would silently return nothing outside a matching tenant context."""
+    cached = getattr(user, '_msp_layer_active_cache', None)
     if cached is None:
-        from organization.models import Provider
-        cached = Provider.objects.exists()
-        setattr(user, '_provider_layer_active_cache', cached)
+        # inline import: organization models are not loadable at navigation module import
+        # time (AppRegistryNotReady).
+        from organization.models import Tenant
+        cached = Tenant._base_manager.filter(
+            is_provider=True, deleted_at__isnull=True,
+        ).exists()
+        setattr(user, '_msp_layer_active_cache', cached)
     return cached
 
 
+def _user_provider_tenants(user):
+    """The user's accessible managing (``is_provider``) tenants."""
+    # inline import: organization pulls in models; importing at module top would risk
+    # AppRegistryNotReady during navigation module load.
+    from organization.access import accessible_tenant_ids
+    from organization.models import Tenant
+
+    ids = accessible_tenant_ids(user)
+    if not ids:
+        return []
+    return list(Tenant._base_manager.filter(
+        pk__in=ids, is_provider=True, deleted_at__isnull=True,
+    ))
+
+
 def _can_admin_provider(user):
-    """Show provider-admin nav only when a Provider exists AND the user can manage one
-    (superuser, or holds ``organization.manage_provider``)."""
+    """Show MSP-admin nav only when a managing tenant exists AND the user can administer
+    one: superuser, or holds ``organization.add_membership`` / ``organization.change_tenant``
+    on one of their ``is_provider`` tenants."""
     if not getattr(user, 'is_authenticated', False):
         return False
-    if not _provider_layer_active(user):
+    if not _msp_layer_active(user):
         return False
     if user.is_superuser:
         return True
-    from core.auth.provider import has_provider_capability
-    return has_provider_capability(user, 'manage_provider')
+    return any(
+        user.has_perm('organization.add_membership', obj=tenant)
+        or user.has_perm('organization.change_tenant', obj=tenant)
+        for tenant in _user_provider_tenants(user)
+    )
 
 
 def can_manage_user_groups(user):
-    """Menu gate for UserGroup admin — delegates to the canonical RBAC gate so the
-    nav stays in parity with the backend (superuser, provider ``manage_groups``
-    capability, OR the direct single-company ``organization.manage_groups`` grant)."""
-    # inline import: core.auth.provider pulls in organization models; importing at module
-    # top would risk AppRegistryNotReady during navigation module load.
-    from core.auth.provider import can_manage_user_groups as _canonical
-    return _canonical(user)
+    """Menu gate for UserGroup admin: superuser, OR ``users.add_usergroup`` /
+    ``users.change_usergroup`` held in ANY of the user's tenants.
+
+    MUST stay in lock-step with the backend gate on the UserGroup views
+    (``users/views.py`` ``GlobalGroupAdminMixin`` / ``can_manage_user_groups``) —
+    same logic, so the nav never shows an entry the view would reject (or hides
+    one it would allow)."""
+    if not getattr(user, 'is_authenticated', False):
+        return False
+    if user.is_superuser:
+        return True
+    # inline import: organization pulls in models; importing at module top would risk
+    # AppRegistryNotReady during navigation module load.
+    from organization.access import accessible_tenant_ids
+    from organization.models import Tenant
+
+    ids = accessible_tenant_ids(user)
+    if not ids:
+        return False
+    # _base_manager: cross-tenant machinery must not ride the tenant-scoped manager.
+    return any(
+        user.has_perm('users.add_usergroup', obj=tenant)
+        or user.has_perm('users.change_usergroup', obj=tenant)
+        for tenant in Tenant._base_manager.filter(pk__in=ids, deleted_at__isnull=True)
+    )
 
 ORG_MENU = Menu(
     label=_('Organization'),
@@ -585,27 +628,12 @@ ADMIN_MENU = Menu(
             label=_('Provider (MSP)'),
             items=(
                 MenuItem(
-                    link='organization:provider_list',
-                    link_text=_('Providers'),
-                    permissions=(),
-                    condition=_can_admin_provider,
-                    buttons=(
-                        MenuItemButton(
-                            link='organization:provider_create',
-                            title=_('Add'),
-                            icon_class='mdi mdi-plus-thick',
-                            permissions=(),
-                        ),
-                    ),
-                ),
-                MenuItem(
                     link='organization:technician_quick_add',
                     link_text=_('Add Technician'),
                     permissions=(),
                     condition=_can_admin_provider,
                     buttons=(),
                 ),
-
             ),
         ),
         MenuGroup(

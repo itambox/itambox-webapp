@@ -7,6 +7,7 @@ from organization.models import TenantGroup, Tenant, Membership, Role, Site, Loc
 from users.models import UserGroup
 from assets.models import StatusLabel, Asset, AssetRole, Manufacturer, AssetType
 from core.managers import set_current_tenant, set_current_membership
+from core.tests.mixins import grant
 
 User = get_user_model()
 
@@ -26,8 +27,7 @@ class CoreTenantSecurityTestCase(TestCase):
                 'assets.view_asset', 'assets.add_asset', 'assets.change_asset', 'assets.delete_asset'
             ]
         )
-        self.membership = Membership.objects.create(user=self.user, tenant=self.tenant)
-        self.membership.roles.add(self.role)
+        self.membership = grant(self.user, self.tenant, self.role).membership
 
     def test_tenant_group_scoping(self):
         from core.managers import set_current_tenant_group
@@ -93,10 +93,8 @@ class CoreTenantSecurityTestCase(TestCase):
                 'assets.view_asset'
             ]
         )
-        mem_admin = Membership.objects.create(user=test_user, tenant=tenant_admin)
-        mem_admin.roles.add(admin_role)
-        mem_readonly = Membership.objects.create(user=test_user, tenant=tenant_readonly)
-        mem_readonly.roles.add(reader_role)
+        mem_admin = grant(test_user, tenant_admin, admin_role).membership
+        mem_readonly = grant(test_user, tenant_readonly, reader_role).membership
 
         # Set active context in test client session
         self.client.force_login(test_user)
@@ -263,9 +261,7 @@ class CrossTenantAttackTestCase(TestCase):
                 'core.change_recyclebin', 'core.delete_recyclebin',
             ]
         )
-        self.membership_b = Membership.objects.create(user=self.user_b, tenant=self.tenant_b,
-        )
-        self.membership_b.roles.add(self.role_b)
+        self.membership_b = grant(self.user_b, self.tenant_b, self.role_b).membership
 
         # Login as user_b with active tenant = Tenant B
         self.client.force_login(self.user_b)
@@ -544,12 +540,13 @@ class MultiRoleUnionTestCase(TestCase):
             permissions=['assets.change_asset'],
         )
 
-        # Membership: direct role A + direct_permissions granting 'assets.delete_asset'
-        self.membership = Membership.objects.create(user=self.user,
-            tenant=self.tenant,
-            direct_permissions=['assets.delete_asset'],
+        # Membership: direct role A + a one-off role standing in for the deleted
+        # direct_permissions field, granting 'assets.delete_asset'
+        self.membership = grant(self.user, self.tenant, self.role_a).membership
+        self.direct_role = Role.objects.create(
+            tenant=self.tenant, name='Direct grants', permissions=['assets.delete_asset'],
         )
-        self.membership.roles.add(self.role_a)
+        grant(self.user, self.tenant, self.direct_role)
 
         # UserGroup with role C
         self.group = UserGroup.objects.create(name='Test Group', is_active=True)
@@ -582,7 +579,7 @@ class MultiRoleUnionTestCase(TestCase):
 
     def test_multi_role_membership_is_union(self):
         """Two direct roles on a membership yield the union of both roles' permissions."""
-        self.membership.roles.add(self.role_b)
+        grant(self.user, self.tenant, self.role_b)
         # Invalidate the per-request cache so the next has_perm re-queries
         cache_key = f'_effective_perms_{self.tenant.pk}'
         if hasattr(self.user, cache_key):
@@ -610,12 +607,13 @@ class TenantBoundaryWithGroupsTestCase(TestCase):
         self.group_a.roles.add(self.role_a)
         self.group_a.members.add(self.user)
 
-        # Membership in tenant A with direct_permissions
-        self.membership_a = Membership.objects.create(user=self.user,
-            tenant=self.tenant_a,
-            direct_permissions=['assets.delete_asset'],
+        # Membership in tenant A with a direct role standing in for the deleted
+        # direct_permissions field
+        self.membership_a = grant(self.user, self.tenant_a, self.role_a).membership
+        self.direct_role_a = Role.objects.create(
+            tenant=self.tenant_a, name='Direct grants', permissions=['assets.delete_asset'],
         )
-        self.membership_a.roles.add(self.role_a)
+        grant(self.user, self.tenant_a, self.direct_role_a)
 
         # Status/asset for tenant B
         self.status = StatusLabel.objects.create(name='BA-Active', slug='ba-active', type='deployable')
@@ -677,10 +675,12 @@ class IsActiveGatingTestCase(TestCase):
         """is_active=False on a Membership drops that membership's OWN roles and
         direct_permissions. (Group access is a SEPARATE, independent path that is not
         gated by membership — see test_user_groups.MembershipIndependenceTests.)"""
-        membership = Membership.objects.create(user=self.user, tenant=self.tenant, is_active=False,
-            direct_permissions=['assets.delete_asset'],
+        membership = Membership.objects.create(user=self.user, tenant=self.tenant, is_active=False)
+        grant(self.user, self.tenant, self.role)
+        direct_role = Role.objects.create(
+            tenant=self.tenant, name='Direct grants', permissions=['assets.delete_asset'],
         )
-        membership.roles.add(self.role)
+        grant(self.user, self.tenant, direct_role)
 
         set_current_tenant(self.tenant)
         set_current_membership(membership)
@@ -735,9 +735,7 @@ class SoftDeletedRoleGrantsNothingTestCase(TestCase):
             name='Soon Deleted Role',
             permissions=['assets.view_asset', 'assets.change_asset'],
         )
-        self.membership = Membership.objects.create(user=self.user, tenant=self.tenant,
-        )
-        self.membership.roles.add(self.role)
+        self.membership = grant(self.user, self.tenant, self.role).membership
 
         self.group = UserGroup.objects.create(name='SD Group', is_active=True)
         self.group.roles.add(self.role)
@@ -769,7 +767,7 @@ class SoftDeletedRoleGrantsNothingTestCase(TestCase):
     def test_soft_deleted_role_on_group_grants_nothing(self):
         """After soft-deleting the role, group path must also yield no perms."""
         # Ensure only the group path is active
-        self.membership.roles.clear()
+        self.membership.assignments.all().delete()
         self.role.delete()  # SoftDeleteMixin soft-delete
         self._clear_perm_cache()
         self.assertFalse(self.user.has_perm('assets.view_asset'))
@@ -788,9 +786,7 @@ class PermCacheTestCase(TestCase):
             name='Cache Role',
             permissions=['assets.view_asset'],
         )
-        self.membership = Membership.objects.create(user=self.user, tenant=self.tenant,
-        )
-        self.membership.roles.add(self.role)
+        self.membership = grant(self.user, self.tenant, self.role).membership
 
         set_current_tenant(self.tenant)
         set_current_membership(self.membership)

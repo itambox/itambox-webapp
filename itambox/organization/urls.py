@@ -93,7 +93,7 @@ urlpatterns = [
     path('contact-assignments/add/', views.ContactAssignmentCreateView.as_view(), name='contactassignment_create'),
     path('contact-assignments/<int:pk>/delete/', views.ContactAssignmentDeleteView.as_view(), name='contactassignment_delete'),
 
-    # Roles (unified — tenant- and provider-scoped)
+    # Roles (tenant-owned permission sets)
     path('roles/', views.RoleListView.as_view(), name='role_list'),
     path('roles/add/', views.RoleEditView.as_view(), name='role_create'),
     path('roles/delete/', views.RoleBulkDeleteView.as_view(), name='role_bulk_delete'),
@@ -112,13 +112,6 @@ urlpatterns = [
     path('cost-centers/<int:pk>/edit/', views.CostCenterEditView.as_view(), name='costcenter_update'),
     path('cost-centers/<int:pk>/clone/', views.CostCenterCloneView.as_view(), name='costcenter_clone'),
     path('cost-centers/<int:pk>/delete/', views.CostCenterDeleteView.as_view(), name='costcenter_delete'),
-
-    # Providers (MSP)
-    path('providers/', views.ProviderListView.as_view(), name='provider_list'),
-    path('providers/add/', views.ProviderEditView.as_view(), name='provider_create'),
-    path('providers/<int:pk>/', views.ProviderDetailView.as_view(), name='provider_detail'),
-    path('providers/<int:pk>/edit/', views.ProviderEditView.as_view(), name='provider_update'),
-    path('providers/<int:pk>/delete/', views.ProviderDeleteView.as_view(), name='provider_delete'),
 
     # Quick onboarding
     path('onboard/technician/', views.TechnicianQuickAddView.as_view(), name='technician_quick_add'),

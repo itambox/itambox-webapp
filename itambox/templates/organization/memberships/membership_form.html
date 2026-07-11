@@ -37,7 +37,7 @@ organization/role_form.html.
                     {% if is_editing %}{% translate "Edit membership" %}{% else %}{% translate "Add membership" %}{% endif %}
                 </h4>
                 <p class="text-muted mb-4 small">
-                    {% translate "A membership grants a user access to a tenant (as a member) or to a provider (as staff). Roles carry the permissions; provider staff can additionally scope which customer tenants they reach." %}
+                    {% translate "A membership binds a user to one tenant. Role assignments carry the permissions; on a managing (MSP) tenant a grant can additionally reach into the managed tenants." %}
                 </p>
 
                 {# The form's FormHelper renders the <form>, Fieldset sections, and buttons. #}
