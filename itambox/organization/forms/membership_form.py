@@ -39,6 +39,9 @@ from crispy_forms.layout import Layout, Fieldset
 from core.forms import FilterForm, BulkEditForm
 from core.auth.guards import validate_assignment_grant
 from organization.access import get_descendant_tenant_group_ids
+from users.services import (
+    AmbiguousEmailError, normalize_email, resolve_existing_user, resolve_or_create_user,
+)
 from ..models import Membership, Role, RoleAssignment, Tenant, TenantGroup
 
 User = get_user_model()
@@ -531,7 +534,7 @@ class MembershipForm(forms.ModelForm):
 
         if who == self.WHO_NEW:
             cleaned['user'] = None
-            email = (cleaned.get('new_user_email') or '').strip().lower()
+            email = normalize_email(cleaned.get('new_user_email'))
             cleaned['new_user_email'] = email
             if not email:
                 if 'new_user_email' not in self.errors:
@@ -539,39 +542,45 @@ class MembershipForm(forms.ModelForm):
                         "An email address is required to create a new user."
                     ))
             else:
-                self._existing_user_by_email = User.objects.filter(
-                    email__iexact=email,
-                ).order_by('pk').first()
-                if self._existing_user_by_email is not None:
-                    # Get-or-create semantics: reuse the account instead of
-                    # duplicating it — but a second membership at the same tenant
-                    # is an edit, not an add.
-                    cleaned['user'] = self._existing_user_by_email
-                    if Membership.objects.filter(
-                        user=self._existing_user_by_email, tenant=tenant,
-                    ).exists():
-                        # Defense-in-depth against a membership oracle: only reveal
-                        # that the account already belongs to THIS tenant to an actor
-                        # allowed to manage its memberships (the create view already
-                        # 404s an unauthorized deep link; this covers directly-built
-                        # forms / tampered posts). An unauthorized actor gets a
-                        # non-revealing error instead of the tenant's membership state.
-                        if self._actor_may_manage_memberships(tenant):
-                            self.add_error('new_user_email', _(
-                                "%(user)s is already a member of %(tenant)s — edit "
-                                "their membership instead."
-                            ) % {'user': self._existing_user_by_email, 'tenant': tenant})
-                        else:
-                            self.add_error('new_user_email', _(
-                                "This account cannot be added to the selected tenant."
-                            ))
-                elif User.objects.filter(username=email).exists():
-                    # username=email convention: a stale account with that username
-                    # but a different email would make the insert 500 otherwise.
+                try:
+                    # Resolve (never create) here; the actual write is delegated to
+                    # users.services on save so it is transaction-/race-safe.
+                    self._existing_user_by_email = resolve_existing_user(email)
+                except AmbiguousEmailError:
+                    # More than one account shares this email — fail closed rather
+                    # than silently picking one (email is not globally unique).
+                    self._existing_user_by_email = None
                     self.add_error('new_user_email', _(
-                        "A user with this username already exists but uses a "
-                        "different email address."
+                        "More than one account already uses this email address — "
+                        "resolve the duplicate before adding a membership."
                     ))
+                else:
+                    if self._existing_user_by_email is not None:
+                        # Get-or-create semantics: reuse the account instead of
+                        # duplicating it — but a second membership at the same tenant
+                        # is an edit, not an add.
+                        cleaned['user'] = self._existing_user_by_email
+                        if Membership.objects.filter(
+                            user=self._existing_user_by_email, tenant=tenant,
+                        ).exists():
+                            # Defense-in-depth against a membership oracle: only
+                            # reveal that the account already belongs to THIS tenant
+                            # to an actor allowed to manage its memberships (the
+                            # create view already 404s an unauthorized deep link;
+                            # this covers directly-built forms / tampered posts). An
+                            # unauthorized actor gets a non-revealing error instead.
+                            if self._actor_may_manage_memberships(tenant):
+                                self.add_error('new_user_email', _(
+                                    "%(user)s is already a member of %(tenant)s — edit "
+                                    "their membership instead."
+                                ) % {'user': self._existing_user_by_email, 'tenant': tenant})
+                            else:
+                                self.add_error('new_user_email', _(
+                                    "This account cannot be added to the selected tenant."
+                                ))
+                    # No match → a new account is created on save with a length-safe
+                    # username (users.services), so a long email / username clash is
+                    # handled there rather than rejected here.
             if not (cleaned.get('new_user_first_name') or '').strip():
                 self.add_error('new_user_first_name', _("Required for a new user."))
             if not (cleaned.get('new_user_last_name') or '').strip():
@@ -611,23 +620,21 @@ class MembershipForm(forms.ModelForm):
         return instance
 
     def _create_inline_user(self):
-        """Create the who-block's "new user": username=email, unusable password.
+        """Get-or-create the who-block's "new user" via the identity service.
 
-        Credentials are never issued automatically — the membership detail's
-        "Send password setup link" action does that explicitly.
+        Delegates the write to ``users.services.resolve_or_create_user`` so it is
+        transaction-/race-safe, length-safe (username fits the field), and reuses a
+        concurrently-created account rather than duplicating it. Credentials are
+        never issued automatically — the membership detail's "Send password setup
+        link" action does that explicitly.
         """
         cleaned = self.cleaned_data
-        email = cleaned['new_user_email']
-        user = User(
-            username=email,
-            email=email,
-            first_name=(cleaned.get('new_user_first_name') or '').strip(),
-            last_name=(cleaned.get('new_user_last_name') or '').strip(),
-            is_active=True,
+        user, created = resolve_or_create_user(
+            email=cleaned['new_user_email'],
+            first_name=cleaned.get('new_user_first_name'),
+            last_name=cleaned.get('new_user_last_name'),
         )
-        user.set_unusable_password()
-        user.save()
-        self.new_user_created = True
+        self.new_user_created = created
         return user
 
     def _sync_assignments(self, membership):
