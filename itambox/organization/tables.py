@@ -1,4 +1,6 @@
 # itambox/organization/tables.py
+from types import SimpleNamespace
+
 import django_tables2 as tables
 from django_tables2.utils import A
 from .models import (
@@ -266,27 +268,40 @@ class RoleTable(BaseTable):
 class MembershipTable(BaseTable):
     pk = ToggleColumn(accessor='pk')
     user = tables.LinkColumn('users:user_detail', args=[A('user.pk')], verbose_name=_('User'))
-    kind = tables.Column(verbose_name=_('Kind'), accessor='pk', orderable=False, empty_values=())
-    tenant = tables.LinkColumn('organization:tenant_detail', args=[A('tenant_id')], accessor='tenant', verbose_name=_('Tenant'))
     roles = tables.Column(verbose_name=_('Roles'), accessor='assignments', orderable=False, empty_values=())
+    kind = tables.Column(verbose_name=_('Reach'), accessor='pk', orderable=False, empty_values=())
     is_active = tables.BooleanColumn(verbose_name=_('Active'))
     joined_at = tables.DateTimeColumn(format="Y-m-d H:i", verbose_name=_('Joined'))
     actions = ActionsColumn(actions=('edit', 'delete'))
 
     class Meta(BaseTable.Meta):
         model = Membership
-        fields = ('pk', 'user', 'kind', 'tenant', 'roles', 'is_active', 'joined_at', 'actions')
-        default_columns = ('pk', 'user', 'kind', 'tenant', 'roles', 'is_active', 'joined_at', 'actions')
+        fields = ('pk', 'user', 'roles', 'kind', 'is_active', 'joined_at', 'actions')
+        default_columns = ('pk', 'user', 'roles', 'kind', 'is_active', 'joined_at', 'actions')
 
     def render_kind(self, record):
         # Purple "Staff" when any grant carries managed reach, blue "Member" otherwise.
-        return membership_kind_badge(record)
+        # Prefer the list view's Exists() annotation (``has_managed_reach``) so the
+        # badge costs zero queries per row; fall back to the model property (one
+        # exists() query) for callers that pass an unannotated queryset. The badge
+        # helper only reads ``.is_staff_membership``, which is a read-only property
+        # on Membership — an annotation cannot reuse that name, so hand the helper
+        # the precomputed answer instead.
+        staff = getattr(record, 'has_managed_reach', None)
+        if staff is None:
+            staff = record.is_staff_membership
+        return membership_kind_badge(SimpleNamespace(is_staff_membership=bool(staff)))
 
     def render_roles(self, value, record):
+        # Aggregated from the prefetched assignments: link per role, "Shared" badge
+        # on shared-in definitions, reach badge on managed-reach grants.
         parts = []
         for assignment in record.assignments.all():
             url = reverse('organization:role_detail', kwargs={'pk': assignment.role_id})
             link = format_html('<a href="{}">{}</a>', url, assignment.role.name)
+            shared = shared_role_badge(assignment.role)
+            if shared:
+                link = format_html('{} {}', link, shared)
             if assignment.reach == RoleAssignment.REACH_MANAGED:
                 link = format_html('{} {}', link, reach_badge(assignment))
             parts.append(link)
@@ -307,5 +322,4 @@ class CostCenterTable(BaseTable):
         model = CostCenter
         fields = ('pk', 'code', 'name', 'tenant', 'parent', 'description', 'child_count', 'is_active', 'actions')
         default_columns = ('pk', 'code', 'name', 'tenant', 'parent', 'child_count', 'is_active', 'actions')
-
 

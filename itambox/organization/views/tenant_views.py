@@ -2,7 +2,8 @@ from django.shortcuts import redirect, render, get_object_or_404
 from django.urls import reverse, reverse_lazy
 from django.contrib import messages
 from django.contrib.auth.mixins import LoginRequiredMixin
-from django.db.models import Count
+from django.core.exceptions import PermissionDenied
+from django.db.models import Count, Q
 from django.http import Http404, HttpResponse
 from django.utils.translation import gettext_lazy as _
 from django.contrib.auth.decorators import login_required
@@ -27,6 +28,13 @@ from django_tables2 import RequestConfig
 
 
 class TenantListView(ObjectListView):
+    """Tenant-scoped by default, always — an MSP admin no longer widens this list
+    with ``?all_providers=true`` (retired: RBAC stage-3 §3). Superusers still see
+    every tenant via the normal unscoped path (no active tenant context ⇒
+    ``filter_by_tenant()`` is a no-op). MSP staff reach their customer tenants
+    through the switcher (``organization.access.accessible_tenant_ids``) or the
+    "Managed Tenants" tab on their own provider tenant's detail page.
+    """
     queryset = Tenant.objects.select_related('group', 'managed_by').prefetch_related('tags').annotate(
         site_count=Count('sites', distinct=True),
         location_count=Count('locations', distinct=True),
@@ -35,85 +43,6 @@ class TenantListView(ObjectListView):
     filterset_form = TenantFilterForm
     table = TenantTable
     action_buttons = ('add',)
-
-    def _manageable_provider_ids(self):
-        """PKs of the ``is_provider`` tenants the user may administer, or ``None`` meaning *all*.
-
-        Superuser → ``None`` (every managing tenant). Otherwise the set of managing
-        tenants where the user holds ``organization.change_tenant`` — never "any
-        managing tenant grants all", so a single-MSP admin can only ever see their
-        OWN customer tenants. ``_base_manager``: this check runs across tenant
-        contexts, where the scoped default manager fails closed to ``.none()``.
-        """
-        user = self.request.user
-        if not (user and user.is_authenticated):
-            return set()
-        if user.is_superuser:
-            return None
-        return {
-            t.pk for t in Tenant._base_manager.filter(
-                is_provider=True, deleted_at__isnull=True,
-            )
-            if user.has_perm('organization.change_tenant', obj=t)
-        }
-
-    def _can_view_all_providers(self):
-        """Whether the requesting user may opt into the cross-tenant managed set.
-
-        True for a superuser, or a user holding ``organization.change_tenant`` on
-        at least one ``is_provider`` tenant. The *scope* of what they then see is
-        still restricted to the tenants managed by THOSE tenants (see
-        ``get_queryset``). Anyone else stays tenant-scoped.
-        """
-        ids = self._manageable_provider_ids()
-        return ids is None or bool(ids)
-
-    def get_queryset(self):
-        """Default: tenant-scoped (``Tenant.objects``) — never widened for ordinary users.
-
-        An MSP admin may explicitly opt into the cross-tenant set of tenants they
-        manage with ``?all_providers=true``; the toggle is honoured ONLY for managing
-        tenants the user actually holds ``organization.change_tenant`` on (a superuser
-        sees every managed tenant). This preserves the MSP cross-tenant listing without
-        loosening isolation for everyone else and WITHOUT leaking other MSPs' tenants
-        to a single-MSP admin.
-        """
-        if self.request.GET.get('all_providers') == 'true':
-            managed = self._manageable_provider_ids()
-            if managed is None:
-                # Superuser: every managed, non-deleted tenant.
-                base = Tenant._base_manager.filter(
-                    managed_by__isnull=False, deleted_at__isnull=True,
-                )
-            elif managed:
-                # MSP admin: ONLY tenants managed by the tenants they administer.
-                base = Tenant._base_manager.filter(
-                    managed_by_id__in=managed, deleted_at__isnull=True,
-                )
-            else:
-                base = None
-            if base is not None:
-                # _base_manager bypasses tenant scoping (an MSP admin legitimately
-                # views across their own customer tenants).
-                self.queryset = (
-                    base
-                    .select_related('group', 'managed_by')
-                    .prefetch_related('tags')
-                    .annotate(
-                        site_count=Count('sites', distinct=True),
-                        location_count=Count('locations', distinct=True),
-                    )
-                )
-        return super().get_queryset()
-
-    def get_context_data(self, **kwargs):
-        context = super().get_context_data(**kwargs)
-        context['can_view_all_providers'] = self._can_view_all_providers()
-        context['viewing_all_providers'] = (
-            self.request.GET.get('all_providers') == 'true'
-            and context['can_view_all_providers']
-        )
-        return context
 
 
 class TenantDetailView(ObjectDetailView):
@@ -141,6 +70,14 @@ class TenantDetailView(ObjectDetailView):
         context['tenant_license_count'] = tenant.licenses.count()
         context['tenant_kit_count'] = tenant.kits.count()
         context['tenant_subscription_count'] = tenant.subscriptions_org.count()
+
+        # Managed tenants are a DIFFERENT tenant than whichever one is active for
+        # this request — the scoped default manager (``tenant.managed_tenants``)
+        # would silently return none of them, so count via ``_base_manager``.
+        context['tenant_managed_count'] = (
+            Tenant._base_manager.filter(managed_by_id=tenant.pk, deleted_at__isnull=True).count()
+            if tenant.is_provider else 0
+        )
 
         tenant_configs = getattr(settings, 'ITAMBOX_TENANT_LDAP_CONFIGS', {})
         context['has_ldap'] = tenant.slug in tenant_configs
@@ -281,7 +218,6 @@ class TenantAccessView(LoginRequiredMixin, View):
             request.user.has_perm('organization.view_membership', obj=tenant)
         )
         if not has_access:
-            from django.core.exceptions import PermissionDenied
             raise PermissionDenied(_("You do not have permission to view the access report for this tenant."))
         report = tenant_access_report(tenant)
         return render(request, 'organization/tenants/who_has_access.html', {
@@ -290,11 +226,71 @@ class TenantAccessView(LoginRequiredMixin, View):
         })
 
 
+class TenantManagedTenantsTabView(LoginRequiredMixin, View):
+    """Lazy ``hx-get`` partial for the "Managed Tenants" tab on an ``is_provider``
+    tenant's detail page (RBAC stage-3 §3).
+
+    Deliberately its own URL (``tenants/<pk>/managed/``) rather than the ``?tab=``
+    dispatch ``TenantDetailView``'s sibling tabs use — keeps this tab
+    coordinate-free from that view's ``get_tab_*`` method surface.
+    """
+
+    def get(self, request, pk):
+        # get_object_or_404 goes through Tenant.objects (tenant-scoped): this is
+        # correct here, since the tab only ever renders on the PROVIDER tenant's
+        # own detail page, which is by definition reachable in the requester's
+        # current tenant context.
+        tenant = get_object_or_404(Tenant, pk=pk)
+        has_access = (
+            request.user.is_superuser or
+            request.user.has_perm('organization.view_tenant', obj=tenant)
+        )
+        if not has_access:
+            raise PermissionDenied(_("You do not have permission to view this tenant."))
+        if not tenant.is_provider:
+            raise Http404()
+
+        # _base_manager: managed (customer) tenants are a DIFFERENT tenant than
+        # the one active for this request — the scoped default manager would
+        # silently return none of them (see "Architecture: tenant scoping").
+        managed_tenants = (
+            Tenant._base_manager
+            .filter(managed_by_id=tenant.pk, deleted_at__isnull=True)
+            .select_related('group')
+            .annotate(
+                member_count=Count(
+                    'memberships', filter=Q(memberships__is_active=True), distinct=True,
+                ),
+            )
+            .order_by('name')
+        )
+        can_add_managed_tenant = (
+            request.user.is_superuser or
+            request.user.has_perm('organization.add_tenant', obj=tenant)
+        )
+        return render(request, 'organization/tenants/_tab_managed_tenants.html', {
+            'tenant': tenant,
+            'managed_tenants': managed_tenants,
+            'can_add_managed_tenant': can_add_managed_tenant,
+        })
+
+
 class TenantEditView(ObjectEditView):
     queryset = Tenant.objects.all()
     model = Tenant
     model_form = TenantForm
     template_name = 'generic/object_edit.html'
+
+    def get_form_kwargs(self):
+        # ``managed_by_param`` carries "Add managed tenant" (tenants/add/?managed_by=<pk>)
+        # through to TenantForm, which forces it server-side for actors holding
+        # organization.add_tenant on that MSP tenant (superusers unrestricted;
+        # everyone else ignored). request.GET reflects the query string for both
+        # GET and POST here since the form posts back to the current URL.
+        kwargs = super().get_form_kwargs()
+        kwargs['user'] = self.request.user
+        kwargs['managed_by_param'] = self.request.GET.get('managed_by')
+        return kwargs
 
 
 class TenantDeleteView(ObjectDeleteView):

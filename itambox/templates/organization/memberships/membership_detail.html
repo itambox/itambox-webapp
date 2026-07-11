@@ -4,7 +4,7 @@
 
 {% block extra_page_actions %}
     {% if object.user.email %}
-    <form method="post" action="{% url 'organization:membership_send_reset' pk=object.pk %}" class="d-inline">
+    <form id="send-password-setup" method="post" action="{% url 'organization:membership_send_reset' pk=object.pk %}" class="d-inline">
         {% csrf_token %}
         <button type="submit" class="btn btn-outline-primary">
             <i class="mdi mdi-email-lock-outline me-1"></i>

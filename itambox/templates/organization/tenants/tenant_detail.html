@@ -11,6 +11,16 @@
 
 {# --- Tabs Hook --- #}
 {% block extra_tabs %}
+    {% if object.is_provider %}
+    <li class="nav-item" role="presentation" data-bs-toggle="tooltip" data-bs-placement="top" title="{% translate 'Managed Tenants' %}">
+        <a href="?tab=managed-tenants" class="nav-link {% if request.GET.tab == 'managed-tenants' %}active{% endif %}" data-bs-toggle="tab" data-bs-target="#managed-tenants" role="tab" hx-boost="false"
+           hx-get="{% url 'organization:tenant_managed_tenants_tab' pk=object.pk %}" hx-target="#managed-tenants" hx-swap="innerHTML" hx-trigger="click once" hx-sync="#detail-tabs:replace" aria-selected="{% if request.GET.tab == 'managed-tenants' %}true{% else %}false{% endif %}">
+            <i class="mdi mdi-domain text-red"></i>
+            <span class="d-none d-xl-inline ms-1">{% translate "Managed Tenants" %}</span>
+            <span class="badge bg-red-lt ms-2">{{ tenant_managed_count }}</span>
+        </a>
+    </li>
+    {% endif %}
     <li class="nav-item" role="presentation" data-bs-toggle="tooltip" data-bs-placement="top" title="{% translate 'Sites' %}">
         <a href="?tab=sites" class="nav-link {% if request.GET.tab == 'sites' %}active{% endif %}" data-bs-toggle="tab" data-bs-target="#sites" role="tab"
            hx-get="?tab=sites" hx-target="#sites" hx-swap="innerHTML" hx-trigger="click once" hx-sync="#detail-tabs:replace" aria-selected="{% if request.GET.tab == 'sites' %}true{% else %}false{% endif %}">
@@ -110,6 +120,16 @@
 
 {# --- Extra Tab Panes --- #}
 {% block extra_tab_panes %}
+    {% if object.is_provider %}
+    {# Managed Tenants Tab Pane #}
+    <div class="tab-pane tab-pane--lazy fade {% if request.GET.tab == 'managed-tenants' %}show active{% endif %}" id="managed-tenants" role="tabpanel">
+        <div class="text-center py-5 text-muted">
+            <div class="spinner-border spinner-border-sm text-primary mb-2" role="status"></div>
+            <div>{% translate "Loading Managed Tenants..." %}</div>
+        </div>
+    </div>
+    {% endif %}
+
     {# Sites Tab Pane #}
     <div class="tab-pane tab-pane--lazy fade {% if request.GET.tab == 'sites' %}show active{% endif %}" id="sites" role="tabpanel">
         <div class="text-center py-5 text-muted">

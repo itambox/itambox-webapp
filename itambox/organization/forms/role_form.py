@@ -121,7 +121,9 @@ class RoleForm(forms.ModelForm):
         widgets = {
             'name': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'e.g. Inventory Manager'}),
             'description': forms.Textarea(attrs={'class': 'form-control', 'rows': 3, 'placeholder': _('Describe the role…')}),
-            'shared_with_managed': forms.CheckboxInput(attrs={'class': 'form-check-input'}),
+            # role="switch" pairs with the .form-switch wrapper role_form.html renders it
+            # in — a highlighted switch, not a plain checkbox (RBAC_STAGE3_SPEC.md §4).
+            'shared_with_managed': forms.CheckboxInput(attrs={'class': 'form-check-input', 'role': 'switch'}),
         }
 
     def __init__(self, *args, **kwargs):
@@ -138,9 +140,17 @@ class RoleForm(forms.ModelForm):
         else:
             self.owner_tenant = tenant_ctx or get_current_tenant()
 
-        # Sharing is only meaningful when the owner manages other tenants.
+        # Sharing is only meaningful when the owner manages other tenants — the
+        # switch never renders for a plain tenant's role, even for a superuser.
         if not (self.owner_tenant is not None and self.owner_tenant.is_provider):
             self.fields.pop('shared_with_managed', None)
+        else:
+            # Single source of truth for the switch's copy — role_form.html renders
+            # this help_text verbatim rather than hand-copying it into the template.
+            self.fields['shared_with_managed'].help_text = _(
+                "Managed tenants can assign this role to their own members; only "
+                "you can edit it."
+            )
 
         # Build the CRUD matrix and pre-check from the instance's permission set.
         existing_perms = set(self.instance.permissions or [])

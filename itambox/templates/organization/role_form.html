@@ -45,6 +45,23 @@
                     </div>
                 </div>
 
+                {% if form.shared_with_managed %}
+                {# Highlighted switch, directly under name/description (is_provider owners only). #}
+                <div class="card card-sm bg-teal-lt border-teal mb-4">
+                    <div class="card-body">
+                        <div class="form-check form-switch mb-1">
+                            {{ form.shared_with_managed }}
+                            <label class="form-check-label fw-semibold" for="{{ form.shared_with_managed.id_for_label }}">
+                                {% translate "Share with managed tenants" %}
+                            </label>
+                        </div>
+                        <div class="text-muted small">
+                            {{ form.shared_with_managed.help_text }}
+                        </div>
+                    </div>
+                </div>
+                {% endif %}
+
                 <hr class="my-4">
 
                 <h4 class="card-title text-primary mb-3">{% translate "Permissions Matrix" %}</h4>
@@ -185,24 +202,6 @@
                         </div>
                     </div>
                 </div>
-
-                {% if form.shared_with_managed %}
-                <hr class="my-4">
-
-                <h4 class="card-title text-primary mb-3">{% translate "Sharing" %}</h4>
-
-                <div class="row">
-                    <div class="col-12 mb-3">
-                        <div class="form-check">
-                            {{ form.shared_with_managed }}
-                            <label class="form-check-label" for="{{ form.shared_with_managed.id_for_label }}">
-                                <strong>{% translate "Share with managed tenants" %}</strong>
-                                <span class="d-block text-muted small">{% translate "Managed tenants may assign this role to their own members; only this organization can edit it." %}</span>
-                            </label>
-                        </div>
-                    </div>
-                </div>
-                {% endif %}
 
                 <div class="d-flex justify-content-end mt-4">
                     <button type="submit" class="btn btn-primary">

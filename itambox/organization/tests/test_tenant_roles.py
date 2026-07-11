@@ -10,6 +10,7 @@ helper, which creates the Membership anchor + one RoleAssignment row.
 """
 from django.test import TestCase
 from django.contrib.auth import get_user_model
+from django.urls import reverse
 from organization.models import Tenant, Membership, Role, RoleAssignment
 from organization.forms import RoleForm as TenantRoleForm, MembershipForm
 from core.auth import MembershipBackend
@@ -761,6 +762,73 @@ class SharedRoleTests(TestCase):
         self.assertTrue(customer_admin.has_perm('organization.change_role', obj=own_role))
 
 
+class RoleDeleteConfirmSharedWarningTests(TestCase):
+    """Delete-confirm wording for a shared role with live assignments in a managed
+    tenant (RBAC_STAGE3_SPEC.md §4): "grants survive as audit but stop resolving" —
+    wording only, since Role.delete() (soft delete) + the auth backend's
+    role.deleted_at check already implement that semantics as of stage 2. The
+    warning fires only when BOTH hold: the role is shared_with_managed AND at
+    least one RoleAssignment actually lives in one of its managed tenants."""
+
+    def setUp(self):
+        set_current_tenant(None)
+        set_current_membership(None)
+
+        self.superuser = User.objects.create_superuser(
+            username='su-delete-warn', email='su-delete-warn@example.com', password='pw',
+        )
+        self.msp_tenant = Tenant.objects.create(
+            name="Delete-Warn MSP", slug="delete-warn-msp", is_provider=True,
+        )
+        self.customer_tenant = Tenant.objects.create(
+            name="Delete-Warn Customer", slug="delete-warn-customer", managed_by=self.msp_tenant,
+        )
+        self.client.force_login(self.superuser)
+
+    def tearDown(self):
+        set_current_tenant(None)
+        set_current_membership(None)
+
+    def _delete_url(self, pk, tenant):
+        from django.urls import reverse
+        return f"{reverse('organization:role_delete', kwargs={'pk': pk})}?switch_tenant={tenant.pk}"
+
+    def test_delete_confirm_warns_when_a_shared_role_has_a_managed_tenant_assignment(self):
+        role = Role.objects.create(
+            tenant=self.msp_tenant, name="Shared With Grants", permissions=[],
+            shared_with_managed=True,
+        )
+        member = User.objects.create_user(username='cust-del-warn', email='cust-del-warn@example.com')
+        grant(member, self.customer_tenant, role)  # own-reach grant AT the managed tenant
+
+        resp = self.client.get(self._delete_url(role.pk, self.msp_tenant))
+        self.assertEqual(resp.status_code, 200)
+        self.assertContains(resp, "survive as an audit trail")
+
+    def test_delete_confirm_silent_when_a_shared_role_has_no_managed_tenant_assignments(self):
+        role = Role.objects.create(
+            tenant=self.msp_tenant, name="Shared No Grants", permissions=[],
+            shared_with_managed=True,
+        )
+        resp = self.client.get(self._delete_url(role.pk, self.msp_tenant))
+        self.assertEqual(resp.status_code, 200)
+        self.assertNotContains(resp, "survive as an audit trail")
+
+    def test_delete_confirm_silent_for_a_non_shared_role_even_with_assignments(self):
+        # Assignments at the OWNING tenant itself (not a managed one) never
+        # trigger the warning, and neither does shared_with_managed=False.
+        role = Role.objects.create(
+            tenant=self.msp_tenant, name="Private With Grants", permissions=[],
+            shared_with_managed=False,
+        )
+        staff = User.objects.create_user(username='staff-del-warn', email='staff-del-warn@example.com')
+        grant(staff, self.msp_tenant, role)
+
+        resp = self.client.get(self._delete_url(role.pk, self.msp_tenant))
+        self.assertEqual(resp.status_code, 200)
+        self.assertNotContains(resp, "survive as an audit trail")
+
+
 class RBACCoverageTests(TestCase):
     def setUp(self):
         set_current_tenant(None)
@@ -850,50 +918,16 @@ class RBACCoverageTests(TestCase):
         assignment.delete()
         self.assertNotIn("assets.view_asset", backend._effective_perms_for_tenant(user, self.tenant_a))
 
-    def test_technician_quick_form(self):
-        # M10 successor: TechnicianQuickForm (organization/forms/provider_form.py)
-        # onboards staff at a managing (is_provider) tenant with a managed-reach
-        # RoleAssignment — there is no separate Provider container/field anymore.
-        from organization.forms import TechnicianQuickForm
+    def test_technician_quick_route_redirects_to_unified_preset(self):
+        # Stage 3 deletes TechnicianQuickForm. The compatibility route is now a
+        # GET-only redirect into the unified, guarded membership form.
+        self.client.force_login(self.super_user)
 
-        role = Role.objects.create(
-            tenant=self.msp_tenant, name="MSP Admin Role",
-            permissions=["assets.view_asset"],
-        )
+        response = self.client.get(reverse('organization:technician_quick_add'))
 
-        non_admin_user = User.objects.create_user(username='nonadmin', email='nonadmin@example.com')
-
-        form = TechnicianQuickForm(
-            user=non_admin_user,
-            data={
-                'email': 'newtech@example.com',
-                'first_name': 'New', 'last_name': 'Tech',
-                'organization': self.msp_tenant.pk,
-                'role': role.pk,
-                'managed_scope': RoleAssignment.SCOPE_ALL,
-            }
+        self.assertRedirects(
+            response,
+            reverse('organization:membership_create')
+            + f'?preset=technician&tenant={self.msp_tenant.pk}',
+            fetch_redirect_response=False,
         )
-        self.assertFalse(form.is_valid())
-        # non_admin holds no add_membership on the managing tenant, so it's
-        # excluded from the organization picker's queryset entirely.
-        self.assertIn('organization', form.errors)
-        self.assertFalse(User.objects.filter(email='newtech@example.com').exists())
-
-        form_super = TechnicianQuickForm(
-            user=self.super_user,
-            data={
-                'email': 'newtech@example.com',
-                'first_name': 'New', 'last_name': 'Tech',
-                'organization': self.msp_tenant.pk,
-                'role': role.pk,
-                'managed_scope': RoleAssignment.SCOPE_ALL,
-            }
-        )
-        self.assertTrue(form_super.is_valid(), form_super.errors)
-        user, membership = form_super.save()
-        self.assertEqual(user.email, 'newtech@example.com')
-        self.assertEqual(membership.tenant, self.msp_tenant)
-        assignment = RoleAssignment.objects.get(
-            membership=membership, role=role, reach=RoleAssignment.REACH_MANAGED,
-        )
-        self.assertEqual(assignment.managed_scope, RoleAssignment.SCOPE_ALL)

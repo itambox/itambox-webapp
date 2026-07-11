@@ -1,18 +1,19 @@
-"""Quick onboarding views.
+"""Quick onboarding views — stage-3 remnant.
 
-The Provider CRUD views died with the ``Provider`` model: a provider is now a
-``Tenant`` with ``is_provider=True``, administered through the regular tenant
-screens. What remains here is the single-form technician onboarding flow
-(kept until the stage-3 grants UX replaces it).
+The single-form technician onboarding flow (``TechnicianQuickForm``) was folded
+into the unified "Add member" flow: ``TechnicianQuickAddView`` is now a thin
+redirect to ``memberships/add/?tenant=<msp pk>&preset=technician``. The nav item
+"Add Technician" keeps pointing at this route, so bookmarks and menus survive.
 """
-from django.contrib import messages
-from django.contrib.auth.mixins import UserPassesTestMixin
+from urllib.parse import urlencode
+
+from django.contrib.auth.mixins import LoginRequiredMixin
+from django.core.exceptions import PermissionDenied
 from django.shortcuts import redirect
 from django.urls import reverse
 from django.utils.translation import gettext_lazy as _
-from django.views.generic import FormView
+from django.views import View
 
-from ..forms import TechnicianQuickForm
 from ..models import Tenant
 
 
@@ -29,66 +30,43 @@ def _provider_tenants_with_perm(user, perm):
         deleted_at__isnull=True,
         memberships__user=user,
         memberships__is_active=True,
-    ).distinct()
+    ).distinct().order_by('name')
     return [t for t in candidates if user.has_perm(perm, obj=t)]
 
 
-class TechnicianQuickAddView(UserPassesTestMixin, FormView):
-    """Single-form technician onboarding at a managing (``is_provider``) tenant.
+class TechnicianQuickAddView(LoginRequiredMixin, View):
+    """Thin redirect into the unified add-member flow with the technician preset.
 
-    Gate: superuser, or ``organization.add_membership`` held at one of the
-    ``is_provider`` tenants the user belongs to.
+    Resolves which managing (``is_provider``) tenant the actor onboards for: the
+    active tenant when it qualifies, otherwise the first provider tenant where
+    they hold ``organization.add_membership`` (superusers: any provider tenant).
+    No form logic lives here anymore — the target ``MembershipCreateView``
+    enforces the actual ``add_membership`` permission and the escalation guards.
     """
-    template_name = 'organization/providers/technician_quick.html'
-    form_class = TechnicianQuickForm
+    http_method_names = ['get']
 
-    def test_func(self):
-        user = self.request.user
-        if not (user and user.is_authenticated):
-            return False
-        if user.is_superuser:
-            return True
-        return bool(_provider_tenants_with_perm(user, 'organization.add_membership'))
-
-    def get_form_kwargs(self):
-        kwargs = super().get_form_kwargs()
-        kwargs['user'] = self.request.user
-        return kwargs
-
-    def form_valid(self, form):
-        # Defense in depth — the form's clean() enforces the same gate.
-        organization = form.cleaned_data['organization']
-        if not self.request.user.is_superuser and not self.request.user.has_perm(
-            'organization.add_membership', obj=organization,
-        ):
-            messages.error(
-                self.request,
-                _("You do not have permission to onboard staff for this managing tenant."),
-            )
-            return self.form_invalid(form)
-
-        user, membership = form.save()
-        if form.cleaned_data.get('role') is None:
-            # No role was chosen (allowed for a first hire): the membership carries zero
-            # permissions until a role assignment is created. Steer the admin straight
-            # into role creation, deep-linked to the managing tenant so the new role is
-            # owned there.
-            messages.warning(
-                self.request,
-                _("Onboarded %(user)s as staff of %(tenant)s, but they have NO "
-                  "permissions yet. Create and assign a role to grant access.") % {
-                    'user': user, 'tenant': membership.tenant,
-                },
-            )
-            role_create_url = (
-                reverse('organization:role_create')
-                + f'?tenant={membership.tenant_id}'
-            )
-            return redirect(role_create_url)
-        messages.success(
-            self.request,
-            _("Onboarded %(user)s as staff of %(tenant)s.") % {
-                'user': user, 'tenant': membership.tenant,
-            },
+    def get(self, request):
+        candidates = _provider_tenants_with_perm(
+            request.user, 'organization.add_membership',
         )
-        return redirect(reverse('organization:membership_detail', kwargs={'pk': membership.pk}))
+        if getattr(request.user, 'is_superuser', False) and not candidates:
+            candidates = list(Tenant._base_manager.filter(
+                is_provider=True, deleted_at__isnull=True,
+            ).order_by('name'))
+
+        active = getattr(request, 'active_tenant', None)
+        msp = None
+        if active is not None and any(t.pk == active.pk for t in candidates):
+            msp = active
+        elif candidates:
+            msp = candidates[0]
+
+        if msp is None:
+            raise PermissionDenied(
+                _("No managing organization is available for technician onboarding.")
+            )
+
+        params = {'preset': 'technician', 'tenant': msp.pk}
+        return redirect(
+            f"{reverse('organization:membership_create')}?{urlencode(params)}"
+        )

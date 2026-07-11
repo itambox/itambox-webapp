@@ -9,15 +9,9 @@ just ``Tenant(is_provider=True)``, with customer tenants pointing back via
   (a) ``organization:customer_tenant_list`` no longer resolves.
   (b) ``TenantFilterSet`` exposes the ``managed_by`` (narrow to one managing tenant)
       and ``is_provider`` filters.
-  (c) an ordinary tenant user's tenant list stays tenant-scoped — the cross-tenant
-      opt-in (``?all_providers=true``) is IGNORED for a user who holds no
-      ``organization.change_tenant`` on any ``is_provider`` tenant, so no other
-      tenant's rows leak.
-  (d) a user holding ``organization.change_tenant`` on an ``is_provider`` tenant CAN
-      opt into the widened set via ``?all_providers=true`` — scoped to ONLY the
-      tenants managed by the ``is_provider`` tenant(s) they administer (no cross-MSP
-      leak: an admin of MSP-A must never see MSP-B's managed tenants).
-  (e) a superuser opting in sees every managed tenant across every MSP.
+  (c) tenant lists remain normally scoped and the retired
+      ``?all_providers=true`` parameter never widens them. Provider admins use the
+      Managed Tenants detail tab instead; superusers retain their normal global list.
 """
 from django.contrib.auth import get_user_model
 from django.test import RequestFactory, TestCase
@@ -137,9 +131,7 @@ class CustomerTenantConsolidationTests(TenantTestMixin, TestCase):
         self.assertNotIn(self.customer_b.pk, pks)
 
     def test_ordinary_user_cannot_opt_into_cross_tenant_set(self):
-        """SECURITY: the ?all_providers=true toggle is honoured ONLY for a user
-        holding organization.change_tenant on an is_provider tenant. An ordinary
-        user passing it must NOT widen their scope."""
+        """The retired query parameter never widens an ordinary user's scope."""
         self.client.force_login(self.ordinary_user)
         response = self.client.get(self.list_url, {"all_providers": "true"})
         self.assertEqual(response.status_code, 200)
@@ -147,15 +139,12 @@ class CustomerTenantConsolidationTests(TenantTestMixin, TestCase):
         self.assertEqual(pks, {self.own_tenant.pk})
         self.assertNotIn(self.customer_a.pk, pks)
         self.assertNotIn(self.customer_b.pk, pks)
-        self.assertFalse(response.context["viewing_all_providers"])
-        self.assertFalse(response.context["can_view_all_providers"])
+        self.assertNotIn("viewing_all_providers", response.context)
+        self.assertNotIn("can_view_all_providers", response.context)
 
     # --- (d) MSP admin opt-in: OWN managed tenants only, no cross-MSP leak ------
-    def test_msp_admin_opt_in_shows_only_own_managed_tenants(self):
-        """An MSP-A admin opting in sees MSP-A's customer tenants — but NOT another
-        MSP's (RBAC review #11 HIGH: ``?all_providers=true`` must scope to the
-        is_provider tenants the user actually administers, never every managed
-        tenant system-wide). The standalone tenant never appears in the widened set."""
+    def test_msp_admin_cannot_widen_list_with_retired_parameter(self):
+        """Provider admins reach customers through the detail tab, not this list."""
         self.client.force_login(self.msp_a_admin)
         # Establish the MSP tenant itself as the active tenant — that's where the
         # admin holds their own-reach membership, so it satisfies the ambient
@@ -166,18 +155,13 @@ class CustomerTenantConsolidationTests(TenantTestMixin, TestCase):
 
         response = self.client.get(self.list_url, {"all_providers": "true"})
         self.assertEqual(response.status_code, 200)
-        self.assertTrue(response.context["can_view_all_providers"])
-        self.assertTrue(response.context["viewing_all_providers"])
-
         pks = self._list_pks(response)
-        self.assertIn(self.customer_a.pk, pks)        # own managed tenant
-        self.assertNotIn(self.customer_b.pk, pks)      # another MSP's — must NOT leak
-        self.assertNotIn(self.own_tenant.pk, pks)      # standalone tenant
-        self.assertNotIn(self.msp_a.pk, pks)            # the managing tenant itself isn't a "managed" row
+        self.assertEqual(pks, {self.msp_a.pk})
+        self.assertNotIn(self.customer_a.pk, pks)
+        self.assertNotIn(self.customer_b.pk, pks)
+        self.assertNotIn("can_view_all_providers", response.context)
 
-    def test_msp_admins_are_isolated_from_each_other(self):
-        """Two single-MSP admins: neither sees the other's managed tenants under
-        ``?all_providers=true`` (RBAC review #11 HIGH — cross-MSP isolation)."""
+    def test_second_msp_admin_also_stays_scoped_with_retired_parameter(self):
         msp_b_admin_role = Role.objects.create(
             tenant=self.msp_b, name="MSP B Admin",
             permissions=["organization.change_tenant", "organization.view_tenant"],
@@ -196,12 +180,11 @@ class CustomerTenantConsolidationTests(TenantTestMixin, TestCase):
         response = self.client.get(self.list_url, {"all_providers": "true"})
         self.assertEqual(response.status_code, 200)
         pks = self._list_pks(response)
-        self.assertIn(self.customer_b.pk, pks)        # own managed tenant
-        self.assertNotIn(self.customer_a.pk, pks)      # MSP-A's — must NOT leak
+        self.assertEqual(pks, {self.msp_b.pk})
+        self.assertNotIn(self.customer_b.pk, pks)
+        self.assertNotIn(self.customer_a.pk, pks)
 
-    def test_superuser_opt_in_shows_all_managed_tenants(self):
-        """A superuser opting in sees every managed tenant across all MSPs (the one
-        principal legitimately allowed the full cross-tenant view)."""
+    def test_superuser_retains_normal_global_list(self):
         su = User.objects.create_user(
             username="root", email="root@example.com", password="pw",
             is_active=True, is_superuser=True, is_staff=True,
@@ -210,9 +193,11 @@ class CustomerTenantConsolidationTests(TenantTestMixin, TestCase):
         response = self.client.get(self.list_url, {"all_providers": "true"})
         self.assertEqual(response.status_code, 200)
         pks = self._list_pks(response)
+        self.assertIn(self.msp_a.pk, pks)
+        self.assertIn(self.msp_b.pk, pks)
         self.assertIn(self.customer_a.pk, pks)
         self.assertIn(self.customer_b.pk, pks)
-        self.assertNotIn(self.own_tenant.pk, pks)      # standalone tenant excluded
+        self.assertIn(self.own_tenant.pk, pks)
 
     def test_msp_admin_without_opt_in_stays_scoped(self):
         """Without the toggle the MSP admin's list is the ordinary tenant-scoped
@@ -224,7 +209,7 @@ class CustomerTenantConsolidationTests(TenantTestMixin, TestCase):
 
         response = self.client.get(self.list_url)
         self.assertEqual(response.status_code, 200)
-        self.assertFalse(response.context["viewing_all_providers"])
+        self.assertNotIn("viewing_all_providers", response.context)
         pks = self._list_pks(response)
         # Scoped to the single active tenant (the MSP tenant itself), not the whole
         # cross-tenant managed set.
@@ -232,11 +217,7 @@ class CustomerTenantConsolidationTests(TenantTestMixin, TestCase):
         self.assertNotIn(self.customer_a.pk, pks)
         self.assertNotIn(self.customer_b.pk, pks)
 
-    def test_user_with_change_tenant_only_on_managed_tenant_cannot_opt_in(self):
-        """Holding organization.change_tenant scoped to a MANAGED tenant (not an
-        is_provider one) must not satisfy the gate — ``_manageable_provider_ids``
-        only counts ``is_provider`` tenants where the user holds the permission
-        directly, not permissions projected onto tenants they manage."""
+    def test_customer_admin_cannot_widen_list_with_retired_parameter(self):
         customer_admin_role = Role.objects.create(
             tenant=self.customer_a, name="Customer A Admin",
             permissions=["organization.change_tenant", "organization.view_tenant"],
@@ -250,8 +231,8 @@ class CustomerTenantConsolidationTests(TenantTestMixin, TestCase):
         self.client.force_login(customer_admin)
         response = self.client.get(self.list_url, {"all_providers": "true"})
         self.assertEqual(response.status_code, 200)
-        self.assertFalse(response.context["can_view_all_providers"])
-        self.assertFalse(response.context["viewing_all_providers"])
+        self.assertNotIn("can_view_all_providers", response.context)
+        self.assertNotIn("viewing_all_providers", response.context)
         pks = self._list_pks(response)
         self.assertEqual(pks, {self.customer_a.pk})
         self.assertNotIn(self.customer_b.pk, pks)
