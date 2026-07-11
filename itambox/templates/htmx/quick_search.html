@@ -1,13 +1,19 @@
 {% load i18n %}
+{% comment %}
+The hx-trigger MUST live on the element that owns hx-get: a trigger on the bare
+input issues no request at all (release-review blocker #4 — typing/Enter left
+lists unfiltered). The form owns the whole HTMX contract; keyup/search events
+are delegated from the input via `from:find`.
+{% endcomment %}
 <form method="get" action="" class="filter-form-inline"
       hx-get="{{ hx_url|default:request.path }}"
       hx-target="{{ hx_target|default:'#object-list-dynamic-content' }}"
       hx-swap="innerHTML"
-      hx-push-url="true">
+      hx-push-url="true"
+      hx-trigger="submit, keyup changed delay:500ms from:find input[type='search'], search from:find input[type='search']">
     <div class="input-group input-group-flat input-group-sm">
         <input type="search" name="q" class="form-control form-control-sm" placeholder="{% translate 'Search...' %}"
-               value="{{ request.GET.q|default:'' }}"
-               hx-trigger="keyup changed delay:500ms, search">
+               value="{{ request.GET.q|default:'' }}">
         <span class="input-group-text {% if not request.GET.q %}d-none{% endif %}">
             <a href="#" class="link-secondary clear-search-btn"
                title="{% translate 'Clear search' %}" data-bs-toggle="tooltip">

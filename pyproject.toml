@@ -3,14 +3,15 @@ name = "itambox"
 version = "1.0.0-alpha1"
 description = "IT Asset Management System inspired by NetBox"
 requires-python = ">=3.11"
-# NOTE: itambox/requirements.txt is the canonical, fully-enumerated install set
-# (it pins every runtime dependency, including a few transitives this list omits,
-# e.g. mozilla-django-oidc, gunicorn, whitenoise, pyOpenSSL). This [project] table
-# must stay bootable on its own: `pip install .` with NO extras has to yield a
-# runnable app, so the always-required infrastructure deps below (DB driver,
-# cache/broker client) live in the base set rather than in an opt-in extra. The
-# app rejects SQLite at settings load, so a missing DB driver here means the app
-# cannot boot at all. Keep version ranges in sync with requirements.txt.
+# NOTE: ITAMbox is NOT pip-installable and does not ship wheels/sdists. The apps
+# are top-level packages (core, organization, assets, ...) rooted in itambox/ —
+# packaging them would install a package literally named `core` into
+# site-packages. The supported deployment paths are Docker (see Dockerfile /
+# docker-compose.yml) and a checkout + virtualenv provisioned from
+# itambox/requirements.txt (the canonical, fully-pinned install set — it also
+# carries transitives this list omits, e.g. mozilla-django-oidc, gunicorn,
+# whitenoise, pyOpenSSL). This [project] table exists for metadata and tooling
+# only; keep version ranges roughly in sync with requirements.txt.
 dependencies = [
     "Django>=5.2,<5.3",
     "djangorestframework>=3.16,<3.17",
@@ -58,13 +59,9 @@ celery = [
     "redis>=5.2,<6.0",
 ]
 
-[build-system]
-requires = ["setuptools>=69.0"]
-build-backend = "setuptools.build_meta"
-
-[tool.setuptools.packages.find]
-where = ["."]
-include = ["itambox*"]
+# No [build-system] / setuptools packaging on purpose: `pip install .` is an
+# unsupported path (see the NOTE on [project] above) and should fail loudly
+# rather than produce an empty or hazardous top-level install.
 
 [tool.pytest.ini_options]
 DJANGO_SETTINGS_MODULE = "core.settings"

@@ -7,6 +7,7 @@ if TYPE_CHECKING:
     from django.contrib.auth.models import AbstractBaseUser
     from django.http import HttpRequest
     from organization.models import AssetHolder, Location
+    from .models import AssetDisposal
 
 from django.db import transaction
 from django.db.models import Sum
