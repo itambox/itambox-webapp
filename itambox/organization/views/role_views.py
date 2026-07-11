@@ -4,7 +4,7 @@ from django.contrib.auth.mixins import LoginRequiredMixin
 from django.core.exceptions import PermissionDenied, ValidationError
 from django.db import transaction
 from django.db.models import Count, ProtectedError, Q
-from django.http import HttpResponseRedirect
+from django.http import Http404, HttpResponseRedirect
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse, reverse_lazy
 from django.utils.translation import gettext_lazy as _
@@ -52,10 +52,40 @@ class RoleDetailView(ObjectDetailView):
 
     def get_queryset(self):
         # A managed tenant may view (read-only) the roles shared down to it.
+        # Build the base fresh per request rather than reuse the import-baked class
+        # attribute (whose tenant scope is frozen to whatever context was active at
+        # module import — an order-dependent 404 hazard in tests / on first reverse).
         tenant = getattr(self.request, 'active_tenant', None)
         if tenant is not None:
             self.queryset = _annotate_member_count(_roles_visible_in(tenant))
+        else:
+            self.queryset = _annotate_member_count(Role.objects.all())
         return super().get_queryset()
+
+    def has_permission(self):
+        # The generic check evaluates `view_role` against the role's OWNING tenant,
+        # which denies a managed-tenant admin a role their managing organization
+        # shares down (they hold no membership in the provider). Resolve the
+        # boundary explicitly instead: owner context checks against the role, a
+        # shared-in context checks `view_role` against the ACTIVE managed tenant.
+        try:
+            role = self.get_object()  # get_queryset already 404s a role not visible here
+        except Http404:
+            if self.request.user.is_authenticated:
+                raise
+            return False
+        user = self.request.user
+        if user.is_superuser:
+            return True
+        active = getattr(self.request, 'active_tenant', None)
+        if active is None:
+            return False  # non-superuser global context: fail closed
+        if role.tenant_id == active.pk:  # owner context
+            return user.has_perm('organization.view_role', obj=role)
+        if role.shared_with_managed and active.managed_by_id == role.tenant_id:
+            # Shared-in: authorize against the managed tenant, not the provider role.
+            return user.has_perm('organization.view_role', obj=active)
+        return False  # fail closed
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
@@ -72,15 +102,37 @@ class RoleDetailView(ObjectDetailView):
             })
         context['matrix_grouped_items'] = groups
         context['custom_permissions'] = CUSTOM_PERMISSIONS
-        context['member_count'] = getattr(role, 'member_count', 0) or 0
-        context['members_url'] = f"{reverse('organization:membership_list')}?role={role.pk}"
-        # A role shared down by a managing tenant is read-only here.
         active = getattr(self.request, 'active_tenant', None)
+        # Scope the member count to the tenant being viewed so it agrees with the
+        # (active-tenant-scoped) members list the link resolves to — a shared-in
+        # role must never surface sibling customers' or provider-internal counts.
+        members_url = f"{reverse('organization:membership_list')}?role={role.pk}"
+        if active is not None:
+            member_count = (
+                RoleAssignment.objects.filter(role=role, membership__tenant=active)
+                .values('membership_id').distinct().count()
+            )
+        else:
+            member_count = getattr(role, 'member_count', 0) or 0  # superuser global total
+        context['member_count'] = member_count
+        context['members_url'] = members_url
+        # A role shared down by a managing tenant is read-only here.
         shared_in_role = bool(
             active is not None
             and active.managed_by_id == role.tenant_id
             and role.shared_with_managed
         )
+        # Never link the owning-tenant name to a page the viewer cannot open: link
+        # only when they may view that tenant, otherwise the template renders plain
+        # text (a managed-tenant admin can read a shared role but not its provider).
+        provider_url = None
+        if role.tenant_id and (
+            self.request.user.is_superuser
+            or self.request.user.has_perm('organization.view_tenant', obj=role.tenant)
+        ):
+            provider_url = role.tenant.get_absolute_url()
+        context['provider_tenant_url'] = provider_url
+        context['provider_tenant_name'] = role.tenant.name if role.tenant_id else ''
         role_editable = bool(
             (active is not None and role.tenant_id == active.pk)
             or (active is None and self.request.user.is_superuser)
@@ -114,7 +166,10 @@ class RoleEditView(ObjectEditView):
         kwargs['user'] = self.request.user
         # A ?tenant=<pk> deep-link pre-binds the new role's owner (e.g. role-less
         # technician onboarding). On edit the form locks to the instance's own
-        # tenant, so this is create-only.
+        # tenant, so this is create-only. The owner tenant is AUTHORIZED before the
+        # form is built: an explicit deep link to a tenant the requester may not add
+        # roles to 404s (same non-confirming pattern as the membership-create view)
+        # rather than pre-binding a foreign owner and rendering its form.
         if self.kwargs.get('pk') is None:
             tenant_id = self.request.GET.get('tenant')
             if tenant_id:
@@ -124,8 +179,12 @@ class RoleEditView(ObjectEditView):
                     ).first()
                 except (TypeError, ValueError):  # non-numeric ?tenant= must not 500
                     tenant = None
-                if tenant is not None:
-                    kwargs['tenant'] = tenant
+                if tenant is None or not (
+                    self.request.user.is_superuser
+                    or self.request.user.has_perm('organization.add_role', obj=tenant)
+                ):
+                    raise Http404("No role can be added to the requested tenant.")
+                kwargs['tenant'] = tenant
         return kwargs
 
 

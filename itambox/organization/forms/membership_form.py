@@ -502,6 +502,21 @@ class MembershipForm(forms.ModelForm):
             )
         return cleaned
 
+    def _actor_may_manage_memberships(self, tenant):
+        """Whether the acting user may add/change memberships in ``tenant``.
+
+        Superusers and an absent actor (system/programmatic contexts) are trusted;
+        otherwise the relevant object-level Django permission is required. Used only
+        for the membership-oracle defense in ``_clean_who`` — role-permission
+        escalation is a separate, unconditional check.
+        """
+        user = self._requesting_user
+        if user is None or getattr(user, 'is_superuser', False):
+            return True
+        perm = ('organization.change_membership' if self.instance.pk
+                else 'organization.add_membership')
+        return user.has_perm(perm, obj=tenant)
+
     def _clean_who(self, cleaned, tenant):
         """Enforce exactly one side of the who-radio (create only).
 
@@ -535,10 +550,21 @@ class MembershipForm(forms.ModelForm):
                     if Membership.objects.filter(
                         user=self._existing_user_by_email, tenant=tenant,
                     ).exists():
-                        self.add_error('new_user_email', _(
-                            "%(user)s is already a member of %(tenant)s — edit "
-                            "their membership instead."
-                        ) % {'user': self._existing_user_by_email, 'tenant': tenant})
+                        # Defense-in-depth against a membership oracle: only reveal
+                        # that the account already belongs to THIS tenant to an actor
+                        # allowed to manage its memberships (the create view already
+                        # 404s an unauthorized deep link; this covers directly-built
+                        # forms / tampered posts). An unauthorized actor gets a
+                        # non-revealing error instead of the tenant's membership state.
+                        if self._actor_may_manage_memberships(tenant):
+                            self.add_error('new_user_email', _(
+                                "%(user)s is already a member of %(tenant)s — edit "
+                                "their membership instead."
+                            ) % {'user': self._existing_user_by_email, 'tenant': tenant})
+                        else:
+                            self.add_error('new_user_email', _(
+                                "This account cannot be added to the selected tenant."
+                            ))
                 elif User.objects.filter(username=email).exists():
                     # username=email convention: a stale account with that username
                     # but a different email would make the insert 500 otherwise.

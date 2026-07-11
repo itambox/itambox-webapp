@@ -16,9 +16,15 @@
 <div class="alert alert-info d-flex align-items-center mb-4" role="alert">
     <i class="mdi mdi-information-outline fs-3 me-2"></i>
     <div>
-        {% blocktranslate trimmed with provider_url=object.tenant.get_absolute_url provider_name=object.tenant.name %}
+        {% if provider_tenant_url %}
+        {% blocktranslate trimmed with provider_url=provider_tenant_url provider_name=provider_tenant_name %}
         Shared by <a href="{{ provider_url }}">{{ provider_name }}</a> — edit it there.
         {% endblocktranslate %}
+        {% else %}
+        {% blocktranslate trimmed with provider_name=provider_tenant_name %}
+        Shared by {{ provider_name }} — edit it there.
+        {% endblocktranslate %}
+        {% endif %}
     </div>
 </div>
 {% endif %}
@@ -33,7 +39,7 @@
             {% endif %}
         </div>
         <div class="text-muted small mt-1">
-            {% if object.tenant %}<a href="{{ object.tenant.get_absolute_url }}">{{ object.tenant }}</a>{% endif %}
+            {% if provider_tenant_url %}<a href="{{ provider_tenant_url }}">{{ provider_tenant_name }}</a>{% elif provider_tenant_name %}{{ provider_tenant_name }}{% endif %}
         </div>
     </div>
     <div class="col-md-6 mb-3">
