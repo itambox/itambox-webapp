@@ -41,10 +41,14 @@ def validate_external_url(url, allow_private=False):
             infos = socket.getaddrinfo(host, parts.port or (443 if parts.scheme == 'https' else 80),
                                        proto=socket.IPPROTO_TCP)
         except socket.gaierror:
-            # Host does not resolve: there is no internal target to protect against
-            # and the request will fail on its own. Don't couple URL validation to
-            # transient DNS availability — allow it through.
-            return []
+            # FAIL CLOSED. An unresolvable host cannot be pinned to a validated
+            # address, and "allow it through" would let an attacker-controlled
+            # resolver answer differently at send time (DNS rebinding: benign at
+            # validation, 169.254.169.254 at connect). A transient DNS outage
+            # making a webhook save/send fail is the acceptable cost.
+            raise ValidationError(
+                _('URL host could not be resolved; refusing to accept it unverified.')
+            )
 
     resolved = []
     for info in infos:

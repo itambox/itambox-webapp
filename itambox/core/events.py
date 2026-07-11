@@ -321,21 +321,25 @@ def _send_notification(rule, event):
         )
 
 
-def _is_safe_outbound_url(url):
-    """SSRF guard shared by the synchronous notification senders."""
+def _post_pinned(webhook_url, payload):
+    """SSRF-hardened POST shared by the synchronous notification senders.
+
+    Routes through core.http.request_pinned: send-time validation (fail closed,
+    incl. unresolvable hosts) + the connection pinned to the validated address,
+    so a DNS-rebinding answer between check and use cannot re-route the request.
+    Returns the response, or None when the URL is blocked.
+    """
     from django.core.exceptions import ValidationError
-    from core.validators import validate_external_url
+    # inline import: keep event-dispatch import-light; core.http pulls requests.
+    from core.http import request_pinned
     try:
-        validate_external_url(url)
-        return True
+        return request_pinned('POST', webhook_url, json=payload, timeout=10)
     except ValidationError as exc:
-        logger.error("Outbound notification to %s blocked by SSRF guard: %s", url, exc)
-        return False
+        logger.error("Outbound notification to %s blocked by SSRF guard: %s", webhook_url, exc)
+        return None
 
 
 def _send_slack_notification(webhook_url, message_text, title=None):
-    if not _is_safe_outbound_url(webhook_url):
-        return False
     payload = {
         'text': message_text,
     }
@@ -351,7 +355,9 @@ def _send_slack_notification(webhook_url, message_text, title=None):
             }
         ]
     try:
-        response = requests.post(webhook_url, json=payload, timeout=10)
+        response = _post_pinned(webhook_url, payload)
+        if response is None:
+            return False
         response.raise_for_status()
         logger.info("Slack notification sent — status %s", response.status_code)
         return True
@@ -361,8 +367,6 @@ def _send_slack_notification(webhook_url, message_text, title=None):
 
 
 def _send_teams_notification(webhook_url, message_text, title=None):
-    if not _is_safe_outbound_url(webhook_url):
-        return False
     payload = {
         '@type': 'MessageCard',
         '@context': 'https://schema.org/extensions',
@@ -372,7 +376,9 @@ def _send_teams_notification(webhook_url, message_text, title=None):
         'text': message_text,
     }
     try:
-        response = requests.post(webhook_url, json=payload, timeout=10)
+        response = _post_pinned(webhook_url, payload)
+        if response is None:
+            return False
         response.raise_for_status()
         logger.info("Teams notification sent — status %s", response.status_code)
         return True
