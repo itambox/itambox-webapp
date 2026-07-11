@@ -759,7 +759,14 @@ class RoleAssignment(ChangeLoggingMixin, models.Model):
             # inline import: avoid an organization.models <-> organization.access cycle at load
             from organization.access import get_descendant_tenant_group_ids
             return tenant.group_id in get_descendant_tenant_group_ids(self.scope_group_id)
-        return self.assigned_tenants.filter(pk=tenant.pk).exists()
+        # _base_manager (unscoped) via the reverse relation: the M2M's own related
+        # manager is Tenant's tenant-scoped manager, which would both fail closed
+        # outside the tenant's context AND recurse back into filter_by_tenant when
+        # this canonical helper is reached from accessible_tenant_ids under a group
+        # scope.
+        return Tenant._base_manager.filter(
+            reach_assignments=self, pk=tenant.pk,
+        ).exists()
 
     def scoped_tenant_ids(self):
         """The set of managed-tenant ids this grant reaches (empty for own-reach)."""
@@ -783,9 +790,13 @@ class RoleAssignment(ChangeLoggingMixin, models.Model):
                     managed_by_id=provider_id, group_id__in=group_ids,
                 ).values_list('pk', flat=True)
             )
+        # _base_manager via the reverse relation (see covers_tenant): unscoped, so it
+        # neither fails closed outside the tenant context nor recurses into
+        # filter_by_tenant when reached from accessible_tenant_ids under a group scope.
         return set(
-            self.assigned_tenants.filter(managed_by_id=provider_id)
-            .values_list('pk', flat=True)
+            Tenant._base_manager.filter(
+                reach_assignments=self, managed_by_id=provider_id,
+            ).values_list('pk', flat=True)
         )
 
     # ------------------------------------------------------------------ explicit coverage

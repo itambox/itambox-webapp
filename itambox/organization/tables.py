@@ -268,6 +268,13 @@ class RoleTable(BaseTable):
 class MembershipTable(BaseTable):
     pk = ToggleColumn(accessor='pk')
     user = tables.LinkColumn('users:user_detail', args=[A('user.pk')], verbose_name=_('User'))
+    # Shown only in a multi-tenant context (group scope / superuser global) — the
+    # MembershipListView excludes it under a single active tenant, where every row
+    # shares that tenant. Never render a mixed table without this identifier.
+    tenant = tables.LinkColumn(
+        'organization:tenant_detail', args=[A('tenant_id')], accessor='tenant',
+        verbose_name=_('Tenant'),
+    )
     roles = tables.Column(verbose_name=_('Roles'), accessor='assignments', orderable=False, empty_values=())
     kind = tables.Column(verbose_name=_('Reach'), accessor='pk', orderable=False, empty_values=())
     is_active = tables.BooleanColumn(verbose_name=_('Active'))
@@ -276,8 +283,8 @@ class MembershipTable(BaseTable):
 
     class Meta(BaseTable.Meta):
         model = Membership
-        fields = ('pk', 'user', 'roles', 'kind', 'is_active', 'joined_at', 'actions')
-        default_columns = ('pk', 'user', 'roles', 'kind', 'is_active', 'joined_at', 'actions')
+        fields = ('pk', 'user', 'tenant', 'roles', 'kind', 'is_active', 'joined_at', 'actions')
+        default_columns = ('pk', 'user', 'tenant', 'roles', 'kind', 'is_active', 'joined_at', 'actions')
 
     def render_kind(self, record):
         # Purple "Staff" when any grant carries managed reach, blue "Member" otherwise.
