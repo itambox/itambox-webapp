@@ -9,4 +9,5 @@ from .depreciation import calculate_depreciation
 from .webhooks import send_webhook_task
 from .ldap import sync_tenant_ldap_task
 from .intune_sync import sync_tenant_intune
+from .retention import prune_changelog_task
 
