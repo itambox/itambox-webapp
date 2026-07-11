@@ -3,7 +3,10 @@
 {% load rbac_badges %}
 
 {% block extra_page_actions %}
-    {% if object.user.email %}
+    {# Only a viewer who may change this membership sees the credential-issuing #}
+    {# action; MembershipSendResetView enforces the same change_membership guard #}
+    {# on POST, so hiding the button here just avoids a dead control. #}
+    {% if object.user.email and can_change %}
     <form id="send-password-setup" method="post" action="{% url 'organization:membership_send_reset' pk=object.pk %}" class="d-inline">
         {% csrf_token %}
         <button type="submit" class="btn btn-outline-primary">

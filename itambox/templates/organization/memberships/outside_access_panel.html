@@ -29,8 +29,13 @@ or on the user group).
                 </thead>
                 <tbody>
                     {% for entry in entries %}
-                    <tr>
-                        <td>{{ entry.user }}</td>
+                    <tr{% if entry.inactive %} class="text-muted"{% endif %}>
+                        <td>
+                            {{ entry.user }}
+                            {% if entry.inactive %}
+                            <span class="badge bg-secondary-lt text-secondary ms-1" title="{% translate 'This account is disabled and cannot currently sign in.' %}">{% translate "Inactive" %}</span>
+                            {% endif %}
+                        </td>
                         <td>
                             {% for source in entry.sources %}
                                 {% if source == 'managed' %}

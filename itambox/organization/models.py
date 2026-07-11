@@ -759,11 +759,15 @@ class RoleAssignment(ChangeLoggingMixin, models.Model):
             # inline import: avoid an organization.models <-> organization.access cycle at load
             from organization.access import get_descendant_tenant_group_ids
             return tenant.group_id in get_descendant_tenant_group_ids(self.scope_group_id)
-        # _base_manager (unscoped) via the reverse relation: the M2M's own related
-        # manager is Tenant's tenant-scoped manager, which would both fail closed
-        # outside the tenant's context AND recurse back into filter_by_tenant when
-        # this canonical helper is reached from accessible_tenant_ids under a group
-        # scope.
+        # When ``assigned_tenants`` has been prefetched (e.g. the outside-access
+        # report prefetches it via _base_manager to avoid one query per explicit
+        # assignment), read the cache; otherwise query via _base_manager (unscoped)
+        # through the reverse relation — the M2M's own related manager is Tenant's
+        # tenant-scoped manager, which would fail closed outside the tenant's
+        # context AND recurse into filter_by_tenant when this canonical helper is
+        # reached from accessible_tenant_ids under a group scope.
+        if 'assigned_tenants' in getattr(self, '_prefetched_objects_cache', {}):
+            return any(t.pk == tenant.pk for t in self.assigned_tenants.all())
         return Tenant._base_manager.filter(
             reach_assignments=self, pk=tenant.pk,
         ).exists()
