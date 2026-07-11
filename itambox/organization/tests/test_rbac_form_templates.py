@@ -18,6 +18,7 @@ from django.test import TestCase
 from django.urls import reverse
 
 from core.tests.mixins import TenantTestMixin
+from organization.models import Tenant
 from organization.forms import MembershipForm
 from users.forms import UserGroupForm
 
@@ -73,9 +74,16 @@ class RBACFormTemplateTests(TenantTestMixin, TestCase):
         """
         minimal_base = Template('{% block content %}{% endblock %}')
 
+        # A provider tenant so the managed-grants formset (and its row partial)
+        # actually renders — this is what the real view supplies to the template.
+        provider = Tenant.objects.create(
+            name="Render MSP", slug="render-msp-tmpl", is_provider=True,
+        )
+        membership_form = MembershipForm(user=self.admin, tenant=provider)
         membership_ctx = Context({
             'base_template': minimal_base,
-            'form': MembershipForm(user=self.admin, tenant=self.tenant),
+            'form': membership_form,
+            'managed_formset': membership_form.managed_formset,
             'title': 'Create membership',
             'is_editing': False,
             'cancel_url': reverse('organization:membership_list'),
@@ -85,6 +93,9 @@ class RBACFormTemplateTests(TenantTestMixin, TestCase):
         ).template.render(membership_ctx)
         self.assertIn('<form', membership_html)
         self.assertIn('name="user"', membership_html)
+        # The managed-grants formset renders: management form + one row's role select.
+        self.assertIn('name="managed-TOTAL_FORMS"', membership_html)
+        self.assertIn('managed-0-role', membership_html)
 
         usergroup_ctx = Context({
             'base_template': minimal_base,

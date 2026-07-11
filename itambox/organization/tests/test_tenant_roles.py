@@ -665,7 +665,7 @@ class SharedRoleTests(TestCase):
         # The role-picker query documented in RBAC_STAGE2_SPEC.md §7 (implemented
         # by MembershipForm): Q(tenant=T) | Q(tenant=T.managed_by, shared_with_managed=True).
         form = MembershipForm(user=self.super_user, tenant=self.customer_tenant)
-        offered = set(form.fields['roles'].queryset)
+        offered = set(form.fields['own_roles'].queryset)
         self.assertIn(self.shared_role, offered)
         self.assertNotIn(self.private_role, offered)
 
@@ -674,7 +674,7 @@ class SharedRoleTests(TestCase):
         form = MembershipForm(
             data={
                 'user': member.pk, 'tenant': self.customer_tenant.pk,
-                'roles': [self.shared_role.pk], 'reach': RoleAssignment.REACH_OWN,
+                'own_roles': [self.shared_role.pk],
                 'is_active': True,
             },
             user=self.super_user, tenant=self.customer_tenant,
@@ -699,19 +699,19 @@ class SharedRoleTests(TestCase):
         # test_role_picker_offers_shared_but_not_private_roles above): its queryset
         # is `Q(tenant=T) | Q(tenant=T.managed_by, shared_with_managed=True)`, which
         # excludes an unshared MSP-owned role. Submitting its pk anyway is rejected
-        # as an invalid choice on the `roles` field itself — the clean()-level
+        # as an invalid choice on the `own_roles` field itself — the clean()-level
         # "not available in the selected tenant" guard is unreachable here since
-        # the field-level rejection empties `cleaned_data['roles']` first.
+        # the field-level rejection empties `cleaned_data['own_roles']` first.
         form = MembershipForm(
             data={
                 'user': member.pk, 'tenant': self.customer_tenant.pk,
-                'roles': [self.private_role.pk], 'reach': RoleAssignment.REACH_OWN,
+                'own_roles': [self.private_role.pk],
                 'is_active': True,
             },
             user=self.super_user, tenant=self.customer_tenant,
         )
         self.assertFalse(form.is_valid())
-        self.assertIn('roles', form.errors)
+        self.assertIn('own_roles', form.errors)
         self.assertFalse(
             RoleAssignment.objects.filter(role=self.private_role, membership__user=member).exists()
         )

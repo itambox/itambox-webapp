@@ -201,8 +201,23 @@ class MembershipSendResetView(LoginRequiredMixin, View):
         return redirect(detail_url)
 
 
-class MembershipCreateView(ObjectEditView):
-    """The unified "Add member" flow: who / what (roles) / where (reach) in one form."""
+class _MembershipFormViewMixin:
+    """Shared context wiring for the create/edit membership screens.
+
+    The membership template wraps its own ``<form>`` so it can embed the managed
+    grants formset that ``MembershipForm`` owns; expose that formset to the
+    template so it renders (and its errors survive form_invalid re-render).
+    """
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        form = context.get('form')
+        context['managed_formset'] = getattr(form, 'managed_formset', None)
+        return context
+
+
+class MembershipCreateView(_MembershipFormViewMixin, ObjectEditView):
+    """The unified "Add member" flow: who / this-organization / managed tenants in one form."""
     queryset = Membership.objects.all()
     model = Membership
     model_form = MembershipForm
@@ -268,7 +283,7 @@ class MembershipCreateView(ObjectEditView):
         return response
 
 
-class MembershipEditView(ObjectEditView):
+class MembershipEditView(_MembershipFormViewMixin, ObjectEditView):
     """Edit a membership's assignments / active flag. User + tenant are immutable.
 
     The form reconciles RoleAssignment rows at BOTH reaches (own + managed);

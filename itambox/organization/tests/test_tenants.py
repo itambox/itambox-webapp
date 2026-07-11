@@ -74,7 +74,7 @@ class TenantViewTests(TestCase):
         response = self.client.post(url, {
             'user': self.user.pk,
             'tenant': self.tenant.pk,
-            'roles': [role.pk],
+            'own_roles': [role.pk],
         })
         self.assertEqual(response.status_code, 302)
         membership = Membership.objects.get(user=self.user, tenant=self.tenant)
