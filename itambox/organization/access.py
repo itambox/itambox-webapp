@@ -96,7 +96,8 @@ def tenant_access_report(tenant, external_only=False):
     this tenant's roles. This feeds the read-only "Access from outside this tenant"
     panel on the members list — grants shown there are managed where they live.
     """
-    from organization.models import Membership, RoleAssignment
+    from django.db.models import Prefetch
+    from organization.models import Membership, RoleAssignment, Tenant
     from users.models import UserGroup
 
     user_data = {}
@@ -150,7 +151,12 @@ def tenant_access_report(tenant, external_only=False):
             reach=RoleAssignment.REACH_MANAGED,
             membership__tenant_id=tenant.managed_by_id,
             membership__is_active=True,
-        ).select_related('membership__user', 'role', 'scope_group')
+        ).select_related('membership__user', 'role', 'scope_group').prefetch_related(
+            # _base_manager: the explicit-scope tenants are managed customers, which
+            # the tenant-scoped default manager would hide; prefetching here lets
+            # covers_tenant() read the cache instead of one query per assignment.
+            Prefetch('assigned_tenants', queryset=Tenant._base_manager.all()),
+        )
         for assignment in staff_assignments:
             if assignment.role.deleted_at is None and assignment.covers_tenant(tenant):
                 entry = _get_user_entry(assignment.membership.user)
@@ -171,11 +177,17 @@ def tenant_access_report(tenant, external_only=False):
 
     report = []
     for data in user_data.values():
+        user = data['user']
+        # A globally-disabled account (is_active=False) or one barred from
+        # interactive login (can_login=False) holds the grant but cannot actually
+        # use it — flag it so the panel does not claim it "can access".
+        inactive = not (user.is_active and getattr(user, 'can_login', True))
         report.append({
-            'user': data['user'],
+            'user': user,
             'sources': sorted(data['sources']),
             'groups': sorted(data['groups']),
             'permissions': sorted(data['permissions']),
+            'inactive': inactive,
         })
     report.sort(key=lambda r: (r['user'].username or '').lower())
     return report
