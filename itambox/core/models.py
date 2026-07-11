@@ -221,8 +221,11 @@ class ChangeLoggingMixin:
             self, exclude_fields=self._change_logging_excluded_fields
         )
 
-    def _log_change(self, action, prechange_data=None, postchange_data=None, message=''):
-        user = get_current_user()
+    def _log_change(self, action, prechange_data=None, postchange_data=None, message='', user=None):
+        # ``user`` overrides the acting user for this row (e.g. an explicit actor
+        # passed to log_m2m_change); otherwise the ambient request user is used.
+        if user is None:
+            user = get_current_user()
         request_id = get_current_request_id()
 
         if not request_id:
@@ -286,6 +289,47 @@ class ChangeLoggingMixin:
             if obj is None:
                 return None
         return obj
+
+    def log_m2m_change(self, field_name, new_values, actor=None):
+        """Apply an M2M ``.set()`` and record it in the changelog.
+
+        ``save()``/``delete()`` cannot capture many-to-many edits: Django fires
+        ``m2m_changed`` AFTER ``save()`` returns, so a plain ``field.set(...)``
+        leaves the audit trail showing the pre-edit (often empty) set. Any AUDITED
+        M2M mutation must go through here. It captures a full prechange snapshot
+        (M2M ids included, via ``serialize_object``), applies the change, captures
+        the postchange snapshot, and writes exactly ONE attributed ``ObjectChange``
+        UPDATE — but only when the set actually changes, so an unchanged re-apply
+        writes nothing (no duplicate/no-op rows). ``actor`` overrides the changelog
+        user for this write (else the ambient request user). Returns ``True`` when a
+        change was applied and logged, ``False`` on a no-op.
+        """
+        # Read the current + target ids through the UNSCOPED through table. Reading
+        # the related manager (``field.values_list``) would apply the related
+        # model's own manager — which for a tenant-scoped target (e.g. Tenant) fails
+        # closed to nothing outside its tenant context, so the snapshot would show
+        # an empty set even though rows exist. serialize_object() has the same blind
+        # spot, so the M2M key is overridden with the true ids below.
+        m2m_field = self._meta.get_field(field_name)
+        through = m2m_field.remote_field.through
+        source_fn = m2m_field.m2m_field_name()
+        target_col = m2m_field.m2m_reverse_field_name() + '_id'
+        current_ids = sorted(
+            through._base_manager.filter(**{source_fn: self}).values_list(target_col, flat=True)
+        )
+        target_ids = sorted({getattr(v, 'pk', v) for v in (new_values or [])})
+        if target_ids == current_ids:
+            return False
+        prechange = serialize_object(self, exclude_fields=self._change_logging_excluded_fields)
+        prechange[field_name] = current_ids
+        getattr(self, field_name).set(list(new_values or []))
+        postchange = serialize_object(self, exclude_fields=self._change_logging_excluded_fields)
+        postchange[field_name] = target_ids
+        self._log_change(
+            action=ObjectChangeActionChoices.ACTION_UPDATE,
+            prechange_data=prechange, postchange_data=postchange, user=actor,
+        )
+        return True
 
     def save(self, *args, **kwargs):
         if not get_current_request_id():

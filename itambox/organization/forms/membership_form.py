@@ -699,18 +699,17 @@ class MembershipForm(forms.ModelForm):
                     granted_by=self._requesting_user,
                 )
                 assignment.save()
-                if assigned:
-                    assignment.assigned_tenants.set(assigned)
+                # Route the explicit coverage through the audited writer so the
+                # M2M scope lands in ObjectChange (save() alone logs it empty).
+                assignment.set_assigned_tenants(assigned, actor=self._requesting_user)
             else:
                 if (assignment.managed_scope != scope
                         or assignment.scope_group_id != (scope_group.pk if scope_group else None)):
                     assignment.managed_scope = scope
                     assignment.scope_group = scope_group
                     assignment.save()
-                current = set(assignment.assigned_tenants.values_list('pk', flat=True))
-                target = {t.pk for t in assigned}
-                if current != target:
-                    assignment.assigned_tenants.set(assigned)
+                # set_assigned_tenants no-ops (and logs nothing) when unchanged.
+                assignment.set_assigned_tenants(assigned, actor=self._requesting_user)
 
 
 class MembershipFilterForm(FilterForm):

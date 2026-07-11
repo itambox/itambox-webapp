@@ -46,7 +46,9 @@ class SeedAccessMixin:
                 membership=membership, role=role, reach=reach,
                 defaults={'granted_by': granted_by, 'managed_scope': managed_scope})
             if assigned_tenants is not None:
-                assignment.assigned_tenants.set(assigned_tenants)
+                # The single supported writer for explicit coverage (audited when a
+                # request context exists; seeds run without one, so just applies).
+                assignment.set_assigned_tenants(assigned_tenants, actor=granted_by)
             return assignment
 
         # Build permission catalogs from Django's permission table.
