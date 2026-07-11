@@ -6,7 +6,7 @@ from django.contrib.auth.mixins import LoginRequiredMixin
 from django.core.exceptions import ValidationError
 from django.db import transaction
 from django.db.models import Exists, OuterRef
-from django.http import HttpResponse, HttpResponseRedirect
+from django.http import Http404, HttpResponse, HttpResponseRedirect
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
 from django.utils.html import format_html
@@ -217,37 +217,87 @@ class _MembershipFormViewMixin:
 
 
 class MembershipCreateView(_MembershipFormViewMixin, ObjectEditView):
-    """The unified "Add member" flow: who / this-organization / managed tenants in one form."""
+    """The unified "Add member" flow: who / this-organization / managed tenants in one form.
+
+    The tenant this membership will belong to is AUTHORIZED before the form is
+    built or rendered: an explicit ``?tenant=<pk>`` the requester may not add
+    members to 404s (never confirming its existence, never leaking its roles /
+    managed tenants), and only a superuser gets the context-free global picker.
+    """
     queryset = Membership.objects.all()
     model = Membership
     model_form = MembershipForm
     template_name = 'organization/memberships/membership_form.html'
 
-    def get_initial(self):
-        initial = super().get_initial()
-        for key in ('user', 'tenant'):
-            val = self.request.GET.get(key)
-            if val:
-                initial[key] = val
-        return initial
+    _AUTHZ_UNSET = object()
 
-    def get_form_kwargs(self):
-        kwargs = super().get_form_kwargs()
-        kwargs['user'] = self.request.user
-        # An explicit ?tenant=<pk> deep-link (e.g. "add member" from a tenant page) wins
-        # over the ambient active tenant.
-        tenant = None
+    def _authorized_tenant(self):
+        """Resolve + authorize the tenant this membership will belong to (cached).
+
+        An explicit ``?tenant=`` is authorized as a deep link; without it the
+        ambient active tenant is used. In both cases the requester must be a
+        superuser or hold ``organization.add_membership`` on that tenant. An
+        explicitly requested tenant the requester may not use (missing, deleted,
+        or unauthorized) raises ``Http404`` so the endpoint does not confirm it
+        exists. Returns ``None`` only for a context-free request (no ?tenant, no
+        usable active tenant) — reserved for superusers by ``has_permission()``.
+        """
+        cached = getattr(self, '_authorized_tenant_cache', self._AUTHZ_UNSET)
+        if cached is not self._AUTHZ_UNSET:
+            return cached
+
+        user = self.request.user
         tenant_param = self.request.GET.get('tenant')
-        if tenant_param:
+        explicit = bool(tenant_param)
+        tenant = None
+        if explicit:
             try:
                 tenant = Tenant._base_manager.filter(
                     pk=tenant_param, deleted_at__isnull=True,
                 ).first()
             except (TypeError, ValueError):  # non-numeric ?tenant= must not 500
                 tenant = None
-        kwargs['tenant'] = tenant or getattr(self.request, 'active_tenant', None)
+        else:
+            tenant = getattr(self.request, 'active_tenant', None)
+
+        authorized = None
+        if tenant is not None and (
+            user.is_superuser
+            or user.has_perm('organization.add_membership', obj=tenant)
+        ):
+            authorized = tenant
+
+        # A deep link to a tenant the requester may not use must be indistinguishable
+        # from one that does not exist — 404, do not fall back to the active tenant.
+        if explicit and authorized is None:
+            raise Http404("No membership can be added to the requested tenant.")
+
+        self._authorized_tenant_cache = authorized
+        return authorized
+
+    def has_permission(self):
+        authorized = self._authorized_tenant()  # may 404 an explicit unauthorized tenant
+        if authorized is not None:
+            return True
+        # No authorized tenant context: only a superuser may get the context-free
+        # global picker. Everyone else fails closed (no ambient add-membership right).
+        return bool(self.request.user.is_superuser)
+
+    def get_initial(self):
+        initial = super().get_initial()
+        # ?user= prefills the member select; the tenant is governed by
+        # _authorized_tenant() (the form's tenant= kwarg), never by a raw ?tenant.
+        user_param = self.request.GET.get('user')
+        if user_param:
+            initial['user'] = user_param
+        return initial
+
+    def get_form_kwargs(self):
+        kwargs = super().get_form_kwargs()
+        kwargs['user'] = self.request.user
+        kwargs['tenant'] = self._authorized_tenant()
         # ?preset=technician (the redirected quick-onboard flow) preselects
-        # who=new + managed reach/all + the shared Technician role.
+        # who=new + one managed/all Technician grant row.
         preset = self.request.GET.get('preset')
         if preset:
             kwargs['preset'] = preset
