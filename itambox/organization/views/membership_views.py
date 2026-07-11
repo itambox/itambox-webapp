@@ -5,7 +5,7 @@ from django.contrib.auth.forms import PasswordResetForm
 from django.contrib.auth.mixins import LoginRequiredMixin
 from django.core.exceptions import ValidationError
 from django.db import transaction
-from django.db.models import Exists, OuterRef
+from django.db.models import Exists, OuterRef, Prefetch
 from django.http import Http404, HttpResponse, HttpResponseRedirect
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
@@ -37,7 +37,17 @@ class MembershipListView(ObjectListView):
     queryset = (
         Membership.objects
         .select_related('user', 'tenant')
-        .prefetch_related('assignments__role')
+        # Join role + role.tenant into the assignment prefetch: the roles column
+        # (and Role.__str__) touch role.tenant per row, which the tenant-scoped
+        # Tenant manager would otherwise re-fetch one-.get()-per-row (an N+1 that
+        # also fails closed outside the role's tenant context). select_related uses
+        # a JOIN, so it is both constant-cost and scope-independent.
+        .prefetch_related(
+            Prefetch(
+                'assignments',
+                queryset=RoleAssignment.objects.select_related('role', 'role__tenant'),
+            )
+        )
         .annotate(
             has_managed_reach=Exists(
                 RoleAssignment.objects.filter(
@@ -63,7 +73,69 @@ class MembershipListView(ObjectListView):
 
     def get_queryset(self):
         qs = super().get_queryset()
-        return visible_to_containers(self.request.user, qs, 'organization.view_membership')
+        user = self.request.user
+        active_tenant = getattr(self.request, 'active_tenant', None)
+        active_group = getattr(self.request, 'active_tenant_group', None)
+        if active_tenant is not None:
+            # Single active tenant: only its LOCAL memberships, and only if the
+            # requester may view them here. No mixed rows, so no Tenant column.
+            if user.is_superuser or user.has_perm(
+                'organization.view_membership', obj=active_tenant,
+            ):
+                return qs.filter(tenant=active_tenant)
+            return qs.none()
+        # Group scope or superuser global: memberships from the tenants in the
+        # active context. Compute that set from request.active_tenant_group (stable)
+        # rather than Tenant.objects — the permission backend's obj=None resolution
+        # clobbers the current-tenant contextvar to the user's first membership
+        # while checking the ambient view_membership perm, which would otherwise
+        # mis-scope the group query to that single tenant.
+        scoped_ids = self._context_tenant_ids(user, active_group)
+        if user.is_superuser:
+            return qs.filter(tenant_id__in=scoped_ids)
+        allowed = [
+            t.pk for t in Tenant._base_manager.filter(
+                pk__in=scoped_ids, deleted_at__isnull=True,
+            )
+            if user.has_perm('organization.view_membership', obj=t)
+        ]
+        return qs.filter(tenant_id__in=allowed)
+
+    def _context_tenant_ids(self, user, active_group):
+        """Tenant ids visible in the active group / global context (see get_queryset).
+
+        Group scope → the group subtree's tenants, intersected with the canonical
+        accessible set for a non-superuser. Global (superuser, no active tenant or
+        group) → every tenant. A non-superuser never reaches the global case
+        (middleware always resolves them an active tenant).
+        """
+        # inline import: keep accessible_tenant_ids as the single source of truth
+        # without a module-load cycle risk.
+        from organization.access import accessible_tenant_ids, get_descendant_tenant_group_ids
+        if active_group is not None:
+            group_ids = get_descendant_tenant_group_ids(active_group.pk)
+            base = Tenant._base_manager.filter(
+                group_id__in=group_ids, deleted_at__isnull=True,
+            )
+            if not user.is_superuser:
+                base = base.filter(pk__in=accessible_tenant_ids(user))
+            return set(base.values_list('pk', flat=True))
+        if user.is_superuser:
+            return set(
+                Tenant._base_manager.filter(deleted_at__isnull=True).values_list('pk', flat=True)
+            )
+        return set()
+
+    def _show_tenant_column(self):
+        """Show the Tenant column only when rows may span tenants (group scope or
+        superuser global) — never under a single active tenant."""
+        return getattr(self.request, 'active_tenant', None) is None
+
+    def get_table(self):
+        # Hard-exclude the Tenant column under a single active tenant (every row
+        # shares it); keep it otherwise so a mixed table always identifies each row.
+        exclude = () if self._show_tenant_column() else ('tenant',)
+        return self.table(self.object_list, request=self.request, exclude=exclude)
 
     def _outside_access_tenant(self):
         """The active tenant when the requester may audit its access, else ``None``.

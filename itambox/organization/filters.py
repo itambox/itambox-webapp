@@ -347,7 +347,10 @@ class MembershipFilterSet(BaseOrgFilterSet):
     # (distinct: a membership with several matching assignments must list once).
     role = django_filters.ModelMultipleChoiceFilter(
         field_name='assignments__role',
-        queryset=Role._base_manager.filter(deleted_at__isnull=True),
+        # select_related('tenant'): the widget renders one <option> per role via
+        # Role.__str__ ("name (tenant)"), which would otherwise fetch role.tenant
+        # once per choice — an N+1 that grows with the tenant's role count.
+        queryset=Role._base_manager.filter(deleted_at__isnull=True).select_related('tenant'),
         label=_('Roles'),
         distinct=True,
         widget=forms.SelectMultiple(attrs={'class': 'form-select'}),
