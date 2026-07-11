@@ -143,6 +143,7 @@ nav:
       - Installation: 'operations/installation.md'
       - Upgrades: 'operations/upgrades.md'
       - Backup & Restore: 'operations/backup-restore.md'
+      - Data Retention: 'operations/data-retention.md'
   - Development:
       - Release Checklist: 'development/release-checklist.md'
       - Module Maturity: 'development/module-maturity.md'

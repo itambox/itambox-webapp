@@ -4,6 +4,7 @@ from django.urls import reverse
 from django.contrib.contenttypes.fields import GenericForeignKey
 from django.contrib.contenttypes.models import ContentType
 from django.conf import settings
+from django.core.validators import MinValueValidator
 
 
 def _default_currency():
@@ -230,6 +231,17 @@ class Tenant(DeletableVaultModel, BookmarkableMixin):
         related_name='tenants_defaulting',
         verbose_name=_("Default depreciation policy"),
         help_text=_("Fallback policy applied to all assets that have no type-level schedule and no per-asset override."),
+    )
+    changelog_retention_days = models.IntegerField(
+        null=True,
+        blank=True,
+        validators=[MinValueValidator(0)],
+        verbose_name=_("Changelog retention override (days)"),
+        help_text=_(
+            "Overrides ITAMBOX_CHANGELOG_RETENTION_DAYS for this tenant's ObjectChange "
+            "rows only. Blank uses the global setting. 0 = unlimited (legal hold -- this "
+            "tenant's changelog is never pruned by prune_changelog)."
+        ),
     )
 
     class Meta:
