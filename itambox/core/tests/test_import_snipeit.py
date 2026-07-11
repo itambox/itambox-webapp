@@ -415,10 +415,7 @@ class TestSnipeITImporter(TenantTestMixin):
                 {'id': 13, 'name': 'Status D', 'type': 'archived'},
             ],
         }
-        call_count = 0
-
         def fake_get(endpoint, params=None, _retries=0):
-            nonlocal call_count
             if endpoint == '/api/v1/statuslabels':
                 if (params or {}).get('offset', 0) == 0:
                     return two_page_labels

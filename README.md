@@ -69,14 +69,19 @@ ITAMbox uses a dual-template layout to achieve a fast interface without a comple
 
 ## Getting Started
 
-### Quick Start with Docker Compose
+### Evaluate with Docker Compose (demo data)
 
-To spin up the PostgreSQL database and application server immediately:
+To spin up the PostgreSQL database and application server with a full demo
+dataset (a managed-service provider, customer tenants, assets, licenses, …):
 
 ```bash
 # Clone the repository
 git clone https://github.com/itambox-itam/itambox-webapp.git
 cd itambox-webapp
+
+# Optional: pin the admin password up front (otherwise a strong one is
+# generated and printed ONCE by the seed step below — capture it!)
+export DJANGO_SUPERUSER_PASSWORD=change-me
 
 # Build and start services
 docker compose up -d --build
@@ -84,10 +89,27 @@ docker compose up -d --build
 # Run database migrations
 docker compose exec app python manage.py migrate
 
-# Seed sample data (creates initial organization, assets, and users)
+# Seed demo data (safe on a fresh database; re-seeding an existing
+# non-debug database clears domain data and therefore requires --force)
 docker compose exec app python manage.py seed_data
+```
 
-# App is now live at http://localhost:8000 (Default login: admin / admin)
+The app is now live at `http://localhost:8000`. Sign in as `admin` with the
+password printed by the seed step (or your `DJANGO_SUPERUSER_PASSWORD`), or
+explore the demo roles — e.g. MSP engineer `lars.eklund`, password
+`itambox2026`.
+
+### Production first run
+
+Production installs do **not** use demo data. After configuring `.env`
+(`ITAMBOX_SECRET_KEY`, `ITAMBOX_FIELD_ENCRYPTION_KEYS`,
+`ITAMBOX_CACHE_BACKEND=redis` for multi-worker deployments — see
+`.env.example`):
+
+```bash
+docker compose up -d --build
+docker compose exec app python manage.py migrate
+docker compose exec app python manage.py createsuperuser
 ```
 
 ### Local Virtualenv Setup
