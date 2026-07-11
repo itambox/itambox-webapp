@@ -2,9 +2,10 @@ from django.test import TestCase
 from django.contrib.auth import get_user_model
 from django.urls import reverse
 
-from organization.models import Tenant, Role, Membership
+from organization.models import Tenant, Role
 from assets.models import Manufacturer, AssetType
 from inventory.models import Kit, KitItem
+from core.tests.mixins import grant
 
 User = get_user_model()
 
@@ -32,16 +33,12 @@ class KitItemCrossTenantTests(TestCase):
         self.role_a = Role.objects.create(
             tenant=self.tenant_a, name='Admin', permissions=kititem_perms
         )
-        self.membership_a = Membership.objects.create(user=self.user_a, tenant=self.tenant_a
-        )
-        self.membership_a.roles.add(self.role_a)
+        self.membership_a = grant(self.user_a, self.tenant_a, self.role_a).membership
 
         self.role_b = Role.objects.create(
             tenant=self.tenant_b, name='Admin', permissions=kititem_perms
         )
-        self.membership_b = Membership.objects.create(user=self.user_b, tenant=self.tenant_b
-        )
-        self.membership_b.roles.add(self.role_b)
+        self.membership_b = grant(self.user_b, self.tenant_b, self.role_b).membership
 
         # Shared metadata for kit-item targets
         self.mfr = Manufacturer.objects.create(name='Apple', slug='apple')

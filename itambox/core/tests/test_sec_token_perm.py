@@ -16,6 +16,7 @@ from django.contrib.auth import get_user_model
 from django.urls import reverse
 
 from organization.models import Tenant, Role, Membership
+from core.tests.mixins import grant
 
 User = get_user_model()
 
@@ -36,9 +37,7 @@ class TokenPermissionsBypassRemovedTests(TestCase):
         self.member = User.objects.create_user(
             username='member-f7', password='password123'
         )
-        self.membership = Membership.objects.create(user=self.member, tenant=self.tenant,
-        )
-        self.membership.roles.add(self.role)
+        self.membership = grant(self.member, self.tenant, self.role).membership
 
         # Unscoped user: authenticated, NOT a superuser, with NO membership
         # and NO asset-holder profile -> has no resolvable tenant.

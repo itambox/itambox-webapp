@@ -8,10 +8,10 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 from rest_framework.permissions import IsAuthenticated
 
+from core.managers import set_current_tenant
 from itambox.middleware import set_current_user
-from organization.models import Provider
+from organization.models import Tenant, Membership
 from users.models import UserGroup
-from organization.models import Membership
 from users.api.scim.serializers import (
     SCIMUserSerializer, SCIMGroupSerializer, SCIMServiceProviderConfigSerializer
 )
@@ -25,26 +25,31 @@ User = get_user_model()
 _UNSET = object()
 
 
-def sync_provider_group_members(provider, group, member_ids):
-    """Reconcile ``group.members`` to ``member_ids``, restricted to provider staff.
+def sync_provider_group_members(tenant, group, member_ids):
+    """Reconcile ``group.members`` to ``member_ids``, restricted to staff of ``tenant``.
 
-    Only users with an active ``Membership`` in THIS provider may be added. A
-    provider SCIM token is scoped to a single provider, so group sync must never write a
-    user who is not provider staff (that would be a cross-scope write and a user-id
-    enumeration oracle). New staff are provisioned exclusively through SCIM /Users; unknown
-    or non-staff ids are skipped.
+    ``tenant`` is the managing (``is_provider``) tenant this SCIM endpoint is mounted
+    for. Only users with an active ``Membership`` in THIS tenant may be added. A
+    provider SCIM token is scoped to a single managing tenant, so group sync must never
+    write a user who is not its staff (that would be a cross-scope write and a user-id
+    enumeration oracle). New staff are provisioned exclusively through SCIM /Users;
+    unknown or non-staff ids are skipped.
+
+    Deliberately unguarded (no validate_group_membership_grant): SCIM provisioning is
+    trusted operator configuration — the IdP mapping, not an in-app actor, decides who
+    belongs to which staff group.
     """
     valid_member_ids = set()
     for uid in member_ids:
         membership = Membership.objects.filter(
-            user_id=uid, provider=provider, is_active=True
+            user_id=uid, tenant=tenant, is_active=True
         ).first()
         if membership:
             valid_member_ids.add(uid)
         else:
             logger.warning(
                 "SCIM provider group sync skipped user id %s: not active staff of provider %s "
-                "(provision via SCIM /Users first).", uid, provider.slug
+                "(provision via SCIM /Users first).", uid, tenant.slug
             )
 
     # Apply only the delta (add/remove) so ChangeLoggingMixin does not fire on unchanged
@@ -87,15 +92,20 @@ class SCIMProviderMixin:
         if not provider_slug:
             raise exceptions.ValidationError("provider_slug is required")
 
-        try:
-            self.provider = Provider._base_manager.get(slug=provider_slug)
-        except Provider.DoesNotExist:
+        # A provider is a Tenant with is_provider=True; the /api/providers/<slug>/
+        # mount is kept but resolves against the tenant tree. _base_manager: no tenant
+        # context exists yet, so the tenant-scoped default manager would return nothing.
+        self.tenant = Tenant._base_manager.filter(
+            is_provider=True, deleted_at__isnull=True, slug=provider_slug,
+        ).first()
+        if self.tenant is None:
             raise exceptions.NotFound("Provider not found.")
 
-        # Provider models are global (above tenants) — no set_current_tenant needed. Bind the
-        # token's owner as the current user so SCIM-driven changelog rows are attributed to
-        # the acting service account rather than 'System' (CurrentUserMiddleware captured
-        # AnonymousUser before DRF auth ran).
+        # Bind the managing tenant as the current tenant (it IS a tenant now) and the
+        # token's owner as the current user so SCIM-driven changelog rows are attributed
+        # to the acting service account rather than 'System' (CurrentUserMiddleware
+        # captured AnonymousUser before DRF auth ran).
+        set_current_tenant(self.tenant)
         if getattr(request, 'user', None) and request.user.is_authenticated:
             set_current_user(request.user)
 
@@ -149,7 +159,7 @@ class ProviderServiceProviderConfigView(SCIMProviderMixin, APIView):
 class SCIMProviderUserListView(SCIMProviderMixin, APIView):
     def get(self, request, *args, **kwargs):
         queryset = User.objects.filter(
-            memberships__provider=self.provider, memberships__is_active=True,
+            memberships__tenant=self.tenant, memberships__is_active=True,
         ).distinct()
 
         try:
@@ -171,7 +181,7 @@ class SCIMProviderUserListView(SCIMProviderMixin, APIView):
         serializer = SCIMUserSerializer(
             sliced_queryset,
             many=True,
-            context={'request': request, 'tenant_slug': self.provider.slug}
+            context={'request': request, 'tenant_slug': self.tenant.slug, 'tenant': self.tenant}
         )
 
         return Response({
@@ -239,7 +249,7 @@ class SCIMProviderUserListView(SCIMProviderMixin, APIView):
 
         user = User.objects.filter(username=username).first()
         if user:
-            existing = Membership.objects.filter(user=user, provider=self.provider).first()
+            existing = Membership.objects.filter(user=user, tenant=self.tenant).first()
             if existing:
                 return Response({
                     "schemas": ["urn:ietf:params:scim:api:messages:2.0:Error"],
@@ -248,7 +258,13 @@ class SCIMProviderUserListView(SCIMProviderMixin, APIView):
                 }, status=status.HTTP_409_CONFLICT)
 
             with transaction.atomic():
-                Membership.objects.create(user=user, provider=self.provider, tenant_scope=Membership.SCOPE_EXPLICIT, is_active=active)
+                # SCIM provisions identity only: a bare membership at the managing
+                # tenant with NO RoleAssignment rows — zero permissions and zero reach
+                # until granted in-app (matching the old empty explicit scope). Were a
+                # provisioning config ever to map roles, it would resolve them against
+                # this tenant's own roles and create assignments with granted_by=None —
+                # SCIM is trusted operator configuration, deliberately unguarded.
+                Membership.objects.create(user=user, tenant=self.tenant, is_active=active)
         else:
             with transaction.atomic():
                 user = User.objects.create_user(
@@ -261,11 +277,12 @@ class SCIMProviderUserListView(SCIMProviderMixin, APIView):
                 user.set_unusable_password()
                 user.save()
 
-                Membership.objects.create(user=user, provider=self.provider, tenant_scope=Membership.SCOPE_EXPLICIT, is_active=active)
+                # See comment above: bare membership, assignments granted in-app.
+                Membership.objects.create(user=user, tenant=self.tenant, is_active=active)
 
         serializer = SCIMUserSerializer(
             user,
-            context={'request': request, 'tenant_slug': self.provider.slug}
+            context={'request': request, 'tenant_slug': self.tenant.slug, 'tenant': self.tenant}
         )
         return Response(serializer.data, status=status.HTTP_201_CREATED)
 
@@ -273,56 +290,49 @@ class SCIMProviderUserListView(SCIMProviderMixin, APIView):
 class SCIMProviderUserDetailView(SCIMProviderMixin, APIView):
     def _staff_queryset(self):
         return User.objects.filter(
-            memberships__provider=self.provider, memberships__is_active=True,
+            memberships__tenant=self.tenant, memberships__is_active=True,
         ).distinct()
 
     def get(self, request, pk, *args, **kwargs):
         user = get_object_or_404(self._staff_queryset(), id=pk)
         serializer = SCIMUserSerializer(
             user,
-            context={'request': request, 'tenant_slug': self.provider.slug}
+            context={'request': request, 'tenant_slug': self.tenant.slug, 'tenant': self.tenant}
         )
         return Response(serializer.data, status=status.HTTP_200_OK)
 
     def _apply_scim_identity(self, user, *, username=_UNSET, email=_UNSET,
                              first_name=_UNSET, last_name=_UNSET, active=_UNSET):
-        """Apply SCIM-provisioned identity/active changes for this provider.
+        """Apply SCIM-provisioned identity/active changes for this managing tenant.
 
-        A provider SCIM token is bound to exactly one provider.
+        A provider SCIM token is bound to exactly one managing tenant.
 
-        - ``active`` is applied PER-PROVIDER: it (de)activates this provider's membership
+        - ``active`` is applied PER-TENANT: it (de)activates this tenant's membership
           only. The global ``User.is_active`` is reconciled to whether the user has ANY
-          active provider membership left, so a fully de-provisioned user can no longer
-          authenticate — but is never globally locked out from a single provider's token.
-        - identity (username/email/name) must NEVER be rewritten for a user who is also a
-          member of another provider or any tenant — that is a cross-scope write on a shared
-          principal. Those changes apply only to a user whose sole membership is this provider.
+          active membership left, so a fully de-provisioned user can no longer
+          authenticate — but is never globally locked out by a single tenant's token.
+        - identity (username/email/name) must NEVER be rewritten for a user who is also
+          a member of any other tenant — that is a cross-scope write on a shared
+          principal. Those changes apply only to a user whose sole membership is this
+          managing tenant.
         """
-        # inline import: avoids users <-> organization import cycle at module load
-        from organization.models import Membership as _M
-
-        has_other_provider = (
-            Membership.objects.filter(user=user, provider__isnull=False)
-            .exclude(provider=self.provider)
+        has_other = (
+            Membership.objects.filter(user=user)
+            .exclude(tenant=self.tenant)
             .exists()
         )
-        has_tenant = _M.objects.filter(user=user, tenant__isnull=False).exists()
-        has_other = has_other_provider or has_tenant
 
         if active is not _UNSET:
-            membership = Membership.objects.filter(user=user, provider=self.provider).first()
+            membership = Membership.objects.filter(user=user, tenant=self.tenant).first()
             if membership is not None and membership.is_active != active:
                 membership.is_active = active
                 membership.save(update_fields=['is_active'])
-            # Mirror the global flag to "has any active provider membership". (Tenant-only
-            # users are governed by their tenant memberships, not by this provider token.)
-            any_active = Membership.objects.filter(user=user, provider__isnull=False, is_active=True).exists()
-            if not any_active and not has_tenant:
-                if user.is_active:
-                    user.is_active = False
-                    user.save(update_fields=['is_active'])
-            elif any_active and not user.is_active:
-                user.is_active = True
+            # Mirror the global flag to "has any active membership anywhere": clears
+            # login only when the user is fully de-provisioned, never from a single
+            # tenant's token while another tenant still has them active.
+            any_active = Membership.objects.filter(user=user, is_active=True).exists()
+            if user.is_active != any_active:
+                user.is_active = any_active
                 user.save(update_fields=['is_active'])
 
         if has_other:
@@ -412,7 +422,7 @@ class SCIMProviderUserDetailView(SCIMProviderMixin, APIView):
 
         serializer = SCIMUserSerializer(
             user,
-            context={'request': request, 'tenant_slug': self.provider.slug}
+            context={'request': request, 'tenant_slug': self.tenant.slug, 'tenant': self.tenant}
         )
         return Response(serializer.data, status=status.HTTP_200_OK)
 
@@ -479,23 +489,30 @@ class SCIMProviderUserDetailView(SCIMProviderMixin, APIView):
 
         serializer = SCIMUserSerializer(
             user,
-            context={'request': request, 'tenant_slug': self.provider.slug}
+            context={'request': request, 'tenant_slug': self.tenant.slug, 'tenant': self.tenant}
         )
         return Response(serializer.data, status=status.HTTP_200_OK)
 
     def delete(self, request, pk, *args, **kwargs):
         user = get_object_or_404(self._staff_queryset(), id=pk)
         with transaction.atomic():
-            # Remove only the membership for this provider. Delete per-instance so each
-            # removal is change-logged (QuerySet.delete() bypasses ChangeLoggingMixin).
-            for membership in Membership.objects.filter(user=user, provider=self.provider):
+            # Remove only the membership at this managing tenant. Delete per-instance so
+            # each removal is change-logged (QuerySet.delete() bypasses
+            # ChangeLoggingMixin). Deleting the membership CASCADEs its RoleAssignment
+            # rows, revoking own AND managed reach in one stroke.
+            for membership in Membership.objects.filter(user=user, tenant=self.tenant):
                 membership.delete()
+            # Fully de-provisioned user (no memberships anywhere): deactivate the
+            # account instead of hard-deleting (same rule as the tenant SCIM path).
+            if not Membership.objects.filter(user=user).exists():
+                user.is_active = False
+                user.save(update_fields=['is_active'])
         return Response(status=status.HTTP_204_NO_CONTENT)
 
 
 class SCIMProviderGroupListView(SCIMProviderMixin, APIView):
     def get(self, request, *args, **kwargs):
-        queryset = UserGroup.objects.filter(provider=self.provider)
+        queryset = UserGroup.objects.filter(tenant=self.tenant)
 
         try:
             start_index = int(request.query_params.get('startIndex', 1))
@@ -514,7 +531,7 @@ class SCIMProviderGroupListView(SCIMProviderMixin, APIView):
         sliced_queryset = queryset[start_index - 1 : start_index - 1 + count]
 
         serializer = SCIMGroupSerializer(
-            sliced_queryset, many=True, context={'request': request, 'tenant_slug': self.provider.slug}
+            sliced_queryset, many=True, context={'request': request, 'tenant_slug': self.tenant.slug}
         )
 
         return Response({
@@ -541,10 +558,10 @@ class SCIMProviderGroupListView(SCIMProviderMixin, APIView):
                 "detail": "displayName exceeds maximum length of 100 characters."
             }, status=status.HTTP_400_BAD_REQUEST)
 
-        # Group names are unique PER PROVIDER (active rows): reject only a duplicate within
-        # THIS provider, surfacing a clean 409 rather than a DB IntegrityError. A different
-        # provider may legitimately reuse the same displayName.
-        if UserGroup.objects.filter(provider=self.provider, name=name).exists():
+        # Group names are unique PER OWNING TENANT (active rows): reject only a
+        # duplicate within THIS managing tenant, surfacing a clean 409 rather than a DB
+        # IntegrityError. A different tenant may legitimately reuse the same displayName.
+        if UserGroup.objects.filter(tenant=self.tenant, name=name).exists():
             return Response({
                 "schemas": ["urn:ietf:params:scim:api:messages:2.0:Error"],
                 "status": "409",
@@ -568,23 +585,23 @@ class SCIMProviderGroupListView(SCIMProviderMixin, APIView):
 
         with transaction.atomic():
             group = UserGroup.objects.create(
-                provider=self.provider,
+                tenant=self.tenant,
                 name=name,
             )
-            sync_provider_group_members(self.provider, group, member_ids)
+            sync_provider_group_members(self.tenant, group, member_ids)
 
-        serializer = SCIMGroupSerializer(group, context={'request': request, 'tenant_slug': self.provider.slug})
+        serializer = SCIMGroupSerializer(group, context={'request': request, 'tenant_slug': self.tenant.slug})
         return Response(serializer.data, status=status.HTTP_201_CREATED)
 
 
 class SCIMProviderGroupDetailView(SCIMProviderMixin, APIView):
     def get(self, request, pk, *args, **kwargs):
-        group = get_object_or_404(UserGroup.objects.filter(provider=self.provider), id=pk)
-        serializer = SCIMGroupSerializer(group, context={'request': request, 'tenant_slug': self.provider.slug})
+        group = get_object_or_404(UserGroup.objects.filter(tenant=self.tenant), id=pk)
+        serializer = SCIMGroupSerializer(group, context={'request': request, 'tenant_slug': self.tenant.slug})
         return Response(serializer.data, status=status.HTTP_200_OK)
 
     def put(self, request, pk, *args, **kwargs):
-        group = get_object_or_404(UserGroup.objects.filter(provider=self.provider), id=pk)
+        group = get_object_or_404(UserGroup.objects.filter(tenant=self.tenant), id=pk)
 
         name = request.data.get('displayName')
         if not name:
@@ -619,13 +636,13 @@ class SCIMProviderGroupDetailView(SCIMProviderMixin, APIView):
         with transaction.atomic():
             group.name = name
             group.save()
-            sync_provider_group_members(self.provider, group, member_ids)
+            sync_provider_group_members(self.tenant, group, member_ids)
 
-        serializer = SCIMGroupSerializer(group, context={'request': request, 'tenant_slug': self.provider.slug})
+        serializer = SCIMGroupSerializer(group, context={'request': request, 'tenant_slug': self.tenant.slug})
         return Response(serializer.data, status=status.HTTP_200_OK)
 
     def patch(self, request, pk, *args, **kwargs):
-        group = get_object_or_404(UserGroup.objects.filter(provider=self.provider), id=pk)
+        group = get_object_or_404(UserGroup.objects.filter(tenant=self.tenant), id=pk)
 
         # Build the desired member id set from the current group state, then apply PATCH ops.
         current_member_ids = set(group.members.values_list('id', flat=True))
@@ -714,13 +731,13 @@ class SCIMProviderGroupDetailView(SCIMProviderMixin, APIView):
                                     }, status=status.HTTP_400_BAD_REQUEST)
 
             group.save()
-            sync_provider_group_members(self.provider, group, current_member_ids)
+            sync_provider_group_members(self.tenant, group, current_member_ids)
 
-        serializer = SCIMGroupSerializer(group, context={'request': request, 'tenant_slug': self.provider.slug})
+        serializer = SCIMGroupSerializer(group, context={'request': request, 'tenant_slug': self.tenant.slug})
         return Response(serializer.data, status=status.HTTP_200_OK)
 
     def delete(self, request, pk, *args, **kwargs):
-        group = get_object_or_404(UserGroup.objects.filter(provider=self.provider), id=pk)
+        group = get_object_or_404(UserGroup.objects.filter(tenant=self.tenant), id=pk)
         with transaction.atomic():
             # Soft-delete via the model's delete() for change-logging.
             group.delete()

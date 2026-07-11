@@ -9,10 +9,10 @@ from django.test import TestCase
 from django.contrib.auth import get_user_model
 from model_bakery import baker
 
-from organization.models import Tenant, Role, Membership
+from organization.models import Tenant, Role
 from assets.models import AssetRequest
 from core.models import Notification
-from core.tests.mixins import TenantTestMixin
+from core.tests.mixins import TenantTestMixin, grant
 
 User = get_user_model()
 
@@ -23,12 +23,10 @@ class NewRequestNotifyRecipientTests(TenantTestMixin, TestCase):
         self.tenant_b = Tenant.objects.create(name='Tenant B', slug='req-tenant-b')
 
         self.staff_a = User.objects.create_user(username='req_staff_a', password='x', is_staff=True)
-        _m_a = Membership.objects.create(user=self.staff_a, tenant=self.tenant)
-        _m_a.roles.add(self.tenant_role)
+        grant(self.staff_a, self.tenant, self.tenant_role)
         self.staff_b = User.objects.create_user(username='req_staff_b', password='x', is_staff=True)
         role_b = Role.objects.create(tenant=self.tenant_b, name='B role', permissions=[])
-        _m_b = Membership.objects.create(user=self.staff_b, tenant=self.tenant_b)
-        _m_b.roles.add(role_b)
+        grant(self.staff_b, self.tenant_b, role_b)
 
         self.set_active_tenant(self.tenant)
         # AssetRequest requires exactly one requested item category.

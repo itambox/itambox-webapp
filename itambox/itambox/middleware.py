@@ -127,7 +127,6 @@ class CSPMiddleware:
 from core.managers import (
     set_current_tenant, set_current_tenant_group, set_current_membership,
     get_current_tenant, get_current_tenant_group, get_current_membership,
-    set_current_provider_membership, get_current_provider_membership,
 )
 
 class TenantMiddleware:
@@ -155,17 +154,14 @@ class TenantMiddleware:
             get_current_tenant(),
             get_current_tenant_group(),
             get_current_membership(),
-            get_current_provider_membership(),
         )
         if not hasattr(request, 'user') or not request.user.is_authenticated:
             request.active_tenant = None
             request.active_tenant_group = None
             request.active_membership = None
-            request.active_provider_membership = None
             set_current_tenant(None)
             set_current_tenant_group(None)
             set_current_membership(None)
-            set_current_provider_membership(None)
             return prev
 
         # 1. Resolve selected tenant or group from Session or URL Query Parameter
@@ -287,44 +283,26 @@ class TenantMiddleware:
                     if 'active_tenant_group_id' in request.session:
                         del request.session['active_tenant_group_id']
 
-        # Provider membership for the active tenant's provider (optional view context).
-        # Only queried when the active tenant is provider-managed AND the user isn't a
-        # superuser, so single-company installs (no provider) incur zero overhead.
-        active_provider_membership = None
-        if (
-            active_tenant is not None
-            and getattr(active_tenant, 'provider_id', None)
-            and not request.user.is_superuser
-        ):
-            from organization.models import Membership
-            active_provider_membership = Membership.objects.filter(
-                user=request.user, provider_id=active_tenant.provider_id, is_active=True,
-            ).prefetch_related('roles').first()
-
         # Bind to request
         request.active_tenant = active_tenant
         request.active_tenant_group = active_tenant_group
         request.active_membership = active_membership
-        request.active_provider_membership = active_provider_membership
 
         # Call core manager thread context setter
         set_current_tenant(active_tenant)
         set_current_tenant_group(active_tenant_group)
         set_current_membership(active_membership)
-        set_current_provider_membership(active_provider_membership)
 
         return prev
 
     def process_response(self, request, response, prev=None):
         if prev is not None:
-            prev_tenant, prev_group, prev_membership, prev_provider_membership = prev
+            prev_tenant, prev_group, prev_membership = prev
             set_current_tenant(prev_tenant)
             set_current_tenant_group(prev_group)
             set_current_membership(prev_membership)
-            set_current_provider_membership(prev_provider_membership)
         else:
             set_current_tenant(None)
             set_current_tenant_group(None)
             set_current_membership(None)
-            set_current_provider_membership(None)
         return response

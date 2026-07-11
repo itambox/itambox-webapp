@@ -41,30 +41,20 @@ class PasswordLoginOnlyBackend(ModelBackend):
 
 
 class MembershipBackend:
-    """Unified RBAC backend.
+    """Unified RBAC backend — one container type (Tenant), one vocabulary.
 
-    Resolves a user's permissions through a single ``Membership`` model that may bind
-    them to either a ``Tenant`` (member) or a ``Provider`` (staff). All
-    permissions — including provider-level capabilities such as
-    ``organization.manage_tenants`` — flow through this one backend, so
-    ``user.has_perm(perm, obj=...)`` is the only authorization currency.
+    ``user.has_perm(perm, obj=...)`` is the only authorization currency. A user's
+    permissions inside a tenant ``T`` are the additive union of:
 
-    Resolution rules:
+      1. own-reach :class:`RoleAssignment` rows on their active ``Membership(T)``;
+      2. roles owned by ``T`` carried by an active ``UserGroup`` they belong to;
+      3. managed-reach assignments on their active membership at ``T.managed_by``
+         (the managing/provider tenant) whose refinement covers ``T``.
 
-      * ``has_perm(user, perm, obj=Provider)`` or ``obj`` with a ``provider`` attr →
-        resolve against the user's active provider Membership for that Provider.
-
-      * ``has_perm(user, perm, obj=tenant_obj)`` → resolve against the user's permissions
-        in that tenant, which is the additive union of:
-
-          1. direct tenant Membership ``direct_permissions`` + attached tenant-scoped Role permissions;
-          2. tenant-scoped Roles carried by an active ``UserGroup`` the user belongs to,
-             whose ``role.tenant`` equals this tenant;
-          3. provider-scoped Roles attached to the user's provider Membership for
-             ``tenant.provider`` (when that tenant is within ``tenant_scope``).
-
-      * ``has_perm(user, perm)`` with no obj → use the current bound membership / tenant,
-        else first accessible tenant or provider.
+    There is no second resolution path: administering a provider tenant is simply
+    holding permissions inside THAT tenant (rule 1/2 there), and nothing is
+    stripped in the managed projection — role content alone decides what a grant
+    conveys, and the escalation guard decides who may create it.
     """
     def authenticate(self, request, username=None, password=None, **kwargs):
         return None
@@ -74,172 +64,100 @@ class MembershipBackend:
         """Frozen union of permissions the user holds inside ``tenant``.
 
         Cached on the user as ``_perms_tenant_<pk>`` so the dozens of ``has_perm`` checks
-        in a single request cost at most two queries.
+        in a single request cost at most three queries.
         """
         cache_key = f'_perms_tenant_{tenant.pk}'
         if hasattr(user_obj, cache_key):
             return getattr(user_obj, cache_key)
 
         # inline imports: avoid AppRegistryNotReady at module load
-        from organization.models import Membership, Role
+        from organization.models import Role, RoleAssignment
 
         perms = set()
 
-        # (1) Direct tenant membership: direct grants + attached role permissions.
-        mem_cache_key = f'_tenant_membership_{tenant.pk}'
-        if hasattr(user_obj, mem_cache_key):
-            membership = getattr(user_obj, mem_cache_key)
-        else:
-            membership = Membership.objects.filter(
-                user=user_obj, tenant=tenant, is_active=True,
-            ).first()
-            setattr(user_obj, mem_cache_key, membership)
-
-        if membership is not None:
-            perms.update(membership.direct_permissions or [])
-            for perm_list in Role._base_manager.filter(
-                memberships=membership, deleted_at__isnull=True, scope=Role.SCOPE_TENANT,
-            ).values_list('permissions', flat=True):
-                perms.update(perm_list or [])
+        # (1) Own-reach assignments on the user's active membership in this tenant.
+        for perm_list in Role._base_manager.filter(
+            deleted_at__isnull=True,
+            assignments__reach=RoleAssignment.REACH_OWN,
+            assignments__membership__user=user_obj,
+            assignments__membership__tenant=tenant,
+            assignments__membership__is_active=True,
+        ).values_list('permissions', flat=True):
+            perms.update(perm_list or [])
 
         # (2) Cross-tenant UserGroups: any active group the user belongs to whose attached
-        # roles target THIS tenant. _base_manager keeps the lookup tenant-context-independent.
+        # roles are owned by THIS tenant. _base_manager keeps the lookup context-independent.
         for perm_list in Role._base_manager.filter(
-            scope=Role.SCOPE_TENANT, tenant=tenant, deleted_at__isnull=True,
+            tenant=tenant, deleted_at__isnull=True,
             user_groups__members=user_obj,
             user_groups__is_active=True,
             user_groups__deleted_at__isnull=True,
         ).values_list('permissions', flat=True):
             perms.update(perm_list or [])
 
-        # (3) Provider staff projection: if this tenant has a provider and the user is
-        # active staff there whose tenant_scope covers this tenant, every provider-scoped
-        # Role attached to that staff membership contributes its permissions.
-        if getattr(tenant, 'provider_id', None):
-            staff = Membership.objects.filter(
-                user=user_obj, provider_id=tenant.provider_id, is_active=True,
-            ).select_related('scope_group').first()
-            if staff is not None and staff.covers_tenant(tenant):
-                for perm_list in Role._base_manager.filter(
-                    memberships=staff, deleted_at__isnull=True, scope=Role.SCOPE_PROVIDER,
-                ).values_list('permissions', flat=True):
-                    # Strip organization.manage_* in the projection via the canonical helper
-                    # (Membership.project_permissions_for_tenant is the single source of truth).
-                    perms.update(Membership.project_permissions_for_tenant(perm_list))
+        # (3) Managed-reach projection from the managing tenant (single hop, depth 1).
+        if tenant.managed_by_id:
+            for assignment in RoleAssignment.objects.filter(
+                reach=RoleAssignment.REACH_MANAGED,
+                membership__user=user_obj,
+                membership__tenant_id=tenant.managed_by_id,
+                membership__is_active=True,
+            ).select_related('role', 'scope_group', 'membership'):
+                if assignment.role.deleted_at is None and assignment.covers_tenant(tenant):
+                    perms.update(assignment.role.permissions or [])
 
         result = frozenset(perms)
         setattr(user_obj, cache_key, result)
         return result
-
-    # ----------------------------------------------------------------- provider perms
-    def _effective_perms_for_provider(self, user_obj, provider):
-        """Frozen union of permissions the user holds against ``provider`` (the MSP itself).
-
-        Only provider-scoped Roles contribute: tenant-scoped roles are evaluated per-tenant
-        via :meth:`_effective_perms_for_tenant`.
-        """
-        cache_key = f'_perms_provider_{provider.pk}'
-        if hasattr(user_obj, cache_key):
-            return getattr(user_obj, cache_key)
-
-        from organization.models import Membership, Role
-
-        perms = set()
-        staff = Membership.objects.filter(
-            user=user_obj, provider=provider, is_active=True,
-        ).first()
-        if staff is not None:
-            perms.update(staff.direct_permissions or [])
-            for perm_list in Role._base_manager.filter(
-                memberships=staff, deleted_at__isnull=True, scope=Role.SCOPE_PROVIDER,
-            ).values_list('permissions', flat=True):
-                perms.update(perm_list or [])
-
-        result = frozenset(perms)
-        setattr(user_obj, cache_key, result)
-        return result
-
-    # ------------------------------------------------------------------ scope check
-    def _tenant_in_scope(self, staff_membership, tenant):
-        """Whether ``tenant`` falls within the provider-staff membership's tenant scope.
-
-        Thin delegate to the canonical :meth:`organization.models.Membership.covers_tenant`
-        — kept as a method for the existing internal call site; do not re-implement the
-        scope branching here.
-        """
-        return staff_membership.covers_tenant(tenant)
 
     # ------------------------------------------------------------------ context resolution
-    def _resolve_target(self, user_obj, obj):
-        """Decide whether to evaluate against a Provider or a Tenant context.
+    def _resolve_tenant(self, user_obj, obj):
+        """Resolve the tenant context to evaluate against, or ``None``.
 
-        Returns ``('provider', provider)``, ``('tenant', tenant)``, or ``(None, None)``.
+        Objects resolve through their ``tenant`` attribute (a Tenant instance IS its own
+        context). With no object, ambient state applies: bound membership → current
+        tenant → first active membership's tenant → first managed-reachable tenant.
         """
-        from organization.models import Provider, Tenant, Membership
+        from organization.models import Tenant, Membership
 
         if obj is not None:
-            # Provider passed directly — provider context. Use strict isinstance against the
-            # organization.Provider class (NOT a name-based match) so an unrelated model that
-            # happens to be named ``Provider`` — e.g. ``subscriptions.Provider`` for SaaS
-            # vendors — is not misinterpreted as the MSP provider here.
-            if isinstance(obj, Provider):
-                return 'provider', obj
-            # A Tenant is ALWAYS tenant context, even though it carries a ``provider`` FK
-            # (its managing MSP). Resolve it BEFORE the generic provider-attr sniff below;
-            # otherwise ``has_perm(perm, obj=<provider-managed tenant>)`` is misrouted to
-            # provider context and skips per-tenant resolution (including the manage_* strip).
             obj_tenant = getattr(obj, 'tenant', None)
             if obj_tenant is None and isinstance(obj, Tenant):
                 obj_tenant = obj
-            # A non-Tenant object carrying a provider FK (and no tenant) — provider context.
-            if obj_tenant is None:
-                obj_provider = getattr(obj, 'provider', None)
-                if obj_provider is not None and isinstance(obj_provider, Provider):
-                    return 'provider', obj_provider
             if obj_tenant is not None:
-                # Pre-cache the (possibly None) active tenant membership for later perm calls.
+                # Pre-cache the (possibly None) active tenant membership for later calls.
                 mem_cache_key = f'_tenant_membership_{obj_tenant.pk}'
                 if not hasattr(user_obj, mem_cache_key):
                     membership = Membership.objects.filter(
                         user=user_obj, tenant=obj_tenant, is_active=True,
                     ).first()
                     setattr(user_obj, mem_cache_key, membership)
-                return 'tenant', obj_tenant
-            # Fall through to ambient resolution.
+                return obj_tenant
+            # Tenant-less object (global/shared) — fall through to ambient resolution.
 
-        # No obj: respect a bound membership for this user, else current tenant, else
-        # first active tenant membership, else first reachable provider tenant.
         membership = get_current_membership()
         if membership and membership.user_id == user_obj.pk and membership.tenant_id:
-            return 'tenant', membership.tenant
+            return membership.tenant
         current_tenant = get_current_tenant()
         if current_tenant is not None:
-            return 'tenant', current_tenant
+            return current_tenant
         first = Membership.objects.filter(
-            user=user_obj, is_active=True, tenant__isnull=False,
+            user=user_obj, is_active=True,
         ).select_related('tenant').first()
         if first is not None:
             set_current_tenant(first.tenant)
             set_current_membership(first)
-            return 'tenant', first.tenant
-        # No tenant membership: fall back to a tenant reachable through provider staff.
-        from organization.access import provider_accessible_tenant_ids
-        provider_tenant_ids = provider_accessible_tenant_ids(user_obj)
-        if provider_tenant_ids:
-            from organization.models import Tenant
-            tenant = Tenant._base_manager.filter(
-                pk__in=provider_tenant_ids,
-            ).order_by('name').first()
+            return first.tenant
+        # Defensive fallback: a user whose only access is managed reach (should not
+        # happen — reach rides on a membership — but fail towards a valid context).
+        from organization.access import managed_accessible_tenant_ids
+        reachable = managed_accessible_tenant_ids(user_obj)
+        if reachable:
+            tenant = Tenant._base_manager.filter(pk__in=reachable).order_by('name').first()
             if tenant is not None:
                 set_current_tenant(tenant)
-                return 'tenant', tenant
-        # Or a Provider the user has staff membership in (for provider-only operators).
-        first_staff = Membership.objects.filter(
-            user=user_obj, is_active=True, provider__isnull=False,
-        ).select_related('provider').first()
-        if first_staff is not None:
-            return 'provider', first_staff.provider
-        return None, None
+                return tenant
+        return None
 
     # ------------------------------------------------------------------ public API
     def has_perm(self, user_obj, perm, obj=None):
@@ -247,30 +165,21 @@ class MembershipBackend:
             return False
         if user_obj.is_superuser:
             return True
-        kind, target = self._resolve_target(user_obj, obj)
-        if target is None:
+        tenant = self._resolve_tenant(user_obj, obj)
+        if tenant is None:
             return False
-        if kind == 'provider':
-            if perm in self._effective_perms_for_provider(user_obj, target):
-                return True
-            # Provider operators may also hold tenant-level perms via the same membership's
-            # provider-scoped roles when checked against a Provider object — already covered.
-            return False
-        # kind == 'tenant'
-        return perm in self._effective_perms_for_tenant(user_obj, target)
+        return perm in self._effective_perms_for_tenant(user_obj, tenant)
 
     def has_module_perms(self, user_obj, app_label):
         if not user_obj.is_active:
             return False
         if user_obj.is_superuser:
             return True
-        kind, target = self._resolve_target(user_obj, None)
-        if target is None:
+        tenant = self._resolve_tenant(user_obj, None)
+        if tenant is None:
             return False
         prefix = app_label + '.'
-        if kind == 'provider':
-            return any(p.startswith(prefix) for p in self._effective_perms_for_provider(user_obj, target))
-        return any(p.startswith(prefix) for p in self._effective_perms_for_tenant(user_obj, target))
+        return any(p.startswith(prefix) for p in self._effective_perms_for_tenant(user_obj, tenant))
 
 
 # Backwards-compat alias: existing settings reference TenantMembershipBackend.

@@ -12,6 +12,7 @@ from organization.models import Tenant, Role, Membership, Site, Location
 from users.models import Token
 from assets.models import StatusLabel, AssetRole, Asset
 from compliance.models import AssetAudit
+from core.tests.mixins import grant
 
 User = get_user_model()
 
@@ -67,10 +68,7 @@ class Phase3ChangeLoggingModelsTestCase(TestCase):
 
     def test_tenant_membership_create_is_logged(self):
         before = ObjectChange._base_manager.count()
-        membership = Membership.objects.create(user=self.user,
-            tenant=self.tenant,
-        )
-        membership.roles.add(self.role)
+        membership = grant(self.user, self.tenant, self.role).membership
         self.assertGreater(ObjectChange._base_manager.count(), before)
         # Membership has a direct tenant FK -> attributed to that tenant.
         self._assert_create_logged(membership, self.tenant)

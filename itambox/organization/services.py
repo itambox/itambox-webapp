@@ -1,54 +1,66 @@
 """Domain/service-layer helpers for the organization app.
 
-Currently holds the container-visibility helper shared by the ``Membership``
+Currently holds the tenant-visibility helper shared by the ``Membership``
 UI views and any model-agnostic code (e.g. ``ObjectExportView``) that needs
 the same restriction applied to a model whose default manager does not
 filter by tenant.
 """
-from django.db.models import Q
+from .access import accessible_tenant_ids
+from .models import Tenant
 
-from .models import Tenant, Provider
+
+# Access-control models whose default manager is deliberately unscoped (their
+# tenant resolution is itself an *input* to tenant scoping, so they cannot ride
+# the tenant-scoping manager — see TenantScopingQuerySet.filter_by_tenant() in
+# core/managers.py). Generic, model-agnostic code (ObjectExportView) must apply
+# ``visible_to_containers`` to these instead.
+_UNFILTERED_CONTAINER_MODELS = {
+    ('organization', 'membership'),
+    ('organization', 'roleassignment'),
+    ('users', 'token'),
+}
 
 
 def visible_to_containers(user, qs, perm):
-    """Restrict a queryset of container-scoped rows (rows carrying a
-    ``tenant`` and/or ``provider`` FK, e.g. ``Membership``, ``users.Token``)
-    to the tenants/providers ``user`` actually holds ``perm`` in.
+    """Restrict a queryset of tenant-anchored rows (``Membership``,
+    ``RoleAssignment``, ``users.Token``) to the tenants ``user`` actually
+    holds ``perm`` in.
 
-    Some models intentionally use Django's plain, unscoped default manager
-    (``Membership``'s tenant resolution is itself the input to tenant
-    scoping, so it can't ride the tenant-scoping manager — see the comment
-    in ``core/managers.py``'s ``TenantScopingQuerySet.filter_by_tenant()``).
-    That means ``TenantScopingViewMixin.get_queryset()`` — and any other
-    generic, model-agnostic view built on ``filter_by_tenant()``, such as
-    ``ObjectExportView`` — is a silent no-op for them, so callers must
-    restrict the queryset manually with this helper. Superusers are
+    These models intentionally use an unscoped default manager, so
+    ``TenantScopingViewMixin.get_queryset()`` — and any other generic,
+    model-agnostic view built on ``filter_by_tenant()``, such as
+    ``ObjectExportView`` — is a silent no-op for them; callers must restrict
+    the queryset manually with this helper. Candidate tenants come from
+    ``accessible_tenant_ids`` (membership + group + managed reach), then each
+    is checked with ``user.has_perm(perm, obj=tenant)``. Superusers are
     unaffected (``PermissionsMixin.has_perm`` short-circuits ``True`` before
-    any backend runs), and legitimate multi-tenant/multi-provider staff still
-    see every container they hold ``perm`` in.
+    any backend runs); multi-tenant staff still see every tenant they hold
+    ``perm`` in, including via managed reach.
     """
     if user.is_superuser:
         return qs
-    allowed_tenants = [
-        t.pk for t in Tenant._base_manager.filter(deleted_at__isnull=True)
+    candidate_ids = accessible_tenant_ids(user)
+    allowed = [
+        t.pk for t in Tenant._base_manager.filter(
+            pk__in=candidate_ids, deleted_at__isnull=True,
+        )
         if user.has_perm(perm, obj=t)
     ]
-    allowed_providers = [
-        p.pk for p in Provider._base_manager.filter(deleted_at__isnull=True)
-        if user.has_perm(perm, obj=p)
-    ]
-    return qs.filter(Q(tenant_id__in=allowed_tenants) | Q(provider_id__in=allowed_providers))
+    model = qs.model
+    field_names = {f.name for f in model._meta.get_fields()}
+    if 'tenant' in field_names:
+        return qs.filter(tenant_id__in=allowed)
+    if 'membership' in field_names:
+        # RoleAssignment-shaped rows anchor to a tenant via their membership.
+        return qs.filter(membership__tenant_id__in=allowed)
+    return qs.none()  # unknown shape — fail closed
 
 
 def is_container_scoped_unfiltered(model):
-    """True for models like ``Membership``/``users.Token`` that carry both a
-    ``tenant`` and a ``provider`` FK but whose default manager does not
-    filter by tenant (see ``visible_to_containers``). Model-agnostic code
-    that would otherwise rely on ``filter_by_tenant`` (e.g.
-    ``ObjectExportView``) uses this to detect when it must apply
-    ``visible_to_containers`` instead.
+    """True for the access-control models (``Membership``, ``RoleAssignment``,
+    ``users.Token``) that carry a tenant anchor but whose default manager does
+    not filter by tenant (see ``visible_to_containers``). Model-agnostic code
+    that would otherwise rely on ``filter_by_tenant`` (e.g. ``ObjectExportView``)
+    uses this to detect when it must apply ``visible_to_containers`` instead.
     """
-    if hasattr(model.objects, 'filter_by_tenant'):
-        return False
-    field_names = {f.name for f in model._meta.get_fields()}
-    return {'tenant', 'provider'}.issubset(field_names)
+    return (model._meta.app_label, model._meta.model_name) in _UNFILTERED_CONTAINER_MODELS

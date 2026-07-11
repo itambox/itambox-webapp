@@ -10,13 +10,10 @@ from .contact_form import ContactForm, ContactFilterForm
 from .contactrole_form import ContactRoleForm, ContactAssignmentForm, ContactRoleFilterForm
 from .role_form import (
     RoleForm, RoleFilterForm, RoleAssignUsersForm, MATRIX_MODELS,
-    PROVIDER_CAPABILITIES, CUSTOM_PERMISSIONS,
+    CUSTOM_PERMISSIONS,
 )
 from .membership_form import (
     MembershipForm, MembershipFilterForm, MembershipBulkRoleForm,
 )
 from .costcenter_form import CostCenterForm, CostCenterFilterForm
-from .provider_form import (
-    ProviderForm, ProviderFilterForm,
-    TechnicianQuickForm,
-)
+from .provider_form import TechnicianQuickForm

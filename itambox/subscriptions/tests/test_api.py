@@ -20,7 +20,8 @@ class SubscriptionAPITests(APITestCase):
         )
 
         # Create Tenant & AssetHolder profile for staff user
-        from organization.models import TenantGroup, Tenant, AssetHolder, Role, Membership
+        from organization.models import TenantGroup, Tenant, AssetHolder, Role
+        from core.tests.mixins import grant
         self.tg = TenantGroup.objects.create(name="API TG", slug="api-tg")
         self.tenant = Tenant.objects.create(name="API Tenant", slug="api-tenant", group=self.tg)
         self.holder = AssetHolder.objects.create(
@@ -59,8 +60,7 @@ class SubscriptionAPITests(APITestCase):
                 'subscriptions.change_subscriptionassignment', 'subscriptions.delete_subscriptionassignment',
             ],
         )
-        membership = Membership.objects.create(user=self.staff, tenant=self.tenant)
-        membership.roles.add(role)
+        grant(self.staff, self.tenant, role)
 
     def test_provider_api_crud(self):
         self.client.force_authenticate(user=self.staff)

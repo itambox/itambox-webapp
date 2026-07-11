@@ -19,8 +19,8 @@ class EventsSystemTestCase(TransactionTestCase):
         super().setUp()
         self.manufacturer_ct = ContentType.objects.get_for_model(Manufacturer)
 
-    @patch('requests.request')
-    def test_event_dispatch_on_create_update_delete(self, mock_request):
+    @patch('core.http.request_pinned')
+    def test_event_dispatch_on_create_update_delete(self, mock_request_pinned):
         # Create
         mfr = Manufacturer.objects.create(name="Lenovo", slug="lenovo")
         
@@ -87,12 +87,12 @@ class EventsSystemTestCase(TransactionTestCase):
         from django.contrib.auth import get_user_model
         from organization.models import Tenant, Location, Role, Membership
         from core.managers import set_current_tenant
+        from core.tests.mixins import grant
 
         tenant_a = Tenant.objects.create(name="Tenant A", slug="tenant-a")
         tenant_b = Tenant.objects.create(name="Tenant B", slug="tenant-b")
         member_a = get_user_model().objects.create_user(username='member_a', password='pw')
-        m_a = Membership.objects.create(user=member_a, tenant=tenant_a)
-        m_a.roles.add(Role.objects.create(tenant=tenant_a, name='R', permissions=[]))
+        grant(member_a, tenant_a, Role.objects.create(tenant=tenant_a, name='R', permissions=[]))
         loc_ct = ContentType.objects.get_for_model(Location)
 
         EventRule.objects.create(
@@ -128,11 +128,11 @@ class EventsSystemTestCase(TransactionTestCase):
             "Tenant B's event rule must NOT fire for a tenant-A object in a system context.",
         )
 
-    @patch('requests.request')
-    def test_webhook_delivery_with_hmac_signature(self, mock_request):
+    @patch('core.http.request_pinned')
+    def test_webhook_delivery_with_hmac_signature(self, mock_request_pinned):
         mock_response = MagicMock()
         mock_response.status_code = 200
-        mock_request.return_value = mock_response
+        mock_request_pinned.return_value = mock_response
 
         # Create webhook rule
         rule = EventRule.objects.create(
@@ -160,18 +160,19 @@ class EventsSystemTestCase(TransactionTestCase):
         with transaction.atomic():
             dispatch_event(Manufacturer, event, 'create')
         
-        # Verify webhook request parameters
-        self.assertTrue(mock_request.called)
-        call_args = mock_request.call_args[1]
-        self.assertEqual(call_args['method'], 'POST')
-        self.assertEqual(call_args['url'], 'https://example.com/webhook-receiver')
-        
+        # Verify webhook request parameters. request_pinned(method, url, headers=..., data=...,
+        # timeout=...) — method/url are positional, the rest are kwargs.
+        self.assertTrue(mock_request_pinned.called)
+        call_args, call_kwargs = mock_request_pinned.call_args
+        self.assertEqual(call_args[0], 'POST')
+        self.assertEqual(call_args[1], 'https://example.com/webhook-receiver')
+
         # Verify HMAC signature
-        headers = call_args['headers']
+        headers = call_kwargs['headers']
         self.assertEqual(headers['X-Custom-Header'], 'CustomValue')
         self.assertIn('X-Hub-Signature-256', headers)
-        
-        body = call_args['data']
+
+        body = call_kwargs['data']
         expected_sig = hmac.new(
             b'mysecretkey',
             body.encode('utf-8'),
@@ -179,13 +180,13 @@ class EventsSystemTestCase(TransactionTestCase):
         ).hexdigest()
         self.assertEqual(headers['X-Hub-Signature-256'], f'sha256={expected_sig}')
 
-    @patch('requests.request')
-    def test_webhook_delivery_via_linked_endpoint(self, mock_request):
+    @patch('core.http.request_pinned')
+    def test_webhook_delivery_via_linked_endpoint(self, mock_request_pinned):
         # A rule linked to a WebhookEndpoint sources URL/method/headers/secret/retry from
         # the endpoint — no url/secret needed in action_config.
         mock_response = MagicMock()
         mock_response.status_code = 200
-        mock_request.return_value = mock_response
+        mock_request_pinned.return_value = mock_response
 
         endpoint = WebhookEndpoint.objects.create(
             name="Linked Endpoint",
@@ -215,14 +216,14 @@ class EventsSystemTestCase(TransactionTestCase):
         with transaction.atomic():
             dispatch_event(Manufacturer, event, 'create')
 
-        self.assertTrue(mock_request.called)
-        call_args = mock_request.call_args[1]
-        self.assertEqual(call_args['url'], 'https://example.com/linked-receiver')
-        self.assertEqual(call_args['method'], 'POST')
+        self.assertTrue(mock_request_pinned.called)
+        call_args, call_kwargs = mock_request_pinned.call_args
+        self.assertEqual(call_args[1], 'https://example.com/linked-receiver')
+        self.assertEqual(call_args[0], 'POST')
 
-        headers = call_args['headers']
+        headers = call_kwargs['headers']
         self.assertEqual(headers['X-From'], 'endpoint')
-        body = call_args['data']
+        body = call_kwargs['data']
         expected_sig = hmac.new(
             endpoint.secret_decrypted.encode('utf-8'),
             body.encode('utf-8'),
@@ -230,8 +231,8 @@ class EventsSystemTestCase(TransactionTestCase):
         ).hexdigest()
         self.assertEqual(headers['X-Hub-Signature-256'], f'sha256={expected_sig}')
 
-    @patch('requests.request')
-    def test_disabled_linked_endpoint_suppresses_delivery(self, mock_request):
+    @patch('core.http.request_pinned')
+    def test_disabled_linked_endpoint_suppresses_delivery(self, mock_request_pinned):
         endpoint = WebhookEndpoint.objects.create(
             name="Disabled Endpoint",
             url="https://example.com/disabled",
@@ -256,7 +257,7 @@ class EventsSystemTestCase(TransactionTestCase):
         with transaction.atomic():
             dispatch_event(Manufacturer, event, 'create')
 
-        self.assertFalse(mock_request.called)
+        self.assertFalse(mock_request_pinned.called)
 
     def test_legacy_script_rule_does_not_crash(self):
         # Rows with action_type='script' may exist in the DB from before the action was
@@ -279,14 +280,14 @@ class EventsSystemTestCase(TransactionTestCase):
         self.assertIsNotNone(dispatched)
         self.assertTrue(dispatched.processed)
 
-    @patch('requests.post')
-    def test_notification_channels(self, mock_post):
+    @patch('core.http.request_pinned')
+    def test_notification_channels(self, mock_request_pinned):
         from django.contrib.auth import get_user_model
         User = get_user_model()
 
         mock_resp = MagicMock()
         mock_resp.status_code = 200
-        mock_post.return_value = mock_resp
+        mock_request_pinned.return_value = mock_resp
 
         # Slack Channel
         slack_channel = NotificationChannel.objects.create(
@@ -311,15 +312,21 @@ class EventsSystemTestCase(TransactionTestCase):
             channel_type=NotificationChannel.TYPE_IN_APP
         )
 
-        # Test Slack sending
+        # Test Slack sending. _post_pinned calls request_pinned('POST', url, json=payload,
+        # timeout=10) — method/url positional, url is the second positional arg.
         res = send_notification_to_channel(slack_channel, "Subject Slack", "Body Slack")
         self.assertTrue(res)
-        self.assertIn("hooks.slack.com", mock_post.call_args[0][0])
+        call_args, call_kwargs = mock_request_pinned.call_args
+        self.assertEqual(call_args[0], 'POST')
+        self.assertIn("hooks.slack.com", call_args[1])
+        self.assertEqual(call_kwargs['timeout'], 10)
 
         # Test Teams sending
         res = send_notification_to_channel(teams_channel, "Subject Teams", "Body Teams")
         self.assertTrue(res)
-        self.assertIn("webhook.office.com", mock_post.call_args[0][0])
+        call_args, call_kwargs = mock_request_pinned.call_args
+        self.assertEqual(call_args[0], 'POST')
+        self.assertIn("webhook.office.com", call_args[1])
 
         # Test In-App Notification creation — creates one notification per resolved user
         initial_count = Notification.objects.count()
@@ -346,13 +353,13 @@ class WebhookRetryTestCase(TransactionTestCase):
         event_data={},
     )
 
-    @patch('core.tasks.webhooks.requests.request')
+    @patch('core.http.request_pinned')
     @patch('core.tasks.webhooks.async_task')
-    def test_5xx_retries(self, mock_async, mock_request):
+    def test_5xx_retries(self, mock_async, mock_request_pinned):
         from core.tasks.webhooks import send_webhook_task
         resp = MagicMock(status_code=503)
         resp.raise_for_status.side_effect = __import__('requests').HTTPError(response=resp)
-        mock_request.return_value = resp
+        mock_request_pinned.return_value = resp
 
         send_webhook_task(**self.BASE_KWARGS, retry_count=2, retry_backoff=0)
 
@@ -361,46 +368,46 @@ class WebhookRetryTestCase(TransactionTestCase):
         self.assertEqual(kw['attempt'], 1)
         self.assertEqual(kw['retry_count'], 2)
 
-    @patch('core.tasks.webhooks.requests.request')
+    @patch('core.http.request_pinned')
     @patch('core.tasks.webhooks.async_task')
-    def test_5xx_gives_up_after_max_attempts(self, mock_async, mock_request):
+    def test_5xx_gives_up_after_max_attempts(self, mock_async, mock_request_pinned):
         from core.tasks.webhooks import send_webhook_task
         resp = MagicMock(status_code=503)
         resp.raise_for_status.side_effect = __import__('requests').HTTPError(response=resp)
-        mock_request.return_value = resp
+        mock_request_pinned.return_value = resp
 
         send_webhook_task(**self.BASE_KWARGS, attempt=2, retry_count=2)
 
         mock_async.assert_not_called()
 
-    @patch('core.tasks.webhooks.requests.request')
+    @patch('core.http.request_pinned')
     @patch('core.tasks.webhooks.async_task')
-    def test_4xx_does_not_retry(self, mock_async, mock_request):
+    def test_4xx_does_not_retry(self, mock_async, mock_request_pinned):
         from core.tasks.webhooks import send_webhook_task
         resp = MagicMock(status_code=422)
         resp.raise_for_status.return_value = None
-        mock_request.return_value = resp
+        mock_request_pinned.return_value = resp
 
         send_webhook_task(**self.BASE_KWARGS, retry_count=3)
 
         mock_async.assert_not_called()
 
-    @patch('core.tasks.webhooks.requests.request')
+    @patch('core.http.request_pinned')
     @patch('core.tasks.webhooks.async_task')
-    def test_2xx_no_retry(self, mock_async, mock_request):
+    def test_2xx_no_retry(self, mock_async, mock_request_pinned):
         from core.tasks.webhooks import send_webhook_task
         resp = MagicMock(status_code=200)
         resp.raise_for_status.return_value = None
-        mock_request.return_value = resp
+        mock_request_pinned.return_value = resp
 
         send_webhook_task(**self.BASE_KWARGS, retry_count=3)
 
         mock_async.assert_not_called()
 
-    @patch('core.tasks.webhooks.requests.request')
+    @patch('core.http.request_pinned')
     @patch('core.tasks.webhooks.async_task')
     @patch('core.tasks.webhooks.Schedule')
-    def test_5xx_with_backoff_schedules_delayed_retry(self, mock_schedule, mock_async, mock_request):
+    def test_5xx_with_backoff_schedules_delayed_retry(self, mock_schedule, mock_async, mock_request_pinned):
         """A positive retry_backoff must defer the retry via a one-off Schedule,
         not re-enqueue immediately. The kwargs must round-trip through the same
         ast.literal_eval the django-q2 scheduler uses."""
@@ -408,7 +415,7 @@ class WebhookRetryTestCase(TransactionTestCase):
         from core.tasks.webhooks import send_webhook_task
         resp = MagicMock(status_code=503)
         resp.raise_for_status.side_effect = __import__('requests').HTTPError(response=resp)
-        mock_request.return_value = resp
+        mock_request_pinned.return_value = resp
 
         send_webhook_task(**self.BASE_KWARGS, retry_count=2, retry_backoff=60)
 
@@ -424,10 +431,10 @@ class WebhookRetryTestCase(TransactionTestCase):
         self.assertEqual(retry['retry_backoff'], 60)
         self.assertEqual(retry['url'], self.BASE_KWARGS['url'])
 
-    @patch('core.tasks.webhooks.requests.request')
+    @patch('core.http.request_pinned')
     @patch('core.tasks.webhooks.async_task')
     @patch('core.tasks.webhooks.Schedule')
-    def test_endpoint_secret_not_persisted_in_retry_schedule(self, mock_schedule, mock_async, mock_request):
+    def test_endpoint_secret_not_persisted_in_retry_schedule(self, mock_schedule, mock_async, mock_request_pinned):
         """WS5-4: an endpoint-linked retry must re-derive the secret from the endpoint, never
         write it into Schedule.kwargs (which django-q stores plaintext)."""
         import ast
@@ -437,14 +444,15 @@ class WebhookRetryTestCase(TransactionTestCase):
         )
         resp = MagicMock(status_code=503)
         resp.raise_for_status.side_effect = __import__('requests').HTTPError(response=resp)
-        mock_request.return_value = resp
+        mock_request_pinned.return_value = resp
 
         kwargs = dict(self.BASE_KWARGS, secret='', webhook_endpoint_id=endpoint.pk,
                       retry_count=2, retry_backoff=60)
         send_webhook_task(**kwargs)
 
         # The HMAC was still computed (secret re-derived from the endpoint at run time).
-        self.assertIn('X-Hub-Signature-256', mock_request.call_args[1]['headers'])
+        # request_pinned(method, url, headers=..., data=..., timeout=...) — headers is a kwarg.
+        self.assertIn('X-Hub-Signature-256', mock_request_pinned.call_args[1]['headers'])
         # The retry Schedule.kwargs must NOT contain the secret — only the endpoint id.
         mock_schedule.objects.create.assert_called_once()
         _, kw = mock_schedule.objects.create.call_args

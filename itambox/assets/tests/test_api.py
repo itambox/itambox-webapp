@@ -7,6 +7,7 @@ from assets.models import Asset, AssetType, StatusLabel, AssetRole, Manufacturer
 from organization.models import AssetHolder, Site, Location, Tenant, Role, Membership
 from licenses.models import License, LicenseSeatAssignment
 from software.models import Software
+from core.tests.mixins import grant
 
 User = get_user_model()
 
@@ -33,10 +34,7 @@ class ITAMBoxAPITestCase(APITestCase):
             name='Staff Role A',
             permissions=['assets.view_asset', 'assets.add_asset', 'assets.change_asset'],
         )
-        _m = Membership.objects.create(user=self.staff,
-            tenant=self.tenant_a,
-        )
-        _m.roles.add(self.role_staff_a)
+        grant(self.staff, self.tenant_a, self.role_staff_a)
 
         # Associate staff with Tenant A via AssetHolder profile
         self.holder_staff = AssetHolder.objects.create(
@@ -144,14 +142,12 @@ class ITAMBoxAPITestCase(APITestCase):
         """WS1-6: checkout is a state change -> requires assets.change_asset, not the
         POST-default assets.add_asset."""
         add_only = User.objects.create_user(username='addonly', password='pw')
-        _m_add = Membership.objects.create(user=add_only, tenant=self.tenant_a)
-        _m_add.roles.add(Role.objects.create(
+        grant(add_only, self.tenant_a, Role.objects.create(
             tenant=self.tenant_a, name='Add Only',
             permissions=['assets.view_asset', 'assets.add_asset'],
         ))
         change_only = User.objects.create_user(username='changeonly', password='pw')
-        _m_change = Membership.objects.create(user=change_only, tenant=self.tenant_a)
-        _m_change.roles.add(Role.objects.create(
+        grant(change_only, self.tenant_a, Role.objects.create(
             tenant=self.tenant_a, name='Change Only',
             permissions=['assets.view_asset', 'assets.change_asset'],
         ))

@@ -19,7 +19,7 @@ from django.contrib.auth import get_user_model
 from django.urls import reverse
 
 from itambox.middleware import CurrentUserMiddleware, _current_user, _request_id
-from core.tests.mixins import TenantTestMixin
+from core.tests.mixins import TenantTestMixin, grant
 from extras.models import Bookmark, ObjectWatch
 from extras.dashboard.widgets import BookmarksWidget
 
@@ -92,15 +92,8 @@ class WatchNotificationTests(TenantTestMixin, TestCase):
         self.bookmarker = _make_user("bookmarker")
 
         # Associate users with the tenant so they pass the view permission checks
-        from organization.models import Membership
-        watcher_membership = Membership.objects.create(user=self.watcher,
-            tenant=self.tenant,
-        )
-        watcher_membership.roles.add(self.tenant_role)
-        bookmarker_membership = Membership.objects.create(user=self.bookmarker,
-            tenant=self.tenant,
-        )
-        bookmarker_membership.roles.add(self.tenant_role)
+        grant(self.watcher, self.tenant, self.tenant_role)
+        grant(self.bookmarker, self.tenant, self.tenant_role)
 
         from extras.models import Tag
         _set_user_context(self.watcher)
@@ -158,12 +151,10 @@ class WatchNotificationTests(TenantTestMixin, TestCase):
 
         ct = ContentType.objects.get_for_model(Tag)
         # Three additional watchers (plus self.watcher from setUp) on the same object.
-        from organization.models import Membership
         extra_watchers = []
         for i in range(3):
             u = _make_user(f"watcher_bulk_{i}")
-            m = Membership.objects.create(user=u, tenant=self.tenant)
-            m.roles.add(self.tenant_role)
+            grant(u, self.tenant, self.tenant_role)
             ObjectWatch.objects.create(user=u, model=ct, object_id=self.tag.pk)
             extra_watchers.append(u)
 

@@ -8,8 +8,9 @@ from django.urls import reverse
 from assets.models import Manufacturer, Category
 from inventory.models import Accessory, AccessoryStock
 from organization.models import (
-    Tenant, Role, Membership, AssetHolder, Location, Site,
+    Tenant, Role, AssetHolder, Location, Site,
 )
+from core.tests.mixins import grant
 
 User = get_user_model()
 
@@ -25,8 +26,7 @@ class InventoryAssignmentOverAllocationTests(TestCase):
                 'inventory.change_accessoryassignment',
             ],
         )
-        membership = Membership.objects.create(user=self.user, tenant=self.tenant)
-        membership.roles.add(role)
+        grant(self.user, self.tenant, role)
         self.mfr = Manufacturer.objects.create(name='Logitech', slug='logi-inv')
         self.cat = Category.objects.create(
             name='Acc Cat', slug='acc-cat-inv', applies_to={'accessory': True}

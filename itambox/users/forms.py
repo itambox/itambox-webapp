@@ -27,13 +27,6 @@ class UserForm(forms.ModelForm):
         required=False,
         help_text=_("Raw passwords are not stored. If editing a user, leave this blank to keep the current password.")
     )
-    is_group_manager = forms.BooleanField(
-        required=False,
-        label=_("Group Manager"),
-        help_text=_("Can create and manage global user groups (which grant cross-tenant access). "
-                    "A global capability granted only by superusers."),
-        widget=forms.CheckboxInput(attrs={'class': 'form-check-input'}),
-    )
 
     class Meta:
         model = User
@@ -68,15 +61,6 @@ class UserForm(forms.ModelForm):
             if 'can_login' in self.fields:
                 self.fields['can_login'].disabled = True
 
-        # Group Manager is the global organization.manage_groups capability; reflect
-        # the current grant and let only superusers change it.
-        if self.instance and self.instance.pk:
-            self.fields['is_group_manager'].initial = self.instance.user_permissions.filter(
-                content_type__app_label='organization', codename='manage_groups',
-            ).exists()
-        if not self.request_user or not self.request_user.is_superuser:
-            self.fields['is_group_manager'].disabled = True
-
         self.helper = FormHelper(self)
         self.helper.form_method = 'post'
         self.helper.form_tag = True
@@ -102,10 +86,6 @@ class UserForm(forms.ModelForm):
                 Row(
                     Column('is_staff', css_class='col-md-6'),
                     Column('is_superuser', css_class='col-md-6'),
-                    css_class='row g-3',
-                ),
-                Row(
-                    Column('is_group_manager', css_class='col-md-12'),
                     css_class='row g-3',
                 ),
             ),
@@ -136,24 +116,7 @@ class UserForm(forms.ModelForm):
         if commit:
             user.save()
             self.save_m2m()
-            self._sync_group_manager(user)
         return user
-
-    def _sync_group_manager(self, user):
-        """Grant/revoke the global organization.manage_groups capability. Only a
-        superuser may change it (the field is disabled otherwise)."""
-        if not self.request_user or not self.request_user.is_superuser:
-            return
-        from django.contrib.auth.models import Permission
-        perm = Permission.objects.filter(
-            content_type__app_label='organization', codename='manage_groups',
-        ).first()
-        if not perm:
-            return
-        if self.cleaned_data.get('is_group_manager'):
-            user.user_permissions.add(perm)
-        else:
-            user.user_permissions.remove(perm)
 
 class UserPreferencesForm(forms.Form):
     # Define fields explicitly
@@ -490,7 +453,8 @@ class UserBulkEditForm(BulkEditForm):
 # UserGroup is an identity-layer construct (relocated here from organization/): it grants
 # cross-tenant access, so it lives alongside the User model rather than the business-data
 # (organization) layer.
-from organization.models import Role, Provider
+from organization.models import Role, Tenant
+from organization.access import accessible_tenant_ids
 from core.auth.guards import validate_permission_grant, validate_group_membership_grant
 from .models import UserGroup
 from .filters import UserGroupFilterSet
@@ -515,13 +479,15 @@ class _RolesHolder:
 
 
 class UserGroupForm(forms.ModelForm):
-    """Create/edit a global, cross-tenant UserGroup.
+    """Create/edit a cross-tenant UserGroup.
 
-    Groups are NOT tenant-bound: ``roles`` may reference roles from any tenant (each
-    role label includes its tenant) and ``members`` may be any user. A member gains
-    each role's permissions — and access — in that role's tenant. Because managing a
-    group can grant cross-tenant access, the views restrict this to global admins; the
-    escalation guard here is defence in depth for any non-superuser who reaches the form.
+    Groups are NOT tenant-bound for permission purposes: ``roles`` may reference roles
+    from any tenant (each role label includes its tenant) and ``members`` may be any
+    user. A member gains each role's permissions — and access — in that role's tenant.
+    The group's ``tenant`` is its OWNER and SCIM provisioning scope only; blank means a
+    global group (superuser-managed). Because managing a group can grant cross-tenant
+    access, the views restrict this to group admins; the escalation guards here are
+    defence in depth for any non-superuser who reaches the form.
     """
     name = forms.CharField(
         max_length=100,
@@ -548,13 +514,14 @@ class UserGroupForm(forms.ModelForm):
         label=_("Members"),
         widget=forms.SelectMultiple(attrs={'class': 'form-select'}),
     )
-    provider = forms.ModelChoiceField(
-        queryset=Provider._base_manager.none(),
+    tenant = forms.ModelChoiceField(
+        queryset=Tenant._base_manager.none(),
         required=False,
-        label=_("Provider (SCIM scope)"),
+        label=_("SCIM scope / owning tenant"),
         widget=forms.Select(attrs={'class': 'form-select'}),
-        help_text=_("Set a provider to make this group SCIM-managed by that provider. "
-                    "Leave blank for a global group managed here in the UI."),
+        help_text=_("The tenant that owns this group and whose SCIM provisioning manages "
+                    "it. Leave blank for a global group managed here in the UI "
+                    "(superusers only)."),
     )
     is_active = forms.BooleanField(
         required=False,
@@ -564,49 +531,60 @@ class UserGroupForm(forms.ModelForm):
 
     class Meta:
         model = UserGroup
-        fields = ['name', 'description', 'roles', 'members', 'provider', 'is_active']
+        fields = ['name', 'description', 'roles', 'members', 'tenant', 'is_active']
 
     @staticmethod
     def _role_label(role):
-        """Prefix each role choice with its container so cross-container roles are legible,
-        e.g. ``[Tenant A] Administrator`` vs ``[Provider Northwind] MSP Technician``."""
-        if role.scope == Role.SCOPE_PROVIDER and role.provider_id:
-            return f"[{role.provider.name}] {role.name}"
-        if role.tenant_id:
-            return f"[{role.tenant.name}] {role.name}"
-        return role.name
+        """Prefix each role choice with its owning tenant so cross-tenant roles are
+        legible, e.g. ``[Tenant A] Administrator`` vs ``[Northwind MSP] Technician``."""
+        return f"[{role.tenant.name}] {role.name}"
 
     def __init__(self, *args, user=None, tenant=None, **kwargs):
-        # `tenant` is accepted for call-site compatibility but ignored: groups are global.
+        # `tenant` (the request's active tenant) is accepted for call-site compatibility
+        # but ignored: group administration is a cross-tenant surface.
         self._requesting_user = user
         super().__init__(*args, **kwargs)
-        # Roles across ALL containers (unscoped _base_manager overrides the core/apps.py
+        is_superuser = bool(self._requesting_user is not None and self._requesting_user.is_superuser)
+        # Roles across ALL tenants (unscoped _base_manager overrides the core/apps.py
         # current-tenant scoping applied during super().__init__); any user as member.
         self.fields['roles'].queryset = Role._base_manager.filter(
             deleted_at__isnull=True,
-        ).select_related('tenant', 'provider').order_by('scope', 'tenant__name', 'provider__name', 'name')
+        ).select_related('tenant').order_by('tenant__name', 'name')
         self.fields['roles'].label_from_instance = self._role_label
         self.fields['members'].queryset = User.objects.all().order_by('username')
-        # Scope the SCIM ``provider`` choice to providers the requesting user may manage:
-        # setting a group's provider hands that provider's SCIM-synced staff every role the
-        # group carries, so a group admin must not be able to point a group at a provider
-        # they do not administer (cross-provider takeover). Superuser sees all; blank (a
-        # global, UI-managed group) always remains allowed via ``required=False``.
-        # Mirrors TechnicianQuickForm.__init__ scoping (organization/forms/provider_form.py).
-        provider_qs = Provider._base_manager.filter(deleted_at__isnull=True).order_by('name')
-        if self._requesting_user is not None and not self._requesting_user.is_superuser:
+        # Scope the owning-``tenant`` choice to tenants where the requesting user holds
+        # ``users.change_usergroup``: a group's tenant decides whose admins and whose SCIM
+        # token control it, so a group admin must not be able to hand a group to (or
+        # create one under) a tenant they do not administer. Superuser sees all tenants
+        # plus blank (= global group).
+        tenant_qs = Tenant._base_manager.filter(deleted_at__isnull=True).order_by('name')
+        if self._requesting_user is not None and not is_superuser:
             manageable = [
-                p.pk for p in provider_qs
-                if self._requesting_user.has_perm('organization.manage_groups', obj=p)
+                t.pk for t in Tenant._base_manager.filter(
+                    pk__in=accessible_tenant_ids(self._requesting_user),
+                    deleted_at__isnull=True,
+                )
+                if self._requesting_user.has_perm('users.change_usergroup', obj=t)
             ]
             # Preserve the current value when editing so the field validates: a non-superuser
-            # editing a group whose provider they cannot manage still sees it (the change
-            # guard in clean() enforces they may not alter it to another unmanaged provider).
-            current_provider_id = getattr(self.instance, 'provider_id', None)
-            if current_provider_id is not None and current_provider_id not in manageable:
-                manageable.append(current_provider_id)
-            provider_qs = provider_qs.filter(pk__in=manageable)
-        self.fields['provider'].queryset = provider_qs
+            # editing a group whose tenant they cannot manage still sees it (the change
+            # guard in clean() enforces they may not alter it).
+            current_tenant_id = getattr(self.instance, 'tenant_id', None)
+            if current_tenant_id is not None and current_tenant_id not in manageable:
+                manageable.append(current_tenant_id)
+            tenant_qs = tenant_qs.filter(pk__in=manageable)
+        self.fields['tenant'].queryset = tenant_qs
+        # Blank tenant = global group, superuser-only. The core/apps.py BaseForm patch
+        # force-sets tenant.required=True during super().__init__; re-decide it here:
+        # superusers (and guard-exempt programmatic use without a user) may leave it
+        # blank, non-superusers must pick a tenant — except when re-saving an existing
+        # global group, where keeping blank is a no-op (changes are guarded in clean()).
+        if is_superuser or self._requesting_user is None:
+            self.fields['tenant'].required = False
+        else:
+            self.fields['tenant'].required = not (
+                self.instance.pk and self.instance.tenant_id is None
+            )
 
         self.helper = FormHelper(self)
         self.helper.form_method = 'post'
@@ -614,7 +592,7 @@ class UserGroupForm(forms.ModelForm):
         self.helper.layout = Layout(
             Fieldset(str(_("Group details")), 'name', 'description', 'is_active'),
             Fieldset(str(_("Access grants")), 'roles', 'members'),
-            Fieldset(str(_("Scope")), 'provider'),
+            Fieldset(str(_("Scope")), 'tenant'),
         )
         add_standard_buttons(self.helper, self.instance, 'users:usergroup_list')
 
@@ -623,42 +601,44 @@ class UserGroupForm(forms.ModelForm):
         user = self._requesting_user
         is_superuser = bool(user is not None and user.is_superuser)
 
-        # Escalation guard (defence in depth; group management is global-admin only):
-        # a non-superuser may attach a role only if they already hold every one of its
-        # permissions in that role's OWN container. A group's roles may span containers, so
-        # each is validated against ``role.owner`` (the role's tenant OR provider) — using
-        # ``role.tenant`` would wrongly reject every provider-scoped role (container=None
-        # holds nothing).
+        # Escalation guard (defence in depth; group management is admin-gated in the
+        # views): a non-superuser may attach a role only if they already hold every one
+        # of its permissions in that role's OWN tenant. A group's roles may span tenants,
+        # so each is validated against ``role.owner`` (= ``role.tenant``).
         for role in (cleaned_data.get('roles') or []):
             validate_permission_grant(user, role.permissions or [], role.owner)
 
-        # Provider ownership guard (§3-B): setting/changing the SCIM ``provider`` grants
-        # that provider's staff every role the group carries. A non-superuser may only
-        # pick a provider they manage (``organization.manage_groups`` on it), and when
-        # EDITING must be able to manage BOTH the old and the new value — otherwise they
-        # could move a group they don't fully control onto a provider they do.
-        if not is_superuser and user is not None and 'provider' in cleaned_data:
-            new_provider = cleaned_data.get('provider')
-            old_provider = self.instance.provider if self.instance.pk else None
-            changed = getattr(old_provider, 'pk', None) != getattr(new_provider, 'pk', None)
-            # Only guard an actual CHANGE of the SCIM provider. A no-op re-save (editing other
-            # fields while leaving the provider untouched) grants nothing new, so it must not be
-            # blocked — otherwise a legacy single-company admin who holds manage_groups via a
-            # direct user_permissions grant (no Provider membership, so has_perm(obj=provider)
-            # is always False) could never edit an existing provider-scoped group at all.
-            if changed:
-                if new_provider is not None and not user.has_perm(
-                    'organization.manage_groups', obj=new_provider,
-                ):
-                    self.add_error('provider', _(
-                        "You do not have permission to manage groups for this provider."
+        # Ownership guard: setting/changing the owning ``tenant`` re-keys which tenant's
+        # admins and SCIM token control the group. A non-superuser may only pick a tenant
+        # where they hold ``users.change_usergroup``, and when EDITING must hold it for
+        # BOTH the old and the new value — otherwise they could move a group they don't
+        # fully control onto a tenant they do. A blank (global) side is superuser-only.
+        # A no-op re-save (tenant untouched) grants nothing new and is not blocked.
+        if not is_superuser and user is not None and 'tenant' in cleaned_data:
+            new_tenant = cleaned_data.get('tenant')
+            old_tenant = self.instance.tenant if self.instance.pk else None
+            if not self.instance.pk:
+                if new_tenant is None:
+                    self.add_error('tenant', _(
+                        "Only superusers can create global user groups."
                     ))
-                elif old_provider is not None and not user.has_perm(
-                    'organization.manage_groups', obj=old_provider,
+                elif not user.has_perm('users.change_usergroup', obj=new_tenant):
+                    self.add_error('tenant', _(
+                        "You do not have permission to manage user groups for this tenant."
+                    ))
+            elif getattr(old_tenant, 'pk', None) != getattr(new_tenant, 'pk', None):
+                if new_tenant is None or not user.has_perm(
+                    'users.change_usergroup', obj=new_tenant,
                 ):
-                    self.add_error('provider', _(
+                    self.add_error('tenant', _(
+                        "You do not have permission to manage user groups for this tenant."
+                    ))
+                elif old_tenant is None or not user.has_perm(
+                    'users.change_usergroup', obj=old_tenant,
+                ):
+                    self.add_error('tenant', _(
                         "You do not have permission to move this group away from its "
-                        "current provider."
+                        "current owning tenant."
                     ))
 
         # Member-grant escalation guard (§3-C): adding a member confers every role the

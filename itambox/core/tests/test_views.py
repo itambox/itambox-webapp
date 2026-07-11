@@ -280,6 +280,7 @@ class CoreViewsTestCase(TestCase):
         """Test Recycle Bin access control for superusers, standard roles, and restricted users."""
         from organization.models import Tenant, Role, Membership
         from django.contrib.contenttypes.models import ContentType
+        from core.tests.mixins import grant
         
         # 1. Setup tenant and standard user
         tenant = Tenant.objects.create(name="ACME Corp", slug="acme")
@@ -293,8 +294,7 @@ class CoreViewsTestCase(TestCase):
                 'assets.view_asset',
             ]
         )
-        membership = Membership.objects.create(user=std_user, tenant=tenant)
-        membership.roles.add(std_role)
+        membership = grant(std_user, tenant, std_role).membership
         
         # Setup asset
         mfr = Manufacturer.objects.create(name="Perm Mfr", slug="perm-mfr")
@@ -349,7 +349,8 @@ class CoreViewsTestCase(TestCase):
                 'core.delete_recyclebin',
             ]
         )
-        membership.roles.set([role_obj])
+        membership.assignments.all().delete()
+        grant(std_user, tenant, role_obj)
         
         # 4. Try again with permissions
         # Force a reload of the user object to update cached memberships

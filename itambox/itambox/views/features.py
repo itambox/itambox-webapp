@@ -242,7 +242,7 @@ class ObjectExportView(LoginRequiredMixin, View):
             # filter_by_tenant, so the queryset built above is not tenant-scoped
             # at all — an ambient view_<model> permission (granted by every
             # seeded role, including Read-Only) would otherwise dump every
-            # tenant's/provider's rows. Mirrors the restriction
+            # tenant's rows. Mirrors the restriction
             # MembershipListView/MembershipDetailView apply on top of the same
             # unscoped manager.
             queryset = visible_to_containers(request.user, queryset, f'{app_label}.view_{model_name}')

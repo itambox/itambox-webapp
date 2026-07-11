@@ -203,7 +203,7 @@ class MultiTenantAuthTestCase(TestCase):
 
         # Check tenant membership was created
         membership = Membership.objects.get(user=user, tenant=self.tenant_alpha)
-        self.assertEqual(membership.roles.first().name, 'Member')
+        self.assertEqual(membership.assignments.first().role.name, 'Member')
 
     def test_sync_tenant_ldap_command_invalid_tenant(self):
         """Test that sync_tenant_ldap raises CommandError for non-existent tenants."""

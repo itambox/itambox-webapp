@@ -33,7 +33,7 @@ class ETagPreconditionTests(APITestCase):
         self.staff.set_password('password123')
         self.staff.save()
 
-        from organization.models import Tenant, Role, Membership
+        from organization.models import Tenant, Role, Membership, RoleAssignment
         self.tenant = baker.make(Tenant, name='Test Tenant', slug='test-tenant')
         self.role = baker.make(
             Role,
@@ -51,7 +51,7 @@ class ETagPreconditionTests(APITestCase):
             user=self.staff,
             tenant=self.tenant,
         )
-        self.membership.roles.add(self.role)
+        RoleAssignment.objects.create(membership=self.membership, role=self.role)
 
         self.manufacturer = baker.make(Manufacturer, name='Microsoft', slug='microsoft')
         self.software = baker.make(

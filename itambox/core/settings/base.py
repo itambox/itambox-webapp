@@ -326,9 +326,9 @@ LOGOUT_REDIRECT_URL = 'login'
 SAML_CSP_HANDLER = ''
 
 AUTHENTICATION_BACKENDS = [
+    # MembershipBackend is the single authorization path: all permissions resolve
+    # through RoleAssignment rows (one vocabulary, one container type — Tenant).
     'core.auth.TenantMembershipBackend',
-    # GlobalCapabilityBackend removed: provider-level capabilities are now checked directly
-    # via core.auth.provider.has_provider_capability / can_manage_user_groups.
     'core.auth.ldap.MultiTenantLDAPBackend',
     'core.auth.saml.TenantSaml2Backend',
     'core.auth.oidc.TenantOIDCBackend',
@@ -369,16 +369,29 @@ except Exception as e:
     logging.getLogger(__name__).warning('Failed to parse ITAMBOX_TENANT_OIDC_CONFIGS: %s', e)
     ITAMBOX_TENANT_OIDC_CONFIGS = {}
 
-# Provider-level SSO group → Role mapping (keyed by provider slug). Mirrors the
-# per-tenant configs above but provisions Membership (MSP staff) instead of
-# Membership. Each entry may carry OIDC_GROUP_PROVIDER_ROLE_MAPPING /
-# SAML_GROUP_PROVIDER_ROLE_MAPPING / LDAP_GROUP_PROVIDER_ROLE_MAPPING dicts.
-for _prov_cfg in ('ITAMBOX_PROVIDER_OIDC_CONFIGS', 'ITAMBOX_PROVIDER_SAML_CONFIGS', 'ITAMBOX_PROVIDER_LDAP_CONFIGS'):
+# TRANSITIONAL env-var merge (2026-07 RBAC collapse): a managing (is_provider)
+# tenant's SSO config — including its MSP-staff group→role mapping
+# (*_GROUP_PROVIDER_ROLE_MAPPING) — now lives under its OWN slug in the
+# ITAMBOX_TENANT_*_CONFIGS dicts above. The legacy ITAMBOX_PROVIDER_*_CONFIGS
+# env vars (keyed by the same slug) are still read and merged in so existing
+# deployments keep working; explicit tenant-keyed entries win on key conflicts.
+# Ops should move these entries into ITAMBOX_TENANT_*_CONFIGS and drop the
+# PROVIDER env vars — this shim is slated for removal.
+for _env_name, _target in (
+    ('ITAMBOX_PROVIDER_OIDC_CONFIGS', ITAMBOX_TENANT_OIDC_CONFIGS),
+    ('ITAMBOX_PROVIDER_SAML_CONFIGS', ITAMBOX_TENANT_SAML_CONFIGS),
+    ('ITAMBOX_PROVIDER_LDAP_CONFIGS', ITAMBOX_TENANT_LDAP_CONFIGS),
+):
     try:
-        globals()[_prov_cfg] = json.loads(os.environ.get(_prov_cfg, '{}'))
+        _legacy_cfg = json.loads(os.environ.get(_env_name, '{}'))
     except Exception as e:
-        logging.getLogger(__name__).warning('Failed to parse %s: %s', _prov_cfg, e)
-        globals()[_prov_cfg] = {}
+        logging.getLogger(__name__).warning('Failed to parse %s: %s', _env_name, e)
+        _legacy_cfg = {}
+    for _slug, _cfg in (_legacy_cfg or {}).items():
+        _merged = dict(_cfg or {})
+        _merged.update(_target.get(_slug, {}))
+        _target[_slug] = _merged
+del _env_name, _target, _legacy_cfg
 
 # Intune discovery connector — per-tenant config.
 # Keys per tenant slug: azure_tenant_id, client_id, client_secret,
@@ -416,8 +429,13 @@ Q_CLUSTER = {
     'label': 'Django Q Cluster',
     'orm': 'default',        # Standard database ORM broker
     # Don't persist successful tasks (we only fire-and-forget async_task, never
-    # fetch results); failures are always saved and never pruned by django-q2,
-    # so list_failed_tasks stays complete without the table bloating on successes.
+    # fetch results); failures are always saved -- django-q2 itself never
+    # prunes them. That used to mean the failure table grew forever; it's now
+    # closed by the `prune_changelog` management command (core/management/
+    # commands/prune_changelog.py), which deletes Failure rows older than
+    # ITAMBOX_QTASK_FAILED_RETENTION_DAYS (default 90; 0 = unlimited) on the
+    # daily schedule CoreConfig registers in core/apps.py, so list_failed_tasks
+    # stays complete for recent failures without unbounded growth.
     'save_limit': -1,
 }
 
@@ -441,6 +459,25 @@ if 'test' in sys.argv or any('test' in arg or 'pytest' in arg for arg in sys.arg
     DATABASES['default']['CONN_MAX_AGE'] = 0
     DATABASES['default']['OPTIONS']['options'] = '-c lock_timeout=30000 -c statement_timeout=600000'
 
+
+# ==============================================================================
+# Data Retention (changelog / operational-data pruning)
+# ==============================================================================
+# Retention windows for `prune_changelog` (core/management/commands/
+# prune_changelog.py), scheduled to run daily via the Schedule CoreConfig
+# registers in core/apps.py. Each is a day count measured against the row's
+# own timestamp (ObjectChange.time / AlertLog.created_at /
+# Notification.created_at / django-q2 Failure.stopped). 0 means unlimited:
+# that data class is never pruned by age. The changelog also supports a
+# per-tenant override -- Tenant.changelog_retention_days (organization/
+# models.py; null = use this setting, 0 = unlimited/legal hold) -- which
+# always wins over this setting for that tenant's rows.
+ITAMBOX_CHANGELOG_RETENTION_DAYS = int(os.environ.get('ITAMBOX_CHANGELOG_RETENTION_DAYS', '365'))
+ITAMBOX_ALERTLOG_RETENTION_DAYS = int(os.environ.get('ITAMBOX_ALERTLOG_RETENTION_DAYS', '180'))
+ITAMBOX_NOTIFICATION_RETENTION_DAYS = int(os.environ.get('ITAMBOX_NOTIFICATION_RETENTION_DAYS', '90'))
+# Pruned against django-q2's own Failure proxy model (Task rows with
+# success=False). See the `save_limit` comment on Q_CLUSTER above.
+ITAMBOX_QTASK_FAILED_RETENTION_DAYS = int(os.environ.get('ITAMBOX_QTASK_FAILED_RETENTION_DAYS', '90'))
 
 ALLOW_GLOBAL_CUSTODY_TEMPLATES = os.environ.get('ITAMBOX_ALLOW_GLOBAL_CUSTODY_TEMPLATES', 'True') == 'True'
 REQUIRE_CUSTODY_SIGNIN = os.environ.get('ITAMBOX_REQUIRE_CUSTODY_SIGNIN', 'True') == 'True'

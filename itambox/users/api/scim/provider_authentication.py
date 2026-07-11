@@ -4,25 +4,27 @@ from rest_framework.authentication import BaseAuthentication, get_authorization_
 from rest_framework import exceptions
 from django.utils import timezone
 
-from core.auth.provider import has_provider_capability
 from users.models import Token
-from organization.models import Provider
+from organization.models import Tenant
 
 logger = logging.getLogger('itambox.scim.auth')
 
 
 class SCIMProviderBearerTokenAuthentication(BaseAuthentication):
-    """Bearer-token auth for the provider-level SCIM endpoint.
+    """Bearer-token auth for the provider-level (staff) SCIM endpoint.
 
-    Mirrors ``SCIMBearerTokenAuthentication`` but resolves a ``Provider`` (not a
-    ``Tenant``) from the URL and authorizes against provider capabilities instead of
-    tenant roles. A request is accepted only when the bearer token is scoped to this
-    provider AND the token's user holds ``manage_provider_users`` for it (superusers
+    Mirrors ``SCIMBearerTokenAuthentication`` but resolves the managing
+    (``is_provider``) tenant from the ``/api/providers/<slug>/scim/`` mount. A
+    provider is just a tenant now, so authorization is the SAME standard perm the
+    tenant SCIM path uses: the token must be scoped to this provider tenant AND the
+    token's user must hold ``organization.change_membership`` inside it (superusers
     bypass both). Writes additionally require ``token.write_enabled``.
     """
 
     def authenticate(self, request):
-        # 1. Resolve provider from URL path
+        # 1. Resolve the managing (is_provider) tenant from the URL path. The
+        #    /api/providers/<slug>/ mount is kept for stage 2; only its resolution
+        #    target changed (Provider model is gone).
         provider_slug = None
         if request.resolver_match and 'provider_slug' in request.resolver_match.kwargs:
             provider_slug = request.resolver_match.kwargs['provider_slug']
@@ -34,9 +36,12 @@ class SCIMProviderBearerTokenAuthentication(BaseAuthentication):
         if not provider_slug:
             return None
 
-        try:
-            provider = Provider._base_manager.get(slug=provider_slug)
-        except Provider.DoesNotExist:
+        # _base_manager: token auth runs before any tenant context exists, so the
+        # tenant-scoped default manager would silently return nothing here.
+        tenant = Tenant._base_manager.filter(
+            is_provider=True, deleted_at__isnull=True, slug=provider_slug,
+        ).first()
+        if tenant is None:
             raise exceptions.AuthenticationFailed('Provider not found.')
 
         auth = get_authorization_header(request).split()
@@ -76,15 +81,19 @@ class SCIMProviderBearerTokenAuthentication(BaseAuthentication):
             if not user.is_active:
                 raise exceptions.AuthenticationFailed('User inactive or deleted.')
 
-            # Authorization: superusers always pass. Everyone else must BOTH (a) present a
-            # token scoped to THIS provider and (b) hold the manage_provider_users capability
-            # for this provider. Fail closed otherwise.
+            # Authorization: superusers always pass. Everyone else must BOTH (a) present
+            # a token scoped to THIS provider tenant (a "provider SCIM token" is simply a
+            # token whose tenant has is_provider set) and (b) hold the standard
+            # organization.change_membership permission inside it — the same real
+            # has_perm check the tenant SCIM path performs, resolved against role
+            # content, never a role-name match. Fail closed otherwise.
             if not user.is_superuser:
-                if token.provider_id != provider.pk:
+                if token.tenant_id != tenant.pk:
                     raise exceptions.AuthenticationFailed('Token is not scoped to this provider.')
-                if not has_provider_capability(user, 'manage_staff', provider=provider):
+                if not user.has_perm('organization.change_membership', obj=tenant):
                     raise exceptions.AuthenticationFailed(
-                        'User does not have sufficient permissions (manage_provider_users required).'
+                        'User does not have sufficient permissions '
+                        '(organization.change_membership required).'
                     )
 
             # Enforce write_enabled token flag for write methods

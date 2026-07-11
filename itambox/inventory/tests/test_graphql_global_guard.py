@@ -12,9 +12,10 @@ from django.contrib.auth import get_user_model
 from core.schema import schema
 from core.managers import set_current_tenant, set_current_tenant_group, set_current_membership
 from itambox.middleware import _current_user
-from organization.models import Tenant, TenantGroup, Role, Membership
+from organization.models import Tenant, TenantGroup, Role
 from inventory.models import Kit, Accessory
 from assets.models import Manufacturer
+from core.tests.mixins import grant
 
 
 class GraphQLGlobalCatalogueGuardTests(TestCase):
@@ -33,8 +34,7 @@ class GraphQLGlobalCatalogueGuardTests(TestCase):
                 'inventory.view_accessory', 'inventory.change_accessory', 'inventory.delete_accessory',
             ],
         )
-        self.membership = Membership.objects.create(user=self.user, tenant=self.tenant)
-        self.membership.roles.add(role)
+        self.membership = grant(self.user, self.tenant, role).membership
 
         # Create the global (tenant=None) rows the attacker would target.
         set_current_tenant(self.tenant)

@@ -3,6 +3,7 @@ from django.test import TestCase
 from django.contrib.auth import get_user_model
 from django.urls import reverse
 
+from core.tests.mixins import grant
 from organization.models import Tenant, Role, Membership
 from users.models import UserGroup
 from assets.models import Asset, StatusLabel, AssetRole, Manufacturer, AssetType
@@ -27,12 +28,9 @@ class SecurityBoundariesTestCase(TestCase):
                 'assets.view_asset', 'assets.add_asset', 'assets.change_asset', 'assets.delete_asset'
             ]
         )
-        self.membership_a = Membership.objects.create(user=self.user_a,
-            tenant=self.tenant_a,
-        )
-        self.membership_a.roles.add(self.role_a)
+        self.membership_a = grant(self.user_a, self.tenant_a, self.role_a).membership
 
-        # Bind Tenant B User (M2M: create then add roles)
+        # Bind Tenant B User (per-grant RoleAssignment)
         self.role_b = Role.objects.create(
             tenant=self.tenant_b,
             name='Admin',
@@ -40,10 +38,7 @@ class SecurityBoundariesTestCase(TestCase):
                 'assets.view_asset', 'assets.add_asset', 'assets.change_asset', 'assets.delete_asset'
             ]
         )
-        self.membership_b = Membership.objects.create(user=self.user_b,
-            tenant=self.tenant_b,
-        )
-        self.membership_b.roles.add(self.role_b)
+        self.membership_b = grant(self.user_b, self.tenant_b, self.role_b).membership
 
         # Create base metadata
         self.status = StatusLabel.objects.create(name='Active', slug='active')
@@ -163,10 +158,14 @@ class MultiRoleSecurityBoundaryTestCase(TestCase):
         )
 
         # Membership in Tenant A
-        self.membership_a = Membership.objects.create(user=self.user, tenant=self.tenant_a,
-            direct_permissions=['assets.delete_asset'],
+        self.membership_a = grant(self.user, self.tenant_a, self.role_a).membership
+        # direct_permissions field is gone — model the same coverage as a one-off role.
+        self.direct_role = Role.objects.create(
+            tenant=self.tenant_a,
+            name='Direct grants',
+            permissions=['assets.delete_asset'],
         )
-        self.membership_a.roles.add(self.role_a)
+        grant(self.user, self.tenant_a, self.direct_role)
 
         # UserGroup in Tenant A (change perm via group)
         self.group_a = UserGroup.objects.create(name='MRSB-Group-A', is_active=True)
@@ -241,10 +240,8 @@ class MultiRoleSecurityBoundaryTestCase(TestCase):
         self.group_a.is_active = False
         self.group_a.save()
 
-        # Remove roles from membership so group is the only change-perm source
-        self.membership_a.roles.clear()
-        self.membership_a.direct_permissions = []
-        self.membership_a.save()
+        # Remove assignments from membership so group is the only change-perm source
+        self.membership_a.assignments.all().delete()
         self._clear_perm_cache()
 
         self.assertFalse(self.user.has_perm('assets.change_asset'))
@@ -261,7 +258,7 @@ class MultiRoleSecurityBoundaryTestCase(TestCase):
             name='Transient Role',
             permissions=['organization.view_tenant'],
         )
-        self.membership_a.roles.add(transient_role)
+        grant(self.user, self.tenant_a, transient_role)
         self._clear_perm_cache()
         self.assertTrue(self.user.has_perm('organization.view_tenant'))
 

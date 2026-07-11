@@ -3,10 +3,12 @@
 {% load rbac_badges %}
 
 {% block extra_page_actions %}
+{% if role_editable %}
 <a href="{% url 'organization:role_assign_users' pk=object.pk %}" class="btn btn-ghost-secondary">
     <i class="mdi mdi-account-multiple-plus"></i>
     {% translate "Assign Users" %}
 </a>
+{% endif %}
 {% endblock extra_page_actions %}
 
 {% block object_details %}
@@ -15,10 +17,13 @@
         <label class="form-label text-muted">{% translate "Name" %}</label>
         <div class="fw-bold fs-3 text-dark">
             {{ object.name }}
-            {% role_scope_badge object icon=True extra_class="align-middle ms-2" %}
+            {% shared_role_badge object %}
+            {% if not role_editable %}
+            <span class="badge bg-secondary-lt text-secondary align-middle ms-1" title="{% translate 'Owned by the managing tenant — only the owner can edit it.' %}">{% translate "Read-only" %}</span>
+            {% endif %}
         </div>
         <div class="text-muted small mt-1">
-            {% if object.owner %}<a href="{{ object.owner.get_absolute_url }}">{{ object.owner }}</a>{% endif %}
+            {% if object.tenant %}<a href="{{ object.tenant.get_absolute_url }}">{{ object.tenant }}</a>{% endif %}
         </div>
     </div>
     <div class="col-md-6 mb-3">
@@ -141,31 +146,5 @@
 {% endif %}
 {% else %}
 <p class="text-muted"><em>{% translate "This role has no permissions." %}</em></p>
-{% endif %}
-
-{% if object.scope == 'provider' %}
-<hr class="my-4">
-<h4 class="card-title text-primary mb-3">{% translate "Provider capabilities" %}</h4>
-<p class="text-muted mb-3 small">
-    {% translate "MSP-level capabilities that apply to the provider organization itself. These never project into customer tenants." %}
-</p>
-<div class="row">
-    {% for codename, label in provider_capabilities %}
-    <div class="col-md-6 mb-3">
-        <div class="card card-sm border shadow-none bg-transparent">
-            <div class="card-body d-flex align-items-center">
-                {% with full="organization."|add:codename %}
-                {% if full in object.permissions %}
-                <span class="badge bg-success text-success-fg me-3"><i class="mdi mdi-check"></i></span>
-                {% else %}
-                <span class="badge bg-secondary-lt text-muted me-3"><i class="mdi mdi-close"></i></span>
-                {% endif %}
-                {% endwith %}
-                <div><strong>{{ label }}</strong></div>
-            </div>
-        </div>
-    </div>
-    {% endfor %}
-</div>
 {% endif %}
 {% endblock object_details %}
