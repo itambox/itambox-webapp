@@ -29,4 +29,5 @@ import './command-k';
 import './inline-actions';
 import './bulk-receive';
 import './audit-basket';
+import './membership-form';
 

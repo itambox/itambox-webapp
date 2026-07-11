@@ -1,0 +1,58 @@
+{% load i18n %}
+{% comment %}
+Read-only audit panel on the members list: who reaches the active tenant WITHOUT a
+local membership row (provider staff via managed reach, user-group members via this
+tenant's roles). Rendered lazily via ?panel=outside_access on the membership list URL;
+the view returns an empty body instead of this template when there are no entries.
+No actions on purpose — these grants are managed where they live (at the provider,
+or on the user group).
+{% endcomment %}
+<div class="card">
+    <div class="card-header">
+        <h3 class="card-title text-secondary d-flex align-items-center m-0">
+            <i class="mdi mdi-shield-account-outline me-2 text-muted"></i>
+            {% translate "Access from outside this tenant" %}
+        </h3>
+    </div>
+    <div class="card-body">
+        <p class="text-muted small">
+            {% translate "These people can work in this tenant without being members here. Their grants are managed where they were made — at the managing provider or on the user group." %}
+        </p>
+        <div class="table-responsive">
+            <table class="table table-hover align-middle border mb-0">
+                <thead class="table-light">
+                    <tr>
+                        <th>{% translate "User" %}</th>
+                        <th>{% translate "Source" %}</th>
+                        <th>{% translate "Permissions" %}</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for entry in entries %}
+                    <tr>
+                        <td>{{ entry.user }}</td>
+                        <td>
+                            {% for source in entry.sources %}
+                                {% if source == 'managed' %}
+                                    <span class="badge bg-purple-lt text-purple me-1">
+                                        <i class="mdi mdi-domain me-1"></i>{% blocktranslate with provider=tenant.managed_by.name %}Managed by {{ provider }}{% endblocktranslate %}
+                                    </span>
+                                {% elif source == 'group' %}
+                                    {% for group_name in entry.groups %}
+                                    <span class="badge bg-cyan-lt text-cyan me-1">
+                                        <i class="mdi mdi-account-group-outline me-1"></i>{% blocktranslate with group=group_name %}Via group {{ group }}{% endblocktranslate %}
+                                    </span>
+                                    {% endfor %}
+                                {% endif %}
+                            {% endfor %}
+                        </td>
+                        <td>
+                            <span class="badge bg-secondary-lt" title="{% translate 'Effective permissions in this tenant' %}">{{ entry.permissions|length }}</span>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>

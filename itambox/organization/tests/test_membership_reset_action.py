@@ -1,17 +1,14 @@
 """Regression tests for FIX #5 (RBAC review §3-E, defect #5).
 
-The ``send_invite`` checkbox on technician onboarding was a no-op (collected but never
-read), so onboarded staff got ``set_unusable_password()`` with no way to log in. The fix:
-
-  * remove the misleading ``send_invite`` field from ``TechnicianQuickForm``; and
-  * add a manual "send password-reset / set-password link" action on the membership
+Inline-created users have an unusable password until an administrator sends a setup
+link. The unified member flow therefore exposes a manual
+"send password-reset / set-password link" action on the membership
     detail page, guarded so only a manager of the membership's tenant (or a superuser)
     can trigger it.
 
 These tests cover:
-  (a) ``TechnicianQuickForm`` no longer declares ``send_invite``;
-  (b) the send-reset action, when POSTed by an authorized manager, sends exactly one email;
-  (c) an unauthorized user is denied and no email is sent.
+  (a) the send-reset action, when POSTed by an authorized manager, sends exactly one email;
+  (b) an unauthorized user is denied and no email is sent.
 
 Fixture note (RBAC stage-2 structural collapse): the old ``Provider`` model + Membership
 ``roles`` M2M are gone. A managing (MSP) organization is now a ``Tenant(is_provider=True)``;
@@ -25,16 +22,9 @@ from django.test import TestCase
 from django.urls import reverse
 
 from core.tests.mixins import TenantTestMixin
-from organization.forms.provider_form import TechnicianQuickForm
 from organization.models import Tenant, Membership, Role
 
 User = get_user_model()
-
-
-class TechnicianQuickFormSendInviteRemovedTests(TestCase):
-    def test_form_has_no_send_invite_field(self):
-        form = TechnicianQuickForm()
-        self.assertNotIn('send_invite', form.fields)
 
 
 class MembershipSendResetActionTests(TenantTestMixin, TestCase):

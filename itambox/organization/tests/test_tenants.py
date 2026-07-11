@@ -77,8 +77,11 @@ class TenantViewTests(TestCase):
             'roles': [role.pk],
         })
         self.assertEqual(response.status_code, 302)
-        self.assertIn(reverse('users:user_detail', kwargs={'pk': self.user.pk}), response.url)
-        self.assertTrue(Membership.objects.filter(user=self.user, tenant=self.tenant).exists())
+        membership = Membership.objects.get(user=self.user, tenant=self.tenant)
+        self.assertEqual(
+            response.url,
+            reverse('organization:membership_detail', kwargs={'pk': membership.pk}),
+        )
 
 
     def test_edit_view_post(self):

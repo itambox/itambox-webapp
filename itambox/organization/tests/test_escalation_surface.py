@@ -16,7 +16,7 @@ Surfaces covered (one test class per surface):
   3. ``RoleAssignUsersView`` (organization/views/role_views.py)
   4. ``UserGroupForm`` (users/forms.py) — role attach, owning-tenant scope, member grants
   5. ``UserGroupAssignUsersView`` (users/views.py)
-  6. ``TechnicianQuickForm`` (organization/forms/provider_form.py) — managed-reach onboarding
+  6. Unified ``MembershipForm`` — managed-reach inline-user onboarding
   7. Reach-grant escalation — ``validate_assignment_grant`` itself (core/auth/guards.py), the guard
      that stops an actor handing out MANAGED reach broader than their own, independent of whether
      they hold the role's permission content.
@@ -46,7 +46,6 @@ from core.managers import set_current_tenant, set_current_membership
 from core.tests.mixins import TenantTestMixin
 from organization.models import Membership, Role, RoleAssignment, Tenant
 from organization.forms import MembershipForm, MembershipBulkRoleForm
-from organization.forms.provider_form import TechnicianQuickForm
 from users.models import UserGroup
 from users.forms import UserGroupForm
 
@@ -535,11 +534,11 @@ class UserGroupAssignUsersViewEscalationTests(EscalationSurfaceTestCase):
 
 
 # --------------------------------------------------------------------------------------------- #
-# 6. TechnicianQuickForm
+# 6. Unified MembershipForm managed-reach onboarding
 # --------------------------------------------------------------------------------------------- #
-class TechnicianQuickFormEscalationTests(EscalationSurfaceTestCase):
+class UnifiedMembershipOnboardingEscalationTests(EscalationSurfaceTestCase):
     """Surface #6: onboarding a technician with an over-privileged MANAGED-reach role
-    assignment is blocked by ``TechnicianQuickForm.clean()`` (organization/forms/provider_form.py),
+    assignment is blocked by ``MembershipForm.clean()``,
     which delegates to ``validate_assignment_grant`` for the managed-reach grant."""
 
     def setUp(self):
@@ -582,31 +581,41 @@ class TechnicianQuickFormEscalationTests(EscalationSurfaceTestCase):
 
     def _form_data(self, role):
         return {
-            'email': 'newtech@acme.test',
-            'first_name': 'New', 'last_name': 'Tech',
-            'organization': self.org.pk,
-            'role': role.pk if role else '',
+            'who': MembershipForm.WHO_NEW,
+            'new_user_email': 'newtech@acme.test',
+            'new_user_first_name': 'New',
+            'new_user_last_name': 'Tech',
+            'tenant': self.org.pk,
+            'roles': [role.pk] if role else [],
+            'reach_managed': 'on',
             'managed_scope': RoleAssignment.SCOPE_ALL,
+            'is_active': 'on',
         }
 
     def test_low_privilege_onboarder_cannot_onboard_with_overprivileged_role(self):
         """A user who can create memberships but does not hold the role's permissions (nor
         ``add_roleassignment``) cannot onboard a technician into that role."""
         _flush_perm_cache(self.onboarder)
-        form = TechnicianQuickForm(data=self._form_data(self.overpriv_provider_role), user=self.onboarder)
+        form = MembershipForm(
+            data=self._form_data(self.overpriv_provider_role),
+            user=self.onboarder,
+            tenant=self.org,
+        )
         self.assertFalse(form.is_valid())
-        self.assertIn('role', form.errors)
+        self.assertTrue(form.non_field_errors())
         self.assertFalse(User.objects.filter(email='newtech@acme.test').exists())
 
     def test_high_privilege_onboarder_can_onboard_with_role_within_their_permissions(self):
         """An onboarder holding the role's permissions AND sufficient managed reach can
         onboard the technician, creating a managed-reach RoleAssignment."""
         _flush_perm_cache(self.senior_onboarder)
-        form = TechnicianQuickForm(
-            data=self._form_data(self.overpriv_provider_role), user=self.senior_onboarder,
+        form = MembershipForm(
+            data=self._form_data(self.overpriv_provider_role),
+            user=self.senior_onboarder,
+            tenant=self.org,
         )
         self.assertTrue(form.is_valid(), form.errors)
-        user, membership = form.save()
+        membership = form.save()
         self.assertTrue(
             membership.assignments.filter(
                 role=self.overpriv_provider_role, reach=RoleAssignment.REACH_MANAGED,
@@ -614,7 +623,11 @@ class TechnicianQuickFormEscalationTests(EscalationSurfaceTestCase):
         )
 
     def test_superuser_can_onboard_with_any_role(self):
-        form = TechnicianQuickForm(data=self._form_data(self.overpriv_provider_role), user=self.superuser)
+        form = MembershipForm(
+            data=self._form_data(self.overpriv_provider_role),
+            user=self.superuser,
+            tenant=self.org,
+        )
         self.assertTrue(form.is_valid(), form.errors)
 
 
@@ -764,7 +777,7 @@ class ReachGrantEscalationTests(EscalationSurfaceTestCase):
                 'user': victim.pk,
                 'tenant': self.org.pk,
                 'roles': [self.managed_role.pk],
-                'reach': RoleAssignment.REACH_MANAGED,
+                'reach_managed': 'on',
                 'managed_scope': RoleAssignment.SCOPE_ALL,
                 'is_active': True,
             },
@@ -789,7 +802,7 @@ class ReachGrantEscalationTests(EscalationSurfaceTestCase):
                 'user': victim.pk,
                 'tenant': self.org.pk,
                 'roles': [self.managed_role.pk],
-                'reach': RoleAssignment.REACH_MANAGED,
+                'reach_managed': 'on',
                 'managed_scope': RoleAssignment.SCOPE_EXPLICIT,
                 'assigned_tenants': [self.customer_a.pk],
                 'is_active': True,

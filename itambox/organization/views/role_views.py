@@ -45,17 +45,6 @@ class RoleListView(ObjectListView):
     table = RoleTable
     action_buttons = ('add',)
 
-    def get_queryset(self):
-        # Active tenant's own roles ∪ roles its managing tenant shares down.
-        # Shared roles are listed but only editable by their owner (RoleEditView
-        # resolves through the tenant-scoped manager, so they 404 on edit).
-        tenant = getattr(self.request, 'active_tenant', None)
-        if tenant is not None:
-            self.queryset = _annotate_member_count(
-                _roles_visible_in(tenant)
-            ).select_related('tenant')
-        return super().get_queryset()
-
 
 class RoleDetailView(ObjectDetailView):
     queryset = _annotate_member_count(Role.objects.all())
@@ -70,7 +59,7 @@ class RoleDetailView(ObjectDetailView):
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
-        role = self.get_object()
+        role = self.object
         groups = {}
         for key, info in MATRIX_MODELS.items():
             app, model = info['app'], info['model_name']
@@ -87,7 +76,30 @@ class RoleDetailView(ObjectDetailView):
         context['members_url'] = f"{reverse('organization:membership_list')}?role={role.pk}"
         # A role shared down by a managing tenant is read-only here.
         active = getattr(self.request, 'active_tenant', None)
-        context['role_editable'] = bool(active is not None and role.tenant_id == active.pk)
+        shared_in_role = bool(
+            active is not None
+            and active.managed_by_id == role.tenant_id
+            and role.shared_with_managed
+        )
+        role_editable = bool(
+            (active is not None and role.tenant_id == active.pk)
+            or (active is None and self.request.user.is_superuser)
+        )
+        context['role_editable'] = role_editable
+        context['shared_in_role'] = shared_in_role
+        if not role_editable:
+            # Edit/Delete must not surface on a shared-in role viewed from a managed
+            # tenant, even for a superuser: ``has_perm(obj=role)`` resolves against
+            # the role's OWNING tenant (RoleAssignment-agnostic superuser bypass in
+            # MembershipBackend.has_perm), so ``can_change``/``can_delete`` can be
+            # True here while RoleEditView's tenant-scoped queryset still 404s on
+            # this pk. role_editable is the authoritative gate for this page.
+            context['can_change'] = False
+            context['can_delete'] = False
+            context['edit_url'] = None
+            context['delete_url'] = None
+            context['action_urls']['edit'] = None
+            context['action_urls']['delete'] = None
         return context
 
 
@@ -139,6 +151,26 @@ class RoleDeleteView(ObjectDeleteView):
     model = Role
     template_name = 'generic/object_confirm_delete.html'
     success_url = reverse_lazy('organization:role_list')
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        role = self.object
+        # Role.delete() is a soft delete (SoftDeleteMixin): RoleAssignment rows
+        # survive it (RoleAssignment.survive_parent_soft_delete) as the audit
+        # trail, but a deleted role's permissions stop projecting everywhere
+        # immediately (MembershipBackend checks role.deleted_at). Surface that
+        # explicitly when other tenants actually hold live grants against this
+        # shared definition — deleting it is not undone by "it's just soft".
+        if role.shared_with_managed and RoleAssignment.objects.filter(
+            role=role, membership__tenant__managed_by_id=role.tenant_id,
+        ).exists():
+            context['extra_warning'] = _(
+                "This role is shared with managed tenants and still has active "
+                "assignments there. Deleting it does not remove those grants — "
+                "they survive as an audit trail but immediately stop granting "
+                "access."
+            )
+        return context
 
 
 class RoleBulkDeleteView(ObjectBulkDeleteView):

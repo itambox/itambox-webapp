@@ -152,12 +152,12 @@ class MembershipFormRoleSaveTests(TenantTestMixin, TestCase):
         self.assertTrue(form.is_valid(), form.errors.as_json())
 
 
-class MembershipFormPreservesManagedReachTests(TenantTestMixin, TestCase):
-    """Successor invariant for FIX #4(c): the ``direct_permissions`` column is gone, so
-    the "editing doesn't wipe unrelated grants" guarantee now means the form only
-    reconciles assignments at the reach it edits (``own`` by default) — a pre-existing
-    managed-reach assignment on the same membership must survive an own-reach edit
-    untouched (per ``MembershipForm``'s own docstring)."""
+class MembershipFormReconcilesBothReachesTests(TenantTestMixin, TestCase):
+    """The unified edit form authors both reaches in one submission.
+
+    Existing selected assignments retain their provenance while deselected roles
+    are removed and newly selected roles are projected into each checked reach.
+    """
 
     def setUp(self):
         set_current_tenant(None)
@@ -187,13 +187,18 @@ class MembershipFormPreservesManagedReachTests(TenantTestMixin, TestCase):
         set_current_membership(None)
 
     # (c) ---------------------------------------------------------------
-    def test_editing_own_reach_roles_leaves_managed_reach_assignment_untouched(self):
+    def test_editing_both_reaches_preserves_selected_managed_assignment(self):
+        managed_assignment = self.membership.assignments.get(
+            role=self.managed_role, reach=RoleAssignment.REACH_MANAGED,
+        )
         form = MembershipForm(
             data={
                 'user': self.member_user.pk,
                 'tenant': self.tenant.pk,
-                'roles': [self.role_b.pk],
-                'reach': RoleAssignment.REACH_OWN,
+                'roles': [self.role_b.pk, self.managed_role.pk],
+                'reach_own': 'on',
+                'reach_managed': 'on',
+                'managed_scope': RoleAssignment.SCOPE_ALL,
                 'is_active': 'on',
             },
             instance=self.membership,
@@ -214,9 +219,10 @@ class MembershipFormPreservesManagedReachTests(TenantTestMixin, TestCase):
                 role=self.role_a, reach=RoleAssignment.REACH_OWN,
             ).exists()
         )
-        # ...but the pre-existing managed-reach assignment is untouched.
-        self.assertTrue(
-            self.membership.assignments.filter(
+        # ...and the selected pre-existing managed grant is retained, not replaced.
+        self.assertEqual(
+            self.membership.assignments.get(
                 role=self.managed_role, reach=RoleAssignment.REACH_MANAGED,
-            ).exists()
+            ).pk,
+            managed_assignment.pk,
         )

@@ -3,12 +3,14 @@
 {% load crispy_forms_tags %}
 
 {% comment %}
-Bespoke create/edit screen for MembershipForm — one of the three RBAC form
-flows (Role / Membership / UserGroup) that should read as a single system.
-The form defines its own FormHelper/Layout (Fieldset sections + standard
-Submit/Cancel buttons via add_standard_buttons), so {% crispy form %} renders
-the whole <form>. We only supply the surrounding page chrome to match
-organization/role_form.html.
+Bespoke create/edit screen for MembershipForm — the unified "Add member" grant
+flow (Who / What / Where), one of the three RBAC form flows (Role / Membership /
+UserGroup) that should read as a single system. The form defines its own
+FormHelper/Layout (Fieldset sections + standard Submit/Cancel buttons via
+add_standard_buttons), so {% crispy form %} renders the whole <form>. We only
+supply the surrounding page chrome to match organization/role_form.html.
+The who-radio and managed-refinement visibility toggles live in
+static/src/membership-form.ts (bundled globally).
 {% endcomment %}
 
 {% block title %}{{ title }} {% translate "- ITAMbox" %}{% endblock %}
@@ -34,10 +36,10 @@ organization/role_form.html.
         <div class="card shadow-sm">
             <div class="card-body">
                 <h4 class="card-title text-primary mb-2">
-                    {% if is_editing %}{% translate "Edit membership" %}{% else %}{% translate "Add membership" %}{% endif %}
+                    {% if is_editing %}{% translate "Edit member" %}{% else %}{% translate "Add member" %}{% endif %}
                 </h4>
                 <p class="text-muted mb-4 small">
-                    {% translate "A membership binds a user to one tenant. Role assignments carry the permissions; on a managing (MSP) tenant a grant can additionally reach into the managed tenants." %}
+                    {% translate "Pick who joins (an existing user, or a new one created by email), what they may do (roles), and — on a managing (MSP) tenant — where the roles apply: this organization, its managed tenants, or both." %}
                 </p>
 
                 {# The form's FormHelper renders the <form>, Fieldset sections, and buttons. #}

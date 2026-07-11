@@ -5,10 +5,12 @@ from django.contrib.auth.forms import PasswordResetForm
 from django.contrib.auth.mixins import LoginRequiredMixin
 from django.core.exceptions import ValidationError
 from django.db import transaction
-from django.http import HttpResponseRedirect
-from django.shortcuts import get_object_or_404, redirect
+from django.db.models import Exists, OuterRef
+from django.http import HttpResponse, HttpResponseRedirect
+from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
-from django.utils.translation import gettext_lazy as _
+from django.utils.html import format_html
+from django.utils.translation import gettext, gettext_lazy as _
 from django.views import View
 
 from core.auth.guards import validate_assignment_grant
@@ -17,6 +19,7 @@ from itambox.views.generic import (
     ObjectListView, ObjectDetailView, ObjectEditView, ObjectDeleteView,
     ObjectBulkEditView, ObjectBulkDeleteView,
 )
+from ..access import tenant_access_report
 from ..models import Membership, RoleAssignment, Tenant
 from ..forms import MembershipForm, MembershipFilterForm, MembershipBulkRoleForm
 from ..tables import MembershipTable
@@ -27,19 +30,75 @@ User = get_user_model()
 
 
 class MembershipListView(ObjectListView):
+    # ``has_managed_reach`` feeds MembershipTable's Staff/Member badge as a single
+    # correlated EXISTS in the list query — the model property would otherwise run
+    # one exists() query per rendered row. (Membership/RoleAssignment default
+    # managers are deliberately unscoped, so baking this at import time is safe.)
     queryset = (
         Membership.objects
         .select_related('user', 'tenant')
         .prefetch_related('assignments__role')
+        .annotate(
+            has_managed_reach=Exists(
+                RoleAssignment.objects.filter(
+                    membership_id=OuterRef('pk'),
+                    reach=RoleAssignment.REACH_MANAGED,
+                )
+            )
+        )
     )
     filterset = MembershipFilterSet
     filterset_form = MembershipFilterForm
     table = MembershipTable
     action_buttons = ('add',)
 
+    def get(self, request, *args, **kwargs):
+        # Lazy partial route (mirrors the ?tab= pattern on detail pages): the
+        # members list embeds a container that hx-gets this same URL with
+        # ?panel=outside_access on load. Keeping it on the list URL means the
+        # panel inherits the list's LoginRequired/PermissionRequired gate.
+        if request.GET.get('panel') == 'outside_access':
+            return self._render_outside_access_panel(request)
+        return super().get(request, *args, **kwargs)
+
     def get_queryset(self):
         qs = super().get_queryset()
         return visible_to_containers(self.request.user, qs, 'organization.view_membership')
+
+    def _outside_access_tenant(self):
+        """The active tenant when the requester may audit its access, else ``None``.
+
+        Mirrors ``TenantAccessView``'s object-level check: the panel is an access
+        audit for one specific tenant, so the ambient module permission alone
+        (checked by ``PermissionRequiredMixin``) is not enough.
+        """
+        tenant = getattr(self.request, 'active_tenant', None)
+        if tenant is None:
+            return None
+        if self.request.user.is_superuser or self.request.user.has_perm(
+            'organization.view_membership', obj=tenant,
+        ):
+            return tenant
+        return None
+
+    def _render_outside_access_panel(self, request):
+        tenant = self._outside_access_tenant()
+        if tenant is None:
+            return HttpResponse('')
+        entries = tenant_access_report(tenant, external_only=True)
+        # Empty report → empty response: the panel chrome only ever renders when
+        # someone actually reaches this tenant from outside.
+        if not entries:
+            return HttpResponse('')
+        return render(request, 'organization/memberships/outside_access_panel.html', {
+            'tenant': tenant,
+            'entries': entries,
+        })
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context['outside_access_tenant'] = self._outside_access_tenant()
+        return context
 
 
 class MembershipDetailView(ObjectDetailView):
@@ -61,7 +120,7 @@ class MembershipDetailView(ObjectDetailView):
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
-        context['assignments'] = self.get_object().assignments.all()
+        context['assignments'] = self.object.assignments.all()
         return context
 
 
@@ -143,6 +202,7 @@ class MembershipSendResetView(LoginRequiredMixin, View):
 
 
 class MembershipCreateView(ObjectEditView):
+    """The unified "Add member" flow: who / what (roles) / where (reach) in one form."""
     queryset = Membership.objects.all()
     model = Membership
     model_form = MembershipForm
@@ -171,16 +231,49 @@ class MembershipCreateView(ObjectEditView):
             except (TypeError, ValueError):  # non-numeric ?tenant= must not 500
                 tenant = None
         kwargs['tenant'] = tenant or getattr(self.request, 'active_tenant', None)
+        # ?preset=technician (the redirected quick-onboard flow) preselects
+        # who=new + managed reach/all + the shared Technician role.
+        preset = self.request.GET.get('preset')
+        if preset:
+            kwargs['preset'] = preset
         return kwargs
 
-    def get_success_url(self):
-        if self.object and self.object.user:
-            return reverse('users:user_detail', kwargs={'pk': self.object.user.pk})
-        return reverse('organization:membership_list')
+    # Success redirect: the generic get_success_url falls back to
+    # ``Membership.get_absolute_url()`` — the membership detail, where the new
+    # assignments (and the send-password-setup action) live.
+
+    def form_valid(self, form):
+        response = super().form_valid(form)
+        membership = self.object
+        if membership is None:
+            return response
+        if getattr(form, 'new_user_created', False):
+            # The inline-created user has an unusable password: point the admin
+            # straight at the existing "Send password setup link" action.
+            setup_url = reverse(
+                'organization:membership_detail', kwargs={'pk': membership.pk},
+            ) + '#send-password-setup'
+            messages.info(self.request, format_html(
+                gettext('{user} has no password yet — <a href="{url}">send them a '
+                        'password setup link</a> so they can sign in.'),
+                user=str(membership.user), url=setup_url,
+            ))
+        if not membership.assignments.exists():
+            # Role-less onboarding is allowed (first hire), but the membership
+            # carries zero permissions until a role is assigned — warn loudly.
+            messages.warning(self.request, _(
+                "%(user)s is now a member of %(tenant)s but has NO permissions "
+                "yet — edit the membership to assign a role."
+            ) % {'user': membership.user, 'tenant': membership.tenant})
+        return response
 
 
 class MembershipEditView(ObjectEditView):
-    """Edit a membership's assignments / active flag. User + tenant are immutable."""
+    """Edit a membership's assignments / active flag. User + tenant are immutable.
+
+    The form reconciles RoleAssignment rows at BOTH reaches (own + managed);
+    success falls through to the generic redirect → membership detail.
+    """
     queryset = Membership.objects.all()
     model = Membership
     model_form = MembershipForm
@@ -197,11 +290,6 @@ class MembershipEditView(ObjectEditView):
             if f in form.fields:
                 form.fields[f].disabled = True
         return form
-
-    def get_success_url(self):
-        if self.object and self.object.user:
-            return reverse('users:user_detail', kwargs={'pk': self.object.user.pk})
-        return reverse('organization:membership_list')
 
 
 class MembershipDeleteView(ObjectDeleteView):

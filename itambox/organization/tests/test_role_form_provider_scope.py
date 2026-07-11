@@ -234,6 +234,19 @@ class SharedRoleNotEditableFromManagedTenantTests(TenantTestMixin, TestCase):
         self.assertEqual(resp.status_code, 200)
         self.assertFalse(resp.context['role_editable'])
 
+    def test_managed_tenant_role_list_contains_only_locally_owned_roles(self):
+        url = (
+            reverse('organization:role_list')
+            + f'?switch_tenant={self.managed_tenant.pk}'
+        )
+
+        resp = self.client.get(url)
+
+        self.assertEqual(resp.status_code, 200)
+        listed_ids = set(resp.context['table'].data.data.values_list('pk', flat=True))
+        self.assertIn(self.local_role.pk, listed_ids)
+        self.assertNotIn(self.shared_role.pk, listed_ids)
+
     def test_local_role_edit_view_reachable_from_its_own_tenant(self):
         resp = self.client.get(self._url('organization:role_update', self.local_role.pk, self.managed_tenant))
         self.assertEqual(resp.status_code, 200)
@@ -269,3 +282,102 @@ class SharedRoleNotEditableFromManagedTenantTests(TenantTestMixin, TestCase):
 
         resp = self.client.get(self._url('organization:role_update', self.shared_role.pk, self.provider_tenant))
         self.assertEqual(resp.status_code, 200)
+
+    # ----------------------------------------------------------------------------------- #
+    # RBAC_STAGE3_SPEC.md §4 — read-only banner + action gating on a shared-in role.
+    # ----------------------------------------------------------------------------------- #
+    def test_shared_role_detail_shows_the_shared_by_banner_from_the_managed_tenant(self):
+        resp = self.client.get(self._url('organization:role_detail', self.shared_role.pk, self.managed_tenant))
+        self.assertEqual(resp.status_code, 200)
+        self.assertContains(resp, "Shared by")
+        self.assertContains(resp, self.provider_tenant.name)
+
+    def test_local_role_detail_has_no_shared_by_banner(self):
+        resp = self.client.get(self._url('organization:role_detail', self.local_role.pk, self.managed_tenant))
+        self.assertEqual(resp.status_code, 200)
+        self.assertNotContains(resp, "Shared by")
+
+    def test_shared_role_owning_tenant_detail_has_no_shared_by_banner(self):
+        """Control: viewed from its OWN tenant (role_editable=True), the banner
+        must not render even though the role itself is shared_with_managed."""
+        resp = self.client.get(self._url('organization:role_detail', self.shared_role.pk, self.provider_tenant))
+        self.assertEqual(resp.status_code, 200)
+        self.assertNotContains(resp, "Shared by")
+
+    def test_shared_role_detail_hides_edit_and_delete_actions_even_for_a_superuser(self):
+        """MembershipBackend.has_perm short-circuits True for any superuser
+        regardless of obj/tenant, so can_change/can_delete (and therefore
+        action_urls.edit/delete) would otherwise populate here even though
+        RoleEditView 404s on this exact pk from the managed tenant (see
+        test_shared_role_edit_view_404s_from_the_managed_tenant above).
+        role_editable is the authoritative gate that must suppress both so the
+        page never offers a link that immediately 404s."""
+        resp = self.client.get(self._url('organization:role_detail', self.shared_role.pk, self.managed_tenant))
+        self.assertEqual(resp.status_code, 200)
+        self.assertFalse(resp.context['role_editable'])
+        self.assertIsNone(resp.context['action_urls']['edit'])
+        self.assertIsNone(resp.context['action_urls']['delete'])
+        self.assertFalse(resp.context['can_change'])
+        self.assertFalse(resp.context['can_delete'])
+        self.assertNotContains(resp, 'mdi-pencil-outline')
+
+    def test_local_role_detail_still_offers_edit_action(self):
+        """Control: a locally-owned role's Edit action is untouched by the gate."""
+        resp = self.client.get(self._url('organization:role_detail', self.local_role.pk, self.managed_tenant))
+        self.assertEqual(resp.status_code, 200)
+        self.assertTrue(resp.context['role_editable'])
+        self.assertIsNotNone(resp.context['action_urls']['edit'])
+
+
+# --------------------------------------------------------------------------------------------- #
+# Form layer: the shared_with_managed switch's widget attrs, help text, and visibility
+# (RBAC_STAGE3_SPEC.md §4). role_form.html renders the switch highlighted directly under
+# name/description and verbatim-renders the field's help_text — this module owns the copy
+# and the widget attrs that drive that rendering.
+# --------------------------------------------------------------------------------------------- #
+class SharedWithManagedSwitchFormLayerTests(TenantTestMixin, TestCase):
+
+    def setUp(self):
+        self.clear_tenant_context()
+        self.setup_tenant_context(name="Plain Co", slug="plain-co-switch")  # self.tenant, self.tenant_admin
+        self.superuser = self.tenant_admin
+        self.provider_tenant = Tenant.objects.create(
+            name="Northwind MSP", slug="northwind-msp-switch", is_provider=True,
+        )
+
+    def tearDown(self):
+        self.clear_tenant_context()
+
+    def test_switch_widget_renders_as_a_bootstrap_switch(self):
+        form = RoleForm(user=self.superuser, tenant=self.provider_tenant)
+        attrs = form.fields['shared_with_managed'].widget.attrs
+        self.assertEqual(attrs.get('role'), 'switch')
+        self.assertEqual(attrs.get('class'), 'form-check-input')
+
+    def test_switch_help_text_matches_the_binding_spec_wording(self):
+        form = RoleForm(user=self.superuser, tenant=self.provider_tenant)
+        self.assertEqual(
+            str(form.fields['shared_with_managed'].help_text),
+            "Managed tenants can assign this role to their own members; only you can edit it.",
+        )
+
+    def test_switch_absent_for_a_plain_tenant_even_for_a_superuser(self):
+        form = RoleForm(user=self.superuser, tenant=self.tenant)
+        self.assertNotIn('shared_with_managed', form.fields)
+
+    def test_switch_visibility_on_edit_follows_the_instances_own_tenant_not_the_context(self):
+        """A role already owned by a plain tenant never regrows the switch just
+        because a provider tenant happens to be passed as ``tenant=`` context —
+        edit-time owner resolution is locked to ``instance.tenant``."""
+        role = Role.objects.create(tenant=self.tenant, name="Plain Role Switch", permissions=[])
+        form = RoleForm(instance=role, user=self.superuser, tenant=self.provider_tenant)
+        self.assertNotIn('shared_with_managed', form.fields)
+
+    def test_switch_present_and_checked_on_a_shared_roles_edit_form(self):
+        role = Role.objects.create(
+            tenant=self.provider_tenant, name="MSP Role Switch", permissions=[],
+            shared_with_managed=True,
+        )
+        form = RoleForm(instance=role, user=self.superuser, tenant=self.provider_tenant)
+        self.assertIn('shared_with_managed', form.fields)
+        self.assertTrue(form['shared_with_managed'].value())

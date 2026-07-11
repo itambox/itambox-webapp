@@ -12,6 +12,16 @@
 {% endblock extra_page_actions %}
 
 {% block object_details %}
+{% if shared_in_role %}
+<div class="alert alert-info d-flex align-items-center mb-4" role="alert">
+    <i class="mdi mdi-information-outline fs-3 me-2"></i>
+    <div>
+        {% blocktranslate trimmed with provider_url=object.tenant.get_absolute_url provider_name=object.tenant.name %}
+        Shared by <a href="{{ provider_url }}">{{ provider_name }}</a> — edit it there.
+        {% endblocktranslate %}
+    </div>
+</div>
+{% endif %}
 <div class="row">
     <div class="col-md-6 mb-3">
         <label class="form-label text-muted">{% translate "Name" %}</label>
