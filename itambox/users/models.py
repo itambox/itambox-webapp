@@ -76,6 +76,12 @@ class User(AbstractUser):
             "API tokens and account status (is_active) are unaffected."
         ),
     )
+    # NOTE: email is deliberately NOT globally unique. SSO (OIDC/SAML/LDAP), SCIM,
+    # and the SnipeIT importer all provision accounts independently of email, and
+    # forcing email-based identity would either break those flows or invite
+    # email-based account-linking takeover. Inline onboarding therefore resolves
+    # identity at the write path (users.services): it reuses a single match, fails
+    # closed on an ambiguous email, and never silently merges accounts.
 
 
 class UserPreference(models.Model):
