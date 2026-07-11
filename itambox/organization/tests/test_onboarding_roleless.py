@@ -89,7 +89,7 @@ class TechnicianPresetInitialTests(TenantTestMixin, TestCase):
     def tearDown(self):
         self.clear_tenant_context()
 
-    def test_preset_selects_new_user_managed_all_and_technician_role(self):
+    def test_preset_selects_new_user_and_one_managed_all_technician_row(self):
         from organization.forms import MembershipForm
 
         form = MembershipForm(
@@ -100,11 +100,11 @@ class TechnicianPresetInitialTests(TenantTestMixin, TestCase):
             ),
         )
 
+        # New user, no own-reach roles, and exactly one managed formset row for the
+        # shared Technician role covering all managed tenants.
         self.assertEqual(form.fields['who'].initial, MembershipForm.WHO_NEW)
-        self.assertFalse(form.fields['reach_own'].initial)
-        self.assertTrue(form.fields['reach_managed'].initial)
-        self.assertEqual(
-            form.fields['managed_scope'].initial,
-            RoleAssignment.SCOPE_ALL,
-        )
-        self.assertEqual(form.fields['roles'].initial, [self.technician.pk])
+        self.assertEqual(list(form.fields['own_roles'].initial), [])
+        seeded = [row for row in form.managed_formset.initial if row.get('role')]
+        self.assertEqual(len(seeded), 1)
+        self.assertEqual(seeded[0]['role'], self.technician.pk)
+        self.assertEqual(seeded[0]['managed_scope'], RoleAssignment.SCOPE_ALL)

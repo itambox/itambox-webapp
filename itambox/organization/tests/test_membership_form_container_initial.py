@@ -1,4 +1,4 @@
-"""Tests for the stage-3 unified ``MembershipForm`` — the "Add member" grant flow.
+"""Tests for the stage-3 unified ``MembershipForm`` — the lossless "Add member" flow.
 
 The form authors the whole grant in one screen
 (``organization/forms/membership_form.py``):
@@ -6,32 +6,17 @@ The form authors the whole grant in one screen
   * **Who** (create only) — radio "Existing user" (user select) vs. "New user"
     (email + first/last). ``clean()`` enforces exactly one side; a new user is
     get-or-created by email with ``set_unusable_password()``.
-  * **What** — roles; the picker offers the membership tenant's own roles plus
-    definitions shared down by its managing organization, labelled
-    "(from <provider>)".
-  * **Where** — only on a managing (``is_provider``) tenant: "This organization"
-    and/or "Managed tenants" checkboxes (+ coverage refinement). ``save()``
-    writes one own-reach and/or one managed-reach ``RoleAssignment`` row per
-    selected role, stamped ``granted_by=<the acting user>``.
-  * **Edit** reconciles BOTH reaches: rows at a deselected reach are deleted,
-    surviving (role, reach) rows keep their ``granted_by`` provenance.
+  * **This organization** — an ``own_roles`` multi-select; each selected role maps
+    to one ``RoleAssignment(reach='own')``.
+  * **Managed tenants** — only on a managing (``is_provider``) tenant: a formset,
+    ONE ROW PER managed grant (role + its own coverage refinement). Each row maps
+    to one ``RoleAssignment(reach='managed')``.
+  * **Edit** reconciles per instance: surviving rows keep their ``granted_by``
+    provenance; only deselected/removed rows are deleted; only new rows created.
 
-Covers:
-  (a) the tenant context kwarg governs the create flow, including the case
-      where a stale/mismatched ``initial`` dict entry is also present.
-  (b) the real view path: ``MembershipCreateView`` with ``?tenant=<pk>`` —
-      mirrors ``get_initial()``/``get_form_kwargs()`` end to end.
-  (c) the Where block only renders (and only accepts managed reach) when the
-      membership's tenant ``is_provider``; a defense-in-depth check in
-      ``clean()`` re-validates against whatever tenant was *actually posted*.
-  (d) ``save()`` creates ``RoleAssignment`` rows — own, managed, or BOTH per
-      selected role — with ``granted_by`` set to the acting user.
-  (e) editing reconciles rows at BOTH reaches (add + remove + reach-uncheck),
-      preserving ``granted_by`` on rows left untouched.
-  (f) the who-block: inline user creation (unusable password), get-or-create by
-      email, exactly-one-side enforcement, duplicate-membership rejection, and
-      absence of the block on edit.
-  (g) shared-in roles are labelled "(from <provider>)" in the picker.
+Covers (a)–(g): tenant context governs create, the real view path, the managed
+formset only on provider tenants, save writes the right rows, edit reconciles both
+reaches independently, the who-block, and shared-role labelling.
 """
 from django import forms
 from django.contrib.auth import get_user_model
@@ -42,10 +27,9 @@ from core.tests.mixins import TenantTestMixin, grant
 from organization.models import Tenant, Membership, Role, RoleAssignment
 from organization.forms.membership_form import MembershipForm
 
-User = get_user_model()
+from ._membership_form_helpers import membership_post_data
 
-WHERE_FIELDS = ('reach_own', 'reach_managed', 'managed_scope', 'scope_group',
-                'assigned_tenants')
+User = get_user_model()
 
 
 class MembershipFormTenantContextTests(TenantTestMixin, TestCase):
@@ -76,11 +60,7 @@ class MembershipFormTenantContextTests(TenantTestMixin, TestCase):
 
     def test_tenant_context_create_is_submittable_and_saves_against_context_tenant(self):
         bound = MembershipForm(
-            data={
-                'user': self.member_user.pk,
-                'tenant': str(self.tenant.pk),
-                'is_active': 'on',
-            },
+            data=membership_post_data(user=self.member_user.pk, tenant=str(self.tenant.pk)),
             tenant=self.tenant,
             initial={'tenant': str(self.other_tenant.pk)},
             user=self.superuser,
@@ -135,11 +115,9 @@ class MembershipCreateViewTenantContextTests(TenantTestMixin, TestCase):
 
     def test_tenant_get_param_flow_is_submittable_and_lands_on_membership_detail(self):
         url = reverse('organization:membership_create') + f'?tenant={self.tenant.pk}'
-        response = self.client.post(url, data={
-            'user': self.staff_user.pk,
-            'tenant': self.tenant.pk,
-            'is_active': 'on',
-        })
+        response = self.client.post(url, data=membership_post_data(
+            user=self.staff_user.pk, tenant=self.tenant.pk,
+        ))
         self.assertEqual(
             response.status_code, 302,
             getattr(response, 'context', None) and response.context['form'].errors.as_json(),
@@ -153,10 +131,9 @@ class MembershipCreateViewTenantContextTests(TenantTestMixin, TestCase):
         )
 
 
-class MembershipFormWhereBlockTests(TenantTestMixin, TestCase):
-    """(c) The Where block (reach checkboxes + refinement) renders only when the
-    membership's tenant is a managing (``is_provider``) tenant, and ``clean()``
-    re-validates that against whatever tenant was actually posted."""
+class MembershipFormManagedBlockTests(TenantTestMixin, TestCase):
+    """(c) The Managed-tenants formset renders only when the membership's tenant is
+    a managing (``is_provider``) tenant; ``own_roles`` always renders."""
 
     def setUp(self):
         self.clear_tenant_context()
@@ -172,50 +149,42 @@ class MembershipFormWhereBlockTests(TenantTestMixin, TestCase):
     def tearDown(self):
         self.clear_tenant_context()
 
-    def test_provider_tenant_offers_reach_checkboxes_and_refinement_fields(self):
+    def test_provider_tenant_offers_the_managed_formset_and_own_roles(self):
         form = MembershipForm(tenant=self.msp_tenant, user=self.superuser)
-        for fname in WHERE_FIELDS:
-            self.assertIn(fname, form.fields)
-        # "This organization" defaults on, "Managed tenants" off.
-        self.assertTrue(form.fields['reach_own'].initial)
-        self.assertFalse(form.fields['reach_managed'].initial)
+        self.assertIn('own_roles', form.fields)
+        self.assertIsNotNone(form.managed_formset)
 
-    def test_non_provider_tenant_drops_the_where_block(self):
+    def test_non_provider_tenant_drops_the_managed_formset(self):
         for tenant in (self.customer_tenant, self.standalone_tenant):
             form = MembershipForm(tenant=tenant, user=self.superuser)
-            for fname in WHERE_FIELDS:
-                self.assertNotIn(fname, form.fields)
+            self.assertIn('own_roles', form.fields)
+            self.assertIsNone(form.managed_formset)
 
-    def test_context_free_create_offers_the_where_block_pending_the_tenant_pick(self):
-        # Unknown tenant (no context, unbound form): the block stays available
-        # so it can render; clean() re-validates once a real tenant is submitted.
+    def test_context_free_create_offers_the_managed_formset_pending_the_tenant_pick(self):
+        # Unknown tenant (no context, unbound form): the formset stays available so
+        # it can render; clean()/the row forms re-validate once a real tenant posts.
         form = MembershipForm(user=self.superuser)
-        for fname in WHERE_FIELDS:
-            self.assertIn(fname, form.fields)
+        self.assertIsNotNone(form.managed_formset)
 
-    def test_clean_rejects_managed_reach_for_a_non_provider_posted_tenant(self):
+    def test_tampered_non_provider_tenant_is_rejected_at_the_tenant_field(self):
+        # A context-bound create restricts the tenant field's queryset to the
+        # context tenant, so a tampered hidden input posting another tenant fails
+        # field validation — it can never reach (or write) managed grants.
         member_user = User.objects.create_user(
             username="member_mfrb_tamper", email="member_mfrb_tamper@x.com", password="pw",
         )
         bound = MembershipForm(
-            data={
-                'user': member_user.pk,
-                # Posted tenant differs from the (provider) context tenant below —
-                # the ``tenant`` field's queryset is never narrowed to the context
-                # tenant, only its initial/widget are set, so a tampered hidden
-                # input can post any tenant. clean() must catch this even though
-                # the Where fields were offered based on the context tenant.
-                'tenant': self.standalone_tenant.pk,
-                'roles': [],
-                'reach_managed': 'on',
-                'managed_scope': RoleAssignment.SCOPE_ALL,
-                'is_active': 'on',
-            },
+            data=membership_post_data(
+                user=member_user.pk,
+                tenant=self.standalone_tenant.pk,  # tampered: not the context tenant
+                managed=[{'role': '', 'managed_scope': RoleAssignment.SCOPE_ALL}],
+            ),
             tenant=self.msp_tenant,
             user=self.superuser,
         )
         self.assertFalse(bound.is_valid())
-        self.assertIn('reach_managed', bound.errors)
+        self.assertIn('tenant', bound.errors)
+        self.assertFalse(Membership.objects.filter(user=member_user).exists())
 
     def test_own_reach_is_implied_for_a_non_provider_tenant(self):
         member_user = User.objects.create_user(
@@ -223,12 +192,9 @@ class MembershipFormWhereBlockTests(TenantTestMixin, TestCase):
         )
         role = Role.objects.create(tenant=self.customer_tenant, name="Local Role", permissions=[])
         bound = MembershipForm(
-            data={
-                'user': member_user.pk,
-                'tenant': self.customer_tenant.pk,
-                'roles': [role.pk],
-                'is_active': 'on',
-            },
+            data=membership_post_data(
+                user=member_user.pk, tenant=self.customer_tenant.pk, own_roles=[role.pk],
+            ),
             tenant=self.customer_tenant,
             user=self.superuser,
         )
@@ -240,29 +206,10 @@ class MembershipFormWhereBlockTests(TenantTestMixin, TestCase):
             ).exists()
         )
 
-    def test_roles_without_any_reach_checkbox_are_rejected_on_a_provider_tenant(self):
-        member_user = User.objects.create_user(
-            username="member_mfrb_noreach", email="member_mfrb_noreach@x.com", password="pw",
-        )
-        role = Role.objects.create(tenant=self.msp_tenant, name="MSP Role NR", permissions=[])
-        bound = MembershipForm(
-            data={
-                'user': member_user.pk,
-                'tenant': self.msp_tenant.pk,
-                'roles': [role.pk],
-                # neither reach_own nor reach_managed checked
-                'is_active': 'on',
-            },
-            tenant=self.msp_tenant,
-            user=self.superuser,
-        )
-        self.assertFalse(bound.is_valid())
-        self.assertIn('reach_own', bound.errors)
-
 
 class MembershipFormSaveCreatesAssignmentsTests(TenantTestMixin, TestCase):
-    """(d) ``save()`` writes one ``RoleAssignment`` row per selected role and
-    selected reach, stamped with the acting (granting) user."""
+    """(d) ``save()`` writes one ``RoleAssignment`` row per own role and per managed
+    formset row, stamped with the acting (granting) user."""
 
     def setUp(self):
         self.clear_tenant_context()
@@ -289,12 +236,9 @@ class MembershipFormSaveCreatesAssignmentsTests(TenantTestMixin, TestCase):
 
     def test_own_reach_save_creates_assignment_stamped_with_actor(self):
         bound = MembershipForm(
-            data={
-                'user': self.member_user.pk,
-                'tenant': self.tenant.pk,
-                'roles': [self.role.pk],
-                'is_active': 'on',
-            },
+            data=membership_post_data(
+                user=self.member_user.pk, tenant=self.tenant.pk, own_roles=[self.role.pk],
+            ),
             tenant=self.tenant,
             user=self.superuser,
         )
@@ -309,14 +253,10 @@ class MembershipFormSaveCreatesAssignmentsTests(TenantTestMixin, TestCase):
 
     def test_managed_reach_save_creates_assignment_with_scope_and_actor(self):
         bound = MembershipForm(
-            data={
-                'user': self.member_user.pk,
-                'tenant': self.msp_tenant.pk,
-                'roles': [self.msp_role.pk],
-                'reach_managed': 'on',
-                'managed_scope': RoleAssignment.SCOPE_ALL,
-                'is_active': 'on',
-            },
+            data=membership_post_data(
+                user=self.member_user.pk, tenant=self.msp_tenant.pk,
+                managed=[{'role': self.msp_role.pk, 'managed_scope': RoleAssignment.SCOPE_ALL}],
+            ),
             tenant=self.msp_tenant,
             user=self.superuser,
         )
@@ -328,17 +268,13 @@ class MembershipFormSaveCreatesAssignmentsTests(TenantTestMixin, TestCase):
         self.assertEqual(assignment.granted_by_id, self.superuser.pk)
         self.assertTrue(assignment.covers_tenant(self.customer_tenant))
 
-    def test_both_reaches_checked_write_two_rows_per_role(self):
+    def test_both_reaches_write_two_rows_for_one_role(self):
         bound = MembershipForm(
-            data={
-                'user': self.member_user.pk,
-                'tenant': self.msp_tenant.pk,
-                'roles': [self.msp_role.pk],
-                'reach_own': 'on',
-                'reach_managed': 'on',
-                'managed_scope': RoleAssignment.SCOPE_ALL,
-                'is_active': 'on',
-            },
+            data=membership_post_data(
+                user=self.member_user.pk, tenant=self.msp_tenant.pk,
+                own_roles=[self.msp_role.pk],
+                managed=[{'role': self.msp_role.pk, 'managed_scope': RoleAssignment.SCOPE_ALL}],
+            ),
             tenant=self.msp_tenant,
             user=self.superuser,
         )
@@ -354,7 +290,7 @@ class MembershipFormSaveCreatesAssignmentsTests(TenantTestMixin, TestCase):
 
     def test_no_roles_selected_creates_membership_without_assignments(self):
         bound = MembershipForm(
-            data={'user': self.member_user.pk, 'tenant': self.tenant.pk, 'is_active': 'on'},
+            data=membership_post_data(user=self.member_user.pk, tenant=self.tenant.pk),
             tenant=self.tenant,
             user=self.superuser,
         )
@@ -364,9 +300,9 @@ class MembershipFormSaveCreatesAssignmentsTests(TenantTestMixin, TestCase):
 
 
 class MembershipFormEditReconcilesBothReachesTests(TenantTestMixin, TestCase):
-    """(e) Editing a membership reconciles ``RoleAssignment`` rows at BOTH
-    reaches: deselected roles lose their rows, an unchecked reach loses ALL its
-    rows, and untouched rows keep their ``granted_by`` provenance."""
+    """(e) Editing reconciles ``RoleAssignment`` rows at BOTH reaches independently:
+    deselected own roles lose their rows, removed managed rows are deleted, and
+    untouched rows keep their ``granted_by`` provenance."""
 
     def setUp(self):
         self.clear_tenant_context()
@@ -408,33 +344,31 @@ class MembershipFormEditReconcilesBothReachesTests(TenantTestMixin, TestCase):
         )
         return managed_assignment.membership, msp_role, own_assignment, managed_assignment
 
-    def test_unbound_edit_seeds_roles_from_both_reaches_and_reach_checkboxes(self):
+    def test_unbound_edit_seeds_own_roles_and_managed_formset_from_both_reaches(self):
         membership, msp_role, _own, _managed = self._msp_membership_with_both_reaches()
         form = MembershipForm(instance=membership, user=self.superuser)
-        self.assertEqual(set(form.fields['roles'].initial), {msp_role.pk})
-        self.assertTrue(form.fields['reach_own'].initial)
-        self.assertTrue(form.fields['reach_managed'].initial)
-        self.assertEqual(form.fields['managed_scope'].initial, RoleAssignment.SCOPE_ALL)
+        self.assertEqual(set(form.fields['own_roles'].initial), {msp_role.pk})
+        seeded = [row for row in form.managed_formset.initial if row.get('role') == msp_role.pk]
+        self.assertEqual(len(seeded), 1)
+        self.assertEqual(seeded[0]['managed_scope'], RoleAssignment.SCOPE_ALL)
 
-    def test_unbound_edit_seeds_roles_and_own_reach_from_own_only_assignments(self):
+    def test_unbound_edit_seeds_own_roles_from_own_only_assignments(self):
         form = MembershipForm(instance=self.membership, user=self.superuser)
         self.assertEqual(
-            set(form.fields['roles'].initial), {self.role_a.pk, self.role_b.pk},
+            set(form.fields['own_roles'].initial), {self.role_a.pk, self.role_b.pk},
         )
-        # Non-provider tenant: no Where block at all.
-        self.assertNotIn('reach_own', form.fields)
+        # Non-provider tenant: no managed formset at all.
+        self.assertIsNone(form.managed_formset)
 
     def test_edit_adds_and_removes_own_reach_rows(self):
         other_editor = User.objects.create_user(
             username="editor_mfer", email="editor_mfer@x.com", password="pw",
         )
         bound = MembershipForm(
-            data={
-                'user': self.member_user.pk,
-                'tenant': self.tenant.pk,
-                'roles': [self.role_a.pk, self.role_c.pk],
-                'is_active': 'on',
-            },
+            data=membership_post_data(
+                user=self.member_user.pk, tenant=self.tenant.pk,
+                own_roles=[self.role_a.pk, self.role_c.pk],
+            ),
             instance=self.membership,
             user=other_editor,
         )
@@ -451,12 +385,9 @@ class MembershipFormEditReconcilesBothReachesTests(TenantTestMixin, TestCase):
             username="other_editor_mfer", email="other_editor_mfer@x.com", password="pw",
         )
         bound = MembershipForm(
-            data={
-                'user': self.member_user.pk,
-                'tenant': self.tenant.pk,
-                'roles': [self.role_a.pk],
-                'is_active': 'on',
-            },
+            data=membership_post_data(
+                user=self.member_user.pk, tenant=self.tenant.pk, own_roles=[self.role_a.pk],
+            ),
             instance=self.membership,
             user=other_editor,
         )
@@ -465,20 +396,19 @@ class MembershipFormEditReconcilesBothReachesTests(TenantTestMixin, TestCase):
         self.assignment_a.refresh_from_db()
         self.assertEqual(self.assignment_a.granted_by_id, self.superuser.pk)
 
-    def test_edit_keeps_managed_rows_while_the_managed_checkbox_stays_checked(self):
+    def test_edit_keeps_a_resubmitted_managed_row_with_its_provenance(self):
         membership, msp_role, own_assignment, managed_assignment = (
             self._msp_membership_with_both_reaches()
         )
         bound = MembershipForm(
-            data={
-                'user': self.member_user.pk,
-                'tenant': self.msp_tenant.pk,
-                'roles': [msp_role.pk],
-                'reach_own': 'on',
-                'reach_managed': 'on',
-                'managed_scope': RoleAssignment.SCOPE_ALL,
-                'is_active': 'on',
-            },
+            data=membership_post_data(
+                user=self.member_user.pk, tenant=self.msp_tenant.pk,
+                own_roles=[msp_role.pk],
+                managed=[{
+                    'id': managed_assignment.pk, 'role': msp_role.pk,
+                    'managed_scope': RoleAssignment.SCOPE_ALL,
+                }],
+            ),
             instance=membership,
             user=self.superuser,
         )
@@ -490,19 +420,19 @@ class MembershipFormEditReconcilesBothReachesTests(TenantTestMixin, TestCase):
         self.assertEqual(managed_assignment.granted_by_id, self.superuser.pk)
         self.assertEqual(managed_assignment.managed_scope, RoleAssignment.SCOPE_ALL)
 
-    def test_edit_unchecking_managed_reach_deletes_all_managed_rows(self):
+    def test_edit_removing_a_managed_row_deletes_only_that_grant(self):
         membership, msp_role, own_assignment, managed_assignment = (
             self._msp_membership_with_both_reaches()
         )
         bound = MembershipForm(
-            data={
-                'user': self.member_user.pk,
-                'tenant': self.msp_tenant.pk,
-                'roles': [msp_role.pk],
-                'reach_own': 'on',
-                # reach_managed deliberately unchecked → managed rows go away
-                'is_active': 'on',
-            },
+            data=membership_post_data(
+                user=self.member_user.pk, tenant=self.msp_tenant.pk,
+                own_roles=[msp_role.pk],
+                managed=[{
+                    'id': managed_assignment.pk, 'role': msp_role.pk,
+                    'managed_scope': RoleAssignment.SCOPE_ALL, 'delete': True,
+                }],
+            ),
             instance=membership,
             user=self.superuser,
         )
@@ -530,16 +460,15 @@ class MembershipFormWhoBlockTests(TenantTestMixin, TestCase):
         self.clear_tenant_context()
 
     def _new_user_data(self, **overrides):
-        data = {
+        defaults = {
             'who': MembershipForm.WHO_NEW,
             'tenant': self.tenant.pk,
             'new_user_email': 'fresh@x.com',
             'new_user_first_name': 'Fresh',
             'new_user_last_name': 'Hire',
-            'is_active': 'on',
         }
-        data.update(overrides)
-        return data
+        defaults.update(overrides)
+        return membership_post_data(**defaults)
 
     def test_new_user_is_created_with_unusable_password(self):
         bound = MembershipForm(
@@ -583,11 +512,7 @@ class MembershipFormWhoBlockTests(TenantTestMixin, TestCase):
 
     def test_existing_side_requires_a_user_pick(self):
         bound = MembershipForm(
-            data={
-                'who': MembershipForm.WHO_EXISTING,
-                'tenant': self.tenant.pk,
-                'is_active': 'on',
-            },
+            data=membership_post_data(who=MembershipForm.WHO_EXISTING, tenant=self.tenant.pk),
             tenant=self.tenant, user=self.superuser,
         )
         self.assertFalse(bound.is_valid())
@@ -661,7 +586,7 @@ class MembershipFormSharedRoleLabelTests(TenantTestMixin, TestCase):
 
     def test_picker_offers_own_plus_shared_in_roles_with_provider_labels(self):
         form = MembershipForm(tenant=self.customer, user=self.superuser)
-        labels = {pk: str(label) for pk, label in form.fields['roles'].choices}
+        labels = {pk: str(label) for pk, label in form.fields['own_roles'].choices}
         self.assertIn(self.own_role.pk, labels)
         self.assertIn(self.shared_role.pk, labels)
         self.assertNotIn(self.unshared_msp_role.pk, labels)

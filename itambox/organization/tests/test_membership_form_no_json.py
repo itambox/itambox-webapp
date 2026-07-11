@@ -19,6 +19,8 @@ from core.tests.mixins import TenantTestMixin, grant
 from organization.models import Tenant, Membership, Role, RoleAssignment
 from organization.forms.membership_form import MembershipForm
 
+from ._membership_form_helpers import membership_post_data
+
 User = get_user_model()
 
 
@@ -44,6 +46,8 @@ class MembershipFormNoJSONFieldTests(TenantTestMixin, TestCase):
         form = MembershipForm()
         self.assertNotIn('direct_permissions', form.fields)
         self.assertNotIn('direct_permissions', MembershipForm.Meta.fields)
+        # The grant surface is own_roles + the managed formset — no raw JSON.
+        self.assertIn('own_roles', form.fields)
 
     def test_layout_never_references_direct_permissions(self):
         """The crispy layout (and its bound-field walk) must not mention the dropped field."""
@@ -76,7 +80,7 @@ class MembershipFormRoleSaveTests(TenantTestMixin, TestCase):
             data={
                 'user': self.member_user.pk,
                 'tenant': self.tenant.pk,
-                'roles': [self.role.pk],
+                'own_roles': [self.role.pk],
                 'is_active': 'on',
             },
             user=self.superuser,
@@ -110,7 +114,7 @@ class MembershipFormRoleSaveTests(TenantTestMixin, TestCase):
             data={
                 'user': self.member_user.pk,
                 'tenant': self.tenant.pk,
-                'roles': [powerful_role.pk],
+                'own_roles': [powerful_role.pk],
                 'is_active': 'on',
             },
             user=low_actor,
@@ -143,7 +147,7 @@ class MembershipFormRoleSaveTests(TenantTestMixin, TestCase):
             data={
                 'user': self.member_user.pk,
                 'tenant': self.tenant.pk,
-                'roles': [priv_role.pk],
+                'own_roles': [priv_role.pk],
                 'is_active': 'on',
             },
             user=actor,
@@ -192,15 +196,14 @@ class MembershipFormReconcilesBothReachesTests(TenantTestMixin, TestCase):
             role=self.managed_role, reach=RoleAssignment.REACH_MANAGED,
         )
         form = MembershipForm(
-            data={
-                'user': self.member_user.pk,
-                'tenant': self.tenant.pk,
-                'roles': [self.role_b.pk, self.managed_role.pk],
-                'reach_own': 'on',
-                'reach_managed': 'on',
-                'managed_scope': RoleAssignment.SCOPE_ALL,
-                'is_active': 'on',
-            },
+            data=membership_post_data(
+                user=self.member_user.pk, tenant=self.tenant.pk,
+                own_roles=[self.role_b.pk],
+                managed=[{
+                    'id': managed_assignment.pk, 'role': self.managed_role.pk,
+                    'managed_scope': RoleAssignment.SCOPE_ALL,
+                }],
+            ),
             instance=self.membership,
             user=self.superuser,
             tenant=self.tenant,

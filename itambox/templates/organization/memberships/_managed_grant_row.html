@@ -1,0 +1,53 @@
+{% load i18n %}
+{% comment %}
+One managed-grant formset row (RBAC stage 3, MembershipForm's provider-only
+"Managed tenants" formset). Rendered once per bound/initial row and once inside a
+<template> as the empty form membership-form.ts clones. `mf` is the row form.
+
+membership-form.ts drives, per row:
+  * scope refinement visibility ([data-scope-group] / [data-scope-tenants]) from
+    the managed_scope select;
+  * the remove button, which checks the row's DELETE box and collapses the row
+    (the server reconciler deletes DELETE-marked / removed rows).
+The DELETE checkbox stays reachable so the form still works without JavaScript.
+{% endcomment %}
+<div class="managed-grant-row card border-0 bg-body-tertiary p-3 mb-2" data-managed-row>
+    {{ mf.id }}
+    {% if mf.non_field_errors %}
+    <div class="alert alert-danger py-2 mb-2">{{ mf.non_field_errors }}</div>
+    {% endif %}
+    <div class="row g-2 align-items-start">
+        <div class="col-md-4">
+            <label class="form-label small text-muted">{% translate "Role" %}</label>
+            {{ mf.role }}
+            {% for error in mf.role.errors %}<div class="invalid-feedback d-block">{{ error }}</div>{% endfor %}
+        </div>
+        <div class="col-md-3">
+            <label class="form-label small text-muted">{% translate "Coverage" %}</label>
+            {{ mf.managed_scope }}
+            {% for error in mf.managed_scope.errors %}<div class="invalid-feedback d-block">{{ error }}</div>{% endfor %}
+        </div>
+        <div class="col-md-4">
+            <div data-scope-group>
+                <label class="form-label small text-muted">{% translate "Tenant group" %}</label>
+                {{ mf.scope_group }}
+                {% for error in mf.scope_group.errors %}<div class="invalid-feedback d-block">{{ error }}</div>{% endfor %}
+            </div>
+            <div data-scope-tenants>
+                <label class="form-label small text-muted">{% translate "Specific tenants" %}</label>
+                {{ mf.assigned_tenants }}
+                {% for error in mf.assigned_tenants.errors %}<div class="invalid-feedback d-block">{{ error }}</div>{% endfor %}
+            </div>
+        </div>
+        <div class="col-md-1 d-flex flex-column align-items-start justify-content-end">
+            <button type="button" class="btn btn-sm btn-outline-danger" data-remove-managed-row
+                    title="{% translate 'Remove this grant' %}">
+                <i class="mdi mdi-delete"></i>
+            </button>
+            <label class="form-check mt-1 small text-muted" data-delete-toggle>
+                {{ mf.DELETE }}
+                <span class="form-check-label">{% translate "Remove" %}</span>
+            </label>
+        </div>
+    </div>
+</div>

@@ -46,6 +46,8 @@ from core.managers import set_current_tenant, set_current_membership
 from core.tests.mixins import TenantTestMixin
 from organization.models import Membership, Role, RoleAssignment, Tenant
 from organization.forms import MembershipForm, MembershipBulkRoleForm
+
+from ._membership_form_helpers import membership_post_data
 from users.models import UserGroup
 from users.forms import UserGroupForm
 
@@ -134,8 +136,7 @@ class MembershipFormEscalationTests(EscalationSurfaceTestCase):
         return {
             'user': self.victim.pk,
             'tenant': self.tenant.pk,
-            'roles': [role.pk],
-            'reach': RoleAssignment.REACH_OWN,
+            'own_roles': [role.pk],
             'is_active': True,
         }
 
@@ -580,17 +581,16 @@ class UnifiedMembershipOnboardingEscalationTests(EscalationSurfaceTestCase):
         )
 
     def _form_data(self, role):
-        return {
-            'who': MembershipForm.WHO_NEW,
-            'new_user_email': 'newtech@acme.test',
-            'new_user_first_name': 'New',
-            'new_user_last_name': 'Tech',
-            'tenant': self.org.pk,
-            'roles': [role.pk] if role else [],
-            'reach_managed': 'on',
-            'managed_scope': RoleAssignment.SCOPE_ALL,
-            'is_active': 'on',
-        }
+        return membership_post_data(
+            who=MembershipForm.WHO_NEW,
+            new_user_email='newtech@acme.test',
+            new_user_first_name='New', new_user_last_name='Tech',
+            tenant=self.org.pk,
+            managed=(
+                [{'role': role.pk, 'managed_scope': RoleAssignment.SCOPE_ALL}]
+                if role else []
+            ),
+        )
 
     def test_low_privilege_onboarder_cannot_onboard_with_overprivileged_role(self):
         """A user who can create memberships but does not hold the role's permissions (nor
@@ -602,7 +602,12 @@ class UnifiedMembershipOnboardingEscalationTests(EscalationSurfaceTestCase):
             tenant=self.org,
         )
         self.assertFalse(form.is_valid())
-        self.assertTrue(form.non_field_errors())
+        # The managed row's escalation guard fires (error on that formset row).
+        row_errors = form.managed_formset.forms[0].non_field_errors()
+        self.assertTrue(
+            any('escalation' in e.lower() or 'reach' in e.lower() for e in row_errors),
+            row_errors,
+        )
         self.assertFalse(User.objects.filter(email='newtech@acme.test').exists())
 
     def test_high_privilege_onboarder_can_onboard_with_role_within_their_permissions(self):
@@ -773,14 +778,10 @@ class ReachGrantEscalationTests(EscalationSurfaceTestCase):
             username='reach_victim', email='reach_victim@acme.test', password='pw',
         )
         form = MembershipForm(
-            data={
-                'user': victim.pk,
-                'tenant': self.org.pk,
-                'roles': [self.managed_role.pk],
-                'reach_managed': 'on',
-                'managed_scope': RoleAssignment.SCOPE_ALL,
-                'is_active': True,
-            },
+            data=membership_post_data(
+                user=victim.pk, tenant=self.org.pk,
+                managed=[{'role': self.managed_role.pk, 'managed_scope': RoleAssignment.SCOPE_ALL}],
+            ),
             user=actor,
             tenant=self.org,
         )
@@ -798,15 +799,14 @@ class ReachGrantEscalationTests(EscalationSurfaceTestCase):
             username='reach_grantee', email='reach_grantee@acme.test', password='pw',
         )
         form = MembershipForm(
-            data={
-                'user': victim.pk,
-                'tenant': self.org.pk,
-                'roles': [self.managed_role.pk],
-                'reach_managed': 'on',
-                'managed_scope': RoleAssignment.SCOPE_EXPLICIT,
-                'assigned_tenants': [self.customer_a.pk],
-                'is_active': True,
-            },
+            data=membership_post_data(
+                user=victim.pk, tenant=self.org.pk,
+                managed=[{
+                    'role': self.managed_role.pk,
+                    'managed_scope': RoleAssignment.SCOPE_EXPLICIT,
+                    'assigned_tenants': [self.customer_a.pk],
+                }],
+            ),
             user=actor,
             tenant=self.org,
         )

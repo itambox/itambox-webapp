@@ -158,25 +158,25 @@ class ManagedTenantRolePickerTests(TenantTestMixin, TestCase):
 
     def test_role_picker_offers_own_plus_shared_in_roles(self):
         form = MembershipForm(user=self.superuser, tenant=self.managed_tenant)
-        offered = set(form.fields['roles'].queryset)
+        offered = set(form.fields['own_roles'].queryset)
         self.assertIn(self.local_role, offered)
         self.assertIn(self.shared_role, offered)
 
     def test_role_picker_excludes_managing_tenants_unshared_role(self):
         form = MembershipForm(user=self.superuser, tenant=self.managed_tenant)
-        offered = set(form.fields['roles'].queryset)
+        offered = set(form.fields['own_roles'].queryset)
         self.assertNotIn(self.private_role, offered)
 
     def test_role_picker_excludes_unrelated_tenants_role(self):
         form = MembershipForm(user=self.superuser, tenant=self.managed_tenant)
-        offered = set(form.fields['roles'].queryset)
+        offered = set(form.fields['own_roles'].queryset)
         self.assertNotIn(self.tenant_role, offered)
 
     def test_managing_tenants_own_picker_never_offers_a_managed_tenants_local_role(self):
         """Sharing is one-directional: the managing tenant's own picker never
         pulls in a managed tenant's locally-owned role."""
         form = MembershipForm(user=self.superuser, tenant=self.provider_tenant)
-        offered = set(form.fields['roles'].queryset)
+        offered = set(form.fields['own_roles'].queryset)
         self.assertNotIn(self.local_role, offered)
         self.assertIn(self.shared_role, offered)
         self.assertIn(self.private_role, offered)
@@ -185,7 +185,7 @@ class ManagedTenantRolePickerTests(TenantTestMixin, TestCase):
         """A tenant with no ``managed_by`` sees only its own roles — no managing
         tenant to inherit shared definitions from."""
         form = MembershipForm(user=self.superuser, tenant=self.tenant)
-        offered = set(form.fields['roles'].queryset)
+        offered = set(form.fields['own_roles'].queryset)
         self.assertEqual(offered, {self.tenant_role})
 
 

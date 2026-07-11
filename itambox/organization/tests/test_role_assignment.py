@@ -213,7 +213,7 @@ class TenantMembershipEditViewTests(TestCase):
         resp = self.client.post(url, {
             'user': self.member_user.pk,
             'tenant': self.tenant.pk,
-            'roles': [self.role_b.pk],
+            'own_roles': [self.role_b.pk],
         })
         self.assertIn(resp.status_code, (200, 302))
         self.membership.refresh_from_db()
@@ -231,7 +231,7 @@ class TenantMembershipEditViewTests(TestCase):
         resp = self.client.post(url, {
             'user': self.member_user.pk,
             'tenant': self.tenant.pk,
-            'roles': [other_role.pk],
+            'own_roles': [other_role.pk],
         })
         # Form should be invalid — the role picker's queryset never includes a
         # role owned by an unrelated tenant, so it's rejected as "not a valid choice".
