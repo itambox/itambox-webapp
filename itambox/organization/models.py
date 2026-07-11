@@ -788,6 +788,20 @@ class RoleAssignment(ChangeLoggingMixin, models.Model):
             .values_list('pk', flat=True)
         )
 
+    # ------------------------------------------------------------------ explicit coverage
+    def set_assigned_tenants(self, tenants, actor=None):
+        """The ONLY supported writer for this grant's explicit managed coverage.
+
+        Routes the M2M edit through :meth:`ChangeLoggingMixin.log_m2m_change` so
+        the change is recorded in ``ObjectChange`` (the mixin's ``save()`` cannot
+        capture it — Django fires ``m2m_changed`` after ``save()``), attributed to
+        the membership's tenant (via ``changelog_tenant_lookup``), the current
+        request, and ``actor``. The existing ``m2m_changed`` receiver still clears
+        the affected user's effective-permission caches. An unchanged set is a
+        no-op (nothing applied, nothing logged). Returns ``True`` on a real change.
+        """
+        return self.log_m2m_change('assigned_tenants', tenants, actor=actor)
+
 
 class CostCenter(AutoSlugMixin, CustomFieldDataMixin, StandardModel, SoftDeleteMixin):
     """
