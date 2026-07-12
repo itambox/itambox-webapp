@@ -145,5 +145,6 @@ nav:
       - Backup & Restore: 'operations/backup-restore.md'
       - Data Retention: 'operations/data-retention.md'
   - Development:
+      - Data Model: 'development/data-model.md'
       - Release Checklist: 'development/release-checklist.md'
       - Module Maturity: 'development/module-maturity.md'

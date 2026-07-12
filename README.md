@@ -45,18 +45,10 @@ ITAMbox is an IT asset management (ITAM) and tracking application. Inspired by t
 
 ### Entity Relationship Diagram
 
-```mermaid
-erDiagram
-    Asset }|--|| AssetType : "belongs to"
-    AssetType ||--o| CustomFieldset : "defines specs via"
-    AssetType ||--o| Depreciation : "depreciates via"
-    Asset }|--o| StatusLabel : "assigned status"
-    CustomFieldset ||--o{ CustomField : "contains dynamic fields"
-    KitItem }|--|| Kit : "defined in"
-    KitItem }|--o| AssetType : "allocates type"
-    KitItem }|--o| Accessory : "allocates stock"
-    KitItem }|--o| License : "allocates seat"
-```
+The full, generated relationship graph is maintained in the
+[data-model documentation](itambox/docs/development/data-model.md). It groups
+all concrete domain models by Django app and labels their direct ORM
+relationships.
 
 ### HTMX Navigation
 
