@@ -42,6 +42,31 @@ def get_descendant_tenant_group_ids(group_id, live_only=False):
     return ids
 
 
+def get_ancestor_tenant_group_ids(group_id):
+    """Return ``group_id`` plus the ids of all its ancestor TenantGroups (inclusive).
+
+    Cycle-safe upward walk over the raw tree (no soft-delete pruning), matching
+    the reach/audit semantics of the descendant walk above. Used by the
+    resource-access resolver: a grant to group G covers every tenant whose
+    group chain passes through G, so coverage is "G is an ancestor-or-self of
+    the tenant's group".
+    """
+    if group_id is None:
+        return set()
+    # inline import: avoid AppRegistryNotReady / a core<->organization cycle at load
+    from organization.models import TenantGroup
+
+    seen = set()
+    node = group_id
+    while node is not None and node not in seen:
+        seen.add(node)
+        node = (
+            TenantGroup._base_manager.filter(pk=node)
+            .values_list('parent_id', flat=True).first()
+        )
+    return seen
+
+
 def managed_accessible_tenant_ids(user):
     """Managed-tenant ids reachable via the user's managed-reach assignments (step 3).
 
