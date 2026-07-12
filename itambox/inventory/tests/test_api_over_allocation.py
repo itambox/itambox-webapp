@@ -34,8 +34,8 @@ class InventoryAssignmentOverAllocationTests(TestCase):
         self.accessory = Accessory.objects.create(
             name='Mouse', manufacturer=self.mfr, category=self.cat, tenant=self.tenant
         )
-        self.site = Site.objects.create(name='Site', slug='site-inv')
-        self.location = Location.objects.create(name='Loc', slug='loc-inv', site=self.site)
+        self.site = Site.objects.create(name='Site', slug='site-inv', tenant=self.tenant)
+        self.location = Location.objects.create(name='Loc', slug='loc-inv', site=self.site, tenant=self.tenant)
         # total_stock == 2 -> available == 2
         AccessoryStock.objects.create(accessory=self.accessory, location=self.location, qty=2)
         self.holder = AssetHolder.objects.create(

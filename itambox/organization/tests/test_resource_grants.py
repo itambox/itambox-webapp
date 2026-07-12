@@ -112,11 +112,21 @@ class TenantResourceGrantValidationTests(TestCase):
             ))
 
     def test_resource_at_tenantless_location_rejected(self):
+        # ADR-0001 phase 4: AbstractStock now derives+requires a tenant from
+        # its location at creation time, so a stock pool can no longer be
+        # created directly at a tenant-less location. Reproduce the scenario
+        # this guard defends against — a grant referencing a pool whose
+        # owning location has since lost its tenant (e.g. tenant offboarding)
+        # — by clearing the location's tenant AFTER the stock already exists.
         site = Site.objects.create(name='TRG NoT Site', slug='trg-not-site')
-        loc = Location.objects.create(name='TRG NoT', slug='trg-not', site=site)
+        loc = Location.objects.create(
+            name='TRG NoT', slug='trg-not', site=site, tenant=self.provider,
+        )
         orphan_stock = AccessoryStock.objects.create(
             accessory=self.accessory, location=loc, qty=1,
         )
+        loc.tenant = None
+        loc.save()
         with self.assertRaises(ValidationError):
             TenantResourceGrant.objects.create(**self._grant_kwargs(
                 resource_id=orphan_stock.pk,

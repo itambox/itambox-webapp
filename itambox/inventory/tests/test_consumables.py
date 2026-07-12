@@ -3,7 +3,7 @@ from django.contrib.auth import get_user_model
 from django.urls import reverse
 from django.db import transaction
 from assets.models import Manufacturer, AssetType, AssetRole, Category, Asset
-from organization.models import Site, Location, AssetHolder
+from organization.models import Site, Location, AssetHolder, Tenant
 from inventory.models import Consumable, ConsumableStock, ConsumableAssignment
 
 User = get_user_model()
@@ -32,9 +32,10 @@ def _add_stock(model_class, stock_model_class, catalog_item, location, qty):
 
 class ConsumableModelTests(TestCase):
     def setUp(self):
+        self.tenant = Tenant.objects.create(name="Tenant Consumable Model", slug="tenant-consumable-model")
         self.manufacturer = Manufacturer.objects.create(name='HP', slug='hp')
-        self.site = Site.objects.create(name='Warehouse', slug='warehouse')
-        self.location = Location.objects.create(name='Shelf B', slug='shelf-b', site=self.site)
+        self.site = Site.objects.create(name='Warehouse', slug='warehouse', tenant=self.tenant)
+        self.location = Location.objects.create(name='Shelf B', slug='shelf-b', site=self.site, tenant=self.tenant)
         self.cat_toner = _create_category('Toner', consumable=True)
         self.cat_ink = _create_category('Ink', consumable=True)
 
@@ -77,9 +78,10 @@ class ConsumableModelTests(TestCase):
 
 class ConsumableAssignmentModelTests(TestCase):
     def setUp(self):
+        self.tenant = Tenant.objects.create(name="Tenant Consumable Assign", slug="tenant-consumable-assign")
         self.manufacturer = Manufacturer.objects.create(name='Brother', slug='brother')
-        self.site = Site.objects.create(name='Site A', slug='site-a')
-        self.location = Location.objects.create(name='Floor 1', slug='floor-1', site=self.site)
+        self.site = Site.objects.create(name='Site A', slug='site-a', tenant=self.tenant)
+        self.location = Location.objects.create(name='Floor 1', slug='floor-1', site=self.site, tenant=self.tenant)
         self.holder = AssetHolder.objects.create(first_name='Alice', last_name='Brown', upn='alice.brown')
         self.asset_role = AssetRole.objects.create(name='Desktop', slug='desktop')
         self.asset_type = AssetType.objects.create(manufacturer=self.manufacturer, model='OptiPlex 7010', slug='optiplex-7010')
@@ -143,9 +145,10 @@ class ConsumableViewTests(TestCase):
             username='testadmin', password='testpassword', is_staff=True, is_superuser=True
         )
         self.client.login(username='testadmin', password='testpassword')
+        self.tenant = Tenant.objects.create(name="Tenant Consumable View", slug="tenant-consumable-view")
         self.manufacturer = Manufacturer.objects.create(name='HP', slug='hp')
-        self.site = Site.objects.create(name='Office', slug='office')
-        self.location = Location.objects.create(name='Shelf', slug='shelf', site=self.site)
+        self.site = Site.objects.create(name='Office', slug='office', tenant=self.tenant)
+        self.location = Location.objects.create(name='Shelf', slug='shelf', site=self.site, tenant=self.tenant)
         self.cat_toner = _create_category('Toner', consumable=True)
         self.cat_ink = _create_category('Ink', consumable=True)
         self.consumable = Consumable.objects.create(
@@ -185,6 +188,11 @@ class ConsumableViewTests(TestCase):
             'name': 'Ink Cartridge Black',
             'slug': 'hp-ink-cartridge-black',
             'category': self.cat_ink.pk,
+            # A Tenant row exists in this TestCase (self.tenant, owning self.location's
+            # stock), which makes core.apps's global form monkey-patch require 'tenant'
+            # on any ModelForm carrying that field. Align this catalogue item into the
+            # same tenant as the rest of the fixture.
+            'tenant': self.tenant.pk,
         })
         if response.status_code != 302:
             form = response.context.get('form')
@@ -204,6 +212,9 @@ class ConsumableViewTests(TestCase):
             'name': 'Updated Toner',
             'slug': 'hp-laserjet-toner-cartridge',
             'category': self.cat_toner.pk,
+            # See test_create_view_post: a Tenant exists in this TestCase, so the
+            # form's 'tenant' field is required by core.apps's global monkey-patch.
+            'tenant': self.tenant.pk,
         })
         if response.status_code != 302:
             form = response.context.get('form')
@@ -234,9 +245,10 @@ class ConsumableCheckoutViewTests(TestCase):
             username='testadmin', password='testpassword', is_staff=True, is_superuser=True
         )
         self.client.login(username='testadmin', password='testpassword')
+        self.tenant = Tenant.objects.create(name="Tenant Consumable Checkout", slug="tenant-consumable-checkout")
         self.manufacturer = Manufacturer.objects.create(name='HP', slug='hp')
-        self.site = Site.objects.create(name='Office', slug='office')
-        self.location = Location.objects.create(name='Shelf', slug='shelf', site=self.site)
+        self.site = Site.objects.create(name='Office', slug='office', tenant=self.tenant)
+        self.location = Location.objects.create(name='Shelf', slug='shelf', site=self.site, tenant=self.tenant)
         self.cat_toner = _create_category('Toner', consumable=True)
         self.consumable = Consumable.objects.create(
             name='LaserJet Cartridge', manufacturer=self.manufacturer, category=self.cat_toner
@@ -283,10 +295,11 @@ class ConsumableCheckoutViewTests(TestCase):
 
 class ConsumableStockFilterSetTests(TestCase):
     def setUp(self):
+        self.tenant = Tenant.objects.create(name="Tenant Consumable Filter", slug="tenant-consumable-filter")
         self.manufacturer = Manufacturer.objects.create(name="Canon", slug="canon")
-        self.site = Site.objects.create(name="Main HQ", slug="main-hq")
-        self.loc1 = Location.objects.create(name="Server Room", slug="server-room", site=self.site)
-        self.loc2 = Location.objects.create(name="Storage B", slug="storage-b", site=self.site)
+        self.site = Site.objects.create(name="Main HQ", slug="main-hq", tenant=self.tenant)
+        self.loc1 = Location.objects.create(name="Server Room", slug="server-room", site=self.site, tenant=self.tenant)
+        self.loc2 = Location.objects.create(name="Storage B", slug="storage-b", site=self.site, tenant=self.tenant)
         
         self.con1 = Consumable.objects.create(name="Toner Black", slug="toner-black", manufacturer=self.manufacturer)
         self.con2 = Consumable.objects.create(name="Toner Cyan", slug="toner-cyan", manufacturer=self.manufacturer)

@@ -85,17 +85,36 @@ class SeedInventoryStockMixin:
                     defaults={'qty': random.choice([1, 2, 3, 4])})
                 comp_count += 1
 
-        # Accessory assignments to a sample of holders
+        # Accessory/consumable issues to holders, drawn from each tenant's own
+        # first-location pool: the unit is provisioned into the local pool and
+        # handed out from there. ADR-0001 phase 4 keeps this grant-free — the
+        # pool at the customer location belongs to the customer even though
+        # the catalogue item is MSP-owned; assigning MSP-sourced units without
+        # a local pool would now (correctly) demand a TenantResourceGrant.
         assign_count = 0
-        all_holders = [h for hs in self._tenant_holders.values() for h in hs]
-        for holder in random.sample(all_holders, k=min(60, len(all_holders))):
-            for acc_slug in random.sample(list(self._accessories), k=random.randint(1, 3)):
-                AccessoryAssignment.objects.create(accessory=self._accessories[acc_slug],
-                                                   assigned_holder=holder, qty=1)
-                assign_count += 1
-        for holder in random.sample(all_holders, k=min(10, len(all_holders))):
-            ConsumableAssignment.objects.create(consumable=self._consumables['aa-batteries-24'],
-                                                assigned_holder=holder, qty=1)
+        for tslug, holders in self._tenant_holders.items():
+            locs = self._tenant_locations.get(tslug) or []
+            if not locs or not holders:
+                continue
+            loc = locs[0]
+            for holder in random.sample(holders, k=min(8, len(holders))):
+                for acc_slug in random.sample(list(self._accessories), k=random.randint(1, 3)):
+                    acc = self._accessories[acc_slug]
+                    pool, _created = AccessoryStock.objects.get_or_create(
+                        accessory=acc, location=loc, defaults={'qty': 0})
+                    pool.qty += 1  # provision the unit locally before issuing it
+                    pool.save(update_fields=['qty'])
+                    AccessoryAssignment.objects.create(
+                        accessory=acc, assigned_holder=holder, qty=1, from_location=loc)
+                    assign_count += 1
+            for holder in random.sample(holders, k=min(1, len(holders))):
+                con = self._consumables['aa-batteries-24']
+                pool, _created = ConsumableStock.objects.get_or_create(
+                    consumable=con, location=loc, defaults={'qty': 0})
+                pool.qty += 1
+                pool.save(update_fields=['qty'])
+                ConsumableAssignment.objects.create(
+                    consumable=con, assigned_holder=holder, qty=1, from_location=loc)
 
         # Kits
         kits = [
