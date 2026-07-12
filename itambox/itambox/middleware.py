@@ -245,9 +245,18 @@ class TenantMiddleware:
 
             elif session_group_id:
                 # Standard user may scope to a tenant-group only if they can access at
-                # least one tenant in it (via membership or a group grant).
+                # least one tenant in its SUBTREE (via membership, a group grant, or
+                # managed reach). The descendant walk (pruned at soft-deleted nodes)
+                # matches filter_by_tenant and the auth backend's group gate — a member
+                # whose tenants all sit in a child group may still activate the parent.
+                # inline import: avoid a middleware <-> organization cycle at load
+                from organization.access import get_descendant_tenant_group_ids
                 group_tenant_ids = set(
-                    Tenant._base_manager.filter(group_id=session_group_id).values_list('pk', flat=True)
+                    Tenant._base_manager.filter(
+                        group_id__in=get_descendant_tenant_group_ids(
+                            _as_int(session_group_id), live_only=True,
+                        ),
+                    ).values_list('pk', flat=True)
                 )
                 if accessible & group_tenant_ids:
                     # _base_manager: resolve the active group unscoped (bootstrap —
@@ -255,7 +264,7 @@ class TenantMiddleware:
                     active_tenant_group = TenantGroup._base_manager.get(pk=session_group_id)
                     active_membership = Membership.objects.filter(
                         user=request.user,
-                        tenant__group_id=session_group_id,
+                        tenant_id__in=group_tenant_ids,
                         is_active=True,
                     ).select_related('tenant', 'tenant__group').first()
                 else:
