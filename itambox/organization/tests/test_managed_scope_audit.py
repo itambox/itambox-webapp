@@ -59,10 +59,13 @@ class ManagedScopeAuditTests(TestCase):
         return ContentType.objects.get_for_model(RoleAssignment)
 
     def _updates(self):
+        # pk tiebreak: two set_assigned_tenants() calls in one test can land on
+        # the same `time` (Windows clock tick ~15ms), making .last() on a
+        # time-only ordering nondeterministic.
         return ObjectChange._base_manager.filter(
             changed_object_type=self._ct(), changed_object_id=self.assignment.pk,
             action='update',
-        ).order_by('time')
+        ).order_by('time', 'pk')
 
     def test_new_explicit_scope_is_recorded_with_the_tenant_ids(self):
         changed = self.assignment.set_assigned_tenants([self.cust_a], actor=self.actor)
