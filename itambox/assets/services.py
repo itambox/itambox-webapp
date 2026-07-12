@@ -21,7 +21,10 @@ from django.utils.translation import gettext_lazy as _
 from .choices import StatusTypeChoices
 from .models import Asset, StatusLabel, AssetAssignment
 from compliance.models import CustodyReceipt
-from inventory.models import AccessoryAssignment, ConsumableAssignment
+from inventory.models import (
+    AccessoryAssignment, AccessoryStock, ConsumableAssignment, ConsumableStock,
+)
+from inventory.services import resolve_grant_for_checkout
 from licenses.models import LicenseSeatAssignment
 
 
@@ -463,7 +466,12 @@ def checkout_kit(kit, holder=None, location=None, user=None, notes="", source_lo
                     assigned_location=location,
                     from_location=source_location,
                     qty=item.qty,
-                    notes=f"Checked out via Kit '{kit.name}'. {notes}"
+                    notes=f"Checked out via Kit '{kit.name}'. {notes}",
+                    # ADR-0001: a cross-tenant source pool needs a covering grant.
+                    resource_grant=resolve_grant_for_checkout(
+                        item.accessory, 'accessory', AccessoryStock,
+                        AccessoryAssignment, source_location, user=user,
+                    ),
                 )
             elif item.consumable:
                 ConsumableAssignment.objects.create(
@@ -472,7 +480,11 @@ def checkout_kit(kit, holder=None, location=None, user=None, notes="", source_lo
                     assigned_location=location,
                     from_location=source_location,
                     qty=item.qty,
-                    notes=f"Checked out via Kit '{kit.name}'. {notes}"
+                    notes=f"Checked out via Kit '{kit.name}'. {notes}",
+                    resource_grant=resolve_grant_for_checkout(
+                        item.consumable, 'consumable', ConsumableStock,
+                        ConsumableAssignment, source_location, user=user,
+                    ),
                 )
             elif item.license:
                 if holder:

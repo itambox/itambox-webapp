@@ -235,11 +235,20 @@ class ResolveStockAccessTests(TenantTestMixin, TestCase):
         assert decision.reason == DENIED_NO_ACTIVE_TENANT
 
     def test_owner_unresolvable_denied(self):
+        # ADR-0001 phase 4: AbstractStock now derives+requires a tenant from
+        # its location at creation time, so a pool can no longer be created
+        # directly at a tenant-less location. Reproduce an unresolvable owner
+        # by clearing the location's tenant AFTER the stock already exists
+        # (e.g. tenant offboarding leaving a stray pool behind).
         site = Site.objects.create(name='RA NoT Site', slug='ra-not-site')
-        loc = Location.objects.create(name='RA NoT', slug='ra-not', site=site)
+        loc = Location.objects.create(
+            name='RA NoT', slug='ra-not', site=site, tenant=self.owner,
+        )
         stray = AccessoryStock.objects.create(
             accessory=self.accessory, location=loc, qty=1,
         )
+        loc.tenant = None
+        loc.save()
         decision = resolve_stock_access(
             self.tech, stray, TenantResourceGrant.ACCESS_USE, PERM,
             active_tenant=self.grantee,

@@ -2,7 +2,7 @@ from django.test import TestCase
 from django.contrib.auth import get_user_model
 from django.urls import reverse
 from assets.models import Manufacturer, Category
-from organization.models import Site, Location, AssetHolder
+from organization.models import Site, Location, AssetHolder, Tenant
 from inventory.models import (
     Consumable, ConsumableStock, ConsumableAssignment,
     Accessory, AccessoryStock, AccessoryAssignment,
@@ -19,10 +19,11 @@ class BulkCheckoutInventoryTests(TestCase):
         # Give permissions
         self.client.login(username='testadmin', password='testpassword')
         
+        self.tenant = Tenant.objects.create(name="Tenant Bulk Checkout", slug="tenant-bulk-checkout")
         self.manufacturer = Manufacturer.objects.create(name='HP', slug='hp')
-        self.site = Site.objects.create(name='Warehouse', slug='warehouse')
-        self.loc_a = Location.objects.create(name='Shelf A', slug='shelf-a', site=self.site)
-        self.loc_b = Location.objects.create(name='Shelf B', slug='shelf-b', site=self.site)
+        self.site = Site.objects.create(name='Warehouse', slug='warehouse', tenant=self.tenant)
+        self.loc_a = Location.objects.create(name='Shelf A', slug='shelf-a', site=self.site, tenant=self.tenant)
+        self.loc_b = Location.objects.create(name='Shelf B', slug='shelf-b', site=self.site, tenant=self.tenant)
         self.holder = AssetHolder.objects.create(first_name='John', last_name='Doe', upn='john.doe')
         
         self.cat_con = Category.objects.create(name='Consumable Cat', slug='con-cat', applies_to={'consumable': True})

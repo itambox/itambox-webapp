@@ -235,12 +235,29 @@ def check_stock_tenant_conflicts(topology=None):
     for label, item_attr in STOCK_SPECS:
         model = apps.get_model(label)
         rows = model._base_manager.values(
-            'pk', 'location_id', 'location__tenant_id', f'{item_attr}_id',
-            f'{item_attr}__tenant_id',
+            'pk', 'tenant_id', 'location_id', 'location__tenant_id',
+            f'{item_attr}_id', f'{item_attr}__tenant_id',
         )
         for row in rows:
             loc_tenant = row['location__tenant_id']
             item_tenant = row[f'{item_attr}__tenant_id']
+            if loc_tenant is not None and row['tenant_id'] != loc_tenant:
+                # Phase-4 invariant: stock.tenant is derived from and must
+                # match location.tenant — drift means someone bypassed save().
+                # (A tenant-less location is the AMBIGUOUS case below, not
+                # drift — one finding per row, not two.)
+                findings.append(Finding(
+                    check='stock_tenant_conflict',
+                    model=label, pk=row['pk'],
+                    summary=(f'{label} #{row["pk"]}: stored tenant '
+                             f'{topo.name(row["tenant_id"]) if row["tenant_id"] else "NULL"} '
+                             f'!= location tenant '
+                             f'{topo.name(loc_tenant)} (drift)'),
+                    classification=topo.classify(loc_tenant, row['tenant_id']),
+                    details={'stored_tenant_id': row['tenant_id'],
+                             'location_id': row['location_id'],
+                             'location_tenant_id': loc_tenant},
+                ))
             if loc_tenant is None:
                 findings.append(Finding(
                     check='stock_tenant_conflict',

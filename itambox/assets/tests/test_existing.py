@@ -63,6 +63,12 @@ class ComponentTrackingTestCase(TransactionTestCase):
         self.category = Category.objects.create(name="Memory", slug="memory", applies_to={"component": True})
 
         from organization.models import Site, Location
+        # NOTE: deliberately no tenant on this shared fixture — the global
+        # "tenant field required" form monkey-patch (core/apps.py) activates
+        # for every form in this TransactionTestCase the moment ANY Tenant
+        # row exists in the DB. Tests that need stock (which, per ADR-0001
+        # phase 4, requires a tenant-owned location) create their own
+        # tenant-scoped location locally instead of mutating this shared one.
         self.site = Site.objects.create(name="HQ", slug="hq")
         self.location = Location.objects.create(name="Warehouse", slug="warehouse", site=self.site)
         self.acc_category = Category.objects.create(name="Keyboard", slug="keyboard", applies_to={"accessory": True})
@@ -261,6 +267,18 @@ class ComponentTrackingTestCase(TransactionTestCase):
 
     def test_accessory_crud_and_checkout_views(self):
         from inventory.models import AccessoryStock
+        from organization.models import Tenant
+
+        # ADR-0001 phase 4: stock requires a location owned by a tenant. Use a
+        # tenant-scoped location local to this test (not the shared
+        # self.location) — the moment a Tenant row exists, the global "tenant
+        # field required" form monkey-patch (core/apps.py) kicks in for every
+        # form in this TransactionTestCase, so it must not leak into other
+        # test methods via setUp.
+        tenant = Tenant.objects.create(name="Accessory Crud Co", slug="accessory-crud-co")
+        self.location.tenant = tenant
+        self.location.save(update_fields=['tenant'])
+
         # Create Accessory
         acc = Accessory.objects.create(
             manufacturer=self.manufacturer,
@@ -295,7 +313,11 @@ class ComponentTrackingTestCase(TransactionTestCase):
             'part_number': 'MS-WM126',
             'min_qty': 3,
             'allow_overallocate': True,
-            'notes': 'Office standard mouse'
+            'notes': 'Office standard mouse',
+            # A Tenant now exists in the DB (created above for the stock
+            # location), which flips AccessoryForm's 'tenant' field to
+            # required (core/apps.py's global "tenant required" monkey-patch).
+            'tenant': tenant.pk,
         }
         response = self.client.post(reverse('inventory:accessory_create'), data=post_data)
         self.assertEqual(response.status_code, 302)
@@ -964,7 +986,7 @@ class EnterpriseITAMTestCase(_SeededStatusLabelsMixin, TestCase):
         self.assertContains(response, "Estimated value (indicative)")
 
     def test_atomic_kit_checkout_flow(self):
-        from organization.models import AssetHolder, Site, Location
+        from organization.models import AssetHolder, Site, Location, Tenant
         from software.models import Software
         from licenses.models import License
         from inventory.models import AccessoryStock
@@ -974,15 +996,17 @@ class EnterpriseITAMTestCase(_SeededStatusLabelsMixin, TestCase):
             model="MacBook Pro",
             slug="apple-macbook-pro"
         )
-        
+
         acc_cat = Category.objects.create(
             name="Chargers",
             slug="chargers",
             applies_to={"accessory": True}
         )
 
+        # ADR-0001 phase 4: stock requires a location owned by a tenant.
+        tenant = Tenant.objects.create(name="Enterprise ITAM Co", slug="enterprise-itam-co")
         site = Site.objects.create(name="HQ", slug="hq")
-        location = Location.objects.create(name="Warehouse", slug="warehouse", site=site)
+        location = Location.objects.create(name="Warehouse", slug="warehouse", site=site, tenant=tenant)
 
         charger = Accessory.objects.create(
             manufacturer=self.manufacturer,

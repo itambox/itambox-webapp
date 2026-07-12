@@ -3,7 +3,7 @@ from django.contrib.auth import get_user_model
 from django.urls import reverse
 from django.core.exceptions import ValidationError
 from assets.models import Manufacturer, AssetType, Category, StatusLabel
-from organization.models import Site, Location, AssetHolder
+from organization.models import Site, Location, AssetHolder, Tenant
 from licenses.models import License
 from software.models import Software
 from inventory.models import Accessory, Consumable, ConsumableStock, ConsumableAssignment, Kit, KitItem
@@ -187,9 +187,10 @@ class KitConsumableFulfillmentTests(TestCase):
             slug='in-use',
             defaults={'name': 'In Use', 'type': 'deployed', 'color': '007bff'},
         )
+        self.tenant = Tenant.objects.create(name="Tenant Kit Fulfillment", slug="tenant-kit-fulfillment")
         self.manufacturer = Manufacturer.objects.create(name='Logitech', slug='logitech')
-        self.site = Site.objects.create(name='Warehouse', slug='warehouse')
-        self.location = Location.objects.create(name='Shelf A', slug='shelf-a', site=self.site)
+        self.site = Site.objects.create(name='Warehouse', slug='warehouse', tenant=self.tenant)
+        self.location = Location.objects.create(name='Shelf A', slug='shelf-a', site=self.site, tenant=self.tenant)
         self.holder = AssetHolder.objects.create(first_name='John', last_name='Smith', upn='john.smith')
         self.cat_cable = _create_category('Cable', consumable=True)
         self.consumable = Consumable.objects.create(

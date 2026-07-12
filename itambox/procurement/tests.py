@@ -5,7 +5,7 @@ from django.utils import timezone
 from procurement.models import PurchaseOrder, PurchaseOrderLine, FulfillmentLink
 from assets.models import Supplier, AssetRequest, AssetType, Manufacturer, StatusLabel
 from assets.choices import RequestStatusChoices
-from organization.models import Location, Site
+from organization.models import Location, Site, Tenant
 from software.models import Software
 from licenses.models import License
 
@@ -25,8 +25,11 @@ class ProcurementStatusTransitionTests(TestCase):
         )
 
         # Create a site and location
+        # ADR-0001 phase 4: stock (ComponentStock/AccessoryStock/ConsumableStock)
+        # requires a location owned by a tenant.
+        self.tenant = Tenant.objects.create(name='Procurement Test Tenant', slug='procurement-test-tenant')
         self.site = Site.objects.create(name='Test Site', slug='test-site')
-        self.location = Location.objects.create(name='Test Location', slug='test-location', site=self.site)
+        self.location = Location.objects.create(name='Test Location', slug='test-location', site=self.site, tenant=self.tenant)
         
         # Create a supplier
         self.supplier = Supplier.objects.create(name='Test Supplier', slug='test-supplier')

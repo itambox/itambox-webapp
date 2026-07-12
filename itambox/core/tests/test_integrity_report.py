@@ -196,14 +196,21 @@ class CheckStockTenantConflictsTests(TestCase):
         self.assertEqual(matches[0].classification, CLASS_PROVIDER_MANAGED)
 
     def test_location_without_tenant_is_ambiguous(self):
+        # ADR-0001 phase 4: stock can no longer be CREATED at a tenant-less
+        # location, so seed the orphaned-pool state post-hoc — the location
+        # loses its tenant after the pool exists (e.g. tenant offboarding).
         accessory = Accessory.objects.create(
             name='Homeless Dock', manufacturer=self.mfr, tenant=self.t.provider,
         )
-        site = Site.objects.create(name='No-Tenant Site', slug='site-no-tenant', tenant=None)
+        site = Site.objects.create(
+            name='No-Tenant Site', slug='site-no-tenant', tenant=self.t.provider,
+        )
         location = Location.objects.create(
-            name='No-Tenant Loc', slug='loc-no-tenant', site=site, tenant=None,
+            name='No-Tenant Loc', slug='loc-no-tenant', site=site,
+            tenant=self.t.provider,
         )
         stock = AccessoryStock.objects.create(accessory=accessory, location=location, qty=1)
+        Location._base_manager.filter(pk=location.pk).update(tenant=None)
 
         findings = check_stock_tenant_conflicts()
         matches = [f for f in findings if f.model == 'inventory.AccessoryStock' and f.pk == stock.pk]
@@ -246,9 +253,19 @@ class CheckCrossTenantAssignmentsTests(TestCase):
             first_name='Man', last_name='Aged', upn='man.aged@managed.example.com',
             tenant=self.t.managed,
         )
-        assignment = AccessoryAssignment.objects.create(
-            accessory=accessory, from_location=from_location, assigned_holder=holder, qty=1,
+        # AbstractAssignment.clean() (ADR-0001 phase 4) forbids constructing a
+        # cross-tenant row without a resource grant; create same-tenant first
+        # and retarget via the base-manager update() bypass (matches the
+        # AssetAssignment pattern below) to reach the legacy cross-tenant
+        # anomaly the integrity report must detect.
+        own_holder = AssetHolder.objects.create(
+            first_name='Own', last_name='Holder', upn='own.holder@provider.example.com',
+            tenant=self.t.provider,
         )
+        assignment = AccessoryAssignment.objects.create(
+            accessory=accessory, from_location=from_location, assigned_holder=own_holder, qty=1,
+        )
+        AccessoryAssignment._base_manager.filter(pk=assignment.pk).update(assigned_holder=holder)
         stock = AccessoryStock.objects.get(accessory=accessory, location=from_location)
 
         findings, proposals = check_cross_tenant_assignments()
@@ -282,9 +299,18 @@ class CheckCrossTenantAssignmentsTests(TestCase):
             first_name='Other', last_name='Holder', upn='other.holder@provider.example.com',
             tenant=self.t.provider,
         )
-        assignment = AccessoryAssignment.objects.create(
-            accessory=accessory, from_location=from_location, assigned_holder=holder, qty=1,
+        # AbstractAssignment.clean() (ADR-0001 phase 4) forbids constructing a
+        # cross-tenant row without a resource grant; create same-tenant first
+        # and retarget via the base-manager update() bypass to reach the
+        # legacy cross-tenant anomaly the integrity report must detect.
+        own_holder = AssetHolder.objects.create(
+            first_name='Own', last_name='Unrelated', upn='own.unrelated@unrelated.example.com',
+            tenant=self.t.unrelated,
         )
+        assignment = AccessoryAssignment.objects.create(
+            accessory=accessory, from_location=from_location, assigned_holder=own_holder, qty=1,
+        )
+        AccessoryAssignment._base_manager.filter(pk=assignment.pk).update(assigned_holder=holder)
 
         findings, proposals = check_cross_tenant_assignments()
         matches = [
@@ -332,12 +358,22 @@ class CheckCrossTenantAssignmentsTests(TestCase):
             first_name='Two', last_name='Managed', upn='two.managed@managed.example.com',
             tenant=self.t.managed,
         )
-        AccessoryAssignment.objects.create(
-            accessory=accessory, from_location=from_location, assigned_holder=holder1, qty=1,
+        # AbstractAssignment.clean() (ADR-0001 phase 4) forbids constructing a
+        # cross-tenant row without a resource grant; create same-tenant first
+        # and retarget via the base-manager update() bypass to reach the
+        # legacy cross-tenant anomaly the integrity report must detect.
+        own_holder = AssetHolder.objects.create(
+            first_name='Own', last_name='Provider', upn='own.provider.dedup@provider.example.com',
+            tenant=self.t.provider,
         )
-        AccessoryAssignment.objects.create(
-            accessory=accessory, from_location=from_location, assigned_holder=holder2, qty=1,
+        a1 = AccessoryAssignment.objects.create(
+            accessory=accessory, from_location=from_location, assigned_holder=own_holder, qty=1,
         )
+        AccessoryAssignment._base_manager.filter(pk=a1.pk).update(assigned_holder=holder1)
+        a2 = AccessoryAssignment.objects.create(
+            accessory=accessory, from_location=from_location, assigned_holder=own_holder, qty=1,
+        )
+        AccessoryAssignment._base_manager.filter(pk=a2.pk).update(assigned_holder=holder2)
 
         _findings, proposals, _stats = run_all_checks()
         matching = [
