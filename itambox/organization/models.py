@@ -1102,6 +1102,28 @@ class TenantResourceGrant(SoftDeleteMixin, ChangeLoggingMixin, BaseModel):
     def is_active(self):
         return self.deleted_at is None
 
+    def delete(self, *args, force_hard_delete=False, **kwargs):
+        """Revocation (soft delete) must ALWAYS be possible.
+
+        Historical assignments reference the grant with on_delete=PROTECT so
+        a HARD delete cannot destroy provenance — but the SoftDeleteMixin
+        soft path runs the deletion collector, which would trip over that
+        very PROTECT. A revocation only stamps ``deleted_at`` and cascades
+        to nothing, so skip the collector entirely on the soft path.
+        """
+        force_hard = force_hard_delete or getattr(self, '_force_hard_delete', False)
+        if force_hard:
+            return super().delete(*args, force_hard_delete=True, **kwargs)
+        from django.db import transaction
+        with transaction.atomic():
+            if hasattr(self, '_changelog_action'):
+                # inline import: mirrors SoftDeleteMixin.delete's soft branch
+                from core.choices import ObjectChangeActionChoices
+                self._changelog_action = ObjectChangeActionChoices.ACTION_DELETE
+            if hasattr(self, 'snapshot') and callable(self.snapshot):
+                self.snapshot()
+            self.soft_delete()
+
     def clean(self):
         # Runs on every save via the global pre_save validator — keep it cheap.
         from django.core.exceptions import ValidationError
