@@ -146,5 +146,6 @@ nav:
       - Data Retention: 'operations/data-retention.md'
   - Development:
       - Data Model: 'development/data-model.md'
+      - 'ADR-0001: Tenancy, RBAC & Resource Sharing': 'development/adr-0001-tenancy-rbac-and-resource-sharing.md'
       - Release Checklist: 'development/release-checklist.md'
       - Module Maturity: 'development/module-maturity.md'
