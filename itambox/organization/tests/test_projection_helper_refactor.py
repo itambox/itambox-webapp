@@ -133,8 +133,10 @@ class CoversTenantScopeTests(TestCase):
         # (organization.access.get_descendant_tenant_group_ids).
         g1 = TenantGroup.objects.create(name="Cycle A", slug="cycle-a")
         g2 = TenantGroup.objects.create(name="Cycle B", slug="cycle-b", parent=g1)
-        g1.parent = g2
-        g1.save()
+        # .update(): TenantGroup.clean() now rejects cycles on the save path,
+        # so seed the malformed data behind validation's back.
+        TenantGroup._base_manager.filter(pk=g1.pk).update(parent=g2)
+        g1.refresh_from_db()
 
         t_in_cycle = Tenant.objects.create(
             name="T Cycle", slug="t-cycle", managed_by=self.msp, group=g2,

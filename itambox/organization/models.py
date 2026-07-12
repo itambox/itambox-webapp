@@ -186,6 +186,34 @@ class TenantGroup(StandardModel, SoftDeleteMixin):
     def get_absolute_url(self):
         return reverse('organization:tenantgroup_detail', kwargs={'pk': self.pk})
 
+    def clean(self):
+        # Runs on every save via the global pre_save validator — keep it cheap.
+        # A parent cycle would send every group-scoped descendant walk in
+        # circles (the walks are cycle-tolerant, but the tree would be wrong),
+        # so reject it at write time like CostCenter does.
+        from django.core.exceptions import ValidationError
+        super().clean()
+        if self.parent_id is None:
+            return
+        if self.pk and self.parent_id == self.pk:
+            raise ValidationError({'parent': _("A tenant group cannot be its own parent.")})
+        if self.pk:
+            visited = set()
+            node_id = self.parent_id
+            while node_id is not None:
+                if node_id == self.pk:
+                    raise ValidationError({'parent': _(
+                        "Setting this parent would create a cycle in the group hierarchy."
+                    )})
+                if node_id in visited:
+                    break
+                visited.add(node_id)
+                node_id = (
+                    TenantGroup._base_manager.filter(pk=node_id)
+                    .values_list('parent_id', flat=True).first()
+                )
+
+
 class Tenant(DeletableVaultModel, BookmarkableMixin):
     objects = TenantScopingSoftDeleteManager()
     all_objects = TenantScopingAllObjectsManager()
