@@ -952,3 +952,193 @@ class CostCenter(AutoSlugMixin, CustomFieldDataMixin, StandardModel, SoftDeleteM
                     break
                 visited.add(node.pk)
                 node = node.parent
+
+
+# ---------------------------------------------------------------------------
+# Cross-tenant resource sharing (ADR-0001, remediation plan phase 2)
+# ---------------------------------------------------------------------------
+
+class TenantResourceGrant(SoftDeleteMixin, ChangeLoggingMixin, BaseModel):
+    """One tenant's explicit permission for another tenant (or a TenantGroup
+    subtree) to see/use ONE of its stock pools.
+
+    ADR-0001: TenantGroup membership makes sharing *eligible*, never
+    automatic — every cross-tenant resource use requires one of these rows.
+    Grants are non-transitive, convey no user permissions (RBAC is checked
+    independently by the resolver), and are revoked by soft-delete so that
+    historical assignments keep their provenance pointer.
+
+    Like Membership/RoleAssignment, the default manager is deliberately
+    UNSCOPED: this is authorization infrastructure that the resolver must
+    read from both the owner's and the grantee's tenant context. UI/API
+    surfaces scope their querysets explicitly.
+    """
+    # Soft-deleting the owner/grantee tenant must not destroy the audit
+    # trail; grants become inert (the resolver re-checks liveness) and
+    # restore re-arms them. Hard deletes still cascade.
+    survive_parent_soft_delete = True
+
+    # NO all_objects manager, on purpose (mirrors Membership/RoleAssignment):
+    # revocation is a lifecycle state, not "trash" — grants must not surface
+    # in the generic recycle bin for restore. Audit surfaces (admin) read
+    # revoked rows through _base_manager.
+    objects = SoftDeleteManager()
+
+    ACCESS_VIEW = 'view'
+    ACCESS_USE = 'use'
+    ACCESS_CHOICES = [
+        (ACCESS_VIEW, _('View')),
+        (ACCESS_USE, _('View + allocate/consume')),
+    ]
+
+    #: The only models a grant may reference (tight allowlist by design —
+    #: extend deliberately, never generically).
+    APPROVED_RESOURCE_MODELS = (
+        'inventory.componentstock',
+        'inventory.accessorystock',
+        'inventory.consumablestock',
+    )
+
+    tenant = models.ForeignKey(
+        'organization.Tenant',
+        on_delete=models.CASCADE,
+        related_name='resource_grants_given',
+        db_index=True,
+        verbose_name=_("Owning tenant"),
+        help_text=_("The tenant whose resource is being shared."),
+    )
+    grantee_tenant = models.ForeignKey(
+        'organization.Tenant',
+        on_delete=models.CASCADE,
+        related_name='resource_grants_received',
+        blank=True, null=True,
+        db_index=True,
+        verbose_name=_("Grantee tenant"),
+    )
+    grantee_tenant_group = models.ForeignKey(
+        'organization.TenantGroup',
+        on_delete=models.CASCADE,
+        related_name='resource_grants_received',
+        blank=True, null=True,
+        db_index=True,
+        verbose_name=_("Grantee tenant group"),
+        help_text=_("Grants to a group include its descendant groups."),
+    )
+    resource_type = models.ForeignKey(
+        ContentType,
+        on_delete=models.PROTECT,
+        related_name='+',
+        limit_choices_to=models.Q(
+            app_label='inventory',
+            model__in=('componentstock', 'accessorystock', 'consumablestock'),
+        ),
+        verbose_name=_("Resource type"),
+    )
+    resource_id = models.PositiveBigIntegerField(verbose_name=_("Resource ID"))
+    resource = GenericForeignKey('resource_type', 'resource_id')
+    access_level = models.CharField(
+        max_length=10,
+        choices=ACCESS_CHOICES,
+        default=ACCESS_VIEW,
+        db_index=True,
+        verbose_name=_("Access level"),
+    )
+    granted_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True, blank=True,
+        related_name='granted_resource_grants',
+        verbose_name=_("Granted by"),
+    )
+    reason = models.TextField(blank=True, verbose_name=_("Reason"))
+
+    class Meta:
+        ordering = ['-created_at']
+        verbose_name = _("Tenant resource grant")
+        verbose_name_plural = _("Tenant resource grants")
+        constraints = [
+            models.CheckConstraint(
+                check=(
+                    models.Q(grantee_tenant__isnull=False, grantee_tenant_group__isnull=True)
+                    | models.Q(grantee_tenant__isnull=True, grantee_tenant_group__isnull=False)
+                ),
+                name='organization_trg_exactly_one_grantee',
+            ),
+            models.CheckConstraint(
+                check=(
+                    models.Q(grantee_tenant__isnull=True)
+                    | ~models.Q(grantee_tenant=models.F('tenant'))
+                ),
+                name='organization_trg_owner_not_grantee',
+            ),
+            models.UniqueConstraint(
+                fields=['resource_type', 'resource_id', 'grantee_tenant'],
+                condition=models.Q(deleted_at__isnull=True, grantee_tenant__isnull=False),
+                name='organization_trg_unique_active_tenant_grant',
+            ),
+            models.UniqueConstraint(
+                fields=['resource_type', 'resource_id', 'grantee_tenant_group'],
+                condition=models.Q(deleted_at__isnull=True, grantee_tenant_group__isnull=False),
+                name='organization_trg_unique_active_group_grant',
+            ),
+        ]
+        indexes = [
+            models.Index(
+                fields=['resource_type', 'resource_id'],
+                name='org_trg_resource_idx',
+            ),
+            models.Index(
+                fields=['resource_type', 'resource_id'],
+                condition=models.Q(deleted_at__isnull=True),
+                name='org_trg_active_resource_idx',
+            ),
+        ]
+
+    def __str__(self):
+        grantee = self.grantee_tenant or self.grantee_tenant_group
+        return f"{self.tenant} -> {grantee}: {self.resource_type.model} #{self.resource_id} ({self.access_level})"
+
+    @property
+    def is_active(self):
+        return self.deleted_at is None
+
+    def clean(self):
+        # Runs on every save via the global pre_save validator — keep it cheap.
+        from django.core.exceptions import ValidationError
+        super().clean()
+
+        has_tenant = self.grantee_tenant_id is not None
+        has_group = self.grantee_tenant_group_id is not None
+        if has_tenant == has_group:
+            raise ValidationError(_(
+                "Exactly one of grantee tenant or grantee tenant group must be set."
+            ))
+        if has_tenant and self.grantee_tenant_id == self.tenant_id:
+            raise ValidationError({'grantee_tenant': _(
+                "A tenant cannot be granted its own resource."
+            )})
+
+        if self.resource_type_id:
+            label = f'{self.resource_type.app_label}.{self.resource_type.model}'
+            if label not in self.APPROVED_RESOURCE_MODELS:
+                raise ValidationError({'resource_type': _(
+                    "This model cannot be shared. Approved resources: %(models)s."
+                ) % {'models': ', '.join(self.APPROVED_RESOURCE_MODELS)}})
+
+        # Ownership-through-location proof — only while the grant is active:
+        # a revoked grant must stay saveable (and restorable-to-inspect) even
+        # after the pool has been deleted or moved.
+        if self.deleted_at is None and self.resource_type_id and self.resource_id:
+            model = self.resource_type.model_class()
+            stock = model._base_manager.filter(
+                pk=self.resource_id,
+            ).select_related('location').first()
+            if stock is None:
+                raise ValidationError({'resource_id': _(
+                    "The referenced stock pool does not exist."
+                )})
+            if stock.location.tenant_id is None or stock.location.tenant_id != self.tenant_id:
+                raise ValidationError({'tenant': _(
+                    "The resource must belong to the owning tenant through its "
+                    "location (the pool's location tenant does not match)."
+                )})
