@@ -355,9 +355,18 @@ class TestSnipeITImporter(TenantTestMixin):
         assert Location._base_manager.count() == 0
 
     def test_dry_run_returns_nonzero_created_counts(self):
+        from assets.models import StatusLabel
+
+        # "In Use" normally exists via the seed migration (assets 0003), but a
+        # TransactionTestCase flush earlier in the run wipes seeded rows from a
+        # reused test DB — recreate it so the skip assertion holds regardless.
+        StatusLabel.all_objects.get_or_create(
+            name='In Use',
+            defaults={'slug': 'in-use', 'type': 'deployed', 'color': '007bff'},
+        )
         counts = self._run(dry_run=True)
         assert counts['assets']['created'] == 1
-        # "Ready to Deploy" is new; "In Use" already exists from migration seed → skipped
+        # "Ready to Deploy" is new; "In Use" already exists → skipped
         assert counts['statuslabels']['created'] == 1
         assert counts['statuslabels']['skipped'] == 1
 

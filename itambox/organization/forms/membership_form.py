@@ -602,21 +602,43 @@ class MembershipForm(forms.ModelForm):
 
     # ------------------------------------------------------------------ saving
     def save(self, commit=True):
+        # who=new only creates a user when the email did NOT resolve to an
+        # existing account in clean() (instance.user is already populated then).
         creating_new_user = (
             not self.instance.pk
             and 'who' in self.fields
             and self.cleaned_data.get('who') == self.WHO_NEW
+            and self.instance.user_id is None
         )
+        if creating_new_user and not commit:
+            # Membership.user is a required FK, so the who-block's new user row
+            # would have to be persisted NOW for the returned instance to be
+            # saveable — a side effect commit=False callers don't expect. Fail
+            # loudly instead of silently writing a user.
+            raise ValueError(
+                "MembershipForm cannot save(commit=False) while creating a new "
+                "user inline. Save with commit=True, or select an existing user."
+            )
         with transaction.atomic():
-            if creating_new_user and self.instance.user_id is None:
+            if creating_new_user:
                 # No user matched the email in clean(): create one inline.
                 self.instance.user = self._create_inline_user()
             instance = super().save(commit=commit)
-            # Assignments hang off a persisted membership, so they are reconciled
-            # only on a real commit (mirrors ModelForm.save_m2m). commit=False
-            # returns the unsaved instance without touching grants.
             if commit:
+                # Assignments hang off a persisted membership: reconcile now.
                 self._sync_assignments(instance)
+            else:
+                # Canonical two-step (instance.save() then form.save_m2m()):
+                # chain the grant reconciliation onto Django's save_m2m so the
+                # deferred save writes the SAME rows a commit=True save would —
+                # not a membership silently stripped of its grants.
+                django_save_m2m = self.save_m2m
+
+                def save_m2m():
+                    django_save_m2m()
+                    self._sync_assignments(self.instance)
+
+                self.save_m2m = save_m2m
         return instance
 
     def _create_inline_user(self):
@@ -662,16 +684,9 @@ class MembershipForm(forms.ModelForm):
                 defaults={'granted_by': self._requesting_user},
             )
 
-    def _sync_managed_formset(self, membership):
-        if self.managed_formset is None:
-            return
-        existing = {
-            a.pk: a for a in membership.assignments.filter(
-                reach=RoleAssignment.REACH_MANAGED,
-            )
-        }
-
-        # Pass 1: collect the intended rows (an existing assignment or a new one).
+    def _intended_managed_rows(self, existing):
+        """Pass 1: the grant rows the submitted formset intends, as
+        ``(surviving_assignment_or_None, role, scope, scope_group, assigned)``."""
         kept = []
         for form in self.managed_formset.forms:
             if not hasattr(form, 'cleaned_data'):
@@ -686,7 +701,27 @@ class MembershipForm(forms.ModelForm):
             # An id must belong to THIS membership; a stray/tampered id is ignored
             # (treated as a new row) so it can never touch another membership's grant.
             assignment = existing.get(raw_id) if raw_id in existing else None
+            # A role change is a revoke plus a fresh grant, never an in-place
+            # mutation: granted_by/granted_at document who granted THIS role, so
+            # the old row must die (a change-logged revocation via Pass 2) and a
+            # new row is created under the acting user's provenance. Scope-only
+            # changes still update the surviving row in place (Pass 3).
+            if assignment is not None and assignment.role_id != cd['role'].pk:
+                assignment = None
             kept.append((assignment, cd['role'], scope, scope_group, assigned))
+        return kept
+
+    def _sync_managed_formset(self, membership):
+        if self.managed_formset is None:
+            return
+        existing = {
+            a.pk: a for a in membership.assignments.filter(
+                reach=RoleAssignment.REACH_MANAGED,
+            )
+        }
+
+        # Pass 1: collect the intended rows (an existing assignment or a new one).
+        kept = self._intended_managed_rows(existing)
 
         kept_existing_ids = {a.pk for (a, _r, _s, _g, _t) in kept if a is not None}
 

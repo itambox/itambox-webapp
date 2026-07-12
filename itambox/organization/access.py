@@ -13,8 +13,15 @@ resolved separately by :class:`core.auth.MembershipBackend`.
 """
 
 
-def get_descendant_tenant_group_ids(group_id):
-    """Return ``group_id`` plus the ids of all its descendant TenantGroups (inclusive)."""
+def get_descendant_tenant_group_ids(group_id, live_only=False):
+    """Return ``group_id`` plus the ids of all its descendant TenantGroups (inclusive).
+
+    With ``live_only=True`` the walk prunes at soft-deleted nodes (a deleted
+    subgroup and everything below it is excluded), matching the descendant walk
+    inside ``TenantScopingQuerySet.filter_by_tenant`` — use it wherever the
+    result must agree with what the scoped querysets show. The default keeps the
+    raw tree for reach/audit semantics (``RoleAssignment.covers_tenant`` etc.).
+    """
     if group_id is None:
         return set()
     # inline import: avoid AppRegistryNotReady / a core<->organization cycle at load
@@ -23,11 +30,11 @@ def get_descendant_tenant_group_ids(group_id):
     ids = {group_id}
     frontier = [group_id]
     while frontier:
-        children = list(
-            TenantGroup._base_manager.filter(parent_id__in=frontier)
-            .exclude(pk__in=ids)
-            .values_list('pk', flat=True)
-        )
+        children_qs = TenantGroup._base_manager.filter(
+            parent_id__in=frontier).exclude(pk__in=ids)
+        if live_only:
+            children_qs = children_qs.filter(deleted_at__isnull=True)
+        children = list(children_qs.values_list('pk', flat=True))
         if not children:
             break
         ids.update(children)

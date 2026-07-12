@@ -19,7 +19,7 @@ from django.contrib.auth import get_user_model
 from django.test import TestCase
 
 from core.tests.mixins import TenantTestMixin, grant
-from organization.models import Tenant, Role, RoleAssignment, TenantGroup
+from organization.models import Membership, Tenant, Role, RoleAssignment, TenantGroup
 from organization.forms.membership_form import MembershipForm
 
 from ._membership_form_helpers import membership_post_data
@@ -312,3 +312,322 @@ class ManagedFormsetRulesTests(TenantTestMixin, TestCase):
         self.assertTrue(form.is_valid(), form.errors.as_json())
         membership = form.save()
         self.assertEqual(membership.assignments.count(), 0)
+
+
+class ManagedRoleChangeTests(TenantTestMixin, TestCase):
+    """RC-blocker regression: editing an existing managed row's ROLE must persist.
+
+    The reconciler used to update only the scope fields of a surviving row, so a
+    role change validated, "saved", and silently left the old role granted. A
+    role change is a revoke plus a fresh grant: the old row dies, a new row
+    carries the new role under the acting user's provenance, and the refinement
+    plus sibling rows survive verbatim.
+    """
+
+    def setUp(self):
+        self.clear_tenant_context()
+        self.msp = Tenant.objects.create(name="MSP RC", slug="msp-rc", is_provider=True)
+        self.group = TenantGroup.objects.create(name="RC Region", slug="rc-region")
+        self.cust_a = Tenant.objects.create(name="RC A", slug="rc-a", managed_by=self.msp)
+        self.cust_g = Tenant.objects.create(
+            name="RC G", slug="rc-g", managed_by=self.msp, group=self.group,
+        )
+        self.granter = User.objects.create_superuser(
+            username="rc_granter", email="rc_granter@x.com", password="pw",
+        )
+        self.editor = User.objects.create_superuser(
+            username="rc_editor", email="rc_editor@x.com", password="pw",
+        )
+        self.member = User.objects.create_user(
+            username="rc_member", email="rc_member@x.com", password="pw",
+        )
+        self.role_x = Role.objects.create(tenant=self.msp, name="RC Role X", permissions=[])
+        self.role_y = Role.objects.create(tenant=self.msp, name="RC Role Y", permissions=[])
+        self.role_z = Role.objects.create(tenant=self.msp, name="RC Role Z", permissions=[])
+        self.own = grant(
+            self.member, self.msp, self.role_z,
+            reach=RoleAssignment.REACH_OWN, granted_by=self.granter,
+        )
+        self.mx = grant(
+            self.member, self.msp, self.role_x, reach=RoleAssignment.REACH_MANAGED,
+            managed_scope=RoleAssignment.SCOPE_EXPLICIT, granted_by=self.granter,
+            assigned_tenants=[self.cust_a],
+        )
+        self.membership = self.mx.membership
+
+    def tearDown(self):
+        self.clear_tenant_context()
+
+    def _managed_rows(self, *rows):
+        return membership_post_data(
+            user=self.member.pk, tenant=self.msp.pk,
+            own_roles=[self.role_z.pk], managed=list(rows),
+        )
+
+    def test_role_change_is_persisted_as_revoke_plus_grant(self):
+        own_before = _fingerprint(self.own)
+        form = MembershipForm(
+            data=self._managed_rows({
+                'id': self.mx.pk, 'role': self.role_y.pk,
+                'managed_scope': RoleAssignment.SCOPE_EXPLICIT,
+                'assigned_tenants': [self.cust_a.pk],
+            }),
+            instance=self.membership, user=self.editor,
+        )
+        self.assertTrue(form.is_valid(), form.errors.as_json())
+        form.save()
+        managed = self.membership.assignments.filter(reach=RoleAssignment.REACH_MANAGED)
+        # The requested role IS what the database now grants (the RC probe).
+        self.assertEqual(
+            list(managed.values_list('role_id', flat=True)), [self.role_y.pk],
+        )
+        row = managed.get()
+        # A fresh row under the acting user's provenance, not a mutated old one.
+        self.assertNotEqual(row.pk, self.mx.pk)
+        self.assertEqual(row.granted_by_id, self.editor.pk)
+        # The refinement travelled onto the new grant.
+        self.assertEqual(row.managed_scope, RoleAssignment.SCOPE_EXPLICIT)
+        self.assertEqual(
+            set(row.assigned_tenants.values_list('pk', flat=True)), {self.cust_a.pk},
+        )
+        # The own-reach sibling is untouched.
+        self.own.refresh_from_db()
+        self.assertEqual(_fingerprint(self.own), own_before)
+
+    def test_role_change_preserves_group_scope_and_sibling_row(self):
+        my = grant(
+            self.member, self.msp, self.role_y, reach=RoleAssignment.REACH_MANAGED,
+            managed_scope=RoleAssignment.SCOPE_TENANT_GROUP, scope_group=self.group,
+            granted_by=self.granter,
+        )
+        mx_before = _fingerprint(self.mx)
+        form = MembershipForm(
+            data=self._managed_rows(
+                {
+                    'id': self.mx.pk, 'role': self.role_x.pk,
+                    'managed_scope': RoleAssignment.SCOPE_EXPLICIT,
+                    'assigned_tenants': [self.cust_a.pk],
+                },
+                {
+                    'id': my.pk, 'role': self.role_z.pk,
+                    'managed_scope': RoleAssignment.SCOPE_TENANT_GROUP,
+                    'scope_group': self.group.pk,
+                },
+            ),
+            instance=self.membership, user=self.editor,
+        )
+        self.assertTrue(form.is_valid(), form.errors.as_json())
+        form.save()
+        managed = self.membership.assignments.filter(reach=RoleAssignment.REACH_MANAGED)
+        self.assertEqual(
+            set(managed.values_list('role_id', flat=True)),
+            {self.role_x.pk, self.role_z.pk},
+        )
+        new_row = managed.get(role=self.role_z)
+        self.assertEqual(new_row.managed_scope, RoleAssignment.SCOPE_TENANT_GROUP)
+        self.assertEqual(new_row.scope_group_id, self.group.pk)
+        self.assertEqual(new_row.granted_by_id, self.editor.pk)
+        # The untouched sibling keeps its identity (pk, provenance, timestamps).
+        self.mx.refresh_from_db()
+        self.assertEqual(_fingerprint(self.mx), mx_before)
+
+    def test_role_swap_between_two_managed_rows(self):
+        my = grant(
+            self.member, self.msp, self.role_y, reach=RoleAssignment.REACH_MANAGED,
+            managed_scope=RoleAssignment.SCOPE_ALL, granted_by=self.granter,
+        )
+        form = MembershipForm(
+            data=self._managed_rows(
+                {
+                    'id': self.mx.pk, 'role': self.role_y.pk,
+                    'managed_scope': RoleAssignment.SCOPE_EXPLICIT,
+                    'assigned_tenants': [self.cust_a.pk],
+                },
+                {
+                    'id': my.pk, 'role': self.role_x.pk,
+                    'managed_scope': RoleAssignment.SCOPE_ALL,
+                },
+            ),
+            instance=self.membership, user=self.editor,
+        )
+        self.assertTrue(form.is_valid(), form.errors.as_json())
+        form.save()
+        managed = self.membership.assignments.filter(reach=RoleAssignment.REACH_MANAGED)
+        self.assertEqual(managed.count(), 2)
+        self.assertEqual(managed.get(role=self.role_y).managed_scope, RoleAssignment.SCOPE_EXPLICIT)
+        self.assertEqual(managed.get(role=self.role_x).managed_scope, RoleAssignment.SCOPE_ALL)
+
+    def test_role_change_is_audited_as_revoke_plus_grant(self):
+        # The revoke+regrant design exists FOR the audit trail: with a request
+        # context bound, the old row's deletion and the new row's creation must
+        # both land in ObjectChange (a bulk-delete regression would skip them).
+        import uuid
+        from django.contrib.contenttypes.models import ContentType
+        from core.models import ObjectChange
+        from itambox.middleware import _current_user, _request_id
+
+        _current_user.set(self.editor)
+        _request_id.set(uuid.uuid4())
+        try:
+            old_pk = self.mx.pk
+            form = MembershipForm(
+                data=self._managed_rows({
+                    'id': self.mx.pk, 'role': self.role_y.pk,
+                    'managed_scope': RoleAssignment.SCOPE_EXPLICIT,
+                    'assigned_tenants': [self.cust_a.pk],
+                }),
+                instance=self.membership, user=self.editor,
+            )
+            self.assertTrue(form.is_valid(), form.errors.as_json())
+            form.save()
+            new_pk = self.membership.assignments.get(
+                reach=RoleAssignment.REACH_MANAGED).pk
+            ct = ContentType.objects.get_for_model(RoleAssignment)
+            self.assertTrue(ObjectChange._base_manager.filter(
+                changed_object_type=ct, changed_object_id=old_pk, action='delete',
+            ).exists(), "revocation of the old role must be change-logged")
+            self.assertTrue(ObjectChange._base_manager.filter(
+                changed_object_type=ct, changed_object_id=new_pk, action='create',
+            ).exists(), "the fresh grant must be change-logged")
+        finally:
+            _current_user.set(None)
+            _request_id.set(None)
+
+    def test_role_change_duplicating_a_sibling_role_is_rejected(self):
+        my = grant(
+            self.member, self.msp, self.role_y, reach=RoleAssignment.REACH_MANAGED,
+            managed_scope=RoleAssignment.SCOPE_ALL, granted_by=self.granter,
+        )
+        form = MembershipForm(
+            data=self._managed_rows(
+                {
+                    'id': self.mx.pk, 'role': self.role_y.pk,
+                    'managed_scope': RoleAssignment.SCOPE_EXPLICIT,
+                    'assigned_tenants': [self.cust_a.pk],
+                },
+                {
+                    'id': my.pk, 'role': self.role_y.pk,
+                    'managed_scope': RoleAssignment.SCOPE_ALL,
+                },
+            ),
+            instance=self.membership, user=self.editor,
+        )
+        self.assertFalse(form.is_valid())
+        self.assertTrue(form.managed_formset.non_form_errors())
+        # Nothing changed in the database.
+        self.mx.refresh_from_db()
+        self.assertEqual(self.mx.role_id, self.role_x.pk)
+
+
+class SaveCommitContractTests(TenantTestMixin, TestCase):
+    """RC-blocker regression: ``save(commit=False)`` must not persist anything.
+
+    The inline who-block used to create (and persist) the new user before
+    returning the unsaved membership. That combination is now rejected loudly;
+    the existing-user path keeps its documented no-write contract.
+    """
+
+    def setUp(self):
+        self.clear_tenant_context()
+        self.msp = Tenant.objects.create(name="MSP CF", slug="msp-cf", is_provider=True)
+        self.su = User.objects.create_superuser(
+            username="cf_su", email="cf_su@x.com", password="pw",
+        )
+        self.member = User.objects.create_user(
+            username="cf_member", email="cf_member@x.com", password="pw",
+        )
+        self.role = Role.objects.create(tenant=self.msp, name="CF Role", permissions=[])
+
+    def tearDown(self):
+        self.clear_tenant_context()
+
+    def test_commit_false_with_inline_new_user_raises_and_writes_nothing(self):
+        users_before = User.objects.count()
+        form = MembershipForm(
+            data=membership_post_data(
+                tenant=self.msp.pk, who=MembershipForm.WHO_NEW,
+                new_user_email='cf-fresh@example.com',
+                new_user_first_name='Fresh', new_user_last_name='User',
+            ),
+            tenant=self.msp, user=self.su,
+        )
+        self.assertTrue(form.is_valid(), form.errors.as_json())
+        with self.assertRaises(ValueError):
+            form.save(commit=False)
+        self.assertEqual(User.objects.count(), users_before)
+        self.assertFalse(User.objects.filter(email__iexact='cf-fresh@example.com').exists())
+        self.assertFalse(Membership.objects.filter(tenant=self.msp).exists())
+
+    def test_commit_false_with_existing_user_defers_all_writes(self):
+        form = MembershipForm(
+            data=membership_post_data(
+                user=self.member.pk, tenant=self.msp.pk,
+                who=MembershipForm.WHO_EXISTING, own_roles=[self.role.pk],
+            ),
+            tenant=self.msp, user=self.su,
+        )
+        self.assertTrue(form.is_valid(), form.errors.as_json())
+        instance = form.save(commit=False)
+        self.assertIsNone(instance.pk)
+        self.assertFalse(
+            Membership.objects.filter(user=self.member, tenant=self.msp).exists()
+        )
+        self.assertEqual(
+            RoleAssignment.objects.filter(membership__user=self.member).count(), 0,
+        )
+
+    def test_commit_false_with_resolved_existing_email_defers_all_writes(self):
+        # who=new but the email matches an existing account: clean() resolves
+        # the user (get-or-create semantics), so NO user row would be written —
+        # commit=False must return the unsaved membership, not raise.
+        form = MembershipForm(
+            data=membership_post_data(
+                tenant=self.msp.pk, who=MembershipForm.WHO_NEW,
+                new_user_email=self.member.email,
+                new_user_first_name='CF', new_user_last_name='Member',
+            ),
+            tenant=self.msp, user=self.su,
+        )
+        self.assertTrue(form.is_valid(), form.errors.as_json())
+        instance = form.save(commit=False)
+        self.assertIsNone(instance.pk)
+        self.assertEqual(instance.user_id, self.member.pk)
+        self.assertFalse(Membership.objects.filter(tenant=self.msp).exists())
+
+    def test_commit_false_two_step_completes_grants_via_save_m2m(self):
+        # The canonical Django two-step (instance.save() + form.save_m2m()) must
+        # end with the SAME grant rows a commit=True save writes.
+        form = MembershipForm(
+            data=membership_post_data(
+                user=self.member.pk, tenant=self.msp.pk,
+                who=MembershipForm.WHO_EXISTING, own_roles=[self.role.pk],
+            ),
+            tenant=self.msp, user=self.su,
+        )
+        self.assertTrue(form.is_valid(), form.errors.as_json())
+        instance = form.save(commit=False)
+        self.assertEqual(
+            RoleAssignment.objects.filter(membership__user=self.member).count(), 0,
+        )
+        instance.save()
+        form.save_m2m()
+        membership = Membership.objects.get(user=self.member, tenant=self.msp)
+        assignment = membership.assignments.get()
+        self.assertEqual(assignment.role_id, self.role.pk)
+        self.assertEqual(assignment.reach, RoleAssignment.REACH_OWN)
+        self.assertEqual(assignment.granted_by_id, self.su.pk)
+
+    def test_commit_true_with_inline_new_user_still_works(self):
+        form = MembershipForm(
+            data=membership_post_data(
+                tenant=self.msp.pk, who=MembershipForm.WHO_NEW,
+                new_user_email='cf-real@example.com',
+                new_user_first_name='Real', new_user_last_name='User',
+            ),
+            tenant=self.msp, user=self.su,
+        )
+        self.assertTrue(form.is_valid(), form.errors.as_json())
+        membership = form.save()
+        self.assertIsNotNone(membership.pk)
+        self.assertTrue(form.new_user_created)
+        self.assertEqual(membership.user.email, 'cf-real@example.com')

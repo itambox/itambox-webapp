@@ -106,6 +106,30 @@ class TenantScopingViewMixin:
         return queryset
 
 
+def filter_permitted_rows(user, rows, model, action):
+    """Split ``rows`` into ``(permitted, skipped_count)`` by the per-object perm.
+
+    Bulk views dispatch on an AMBIENT permission check: under a tenant-group
+    scope it passes when the permission is held in ANY accessible tenant of the
+    subtree, while the scoped queryset spans EVERY accessible tenant there —
+    reach alone (not permission content) decides queryset membership. Re-check
+    ``<action>_<model>`` per row (anchored at the row's own tenant) so a member
+    cannot mutate rows of a sibling tenant where their role conveys no such
+    permission. Rows without a resolvable tenant (global/shared) fall back to
+    the ambient gate that already passed. Cheap: the backend caches effective
+    permissions per (user, tenant), so the cost is one resolution per distinct
+    tenant, not per row.
+    """
+    perm = f'{model._meta.app_label}.{action}_{model._meta.model_name}'
+    permitted, skipped = [], 0
+    for obj in rows:
+        if user.has_perm(perm, obj=obj):
+            permitted.append(obj)
+        else:
+            skipped += 1
+    return permitted, skipped
+
+
 class BulkViewMixin:
     """Shared helpers for ``ObjectBulkEditView`` and ``ObjectBulkDeleteView``.
 
