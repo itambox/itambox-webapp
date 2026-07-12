@@ -3,7 +3,7 @@ from django.utils.translation import gettext_lazy as _
 from .models import (
     Region, SiteGroup, Tenant, Location, TenantGroup, Site,
     Contact, ContactRole, ContactAssignment,
-    Membership, Role, RoleAssignment, CostCenter,
+    Membership, Role, RoleAssignment, CostCenter, TenantResourceGrant,
 )
 
 
@@ -77,6 +77,22 @@ class RoleAdmin(admin.ModelAdmin):
     prepopulated_fields = {'slug': ('name',)}
 
 
+class TenantResourceGrantAdmin(admin.ModelAdmin):
+    list_display = ('tenant', 'grantee_tenant', 'grantee_tenant_group',
+                    'resource_type', 'resource_id', 'access_level',
+                    'granted_by', 'created_at', 'deleted_at')
+    list_filter = ('access_level', 'resource_type')
+    search_fields = ('tenant__name', 'grantee_tenant__name',
+                     'grantee_tenant_group__name', 'reason')
+    raw_id_fields = ('tenant', 'grantee_tenant', 'grantee_tenant_group', 'granted_by')
+
+    def get_queryset(self, request):
+        # Include revoked (soft-deleted) grants — the admin is the operator's
+        # audit surface. _base_manager: the model deliberately defines no
+        # all_objects (see the model docstring).
+        return TenantResourceGrant._base_manager.all()
+
+
 class CostCenterAdmin(admin.ModelAdmin):
     list_display = ('code', 'name', 'tenant', 'parent', 'is_active')
     list_filter = ('tenant', 'is_active')
@@ -98,3 +114,4 @@ admin.site.register(Membership, MembershipAdmin)
 admin.site.register(RoleAssignment, RoleAssignmentAdmin)
 admin.site.register(Role, RoleAdmin)
 admin.site.register(CostCenter, CostCenterAdmin)
+admin.site.register(TenantResourceGrant, TenantResourceGrantAdmin)

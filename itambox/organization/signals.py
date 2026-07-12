@@ -1,9 +1,9 @@
-"""Organization signals — unified RBAC wiring."""
+"""Organization signals — unified RBAC wiring + resource-grant hygiene."""
 from django.apps import apps
 from django.db.models.signals import post_save, post_delete, m2m_changed
 from django.dispatch import receiver
 
-from .models import AssetHolder, Membership, Role, RoleAssignment
+from .models import AssetHolder, Membership, Role, RoleAssignment, TenantResourceGrant
 
 
 def _clear_user_perm_caches(user):
@@ -99,3 +99,33 @@ def clear_cache_on_group_members_change(sender, instance, action, pk_set, **kwar
     else:  # instance is a UserGroup; pk_set holds user ids
         for user in User.objects.filter(pk__in=pk_set or []):
             _clear_user_perm_caches(user)
+
+
+# --------------------------------------------------------------------------
+# TenantResourceGrant orphan cleanup (ADR-0001 phase 2): a generic FK cannot
+# cascade, so when an approved stock pool is hard-deleted, revoke (soft-
+# delete) every active grant that references it. Revoked grants stay as the
+# audit trail; assignments keep their provenance pointer.
+# --------------------------------------------------------------------------
+
+def _revoke_grants_for_deleted_resource(sender, instance, **kwargs):
+    from django.contrib.contenttypes.models import ContentType
+    ct = ContentType.objects.get_for_model(sender)
+    for grant in TenantResourceGrant.objects.filter(
+        resource_type=ct, resource_id=instance.pk, deleted_at__isnull=True,
+    ):
+        grant.delete()  # SoftDeleteMixin: sets deleted_at (revocation)
+
+
+def _connect_resource_grant_cleanup():
+    for label in TenantResourceGrant.APPROVED_RESOURCE_MODELS:
+        app_label, model_name = label.split('.')
+        model = apps.get_model(app_label, model_name)
+        post_delete.connect(
+            _revoke_grants_for_deleted_resource,
+            sender=model,
+            dispatch_uid=f'trg_orphan_cleanup_{model_name}',
+        )
+
+
+_connect_resource_grant_cleanup()
