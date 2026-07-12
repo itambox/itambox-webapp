@@ -96,14 +96,24 @@ class TenantScopingQuerySet(models.QuerySet):
 
                 TenantGroup = apps.get_model('organization', 'TenantGroup')
                 descendant_ids = [group_id]
+                seen = {group_id}
                 to_check = [group_id]
                 while to_check:
                     # _base_manager (unscoped): TenantGroup.objects is itself
                     # tenant-scoped now, so using it here would recurse back into
                     # filter_by_tenant. The descendant walk needs the true tree.
-                    children = list(TenantGroup._base_manager.filter(parent_id__in=to_check, deleted_at__isnull=True).values_list('pk', flat=True))
+                    # exclude(seen): a parent cycle in bad data must terminate the
+                    # walk, not hang every scoped request (mirrors the cycle-safe
+                    # walk in organization.access.get_descendant_tenant_group_ids).
+                    children = list(
+                        TenantGroup._base_manager
+                        .filter(parent_id__in=to_check, deleted_at__isnull=True)
+                        .exclude(pk__in=seen)
+                        .values_list('pk', flat=True)
+                    )
                     if not children:
                         break
+                    seen.update(children)
                     descendant_ids.extend(children)
                     to_check = children
                 cache[group_id] = descendant_ids
