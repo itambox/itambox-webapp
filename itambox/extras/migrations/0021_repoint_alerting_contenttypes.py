@@ -42,6 +42,13 @@ def backwards(apps, schema_editor):
 
 class Migration(migrations.Migration):
 
+    # This data migration reads organization.TenantRole from historical
+    # state; pin it BEFORE the migration that drops the model, so new
+    # migrations elsewhere can never re-shuffle the plan past the drop.
+    run_before = [
+        ('organization', '0027_drop_legacy_role_models'),
+    ]
+
     dependencies = [
         ('extras', '0022_fix_scheduledreport_channels_ref'),
         ('core', '0027_remove_notificationchannel_alertrule_alertlog'),
