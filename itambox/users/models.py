@@ -218,7 +218,7 @@ class Token(ChangeLoggingMixin, models.Model):
         if not plaintext:
             return None
         digests = [hash_token(plaintext, pid) for pid in token_peppers()]
-        return cls.objects.select_related('user').filter(digest__in=digests).first()
+        return cls.objects.select_related('user', 'tenant').filter(digest__in=digests).first()
 
     @property
     def is_expired(self):
