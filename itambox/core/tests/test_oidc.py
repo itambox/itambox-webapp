@@ -6,7 +6,16 @@ from django.contrib.contenttypes.models import ContentType
 from django.urls import reverse
 from core.managers import set_current_tenant, get_current_tenant
 from core.auth.oidc import TenantOIDCBackend, TenantOIDCAuthorizeView, TenantOIDCCallbackView
-from organization.models import Tenant, Membership, Role, AssetHolder
+from organization.models import (
+    AssetHolder,
+    Membership,
+    Role,
+    RoleGrant,
+    RoleGrantScope,
+    Tenant,
+)
+from organization.rbac import accessible_tenant_ids, effective_permissions
+from users.models import GroupMembership, UserGroup
 
 User = get_user_model()
 
@@ -148,9 +157,9 @@ class TenantOIDCTestCase(TestCase):
         user_admin = backend.create_user(claims_admin)
 
         membership_admin = Membership.objects.get(user=user_admin, tenant=self.tenant_alpha)
-        self.assertEqual(membership_admin.assignments.first().role.name, "Admin")
+        self.assertEqual(membership_admin.role_grants.first().role.name, "Admin")
         # Admin should have delete permission on normal models
-        self.assertTrue(any("delete_" in p for p in membership_admin.assignments.first().role.permissions if "dashboard" not in p))
+        self.assertTrue(any("delete_" in p for p in membership_admin.role_grants.first().role.permissions if "dashboard" not in p))
 
         # Setup OIDC claims mapping to Manager (lower priority than Admin, higher than Member)
         claims_manager = {
@@ -161,9 +170,9 @@ class TenantOIDCTestCase(TestCase):
         user_mgr = backend.create_user(claims_manager)
 
         membership_mgr = Membership.objects.get(user=user_mgr, tenant=self.tenant_alpha)
-        self.assertEqual(membership_mgr.assignments.first().role.name, "Manager")
+        self.assertEqual(membership_mgr.role_grants.first().role.name, "Manager")
         # Manager should not have delete permission on normal models but should have add/change
-        self.assertFalse(any("delete_" in p for p in membership_mgr.assignments.first().role.permissions if "dashboard" not in p))
+        self.assertFalse(any("delete_" in p for p in membership_mgr.role_grants.first().role.permissions if "dashboard" not in p))
 
         # Fallback to Member
         claims_fallback = {
@@ -174,7 +183,418 @@ class TenantOIDCTestCase(TestCase):
         user_mem = backend.create_user(claims_fallback)
 
         membership_mem = Membership.objects.get(user=user_mem, tenant=self.tenant_alpha)
-        self.assertEqual(membership_mem.assignments.first().role.name, "Member")
+        self.assertEqual(membership_mem.role_grants.first().role.name, "Member")
+
+    def test_managed_customer_provider_staff_mapping_provisions_provider_identity_only(self):
+        provider = Tenant.objects.create(
+            name="Provider",
+            slug="oidc-provider",
+            is_provider=True,
+        )
+        self.tenant_alpha.managed_by = provider
+        self.tenant_alpha.save(update_fields=['managed_by'])
+        provider_role = Role.objects.create(
+            tenant=provider,
+            name="Provider Technician",
+            permissions=['assets.view_asset'],
+        )
+        configs = {
+            provider.slug: {
+                'OIDC_GROUP_PROVIDER_ROLE_MAPPING': {
+                    'provider-technicians': provider_role.name,
+                },
+            },
+            self.tenant_alpha.slug: {
+                # This deliberately maps the same claim locally. Provider
+                # identity resolution must take precedence.
+                'OIDC_GROUP_ROLE_MAPPING': {
+                    'provider-technicians': 'Admin',
+                },
+            },
+        }
+
+        set_current_tenant(self.tenant_alpha)
+        with self.settings(ITAMBOX_TENANT_OIDC_CONFIGS=configs):
+            user = TenantOIDCBackend().create_user({
+                'email': 'provider-tech@example.com',
+                'sub': 'provider-tech',
+                'groups': ['provider-technicians'],
+            })
+
+        provider_membership = Membership.objects.get(user=user)
+        self.assertEqual(provider_membership.tenant_id, provider.pk)
+        self.assertTrue(provider_membership.is_active)
+        self.assertFalse(Membership.objects.filter(
+            user=user,
+            tenant=self.tenant_alpha,
+        ).exists())
+        self.assertFalse(AssetHolder.objects.filter(
+            user=user,
+            tenant=self.tenant_alpha,
+        ).exists())
+        self.assertFalse(RoleGrant.objects.filter(
+            membership=provider_membership,
+        ).exists())
+        self.assertEqual(accessible_tenant_ids(user), {provider.pk})
+        self.assertEqual(effective_permissions(user, self.tenant_alpha), frozenset())
+
+        grant = RoleGrant.objects.create(
+            membership=provider_membership,
+            role=provider_role,
+        )
+        RoleGrantScope.objects.create(
+            role_grant=grant,
+            scope_type=RoleGrantScope.SCOPE_TENANT,
+            tenant=self.tenant_alpha,
+        )
+
+        self.assertEqual(
+            accessible_tenant_ids(user),
+            {provider.pk, self.tenant_alpha.pk},
+        )
+        self.assertEqual(
+            effective_permissions(user, self.tenant_alpha),
+            frozenset({'assets.view_asset'}),
+        )
+
+    def test_existing_customer_user_transition_normalizes_to_provider_identity(self):
+        provider = Tenant.objects.create(
+            name='Transition Provider',
+            slug='oidc-transition-provider',
+            is_provider=True,
+        )
+        self.tenant_alpha.managed_by = provider
+        self.tenant_alpha.save(update_fields=['managed_by'])
+        provider_role = Role.objects.create(
+            tenant=provider,
+            name='Provider Technician',
+            permissions=['assets.view_asset'],
+        )
+        customer_role = Role.objects.create(
+            tenant=self.tenant_alpha,
+            name='Customer Member',
+            permissions=['assets.view_asset'],
+        )
+        user = User.objects.create_user(
+            username='transition-tech',
+            email='transition-tech@example.com',
+        )
+        customer_membership = Membership.objects.create(
+            user=user,
+            tenant=self.tenant_alpha,
+        )
+        local_grant = RoleGrant.objects.create(
+            membership=customer_membership,
+            role=customer_role,
+        )
+        local_scope = RoleGrantScope.objects.create(
+            role_grant=local_grant,
+            scope_type=RoleGrantScope.SCOPE_OWN,
+        )
+        customer_group = UserGroup.objects.create(
+            tenant=self.tenant_alpha,
+            name='Customer users',
+        )
+        local_group_membership = GroupMembership.objects.create(
+            user_group=customer_group,
+            membership=customer_membership,
+        )
+        customer_holder = AssetHolder.objects.create(
+            user=user,
+            first_name='Transition',
+            last_name='Tech',
+            upn='transition-tech@example.com',
+            email='transition-tech@example.com',
+            tenant=self.tenant_alpha,
+        )
+
+        # Existing provider identity is suspended and must be reactivated.
+        provider_membership = Membership.objects.create(
+            user=user,
+            tenant=provider,
+            is_active=False,
+        )
+
+        # An unrelated customer identity must remain completely untouched.
+        unrelated_membership = Membership.objects.create(
+            user=user,
+            tenant=self.tenant_beta,
+        )
+        unrelated_holder = AssetHolder.objects.create(
+            user=user,
+            first_name='Other',
+            last_name='Identity',
+            upn='transition-tech@beta.example.com',
+            email='transition-tech@example.com',
+            tenant=self.tenant_beta,
+        )
+        configs = {
+            provider.slug: {
+                'OIDC_GROUP_PROVIDER_ROLE_MAPPING': {
+                    'provider-technicians': provider_role.name,
+                },
+            },
+            self.tenant_alpha.slug: {},
+        }
+
+        set_current_tenant(self.tenant_alpha)
+        with self.settings(ITAMBOX_TENANT_OIDC_CONFIGS=configs):
+            updated = TenantOIDCBackend().update_user(user, {
+                'email': user.email,
+                'sub': 'transition-tech',
+                'groups': ['provider-technicians'],
+            })
+
+        self.assertEqual(updated, user)
+        provider_membership.refresh_from_db()
+        self.assertTrue(provider_membership.is_active)
+        self.assertFalse(RoleGrant.objects.filter(
+            membership=provider_membership,
+        ).exists())
+        self.assertFalse(Membership._base_manager.filter(
+            pk=customer_membership.pk,
+        ).exists())
+        self.assertFalse(RoleGrant.objects.filter(pk=local_grant.pk).exists())
+        self.assertFalse(RoleGrantScope.objects.filter(pk=local_scope.pk).exists())
+        self.assertFalse(GroupMembership.objects.filter(
+            pk=local_group_membership.pk,
+        ).exists())
+        self.assertTrue(UserGroup._base_manager.filter(
+            pk=customer_group.pk,
+        ).exists())
+
+        customer_holder.refresh_from_db()
+        self.assertIsNone(customer_holder.user_id)
+        self.assertIsNone(customer_holder.deleted_at)
+        self.assertTrue(AssetHolder._base_manager.filter(
+            pk=customer_holder.pk,
+        ).exists())
+
+        self.assertTrue(Membership._base_manager.filter(
+            pk=unrelated_membership.pk,
+            user=user,
+            tenant=self.tenant_beta,
+        ).exists())
+        unrelated_holder.refresh_from_db()
+        self.assertEqual(unrelated_holder.user_id, user.pk)
+
+    def test_existing_customer_identity_survives_missing_provider_role(self):
+        provider = Tenant.objects.create(
+            name='Missing Role Transition Provider',
+            slug='oidc-transition-missing-role',
+            is_provider=True,
+        )
+        self.tenant_alpha.managed_by = provider
+        self.tenant_alpha.save(update_fields=['managed_by'])
+        customer_role = Role.objects.create(
+            tenant=self.tenant_alpha,
+            name='Customer Member',
+            permissions=['assets.view_asset'],
+        )
+        user = User.objects.create_user(
+            username='retained-customer',
+            email='retained-customer@example.com',
+        )
+        customer_membership = Membership.objects.create(
+            user=user,
+            tenant=self.tenant_alpha,
+        )
+        local_grant = RoleGrant.objects.create(
+            membership=customer_membership,
+            role=customer_role,
+        )
+        local_scope = RoleGrantScope.objects.create(
+            role_grant=local_grant,
+            scope_type=RoleGrantScope.SCOPE_OWN,
+        )
+        customer_group = UserGroup.objects.create(
+            tenant=self.tenant_alpha,
+            name='Retained customer users',
+        )
+        local_group_membership = GroupMembership.objects.create(
+            user_group=customer_group,
+            membership=customer_membership,
+        )
+        customer_holder = AssetHolder.objects.create(
+            user=user,
+            first_name='Retained',
+            last_name='Customer',
+            upn='retained-customer@example.com',
+            email='retained-customer@example.com',
+            tenant=self.tenant_alpha,
+        )
+        provider_membership = Membership.objects.create(
+            user=user,
+            tenant=provider,
+            is_active=False,
+        )
+        configs = {
+            provider.slug: {
+                'OIDC_GROUP_PROVIDER_ROLE_MAPPING': {
+                    'provider-technicians': 'Missing Provider Role',
+                },
+            },
+            self.tenant_alpha.slug: {},
+        }
+
+        set_current_tenant(self.tenant_alpha)
+        with self.settings(ITAMBOX_TENANT_OIDC_CONFIGS=configs):
+            TenantOIDCBackend().update_user(user, {
+                'email': user.email,
+                'sub': 'retained-customer',
+                'groups': ['provider-technicians'],
+            })
+
+        customer_membership.refresh_from_db()
+        self.assertTrue(customer_membership.is_active)
+        self.assertTrue(RoleGrant.objects.filter(pk=local_grant.pk).exists())
+        self.assertTrue(RoleGrantScope.objects.filter(pk=local_scope.pk).exists())
+        self.assertTrue(GroupMembership.objects.filter(
+            pk=local_group_membership.pk,
+        ).exists())
+        customer_holder.refresh_from_db()
+        self.assertEqual(customer_holder.user_id, user.pk)
+        self.assertIsNone(customer_holder.deleted_at)
+        provider_membership.refresh_from_db()
+        self.assertFalse(provider_membership.is_active)
+
+    def test_provider_identity_transition_rolls_back_as_one_unit(self):
+        provider = Tenant.objects.create(
+            name='Atomic Transition Provider',
+            slug='oidc-transition-atomic',
+            is_provider=True,
+        )
+        self.tenant_alpha.managed_by = provider
+        self.tenant_alpha.save(update_fields=['managed_by'])
+        provider_role = Role.objects.create(
+            tenant=provider,
+            name='Provider Technician',
+        )
+        user = User.objects.create_user(
+            username='atomic-transition-tech',
+            email='atomic-transition-tech@example.com',
+        )
+        customer_membership = Membership.objects.create(
+            user=user,
+            tenant=self.tenant_alpha,
+        )
+        provider_membership = Membership.objects.create(
+            user=user,
+            tenant=provider,
+            is_active=False,
+        )
+        customer_holder = AssetHolder.objects.create(
+            user=user,
+            first_name='Atomic',
+            last_name='Transition',
+            upn='atomic-transition-tech@example.com',
+            email='atomic-transition-tech@example.com',
+            tenant=self.tenant_alpha,
+        )
+        configs = {
+            provider.slug: {
+                'OIDC_GROUP_PROVIDER_ROLE_MAPPING': {
+                    'provider-technicians': provider_role.name,
+                },
+            },
+            self.tenant_alpha.slug: {},
+        }
+
+        set_current_tenant(self.tenant_alpha)
+        with self.settings(ITAMBOX_TENANT_OIDC_CONFIGS=configs):
+            with patch.object(
+                AssetHolder,
+                'save',
+                side_effect=RuntimeError('holder unlink failed'),
+            ):
+                with self.assertRaisesRegex(RuntimeError, 'holder unlink failed'):
+                    TenantOIDCBackend().update_user(user, {
+                        'email': user.email,
+                        'sub': 'atomic-transition-tech',
+                        'groups': ['provider-technicians'],
+                    })
+
+        provider_membership.refresh_from_db()
+        self.assertFalse(provider_membership.is_active)
+        self.assertTrue(Membership._base_manager.filter(
+            pk=customer_membership.pk,
+        ).exists())
+        customer_holder.refresh_from_db()
+        self.assertEqual(customer_holder.user_id, user.pk)
+
+    def test_provider_staff_mapping_with_missing_provider_role_fails_closed(self):
+        provider = Tenant.objects.create(
+            name="Provider",
+            slug="oidc-provider-missing-role",
+            is_provider=True,
+        )
+        self.tenant_alpha.managed_by = provider
+        self.tenant_alpha.save(update_fields=['managed_by'])
+        configs = {
+            provider.slug: {
+                'OIDC_GROUP_PROVIDER_ROLE_MAPPING': {
+                    'provider-technicians': 'Missing Provider Role',
+                },
+            },
+            self.tenant_alpha.slug: {
+                'OIDC_GROUP_ROLE_MAPPING': {
+                    'provider-technicians': 'Admin',
+                },
+            },
+        }
+
+        set_current_tenant(self.tenant_alpha)
+        with self.settings(ITAMBOX_TENANT_OIDC_CONFIGS=configs):
+            user = TenantOIDCBackend().create_user({
+                'email': 'unresolved-provider-tech@example.com',
+                'sub': 'unresolved-provider-tech',
+                'groups': ['provider-technicians'],
+            })
+
+        self.assertFalse(Membership.objects.filter(user=user).exists())
+        self.assertFalse(AssetHolder.objects.filter(user=user).exists())
+        self.assertEqual(accessible_tenant_ids(user), set())
+
+    def test_nonmatching_provider_group_keeps_customer_jit_behavior(self):
+        provider = Tenant.objects.create(
+            name="Provider",
+            slug="oidc-provider-nonmatch",
+            is_provider=True,
+        )
+        self.tenant_alpha.managed_by = provider
+        self.tenant_alpha.save(update_fields=['managed_by'])
+        Role.objects.create(tenant=provider, name='Provider Technician')
+        configs = {
+            provider.slug: {
+                'OIDC_GROUP_PROVIDER_ROLE_MAPPING': {
+                    'provider-technicians': 'Provider Technician',
+                },
+            },
+            self.tenant_alpha.slug: {
+                'OIDC_GROUP_ROLE_MAPPING': {
+                    'customer-users': 'Member',
+                },
+            },
+        }
+
+        set_current_tenant(self.tenant_alpha)
+        with self.settings(ITAMBOX_TENANT_OIDC_CONFIGS=configs):
+            user = TenantOIDCBackend().create_user({
+                'email': 'customer-user@example.com',
+                'sub': 'customer-user',
+                'groups': ['customer-users'],
+            })
+
+        customer_membership = Membership.objects.get(user=user)
+        self.assertEqual(customer_membership.tenant_id, self.tenant_alpha.pk)
+        self.assertTrue(AssetHolder.objects.filter(
+            user=user,
+            tenant=self.tenant_alpha,
+        ).exists())
+        self.assertEqual(
+            customer_membership.role_grants.get().role.name,
+            'Member',
+        )
 
     def test_authorize_view_tenant_routing(self):
         # Access with slug in kwargs
@@ -243,7 +663,7 @@ class TenantOIDCTestCase(TestCase):
         }
         user_admin = backend.create_user(claims_admin)
         membership_admin = Membership.objects.get(user=user_admin, tenant=self.tenant_alpha)
-        self.assertEqual(membership_admin.assignments.first().role.name, "Admin")
+        self.assertEqual(membership_admin.role_grants.first().role.name, "Admin")
 
         claims_mgr = {
             "email": "mgr-ci@alpha.com",
@@ -252,7 +672,7 @@ class TenantOIDCTestCase(TestCase):
         }
         user_mgr = backend.create_user(claims_mgr)
         membership_mgr = Membership.objects.get(user=user_mgr, tenant=self.tenant_alpha)
-        self.assertEqual(membership_mgr.assignments.first().role.name, "Manager")
+        self.assertEqual(membership_mgr.role_grants.first().role.name, "Manager")
 
         claims_mem = {
             "email": "mem-ci@alpha.com",
@@ -261,7 +681,7 @@ class TenantOIDCTestCase(TestCase):
         }
         user_mem = backend.create_user(claims_mem)
         membership_mem = Membership.objects.get(user=user_mem, tenant=self.tenant_alpha)
-        self.assertEqual(membership_mem.assignments.first().role.name, "Member")
+        self.assertEqual(membership_mem.role_grants.first().role.name, "Member")
 
     def test_authorize_view_invalid_tenant_slug(self):
         # Access with an invalid slug in kwargs
@@ -388,7 +808,7 @@ class TenantOIDCTestCase(TestCase):
         }
         user_no_groups = backend.create_user(claims_no_groups)
         membership_no_groups = Membership.objects.get(user=user_no_groups, tenant=self.tenant_alpha)
-        self.assertEqual(membership_no_groups.assignments.first().role.name, "Member") # Fallback to Member
+        self.assertEqual(membership_no_groups.role_grants.first().role.name, "Member") # Fallback to Member
 
         # Case D: malformed 'groups' claim (e.g. not a list or string, like a dict or integer)
         claims_dict_groups = {
@@ -398,7 +818,7 @@ class TenantOIDCTestCase(TestCase):
         }
         user_dict_groups = backend.create_user(claims_dict_groups)
         membership_dict_groups = Membership.objects.get(user=user_dict_groups, tenant=self.tenant_alpha)
-        self.assertEqual(membership_dict_groups.assignments.first().role.name, "Member") # Fallback to Member
+        self.assertEqual(membership_dict_groups.role_grants.first().role.name, "Member") # Fallback to Member
 
         claims_int_groups = {
             "sub": "int-groups-sub",
@@ -407,7 +827,7 @@ class TenantOIDCTestCase(TestCase):
         }
         user_int_groups = backend.create_user(claims_int_groups)
         membership_int_groups = Membership.objects.get(user=user_int_groups, tenant=self.tenant_alpha)
-        self.assertEqual(membership_int_groups.assignments.first().role.name, "Member") # Fallback to Member
+        self.assertEqual(membership_int_groups.role_grants.first().role.name, "Member") # Fallback to Member
 
     def test_upn_and_onetoone_collisions_multitenant(self):
         backend = TenantOIDCBackend()
@@ -476,7 +896,7 @@ class TenantOIDCTestCase(TestCase):
         }
         user = backend.create_user(claims)
         membership = Membership.objects.get(user=user, tenant=self.tenant_alpha)
-        self.assertEqual(membership.assignments.first().role.name, "Admin")
+        self.assertEqual(membership.role_grants.first().role.name, "Admin")
 
         # User is in alpha-members (Member) and alpha-managers (Manager)
         # Should select Manager
@@ -487,7 +907,7 @@ class TenantOIDCTestCase(TestCase):
         }
         user_mgr = backend.create_user(claims_mgr)
         membership_mgr = Membership.objects.get(user=user_mgr, tenant=self.tenant_alpha)
-        self.assertEqual(membership_mgr.assignments.first().role.name, "Manager")
+        self.assertEqual(membership_mgr.role_grants.first().role.name, "Manager")
 
     def test_group_name_lookup_case_sensitivity(self):
         backend = TenantOIDCBackend()
@@ -503,7 +923,7 @@ class TenantOIDCTestCase(TestCase):
         }
         user = backend.create_user(claims)
         membership = Membership.objects.get(user=user, tenant=self.tenant_alpha)
-        self.assertEqual(membership.assignments.first().role.name, "Member")
+        self.assertEqual(membership.role_grants.first().role.name, "Member")
 
     @override_settings(
         OIDC_OP_AUTHORIZATION_ENDPOINT="https://example.com/oauth2",

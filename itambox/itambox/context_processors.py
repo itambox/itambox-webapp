@@ -34,13 +34,13 @@ def notifications_processor(request):
 def tenant_switcher_processor(request):
     """Context processor providing structured tenants for the workspace switcher.
 
-    Non-superuser switcher entries are grouped into two sections (RBAC stage-3
-    §5): ``own_tenants_switcher`` -- "Your organization", the tenants the user
+    Non-superuser switcher entries are grouped into two sections:
+    ``own_tenants_switcher`` -- "Your organization", the tenants the user
     directly belongs to (an active ``Membership`` row), ``is_provider`` ones
     pinned first -- and ``grouped_managed_tenants_switcher`` -- "Managed
     tenants", every OTHER tenant reachable via
-    ``organization.access.accessible_tenant_ids`` (managed-reach grants or a
-    cross-tenant UserGroup role) but with no direct membership here, still
+    ``organization.access.accessible_tenant_ids`` (direct or group grants with
+    managed scopes) but with no direct membership here, still
     bucketed by TenantGroup like before.
     """
     if not request.user.is_authenticated:
@@ -121,9 +121,11 @@ def tenant_switcher_processor(request):
         )
 
     def get_grouped_managed_tenants():
-        """"Managed tenants": reach-derived access (managed-reach RoleAssignment
-        grants, or a role carried by a cross-tenant UserGroup) WITHOUT a direct
-        membership row here. TenantGroup subgrouping preserved within."""
+        """Managed tenants reached by direct or group RoleGrantScope rows.
+
+        These tenants intentionally have no direct customer Membership row.
+        TenantGroup subgrouping is preserved in navigation.
+        """
         if request.user.is_superuser:
             return []
         from organization.access import accessible_tenant_ids

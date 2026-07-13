@@ -54,7 +54,7 @@ if not SECRET_KEY:
     )
 
 INSTALLED_APPS = [
-    'django.contrib.admin',
+    'core.apps.SuperuserAdminConfig',
     'django.contrib.auth',
     'django.contrib.contenttypes',
     'django.contrib.sessions',
@@ -241,11 +241,6 @@ DOCS_ROOT = os.environ.get('ITAMBOX_DOCS_ROOT', BASE_DIR / 'docs')
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
-# Phase-5 RBAC rollout: legacy|compare|new. Compare evaluates both resolvers,
-# logs every disagreement, and still returns the legacy decision. Do not enable
-# new until ``manage.py compare_rbac_resolvers`` reports zero differences.
-RBAC_RESOLVER_MODE = os.environ.get('ITAMBOX_RBAC_RESOLVER_MODE', 'compare').lower()
-
 CRISPY_ALLOWED_TEMPLATE_PACKS = "bootstrap5"
 CRISPY_TEMPLATE_PACK = "bootstrap5"
 
@@ -332,8 +327,8 @@ SAML_CSP_HANDLER = ''
 
 AUTHENTICATION_BACKENDS = [
     # MembershipBackend is the single authorization path: all permissions resolve
-    # through RoleAssignment rows (one vocabulary, one container type — Tenant).
-    'core.auth.TenantMembershipBackend',
+    # through RoleGrant + RoleGrantScope rows.
+    'core.auth.MembershipBackend',
     'core.auth.ldap.MultiTenantLDAPBackend',
     'core.auth.saml.TenantSaml2Backend',
     'core.auth.oidc.TenantOIDCBackend',
@@ -373,30 +368,6 @@ try:
 except Exception as e:
     logging.getLogger(__name__).warning('Failed to parse ITAMBOX_TENANT_OIDC_CONFIGS: %s', e)
     ITAMBOX_TENANT_OIDC_CONFIGS = {}
-
-# TRANSITIONAL env-var merge (2026-07 RBAC collapse): a managing (is_provider)
-# tenant's SSO config — including its MSP-staff group→role mapping
-# (*_GROUP_PROVIDER_ROLE_MAPPING) — now lives under its OWN slug in the
-# ITAMBOX_TENANT_*_CONFIGS dicts above. The legacy ITAMBOX_PROVIDER_*_CONFIGS
-# env vars (keyed by the same slug) are still read and merged in so existing
-# deployments keep working; explicit tenant-keyed entries win on key conflicts.
-# Ops should move these entries into ITAMBOX_TENANT_*_CONFIGS and drop the
-# PROVIDER env vars — this shim is slated for removal.
-for _env_name, _target in (
-    ('ITAMBOX_PROVIDER_OIDC_CONFIGS', ITAMBOX_TENANT_OIDC_CONFIGS),
-    ('ITAMBOX_PROVIDER_SAML_CONFIGS', ITAMBOX_TENANT_SAML_CONFIGS),
-    ('ITAMBOX_PROVIDER_LDAP_CONFIGS', ITAMBOX_TENANT_LDAP_CONFIGS),
-):
-    try:
-        _legacy_cfg = json.loads(os.environ.get(_env_name, '{}'))
-    except Exception as e:
-        logging.getLogger(__name__).warning('Failed to parse %s: %s', _env_name, e)
-        _legacy_cfg = {}
-    for _slug, _cfg in (_legacy_cfg or {}).items():
-        _merged = dict(_cfg or {})
-        _merged.update(_target.get(_slug, {}))
-        _target[_slug] = _merged
-del _env_name, _target, _legacy_cfg
 
 # Intune discovery connector — per-tenant config.
 # Keys per tenant slug: azure_tenant_id, client_id, client_secret,
@@ -605,5 +576,3 @@ CORS_ALLOWED_ORIGINS = [
     for origin in os.environ.get('ITAMBOX_CORS_ALLOWED_ORIGINS', '').split(',')
     if origin.strip()
 ]
-
-

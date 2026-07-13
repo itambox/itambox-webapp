@@ -42,7 +42,10 @@ class TenantResourceGrantForm(forms.ModelForm):
             if user is not None:
                 candidate_ids |= accessible_tenant_ids(user)
             if owner_tenant.group_id:
-                root_ids = get_ancestor_tenant_group_ids(owner_tenant.group_id)
+                root_ids = get_ancestor_tenant_group_ids(
+                    owner_tenant.group_id,
+                    live_only=True,
+                )
                 candidate_ids |= set(
                     Tenant._base_manager.filter(
                         group_id__in=root_ids, deleted_at__isnull=True,

@@ -10,6 +10,21 @@ from django.views.generic import View
 from itambox.utils import get_model_viewname
 
 
+SUPERUSER_ONLY_MUTATION_MODELS = frozenset({
+    'organization.tenantgroup',
+})
+
+
+def user_can_mutate_model(user, model):
+    """Apply model-wide mutation policies shared by every generic write path."""
+    if model is None:
+        return True
+    return (
+        model._meta.label_lower not in SUPERUSER_ONLY_MUTATION_MODELS
+        or bool(user and user.is_superuser)
+    )
+
+
 class CachedObjectMixin:
     """Cache ``get_object()`` for the lifetime of the request.
 

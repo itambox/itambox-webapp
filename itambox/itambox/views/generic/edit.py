@@ -13,7 +13,11 @@ from django.views.generic import UpdateView
 
 from itambox.utils import get_model_viewname, get_help_url
 from itambox.views.htmx import BaseHTMXView
-from itambox.views.generic.mixins import TenantScopingViewMixin, CachedObjectMixin
+from itambox.views.generic.mixins import (
+    CachedObjectMixin,
+    TenantScopingViewMixin,
+    user_can_mutate_model,
+)
 from itambox.views.generic.utils import safe_return_url
 
 logger = logging.getLogger(__name__)
@@ -24,6 +28,8 @@ class ObjectEditView(TenantScopingViewMixin, PermissionRequiredMixin, LoginRequi
     template_name = 'generic/object_edit.html'
 
     def has_permission(self):
+        if not user_can_mutate_model(self.request.user, self._get_model()):
+            return False
         perms = self.get_permission_required()
         try:
             obj = self.get_object()

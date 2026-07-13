@@ -46,8 +46,9 @@ def backfill_phase5_rbac(apps, schema_editor):
             ])
 
     # A legacy group-role edge is derivable only when both are owned by the
-    # same tenant. Cross-owner/global groups are deliberately left as comparison
-    # disagreements for operator correction; migration must not invent access.
+    # same tenant. Cross-owner/global groups are deliberately not converted:
+    # the destructive cutover must not preserve invalid ownership by inventing
+    # access in the canonical model.
     for group in UserGroup.objects.exclude(tenant_id=None).iterator():
         for role in Role.objects.filter(user_groups=group).iterator():
             if role.tenant_id != group.tenant_id:

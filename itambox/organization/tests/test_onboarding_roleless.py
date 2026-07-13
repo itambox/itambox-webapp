@@ -9,7 +9,7 @@ from django.test import TestCase
 from django.urls import reverse
 
 from core.tests.mixins import TenantTestMixin
-from organization.models import Tenant, Membership, Role, RoleAssignment
+from organization.models import Tenant, Membership, Role, RoleGrantScope
 
 User = get_user_model()
 
@@ -34,7 +34,7 @@ class TechnicianPresetRedirectTests(TenantTestMixin, TestCase):
             self.staff_admin,
             self.msp,
             self.admin_role,
-            reach=RoleAssignment.REACH_OWN,
+            reach='own',
         )
         self.url = reverse('organization:technician_quick_add')
 
@@ -107,4 +107,7 @@ class TechnicianPresetInitialTests(TenantTestMixin, TestCase):
         seeded = [row for row in form.managed_formset.initial if row.get('role')]
         self.assertEqual(len(seeded), 1)
         self.assertEqual(seeded[0]['role'], self.technician.pk)
-        self.assertEqual(seeded[0]['managed_scope'], RoleAssignment.SCOPE_ALL)
+        self.assertEqual(
+            seeded[0]['managed_scope'],
+            RoleGrantScope.SCOPE_ALL_MANAGED,
+        )

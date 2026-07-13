@@ -16,18 +16,13 @@ docs and the code).
 ITAMbox is multi-tenant with an MSP (managed service provider) layer on top:
 a tenant with `is_provider=True` may manage other tenants via
 `Tenant.managed_by` (depth 1 — chains are rejected, see
-`organization/models.py::Tenant.clean`). Permission grants today are spread
-over several mechanisms (`RoleAssignment` rows with reach/scope refinements,
-`UserGroup` role links, direct permission JSON), and cross-tenant *resource*
-use (one tenant consuming another tenant's stock) has no first-class
-representation at all — tenant scoping is derived indirectly from catalogue
-items or locations, and cross-tenant rows exist in the wild with no recorded
-authorization.
+`organization/models.py::Tenant.clean`). The pre-consolidation model spread
+permission grants across assignment rows and group M2Ms, while cross-tenant
+resource use had no first-class authorization record.
 
 This ADR fixes the target semantics for both problems. The migration plan
 that implements it is the data-model remediation plan (phases 1–6); each
-phase must be independently deployable and reversible, and the RBAC
-migration must not be combined with the inventory migration.
+The RBAC contraction remains separate from the inventory migration.
 
 ## Decision — RBAC
 
@@ -83,17 +78,16 @@ provider-owned roles; direct grants and group grants are additive; managed
 scopes are valid only while the target is managed by the role owner; no
 nested groups; no customer approval fields.
 
-Migration order: add tables → backfill group members → convert
-`UserGroup.roles` and `RoleAssignment` rows into RoleGrants + scopes → run
-old and new resolution in comparison mode and investigate every disagreement
-→ switch the auth backend → remove the old M2Ms and `RoleAssignment`.
+Migration order: add canonical tables → backfill derivable grants and group
+memberships → switch every writer and resolver to the canonical aggregate →
+drop the old M2Ms and assignment table.
 
-Phase 5 expansion is implemented with `ITAMBOX_RBAC_RESOLVER_MODE=compare`
-as the safe default. The comparison path returns the legacy decision while
-logging differences. Operators must run `python manage.py
-compare_rbac_resolvers` against production and resolve every reported row
-before setting the mode to `new`; the legacy fields and compatibility pointer
-remain intentionally present until that real-data gate is satisfied.
+The application is unreleased, so Phase 5 intentionally has no dual-write,
+comparison resolver, feature flag, or compatibility model. The contraction is
+direct and destructive: developer data that cannot be derived safely is reset
+instead of keeping a second authorization path alive. Historical content-type
+rows may remain when audit records reference them, but they are not executable
+grant paths.
 
 Today's `Role.shared_with_managed` mechanism (a provider role assignable by
 managed-tenant admins to their own members) is a legitimate pattern under

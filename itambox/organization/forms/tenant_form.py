@@ -74,8 +74,6 @@ class TenantForm(forms.ModelForm):
         # trusted as user input.
         managed_by_param = kwargs.pop('managed_by_param', None)
         super().__init__(*args, **kwargs)
-        # Scope the tenant's group picker to the user's accessible groups.
-        scope_tenant_group_field(self, field_name='group')
         # Preserve exotic codes set via the API: keep the saved value selectable
         # instead of silently dropping it on the next edit.
         current = getattr(self.instance, 'currency', None)
@@ -83,6 +81,14 @@ class TenantForm(forms.ModelForm):
             self.fields['currency'].choices = list(CURRENCY_CHOICES) + [(current, current)]
 
         is_superuser = bool(requesting_user and getattr(requesting_user, 'is_superuser', False))
+
+        if is_superuser:
+            scope_tenant_group_field(self, field_name='group')
+        else:
+            # TenantGroup is global topology. Omitting the model field from the
+            # bound form both hides it and makes tampered POST values inert;
+            # ModelForm then preserves the saved value on updates.
+            self.fields.pop('group', None)
 
         # A provider admin creating a new managed tenant via the "Add managed
         # tenant" link is forced into that provider's managed_by -- but ONLY when
@@ -142,14 +148,16 @@ class TenantForm(forms.ModelForm):
                 Div('slug', css_class='col-md-6'),
                 css_class='row'
             ),
-            Div(
-                Div('group', css_class='col-md-6'),
-                Div('currency', css_class='col-md-3'),
-                Div('default_depreciation', css_class='col-md-3'),
-                css_class='row'
-            ),
         ]
         if is_superuser:
+            layout_rows.append(
+                Div(
+                    Div('group', css_class='col-md-6'),
+                    Div('currency', css_class='col-md-3'),
+                    Div('default_depreciation', css_class='col-md-3'),
+                    css_class='row'
+                )
+            )
             layout_rows.append(
                 Div(
                     Div('managed_by', css_class='col-md-6'),
@@ -157,11 +165,19 @@ class TenantForm(forms.ModelForm):
                     css_class='row'
                 )
             )
-        elif forced_managed_by is not None:
-            layout_rows.append(HTML(format_html(
-                '<div class="alert alert-info py-2 px-3 mb-3">{}</div>',
-                _('This tenant will be managed by %(name)s.') % {'name': forced_managed_by.name},
-            )))
+        else:
+            layout_rows.append(
+                Div(
+                    Div('currency', css_class='col-md-6'),
+                    Div('default_depreciation', css_class='col-md-6'),
+                    css_class='row'
+                )
+            )
+            if forced_managed_by is not None:
+                layout_rows.append(HTML(format_html(
+                    '<div class="alert alert-info py-2 px-3 mb-3">{}</div>',
+                    _('This tenant will be managed by %(name)s.') % {'name': forced_managed_by.name},
+                )))
         layout_rows.extend(['description', 'comments', 'tags'])
         self.helper.layout = Layout(*layout_rows)
         from .helpers import add_standard_buttons

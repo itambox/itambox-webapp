@@ -1,13 +1,9 @@
 from datetime import timedelta
-import importlib
-from io import StringIO
 
-from django.apps import apps
 from django.contrib.auth import get_user_model
 from django.core.exceptions import ValidationError
-from django.core.management import call_command
-from django.core.management.base import CommandError
-from django.test import TestCase, override_settings
+from django.db import IntegrityError
+from django.test import TestCase
 from django.utils import timezone
 
 from core.mfa import user_requires_mfa
@@ -15,16 +11,14 @@ from organization.access import tenant_access_report
 from organization.models import (
     Membership,
     Role,
-    RoleAssignment,
     RoleGrant,
     RoleGrantScope,
     Tenant,
     TenantGroup,
 )
 from organization.rbac import (
-    new_accessible_tenant_ids,
-    new_effective_permissions,
-    resolve_effective_permissions,
+    accessible_tenant_ids,
+    effective_permissions,
 )
 from users.models import GroupMembership, UserGroup
 
@@ -88,13 +82,9 @@ class Phase5RBACModelTests(TestCase):
                 membership=foreign_membership,
             )
 
-    def test_global_group_cannot_receive_group_membership(self):
-        global_group = UserGroup.objects.create(name='Legacy global')
-        with self.assertRaises(ValidationError):
-            GroupMembership.objects.create(
-                user_group=global_group,
-                membership=self.membership,
-            )
+    def test_user_group_requires_owner(self):
+        with self.assertRaises((ValidationError, IntegrityError)):
+            UserGroup.objects.create(name='Ownerless group')
 
     def test_role_grant_requires_exactly_one_principal(self):
         with self.assertRaises(ValidationError):
@@ -132,6 +122,32 @@ class Phase5RBACModelTests(TestCase):
         )
         self.assertIsNotNone(grant.pk)
 
+    def test_custom_action_permission_is_elevated_and_mfa_protected(self):
+        approver = Role.objects.create(
+            tenant=self.provider,
+            name='Purchase approver',
+            permissions=['procurement.approve_purchaseorder'],
+        )
+        with self.assertRaises(ValidationError) as context:
+            RoleGrant.objects.create(
+                membership=self.membership,
+                role=approver,
+            )
+        self.assertIn('reason', context.exception.message_dict)
+        self.assertIn('valid_until', context.exception.message_dict)
+
+        role_grant = RoleGrant.objects.create(
+            membership=self.membership,
+            role=approver,
+            reason='Temporary purchase approval duty',
+            valid_until=timezone.now() + timedelta(hours=2),
+        )
+        RoleGrantScope.objects.create(
+            role_grant=role_grant,
+            scope_type=RoleGrantScope.SCOPE_OWN,
+        )
+        self.assertTrue(user_requires_mfa(self.user))
+
     def test_read_only_direct_grant_may_be_permanent(self):
         grant = RoleGrant.objects.create(
             membership=self.membership,
@@ -162,11 +178,11 @@ class Phase5RBACModelTests(TestCase):
             ).exists()
         )
         self.assertEqual(
-            new_effective_permissions(self.user, self.customer_a),
+            effective_permissions(self.user, self.customer_a),
             frozenset({'assets.view_asset', 'assets.change_asset'}),
         )
         self.assertEqual(
-            new_effective_permissions(self.user, self.customer_z),
+            effective_permissions(self.user, self.customer_z),
             frozenset({'assets.view_asset'}),
         )
 
@@ -198,7 +214,7 @@ class Phase5RBACModelTests(TestCase):
         )
 
         self.assertEqual(
-            new_effective_permissions(self.user, self.customer_a),
+            effective_permissions(self.user, self.customer_a),
             frozenset({'assets.view_asset', 'assets.change_asset'}),
         )
 
@@ -212,16 +228,24 @@ class Phase5RBACModelTests(TestCase):
             RoleGrantScope.SCOPE_ALL_MANAGED,
         )
         self.assertEqual(
-            new_effective_permissions(self.user, self.customer_a),
+            effective_permissions(self.user, self.customer_a),
             frozenset({'assets.view_asset'}),
         )
 
         self.customer_a.managed_by = None
         self.customer_a.save(update_fields=['managed_by'])
         self.assertEqual(
-            new_effective_permissions(self.user, self.customer_a),
+            effective_permissions(self.user, self.customer_a),
             frozenset(),
         )
+
+    def test_provider_cannot_be_disabled_while_it_has_live_customers(self):
+        self.provider.is_provider = False
+
+        with self.assertRaises(ValidationError) as context:
+            self.provider.save(update_fields=['is_provider'])
+
+        self.assertIn('is_provider', context.exception.message_dict)
 
     def test_unrelated_group_edit_preserves_managed_grant_scopes(self):
         grant = self._group_grant(
@@ -258,13 +282,13 @@ class Phase5RBACModelTests(TestCase):
         )
 
         self.assertEqual(
-            new_effective_permissions(customer_user, self.customer_a),
+            effective_permissions(customer_user, self.customer_a),
             frozenset({'assets.view_asset'}),
         )
         self.customer_a.managed_by = None
         self.customer_a.save(update_fields=['managed_by'])
         self.assertEqual(
-            new_effective_permissions(customer_user, self.customer_a),
+            effective_permissions(customer_user, self.customer_a),
             frozenset(),
         )
 
@@ -279,7 +303,7 @@ class Phase5RBACModelTests(TestCase):
             scope_type=RoleGrantScope.SCOPE_TENANT,
             tenant=self.customer_a,
         )
-        self.assertEqual(new_effective_permissions(self.user, self.customer_a), frozenset())
+        self.assertEqual(effective_permissions(self.user, self.customer_a), frozenset())
 
     def test_tenant_group_scope_includes_descendants_only(self):
         parent = TenantGroup.objects.create(name='Parent', slug='parent')
@@ -297,10 +321,10 @@ class Phase5RBACModelTests(TestCase):
         )
 
         self.assertEqual(
-            new_effective_permissions(self.user, self.customer_z),
+            effective_permissions(self.user, self.customer_z),
             frozenset({'assets.view_asset'}),
         )
-        self.assertEqual(new_effective_permissions(self.user, self.customer_a), frozenset())
+        self.assertEqual(effective_permissions(self.user, self.customer_a), frozenset())
 
     def test_accessible_tenants_include_scoped_managed_targets(self):
         GroupMembership.objects.create(
@@ -313,11 +337,10 @@ class Phase5RBACModelTests(TestCase):
             tenant=self.customer_z,
         )
         self.assertEqual(
-            new_accessible_tenant_ids(self.user),
+            accessible_tenant_ids(self.user),
             {self.provider.pk, self.customer_z.pk},
         )
 
-    @override_settings(RBAC_RESOLVER_MODE='new')
     def test_auth_backend_uses_role_grants_after_cutover(self):
         GroupMembership.objects.create(
             user_group=self.group,
@@ -336,7 +359,6 @@ class Phase5RBACModelTests(TestCase):
             self.user.has_perm('assets.change_asset', obj=self.customer_a)
         )
 
-    @override_settings(RBAC_RESOLVER_MODE='new')
     def test_access_report_uses_group_memberships_after_cutover(self):
         GroupMembership.objects.create(
             user_group=self.group,
@@ -369,148 +391,3 @@ class Phase5RBACModelTests(TestCase):
         )
 
         self.assertTrue(user_requires_mfa(self.user))
-
-
-class Phase5LegacyShadowAndComparisonTests(TestCase):
-    def setUp(self):
-        self.provider = Tenant.objects.create(
-            name='Shadow Provider', slug='shadow-provider', is_provider=True,
-        )
-        self.customer = Tenant.objects.create(
-            name='Shadow Customer',
-            slug='shadow-customer',
-            managed_by=self.provider,
-        )
-        self.user = User.objects.create_user(username='shadow-user')
-        self.membership = Membership.objects.create(user=self.user, tenant=self.provider)
-        self.role = Role.objects.create(
-            tenant=self.provider,
-            name='Shadow reader',
-            permissions=['assets.view_asset'],
-        )
-
-    def test_role_assignment_and_scope_are_shadowed_and_deleted(self):
-        assignment = RoleAssignment.objects.create(
-            membership=self.membership,
-            role=self.role,
-            reach=RoleAssignment.REACH_MANAGED,
-            managed_scope=RoleAssignment.SCOPE_EXPLICIT,
-        )
-        grant = RoleGrant.objects.get(legacy_assignment=assignment)
-        self.assertFalse(grant.scopes.exists())
-
-        assignment.assigned_tenants.add(self.customer)
-        scope = grant.scopes.get()
-        self.assertEqual(scope.scope_type, RoleGrantScope.SCOPE_TENANT)
-        self.assertEqual(scope.tenant, self.customer)
-
-        assignment.delete()
-        self.assertFalse(RoleGrant.objects.filter(pk=grant.pk).exists())
-
-    def test_valid_legacy_group_links_are_shadowed(self):
-        group = UserGroup.objects.create(
-            tenant=self.provider,
-            name='Shadow group',
-        )
-        group.roles.add(self.role)
-        group.members.add(self.user)
-
-        grant = RoleGrant.objects.get(user_group=group, role=self.role)
-        self.assertEqual(grant.scopes.get().scope_type, RoleGrantScope.SCOPE_OWN)
-        self.assertTrue(
-            GroupMembership.objects.filter(
-                user_group=group,
-                membership=self.membership,
-            ).exists()
-        )
-
-    def test_data_migration_rebuilds_derivable_shadow_rows(self):
-        assignment = RoleAssignment.objects.create(
-            membership=self.membership,
-            role=self.role,
-            reach=RoleAssignment.REACH_MANAGED,
-            managed_scope=RoleAssignment.SCOPE_EXPLICIT,
-        )
-        assignment.assigned_tenants.add(self.customer)
-        group = UserGroup.objects.create(
-            tenant=self.provider,
-            name='Backfill group',
-        )
-        group.roles.add(self.role)
-        group.members.add(self.user)
-        RoleGrantScope.objects.all().delete()
-        RoleGrant.objects.all().delete()
-        GroupMembership.objects.all().delete()
-
-        migration = importlib.import_module(
-            'organization.migrations.0039_backfill_phase5_rbac'
-        )
-        migration.backfill_phase5_rbac(apps, None)
-
-        assignment_grant = RoleGrant.objects.get(legacy_assignment=assignment)
-        self.assertEqual(
-            assignment_grant.scopes.get().tenant_id,
-            self.customer.pk,
-        )
-        self.assertTrue(RoleGrant.objects.filter(user_group=group, role=self.role).exists())
-        self.assertTrue(
-            GroupMembership.objects.filter(
-                user_group=group,
-                membership=self.membership,
-            ).exists()
-        )
-
-    def test_comparison_command_is_clean_for_derivable_legacy_data(self):
-        assignment = RoleAssignment.objects.create(
-            membership=self.membership,
-            role=self.role,
-            reach=RoleAssignment.REACH_MANAGED,
-            managed_scope=RoleAssignment.SCOPE_EXPLICIT,
-        )
-        assignment.assigned_tenants.add(self.customer)
-        output = StringIO()
-
-        call_command(
-            'compare_rbac_resolvers',
-            user_id=self.user.pk,
-            stdout=output,
-        )
-
-        self.assertIn('0 disagreement(s)', output.getvalue())
-
-    def test_comparison_command_fails_on_non_derivable_cross_owner_group(self):
-        customer_role = Role.objects.create(
-            tenant=self.customer,
-            name='Legacy customer role',
-            permissions=['assets.change_asset'],
-        )
-        group = UserGroup.objects.create(
-            tenant=self.provider,
-            name='Legacy cross-owner group',
-        )
-        group.members.add(self.user)
-        group.roles.add(customer_role)
-
-        with self.assertRaises(CommandError):
-            call_command(
-                'compare_rbac_resolvers',
-                user_id=self.user.pk,
-                tenant_id=self.customer.pk,
-                stdout=StringIO(),
-                stderr=StringIO(),
-            )
-
-    @override_settings(RBAC_RESOLVER_MODE='compare')
-    def test_compare_mode_returns_legacy_decision(self):
-        assignment = RoleAssignment.objects.create(
-            membership=self.membership,
-            role=self.role,
-            reach=RoleAssignment.REACH_MANAGED,
-            managed_scope=RoleAssignment.SCOPE_EXPLICIT,
-        )
-        assignment.assigned_tenants.add(self.customer)
-
-        self.assertEqual(
-            resolve_effective_permissions(self.user, self.customer),
-            frozenset({'assets.view_asset'}),
-        )

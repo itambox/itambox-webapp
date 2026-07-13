@@ -4,7 +4,7 @@ from django.urls import reverse
 from django.utils import timezone
 from rest_framework import status
 
-from organization.models import Tenant, Role, Membership, RoleAssignment
+from organization.models import Membership, Role, RoleGrant, RoleGrantScope, Tenant
 from users.models import GroupMembership, Token, UserGroup
 from core.tests.mixins import grant
 
@@ -18,7 +18,7 @@ class ProviderSCIMProvisioningTests(TestCase):
     against role *content*, never ``Role.name``) held on the provider tenant itself; a
     token is "provider-scoped" simply by its ``tenant`` FK pointing at that tenant.
     Provisioning creates a bare ``Membership`` at the provider tenant with NO
-    ``RoleAssignment`` — permissions/reach are granted in-app afterwards, never implied
+    ``RoleGrant`` — permissions/reach are granted in-app afterwards, never implied
     by SCIM.
     """
 
@@ -37,7 +37,13 @@ class ProviderSCIMProvisioningTests(TestCase):
         self.role_staff = Role.objects.create(
             tenant=self.provider,
             name="Tier 2 Grant",
-            permissions=['organization.change_membership'],
+            permissions=[
+                'organization.change_membership',
+                'users.view_usergroup',
+                'users.add_usergroup',
+                'users.change_usergroup',
+                'users.delete_usergroup',
+            ],
         )
         # A role WITHOUT that permission.
         self.role_readonly = Role.objects.create(
@@ -47,7 +53,7 @@ class ProviderSCIMProvisioningTests(TestCase):
         )
 
         # Authorised provider-staff user: active Membership at the provider tenant +
-        # own-reach RoleAssignment carrying the gating permission.
+        # own-scope RoleGrant carrying the gating permission.
         self.admin_user = User.objects.create_user(
             username="provadmin", email="provadmin@msp.com", password="adminpassword"
         )
@@ -108,6 +114,52 @@ class ProviderSCIMProvisioningTests(TestCase):
         url = reverse('api:provider_scim:user-list', kwargs={'provider_slug': self.provider.slug})
         response = self.client.get(url, HTTP_AUTHORIZATION=f'Bearer {self.weak_token.key}')
         self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
+
+    def test_group_endpoints_require_method_specific_group_permissions(self):
+        role = Role.objects.create(
+            tenant=self.provider,
+            name='SCIM identity only',
+            permissions=['organization.change_membership'],
+        )
+        user = User.objects.create_user(username='scim-identity-only')
+        grant(user, self.provider, role)
+        token = Token.objects.create(
+            user=user,
+            tenant=self.provider,
+            expires=timezone.now() + timezone.timedelta(days=1),
+        )
+        headers = {'HTTP_AUTHORIZATION': f'Bearer {token.key}'}
+        group = UserGroup.objects.create(tenant=self.provider, name='Protected group')
+        list_url = reverse(
+            'api:provider_scim:group-list',
+            kwargs={'provider_slug': self.provider.slug},
+        )
+        detail_url = reverse(
+            'api:provider_scim:group-detail',
+            kwargs={'provider_slug': self.provider.slug, 'pk': group.pk},
+        )
+        cases = [
+            ('get', list_url, None),
+            ('post', list_url, {'displayName': 'Denied create'}),
+            ('get', detail_url, None),
+            ('put', detail_url, {'displayName': 'Denied update'}),
+            ('patch', detail_url, {'Operations': []}),
+            ('delete', detail_url, None),
+        ]
+
+        for method, url, payload in cases:
+            with self.subTest(method=method, url=url):
+                client_method = getattr(self.client, method)
+                if payload is None:
+                    response = client_method(url, **headers)
+                else:
+                    response = client_method(
+                        url,
+                        data=payload,
+                        content_type='application/json',
+                        **headers,
+                    )
+                self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
 
     def test_token_scoped_to_other_provider_rejected(self):
         """D2-1 regression (cross-tenant token isolation): valid_token is scoped
@@ -192,9 +244,9 @@ class ProviderSCIMProvisioningTests(TestCase):
         self.assertTrue(
             Membership.objects.filter(user=user, tenant=self.provider, is_active=True).exists()
         )
-        # SCIM provisions identity only: no RoleAssignment is auto-created — permissions
+        # SCIM provisions identity only: no RoleGrant is auto-created — permissions
         # and reach are granted in-app afterwards, never implied by provisioning.
-        self.assertFalse(RoleAssignment.objects.filter(membership__user=user).exists())
+        self.assertFalse(RoleGrant.objects.filter(membership__user=user).exists())
 
         # Conflict on duplicate membership.
         response = self.client.post(url, data=payload, content_type='application/json', **self.auth_headers)
@@ -266,10 +318,14 @@ class ProviderSCIMProvisioningTests(TestCase):
 
         group = UserGroup.objects.get(name="Senior Technicians")
         self.assertEqual(group.tenant, self.provider)
-        self.assertIn(self.admin_user, group.members.all())
+        self.assertTrue(GroupMembership.objects.filter(
+            user_group=group,
+            membership__user=self.admin_user,
+        ).exists())
         group_membership = GroupMembership.objects.get(user_group=group)
         self.assertEqual(group_membership.source, GroupMembership.SOURCE_SCIM)
         self.assertEqual(group_membership.external_id, str(self.admin_user.id))
+        self.assertEqual(group_membership.added_by, self.admin_user)
 
         # Now the list shows it.
         response = self.client.get(list_url, **self.auth_headers)
@@ -292,8 +348,131 @@ class ProviderSCIMProvisioningTests(TestCase):
         response = self.client.post(list_url, data=payload, content_type='application/json', **self.auth_headers)
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
         group = UserGroup.objects.get(name="Guarded Group")
-        self.assertIn(self.admin_user, group.members.all())
-        self.assertNotIn(outsider, group.members.all())
+        self.assertTrue(GroupMembership.objects.filter(
+            user_group=group,
+            membership__user=self.admin_user,
+        ).exists())
+        self.assertFalse(GroupMembership.objects.filter(
+            user_group=group,
+            membership__user=outsider,
+        ).exists())
+
+    def test_group_sync_rejects_self_and_other_escalation(self):
+        dangerous_role = Role.objects.create(
+            tenant=self.provider,
+            name='Dangerous inherited role',
+            permissions=['assets.delete_asset'],
+        )
+        group = UserGroup.objects.create(
+            tenant=self.provider,
+            name='Privileged SCIM group',
+        )
+        role_grant = RoleGrant.objects.create(user_group=group, role=dangerous_role)
+        RoleGrantScope.objects.create(
+            role_grant=role_grant,
+            scope_type=RoleGrantScope.SCOPE_OWN,
+        )
+        detail_url = reverse(
+            'api:provider_scim:group-detail',
+            kwargs={'provider_slug': self.provider.slug, 'pk': group.pk},
+        )
+
+        for user in (self.admin_user, self.weak_user):
+            with self.subTest(user=user.username):
+                payload = {
+                    'Operations': [{
+                        'op': 'add',
+                        'path': 'members',
+                        'value': [{'value': str(user.pk)}],
+                    }],
+                }
+                response = self.client.patch(
+                    detail_url,
+                    data=payload,
+                    content_type='application/json',
+                    **self.auth_headers,
+                )
+                self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+                self.assertIn('Privilege escalation', str(response.json()))
+                self.assertFalse(GroupMembership.objects.filter(
+                    user_group=group,
+                    membership__user=user,
+                ).exists())
+
+    def test_put_and_patch_reconcile_only_scim_memberships(self):
+        group = UserGroup.objects.create(tenant=self.provider, name='Mixed provenance')
+        admin_membership = Membership.objects.get(
+            tenant=self.provider,
+            user=self.admin_user,
+        )
+        weak_membership = Membership.objects.get(
+            tenant=self.provider,
+            user=self.weak_user,
+        )
+        scim_user = User.objects.create_user(username='scim-owned-member')
+        scim_membership = Membership.objects.create(
+            tenant=self.provider,
+            user=scim_user,
+        )
+        manual_row = GroupMembership.objects.create(
+            user_group=group,
+            membership=admin_membership,
+            source=GroupMembership.SOURCE_MANUAL,
+            external_id='manual-record',
+            added_by=self.weak_user,
+        )
+        ldap_row = GroupMembership.objects.create(
+            user_group=group,
+            membership=weak_membership,
+            source=GroupMembership.SOURCE_LDAP,
+            external_id='ldap-record',
+        )
+        scim_row = GroupMembership.objects.create(
+            user_group=group,
+            membership=scim_membership,
+            source=GroupMembership.SOURCE_SCIM,
+            external_id=str(scim_user.pk),
+            added_by=self.admin_user,
+        )
+        detail_url = reverse(
+            'api:provider_scim:group-detail',
+            kwargs={'provider_slug': self.provider.slug, 'pk': group.pk},
+        )
+
+        put_payload = {
+            'displayName': 'Mixed provenance renamed',
+            'members': [{'value': str(self.admin_user.pk)}],
+        }
+        response = self.client.put(
+            detail_url,
+            data=put_payload,
+            content_type='application/json',
+            **self.auth_headers,
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertFalse(GroupMembership.objects.filter(pk=scim_row.pk).exists())
+
+        for row, expected_source, expected_external_id, expected_actor in (
+            (manual_row, GroupMembership.SOURCE_MANUAL, 'manual-record', self.weak_user),
+            (ldap_row, GroupMembership.SOURCE_LDAP, 'ldap-record', None),
+        ):
+            row.refresh_from_db()
+            self.assertEqual(row.source, expected_source)
+            self.assertEqual(row.external_id, expected_external_id)
+            self.assertEqual(row.added_by, expected_actor)
+
+        patch_payload = {
+            'Operations': [{'op': 'replace', 'path': 'members', 'value': []}],
+        }
+        response = self.client.patch(
+            detail_url,
+            data=patch_payload,
+            content_type='application/json',
+            **self.auth_headers,
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertTrue(GroupMembership.objects.filter(pk=manual_row.pk).exists())
+        self.assertTrue(GroupMembership.objects.filter(pk=ldap_row.pk).exists())
 
     def test_group_detail_put_patch_delete(self):
         group = UserGroup.objects.create(tenant=self.provider, name="Editable Group")
@@ -309,7 +488,10 @@ class ProviderSCIMProvisioningTests(TestCase):
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         group.refresh_from_db()
         self.assertEqual(group.name, "Renamed Group")
-        self.assertIn(self.admin_user, group.members.all())
+        self.assertTrue(GroupMembership.objects.filter(
+            user_group=group,
+            membership__user=self.admin_user,
+        ).exists())
 
         # PATCH removes the member.
         patch_payload = {
@@ -319,7 +501,10 @@ class ProviderSCIMProvisioningTests(TestCase):
         response = self.client.patch(detail_url, data=patch_payload, content_type='application/json', **self.auth_headers)
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         group.refresh_from_db()
-        self.assertNotIn(self.admin_user, group.members.all())
+        self.assertFalse(GroupMembership.objects.filter(
+            user_group=group,
+            membership__user=self.admin_user,
+        ).exists())
         self.assertFalse(GroupMembership.objects.filter(user_group=group).exists())
 
         # DELETE soft-deletes.

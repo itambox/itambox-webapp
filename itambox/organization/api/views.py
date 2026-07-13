@@ -2,7 +2,11 @@ from django_filters.rest_framework import DjangoFilterBackend
 from django.contrib.contenttypes.models import ContentType
 from django.core.exceptions import FieldDoesNotExist
 from django.db.models import Count, Q
-from itambox.api.permissions import TokenPermissions, StrictTenantPermission
+from itambox.api.permissions import (
+    IsSuperuserOrReadOnly,
+    StrictTenantPermission,
+    TokenPermissions,
+)
 from itambox.api.viewsets import ITAMBoxModelViewSet, ITAMBoxReadOnlyModelViewSet
 from organization.models import (
     Site, Region, SiteGroup, Location, Tenant, TenantGroup,
@@ -61,7 +65,11 @@ class LocationViewSet(ITAMBoxModelViewSet):
 
 
 class TenantGroupViewSet(ITAMBoxModelViewSet):
-    permission_classes = [TokenPermissions, StrictTenantPermission]
+    permission_classes = [
+        TokenPermissions,
+        StrictTenantPermission,
+        IsSuperuserOrReadOnly,
+    ]
     queryset = TenantGroup.objects.select_related('parent').prefetch_related('tenants').annotate(
         tenant_count=Count('tenants', filter=Q(tenants__deleted_at__isnull=True))
     )
@@ -216,4 +224,3 @@ class CostCenterViewSet(ITAMBoxModelViewSet):
     serializer_class = CostCenterSerializer
     filter_backends = (DjangoFilterBackend,)
     filterset_class = CostCenterFilterSet
-

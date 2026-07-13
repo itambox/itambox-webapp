@@ -1,11 +1,11 @@
 /**
- * ITAMbox — Membership "Add member" form interactivity.
+ * ITAMbox — membership and user-group grant form interactivity.
  *
  * Progressive-disclosure + formset management for the unified, lossless grant
- * flow (organization MembershipForm):
+ * flow (organization MembershipForm and users.UserGroupForm):
  *   1. Who-radio: "Existing user" shows the user select, "New user" shows the
  *      inline email/first/last fields.
- *   2. Managed-tenants formset (one row per managed grant): each row's coverage
+ *   2. Managed-tenants formsets: each row's coverage
  *      refinement (tenant-group vs specific-tenants picker) follows that row's
  *      "Coverage" (managed_scope) select. An "Add managed grant" button clones the
  *      <template> empty form and bumps TOTAL_FORMS; each row's remove button

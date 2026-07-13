@@ -1,5 +1,4 @@
 from django.contrib import admin
-from django.conf import settings
 from django.contrib.auth import get_user_model
 from django.contrib.auth.admin import UserAdmin as BaseUserAdmin
 from django.contrib.auth.models import Group
@@ -43,12 +42,3 @@ class GroupMembershipAdmin(admin.ModelAdmin):
         'membership__tenant__name', 'external_id',
     )
     raw_id_fields = ('user_group', 'membership', 'added_by')
-
-    def has_add_permission(self, request):
-        return settings.RBAC_RESOLVER_MODE == 'new' and super().has_add_permission(request)
-
-    def has_change_permission(self, request, obj=None):
-        return settings.RBAC_RESOLVER_MODE == 'new' and super().has_change_permission(request, obj)
-
-    def has_delete_permission(self, request, obj=None):
-        return settings.RBAC_RESOLVER_MODE == 'new' and super().has_delete_permission(request, obj)

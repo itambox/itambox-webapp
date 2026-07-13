@@ -12,7 +12,11 @@ from django.views.generic.base import TemplateResponseMixin
 
 from core.forms import BulkEditForm
 from itambox.views.htmx import BaseHTMXView
-from itambox.views.generic.mixins import BulkViewMixin, filter_permitted_rows
+from itambox.views.generic.mixins import (
+    BulkViewMixin,
+    filter_permitted_rows,
+    user_can_mutate_model,
+)
 from itambox.views.generic.utils import safe_return_url
 
 logger = logging.getLogger(__name__)
@@ -22,6 +26,40 @@ class ObjectBulkEditView(BulkViewMixin, PermissionRequiredMixin, LoginRequiredMi
     queryset = None
     form_class = None
     template_name = 'generic/object_bulk_edit.html'
+    # The request-selected fallback form intentionally supports ordinary
+    # tenant-scoped business models. These two models have security-specific
+    # forms whose invariants cannot be reproduced by the scalar-field generator:
+    # Tenant topology/provider edges are superuser-only, and Role ownership plus
+    # projected permissions require escalation checks. Their dedicated views
+    # remain available; the global ``/bulk-edit/`` escape hatch does not.
+    dynamic_model_denylist = frozenset({
+        'organization.role',
+        'organization.tenant',
+    })
+
+    def _uses_request_selected_model(self):
+        return (
+            self.queryset is None
+            and getattr(self, 'model', None) is None
+            and not (
+                self.form_class is not None
+                and getattr(self.form_class, '_meta', None) is not None
+                and getattr(self.form_class._meta, 'model', None) is not None
+            )
+        )
+
+    def has_permission(self):
+        model = self._get_model()
+        if (
+            self._uses_request_selected_model()
+            and model is not None
+            and model._meta.label_lower in self.dynamic_model_denylist
+        ):
+            return False
+        return (
+            user_can_mutate_model(self.request.user, model)
+            and super().has_permission()
+        )
 
     def get_permission_required(self):
         model = self._get_model()
@@ -164,6 +202,12 @@ class ObjectBulkEditView(BulkViewMixin, PermissionRequiredMixin, LoginRequiredMi
 class ObjectBulkDeleteView(BulkViewMixin, PermissionRequiredMixin, LoginRequiredMixin, BaseHTMXView, TemplateResponseMixin, View):
     queryset = None
     template_name = 'generic/object_confirm_bulk_delete.html'
+
+    def has_permission(self):
+        return (
+            user_can_mutate_model(self.request.user, self._get_model())
+            and super().has_permission()
+        )
 
     def get_permission_required(self):
         model = self._get_model()

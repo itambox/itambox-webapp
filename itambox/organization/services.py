@@ -9,6 +9,8 @@ tenant, plus the centralized cross-tenant resource-access resolver
 from dataclasses import dataclass
 from typing import Optional
 
+from django.db.models import Q
+
 from core.managers import get_current_tenant
 
 from .access import accessible_tenant_ids, get_ancestor_tenant_group_ids
@@ -22,7 +24,7 @@ from .models import Tenant, TenantResourceGrant
 # ``visible_to_containers`` to these instead.
 _UNFILTERED_CONTAINER_MODELS = {
     ('organization', 'membership'),
-    ('organization', 'roleassignment'),
+    ('organization', 'rolegrant'),
     ('organization', 'tenantresourcegrant'),
     ('users', 'token'),
 }
@@ -30,7 +32,7 @@ _UNFILTERED_CONTAINER_MODELS = {
 
 def visible_to_containers(user, qs, perm):
     """Restrict a queryset of tenant-anchored rows (``Membership``,
-    ``RoleAssignment``, ``users.Token``) to the tenants ``user`` actually
+    ``RoleGrant``, ``users.Token``) to the tenants ``user`` actually
     holds ``perm`` in.
 
     These models intentionally use an unscoped default manager, so
@@ -57,14 +59,18 @@ def visible_to_containers(user, qs, perm):
     field_names = {f.name for f in model._meta.get_fields()}
     if 'tenant' in field_names:
         return qs.filter(tenant_id__in=allowed)
+    if {'membership', 'user_group'} <= field_names:
+        return qs.filter(
+            Q(membership__tenant_id__in=allowed)
+            | Q(user_group__tenant_id__in=allowed)
+        )
     if 'membership' in field_names:
-        # RoleAssignment-shaped rows anchor to a tenant via their membership.
         return qs.filter(membership__tenant_id__in=allowed)
     return qs.none()  # unknown shape — fail closed
 
 
 def is_container_scoped_unfiltered(model):
-    """True for the access-control models (``Membership``, ``RoleAssignment``,
+    """True for the access-control models (``Membership``, ``RoleGrant``,
     ``users.Token``) that carry a tenant anchor but whose default manager does
     not filter by tenant (see ``visible_to_containers``). Model-agnostic code
     that would otherwise rely on ``filter_by_tenant`` (e.g. ``ObjectExportView``)
@@ -174,7 +180,10 @@ def _find_covering_grant(owner_tenant_id, active_tenant, stock):
     grant = base.filter(grantee_tenant=active_tenant).first()
     if grant is not None:
         return grant, REASON_DIRECT_GRANT
-    ancestor_group_ids = get_ancestor_tenant_group_ids(active_tenant.group_id)
+    ancestor_group_ids = get_ancestor_tenant_group_ids(
+        active_tenant.group_id,
+        live_only=True,
+    )
     if ancestor_group_ids:
         grant = (
             base.filter(grantee_tenant_group_id__in=ancestor_group_ids)

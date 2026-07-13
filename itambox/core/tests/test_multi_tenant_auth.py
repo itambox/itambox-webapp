@@ -3,11 +3,12 @@ from unittest.mock import patch, MagicMock
 from django.test import TestCase, override_settings
 from django.core.management import call_command, CommandError
 from django.contrib.auth import get_user_model
+from django.utils import timezone
 from core.managers import set_current_tenant, get_current_tenant
 from core.auth.ldap import MultiTenantLDAPBackend
 import ldap
 from core.auth.saml import load_saml_config
-from organization.models import Tenant, Membership
+from organization.models import Membership, RoleGrantScope, Tenant
 
 User = get_user_model()
 
@@ -203,7 +204,12 @@ class MultiTenantAuthTestCase(TestCase):
 
         # Check tenant membership was created
         membership = Membership.objects.get(user=user, tenant=self.tenant_alpha)
-        self.assertEqual(membership.assignments.first().role.name, 'Member')
+        role_grant = membership.role_grants.get(
+            scopes__scope_type=RoleGrantScope.SCOPE_OWN,
+        )
+        self.assertEqual(role_grant.role.name, 'Member')
+        self.assertEqual(role_grant.reason, 'LDAP directory synchronization')
+        self.assertGreater(role_grant.valid_until, timezone.now())
 
     def test_sync_tenant_ldap_command_invalid_tenant(self):
         """Test that sync_tenant_ldap raises CommandError for non-existent tenants."""

@@ -4,11 +4,22 @@ from django.contrib.auth import get_user_model
 from django.urls import reverse
 
 from core.tests.mixins import grant
-from organization.models import Tenant, Role, Membership
-from users.models import UserGroup
+from organization.models import Role, RoleGrant, RoleGrantScope, Tenant
+from users.models import GroupMembership, UserGroup
 from assets.models import Asset, StatusLabel, AssetRole, Manufacturer, AssetType
 
 User = get_user_model()
+
+
+def grant_group_role(group, membership, role):
+    GroupMembership.objects.create(user_group=group, membership=membership)
+    role_grant = RoleGrant.objects.create(user_group=group, role=role)
+    RoleGrantScope.objects.create(
+        role_grant=role_grant,
+        scope_type=RoleGrantScope.SCOPE_OWN,
+    )
+    return role_grant
+
 
 class SecurityBoundariesTestCase(TestCase):
     def setUp(self):
@@ -20,7 +31,7 @@ class SecurityBoundariesTestCase(TestCase):
         self.user_a = User.objects.create_user(username='user_a', password='password123')
         self.user_b = User.objects.create_user(username='user_b', password='password123')
 
-        # Bind Tenant A User (M2M: create then add roles)
+        # Bind Tenant A user through a canonical direct RoleGrant.
         self.role_a = Role.objects.create(
             tenant=self.tenant_a,
             name='Admin',
@@ -30,7 +41,7 @@ class SecurityBoundariesTestCase(TestCase):
         )
         self.membership_a = grant(self.user_a, self.tenant_a, self.role_a).membership
 
-        # Bind Tenant B User (per-grant RoleAssignment)
+        # Bind Tenant B user through a canonical direct RoleGrant.
         self.role_b = Role.objects.create(
             tenant=self.tenant_b,
             name='Admin',
@@ -159,7 +170,7 @@ class MultiRoleSecurityBoundaryTestCase(TestCase):
 
         # Membership in Tenant A
         self.membership_a = grant(self.user, self.tenant_a, self.role_a).membership
-        # direct_permissions field is gone — model the same coverage as a one-off role.
+        # A second direct role grant contributes additional permissions additively.
         self.direct_role = Role.objects.create(
             tenant=self.tenant_a,
             name='Direct grants',
@@ -167,10 +178,13 @@ class MultiRoleSecurityBoundaryTestCase(TestCase):
         )
         grant(self.user, self.tenant_a, self.direct_role)
 
-        # UserGroup in Tenant A (change perm via group)
-        self.group_a = UserGroup.objects.create(name='MRSB-Group-A', is_active=True)
-        self.group_a.roles.add(self.role_a)
-        self.group_a.members.add(self.user)
+        # UserGroup in Tenant A (change perm via its membership-backed grant)
+        self.group_a = UserGroup.objects.create(
+            tenant=self.tenant_a,
+            name='MRSB-Group-A',
+            is_active=True,
+        )
+        grant_group_role(self.group_a, self.membership_a, self.role_a)
 
         # Asset in Tenant B — this is what we must NOT access
         self.status = StatusLabel.objects.create(name='MRSB-Status', slug='mrsb-status', type='deployable')
@@ -204,8 +218,8 @@ class MultiRoleSecurityBoundaryTestCase(TestCase):
         self._clear_perm_cache()
         self.assertFalse(self.user.has_perm('assets.view_asset', obj=self.asset_b))
 
-    def test_direct_permission_does_not_apply_across_tenants(self):
-        """direct_permissions in tenant A must not grant access to a tenant B object."""
+    def test_additional_direct_grant_does_not_apply_across_tenants(self):
+        """An additional direct grant in tenant A cannot reach a tenant B object."""
         self._clear_perm_cache()
         self.assertFalse(self.user.has_perm('assets.delete_asset', obj=self.asset_b))
 
@@ -218,18 +232,16 @@ class MultiRoleSecurityBoundaryTestCase(TestCase):
     # is_active gating (membership)
     # ------------------------------------------------------------------
 
-    def test_suspended_membership_denies_its_own_paths(self):
-        """Suspending the membership shuts off its OWN roles and direct_permissions. An
-        active UserGroup is a SEPARATE, independent access path and would still grant, so
-        the user is removed from the group here to isolate the membership paths."""
-        self.group_a.members.remove(self.user)
+    def test_suspended_membership_denies_direct_and_group_paths(self):
+        """Suspending the membership shuts off both its direct grants and any group
+        grants whose principal link is backed by that membership."""
         self.membership_a.is_active = False
         self.membership_a.save()
         self._clear_perm_cache()
 
         self.assertFalse(self.user.has_perm('assets.view_asset'))    # role path
-        self.assertFalse(self.user.has_perm('assets.delete_asset'))  # direct_permissions path
-        self.assertFalse(self.user.has_perm('assets.change_asset'))  # role path
+        self.assertFalse(self.user.has_perm('assets.delete_asset'))  # direct grant path
+        self.assertFalse(self.user.has_perm('assets.change_asset'))  # group grant path
 
     # ------------------------------------------------------------------
     # is_active gating (UserGroup)
@@ -241,7 +253,7 @@ class MultiRoleSecurityBoundaryTestCase(TestCase):
         self.group_a.save()
 
         # Remove assignments from membership so group is the only change-perm source
-        self.membership_a.assignments.all().delete()
+        self.membership_a.role_grants.all().delete()
         self._clear_perm_cache()
 
         self.assertFalse(self.user.has_perm('assets.change_asset'))
@@ -274,9 +286,12 @@ class MultiRoleSecurityBoundaryTestCase(TestCase):
             name='Group-only Role',
             permissions=['organization.view_tenant'],
         )
-        extra_group = UserGroup.objects.create(name='Extra Group', is_active=True)
-        extra_group.roles.add(group_only_role)
-        extra_group.members.add(self.user)
+        extra_group = UserGroup.objects.create(
+            tenant=self.tenant_a,
+            name='Extra Group',
+            is_active=True,
+        )
+        grant_group_role(extra_group, self.membership_a, group_only_role)
         self._clear_perm_cache()
         self.assertTrue(self.user.has_perm('organization.view_tenant'))
 

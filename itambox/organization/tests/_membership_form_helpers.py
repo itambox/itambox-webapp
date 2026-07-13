@@ -21,7 +21,8 @@ def managed_management_form(total, initial=0, prefix=MANAGED_FORMSET_PREFIX):
 
 
 def managed_row(index, *, role=None, managed_scope=None, scope_group=None,
-                assigned_tenants=None, id=None, delete=False,
+                assigned_tenants=None, reason=None, valid_until=None,
+                id=None, delete=False,
                 prefix=MANAGED_FORMSET_PREFIX):
     """One indexed managed-grant formset block as POST keys."""
     p = f'{prefix}-{index}-'
@@ -36,6 +37,10 @@ def managed_row(index, *, role=None, managed_scope=None, scope_group=None,
         d[p + 'scope_group'] = scope_group
     if assigned_tenants:
         d[p + 'assigned_tenants'] = list(assigned_tenants)
+    if reason is not None:
+        d[p + 'reason'] = reason
+    if valid_until is not None:
+        d[p + 'valid_until'] = valid_until
     if delete:
         d[p + 'DELETE'] = 'on'
     return d
@@ -43,7 +48,8 @@ def managed_row(index, *, role=None, managed_scope=None, scope_group=None,
 
 def membership_post_data(*, tenant, user=None, own_roles=None, is_active=True,
                          who=None, new_user_email=None, new_user_first_name=None,
-                         new_user_last_name=None, managed=None):
+                         new_user_last_name=None, reason=None, valid_until=None,
+                         managed=None):
     """Assemble a full MembershipForm POST dict.
 
     ``managed`` is a list of dicts, each a kwargs bag for :func:`managed_row`
@@ -57,6 +63,10 @@ def membership_post_data(*, tenant, user=None, own_roles=None, is_active=True,
         data['user'] = user
     if own_roles is not None:
         data['own_roles'] = list(own_roles)
+    if reason is not None:
+        data['reason'] = reason
+    if valid_until is not None:
+        data['valid_until'] = valid_until
     if who is not None:
         data['who'] = who
     if new_user_email is not None:

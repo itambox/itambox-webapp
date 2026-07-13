@@ -1,26 +1,28 @@
-"""Views for the unified ``Membership`` model (thin anchor + RoleAssignment grants)."""
+"""Views for Membership principals and their canonical RoleGrant aggregates."""
 from django.contrib import messages
 from django.contrib.auth import get_user_model
 from django.contrib.auth.forms import PasswordResetForm
 from django.contrib.auth.mixins import LoginRequiredMixin
 from django.core.exceptions import ValidationError
 from django.db import transaction
-from django.db.models import Exists, OuterRef, Prefetch
+from django.db.models import Exists, OuterRef, Prefetch, Q
 from django.http import Http404, HttpResponse, HttpResponseRedirect
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
+from django.utils import timezone
 from django.utils.html import format_html
 from django.utils.translation import gettext, gettext_lazy as _
 from django.views import View
 
-from core.auth.guards import validate_assignment_grant
+from core.auth.guards import validate_role_grant
+from core.mfa import role_is_privileged
 from itambox.views.generic.utils import safe_return_url
 from itambox.views.generic import (
     ObjectListView, ObjectDetailView, ObjectEditView, ObjectDeleteView,
     ObjectBulkEditView, ObjectBulkDeleteView,
 )
 from ..access import tenant_access_report
-from ..models import Membership, RoleAssignment, Tenant
+from ..models import Membership, RoleGrant, RoleGrantScope, Tenant
 from ..forms import MembershipForm, MembershipFilterForm, MembershipBulkRoleForm
 from ..tables import MembershipTable
 from ..filters import MembershipFilterSet
@@ -32,27 +34,36 @@ User = get_user_model()
 class MembershipListView(ObjectListView):
     # ``has_managed_reach`` feeds MembershipTable's Staff/Member badge as a single
     # correlated EXISTS in the list query — the model property would otherwise run
-    # one exists() query per rendered row. (Membership/RoleAssignment default
+    # one exists() query per rendered row. (Membership/RoleGrant default
     # managers are deliberately unscoped, so baking this at import time is safe.)
     queryset = (
         Membership.objects
         .select_related('user', 'tenant')
-        # Join role + role.tenant into the assignment prefetch: the roles column
+        # Join role + role.tenant into the grant prefetch: the roles column
         # (and Role.__str__) touch role.tenant per row, which the tenant-scoped
         # Tenant manager would otherwise re-fetch one-.get()-per-row (an N+1 that
         # also fails closed outside the role's tenant context). select_related uses
         # a JOIN, so it is both constant-cost and scope-independent.
         .prefetch_related(
             Prefetch(
-                'assignments',
-                queryset=RoleAssignment.objects.select_related('role', 'role__tenant'),
+                'role_grants',
+                queryset=RoleGrant.objects.select_related(
+                    'role', 'role__tenant', 'granted_by',
+                ).prefetch_related('scopes', 'scopes__tenant', 'scopes__tenant_group'),
             )
         )
         .annotate(
             has_managed_reach=Exists(
-                RoleAssignment.objects.filter(
+                RoleGrant.objects.filter(
                     membership_id=OuterRef('pk'),
-                    reach=RoleAssignment.REACH_MANAGED,
+                    role__deleted_at__isnull=True,
+                    scopes__scope_type__in=(
+                        RoleGrantScope.SCOPE_TENANT,
+                        RoleGrantScope.SCOPE_TENANT_GROUP,
+                        RoleGrantScope.SCOPE_ALL_MANAGED,
+                    ),
+                ).filter(
+                    Q(valid_until__isnull=True) | Q(valid_until__gt=timezone.now())
                 )
             )
         )
@@ -178,10 +189,10 @@ class MembershipDetailView(ObjectDetailView):
         Membership.objects
         .select_related('user', 'tenant')
         .prefetch_related(
-            'assignments__role',
-            'assignments__scope_group',
-            'assignments__assigned_tenants',
-            'assignments__granted_by',
+            'role_grants__role',
+            'role_grants__scopes__tenant',
+            'role_grants__scopes__tenant_group',
+            'role_grants__granted_by',
         )
     )
     template_name = 'organization/memberships/membership_detail.html'
@@ -192,7 +203,7 @@ class MembershipDetailView(ObjectDetailView):
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
-        context['assignments'] = self.object.assignments.all()
+        context['grants'] = self.object.role_grants.all()
         return context
 
 
@@ -377,7 +388,7 @@ class MembershipCreateView(_MembershipFormViewMixin, ObjectEditView):
 
     # Success redirect: the generic get_success_url falls back to
     # ``Membership.get_absolute_url()`` — the membership detail, where the new
-    # assignments (and the send-password-setup action) live.
+    # grants (and the send-password-setup action) live.
 
     def form_valid(self, form):
         response = super().form_valid(form)
@@ -395,7 +406,7 @@ class MembershipCreateView(_MembershipFormViewMixin, ObjectEditView):
                         'password setup link</a> so they can sign in.'),
                 user=str(membership.user), url=setup_url,
             ))
-        if not membership.assignments.exists():
+        if not membership.role_grants.filter(scopes__isnull=False).exists():
             # Role-less onboarding is allowed (first hire), but the membership
             # carries zero permissions until a role is assigned — warn loudly.
             messages.warning(self.request, _(
@@ -406,9 +417,9 @@ class MembershipCreateView(_MembershipFormViewMixin, ObjectEditView):
 
 
 class MembershipEditView(_MembershipFormViewMixin, ObjectEditView):
-    """Edit a membership's assignments / active flag. User + tenant are immutable.
+    """Edit a membership's grants / active flag. User + tenant are immutable.
 
-    The form reconciles RoleAssignment rows at BOTH reaches (own + managed);
+    The form reconciles RoleGrant aggregates and their additive scopes;
     success falls through to the generic redirect → membership detail.
     """
     queryset = Membership.objects.all()
@@ -442,8 +453,8 @@ class MembershipDeleteView(ObjectDeleteView):
 class MembershipBulkEditView(ObjectBulkEditView):
     """Bulk role (re-)assignment for memberships sharing one tenant.
 
-    Adds/removes own-reach ``RoleAssignment`` rows; every added role passes
-    :func:`validate_assignment_grant` before anything is written.
+    Adds/removes own-tenant scopes on direct RoleGrants; every added role passes
+    :func:`validate_role_grant` before anything is written.
     """
     queryset = Membership.objects.all()
     form_class = MembershipBulkRoleForm
@@ -451,6 +462,50 @@ class MembershipBulkEditView(ObjectBulkEditView):
     def _get_queryset(self, pks):
         qs = Membership.objects.filter(pk__in=pks)
         return visible_to_containers(self.request.user, qs, 'organization.change_membership')
+
+    @staticmethod
+    def _add_own_scope(membership, role, actor, reason='', valid_until=None):
+        """Add one live direct own-tenant grant as its own audit aggregate."""
+        live = Q(valid_until__isnull=True) | Q(valid_until__gt=timezone.now())
+        if RoleGrant.objects.filter(
+            live,
+            membership=membership,
+            role=role,
+            scopes__scope_type=RoleGrantScope.SCOPE_OWN,
+        ).exists():
+            return False
+
+        elevated = role_is_privileged(role)
+        grant = RoleGrant(
+            membership=membership,
+            role=role,
+            granted_by=actor,
+            reason=reason if elevated else '',
+            valid_until=valid_until if elevated else None,
+        )
+        grant.full_clean()
+        grant.save()
+
+        scope = RoleGrantScope(
+            role_grant=grant,
+            scope_type=RoleGrantScope.SCOPE_OWN,
+        )
+        scope.full_clean()
+        scope.save()
+        return True
+
+    @staticmethod
+    def _remove_own_scopes(membership, roles):
+        grants = RoleGrant.objects.filter(
+            membership=membership,
+            role__in=roles,
+            scopes__scope_type=RoleGrantScope.SCOPE_OWN,
+        ).distinct()
+        for grant in grants:
+            for scope in grant.scopes.filter(scope_type=RoleGrantScope.SCOPE_OWN):
+                scope.delete()
+            if not grant.scopes.exists():
+                grant.delete()
 
     def post(self, request, *args, **kwargs):
         pks = request.POST.getlist('pk')
@@ -473,6 +528,8 @@ class MembershipBulkEditView(ObjectBulkEditView):
             if form.is_valid():
                 roles_to_add = list(form.cleaned_data.get('roles_to_add') or [])
                 roles_to_remove = list(form.cleaned_data.get('roles_to_remove') or [])
+                reason = form.cleaned_data.get('reason') or ''
+                valid_until = form.cleaned_data.get('valid_until')
                 if not roles_to_add and not roles_to_remove:
                     messages.warning(request, _("No roles to add or remove were specified."))
                     return HttpResponseRedirect(return_url)
@@ -493,6 +550,7 @@ class MembershipBulkEditView(ObjectBulkEditView):
                         tenant.managed_by_id
                         and role.tenant_id == tenant.managed_by_id
                         and role.shared_with_managed
+                        and role.tenant.is_provider
                     )
                     if not assignable:
                         messages.error(
@@ -508,8 +566,11 @@ class MembershipBulkEditView(ObjectBulkEditView):
                 # Privilege-escalation guard, per role being granted.
                 try:
                     for role in roles_to_add:
-                        validate_assignment_grant(
-                            request.user, role, tenant, reach=RoleAssignment.REACH_OWN,
+                        validate_role_grant(
+                            request.user,
+                            role,
+                            tenant,
+                            scope_type=RoleGrantScope.SCOPE_OWN,
                         )
                 except ValidationError as e:
                     messages.error(request, ", ".join(e.messages))
@@ -518,20 +579,15 @@ class MembershipBulkEditView(ObjectBulkEditView):
                 with transaction.atomic():
                     for obj in objects:
                         for role in roles_to_add:
-                            RoleAssignment.objects.get_or_create(
-                                membership=obj, role=role, reach=RoleAssignment.REACH_OWN,
-                                defaults={'granted_by': request.user},
+                            self._add_own_scope(
+                                obj,
+                                role,
+                                request.user,
+                                reason=reason,
+                                valid_until=valid_until,
                             )
                         if roles_to_remove:
-                            # Per-instance delete so each revoke hits the changelog
-                            # (queryset.delete() would bypass ChangeLoggingMixin).
-                            stale = RoleAssignment.objects.filter(
-                                membership=obj,
-                                role__in=roles_to_remove,
-                                reach=RoleAssignment.REACH_OWN,
-                            )
-                            for assignment in stale:
-                                assignment.delete()
+                            self._remove_own_scopes(obj, roles_to_remove)
                 messages.success(request, _("Updated %(count)d membership(s).") % {'count': len(objects)})
                 return HttpResponseRedirect(return_url)
         else:

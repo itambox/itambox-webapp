@@ -307,6 +307,18 @@ class Tenant(DeletableVaultModel, BookmarkableMixin):
                     "The managing tenant is itself managed — chains are not supported."
                 )})
 
+        if (
+            self.pk
+            and (not self.is_provider or self.deleted_at is not None)
+            and Tenant._base_manager.filter(
+                managed_by_id=self.pk,
+                deleted_at__isnull=True,
+            ).exists()
+        ):
+            raise ValidationError({'is_provider': _(
+                "Move every live managed tenant before disabling or deleting this provider."
+            )})
+
     def get_absolute_url(self):
         return reverse('organization:tenant_detail', kwargs={'pk': self.pk})
 
@@ -529,10 +541,10 @@ class ContactAssignment(ChangeLoggingMixin, BaseModel):
 
 
 # ---------------------------------------------------------------------------
-# Unified RBAC: Role + Membership + RoleAssignment
+# Unified RBAC: Role + Membership + RoleGrant + RoleGrantScope
 #
 # One container type (Tenant), one permission vocabulary ('app.codename'), and
-# per-grant RoleAssignment rows. A provider (MSP) is just a tenant with
+# scoped RoleGrant rows. A provider (MSP) is just a tenant with
 # ``is_provider=True`` that other tenants point at via ``managed_by``; reach
 # into those managed tenants is a property of the individual grant.
 # ---------------------------------------------------------------------------
@@ -589,11 +601,6 @@ class Role(AutoSlugMixin, StandardModel, SoftDeleteMixin):
     def get_absolute_url(self):
         return reverse('organization:role_detail', kwargs={'pk': self.pk})
 
-    @property
-    def owner(self):
-        """Compat alias: the tenant that owns this role (guards/forms call ``role.owner``)."""
-        return self.tenant
-
     # NOTE: Role intentionally has NO model-layer ``clean()`` validation of ``permissions``.
     # A global ``pre_save`` receiver (core/signals.py::validate_custom_validators_on_save) runs
     # ``clean()`` on every ChangeLoggingMixin save, so a hard check here would fire on ALL
@@ -605,10 +612,9 @@ class Role(AutoSlugMixin, StandardModel, SoftDeleteMixin):
 class Membership(ChangeLoggingMixin, models.Model):
     """A user's binding to one tenant — the thin "person belongs here" anchor.
 
-    What the person may DO is carried by :class:`RoleAssignment` rows hanging off
-    this membership (one row per role × reach). ``is_active=False`` suspends the
-    person in this tenant (all their assignments at once) while retaining the row,
-    the assignments, and any AssetHolder linkage for re-activation.
+    What the person may do is carried by direct and group ``RoleGrant`` rows.
+    ``is_active=False`` suspends every grant reached through this membership while
+    retaining its audit history and any AssetHolder linkage for re-activation.
 
     NOTE: the global ``User.is_active`` / ``User.can_login`` is synced from
     memberships ONLY by the SCIM provisioning paths, which clear it when a
@@ -652,29 +658,24 @@ class Membership(ChangeLoggingMixin, models.Model):
 
     @property
     def is_staff_membership(self):
-        """True when any assignment on this membership projects into managed tenants."""
-        return self.assignments.filter(reach=RoleAssignment.REACH_MANAGED).exists()
+        """True when any grant on this membership reaches managed tenants."""
+        return self.role_grants.filter(
+            role__deleted_at__isnull=True,
+            scopes__scope_type__in=(
+                RoleGrantScope.SCOPE_TENANT,
+                RoleGrantScope.SCOPE_TENANT_GROUP,
+                RoleGrantScope.SCOPE_ALL_MANAGED,
+            ),
+        ).filter(
+            models.Q(valid_until__isnull=True) | models.Q(valid_until__gt=timezone.now())
+        ).exists()
 
 
-class RoleAssignment(ChangeLoggingMixin, models.Model):
-    """One role granted at one scope — the unit of granting and audit.
+class RoleGrant(ChangeLoggingMixin, models.Model):
+    """A role granted to exactly one Membership or tenant-owned UserGroup.
 
-    ``reach='own'``      → the role applies inside ``membership.tenant`` only.
-    ``reach='managed'``  → the role applies inside the managed tenants selected by
-                           the refinement (``managed_scope`` / ``scope_group`` /
-                           ``assigned_tenants``); valid only when
-                           ``membership.tenant.is_provider``.
-
-    "Same role in both places" is two rows. Every grant records who granted it
-    and when — the audit provenance the old roles-M2M could not carry.
+    Scope is represented exclusively by child :class:`RoleGrantScope` rows.
     """
-    # Attribute each grant/revoke to the membership's tenant in the changelog.
-    changelog_tenant_lookup = 'membership__tenant'
-    # A SOFT-deleted Role/Tenant must not physically destroy its grant rows:
-    # they are the audit trail, the backend already treats deleted roles as
-    # inert, and restoring the role re-arms the grants. Hard deletes still
-    # cascade normally. (Consumed by SoftDeleteMixin.delete's collector loop.)
-    survive_parent_soft_delete = True
 
     REACH_OWN = 'own'
     REACH_MANAGED = 'managed'
@@ -682,181 +683,7 @@ class RoleAssignment(ChangeLoggingMixin, models.Model):
         (REACH_OWN, _('This tenant')),
         (REACH_MANAGED, _('Managed tenants')),
     ]
-
-    SCOPE_EXPLICIT = 'explicit'
-    SCOPE_TENANT_GROUP = 'tenant_group'
-    SCOPE_ALL = 'all'
-    SCOPE_CHOICES = [
-        (SCOPE_EXPLICIT, _('Specific tenants')),
-        (SCOPE_TENANT_GROUP, _('A tenant group + its descendants')),
-        (SCOPE_ALL, _('All managed tenants')),
-    ]
-
-    membership = models.ForeignKey(
-        'organization.Membership',
-        on_delete=models.CASCADE,
-        related_name='assignments',
-        verbose_name=_("Membership"),
-    )
-    role = models.ForeignKey(
-        'organization.Role',
-        on_delete=models.CASCADE,
-        related_name='assignments',
-        verbose_name=_("Role"),
-    )
-    reach = models.CharField(
-        max_length=10, choices=REACH_CHOICES, default=REACH_OWN,
-        db_index=True, verbose_name=_("Reach"),
-    )
-    managed_scope = models.CharField(
-        max_length=20, choices=SCOPE_CHOICES, blank=True, null=True,
-        verbose_name=_("Managed scope"),
-        help_text=_("Managed reach only. Which managed tenants this grant covers."),
-    )
-    scope_group = models.ForeignKey(
-        'organization.TenantGroup',
-        on_delete=models.SET_NULL,
-        related_name='assignment_scopes',
-        blank=True, null=True,
-        verbose_name=_("Scope group"),
-        help_text=_("Used when managed_scope='tenant_group'."),
-    )
-    assigned_tenants = models.ManyToManyField(
-        'organization.Tenant',
-        related_name='reach_assignments',
-        blank=True,
-        verbose_name=_("Assigned tenants"),
-        help_text=_("Used when managed_scope='explicit'."),
-    )
-    granted_by = models.ForeignKey(
-        settings.AUTH_USER_MODEL,
-        on_delete=models.SET_NULL,
-        null=True, blank=True,
-        related_name='granted_assignments',
-        verbose_name=_("Granted by"),
-    )
-    granted_at = models.DateTimeField(auto_now_add=True)
-
-    class Meta:
-        ordering = ['membership', 'role']
-        verbose_name = _("Role assignment")
-        verbose_name_plural = _("Role assignments")
-        constraints = [
-            models.UniqueConstraint(
-                fields=['membership', 'role', 'reach'],
-                name='organization_roleassignment_unique_grant',
-            ),
-        ]
-
-    def __str__(self):
-        return f"{self.membership.user} : {self.role.name} ({self.get_reach_display()})"
-
-    def clean(self):
-        # Runs on every save via the global pre_save validator — keep it cheap.
-        from django.core.exceptions import ValidationError
-        super().clean()
-        if self.reach == self.REACH_MANAGED:
-            if self.membership_id and not self.membership.tenant.is_provider:
-                raise ValidationError({'reach': _(
-                    "Managed reach requires the membership's tenant to be a managing "
-                    "(provider) tenant."
-                )})
-            if not self.managed_scope:
-                self.managed_scope = self.SCOPE_EXPLICIT
-        else:
-            if self.managed_scope or self.scope_group_id:
-                raise ValidationError({'managed_scope': _(
-                    "Scope refinement is only valid for managed reach."
-                )})
-
-    # ------------------------------------------------------------------ reach resolution
-    # CANONICAL source of truth for managed-tenant reachability. The auth backend,
-    # organization.access, and the access report all delegate here — do NOT hand-copy
-    # the branching elsewhere.
-
-    def covers_tenant(self, tenant):
-        """Whether ``tenant`` falls within this managed-reach grant."""
-        if self.reach != self.REACH_MANAGED:
-            return False
-        # A grant only ever covers tenants managed by its OWN membership tenant.
-        if tenant.managed_by_id != self.membership.tenant_id:
-            return False
-        scope = self.managed_scope or self.SCOPE_EXPLICIT
-        if scope == self.SCOPE_ALL:
-            return True
-        if scope == self.SCOPE_TENANT_GROUP:
-            if not self.scope_group_id or not tenant.group_id:
-                return False
-            # inline import: avoid an organization.models <-> organization.access cycle at load
-            from organization.access import get_descendant_tenant_group_ids
-            return tenant.group_id in get_descendant_tenant_group_ids(self.scope_group_id)
-        # When ``assigned_tenants`` has been prefetched (e.g. the outside-access
-        # report prefetches it via _base_manager to avoid one query per explicit
-        # assignment), read the cache; otherwise query via _base_manager (unscoped)
-        # through the reverse relation — the M2M's own related manager is Tenant's
-        # tenant-scoped manager, which would fail closed outside the tenant's
-        # context AND recurse into filter_by_tenant when this canonical helper is
-        # reached from accessible_tenant_ids under a group scope.
-        if 'assigned_tenants' in getattr(self, '_prefetched_objects_cache', {}):
-            return any(t.pk == tenant.pk for t in self.assigned_tenants.all())
-        return Tenant._base_manager.filter(
-            reach_assignments=self, pk=tenant.pk,
-        ).exists()
-
-    def scoped_tenant_ids(self):
-        """The set of managed-tenant ids this grant reaches (empty for own-reach)."""
-        if self.reach != self.REACH_MANAGED:
-            return set()
-        provider_id = self.membership.tenant_id
-        scope = self.managed_scope or self.SCOPE_EXPLICIT
-        if scope == self.SCOPE_ALL:
-            return set(
-                Tenant._base_manager.filter(managed_by_id=provider_id)
-                .values_list('pk', flat=True)
-            )
-        if scope == self.SCOPE_TENANT_GROUP:
-            if not self.scope_group_id:
-                return set()
-            # inline import: avoid an organization.models <-> organization.access cycle at load
-            from organization.access import get_descendant_tenant_group_ids
-            group_ids = get_descendant_tenant_group_ids(self.scope_group_id)
-            return set(
-                Tenant._base_manager.filter(
-                    managed_by_id=provider_id, group_id__in=group_ids,
-                ).values_list('pk', flat=True)
-            )
-        # _base_manager via the reverse relation (see covers_tenant): unscoped, so it
-        # neither fails closed outside the tenant context nor recurses into
-        # filter_by_tenant when reached from accessible_tenant_ids under a group scope.
-        return set(
-            Tenant._base_manager.filter(
-                reach_assignments=self, managed_by_id=provider_id,
-            ).values_list('pk', flat=True)
-        )
-
-    # ------------------------------------------------------------------ explicit coverage
-    def set_assigned_tenants(self, tenants, actor=None):
-        """The ONLY supported writer for this grant's explicit managed coverage.
-
-        Routes the M2M edit through :meth:`ChangeLoggingMixin.log_m2m_change` so
-        the change is recorded in ``ObjectChange`` (the mixin's ``save()`` cannot
-        capture it — Django fires ``m2m_changed`` after ``save()``), attributed to
-        the membership's tenant (via ``changelog_tenant_lookup``), the current
-        request, and ``actor``. The existing ``m2m_changed`` receiver still clears
-        the affected user's effective-permission caches. An unchanged set is a
-        no-op (nothing applied, nothing logged). Returns ``True`` on a real change.
-        """
-        return self.log_m2m_change('assigned_tenants', tenants, actor=actor)
-
-
-class RoleGrant(ChangeLoggingMixin, models.Model):
-    """A role granted to exactly one Membership or tenant-owned UserGroup.
-
-    Scope is represented exclusively by child :class:`RoleGrantScope` rows.
-    ``legacy_assignment`` is a temporary expansion-migration pointer: it keeps
-    shadow rows synchronized while both resolvers are compared, and is removed
-    together with RoleAssignment at final cutover.
-    """
+    survive_parent_soft_delete = True
 
     membership = models.ForeignKey(
         'organization.Membership',
@@ -895,15 +722,6 @@ class RoleGrant(ChangeLoggingMixin, models.Model):
         null=True,
         db_index=True,
         verbose_name=_('Valid until'),
-    )
-    legacy_assignment = models.OneToOneField(
-        'organization.RoleAssignment',
-        on_delete=models.SET_NULL,
-        related_name='successor_grant',
-        blank=True,
-        null=True,
-        editable=False,
-        verbose_name=_('Legacy assignment'),
     )
 
     class Meta:
@@ -949,6 +767,16 @@ class RoleGrant(ChangeLoggingMixin, models.Model):
     def is_active(self):
         return self.valid_until is None or self.valid_until > timezone.now()
 
+    @property
+    def reach(self):
+        """Presentation-level reach derived from the grant's additive scopes."""
+        if any(scope.scope_type != RoleGrantScope.SCOPE_OWN for scope in self.scopes.all()):
+            return self.REACH_MANAGED
+        return self.REACH_OWN
+
+    def get_reach_display(self):
+        return dict(self.REACH_CHOICES)[self.reach]
+
     def __str__(self):
         principal = self.membership or self.user_group
         return f'{principal}: {self.role}'
@@ -970,31 +798,61 @@ class RoleGrant(ChangeLoggingMixin, models.Model):
         if self.membership_id and self.role_id and self.role.tenant_id != owner_id:
             shared_own_role = (
                 self.role.shared_with_managed
+                and self.role.tenant.is_provider
                 and self.membership.tenant.managed_by_id == self.role.tenant_id
             )
-            if not shared_own_role and self.legacy_assignment_id is None:
+            if not shared_own_role:
                 raise ValidationError({
                     'role': _('A direct grant may use only a role owned by its tenant or managing provider.')
                 })
 
-        # The legacy schema had no reason/expiry fields, so migrated rows are
-        # grandfathered only for the comparison window. Every newly authored
-        # elevated direct grant is explicitly temporary and justified.
-        if (
-            self.membership_id
-            and self.legacy_assignment_id is None
-            and self.role_id
-            and role_is_privileged(self.role)
-        ):
+        if self.membership_id and self.role_id and role_is_privileged(self.role):
             errors = {}
             if not self.reason.strip():
                 errors['reason'] = _('Elevated direct grants require a reason.')
             if self.valid_until is None:
                 errors['valid_until'] = _('Elevated direct grants require an expiration.')
-            elif self._state.adding and self.valid_until <= timezone.now():
+            elif self.valid_until <= timezone.now():
                 errors['valid_until'] = _('The expiration must be in the future.')
             if errors:
                 raise ValidationError(errors)
+
+    def scoped_tenant_ids(self):
+        """Concrete managed-tenant coverage of this grant."""
+        if (
+            self.principal_tenant_id != self.role.tenant_id
+            or not self.role.tenant.is_provider
+        ):
+            return set()
+        tenant_ids = set()
+        for scope in self.scopes.all():
+            if scope.scope_type == RoleGrantScope.SCOPE_ALL_MANAGED:
+                tenant_ids.update(
+                    Tenant._base_manager.filter(
+                        managed_by_id=self.role.tenant_id,
+                        deleted_at__isnull=True,
+                    ).values_list('pk', flat=True)
+                )
+            elif scope.scope_type == RoleGrantScope.SCOPE_TENANT:
+                if scope.tenant_id and Tenant._base_manager.filter(
+                    pk=scope.tenant_id,
+                    managed_by_id=self.role.tenant_id,
+                    deleted_at__isnull=True,
+                ).exists():
+                    tenant_ids.add(scope.tenant_id)
+            elif scope.scope_type == RoleGrantScope.SCOPE_TENANT_GROUP:
+                from organization.access import get_descendant_tenant_group_ids
+                tenant_ids.update(
+                    Tenant._base_manager.filter(
+                        managed_by_id=self.role.tenant_id,
+                        group_id__in=get_descendant_tenant_group_ids(
+                            scope.tenant_group_id,
+                            live_only=True,
+                        ),
+                        deleted_at__isnull=True,
+                    ).values_list('pk', flat=True)
+                )
+        return tenant_ids
 
     def covers_tenant(self, tenant):
         """Return whether any live additive scope on this grant covers ``tenant``."""
@@ -1013,6 +871,7 @@ class RoleGrant(ChangeLoggingMixin, models.Model):
                 if (
                     self.membership_id
                     and self.role.shared_with_managed
+                    and self.role.tenant.is_provider
                     and tenant.managed_by_id == self.role.tenant_id
                 ):
                     return True
@@ -1036,13 +895,21 @@ class RoleGrant(ChangeLoggingMixin, models.Model):
                 if not scope.tenant_group_id or not tenant.group_id:
                     continue
                 from organization.access import get_descendant_tenant_group_ids
-                if tenant.group_id in get_descendant_tenant_group_ids(scope.tenant_group_id):
+                if tenant.group_id in get_descendant_tenant_group_ids(
+                    scope.tenant_group_id,
+                    live_only=True,
+                ):
                     return True
         return False
 
 
 class RoleGrantScope(ChangeLoggingMixin, models.Model):
     """One additive reach boundary for a RoleGrant; explicit deny is unsupported."""
+
+    # RoleGrant survives a parent Role soft-delete as inert audit history. The
+    # soft-delete collector also sees its non-soft-deletable children directly,
+    # so scopes must opt out independently or the aggregate is only half kept.
+    survive_parent_soft_delete = True
 
     SCOPE_OWN = 'own'
     SCOPE_TENANT = 'tenant'
@@ -1149,13 +1016,12 @@ class RoleGrantScope(ChangeLoggingMixin, models.Model):
         if not self.role_grant_id:
             return
         grant = self.role_grant
-        if grant.legacy_assignment_id is not None:
-            return
         owner_id = grant.principal_tenant_id
         if self.scope_type == self.SCOPE_OWN:
             valid_shared_role = (
                 grant.membership_id
                 and grant.role.shared_with_managed
+                and grant.role.tenant.is_provider
                 and grant.membership.tenant.managed_by_id == grant.role.tenant_id
             )
             if grant.role.tenant_id != owner_id and not valid_shared_role:
@@ -1289,7 +1155,7 @@ class TenantResourceGrant(SoftDeleteMixin, ChangeLoggingMixin, BaseModel):
     independently by the resolver), and are revoked by soft-delete so that
     historical assignments keep their provenance pointer.
 
-    Like Membership/RoleAssignment, the default manager is deliberately
+    Like Membership/RoleGrant, the default manager is deliberately
     UNSCOPED: this is authorization infrastructure that the resolver must
     read from both the owner's and the grantee's tenant context. UI/API
     surfaces scope their querysets explicitly.
@@ -1299,7 +1165,7 @@ class TenantResourceGrant(SoftDeleteMixin, ChangeLoggingMixin, BaseModel):
     # restore re-arms them. Hard deletes still cascade.
     survive_parent_soft_delete = True
 
-    # NO all_objects manager, on purpose (mirrors Membership/RoleAssignment):
+    # NO all_objects manager, on purpose (mirrors Membership/RoleGrant):
     # revocation is a lifecycle state, not "trash" — grants must not surface
     # in the generic recycle bin for restore. Audit surfaces (admin) read
     # revoked rows through _base_manager.

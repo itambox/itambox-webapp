@@ -3,12 +3,13 @@ from core.filters import BaseFilterSet
 from django import forms
 from django.db.models import Q
 from django.contrib.contenttypes.models import ContentType
+from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
 from assets.models import Manufacturer, AssetType
 from organization.models import (
     Site, Region, SiteGroup, Location, Tenant, TenantGroup,
     AssetHolder, Contact, ContactRole, ContactAssignment,
-    Role, Membership, RoleAssignment, CostCenter,
+    Role, Membership, RoleGrant, RoleGrantScope, CostCenter,
 )
 
 from extras.models import Tag # Import Tag
@@ -343,10 +344,11 @@ class MembershipFilterSet(BaseOrgFilterSet):
         queryset=Tenant._base_manager.filter(deleted_at__isnull=True),
         widget=forms.Select(attrs={'class': 'form-select'}),
     )
-    # Grants live on RoleAssignment rows now — filter through the reverse relation
-    # (distinct: a membership with several matching assignments must list once).
+    # Filter through the grant relation; distinct prevents a membership with
+    # several matching scopes from appearing more than once.
     role = django_filters.ModelMultipleChoiceFilter(
-        field_name='assignments__role',
+        field_name='role_grants__role',
+        method='filter_role',
         # select_related('tenant'): the widget renders one <option> per role via
         # Role.__str__ ("name (tenant)"), which would otherwise fetch role.tenant
         # once per choice — an N+1 that grows with the tenant's role count.
@@ -356,8 +358,8 @@ class MembershipFilterSet(BaseOrgFilterSet):
         widget=forms.SelectMultiple(attrs={'class': 'form-select'}),
     )
     reach = django_filters.ChoiceFilter(
-        field_name='assignments__reach',
-        choices=RoleAssignment.REACH_CHOICES,
+        method='filter_reach',
+        choices=RoleGrant.REACH_CHOICES,
         label=_('Reach'),
         distinct=True,
         widget=forms.Select(attrs={'class': 'form-select'}),
@@ -380,12 +382,55 @@ class MembershipFilterSet(BaseOrgFilterSet):
     def search(self, queryset, name, value):
         if not value.strip():
             return queryset
+        live_role_grant = (
+            Q(role_grants__role__deleted_at__isnull=True)
+            & Q(role_grants__scopes__isnull=False)
+            & (
+                Q(role_grants__valid_until__isnull=True)
+                | Q(role_grants__valid_until__gt=timezone.now())
+            )
+        )
         return queryset.filter(
             Q(user__username__icontains=value)
             | Q(user__email__icontains=value)
-            | Q(assignments__role__name__icontains=value)
+            | (Q(role_grants__role__name__icontains=value) & live_role_grant)
             | Q(tenant__name__icontains=value)
         ).distinct()
+
+    def filter_role(self, queryset, name, value):
+        if not value:
+            return queryset
+        return queryset.filter(
+            role_grants__role__in=value,
+            role_grants__role__deleted_at__isnull=True,
+            role_grants__scopes__isnull=False,
+        ).filter(
+            Q(role_grants__valid_until__isnull=True)
+            | Q(role_grants__valid_until__gt=timezone.now())
+        ).distinct()
+
+    def filter_reach(self, queryset, name, value):
+        if value == RoleGrant.REACH_OWN:
+            return queryset.filter(
+                role_grants__scopes__scope_type=RoleGrantScope.SCOPE_OWN,
+                role_grants__role__deleted_at__isnull=True,
+            ).filter(
+                Q(role_grants__valid_until__isnull=True)
+                | Q(role_grants__valid_until__gt=timezone.now())
+            ).distinct()
+        if value == RoleGrant.REACH_MANAGED:
+            return queryset.filter(
+                role_grants__scopes__scope_type__in=(
+                    RoleGrantScope.SCOPE_TENANT,
+                    RoleGrantScope.SCOPE_TENANT_GROUP,
+                    RoleGrantScope.SCOPE_ALL_MANAGED,
+                ),
+                role_grants__role__deleted_at__isnull=True,
+            ).filter(
+                Q(role_grants__valid_until__isnull=True)
+                | Q(role_grants__valid_until__gt=timezone.now())
+            ).distinct()
+        return queryset
 
 
 class CostCenterFilterSet(BaseOrgFilterSet):
