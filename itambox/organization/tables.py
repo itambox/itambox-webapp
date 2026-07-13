@@ -6,7 +6,7 @@ from django_tables2.utils import A
 from .models import (
     Site, Region, SiteGroup, Location, Tenant, TenantGroup,
     AssetHolder, Contact, ContactRole, ContactAssignment,
-    Role, Membership, RoleAssignment, CostCenter,
+    Role, Membership, RoleAssignment, CostCenter, TenantResourceGrant,
 )
 from core.tables import ActionsColumn, BaseTable, CountLinkColumn, ToggleColumn
 from extras.tables import TagColumn
@@ -330,3 +330,59 @@ class CostCenterTable(BaseTable):
         fields = ('pk', 'code', 'name', 'tenant', 'parent', 'description', 'child_count', 'is_active', 'actions')
         default_columns = ('pk', 'code', 'name', 'tenant', 'parent', 'child_count', 'is_active', 'actions')
 
+
+class TenantResourceGrantTable(BaseTable):
+    """Grants involving the active tenant (given and received)."""
+    pk = ToggleColumn(accessor='pk')
+    tenant = tables.Column(verbose_name=_('Owner'))
+    grantee = tables.Column(verbose_name=_('Grantee'), empty_values=(), orderable=False)
+    resource = tables.Column(verbose_name=_('Shared pool'), empty_values=(), orderable=False)
+    access_level = tables.Column(verbose_name=_('Access'))
+    granted_by = tables.Column(verbose_name=_('Granted by'))
+    created_at = tables.DateTimeColumn(verbose_name=_('Granted at'), format='Y-m-d H:i')
+    actions = tables.Column(
+        verbose_name='',
+        orderable=False,
+        empty_values=(),
+        attrs={
+            'th': {'class': 'col-actions-wide text-nowrap'},
+            'td': {'class': 'text-end text-nowrap noprint p-1 col-actions-wide'}
+        }
+    )
+
+    class Meta(BaseTable.Meta):
+        model = TenantResourceGrant
+        fields = ('pk', 'tenant', 'grantee', 'resource', 'access_level',
+                  'granted_by', 'created_at', 'actions')
+        default_columns = ('pk', 'tenant', 'grantee', 'resource', 'access_level',
+                           'created_at', 'actions')
+
+    def render_grantee(self, record):
+        if record.grantee_tenant_id:
+            return str(record.grantee_tenant)
+        return format_html(
+            '{} <span class="badge bg-azure-lt">{}</span>',
+            record.grantee_tenant_group, _('Group (incl. descendants)'),
+        )
+
+    def render_resource(self, record):
+        resource = record.resource  # GenericFK; may be gone (revoked orphans)
+        if resource is None:
+            return format_html(
+                '<span class="text-muted">{} #{}</span>',
+                record.resource_type.model, record.resource_id,
+            )
+        return str(resource)
+
+    def render_actions(self, record):
+        request = getattr(self, 'request', None)
+        if not request or not self.has_perm(
+            request.user, 'organization.delete_tenantresourcegrant', record,
+        ):
+            return mark_safe('<span class="text-muted small">&mdash;</span>')
+        revoke_url = reverse('organization:tenantresourcegrant_delete', kwargs={'pk': record.pk})
+        return format_html(
+            '<a href="{}" class="btn btn-sm btn-outline-danger" title="{}">'
+            '<i class="mdi mdi-link-variant-off"></i> {}</a>',
+            revoke_url, _('Revoke this grant'), _('Revoke'),
+        )

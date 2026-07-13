@@ -142,7 +142,10 @@ class ConsumableCheckoutForm(BaseCheckoutForm):
     def __init__(self, *args, **kwargs):
         self.consumable = kwargs.pop('consumable', None)
         tenant = self.consumable.tenant if self.consumable else None
-        super().__init__(*args, tenant=tenant, **kwargs)
+        # inline import: sibling-module import at call time avoids a forms-package cycle
+        from ..models import ConsumableStock
+        super().__init__(*args, tenant=tenant, item=self.consumable,
+                         stock_model=ConsumableStock, **kwargs)
         self.helper = FormHelper()
         self.helper.form_tag = False
         self.helper.layout = Layout(

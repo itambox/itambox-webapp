@@ -43,6 +43,10 @@ from .membership_views import (
     MembershipDeleteView, MembershipBulkEditView, MembershipBulkDeleteView,
     MembershipSendResetView,
 )
+from .resource_grant_views import (
+    TenantResourceGrantListView, TenantResourceGrantCreateView,
+    TenantResourceGrantRevokeView,
+)
 from .costcenter_views import (
     CostCenterListView, CostCenterDetailView, CostCenterEditView, CostCenterDeleteView,
     CostCenterCloneView, CostCenterBulkEditView, CostCenterBulkDeleteView,

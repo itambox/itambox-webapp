@@ -84,6 +84,38 @@ def checkout_inventory_item(
     return assignment
 
 
+def shared_stock_union(queryset, stock_model):
+    """Extend a tenant-scoped stock queryset with pools shared TO the active
+    tenant via live TenantResourceGrants (ADR-0001 phase 4b: grantees may VIEW
+    shared stock). Read surfaces only — mutation views keep pure scoping.
+    No active tenant → unchanged queryset."""
+    # inline imports: break an inventory <-> organization import cycle at load
+    from core.managers import get_current_tenant
+    from organization.access import shared_resource_ids
+
+    tenant = get_current_tenant()
+    if tenant is None:
+        return queryset
+    return queryset | stock_model._base_manager.filter(
+        pk__in=shared_resource_ids(stock_model, tenant),
+    )
+
+
+def recipient_assignment_union(queryset, assignment_model):
+    """Extend a tenant-scoped assignment queryset with live rows TARGETING the
+    active tenant (ADR-0001 phase 4b: recipients may view inbound cross-tenant
+    assignments and run the return workflow). No active tenant → unchanged."""
+    # inline import: break an inventory <-> core import cycle at load
+    from core.managers import get_current_tenant
+
+    tenant = get_current_tenant()
+    if tenant is None:
+        return queryset
+    return queryset | assignment_model._base_manager.filter(
+        target_tenant=tenant, deleted_at__isnull=True,
+    )
+
+
 def resolve_grant_for_checkout(item, item_field, stock_model, assignment_model,
                                source_location, user=None):
     """Authorize a checkout's source pool and return the covering grant.
@@ -128,7 +160,13 @@ def resolve_grant_for_checkout(item, item_field, stock_model, assignment_model,
 
 
 def checkin_accessory(assignment_pk: Any, user: Optional[Any] = None) -> Tuple[Any, int, Any]:
-    assignment = get_object_or_404(AccessoryAssignment, pk=assignment_pk)
+    # _base_manager + live filter: the calling view already authorized the
+    # actor (owner OR recipient tenant, ADR-0001 4b); the tenant-scoped
+    # default manager would hide the row from the recipient's context.
+    assignment = get_object_or_404(
+        AccessoryAssignment._base_manager.filter(deleted_at__isnull=True),
+        pk=assignment_pk,
+    )
     accessory = assignment.accessory
     qty = assignment.qty
     recipient = assignment.assigned_holder or assignment.assigned_location or assignment.assigned_asset
@@ -138,7 +176,11 @@ def checkin_accessory(assignment_pk: Any, user: Optional[Any] = None) -> Tuple[A
 
 
 def checkin_component(assignment_pk: Any, user: Optional[Any] = None) -> Tuple[Any, int, Any]:
-    assignment = get_object_or_404(ComponentAllocation, pk=assignment_pk)
+    # _base_manager + live filter: see checkin_accessory.
+    assignment = get_object_or_404(
+        ComponentAllocation._base_manager.filter(deleted_at__isnull=True),
+        pk=assignment_pk,
+    )
     component = assignment.component
     qty = assignment.qty
     recipient = assignment.assigned_holder or assignment.assigned_location or assignment.assigned_asset

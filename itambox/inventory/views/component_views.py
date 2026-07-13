@@ -17,7 +17,10 @@ from itambox.panels import Panel
 
 from ..models import Component, ComponentStock, ComponentAllocation
 from .. import forms, tables, filters
-from inventory.services import checkout_inventory_item, checkin_component
+from inventory.services import (
+    checkout_inventory_item, checkin_component,
+    recipient_assignment_union, shared_stock_union,
+)
 
 
 class ComponentListView(ObjectListView):
@@ -95,6 +98,11 @@ class ComponentCloneView(ObjectCloneView):
 
 class ComponentStockListView(ObjectListView):
     queryset = ComponentStock.objects.select_related('component', 'location')
+
+    def get_queryset(self):
+        # ADR-0001 4b: include pools shared TO the active tenant (read-only).
+        return shared_stock_union(super().get_queryset(), ComponentStock).select_related(
+            'component', 'location')
     filterset = filters.ComponentStockFilterSet
     filterset_form = forms.ComponentStockFilterForm
     table = tables.ComponentStockTable
@@ -134,6 +142,12 @@ class ComponentStockDeleteView(ObjectDeleteView):
 
 class ComponentAllocationListView(ObjectListView):
     queryset = ComponentAllocation.objects.select_related('component', 'assigned_holder', 'assigned_location', 'assigned_asset').prefetch_related('tags')
+
+    def get_queryset(self):
+        # ADR-0001 4b: recipients see allocations targeting their tenant.
+        return recipient_assignment_union(
+            super().get_queryset(), ComponentAllocation,
+        ).select_related('component', 'assigned_holder', 'assigned_location', 'assigned_asset')
     filterset = filters.ComponentAllocationFilterSet
     filterset_form = forms.ComponentAllocationFilterForm
     table = tables.ComponentAllocationTable
@@ -172,7 +186,8 @@ class ComponentStockAdjustView(LoginRequiredMixin, View):
                 stock = ComponentStock.objects.select_for_update().get(pk=pk)
             except ComponentStock.DoesNotExist:
                 raise Http404
-            if not request.user.has_perm('inventory.change_componentstock', obj=stock.component):
+            # Anchor at the POOL — see AccessoryStockAdjustView.
+            if not request.user.has_perm('inventory.change_componentstock', obj=stock):
                 return HttpResponseForbidden(_("Permission denied."))
             action = request.GET.get('action')
 
@@ -275,6 +290,19 @@ class ComponentCheckoutView(GenericTransactionView):
 class ComponentCheckinView(SimplePostView):
     permission_required = ('inventory.change_component',)
     queryset = ComponentAllocation.objects.all()
+
+    def get_queryset(self):
+        # ADR-0001 4b: the recipient tenant may run the return workflow.
+        return recipient_assignment_union(super().get_queryset(), ComponentAllocation)
+
+    def has_permission(self):
+        perms = self.get_permission_required()
+        obj = self.get_object()
+        if self.request.user.has_perms(perms, obj=obj):
+            return True
+        # Recipient side: the same permission, held in the TARGET tenant.
+        target = obj.target_tenant
+        return target is not None and self.request.user.has_perms(perms, obj=target)
 
     def perform_action(self, assignment, request):
         component, qty, recipient = checkin_component(assignment.pk, user=request.user)
