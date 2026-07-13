@@ -48,44 +48,36 @@ class TokenPermissions(BasePermission):
         if not request.user or not request.user.is_authenticated:
             return False
 
-        if getattr(view, '_ignore_model_permissions', False):
-            return True
-
         qs = self._queryset(view)
         perms = self.get_required_permissions(request.method, qs.model)
 
         if not perms:
             return True
 
-        # Ensure active tenant context is set and valid
-        from core.managers import get_current_tenant, set_current_tenant, set_current_membership
-        if not get_current_tenant():
-            from organization.models import Membership
-            membership = Membership.objects.filter(user=request.user, is_active=True).select_related('tenant').first()
-            if membership:
-                set_current_tenant(membership.tenant)
-                set_current_membership(membership)
-            else:
-                from organization.models import AssetHolder
-                holder = request.user.asset_holder_profiles.first()
-                if holder and holder.tenant:
-                    set_current_tenant(holder.tenant)
-                elif request.user.is_superuser:
-                    # Superusers are global and unscoped by default
-                    pass
-                else:
-                    # No membership, no asset-holder profile, not a superuser:
-                    # the request has no resolvable tenant scope. Deny.
-                    return False
+        # Tenant selection belongs to TenantMiddleware or TokenAuthentication.
+        # Permission evaluation must never silently choose the user's first
+        # membership: that makes an unbound request's authorization depend on
+        # database ordering and can stomp an intentional tenant-group scope.
+        from core.managers import get_current_tenant, get_current_tenant_group
+        tenant = get_current_tenant()
+        token_tenant_id = getattr(getattr(request, 'auth', None), 'tenant_id', None)
+        if token_tenant_id is not None:
+            # Token requests are single-tenant and must remain pinned to the
+            # authenticated token's tenant for the complete request.
+            if (
+                tenant is None
+                or tenant.pk != token_tenant_id
+                or getattr(request.auth, 'user_id', None) != request.user.pk
+            ):
+                return False
+        elif not request.user.is_superuser and tenant is None and get_current_tenant_group() is None:
+            return False
 
         return request.user.has_perms(perms)
 
     def has_object_permission(self, request, view, obj):
         if not request.user or not request.user.is_authenticated:
             return False
-
-        if getattr(view, '_ignore_model_permissions', False):
-            return True
 
         qs = self._queryset(view)
         perms = self.get_required_permissions(request.method, qs.model)

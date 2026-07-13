@@ -19,7 +19,7 @@ User = get_user_model()
 
 
 class APIRootView(APIView):
-    _ignore_model_permissions = True
+    permission_classes = [IsAuthenticated]
 
     def get_view_name(self):
         return "API Root"
