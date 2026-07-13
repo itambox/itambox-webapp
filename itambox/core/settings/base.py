@@ -241,6 +241,11 @@ DOCS_ROOT = os.environ.get('ITAMBOX_DOCS_ROOT', BASE_DIR / 'docs')
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
+# Phase-5 RBAC rollout: legacy|compare|new. Compare evaluates both resolvers,
+# logs every disagreement, and still returns the legacy decision. Do not enable
+# new until ``manage.py compare_rbac_resolvers`` reports zero differences.
+RBAC_RESOLVER_MODE = os.environ.get('ITAMBOX_RBAC_RESOLVER_MODE', 'compare').lower()
+
 CRISPY_ALLOWED_TEMPLATE_PACKS = "bootstrap5"
 CRISPY_TEMPLATE_PACK = "bootstrap5"
 
@@ -600,7 +605,5 @@ CORS_ALLOWED_ORIGINS = [
     for origin in os.environ.get('ITAMBOX_CORS_ALLOWED_ORIGINS', '').split(',')
     if origin.strip()
 ]
-
-
 
 

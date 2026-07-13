@@ -88,6 +88,13 @@ Migration order: add tables → backfill group members → convert
 old and new resolution in comparison mode and investigate every disagreement
 → switch the auth backend → remove the old M2Ms and `RoleAssignment`.
 
+Phase 5 expansion is implemented with `ITAMBOX_RBAC_RESOLVER_MODE=compare`
+as the safe default. The comparison path returns the legacy decision while
+logging differences. Operators must run `python manage.py
+compare_rbac_resolvers` against production and resolve every reported row
+before setting the mode to `new`; the legacy fields and compatibility pointer
+remain intentionally present until that real-data gate is satisfied.
+
 Today's `Role.shared_with_managed` mechanism (a provider role assignable by
 managed-tenant admins to their own members) is a legitimate pattern under
 this design and converts to a RoleGrant on the customer membership with a

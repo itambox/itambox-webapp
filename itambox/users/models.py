@@ -249,21 +249,12 @@ class Token(ChangeLoggingMixin, models.Model):
 
 
 class UserGroup(AutoSlugMixin, StandardModel, SoftDeleteMixin):
-    """A cross-cutting group of users granted one or more Roles.
+    """A flat application group owned by one tenant/provider.
 
-    A group is NOT bound to a single tenant for permission purposes: its ``roles`` may
-    reference roles from any number of tenants, and a member is granted each role's
-    permissions in that role's owning tenant — which in turn grants access to those
-    tenants (no per-tenant Membership required). This models MSP teams (e.g. "Senior
-    Technicians" holding admin roles across customers A, B and C) as well as
-    single-tenant groups.
-
-    A user's effective permissions in a tenant are the additive union of every group
-    role owned by that tenant plus the user's own assignment-carried roles there.
-    Lives in the identity layer (``users``) because it answers "who can do what",
-    not "what exists in the business". Group management is gated by the standard
-    Django permissions ``users.change_usergroup`` / ``users.add_usergroup`` through
-    the unified RBAC (one vocabulary — the manage_groups capability is gone).
+    Phase 5 resolves members through :class:`GroupMembership` and permissions
+    through organization.RoleGrant. The legacy ``members``/``roles`` M2Ms stay
+    temporarily writable only to shadow existing UI/SCIM paths while comparison
+    mode proves equivalence; they are removed after the production cutover gate.
     """
     # Default manager stays deliberately unscoped (group admin views scope their
     # querysets explicitly — groups are cross-cutting); all_objects rides the
@@ -282,8 +273,7 @@ class UserGroup(AutoSlugMixin, StandardModel, SoftDeleteMixin):
         related_name='user_groups',
         blank=True,
         verbose_name=_("Roles"),
-        help_text=_("Roles granted to members. Roles may span multiple tenants or "
-                    "providers; a member gets each role's permissions in its container."),
+        help_text=_("Legacy comparison field; new grants use RoleGrant + RoleGrantScope."),
     )
     members = models.ManyToManyField(
         settings.AUTH_USER_MODEL,
@@ -291,13 +281,9 @@ class UserGroup(AutoSlugMixin, StandardModel, SoftDeleteMixin):
         blank=True,
         verbose_name=_("Members"),
     )
-    # Owning tenant + SCIM provisioning scope (functional, not decorative): every
-    # tenant-SCIM group operation filters ``UserGroup.objects.filter(tenant=...)``, so a
-    # group's ``tenant`` decides which tenant's SCIM token may list/create/update/delete
-    # it, and name/slug uniqueness is scoped to it. For MSP teams this is the managing
-    # (is_provider) tenant. NULL = a global group (managed in the UI by superusers only,
-    # outside SCIM). It does not affect permission *resolution* — that is driven entirely
-    # by the group's ``roles``.
+    # Owning tenant + external provisioning scope. NULL remains temporarily so
+    # comparison mode can surface legacy global groups without inventing an owner;
+    # final cutover makes this non-null after operators resolve every such row.
     tenant = models.ForeignKey(
         'organization.Tenant',
         on_delete=models.SET_NULL,
@@ -343,3 +329,99 @@ class UserGroup(AutoSlugMixin, StandardModel, SoftDeleteMixin):
 
     def get_absolute_url(self):
         return reverse('users:usergroup_detail', kwargs={'pk': self.pk})
+
+
+class GroupMembership(ChangeLoggingMixin, models.Model):
+    """One tenant Membership included in one flat, tenant-owned UserGroup.
+
+    External directory nesting is flattened into these rows during sync; the
+    application deliberately has no group-in-group relation.
+    """
+
+    SOURCE_MANUAL = 'manual'
+    SOURCE_SCIM = 'scim'
+    SOURCE_LDAP = 'ldap'
+    SOURCE_OIDC = 'oidc'
+    SOURCE_SAML = 'saml'
+    SOURCE_CHOICES = [
+        (SOURCE_MANUAL, _('Manual')),
+        (SOURCE_SCIM, _('SCIM')),
+        (SOURCE_LDAP, _('LDAP / Entra ID')),
+        (SOURCE_OIDC, _('OIDC')),
+        (SOURCE_SAML, _('SAML')),
+    ]
+
+    user_group = models.ForeignKey(
+        'users.UserGroup',
+        on_delete=models.CASCADE,
+        related_name='group_memberships',
+        verbose_name=_('User group'),
+    )
+    membership = models.ForeignKey(
+        'organization.Membership',
+        on_delete=models.CASCADE,
+        related_name='group_memberships',
+        verbose_name=_('Membership'),
+    )
+    added_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        related_name='added_group_memberships',
+        blank=True,
+        null=True,
+        verbose_name=_('Added by'),
+    )
+    source = models.CharField(
+        max_length=20,
+        choices=SOURCE_CHOICES,
+        default=SOURCE_MANUAL,
+        db_index=True,
+        verbose_name=_('Source'),
+    )
+    external_id = models.CharField(
+        max_length=255,
+        blank=True,
+        verbose_name=_('External ID'),
+        help_text=_('Stable membership identifier supplied by SCIM/LDAP when available.'),
+    )
+    added_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['user_group', 'membership']
+        verbose_name = _('Group membership')
+        verbose_name_plural = _('Group memberships')
+        constraints = [
+            models.UniqueConstraint(
+                fields=['user_group', 'membership'],
+                name='users_groupmembership_unique_member',
+            ),
+            models.UniqueConstraint(
+                fields=['user_group', 'source', 'external_id'],
+                condition=~models.Q(external_id=''),
+                name='users_groupmembership_unique_external_id',
+            ),
+        ]
+        indexes = [
+            models.Index(
+                fields=['user_group', 'source', 'external_id'],
+                name='users_groupmember_external_idx',
+            ),
+        ]
+
+    @property
+    def tenant(self):
+        return self.user_group.tenant
+
+    def __str__(self):
+        return f'{self.membership} in {self.user_group}'
+
+    def clean(self):
+        super().clean()
+        if not self.user_group_id or not self.membership_id:
+            return
+        if self.user_group.tenant_id is None:
+            raise ValidationError({'user_group': _('A group membership requires a tenant-owned group.')})
+        if self.membership.tenant_id != self.user_group.tenant_id:
+            raise ValidationError({
+                'membership': _('The membership must belong to the group\'s owning tenant.')
+            })

@@ -1,9 +1,11 @@
 from django.db import models
+from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
 from django.urls import reverse
 from django.contrib.contenttypes.fields import GenericForeignKey
 from django.contrib.contenttypes.models import ContentType
 from django.conf import settings
+from django.core.exceptions import ValidationError
 from django.core.validators import MinValueValidator
 
 
@@ -11,6 +13,7 @@ def _default_currency():
     return getattr(settings, 'ITAMBOX_DEFAULT_CURRENCY', 'EUR')
 from core.models import BaseModel, ChangeLoggingMixin, StandardModel, VaultModel, DeletableVaultModel
 from core.managers import TenantScopingManager, SoftDeleteManager, AllObjectsManager, TenantScopingSoftDeleteManager, TenantScopingAllObjectsManager
+from core.mfa import role_is_privileged
 from core.mixins import ExportableMixin, TaggableMixin, JournalingMixin, AutoSlugMixin, CloneableMixin, ImageAttachmentMixin, FileAttachmentMixin, BookmarkableMixin, SubscribableMixin, SoftDeleteMixin, CustomFieldDataMixin
 
 # Create your models here.
@@ -844,6 +847,324 @@ class RoleAssignment(ChangeLoggingMixin, models.Model):
         no-op (nothing applied, nothing logged). Returns ``True`` on a real change.
         """
         return self.log_m2m_change('assigned_tenants', tenants, actor=actor)
+
+
+class RoleGrant(ChangeLoggingMixin, models.Model):
+    """A role granted to exactly one Membership or tenant-owned UserGroup.
+
+    Scope is represented exclusively by child :class:`RoleGrantScope` rows.
+    ``legacy_assignment`` is a temporary expansion-migration pointer: it keeps
+    shadow rows synchronized while both resolvers are compared, and is removed
+    together with RoleAssignment at final cutover.
+    """
+
+    membership = models.ForeignKey(
+        'organization.Membership',
+        on_delete=models.CASCADE,
+        related_name='role_grants',
+        blank=True,
+        null=True,
+        verbose_name=_('Membership'),
+    )
+    user_group = models.ForeignKey(
+        'users.UserGroup',
+        on_delete=models.CASCADE,
+        related_name='role_grants',
+        blank=True,
+        null=True,
+        verbose_name=_('User group'),
+    )
+    role = models.ForeignKey(
+        'organization.Role',
+        on_delete=models.CASCADE,
+        related_name='role_grants',
+        verbose_name=_('Role'),
+    )
+    granted_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        related_name='granted_role_grants',
+        blank=True,
+        null=True,
+        verbose_name=_('Granted by'),
+    )
+    granted_at = models.DateTimeField(auto_now_add=True)
+    reason = models.TextField(blank=True, verbose_name=_('Reason'))
+    valid_until = models.DateTimeField(
+        blank=True,
+        null=True,
+        db_index=True,
+        verbose_name=_('Valid until'),
+    )
+    legacy_assignment = models.OneToOneField(
+        'organization.RoleAssignment',
+        on_delete=models.SET_NULL,
+        related_name='successor_grant',
+        blank=True,
+        null=True,
+        editable=False,
+        verbose_name=_('Legacy assignment'),
+    )
+
+    class Meta:
+        ordering = ['role', 'membership', 'user_group']
+        verbose_name = _('Role grant')
+        verbose_name_plural = _('Role grants')
+        constraints = [
+            models.CheckConstraint(
+                check=(
+                    models.Q(membership__isnull=False, user_group__isnull=True)
+                    | models.Q(membership__isnull=True, user_group__isnull=False)
+                ),
+                name='organization_rolegrant_exactly_one_principal',
+            ),
+            models.UniqueConstraint(
+                fields=['user_group', 'role'],
+                condition=models.Q(user_group__isnull=False),
+                name='organization_rolegrant_unique_group_role',
+            ),
+        ]
+        indexes = [
+            models.Index(fields=['membership', 'role'], name='org_rolegrant_member_role_idx'),
+            models.Index(fields=['user_group', 'role'], name='org_rolegrant_group_role_idx'),
+        ]
+
+    @property
+    def tenant(self):
+        if self.membership_id:
+            return self.membership.tenant
+        if self.user_group_id:
+            return self.user_group.tenant
+        return None
+
+    @property
+    def principal_tenant_id(self):
+        if self.membership_id:
+            return self.membership.tenant_id
+        if self.user_group_id:
+            return self.user_group.tenant_id
+        return None
+
+    @property
+    def is_active(self):
+        return self.valid_until is None or self.valid_until > timezone.now()
+
+    def __str__(self):
+        principal = self.membership or self.user_group
+        return f'{principal}: {self.role}'
+
+    def clean(self):
+        super().clean()
+        if bool(self.membership_id) == bool(self.user_group_id):
+            raise ValidationError(_('A role grant requires exactly one principal.'))
+
+        owner_id = self.principal_tenant_id
+        if owner_id is None:
+            raise ValidationError(_('The grant principal must have an owning tenant.'))
+
+        if self.user_group_id and self.role_id and self.role.tenant_id != owner_id:
+            raise ValidationError({
+                'role': _('A group may carry only roles owned by the group tenant.')
+            })
+
+        if self.membership_id and self.role_id and self.role.tenant_id != owner_id:
+            shared_own_role = (
+                self.role.shared_with_managed
+                and self.membership.tenant.managed_by_id == self.role.tenant_id
+            )
+            if not shared_own_role and self.legacy_assignment_id is None:
+                raise ValidationError({
+                    'role': _('A direct grant may use only a role owned by its tenant or managing provider.')
+                })
+
+        # The legacy schema had no reason/expiry fields, so migrated rows are
+        # grandfathered only for the comparison window. Every newly authored
+        # elevated direct grant is explicitly temporary and justified.
+        if (
+            self.membership_id
+            and self.legacy_assignment_id is None
+            and self.role_id
+            and role_is_privileged(self.role)
+        ):
+            errors = {}
+            if not self.reason.strip():
+                errors['reason'] = _('Elevated direct grants require a reason.')
+            if self.valid_until is None:
+                errors['valid_until'] = _('Elevated direct grants require an expiration.')
+            elif self._state.adding and self.valid_until <= timezone.now():
+                errors['valid_until'] = _('The expiration must be in the future.')
+            if errors:
+                raise ValidationError(errors)
+
+    def covers_tenant(self, tenant):
+        """Return whether any live additive scope on this grant covers ``tenant``."""
+        if not self.is_active or self.role.deleted_at is not None:
+            return False
+        owner_id = self.principal_tenant_id
+        if owner_id is None:
+            return False
+
+        for scope in self.scopes.all():
+            if scope.scope_type == RoleGrantScope.SCOPE_OWN:
+                if tenant.pk != owner_id:
+                    continue
+                if self.role.tenant_id == owner_id:
+                    return True
+                if (
+                    self.membership_id
+                    and self.role.shared_with_managed
+                    and tenant.managed_by_id == self.role.tenant_id
+                ):
+                    return True
+                continue
+
+            # Every managed projection is gated by the live management edge and
+            # by provider ownership of both principal and role.
+            if (
+                tenant.managed_by_id != self.role.tenant_id
+                or owner_id != self.role.tenant_id
+                or not self.role.tenant.is_provider
+            ):
+                continue
+            if scope.scope_type == RoleGrantScope.SCOPE_ALL_MANAGED:
+                return True
+            if scope.scope_type == RoleGrantScope.SCOPE_TENANT:
+                if scope.tenant_id == tenant.pk:
+                    return True
+                continue
+            if scope.scope_type == RoleGrantScope.SCOPE_TENANT_GROUP:
+                if not scope.tenant_group_id or not tenant.group_id:
+                    continue
+                from organization.access import get_descendant_tenant_group_ids
+                if tenant.group_id in get_descendant_tenant_group_ids(scope.tenant_group_id):
+                    return True
+        return False
+
+
+class RoleGrantScope(ChangeLoggingMixin, models.Model):
+    """One additive reach boundary for a RoleGrant; explicit deny is unsupported."""
+
+    SCOPE_OWN = 'own'
+    SCOPE_TENANT = 'tenant'
+    SCOPE_TENANT_GROUP = 'tenant_group'
+    SCOPE_ALL_MANAGED = 'all_managed'
+    SCOPE_CHOICES = [
+        (SCOPE_OWN, _('Principal tenant')),
+        (SCOPE_TENANT, _('Specific managed tenant')),
+        (SCOPE_TENANT_GROUP, _('Managed tenant group + descendants')),
+        (SCOPE_ALL_MANAGED, _('All managed tenants')),
+    ]
+
+    role_grant = models.ForeignKey(
+        'organization.RoleGrant',
+        on_delete=models.CASCADE,
+        related_name='scopes',
+        verbose_name=_('Role grant'),
+    )
+    scope_type = models.CharField(
+        max_length=20,
+        choices=SCOPE_CHOICES,
+        db_index=True,
+        verbose_name=_('Scope type'),
+    )
+    tenant = models.ForeignKey(
+        'organization.Tenant',
+        on_delete=models.CASCADE,
+        related_name='role_grant_scopes',
+        blank=True,
+        null=True,
+        verbose_name=_('Tenant'),
+    )
+    tenant_group = models.ForeignKey(
+        'organization.TenantGroup',
+        on_delete=models.CASCADE,
+        related_name='role_grant_scopes',
+        blank=True,
+        null=True,
+        verbose_name=_('Tenant group'),
+    )
+
+    class Meta:
+        ordering = ['role_grant', 'scope_type', 'tenant', 'tenant_group']
+        verbose_name = _('Role grant scope')
+        verbose_name_plural = _('Role grant scopes')
+        constraints = [
+            models.CheckConstraint(
+                check=(
+                    models.Q(
+                        scope_type__in=['own', 'all_managed'],
+                        tenant__isnull=True,
+                        tenant_group__isnull=True,
+                    )
+                    | models.Q(
+                        scope_type='tenant',
+                        tenant__isnull=False,
+                        tenant_group__isnull=True,
+                    )
+                    | models.Q(
+                        scope_type='tenant_group',
+                        tenant__isnull=True,
+                        tenant_group__isnull=False,
+                    )
+                ),
+                name='organization_rolegrantscope_shape',
+            ),
+            models.UniqueConstraint(
+                fields=['role_grant', 'scope_type'],
+                condition=models.Q(scope_type__in=['own', 'all_managed']),
+                name='organization_rolegrantscope_unique_singleton',
+            ),
+            models.UniqueConstraint(
+                fields=['role_grant', 'tenant'],
+                condition=models.Q(scope_type='tenant'),
+                name='organization_rolegrantscope_unique_tenant',
+            ),
+            models.UniqueConstraint(
+                fields=['role_grant', 'tenant_group'],
+                condition=models.Q(scope_type='tenant_group'),
+                name='organization_rolegrantscope_unique_group',
+            ),
+        ]
+
+    def __str__(self):
+        target = self.tenant or self.tenant_group or self.get_scope_type_display()
+        return f'{self.role_grant} -> {target}'
+
+    def clean(self):
+        super().clean()
+        has_tenant = self.tenant_id is not None
+        has_group = self.tenant_group_id is not None
+        if self.scope_type in (self.SCOPE_OWN, self.SCOPE_ALL_MANAGED):
+            if has_tenant or has_group:
+                raise ValidationError(_('This scope type cannot carry a tenant target.'))
+        elif self.scope_type == self.SCOPE_TENANT:
+            if not has_tenant or has_group:
+                raise ValidationError(_('A tenant scope requires exactly one tenant.'))
+        elif self.scope_type == self.SCOPE_TENANT_GROUP:
+            if has_tenant or not has_group:
+                raise ValidationError(_('A group scope requires exactly one tenant group.'))
+        else:
+            raise ValidationError({'scope_type': _('Unknown role grant scope type.')})
+
+        if not self.role_grant_id:
+            return
+        grant = self.role_grant
+        if grant.legacy_assignment_id is not None:
+            return
+        owner_id = grant.principal_tenant_id
+        if self.scope_type == self.SCOPE_OWN:
+            valid_shared_role = (
+                grant.membership_id
+                and grant.role.shared_with_managed
+                and grant.membership.tenant.managed_by_id == grant.role.tenant_id
+            )
+            if grant.role.tenant_id != owner_id and not valid_shared_role:
+                raise ValidationError(_('Own scope requires a role valid in the principal tenant.'))
+            return
+        if owner_id != grant.role.tenant_id or not grant.role.tenant.is_provider:
+            raise ValidationError(_('Managed scopes require a provider-owned role and principal.'))
+        if self.scope_type == self.SCOPE_TENANT and self.tenant.managed_by_id != owner_id:
+            raise ValidationError({'tenant': _('The target tenant is not managed by the role owner.')})
 
 
 class CostCenter(AutoSlugMixin, CustomFieldDataMixin, StandardModel, SoftDeleteMixin):

@@ -378,6 +378,7 @@ class UserGroupFormEscalationTests(EscalationSurfaceTestCase):
         self.target_user = User.objects.create_user(
             username='ug_target', email='ug_target@acme.test', password='pw',
         )
+        Membership.objects.create(user=self.target_user, tenant=self.msp_a)
 
     def test_low_privilege_group_admin_cannot_attach_overprivileged_role(self):
         """(a) A group admin cannot attach a role whose permissions they do not hold — even
@@ -456,14 +457,15 @@ class UserGroupFormEscalationTests(EscalationSurfaceTestCase):
         form = UserGroupForm(data=data, user=self.group_admin)
         self.assertTrue(form.is_valid(), form.errors)
 
-    def test_superuser_bypasses_all_usergroup_form_guards(self):
+    def test_superuser_cannot_bypass_group_structural_invariants(self):
         data = {
             'name': 'SU Group', 'roles': [self.overpriv_role.pk],
             'members': [self.target_user.pk],
             'tenant': self.msp_b.pk, 'is_active': True,
         }
         form = UserGroupForm(data=data, user=self.superuser)
-        self.assertTrue(form.is_valid(), form.errors)
+        self.assertFalse(form.is_valid())
+        self.assertIn('roles', form.errors)
 
 
 # --------------------------------------------------------------------------------------------- #
@@ -490,12 +492,15 @@ class UserGroupAssignUsersViewEscalationTests(EscalationSurfaceTestCase):
 
         # A group carrying the over-privileged tenant role — the admin above cannot grant this
         # role's permissions, so adding a member must be blocked.
-        self.overpriv_group = UserGroup.objects.create(name="Overpriv Group")
+        self.overpriv_group = UserGroup.objects.create(
+            name="Overpriv Group", tenant=self.tenant,
+        )
         self.overpriv_group.roles.add(self.overpriv_role)
 
         self.target_user = User.objects.create_user(
             username='ug_assign_target', email='ug_assign_target@acme.test', password='pw',
         )
+        Membership.objects.create(user=self.target_user, tenant=self.tenant)
 
     def _url(self, group=None):
         return reverse('users:usergroup_assign_users', kwargs={'pk': (group or self.overpriv_group).pk})
@@ -512,11 +517,14 @@ class UserGroupAssignUsersViewEscalationTests(EscalationSurfaceTestCase):
 
     def test_high_privilege_group_admin_can_add_member_to_group_within_permissions(self):
         """Positive: a group admin who holds the carried role's permissions succeeds."""
-        narrow_group = UserGroup.objects.create(name="Narrow Group")
+        narrow_group = UserGroup.objects.create(
+            name="Narrow Group", tenant=self.msp_a2,
+        )
         narrow_tenant_role = Role.objects.create(
             tenant=self.msp_a2, name="A2 Narrow", permissions=[NARROW_PERM],
         )
         narrow_group.roles.add(narrow_tenant_role)
+        Membership.objects.get_or_create(user=self.target_user, tenant=self.msp_a2)
         _flush_perm_cache(self.group_admin)
 
         self.client.force_login(self.group_admin)
