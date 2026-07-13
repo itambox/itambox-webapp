@@ -251,45 +251,22 @@ class Token(ChangeLoggingMixin, models.Model):
 class UserGroup(AutoSlugMixin, StandardModel, SoftDeleteMixin):
     """A flat application group owned by one tenant/provider.
 
-    Phase 5 resolves members through :class:`GroupMembership` and permissions
-    through organization.RoleGrant. The legacy ``members``/``roles`` M2Ms stay
-    temporarily writable only to shadow existing UI/SCIM paths while comparison
-    mode proves equivalence; they are removed after the production cutover gate.
+    Members are Membership-backed :class:`GroupMembership` rows; permissions are
+    additive organization.RoleGrant rows with explicit RoleGrantScope children.
     """
-    # Default manager stays deliberately unscoped (group admin views scope their
-    # querysets explicitly — groups are cross-cutting); all_objects rides the
-    # tenant-scoping variant so recycle-bin/export surfaces honour the tenant
-    # boundary now that groups carry an owning-tenant FK. allow_global_tenant
-    # keeps NULL-tenant (global, superuser-managed) groups visible.
+    # The default manager stays deliberately unscoped because groups participate
+    # in cross-tenant projections. Every UI/API surface scopes them explicitly.
+    # ``all_objects`` keeps recycle-bin/export access tenant-aware.
     objects = SoftDeleteManager()
     all_objects = TenantScopingAllObjectsManager()
-    allow_global_tenant = True
 
     name = models.CharField(max_length=100, verbose_name=_("Name"))
     slug = models.SlugField(max_length=100, verbose_name=_("Slug"))
     description = models.TextField(blank=True, verbose_name=_("Description"))
-    roles = models.ManyToManyField(
-        'organization.Role',
-        related_name='user_groups',
-        blank=True,
-        verbose_name=_("Roles"),
-        help_text=_("Legacy comparison field; new grants use RoleGrant + RoleGrantScope."),
-    )
-    members = models.ManyToManyField(
-        settings.AUTH_USER_MODEL,
-        related_name='user_groups',
-        blank=True,
-        verbose_name=_("Members"),
-    )
-    # Owning tenant + external provisioning scope. NULL remains temporarily so
-    # comparison mode can surface legacy global groups without inventing an owner;
-    # final cutover makes this non-null after operators resolve every such row.
     tenant = models.ForeignKey(
         'organization.Tenant',
-        on_delete=models.SET_NULL,
+        on_delete=models.CASCADE,
         related_name='user_groups',
-        blank=True,
-        null=True,
         verbose_name=_("Tenant"),
     )
     is_active = models.BooleanField(default=True, db_index=True, verbose_name=_("Active"))
@@ -299,28 +276,15 @@ class UserGroup(AutoSlugMixin, StandardModel, SoftDeleteMixin):
         verbose_name = _("User Group")
         verbose_name_plural = _("User Groups")
         constraints = [
-            # Unique (tenant, name) for tenant-owned groups
             models.UniqueConstraint(
                 fields=['tenant', 'name'],
-                condition=models.Q(deleted_at__isnull=True) & models.Q(tenant__isnull=False),
+                condition=models.Q(deleted_at__isnull=True),
                 name='users_usergroup_unique_tenant_name_active',
             ),
-            # Unique name for global groups (where tenant is NULL)
-            models.UniqueConstraint(
-                fields=['name'],
-                condition=models.Q(deleted_at__isnull=True) & models.Q(tenant__isnull=True),
-                name='users_usergroup_unique_global_name_active',
-            ),
-            # Same for slug
             models.UniqueConstraint(
                 fields=['tenant', 'slug'],
-                condition=models.Q(deleted_at__isnull=True) & models.Q(tenant__isnull=False),
+                condition=models.Q(deleted_at__isnull=True),
                 name='users_usergroup_unique_tenant_slug_active',
-            ),
-            models.UniqueConstraint(
-                fields=['slug'],
-                condition=models.Q(deleted_at__isnull=True) & models.Q(tenant__isnull=True),
-                name='users_usergroup_unique_global_slug_active',
             ),
         ]
 
@@ -330,6 +294,17 @@ class UserGroup(AutoSlugMixin, StandardModel, SoftDeleteMixin):
     def get_absolute_url(self):
         return reverse('users:usergroup_detail', kwargs={'pk': self.pk})
 
+    def clean(self):
+        super().clean()
+        if self.pk:
+            original_tenant_id = (
+                type(self)._base_manager.filter(pk=self.pk)
+                .values_list('tenant_id', flat=True)
+                .first()
+            )
+            if original_tenant_id is not None and self.tenant_id != original_tenant_id:
+                raise ValidationError({'tenant': _('A user group owner cannot be changed.')})
+
 
 class GroupMembership(ChangeLoggingMixin, models.Model):
     """One tenant Membership included in one flat, tenant-owned UserGroup.
@@ -337,6 +312,8 @@ class GroupMembership(ChangeLoggingMixin, models.Model):
     External directory nesting is flattened into these rows during sync; the
     application deliberately has no group-in-group relation.
     """
+
+    survive_parent_soft_delete = True
 
     SOURCE_MANUAL = 'manual'
     SOURCE_SCIM = 'scim'

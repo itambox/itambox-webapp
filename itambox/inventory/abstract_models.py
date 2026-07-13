@@ -307,7 +307,7 @@ class AbstractAssignment(JournalingMixin, TaggableMixin, SoftDeleteMixin, Change
                 and self.target_tenant.group_id
             )
             if not target_group_id or grant.grantee_tenant_group_id not in \
-                    get_ancestor_tenant_group_ids(target_group_id):
+                    get_ancestor_tenant_group_ids(target_group_id, live_only=True):
                 problems.append("the grant's tenant group does not cover the target tenant")
         return problems
 

@@ -349,7 +349,7 @@ class CoreViewsTestCase(TestCase):
                 'core.delete_recyclebin',
             ]
         )
-        membership.assignments.all().delete()
+        membership.role_grants.all().delete()
         grant(std_user, tenant, role_obj)
         
         # 4. Try again with permissions
@@ -418,5 +418,4 @@ class CoreViewsTestCase(TestCase):
         request.base_template = 'custom_base.html'
         context = base_template_processor(request)
         self.assertEqual(context['base_template'], 'custom_base.html')
-
 

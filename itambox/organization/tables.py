@@ -6,7 +6,7 @@ from django_tables2.utils import A
 from .models import (
     Site, Region, SiteGroup, Location, Tenant, TenantGroup,
     AssetHolder, Contact, ContactRole, ContactAssignment,
-    Role, Membership, RoleAssignment, CostCenter, TenantResourceGrant,
+    Role, Membership, RoleGrant, CostCenter, TenantResourceGrant,
 )
 from core.tables import ActionsColumn, BaseTable, CountLinkColumn, ToggleColumn
 from extras.tables import TagColumn
@@ -242,7 +242,7 @@ class RoleTable(BaseTable):
     tenant = tables.Column(verbose_name=_('Owner'), accessor='tenant', orderable=True)
     shared = tables.Column(verbose_name=_('Shared'), accessor='shared_with_managed', orderable=True, empty_values=())
     description = tables.Column()
-    member_count = tables.Column(verbose_name=_('Members'), orderable=True, empty_values=[])
+    member_count = tables.Column(verbose_name=_('Direct members'), orderable=True, empty_values=[])
     actions = ActionsColumn()
 
     class Meta(BaseTable.Meta):
@@ -275,7 +275,7 @@ class MembershipTable(BaseTable):
         'organization:tenant_detail', args=[A('tenant_id')], accessor='tenant',
         verbose_name=_('Tenant'),
     )
-    roles = tables.Column(verbose_name=_('Roles'), accessor='assignments', orderable=False, empty_values=())
+    roles = tables.Column(verbose_name=_('Roles'), accessor='role_grants', orderable=False, empty_values=())
     kind = tables.Column(verbose_name=_('Reach'), accessor='pk', orderable=False, empty_values=())
     is_active = tables.BooleanColumn(verbose_name=_('Active'))
     joined_at = tables.DateTimeColumn(format="Y-m-d H:i", verbose_name=_('Joined'))
@@ -300,17 +300,23 @@ class MembershipTable(BaseTable):
         return membership_kind_badge(SimpleNamespace(is_staff_membership=bool(staff)))
 
     def render_roles(self, value, record):
-        # Aggregated from the prefetched assignments: link per role, "Shared" badge
+        # Aggregated from the prefetched grants: link per role, "Shared" badge
         # on shared-in definitions, reach badge on managed-reach grants.
         parts = []
-        for assignment in record.assignments.all():
-            url = reverse('organization:role_detail', kwargs={'pk': assignment.role_id})
-            link = format_html('<a href="{}">{}</a>', url, assignment.role.name)
-            shared = shared_role_badge(assignment.role)
+        for grant in record.role_grants.all():
+            if (
+                not grant.is_active
+                or grant.role.deleted_at is not None
+                or not grant.scopes.all()
+            ):
+                continue
+            url = reverse('organization:role_detail', kwargs={'pk': grant.role_id})
+            link = format_html('<a href="{}">{}</a>', url, grant.role.name)
+            shared = shared_role_badge(grant.role)
             if shared:
                 link = format_html('{} {}', link, shared)
-            if assignment.reach == RoleAssignment.REACH_MANAGED:
-                link = format_html('{} {}', link, reach_badge(assignment))
+            if grant.reach == RoleGrant.REACH_MANAGED:
+                link = format_html('{} {}', link, reach_badge(grant))
             parts.append(link)
         return mark_safe(', '.join(parts)) if parts else _('(none)')
 

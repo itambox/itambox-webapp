@@ -19,7 +19,7 @@ The canonical implementation now lives in ``users.views.is_global_group_admin``
 These tests assert the two gates agree across the full grant matrix: plain
 member (denied), tenant admin holding the perm directly (allowed), superuser
 (allowed), and a user who only holds the perm via a managed-reach
-RoleAssignment at an ``is_provider`` tenant covering a customer tenant
+RoleGrant at an ``is_provider`` tenant covering a customer tenant
 (allowed, evaluated in the covered customer tenant's context).
 """
 
@@ -28,7 +28,7 @@ from django.contrib.auth import get_user_model
 
 from core.navigation.menu import can_manage_user_groups as nav_gate
 from core.tests.mixins import TenantTestMixin, grant
-from organization.models import Role, RoleAssignment, Tenant
+from organization.models import Role, RoleGrant, RoleGrantScope, Tenant
 from users.views import is_global_group_admin
 
 User = get_user_model()
@@ -55,7 +55,7 @@ class TestNavGroupGateUnify(TenantTestMixin):
 
     def test_tenant_admin_with_change_usergroup_allowed_by_both_gates(self):
         """A non-superuser holding ``users.change_usergroup`` via an own-reach
-        RoleAssignment on their tenant is recognized by both gates."""
+        RoleGrant on their tenant is recognized by both gates."""
         tenant = Tenant.objects.create(name="Admin Co", slug="admin-co")
         user = User.objects.create_user(
             username='tenant_admin', email='tenant_admin@example.com', password='password',
@@ -81,8 +81,8 @@ class TestNavGroupGateUnify(TenantTestMixin):
 
     def test_managed_reach_grant_at_provider_tenant_allowed_by_both_gates(self):
         """A user whose ONLY route to ``users.add_usergroup`` is a managed-reach
-        RoleAssignment on an ``is_provider`` tenant (covering a customer via
-        SCOPE_ALL) is recognized by both gates when evaluated for the covered
+        RoleGrant on an ``is_provider`` tenant (covering a customer via an
+        all-managed scope) is recognized by both gates when evaluated for the covered
         customer tenant.
 
         This exercises rule (3) of ``MembershipBackend._effective_perms_for_tenant``
@@ -104,8 +104,8 @@ class TestNavGroupGateUnify(TenantTestMixin):
         )
         grant(
             user, provider_tenant, managed_role,
-            reach=RoleAssignment.REACH_MANAGED,
-            managed_scope=RoleAssignment.SCOPE_ALL,
+            reach=RoleGrant.REACH_MANAGED,
+            managed_scope=RoleGrantScope.SCOPE_ALL_MANAGED,
         )
 
         with self.tenant_context(customer_tenant):

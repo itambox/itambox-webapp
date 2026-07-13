@@ -50,4 +50,16 @@ The DELETE checkbox stays reachable so the form still works without JavaScript.
             </label>
         </div>
     </div>
+    <div class="row g-2 mt-1">
+        <div class="col-md-8">
+            <label class="form-label small text-muted">{% translate "Reason for elevated direct grant" %}</label>
+            {{ mf.reason }}
+            {% for error in mf.reason.errors %}<div class="invalid-feedback d-block">{{ error }}</div>{% endfor %}
+        </div>
+        <div class="col-md-4">
+            <label class="form-label small text-muted">{% translate "Valid until" %}</label>
+            {{ mf.valid_until }}
+            {% for error in mf.valid_until.errors %}<div class="invalid-feedback d-block">{{ error }}</div>{% endfor %}
+        </div>
+    </div>
 </div>

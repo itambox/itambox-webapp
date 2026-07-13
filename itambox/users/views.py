@@ -42,7 +42,11 @@ class UserProfileView(LoginRequiredMixin, BaseHTMXView, UpdateView):
         context['active_tab'] = 'profile'
         context['user'] = self.request.user
         from organization.models import Membership
-        context['user_memberships'] = Membership.objects.filter(user=self.request.user).select_related('tenant').prefetch_related('assignments__role')
+        context['user_memberships'] = Membership.objects.filter(
+            user=self.request.user,
+        ).select_related('tenant').prefetch_related(
+            'role_grants__role', 'role_grants__scopes',
+        )
         activity_qs = ObjectChange.objects.filter(user=self.request.user)[:15]
         activity_table = ObjectChangeTable(activity_qs, request=self.request)
         activity_table.configure(self.request, paginate=False)
@@ -562,7 +566,9 @@ class UserBulkEditView(ObjectBulkEditView):
 
 class UserDetailView(ObjectDetailView):
     queryset = User.objects.prefetch_related(
-        'memberships__tenant', 'memberships__assignments__role',
+        'memberships__tenant',
+        'memberships__role_grants__role',
+        'memberships__role_grants__scopes',
     )
     template_name = 'users/user_detail.html'
 
@@ -608,10 +614,10 @@ from django.contrib.auth.mixins import UserPassesTestMixin
 from django.db import transaction
 from django.db.models import Count, Prefetch
 from itambox.views.generic import ObjectBulkDeleteView
-from organization.models import Role, Tenant
+from organization.models import RoleGrant, Tenant
 from organization.access import accessible_tenant_ids
 from core.auth.guards import validate_group_membership_grant
-from .models import UserGroup
+from .models import GroupMembership, UserGroup
 from .tables import UserGroupTable
 from .filters import UserGroupFilterSet
 from .forms import UserGroupForm, UserGroupFilterForm, UserGroupAssignUsersForm
@@ -648,53 +654,66 @@ def is_global_group_admin(user):
 
 
 class GlobalGroupAdminMixin(UserPassesTestMixin):
-    """Restrict a UserGroup view to group admins (see is_global_group_admin).
+    """Scope every group lookup to tenants the actor may administer."""
 
-    ``test_func`` enforces the gate (standard ``users.*_usergroup`` perms held in any of
-    the user's tenants); ``get_permission_required`` returns an empty set so the generic
-    PermissionRequiredMixin in the MRO does not additionally require ``view_usergroup``
-    in the ACTIVE tenant — group administration is a cross-tenant surface."""
+    group_permission = 'users.view_usergroup'
+
+    def get_group_permission(self):
+        return self.group_permission
+
     def test_func(self):
-        return is_global_group_admin(self.request.user)
+        user = self.request.user
+        if user is None or not getattr(user, 'is_authenticated', False):
+            return False
+        if user.is_superuser:
+            return True
+        return bool(_group_admin_tenant_ids(user, (self.get_group_permission(),)))
 
     def get_permission_required(self):
         return ()
 
+    def permitted_group_tenant_ids(self):
+        if self.request.user.is_superuser:
+            return None
+        return _group_admin_tenant_ids(
+            self.request.user,
+            (self.get_group_permission(),),
+        )
+
+    def scope_group_queryset(self, queryset):
+        tenant_ids = self.permitted_group_tenant_ids()
+        if tenant_ids is None:
+            return queryset
+        return queryset.filter(tenant_id__in=tenant_ids)
+
+    def get_queryset(self):
+        return self.scope_group_queryset(super().get_queryset())
+
 
 class UserGroupListView(GlobalGroupAdminMixin, ObjectListView):
     queryset = UserGroup.objects.annotate(
-        member_count=Count('members', distinct=True),
-        role_count=Count('roles', distinct=True),
+        member_count=Count('group_memberships', distinct=True),
+        role_count=Count('role_grants', distinct=True),
     )
     filterset = UserGroupFilterSet
     filterset_form = UserGroupFilterForm
     table = UserGroupTable
     action_buttons = ('add',)
 
-    def get_queryset(self):
-        """Superusers see all groups (including global, tenant-less ones); everyone else
-        sees the groups owned by tenants where they hold ``users.view_usergroup``."""
-        qs = super().get_queryset()
-        user = self.request.user
-        if user.is_superuser:
-            return qs
-        viewable_ids = _group_admin_tenant_ids(user, ('users.view_usergroup',))
-        return qs.filter(tenant_id__in=viewable_ids)
-
 
 class UserGroupDetailView(GlobalGroupAdminMixin, ObjectDetailView):
-    queryset = UserGroup.objects.prefetch_related(
+    queryset = UserGroup.objects.select_related('tenant').prefetch_related(
         Prefetch(
-            'roles',
-            # _base_manager: the group detail must show carried roles from EVERY tenant,
-            # not just the active one (the default Role manager is tenant-scoped).
-            queryset=Role._base_manager.filter(
-                deleted_at__isnull=True,
-            ).select_related('tenant').order_by('tenant__name', 'name'),
+            'role_grants',
+            queryset=RoleGrant.objects.select_related(
+                'role', 'role__tenant',
+            ).prefetch_related(
+                'scopes__tenant', 'scopes__tenant_group',
+            ).order_by('role__name'),
         ),
-        'members',
+        'group_memberships__membership__user',
     ).annotate(
-        member_count=Count('members', distinct=True),
+        member_count=Count('group_memberships', distinct=True),
     )
     template_name = 'users/usergroups/usergroup_detail.html'
 
@@ -702,14 +721,15 @@ class UserGroupDetailView(GlobalGroupAdminMixin, ObjectDetailView):
         context = super().get_context_data(**kwargs)
         group = self.get_object()
 
-        # Build union of permissions across all attached roles (for detail display).
+        # Build the displayed permission union from canonical role grants.
+        grants = list(group.role_grants.all())
         all_perms = set()
-        for role in group.roles.all():
-            all_perms.update(role.permissions or [])
+        for grant in grants:
+            all_perms.update(grant.role.permissions or [])
         context['effective_permissions'] = sorted(all_perms)
 
-        context['members'] = group.members.all().order_by('username')
-        context['roles'] = group.roles.all()
+        context['members'] = group.group_memberships.all()
+        context['grants'] = grants
         context['member_count'] = getattr(group, 'member_count', 0) or 0
         return context
 
@@ -720,14 +740,25 @@ class UserGroupEditView(GlobalGroupAdminMixin, ObjectEditView):
     model_form = UserGroupForm
     template_name = 'users/usergroups/usergroup_form.html'
 
+    def get_group_permission(self):
+        if 'pk' in self.kwargs:
+            return 'users.change_usergroup'
+        return 'users.add_usergroup'
+
     def get_form_kwargs(self):
         kwargs = super().get_form_kwargs()
         kwargs['user'] = self.request.user
         kwargs['tenant'] = getattr(self.request, 'active_tenant', None)
         return kwargs
 
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context['managed_formset'] = context['form'].managed_formset
+        return context
+
 
 class UserGroupDeleteView(GlobalGroupAdminMixin, ObjectDeleteView):
+    group_permission = 'users.delete_usergroup'
     queryset = UserGroup.objects.all()
     model = UserGroup
     template_name = 'generic/object_confirm_delete.html'
@@ -735,7 +766,11 @@ class UserGroupDeleteView(GlobalGroupAdminMixin, ObjectDeleteView):
 
 
 class UserGroupBulkDeleteView(GlobalGroupAdminMixin, ObjectBulkDeleteView):
+    group_permission = 'users.delete_usergroup'
     queryset = UserGroup.objects.all()
+
+    def _get_queryset(self, pks):
+        return self.scope_group_queryset(super()._get_queryset(pks))
 
     def post(self, request, *args, **kwargs):
         from django.http import HttpResponseRedirect
@@ -791,10 +826,14 @@ class UserGroupBulkDeleteView(GlobalGroupAdminMixin, ObjectBulkDeleteView):
 
 class UserGroupAssignUsersView(GlobalGroupAdminMixin, LoginRequiredMixin, View):
     """Add active owner-tenant Memberships to a UserGroup (idempotent)."""
+    group_permission = 'users.change_usergroup'
     template_name = 'users/usergroups/usergroup_assign_users.html'
 
     def _get_group(self, pk):
-        return get_object_or_404(UserGroup, pk=pk)
+        return get_object_or_404(
+            self.scope_group_queryset(UserGroup.objects.select_related('tenant')),
+            pk=pk,
+        )
 
     def get(self, request, pk, *args, **kwargs):
         group = self._get_group(pk)
@@ -816,15 +855,20 @@ class UserGroupAssignUsersView(GlobalGroupAdminMixin, LoginRequiredMixin, View):
                     messages.error(request, msg)
                 return render(request, self.template_name, {'group': group, 'form': form})
 
-            users = form.cleaned_data['users']
+            memberships = form.cleaned_data['memberships']
             added = 0
             already_member = 0
             with transaction.atomic():
-                for user in users:
-                    if group.members.filter(pk=user.pk).exists():
+                for membership in memberships:
+                    if group.group_memberships.filter(membership=membership).exists():
                         already_member += 1
                     else:
-                        group.members.add(user)
+                        GroupMembership.objects.create(
+                            user_group=group,
+                            membership=membership,
+                            source=GroupMembership.SOURCE_MANUAL,
+                            added_by=request.user,
+                        )
                         added += 1
             messages.success(
                 request,

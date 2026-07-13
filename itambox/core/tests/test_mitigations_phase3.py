@@ -152,14 +152,11 @@ class MitigationsPhase3Tests(TestCase):
         
         # The key assertion is the single JOIN'd Asset query (select_related works — no
         # N+1 on asset relations). The remaining queries are auth/tenant/permission
-        # overhead: token + last_used, tenant, TenantGroup, the membership lookup, and
-        # the additive-union permission resolution (own-reach RoleAssignments + group
-        # roles owned by the tenant), plus session read/write. Post-RBAC-collapse the
-        # managed-reach projection only queries when the tenant itself is
-        # ``managed_by`` a provider tenant (not the case here), so this tenant's
-        # resolution is 2 bounded queries rather than the old always-run
-        # provider-membership lookup — one query fewer than before the collapse.
-        with self.assertNumQueries(18):
+        # overhead: token + last_used, tenant, TenantGroup, the membership lookup,
+        # additive RoleGrant resolution (grant + prefetched scopes), a bounded
+        # own-tenant coverage lookup, and session read/write. Managed projection is
+        # skipped because this tenant is not managed by a provider.
+        with self.assertNumQueries(19):
             response = self.client.post(
                 self.graphql_url,
                 data=json.dumps({'query': query}),

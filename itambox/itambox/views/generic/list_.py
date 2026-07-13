@@ -18,7 +18,10 @@ from extras.models import ExportTemplate, LabelTemplate, SavedFilter
 from itambox.registry import registry
 from itambox.utils import get_model_viewname, get_table_for_model, get_help_url
 from itambox.views.htmx import BaseHTMXView
-from itambox.views.generic.mixins import TenantScopingViewMixin
+from itambox.views.generic.mixins import (
+    TenantScopingViewMixin,
+    user_can_mutate_model,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -194,6 +197,7 @@ class ObjectListView(TenantScopingViewMixin, PermissionRequiredMixin, LoginRequi
         context['app_label'] = _model._meta.app_label
         context['model_name'] = _model._meta.model_name
         context['object_type'] = _model._meta.verbose_name
+        mutation_allowed = user_can_mutate_model(self.request.user, _model)
 
         context.setdefault('is_beta_module', module_maturity(_model._meta.app_label) == BETA)
 
@@ -244,7 +248,7 @@ class ObjectListView(TenantScopingViewMixin, PermissionRequiredMixin, LoginRequi
         _importable = is_model_importable(_model)
         context['can_export'] = _importable
         context['import_url'] = None
-        if _importable:
+        if _importable and mutation_allowed:
             try:
                 context['import_url'] = reverse('generic_import', kwargs={
                     'app_label': _model._meta.app_label,
@@ -271,8 +275,14 @@ class ObjectListView(TenantScopingViewMixin, PermissionRequiredMixin, LoginRequi
             except NoReverseMatch:
                 context['bulk_edit_url'] = None
 
+        if not mutation_allowed:
+            context['bulk_delete_url'] = None
+            context['bulk_edit_url'] = None
+
         # Check permissions in Python
-        can_add = self.request.user.has_perm(f"{_model._meta.app_label}.add_{_model._meta.model_name}")
+        can_add = mutation_allowed and self.request.user.has_perm(
+            f"{_model._meta.app_label}.add_{_model._meta.model_name}"
+        )
         context['can_add'] = can_add
 
         context['action_buttons'] = self.action_buttons
@@ -294,6 +304,10 @@ class ObjectListView(TenantScopingViewMixin, PermissionRequiredMixin, LoginRequi
                 context['bulk_restore_url'] = reverse('object_bulk_restore', kwargs={'content_type_id': ct.pk})
                 context['bulk_purge_url'] = reverse('object_bulk_purge', kwargs={'content_type_id': ct.pk})
             except Exception:
+                context['bulk_restore_url'] = None
+                context['bulk_purge_url'] = None
+
+            if not mutation_allowed:
                 context['bulk_restore_url'] = None
                 context['bulk_purge_url'] = None
 

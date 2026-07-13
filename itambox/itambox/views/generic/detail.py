@@ -23,7 +23,11 @@ from extras.models import (
 from itambox.registry import registry
 from itambox.utils import get_model_viewname, get_help_url
 from itambox.views.htmx import BaseHTMXView
-from itambox.views.generic.mixins import TenantScopingViewMixin, CachedObjectMixin
+from itambox.views.generic.mixins import (
+    CachedObjectMixin,
+    TenantScopingViewMixin,
+    user_can_mutate_model,
+)
 from subscriptions.models import SubscriptionAssignment
 from subscriptions.tables import SubscriptionAssignmentTable
 
@@ -266,8 +270,13 @@ class ObjectDetailView(TenantScopingViewMixin, PermissionRequiredMixin, LoginReq
         context['model'] = obj.__class__
         context['layout'] = self.layout
 
-        can_change = self.request.user.has_perm(f'{app_label}.change_{model_name}', obj=obj)
-        can_delete = self.request.user.has_perm(f'{app_label}.delete_{model_name}', obj=obj)
+        mutation_allowed = user_can_mutate_model(self.request.user, obj.__class__)
+        can_change = mutation_allowed and self.request.user.has_perm(
+            f'{app_label}.change_{model_name}', obj=obj,
+        )
+        can_delete = mutation_allowed and self.request.user.has_perm(
+            f'{app_label}.delete_{model_name}', obj=obj,
+        )
         context['can_change'] = can_change
         context['can_delete'] = can_delete
         context['edit_url'] = None
@@ -287,7 +296,7 @@ class ObjectDetailView(TenantScopingViewMixin, PermissionRequiredMixin, LoginReq
         # Clone is offered generically for any model flagged cloneable (via
         # CloneableMixin) that has a clone view wired and that the user may add.
         context['clone_url'] = None
-        if registry.model_has_feature(obj.__class__, 'cloneable') and \
+        if mutation_allowed and registry.model_has_feature(obj.__class__, 'cloneable') and \
                 self.request.user.has_perm(f'{app_label}.add_{model_name}', obj=obj):
             try:
                 context['clone_url'] = reverse(get_model_viewname(obj, 'clone'), kwargs={'pk': obj.pk})

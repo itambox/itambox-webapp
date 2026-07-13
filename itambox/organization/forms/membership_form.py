@@ -1,48 +1,26 @@
-"""Membership form — the unified "Add member" grant flow (RBAC stage 3).
+"""Unified Membership and canonical RoleGrant editor.
 
-One form authors the whole grant, LOSSLESSLY — the on-screen representation is a
-one-to-one mapping of the persisted ``RoleAssignment`` rows, so opening and
-re-submitting an untouched membership produces zero grant changes:
-
-  * **Who** — an existing user, or a new one created inline (get-or-create by
-    email, ``set_unusable_password()``). Credentials are issued later via the
-    membership detail's "Send password setup link" action — never automatically.
-  * **This organization** — an ``own_roles`` multi-select. Each selected role maps
-    to exactly one ``RoleAssignment(reach='own')`` (no per-row refinement).
-  * **Managed tenants** — on a managing (``is_provider``) tenant only, a provider
-    inline formset with ONE ROW PER managed grant: ``role`` + its own coverage
-    refinement (``managed_scope`` / ``scope_group`` / ``assigned_tenants``). Each
-    row is one ``RoleAssignment(reach='managed')``. The same role may appear once
-    in ``own_roles`` and once as a managed row (two rows, two reaches); the formset
-    rejects two managed rows for the same role.
-
-Edit seeds ``own_roles`` from the own-reach rows and one formset row per managed
-assignment — no union, no copy of one row's refinement onto another. ``save()``
-reconciles per instance: surviving ``(role, reach)`` rows keep their
-``granted_by``/``granted_at`` provenance untouched, only genuinely new rows are
-created (stamped ``granted_by=<actor>``) and only removed/deselected rows are
-deleted (via per-object ``delete()`` so revocations are change-logged). Every new
-or changed row passes :func:`core.auth.guards.validate_assignment_grant`.
-
-``?preset=technician`` (via the ``preset`` kwarg) preselects the MSP quick-onboard
-shape: a new user and a single managed formset row for the shared "Technician"
-role covering all managed tenants. It does not create an own-reach row.
+Own-tenant roles use direct grants with an ``own`` scope. Provider reach uses one
+direct grant plus additive RoleGrantScope children. Every elevated direct grant
+requires a reason and future expiration.
 """
 from django import forms
 from django.contrib.auth import get_user_model
 from django.db import transaction
 from django.db.models import Q
+from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
 from crispy_forms.helper import FormHelper
 from crispy_forms.layout import Layout, Fieldset
 
 from core.forms import FilterForm, BulkEditForm
-from core.auth.guards import validate_assignment_grant
+from core.auth.guards import validate_group_membership_grant, validate_role_grant
 from organization.access import get_descendant_tenant_group_ids
+from core.mfa import role_is_privileged
 from users.services import (
     AmbiguousEmailError, normalize_email, resolve_existing_user, resolve_or_create_user,
 )
-from ..models import Membership, Role, RoleAssignment, Tenant, TenantGroup
+from ..models import Membership, Role, RoleGrant, RoleGrantScope, Tenant, TenantGroup
 
 User = get_user_model()
 
@@ -81,7 +59,11 @@ def _role_assignable_in(role, tenant):
     down by its managing organization."""
     if role.tenant_id == tenant.pk:
         return True
-    return bool(role.shared_with_managed and tenant.managed_by_id == role.tenant_id)
+    return bool(
+        role.shared_with_managed
+        and role.tenant.is_provider
+        and tenant.managed_by_id == role.tenant_id
+    )
 
 
 def _roles_visible_in_qs(membership_tenant):
@@ -95,21 +77,23 @@ def _roles_visible_in_qs(membership_tenant):
         ownership = Q(tenant=membership_tenant)
         if membership_tenant.managed_by_id:
             ownership |= Q(
-                tenant_id=membership_tenant.managed_by_id, shared_with_managed=True,
+                tenant_id=membership_tenant.managed_by_id,
+                tenant__is_provider=True,
+                shared_with_managed=True,
             )
         qs = qs.filter(ownership)
     return qs.order_by('name')
 
 
 # ---------------------------------------------------------------------------
-# Managed-reach grant formset — one row per RoleAssignment(reach='managed')
+# Managed-reach grant formset — one row per RoleGrant aggregate
 # ---------------------------------------------------------------------------
-class ManagedRoleAssignmentForm(forms.Form):
+class ManagedRoleGrantForm(forms.Form):
     """One managed-reach grant: a role plus its own coverage refinement.
 
     Purely a UI row — it does not persist itself; ``MembershipForm.save()``
     reconciles the whole formset against the membership's existing managed rows.
-    ``id`` carries the existing ``RoleAssignment`` pk (blank for a new row) so the
+    ``id`` carries the existing ``RoleGrant`` pk (blank for a new row) so the
     reconciler can preserve provenance on surviving rows.
     """
 
@@ -119,8 +103,12 @@ class ManagedRoleAssignmentForm(forms.Form):
         widget=forms.Select(attrs={'class': 'form-select managed-role'}),
     )
     managed_scope = forms.ChoiceField(
-        choices=RoleAssignment.SCOPE_CHOICES,
-        initial=RoleAssignment.SCOPE_EXPLICIT,
+        choices=(
+            ('explicit', _("Specific tenants")),
+            (RoleGrantScope.SCOPE_TENANT_GROUP, _("A tenant group + its descendants")),
+            (RoleGrantScope.SCOPE_ALL_MANAGED, _("All managed tenants")),
+        ),
+        initial='explicit',
         required=False, label=_("Coverage"),
         widget=forms.Select(attrs={'class': 'form-select managed-scope'}),
     )
@@ -131,6 +119,18 @@ class ManagedRoleAssignmentForm(forms.Form):
     assigned_tenants = forms.ModelMultipleChoiceField(
         queryset=Tenant._base_manager.none(), required=False, label=_("Specific tenants"),
         widget=forms.SelectMultiple(attrs={'class': 'form-select managed-assigned-tenants'}),
+    )
+    reason = forms.CharField(
+        required=False, label=_("Reason"), widget=forms.Textarea(attrs={'rows': 2}),
+        help_text=_("Required when this is an elevated direct grant."),
+    )
+    valid_until = forms.DateTimeField(
+        required=False, label=_("Valid until"),
+        widget=forms.DateTimeInput(
+            format='%Y-%m-%dT%H:%M',
+            attrs={'type': 'datetime-local'},
+        ),
+        help_text=_("Required and must be in the future for elevated direct grants."),
     )
 
     def __init__(self, *args, membership_tenant=None, requesting_user=None, **kwargs):
@@ -168,10 +168,10 @@ class ManagedRoleAssignmentForm(forms.Form):
                 "Managed grants require a managing (provider) tenant."
             ))
 
-        scope = cleaned.get('managed_scope') or RoleAssignment.SCOPE_EXPLICIT
+        scope = cleaned.get('managed_scope') or 'explicit'
         cleaned['managed_scope'] = scope
         requested_tenant_ids = None
-        if scope == RoleAssignment.SCOPE_TENANT_GROUP:
+        if scope == RoleGrantScope.SCOPE_TENANT_GROUP:
             cleaned['assigned_tenants'] = []
             scope_group = cleaned.get('scope_group')
             if not scope_group:
@@ -185,7 +185,7 @@ class ManagedRoleAssignmentForm(forms.Form):
                     group_id__in=get_descendant_tenant_group_ids(scope_group.pk),
                 ).values_list('pk', flat=True)
             )
-        elif scope == RoleAssignment.SCOPE_EXPLICIT:
+        elif scope == 'explicit':
             cleaned['scope_group'] = None
             assigned = list(cleaned.get('assigned_tenants') or [])
             if not assigned:
@@ -212,10 +212,21 @@ class ManagedRoleAssignmentForm(forms.Form):
 
         # Escalation guard for this one managed row — a single invalid row makes
         # the formset (and thus the whole transaction) fail.
+        if role_is_privileged(role):
+            reason = (cleaned.get('reason') or '').strip()
+            valid_until = cleaned.get('valid_until')
+            if not reason:
+                self.add_error('reason', _("Elevated direct grants require a reason."))
+            if valid_until is None:
+                self.add_error('valid_until', _("Elevated direct grants require an expiration."))
+            elif valid_until <= timezone.now():
+                self.add_error('valid_until', _("The expiration must be in the future."))
+            cleaned['reason'] = reason
+
         try:
-            validate_assignment_grant(
+            validate_role_grant(
                 self._requesting_user, role, tenant,
-                reach=RoleAssignment.REACH_MANAGED,
+                scope_type=scope,
                 requested_tenant_ids=requested_tenant_ids,
             )
         except forms.ValidationError as exc:
@@ -223,7 +234,7 @@ class ManagedRoleAssignmentForm(forms.Form):
         return cleaned
 
 
-class BaseManagedRoleAssignmentFormSet(forms.BaseFormSet):
+class BaseManagedRoleGrantFormSet(forms.BaseFormSet):
     """Rejects two managed rows for the same role (they'd collide on the unique
     ``(membership, role, reach)`` grant constraint)."""
 
@@ -247,9 +258,9 @@ class BaseManagedRoleAssignmentFormSet(forms.BaseFormSet):
             seen.add(role.pk)
 
 
-ManagedRoleAssignmentFormSet = forms.formset_factory(
-    ManagedRoleAssignmentForm,
-    formset=BaseManagedRoleAssignmentFormSet,
+ManagedRoleGrantFormSet = forms.formset_factory(
+    ManagedRoleGrantForm,
+    formset=BaseManagedRoleGrantFormSet,
     extra=1, can_delete=True,
 )
 
@@ -307,6 +318,21 @@ class MembershipForm(forms.ModelForm):
         help_text=_("Roles that apply inside this organization. This tenant's roles, "
                     "plus definitions shared down by its managing organization."),
     )
+    reason = forms.CharField(
+        required=False,
+        label=_("Reason for new elevated direct grants"),
+        widget=forms.Textarea(attrs={'rows': 2}),
+        help_text=_("Required when adding an elevated role directly to this membership."),
+    )
+    valid_until = forms.DateTimeField(
+        required=False,
+        label=_("Expiry for new elevated direct grants"),
+        widget=forms.DateTimeInput(
+            format='%Y-%m-%dT%H:%M',
+            attrs={'type': 'datetime-local'},
+        ),
+        help_text=_("Required and must be in the future for new elevated direct grants."),
+    )
 
     class Meta:
         model = Membership
@@ -321,6 +347,12 @@ class MembershipForm(forms.ModelForm):
         self._tenant_ctx = kwargs.pop('tenant', None)
         self._preset = kwargs.pop('preset', None)
         super().__init__(*args, **kwargs)
+        # Keep the persisted state before ModelForm applies submitted values to
+        # ``instance``. Reactivation restores both direct grants and every group
+        # grant inherited through this Membership.
+        self._initial_is_active = (
+            self.instance.is_active if self.instance.pk else None
+        )
 
         #: Set by save() when the who-block created a brand-new user, so the view
         #: can surface the "send password setup link" hint.
@@ -377,23 +409,59 @@ class MembershipForm(forms.ModelForm):
 
         # Seed own_roles + the managed formset losslessly from the existing rows.
         managed_initial = []
+        self._existing_own_role_ids = set()
         if self.instance.pk:
-            self.fields['own_roles'].initial = sorted(
-                self.instance.assignments.filter(
-                    reach=RoleAssignment.REACH_OWN,
-                ).values_list('role_id', flat=True)
+            self._existing_own_role_ids = set(
+                self.instance.role_grants.filter(
+                    scopes__scope_type=RoleGrantScope.SCOPE_OWN,
+                    role__deleted_at__isnull=True,
+                ).filter(
+                    Q(valid_until__isnull=True) | Q(valid_until__gt=timezone.now())
+                ).values_list('role_id', flat=True).distinct()
             )
-            for a in self.instance.assignments.filter(
-                reach=RoleAssignment.REACH_MANAGED,
-            ).select_related('scope_group'):
+            self.fields['own_roles'].initial = sorted(self._existing_own_role_ids)
+            grants = self.instance.role_grants.filter(
+                role__deleted_at__isnull=True,
+                scopes__scope_type__in=(
+                    RoleGrantScope.SCOPE_TENANT,
+                    RoleGrantScope.SCOPE_TENANT_GROUP,
+                    RoleGrantScope.SCOPE_ALL_MANAGED,
+                ),
+            ).filter(
+                Q(valid_until__isnull=True) | Q(valid_until__gt=timezone.now())
+            ).select_related('role').prefetch_related(
+                'scopes', 'scopes__tenant', 'scopes__tenant_group',
+            ).distinct()
+            for grant in grants:
+                scopes = list(grant.scopes.all())
+                if any(s.scope_type == RoleGrantScope.SCOPE_ALL_MANAGED for s in scopes):
+                    scope = RoleGrantScope.SCOPE_ALL_MANAGED
+                    scope_group_id = None
+                    tenant_ids = []
+                else:
+                    group_scope = next(
+                        (s for s in scopes if s.scope_type == RoleGrantScope.SCOPE_TENANT_GROUP),
+                        None,
+                    )
+                    if group_scope is not None:
+                        scope = RoleGrantScope.SCOPE_TENANT_GROUP
+                        scope_group_id = group_scope.tenant_group_id
+                        tenant_ids = []
+                    else:
+                        scope = 'explicit'
+                        scope_group_id = None
+                        tenant_ids = [
+                            s.tenant_id for s in scopes
+                            if s.scope_type == RoleGrantScope.SCOPE_TENANT and s.tenant_id
+                        ]
                 managed_initial.append({
-                    'id': a.pk,
-                    'role': a.role_id,
-                    'managed_scope': a.managed_scope or RoleAssignment.SCOPE_EXPLICIT,
-                    'scope_group': a.scope_group_id,
-                    'assigned_tenants': list(
-                        a.assigned_tenants.values_list('pk', flat=True)
-                    ),
+                    'id': grant.pk,
+                    'role': grant.role_id,
+                    'managed_scope': scope,
+                    'scope_group': scope_group_id,
+                    'assigned_tenants': tenant_ids,
+                    'reason': grant.reason,
+                    'valid_until': grant.valid_until,
                 })
         elif not self.is_bound and self._preset == self.PRESET_TECHNICIAN \
                 and membership_tenant is not None and membership_tenant.is_provider:
@@ -416,11 +484,11 @@ class MembershipForm(forms.ModelForm):
             'requesting_user': self._requesting_user,
         }
         if self.is_bound:
-            return ManagedRoleAssignmentFormSet(
+            return ManagedRoleGrantFormSet(
                 self.data, self.files,
                 prefix=MANAGED_FORMSET_PREFIX, form_kwargs=form_kwargs,
             )
-        return ManagedRoleAssignmentFormSet(
+        return ManagedRoleGrantFormSet(
             initial=managed_initial,
             prefix=MANAGED_FORMSET_PREFIX, form_kwargs=form_kwargs,
         )
@@ -442,7 +510,7 @@ class MembershipForm(forms.ModelForm):
             return []
         return [{
             'role': technician_role.pk,
-            'managed_scope': RoleAssignment.SCOPE_ALL,
+            'managed_scope': RoleGrantScope.SCOPE_ALL_MANAGED,
         }]
 
     def _layout_items(self):
@@ -457,7 +525,10 @@ class MembershipForm(forms.ModelForm):
             ))
         else:
             items.append('user')
-        items.append(Fieldset(str(_("This organization — roles")), 'own_roles'))
+        items.append(Fieldset(
+            str(_("This organization — roles")),
+            'own_roles', 'reason', 'valid_until',
+        ))
         items.append('is_active')
         return items
 
@@ -487,22 +558,61 @@ class MembershipForm(forms.ModelForm):
                     _("Role '%(role)s' is not available in the selected tenant.") % {'role': role}
                 )
 
-        # Escalation guard — one per own-reach RoleAssignment row, aggregated so the
+        # Escalation guard — one per direct own-scope grant, aggregated so the
         # admin sees all failures. Managed-reach rows are guarded inside the formset.
         errors = []
         for role in own_roles:
             try:
-                validate_assignment_grant(
+                validate_role_grant(
                     self._requesting_user, role, tenant,
-                    reach=RoleAssignment.REACH_OWN,
+                    scope_type=RoleGrantScope.SCOPE_OWN,
                 )
             except forms.ValidationError as exc:
                 errors.extend(exc.messages)
+
+        reactivating = bool(
+            self.instance.pk
+            and self._initial_is_active is False
+            and cleaned.get('is_active')
+        )
+        if reactivating:
+            # MembershipForm never edits GroupMembership rows. Switching the
+            # principal back on is equivalent to adding it to every retained,
+            # live group again and must pass the same inheritance guard,
+            # including provider-managed projections. Inactive/deleted groups
+            # remain inert and are handled if they are reactivated separately.
+            retained_group_memberships = self.instance.group_memberships.filter(
+                user_group__is_active=True,
+                user_group__deleted_at__isnull=True,
+            ).select_related('user_group')
+            for group_membership in retained_group_memberships:
+                try:
+                    validate_group_membership_grant(
+                        self._requesting_user,
+                        group_membership.user_group,
+                    )
+                except forms.ValidationError as exc:
+                    errors.extend(exc.messages)
         if errors:
             seen = set()
             raise forms.ValidationError(
                 [e for e in errors if not (e in seen or seen.add(e))]
             )
+
+        new_privileged_roles = [
+            role for role in own_roles
+            if role.pk not in self._existing_own_role_ids and role_is_privileged(role)
+        ]
+        reason = (cleaned.get('reason') or '').strip()
+        valid_until = cleaned.get('valid_until')
+        cleaned['reason'] = reason
+        if new_privileged_roles:
+            if not reason:
+                self.add_error('reason', _("Elevated direct grants require a reason."))
+            if valid_until is None:
+                self.add_error('valid_until', _("Elevated direct grants require an expiration."))
+            elif valid_until <= timezone.now():
+                self.add_error('valid_until', _("The expiration must be in the future."))
         return cleaned
 
     def _actor_may_manage_memberships(self, tenant):
@@ -626,7 +736,7 @@ class MembershipForm(forms.ModelForm):
             instance = super().save(commit=commit)
             if commit:
                 # Assignments hang off a persisted membership: reconcile now.
-                self._sync_assignments(instance)
+                self._sync_grants(instance)
             else:
                 # Canonical two-step (instance.save() then form.save_m2m()):
                 # chain the grant reconciliation onto Django's save_m2m so the
@@ -636,7 +746,7 @@ class MembershipForm(forms.ModelForm):
 
                 def save_m2m():
                     django_save_m2m()
-                    self._sync_assignments(self.instance)
+                    self._sync_grants(self.instance)
 
                 self.save_m2m = save_m2m
         return instance
@@ -659,7 +769,7 @@ class MembershipForm(forms.ModelForm):
         self.new_user_created = created
         return user
 
-    def _sync_assignments(self, membership):
+    def _sync_grants(self, membership):
         """Reconcile the membership's assignments per instance, losslessly.
 
         Own-reach rows follow ``own_roles``; managed-reach rows follow the formset,
@@ -675,18 +785,45 @@ class MembershipForm(forms.ModelForm):
     def _sync_own_roles(self, membership):
         selected = list(self.cleaned_data.get('own_roles') or [])
         selected_ids = {r.pk for r in selected}
-        for assignment in membership.assignments.filter(reach=RoleAssignment.REACH_OWN):
-            if assignment.role_id not in selected_ids:
-                assignment.delete()
+        existing = list(
+            membership.role_grants.filter(
+                scopes__scope_type=RoleGrantScope.SCOPE_OWN,
+                role__deleted_at__isnull=True,
+            ).filter(
+                Q(valid_until__isnull=True) | Q(valid_until__gt=timezone.now())
+            ).prefetch_related('scopes').distinct()
+        )
+        existing_by_role = {}
+        for grant in existing:
+            existing_by_role.setdefault(grant.role_id, grant)
+            if grant.role_id in selected_ids:
+                continue
+            for scope in list(grant.scopes.all()):
+                if scope.scope_type == RoleGrantScope.SCOPE_OWN:
+                    scope.delete()
+            if not RoleGrantScope.objects.filter(role_grant=grant).exists():
+                grant.delete()
+
         for role in selected:
-            RoleAssignment.objects.get_or_create(
-                membership=membership, role=role, reach=RoleAssignment.REACH_OWN,
-                defaults={'granted_by': self._requesting_user},
+            if role.pk in existing_by_role:
+                continue
+            privileged = role_is_privileged(role)
+            grant = RoleGrant(
+                membership=membership,
+                role=role,
+                granted_by=self._requesting_user,
+                reason=self.cleaned_data.get('reason', '') if privileged else '',
+                valid_until=self.cleaned_data.get('valid_until') if privileged else None,
+            )
+            grant.save()
+            RoleGrantScope.objects.create(
+                role_grant=grant,
+                scope_type=RoleGrantScope.SCOPE_OWN,
             )
 
     def _intended_managed_rows(self, existing):
         """Pass 1: the grant rows the submitted formset intends, as
-        ``(surviving_assignment_or_None, role, scope, scope_group, assigned)``."""
+        ``(surviving_grant_or_None, role, scope, scope_group, assigned, metadata)``."""
         kept = []
         for form in self.managed_formset.forms:
             if not hasattr(form, 'cleaned_data'):
@@ -694,64 +831,118 @@ class MembershipForm(forms.ModelForm):
             cd = form.cleaned_data
             if cd.get('DELETE') or not cd.get('role'):
                 continue
-            scope = cd.get('managed_scope') or RoleAssignment.SCOPE_EXPLICIT
-            scope_group = cd.get('scope_group') if scope == RoleAssignment.SCOPE_TENANT_GROUP else None
-            assigned = list(cd.get('assigned_tenants') or []) if scope == RoleAssignment.SCOPE_EXPLICIT else []
+            scope = cd.get('managed_scope') or 'explicit'
+            scope_group = (
+                cd.get('scope_group')
+                if scope == RoleGrantScope.SCOPE_TENANT_GROUP else None
+            )
+            assigned = (
+                list(cd.get('assigned_tenants') or [])
+                if scope == 'explicit' else []
+            )
             raw_id = cd.get('id')
             # An id must belong to THIS membership; a stray/tampered id is ignored
             # (treated as a new row) so it can never touch another membership's grant.
-            assignment = existing.get(raw_id) if raw_id in existing else None
+            grant = existing.get(raw_id) if raw_id in existing else None
             # A role change is a revoke plus a fresh grant, never an in-place
             # mutation: granted_by/granted_at document who granted THIS role, so
             # the old row must die (a change-logged revocation via Pass 2) and a
             # new row is created under the acting user's provenance. Scope-only
             # changes still update the surviving row in place (Pass 3).
-            if assignment is not None and assignment.role_id != cd['role'].pk:
-                assignment = None
-            kept.append((assignment, cd['role'], scope, scope_group, assigned))
+            if grant is not None and grant.role_id != cd['role'].pk:
+                grant = None
+            kept.append((
+                grant,
+                cd['role'],
+                scope,
+                scope_group,
+                assigned,
+                (cd.get('reason') or '').strip(),
+                cd.get('valid_until'),
+            ))
         return kept
 
     def _sync_managed_formset(self, membership):
         if self.managed_formset is None:
             return
         existing = {
-            a.pk: a for a in membership.assignments.filter(
-                reach=RoleAssignment.REACH_MANAGED,
-            )
+            grant.pk: grant for grant in membership.role_grants.filter(
+                role__deleted_at__isnull=True,
+                scopes__scope_type__in=(
+                    RoleGrantScope.SCOPE_TENANT,
+                    RoleGrantScope.SCOPE_TENANT_GROUP,
+                    RoleGrantScope.SCOPE_ALL_MANAGED,
+                ),
+            ).filter(
+                Q(valid_until__isnull=True) | Q(valid_until__gt=timezone.now())
+            ).prefetch_related('scopes').distinct()
         }
 
-        # Pass 1: collect the intended rows (an existing assignment or a new one).
+        # Pass 1: collect the intended rows (an existing grant or a new one).
         kept = self._intended_managed_rows(existing)
 
-        kept_existing_ids = {a.pk for (a, _r, _s, _g, _t) in kept if a is not None}
+        kept_existing_ids = {
+            grant.pk
+            for (grant, _role, _scope, _group, _tenants, _reason, _expiry) in kept
+            if grant is not None
+        }
 
-        # Pass 2: delete removed rows FIRST so their (membership, role, reach) slot
-        # is free before a new row possibly re-grants the same role.
-        for pk, assignment in existing.items():
+        # Pass 2: revoke every managed scope omitted by the submitted formset.
+        # Preserve a possible own scope on the same aggregate.
+        for pk, grant in existing.items():
             if pk not in kept_existing_ids:
-                assignment.delete()
+                for child in list(grant.scopes.all()):
+                    if child.scope_type != RoleGrantScope.SCOPE_OWN:
+                        child.delete()
+                if not RoleGrantScope.objects.filter(role_grant=grant).exists():
+                    grant.delete()
 
-        # Pass 3: create new rows and update surviving ones (provenance preserved).
-        for assignment, role, scope, scope_group, assigned in kept:
-            if assignment is None:
-                assignment = RoleAssignment(
-                    membership=membership, role=role,
-                    reach=RoleAssignment.REACH_MANAGED,
-                    managed_scope=scope, scope_group=scope_group,
+        # Pass 3: create new aggregates and synchronize their scope children.
+        for grant, role, scope, scope_group, assigned, reason, valid_until in kept:
+            if grant is None:
+                grant = RoleGrant(
+                    membership=membership,
+                    role=role,
                     granted_by=self._requesting_user,
+                    reason=reason,
+                    valid_until=valid_until,
                 )
-                assignment.save()
-                # Route the explicit coverage through the audited writer so the
-                # M2M scope lands in ObjectChange (save() alone logs it empty).
-                assignment.set_assigned_tenants(assigned, actor=self._requesting_user)
+                grant.save()
             else:
-                if (assignment.managed_scope != scope
-                        or assignment.scope_group_id != (scope_group.pk if scope_group else None)):
-                    assignment.managed_scope = scope
-                    assignment.scope_group = scope_group
-                    assignment.save()
-                # set_assigned_tenants no-ops (and logs nothing) when unchanged.
-                assignment.set_assigned_tenants(assigned, actor=self._requesting_user)
+                changed = False
+                if grant.reason != reason:
+                    grant.reason = reason
+                    changed = True
+                if grant.valid_until != valid_until:
+                    grant.valid_until = valid_until
+                    changed = True
+                if changed:
+                    grant.save(update_fields=['reason', 'valid_until'])
+
+            if scope == RoleGrantScope.SCOPE_ALL_MANAGED:
+                desired = {(RoleGrantScope.SCOPE_ALL_MANAGED, None, None)}
+            elif scope == RoleGrantScope.SCOPE_TENANT_GROUP:
+                desired = {(RoleGrantScope.SCOPE_TENANT_GROUP, None, scope_group.pk)}
+            else:
+                desired = {
+                    (RoleGrantScope.SCOPE_TENANT, tenant.pk, None)
+                    for tenant in assigned
+                }
+            current = {
+                (child.scope_type, child.tenant_id, child.tenant_group_id): child
+                for child in grant.scopes.all()
+                if child.scope_type != RoleGrantScope.SCOPE_OWN
+            }
+            for key, child in current.items():
+                if key not in desired:
+                    child.delete()
+            for scope_type, tenant_id, tenant_group_id in desired - set(current):
+                RoleGrantScope.objects.create(
+                    role_grant=grant,
+                    scope_type=scope_type,
+                    tenant_id=tenant_id,
+                    tenant_group_id=tenant_group_id,
+                )
 
 
 class MembershipFilterForm(FilterForm):
@@ -760,12 +951,7 @@ class MembershipFilterForm(FilterForm):
 
 
 class MembershipBulkRoleForm(BulkEditForm):
-    """Bulk add/remove own-reach role assignments for selected memberships.
-
-    The bulk view resolves each membership's tenant, validates role availability
-    there, and calls ``validate_assignment_grant`` per (membership, role) before
-    creating/deleting ``RoleAssignment`` rows with ``reach='own'``.
-    """
+    """Bulk add/remove direct own-scope grants for selected memberships."""
     roles_to_add = forms.ModelMultipleChoiceField(
         queryset=Role._base_manager.filter(deleted_at__isnull=True),
         required=False, label=_("Add roles"),
@@ -776,8 +962,39 @@ class MembershipBulkRoleForm(BulkEditForm):
         required=False, label=_("Remove roles"),
         widget=forms.SelectMultiple(attrs={'class': 'form-select'}),
     )
+    reason = forms.CharField(
+        required=False,
+        label=_("Reason for elevated direct grants"),
+        widget=forms.Textarea(attrs={'rows': 2}),
+    )
+    valid_until = forms.DateTimeField(
+        required=False,
+        label=_("Expiry for elevated direct grants"),
+        widget=forms.DateTimeInput(
+            format='%Y-%m-%dT%H:%M',
+            attrs={'type': 'datetime-local'},
+        ),
+    )
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.fields.pop('add_tags', None)
         self.fields.pop('remove_tags', None)
+
+    def clean(self):
+        cleaned = super().clean()
+        privileged = any(
+            role_is_privileged(role)
+            for role in cleaned.get('roles_to_add') or []
+        )
+        reason = (cleaned.get('reason') or '').strip()
+        valid_until = cleaned.get('valid_until')
+        cleaned['reason'] = reason
+        if privileged:
+            if not reason:
+                self.add_error('reason', _("Elevated direct grants require a reason."))
+            if valid_until is None:
+                self.add_error('valid_until', _("Elevated direct grants require an expiration."))
+            elif valid_until <= timezone.now():
+                self.add_error('valid_until', _("The expiration must be in the future."))
+        return cleaned

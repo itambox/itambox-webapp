@@ -5,10 +5,9 @@
 {% comment %}
 Bespoke create/edit screen for UserGroupForm — one of the three RBAC form
 flows (Role / Membership / UserGroup) that should read as a single system.
-The form defines its own FormHelper/Layout (Fieldset sections + standard
-Submit/Cancel buttons via add_standard_buttons), so {% crispy form %} renders
-the whole <form>. We only supply the surrounding page chrome to match
-organization/role_form.html.
+The form renders its main fields through crispy and owns a managed-scope
+formset. This template wraps both in one POST form; membership-form.ts provides
+the generic managed-row add/remove and coverage toggles.
 {% endcomment %}
 
 {% block title %}{{ title }} {% translate "- ITAMbox" %}{% endblock %}
@@ -37,11 +36,58 @@ organization/role_form.html.
                     {% if is_editing %}{% translate "Edit user group" %}{% else %}{% translate "Add user group" %}{% endif %}
                 </h4>
                 <p class="text-muted mb-4 small">
-                    {% translate "A user group can carry roles from any tenant and grant them to its members. The owning tenant decides whose admins and whose SCIM provisioning manage the group; leave it blank for a global, superuser-managed group." %}
+                    {% translate "A user group is owned by one tenant and contains that tenant's memberships. Its permanent group grants can be projected into explicitly scoped managed tenants." %}
                 </p>
 
-                {# The form's FormHelper renders the <form>, Fieldset sections, and buttons. #}
-                {% crispy form %}
+                <form method="post" hx-boost="false" novalidate>
+                    {% csrf_token %}
+                    {% if form.non_field_errors %}
+                    <div class="alert alert-danger">{{ form.non_field_errors }}</div>
+                    {% endif %}
+
+                    {% crispy form %}
+
+                    {% if managed_formset %}
+                    <fieldset class="mb-4" id="managed-grants" data-managed-formset>
+                        <legend class="fs-4 text-primary">{% translate "Managed tenant projections" %}</legend>
+                        <p class="text-muted small">
+                            {% translate "Add one or more additive scope rows per role. Group grants may be permanent; direct-grant reason and expiration rules do not apply." %}
+                        </p>
+                        {{ managed_formset.management_form }}
+                        {% if managed_formset.non_form_errors %}
+                        <div class="alert alert-danger">
+                            <ul class="mb-0">
+                                {% for error in managed_formset.non_form_errors %}
+                                <li>{{ error }}</li>
+                                {% endfor %}
+                            </ul>
+                        </div>
+                        {% endif %}
+
+                        <div id="managed-formset-rows">
+                            {% for mf in managed_formset %}
+                                {% include "users/usergroups/_managed_grant_row.html" with mf=mf %}
+                            {% endfor %}
+                        </div>
+
+                        <template id="managed-empty-form">
+                            {% include "users/usergroups/_managed_grant_row.html" with mf=managed_formset.empty_form %}
+                        </template>
+
+                        <button type="button" class="btn btn-outline-primary btn-sm mt-2" data-add-managed-row>
+                            <i class="mdi mdi-plus"></i>
+                            {% translate "Add managed scope" %}
+                        </button>
+                    </fieldset>
+                    {% endif %}
+
+                    <button type="submit" name="submit" class="btn btn-primary">
+                        {% if is_editing %}{% translate "Update" %}{% else %}{% translate "Create" %}{% endif %}
+                    </button>
+                    <a href="{{ cancel_url }}" class="btn btn-outline-secondary ms-2" data-no-dirty-track="true">
+                        {% translate "Cancel" %}
+                    </a>
+                </form>
             </div>
         </div>
     </div>

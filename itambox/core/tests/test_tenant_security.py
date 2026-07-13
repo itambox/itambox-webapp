@@ -3,13 +3,33 @@ from django.contrib.contenttypes.models import ContentType
 from django.test import TestCase, RequestFactory
 from django.contrib.auth import get_user_model
 from django.urls import reverse
-from organization.models import TenantGroup, Tenant, Membership, Role, Site, Location
-from users.models import UserGroup
+from organization.models import (
+    Location,
+    Membership,
+    Role,
+    RoleGrant,
+    RoleGrantScope,
+    Site,
+    Tenant,
+    TenantGroup,
+)
+from users.models import GroupMembership, UserGroup
 from assets.models import StatusLabel, Asset, AssetRole, Manufacturer, AssetType
 from core.managers import set_current_tenant, set_current_membership
 from core.tests.mixins import grant
 
 User = get_user_model()
+
+
+def grant_group_role(group, membership, role):
+    GroupMembership.objects.create(user_group=group, membership=membership)
+    role_grant = RoleGrant.objects.create(user_group=group, role=role)
+    RoleGrantScope.objects.create(
+        role_grant=role_grant,
+        scope_type=RoleGrantScope.SCOPE_OWN,
+    )
+    return role_grant
+
 
 class CoreTenantSecurityTestCase(TestCase):
     def setUp(self):
@@ -510,12 +530,12 @@ class EmailSettingsEncryptionTestCase(TestCase):
 
 
 # ---------------------------------------------------------------------------
-# Multi-role RBAC tests (new shape: M2M roles + direct_permissions + UserGroup)
+# Canonical additive RBAC tests (direct and group RoleGrants)
 # ---------------------------------------------------------------------------
 
 class MultiRoleUnionTestCase(TestCase):
     """Verify the additive union of permission sources:
-    direct membership roles + direct_permissions + UserGroup roles."""
+    direct membership RoleGrants + UserGroup RoleGrants."""
 
     def setUp(self):
         self.tenant = Tenant.objects.create(name='Union Tenant', slug='union-tenant')
@@ -540,18 +560,20 @@ class MultiRoleUnionTestCase(TestCase):
             permissions=['assets.change_asset'],
         )
 
-        # Membership: direct role A + a one-off role standing in for the deleted
-        # direct_permissions field, granting 'assets.delete_asset'
+        # Membership: direct role A plus a second additive direct grant.
         self.membership = grant(self.user, self.tenant, self.role_a).membership
         self.direct_role = Role.objects.create(
             tenant=self.tenant, name='Direct grants', permissions=['assets.delete_asset'],
         )
         grant(self.user, self.tenant, self.direct_role)
 
-        # UserGroup with role C
-        self.group = UserGroup.objects.create(name='Test Group', is_active=True)
-        self.group.roles.add(self.role_c)
-        self.group.members.add(self.user)
+        # Tenant-owned UserGroup with a membership-backed role grant.
+        self.group = UserGroup.objects.create(
+            tenant=self.tenant,
+            name='Test Group',
+            is_active=True,
+        )
+        grant_group_role(self.group, self.membership, self.role_c)
 
         # Set context
         set_current_tenant(self.tenant)
@@ -565,8 +587,8 @@ class MultiRoleUnionTestCase(TestCase):
         """Permission from a direct membership role resolves True."""
         self.assertTrue(self.user.has_perm('assets.view_asset'))
 
-    def test_direct_permission_grant_resolves_true(self):
-        """Permission granted directly via direct_permissions resolves True."""
+    def test_additional_direct_grant_resolves_true(self):
+        """Permission from a second direct RoleGrant resolves True."""
         self.assertTrue(self.user.has_perm('assets.delete_asset'))
 
     def test_usergroup_role_perm_granted(self):
@@ -602,18 +624,20 @@ class TenantBoundaryWithGroupsTestCase(TestCase):
             permissions=['assets.view_asset', 'assets.change_asset', 'assets.delete_asset'],
         )
 
-        # Group in tenant A with full permissions
-        self.group_a = UserGroup.objects.create(name='Group A', is_active=True)
-        self.group_a.roles.add(self.role_a)
-        self.group_a.members.add(self.user)
-
-        # Membership in tenant A with a direct role standing in for the deleted
-        # direct_permissions field
+        # Membership in tenant A with a second additive direct grant.
         self.membership_a = grant(self.user, self.tenant_a, self.role_a).membership
         self.direct_role_a = Role.objects.create(
             tenant=self.tenant_a, name='Direct grants', permissions=['assets.delete_asset'],
         )
         grant(self.user, self.tenant_a, self.direct_role_a)
+
+        # Group in tenant A with full permissions.
+        self.group_a = UserGroup.objects.create(
+            tenant=self.tenant_a,
+            name='Group A',
+            is_active=True,
+        )
+        grant_group_role(self.group_a, self.membership_a, self.role_a)
 
         # Status/asset for tenant B
         self.status = StatusLabel.objects.create(name='BA-Active', slug='ba-active', type='deployable')
@@ -633,8 +657,8 @@ class TenantBoundaryWithGroupsTestCase(TestCase):
         """UserGroup grant in tenant A must not allow access to a tenant B object."""
         self.assertFalse(self.user.has_perm('assets.change_asset', obj=self.asset_b))
 
-    def test_direct_permission_in_tenant_a_does_not_apply_to_tenant_b_object(self):
-        """direct_permissions in tenant A must not allow access to a tenant B object."""
+    def test_additional_direct_grant_does_not_apply_to_tenant_b_object(self):
+        """An additional direct grant in tenant A cannot reach a tenant B object."""
         self.assertFalse(self.user.has_perm('assets.delete_asset', obj=self.asset_b))
 
     def test_role_in_tenant_a_does_not_apply_to_tenant_b_object(self):
@@ -672,9 +696,8 @@ class IsActiveGatingTestCase(TestCase):
                 delattr(user, attr)
 
     def test_suspended_membership_own_roles_grant_nothing(self):
-        """is_active=False on a Membership drops that membership's OWN roles and
-        direct_permissions. (Group access is a SEPARATE, independent path that is not
-        gated by membership — see test_user_groups.MembershipIndependenceTests.)"""
+        """An inactive Membership contributes neither its direct grants nor any
+        group grants that use it as their membership-backed principal."""
         membership = Membership.objects.create(user=self.user, tenant=self.tenant, is_active=False)
         grant(self.user, self.tenant, self.role)
         direct_role = Role.objects.create(
@@ -695,9 +718,12 @@ class IsActiveGatingTestCase(TestCase):
         membership = Membership.objects.create(user=self.user, tenant=self.tenant, is_active=True,
         )
         # No direct roles on membership; only an inactive group
-        group = UserGroup.objects.create(name='Inactive Group', is_active=False)
-        group.roles.add(self.role)
-        group.members.add(self.user)
+        group = UserGroup.objects.create(
+            tenant=self.tenant,
+            name='Inactive Group',
+            is_active=False,
+        )
+        grant_group_role(group, membership, self.role)
 
         set_current_tenant(self.tenant)
         set_current_membership(membership)
@@ -705,15 +731,22 @@ class IsActiveGatingTestCase(TestCase):
 
         self.assertFalse(self.user.has_perm('assets.view_asset'))
 
-    def test_no_membership_user_in_active_group_gets_group_perms(self):
-        """Groups grant access INDEPENDENTLY of Membership: a user with no
-        membership but in an active group gains that group's role perms in the role's
-        tenant (the MSP cross-tenant model)."""
-        other_user = User.objects.create_user(username='no_mem_user', password='pass')
+    def test_membership_backed_user_in_active_group_gets_group_perms(self):
+        """An active group grants permissions through an owner-tenant Membership,
+        even when that membership has no direct role grants."""
+        other_user = User.objects.create_user(username='group_member_user', password='pass')
+        other_membership = Membership.objects.create(
+            user=other_user,
+            tenant=self.tenant,
+            is_active=True,
+        )
 
-        group = UserGroup.objects.create(name='Group No Mem', is_active=True)
-        group.roles.add(self.role)
-        group.members.add(other_user)
+        group = UserGroup.objects.create(
+            tenant=self.tenant,
+            name='Group Member',
+            is_active=True,
+        )
+        grant_group_role(group, other_membership, self.role)
 
         set_current_tenant(self.tenant)
         set_current_membership(None)
@@ -737,9 +770,12 @@ class SoftDeletedRoleGrantsNothingTestCase(TestCase):
         )
         self.membership = grant(self.user, self.tenant, self.role).membership
 
-        self.group = UserGroup.objects.create(name='SD Group', is_active=True)
-        self.group.roles.add(self.role)
-        self.group.members.add(self.user)
+        self.group = UserGroup.objects.create(
+            tenant=self.tenant,
+            name='SD Group',
+            is_active=True,
+        )
+        grant_group_role(self.group, self.membership, self.role)
 
         set_current_tenant(self.tenant)
         set_current_membership(self.membership)
@@ -767,7 +803,7 @@ class SoftDeletedRoleGrantsNothingTestCase(TestCase):
     def test_soft_deleted_role_on_group_grants_nothing(self):
         """After soft-deleting the role, group path must also yield no perms."""
         # Ensure only the group path is active
-        self.membership.assignments.all().delete()
+        self.membership.role_grants.all().delete()
         self.role.delete()  # SoftDeleteMixin soft-delete
         self._clear_perm_cache()
         self.assertFalse(self.user.has_perm('assets.view_asset'))

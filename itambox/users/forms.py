@@ -5,6 +5,7 @@
 import logging
 from django import forms
 from django.contrib.auth import get_user_model
+from django.db.models import Q
 # Import UserPreference from this app's models
 from .models import UserPreference 
 from django.utils.translation import gettext_lazy as _
@@ -452,38 +453,192 @@ class UserBulkEditForm(BulkEditForm):
 # --------------------------------------------------------------------------- UserGroup
 # UserGroup is an identity-layer construct (relocated here from organization/):
 # provider-owned groups may be projected into managed tenants through RoleGrant scopes.
-from organization.models import Membership, Role, Tenant
-from organization.access import accessible_tenant_ids
-from core.auth.guards import validate_permission_grant, validate_group_membership_grant
-from .models import UserGroup
+from django.db import transaction
+
+from organization.models import (
+    Membership, Role, RoleGrant, RoleGrantScope, Tenant, TenantGroup,
+)
+from organization.access import accessible_tenant_ids, get_descendant_tenant_group_ids
+from core.auth.guards import validate_role_grant
+from .models import GroupMembership, UserGroup
 from .filters import UserGroupFilterSet
 
 
-class _RolesHolder:
-    """Lightweight stand-in exposing ``roles.all()`` for an unsaved role set.
+class GroupManagedRoleGrantForm(forms.Form):
+    """One additive managed-scope segment of a group RoleGrant."""
 
-    ``validate_group_membership_grant`` iterates ``group.roles.all()``; on a create (no pk)
-    the submitted roles have no persisted M2M yet, so we wrap the in-memory list to satisfy
-    that contract without saving prematurely.
-    """
-    class _Manager:
-        def __init__(self, roles):
-            self._roles = roles
+    SCOPE_EXPLICIT = 'explicit'
+    id = forms.IntegerField(required=False, widget=forms.HiddenInput)
+    role = forms.ModelChoiceField(
+        queryset=Role._base_manager.none(),
+        required=False,
+        label=_("Role"),
+        widget=forms.Select(attrs={'class': 'form-select managed-role'}),
+    )
+    managed_scope = forms.ChoiceField(
+        choices=(
+            (SCOPE_EXPLICIT, _("Specific tenants")),
+            (RoleGrantScope.SCOPE_TENANT_GROUP, _("A tenant group + its descendants")),
+            (RoleGrantScope.SCOPE_ALL_MANAGED, _("All managed tenants")),
+        ),
+        initial=SCOPE_EXPLICIT,
+        required=False,
+        label=_("Coverage"),
+        widget=forms.Select(attrs={'class': 'form-select managed-scope'}),
+    )
+    scope_group = forms.ModelChoiceField(
+        queryset=TenantGroup._base_manager.none(),
+        required=False,
+        label=_("Tenant group"),
+        widget=forms.Select(attrs={'class': 'form-select managed-scope-group'}),
+    )
+    assigned_tenants = forms.ModelMultipleChoiceField(
+        queryset=Tenant._base_manager.none(),
+        required=False,
+        label=_("Specific tenants"),
+        widget=forms.SelectMultiple(attrs={'class': 'form-select managed-assigned-tenants'}),
+    )
 
-        def all(self):
-            return self._roles
+    def __init__(self, *args, owner=None, requesting_user=None, **kwargs):
+        super().__init__(*args, **kwargs)
+        self._owner = owner
+        self._requesting_user = requesting_user
+        if owner is None:
+            return
+        self.fields['role'].queryset = Role._base_manager.filter(
+            tenant=owner,
+            deleted_at__isnull=True,
+        ).order_by('name')
+        self.fields['scope_group'].queryset = TenantGroup._base_manager.filter(
+            deleted_at__isnull=True,
+        ).order_by('name')
+        self.fields['assigned_tenants'].queryset = Tenant._base_manager.filter(
+            managed_by=owner,
+            deleted_at__isnull=True,
+        ).order_by('name')
 
-    def __init__(self, roles):
-        self.roles = self._Manager(roles)
+    def clean(self):
+        cleaned = super().clean()
+        if cleaned.get('DELETE') or not cleaned.get('role'):
+            return cleaned
+
+        owner = self._owner
+        role = cleaned['role']
+        if owner is None or not owner.is_provider:
+            raise forms.ValidationError(_(
+                "Managed group grants require a managing provider tenant."
+            ))
+        if role.tenant_id != owner.pk:
+            self.add_error('role', _('The role must be owned by the group tenant.'))
+            return cleaned
+
+        scope = cleaned.get('managed_scope') or self.SCOPE_EXPLICIT
+        cleaned['managed_scope'] = scope
+        requested_tenant_ids = None
+        if scope == RoleGrantScope.SCOPE_TENANT_GROUP:
+            cleaned['assigned_tenants'] = []
+            scope_group = cleaned.get('scope_group')
+            if scope_group is None:
+                self.add_error('scope_group', _('Pick a tenant group.'))
+                return cleaned
+            requested_tenant_ids = set(
+                Tenant._base_manager.filter(
+                    managed_by=owner,
+                    group_id__in=get_descendant_tenant_group_ids(scope_group.pk),
+                    deleted_at__isnull=True,
+                ).values_list('pk', flat=True)
+            )
+        elif scope == self.SCOPE_EXPLICIT:
+            cleaned['scope_group'] = None
+            assigned = list(cleaned.get('assigned_tenants') or [])
+            if not assigned:
+                self.add_error('assigned_tenants', _('Pick at least one managed tenant.'))
+                return cleaned
+            if any(tenant.managed_by_id != owner.pk for tenant in assigned):
+                self.add_error(
+                    'assigned_tenants',
+                    _('Every selected tenant must be managed by the group owner.'),
+                )
+                return cleaned
+            requested_tenant_ids = {tenant.pk for tenant in assigned}
+        else:
+            cleaned['scope_group'] = None
+            cleaned['assigned_tenants'] = []
+
+        try:
+            validate_role_grant(
+                self._requesting_user,
+                role,
+                owner,
+                scope_type=scope,
+                requested_tenant_ids=requested_tenant_ids,
+            )
+        except forms.ValidationError as exc:
+            raise forms.ValidationError(exc.messages)
+        return cleaned
+
+
+class BaseGroupManagedRoleGrantFormSet(forms.BaseFormSet):
+    """Reject duplicate scope targets while allowing additive rows per role."""
+
+    def clean(self):
+        super().clean()
+        if any(self.errors):
+            return
+        signatures = set()
+        explicit_tenants_by_role = {}
+        row_count_by_role = {}
+        all_managed_roles = set()
+        for form in self.forms:
+            if not hasattr(form, 'cleaned_data'):
+                continue
+            cleaned = form.cleaned_data
+            if cleaned.get('DELETE') or not cleaned.get('role'):
+                continue
+            role_id = cleaned['role'].pk
+            scope = cleaned.get('managed_scope') or GroupManagedRoleGrantForm.SCOPE_EXPLICIT
+            row_count_by_role[role_id] = row_count_by_role.get(role_id, 0) + 1
+            if scope == RoleGrantScope.SCOPE_TENANT_GROUP:
+                signature = (role_id, scope, cleaned['scope_group'].pk)
+            elif scope == RoleGrantScope.SCOPE_ALL_MANAGED:
+                all_managed_roles.add(role_id)
+                signature = (role_id, scope, None)
+            else:
+                tenant_ids = {tenant.pk for tenant in cleaned.get('assigned_tenants') or []}
+                overlap = explicit_tenants_by_role.setdefault(role_id, set()) & tenant_ids
+                if overlap:
+                    raise forms.ValidationError(_(
+                        "The same role targets a managed tenant more than once."
+                    ))
+                explicit_tenants_by_role[role_id].update(tenant_ids)
+                signature = None
+            if signature is not None and signature in signatures:
+                raise forms.ValidationError(_('A managed grant scope is duplicated.'))
+            if signature is not None:
+                signatures.add(signature)
+        if any(row_count_by_role[role_id] > 1 for role_id in all_managed_roles):
+            raise forms.ValidationError(_(
+                "All managed tenants already covers every narrower scope for that role."
+            ))
+
+
+GroupManagedRoleGrantFormSet = forms.formset_factory(
+    GroupManagedRoleGrantForm,
+    formset=BaseGroupManagedRoleGrantFormSet,
+    extra=1,
+    can_delete=True,
+)
+
+GROUP_MANAGED_FORMSET_PREFIX = 'managed'
 
 
 class UserGroupForm(forms.ModelForm):
-    """Compatibility writer for a flat, tenant-owned phase-5 UserGroup.
+    """Edit a tenant-owned group through canonical RBAC aggregates.
 
-    It still writes the legacy M2Ms during comparison mode, whose signals create
-    GroupMembership/RoleGrant shadows. New invalid shapes are rejected: the
-    owner is mandatory, roles must be owner-owned, and every selected user must
-    have an active Membership in that owner.
+    The role picker authors own-tenant scopes; the managed formset adds explicit,
+    tenant-group, or all-managed scopes to the same per-role grant. Members are
+    tenant Membership rows, never global users. Manual group memberships are
+    reconciled here while directory-managed rows remain owned by their source.
     """
     name = forms.CharField(
         max_length=100,
@@ -498,16 +653,18 @@ class UserGroupForm(forms.ModelForm):
     roles = forms.ModelMultipleChoiceField(
         queryset=Role._base_manager.none(),
         required=False,
-        label=_("Roles"),
+        label=_("Roles in owning tenant"),
         widget=forms.SelectMultiple(attrs={'class': 'form-select'}),
-        help_text=_("Owner-owned roles applied inside the group's own tenant. Managed "
-                    "projections are configured on RoleGrant scopes."),
+        help_text=_("Owner-owned roles that apply inside the group's own tenant."),
     )
     members = forms.ModelMultipleChoiceField(
-        queryset=User.objects.none(),
+        queryset=Membership.objects.none(),
         required=False,
         label=_("Members"),
         widget=forms.SelectMultiple(attrs={'class': 'form-select'}),
+        help_text=_("Active memberships in the owning tenant can be added. Existing "
+                    "inactive rows remain visible; directory-managed rows must be "
+                    "removed through their identity source."),
     )
     tenant = forms.ModelChoiceField(
         queryset=Tenant._base_manager.none(),
@@ -528,159 +685,358 @@ class UserGroupForm(forms.ModelForm):
 
     @staticmethod
     def _role_label(role):
-        """Prefix each role choice with its owner while the legacy picker remains."""
-        return f"[{role.tenant.name}] {role.name}"
+        return role.name
+
+    @staticmethod
+    def _membership_label(membership):
+        user = membership.user
+        label = user.get_full_name().strip() or user.username
+        if user.email:
+            label = f"{label} ({user.email})"
+        if not membership.is_active:
+            label = _("%(member)s [inactive]") % {'member': label}
+        return label
 
     def __init__(self, *args, user=None, tenant=None, **kwargs):
-        # ``tenant`` remains accepted for call-site compatibility; authorization
-        # is derived from the explicit owner submitted on the group.
         self._requesting_user = user
         super().__init__(*args, **kwargs)
-        is_superuser = bool(self._requesting_user is not None and self._requesting_user.is_superuser)
-        # The compatibility form displays unscoped candidates, then clean()
-        # requires owner-owned roles and active owner Memberships.
-        self.fields['roles'].queryset = Role._base_manager.filter(
-            deleted_at__isnull=True,
-        ).select_related('tenant').order_by('tenant__name', 'name')
-        self.fields['roles'].label_from_instance = self._role_label
-        self.fields['members'].queryset = User.objects.all().order_by('username')
-        # Scope the owning-``tenant`` choice to tenants where the requesting user holds
-        # ``users.change_usergroup``: a group's tenant decides whose admins and whose SCIM
-        # token control it, so a group admin must not be able to hand a group to (or
-        # create one under) a tenant they do not administer. Superuser sees all tenants
-        # plus blank (= global group).
+        # ModelForm applies cleaned values to ``instance`` after ``clean()``.
+        # Keep the persisted activation state explicitly so reactivation can be
+        # treated as restoring every retained grant, not as a metadata-only edit.
+        self._initial_is_active = (
+            self.instance.is_active if self.instance.pk else None
+        )
+        is_superuser = bool(user is None or user.is_superuser)
+        self._submitted_owner_changed = False
+
         tenant_qs = Tenant._base_manager.filter(deleted_at__isnull=True).order_by('name')
-        if self._requesting_user is not None and not is_superuser:
-            manageable = [
-                t.pk for t in Tenant._base_manager.filter(
-                    pk__in=accessible_tenant_ids(self._requesting_user),
-                    deleted_at__isnull=True,
-                )
-                if self._requesting_user.has_perm('users.change_usergroup', obj=t)
+        if not is_superuser:
+            manageable_ids = [
+                candidate.pk
+                for candidate in tenant_qs.filter(pk__in=accessible_tenant_ids(user))
+                if user.has_perm('users.add_usergroup', obj=candidate)
             ]
-            # Preserve the current value when editing so the field validates: a non-superuser
-            # editing a group whose tenant they cannot manage still sees it (the change
-            # guard in clean() enforces they may not alter it).
-            current_tenant_id = getattr(self.instance, 'tenant_id', None)
-            if current_tenant_id is not None and current_tenant_id not in manageable:
-                manageable.append(current_tenant_id)
-            tenant_qs = tenant_qs.filter(pk__in=manageable)
-        self.fields['tenant'].queryset = tenant_qs
-        # Blank tenant = global group, superuser-only. The core/apps.py BaseForm patch
-        # force-sets tenant.required=True during super().__init__; re-decide it here:
-        # superusers (and guard-exempt programmatic use without a user) may leave it
-        # blank, non-superusers must pick a tenant — except when re-saving an existing
-        # global group, where keeping blank is a no-op (changes are guarded in clean()).
-        self.fields['tenant'].required = True
+            tenant_qs = tenant_qs.filter(pk__in=manageable_ids)
+
+        owner = None
+        if self.instance.pk:
+            owner = self.instance.tenant
+            if self.is_bound:
+                raw_owner = self.data.get('tenant')
+                self._submitted_owner_changed = (
+                    raw_owner not in (None, '') and str(raw_owner) != str(owner.pk)
+                )
+            self.fields['tenant'].queryset = Tenant._base_manager.filter(pk=owner.pk)
+            self.fields['tenant'].initial = owner.pk
+            self.fields['tenant'].disabled = True
+        else:
+            self.fields['tenant'].queryset = tenant_qs
+            if self.is_bound:
+                try:
+                    owner = tenant_qs.filter(pk=self.data.get('tenant')).first()
+                except (TypeError, ValueError):
+                    owner = None
+            elif tenant is not None and tenant_qs.filter(pk=tenant.pk).exists():
+                owner = tenant
+                self.fields['tenant'].initial = tenant.pk
+
+        if owner is not None:
+            self.fields['roles'].queryset = Role._base_manager.filter(
+                tenant=owner,
+                deleted_at__isnull=True,
+            ).select_related('tenant').order_by('name')
+            membership_qs = Membership.objects.filter(tenant=owner)
+            if self.instance.pk:
+                membership_qs = membership_qs.filter(
+                    Q(is_active=True) | Q(group_memberships__user_group=self.instance)
+                ).distinct()
+            else:
+                membership_qs = membership_qs.filter(is_active=True)
+            self.fields['members'].queryset = membership_qs.select_related(
+                'user', 'tenant',
+            ).order_by(
+                'user__last_name', 'user__first_name', 'user__username',
+            )
+        self.fields['roles'].label_from_instance = self._role_label
+        self.fields['members'].label_from_instance = self._membership_label
+
+        managed_initial = []
+        if self.instance.pk:
+            self.fields['roles'].initial = list(
+                self.instance.role_grants.filter(
+                    scopes__scope_type=RoleGrantScope.SCOPE_OWN,
+                ).values_list('role_id', flat=True)
+            )
+            self.fields['members'].initial = list(
+                self.instance.group_memberships.values_list('membership_id', flat=True)
+            )
+            managed_initial = self._managed_initial()
+
+        self.managed_formset = self._build_managed_formset(owner, managed_initial)
 
         self.helper = FormHelper(self)
         self.helper.form_method = 'post'
-        self.helper.form_tag = True
+        self.helper.form_tag = False
+        self.helper.disable_csrf = True
         self.helper.layout = Layout(
-            Fieldset(str(_("Group details")), 'name', 'description', 'is_active'),
-            Fieldset(str(_("Access grants")), 'roles', 'members'),
-            Fieldset(str(_("Scope")), 'tenant'),
+            Fieldset(
+                str(_("Group details")),
+                'tenant', 'name', 'description', 'is_active',
+            ),
+            Fieldset(str(_("Owning tenant roles")), 'roles'),
+            Fieldset(str(_("Members")), 'members'),
         )
-        add_standard_buttons(self.helper, self.instance, 'users:usergroup_list')
+
+    def _managed_initial(self):
+        rows = []
+        grants = self.instance.role_grants.select_related('role').prefetch_related('scopes')
+        for grant in grants:
+            scopes = [
+                scope for scope in grant.scopes.all()
+                if scope.scope_type != RoleGrantScope.SCOPE_OWN
+            ]
+            explicit_tenant_ids = [
+                scope.tenant_id
+                for scope in scopes
+                if scope.scope_type == RoleGrantScope.SCOPE_TENANT and scope.tenant_id
+            ]
+            if explicit_tenant_ids:
+                rows.append({
+                    'id': grant.pk,
+                    'role': grant.role_id,
+                    'managed_scope': GroupManagedRoleGrantForm.SCOPE_EXPLICIT,
+                    'assigned_tenants': explicit_tenant_ids,
+                })
+            for scope in scopes:
+                if scope.scope_type == RoleGrantScope.SCOPE_TENANT_GROUP:
+                    rows.append({
+                        'id': grant.pk,
+                        'role': grant.role_id,
+                        'managed_scope': RoleGrantScope.SCOPE_TENANT_GROUP,
+                        'scope_group': scope.tenant_group_id,
+                    })
+                elif scope.scope_type == RoleGrantScope.SCOPE_ALL_MANAGED:
+                    rows.append({
+                        'id': grant.pk,
+                        'role': grant.role_id,
+                        'managed_scope': RoleGrantScope.SCOPE_ALL_MANAGED,
+                    })
+        return rows
+
+    def _build_managed_formset(self, owner, initial):
+        if owner is None or not owner.is_provider:
+            return None
+        form_kwargs = {
+            'owner': owner,
+            'requesting_user': self._requesting_user,
+        }
+        if self.is_bound:
+            return GroupManagedRoleGrantFormSet(
+                self.data,
+                self.files,
+                prefix=GROUP_MANAGED_FORMSET_PREFIX,
+                form_kwargs=form_kwargs,
+            )
+        return GroupManagedRoleGrantFormSet(
+            initial=initial,
+            prefix=GROUP_MANAGED_FORMSET_PREFIX,
+            form_kwargs=form_kwargs,
+        )
+
+    def is_valid(self):
+        form_valid = super().is_valid()
+        formset_valid = True
+        if self.managed_formset is not None:
+            formset_valid = self.managed_formset.is_valid()
+        return form_valid and formset_valid
 
     def clean(self):
         cleaned_data = super().clean()
-        user = self._requesting_user
-        is_superuser = bool(user is not None and user.is_superuser)
         owner = cleaned_data.get('tenant')
 
         if owner is None:
             self.add_error('tenant', _('Every user group must have an owning tenant.'))
-        else:
-            foreign_roles = [
-                role for role in (cleaned_data.get('roles') or [])
-                if role.tenant_id != owner.pk
-            ]
-            if foreign_roles:
-                self.add_error(
-                    'roles',
-                    _('A group may carry only roles owned by its owning tenant.'),
+            return cleaned_data
+
+        if self.instance.pk and (
+            owner.pk != self.instance.tenant_id or self._submitted_owner_changed
+        ):
+            self.add_error('tenant', _('A user group owner cannot be changed.'))
+
+        roles = list(cleaned_data.get('roles') or [])
+        if any(role.tenant_id != owner.pk for role in roles):
+            self.add_error(
+                'roles',
+                _('A group may carry only roles owned by its owning tenant.'),
+            )
+
+        memberships = list(cleaned_data.get('members') or [])
+        existing_member_ids = set(
+            self.instance.group_memberships.values_list('membership_id', flat=True)
+            if self.instance.pk else []
+        )
+        if any(
+            membership.tenant_id != owner.pk
+            or (not membership.is_active and membership.pk not in existing_member_ids)
+            for membership in memberships
+        ):
+            self.add_error(
+                'members',
+                _('Every group member must be an active Membership in the owning tenant.'),
+            )
+
+        existing_own_role_ids = set(
+            self.instance.role_grants.filter(
+                scopes__scope_type=RoleGrantScope.SCOPE_OWN,
+            ).values_list('role_id', flat=True)
+            if self.instance.pk else []
+        )
+        selected_role_ids = {role.pk for role in roles}
+        selected_member_ids = {membership.pk for membership in memberships}
+
+        # A new role affects every existing member; a new member inherits every
+        # selected grant. Reactivating the group restores every retained role to
+        # every existing member, so all selected own-scope roles must pass the
+        # same escalation guard even though their grant rows already existed.
+        role_ids_to_validate = selected_role_ids - existing_own_role_ids
+        reactivating = bool(
+            self.instance.pk
+            and self._initial_is_active is False
+            and cleaned_data.get('is_active')
+        )
+        if reactivating or selected_member_ids - existing_member_ids:
+            role_ids_to_validate = selected_role_ids
+
+        role_by_id = {role.pk: role for role in roles}
+        errors = []
+        for role_id in role_ids_to_validate:
+            try:
+                validate_role_grant(
+                    self._requesting_user,
+                    role_by_id[role_id],
+                    owner,
+                    scope_type=RoleGrantScope.SCOPE_OWN,
                 )
-            member_ids = [member.pk for member in (cleaned_data.get('members') or [])]
-            active_member_ids = set(Membership.objects.filter(
-                tenant=owner,
-                user_id__in=member_ids,
-                is_active=True,
-            ).values_list('user_id', flat=True))
-            if set(member_ids) - active_member_ids:
-                self.add_error(
-                    'members',
-                    _('Every group member must have an active Membership in the owning tenant.'),
-                )
-
-        # Escalation guard (defence in depth; group management is admin-gated in the
-        # views): a non-superuser may attach a role only if they already hold every one
-        # of its permissions in the group's owning tenant.
-        for role in (cleaned_data.get('roles') or []):
-            validate_permission_grant(user, role.permissions or [], role.owner)
-
-        # Ownership guard: setting/changing the owning ``tenant`` re-keys which tenant's
-        # admins and SCIM token control the group. A non-superuser may only pick a tenant
-        # where they hold ``users.change_usergroup``, and when EDITING must hold it for
-        # BOTH the old and the new value — otherwise they could move a group they don't
-        # fully control onto a tenant they do. A blank (global) side is superuser-only.
-        # A no-op re-save (tenant untouched) grants nothing new and is not blocked.
-        if not is_superuser and user is not None and 'tenant' in cleaned_data:
-            new_tenant = cleaned_data.get('tenant')
-            old_tenant = self.instance.tenant if self.instance.pk else None
-            if not self.instance.pk:
-                if new_tenant is None:
-                    self.add_error('tenant', _(
-                        "Only superusers can create global user groups."
-                    ))
-                elif not user.has_perm('users.change_usergroup', obj=new_tenant):
-                    self.add_error('tenant', _(
-                        "You do not have permission to manage user groups for this tenant."
-                    ))
-            elif getattr(old_tenant, 'pk', None) != getattr(new_tenant, 'pk', None):
-                if new_tenant is None or not user.has_perm(
-                    'users.change_usergroup', obj=new_tenant,
-                ):
-                    self.add_error('tenant', _(
-                        "You do not have permission to manage user groups for this tenant."
-                    ))
-                elif old_tenant is None or not user.has_perm(
-                    'users.change_usergroup', obj=old_tenant,
-                ):
-                    self.add_error('tenant', _(
-                        "You do not have permission to move this group away from its "
-                        "current owning tenant."
-                    ))
-
-        # Member-grant escalation guard (§3-C): adding a member confers every role the
-        # group carries. If the group carries roles (existing or being set on this save)
-        # and members are being set/added, validate each carried role against the actor's
-        # held permissions — the same check enforced in UserGroupAssignUsersView, so the
-        # form write path is covered too. Reuse the shared helper for parity.
-        if not is_superuser and user is not None and cleaned_data.get('members'):
-            group_for_check = self._group_for_membership_check(cleaned_data)
-            if group_for_check is not None:
-                try:
-                    validate_group_membership_grant(user, group_for_check)
-                except forms.ValidationError as exc:
-                    self.add_error('members', exc)
+            except forms.ValidationError as exc:
+                errors.extend(exc.messages)
+        if errors:
+            self.add_error(None, forms.ValidationError(list(dict.fromkeys(errors))))
 
         return cleaned_data
 
-    def _group_for_membership_check(self, cleaned_data):
-        """Return an object exposing a ``roles.all()`` accessor reflecting the roles the
-        group will carry after this save, for ``validate_group_membership_grant``.
+    def save(self, commit=True):
+        with transaction.atomic():
+            group = super().save(commit=commit)
+            if commit:
+                self._sync_group_aggregate(group)
+            else:
+                django_save_m2m = self.save_m2m
 
-        On create the group has no pk yet, so ``self.instance.roles`` is empty — use the
-        submitted ``roles`` instead. On edit, the submitted ``roles`` supersede the stored
-        set when the field is present; otherwise fall back to the persisted roles.
-        """
-        if 'roles' in cleaned_data:
-            roles = list(cleaned_data.get('roles') or [])
-            return _RolesHolder(roles)
-        if self.instance.pk:
-            return self.instance
-        return None
+                def save_m2m():
+                    django_save_m2m()
+                    self._sync_group_aggregate(self.instance)
+
+                self.save_m2m = save_m2m
+        return group
+
+    def _sync_group_aggregate(self, group):
+        with transaction.atomic():
+            self._sync_role_grants(group)
+            self._sync_manual_memberships(group)
+
+    def _sync_role_grants(self, group):
+        own_roles = list(self.cleaned_data.get('roles') or [])
+        roles_by_id = {role.pk: role for role in own_roles}
+        desired_scopes = {
+            role.pk: {(RoleGrantScope.SCOPE_OWN, None, None)}
+            for role in own_roles
+        }
+
+        if self.managed_formset is not None:
+            for form in self.managed_formset.forms:
+                if not hasattr(form, 'cleaned_data'):
+                    continue
+                cleaned = form.cleaned_data
+                if cleaned.get('DELETE') or not cleaned.get('role'):
+                    continue
+                role = cleaned['role']
+                roles_by_id[role.pk] = role
+                role_scopes = desired_scopes.setdefault(role.pk, set())
+                scope = (
+                    cleaned.get('managed_scope')
+                    or GroupManagedRoleGrantForm.SCOPE_EXPLICIT
+                )
+                if scope == RoleGrantScope.SCOPE_ALL_MANAGED:
+                    role_scopes.add((RoleGrantScope.SCOPE_ALL_MANAGED, None, None))
+                elif scope == RoleGrantScope.SCOPE_TENANT_GROUP:
+                    role_scopes.add((
+                        RoleGrantScope.SCOPE_TENANT_GROUP,
+                        None,
+                        cleaned['scope_group'].pk,
+                    ))
+                else:
+                    role_scopes.update(
+                        (RoleGrantScope.SCOPE_TENANT, tenant.pk, None)
+                        for tenant in cleaned.get('assigned_tenants') or []
+                    )
+
+        existing = {
+            grant.role_id: grant
+            for grant in group.role_grants.select_related('role').prefetch_related('scopes')
+        }
+        for role_id, grant in existing.items():
+            if role_id not in desired_scopes:
+                grant.delete()
+
+        for role_id, scope_keys in desired_scopes.items():
+            grant = existing.get(role_id)
+            if grant is None:
+                grant = RoleGrant(
+                    user_group=group,
+                    role=roles_by_id[role_id],
+                    granted_by=self._requesting_user,
+                )
+                grant.save()
+
+            existing_scopes = {
+                (scope.scope_type, scope.tenant_id, scope.tenant_group_id): scope
+                for scope in grant.scopes.all()
+            }
+            for key, scope in existing_scopes.items():
+                if key not in scope_keys:
+                    scope.delete()
+            for scope_type, tenant_id, tenant_group_id in scope_keys:
+                if (scope_type, tenant_id, tenant_group_id) in existing_scopes:
+                    continue
+                RoleGrantScope.objects.create(
+                    role_grant=grant,
+                    scope_type=scope_type,
+                    tenant_id=tenant_id,
+                    tenant_group_id=tenant_group_id,
+                )
+
+    def _sync_manual_memberships(self, group):
+        memberships = list(self.cleaned_data.get('members') or [])
+        selected_ids = {membership.pk for membership in memberships}
+        existing = {
+            row.membership_id: row
+            for row in group.group_memberships.select_related('membership')
+        }
+        for membership_id, row in existing.items():
+            if (
+                membership_id not in selected_ids
+                and row.source == GroupMembership.SOURCE_MANUAL
+            ):
+                row.delete()
+        for membership in memberships:
+            if membership.pk in existing:
+                continue
+            GroupMembership.objects.create(
+                user_group=group,
+                membership=membership,
+                source=GroupMembership.SOURCE_MANUAL,
+                added_by=self._requesting_user,
+            )
 
 
 class UserGroupFilterForm(FilterForm):
@@ -689,19 +1045,19 @@ class UserGroupFilterForm(FilterForm):
 
 class UserGroupAssignUsersForm(forms.Form):
     """Pick active members of the group's owning tenant."""
-    users = forms.ModelMultipleChoiceField(
-        queryset=User.objects.all().order_by('username'),
+    memberships = forms.ModelMultipleChoiceField(
+        queryset=Membership.objects.none(),
         required=True,
-        label=_("Users"),
+        label=_("Tenant memberships"),
         widget=forms.SelectMultiple(attrs={'class': 'form-select'}),
     )
 
     def __init__(self, *args, group, **kwargs):
         super().__init__(*args, **kwargs)
-        if group.tenant_id is None:
-            self.fields['users'].queryset = User.objects.none()
-            return
-        self.fields['users'].queryset = User.objects.filter(
-            memberships__tenant_id=group.tenant_id,
-            memberships__is_active=True,
-        ).distinct().order_by('username')
+        self.fields['memberships'].queryset = Membership.objects.filter(
+            tenant_id=group.tenant_id,
+            is_active=True,
+        ).select_related('user', 'tenant').order_by(
+            'user__last_name', 'user__first_name', 'user__username',
+        )
+        self.fields['memberships'].label_from_instance = UserGroupForm._membership_label

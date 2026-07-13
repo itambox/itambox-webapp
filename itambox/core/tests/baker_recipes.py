@@ -1,5 +1,12 @@
 from model_bakery.recipe import Recipe, foreign_key
-from organization.models import Tenant, TenantGroup, Role, Membership, RoleAssignment
+from organization.models import (
+    Membership,
+    Role,
+    RoleGrant,
+    RoleGrantScope,
+    Tenant,
+    TenantGroup,
+)
 from django.contrib.auth import get_user_model
 
 User = get_user_model()
@@ -30,18 +37,22 @@ user = Recipe(
     email="testuser@example.com"
 )
 
-# A Membership is just the (user, tenant) anchor; what the user may DO is a
-# separate RoleAssignment row. Callers that need a grant use the
-# `role_assignment` recipe below, or `core.tests.mixins.grant(...)`.
+# A Membership is just the (user, tenant) anchor. Callers needing effective
+# access should normally use ``core.tests.mixins.grant(...)`` so a scope is added.
 tenant_membership = Recipe(
     Membership,
     user=foreign_key(user),
     tenant=foreign_key(tenant),
 )
 
-role_assignment = Recipe(
-    RoleAssignment,
+role_grant = Recipe(
+    RoleGrant,
     membership=foreign_key(tenant_membership),
     role=foreign_key(tenant_role),
-    reach=RoleAssignment.REACH_OWN,
+)
+
+role_grant_scope = Recipe(
+    RoleGrantScope,
+    role_grant=foreign_key(role_grant),
+    scope_type=RoleGrantScope.SCOPE_OWN,
 )

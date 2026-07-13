@@ -1,19 +1,5 @@
-"""Regression tests for ``core.integrity.check_rbac_grants`` and the
-``integrity_report`` management command (data-model remediation plan, phase 1).
+"""Regression coverage for canonical RoleGrant integrity reporting."""
 
-These tests operate purely at the model layer (no HTTP requests, no active
-tenant/user context) so the tenant-scoping managers on Role/Tenant/TenantGroup
-resolve unscoped (see core/managers.py::TenantScopingQuerySet.filter_by_tenant:
-with no current user bound, the "fail closed" branch is skipped and the full
-queryset is returned) — exactly like ``check_rbac_grants`` itself, which reads
-everything through ``_base_manager``/unscoped managers by design.
-
-Anomalous rows that the model layer's own ``clean()`` would reject on create
-are seeded by creating a VALID row first and mutating it into the anomalous
-shape via ``QuerySet.update()``, which bypasses ``save()``/the pre_save
-validator (see ``core/tests/mixins.py`` conventions and neighbouring RBAC
-tests such as ``organization/tests/test_managed_only_group_access.py``).
-"""
 import json
 import tempfile
 from io import StringIO
@@ -25,27 +11,29 @@ from django.test import TestCase
 from django.utils import timezone
 
 from core.integrity import (
-    CLASS_AMBIGUOUS,
     CLASS_INVALID,
     CLASS_PROVIDER_MANAGED,
     check_rbac_grants,
 )
 from core.managers import set_current_membership, set_current_tenant, set_current_tenant_group
 from core.tests.mixins import grant
-from organization.models import Membership, Role, RoleAssignment, Tenant, TenantGroup
-from users.models import UserGroup
+from organization.models import (
+    Membership,
+    Role,
+    RoleGrant,
+    RoleGrantScope,
+    Tenant,
+)
+from users.models import GroupMembership, UserGroup
 
 User = get_user_model()
 
 
 def _findings_for(findings, model_label, pk):
-    return [f for f in findings if f.model == model_label and f.pk == pk]
+    return [finding for finding in findings if finding.model == model_label and finding.pk == pk]
 
 
 class _ContextResetMixin:
-    """Belt-and-suspenders context reset (conftest already does this after
-    every test; resetting on entry too keeps these tests order-independent)."""
-
     def setUp(self):
         super().setUp()
         set_current_tenant(None)
@@ -59,262 +47,250 @@ class _ContextResetMixin:
         super().tearDown()
 
 
-# --------------------------------------------------------------------------- RoleAssignment
-class RoleAssignmentRBACCheckTests(_ContextResetMixin, TestCase):
-    """check_rbac_grants(): every RoleAssignment shape from the ADR-0001 target
-    semantics, plus the anomalies that fall outside it."""
+class RoleGrantRBACCheckTests(_ContextResetMixin, TestCase):
+    def _matches(self, findings, role_grant):
+        return _findings_for(findings, 'organization.RoleGrant', role_grant.pk)
 
-    def _matches(self, findings, assignment):
-        return _findings_for(findings, 'organization.RoleAssignment', assignment.pk)
+    def test_own_scope_role_owned_by_membership_tenant_is_clean(self):
+        tenant = Tenant.objects.create(name='RG Own', slug='rg-own')
+        role = Role.objects.create(tenant=tenant, name='Viewer', permissions=[])
+        user = User.objects.create_user(username='rg_own', password='pw')
+        role_grant = grant(user, tenant, role)
 
-    # (a) own-reach grant of a role owned by the membership tenant -> NO finding.
-    def test_own_reach_role_owned_by_membership_tenant_is_clean(self):
-        tenant = Tenant.objects.create(name='RA Own A', slug='ra-own-a')
-        role = Role.objects.create(tenant=tenant, name='Own Role A', permissions=[])
-        user = User.objects.create_user(username='ra_own_a', password='pw')
-        assignment = grant(user, tenant, role)
+        self.assertEqual(self._matches(check_rbac_grants(), role_grant), [])
 
-        findings = check_rbac_grants()
-
-        self.assertEqual(self._matches(findings, assignment), [])
-
-    # (b) own-reach grant of a provider-owned shared role into a managed tenant -> NO finding.
-    def test_own_reach_shared_role_into_managed_tenant_is_clean(self):
-        provider = Tenant.objects.create(name='RA Prov B', slug='ra-prov-b', is_provider=True)
+    def test_shared_provider_role_on_managed_membership_is_clean(self):
+        provider = Tenant.objects.create(name='RG Provider', slug='rg-provider', is_provider=True)
         managed = Tenant.objects.create(
-            name='RA Managed B', slug='ra-managed-b', managed_by=provider,
+            name='RG Managed', slug='rg-managed', managed_by=provider,
         )
         role = Role.objects.create(
-            tenant=provider, name='Shared Role B', shared_with_managed=True, permissions=[],
+            tenant=provider,
+            name='Shared Viewer',
+            shared_with_managed=True,
+            permissions=[],
         )
-        user = User.objects.create_user(username='ra_shared_b', password='pw')
-        # Own-reach grant on a membership anchored in the MANAGED tenant.
-        assignment = grant(user, managed, role)
+        user = User.objects.create_user(username='rg_shared', password='pw')
+        role_grant = grant(user, managed, role)
 
-        findings = check_rbac_grants()
+        self.assertEqual(self._matches(check_rbac_grants(), role_grant), [])
 
-        self.assertEqual(self._matches(findings, assignment), [])
-
-    # (c) same as (b) but shared_with_managed=False -> finding.
-    def test_own_reach_non_shared_role_into_managed_tenant_is_flagged(self):
-        provider = Tenant.objects.create(name='RA Prov C', slug='ra-prov-c', is_provider=True)
+    def test_unshared_provider_role_on_managed_membership_is_flagged(self):
+        provider = Tenant.objects.create(name='RG Provider B', slug='rg-provider-b', is_provider=True)
         managed = Tenant.objects.create(
-            name='RA Managed C', slug='ra-managed-c', managed_by=provider,
+            name='RG Managed B', slug='rg-managed-b', managed_by=provider,
         )
-        role = Role.objects.create(
-            tenant=provider, name='Unshared Role C', shared_with_managed=False, permissions=[],
+        local_role = Role.objects.create(tenant=managed, name='Local Viewer', permissions=[])
+        unshared_role = Role.objects.create(
+            tenant=provider,
+            name='Unshared Viewer',
+            shared_with_managed=False,
+            permissions=[],
         )
-        user = User.objects.create_user(username='ra_unshared_c', password='pw')
-        assignment = grant(user, managed, role)
+        user = User.objects.create_user(username='rg_unshared', password='pw')
+        role_grant = grant(user, managed, local_role)
+        RoleGrant.objects.filter(pk=role_grant.pk).update(role=unshared_role)
 
-        findings = check_rbac_grants()
+        matches = self._matches(check_rbac_grants(), role_grant)
 
-        matches = self._matches(findings, assignment)
         self.assertEqual(len(matches), 1)
-        self.assertEqual(matches[0].check, 'rbac_grant_inconsistent')
         self.assertEqual(matches[0].classification, CLASS_PROVIDER_MANAGED)
         self.assertFalse(matches[0].details['shared_with_managed'])
 
-    # (d) own-reach grant of a role owned by a completely unrelated tenant -> unrelated-invalid.
-    def test_own_reach_role_from_unrelated_tenant_is_invalid(self):
-        home = Tenant.objects.create(name='RA Home D', slug='ra-home-d')
-        other = Tenant.objects.create(name='RA Unrelated D', slug='ra-unrelated-d')
-        role = Role.objects.create(tenant=other, name='Foreign Role D', permissions=[])
-        user = User.objects.create_user(username='ra_unrelated_d', password='pw')
-        assignment = grant(user, home, role)
+    def test_unrelated_role_owner_is_invalid(self):
+        home = Tenant.objects.create(name='RG Home', slug='rg-home')
+        other = Tenant.objects.create(name='RG Other', slug='rg-other')
+        home_role = Role.objects.create(tenant=home, name='Home Viewer', permissions=[])
+        foreign_role = Role.objects.create(tenant=other, name='Foreign Viewer', permissions=[])
+        user = User.objects.create_user(username='rg_unrelated', password='pw')
+        role_grant = grant(user, home, home_role)
+        RoleGrant.objects.filter(pk=role_grant.pk).update(role=foreign_role)
 
-        findings = check_rbac_grants()
+        matches = self._matches(check_rbac_grants(), role_grant)
 
-        matches = self._matches(findings, assignment)
-        self.assertEqual(len(matches), 1)
-        self.assertEqual(matches[0].check, 'rbac_grant_inconsistent')
-        self.assertEqual(matches[0].classification, CLASS_INVALID)
-        self.assertEqual(CLASS_INVALID, 'unrelated-invalid')
-
-    # (e) managed-reach assignment whose membership tenant is NOT a provider -> finding.
-    def test_managed_reach_with_non_provider_membership_tenant_is_flagged(self):
-        tenant = Tenant.objects.create(name='RA NonProv E', slug='ra-nonprov-e')
-        role = Role.objects.create(tenant=tenant, name='Role E', permissions=[])
-        user = User.objects.create_user(username='ra_nonprov_e', password='pw')
-        # Create as a VALID own-reach grant first (clean() forbids reach=managed
-        # on a non-provider membership tenant at create time), then mutate.
-        assignment = grant(user, tenant, role)
-        RoleAssignment.objects.filter(pk=assignment.pk).update(
-            reach=RoleAssignment.REACH_MANAGED,
-        )
-
-        findings = check_rbac_grants()
-
-        matches = self._matches(findings, assignment)
         self.assertEqual(len(matches), 1)
         self.assertEqual(matches[0].classification, CLASS_INVALID)
-        self.assertIn('membership tenant is not a provider', matches[0].summary)
 
-    # (f) managed-reach assignment whose role belongs to a managed tenant, not the provider.
-    def test_managed_reach_role_owned_by_managed_tenant_is_flagged(self):
-        provider = Tenant.objects.create(name='RA Prov F', slug='ra-prov-f', is_provider=True)
-        managed = Tenant.objects.create(
-            name='RA Managed F', slug='ra-managed-f', managed_by=provider,
-        )
-        role = Role.objects.create(tenant=managed, name='Role F', permissions=[])
-        user = User.objects.create_user(username='ra_provrole_f', password='pw')
-        assignment = grant(user, provider, role, reach=RoleAssignment.REACH_MANAGED)
+    def test_managed_scope_on_non_provider_principal_is_flagged(self):
+        tenant = Tenant.objects.create(name='RG Non-provider', slug='rg-non-provider')
+        role = Role.objects.create(tenant=tenant, name='Viewer', permissions=[])
+        user = User.objects.create_user(username='rg_non_provider', password='pw')
+        role_grant = grant(user, tenant, role)
+        role_grant.scopes.update(scope_type=RoleGrantScope.SCOPE_ALL_MANAGED)
 
-        findings = check_rbac_grants()
+        matches = self._matches(check_rbac_grants(), role_grant)
 
-        matches = self._matches(findings, assignment)
         self.assertEqual(len(matches), 1)
-        self.assertIn(
-            'managed-reach role must be owned by the granting provider', matches[0].summary,
-        )
+        self.assertEqual(matches[0].classification, CLASS_INVALID)
+        self.assertIn('principal tenant is not a provider', matches[0].summary)
 
-    # (g) managed-reach explicit scope whose assigned_tenants includes a tenant no
-    # longer managed by the provider -> finding mentioning stale coverage.
-    def test_managed_reach_explicit_scope_with_stale_tenant_is_flagged(self):
-        provider = Tenant.objects.create(name='RA Prov G', slug='ra-prov-g', is_provider=True)
+    def test_managed_scope_role_must_be_provider_owned(self):
+        provider = Tenant.objects.create(name='RG Provider C', slug='rg-provider-c', is_provider=True)
         managed = Tenant.objects.create(
-            name='RA Managed G', slug='ra-managed-g', managed_by=provider,
+            name='RG Managed C', slug='rg-managed-c', managed_by=provider,
         )
-        role = Role.objects.create(
-            tenant=provider, name='Role G', shared_with_managed=True, permissions=[],
+        provider_role = Role.objects.create(tenant=provider, name='Provider Viewer', permissions=[])
+        customer_role = Role.objects.create(tenant=managed, name='Customer Viewer', permissions=[])
+        user = User.objects.create_user(username='rg_wrong_role', password='pw')
+        role_grant = grant(
+            user,
+            provider,
+            provider_role,
+            reach=RoleGrant.REACH_MANAGED,
+            managed_scope=RoleGrantScope.SCOPE_ALL_MANAGED,
         )
-        user = User.objects.create_user(username='ra_stale_g', password='pw')
-        assignment = grant(
-            user, provider, role,
-            reach=RoleAssignment.REACH_MANAGED,
-            managed_scope=RoleAssignment.SCOPE_EXPLICIT,
+        RoleGrant.objects.filter(pk=role_grant.pk).update(role=customer_role)
+
+        matches = self._matches(check_rbac_grants(), role_grant)
+
+        self.assertEqual(len(matches), 1)
+        self.assertIn('managed-scope role must be owned by the granting provider', matches[0].summary)
+
+    def test_explicit_target_no_longer_managed_is_flagged(self):
+        provider = Tenant.objects.create(name='RG Provider D', slug='rg-provider-d', is_provider=True)
+        managed = Tenant.objects.create(
+            name='RG Managed D', slug='rg-managed-d', managed_by=provider,
+        )
+        role = Role.objects.create(tenant=provider, name='Scoped Viewer', permissions=[])
+        user = User.objects.create_user(username='rg_stale', password='pw')
+        role_grant = grant(
+            user,
+            provider,
+            role,
+            reach=RoleGrant.REACH_MANAGED,
+            managed_scope=RoleGrantScope.SCOPE_TENANT,
             assigned_tenants=[managed],
         )
-        # The provider no longer manages this tenant, but the grant's explicit
-        # coverage still references it.
         Tenant._base_manager.filter(pk=managed.pk).update(managed_by=None)
 
-        findings = check_rbac_grants()
+        matches = self._matches(check_rbac_grants(), role_grant)
 
-        matches = self._matches(findings, assignment)
         self.assertEqual(len(matches), 1)
         self.assertIn('no longer managed', matches[0].summary)
         self.assertEqual(matches[0].details['stale_tenant_ids'], [managed.pk])
 
-    # (h) tenant_group scope with scope_group=NULL -> finding.
-    def test_managed_reach_tenant_group_scope_without_group_is_flagged(self):
-        provider = Tenant.objects.create(name='RA Prov H', slug='ra-prov-h', is_provider=True)
-        group = TenantGroup.objects.create(name='RA Group H', slug='ra-group-h')
-        role = Role.objects.create(tenant=provider, name='Role H', permissions=[])
-        user = User.objects.create_user(username='ra_group_h', password='pw')
-        assignment = grant(
-            user, provider, role,
-            reach=RoleAssignment.REACH_MANAGED,
-            managed_scope=RoleAssignment.SCOPE_TENANT_GROUP,
-            scope_group=group,
-        )
-        RoleAssignment.objects.filter(pk=assignment.pk).update(scope_group=None)
+    def test_scope_less_grant_is_flagged(self):
+        tenant = Tenant.objects.create(name='RG Scope-less', slug='rg-scope-less')
+        role = Role.objects.create(tenant=tenant, name='Viewer', permissions=[])
+        user = User.objects.create_user(username='rg_scope_less', password='pw')
+        membership = Membership.objects.create(user=user, tenant=tenant)
+        role_grant = RoleGrant.objects.create(membership=membership, role=role)
 
-        findings = check_rbac_grants()
+        matches = self._matches(check_rbac_grants(), role_grant)
 
-        matches = self._matches(findings, assignment)
         self.assertEqual(len(matches), 1)
-        self.assertIn('tenant_group scope without a scope group', matches[0].summary)
+        self.assertIn('has no scope', matches[0].summary)
 
-    # Soft-deleted roles must not produce findings even when the underlying
-    # grant shape is otherwise anomalous.
-    def test_soft_deleted_role_suppresses_the_finding(self):
-        home = Tenant.objects.create(name='RA Home I', slug='ra-home-i')
-        other = Tenant.objects.create(name='RA Unrelated I', slug='ra-unrelated-i')
-        role = Role.objects.create(tenant=other, name='Foreign Role I', permissions=[])
-        user = User.objects.create_user(username='ra_softdel_i', password='pw')
-        assignment = grant(user, home, role)
+    def test_elevated_direct_grant_without_metadata_is_flagged(self):
+        tenant = Tenant.objects.create(name='RG Elevated', slug='rg-elevated')
+        role = Role.objects.create(tenant=tenant, name='Viewer', permissions=[])
+        user = User.objects.create_user(username='rg_elevated', password='pw')
+        role_grant = grant(user, tenant, role)
+        Role._base_manager.filter(pk=role.pk).update(
+            permissions=['organization.change_tenant'],
+        )
 
-        findings_before = check_rbac_grants()
-        self.assertEqual(len(self._matches(findings_before, assignment)), 1)
+        matches = self._matches(check_rbac_grants(), role_grant)
 
-        Role._base_manager.filter(pk=role.pk).update(deleted_at=timezone.now())
+        self.assertEqual(len(matches), 1)
+        self.assertIn('lacks a reason or expiration', matches[0].summary)
 
-        findings_after = check_rbac_grants()
-        self.assertEqual(self._matches(findings_after, assignment), [])
+    def test_soft_deleted_role_suppresses_finding(self):
+        home = Tenant.objects.create(name='RG Home E', slug='rg-home-e')
+        other = Tenant.objects.create(name='RG Other E', slug='rg-other-e')
+        home_role = Role.objects.create(tenant=home, name='Home Viewer', permissions=[])
+        foreign_role = Role.objects.create(tenant=other, name='Foreign Viewer', permissions=[])
+        user = User.objects.create_user(username='rg_soft_deleted', password='pw')
+        role_grant = grant(user, home, home_role)
+        RoleGrant.objects.filter(pk=role_grant.pk).update(role=foreign_role)
+        self.assertEqual(len(self._matches(check_rbac_grants(), role_grant)), 1)
+
+        Role._base_manager.filter(pk=foreign_role.pk).update(deleted_at=timezone.now())
+
+        self.assertEqual(self._matches(check_rbac_grants(), role_grant), [])
 
 
-# --------------------------------------------------------------------------- UserGroup
 class UserGroupRBACCheckTests(_ContextResetMixin, TestCase):
-    """check_rbac_grants(): UserGroup ownership/membership consistency."""
-
-    def _matches(self, findings, group):
-        return _findings_for(findings, 'users.UserGroup', group.pk)
-
-    # group with tenant=NULL -> finding.
-    def test_group_without_owning_tenant_is_flagged(self):
-        group = UserGroup.objects.create(name='UG NoTenant A', tenant=None)
-
-        findings = check_rbac_grants()
-
-        matches = self._matches(findings, group)
-        self.assertEqual(len(matches), 1)
-        self.assertEqual(matches[0].check, 'rbac_group_inconsistent')
-        self.assertEqual(matches[0].classification, CLASS_AMBIGUOUS)
-        self.assertIn('has no owning tenant', matches[0].summary)
-
-    # group carrying a role owned by another tenant -> finding, classified
-    # provider-to-managed when the role owner is managed by the group's tenant.
-    def test_group_with_role_from_managed_tenant_is_flagged(self):
-        provider = Tenant.objects.create(name='UG Prov B', slug='ug-prov-b', is_provider=True)
+    def test_group_role_owned_by_another_tenant_is_flagged(self):
+        provider = Tenant.objects.create(name='UG Provider', slug='ug-provider', is_provider=True)
         managed = Tenant.objects.create(
-            name='UG Managed B', slug='ug-managed-b', managed_by=provider,
+            name='UG Managed', slug='ug-managed', managed_by=provider,
         )
-        role = Role.objects.create(tenant=managed, name='UG Role B', permissions=[])
-        group = UserGroup.objects.create(name='UG Group B', tenant=provider)
-        group.roles.add(role)
+        provider_role = Role.objects.create(tenant=provider, name='Provider Viewer', permissions=[])
+        customer_role = Role.objects.create(tenant=managed, name='Customer Viewer', permissions=[])
+        group = UserGroup.objects.create(name='Provider Team', tenant=provider)
+        role_grant = RoleGrant.objects.create(user_group=group, role=provider_role)
+        RoleGrantScope.objects.create(
+            role_grant=role_grant,
+            scope_type=RoleGrantScope.SCOPE_OWN,
+        )
+        RoleGrant.objects.filter(pk=role_grant.pk).update(role=customer_role)
 
-        findings = check_rbac_grants()
+        matches = _findings_for(
+            check_rbac_grants(), 'organization.RoleGrant', role_grant.pk,
+        )
 
-        matches = self._matches(findings, group)
+        self.assertTrue(matches)
+        self.assertTrue(any(match.classification == CLASS_PROVIDER_MANAGED for match in matches))
+
+    def test_group_membership_from_another_tenant_is_flagged(self):
+        owner = Tenant.objects.create(name='UG Owner', slug='ug-owner')
+        other = Tenant.objects.create(name='UG Other', slug='ug-other')
+        group = UserGroup.objects.create(name='Owner Team', tenant=owner)
+        user = User.objects.create_user(username='ug_wrong_membership', password='pw')
+        owner_membership = Membership.objects.create(user=user, tenant=owner)
+        other_membership = Membership.objects.create(user=user, tenant=other)
+        link = GroupMembership.objects.create(
+            user_group=group,
+            membership=owner_membership,
+        )
+        GroupMembership.objects.filter(pk=link.pk).update(membership=other_membership)
+
+        matches = _findings_for(check_rbac_grants(), 'users.GroupMembership', link.pk)
+
         self.assertEqual(len(matches), 1)
-        self.assertEqual(matches[0].check, 'rbac_group_inconsistent')
-        self.assertEqual(matches[0].classification, CLASS_PROVIDER_MANAGED)
-        self.assertEqual(matches[0].details['role_id'], role.pk)
+        self.assertEqual(matches[0].classification, CLASS_INVALID)
+        self.assertIn('differs from group owner', matches[0].summary)
 
-    # group member without an active membership in the owning tenant -> finding.
-    def test_group_member_without_active_membership_is_flagged(self):
-        tenant = Tenant.objects.create(name='UG Tenant C', slug='ug-tenant-c')
-        group = UserGroup.objects.create(name='UG Group C', tenant=tenant)
-        user = User.objects.create_user(username='ug_orphan_c', password='pw')
-        group.members.add(user)
-
-        findings = check_rbac_grants()
-
-        matches = self._matches(findings, group)
-        self.assertEqual(len(matches), 1)
-        self.assertEqual(matches[0].check, 'rbac_group_inconsistent')
-        self.assertEqual(matches[0].classification, CLASS_AMBIGUOUS)
-        self.assertIn('no active membership', matches[0].summary)
-        self.assertEqual(matches[0].details['user_id'], user.pk)
-
-    # fully consistent group -> NO findings.
-    def test_fully_consistent_group_has_no_findings(self):
-        tenant = Tenant.objects.create(name='UG Tenant D', slug='ug-tenant-d')
-        role = Role.objects.create(tenant=tenant, name='UG Role D', permissions=[])
-        group = UserGroup.objects.create(name='UG Group D', tenant=tenant)
-        group.roles.add(role)
-        user = User.objects.create_user(username='ug_member_d', password='pw')
-        Membership.objects.create(user=user, tenant=tenant)
-        group.members.add(user)
+    def test_consistent_group_principal_has_no_findings(self):
+        tenant = Tenant.objects.create(name='UG Tenant', slug='ug-tenant')
+        role = Role.objects.create(tenant=tenant, name='Viewer', permissions=[])
+        group = UserGroup.objects.create(name='Tenant Team', tenant=tenant)
+        user = User.objects.create_user(username='ug_member', password='pw')
+        membership = Membership.objects.create(user=user, tenant=tenant)
+        GroupMembership.objects.create(user_group=group, membership=membership)
+        role_grant = RoleGrant.objects.create(user_group=group, role=role)
+        RoleGrantScope.objects.create(
+            role_grant=role_grant,
+            scope_type=RoleGrantScope.SCOPE_OWN,
+        )
 
         findings = check_rbac_grants()
 
-        self.assertEqual(self._matches(findings, group), [])
+        self.assertEqual(
+            _findings_for(findings, 'organization.RoleGrant', role_grant.pk),
+            [],
+        )
+        self.assertEqual(
+            _findings_for(
+                findings,
+                'users.GroupMembership',
+                GroupMembership.objects.get().pk,
+            ),
+            [],
+        )
 
 
-# --------------------------------------------------------------------------- management command
 class IntegrityReportCommandTests(_ContextResetMixin, TestCase):
-    """`manage.py integrity_report` — CLI surface over core.integrity.run_all_checks."""
-
     def _seed_rbac_anomaly(self):
-        """An own-reach grant of a role from a completely unrelated tenant —
-        deterministically produces exactly one 'unrelated-invalid' RBAC finding."""
         home = Tenant.objects.create(name='CMD Home', slug='cmd-home')
-        other = Tenant.objects.create(name='CMD Unrelated', slug='cmd-unrelated')
-        role = Role.objects.create(tenant=other, name='CMD Foreign Role', permissions=[])
-        user = User.objects.create_user(username='cmd_anomaly_user', password='pw')
-        return grant(user, home, role)
+        other = Tenant.objects.create(name='CMD Other', slug='cmd-other')
+        home_role = Role.objects.create(tenant=home, name='Home Viewer', permissions=[])
+        foreign_role = Role.objects.create(tenant=other, name='Foreign Viewer', permissions=[])
+        user = User.objects.create_user(username='cmd_anomaly', password='pw')
+        role_grant = grant(user, home, home_role)
+        RoleGrant.objects.filter(pk=role_grant.pk).update(role=foreign_role)
+        return role_grant
 
     def test_clean_db_reports_no_findings(self):
         out = StringIO()
@@ -341,32 +317,31 @@ class IntegrityReportCommandTests(_ContextResetMixin, TestCase):
         self.assertIn('proposals', payload)
         self.assertIn('stats', payload)
         self.assertTrue(any(
-            f['check'] == 'rbac_grant_inconsistent' and f['classification'] == 'unrelated-invalid'
-            for f in payload['findings']
+            finding['check'] == 'rbac_grant_inconsistent'
+            and finding['classification'] == 'unrelated-invalid'
+            for finding in payload['findings']
         ))
 
-    def test_proposals_flag_writes_a_json_list_file(self):
+    def test_proposals_flag_writes_json_list(self):
         self._seed_rbac_anomaly()
         with tempfile.TemporaryDirectory() as tmp_dir:
-            proposals_path = Path(tmp_dir) / 'p.json'
+            proposals_path = Path(tmp_dir) / 'proposals.json'
             out = StringIO()
             call_command('integrity_report', proposals=str(proposals_path), stdout=out)
 
             self.assertTrue(proposals_path.exists())
-            payload = json.loads(proposals_path.read_text(encoding='utf-8'))
-            self.assertIsInstance(payload, list)
+            self.assertIsInstance(
+                json.loads(proposals_path.read_text(encoding='utf-8')),
+                list,
+            )
 
-    def test_fail_on_findings_raises_systemexit_when_findings_exist(self):
+    def test_fail_on_findings_raises_systemexit(self):
         self._seed_rbac_anomaly()
-        out = StringIO()
-
         with self.assertRaises(SystemExit):
-            call_command('integrity_report', fail_on_findings=True, stdout=out)
+            call_command('integrity_report', fail_on_findings=True, stdout=StringIO())
 
     def test_fail_on_findings_does_not_raise_when_clean(self):
         out = StringIO()
-
-        # Must not raise.
         call_command('integrity_report', fail_on_findings=True, stdout=out)
 
         self.assertIn('No integrity findings', out.getvalue())

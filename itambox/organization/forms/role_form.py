@@ -10,13 +10,15 @@ from django import forms
 from django.apps import apps as django_apps
 from django.contrib.auth import get_user_model
 from django.contrib.auth.models import Permission
+from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
 from crispy_forms.helper import FormHelper
 from crispy_forms.layout import Layout
 from core.forms import FilterForm
-from core.auth.guards import validate_permission_grant
+from core.auth.guards import validate_permission_grant, validate_role_grant
 from core.managers import get_current_tenant
-from ..models import Role
+from core.mfa import role_is_privileged
+from ..models import Role, RoleGrantScope
 from .helpers import add_standard_buttons
 
 
@@ -44,7 +46,8 @@ MATRIX_MODELS = {
     'assetholder': {'label': _('Asset Holders'), 'app': 'organization', 'model_name': 'assetholder', 'group': _('Organization & Structure')},
     'role': {'label': _('Roles & Permissions'), 'app': 'organization', 'model_name': 'role', 'group': _('Organization & Structure')},
     'membership': {'label': _('Memberships'), 'app': 'organization', 'model_name': 'membership', 'group': _('Organization & Structure')},
-    'roleassignment': {'label': _('Role Assignments'), 'app': 'organization', 'model_name': 'roleassignment', 'group': _('Organization & Structure')},
+    'rolegrant': {'label': _('Role Grants'), 'app': 'organization', 'model_name': 'rolegrant', 'group': _('Organization & Structure')},
+    'tenantresourcegrant': {'label': _('Resource Grants'), 'app': 'organization', 'model_name': 'tenantresourcegrant', 'group': _('Organization & Structure')},
     'region': {'label': _('Regions'), 'app': 'organization', 'model_name': 'region', 'group': _('Organization & Structure')},
     'sitegroup': {'label': _('Site Groups'), 'app': 'organization', 'model_name': 'sitegroup', 'group': _('Organization & Structure')},
     'tenantgroup': {'label': _('Tenant Groups'), 'app': 'organization', 'model_name': 'tenantgroup', 'group': _('Organization & Structure')},
@@ -130,6 +133,11 @@ class RoleForm(forms.ModelForm):
         self.current_user = kwargs.pop('user', None)
         tenant_ctx = kwargs.pop('tenant', None)
         super().__init__(*args, **kwargs)
+        self._original_permissions = frozenset(self.instance.permissions or [])
+        self._was_shared_with_managed = bool(
+            self.instance.pk and self.instance.shared_with_managed
+        )
+        self._was_privileged = bool(self.instance.pk and role_is_privileged(self.instance))
 
         # Owner resolution: locked to the instance's tenant on edit; on create it is the
         # context tenant (?tenant= deep-link from the view) falling back to the active
@@ -240,7 +248,171 @@ class RoleForm(forms.ModelForm):
         validate_permission_grant(self.current_user, assigned_perms, self.owner_tenant)
 
         self.instance.permissions = sorted(assigned_perms)
+        resulting_shared = bool(cleaned_data.get(
+            'shared_with_managed',
+            self.instance.shared_with_managed,
+        ))
+        self.instance.shared_with_managed = resulting_shared
+
+        permissions_changed = assigned_perms != self._original_permissions
+        sharing_reenabled = resulting_shared and not self._was_shared_with_managed
+        if self.instance.pk and (permissions_changed or sharing_reenabled):
+            self._validate_retained_grant_projections()
+
+        # A harmless role must not become a permanent direct-admin back door by
+        # being edited after it was granted. Existing direct grants must already
+        # carry the same reason + expiration required at grant creation before a
+        # role can be elevated; permanent elevated access belongs on groups.
+        self.instance.name = cleaned_data.get('name') or self.instance.name
+        if self.instance.pk and not self._was_privileged and role_is_privileged(self.instance):
+            now = timezone.now()
+            unsafe_direct_grants = any(
+                not grant.reason.strip()
+                or grant.valid_until is None
+                or grant.valid_until <= now
+                for grant in self.instance.role_grants.filter(membership__isnull=False)
+            )
+            if unsafe_direct_grants:
+                raise forms.ValidationError(_(
+                    "This role cannot be elevated while it has direct grants without "
+                    "a reason and a future expiration. Move permanent access to a "
+                    "group or update/revoke those direct grants first."
+                ))
         return cleaned_data
+
+    def _validate_retained_grant_projections(self):
+        """Re-check every live projection that an edited role will continue to power.
+
+        A provider-home permission check is insufficient once a role is already
+        attached to principals or scopes elsewhere.  Editing that shared role is
+        itself a grant into each retained target, so it must pass the same
+        ``validate_role_grant`` checks as creating the aggregate in the first
+        place.  Inert history (expired grants, inactive principals, deleted
+        targets, or severed management edges) is deliberately ignored.
+        """
+        errors = []
+        owner = self.owner_tenant
+
+        grants = self.instance.role_grants.select_related(
+            'membership__tenant',
+            'user_group__tenant',
+        ).prefetch_related(
+            'scopes__tenant',
+            'scopes__tenant_group',
+        )
+
+        for grant in grants:
+            if not grant.is_active:
+                continue
+
+            if grant.membership_id:
+                if not grant.membership.is_active:
+                    continue
+                principal_tenant = grant.membership.tenant
+            elif grant.user_group_id:
+                group = grant.user_group
+                if not group.is_active or group.deleted_at is not None:
+                    continue
+                principal_tenant = group.tenant
+            else:
+                continue
+
+            if principal_tenant.deleted_at is not None:
+                continue
+
+            scopes = list(grant.scopes.all())
+            own_scope_is_effective = any(
+                scope.scope_type == RoleGrantScope.SCOPE_OWN
+                for scope in scopes
+            ) and (
+                self.instance.tenant_id == principal_tenant.pk
+                or (
+                    grant.membership_id
+                    and self.instance.shared_with_managed
+                    and owner.is_provider
+                    and principal_tenant.managed_by_id == owner.pk
+                )
+            )
+            if own_scope_is_effective:
+                self._collect_projection_errors(
+                    errors,
+                    principal_tenant,
+                    RoleGrantScope.SCOPE_OWN,
+                )
+
+            managed_projection_is_effective = (
+                owner.is_provider
+                and principal_tenant.pk == owner.pk
+                and self.instance.tenant_id == owner.pk
+            )
+            if not managed_projection_is_effective:
+                continue
+
+            explicit_tenant_ids = {
+                scope.tenant_id
+                for scope in scopes
+                if (
+                    scope.scope_type == RoleGrantScope.SCOPE_TENANT
+                    and scope.tenant_id
+                    and scope.tenant.deleted_at is None
+                    and scope.tenant.managed_by_id == owner.pk
+                )
+            }
+            if explicit_tenant_ids:
+                self._collect_projection_errors(
+                    errors,
+                    principal_tenant,
+                    RoleGrantScope.SCOPE_TENANT,
+                    requested_tenant_ids=explicit_tenant_ids,
+                )
+
+            has_live_group_scope = any(
+                scope.scope_type == RoleGrantScope.SCOPE_TENANT_GROUP
+                and scope.tenant_group_id
+                and scope.tenant_group.deleted_at is None
+                for scope in scopes
+            )
+            if has_live_group_scope:
+                self._collect_projection_errors(
+                    errors,
+                    principal_tenant,
+                    RoleGrantScope.SCOPE_TENANT_GROUP,
+                )
+
+            if any(
+                scope.scope_type == RoleGrantScope.SCOPE_ALL_MANAGED
+                for scope in scopes
+            ):
+                self._collect_projection_errors(
+                    errors,
+                    principal_tenant,
+                    RoleGrantScope.SCOPE_ALL_MANAGED,
+                )
+
+        if errors:
+            # Multiple retained aggregates can expose different gaps. Validate
+            # them all, then de-duplicate the canonical guard messages for a
+            # useful single form error rather than stopping at the first scope.
+            raise forms.ValidationError(list(dict.fromkeys(errors)))
+
+    def _collect_projection_errors(
+        self,
+        errors,
+        principal_tenant,
+        scope_type,
+        *,
+        requested_tenant_ids=None,
+    ):
+        try:
+            validate_role_grant(
+                self.current_user,
+                self.instance,
+                principal_tenant,
+                scope_type=scope_type,
+                requested_tenant_ids=requested_tenant_ids,
+            )
+        except forms.ValidationError as exc:
+            errors.extend(exc.messages)
 
     # ---------------------------------------------------------------- template helpers
     @property
@@ -328,7 +500,7 @@ class RoleAssignUsersForm(forms.Form):
     """Bulk-add users to a Role (used by the "Assign Users" action).
 
     The view creates memberships (get_or_create) at the role's owning tenant plus
-    own-reach ``RoleAssignment`` rows for the selected users.
+    direct ``RoleGrant`` rows with an own-tenant scope for the selected users.
     """
     users = forms.ModelMultipleChoiceField(
         queryset=None,
@@ -336,7 +508,39 @@ class RoleAssignUsersForm(forms.Form):
         label=_("Users"),
         widget=forms.SelectMultiple(attrs={'class': 'form-select'}),
     )
+    reason = forms.CharField(
+        required=False,
+        label=_('Reason'),
+        help_text=_('Required when directly assigning an elevated role.'),
+        widget=forms.Textarea(attrs={'class': 'form-control', 'rows': 2}),
+    )
+    valid_until = forms.DateTimeField(
+        required=False,
+        label=_('Valid until'),
+        help_text=_('Required when directly assigning an elevated role.'),
+        widget=forms.DateTimeInput(
+            attrs={'class': 'form-control', 'type': 'datetime-local'},
+            format='%Y-%m-%dT%H:%M',
+        ),
+        input_formats=['%Y-%m-%dT%H:%M'],
+    )
 
     def __init__(self, *args, **kwargs):
+        self.role = kwargs.pop('role', None)
         super().__init__(*args, **kwargs)
         self.fields['users'].queryset = get_user_model().objects.order_by('username')
+
+    def clean(self):
+        cleaned_data = super().clean()
+        if self.role is None or not role_is_privileged(self.role):
+            return cleaned_data
+        reason = (cleaned_data.get('reason') or '').strip()
+        valid_until = cleaned_data.get('valid_until')
+        if not reason:
+            self.add_error('reason', _('Elevated direct grants require a reason.'))
+        if valid_until is None:
+            self.add_error('valid_until', _('Elevated direct grants require an expiration.'))
+        elif valid_until <= timezone.now():
+            self.add_error('valid_until', _('The expiration must be in the future.'))
+        cleaned_data['reason'] = reason
+        return cleaned_data

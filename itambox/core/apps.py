@@ -1,6 +1,11 @@
 from django.apps import AppConfig
+from django.contrib.admin.apps import AdminConfig
 from django.db.models.signals import post_migrate
 from django.utils.translation import gettext_lazy as _
+
+
+class SuperuserAdminConfig(AdminConfig):
+    default_site = 'core.admin.SuperuserAdminSite'
 
 
 class CoreConfig(AppConfig):
