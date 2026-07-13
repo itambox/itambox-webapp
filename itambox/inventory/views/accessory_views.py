@@ -18,7 +18,10 @@ from itambox.panels import Panel
 
 from ..models import Accessory, Kit, AccessoryStock, AccessoryAssignment
 from .. import forms, tables, filters
-from inventory.services import checkout_inventory_item, checkin_accessory
+from inventory.services import (
+    checkout_inventory_item, checkin_accessory,
+    recipient_assignment_union, shared_stock_union,
+)
 
 
 class AccessoryListView(ObjectListView):
@@ -140,6 +143,20 @@ class AccessoryCheckinView(SimplePostView):
     permission_required = ('inventory.change_accessory',)
     queryset = AccessoryAssignment.objects.all()
 
+    def get_queryset(self):
+        # ADR-0001 4b: the recipient tenant may run the return workflow.
+        return recipient_assignment_union(super().get_queryset(), AccessoryAssignment)
+
+    def has_permission(self):
+        perms = self.get_permission_required()
+        obj = self.get_object()
+        if self.request.user.has_perms(perms, obj=obj):
+            return True
+        # Recipient side: the same permission, held in the TARGET tenant
+        # (a Tenant instance is its own permission context).
+        target = obj.target_tenant
+        return target is not None and self.request.user.has_perms(perms, obj=target)
+
     def perform_action(self, assignment, request):
         accessory, qty, recipient = checkin_accessory(assignment.pk, user=request.user)
         return {
@@ -161,6 +178,11 @@ class AccessoryBulkDeleteView(ObjectBulkDeleteView):
 
 class AccessoryStockListView(ObjectListView):
     queryset = AccessoryStock.objects.select_related('accessory', 'location').all()
+
+    def get_queryset(self):
+        # ADR-0001 4b: include pools shared TO the active tenant (read-only).
+        return shared_stock_union(super().get_queryset(), AccessoryStock).select_related(
+            'accessory', 'location')
     table = tables.AccessoryStockTable
     action_buttons = ('add',)
     filterset = filters.AccessoryStockFilterSet
@@ -202,6 +224,12 @@ class AccessoryAssignmentListView(ObjectListView):
     queryset = AccessoryAssignment.objects.select_related(
         'accessory', 'assigned_holder', 'assigned_location', 'assigned_asset'
     ).all()
+
+    def get_queryset(self):
+        # ADR-0001 4b: recipients see assignments targeting their tenant.
+        return recipient_assignment_union(
+            super().get_queryset(), AccessoryAssignment,
+        ).select_related('accessory', 'assigned_holder', 'assigned_location', 'assigned_asset')
     table = tables.AccessoryAssignmentTable
     action_buttons = ()
     filterset = filters.AccessoryAssignmentFilterSet
@@ -225,7 +253,10 @@ class AccessoryStockAdjustView(LoginRequiredMixin, View):
                 stock = AccessoryStock.objects.select_for_update().get(pk=pk)
             except AccessoryStock.DoesNotExist:
                 raise Http404
-            if not request.user.has_perm('inventory.change_accessorystock', obj=stock.accessory):
+            # Anchor at the POOL (its tenant is the owner) — never the catalogue
+            # item: grantees and other tenants must not adjust foreign stock
+            # (ADR-0001), and the owner must not be blocked by a foreign item.
+            if not request.user.has_perm('inventory.change_accessorystock', obj=stock):
                 return HttpResponseForbidden(_("Permission denied."))
             action = request.GET.get('action')
 

@@ -99,6 +99,7 @@ ORG_MENU = Menu(
                 get_model_item('organization', 'tenant', _('Tenants')),
                 get_model_item('organization', 'tenantgroup', _('Tenant Groups')),
                 get_model_item('organization', 'assetholder', _('Asset Holders')),
+                get_model_item('organization', 'tenantresourcegrant', _('Resource Grants'), actions=()),
             ),
         ),
         MenuGroup(

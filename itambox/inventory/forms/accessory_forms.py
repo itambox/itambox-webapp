@@ -142,7 +142,10 @@ class AccessoryCheckoutForm(BaseCheckoutForm):
     def __init__(self, *args, **kwargs):
         self.accessory = kwargs.pop('accessory', None)
         tenant = self.accessory.tenant if self.accessory else None
-        super().__init__(*args, tenant=tenant, **kwargs)
+        # inline import: sibling-module import at call time avoids a forms-package cycle
+        from ..models import AccessoryStock
+        super().__init__(*args, tenant=tenant, item=self.accessory,
+                         stock_model=AccessoryStock, **kwargs)
         self.helper = FormHelper()
         self.helper.form_tag = False
         self.helper.layout = Layout(

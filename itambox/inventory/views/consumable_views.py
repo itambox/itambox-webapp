@@ -18,7 +18,9 @@ from itambox.panels import Panel
 
 from ..models import Consumable, Kit, ConsumableStock, ConsumableAssignment
 from .. import forms, tables, filters
-from inventory.services import checkout_inventory_item
+from inventory.services import (
+    checkout_inventory_item, recipient_assignment_union, shared_stock_union,
+)
 
 
 class ConsumableListView(ObjectListView):
@@ -146,6 +148,11 @@ class ConsumableBulkDeleteView(ObjectBulkDeleteView):
 
 class ConsumableStockListView(ObjectListView):
     queryset = ConsumableStock.objects.select_related('consumable', 'location').all()
+
+    def get_queryset(self):
+        # ADR-0001 4b: include pools shared TO the active tenant (read-only).
+        return shared_stock_union(super().get_queryset(), ConsumableStock).select_related(
+            'consumable', 'location')
     table = tables.ConsumableStockTable
     action_buttons = ('add',)
     filterset = filters.ConsumableStockFilterSet
@@ -188,6 +195,12 @@ class ConsumableAssignmentListView(ObjectListView):
     queryset = ConsumableAssignment.objects.select_related(
         'consumable', 'assigned_holder', 'assigned_location', 'assigned_asset'
     ).all()
+
+    def get_queryset(self):
+        # ADR-0001 4b: recipients see consumptions targeting their tenant.
+        return recipient_assignment_union(
+            super().get_queryset(), ConsumableAssignment,
+        ).select_related('consumable', 'assigned_holder', 'assigned_location', 'assigned_asset')
     table = tables.ConsumableAssignmentTable
     action_buttons = ()
     filterset = filters.ConsumableAssignmentFilterSet
@@ -211,7 +224,8 @@ class ConsumableStockAdjustView(LoginRequiredMixin, View):
                 stock = ConsumableStock.objects.select_for_update().get(pk=pk)
             except ConsumableStock.DoesNotExist:
                 raise Http404
-            if not request.user.has_perm('inventory.change_consumablestock', obj=stock.consumable):
+            # Anchor at the POOL — see AccessoryStockAdjustView.
+            if not request.user.has_perm('inventory.change_consumablestock', obj=stock):
                 return HttpResponseForbidden(_("Permission denied."))
             action = request.GET.get('action')
 

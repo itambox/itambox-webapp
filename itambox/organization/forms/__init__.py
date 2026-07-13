@@ -16,3 +16,4 @@ from .membership_form import (
     MembershipForm, MembershipFilterForm, MembershipBulkRoleForm,
 )
 from .costcenter_form import CostCenterForm, CostCenterFilterForm
+from .resource_grant_form import TenantResourceGrantForm

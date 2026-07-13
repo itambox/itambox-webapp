@@ -138,7 +138,10 @@ def resolve_stock_access(user, stock, access_level, perm, active_tenant=None):
         return ResourceAccessDecision(False, DENIED_OWNER_UNRESOLVABLE)
 
     def rbac_ok():
-        return user.has_perm(perm, obj=active_tenant)
+        # System contexts (imports, seeds, background tasks outside
+        # TaskContext) carry no user: the tenant-level grant is the gate
+        # there — the RBAC step applies to real actors.
+        return user is None or user.has_perm(perm, obj=active_tenant)
 
     if owner_tenant_id == active_tenant.pk:
         if not rbac_ok():

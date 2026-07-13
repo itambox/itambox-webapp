@@ -105,6 +105,12 @@ urlpatterns = [
     path('roles/<int:pk>/assign/', views.RoleAssignUsersView.as_view(), name='role_assign_users'),
 
     # Cost Centers
+    path('resource-grants/', views.TenantResourceGrantListView.as_view(), name='tenantresourcegrant_list'),
+    path('resource-grants/add/<int:content_type_id>/<int:resource_id>/',
+         views.TenantResourceGrantCreateView.as_view(), name='tenantresourcegrant_add'),
+    path('resource-grants/<int:pk>/delete/', views.TenantResourceGrantRevokeView.as_view(),
+         name='tenantresourcegrant_delete'),
+
     path('cost-centers/', views.CostCenterListView.as_view(), name='costcenter_list'),
     path('cost-centers/add/', views.CostCenterEditView.as_view(), name='costcenter_create'),
     path('cost-centers/edit/', views.CostCenterBulkEditView.as_view(), name='costcenter_bulk_edit'),

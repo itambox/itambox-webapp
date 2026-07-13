@@ -67,6 +67,35 @@ def get_ancestor_tenant_group_ids(group_id):
     return seen
 
 
+def shared_resource_ids(model, tenant):
+    """Pool ids of ``model`` shared TO ``tenant`` by live TenantResourceGrants.
+
+    Coverage matches the phase-3 resolver: a direct grant to the tenant, or a
+    grant to an ancestor TenantGroup of the tenant's group (group grants
+    include descendants). Any access level counts — 'view' already conveys
+    visibility. Returns a values queryset usable inside ``pk__in`` (a single
+    subquery, no evaluation here); empty when ``tenant`` is None.
+    """
+    # inline imports: avoid AppRegistryNotReady / an organization-internal cycle at load
+    from django.contrib.contenttypes.models import ContentType
+    from django.db.models import Q
+    from organization.models import TenantResourceGrant
+
+    if tenant is None:
+        return TenantResourceGrant.objects.none().values_list('resource_id', flat=True)
+    ct = ContentType.objects.get_for_model(model)
+    grantee_q = Q(grantee_tenant_id=tenant.pk)
+    ancestor_group_ids = get_ancestor_tenant_group_ids(tenant.group_id)
+    if ancestor_group_ids:
+        grantee_q |= Q(grantee_tenant_group_id__in=ancestor_group_ids)
+    return (
+        TenantResourceGrant.objects
+        .filter(resource_type=ct)
+        .filter(grantee_q)
+        .values_list('resource_id', flat=True)
+    )
+
+
 def managed_accessible_tenant_ids(user):
     """Managed-tenant ids reachable via the user's managed-reach assignments (step 3).
 
