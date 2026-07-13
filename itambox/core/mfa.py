@@ -35,6 +35,15 @@ def _role_is_privileged(role_name, permissions, privileged_names_lower) -> bool:
     return False
 
 
+def role_is_privileged(role) -> bool:
+    """Public model-level privilege classifier shared by MFA and RBAC grants."""
+    # inline import: avoids core.auth package initialization during settings/model import.
+    from core.auth.provisioning import PRIVILEGED_ROLE_NAMES
+
+    privileged_names_lower = {name.lower() for name in PRIVILEGED_ROLE_NAMES}
+    return _role_is_privileged(role.name, role.permissions, privileged_names_lower)
+
+
 def user_requires_mfa(user) -> bool:
     """True if MFA must be enforced for ``user``.
 
@@ -63,9 +72,20 @@ def user_requires_mfa(user) -> bool:
         assignments__membership__user=user,
         assignments__membership__is_active=True,
     ).values_list('name', 'permissions').distinct()
-    return any(
+    if any(
         _role_is_privileged(name, permissions, privileged_names_lower)
         for name, permissions in roles
+    ):
+        return True
+
+    # RoleGrant-only writes are possible during comparison/cutover. Enforce MFA
+    # as soon as such a live grant exists; security policy must not lag behind
+    # the legacy shadow or the selected authorization resolver.
+    # inline import: avoids core.mfa <-> organization model imports at module load.
+    from organization.rbac import applicable_new_grants
+    return any(
+        bool(grant.scopes.all()) and role_is_privileged(grant.role)
+        for grant in applicable_new_grants(user)
     )
 
 

@@ -11,7 +11,7 @@ from rest_framework.permissions import IsAuthenticated
 from core.managers import set_current_tenant
 from itambox.middleware import set_current_user
 from organization.models import Tenant, Membership
-from users.models import UserGroup
+from users.models import GroupMembership, UserGroup
 from users.api.scim.serializers import (
     SCIMUserSerializer, SCIMGroupSerializer, SCIMServiceProviderConfigSerializer
 )
@@ -39,13 +39,13 @@ def sync_provider_group_members(tenant, group, member_ids):
     trusted operator configuration — the IdP mapping, not an in-app actor, decides who
     belongs to which staff group.
     """
-    valid_member_ids = set()
+    memberships_by_user_id = {}
     for uid in member_ids:
         membership = Membership.objects.filter(
             user_id=uid, tenant=tenant, is_active=True
         ).first()
         if membership:
-            valid_member_ids.add(uid)
+            memberships_by_user_id[uid] = membership
         else:
             logger.warning(
                 "SCIM provider group sync skipped user id %s: not active staff of provider %s "
@@ -54,11 +54,21 @@ def sync_provider_group_members(tenant, group, member_ids):
 
     # Apply only the delta (add/remove) so ChangeLoggingMixin does not fire on unchanged
     # members.
+    valid_member_ids = set(memberships_by_user_id)
     current_members = set(group.members.values_list('id', flat=True))
     to_add = valid_member_ids - current_members
     to_remove = current_members - valid_member_ids
     if to_add:
         group.members.add(*to_add)
+    for user_id, membership in memberships_by_user_id.items():
+        GroupMembership.objects.update_or_create(
+            user_group=group,
+            membership=membership,
+            defaults={
+                'source': GroupMembership.SOURCE_SCIM,
+                'external_id': str(user_id),
+            },
+        )
     if to_remove:
         group.members.remove(*to_remove)
 

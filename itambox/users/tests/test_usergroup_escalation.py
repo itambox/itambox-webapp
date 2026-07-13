@@ -28,7 +28,7 @@ from django.urls import reverse
 
 from core.managers import set_current_tenant, set_current_membership
 from core.tests.mixins import TenantTestMixin, grant
-from organization.models import Tenant, Role
+from organization.models import Membership, Tenant, Role
 from users.models import UserGroup
 
 User = get_user_model()
@@ -133,7 +133,7 @@ class UserGroupEscalationTests(TenantTestMixin, TestCase):
             tenant=tenant, name="Administrator",
             permissions=["assets.delete_asset", "assets.change_asset"],
         )
-        group = UserGroup.objects.create(name="Priv Team")
+        group = UserGroup.objects.create(name="Priv Team", tenant=tenant)
         group.roles.add(admin_role)
         return group
 
@@ -144,6 +144,7 @@ class UserGroupEscalationTests(TenantTestMixin, TestCase):
         target = User.objects.create_user(
             username="victim", email="victim@example.com", password="pw",
         )
+        Membership.objects.create(user=target, tenant=group.tenant)
         self.client.force_login(self.admin_a)
         url = reverse('users:usergroup_assign_users', kwargs={'pk': group.pk})
         resp = self.client.post(url, {'users': [target.pk]})
@@ -157,6 +158,7 @@ class UserGroupEscalationTests(TenantTestMixin, TestCase):
         target = User.objects.create_user(
             username="ok_user", email="ok_user@example.com", password="pw",
         )
+        Membership.objects.create(user=target, tenant=group.tenant)
         self.client.force_login(self.superuser)
         url = reverse('users:usergroup_assign_users', kwargs={'pk': group.pk})
         resp = self.client.post(url, {'users': [target.pk]})
@@ -173,7 +175,7 @@ class UserGroupEscalationTests(TenantTestMixin, TestCase):
             permissions=["assets.view_asset"],
         )
         grant(self.admin_a, self.tenant_a, held_role)
-        group = UserGroup.objects.create(name="A Viewers")
+        group = UserGroup.objects.create(name="A Viewers", tenant=self.tenant_a)
         group.roles.add(
             Role.objects.create(
                 tenant=self.tenant_a, name="A Viewers Role",
@@ -183,6 +185,7 @@ class UserGroupEscalationTests(TenantTestMixin, TestCase):
         target = User.objects.create_user(
             username="grantee", email="grantee@example.com", password="pw",
         )
+        Membership.objects.create(user=target, tenant=self.tenant_a)
         self.client.force_login(self.admin_a)
         url = reverse('users:usergroup_assign_users', kwargs={'pk': group.pk})
         resp = self.client.post(url, {'users': [target.pk]})

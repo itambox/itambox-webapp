@@ -790,11 +790,7 @@ class UserGroupBulkDeleteView(GlobalGroupAdminMixin, ObjectBulkDeleteView):
 
 
 class UserGroupAssignUsersView(GlobalGroupAdminMixin, LoginRequiredMixin, View):
-    """Add one or more users to a (global) UserGroup's members (idempotent).
-
-    Groups are global, so any user may be a member; management is restricted to
-    global admins (GlobalGroupAdminMixin).
-    """
+    """Add active owner-tenant Memberships to a UserGroup (idempotent)."""
     template_name = 'users/usergroups/usergroup_assign_users.html'
 
     def _get_group(self, pk):
@@ -802,12 +798,12 @@ class UserGroupAssignUsersView(GlobalGroupAdminMixin, LoginRequiredMixin, View):
 
     def get(self, request, pk, *args, **kwargs):
         group = self._get_group(pk)
-        form = UserGroupAssignUsersForm()
+        form = UserGroupAssignUsersForm(group=group)
         return render(request, self.template_name, {'group': group, 'form': form})
 
     def post(self, request, pk, *args, **kwargs):
         group = self._get_group(pk)
-        form = UserGroupAssignUsersForm(request.POST)
+        form = UserGroupAssignUsersForm(request.POST, group=group)
         if form.is_valid():
             # Escalation guard (§3-C): adding a member confers every role the group carries
             # (permissions + tenant access). A non-superuser may only add members to a group

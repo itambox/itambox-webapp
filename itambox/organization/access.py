@@ -118,8 +118,8 @@ def managed_accessible_tenant_ids(user):
     return ids
 
 
-def accessible_tenant_ids(user):
-    """Return the set of tenant IDs ``user`` may access."""
+def legacy_accessible_tenant_ids(user):
+    """Pre-phase-5 accessible tenant resolver, retained for comparison mode."""
     if user is None or not getattr(user, 'is_authenticated', False):
         return set()
     from organization.models import Membership, Role
@@ -143,6 +143,15 @@ def accessible_tenant_ids(user):
     return ids
 
 
+def accessible_tenant_ids(user):
+    """Return tenant IDs through the configured legacy/compare/new resolver."""
+    if user is None or not getattr(user, 'is_authenticated', False):
+        return set()
+    # inline import: avoids organization.access <-> organization.rbac at load time.
+    from organization.rbac import resolve_accessible_tenant_ids
+    return resolve_accessible_tenant_ids(user)
+
+
 def tenant_access_report(tenant, external_only=False):
     """Return who can access ``tenant`` and how — for the per-tenant "Who Has Access" audit.
 
@@ -157,6 +166,11 @@ def tenant_access_report(tenant, external_only=False):
     this tenant's roles. This feeds the read-only "Access from outside this tenant"
     panel on the members list — grants shown there are managed where they live.
     """
+    # inline import: avoids organization.access <-> organization.rbac at load time.
+    from organization.rbac import MODE_NEW, resolver_mode
+    if resolver_mode() == MODE_NEW:
+        return _new_tenant_access_report(tenant, external_only=external_only)
+
     from django.db.models import Prefetch
     from organization.models import Membership, RoleAssignment, Tenant
     from users.models import UserGroup
@@ -251,4 +265,92 @@ def tenant_access_report(tenant, external_only=False):
             'inactive': inactive,
         })
     report.sort(key=lambda r: (r['user'].username or '').lower())
+    return report
+
+
+def _new_tenant_access_report(tenant, external_only=False):
+    """RoleGrant-native implementation of the per-tenant access audit."""
+    # inline imports: keep this model-heavy access module safe during app setup.
+    from django.db.models import Q
+    from django.utils import timezone
+    from organization.models import Membership, RoleGrant
+
+    user_data = {}
+
+    def entry_for(user):
+        if user.pk not in user_data:
+            user_data[user.pk] = {
+                'user': user,
+                'sources': set(),
+                'groups': set(),
+                'permissions': set(),
+            }
+        return user_data[user.pk]
+
+    if not external_only:
+        for membership in Membership.objects.filter(
+            tenant=tenant,
+            is_active=True,
+        ).select_related('user'):
+            entry_for(membership.user)['sources'].add('membership')
+
+    grants = RoleGrant.objects.filter(
+        role__deleted_at__isnull=True,
+    ).filter(
+        Q(valid_until__isnull=True) | Q(valid_until__gt=timezone.now())
+    ).select_related(
+        'membership__user',
+        'membership__tenant',
+        'user_group__tenant',
+        'role__tenant',
+    ).prefetch_related(
+        'scopes',
+        'scopes__tenant',
+        'scopes__tenant_group',
+        'user_group__group_memberships__membership__user',
+    )
+    for grant in grants:
+        if not grant.covers_tenant(tenant):
+            continue
+        if grant.membership_id:
+            if not grant.membership.is_active:
+                continue
+            entry = entry_for(grant.membership.user)
+            source = 'membership' if grant.membership.tenant_id == tenant.pk else 'managed'
+            entry['sources'].add(source)
+            entry['permissions'].update(grant.role.permissions or [])
+            continue
+        group = grant.user_group
+        if group.tenant_id is None or not group.is_active or group.deleted_at is not None:
+            continue
+        for group_membership in group.group_memberships.all():
+            membership = group_membership.membership
+            if not membership.is_active or membership.tenant_id != group.tenant_id:
+                continue
+            entry = entry_for(membership.user)
+            entry['sources'].add('group')
+            if group.tenant_id != tenant.pk:
+                entry['sources'].add('managed')
+            entry['groups'].add(group.name)
+            entry['permissions'].update(grant.role.permissions or [])
+
+    if external_only:
+        local_user_ids = set(
+            Membership.objects.filter(tenant=tenant).values_list('user_id', flat=True)
+        )
+        user_data = {
+            pk: data for pk, data in user_data.items() if pk not in local_user_ids
+        }
+
+    report = []
+    for data in user_data.values():
+        user = data['user']
+        report.append({
+            'user': user,
+            'sources': sorted(data['sources']),
+            'groups': sorted(data['groups']),
+            'permissions': sorted(data['permissions']),
+            'inactive': not (user.is_active and getattr(user, 'can_login', True)),
+        })
+    report.sort(key=lambda row: (row['user'].username or '').lower())
     return report

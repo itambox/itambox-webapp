@@ -5,7 +5,7 @@ from django.utils import timezone
 from rest_framework import status
 
 from organization.models import Tenant, Role, Membership, RoleAssignment
-from users.models import Token, UserGroup
+from users.models import GroupMembership, Token, UserGroup
 from core.tests.mixins import grant
 
 User = get_user_model()
@@ -267,6 +267,9 @@ class ProviderSCIMProvisioningTests(TestCase):
         group = UserGroup.objects.get(name="Senior Technicians")
         self.assertEqual(group.tenant, self.provider)
         self.assertIn(self.admin_user, group.members.all())
+        group_membership = GroupMembership.objects.get(user_group=group)
+        self.assertEqual(group_membership.source, GroupMembership.SOURCE_SCIM)
+        self.assertEqual(group_membership.external_id, str(self.admin_user.id))
 
         # Now the list shows it.
         response = self.client.get(list_url, **self.auth_headers)
@@ -317,6 +320,7 @@ class ProviderSCIMProvisioningTests(TestCase):
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         group.refresh_from_db()
         self.assertNotIn(self.admin_user, group.members.all())
+        self.assertFalse(GroupMembership.objects.filter(user_group=group).exists())
 
         # DELETE soft-deletes.
         response = self.client.delete(detail_url, **self.auth_headers)

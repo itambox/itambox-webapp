@@ -313,7 +313,7 @@ class UserGroupFormTests(_PermCacheMixin, TestCase):
         self.user_a = _user("ua")
         self.user_b = _user("ub")
 
-    def test_tenant_field_present_and_cross_tenant_choices(self):
+    def test_tenant_field_is_required_during_phase5(self):
         """UserGroup now carries an explicit owning/SCIM-scope ``tenant`` (successor of
         the deleted ``provider`` FK) — present on the form and optional for superusers
         (blank = global group). It does not narrow ``roles``/``members``: those still
@@ -322,17 +322,22 @@ class UserGroupFormTests(_PermCacheMixin, TestCase):
         _role(self.ta, "RA"); _role(self.tb, "RB")
         form = UserGroupForm(user=self.superuser)
         self.assertIn('tenant', form.fields)
-        self.assertFalse(form.fields['tenant'].required)
+        self.assertTrue(form.fields['tenant'].required)
         # roles span all tenants; members are all users
         self.assertEqual(form.fields['roles'].queryset.count(), Role._base_manager.count())
         self.assertEqual(form.fields['members'].queryset.count(), User.objects.count())
 
-    def test_superuser_can_assign_cross_tenant_roles(self):
+    def test_superuser_cannot_bypass_cross_tenant_group_invariant(self):
         from users.forms import UserGroupForm
         ra, rb = _role(self.ta, "RA", ["assets.view_asset"]), _role(self.tb, "RB", ["assets.add_asset"])
-        data = {'name': 'X', 'roles': [ra.pk, rb.pk], 'members': [self.user_a.pk], 'is_active': True}
+        _membership(self.user_a, self.ta)
+        data = {
+            'name': 'X', 'roles': [ra.pk, rb.pk], 'members': [self.user_a.pk],
+            'tenant': self.ta.pk, 'is_active': True,
+        }
         form = UserGroupForm(data=data, user=self.superuser)
-        self.assertTrue(form.is_valid(), form.errors)
+        self.assertFalse(form.is_valid())
+        self.assertIn('roles', form.errors)
 
     def test_escalation_guard_blocks_role_with_unheld_perm(self):
         from users.forms import UserGroupForm

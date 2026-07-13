@@ -450,10 +450,9 @@ class UserBulkEditForm(BulkEditForm):
 
 
 # --------------------------------------------------------------------------- UserGroup
-# UserGroup is an identity-layer construct (relocated here from organization/): it grants
-# cross-tenant access, so it lives alongside the User model rather than the business-data
-# (organization) layer.
-from organization.models import Role, Tenant
+# UserGroup is an identity-layer construct (relocated here from organization/):
+# provider-owned groups may be projected into managed tenants through RoleGrant scopes.
+from organization.models import Membership, Role, Tenant
 from organization.access import accessible_tenant_ids
 from core.auth.guards import validate_permission_grant, validate_group_membership_grant
 from .models import UserGroup
@@ -479,15 +478,12 @@ class _RolesHolder:
 
 
 class UserGroupForm(forms.ModelForm):
-    """Create/edit a cross-tenant UserGroup.
+    """Compatibility writer for a flat, tenant-owned phase-5 UserGroup.
 
-    Groups are NOT tenant-bound for permission purposes: ``roles`` may reference roles
-    from any tenant (each role label includes its tenant) and ``members`` may be any
-    user. A member gains each role's permissions — and access — in that role's tenant.
-    The group's ``tenant`` is its OWNER and SCIM provisioning scope only; blank means a
-    global group (superuser-managed). Because managing a group can grant cross-tenant
-    access, the views restrict this to group admins; the escalation guards here are
-    defence in depth for any non-superuser who reaches the form.
+    It still writes the legacy M2Ms during comparison mode, whose signals create
+    GroupMembership/RoleGrant shadows. New invalid shapes are rejected: the
+    owner is mandatory, roles must be owner-owned, and every selected user must
+    have an active Membership in that owner.
     """
     name = forms.CharField(
         max_length=100,
@@ -504,9 +500,8 @@ class UserGroupForm(forms.ModelForm):
         required=False,
         label=_("Roles"),
         widget=forms.SelectMultiple(attrs={'class': 'form-select'}),
-        help_text=_("Roles granted to members. A role may belong to any tenant (the "
-                    "label shows it); members gain that role's permissions and access "
-                    "in that tenant."),
+        help_text=_("Owner-owned roles applied inside the group's own tenant. Managed "
+                    "projections are configured on RoleGrant scopes."),
     )
     members = forms.ModelMultipleChoiceField(
         queryset=User.objects.none(),
@@ -516,12 +511,10 @@ class UserGroupForm(forms.ModelForm):
     )
     tenant = forms.ModelChoiceField(
         queryset=Tenant._base_manager.none(),
-        required=False,
-        label=_("SCIM scope / owning tenant"),
+        required=True,
+        label=_("Owning tenant"),
         widget=forms.Select(attrs={'class': 'form-select'}),
-        help_text=_("The tenant that owns this group and whose SCIM provisioning manages "
-                    "it. Leave blank for a global group managed here in the UI "
-                    "(superusers only)."),
+        help_text=_("The tenant/provider that owns this group and its member identities."),
     )
     is_active = forms.BooleanField(
         required=False,
@@ -535,18 +528,17 @@ class UserGroupForm(forms.ModelForm):
 
     @staticmethod
     def _role_label(role):
-        """Prefix each role choice with its owning tenant so cross-tenant roles are
-        legible, e.g. ``[Tenant A] Administrator`` vs ``[Northwind MSP] Technician``."""
+        """Prefix each role choice with its owner while the legacy picker remains."""
         return f"[{role.tenant.name}] {role.name}"
 
     def __init__(self, *args, user=None, tenant=None, **kwargs):
-        # `tenant` (the request's active tenant) is accepted for call-site compatibility
-        # but ignored: group administration is a cross-tenant surface.
+        # ``tenant`` remains accepted for call-site compatibility; authorization
+        # is derived from the explicit owner submitted on the group.
         self._requesting_user = user
         super().__init__(*args, **kwargs)
         is_superuser = bool(self._requesting_user is not None and self._requesting_user.is_superuser)
-        # Roles across ALL tenants (unscoped _base_manager overrides the core/apps.py
-        # current-tenant scoping applied during super().__init__); any user as member.
+        # The compatibility form displays unscoped candidates, then clean()
+        # requires owner-owned roles and active owner Memberships.
         self.fields['roles'].queryset = Role._base_manager.filter(
             deleted_at__isnull=True,
         ).select_related('tenant').order_by('tenant__name', 'name')
@@ -579,12 +571,7 @@ class UserGroupForm(forms.ModelForm):
         # superusers (and guard-exempt programmatic use without a user) may leave it
         # blank, non-superusers must pick a tenant — except when re-saving an existing
         # global group, where keeping blank is a no-op (changes are guarded in clean()).
-        if is_superuser or self._requesting_user is None:
-            self.fields['tenant'].required = False
-        else:
-            self.fields['tenant'].required = not (
-                self.instance.pk and self.instance.tenant_id is None
-            )
+        self.fields['tenant'].required = True
 
         self.helper = FormHelper(self)
         self.helper.form_method = 'post'
@@ -600,11 +587,35 @@ class UserGroupForm(forms.ModelForm):
         cleaned_data = super().clean()
         user = self._requesting_user
         is_superuser = bool(user is not None and user.is_superuser)
+        owner = cleaned_data.get('tenant')
+
+        if owner is None:
+            self.add_error('tenant', _('Every user group must have an owning tenant.'))
+        else:
+            foreign_roles = [
+                role for role in (cleaned_data.get('roles') or [])
+                if role.tenant_id != owner.pk
+            ]
+            if foreign_roles:
+                self.add_error(
+                    'roles',
+                    _('A group may carry only roles owned by its owning tenant.'),
+                )
+            member_ids = [member.pk for member in (cleaned_data.get('members') or [])]
+            active_member_ids = set(Membership.objects.filter(
+                tenant=owner,
+                user_id__in=member_ids,
+                is_active=True,
+            ).values_list('user_id', flat=True))
+            if set(member_ids) - active_member_ids:
+                self.add_error(
+                    'members',
+                    _('Every group member must have an active Membership in the owning tenant.'),
+                )
 
         # Escalation guard (defence in depth; group management is admin-gated in the
         # views): a non-superuser may attach a role only if they already hold every one
-        # of its permissions in that role's OWN tenant. A group's roles may span tenants,
-        # so each is validated against ``role.owner`` (= ``role.tenant``).
+        # of its permissions in the group's owning tenant.
         for role in (cleaned_data.get('roles') or []):
             validate_permission_grant(user, role.permissions or [], role.owner)
 
@@ -677,10 +688,7 @@ class UserGroupFilterForm(FilterForm):
 
 
 class UserGroupAssignUsersForm(forms.Form):
-    """Used by UserGroupAssignUsersView to pick users to add to a (global) group.
-
-    Groups are global, so any user may be added.
-    """
+    """Pick active members of the group's owning tenant."""
     users = forms.ModelMultipleChoiceField(
         queryset=User.objects.all().order_by('username'),
         required=True,
@@ -688,4 +696,12 @@ class UserGroupAssignUsersForm(forms.Form):
         widget=forms.SelectMultiple(attrs={'class': 'form-select'}),
     )
 
- 
+    def __init__(self, *args, group, **kwargs):
+        super().__init__(*args, **kwargs)
+        if group.tenant_id is None:
+            self.fields['users'].queryset = User.objects.none()
+            return
+        self.fields['users'].queryset = User.objects.filter(
+            memberships__tenant_id=group.tenant_id,
+            memberships__is_active=True,
+        ).distinct().order_by('username')

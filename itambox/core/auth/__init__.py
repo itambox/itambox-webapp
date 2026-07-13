@@ -71,43 +71,10 @@ class MembershipBackend:
         if hasattr(user_obj, cache_key):
             return getattr(user_obj, cache_key)
 
-        # inline imports: avoid AppRegistryNotReady at module load
-        from organization.models import Role, RoleAssignment
+        # inline import: avoids AppRegistryNotReady at auth-backend import time.
+        from organization.rbac import resolve_effective_permissions
 
-        perms = set()
-
-        # (1) Own-reach assignments on the user's active membership in this tenant.
-        for perm_list in Role._base_manager.filter(
-            deleted_at__isnull=True,
-            assignments__reach=RoleAssignment.REACH_OWN,
-            assignments__membership__user=user_obj,
-            assignments__membership__tenant=tenant,
-            assignments__membership__is_active=True,
-        ).values_list('permissions', flat=True):
-            perms.update(perm_list or [])
-
-        # (2) Cross-tenant UserGroups: any active group the user belongs to whose attached
-        # roles are owned by THIS tenant. _base_manager keeps the lookup context-independent.
-        for perm_list in Role._base_manager.filter(
-            tenant=tenant, deleted_at__isnull=True,
-            user_groups__members=user_obj,
-            user_groups__is_active=True,
-            user_groups__deleted_at__isnull=True,
-        ).values_list('permissions', flat=True):
-            perms.update(perm_list or [])
-
-        # (3) Managed-reach projection from the managing tenant (single hop, depth 1).
-        if tenant.managed_by_id:
-            for assignment in RoleAssignment.objects.filter(
-                reach=RoleAssignment.REACH_MANAGED,
-                membership__user=user_obj,
-                membership__tenant_id=tenant.managed_by_id,
-                membership__is_active=True,
-            ).select_related('role', 'scope_group', 'membership'):
-                if assignment.role.deleted_at is None and assignment.covers_tenant(tenant):
-                    perms.update(assignment.role.permissions or [])
-
-        result = frozenset(perms)
+        result = resolve_effective_permissions(user_obj, tenant)
         setattr(user_obj, cache_key, result)
         return result
 

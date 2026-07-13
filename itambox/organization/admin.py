@@ -1,9 +1,10 @@
 from django.contrib import admin
-from django.utils.translation import gettext_lazy as _
+from django.conf import settings
 from .models import (
     Region, SiteGroup, Tenant, Location, TenantGroup, Site,
     Contact, ContactRole, ContactAssignment,
-    Membership, Role, RoleAssignment, CostCenter, TenantResourceGrant,
+    Membership, Role, RoleAssignment, RoleGrant, RoleGrantScope,
+    CostCenter, TenantResourceGrant,
 )
 
 
@@ -70,6 +71,44 @@ class RoleAssignmentAdmin(admin.ModelAdmin):
     raw_id_fields = ('membership', 'role', 'granted_by')
 
 
+class RoleGrantScopeInline(admin.TabularInline):
+    model = RoleGrantScope
+    extra = 0
+    raw_id_fields = ('tenant', 'tenant_group')
+
+    def has_add_permission(self, request, obj=None):
+        return settings.RBAC_RESOLVER_MODE == 'new' and super().has_add_permission(request, obj)
+
+    def has_change_permission(self, request, obj=None):
+        return settings.RBAC_RESOLVER_MODE == 'new' and super().has_change_permission(request, obj)
+
+    def has_delete_permission(self, request, obj=None):
+        return settings.RBAC_RESOLVER_MODE == 'new' and super().has_delete_permission(request, obj)
+
+
+class RoleGrantAdmin(admin.ModelAdmin):
+    list_display = (
+        'role', 'membership', 'user_group', 'valid_until',
+        'granted_by', 'granted_at', 'legacy_assignment',
+    )
+    list_filter = ('role__tenant', 'valid_until')
+    search_fields = (
+        'role__name', 'membership__user__username',
+        'membership__tenant__name', 'user_group__name', 'reason',
+    )
+    raw_id_fields = ('membership', 'user_group', 'role', 'granted_by', 'legacy_assignment')
+    inlines = (RoleGrantScopeInline,)
+
+    def has_add_permission(self, request):
+        return settings.RBAC_RESOLVER_MODE == 'new' and super().has_add_permission(request)
+
+    def has_change_permission(self, request, obj=None):
+        return settings.RBAC_RESOLVER_MODE == 'new' and super().has_change_permission(request, obj)
+
+    def has_delete_permission(self, request, obj=None):
+        return settings.RBAC_RESOLVER_MODE == 'new' and super().has_delete_permission(request, obj)
+
+
 class RoleAdmin(admin.ModelAdmin):
     list_display = ('name', 'tenant', 'shared_with_managed')
     list_filter = ('tenant', 'shared_with_managed')
@@ -112,6 +151,7 @@ admin.site.register(ContactRole, ContactRoleAdmin)
 admin.site.register(ContactAssignment, ContactAssignmentAdmin)
 admin.site.register(Membership, MembershipAdmin)
 admin.site.register(RoleAssignment, RoleAssignmentAdmin)
+admin.site.register(RoleGrant, RoleGrantAdmin)
 admin.site.register(Role, RoleAdmin)
 admin.site.register(CostCenter, CostCenterAdmin)
 admin.site.register(TenantResourceGrant, TenantResourceGrantAdmin)
