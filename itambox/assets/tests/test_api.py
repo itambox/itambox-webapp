@@ -8,6 +8,7 @@ from organization.models import AssetHolder, Site, Location, Tenant, Role, Membe
 from licenses.models import License, LicenseSeatAssignment
 from software.models import Software
 from core.tests.mixins import grant
+from users.models import Token
 
 User = get_user_model()
 
@@ -35,6 +36,7 @@ class ITAMBoxAPITestCase(APITestCase):
             permissions=['assets.view_asset', 'assets.add_asset', 'assets.change_asset'],
         )
         grant(self.staff, self.tenant_a, self.role_staff_a)
+        self.staff_token = Token.objects.create(user=self.staff, tenant=self.tenant_a)
 
         # Associate staff with Tenant A via AssetHolder profile
         self.holder_staff = AssetHolder.objects.create(
@@ -236,7 +238,7 @@ class ITAMBoxAPITestCase(APITestCase):
 
     def test_strict_tenant_isolation_boundary(self):
         # Authenticate as staff user who belongs to Tenant A
-        self.client.force_authenticate(user=self.staff)
+        self.client.credentials(HTTP_AUTHORIZATION=f'Token {self.staff_token.key}')
 
         # 1. Accessing asset of Tenant A should succeed
         detail_url_a = reverse('api:assets_api:asset-detail', kwargs={'pk': self.asset_a.pk})

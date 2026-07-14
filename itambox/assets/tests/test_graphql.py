@@ -85,12 +85,12 @@ class GraphQLTestCase(TestCase):
                         pass
 
         # Create Tokens
-        self.token_a = Token.objects.create(user=self.staff_a)
-        self.token_b = Token.objects.create(user=self.staff_b)
+        self.token_a = Token.objects.create(user=self.staff_a, tenant=self.tenant_a)
+        self.token_b = Token.objects.create(user=self.staff_b, tenant=self.tenant_b)
         # Admin token: used in tests that require a superuser context so that
         # get_object_or_denied() runs without an active_tenant filter (superusers
         # have no forced tenant context when no session tenant is selected).
-        self.token_admin = Token.objects.create(user=self.admin_user)
+        self.token_admin = Token.objects.create(user=self.admin_user, tenant=self.tenant_a)
 
         # Setup base objects
         self.manufacturer = Manufacturer.objects.create(name="Dell", slug="dell")
@@ -753,4 +753,3 @@ class GraphQLTestCase(TestCase):
         res_data = response.json()
         self.assertNotIn('errors', res_data)
         self.assertTrue(res_data['data']['deleteKit']['success'])
-

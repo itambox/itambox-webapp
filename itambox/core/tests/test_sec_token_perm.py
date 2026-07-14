@@ -11,12 +11,17 @@ Membership and no asset-holder profile is denied (403) on a
 TokenPermissions-protected endpoint, while a legitimately scoped member of a
 tenant still succeeds (200) on the same endpoint.
 """
+from types import SimpleNamespace
+
 from django.test import TestCase
 from django.contrib.auth import get_user_model
+from django.test import RequestFactory
 from django.urls import reverse
 
 from organization.models import Tenant, Role, Membership
+from core.managers import set_current_tenant
 from core.tests.mixins import grant
+from itambox.api.permissions import TokenPermissions
 
 User = get_user_model()
 
@@ -73,3 +78,37 @@ class TokenPermissionsBypassRemovedTests(TestCase):
 
         response = self.client.get(self.list_url)
         self.assertEqual(response.status_code, 200)
+
+    def test_legacy_ignore_attribute_cannot_bypass_model_permissions(self):
+        request = RequestFactory().get('/api/')
+        request.user = self.orphan
+        request.auth = None
+        view = SimpleNamespace(
+            queryset=Role._base_manager.all(),
+            _ignore_model_permissions=True,
+        )
+        set_current_tenant(self.tenant)
+        try:
+            self.assertFalse(TokenPermissions().has_permission(request, view))
+        finally:
+            set_current_tenant(None)
+
+    def test_unbound_permission_check_does_not_choose_first_membership(self):
+        request = RequestFactory().get('/api/')
+        request.user = self.member
+        request.auth = None
+        view = SimpleNamespace(queryset=Role._base_manager.all())
+
+        self.assertFalse(TokenPermissions().has_permission(request, view))
+
+    def test_token_permission_context_must_match_token_tenant(self):
+        other = Tenant.objects.create(name='Other token tenant', slug='other-token-tenant')
+        request = RequestFactory().get('/api/')
+        request.user = self.member
+        request.auth = SimpleNamespace(tenant_id=other.pk, user_id=self.member.pk)
+        view = SimpleNamespace(queryset=Role._base_manager.all())
+        set_current_tenant(self.tenant)
+        try:
+            self.assertFalse(TokenPermissions().has_permission(request, view))
+        finally:
+            set_current_tenant(None)
