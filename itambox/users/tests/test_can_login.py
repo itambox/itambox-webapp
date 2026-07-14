@@ -9,6 +9,9 @@ from django.contrib.auth import get_user_model
 from django.test import RequestFactory, TestCase
 
 from core.auth import PasswordLoginOnlyBackend
+from itambox.api.authentication import TokenAuthentication
+from organization.models import Membership, Tenant
+from users.models import Token
 
 User = get_user_model()
 
@@ -76,13 +79,12 @@ class CanLoginTokenSeparationTests(TestCase):
     def test_api_token_auth_unaffected_by_can_login(self):
         """An API token for a can_login=False user still authenticates — token access is
         governed by is_active, not can_login."""
-        from itambox.api.authentication import TokenAuthentication
-        from users.models import Token
-
         user = User.objects.create_user(username='svc', email='svc@example.com')
         user.can_login = False  # may never interactively log in...
         user.save(update_fields=['can_login'])
-        token = Token.objects.create(user=user)  # tenant auto-assigned by Token.save
+        tenant = Tenant.objects.create(name='Service tenant', slug='service-tenant')
+        Membership.objects.create(user=user, tenant=tenant)
+        token = Token.objects.create(user=user, tenant=tenant)
         plaintext = token.key
 
         request = RequestFactory().get('/', HTTP_AUTHORIZATION=f'Token {plaintext}')

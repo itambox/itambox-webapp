@@ -67,14 +67,38 @@ class TokenAuthentication(BaseAuthentication):
         if not token.user.is_active:
             raise exceptions.AuthenticationFailed(_('User inactive or deleted.'))
 
+        # A token is bound to exactly one tenant. Authentication must stop being
+        # valid as soon as that tenant is deleted or the user loses every access
+        # path to it. Relying on model-level permission checks is insufficient:
+        # several legitimate endpoints use only IsAuthenticated and would
+        # otherwise remain reachable after RBAC revocation.
+        if token.tenant.deleted_at is not None:
+            raise exceptions.AuthenticationFailed(_('Token tenant inactive or deleted.'))
+        if not token.user.is_superuser:
+            from organization.access import accessible_tenant_ids
+            if token.tenant_id not in accessible_tenant_ids(token.user):
+                raise exceptions.AuthenticationFailed(
+                    _('Token user no longer has access to the token tenant.')
+                )
+
         if not token.last_used or (timezone.now() - token.last_used).total_seconds() > 60:
             Token.objects.filter(pk=token.pk).update(last_used=timezone.now())
 
         from core.managers import set_current_tenant, set_current_membership
         from organization.models import Membership
         set_current_tenant(token.tenant)
-        membership = Membership.objects.filter(user=token.user, tenant=token.tenant).first()
+        membership = Membership.objects.filter(
+            user=token.user, tenant=token.tenant, is_active=True,
+        ).first()
         set_current_membership(membership)
+
+        # TenantMiddleware runs before DRF token authentication and therefore
+        # sees an anonymous request. Keep request-local state aligned with the
+        # contextvars populated above for code that reads either representation.
+        if request is not None:
+            request.active_tenant = token.tenant
+            request.active_tenant_group = None
+            request.active_membership = membership
 
         return (token.user, token)
 
@@ -98,4 +122,3 @@ try:
             }
 except ImportError:
     pass
-

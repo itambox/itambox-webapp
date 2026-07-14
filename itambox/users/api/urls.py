@@ -1,9 +1,14 @@
-from django.urls import path, include
-from itambox.api.routers import ITAMBoxRouter
-from rest_framework.reverse import reverse
-from rest_framework.response import Response
-from rest_framework.views import APIView
 from collections import OrderedDict
+
+from django.urls import include, path
+from drf_spectacular.utils import extend_schema
+from rest_framework.permissions import IsAuthenticated
+from rest_framework.response import Response
+from rest_framework.reverse import reverse
+from rest_framework.views import APIView
+
+from itambox.api.routers import ITAMBoxRouter
+
 from . import views
 
 app_name = 'users_api'
@@ -13,10 +18,8 @@ router.register(r'users', views.UserViewSet)
 router.register(r'groups', views.GroupViewSet)
 router.register(r'tokens', views.TokenViewSet, basename='token')
 
-from drf_spectacular.utils import extend_schema
-
 class UsersAPIRootView(APIView):
-    _ignore_model_permissions = True
+    permission_classes = [IsAuthenticated]
 
     def get_view_name(self):
         return "Users API Root"
