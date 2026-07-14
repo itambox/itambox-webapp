@@ -28,8 +28,9 @@
                 <p class="text-muted">
                     {% blocktranslate with tenant=role.tenant.name %}
                     Select users to assign to this role in tenant <strong>{{ tenant }}</strong>.
-                    Users without a membership will be added; users already in this tenant with a
-                    different role will be reassigned; users already holding this role are unchanged.
+                    Users without a membership will be added; users already in this tenant get the
+                    role granted in addition to what they hold; users already holding this role are
+                    unchanged.
                     {% endblocktranslate %}
                 </p>
                 <form method="post">

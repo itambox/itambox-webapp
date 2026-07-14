@@ -74,11 +74,14 @@ class TenantViewTests(TestCase):
         response = self.client.post(url, {
             'user': self.user.pk,
             'tenant': self.tenant.pk,
-            'roles': [role.pk],
+            'own_roles': [role.pk],
         })
         self.assertEqual(response.status_code, 302)
-        self.assertIn(reverse('users:user_detail', kwargs={'pk': self.user.pk}), response.url)
-        self.assertTrue(Membership.objects.filter(user=self.user, tenant=self.tenant).exists())
+        membership = Membership.objects.get(user=self.user, tenant=self.tenant)
+        self.assertEqual(
+            response.url,
+            reverse('organization:membership_detail', kwargs={'pk': membership.pk}),
+        )
 
 
     def test_edit_view_post(self):
@@ -184,7 +187,7 @@ class TenantGroupViewExpansionTests(TestCase):
         self.group.refresh_from_db()
         self.assertEqual(self.group.name, 'Premium Clients Updated')
 
-class MultiTenantMembershipAndInvitationTests(TestCase):
+class MultiTenantMembershipTests(TestCase):
     def setUp(self):
         self.tenant_a = Tenant.objects.create(name="Tenant A", slug="tenant-a")
         self.tenant_b = Tenant.objects.create(name="Tenant B", slug="tenant-b")
@@ -239,63 +242,76 @@ class MultiTenantMembershipAndInvitationTests(TestCase):
         )
 
     def test_tenant_membership_creation_and_string_representation(self):
-        from organization.models import Membership
-        membership = Membership.objects.create(user=self.user,
-            tenant=self.tenant_a,
+        from organization.models import RoleAssignment
+        from core.tests.mixins import grant
+        membership = grant(self.user, self.tenant_a, self.role_member).membership
+        self.assertTrue(
+            membership.assignments.filter(
+                role=self.role_member, reach=RoleAssignment.REACH_OWN,
+            ).exists()
         )
-        membership.roles.add(self.role_member)
-        self.assertIn(self.role_member, membership.roles.all())
+        self.assertEqual(str(membership), f"{self.user} @ {self.tenant_a}")
 
-    def test_invitation_acceptance_and_assetholder_linking(self):
-        from organization.models import TenantInvitation, Membership
-        from django.utils import timezone
-        
+    def test_membership_creation_binds_matching_assetholder(self):
+        """The invitation flow is gone — holder binding now fires on membership creation
+        (organization/signals.py bind_asset_holder_on_membership): an unclaimed AssetHolder
+        in the joined tenant with a matching email (case-insensitive) is claimed."""
+        from organization.models import Membership, RoleAssignment
+
         holder = AssetHolder.objects.create(
             first_name="Beate",
             last_name="Office",
             upn="beate.office",
-            email="beate@example.com",
+            email="Beate@example.com",  # different casing than the account email
             tenant=self.tenant_a
         )
         self.assertIsNone(holder.user)
 
-        # A real inviter who holds the granted role's permissions in the tenant: the
-        # accept-time escalation re-check (RBAC review #1) validates the granted role
-        # against the inviter's current perms and fails closed if invited_by is None.
-        inviter = User.objects.create_user(
-            username='inviter', email='inviter@example.com', password='password123'
-        )
-        inviter_membership = Membership.objects.create(user=inviter, tenant=self.tenant_a)
-        inviter_membership.roles.add(self.role_admin)
-
-        invitation = TenantInvitation.objects.create(
-            email="beate@example.com",
-            tenant=self.tenant_a,
-            role=self.role_admin,
-            invited_by=inviter,
-            expires_at=timezone.now() + timezone.timedelta(days=7)
-        )
-        self.assertTrue(invitation.is_valid)
-        self.assertEqual(str(invitation), "Invite for beate@example.com to Tenant A")
-        
-        invitee_user = User.objects.create_user(
+        joining_user = User.objects.create_user(
             username='beate_user', email='beate@example.com', password='password123'
         )
-        from organization.models import accept_invitation
-        accept_invitation(invitation, invitee_user)
+        membership = Membership.objects.create(user=joining_user, tenant=self.tenant_a)
+        RoleAssignment.objects.create(
+            membership=membership, role=self.role_member, reach=RoleAssignment.REACH_OWN,
+        )
 
-        membership = Membership.objects.get(user=invitee_user, tenant=self.tenant_a)
-        self.assertIn(self.role_admin, membership.roles.all())
-        
-        invitation.refresh_from_db()
-        self.assertFalse(invitation.is_valid)
-        self.assertIsNotNone(invitation.accepted_at)
-        
         holder.refresh_from_db()
-        self.assertEqual(holder.user, invitee_user)
+        self.assertEqual(holder.user, joining_user)
+
+    def test_membership_creation_binding_respects_tenant_claim_and_email(self):
+        """No binding across tenants, onto already-claimed holders, or on email mismatch."""
+        from organization.models import Membership
+
+        other_owner = User.objects.create_user(
+            username='owner', email='owner@example.com', password='password123'
+        )
+        claimed = AssetHolder.objects.create(
+            first_name="Claimed", last_name="Holder", upn="claimed.holder",
+            email="beate@example.com", tenant=self.tenant_a, user=other_owner,
+        )
+        wrong_tenant = AssetHolder.objects.create(
+            first_name="Other", last_name="Tenant", upn="other.tenant",
+            email="beate@example.com", tenant=self.tenant_b,
+        )
+        wrong_email = AssetHolder.objects.create(
+            first_name="Wrong", last_name="Email", upn="wrong.email",
+            email="someone.else@example.com", tenant=self.tenant_a,
+        )
+
+        joining_user = User.objects.create_user(
+            username='beate_user2', email='beate@example.com', password='password123'
+        )
+        Membership.objects.create(user=joining_user, tenant=self.tenant_a)
+
+        claimed.refresh_from_db()
+        wrong_tenant.refresh_from_db()
+        wrong_email.refresh_from_db()
+        self.assertEqual(claimed.user, other_owner)   # not stolen
+        self.assertIsNone(wrong_tenant.user)          # tenant boundary respected
+        self.assertIsNone(wrong_email.user)           # email must match
 
     def test_tenant_membership_backend_permissions(self):
-        from organization.models import Membership
+        from organization.models import Membership, RoleAssignment
         from core.managers import set_current_membership
 
         def _flush():
@@ -305,24 +321,34 @@ class MultiTenantMembershipAndInvitationTests(TestCase):
                 if attr.startswith('_perms_tenant_') or attr.startswith('_tenant_membership_'):
                     delattr(self.user, attr)
 
+        def _set_role(membership, role):
+            # Successor to the deleted roles-M2M `.set([...])`: swap the single
+            # own-reach RoleAssignment row for this membership.
+            RoleAssignment.objects.filter(
+                membership=membership, reach=RoleAssignment.REACH_OWN,
+            ).delete()
+            RoleAssignment.objects.create(
+                membership=membership, role=role, reach=RoleAssignment.REACH_OWN,
+            )
+
         reader_mem = Membership.objects.create(user=self.user,
             tenant=self.tenant_a,
         )
-        reader_mem.roles.set([self.role_reader])
+        _set_role(reader_mem, self.role_reader)
 
         set_current_membership(reader_mem)
         _flush()
         self.assertTrue(self.user.has_perm('assets.view_asset'))
         self.assertFalse(self.user.has_perm('assets.add_asset'))
 
-        reader_mem.roles.set([self.role_member])
+        _set_role(reader_mem, self.role_member)
         set_current_membership(reader_mem)
         _flush()
         self.assertTrue(self.user.has_perm('assets.view_asset'))
         self.assertTrue(self.user.has_perm('assets.add_asset'))
         self.assertFalse(self.user.has_perm('assets.delete_asset'))
 
-        reader_mem.roles.set([self.role_admin])
+        _set_role(reader_mem, self.role_admin)
         set_current_membership(reader_mem)
         _flush()
         self.assertTrue(self.user.has_perm('assets.view_asset'))
@@ -332,15 +358,17 @@ class MultiTenantMembershipAndInvitationTests(TestCase):
         set_current_membership(None)
 
     def test_tenant_switching_middleware(self):
-        from organization.models import Membership
+        from organization.models import Membership, RoleAssignment
         from django.contrib.sessions.middleware import SessionMiddleware
         from itambox.middleware import TenantMiddleware
         from django.test import RequestFactory
-        
+
         mem = Membership.objects.create(user=self.user,
             tenant=self.tenant_a,
         )
-        mem.roles.add(self.role_member)
+        RoleAssignment.objects.create(
+            membership=mem, role=self.role_member, reach=RoleAssignment.REACH_OWN,
+        )
 
         factory = RequestFactory()
         

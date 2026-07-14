@@ -301,12 +301,10 @@ class Consumable(AbstractInventoryItem):
 
 
 class ComponentStock(AbstractStock):
-    tenant_lookup = 'component__tenant'
+    # tenant is a REAL field derived from location.tenant (AbstractStock);
+    # scoping runs on it directly — the catalogue item's tenant is irrelevant
+    # to pool ownership (ADR-0001 phase 4).
     objects = TenantScopingManager()
-
-    @property
-    def tenant(self):
-        return self.component.tenant if self.component_id else None
 
     component = models.ForeignKey(
         Component, on_delete=models.PROTECT, related_name='stocks', verbose_name=_("Component"), db_index=True
@@ -337,12 +335,8 @@ class ComponentStock(AbstractStock):
 
 
 class AccessoryStock(AbstractStock):
-    tenant_lookup = 'accessory__tenant'
+    # See ComponentStock — tenant derives from location.tenant.
     objects = TenantScopingManager()
-
-    @property
-    def tenant(self):
-        return self.accessory.tenant if self.accessory_id else None
 
     accessory = models.ForeignKey(
         Accessory, on_delete=models.PROTECT, related_name='stocks', verbose_name=_("Accessory"), db_index=True
@@ -366,12 +360,8 @@ class AccessoryStock(AbstractStock):
 
 
 class ConsumableStock(AbstractStock):
-    tenant_lookup = 'consumable__tenant'
+    # See ComponentStock — tenant derives from location.tenant.
     objects = TenantScopingManager()
-
-    @property
-    def tenant(self):
-        return self.consumable.tenant if self.consumable_id else None
 
     consumable = models.ForeignKey(
         Consumable, on_delete=models.PROTECT, related_name='stocks', verbose_name=_("Consumable"), db_index=True
@@ -396,6 +386,8 @@ class ConsumableStock(AbstractStock):
 
 class ComponentAllocation(AbstractAssignment):
     tenant_lookup = 'component__tenant'
+    _item_attr = 'component'
+    _stock_model_label = 'inventory.ComponentStock'
     objects = TenantScopingSoftDeleteManager()
     all_objects = TenantScopingAllObjectsManager()
 
@@ -468,6 +460,8 @@ class ComponentAllocation(AbstractAssignment):
 
 class AccessoryAssignment(AbstractAssignment):
     tenant_lookup = 'accessory__tenant'
+    _item_attr = 'accessory'
+    _stock_model_label = 'inventory.AccessoryStock'
     objects = TenantScopingSoftDeleteManager()
     all_objects = TenantScopingAllObjectsManager()
 
@@ -508,6 +502,8 @@ class AccessoryAssignment(AbstractAssignment):
 
 class ConsumableAssignment(AbstractAssignment):
     tenant_lookup = 'consumable__tenant'
+    _item_attr = 'consumable'
+    _stock_model_label = 'inventory.ConsumableStock'
     objects = TenantScopingSoftDeleteManager()
     all_objects = TenantScopingAllObjectsManager()
 

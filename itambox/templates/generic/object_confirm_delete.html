@@ -30,6 +30,16 @@
                 {% block message %}
                 <p>{% translate "Are you sure you want to delete" %} <strong>{{ object }}</strong>?</p>
                 {% endblock message %}
+                {% comment %}
+                Optional extra warning a specific delete view may pass via context —
+                e.g. RoleDeleteView explaining shared-role assignment fallout. Absent
+                for every other delete view, so this is a no-op there.
+                {% endcomment %}
+                {% if extra_warning %}
+                <div class="alert alert-warning" role="alert">
+                    {{ extra_warning }}
+                </div>
+                {% endif %}
                 <form method="post">
                     {% csrf_token %}
                     {# Render the form if provided (e.g., ConfirmationForm from base view) #}

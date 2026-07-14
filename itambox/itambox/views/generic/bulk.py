@@ -12,7 +12,7 @@ from django.views.generic.base import TemplateResponseMixin
 
 from core.forms import BulkEditForm
 from itambox.views.htmx import BaseHTMXView
-from itambox.views.generic.mixins import BulkViewMixin
+from itambox.views.generic.mixins import BulkViewMixin, filter_permitted_rows
 from itambox.views.generic.utils import safe_return_url
 
 logger = logging.getLogger(__name__)
@@ -55,7 +55,15 @@ class ObjectBulkEditView(BulkViewMixin, PermissionRequiredMixin, LoginRequiredMi
             messages.warning(request, _("No %(objects)s were selected.") % {'objects': model._meta.verbose_name_plural})
             return HttpResponseRedirect(return_url)
 
-        queryset = self._get_queryset(pks)
+        # Per-row change-perm enforcement (see filter_permitted_rows): the
+        # dispatch gate alone is too coarse inside a multi-tenant group scope.
+        queryset, skipped = filter_permitted_rows(request.user, self._get_queryset(pks), model, 'change')
+        if skipped:
+            messages.warning(request, _(
+                "Skipped %(count)s %(objects)s you do not have permission to change."
+            ) % {'count': skipped, 'objects': model._meta.verbose_name_plural})
+        if not queryset:
+            return HttpResponseRedirect(return_url)
 
         if '_apply' in request.POST:
             form = self._get_bulk_edit_form(request.POST, model)
@@ -176,8 +184,15 @@ class ObjectBulkDeleteView(BulkViewMixin, PermissionRequiredMixin, LoginRequired
             messages.warning(request, _("No %(objects)s were selected.") % {'objects': model._meta.verbose_name_plural})
             return HttpResponseRedirect(return_url)
 
-        queryset = self._get_queryset(pks)
-        objects_to_delete = list(queryset)
+        # Per-row delete-perm enforcement (see filter_permitted_rows): the
+        # dispatch gate alone is too coarse inside a multi-tenant group scope.
+        objects_to_delete, skipped = filter_permitted_rows(
+            request.user, self._get_queryset(pks), model, 'delete',
+        )
+        if skipped:
+            messages.warning(request, _(
+                "Skipped %(count)s %(objects)s you do not have permission to delete."
+            ) % {'count': skipped, 'objects': model._meta.verbose_name_plural})
 
         if not objects_to_delete:
             messages.warning(request, _("No valid %(objects)s selected for deletion.") % {'objects': model._meta.verbose_name_plural})

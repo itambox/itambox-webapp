@@ -1,0 +1,21 @@
+{% extends "generic/object_list.html" %}
+{% load i18n %}
+
+{% block content %}
+{{ block.super }}
+{% if outside_access_tenant %}
+{% comment %}
+Lazily-loaded "Access from outside this tenant" audit panel (RBAC stage 3):
+provider staff reaching the active tenant via managed-reach grants, plus user-group
+members holding this tenant's roles — all without a local membership row. The
+endpoint (?panel=outside_access on this same list URL) returns an empty body when
+nobody reaches the tenant from outside, so no empty panel chrome ever renders.
+{% endcomment %}
+<div id="outside-access-panel"
+     class="mt-3"
+     hx-get="{% url 'organization:membership_list' %}?panel=outside_access"
+     hx-trigger="load once"
+     hx-target="this"
+     hx-swap="innerHTML"></div>
+{% endif %}
+{% endblock content %}

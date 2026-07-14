@@ -42,7 +42,7 @@ class UserProfileView(LoginRequiredMixin, BaseHTMXView, UpdateView):
         context['active_tab'] = 'profile'
         context['user'] = self.request.user
         from organization.models import Membership
-        context['user_memberships'] = Membership.objects.filter(user=self.request.user).select_related('tenant').prefetch_related('roles')
+        context['user_memberships'] = Membership.objects.filter(user=self.request.user).select_related('tenant').prefetch_related('assignments__role')
         activity_qs = ObjectChange.objects.filter(user=self.request.user)[:15]
         activity_table = ObjectChangeTable(activity_qs, request=self.request)
         activity_table.configure(self.request, paginate=False)
@@ -562,7 +562,7 @@ class UserBulkEditView(ObjectBulkEditView):
 
 class UserDetailView(ObjectDetailView):
     queryset = User.objects.prefetch_related(
-        'memberships__tenant', 'memberships__provider', 'memberships__roles',
+        'memberships__tenant', 'memberships__assignments__role',
     )
     template_name = 'users/user_detail.html'
 
@@ -608,7 +608,8 @@ from django.contrib.auth.mixins import UserPassesTestMixin
 from django.db import transaction
 from django.db.models import Count, Prefetch
 from itambox.views.generic import ObjectBulkDeleteView
-from organization.models import Role, Membership
+from organization.models import Role, Tenant
+from organization.access import accessible_tenant_ids
 from core.auth.guards import validate_group_membership_grant
 from .models import UserGroup
 from .tables import UserGroupTable
@@ -616,22 +617,43 @@ from .filters import UserGroupFilterSet
 from .forms import UserGroupForm, UserGroupFilterForm, UserGroupAssignUsersForm
 
 
+def _group_admin_tenant_ids(user, perms):
+    """Ids of the user's accessible tenants where they hold ANY of ``perms``.
+
+    _base_manager: gate evaluation is cross-tenant machinery — the tenant-scoped
+    default Tenant manager silently returns nothing outside a matching tenant context.
+    """
+    ids = accessible_tenant_ids(user)
+    if not ids:
+        return []
+    return [
+        tenant.pk
+        for tenant in Tenant._base_manager.filter(pk__in=ids, deleted_at__isnull=True)
+        if any(user.has_perm(perm, obj=tenant) for perm in perms)
+    ]
+
+
 def is_global_group_admin(user):
-    """User groups are global and can grant cross-tenant access, so only global admins
-    may manage them: superusers, provider staff holding ``can_manage_groups``, OR a user
-    directly granted the legacy ``organization.manage_groups`` capability (single-company
-    backward compat). Delegates to core.auth.provider.can_manage_user_groups."""
-    from core.auth.provider import can_manage_user_groups
-    return can_manage_user_groups(user)
+    """Group-administration gate: user groups can grant cross-tenant access, so managing
+    them requires being a superuser OR holding ``users.add_usergroup`` /
+    ``users.change_usergroup`` in at least one of the user's tenants. Single source for
+    the views here and the navigation gate (kept in parity by tests)."""
+    if user is None or not getattr(user, 'is_authenticated', False):
+        return False
+    if user.is_superuser:
+        return True
+    return bool(_group_admin_tenant_ids(
+        user, ('users.add_usergroup', 'users.change_usergroup'),
+    ))
 
 
 class GlobalGroupAdminMixin(UserPassesTestMixin):
-    """Restrict a UserGroup view to global admins (see is_global_group_admin).
+    """Restrict a UserGroup view to group admins (see is_global_group_admin).
 
-    Group management is gated SOLELY on the global group-management capability — never on
-    the per-model ``view/add/change_usergroup`` permissions. ``test_func`` enforces the
-    capability; ``get_permission_required`` returns an empty set so the generic
-    PermissionRequiredMixin in the MRO does not additionally require ``view_usergroup``."""
+    ``test_func`` enforces the gate (standard ``users.*_usergroup`` perms held in any of
+    the user's tenants); ``get_permission_required`` returns an empty set so the generic
+    PermissionRequiredMixin in the MRO does not additionally require ``view_usergroup``
+    in the ACTIVE tenant — group administration is a cross-tenant surface."""
     def test_func(self):
         return is_global_group_admin(self.request.user)
 
@@ -649,10 +671,27 @@ class UserGroupListView(GlobalGroupAdminMixin, ObjectListView):
     table = UserGroupTable
     action_buttons = ('add',)
 
+    def get_queryset(self):
+        """Superusers see all groups (including global, tenant-less ones); everyone else
+        sees the groups owned by tenants where they hold ``users.view_usergroup``."""
+        qs = super().get_queryset()
+        user = self.request.user
+        if user.is_superuser:
+            return qs
+        viewable_ids = _group_admin_tenant_ids(user, ('users.view_usergroup',))
+        return qs.filter(tenant_id__in=viewable_ids)
+
 
 class UserGroupDetailView(GlobalGroupAdminMixin, ObjectDetailView):
     queryset = UserGroup.objects.prefetch_related(
-        Prefetch('roles', queryset=Role.objects.order_by('scope', 'name')),
+        Prefetch(
+            'roles',
+            # _base_manager: the group detail must show carried roles from EVERY tenant,
+            # not just the active one (the default Role manager is tenant-scoped).
+            queryset=Role._base_manager.filter(
+                deleted_at__isnull=True,
+            ).select_related('tenant').order_by('tenant__name', 'name'),
+        ),
         'members',
     ).annotate(
         member_count=Count('members', distinct=True),

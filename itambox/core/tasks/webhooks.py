@@ -16,7 +16,9 @@ def send_webhook_task(url, method, headers, secret, event_action, event_model_ap
                       attempt=0, retry_count=3, retry_backoff=60, webhook_endpoint_id=None):
     """Dispatch a webhook event. Retries on 5xx and connection errors; 4xx are final."""
     from django.core.exceptions import ValidationError
-    from core.validators import validate_external_url
+    # inline import: core.http imports core.validators (django-loaded); keep the task
+    # module import-light for django-q payload loading.
+    from core.http import request_pinned
 
     # Re-derive the (encrypted-at-rest) secret from the endpoint at run time so it never has
     # to be persisted in the django_q payload / retry Schedule.kwargs (both stored plaintext).
@@ -26,19 +28,15 @@ def send_webhook_task(url, method, headers, secret, event_action, event_model_ap
         if endpoint:
             secret = endpoint.secret_decrypted
 
-    # SSRF guard: never let a tenant-configured URL drive a request to an internal
-    # address. Re-checked here at send time (not just at save) to limit DNS
-    # rebinding. A blocked URL is final — do not retry.
-    try:
-        validate_external_url(url)
-    except ValidationError as exc:
-        logger.error("Webhook %s blocked by SSRF guard: %s", url, exc)
-        return
-
+    # SSRF guard: every send goes through core.http.request_pinned, which
+    # validates the URL at send time (fail closed, incl. unresolvable hosts)
+    # AND pins the connection to the validated address — the request cannot be
+    # re-routed by a second DNS answer between check and use (DNS rebinding),
+    # and redirects are never followed. A blocked URL is final — do not retry.
     try:
         if 'hooks.slack.com' in url:
             payload = {'text': f"Event: {event_action} on {event_model_name} (ID: {event_object_id})"}
-            response = requests.post(url, json=payload, timeout=10)
+            response = request_pinned('POST', url, json=payload, timeout=10)
         elif 'webhook.office.com' in url or 'outlook.office.com/webhook' in url:
             payload = {
                 '@type': 'MessageCard',
@@ -48,7 +46,7 @@ def send_webhook_task(url, method, headers, secret, event_action, event_model_ap
                 'title': 'ITAMbox Notification',
                 'text': f"Event: {event_action} on {event_model_name} (ID: {event_object_id})",
             }
-            response = requests.post(url, json=payload, timeout=10)
+            response = request_pinned('POST', url, json=payload, timeout=10)
         else:
             payload = {
                 'event': event_action,
@@ -67,7 +65,7 @@ def send_webhook_task(url, method, headers, secret, event_action, event_model_ap
                 ).hexdigest()
                 req_headers['X-Hub-Signature-256'] = f'sha256={sig}'
             req_headers.setdefault('Content-Type', 'application/json')
-            response = requests.request(method=method, url=url, headers=req_headers, data=body, timeout=10)
+            response = request_pinned(method, url, headers=req_headers, data=body, timeout=10)
 
         if 400 <= response.status_code < 500:
             logger.warning("Webhook %s returned %s — not retrying (4xx is final)", url, response.status_code)
@@ -75,6 +73,11 @@ def send_webhook_task(url, method, headers, secret, event_action, event_model_ap
         response.raise_for_status()
         logger.info("Webhook sent to %s — status %s", url, response.status_code)
 
+    except ValidationError as exc:
+        # Blocked by the SSRF guard (internal target, bad scheme, or unresolvable
+        # host — fail closed). Final: never retried.
+        logger.error("Webhook %s blocked by SSRF guard: %s", url, exc)
+        return
     except requests.RequestException as exc:
         if attempt >= retry_count:
             logger.error("Webhook %s: all %d attempts failed: %s", url, retry_count, exc)

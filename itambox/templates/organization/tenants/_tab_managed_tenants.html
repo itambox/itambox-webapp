@@ -1,0 +1,61 @@
+{% load i18n %}
+{% comment %}
+Lazy hx-get partial for the "Managed Tenants" tab on an is_provider tenant's
+detail page (RBAC stage-3 §3). Rendered by
+organization.views.tenant_views.TenantManagedTenantsTabView — its own URL
+(tenants/<pk>/managed/), not the ?tab= dispatch the sibling tabs on
+TenantDetailView use.
+
+Expects: tenant, managed_tenants (Tenant queryset annotated with member_count),
+can_add_managed_tenant
+{% endcomment %}
+<div class="card border-0 shadow-sm">
+    <div class="card-header border-0 bg-transparent d-flex justify-content-between align-items-center">
+        <h3 class="card-title">{% translate "Managed Tenants" %}</h3>
+        {% if can_add_managed_tenant %}
+        <a href="{% url 'organization:tenant_create' %}?managed_by={{ tenant.pk }}" class="btn btn-sm btn-primary">
+            <i class="mdi mdi-plus"></i>
+            {% translate "Add managed tenant" %}
+        </a>
+        {% endif %}
+    </div>
+    {% if managed_tenants %}
+        <div class="table-responsive">
+            <table class="table table-hover align-middle border mb-0">
+                <thead class="table-light">
+                    <tr>
+                        <th>{% translate "Name" %}</th>
+                        <th>{% translate "Group" %}</th>
+                        <th>{% translate "Members" %}</th>
+                        <th>{% translate "Created" %}</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for mt in managed_tenants %}
+                    <tr>
+                        <td>
+                            <a href="{% url 'organization:tenant_detail' pk=mt.pk %}">{{ mt.name }}</a>
+                        </td>
+                        <td>
+                            {% if mt.group %}
+                                <a href="{% url 'organization:tenantgroup_detail' pk=mt.group_id %}">{{ mt.group.name }}</a>
+                            {% else %}
+                                <span class="text-muted">&mdash;</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            <span class="badge bg-secondary-lt">{{ mt.member_count }}</span>
+                        </td>
+                        <td>{{ mt.created_at|date:"Y-m-d" }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    {% else %}
+        <div class="card-body py-5 text-muted text-center">
+            <i class="mdi mdi-domain text-muted mb-2" style="font-size: 2rem; display: block;"></i>
+            <p class="mb-0">{% translate "No managed tenants yet." %}</p>
+        </div>
+    {% endif %}
+</div>

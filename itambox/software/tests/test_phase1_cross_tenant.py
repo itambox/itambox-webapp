@@ -13,9 +13,10 @@ from django.test import TestCase
 from django.contrib.auth import get_user_model
 from django.urls import reverse
 
-from organization.models import Tenant, Role, Membership
+from organization.models import Tenant, Role
 from assets.models import Manufacturer
 from software.models import Software
+from core.tests.mixins import grant
 
 User = get_user_model()
 
@@ -37,9 +38,8 @@ class SoftwareApiCrossTenantTestCase(TestCase):
                 'software.delete_software', 'software.add_software',
             ],
         )
-        self.membership_b = Membership.objects.create(user=self.user_b, tenant=self.tenant_b,
-        )
-        self.membership_b.roles.add(self.role_b)
+        self.assignment_b = grant(self.user_b, self.tenant_b, self.role_b)
+        self.membership_b = self.assignment_b.membership
 
         self.mfr = Manufacturer.objects.create(name='Microsoft', slug='microsoft')
 

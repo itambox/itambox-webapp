@@ -2,6 +2,7 @@ from django.test import TestCase
 from django.urls import reverse
 from django.contrib.auth import get_user_model
 from organization.models import Tenant, Role, Membership
+from core.tests.mixins import grant
 
 User = get_user_model()
 
@@ -17,10 +18,7 @@ class HTMXViewsTestCase(TestCase):
                 'assets.view_manufacturer',
             ]
         )
-        self.membership = Membership.objects.create(user=self.user,
-            tenant=self.tenant,
-        )
-        self.membership.roles.add(self.role)
+        self.membership = grant(self.user, self.tenant, self.role).membership
         self.client.force_login(self.user)
 
     def test_non_htmx_request_returns_full_template(self):

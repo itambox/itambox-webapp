@@ -63,6 +63,7 @@ class CoreConfig(AppConfig):
         BaseForm.__init__ = scoped_baseform_init
 
         post_migrate.connect(self._register_alert_schedule, sender=self)
+        post_migrate.connect(self._register_prune_schedule, sender=self)
 
     def _register_alert_schedule(self, sender, **kwargs):
         """Ensure the daily alert evaluation schedule exists in django-q2."""
@@ -74,6 +75,21 @@ class CoreConfig(AppConfig):
             'core.tasks.evaluate_alert_rules_task',
             defaults={
                 'name': 'Daily Alert Rule Evaluation',
+                'schedule_type': Schedule.DAILY,
+                'repeats': -1,
+            },
+        )
+
+    def _register_prune_schedule(self, sender, **kwargs):
+        """Ensure the daily changelog/operational-data retention prune schedule exists."""
+        # inline import: avoid AppRegistryNotReady at app-load time
+        from django_q.models import Schedule
+        from core.schedules import register_schedule
+
+        register_schedule(
+            'core.tasks.prune_changelog_task',
+            defaults={
+                'name': 'Daily Changelog & Operational-Data Retention Prune',
                 'schedule_type': Schedule.DAILY,
                 'repeats': -1,
             },

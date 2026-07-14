@@ -1,21 +1,23 @@
-"""Unified Role form (tenant- and provider-scoped) with permission-matrix UI.
+"""Role form (tenant-owned permission set) with permission-matrix UI.
 
-A single ``RoleForm`` handles every kind of role:
-
-  * tenant-scoped roles (``scope='tenant'``) — the per-tenant role the prior ``TenantRole``
-    used to carry. Renders the per-model CRUD matrix only.
-  * provider-scoped roles (``scope='provider'``) — the MSP staff role projected across the
-    provider's tenants (replaces ``ProviderRoleTemplate`` + ``ProviderRole``). Renders the
-    per-model CRUD matrix **and** the provider capability section
-    (``organization.manage_tenants`` / ``manage_staff`` / ``manage_groups`` / ``manage_provider``).
+Post-collapse there is exactly one kind of role: a permission set owned by a
+tenant. The owner is never picked on the form — it comes from context (the
+``?tenant=`` deep-link or the active tenant) on create and is immutable on edit.
+Roles owned by a managing (``is_provider``) tenant can additionally be shared
+with its managed tenants via the ``shared_with_managed`` checkbox.
 """
 from django import forms
+from django.apps import apps as django_apps
+from django.contrib.auth import get_user_model
+from django.contrib.auth.models import Permission
 from django.utils.translation import gettext_lazy as _
 from crispy_forms.helper import FormHelper
 from crispy_forms.layout import Layout
 from core.forms import FilterForm
 from core.auth.guards import validate_permission_grant
-from ..models import Role, Tenant, Provider
+from core.managers import get_current_tenant
+from ..models import Role
+from .helpers import add_standard_buttons
 
 
 MATRIX_MODELS = {
@@ -42,12 +44,12 @@ MATRIX_MODELS = {
     'assetholder': {'label': _('Asset Holders'), 'app': 'organization', 'model_name': 'assetholder', 'group': _('Organization & Structure')},
     'role': {'label': _('Roles & Permissions'), 'app': 'organization', 'model_name': 'role', 'group': _('Organization & Structure')},
     'membership': {'label': _('Memberships'), 'app': 'organization', 'model_name': 'membership', 'group': _('Organization & Structure')},
+    'roleassignment': {'label': _('Role Assignments'), 'app': 'organization', 'model_name': 'roleassignment', 'group': _('Organization & Structure')},
     'region': {'label': _('Regions'), 'app': 'organization', 'model_name': 'region', 'group': _('Organization & Structure')},
     'sitegroup': {'label': _('Site Groups'), 'app': 'organization', 'model_name': 'sitegroup', 'group': _('Organization & Structure')},
     'tenantgroup': {'label': _('Tenant Groups'), 'app': 'organization', 'model_name': 'tenantgroup', 'group': _('Organization & Structure')},
     'contact': {'label': _('Contacts'), 'app': 'organization', 'model_name': 'contact', 'group': _('Organization & Structure')},
     'contactrole': {'label': _('Contact Roles'), 'app': 'organization', 'model_name': 'contactrole', 'group': _('Organization & Structure')},
-    'tenantinvitation': {'label': _('Tenant Invitations'), 'app': 'organization', 'model_name': 'tenantinvitation', 'group': _('Organization & Structure')},
 
     # Metadata & Settings
     'manufacturer': {'label': _('Manufacturers'), 'app': 'assets', 'model_name': 'manufacturer', 'group': _('Metadata & Settings')},
@@ -97,20 +99,10 @@ MATRIX_MODELS = {
 
 # Drop plugin entries when the plugin is not installed; their permission codenames don't
 # exist and the whitelist validation would reject them otherwise.
-from django.apps import apps as _django_apps  # noqa: E402
 for _plugin_key, _plugin_app in (('docusignenvelope', 'itambox_esign'),):
-    if not _django_apps.is_installed(_plugin_app):
+    if not django_apps.is_installed(_plugin_app):
         MATRIX_MODELS.pop(_plugin_key, None)
 
-
-# Provider-level capabilities only meaningful on provider-scoped roles. Registered as
-# permissions on ``organization.Provider`` (see ``Provider.Meta.permissions``).
-PROVIDER_CAPABILITIES = [
-    ('manage_provider', _('Manage provider settings')),
-    ('manage_tenants',  _('Manage customer tenants')),
-    ('manage_staff',    _('Manage provider staff')),
-    ('manage_groups',   _('Manage user groups')),
-]
 
 # Custom (non-CRUD) permissions exposed as named checkboxes alongside the matrix.
 CUSTOM_PERMISSIONS = [
@@ -121,105 +113,44 @@ CUSTOM_PERMISSIONS = [
 
 
 class RoleForm(forms.ModelForm):
-    """Unified ModelForm for ``organization.Role`` (tenant- or provider-scoped)."""
-
-    tenant = forms.ModelChoiceField(
-        queryset=Tenant.objects.none(),
-        required=False,
-        widget=forms.Select(attrs={'class': 'form-select'}),
-        label=_("Tenant"),
-    )
-    provider = forms.ModelChoiceField(
-        queryset=Provider.objects.none(),
-        required=False,
-        widget=forms.Select(attrs={'class': 'form-select'}),
-        label=_("Provider"),
-    )
-    scope = forms.ChoiceField(
-        choices=Role.SCOPE_CHOICES,
-        widget=forms.Select(attrs={'class': 'form-select'}),
-        label=_("Scope"),
-    )
+    """ModelForm for ``organization.Role`` — owner tenant comes from context, never a picker."""
 
     class Meta:
         model = Role
-        fields = ['name', 'scope', 'tenant', 'provider', 'description', 'is_default']
+        fields = ['name', 'description', 'shared_with_managed']
         widgets = {
             'name': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'e.g. Inventory Manager'}),
             'description': forms.Textarea(attrs={'class': 'form-control', 'rows': 3, 'placeholder': _('Describe the role…')}),
-            'is_default': forms.CheckboxInput(attrs={'class': 'form-check-input'}),
+            # role="switch" pairs with the .form-switch wrapper role_form.html renders it
+            # in — a highlighted switch, not a plain checkbox (RBAC_STAGE3_SPEC.md §4).
+            'shared_with_managed': forms.CheckboxInput(attrs={'class': 'form-check-input', 'role': 'switch'}),
         }
 
     def __init__(self, *args, **kwargs):
         self.current_user = kwargs.pop('user', None)
-        self.tenant = kwargs.pop('tenant', None)
-        self.provider = kwargs.pop('provider', None)
-        # Set by RoleEditView on a fresh add with no bound container: render both container
-        # pickers and let the user choose tenant vs provider (scope derived from the choice).
-        self.allow_container_choice = kwargs.pop('allow_container_choice', False)
+        tenant_ctx = kwargs.pop('tenant', None)
         super().__init__(*args, **kwargs)
 
-        # Scope is decided by which container the form is bound to (tenant vs provider),
-        # not picked by the user. We populate ``initial`` and mark the field disabled so
-        # Django always derives the value from initial, regardless of what the data dict
-        # carries — this keeps the form valid for both short ({"name":…}) and full submits.
+        # Owner resolution: locked to the instance's tenant on edit; on create it is the
+        # context tenant (?tenant= deep-link from the view) falling back to the active
+        # tenant. There is deliberately no owner picker — a role always lives in the
+        # tenant you are working in.
         if self.instance.pk:
-            self.fields['scope'].initial = self.instance.scope
+            self.owner_tenant = self.instance.tenant
         else:
-            self.fields['scope'].initial = self.initial.get('scope') or (
-                Role.SCOPE_PROVIDER if self.provider else Role.SCOPE_TENANT
-            )
-        self.fields['scope'].required = False
-        self.fields['scope'].disabled = True
+            self.owner_tenant = tenant_ctx or get_current_tenant()
 
-        # Tenant / Provider field configuration. Both fields stay ``required=False`` at
-        # the field level — container presence is enforced in ``clean()`` against the
-        # resolved scope so we can carry the value through hidden inputs or context kwargs
-        # without tripping the auto-required validation when a form is re-submitted.
-        self.fields['tenant'].required = False
-        self.fields['provider'].required = False
-        if self.instance.pk and self.instance.scope == Role.SCOPE_TENANT:
-            self.fields['tenant'].queryset = Tenant.objects.filter(pk=self.instance.tenant_id)
-            self.fields['tenant'].initial = self.instance.tenant_id
-            self.fields['tenant'].widget = forms.HiddenInput()
-            self.fields['tenant'].disabled = True
-            self.fields['provider'].queryset = Provider.objects.none()
-            self.fields['provider'].widget = forms.HiddenInput()
-            self.fields['provider'].disabled = True
-        elif self.instance.pk and self.instance.scope == Role.SCOPE_PROVIDER:
-            self.fields['provider'].queryset = Provider.objects.filter(pk=self.instance.provider_id)
-            self.fields['provider'].initial = self.instance.provider_id
-            self.fields['provider'].widget = forms.HiddenInput()
-            self.fields['provider'].disabled = True
-            self.fields['tenant'].queryset = Tenant.objects.none()
-            self.fields['tenant'].widget = forms.HiddenInput()
-            self.fields['tenant'].disabled = True
+        # Sharing is only meaningful when the owner manages other tenants — the
+        # switch never renders for a plain tenant's role, even for a superuser.
+        if not (self.owner_tenant is not None and self.owner_tenant.is_provider):
+            self.fields.pop('shared_with_managed', None)
         else:
-            # Creating (fresh add or clone). Use the unscoped base manager so the pickers
-            # populate regardless of active-tenant context (the tenant-scoping default manager
-            # fails closed to empty when the form runs without a resolved tenant).
-            self.fields['tenant'].queryset = Tenant._base_manager.filter(deleted_at__isnull=True).order_by('name')
-            self.fields['provider'].queryset = Provider._base_manager.filter(deleted_at__isnull=True).order_by('name')
-            if self.tenant is not None:
-                self.fields['tenant'].initial = self.tenant.pk
-                self.fields['tenant'].widget = forms.HiddenInput()
-                self.fields['tenant'].disabled = True
-            if self.provider is not None:
-                self.fields['provider'].initial = self.provider.pk
-                self.fields['provider'].widget = forms.HiddenInput()
-                self.fields['provider'].disabled = True
-            if self.tenant is None and self.provider is None and not self.allow_container_choice:
-                # No container context and NOT the chooser (e.g. a clone): make the REQUIRED
-                # visible picker match the resolved scope, so the template renders the field the
-                # user must fill. A cloned provider role keeps scope='provider', so it must
-                # require the provider picker — requiring tenant (which the template then hides)
-                # made provider-role clones unsubmittable.
-                if self.is_provider_scoped:
-                    self.fields['provider'].required = True
-                else:
-                    self.fields['tenant'].required = True
-            # Chooser mode leaves BOTH pickers optional; clean() enforces exactly-one and
-            # derives the scope from whichever container the user selects.
+            # Single source of truth for the switch's copy — role_form.html renders
+            # this help_text verbatim rather than hand-copying it into the template.
+            self.fields['shared_with_managed'].help_text = _(
+                "Managed tenants can assign this role to their own members; only "
+                "you can edit it."
+            )
 
         # Build the CRUD matrix and pre-check from the instance's permission set.
         existing_perms = set(self.instance.permissions or [])
@@ -245,58 +176,28 @@ class RoleForm(forms.ModelForm):
             )
             self.fields[fname].initial = full in existing_perms
 
-        # Provider capabilities (rendered only on provider scope; cleaning ignores them
-        # for tenant-scoped roles).
-        for codename, label in PROVIDER_CAPABILITIES:
-            fname = f'cap_{codename}'
-            self.fields[fname] = forms.BooleanField(
-                required=False, label=label,
-                widget=forms.CheckboxInput(attrs={'class': 'form-check-input'}),
-            )
-            self.fields[fname].initial = f'organization.{codename}' in existing_perms
-
         # Crispy layout — the matrix sections render through {{ form.matrix_grouped_items }},
         # so we only need to lay out the meta fields here.
         self.helper = FormHelper(self)
         self.helper.form_method = 'post'
         self.helper.form_tag = True
-        layout_fields = ['name', 'scope']
-        if self.tenant is None and self.provider is None and not self.instance.pk:
-            layout_fields.extend(['tenant', 'provider'])
-        layout_fields.extend(['description', 'is_default'])
+        layout_fields = ['name', 'description']
+        if 'shared_with_managed' in self.fields:
+            layout_fields.append('shared_with_managed')
         self.helper.layout = Layout(*layout_fields)
-        from .helpers import add_standard_buttons
         add_standard_buttons(self.helper, self.instance, 'organization:role_list')
 
     # ------------------------------------------------------------------ cleaning
     def clean(self):
         cleaned_data = super().clean()
 
-        # Resolve scope. On edit it's locked to the instance. In chooser mode it's DERIVED from
-        # whichever container the user picked (exactly one required — the field is disabled and
-        # so cannot be user-set directly). Otherwise it comes from the context-derived scope.
-        if self.instance.pk:
-            scope = self.instance.scope
-        elif self.is_container_chooser:
-            picked_tenant = cleaned_data.get('tenant')
-            picked_provider = cleaned_data.get('provider')
-            if picked_tenant and picked_provider:
-                raise forms.ValidationError(
-                    _("Pick either a tenant or a provider for this role, not both.")
-                )
-            if picked_provider:
-                scope = Role.SCOPE_PROVIDER
-            elif picked_tenant:
-                scope = Role.SCOPE_TENANT
-            else:
-                raise forms.ValidationError(
-                    _("Choose a tenant (for a tenant role) or a provider (for a provider role).")
-                )
-        else:
-            scope = cleaned_data.get('scope') or Role.SCOPE_TENANT
-        cleaned_data['scope'] = scope
+        if self.owner_tenant is None:
+            raise forms.ValidationError(
+                _("No tenant context: open this form from a tenant (?tenant=…) "
+                  "or with an active tenant.")
+            )
 
-        # Build permission set from matrix + custom + provider capability checkboxes.
+        # Build permission set from the matrix + custom checkboxes.
         assigned_perms = set()
         for key, info in MATRIX_MODELS.items():
             app, model = info['app'], info['model_name']
@@ -313,11 +214,6 @@ class RoleForm(forms.ModelForm):
             if cleaned_data.get(f'perm_{codename}'):
                 assigned_perms.add(full)
 
-        if scope == Role.SCOPE_PROVIDER:
-            for codename, _label in PROVIDER_CAPABILITIES:
-                if cleaned_data.get(f'cap_{codename}'):
-                    assigned_perms.add(f'organization.{codename}')
-
         # If any permission is granted, also auto-grant the dashboard perms needed for a
         # functioning landing page (view + create/customize own dashboards). Deliberately NOT
         # delete_dashboard: it isn't needed for a landing page, and auto-adding it would make
@@ -331,41 +227,17 @@ class RoleForm(forms.ModelForm):
 
         # Filter against the live permission table to drop codenames that don't exist
         # (matrix rows for models lacking that action, uninstalled plugins, etc.).
-        from django.contrib.auth.models import Permission
         valid = set(
             f'{p.content_type.app_label}.{p.codename}'
             for p in Permission.objects.select_related('content_type').all()
         )
         assigned_perms = {p for p in assigned_perms if p in valid}
 
-        # Resolve owning Tenant/Provider for the role.
-        tenant = cleaned_data.get('tenant') or self.tenant
-        provider = cleaned_data.get('provider') or self.provider
-        if scope == Role.SCOPE_TENANT:
-            if tenant is None and self.instance.tenant_id:
-                tenant = self.instance.tenant
-            if tenant is None:
-                raise forms.ValidationError(_("A tenant is required for tenant-scoped roles."))
-            self.instance.tenant = tenant
-            self.instance.provider = None
-            cleaned_data['tenant'] = tenant
-            cleaned_data['provider'] = None
-            container = tenant
-        else:  # SCOPE_PROVIDER
-            if provider is None and self.instance.provider_id:
-                provider = self.instance.provider
-            if provider is None:
-                raise forms.ValidationError(_("A provider is required for provider roles."))
-            self.instance.provider = provider
-            self.instance.tenant = None
-            cleaned_data['provider'] = provider
-            cleaned_data['tenant'] = None
-            container = provider
-        self.instance.scope = scope
+        self.instance.tenant = self.owner_tenant
 
         # Privilege-escalation guard: a non-superuser may not assign permissions they do
-        # not themselves hold in the role's container (tenant OR provider).
-        validate_permission_grant(self.current_user, assigned_perms, container)
+        # not themselves hold in the role's owning tenant.
+        validate_permission_grant(self.current_user, assigned_perms, self.owner_tenant)
 
         self.instance.permissions = sorted(assigned_perms)
         return cleaned_data
@@ -446,56 +318,25 @@ class RoleForm(forms.ModelForm):
     def custom_permission_fields(self):
         return [(label, self[f'perm_{codename}']) for codename, label, _ in CUSTOM_PERMISSIONS]
 
-    @property
-    def provider_capability_fields(self):
-        return [(label, self[f'cap_{codename}']) for codename, label in PROVIDER_CAPABILITIES]
-
-    @property
-    def is_provider_scoped(self):
-        """Whether this form is editing/creating a provider-scoped role.
-
-        Drives which sections the template renders. On edit the scope is locked to the
-        saved instance. On create/clone it follows ``fields['scope'].initial``, which
-        ``__init__`` already derives with the right precedence — bound ``initial['scope']``
-        (a cloned instance's real scope flows in this way: Django folds the clone's field
-        values into ``self.initial`` before ``__init__`` runs) over the explicit
-        ``provider``/``tenant`` kwarg over the model default. Do NOT fall back to
-        ``self.instance.scope`` here for the pk-less case: a bare ``Role()`` always carries
-        the model field's default (``scope='tenant'``), which would misclassify a fresh
-        ``RoleForm(provider=...)`` as tenant-scoped before this property ever looks at the
-        resolved initial.
-        """
-        if self.instance.pk:
-            return self.instance.scope == Role.SCOPE_PROVIDER
-        return self.fields['scope'].initial == Role.SCOPE_PROVIDER
-
-    @property
-    def is_container_chooser(self):
-        """Fresh add with no bound container and the view opted in → render the
-        tenant-vs-provider chooser (the user picks scope by choosing a container).
-
-        False on edit (container locked to the instance) and on clone (scope carried from
-        the source role), so only the plain ``/roles/add/`` page shows both pickers.
-        """
-        return (
-            self.allow_container_choice
-            and not self.instance.pk
-            and self.tenant is None
-            and self.provider is None
-        )
-
 
 class RoleFilterForm(FilterForm):
-    from ..filters import RoleFilterSet  # local to avoid cycle at import time
+    from ..filters import RoleFilterSet  # inline import: breaks forms <-> filters cycle at import time
     filterset_class = RoleFilterSet
 
 
 class RoleAssignUsersForm(forms.Form):
-    """Bulk-add users to a Role (used by the "Assign Users" action)."""
-    from django.contrib.auth import get_user_model as _gum
+    """Bulk-add users to a Role (used by the "Assign Users" action).
+
+    The view creates memberships (get_or_create) at the role's owning tenant plus
+    own-reach ``RoleAssignment`` rows for the selected users.
+    """
     users = forms.ModelMultipleChoiceField(
-        queryset=_gum().objects.all(),
+        queryset=None,
         required=True,
         label=_("Users"),
         widget=forms.SelectMultiple(attrs={'class': 'form-select'}),
     )
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields['users'].queryset = get_user_model().objects.order_by('username')

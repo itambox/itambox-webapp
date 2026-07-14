@@ -13,6 +13,7 @@ from django.contrib.auth import get_user_model
 from django.contrib.contenttypes.models import ContentType
 from django.urls import reverse
 
+from core.tests.mixins import grant
 from organization.models import (
     Tenant, Role, Membership, Contact, ContactRole, ContactAssignment,
 )
@@ -45,15 +46,11 @@ class ContactAssignmentCrossTenantTestCase(TestCase):
         self.role_a = Role.objects.create(
             tenant=self.tenant_a, name='Admin', permissions=ca_perms
         )
-        self.membership_a = Membership.objects.create(user=self.user_a, tenant=self.tenant_a,
-        )
-        self.membership_a.roles.add(self.role_a)
+        self.membership_a = grant(self.user_a, self.tenant_a, self.role_a).membership
         self.role_b = Role.objects.create(
             tenant=self.tenant_b, name='Admin', permissions=ca_perms
         )
-        self.membership_b = Membership.objects.create(user=self.user_b, tenant=self.tenant_b,
-        )
-        self.membership_b.roles.add(self.role_b)
+        self.membership_b = grant(self.user_b, self.tenant_b, self.role_b).membership
 
         # Shared asset metadata. Use names/slugs unique to this test: the names
         # are uniquely constrained among active rows, and sibling tests in the

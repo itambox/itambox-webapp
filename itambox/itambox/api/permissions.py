@@ -96,7 +96,17 @@ class TokenPermissions(BasePermission):
         # Pass the object so the permission check resolves against the object's own
         # tenant (TenantMembershipBackend._resolve_tenant), making it self-sufficient
         # rather than relying on StrictTenantPermission to catch a tenant mismatch.
-        return request.user.has_perms(perms, obj)
+        if request.user.has_perms(perms, obj):
+            return True
+        # ADR-0001 phase 4b: shared pools and recipient-side assignments are
+        # READABLE across the boundary — the view permission is then checked
+        # in the ACTIVE tenant instead of the (foreign) object tenant.
+        if request.method in SAFE_METHODS:
+            from core.managers import get_current_tenant
+            tenant = get_current_tenant()
+            if tenant is not None and StrictTenantPermission._shared_read_allowed(obj, tenant):
+                return request.user.has_perms(perms)
+        return False
 
 
 class IsAuthenticatedOrLoginNotRequired(BasePermission):
@@ -138,7 +148,26 @@ class StrictTenantPermission(BasePermission):
                 return True
             # Enforce boundary: Object's tenant must match user's tenant
             if obj_tenant != user_tenant:
+                # ADR-0001 phase 4b: two READ-ONLY cross-tenant exceptions —
+                # a stock pool shared to the active tenant by a live grant,
+                # and an assignment whose TARGET is the active tenant (the
+                # recipient side of a granted checkout). Never mutation.
+                if request.method in SAFE_METHODS and self._shared_read_allowed(obj, user_tenant):
+                    return True
                 from django.http import Http404
                 raise Http404()
 
         return True
+
+    @staticmethod
+    def _shared_read_allowed(obj, user_tenant):
+        # inline imports: keep the API layer decoupled from organization at load
+        from organization.access import shared_resource_ids
+        from organization.models import TenantResourceGrant
+
+        label = obj._meta.label_lower
+        if label in TenantResourceGrant.APPROVED_RESOURCE_MODELS:
+            return shared_resource_ids(type(obj), user_tenant).filter(
+                resource_id=obj.pk).exists()
+        target_tenant_id = getattr(obj, 'target_tenant_id', None)
+        return target_tenant_id is not None and target_tenant_id == user_tenant.pk

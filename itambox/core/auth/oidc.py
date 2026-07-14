@@ -268,19 +268,20 @@ class TenantOIDCBackend(TenantOIDCSettingsMixin, OIDCAuthenticationBackend):
         from core.auth.provisioning import provision_membership
         provision_membership(user, tenant, db_role_name, self.get_permissions_for_role, 'OIDC')
 
-        # 3. Provider-level (MSP staff) group claims: if this tenant belongs to a provider
-        # and the provider's OIDC config maps any of the user's group claims to a
-        # Role, (re)assign the corresponding Membership. No mapping / no
-        # provider → no-op, so non-MSP installs are unaffected.
-        if getattr(tenant, 'provider_id', None) and groups_claim:
-            provider_configs = getattr(settings, 'ITAMBOX_PROVIDER_OIDC_CONFIGS', {})
-            provider_config = provider_configs.get(tenant.provider.slug, {})
-            provider_role_mapping = provider_config.get('OIDC_GROUP_PROVIDER_ROLE_MAPPING', {})
+        # 3. MSP-staff group claims: if this tenant is managed by an is_provider tenant
+        # and the MANAGING tenant's OIDC config (its own slug in
+        # ITAMBOX_TENANT_OIDC_CONFIGS) maps any of the user's group claims to one of
+        # its roles, provision a membership + managed-reach assignment there. No
+        # mapping / no managing tenant → no-op, so non-MSP installs are unaffected.
+        # The mapping key keeps its legacy name (operator-facing config contract).
+        if tenant.managed_by_id and groups_claim:
+            managing_config = tenant_configs.get(tenant.managed_by.slug, {})
+            staff_role_mapping = managing_config.get('OIDC_GROUP_PROVIDER_ROLE_MAPPING', {})
             for group in groups_claim:
-                mapped_provider_role = provider_role_mapping.get(group)
-                if mapped_provider_role:
+                mapped_staff_role = staff_role_mapping.get(group)
+                if mapped_staff_role:
                     from core.auth.provisioning import provision_provider_membership
-                    provision_provider_membership(user, tenant.provider, mapped_provider_role, 'OIDC')
+                    provision_provider_membership(user, tenant.managed_by, mapped_staff_role, 'OIDC')
                     break
 
     def get_permissions_for_role(self, role_name):

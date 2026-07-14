@@ -10,8 +10,8 @@ Only the latest active major and minor releases receive security updates.
 
 | Version | Supported          |
 | ------- | ------------------ |
-| 0.1.x   | :white_check_mark: |
-| < 0.1.0 | :x:                |
+| 1.0.x   | :white_check_mark: |
+| < 1.0.0 | :x:                |
 
 ---
 
@@ -21,7 +21,7 @@ Only the latest active major and minor releases receive security updates.
 
 If you discover a security concern (e.g., credential exposure, multi-tenant bypass, symmetric decryption issues), report it privately:
 
-1.  Send a detailed email to: **security@yourdomain.com**
+1.  Send a detailed email to: **security@itambox.dev** (subject prefix: `[ITAMbox Security]`)
 2.  Provide a clear description of the vulnerability, including:
     *   Steps or proof-of-concept code to reproduce the issue.
     *   The potential impact of the vulnerability.

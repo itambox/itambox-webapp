@@ -19,6 +19,12 @@ class TasksTestCase(TransactionTestCase):
         super().setUp()
         self.user = User.objects.create_user(username="task_user", password="password")
         self.tenant = None  # test with no tenant or default tenant
+        # ADR-0001 phase 4: stock requires a location owned by a tenant
+        # (AbstractStock.clean() derives stock.tenant from location.tenant and
+        # rejects a tenant-less location). The alert rule itself stays
+        # tenant=None (global) — only the stock's location needs an owner.
+        from organization.models import Tenant
+        self.stock_tenant = Tenant.objects.create(name="Task Stock Tenant", slug="task-stock-tenant")
 
     @patch('itambox.views.generic.ObjectImportView.get_form_class')
     def test_import_csv_task_success(self, mock_get_form_class):
@@ -91,9 +97,9 @@ class TasksTestCase(TransactionTestCase):
             min_qty=3  # specific threshold
         )
         
-        site = Site.objects.create(name="Stock Site", slug="stock-site")
-        location = Location.objects.create(name="Stock Room", slug="stock-room", site=site)
-        
+        site = Site.objects.create(name="Stock Site", slug="stock-site", tenant=self.stock_tenant)
+        location = Location.objects.create(name="Stock Room", slug="stock-room", site=site, tenant=self.stock_tenant)
+
         # Stock has 2 mouse units (below 3 threshold)
         AccessoryStock.objects.create(accessory=accessory, location=location, qty=2)
 
@@ -113,8 +119,8 @@ class TasksTestCase(TransactionTestCase):
 
         mfr = Manufacturer.objects.create(name=f"M-{slug}", slug=f"m-{slug}")
         accessory = Accessory.objects.create(name=name, slug=slug, manufacturer=mfr, min_qty=min_qty)
-        site = Site.objects.create(name=f"S-{slug}", slug=f"s-{slug}")
-        location = Location.objects.create(name=f"L-{slug}", slug=f"l-{slug}", site=site)
+        site = Site.objects.create(name=f"S-{slug}", slug=f"s-{slug}", tenant=self.stock_tenant)
+        location = Location.objects.create(name=f"L-{slug}", slug=f"l-{slug}", site=site, tenant=self.stock_tenant)
         AccessoryStock.objects.create(accessory=accessory, location=location, qty=qty)
         return accessory
 
@@ -197,6 +203,9 @@ class AlertDedupRegressionTests(TransactionTestCase):
     def setUp(self):
         super().setUp()
         self.ct = ContentType.objects.get_for_model(AlertRule)
+        # ADR-0001 phase 4: stock requires a location owned by a tenant.
+        from organization.models import Tenant
+        self.stock_tenant = Tenant.objects.create(name="Dedup Stock Tenant", slug="dedup-stock-tenant")
 
     def _low_stock_rule(self, name="Dedup Rule"):
         return AlertRule.objects.create(
@@ -210,8 +219,8 @@ class AlertDedupRegressionTests(TransactionTestCase):
         from organization.models import Location, Site
         mfr = Manufacturer.objects.create(name=f"M-{slug}", slug=f"m-{slug}")
         acc = Accessory.objects.create(name=f"A-{slug}", slug=slug, manufacturer=mfr, min_qty=min_qty)
-        site = Site.objects.create(name=f"S-{slug}", slug=f"s-{slug}")
-        loc = Location.objects.create(name=f"L-{slug}", slug=f"l-{slug}", site=site)
+        site = Site.objects.create(name=f"S-{slug}", slug=f"s-{slug}", tenant=self.stock_tenant)
+        loc = Location.objects.create(name=f"L-{slug}", slug=f"l-{slug}", site=site, tenant=self.stock_tenant)
         AccessoryStock.objects.create(accessory=acc, location=loc, qty=qty)
         return acc
 

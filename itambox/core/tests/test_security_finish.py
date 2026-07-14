@@ -16,6 +16,7 @@ from django.urls import reverse
 from assets.models import Asset, AssetType, Manufacturer, StatusLabel
 from inventory.models import Accessory
 from licenses.models import License
+from core.tests.mixins import grant
 from organization.models import Tenant, Membership, Role, Site
 from software.models import Software
 from subscriptions.models import Subscription, Provider
@@ -48,14 +49,12 @@ class UploadJournalPermTests(TestCase):
         # User with change_asset on tenant_a
         self.user_chg = User.objects.create_user("chg", password="pw")
         role_chg = _make_role(self.tenant_a, "changer", ["assets.change_asset"])
-        m_chg = Membership.objects.create(user=self.user_chg, tenant=self.tenant_a)
-        m_chg.roles.add(role_chg)
+        m_chg = grant(self.user_chg, self.tenant_a, role_chg).membership
 
         # User with view-only on tenant_a (no change)
         self.user_view = User.objects.create_user("view", password="pw")
         role_view = _make_role(self.tenant_a, "viewer", ["assets.view_asset"])
-        m_view = Membership.objects.create(user=self.user_view, tenant=self.tenant_a)
-        m_view.roles.add(role_view)
+        m_view = grant(self.user_view, self.tenant_a, role_view).membership
 
         mfr = Manufacturer.objects.create(name="Dell", slug="dell")
         at = AssetType.objects.create(manufacturer=mfr, model="XPS 13")
@@ -188,8 +187,7 @@ class SearchTenantScopingTests(TestCase):
 
         self.user_a = User.objects.create_user("srch_a", password="pw")
         role_a = _make_role(self.tenant_a, "viewer", ["assets.view_asset"])
-        m_a = Membership.objects.create(user=self.user_a, tenant=self.tenant_a)
-        m_a.roles.add(role_a)
+        m_a = grant(self.user_a, self.tenant_a, role_a).membership
 
         mfr = Manufacturer.objects.create(name="HP", slug="hp")
         at = AssetType.objects.create(manufacturer=mfr, model="EliteBook")
@@ -248,8 +246,7 @@ class RESTCrossTenantTests(TestCase):
                 "subscriptions.view_subscription",
             ],
         )
-        m_a = Membership.objects.create(user=self.user_a, tenant=self.tenant_a)
-        m_a.roles.add(role_a)
+        m_a = grant(self.user_a, self.tenant_a, role_a).membership
         self.token_a = Token.objects.create(user=self.user_a)
 
         # Shared metadata

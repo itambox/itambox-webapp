@@ -161,7 +161,7 @@ class Command(BaseCommand):
                         )
                         
                         # Add user to tenant membership as member by default
-                        from organization.models import Membership, Role
+                        from organization.models import Membership, Role, RoleAssignment
                         tenant_role, _ = Role.objects.get_or_create(
                             tenant=tenant,
                             name='Member',
@@ -184,7 +184,13 @@ class Command(BaseCommand):
                             user=user,
                             tenant=tenant,
                         )
-                        membership.roles.add(tenant_role)
+                        # LDAP sync is trusted operator config (like SCIM/SSO JIT):
+                        # own-reach grant without an acting user, so granted_by=None.
+                        RoleAssignment.objects.get_or_create(
+                            membership=membership,
+                            role=tenant_role,
+                            reach=RoleAssignment.REACH_OWN,
+                        )
 
                         if created:
                             created_count += 1

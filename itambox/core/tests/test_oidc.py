@@ -148,9 +148,9 @@ class TenantOIDCTestCase(TestCase):
         user_admin = backend.create_user(claims_admin)
 
         membership_admin = Membership.objects.get(user=user_admin, tenant=self.tenant_alpha)
-        self.assertEqual(membership_admin.roles.first().name, "Admin")
+        self.assertEqual(membership_admin.assignments.first().role.name, "Admin")
         # Admin should have delete permission on normal models
-        self.assertTrue(any("delete_" in p for p in membership_admin.roles.first().permissions if "dashboard" not in p))
+        self.assertTrue(any("delete_" in p for p in membership_admin.assignments.first().role.permissions if "dashboard" not in p))
 
         # Setup OIDC claims mapping to Manager (lower priority than Admin, higher than Member)
         claims_manager = {
@@ -161,9 +161,9 @@ class TenantOIDCTestCase(TestCase):
         user_mgr = backend.create_user(claims_manager)
 
         membership_mgr = Membership.objects.get(user=user_mgr, tenant=self.tenant_alpha)
-        self.assertEqual(membership_mgr.roles.first().name, "Manager")
+        self.assertEqual(membership_mgr.assignments.first().role.name, "Manager")
         # Manager should not have delete permission on normal models but should have add/change
-        self.assertFalse(any("delete_" in p for p in membership_mgr.roles.first().permissions if "dashboard" not in p))
+        self.assertFalse(any("delete_" in p for p in membership_mgr.assignments.first().role.permissions if "dashboard" not in p))
 
         # Fallback to Member
         claims_fallback = {
@@ -174,7 +174,7 @@ class TenantOIDCTestCase(TestCase):
         user_mem = backend.create_user(claims_fallback)
 
         membership_mem = Membership.objects.get(user=user_mem, tenant=self.tenant_alpha)
-        self.assertEqual(membership_mem.roles.first().name, "Member")
+        self.assertEqual(membership_mem.assignments.first().role.name, "Member")
 
     def test_authorize_view_tenant_routing(self):
         # Access with slug in kwargs
@@ -243,7 +243,7 @@ class TenantOIDCTestCase(TestCase):
         }
         user_admin = backend.create_user(claims_admin)
         membership_admin = Membership.objects.get(user=user_admin, tenant=self.tenant_alpha)
-        self.assertEqual(membership_admin.roles.first().name, "Admin")
+        self.assertEqual(membership_admin.assignments.first().role.name, "Admin")
 
         claims_mgr = {
             "email": "mgr-ci@alpha.com",
@@ -252,7 +252,7 @@ class TenantOIDCTestCase(TestCase):
         }
         user_mgr = backend.create_user(claims_mgr)
         membership_mgr = Membership.objects.get(user=user_mgr, tenant=self.tenant_alpha)
-        self.assertEqual(membership_mgr.roles.first().name, "Manager")
+        self.assertEqual(membership_mgr.assignments.first().role.name, "Manager")
 
         claims_mem = {
             "email": "mem-ci@alpha.com",
@@ -261,7 +261,7 @@ class TenantOIDCTestCase(TestCase):
         }
         user_mem = backend.create_user(claims_mem)
         membership_mem = Membership.objects.get(user=user_mem, tenant=self.tenant_alpha)
-        self.assertEqual(membership_mem.roles.first().name, "Member")
+        self.assertEqual(membership_mem.assignments.first().role.name, "Member")
 
     def test_authorize_view_invalid_tenant_slug(self):
         # Access with an invalid slug in kwargs
@@ -388,7 +388,7 @@ class TenantOIDCTestCase(TestCase):
         }
         user_no_groups = backend.create_user(claims_no_groups)
         membership_no_groups = Membership.objects.get(user=user_no_groups, tenant=self.tenant_alpha)
-        self.assertEqual(membership_no_groups.roles.first().name, "Member") # Fallback to Member
+        self.assertEqual(membership_no_groups.assignments.first().role.name, "Member") # Fallback to Member
 
         # Case D: malformed 'groups' claim (e.g. not a list or string, like a dict or integer)
         claims_dict_groups = {
@@ -398,7 +398,7 @@ class TenantOIDCTestCase(TestCase):
         }
         user_dict_groups = backend.create_user(claims_dict_groups)
         membership_dict_groups = Membership.objects.get(user=user_dict_groups, tenant=self.tenant_alpha)
-        self.assertEqual(membership_dict_groups.roles.first().name, "Member") # Fallback to Member
+        self.assertEqual(membership_dict_groups.assignments.first().role.name, "Member") # Fallback to Member
 
         claims_int_groups = {
             "sub": "int-groups-sub",
@@ -407,7 +407,7 @@ class TenantOIDCTestCase(TestCase):
         }
         user_int_groups = backend.create_user(claims_int_groups)
         membership_int_groups = Membership.objects.get(user=user_int_groups, tenant=self.tenant_alpha)
-        self.assertEqual(membership_int_groups.roles.first().name, "Member") # Fallback to Member
+        self.assertEqual(membership_int_groups.assignments.first().role.name, "Member") # Fallback to Member
 
     def test_upn_and_onetoone_collisions_multitenant(self):
         backend = TenantOIDCBackend()
@@ -476,7 +476,7 @@ class TenantOIDCTestCase(TestCase):
         }
         user = backend.create_user(claims)
         membership = Membership.objects.get(user=user, tenant=self.tenant_alpha)
-        self.assertEqual(membership.roles.first().name, "Admin")
+        self.assertEqual(membership.assignments.first().role.name, "Admin")
 
         # User is in alpha-members (Member) and alpha-managers (Manager)
         # Should select Manager
@@ -487,7 +487,7 @@ class TenantOIDCTestCase(TestCase):
         }
         user_mgr = backend.create_user(claims_mgr)
         membership_mgr = Membership.objects.get(user=user_mgr, tenant=self.tenant_alpha)
-        self.assertEqual(membership_mgr.roles.first().name, "Manager")
+        self.assertEqual(membership_mgr.assignments.first().role.name, "Manager")
 
     def test_group_name_lookup_case_sensitivity(self):
         backend = TenantOIDCBackend()
@@ -503,7 +503,7 @@ class TenantOIDCTestCase(TestCase):
         }
         user = backend.create_user(claims)
         membership = Membership.objects.get(user=user, tenant=self.tenant_alpha)
-        self.assertEqual(membership.roles.first().name, "Member")
+        self.assertEqual(membership.assignments.first().role.name, "Member")
 
     @override_settings(
         OIDC_OP_AUTHORIZATION_ENDPOINT="https://example.com/oauth2",

@@ -1,57 +1,60 @@
-"""Canonical badge rendering for ``Role.scope`` and ``Membership.kind``.
+"""Canonical badge rendering for RBAC concepts (post-collapse: reach + sharing).
 
-The "kind" badge in ``RoleTable``/``MembershipTable`` (django-tables2 ``render_kind``
-methods) and the hand-written badges in ``role_form.html`` / ``role_detail.html`` /
-``usergroup_detail.html`` used to duplicate this markup independently, drifting out of
-sync with the model's own display accessors (``get_scope_display()`` / ``get_kind_display()``).
-These two functions are the single source of truth: every call site -- Python or
-template -- goes through them, so wording and markup can never drift apart again.
+The badges in ``RoleTable``/``MembershipTable`` and the hand-written badges in
+``role_form.html`` / ``role_detail.html`` / ``usergroup_detail.html`` go through
+these functions — the single source of truth for wording and markup. After the
+Provider collapse there is no role "scope" and no membership "kind" anymore;
+what remains meaningful is an assignment's ``reach`` (this tenant vs managed
+tenants), whether a membership carries any managed reach ("staff"), and whether
+a role definition is shared with managed tenants.
 """
 from django import template
 from django.utils.html import format_html
+from django.utils.translation import gettext_lazy as _
 
-from ..models import Role, Membership
+from ..models import RoleAssignment
 
 register = template.Library()
 
-_ROLE_SCOPE_ICONS = {
-    Role.SCOPE_PROVIDER: 'mdi-domain',
-    Role.SCOPE_TENANT: 'mdi-office-building',
+_REACH_ICONS = {
+    RoleAssignment.REACH_MANAGED: 'mdi-domain',
+    RoleAssignment.REACH_OWN: 'mdi-office-building',
 }
 
 
 @register.simple_tag
-def role_scope_badge(role_or_is_provider, icon=False, extra_class=''):
-    """Badge for ``Role.scope``: purple for provider-scoped, blue for tenant-scoped.
+def reach_badge(assignment_or_reach, icon=False, extra_class=''):
+    """Badge for an assignment's reach: purple for managed reach, blue for own tenant.
 
-    Wording always comes from ``Role.get_scope_display()``'s labels ('Provider role' /
-    'Tenant role'), never a hand-copied string.
-
-    Accepts either a ``Role`` instance (badge reflects ``role.scope``) or a bare bool --
-    the latter for ``RoleForm.is_provider_scoped``, which is authoritative before a
-    pk-less instance's own ``scope`` field is trustworthy (see that property's docstring).
+    Accepts a ``RoleAssignment`` instance or a bare reach value string. Wording always
+    comes from ``REACH_CHOICES`` labels, never a hand-copied string.
     """
-    if isinstance(role_or_is_provider, Role):
-        is_provider = role_or_is_provider.scope == Role.SCOPE_PROVIDER
-    else:
-        is_provider = bool(role_or_is_provider)
-    scope = Role.SCOPE_PROVIDER if is_provider else Role.SCOPE_TENANT
-    label = dict(Role.SCOPE_CHOICES)[scope]
-    css_class = 'bg-purple-lt text-purple' if is_provider else 'bg-blue-lt text-blue'
+    reach = getattr(assignment_or_reach, 'reach', assignment_or_reach)
+    if reach not in dict(RoleAssignment.REACH_CHOICES):
+        reach = RoleAssignment.REACH_OWN
+    label = dict(RoleAssignment.REACH_CHOICES)[reach]
+    is_managed = reach == RoleAssignment.REACH_MANAGED
+    css_class = 'bg-purple-lt text-purple' if is_managed else 'bg-blue-lt text-blue'
     if extra_class:
         css_class = f'{css_class} {extra_class}'
     icon_html = ''
     if icon:
-        icon_html = format_html('<i class="mdi {} me-1"></i>', _ROLE_SCOPE_ICONS[scope])
+        icon_html = format_html('<i class="mdi {} me-1"></i>', _REACH_ICONS[reach])
     return format_html('<span class="badge {}">{}{}</span>', css_class, icon_html, label)
 
 
 @register.simple_tag
 def membership_kind_badge(membership):
-    """Badge for ``Membership.kind``: purple for provider staff, blue for tenant members.
+    """Badge for a membership: purple "Staff" when any grant carries managed reach,
+    blue "Member" otherwise."""
+    if membership.is_staff_membership:
+        return format_html('<span class="badge bg-purple-lt text-purple">{}</span>', _("Staff"))
+    return format_html('<span class="badge bg-blue-lt text-blue">{}</span>', _("Member"))
 
-    Wording always comes from ``get_kind_display()``'s labels ('Provider staff
-    (technician)' / 'Tenant member'), never a hand-copied string.
-    """
-    css_class = 'bg-purple-lt text-purple' if membership.is_provider_staff else 'bg-blue-lt text-blue'
-    return format_html('<span class="badge {}">{}</span>', css_class, membership.get_kind_display())
+
+@register.simple_tag
+def shared_role_badge(role):
+    """Badge marking a role definition shared with managed tenants (empty otherwise)."""
+    if getattr(role, 'shared_with_managed', False):
+        return format_html('<span class="badge bg-teal-lt text-teal">{}</span>', _("Shared"))
+    return ''

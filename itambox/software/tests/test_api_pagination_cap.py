@@ -6,9 +6,10 @@ from django.urls import reverse
 from django.contrib.auth import get_user_model
 from rest_framework.test import APITestCase
 
-from organization.models import Tenant, Role, Membership
+from organization.models import Tenant, Role
 from assets.models import Manufacturer
 from software.models import Software
+from core.tests.mixins import grant
 
 # Bake the view queryset under a clean (no-tenant) import — see the note in
 # inventory/tests/test_checkout_permissions.py.
@@ -24,8 +25,7 @@ class ApiCountCapTests(APITestCase):
         role = Role.objects.create(
             tenant=self.tenant, name='R', permissions=['software.view_software']
         )
-        _membership = Membership.objects.create(user=self.user, tenant=self.tenant)
-        _membership.roles.add(role)
+        grant(self.user, self.tenant, role)
         mfr = Manufacturer.objects.create(name='MS', slug='capt-ms')
         for i in range(3):
             Software.objects.create(name=f'SW{i}', manufacturer=mfr, tenant=self.tenant)

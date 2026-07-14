@@ -69,8 +69,7 @@ class SCIMBearerTokenAuthentication(BaseAuthentication):
             # permission for it — a real has_perm check against the role's actual JSON
             # permissions, never a Role.name string match (that magic-string pattern was a
             # backdoor: any role literally named 'admin'/'owner' granted access regardless
-            # of its permissions — see the equivalent fix in InviteUserMixin). Fail closed
-            # otherwise.
+            # of its permissions). Fail closed otherwise.
             if not user.is_superuser:
                 if token.tenant_id != tenant.pk:
                     raise exceptions.AuthenticationFailed('Token is not scoped to this tenant.')

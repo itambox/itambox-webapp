@@ -1,7 +1,7 @@
 {% load i18n %}
 {# Reusable workspace/tenant switcher list items. #}
 {# Used by the desktop topbar dropdown and the mobile offcanvas switcher. #}
-{# Expects: request, grouped_tenants_switcher, grouped_memberships_switcher #}
+{# Expects: request, grouped_tenants_switcher, own_tenants_switcher, grouped_managed_tenants_switcher #}
 {% if request.user.is_superuser %}
     <a href="?switch_tenant=" class="list-group-item list-group-item-action py-2 {% if not request.active_tenant and not request.active_tenant_group %}active{% endif %}">
         <div class="d-flex align-items-center">
@@ -34,18 +34,11 @@
         </div>
     {% endfor %}
 {% else %}
-    {% for item in grouped_memberships_switcher %}
-        {% if item.group %}
-            <a href="?switch_tenant_group={{ item.group.id }}" class="list-group-header list-group-item-action py-1 px-3 text-muted fs-6 font-weight-bold text-uppercase d-flex justify-content-between align-items-center {% if request.active_tenant_group.id == item.group.id %}active bg-secondary-lt{% endif %}" style="letter-spacing: 0.05em; font-size: 0.7rem !important; cursor: pointer; text-decoration: none;">
-                <span>{{ item.group.name }}</span>
-                <span class="badge bg-secondary-lt">{% translate "Show All" %}</span>
-            </a>
-        {% else %}
-            <div class="list-group-header py-1 px-3 text-muted fs-6 font-weight-bold text-uppercase" style="letter-spacing: 0.05em; font-size: 0.7rem !important;">
-                {% translate "Ungrouped" %}
-            </div>
-        {% endif %}
-        {% for tenant in item.tenants %}
+    {% if own_tenants_switcher %}
+        <div class="list-group-header py-1 px-3 text-muted fs-6 font-weight-bold text-uppercase" style="letter-spacing: 0.05em; font-size: 0.7rem !important;">
+            {% translate "Your organization" %}
+        </div>
+        {% for tenant in own_tenants_switcher %}
             <a href="?switch_tenant={{ tenant.id }}" class="list-group-item list-group-item-action py-2 ps-4 {% if request.active_tenant.id == tenant.id %}active{% endif %}">
                 <div class="d-flex align-items-center">
                     <span class="status-dot bg-secondary me-2"></span>
@@ -53,9 +46,37 @@
                 </div>
             </a>
         {% endfor %}
-    {% empty %}
+    {% endif %}
+
+    {% if grouped_managed_tenants_switcher %}
+        <div class="list-group-header py-1 px-3 text-muted fs-6 font-weight-bold text-uppercase" style="letter-spacing: 0.05em; font-size: 0.7rem !important;">
+            {% translate "Managed tenants" %}
+        </div>
+        {% for item in grouped_managed_tenants_switcher %}
+            {% if item.group %}
+                <a href="?switch_tenant_group={{ item.group.id }}" class="list-group-header list-group-item-action py-1 px-3 text-muted fs-6 font-weight-bold text-uppercase d-flex justify-content-between align-items-center {% if request.active_tenant_group.id == item.group.id %}active bg-secondary-lt{% endif %}" style="letter-spacing: 0.05em; font-size: 0.7rem !important; cursor: pointer; text-decoration: none; padding-left: 1.5rem !important;">
+                    <span>{{ item.group.name }}</span>
+                    <span class="badge bg-secondary-lt">{% translate "Show All" %}</span>
+                </a>
+            {% else %}
+                <div class="list-group-header py-1 px-3 text-muted fs-6 font-weight-bold text-uppercase" style="letter-spacing: 0.05em; font-size: 0.7rem !important; padding-left: 1.5rem !important;">
+                    {% translate "Ungrouped" %}
+                </div>
+            {% endif %}
+            {% for tenant in item.tenants %}
+                <a href="?switch_tenant={{ tenant.id }}" class="list-group-item list-group-item-action py-2 ps-5 {% if request.active_tenant.id == tenant.id %}active{% endif %}">
+                    <div class="d-flex align-items-center">
+                        <span class="status-dot bg-secondary me-2"></span>
+                        <span class="text-truncate" style="max-width: 180px;">{{ tenant.name }}</span>
+                    </div>
+                </a>
+            {% endfor %}
+        {% endfor %}
+    {% endif %}
+
+    {% if not own_tenants_switcher and not grouped_managed_tenants_switcher %}
         <div class="list-group-item text-muted text-center py-3">
             {% translate "No accessible tenants" %}
         </div>
-    {% endfor %}
+    {% endif %}
 {% endif %}

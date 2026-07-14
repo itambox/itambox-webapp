@@ -18,8 +18,9 @@ from rest_framework.test import APITestCase
 
 from core.models import ObjectChange
 from core.choices import ObjectChangeActionChoices
+from core.tests.mixins import grant
 from organization.models import (
-    TenantGroup, Tenant, AssetHolder, Role, Membership,
+    TenantGroup, Tenant, AssetHolder, Role,
 )
 from subscriptions.models import (
     Provider, Subscription,
@@ -71,8 +72,7 @@ class A5ApiHygieneTests(APITestCase):
                 'subscriptions.delete_subscription',
             ],
         )
-        membership = Membership.objects.create(user=self.staff, tenant=self.tenant)
-        membership.roles.add(role)
+        grant(self.staff, self.tenant, role)
 
     # ----- WS3-3 -----------------------------------------------------------
 

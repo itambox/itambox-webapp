@@ -4,6 +4,7 @@ from django.urls import reverse
 from django.contrib.contenttypes.fields import GenericForeignKey
 from django.contrib.contenttypes.models import ContentType
 from django.conf import settings
+from django.core.validators import MinValueValidator
 
 
 def _default_currency():
@@ -185,6 +186,34 @@ class TenantGroup(StandardModel, SoftDeleteMixin):
     def get_absolute_url(self):
         return reverse('organization:tenantgroup_detail', kwargs={'pk': self.pk})
 
+    def clean(self):
+        # Runs on every save via the global pre_save validator — keep it cheap.
+        # A parent cycle would send every group-scoped descendant walk in
+        # circles (the walks are cycle-tolerant, but the tree would be wrong),
+        # so reject it at write time like CostCenter does.
+        from django.core.exceptions import ValidationError
+        super().clean()
+        if self.parent_id is None:
+            return
+        if self.pk and self.parent_id == self.pk:
+            raise ValidationError({'parent': _("A tenant group cannot be its own parent.")})
+        if self.pk:
+            visited = set()
+            node_id = self.parent_id
+            while node_id is not None:
+                if node_id == self.pk:
+                    raise ValidationError({'parent': _(
+                        "Setting this parent would create a cycle in the group hierarchy."
+                    )})
+                if node_id in visited:
+                    break
+                visited.add(node_id)
+                node_id = (
+                    TenantGroup._base_manager.filter(pk=node_id)
+                    .values_list('parent_id', flat=True).first()
+                )
+
+
 class Tenant(DeletableVaultModel, BookmarkableMixin):
     objects = TenantScopingSoftDeleteManager()
     all_objects = TenantScopingAllObjectsManager()
@@ -198,16 +227,20 @@ class Tenant(DeletableVaultModel, BookmarkableMixin):
         null=True,
         verbose_name=_("Group")
     )
-    # The MSP / managing organization this tenant belongs to. NULL for single-company
-    # installs (no Provider rows) — the entire Provider layer is then invisible.
-    provider = models.ForeignKey(
-        'organization.Provider',
-        on_delete=models.SET_NULL,
-        related_name='tenants',
-        blank=True,
-        null=True,
+    is_provider = models.BooleanField(
+        default=False, db_index=True,
+        verbose_name=_("Manages other tenants (MSP mode)"),
+        help_text=_("Superuser-controlled. When set, this tenant can manage other tenants "
+                    "and its members can be granted reach into them."),
+    )
+    managed_by = models.ForeignKey(
+        'self',
+        on_delete=models.PROTECT,
+        related_name='managed_tenants',
+        blank=True, null=True,
         db_index=True,
-        verbose_name=_("Provider"),
+        verbose_name=_("Managed by"),
+        help_text=_("The managing (provider) tenant. Empty for standalone/root tenants."),
     )
     description = models.TextField(blank=True, verbose_name=_("Description"))
     comments = models.TextField(blank=True, verbose_name=_("Comments"))
@@ -227,6 +260,17 @@ class Tenant(DeletableVaultModel, BookmarkableMixin):
         verbose_name=_("Default depreciation policy"),
         help_text=_("Fallback policy applied to all assets that have no type-level schedule and no per-asset override."),
     )
+    changelog_retention_days = models.IntegerField(
+        null=True,
+        blank=True,
+        validators=[MinValueValidator(0)],
+        verbose_name=_("Changelog retention override (days)"),
+        help_text=_(
+            "Overrides ITAMBOX_CHANGELOG_RETENTION_DAYS for this tenant's ObjectChange "
+            "rows only. Blank uses the global setting. 0 = unlimited (legal hold -- this "
+            "tenant's changelog is never pruned by prune_changelog)."
+        ),
+    )
 
     class Meta:
         ordering = ['name']
@@ -236,6 +280,29 @@ class Tenant(DeletableVaultModel, BookmarkableMixin):
             models.UniqueConstraint(fields=['name'], condition=models.Q(deleted_at__isnull=True), name='unique_tenant_name_active'),
             models.UniqueConstraint(fields=['slug'], condition=models.Q(deleted_at__isnull=True), name='unique_tenant_slug_active'),
         ]
+
+    def clean(self):
+        # Runs on every save via the global pre_save validator — keep it cheap.
+        # Depth-1 management tree (decided 2026-07-10): a manager cannot itself be
+        # managed, and a managed tenant cannot manage others.
+        from django.core.exceptions import ValidationError
+        super().clean()
+        if self.managed_by_id:
+            if self.managed_by_id == self.pk:
+                raise ValidationError({'managed_by': _("A tenant cannot manage itself.")})
+            if self.is_provider:
+                raise ValidationError({'is_provider': _(
+                    "A managed tenant cannot itself be a managing tenant (one level only)."
+                )})
+            manager = self.managed_by
+            if not manager.is_provider:
+                raise ValidationError({'managed_by': _(
+                    "The managing tenant must have MSP mode enabled (is_provider)."
+                )})
+            if manager.managed_by_id:
+                raise ValidationError({'managed_by': _(
+                    "The managing tenant is itself managed — chains are not supported."
+                )})
 
     def get_absolute_url(self):
         return reverse('organization:tenant_detail', kwargs={'pk': self.pk})
@@ -458,74 +525,32 @@ class ContactAssignment(ChangeLoggingMixin, BaseModel):
         return f"{self.contact} ({self.role}) assigned to {self.assigned_object}"
 
 
-import uuid
-from django.utils import timezone
-from django.db import transaction
-
-
 # ---------------------------------------------------------------------------
-# Unified RBAC: Role + Membership
+# Unified RBAC: Role + Membership + RoleAssignment
 #
-# Roles and Memberships replace the prior six-model tangle (TenantRole,
-# ProviderRole, ProviderRoleTemplate, TenantMembership, ProviderMembership,
-# UserGroup-roles-pointer). They are differentiated by their container FK pair
-# (``Role.scope`` / a Membership's tenant-vs-provider) rather than by separate models,
-# so one form, one view, one auth-backend path covers every case.
+# One container type (Tenant), one permission vocabulary ('app.codename'), and
+# per-grant RoleAssignment rows. A provider (MSP) is just a tenant with
+# ``is_provider=True`` that other tenants point at via ``managed_by``; reach
+# into those managed tenants is a property of the individual grant.
 # ---------------------------------------------------------------------------
 
 class Role(AutoSlugMixin, StandardModel, SoftDeleteMixin):
-    """A named permission set bound to either a Tenant or a Provider.
+    """A named permission set owned by (and applying in) one tenant.
 
-    A *tenant-scoped* role (``scope='tenant'``, ``tenant`` set) lists Django
-    permissions for use inside that tenant. A *provider-scoped* role
-    (``scope='provider'``, ``provider`` set) lists permissions granted to MSP
-    staff across the provider's tenants (per the Membership's tenant_scope),
-    and may additionally carry provider-level capabilities such as
-    ``organization.manage_tenants`` / ``manage_staff`` / ``manage_groups`` /
-    ``manage_provider`` — these are plain Django permissions registered on the
-    Provider model, so all gating flows through ``user.has_perm()``.
+    A role owned by a managing (``is_provider``) tenant may additionally be
+    *shared* with its managed tenants (``shared_with_managed``): managed-tenant
+    admins can assign it to their own members but never edit it — a live shared
+    definition, not a clone, so an edit at the owner propagates everywhere.
     """
-    SCOPE_TENANT = 'tenant'
-    SCOPE_PROVIDER = 'provider'
-    SCOPE_CHOICES = [
-        (SCOPE_TENANT, _('Tenant role')),
-        (SCOPE_PROVIDER, _('Provider role')),
-    ]
-
-    # Tenant-scoped roles ride the standard tenant-scoping managers; provider-scoped
-    # roles (``tenant=NULL``) ride through via ``allow_global_tenant`` so MSP staff
-    # working in any of the provider's tenants still see them. Real per-tenant access
-    # control sits in ``MembershipBackend``, not the manager.
     objects = TenantScopingSoftDeleteManager()
     all_objects = TenantScopingAllObjectsManager()
-    allow_global_tenant = True
 
-    # ChangeLoggingMixin must accept tenant=None entries (provider roles) when writing
-    # ObjectChange rows.
-    changelog_global = True
-
-    scope = models.CharField(
-        max_length=20,
-        choices=SCOPE_CHOICES,
-        default=SCOPE_TENANT,
-        db_index=True,
-        verbose_name=_("Scope"),
-    )
     tenant = models.ForeignKey(
         'organization.Tenant',
         on_delete=models.CASCADE,
         related_name='roles',
-        blank=True, null=True,
         db_index=True,
         verbose_name=_("Tenant"),
-    )
-    provider = models.ForeignKey(
-        'organization.Provider',
-        on_delete=models.CASCADE,
-        related_name='roles',
-        blank=True, null=True,
-        db_index=True,
-        verbose_name=_("Provider"),
     )
     name = models.CharField(max_length=100, verbose_name=_("Name"))
     slug = models.SlugField(max_length=100, verbose_name=_("Slug"))
@@ -533,124 +558,61 @@ class Role(AutoSlugMixin, StandardModel, SoftDeleteMixin):
     permissions = models.JSONField(
         default=list, blank=True,
         verbose_name=_("Permissions"),
-        help_text=_(
-            "List of permission codenames ('app_label.codename'). For provider-scoped "
-            "roles, may include organization.manage_tenants/staff/groups/provider."
-        ),
+        help_text=_("List of permission codenames ('app_label.codename')."),
     )
-    is_default = models.BooleanField(
+    shared_with_managed = models.BooleanField(
         default=False,
-        verbose_name=_("Clone to new tenants"),
-        help_text=_("Provider-scoped roles only. Automatically clone this role into new tenants created under this provider."),
+        verbose_name=_("Share with managed tenants"),
+        help_text=_("Only meaningful when the owning tenant manages others: managed tenants "
+                    "may assign this role to their own members; only the owning tenant can "
+                    "edit it."),
     )
 
     class Meta:
-        ordering = ['scope', 'name']
+        ordering = ['name']
         verbose_name = _("Role")
         verbose_name_plural = _("Roles")
         constraints = [
-            # Names unique within the owning tenant/provider.
             models.UniqueConstraint(
                 fields=['tenant', 'name'],
-                condition=models.Q(deleted_at__isnull=True) & models.Q(scope='tenant'),
+                condition=models.Q(deleted_at__isnull=True),
                 name='organization_role_unique_tenant_name',
-            ),
-            models.UniqueConstraint(
-                fields=['provider', 'name'],
-                condition=models.Q(deleted_at__isnull=True) & models.Q(scope='provider'),
-                name='organization_role_unique_provider_name',
-            ),
-            # Exactly one of (tenant, provider) is set, matching ``scope``.
-            models.CheckConstraint(
-                check=(
-                    (models.Q(scope='tenant') & models.Q(tenant__isnull=False) & models.Q(provider__isnull=True))
-                    | (models.Q(scope='provider') & models.Q(provider__isnull=False) & models.Q(tenant__isnull=True))
-                ),
-                name='organization_role_scope_consistency',
             ),
         ]
 
     def __str__(self):
-        if self.scope == self.SCOPE_PROVIDER and self.provider_id:
-            return f"{self.name} ({self.provider.name} provider)"
-        if self.tenant_id:
-            return f"{self.name} ({self.tenant.name})"
-        return self.name
+        return f"{self.name} ({self.tenant.name})" if self.tenant_id else self.name
 
     def get_absolute_url(self):
         return reverse('organization:role_detail', kwargs={'pk': self.pk})
 
     @property
     def owner(self):
-        """The Tenant or Provider that owns this role."""
-        return self.tenant if self.scope == self.SCOPE_TENANT else self.provider
+        """Compat alias: the tenant that owns this role (guards/forms call ``role.owner``)."""
+        return self.tenant
 
     # NOTE: Role intentionally has NO model-layer ``clean()`` validation of ``permissions``.
     # A global ``pre_save`` receiver (core/signals.py::validate_custom_validators_on_save) runs
     # ``clean()`` on every ChangeLoggingMixin save, so a hard check here would fire on ALL
-    # writes — incompatible with this codebase's deliberate design:
-    #   * RoleForm drops unknown codenames and only offers provider capabilities (manage_*)
-    #     on provider-scoped roles;
-    #   * the provider→tenant projection strips ``organization.manage_*`` via
-    #     ``Membership.project_permissions_for_tenant`` (so a stray capability cannot
-    #     project across tenants);
-    #   * ``validate_role_permissions`` audits persisted stale codenames post-hoc — and the
-    #     seed deliberately grants the full permission set to the tenant Administrator role.
-    # Real write-time integrity belongs in a future ManyToManyField(auth.Permission) migration,
-    # not a clean() that would break the seed and the audit command. See M6 in the RBAC review.
-
-    def save(self, *args, **kwargs):
-        # Auto-pick scope from the populated FK so callers can write either
-        # ``Role.objects.create(tenant=...)`` or ``Role.objects.create(provider=...)`` without
-        # repeating the implied ``scope=``. The CheckConstraint still enforces consistency:
-        # if both FKs are set, scope follows ``provider`` (provider-scoped wins because the
-        # tenant FK is then a mistake, caught by the constraint).
-        if self.provider_id and not self.tenant_id:
-            self.scope = self.SCOPE_PROVIDER
-        elif self.tenant_id and not self.provider_id:
-            self.scope = self.SCOPE_TENANT
-        super().save(*args, **kwargs)
+    # writes — incompatible with this codebase's deliberate design: RoleForm drops unknown
+    # codenames, and ``validate_role_permissions`` audits persisted stale codenames post-hoc.
+    # Real write-time integrity belongs in a future ManyToManyField(auth.Permission) migration.
 
 
 class Membership(ChangeLoggingMixin, models.Model):
-    """A user's binding to either a Tenant or a Provider.
+    """A user's binding to one tenant — the thin "person belongs here" anchor.
 
-    The container FK pair is the *sole* discriminator of the two user kinds an admin
-    thinks about — there is no separate ``person_type`` column:
+    What the person may DO is carried by :class:`RoleAssignment` rows hanging off
+    this membership (one row per role × reach). ``is_active=False`` suspends the
+    person in this tenant (all their assignments at once) while retaining the row,
+    the assignments, and any AssetHolder linkage for re-activation.
 
-      - **Provider staff** (MSP technician) — a ``provider``-scoped membership
-        (``provider`` set, ``tenant`` null); ``is_provider_staff`` / ``kind == 'staff'``.
-      - **Tenant member** — a ``tenant``-scoped membership (``tenant`` set, ``provider``
-        null); ``kind == 'member'``.
-
-    Exactly one of ``tenant`` / ``provider`` is set (enforced by a CheckConstraint).
-    Login capability is a property of the ``User`` (``can_login``), not of the Membership.
-
-    For provider-staff memberships, ``tenant_scope`` decides which of the provider's
-    tenants the staff member reaches: ``explicit`` → ``assigned_tenants`` only,
-    ``tenant_group`` → ``scope_group`` and descendants, ``all`` → every provider tenant.
+    NOTE: the global ``User.is_active`` / ``User.can_login`` is synced from
+    memberships ONLY by the SCIM provisioning paths, which clear it when a
+    provisioned user has no active membership left. The interactive UI does NOT
+    auto-clear it: a user whose last membership is deactivated stays authenticated
+    but lands on the "no accessible workspace" page.
     """
-    # Provider memberships have no tenant of their own; tenant memberships do.
-    # ChangeLoggingMixin must accept tenant=None entries for the former.
-    changelog_global = True
-
-    # "staff vs member" is derived from the FK pair (see ``kind``); these constants only
-    # label the two kinds for display/report code, not a stored discriminator.
-    KIND_STAFF = 'staff'
-    KIND_MEMBER = 'member'
-    KIND_CHOICES = [
-        (KIND_MEMBER, _('Tenant member')),
-        (KIND_STAFF, _('Provider staff (technician)')),
-    ]
-
-    SCOPE_EXPLICIT = 'explicit'
-    SCOPE_TENANT_GROUP = 'tenant_group'
-    SCOPE_ALL = 'all'
-    SCOPE_CHOICES = [
-        (SCOPE_EXPLICIT, _('Specific tenants')),
-        (SCOPE_TENANT_GROUP, _('A tenant group + its descendants')),
-        (SCOPE_ALL, _("All of the provider's tenants")),
-    ]
 
     user = models.ForeignKey(
         settings.AUTH_USER_MODEL,
@@ -658,71 +620,13 @@ class Membership(ChangeLoggingMixin, models.Model):
         related_name='memberships',
         verbose_name=_("User"),
     )
-    # Exactly one of these is set (CheckConstraint); the populated FK *is* the kind.
     tenant = models.ForeignKey(
         'organization.Tenant',
         on_delete=models.CASCADE,
         related_name='memberships',
-        blank=True, null=True,
         db_index=True,
         verbose_name=_("Tenant"),
     )
-    provider = models.ForeignKey(
-        'organization.Provider',
-        on_delete=models.CASCADE,
-        related_name='memberships',
-        blank=True, null=True,
-        db_index=True,
-        verbose_name=_("Provider"),
-    )
-    roles = models.ManyToManyField(
-        'organization.Role',
-        related_name='memberships',
-        blank=True,
-        verbose_name=_("Roles"),
-    )
-    direct_permissions = models.JSONField(
-        default=list, blank=True,
-        verbose_name=_("Direct permissions"),
-        help_text=_("Permission codenames granted directly to this membership, "
-                    "independent of any role. Additive with role permissions."),
-    )
-    # Provider-staff tenant scoping (null for tenant memberships).
-    tenant_scope = models.CharField(
-        max_length=20,
-        choices=SCOPE_CHOICES,
-        blank=True, null=True,
-        verbose_name=_("Tenant scope"),
-        help_text=_("Provider staff only. How this technician reaches customer tenants."),
-    )
-    scope_group = models.ForeignKey(
-        'organization.TenantGroup',
-        on_delete=models.SET_NULL,
-        related_name='provider_membership_scopes',
-        blank=True, null=True,
-        verbose_name=_("Scope group"),
-        help_text=_("Used when ``tenant_scope='tenant_group'``."),
-    )
-    assigned_tenants = models.ManyToManyField(
-        'organization.Tenant',
-        related_name='provider_assignments',
-        blank=True,
-        verbose_name=_("Assigned tenants"),
-        help_text=_("Used when ``tenant_scope='explicit'``."),
-    )
-    # Per-container activation. False = the user is suspended in THIS tenant/provider
-    # (e.g. SCIM ``active=false``) but the row, roles, and any AssetHolder linkage are
-    # retained for re-activation. Access gates treat an inactive membership as "not a
-    # member".
-    #
-    # NOTE: the global ``User.is_active`` / ``User.can_login`` is synced from memberships
-    # ONLY by the SCIM provisioning paths (``users/api/scim/views.py`` and
-    # ``users/api/scim/provider_views.py``), which clear it when a provisioned user has no
-    # active membership left. The interactive UI does NOT auto-clear it: a user whose last
-    # membership is deactivated by an admin stays authenticated (and keeps any API tokens),
-    # but on login lands on a "no accessible workspace" page (see
-    # ``organization/views/dashboard`` + ``templates/registration/no_workspace.html``)
-    # rather than a broken, permission-less dashboard.
     is_active = models.BooleanField(default=True, db_index=True, verbose_name=_("Active"))
     joined_at = models.DateTimeField(auto_now_add=True)
 
@@ -731,91 +635,150 @@ class Membership(ChangeLoggingMixin, models.Model):
         verbose_name = _("Membership")
         verbose_name_plural = _("Memberships")
         constraints = [
-            # Exactly one container: provider (⇒ staff) XOR tenant (⇒ member).
-            models.CheckConstraint(
-                check=(
-                    (models.Q(tenant__isnull=False) & models.Q(provider__isnull=True))
-                    | (models.Q(tenant__isnull=True) & models.Q(provider__isnull=False))
-                ),
-                name='organization_membership_exactly_one_container',
-            ),
             models.UniqueConstraint(
                 fields=['user', 'tenant'],
-                condition=models.Q(tenant__isnull=False),
                 name='organization_membership_unique_user_tenant',
-            ),
-            models.UniqueConstraint(
-                fields=['user', 'provider'],
-                condition=models.Q(provider__isnull=False),
-                name='organization_membership_unique_user_provider',
             ),
         ]
 
     def __str__(self):
-        if self.provider_id:
-            return f"{self.user} @ {self.provider} (provider staff)"
-        if self.tenant_id:
-            return f"{self.user} @ {self.tenant} ({self.get_kind_display()})"
-        return f"{self.user} (unbound membership)"
+        return f"{self.user} @ {self.tenant}"
 
     def get_absolute_url(self):
         return reverse('organization:membership_detail', kwargs={'pk': self.pk})
 
     @property
-    def container(self):
-        """The Tenant or Provider this membership belongs to."""
-        return self.provider if self.provider_id else self.tenant
+    def is_staff_membership(self):
+        """True when any assignment on this membership projects into managed tenants."""
+        return self.assignments.filter(reach=RoleAssignment.REACH_MANAGED).exists()
 
-    @property
-    def is_provider_staff(self):
-        """A membership bound to a Provider is, by definition, provider staff."""
-        return bool(self.provider_id)
 
-    @property
-    def kind(self):
-        """``'staff'`` if bound to a provider, else ``'member'`` — derived from the FK."""
-        return self.KIND_STAFF if self.provider_id else self.KIND_MEMBER
+class RoleAssignment(ChangeLoggingMixin, models.Model):
+    """One role granted at one scope — the unit of granting and audit.
 
-    def get_kind_display(self):
-        """Human label for ``kind`` (mirrors Django's ``get_<field>_display`` ergonomics)."""
-        return dict(self.KIND_CHOICES)[self.kind]
+    ``reach='own'``      → the role applies inside ``membership.tenant`` only.
+    ``reach='managed'``  → the role applies inside the managed tenants selected by
+                           the refinement (``managed_scope`` / ``scope_group`` /
+                           ``assigned_tenants``); valid only when
+                           ``membership.tenant.is_provider``.
 
-    def save(self, *args, **kwargs):
-        # A provider-staff membership always needs a tenant_scope; default it on first save
-        # when the caller bound a provider but left the scope blank. Provider/tenant XOR is
-        # enforced by the CheckConstraint, so no discriminator field needs deriving here.
-        if self.provider_id and not self.tenant_id and not self.tenant_scope:
-            self.tenant_scope = self.SCOPE_EXPLICIT
-        super().save(*args, **kwargs)
+    "Same role in both places" is two rows. Every grant records who granted it
+    and when — the audit provenance the old roles-M2M could not carry.
+    """
+    # Attribute each grant/revoke to the membership's tenant in the changelog.
+    changelog_tenant_lookup = 'membership__tenant'
+    # A SOFT-deleted Role/Tenant must not physically destroy its grant rows:
+    # they are the audit trail, the backend already treats deleted roles as
+    # inert, and restoring the role re-arms the grants. Hard deletes still
+    # cascade normally. (Consumed by SoftDeleteMixin.delete's collector loop.)
+    survive_parent_soft_delete = True
 
-    # ------------------------------------------------------------------ RBAC projection
-    # These three methods are the CANONICAL source of truth for provider-staff tenant
-    # reachability and for the provider→tenant permission projection. Every other place
-    # that used to re-implement the ``tenant_scope`` branching or the ``manage_*`` strip
-    # (``core.auth.MembershipBackend``, ``organization.access``, ``organization.signals``)
-    # now delegates here — do NOT hand-copy this logic elsewhere.
-    #
-    # Provider-level capabilities (``organization.manage_*``) never grant inside a tenant,
-    # so they are stripped whenever provider-scoped role permissions project into tenant
-    # context. This prefix is the invariant those methods enforce.
-    MANAGE_CAPABILITY_PREFIX = 'organization.manage_'
+    REACH_OWN = 'own'
+    REACH_MANAGED = 'managed'
+    REACH_CHOICES = [
+        (REACH_OWN, _('This tenant')),
+        (REACH_MANAGED, _('Managed tenants')),
+    ]
+
+    SCOPE_EXPLICIT = 'explicit'
+    SCOPE_TENANT_GROUP = 'tenant_group'
+    SCOPE_ALL = 'all'
+    SCOPE_CHOICES = [
+        (SCOPE_EXPLICIT, _('Specific tenants')),
+        (SCOPE_TENANT_GROUP, _('A tenant group + its descendants')),
+        (SCOPE_ALL, _('All managed tenants')),
+    ]
+
+    membership = models.ForeignKey(
+        'organization.Membership',
+        on_delete=models.CASCADE,
+        related_name='assignments',
+        verbose_name=_("Membership"),
+    )
+    role = models.ForeignKey(
+        'organization.Role',
+        on_delete=models.CASCADE,
+        related_name='assignments',
+        verbose_name=_("Role"),
+    )
+    reach = models.CharField(
+        max_length=10, choices=REACH_CHOICES, default=REACH_OWN,
+        db_index=True, verbose_name=_("Reach"),
+    )
+    managed_scope = models.CharField(
+        max_length=20, choices=SCOPE_CHOICES, blank=True, null=True,
+        verbose_name=_("Managed scope"),
+        help_text=_("Managed reach only. Which managed tenants this grant covers."),
+    )
+    scope_group = models.ForeignKey(
+        'organization.TenantGroup',
+        on_delete=models.SET_NULL,
+        related_name='assignment_scopes',
+        blank=True, null=True,
+        verbose_name=_("Scope group"),
+        help_text=_("Used when managed_scope='tenant_group'."),
+    )
+    assigned_tenants = models.ManyToManyField(
+        'organization.Tenant',
+        related_name='reach_assignments',
+        blank=True,
+        verbose_name=_("Assigned tenants"),
+        help_text=_("Used when managed_scope='explicit'."),
+    )
+    granted_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True, blank=True,
+        related_name='granted_assignments',
+        verbose_name=_("Granted by"),
+    )
+    granted_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['membership', 'role']
+        verbose_name = _("Role assignment")
+        verbose_name_plural = _("Role assignments")
+        constraints = [
+            models.UniqueConstraint(
+                fields=['membership', 'role', 'reach'],
+                name='organization_roleassignment_unique_grant',
+            ),
+        ]
+
+    def __str__(self):
+        return f"{self.membership.user} : {self.role.name} ({self.get_reach_display()})"
+
+    def clean(self):
+        # Runs on every save via the global pre_save validator — keep it cheap.
+        from django.core.exceptions import ValidationError
+        super().clean()
+        if self.reach == self.REACH_MANAGED:
+            if self.membership_id and not self.membership.tenant.is_provider:
+                raise ValidationError({'reach': _(
+                    "Managed reach requires the membership's tenant to be a managing "
+                    "(provider) tenant."
+                )})
+            if not self.managed_scope:
+                self.managed_scope = self.SCOPE_EXPLICIT
+        else:
+            if self.managed_scope or self.scope_group_id:
+                raise ValidationError({'managed_scope': _(
+                    "Scope refinement is only valid for managed reach."
+                )})
+
+    # ------------------------------------------------------------------ reach resolution
+    # CANONICAL source of truth for managed-tenant reachability. The auth backend,
+    # organization.access, and the access report all delegate here — do NOT hand-copy
+    # the branching elsewhere.
 
     def covers_tenant(self, tenant):
-        """Whether ``tenant`` falls within this provider-staff membership's tenant scope.
-
-        Provider-staff only (a tenant membership never "covers" other tenants).
-        ``all`` → any tenant of the provider; ``tenant_group`` → the tenant's group is the
-        scope group or a descendant; ``explicit`` (default) → tenant in ``assigned_tenants``.
-        """
-        if not self.provider_id:
+        """Whether ``tenant`` falls within this managed-reach grant."""
+        if self.reach != self.REACH_MANAGED:
             return False
-        # A staff membership only ever covers tenants of its OWN provider. Without this guard
-        # SCOPE_ALL / SCOPE_TENANT_GROUP would answer True for a foreign provider's tenant that
-        # merely shares a group id — a cross-provider leak. Keeps this canonical helper in step
-        # with scoped_tenant_ids (which filters provider_id in every branch).
-        if tenant.provider_id != self.provider_id:
+        # A grant only ever covers tenants managed by its OWN membership tenant.
+        if tenant.managed_by_id != self.membership.tenant_id:
             return False
-        scope = self.tenant_scope or self.SCOPE_EXPLICIT
+        scope = self.managed_scope or self.SCOPE_EXPLICIT
         if scope == self.SCOPE_ALL:
             return True
         if scope == self.SCOPE_TENANT_GROUP:
@@ -824,85 +787,63 @@ class Membership(ChangeLoggingMixin, models.Model):
             # inline import: avoid an organization.models <-> organization.access cycle at load
             from organization.access import get_descendant_tenant_group_ids
             return tenant.group_id in get_descendant_tenant_group_ids(self.scope_group_id)
-        return self.assigned_tenants.filter(pk=tenant.pk).exists()
+        # When ``assigned_tenants`` has been prefetched (e.g. the outside-access
+        # report prefetches it via _base_manager to avoid one query per explicit
+        # assignment), read the cache; otherwise query via _base_manager (unscoped)
+        # through the reverse relation — the M2M's own related manager is Tenant's
+        # tenant-scoped manager, which would fail closed outside the tenant's
+        # context AND recurse into filter_by_tenant when this canonical helper is
+        # reached from accessible_tenant_ids under a group scope.
+        if 'assigned_tenants' in getattr(self, '_prefetched_objects_cache', {}):
+            return any(t.pk == tenant.pk for t in self.assigned_tenants.all())
+        return Tenant._base_manager.filter(
+            reach_assignments=self, pk=tenant.pk,
+        ).exists()
 
     def scoped_tenant_ids(self):
-        """The set of tenant ids this provider-staff membership can reach.
-
-        Set-based counterpart to :meth:`covers_tenant` — used where callers need the whole
-        reachable set at once (e.g. the tenant switcher) rather than testing one tenant.
-        Returns an empty set for tenant memberships or when the scope resolves to nothing.
-        """
-        if not self.provider_id:
+        """The set of managed-tenant ids this grant reaches (empty for own-reach)."""
+        if self.reach != self.REACH_MANAGED:
             return set()
-        # inline import: avoid an organization.models <-> organization.access cycle at load
-        from organization.models import Tenant
-
-        scope = self.tenant_scope or self.SCOPE_EXPLICIT
+        provider_id = self.membership.tenant_id
+        scope = self.managed_scope or self.SCOPE_EXPLICIT
         if scope == self.SCOPE_ALL:
             return set(
-                Tenant._base_manager.filter(provider_id=self.provider_id)
+                Tenant._base_manager.filter(managed_by_id=provider_id)
                 .values_list('pk', flat=True)
             )
         if scope == self.SCOPE_TENANT_GROUP:
             if not self.scope_group_id:
                 return set()
+            # inline import: avoid an organization.models <-> organization.access cycle at load
             from organization.access import get_descendant_tenant_group_ids
             group_ids = get_descendant_tenant_group_ids(self.scope_group_id)
             return set(
                 Tenant._base_manager.filter(
-                    provider_id=self.provider_id, group_id__in=group_ids,
+                    managed_by_id=provider_id, group_id__in=group_ids,
                 ).values_list('pk', flat=True)
             )
+        # _base_manager via the reverse relation (see covers_tenant): unscoped, so it
+        # neither fails closed outside the tenant context nor recurses into
+        # filter_by_tenant when reached from accessible_tenant_ids under a group scope.
         return set(
-            self.assigned_tenants.filter(provider_id=self.provider_id)
-            .values_list('pk', flat=True)
+            Tenant._base_manager.filter(
+                reach_assignments=self, managed_by_id=provider_id,
+            ).values_list('pk', flat=True)
         )
 
-    @classmethod
-    def project_permissions_for_tenant(cls, perm_iterable):
-        """Project provider-scoped role permissions into tenant context.
+    # ------------------------------------------------------------------ explicit coverage
+    def set_assigned_tenants(self, tenants, actor=None):
+        """The ONLY supported writer for this grant's explicit managed coverage.
 
-        Drops ``organization.manage_*`` capabilities (they are provider-level and never
-        grant inside a tenant) and returns the remaining codenames as a list. ``None``
-        entries in the iterable are treated as empty.
+        Routes the M2M edit through :meth:`ChangeLoggingMixin.log_m2m_change` so
+        the change is recorded in ``ObjectChange`` (the mixin's ``save()`` cannot
+        capture it — Django fires ``m2m_changed`` after ``save()``), attributed to
+        the membership's tenant (via ``changelog_tenant_lookup``), the current
+        request, and ``actor``. The existing ``m2m_changed`` receiver still clears
+        the affected user's effective-permission caches. An unchanged set is a
+        no-op (nothing applied, nothing logged). Returns ``True`` on a real change.
         """
-        return [
-            p for p in (perm_iterable or [])
-            if not p.startswith(cls.MANAGE_CAPABILITY_PREFIX)
-        ]
-
-
-class TenantInvitation(ChangeLoggingMixin, models.Model):
-    objects = TenantScopingManager()
-    # Audit invite issuance/acceptance/deletion (security-relevant access grant)
-    # but keep the one-time bearer token out of the changelog JSON.
-    _change_logging_excluded_fields = ['updated_at', 'token']
-
-    email = models.EmailField(verbose_name=_("Email"))
-    tenant = models.ForeignKey('organization.Tenant', on_delete=models.CASCADE, verbose_name=_("Tenant"))
-    role = models.ForeignKey(
-        'organization.Role',
-        on_delete=models.CASCADE,
-        related_name='invitations',
-        verbose_name=_("Role")
-    )
-    token = models.UUIDField(default=uuid.uuid4, unique=True, editable=False)
-    invited_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, verbose_name=_("Invited By"))
-    created_at = models.DateTimeField(auto_now_add=True)
-    expires_at = models.DateTimeField(verbose_name=_("Expires At"))
-    accepted_at = models.DateTimeField(null=True, blank=True, verbose_name=_("Accepted At"))
-
-    @property
-    def is_valid(self):
-        return self.accepted_at is None and self.expires_at > timezone.now()
-
-    class Meta:
-        verbose_name = _("Tenant Invitation")
-        verbose_name_plural = _("Tenant Invitations")
-
-    def __str__(self):
-        return f"Invite for {self.email} to {self.tenant.name}"
+        return self.log_m2m_change('assigned_tenants', tenants, actor=actor)
 
 
 class CostCenter(AutoSlugMixin, CustomFieldDataMixin, StandardModel, SoftDeleteMixin):
@@ -1013,107 +954,213 @@ class CostCenter(AutoSlugMixin, CustomFieldDataMixin, StandardModel, SoftDeleteM
                 node = node.parent
 
 
-@transaction.atomic
-def accept_invitation(invitation, user):
-    from django.core.exceptions import ValidationError
-    if not invitation.is_valid:
-        raise ValidationError(_("This invitation has expired or has already been accepted."))
+# ---------------------------------------------------------------------------
+# Cross-tenant resource sharing (ADR-0001, remediation plan phase 2)
+# ---------------------------------------------------------------------------
 
-    # Accept-time escalation re-check (defence in depth): the invite form already guards the
-    # role grant at issuance, but roles/permissions can change between issue and accept, and the
-    # inviter may have lost privileges since. Re-validate the role's permissions against the
-    # inviter's CURRENT effective perms in the tenant; reject if they can no longer grant it.
-    # inline import: core.auth.guards -> core.auth -> organization would cycle at module load.
-    from core.auth.guards import validate_permission_grant
-    if invitation.role is not None:
-        # Fail CLOSED when the inviter no longer exists (invited_by is SET_NULL): total
-        # privilege loss is the strongest case this re-check must catch, but
-        # validate_permission_grant treats a None granting user as a trusted no-op, so guard
-        # it explicitly rather than letting the grant through unverified.
-        if invitation.invited_by is None:
-            raise ValidationError(_(
-                "This invitation can no longer be accepted because the person who issued "
-                "it no longer has an account. Please request a new invitation."
-            ))
-        validate_permission_grant(
-            invitation.invited_by, invitation.role.permissions or [], invitation.tenant,
-        )
+class TenantResourceGrant(SoftDeleteMixin, ChangeLoggingMixin, BaseModel):
+    """One tenant's explicit permission for another tenant (or a TenantGroup
+    subtree) to see/use ONE of its stock pools.
 
-    # 1. Create the tenant membership (a tenant member — provider is null)
-    membership = Membership.objects.create(
-        user=user,
-        tenant=invitation.tenant,
-    )
-    membership.roles.add(invitation.role)
+    ADR-0001: TenantGroup membership makes sharing *eligible*, never
+    automatic — every cross-tenant resource use requires one of these rows.
+    Grants are non-transitive, convey no user permissions (RBAC is checked
+    independently by the resolver), and are revoked by soft-delete so that
+    historical assignments keep their provenance pointer.
 
-    # 2. Mark Invitation as accepted
-    invitation.accepted_at = timezone.now()
-    invitation.save()
+    Like Membership/RoleAssignment, the default manager is deliberately
+    UNSCOPED: this is authorization infrastructure that the resolver must
+    read from both the owner's and the grantee's tenant context. UI/API
+    surfaces scope their querysets explicitly.
+    """
+    # Soft-deleting the owner/grantee tenant must not destroy the audit
+    # trail; grants become inert (the resolver re-checks liveness) and
+    # restore re-arms them. Hard deletes still cascade.
+    survive_parent_soft_delete = True
 
-    # 3. Match and bind the User account to an existing AssetHolder record if present
-    holder = AssetHolder.objects.filter(
-        tenant=invitation.tenant,
-        email__iexact=invitation.email,
-        user__isnull=True
-    ).first()
-
-    if holder:
-        holder.user = user
-        holder.save()
-
-
-# --------------------------------------------------------------------------- Provider (MSP)
-# The Provider layer sits ABOVE tenants: one managing organization (MSP) administers its own
-# IT and its customers' IT from a single install. Single-company installs simply have no
-# Provider rows, so the whole layer stays invisible.
-#
-# Provider-level capabilities (manage_tenants, manage_staff, manage_groups, manage_provider)
-# are plain Django permissions declared on Provider.Meta.permissions. They are granted by
-# attaching them to a provider-scoped Role; the auth backend resolves them through normal
-# ``user.has_perm()`` calls — there is no second authorization system.
-
-class Provider(AutoSlugMixin, StandardModel, SoftDeleteMixin):
-    """An MSP / managing organization that administers one or more customer Tenants."""
-    changelog_global = True  # above tenants → changelog attributed to tenant=None
+    # NO all_objects manager, on purpose (mirrors Membership/RoleAssignment):
+    # revocation is a lifecycle state, not "trash" — grants must not surface
+    # in the generic recycle bin for restore. Audit surfaces (admin) read
+    # revoked rows through _base_manager.
     objects = SoftDeleteManager()
-    all_objects = AllObjectsManager()
 
-    name = models.CharField(max_length=100, verbose_name=_("Name"))
-    slug = models.SlugField(max_length=100, verbose_name=_("Slug"))
-    description = models.TextField(blank=True, verbose_name=_("Description"))
-    comments = models.TextField(blank=True, verbose_name=_("Comments"))
-    internal_tenant = models.ForeignKey(
-        'organization.Tenant',
-        on_delete=models.SET_NULL,
-        related_name='provider_internal',
-        blank=True,
-        null=True,
-        verbose_name=_("Internal tenant"),
-        help_text=_("The provider's own IT inventory tenant ('home base' for provider staff)."),
+    ACCESS_VIEW = 'view'
+    ACCESS_USE = 'use'
+    ACCESS_CHOICES = [
+        (ACCESS_VIEW, _('View')),
+        (ACCESS_USE, _('View + allocate/consume')),
+    ]
+
+    #: The only models a grant may reference (tight allowlist by design —
+    #: extend deliberately, never generically).
+    APPROVED_RESOURCE_MODELS = (
+        'inventory.componentstock',
+        'inventory.accessorystock',
+        'inventory.consumablestock',
     )
-    settings = models.JSONField(default=dict, blank=True, verbose_name=_("Settings"))
+
+    tenant = models.ForeignKey(
+        'organization.Tenant',
+        on_delete=models.CASCADE,
+        related_name='resource_grants_given',
+        db_index=True,
+        verbose_name=_("Owning tenant"),
+        help_text=_("The tenant whose resource is being shared."),
+    )
+    grantee_tenant = models.ForeignKey(
+        'organization.Tenant',
+        on_delete=models.CASCADE,
+        related_name='resource_grants_received',
+        blank=True, null=True,
+        db_index=True,
+        verbose_name=_("Grantee tenant"),
+    )
+    grantee_tenant_group = models.ForeignKey(
+        'organization.TenantGroup',
+        on_delete=models.CASCADE,
+        related_name='resource_grants_received',
+        blank=True, null=True,
+        db_index=True,
+        verbose_name=_("Grantee tenant group"),
+        help_text=_("Grants to a group include its descendant groups."),
+    )
+    resource_type = models.ForeignKey(
+        ContentType,
+        on_delete=models.PROTECT,
+        related_name='+',
+        limit_choices_to=models.Q(
+            app_label='inventory',
+            model__in=('componentstock', 'accessorystock', 'consumablestock'),
+        ),
+        verbose_name=_("Resource type"),
+    )
+    resource_id = models.PositiveBigIntegerField(verbose_name=_("Resource ID"))
+    resource = GenericForeignKey('resource_type', 'resource_id')
+    access_level = models.CharField(
+        max_length=10,
+        choices=ACCESS_CHOICES,
+        default=ACCESS_VIEW,
+        db_index=True,
+        verbose_name=_("Access level"),
+    )
+    granted_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True, blank=True,
+        related_name='granted_resource_grants',
+        verbose_name=_("Granted by"),
+    )
+    reason = models.TextField(blank=True, verbose_name=_("Reason"))
 
     class Meta:
-        ordering = ['name']
-        verbose_name = _("Provider")
-        verbose_name_plural = _("Providers")
-        permissions = [
-            # Provider-level capabilities. Held via a provider-scoped Role attached to a
-            # provider-staff Membership. Gated with ``user.has_perm('organization.<cap>')``.
-            ('manage_provider', 'Can manage provider settings'),
-            ('manage_tenants', 'Can manage customer tenants under a provider'),
-            ('manage_staff', 'Can manage provider staff'),
-            ('manage_groups', 'Can manage user groups'),
-        ]
+        ordering = ['-created_at']
+        verbose_name = _("Tenant resource grant")
+        verbose_name_plural = _("Tenant resource grants")
         constraints = [
-            models.UniqueConstraint(fields=['name'], condition=models.Q(deleted_at__isnull=True), name='organization_provider_unique_name_active'),
-            models.UniqueConstraint(fields=['slug'], condition=models.Q(deleted_at__isnull=True), name='organization_provider_unique_slug_active'),
+            models.CheckConstraint(
+                check=(
+                    models.Q(grantee_tenant__isnull=False, grantee_tenant_group__isnull=True)
+                    | models.Q(grantee_tenant__isnull=True, grantee_tenant_group__isnull=False)
+                ),
+                name='organization_trg_exactly_one_grantee',
+            ),
+            models.CheckConstraint(
+                check=(
+                    models.Q(grantee_tenant__isnull=True)
+                    | ~models.Q(grantee_tenant=models.F('tenant'))
+                ),
+                name='organization_trg_owner_not_grantee',
+            ),
+            models.UniqueConstraint(
+                fields=['resource_type', 'resource_id', 'grantee_tenant'],
+                condition=models.Q(deleted_at__isnull=True, grantee_tenant__isnull=False),
+                name='organization_trg_unique_active_tenant_grant',
+            ),
+            models.UniqueConstraint(
+                fields=['resource_type', 'resource_id', 'grantee_tenant_group'],
+                condition=models.Q(deleted_at__isnull=True, grantee_tenant_group__isnull=False),
+                name='organization_trg_unique_active_group_grant',
+            ),
+        ]
+        indexes = [
+            models.Index(
+                fields=['resource_type', 'resource_id'],
+                name='org_trg_resource_idx',
+            ),
+            models.Index(
+                fields=['resource_type', 'resource_id'],
+                condition=models.Q(deleted_at__isnull=True),
+                name='org_trg_active_resource_idx',
+            ),
         ]
 
     def __str__(self):
-        return self.name
+        grantee = self.grantee_tenant or self.grantee_tenant_group
+        return f"{self.tenant} -> {grantee}: {self.resource_type.model} #{self.resource_id} ({self.access_level})"
 
-    def get_absolute_url(self):
-        return reverse('organization:provider_detail', kwargs={'pk': self.pk})
+    @property
+    def is_active(self):
+        return self.deleted_at is None
 
+    def delete(self, *args, force_hard_delete=False, **kwargs):
+        """Revocation (soft delete) must ALWAYS be possible.
 
+        Historical assignments reference the grant with on_delete=PROTECT so
+        a HARD delete cannot destroy provenance — but the SoftDeleteMixin
+        soft path runs the deletion collector, which would trip over that
+        very PROTECT. A revocation only stamps ``deleted_at`` and cascades
+        to nothing, so skip the collector entirely on the soft path.
+        """
+        force_hard = force_hard_delete or getattr(self, '_force_hard_delete', False)
+        if force_hard:
+            return super().delete(*args, force_hard_delete=True, **kwargs)
+        from django.db import transaction
+        with transaction.atomic():
+            if hasattr(self, '_changelog_action'):
+                # inline import: mirrors SoftDeleteMixin.delete's soft branch
+                from core.choices import ObjectChangeActionChoices
+                self._changelog_action = ObjectChangeActionChoices.ACTION_DELETE
+            if hasattr(self, 'snapshot') and callable(self.snapshot):
+                self.snapshot()
+            self.soft_delete()
+
+    def clean(self):
+        # Runs on every save via the global pre_save validator — keep it cheap.
+        from django.core.exceptions import ValidationError
+        super().clean()
+
+        has_tenant = self.grantee_tenant_id is not None
+        has_group = self.grantee_tenant_group_id is not None
+        if has_tenant == has_group:
+            raise ValidationError(_(
+                "Exactly one of grantee tenant or grantee tenant group must be set."
+            ))
+        if has_tenant and self.grantee_tenant_id == self.tenant_id:
+            raise ValidationError({'grantee_tenant': _(
+                "A tenant cannot be granted its own resource."
+            )})
+
+        if self.resource_type_id:
+            label = f'{self.resource_type.app_label}.{self.resource_type.model}'
+            if label not in self.APPROVED_RESOURCE_MODELS:
+                raise ValidationError({'resource_type': _(
+                    "This model cannot be shared. Approved resources: %(models)s."
+                ) % {'models': ', '.join(self.APPROVED_RESOURCE_MODELS)}})
+
+        # Ownership-through-location proof — only while the grant is active:
+        # a revoked grant must stay saveable (and restorable-to-inspect) even
+        # after the pool has been deleted or moved.
+        if self.deleted_at is None and self.resource_type_id and self.resource_id:
+            model = self.resource_type.model_class()
+            stock = model._base_manager.filter(
+                pk=self.resource_id,
+            ).select_related('location').first()
+            if stock is None:
+                raise ValidationError({'resource_id': _(
+                    "The referenced stock pool does not exist."
+                )})
+            if stock.location.tenant_id is None or stock.location.tenant_id != self.tenant_id:
+                raise ValidationError({'tenant': _(
+                    "The resource must belong to the owning tenant through its "
+                    "location (the pool's location tenant does not match)."
+                )})

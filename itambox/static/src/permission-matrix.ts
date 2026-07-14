@@ -115,7 +115,7 @@
         if (!fields) return;
         const wanted = new Set(fields);
         // Only touch matrix checkboxes (those inside the *-checkbox cells), never
-        // the row/column toggles or the custom-perm / provider-capability boxes.
+        // the row/column toggles or the custom-perm boxes.
         const matrixBoxes = document.querySelectorAll(
           '.read-checkbox input[type="checkbox"], .create-checkbox input[type="checkbox"], ' +
           '.edit-checkbox input[type="checkbox"], .delete-checkbox input[type="checkbox"]'
@@ -128,35 +128,6 @@
       });
     }
 
-    // 6. Container chooser (role create) — tenant vs provider.
-    // On the plain /roles/add/ page the user picks a container to set the role's scope.
-    // Enforce mutual exclusivity (picking one clears the other) and reveal the provider-
-    // capabilities section only when a provider is chosen. Server-side clean() is the source
-    // of truth (requires exactly one container and derives scope); this is UX only.
-    const chooser = document.getElementById('role-container-chooser');
-    if (chooser && !(chooser as any)._matrix_init) {
-      (chooser as any)._matrix_init = true;
-      const tenantSel = chooser.querySelector('[name="tenant"]') as HTMLSelectElement | null;
-      const providerSel = chooser.querySelector('[name="provider"]') as HTMLSelectElement | null;
-      const capsSection = document.getElementById('provider-capabilities-section');
-
-      const sync = (changed: 'tenant' | 'provider' | null) => {
-        if (changed === 'provider' && providerSel && providerSel.value && tenantSel) {
-          tenantSel.value = '';
-        }
-        if (changed === 'tenant' && tenantSel && tenantSel.value && providerSel) {
-          providerSel.value = '';
-        }
-        const providerChosen = !!(providerSel && providerSel.value);
-        if (capsSection) capsSection.style.display = providerChosen ? '' : 'none';
-      };
-
-      if (tenantSel) tenantSel.addEventListener('change', () => sync('tenant'));
-      if (providerSel) providerSel.addEventListener('change', () => sync('provider'));
-      // Initial pass: keep caps visibility correct after a validation-error re-render, where
-      // the previously chosen container is repopulated from POST data.
-      sync(null);
-    }
   }
 
   if (document.readyState === 'loading') {

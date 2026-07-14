@@ -8,8 +8,9 @@ from django.urls import reverse
 from assets.models import Manufacturer, Category
 from inventory.models import Accessory, AccessoryStock
 from organization.models import (
-    Tenant, Role, Membership, AssetHolder, Location, Site,
+    Tenant, Role, AssetHolder, Location, Site,
 )
+from core.tests.mixins import grant
 
 User = get_user_model()
 
@@ -25,8 +26,7 @@ class InventoryAssignmentOverAllocationTests(TestCase):
                 'inventory.change_accessoryassignment',
             ],
         )
-        membership = Membership.objects.create(user=self.user, tenant=self.tenant)
-        membership.roles.add(role)
+        grant(self.user, self.tenant, role)
         self.mfr = Manufacturer.objects.create(name='Logitech', slug='logi-inv')
         self.cat = Category.objects.create(
             name='Acc Cat', slug='acc-cat-inv', applies_to={'accessory': True}
@@ -34,8 +34,8 @@ class InventoryAssignmentOverAllocationTests(TestCase):
         self.accessory = Accessory.objects.create(
             name='Mouse', manufacturer=self.mfr, category=self.cat, tenant=self.tenant
         )
-        self.site = Site.objects.create(name='Site', slug='site-inv')
-        self.location = Location.objects.create(name='Loc', slug='loc-inv', site=self.site)
+        self.site = Site.objects.create(name='Site', slug='site-inv', tenant=self.tenant)
+        self.location = Location.objects.create(name='Loc', slug='loc-inv', site=self.site, tenant=self.tenant)
         # total_stock == 2 -> available == 2
         AccessoryStock.objects.create(accessory=self.accessory, location=self.location, qty=2)
         self.holder = AssetHolder.objects.create(

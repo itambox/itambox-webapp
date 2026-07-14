@@ -5,7 +5,8 @@ from django.urls import reverse
 from django.contrib.auth import get_user_model
 from django.contrib.auth.models import Permission
 from django.contrib.contenttypes.models import ContentType
-from organization.models import Tenant, Location, TenantGroup, Membership, Role, Site
+from organization.models import Tenant, Location, TenantGroup, Role, Site
+from core.tests.mixins import grant
 from assets.models import Asset, AssetType, StatusLabel, AssetRole, Manufacturer, Category, Supplier
 from software.models import Software
 from licenses.models import License
@@ -62,10 +63,10 @@ class GraphQLTestCase(TestCase):
                 'inventory.view_kit', 'inventory.add_kit', 'inventory.change_kit', 'inventory.delete_kit',
             ]
         )
-        self.membership_a = Membership.objects.create(user=self.staff_a, tenant=self.tenant_a)
-        self.membership_a.roles.add(self.role_admin_a)
-        self.membership_b = Membership.objects.create(user=self.staff_b, tenant=self.tenant_b)
-        self.membership_b.roles.add(self.role_admin_b)
+        self.assignment_a = grant(self.staff_a, self.tenant_a, self.role_admin_a)
+        self.membership_a = self.assignment_a.membership
+        self.assignment_b = grant(self.staff_b, self.tenant_b, self.role_admin_b)
+        self.membership_b = self.assignment_b.membership
 
         # Grant general Django permissions to staff users
         for user in [self.staff_a, self.staff_b]:

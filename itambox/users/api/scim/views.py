@@ -10,7 +10,7 @@ from rest_framework.permissions import IsAuthenticated
 
 from core.managers import set_current_tenant
 from itambox.middleware import set_current_user
-from organization.models import Tenant, Membership, AssetHolder, Role
+from organization.models import Tenant, Membership, AssetHolder
 from users.models import UserGroup
 from users.api.scim.serializers import (
     SCIMUserSerializer, SCIMGroupSerializer, SCIMServiceProviderConfigSerializer
@@ -296,8 +296,11 @@ class SCIMUserListView(SCIMTenantMixin, APIView):
                 }, status=status.HTTP_409_CONFLICT)
             
             with transaction.atomic():
-                # Roles are assigned in-app via UserGroup; SCIM provisioning creates the
-                # membership with an empty roles set (no get_or_create of a default role).
+                # SCIM provisions identity only: a bare membership with NO RoleAssignment
+                # rows — permissions are granted in-app (or via UserGroup). Were a
+                # provisioning config ever to map roles, it would create own-reach
+                # assignments with granted_by=None — SCIM is trusted operator
+                # configuration, deliberately unguarded.
                 Membership.objects.create(user=user, tenant=self.tenant, is_active=active)
                 link_or_create_assetholder(user, self.tenant)
         else:
@@ -312,8 +315,7 @@ class SCIMUserListView(SCIMTenantMixin, APIView):
                 user.set_unusable_password()
                 user.save()
 
-                # Roles are assigned in-app via UserGroup; SCIM provisioning creates the
-                # membership with an empty roles set (no get_or_create of a default role).
+                # See comment above: bare membership, assignments granted in-app.
                 Membership.objects.create(user=user, tenant=self.tenant, is_active=active)
                 link_or_create_assetholder(user, self.tenant)
 
@@ -563,9 +565,9 @@ class SCIMGroupListView(SCIMTenantMixin, APIView):
                 "detail": str(e)
             }, status=status.HTTP_400_BAD_REQUEST)
         
-        # Groups are global; a tenant's SCIM endpoint sees (read-only) the groups that
-        # grant a role in THIS tenant.
-        queryset = UserGroup.objects.filter(roles__scope=Role.SCOPE_TENANT, roles__tenant=self.tenant).filter(q_obj).distinct()
+        # Groups are cross-tenant; a tenant's SCIM endpoint sees (read-only) the groups
+        # that carry a role owned by THIS tenant.
+        queryset = UserGroup.objects.filter(roles__tenant=self.tenant).filter(q_obj).distinct()
         
         try:
             start_index = int(request.query_params.get('startIndex', 1))
@@ -655,7 +657,7 @@ class SCIMGroupListView(SCIMTenantMixin, APIView):
 class SCIMGroupDetailView(SCIMTenantMixin, APIView):
     def get(self, request, pk, *args, **kwargs):
         group = get_object_or_404(
-            UserGroup.objects.filter(roles__scope=Role.SCOPE_TENANT, roles__tenant=self.tenant).distinct(), id=pk,
+            UserGroup.objects.filter(roles__tenant=self.tenant).distinct(), id=pk,
         )
         serializer = SCIMGroupSerializer(group, context={'request': request, 'tenant_slug': self.tenant.slug})
         return Response(serializer.data, status=status.HTTP_200_OK)

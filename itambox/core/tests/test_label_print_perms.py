@@ -3,6 +3,7 @@ from django.test import TestCase
 from django.urls import reverse
 
 from assets.models import Asset, StatusLabel
+from core.tests.mixins import grant
 from extras.models import LabelTemplate
 from organization.models import Tenant, Role, Membership
 
@@ -24,8 +25,7 @@ class LabelPrintPermissionTests(TestCase):
     def _login(self, username, perms):
         user = User.objects.create_user(username=username, password='pw')
         role = Role.objects.create(tenant=self.tenant, name=f'role-{username}', permissions=perms)
-        membership = Membership.objects.create(user=user, tenant=self.tenant)
-        membership.roles.add(role)
+        membership = grant(user, self.tenant, role).membership
         self.client.force_login(user)
         session = self.client.session
         session['active_tenant_id'] = self.tenant.pk

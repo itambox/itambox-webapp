@@ -3,7 +3,7 @@ from django.contrib.auth import get_user_model
 from django.urls import reverse
 from django.db import transaction
 from assets.models import Manufacturer, AssetType, AssetRole, Category, Asset
-from organization.models import Site, Location, AssetHolder
+from organization.models import Site, Location, AssetHolder, Tenant
 from inventory.models import Accessory, AccessoryStock, AccessoryAssignment
 
 User = get_user_model()
@@ -32,9 +32,10 @@ def _add_stock(model_class, stock_model_class, catalog_item, location, qty):
 
 class AccessoryModelTests(TestCase):
     def setUp(self):
+        self.tenant = Tenant.objects.create(name="Tenant Accessory Model", slug="tenant-accessory-model")
         self.manufacturer = Manufacturer.objects.create(name='Logitech', slug='logitech')
-        self.site = Site.objects.create(name='Warehouse', slug='warehouse')
-        self.location = Location.objects.create(name='Shelf A', slug='shelf-a', site=self.site)
+        self.site = Site.objects.create(name='Warehouse', slug='warehouse', tenant=self.tenant)
+        self.location = Location.objects.create(name='Shelf A', slug='shelf-a', site=self.site, tenant=self.tenant)
         self.cat_keyboard = _create_category('Keyboard', accessory=True)
         self.cat_mouse = _create_category('Mouse', accessory=True)
 
@@ -161,9 +162,10 @@ class AccessoryViewTests(TestCase):
             username='testadmin', password='testpassword', is_staff=True, is_superuser=True
         )
         self.client.login(username='testadmin', password='testpassword')
+        self.tenant = Tenant.objects.create(name="Tenant Accessory View", slug="tenant-accessory-view")
         self.manufacturer = Manufacturer.objects.create(name='Logitech', slug='logitech')
-        self.site = Site.objects.create(name='Office', slug='office')
-        self.location = Location.objects.create(name='Desk', slug='desk', site=self.site)
+        self.site = Site.objects.create(name='Office', slug='office', tenant=self.tenant)
+        self.location = Location.objects.create(name='Desk', slug='desk', site=self.site, tenant=self.tenant)
         self.cat_keyboard = _create_category('Keyboard', accessory=True)
         self.cat_mouse = _create_category('Mouse', accessory=True)
         self.accessory = Accessory.objects.create(
@@ -201,6 +203,11 @@ class AccessoryViewTests(TestCase):
             'name': 'K380 Keyboard',
             'slug': 'logitech-k380-keyboard',
             'category': self.cat_keyboard.pk,
+            # A Tenant row exists in this TestCase (self.tenant, owning self.location's
+            # stock), which makes core.apps's global form monkey-patch require 'tenant'
+            # on any ModelForm carrying that field. Align this catalogue item into the
+            # same tenant as the rest of the fixture.
+            'tenant': self.tenant.pk,
         })
         if response.status_code != 302:
             form = response.context.get('form')
@@ -220,6 +227,9 @@ class AccessoryViewTests(TestCase):
             'name': 'MX Master 3S Updated',
             'slug': 'logitech-mx-master-3s',
             'category': self.cat_mouse.pk,
+            # See test_create_view_post: a Tenant exists in this TestCase, so the
+            # form's 'tenant' field is required by core.apps's global monkey-patch.
+            'tenant': self.tenant.pk,
         })
         if response.status_code != 302:
             form = response.context.get('form')
@@ -256,9 +266,10 @@ class AccessoryCheckoutViewTests(TestCase):
             username='testadmin', password='testpassword', is_staff=True, is_superuser=True
         )
         self.client.login(username='testadmin', password='testpassword')
+        self.tenant = Tenant.objects.create(name="Tenant Accessory Checkout", slug="tenant-accessory-checkout")
         self.manufacturer = Manufacturer.objects.create(name='Logitech', slug='logitech')
-        self.site = Site.objects.create(name='Office', slug='office')
-        self.location = Location.objects.create(name='Desk', slug='desk', site=self.site)
+        self.site = Site.objects.create(name='Office', slug='office', tenant=self.tenant)
+        self.location = Location.objects.create(name='Desk', slug='desk', site=self.site, tenant=self.tenant)
         self.cat_mouse = _create_category('Mouse', accessory=True)
         self.accessory = Accessory.objects.create(
             name='MX Master 3S', manufacturer=self.manufacturer, category=self.cat_mouse
@@ -319,10 +330,11 @@ class AccessoryCheckoutViewTests(TestCase):
 
 class AccessoryStockFilterSetTests(TestCase):
     def setUp(self):
+        self.tenant = Tenant.objects.create(name="Tenant Accessory Filter", slug="tenant-accessory-filter")
         self.manufacturer = Manufacturer.objects.create(name="Logitech", slug="logitech")
-        self.site = Site.objects.create(name="Main HQ", slug="main-hq")
-        self.loc1 = Location.objects.create(name="Server Room", slug="server-room", site=self.site)
-        self.loc2 = Location.objects.create(name="Storage A", slug="storage-a", site=self.site)
+        self.site = Site.objects.create(name="Main HQ", slug="main-hq", tenant=self.tenant)
+        self.loc1 = Location.objects.create(name="Server Room", slug="server-room", site=self.site, tenant=self.tenant)
+        self.loc2 = Location.objects.create(name="Storage A", slug="storage-a", site=self.site, tenant=self.tenant)
         
         self.acc1 = Accessory.objects.create(name="Wired Mouse", slug="wired-mouse", manufacturer=self.manufacturer)
         self.acc2 = Accessory.objects.create(name="Wireless Keyboard", slug="wireless-keyboard", manufacturer=self.manufacturer)

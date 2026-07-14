@@ -5,8 +5,9 @@ from django.core.exceptions import PermissionDenied
 from graphql import GraphQLError
 
 from core.schema import schema
+from core.tests.mixins import grant
 from subscriptions.models import Provider, Subscription, SubscriptionAssignment
-from organization.models import Tenant, TenantGroup, AssetHolder, Role, Membership
+from organization.models import Tenant, TenantGroup, AssetHolder, Role
 from assets.models import Supplier, Asset, StatusLabel
 from itambox.middleware import set_current_tenant
 
@@ -44,8 +45,7 @@ class SubscriptionsGraphQLTestCase(TestCase):
                 'assets.view_asset', 'assets.add_asset',
             ],
         )
-        membership = Membership.objects.create(user=self.user, tenant=self.tenant)
-        membership.roles.add(role)
+        grant(self.user, self.tenant, role)
 
         # Set thread-local tenant context for models creation
         set_current_tenant(self.tenant)

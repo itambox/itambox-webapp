@@ -1,20 +1,25 @@
 """Regression tests for FIX #4 (§3-D): the raw-JSON ``direct_permissions`` textarea
-is removed from ``MembershipForm``.
+is removed from ``MembershipForm``. RBAC Stage-2 subsequently deleted the
+``direct_permissions`` column entirely (``scratch/RBAC_STAGE2_SPEC.md`` §1) — grants
+now live exclusively as ``RoleAssignment`` rows.
 
 Covers:
   (a) MembershipForm exposes no ``direct_permissions`` field (last no-JSON violation gone).
   (b) Saving a membership with roles still works, and the escalation guard still fires on
       role permissions — a low-priv actor cannot attach an over-privileged role.
-  (c) An existing membership that already has ``direct_permissions`` in the DB is not wiped
-      by editing the membership through the form (the model column is untouched).
+  (c) Successor invariant for "editing doesn't wipe unrelated grants": the form only
+      reconciles assignments at the reach it edits (``own`` by default) — a managed-reach
+      assignment on the same membership is left untouched (per the form's own docstring).
 """
 from django.contrib.auth import get_user_model
 from django.test import TestCase
 
 from core.managers import set_current_tenant, set_current_membership
-from core.tests.mixins import TenantTestMixin
-from organization.models import Tenant, Membership, Role
+from core.tests.mixins import TenantTestMixin, grant
+from organization.models import Tenant, Membership, Role, RoleAssignment
 from organization.forms.membership_form import MembershipForm
+
+from ._membership_form_helpers import membership_post_data
 
 User = get_user_model()
 
@@ -41,6 +46,8 @@ class MembershipFormNoJSONFieldTests(TenantTestMixin, TestCase):
         form = MembershipForm()
         self.assertNotIn('direct_permissions', form.fields)
         self.assertNotIn('direct_permissions', MembershipForm.Meta.fields)
+        # The grant surface is own_roles + the managed formset — no raw JSON.
+        self.assertIn('own_roles', form.fields)
 
     def test_layout_never_references_direct_permissions(self):
         """The crispy layout (and its bound-field walk) must not mention the dropped field."""
@@ -73,7 +80,7 @@ class MembershipFormRoleSaveTests(TenantTestMixin, TestCase):
             data={
                 'user': self.member_user.pk,
                 'tenant': self.tenant.pk,
-                'roles': [self.role.pk],
+                'own_roles': [self.role.pk],
                 'is_active': 'on',
             },
             user=self.superuser,
@@ -83,7 +90,11 @@ class MembershipFormRoleSaveTests(TenantTestMixin, TestCase):
         membership = form.save()
         membership.refresh_from_db()
         self.assertEqual(membership.tenant_id, self.tenant.pk)
-        self.assertIn(self.role, membership.roles.all())
+        self.assertTrue(
+            membership.assignments.filter(
+                role=self.role, reach=RoleAssignment.REACH_OWN,
+            ).exists()
+        )
 
     def test_escalation_guard_fires_on_role_permissions(self):
         """A low-priv actor cannot attach a role granting perms they do not themselves hold."""
@@ -92,9 +103,7 @@ class MembershipFormRoleSaveTests(TenantTestMixin, TestCase):
         low_actor = User.objects.create_user(
             username="lowpriv", email="lowpriv@x.com", password="pw",
         )
-        Membership.objects.create(
-            user=low_actor, tenant=self.tenant, is_active=True,
-        ).roles.add(low_role)
+        grant(low_actor, self.tenant, low_role)
 
         # Over-privileged role the low actor must not be able to grant.
         powerful_role = _make_role(
@@ -105,7 +114,7 @@ class MembershipFormRoleSaveTests(TenantTestMixin, TestCase):
             data={
                 'user': self.member_user.pk,
                 'tenant': self.tenant.pk,
-                'roles': [powerful_role.pk],
+                'own_roles': [powerful_role.pk],
                 'is_active': 'on',
             },
             user=low_actor,
@@ -132,15 +141,13 @@ class MembershipFormRoleSaveTests(TenantTestMixin, TestCase):
         actor_role = _make_role(
             self.tenant, "MgrOwn", ["assets.view_asset", "assets.delete_asset"],
         )
-        Membership.objects.create(
-            user=actor, tenant=self.tenant, is_active=True,
-        ).roles.add(actor_role)
+        grant(actor, self.tenant, actor_role)
 
         form = MembershipForm(
             data={
                 'user': self.member_user.pk,
                 'tenant': self.tenant.pk,
-                'roles': [priv_role.pk],
+                'own_roles': [priv_role.pk],
                 'is_active': 'on',
             },
             user=actor,
@@ -149,11 +156,19 @@ class MembershipFormRoleSaveTests(TenantTestMixin, TestCase):
         self.assertTrue(form.is_valid(), form.errors.as_json())
 
 
-class MembershipFormPreservesDirectPermsTests(TenantTestMixin, TestCase):
+class MembershipFormReconcilesBothReachesTests(TenantTestMixin, TestCase):
+    """The unified edit form authors both reaches in one submission.
+
+    Existing selected assignments retain their provenance while deselected roles
+    are removed and newly selected roles are projected into each checked reach.
+    """
+
     def setUp(self):
         set_current_tenant(None)
         set_current_membership(None)
-        self.tenant = Tenant.objects.create(name="Keep Corp", slug="keep-corp")
+        self.tenant = Tenant.objects.create(
+            name="Keep MSP", slug="keep-msp", is_provider=True,
+        )
         self.superuser = User.objects.create_superuser(
             username="su_keep", email="su_keep@x.com", password="pw",
         )
@@ -162,28 +177,33 @@ class MembershipFormPreservesDirectPermsTests(TenantTestMixin, TestCase):
         )
         self.role_a = _make_role(self.tenant, "RoleA", ["assets.view_asset"])
         self.role_b = _make_role(self.tenant, "RoleB", ["assets.view_asset"])
-        # Pre-existing membership carrying direct_permissions already in the DB.
-        self.membership = Membership.objects.create(
-            user=self.member_user,
-            tenant=self.tenant,
-            is_active=True,
-            direct_permissions=["assets.change_asset"],
+        self.managed_role = _make_role(self.tenant, "MSP Technician", ["assets.view_asset"])
+        # Pre-existing membership carrying BOTH an own-reach grant and a managed-reach
+        # grant (the successor of the old "direct_permissions already in the DB" setup).
+        self.membership = grant(self.member_user, self.tenant, self.role_a).membership
+        grant(
+            self.member_user, self.tenant, self.managed_role,
+            reach=RoleAssignment.REACH_MANAGED, managed_scope=RoleAssignment.SCOPE_ALL,
         )
-        self.membership.roles.add(self.role_a)
 
     def tearDown(self):
         set_current_tenant(None)
         set_current_membership(None)
 
     # (c) ---------------------------------------------------------------
-    def test_editing_membership_does_not_wipe_existing_direct_permissions(self):
+    def test_editing_both_reaches_preserves_selected_managed_assignment(self):
+        managed_assignment = self.membership.assignments.get(
+            role=self.managed_role, reach=RoleAssignment.REACH_MANAGED,
+        )
         form = MembershipForm(
-            data={
-                'user': self.member_user.pk,
-                'tenant': self.tenant.pk,
-                'roles': [self.role_b.pk],
-                'is_active': 'on',
-            },
+            data=membership_post_data(
+                user=self.member_user.pk, tenant=self.tenant.pk,
+                own_roles=[self.role_b.pk],
+                managed=[{
+                    'id': managed_assignment.pk, 'role': self.managed_role.pk,
+                    'managed_scope': RoleAssignment.SCOPE_ALL,
+                }],
+            ),
             instance=self.membership,
             user=self.superuser,
             tenant=self.tenant,
@@ -191,7 +211,21 @@ class MembershipFormPreservesDirectPermsTests(TenantTestMixin, TestCase):
         self.assertTrue(form.is_valid(), form.errors.as_json())
         form.save()
         self.membership.refresh_from_db()
-        # Role change took effect...
-        self.assertIn(self.role_b, self.membership.roles.all())
-        # ...but the pre-existing direct_permissions column is untouched.
-        self.assertEqual(self.membership.direct_permissions, ["assets.change_asset"])
+        # Own-reach role change took effect...
+        self.assertTrue(
+            self.membership.assignments.filter(
+                role=self.role_b, reach=RoleAssignment.REACH_OWN,
+            ).exists()
+        )
+        self.assertFalse(
+            self.membership.assignments.filter(
+                role=self.role_a, reach=RoleAssignment.REACH_OWN,
+            ).exists()
+        )
+        # ...and the selected pre-existing managed grant is retained, not replaced.
+        self.assertEqual(
+            self.membership.assignments.get(
+                role=self.managed_role, reach=RoleAssignment.REACH_MANAGED,
+            ).pk,
+            managed_assignment.pk,
+        )

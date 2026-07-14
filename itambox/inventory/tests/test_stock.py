@@ -3,7 +3,7 @@ from django.contrib.auth import get_user_model
 from django.urls import reverse
 from django.contrib.contenttypes.models import ContentType
 from assets.models import Manufacturer, Category
-from organization.models import Site, Location
+from organization.models import Site, Location, Tenant
 from inventory.models import Accessory, Consumable, AccessoryStock, ConsumableStock
 from extras.models import AlertRule, AlertLog, NotificationChannel
 
@@ -30,9 +30,10 @@ class StockCRUDViewTests(TestCase):
             username='testadmin', password='testpassword', is_staff=True, is_superuser=True
         )
         self.client.login(username='testadmin', password='testpassword')
+        self.tenant = Tenant.objects.create(name="Tenant Stock", slug="tenant-stock")
         self.manufacturer = Manufacturer.objects.create(name='Logitech', slug='logitech')
-        self.site = Site.objects.create(name='Site X', slug='site-x')
-        self.location = Location.objects.create(name='Location Y', slug='location-y', site=self.site)
+        self.site = Site.objects.create(name='Site X', slug='site-x', tenant=self.tenant)
+        self.location = Location.objects.create(name='Location Y', slug='location-y', site=self.site, tenant=self.tenant)
         
         self.accessory = Accessory.objects.create(name='Trackpad', manufacturer=self.manufacturer)
         self.consumable = Consumable.objects.create(name='Labels', manufacturer=self.manufacturer)
@@ -96,9 +97,10 @@ class StockAlertsTests(TestCase):
             username='testadmin', password='testpassword', is_staff=True, is_superuser=True
         )
         self.client.login(username='testadmin', password='testpassword')
+        self.tenant = Tenant.objects.create(name="Tenant Alerts", slug="tenant-alerts")
         self.manufacturer = Manufacturer.objects.create(name='Logitech', slug='logitech')
-        self.site = Site.objects.create(name='Office', slug='office')
-        self.location = Location.objects.create(name='Desk', slug='desk', site=self.site)
+        self.site = Site.objects.create(name='Office', slug='office', tenant=self.tenant)
+        self.location = Location.objects.create(name='Desk', slug='desk', site=self.site, tenant=self.tenant)
         self.cat_mouse = _create_category('Mouse', accessory=True)
         self.accessory = Accessory.objects.create(
             name='MX Mouse', manufacturer=self.manufacturer, category=self.cat_mouse, min_qty=5

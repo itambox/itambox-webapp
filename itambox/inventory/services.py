@@ -37,14 +37,33 @@ def checkout_inventory_item(
         item_field = 'component'
 
     with transaction.atomic():
-        # Lock the row to prevent concurrent overallocation
-        item = type(item).objects.select_for_update().get(pk=item.pk)
+        # Lock the row to prevent concurrent overallocation. _base_manager:
+        # the item may live in another tenant than the active one (granted
+        # cross-tenant checkout) — callers have already resolved the item
+        # through an authorized surface.
+        item = type(item)._base_manager.select_for_update().get(pk=item.pk)
 
-        if not item.allow_overallocate and item.available < qty:
-            raise ValidationError(_("No stock available for checkout."))
-            
+        # ADR-0001 phase 3/4: checking out from a pool owned by another
+        # tenant requires a live TenantResourceGrant with 'use' — resolved
+        # BEFORE any availability information is disclosed. The exact grant
+        # used is recorded on the assignment (provenance).
+        resource_grant = resolve_grant_for_checkout(
+            item, item_field, stock_model, assignment_model,
+            source_location, user=user,
+        )
+
+        # Item-level availability spans the ACTIVE tenant's pools (the related
+        # managers are tenant-scoped); for an authorized cross-tenant checkout
+        # the owner's pool is deliberately outside that view, so the pool-
+        # specific check below is the meaningful gate instead.
+        if resource_grant is None:
+            if not item.allow_overallocate and item.available < qty:
+                raise ValidationError(_("No stock available for checkout."))
+
         if source_location:
-            loc_stock = stock_model.objects.filter(
+            # _base_manager: a granted pool belongs to the owning tenant and
+            # is invisible to the grantee's scoped manager.
+            loc_stock = stock_model._base_manager.filter(
                 **{item_field: item, 'location': source_location}
             ).aggregate(qty=Sum('qty'))['qty'] or 0
             if not item.allow_overallocate and loc_stock < qty:
@@ -59,13 +78,95 @@ def checkout_inventory_item(
             from_location=source_location,
             qty=qty,
             notes=notes,
+            resource_grant=resource_grant,
             **{item_field: item}
         )
     return assignment
 
 
+def shared_stock_union(queryset, stock_model):
+    """Extend a tenant-scoped stock queryset with pools shared TO the active
+    tenant via live TenantResourceGrants (ADR-0001 phase 4b: grantees may VIEW
+    shared stock). Read surfaces only — mutation views keep pure scoping.
+    No active tenant → unchanged queryset."""
+    # inline imports: break an inventory <-> organization import cycle at load
+    from core.managers import get_current_tenant
+    from organization.access import shared_resource_ids
+
+    tenant = get_current_tenant()
+    if tenant is None:
+        return queryset
+    return queryset | stock_model._base_manager.filter(
+        pk__in=shared_resource_ids(stock_model, tenant),
+    )
+
+
+def recipient_assignment_union(queryset, assignment_model):
+    """Extend a tenant-scoped assignment queryset with live rows TARGETING the
+    active tenant (ADR-0001 phase 4b: recipients may view inbound cross-tenant
+    assignments and run the return workflow). No active tenant → unchanged."""
+    # inline import: break an inventory <-> core import cycle at load
+    from core.managers import get_current_tenant
+
+    tenant = get_current_tenant()
+    if tenant is None:
+        return queryset
+    return queryset | assignment_model._base_manager.filter(
+        target_tenant=tenant, deleted_at__isnull=True,
+    )
+
+
+def resolve_grant_for_checkout(item, item_field, stock_model, assignment_model,
+                               source_location, user=None):
+    """Authorize a checkout's source pool and return the covering grant.
+
+    Same-tenant (or ownerless/global) sources return ``None`` — normal RBAC
+    at the view layer is the gate there. A pool owned by another tenant than
+    the active one is authorized through ``resolve_stock_access`` (grant +
+    access level + the acting user's RBAC in the active tenant) and the
+    exact grant row is returned for provenance. Shared by the item checkout
+    flow and the kit checkout flow.
+    """
+    # inline imports: break an inventory <-> organization import cycle at load
+    from core.managers import get_current_tenant
+    from itambox.middleware import get_current_user
+    from organization.models import TenantResourceGrant
+    from organization.services import resolve_stock_access
+
+    if source_location is None:
+        return None
+    stock_row = stock_model._base_manager.filter(
+        **{item_field: item, 'location': source_location}
+    ).select_related('location').first()
+    if stock_row is None:
+        return None  # no concrete pool yet — nothing to authorize against
+    active_tenant = get_current_tenant()
+    owner_tenant_id = stock_row.location.tenant_id
+    if (active_tenant is None or owner_tenant_id is None
+            or owner_tenant_id == active_tenant.pk):
+        return None
+    perm = (f'{assignment_model._meta.app_label}.'
+            f'add_{assignment_model._meta.model_name}')
+    decision = resolve_stock_access(
+        user or get_current_user(), stock_row,
+        TenantResourceGrant.ACCESS_USE, perm, active_tenant=active_tenant,
+    )
+    if not decision.allowed:
+        raise ValidationError(_(
+            "Cross-tenant checkout denied (%(reason)s): the owning tenant "
+            "must share this stock pool via a resource grant."
+        ) % {'reason': decision.reason})
+    return decision.grant
+
+
 def checkin_accessory(assignment_pk: Any, user: Optional[Any] = None) -> Tuple[Any, int, Any]:
-    assignment = get_object_or_404(AccessoryAssignment, pk=assignment_pk)
+    # _base_manager + live filter: the calling view already authorized the
+    # actor (owner OR recipient tenant, ADR-0001 4b); the tenant-scoped
+    # default manager would hide the row from the recipient's context.
+    assignment = get_object_or_404(
+        AccessoryAssignment._base_manager.filter(deleted_at__isnull=True),
+        pk=assignment_pk,
+    )
     accessory = assignment.accessory
     qty = assignment.qty
     recipient = assignment.assigned_holder or assignment.assigned_location or assignment.assigned_asset
@@ -75,7 +176,11 @@ def checkin_accessory(assignment_pk: Any, user: Optional[Any] = None) -> Tuple[A
 
 
 def checkin_component(assignment_pk: Any, user: Optional[Any] = None) -> Tuple[Any, int, Any]:
-    assignment = get_object_or_404(ComponentAllocation, pk=assignment_pk)
+    # _base_manager + live filter: see checkin_accessory.
+    assignment = get_object_or_404(
+        ComponentAllocation._base_manager.filter(deleted_at__isnull=True),
+        pk=assignment_pk,
+    )
     component = assignment.component
     qty = assignment.qty
     recipient = assignment.assigned_holder or assignment.assigned_location or assignment.assigned_asset
@@ -110,7 +215,13 @@ def adjust_inventory_stock(
     item = getattr(assignment_instance, item_field)
     
     def update_stock(item_val, location, qty_diff, allow_overallocate):
-        stock, _created = StockModel.objects.select_for_update().get_or_create(
+        # _base_manager: with pool ownership on stock.tenant (phase 4), a
+        # granted cross-tenant checkout must adjust the OWNER's pool, which
+        # the grantee's scoped manager cannot see (a scoped get_or_create
+        # would try to create a duplicate and hit the unique constraint).
+        # Authorization happened upstream (resolve_grant_for_checkout +
+        # AbstractAssignment.clean); this is pure bookkeeping.
+        stock, _created = StockModel._base_manager.select_for_update().get_or_create(
             location=location,
             **{item_field: item_val},
             defaults={'qty': 0}

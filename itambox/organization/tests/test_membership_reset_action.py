@@ -1,17 +1,20 @@
 """Regression tests for FIX #5 (RBAC review §3-E, defect #5).
 
-The ``send_invite`` checkbox on technician onboarding was a no-op (collected but never
-read), so onboarded staff got ``set_unusable_password()`` with no way to log in. The fix:
-
-  * remove the misleading ``send_invite`` field from ``TechnicianQuickForm``; and
-  * add a manual "send password-reset / set-password link" action on the membership
-    detail page, guarded so only a manager of the membership's container (or a superuser)
+Inline-created users have an unusable password until an administrator sends a setup
+link. The unified member flow therefore exposes a manual
+"send password-reset / set-password link" action on the membership
+    detail page, guarded so only a manager of the membership's tenant (or a superuser)
     can trigger it.
 
 These tests cover:
-  (a) ``TechnicianQuickForm`` no longer declares ``send_invite``;
-  (b) the send-reset action, when POSTed by an authorized manager, sends exactly one email;
-  (c) an unauthorized user is denied and no email is sent.
+  (a) the send-reset action, when POSTed by an authorized manager, sends exactly one email;
+  (b) an unauthorized user is denied and no email is sent.
+
+Fixture note (RBAC stage-2 structural collapse): the old ``Provider`` model + Membership
+``roles`` M2M are gone. A managing (MSP) organization is now a ``Tenant(is_provider=True)``;
+grants are per-row ``RoleAssignment``s created via the ``grant()`` test helper. The view's
+own permission check (``organization.change_membership`` on the membership's tenant) is
+unchanged — only the fixture setup below is migrated.
 """
 from django.contrib.auth import get_user_model
 from django.core import mail
@@ -19,42 +22,37 @@ from django.test import TestCase
 from django.urls import reverse
 
 from core.tests.mixins import TenantTestMixin
-from organization.forms.provider_form import TechnicianQuickForm
-from organization.models import Provider, Membership, Role
+from organization.models import Tenant, Membership, Role
 
 User = get_user_model()
-
-
-class TechnicianQuickFormSendInviteRemovedTests(TestCase):
-    def test_form_has_no_send_invite_field(self):
-        form = TechnicianQuickForm()
-        self.assertNotIn('send_invite', form.fields)
 
 
 class MembershipSendResetActionTests(TenantTestMixin, TestCase):
     def setUp(self):
         self.clear_tenant_context()
-        # A provider (MSP) whose staff memberships we manage.
-        self.provider = Provider.objects.create(name="Acme MSP", slug="acme-msp")
+        # A managing (MSP) tenant whose staff memberships we manage.
+        self.provider = Tenant.objects.create(
+            name="Acme MSP", slug="acme-msp", is_provider=True,
+        )
 
-        # A provider-scoped role that lets its holder change memberships on the provider.
+        # A role, owned by the managing tenant, that lets its holder change
+        # memberships there.
         self.manager_role = Role.objects.create(
-            provider=self.provider,
-            scope=Role.SCOPE_PROVIDER,
+            tenant=self.provider,
             name="Staff Manager",
             permissions=["organization.change_membership"],
         )
 
-        # The acting manager: a non-superuser provider-staff member holding manager_role.
+        # The acting manager: a non-superuser staff member holding manager_role via an
+        # own-reach RoleAssignment at the managing tenant.
         self.manager = User.objects.create_user(
             username="manager", email="manager@example.com",
             password="pw", is_active=True,
         )
-        self.manager_membership = Membership.objects.create(
-            user=self.manager, provider=self.provider,
-            tenant_scope=Membership.SCOPE_ALL, is_active=True,
+        self.grant(self.manager, self.provider, self.manager_role)
+        self.manager_membership = Membership.objects.get(
+            user=self.manager, tenant=self.provider,
         )
-        self.manager_membership.roles.add(self.manager_role)
 
         # The onboarded technician whose credential we want to (re)issue. Mirrors the
         # onboarding flow: usable email, unusable password.
@@ -64,11 +62,10 @@ class MembershipSendResetActionTests(TenantTestMixin, TestCase):
         self.tech.set_unusable_password()
         self.tech.save(update_fields=["password"])
         self.tech_membership = Membership.objects.create(
-            user=self.tech, provider=self.provider,
-            tenant_scope=Membership.SCOPE_ALL, is_active=True,
+            user=self.tech, tenant=self.provider, is_active=True,
         )
 
-        # An outsider with no permission on the provider.
+        # An outsider with no permission on the managing tenant.
         self.outsider = User.objects.create_user(
             username="outsider", email="outsider@example.com",
             password="pw", is_active=True,
