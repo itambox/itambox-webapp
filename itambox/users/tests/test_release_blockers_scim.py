@@ -7,15 +7,16 @@ D2-1: a bearer token minted under one tenant must not authenticate against a
 D2-2: authorization must flow through the role's actual JSON permissions
       (``organization.change_membership`` via ``has_perm``), never a literal
       ``Role.name`` string match — the same magic-string backdoor pattern
-      already removed from ``InviteUserMixin``.
+      removed from the (since-deleted) invitation flow.
 """
 from django.contrib.auth import get_user_model
 from django.test import TestCase
 from django.urls import reverse
 from django.utils import timezone
-from organization.models import Tenant, Membership, Role
+from organization.models import Tenant, Role
 from users.models import Token
 from rest_framework import status
+from core.tests.mixins import grant
 
 User = get_user_model()
 
@@ -40,10 +41,8 @@ class SCIMTokenTenantScopeTests(TestCase):
             tenant=self.tenant_b, name="Provisioner",
             permissions=["organization.change_membership"],
         )
-        m_a = Membership.objects.create(user=self.user, tenant=self.tenant_a)
-        m_a.roles.add(role_a)
-        m_b = Membership.objects.create(user=self.user, tenant=self.tenant_b)
-        m_b.roles.add(role_b)
+        grant(self.user, self.tenant_a, role_a)
+        grant(self.user, self.tenant_b, role_b)
 
         # Token explicitly scoped to tenant A only.
         self.token_a = Token.objects.create(
@@ -87,8 +86,7 @@ class SCIMRolePermissionAuthorizationTests(TestCase):
             tenant=self.tenant, name="Admin",
             permissions=["assets.view_asset"],
         )
-        membership = Membership.objects.create(user=user, tenant=self.tenant)
-        membership.roles.add(role)
+        grant(user, self.tenant, role)
 
         url = reverse('api:scim:service-provider-config', kwargs={'tenant_slug': self.tenant.slug})
         response = self.client.get(url, **self._token_for(user))
@@ -100,8 +98,7 @@ class SCIMRolePermissionAuthorizationTests(TestCase):
             tenant=self.tenant, name="Owner",
             permissions=["assets.view_asset"],
         )
-        membership = Membership.objects.create(user=user, tenant=self.tenant)
-        membership.roles.add(role)
+        grant(user, self.tenant, role)
 
         url = reverse('api:scim:service-provider-config', kwargs={'tenant_slug': self.tenant.slug})
         response = self.client.get(url, **self._token_for(user))
@@ -115,8 +112,7 @@ class SCIMRolePermissionAuthorizationTests(TestCase):
             tenant=self.tenant, name="HRIS Sync",
             permissions=["organization.change_membership"],
         )
-        membership = Membership.objects.create(user=user, tenant=self.tenant)
-        membership.roles.add(role)
+        grant(user, self.tenant, role)
 
         url = reverse('api:scim:service-provider-config', kwargs={'tenant_slug': self.tenant.slug})
         response = self.client.get(url, **self._token_for(user))

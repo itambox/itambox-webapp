@@ -37,9 +37,9 @@
                         {% for membership in user_memberships %}
                             <li>
                                 <i class="mdi mdi-domain me-1"></i> <strong>{{ membership.tenant.name }}</strong>
-                                {% with roles=membership.roles.all %}
-                                {% if roles %}
-                                ({% for r in roles %}{{ r.name }}{% if not forloop.last %}, {% endif %}{% endfor %})
+                                {% with assignments=membership.assignments.all %}
+                                {% if assignments %}
+                                ({% for assignment in assignments %}{{ assignment.role.name }}{% if not forloop.last %}, {% endif %}{% endfor %})
                                 {% else %}
                                 <span class="text-muted small">({% translate "no roles" %})</span>
                                 {% endif %}

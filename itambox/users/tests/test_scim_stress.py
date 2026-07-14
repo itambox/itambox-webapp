@@ -7,6 +7,7 @@ from django.utils import timezone
 from organization.models import Tenant, Membership, Role, AssetHolder
 from users.models import Token, UserGroup
 from rest_framework import status
+from core.tests.mixins import grant
 
 User = get_user_model()
 
@@ -31,10 +32,7 @@ class SCIMStressTests(TestCase):
                 "organization.change_membership",
             ]
         )
-        admin_membership = Membership.objects.create(user=self.admin_user,
-            tenant=self.tenant,
-        )
-        admin_membership.roles.add(self.role_admin)
+        admin_membership = grant(self.admin_user, self.tenant, self.role_admin).membership
 
         # Setup tokens — tenant explicit so it unambiguously matches self.tenant's URLs.
         self.valid_token = Token.objects.create(

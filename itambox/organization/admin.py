@@ -3,7 +3,7 @@ from django.utils.translation import gettext_lazy as _
 from .models import (
     Region, SiteGroup, Tenant, Location, TenantGroup, Site,
     Contact, ContactRole, ContactAssignment,
-    Membership, TenantInvitation, Role, CostCenter, Provider,
+    Membership, Role, RoleAssignment, CostCenter, TenantResourceGrant,
 )
 
 
@@ -29,8 +29,8 @@ class TenantGroupAdmin(admin.ModelAdmin):
 
 
 class TenantAdmin(admin.ModelAdmin):
-    list_display = ('name', 'slug', 'group', 'provider')
-    list_filter = ('group', 'provider')
+    list_display = ('name', 'slug', 'group', 'managed_by', 'is_provider')
+    list_filter = ('group', 'managed_by', 'is_provider')
     search_fields = ('name', 'slug', 'description', 'comments')
     prepopulated_fields = {"slug": ("name",)}
 
@@ -58,26 +58,39 @@ class ContactAssignmentAdmin(admin.ModelAdmin):
 
 
 class MembershipAdmin(admin.ModelAdmin):
-    list_display = ('user', 'kind', 'tenant', 'provider', 'is_active', 'joined_at')
-    list_filter = ('tenant', 'provider', 'is_active', 'roles')
-    search_fields = ('user__username', 'user__email', 'tenant__name', 'provider__name')
-
-    @admin.display(description=_("Kind"))
-    def kind(self, obj):
-        return obj.get_kind_display()
+    list_display = ('user', 'tenant', 'is_active', 'joined_at')
+    list_filter = ('tenant', 'is_active')
+    search_fields = ('user__username', 'user__email', 'tenant__name')
 
 
-class TenantInvitationAdmin(admin.ModelAdmin):
-    list_display = ('email', 'tenant', 'role', 'created_at', 'expires_at', 'accepted_at')
-    list_filter = ('tenant', 'role', 'accepted_at')
-    search_fields = ('email', 'tenant__name')
+class RoleAssignmentAdmin(admin.ModelAdmin):
+    list_display = ('membership', 'role', 'reach', 'managed_scope', 'granted_by', 'granted_at')
+    list_filter = ('reach', 'managed_scope')
+    search_fields = ('membership__user__username', 'membership__tenant__name', 'role__name')
+    raw_id_fields = ('membership', 'role', 'granted_by')
 
 
 class RoleAdmin(admin.ModelAdmin):
-    list_display = ('name', 'scope', 'tenant', 'provider', 'is_default')
-    list_filter = ('scope', 'tenant', 'provider', 'is_default')
-    search_fields = ('name', 'tenant__name', 'provider__name', 'description')
+    list_display = ('name', 'tenant', 'shared_with_managed')
+    list_filter = ('tenant', 'shared_with_managed')
+    search_fields = ('name', 'tenant__name', 'description')
     prepopulated_fields = {'slug': ('name',)}
+
+
+class TenantResourceGrantAdmin(admin.ModelAdmin):
+    list_display = ('tenant', 'grantee_tenant', 'grantee_tenant_group',
+                    'resource_type', 'resource_id', 'access_level',
+                    'granted_by', 'created_at', 'deleted_at')
+    list_filter = ('access_level', 'resource_type')
+    search_fields = ('tenant__name', 'grantee_tenant__name',
+                     'grantee_tenant_group__name', 'reason')
+    raw_id_fields = ('tenant', 'grantee_tenant', 'grantee_tenant_group', 'granted_by')
+
+    def get_queryset(self, request):
+        # Include revoked (soft-deleted) grants — the admin is the operator's
+        # audit surface. _base_manager: the model deliberately defines no
+        # all_objects (see the model docstring).
+        return TenantResourceGrant._base_manager.all()
 
 
 class CostCenterAdmin(admin.ModelAdmin):
@@ -86,12 +99,6 @@ class CostCenterAdmin(admin.ModelAdmin):
     search_fields = ('name', 'code', 'description')
     prepopulated_fields = {'slug': ('name',)}
     raw_id_fields = ('parent',)
-
-
-class ProviderAdmin(admin.ModelAdmin):
-    list_display = ('name', 'slug', 'internal_tenant')
-    search_fields = ('name', 'slug', 'description', 'comments')
-    prepopulated_fields = {'slug': ('name',)}
 
 
 admin.site.register(Site, SiteAdmin)
@@ -104,7 +111,7 @@ admin.site.register(Contact, ContactAdmin)
 admin.site.register(ContactRole, ContactRoleAdmin)
 admin.site.register(ContactAssignment, ContactAssignmentAdmin)
 admin.site.register(Membership, MembershipAdmin)
-admin.site.register(TenantInvitation, TenantInvitationAdmin)
+admin.site.register(RoleAssignment, RoleAssignmentAdmin)
 admin.site.register(Role, RoleAdmin)
 admin.site.register(CostCenter, CostCenterAdmin)
-admin.site.register(Provider, ProviderAdmin)
+admin.site.register(TenantResourceGrant, TenantResourceGrantAdmin)

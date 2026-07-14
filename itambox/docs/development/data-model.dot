@@ -1,0 +1,265 @@
+digraph itambox_data_model {
+  graph [bgcolor="#FFFFFF", compound=true, fontname="Arial", newrank=true, nodesep=0.4, pad=0.25, rankdir=LR, ranksep=1.2, splines=polyline];
+  node [color="#52606D", fontname="Arial", fontsize=11, margin="0.14,0.08", shape=box, style="rounded,filled"];
+  edge [color="#667085", fontcolor="#475467", fontname="Arial", fontsize=8, penwidth=1.0];
+
+  subgraph cluster_organization {
+    label="organization";
+    color="#98A2B3";
+    fontcolor="#344054";
+    fontname="Arial Bold";
+    fontsize=13;
+    penwidth=1.2;
+    style="rounded";
+    "organization.AssetHolder" [fillcolor="#E2F4F3", label="AssetHolder"];
+    "organization.Contact" [fillcolor="#E2F4F3", label="Contact"];
+    "organization.ContactAssignment" [fillcolor="#E2F4F3", label="ContactAssignment"];
+    "organization.ContactRole" [fillcolor="#E2F4F3", label="ContactRole"];
+    "organization.CostCenter" [fillcolor="#E2F4F3", label="CostCenter"];
+    "organization.Location" [fillcolor="#E2F4F3", label="Location"];
+    "organization.Membership" [fillcolor="#E2F4F3", label="Membership"];
+    "organization.Region" [fillcolor="#E2F4F3", label="Region"];
+    "organization.Role" [fillcolor="#E2F4F3", label="Role"];
+    "organization.RoleAssignment" [fillcolor="#E2F4F3", label="RoleAssignment"];
+    "organization.Site" [fillcolor="#E2F4F3", label="Site"];
+    "organization.SiteGroup" [fillcolor="#E2F4F3", label="SiteGroup"];
+    "organization.Tenant" [fillcolor="#E2F4F3", label="Tenant"];
+    "organization.TenantGroup" [fillcolor="#E2F4F3", label="TenantGroup"];
+  }
+
+  subgraph cluster_assets {
+    label="assets";
+    color="#98A2B3";
+    fontcolor="#344054";
+    fontname="Arial Bold";
+    fontsize=13;
+    penwidth=1.2;
+    style="rounded";
+    "assets.Asset" [fillcolor="#E8F1FB", label="Asset"];
+    "assets.AssetAssignment" [fillcolor="#E8F1FB", label="AssetAssignment"];
+    "assets.AssetDisposal" [fillcolor="#E8F1FB", label="AssetDisposal"];
+    "assets.AssetMaintenance" [fillcolor="#E8F1FB", label="AssetMaintenance"];
+    "assets.AssetRequest" [fillcolor="#E8F1FB", label="AssetRequest"];
+    "assets.AssetReservation" [fillcolor="#E8F1FB", label="AssetReservation"];
+    "assets.AssetRole" [fillcolor="#E8F1FB", label="AssetRole"];
+    "assets.AssetTagSequence" [fillcolor="#E8F1FB", label="AssetTagSequence"];
+    "assets.AssetType" [fillcolor="#E8F1FB", label="AssetType"];
+    "assets.Category" [fillcolor="#E8F1FB", label="Category"];
+    "assets.Depreciation" [fillcolor="#E8F1FB", label="Depreciation"];
+    "assets.Manufacturer" [fillcolor="#E8F1FB", label="Manufacturer"];
+    "assets.StatusLabel" [fillcolor="#E8F1FB", label="StatusLabel"];
+    "assets.Supplier" [fillcolor="#E8F1FB", label="Supplier"];
+    "assets.Warranty" [fillcolor="#E8F1FB", label="Warranty"];
+  }
+
+  subgraph cluster_inventory {
+    label="inventory";
+    color="#98A2B3";
+    fontcolor="#344054";
+    fontname="Arial Bold";
+    fontsize=13;
+    penwidth=1.2;
+    style="rounded";
+    "inventory.Accessory" [fillcolor="#E7F4EC", label="Accessory"];
+    "inventory.AccessoryAssignment" [fillcolor="#E7F4EC", label="AccessoryAssignment"];
+    "inventory.AccessoryStock" [fillcolor="#E7F4EC", label="AccessoryStock"];
+    "inventory.Component" [fillcolor="#E7F4EC", label="Component"];
+    "inventory.ComponentAllocation" [fillcolor="#E7F4EC", label="ComponentAllocation"];
+    "inventory.ComponentStock" [fillcolor="#E7F4EC", label="ComponentStock"];
+    "inventory.Consumable" [fillcolor="#E7F4EC", label="Consumable"];
+    "inventory.ConsumableAssignment" [fillcolor="#E7F4EC", label="ConsumableAssignment"];
+    "inventory.ConsumableStock" [fillcolor="#E7F4EC", label="ConsumableStock"];
+    "inventory.Kit" [fillcolor="#E7F4EC", label="Kit"];
+    "inventory.KitItem" [fillcolor="#E7F4EC", label="KitItem"];
+  }
+
+  subgraph cluster_licenses {
+    label="licenses";
+    color="#98A2B3";
+    fontcolor="#344054";
+    fontname="Arial Bold";
+    fontsize=13;
+    penwidth=1.2;
+    style="rounded";
+    "licenses.License" [fillcolor="#F2E9F9", label="License"];
+    "licenses.LicenseSeatAssignment" [fillcolor="#F2E9F9", label="LicenseSeatAssignment"];
+  }
+
+  subgraph cluster_software {
+    label="software";
+    color="#98A2B3";
+    fontcolor="#344054";
+    fontname="Arial Bold";
+    fontsize=13;
+    penwidth=1.2;
+    style="rounded";
+    "software.InstalledSoftware" [fillcolor="#E9EEF9", label="InstalledSoftware"];
+    "software.Software" [fillcolor="#E9EEF9", label="Software"];
+  }
+
+  subgraph cluster_subscriptions {
+    label="subscriptions";
+    color="#98A2B3";
+    fontcolor="#344054";
+    fontname="Arial Bold";
+    fontsize=13;
+    penwidth=1.2;
+    style="rounded";
+    "subscriptions.Provider" [fillcolor="#F3F0E1", label="Provider"];
+    "subscriptions.Subscription" [fillcolor="#F3F0E1", label="Subscription"];
+    "subscriptions.SubscriptionAssignment" [fillcolor="#F3F0E1", label="SubscriptionAssignment"];
+  }
+
+  subgraph cluster_procurement {
+    label="procurement";
+    color="#98A2B3";
+    fontcolor="#344054";
+    fontname="Arial Bold";
+    fontsize=13;
+    penwidth=1.2;
+    style="rounded";
+    "procurement.Contract" [fillcolor="#FBE8EF", label="Contract"];
+    "procurement.FulfillmentLink" [fillcolor="#FBE8EF", label="FulfillmentLink"];
+    "procurement.PurchaseOrder" [fillcolor="#FBE8EF", label="PurchaseOrder"];
+    "procurement.PurchaseOrderLine" [fillcolor="#FBE8EF", label="PurchaseOrderLine"];
+  }
+
+  subgraph cluster_compliance {
+    label="compliance";
+    color="#98A2B3";
+    fontcolor="#344054";
+    fontname="Arial Bold";
+    fontsize=13;
+    penwidth=1.2;
+    style="rounded";
+    "compliance.AssetAudit" [fillcolor="#FCE9E4", label="AssetAudit"];
+    "compliance.AuditSession" [fillcolor="#FCE9E4", label="AuditSession"];
+    "compliance.CustodyReceipt" [fillcolor="#FCE9E4", label="CustodyReceipt"];
+    "compliance.CustodyTemplate" [fillcolor="#FCE9E4", label="CustodyTemplate"];
+  }
+
+  "assets.Asset" -> "assets.AssetType" [label="asset_type (optional, foreign key)", tooltip="asset_type (optional, foreign key)", arrowhead="normal"];
+  "assets.Asset" -> "assets.AssetRole" [label="asset_role (optional, foreign key)", tooltip="asset_role (optional, foreign key)", arrowhead="normal"];
+  "assets.Asset" -> "assets.Supplier" [label="supplier (optional, foreign key)", tooltip="supplier (optional, foreign key)", arrowhead="normal"];
+  "assets.Asset" -> "assets.StatusLabel" [label="status (optional, foreign key)", tooltip="status (optional, foreign key)", arrowhead="normal"];
+  "assets.Asset" -> "organization.Location" [label="location (optional, foreign key)", tooltip="location (optional, foreign key)", arrowhead="normal"];
+  "assets.Asset" -> "procurement.PurchaseOrderLine" [label="purchase_order_line (optional, foreign key)", tooltip="purchase_order_line (optional, foreign key)", arrowhead="normal"];
+  "assets.Asset" -> "assets.Depreciation" [label="depreciation_override (optional, foreign key)", tooltip="depreciation_override (optional, foreign key)", arrowhead="normal"];
+  "assets.Asset" -> "organization.CostCenter" [label="cost_center (optional, foreign key)", tooltip="cost_center (optional, foreign key)", arrowhead="normal"];
+  "assets.AssetAssignment" -> "assets.Asset" [label="asset (required, foreign key)", tooltip="asset (required, foreign key)", arrowhead="normal"];
+  "assets.AssetAssignment" -> "organization.AssetHolder" [label="assigned_user (optional, foreign key)", tooltip="assigned_user (optional, foreign key)", arrowhead="normal"];
+  "assets.AssetAssignment" -> "organization.Location" [label="assigned_location (optional, foreign key)", tooltip="assigned_location (optional, foreign key)", arrowhead="normal"];
+  "assets.AssetAssignment" -> "assets.Asset" [label="assigned_asset (optional, foreign key)", tooltip="assigned_asset (optional, foreign key)", arrowhead="normal"];
+  "assets.AssetAssignment" -> "assets.StatusLabel" [label="pre_checkout_status (optional, foreign key)", tooltip="pre_checkout_status (optional, foreign key)", arrowhead="normal"];
+  "assets.AssetDisposal" -> "assets.Asset" [label="asset (required, one-to-one)", tooltip="asset (required, one-to-one)", arrowhead="normal", arrowtail="normal", dir="both", penwidth=1.4];
+  "assets.AssetMaintenance" -> "assets.Asset" [label="asset (required, foreign key)", tooltip="asset (required, foreign key)", arrowhead="normal"];
+  "assets.AssetMaintenance" -> "assets.Supplier" [label="supplier (optional, foreign key)", tooltip="supplier (optional, foreign key)", arrowhead="normal"];
+  "assets.AssetRequest" -> "assets.Asset" [label="asset (optional, foreign key)", tooltip="asset (optional, foreign key)", arrowhead="normal"];
+  "assets.AssetRequest" -> "assets.AssetType" [label="asset_type (optional, foreign key)", tooltip="asset_type (optional, foreign key)", arrowhead="normal"];
+  "assets.AssetRequest" -> "inventory.Component" [label="component (optional, foreign key)", tooltip="component (optional, foreign key)", arrowhead="normal"];
+  "assets.AssetRequest" -> "inventory.Accessory" [label="accessory (optional, foreign key)", tooltip="accessory (optional, foreign key)", arrowhead="normal"];
+  "assets.AssetRequest" -> "inventory.Consumable" [label="consumable (optional, foreign key)", tooltip="consumable (optional, foreign key)", arrowhead="normal"];
+  "assets.AssetRequest" -> "organization.Location" [label="source_location (optional, foreign key)", tooltip="source_location (optional, foreign key)", arrowhead="normal"];
+  "assets.AssetRequest" -> "organization.AssetHolder" [label="assigned_user (optional, foreign key)", tooltip="assigned_user (optional, foreign key)", arrowhead="normal"];
+  "assets.AssetRequest" -> "organization.Location" [label="assigned_location (optional, foreign key)", tooltip="assigned_location (optional, foreign key)", arrowhead="normal"];
+  "assets.AssetRequest" -> "assets.Asset" [label="assigned_asset (optional, foreign key)", tooltip="assigned_asset (optional, foreign key)", arrowhead="normal"];
+  "assets.AssetRequest" -> "assets.AssetRequest" [label="parent (optional, foreign key)", tooltip="parent (optional, foreign key)", arrowhead="normal"];
+  "assets.AssetReservation" -> "assets.Asset" [label="asset (required, foreign key)", tooltip="asset (required, foreign key)", arrowhead="normal"];
+  "assets.AssetReservation" -> "organization.AssetHolder" [label="reserved_for (optional, foreign key)", tooltip="reserved_for (optional, foreign key)", arrowhead="normal"];
+  "assets.AssetTagSequence" -> "assets.Category" [label="category (optional, foreign key)", tooltip="category (optional, foreign key)", arrowhead="normal"];
+  "assets.AssetType" -> "assets.Manufacturer" [label="manufacturer (required, foreign key)", tooltip="manufacturer (required, foreign key)", arrowhead="normal"];
+  "assets.AssetType" -> "assets.Depreciation" [label="depreciation (optional, foreign key)", tooltip="depreciation (optional, foreign key)", arrowhead="normal"];
+  "assets.AssetType" -> "assets.Category" [label="category (optional, foreign key)", tooltip="category (optional, foreign key)", arrowhead="normal"];
+  "assets.AssetType" -> "assets.AssetRole" [label="asset_role (optional, foreign key)", tooltip="asset_role (optional, foreign key)", arrowhead="normal"];
+  "assets.Warranty" -> "assets.Asset" [label="asset (required, foreign key)", tooltip="asset (required, foreign key)", arrowhead="normal"];
+  "compliance.AssetAudit" -> "compliance.AuditSession" [label="session (optional, foreign key)", tooltip="session (optional, foreign key)", arrowhead="normal"];
+  "compliance.AssetAudit" -> "assets.Asset" [label="asset (optional, foreign key)", tooltip="asset (optional, foreign key)", arrowhead="normal"];
+  "compliance.AssetAudit" -> "organization.Location" [label="location (required, foreign key)", tooltip="location (required, foreign key)", arrowhead="normal"];
+  "compliance.AssetAudit" -> "assets.StatusLabel" [label="status (required, foreign key)", tooltip="status (required, foreign key)", arrowhead="normal"];
+  "compliance.AuditSession" -> "organization.Location" [label="location (optional, foreign key)", tooltip="location (optional, foreign key)", arrowhead="normal"];
+  "compliance.CustodyReceipt" -> "assets.Asset" [label="asset (required, foreign key)", tooltip="asset (required, foreign key)", arrowhead="normal"];
+  "compliance.CustodyReceipt" -> "organization.AssetHolder" [label="holder (required, foreign key)", tooltip="holder (required, foreign key)", arrowhead="normal"];
+  "compliance.CustodyReceipt" -> "compliance.CustodyTemplate" [label="custody_template (optional, foreign key)", tooltip="custody_template (optional, foreign key)", arrowhead="normal"];
+  "compliance.CustodyTemplate" -> "organization.TenantGroup" [label="tenant_group (optional, foreign key)", tooltip="tenant_group (optional, foreign key)", arrowhead="normal"];
+  "compliance.CustodyTemplate" -> "assets.Category" [label="category (optional, foreign key)", tooltip="category (optional, foreign key)", arrowhead="normal"];
+  "inventory.Accessory" -> "assets.Manufacturer" [label="manufacturer (required, foreign key)", tooltip="manufacturer (required, foreign key)", arrowhead="normal"];
+  "inventory.Accessory" -> "assets.Category" [label="category (optional, foreign key)", tooltip="category (optional, foreign key)", arrowhead="normal"];
+  "inventory.Accessory" -> "assets.Supplier" [label="supplier (optional, foreign key)", tooltip="supplier (optional, foreign key)", arrowhead="normal"];
+  "inventory.AccessoryAssignment" -> "organization.AssetHolder" [label="assigned_holder (optional, foreign key)", tooltip="assigned_holder (optional, foreign key)", arrowhead="normal"];
+  "inventory.AccessoryAssignment" -> "organization.Location" [label="assigned_location (optional, foreign key)", tooltip="assigned_location (optional, foreign key)", arrowhead="normal"];
+  "inventory.AccessoryAssignment" -> "assets.Asset" [label="assigned_asset (optional, foreign key)", tooltip="assigned_asset (optional, foreign key)", arrowhead="normal"];
+  "inventory.AccessoryAssignment" -> "organization.Location" [label="from_location (optional, foreign key)", tooltip="from_location (optional, foreign key)", arrowhead="normal"];
+  "inventory.AccessoryAssignment" -> "inventory.Accessory" [label="accessory (required, foreign key)", tooltip="accessory (required, foreign key)", arrowhead="normal"];
+  "inventory.AccessoryStock" -> "organization.Location" [label="location (required, foreign key)", tooltip="location (required, foreign key)", arrowhead="normal"];
+  "inventory.AccessoryStock" -> "inventory.Accessory" [label="accessory (required, foreign key)", tooltip="accessory (required, foreign key)", arrowhead="normal"];
+  "inventory.Component" -> "assets.Manufacturer" [label="manufacturer (required, foreign key)", tooltip="manufacturer (required, foreign key)", arrowhead="normal"];
+  "inventory.Component" -> "assets.Category" [label="category (optional, foreign key)", tooltip="category (optional, foreign key)", arrowhead="normal"];
+  "inventory.Component" -> "assets.Supplier" [label="supplier (optional, foreign key)", tooltip="supplier (optional, foreign key)", arrowhead="normal"];
+  "inventory.ComponentAllocation" -> "organization.AssetHolder" [label="assigned_holder (optional, foreign key)", tooltip="assigned_holder (optional, foreign key)", arrowhead="normal"];
+  "inventory.ComponentAllocation" -> "organization.Location" [label="assigned_location (optional, foreign key)", tooltip="assigned_location (optional, foreign key)", arrowhead="normal"];
+  "inventory.ComponentAllocation" -> "inventory.Component" [label="component (required, foreign key)", tooltip="component (required, foreign key)", arrowhead="normal"];
+  "inventory.ComponentAllocation" -> "assets.Asset" [label="assigned_asset (optional, foreign key)", tooltip="assigned_asset (optional, foreign key)", arrowhead="normal"];
+  "inventory.ComponentAllocation" -> "organization.Location" [label="from_location (optional, foreign key)", tooltip="from_location (optional, foreign key)", arrowhead="normal"];
+  "inventory.ComponentStock" -> "inventory.Component" [label="component (required, foreign key)", tooltip="component (required, foreign key)", arrowhead="normal"];
+  "inventory.ComponentStock" -> "organization.Location" [label="location (required, foreign key)", tooltip="location (required, foreign key)", arrowhead="normal"];
+  "inventory.Consumable" -> "assets.Manufacturer" [label="manufacturer (required, foreign key)", tooltip="manufacturer (required, foreign key)", arrowhead="normal"];
+  "inventory.Consumable" -> "assets.Category" [label="category (optional, foreign key)", tooltip="category (optional, foreign key)", arrowhead="normal"];
+  "inventory.Consumable" -> "assets.Supplier" [label="supplier (optional, foreign key)", tooltip="supplier (optional, foreign key)", arrowhead="normal"];
+  "inventory.ConsumableAssignment" -> "organization.AssetHolder" [label="assigned_holder (optional, foreign key)", tooltip="assigned_holder (optional, foreign key)", arrowhead="normal"];
+  "inventory.ConsumableAssignment" -> "organization.Location" [label="assigned_location (optional, foreign key)", tooltip="assigned_location (optional, foreign key)", arrowhead="normal"];
+  "inventory.ConsumableAssignment" -> "assets.Asset" [label="assigned_asset (optional, foreign key)", tooltip="assigned_asset (optional, foreign key)", arrowhead="normal"];
+  "inventory.ConsumableAssignment" -> "organization.Location" [label="from_location (optional, foreign key)", tooltip="from_location (optional, foreign key)", arrowhead="normal"];
+  "inventory.ConsumableAssignment" -> "inventory.Consumable" [label="consumable (required, foreign key)", tooltip="consumable (required, foreign key)", arrowhead="normal"];
+  "inventory.ConsumableStock" -> "organization.Location" [label="location (required, foreign key)", tooltip="location (required, foreign key)", arrowhead="normal"];
+  "inventory.ConsumableStock" -> "inventory.Consumable" [label="consumable (required, foreign key)", tooltip="consumable (required, foreign key)", arrowhead="normal"];
+  "inventory.KitItem" -> "inventory.Kit" [label="kit (required, foreign key)", tooltip="kit (required, foreign key)", arrowhead="normal"];
+  "inventory.KitItem" -> "assets.AssetType" [label="asset_type (optional, foreign key)", tooltip="asset_type (optional, foreign key)", arrowhead="normal"];
+  "inventory.KitItem" -> "inventory.Accessory" [label="accessory (optional, foreign key)", tooltip="accessory (optional, foreign key)", arrowhead="normal"];
+  "inventory.KitItem" -> "licenses.License" [label="license (optional, foreign key)", tooltip="license (optional, foreign key)", arrowhead="normal"];
+  "inventory.KitItem" -> "inventory.Consumable" [label="consumable (optional, foreign key)", tooltip="consumable (optional, foreign key)", arrowhead="normal"];
+  "inventory.KitItem" -> "inventory.Component" [label="component (optional, foreign key)", tooltip="component (optional, foreign key)", arrowhead="normal"];
+  "licenses.License" -> "software.Software" [label="software (required, foreign key)", tooltip="software (required, foreign key)", arrowhead="normal"];
+  "licenses.License" -> "assets.Supplier" [label="supplier (optional, foreign key)", tooltip="supplier (optional, foreign key)", arrowhead="normal"];
+  "licenses.License" -> "organization.CostCenter" [label="cost_center (optional, foreign key)", tooltip="cost_center (optional, foreign key)", arrowhead="normal"];
+  "licenses.License" -> "subscriptions.Subscription" [label="subscription (optional, foreign key)", tooltip="subscription (optional, foreign key)", arrowhead="normal"];
+  "licenses.LicenseSeatAssignment" -> "licenses.License" [label="license (required, foreign key)", tooltip="license (required, foreign key)", arrowhead="normal"];
+  "licenses.LicenseSeatAssignment" -> "assets.Asset" [label="asset (optional, foreign key)", tooltip="asset (optional, foreign key)", arrowhead="normal"];
+  "licenses.LicenseSeatAssignment" -> "organization.AssetHolder" [label="assigned_holder (optional, foreign key)", tooltip="assigned_holder (optional, foreign key)", arrowhead="normal"];
+  "licenses.LicenseSeatAssignment" -> "software.InstalledSoftware" [label="installed_software (optional, foreign key)", tooltip="installed_software (optional, foreign key)", arrowhead="normal"];
+  "organization.ContactAssignment" -> "organization.Contact" [label="contact (required, foreign key)", tooltip="contact (required, foreign key)", arrowhead="normal"];
+  "organization.ContactAssignment" -> "organization.ContactRole" [label="role (required, foreign key)", tooltip="role (required, foreign key)", arrowhead="normal"];
+  "organization.CostCenter" -> "organization.CostCenter" [label="parent (optional, foreign key)", tooltip="parent (optional, foreign key)", arrowhead="normal"];
+  "organization.Location" -> "organization.Site" [label="site (required, foreign key)", tooltip="site (required, foreign key)", arrowhead="normal"];
+  "organization.Location" -> "organization.Location" [label="parent (optional, foreign key)", tooltip="parent (optional, foreign key)", arrowhead="normal"];
+  "organization.Region" -> "organization.Region" [label="parent (optional, foreign key)", tooltip="parent (optional, foreign key)", arrowhead="normal"];
+  "organization.RoleAssignment" -> "organization.Membership" [label="membership (required, foreign key)", tooltip="membership (required, foreign key)", arrowhead="normal"];
+  "organization.RoleAssignment" -> "organization.Role" [label="role (required, foreign key)", tooltip="role (required, foreign key)", arrowhead="normal"];
+  "organization.RoleAssignment" -> "organization.TenantGroup" [label="scope_group (optional, foreign key)", tooltip="scope_group (optional, foreign key)", arrowhead="normal"];
+  "organization.Site" -> "organization.Region" [label="region (optional, foreign key)", tooltip="region (optional, foreign key)", arrowhead="normal"];
+  "organization.Site" -> "organization.SiteGroup" [label="group (optional, foreign key)", tooltip="group (optional, foreign key)", arrowhead="normal"];
+  "organization.SiteGroup" -> "organization.SiteGroup" [label="parent (optional, foreign key)", tooltip="parent (optional, foreign key)", arrowhead="normal"];
+  "organization.Tenant" -> "organization.TenantGroup" [label="group (optional, foreign key)", tooltip="group (optional, foreign key)", arrowhead="normal"];
+  "organization.Tenant" -> "assets.Depreciation" [label="default_depreciation (optional, foreign key)", tooltip="default_depreciation (optional, foreign key)", arrowhead="normal"];
+  "organization.TenantGroup" -> "organization.TenantGroup" [label="parent (optional, foreign key)", tooltip="parent (optional, foreign key)", arrowhead="normal"];
+  "procurement.Contract" -> "assets.Supplier" [label="supplier (optional, foreign key)", tooltip="supplier (optional, foreign key)", arrowhead="normal"];
+  "procurement.Contract" -> "procurement.PurchaseOrder" [label="purchase_order (optional, foreign key)", tooltip="purchase_order (optional, foreign key)", arrowhead="normal"];
+  "procurement.Contract" -> "organization.CostCenter" [label="cost_center (optional, foreign key)", tooltip="cost_center (optional, foreign key)", arrowhead="normal"];
+  "procurement.Contract" -> "assets.Asset" [label="assets (optional, many-to-many)", tooltip="assets (optional, many-to-many)", arrowhead="normal", arrowtail="normal", dir="both", style="dashed"];
+  "procurement.FulfillmentLink" -> "assets.AssetRequest" [label="asset_request (required, foreign key)", tooltip="asset_request (required, foreign key)", arrowhead="normal"];
+  "procurement.FulfillmentLink" -> "procurement.PurchaseOrderLine" [label="purchase_order_line (required, foreign key)", tooltip="purchase_order_line (required, foreign key)", arrowhead="normal"];
+  "procurement.PurchaseOrder" -> "assets.Supplier" [label="supplier (required, foreign key)", tooltip="supplier (required, foreign key)", arrowhead="normal"];
+  "procurement.PurchaseOrder" -> "organization.Location" [label="destination_location (required, foreign key)", tooltip="destination_location (required, foreign key)", arrowhead="normal"];
+  "procurement.PurchaseOrderLine" -> "procurement.PurchaseOrder" [label="purchase_order (required, foreign key)", tooltip="purchase_order (required, foreign key)", arrowhead="normal"];
+  "procurement.PurchaseOrderLine" -> "assets.AssetType" [label="asset_type (optional, foreign key)", tooltip="asset_type (optional, foreign key)", arrowhead="normal"];
+  "procurement.PurchaseOrderLine" -> "inventory.Component" [label="component (optional, foreign key)", tooltip="component (optional, foreign key)", arrowhead="normal"];
+  "procurement.PurchaseOrderLine" -> "inventory.Accessory" [label="accessory (optional, foreign key)", tooltip="accessory (optional, foreign key)", arrowhead="normal"];
+  "procurement.PurchaseOrderLine" -> "inventory.Consumable" [label="consumable (optional, foreign key)", tooltip="consumable (optional, foreign key)", arrowhead="normal"];
+  "procurement.PurchaseOrderLine" -> "licenses.License" [label="license (optional, foreign key)", tooltip="license (optional, foreign key)", arrowhead="normal"];
+  "software.InstalledSoftware" -> "assets.Asset" [label="asset (required, foreign key)", tooltip="asset (required, foreign key)", arrowhead="normal"];
+  "software.InstalledSoftware" -> "software.Software" [label="software (required, foreign key)", tooltip="software (required, foreign key)", arrowhead="normal"];
+  "software.Software" -> "assets.Manufacturer" [label="manufacturer (required, foreign key)", tooltip="manufacturer (required, foreign key)", arrowhead="normal"];
+  "subscriptions.Provider" -> "organization.TenantGroup" [label="tenant_group (optional, foreign key)", tooltip="tenant_group (optional, foreign key)", arrowhead="normal"];
+  "subscriptions.Subscription" -> "subscriptions.Provider" [label="provider (required, foreign key)", tooltip="provider (required, foreign key)", arrowhead="normal"];
+  "subscriptions.Subscription" -> "organization.CostCenter" [label="cost_center (optional, foreign key)", tooltip="cost_center (optional, foreign key)", arrowhead="normal"];
+  "subscriptions.SubscriptionAssignment" -> "subscriptions.Subscription" [label="subscription (required, foreign key)", tooltip="subscription (required, foreign key)", arrowhead="normal"];
+}

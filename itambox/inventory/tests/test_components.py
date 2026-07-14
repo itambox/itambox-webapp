@@ -3,7 +3,7 @@ from django.contrib.auth import get_user_model
 from django.urls import reverse
 from django.db import IntegrityError
 from assets.models import Manufacturer, Category, AssetRole, Asset
-from organization.models import Location, Site
+from organization.models import Location, Site, Tenant
 from inventory.models import Component, ComponentStock, ComponentAllocation
 
 User = get_user_model()
@@ -38,10 +38,11 @@ class ComponentModelTests(TestCase):
         comp = Component.objects.create(
             name='990 Pro 2TB', manufacturer=self.manufacturer, category=self.category
         )
-        site = Site.objects.create(name='Berlin HQ', slug='berlin-hq')
-        location = Location.objects.create(name='Server Room A', slug='server-room-a', site=site)
+        tenant = Tenant.objects.create(name="Tenant Component Stock", slug="tenant-component-stock")
+        site = Site.objects.create(name='Berlin HQ', slug='berlin-hq', tenant=tenant)
+        location = Location.objects.create(name='Server Room A', slug='server-room-a', site=site, tenant=tenant)
         ComponentStock.objects.create(component=comp, location=location, qty=10)
-        location2 = Location.objects.create(name='Server Room B', slug='server-room-b', site=site)
+        location2 = Location.objects.create(name='Server Room B', slug='server-room-b', site=site, tenant=tenant)
         ComponentStock.objects.create(component=comp, location=location2, qty=5)
         self.assertEqual(comp.total_stock, 15)
         self.assertEqual(comp.available_stock, 15)
@@ -84,9 +85,10 @@ class ComponentWarehouseOriginTests(TestCase):
             name='990 Pro 2TB', manufacturer=self.manufacturer, category=self.category
         )
         self.role = AssetRole.objects.create(name='Server', slug='server')
-        self.site = Site.objects.create(name='Munich HQ', slug='munich-hq')
-        self.warehouse = Location.objects.create(name='Warehouse A', slug='warehouse-a', site=self.site)
-        self.desk = Location.objects.create(name='Desk B', slug='desk-b', site=self.site)
+        self.tenant = Tenant.objects.create(name="Tenant Warehouse Origin", slug="tenant-warehouse-origin")
+        self.site = Site.objects.create(name='Munich HQ', slug='munich-hq', tenant=self.tenant)
+        self.warehouse = Location.objects.create(name='Warehouse A', slug='warehouse-a', site=self.site, tenant=self.tenant)
+        self.desk = Location.objects.create(name='Desk B', slug='desk-b', site=self.site, tenant=self.tenant)
         
         self.asset = Asset.objects.create(name='SRV-100', asset_tag='TAG-100', asset_role=self.role, location=self.desk)
         self.stock = ComponentStock.objects.create(component=self.component, location=self.warehouse, qty=10)
@@ -328,8 +330,9 @@ class ComponentStockAdjustViewTests(TestCase):
         self.component = Component.objects.create(
             name='990 Pro 2TB Sym', manufacturer=self.manufacturer, category=self.category
         )
-        self.site = Site.objects.create(name='OfficeSym', slug='officesym')
-        self.location = Location.objects.create(name='DeskSym', slug='desksym', site=self.site)
+        self.tenant = Tenant.objects.create(name="Tenant Component Sym", slug="tenant-component-sym")
+        self.site = Site.objects.create(name='OfficeSym', slug='officesym', tenant=self.tenant)
+        self.location = Location.objects.create(name='DeskSym', slug='desksym', site=self.site, tenant=self.tenant)
         self.stock = ComponentStock.objects.create(component=self.component, location=self.location, qty=10)
 
     def test_component_stock_adjust_increment(self):

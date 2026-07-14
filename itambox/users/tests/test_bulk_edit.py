@@ -4,8 +4,9 @@ from django.contrib.auth import get_user_model
 from django.contrib.messages import get_messages
 from model_bakery import baker
 
-from organization.models import Tenant, Role, Membership
+from organization.models import Tenant, Role
 from core.models import ObjectChange
+from core.tests.mixins import grant
 
 User = get_user_model()
 
@@ -30,21 +31,18 @@ class UserBulkEditTests(TestCase):
             name='Admin',
             permissions=['users.view_user', 'users.change_user'],
         )
-        m = Membership.objects.create(user=self.admin_a, tenant=self.tenant_a)
-        m.roles.add(self.role_a)
+        grant(self.admin_a, self.tenant_a, self.role_a)
 
         # Users belonging to Tenant A
         self.user_a1 = User.objects.create_user(
             username='user_a1', email='a1@test.com', password='password123', is_active=True
         )
-        m = Membership.objects.create(user=self.user_a1, tenant=self.tenant_a)
-        m.roles.add(self.role_a)
+        grant(self.user_a1, self.tenant_a, self.role_a)
 
         self.user_a2 = User.objects.create_user(
             username='user_a2', email='a2@test.com', password='password123', is_active=True
         )
-        m = Membership.objects.create(user=self.user_a2, tenant=self.tenant_a)
-        m.roles.add(self.role_a)
+        grant(self.user_a2, self.tenant_a, self.role_a)
 
         # User belonging to Tenant B (cross-tenant)
         self.user_b1 = User.objects.create_user(
@@ -55,8 +53,7 @@ class UserBulkEditTests(TestCase):
             name='Admin',
             permissions=['users.view_user', 'users.change_user'],
         )
-        m = Membership.objects.create(user=self.user_b1, tenant=self.tenant_b)
-        m.roles.add(self.role_b)
+        grant(self.user_b1, self.tenant_b, self.role_b)
 
         # URLs
         self.bulk_edit_url = reverse('users:user_bulk_edit')

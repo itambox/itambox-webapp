@@ -5,7 +5,8 @@ from django.test import TestCase
 from django.contrib.auth import get_user_model
 from django.urls import reverse
 
-from organization.models import Tenant, Role, Membership
+from organization.models import Tenant, Role
+from core.tests.mixins import grant
 from extras.models import Dashboard
 
 User = get_user_model()
@@ -19,8 +20,7 @@ class DashboardCreateMembershipTests(TestCase):
         self.role = Role.objects.create(tenant=self.tenant_home, name="Member", permissions=[])
 
         self.member = User.objects.create_user(username="member", password="password")
-        m = Membership.objects.create(user=self.member, tenant=self.tenant_home)
-        m.roles.add(self.role)
+        grant(self.member, self.tenant_home, self.role)
 
         self.superuser = User.objects.create_superuser(username="root", password="password")
 
@@ -94,8 +94,7 @@ class DashboardManageModalScopingTests(TestCase):
         self.role = Role.objects.create(tenant=self.tenant_home, name="Member", permissions=[])
 
         self.member = User.objects.create_user(username="member", password="password")
-        m = Membership.objects.create(user=self.member, tenant=self.tenant_home)
-        m.roles.add(self.role)
+        grant(self.member, self.tenant_home, self.role)
 
         self.superuser = User.objects.create_superuser(username="root", password="password")
 

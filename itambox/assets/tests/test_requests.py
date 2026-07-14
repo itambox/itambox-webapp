@@ -9,10 +9,11 @@ from assets.models import (
     Asset, AssetType, AssetRequest, StatusLabel, AssetRole, Manufacturer, Category, AssetTagSequence, Supplier
 )
 from assets.choices import RequestStatusChoices
-from organization.models import AssetHolder, Site, Location, Tenant, Role, Membership
+from organization.models import AssetHolder, Site, Location, Tenant, Role
 from assets.views.request_views import approve_asset_request, deny_asset_request
 from assets.services import checkout_asset
 from core.managers import set_current_tenant, set_current_membership
+from core.tests.mixins import grant
 from inventory.models import (
     Component, ComponentStock, ComponentAllocation,
     Accessory, AccessoryStock, AccessoryAssignment,
@@ -57,14 +58,8 @@ class RequisitionSystemTestCase(TestCase):
             ]
         )
 
-        m1 = Membership.objects.create(user=self.requester_user,
-            tenant=self.tenant,
-        )
-        m1.roles.add(self.role_standard)
-        m2 = Membership.objects.create(user=self.other_user,
-            tenant=self.tenant,
-        )
-        m2.roles.add(self.role_delegated)
+        grant(self.requester_user, self.tenant, self.role_standard)
+        grant(self.other_user, self.tenant, self.role_delegated)
 
         # Set active tenant thread-local context
         set_current_tenant(self.tenant)
@@ -651,10 +646,7 @@ class RequisitionSystemTestCase(TestCase):
         new_user = User.objects.create_user(
             username='noprofileuser', password='password123', is_staff=False, is_superuser=False
         )
-        m_new = Membership.objects.create(user=new_user,
-            tenant=self.tenant,
-        )
-        m_new.roles.add(self.role_standard)
+        grant(new_user, self.tenant, self.role_standard)
         req_no_profile = AssetRequest.objects.create(
             requester=new_user,
             asset_type=self.type_requestable,

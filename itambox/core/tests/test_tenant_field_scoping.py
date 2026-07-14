@@ -11,6 +11,7 @@ from django.contrib.auth import get_user_model
 from organization.models import Tenant, TenantGroup, Role, Membership
 from core.forms import scope_tenant_field
 from core.managers import set_current_tenant, set_current_tenant_group
+from core.tests.mixins import grant
 from itambox.middleware import _current_user
 
 User = get_user_model()
@@ -31,8 +32,7 @@ class ScopeTenantFieldTests(TestCase):
         self.superuser = User.objects.create_superuser(username='root', email='r@x.com', password='pw')
         for t in (self.a1, self.a2):
             role = Role.objects.create(tenant=t, name='R', permissions=[])
-            m = Membership.objects.create(user=self.member, tenant=t)
-            m.roles.add(role)
+            grant(self.member, t, role)
 
         # Load the URLconf now, under a clean (no-tenant) context, so view
         # `queryset = Model.objects.all()` class attributes bake UNSCOPED. The

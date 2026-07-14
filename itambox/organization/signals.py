@@ -1,139 +1,131 @@
-"""Organization signals — unified RBAC wiring."""
+"""Organization signals — unified RBAC wiring + resource-grant hygiene."""
+from django.apps import apps
 from django.db.models.signals import post_save, post_delete, m2m_changed
 from django.dispatch import receiver
 
-from .models import Tenant, Membership, Role
+from .models import AssetHolder, Membership, Role, RoleAssignment, TenantResourceGrant
+
+
+def _clear_user_perm_caches(user):
+    """Drop every per-tenant effective-perm / membership cache memoized on the user."""
+    for attr in list(user.__dict__):
+        if attr.startswith('_perms_tenant_') or attr.startswith('_tenant_membership_'):
+            delattr(user, attr)
+
+
+@receiver(post_save, sender=Membership)
+def bind_asset_holder_on_membership(sender, instance, created, **kwargs):
+    """Bind an unclaimed AssetHolder profile to the joining user's account.
+
+    Relocated from the deleted invitation-accept flow: whenever a user gains a
+    tenant membership (admin form, SCIM, quick-add, seed), an AssetHolder row in
+    that tenant with a matching email and no linked user is claimed by the
+    account. Uses ``_base_manager``: membership creation often runs outside the
+    joining tenant's context (SCIM, provider flows), where the tenant-scoped
+    default manager would silently return nothing.
+    """
+    if not created:
+        return
+    email = (instance.user.email or '').strip()
+    if not email:
+        return
+    holder = AssetHolder._base_manager.filter(
+        tenant_id=instance.tenant_id,
+        email__iexact=email,
+        user__isnull=True,
+        deleted_at__isnull=True,
+    ).first()
+    if holder is not None:
+        holder.user = instance.user
+        holder.save(update_fields=['user'])
 
 
 @receiver([post_save, post_delete], sender=Membership)
 def clear_membership_cache(sender, instance, **kwargs):
-    """Drop the per-(user, tenant) effective-perm caches whose source row changed."""
-    user = instance.user
-    if instance.tenant_id:
-        for attr in (f'_perms_tenant_{instance.tenant_id}', f'_tenant_membership_{instance.tenant_id}'):
-            if hasattr(user, attr):
-                delattr(user, attr)
-    if instance.provider_id:
-        attr = f'_perms_provider_{instance.provider_id}'
-        if hasattr(user, attr):
-            delattr(user, attr)
+    """Membership rows gate every grant on them — bust the user's perm caches."""
+    _clear_user_perm_caches(instance.user)
+
+
+@receiver([post_save, post_delete], sender=RoleAssignment)
+def clear_assignment_cache(sender, instance, **kwargs):
+    """A grant/revoke changes effective perms — for managed reach potentially in
+    many tenants at once, so clear all of the user's per-tenant caches."""
+    _clear_user_perm_caches(instance.membership.user)
+
+
+@receiver(m2m_changed, sender=RoleAssignment.assigned_tenants.through)
+def clear_cache_on_assignment_scope_change(sender, instance, action, pk_set, **kwargs):
+    """Explicit-scope refinement changes alter which tenants a grant covers."""
+    if action in ('post_add', 'post_remove', 'post_clear'):
+        _clear_user_perm_caches(instance.membership.user)
 
 
 @receiver(post_save, sender=Role)
 def clear_perms_cache_on_role_change(sender, instance, **kwargs):
-    """Bust effective-perm caches for every user reached via this role."""
-    for membership in instance.memberships.select_related('user').all():
-        user = membership.user
-        for attr in (
-            f'_perms_tenant_{membership.tenant_id}',
-            f'_perms_provider_{membership.provider_id}',
-        ):
-            if hasattr(user, attr):
-                delattr(user, attr)
-
-
-@receiver(m2m_changed, sender=Membership.roles.through)
-def clear_cache_on_membership_roles_change(sender, instance, action, pk_set, **kwargs):
-    """Bust effective-perm caches when a Membership's roles are modified."""
-    if action in ('post_add', 'post_remove', 'post_clear'):
-        user = instance.user
-        for attr in (
-            f'_perms_tenant_{instance.tenant_id}',
-            f'_perms_provider_{instance.provider_id}',
-            f'_tenant_membership_{instance.tenant_id}',
-        ):
-            if hasattr(user, attr):
-                delattr(user, attr)
-
-
-@receiver(m2m_changed, sender=Role.memberships.through)
-def clear_cache_on_role_memberships_change(sender, instance, action, pk_set, **kwargs):
-    """Bust effective-perm caches when a Role's memberships are modified."""
-    if action in ('post_add', 'post_remove', 'post_clear'):
-        if isinstance(instance, Role):
-            for membership in instance.memberships.select_related('user').all():
-                user = membership.user
-                for attr in (
-                    f'_perms_tenant_{membership.tenant_id}',
-                    f'_perms_provider_{membership.provider_id}',
-                    f'_tenant_membership_{membership.tenant_id}',
-                ):
-                    if hasattr(user, attr):
-                        delattr(user, attr)
-        elif isinstance(instance, Membership):
-            user = instance.user
-            for attr in (
-                f'_perms_tenant_{instance.tenant_id}',
-                f'_perms_provider_{instance.provider_id}',
-                f'_tenant_membership_{instance.tenant_id}',
-            ):
-                if hasattr(user, attr):
-                    delattr(user, attr)
+    """Bust effective-perm caches for every user reached via this role —
+    through assignments and through user groups."""
+    for assignment in instance.assignments.select_related('membership__user').all():
+        _clear_user_perm_caches(assignment.membership.user)
+    UserGroup = apps.get_model('users', 'UserGroup')
+    for group in UserGroup._base_manager.filter(roles=instance).prefetch_related('members'):
+        for user in group.members.all():
+            _clear_user_perm_caches(user)
 
 
 @receiver(m2m_changed, sender=Role.user_groups.through)
 def clear_cache_on_group_roles_change(sender, instance, action, pk_set, **kwargs):
-    """Bust effective-perm caches for all members of a UserGroup when its roles change."""
-    if action in ('post_add', 'post_remove', 'post_clear'):
-        from users.models import UserGroup
-        if isinstance(instance, UserGroup):
-            for member in instance.members.all():
-                for attr in list(member.__dict__):
-                    if attr.startswith('_perms_tenant_') or attr.startswith('_perms_provider_') or attr.startswith('_tenant_membership_'):
-                        delattr(member, attr)
-        elif isinstance(instance, Role):
-            for group in instance.user_groups.prefetch_related('members').all():
-                for member in group.members.all():
-                    for attr in list(member.__dict__):
-                        if attr.startswith('_perms_tenant_') or attr.startswith('_perms_provider_') or attr.startswith('_tenant_membership_'):
-                            delattr(member, attr)
+    """Bust caches when a UserGroup's role set changes (either M2M side)."""
+    if action not in ('post_add', 'post_remove', 'post_clear'):
+        return
+    UserGroup = apps.get_model('users', 'UserGroup')
+    if isinstance(instance, UserGroup):
+        for user in instance.members.all():
+            _clear_user_perm_caches(user)
+    else:  # instance is a Role; pk_set holds group ids
+        for group in UserGroup._base_manager.filter(pk__in=pk_set or []).prefetch_related('members'):
+            for user in group.members.all():
+                _clear_user_perm_caches(user)
 
-
-from django.apps import apps
 
 @receiver(m2m_changed, sender=apps.get_model('users', 'UserGroup').members.through)
 def clear_cache_on_group_members_change(sender, instance, action, pk_set, **kwargs):
-    """Bust effective-perm caches when users are added/removed from a UserGroup."""
-    if action in ('post_add', 'post_remove', 'post_clear'):
-        from users.models import UserGroup
-        from django.contrib.auth import get_user_model
-        User = get_user_model()
-        if isinstance(instance, UserGroup):
-            users = User.objects.filter(pk__in=pk_set) if pk_set else instance.members.all()
-            for user in users:
-                for attr in list(user.__dict__):
-                    if attr.startswith('_perms_tenant_') or attr.startswith('_perms_provider_') or attr.startswith('_tenant_membership_'):
-                        delattr(user, attr)
-        elif isinstance(instance, User):
-            for attr in list(instance.__dict__):
-                if attr.startswith('_perms_tenant_') or attr.startswith('_perms_provider_') or attr.startswith('_tenant_membership_'):
-                    delattr(instance, attr)
-
-
-@receiver(post_save, sender=Tenant)
-def instantiate_default_provider_roles(sender, instance, created, **kwargs):
-    """When a provider-managed tenant is created, materialise the provider's
-    ``is_default`` roles as tenant-scoped Roles so the tenant ships with the MSP's
-    standard role set.
-
-    Each ``Role(scope=provider, provider=<provider>, is_default=True)`` is copied into the
-    new tenant as ``Role(scope=tenant, tenant=<new>)`` with the same name + permissions.
-    No-op for non-provider tenants.
-    """
-    if not created or not instance.provider_id:
+    """Bust caches when users are added to / removed from a group."""
+    if action not in ('post_add', 'post_remove', 'post_clear'):
         return
-    default_roles = Role._base_manager.filter(
-        scope=Role.SCOPE_PROVIDER, provider_id=instance.provider_id,
-        is_default=True, deleted_at__isnull=True,
-    )
-    for src in default_roles:
-        Role._base_manager.get_or_create(
-            scope=Role.SCOPE_TENANT, tenant=instance, name=src.name,
-            defaults={
-                'description': src.description,
-                # Strip provider capabilities (organization.manage_*) via the canonical
-                # helper — they never grant inside a tenant. See Membership for the source.
-                'permissions': Membership.project_permissions_for_tenant(src.permissions),
-                'slug': f'{src.slug}-{instance.slug}'[:100] if src.slug else None,
-            },
+    from django.contrib.auth import get_user_model
+    User = get_user_model()
+    if isinstance(instance, User):
+        _clear_user_perm_caches(instance)
+    else:  # instance is a UserGroup; pk_set holds user ids
+        for user in User.objects.filter(pk__in=pk_set or []):
+            _clear_user_perm_caches(user)
+
+
+# --------------------------------------------------------------------------
+# TenantResourceGrant orphan cleanup (ADR-0001 phase 2): a generic FK cannot
+# cascade, so when an approved stock pool is hard-deleted, revoke (soft-
+# delete) every active grant that references it. Revoked grants stay as the
+# audit trail; assignments keep their provenance pointer.
+# --------------------------------------------------------------------------
+
+def _revoke_grants_for_deleted_resource(sender, instance, **kwargs):
+    from django.contrib.contenttypes.models import ContentType
+    ct = ContentType.objects.get_for_model(sender)
+    for grant in TenantResourceGrant.objects.filter(
+        resource_type=ct, resource_id=instance.pk, deleted_at__isnull=True,
+    ):
+        grant.delete()  # SoftDeleteMixin: sets deleted_at (revocation)
+
+
+def _connect_resource_grant_cleanup():
+    for label in TenantResourceGrant.APPROVED_RESOURCE_MODELS:
+        app_label, model_name = label.split('.')
+        model = apps.get_model(app_label, model_name)
+        post_delete.connect(
+            _revoke_grants_for_deleted_resource,
+            sender=model,
+            dispatch_uid=f'trg_orphan_cleanup_{model_name}',
         )
+
+
+_connect_resource_grant_cleanup()

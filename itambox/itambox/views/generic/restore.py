@@ -12,6 +12,7 @@ from django.utils.translation import gettext as _
 from django.views.generic import View
 
 from itambox.utils import get_model_viewname
+from itambox.views.generic.mixins import filter_permitted_rows
 from itambox.views.generic.utils import safe_return_url
 
 logger = logging.getLogger(__name__)
@@ -127,9 +128,17 @@ class ObjectBulkRestoreView(HtmxActionMixin, PermissionRequiredMixin, LoginRequi
         manager = getattr(self.model, 'all_objects', self.model._base_manager)
         queryset = manager.filter(pk__in=pks, deleted_at__isnull=False)
 
+        # Per-row change-perm enforcement (see filter_permitted_rows): the
+        # dispatch gate alone is too coarse inside a multi-tenant group scope.
+        rows, skipped = filter_permitted_rows(request.user, queryset, self.model, 'change')
+        if skipped:
+            messages.warning(request, _(
+                "Skipped %(count)s %(objects)s you do not have permission to change."
+            ) % {'count': skipped, 'objects': self.model._meta.verbose_name_plural})
+
         count = 0
         with transaction.atomic():
-            for obj in queryset:
+            for obj in rows:
                 obj.restore()
                 count += 1
 
@@ -167,9 +176,17 @@ class ObjectBulkPurgeView(HtmxActionMixin, PermissionRequiredMixin, LoginRequire
         manager = getattr(self.model, 'all_objects', self.model._base_manager)
         queryset = manager.filter(pk__in=pks, deleted_at__isnull=False)
 
+        # Per-row delete-perm enforcement (see filter_permitted_rows): the
+        # dispatch gate alone is too coarse inside a multi-tenant group scope.
+        rows, skipped = filter_permitted_rows(request.user, queryset, self.model, 'delete')
+        if skipped:
+            messages.warning(request, _(
+                "Skipped %(count)s %(objects)s you do not have permission to delete."
+            ) % {'count': skipped, 'objects': self.model._meta.verbose_name_plural})
+
         count = 0
         with transaction.atomic():
-            for obj in queryset:
+            for obj in rows:
                 obj.delete(force_hard_delete=True)
                 count += 1
 

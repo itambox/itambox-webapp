@@ -1,20 +1,33 @@
+"""Role/backend security coverage for the unified RBAC model (RBAC_STAGE2_SPEC.md).
+
+Post-collapse there is exactly one container (Tenant), one permission vocabulary
+('app.codename'), and per-grant RoleAssignment rows. A managing (MSP) tenant is
+just ``Tenant(is_provider=True)``; a customer tenant points at it via
+``managed_by``; reach into managed tenants is a property of the individual
+RoleAssignment (``reach='managed'`` + a scope refinement), not of a separate
+Provider container. Grants are authored with the ``core.tests.mixins.grant``
+helper, which creates the Membership anchor + one RoleAssignment row.
+"""
 from django.test import TestCase
-from django.core.exceptions import ValidationError
 from django.contrib.auth import get_user_model
-from organization.models import Tenant, Membership, Role
-from organization.forms import RoleForm as TenantRoleForm
+from django.urls import reverse
+from organization.models import Tenant, Membership, Role, RoleAssignment
+from organization.forms import RoleForm as TenantRoleForm, MembershipForm
+from core.auth import MembershipBackend
 from core.managers import set_current_tenant, set_current_membership
+from core.tests.mixins import grant
 
 User = get_user_model()
+
 
 class TenantRoleSecurityTests(TestCase):
     def setUp(self):
         set_current_tenant(None)
         set_current_membership(None)
-        
+
         self.tenant_a = Tenant.objects.create(name="Tenant A", slug="tenant-a")
         self.tenant_b = Tenant.objects.create(name="Tenant B", slug="tenant-b")
-        
+
         self.super_user = User.objects.create_superuser(
             username='superuser', email='super@example.com', password='password123'
         )
@@ -26,11 +39,11 @@ class TenantRoleSecurityTests(TestCase):
         )
 
     def test_role_scoping_to_tenant(self):
-        # The unified Role lives on its container (tenant/provider). It's no longer hidden
-        # by a tenant-scoping manager — instead the auth backend gates effective perms per
-        # tenant. We assert: a role's tenant FK pins it to one container, and the backend
-        # refuses to grant the role's perms inside a tenant the user does NOT have a
-        # membership in.
+        # Role.tenant pins a role to exactly one container. It's no longer hidden
+        # by a tenant-scoping manager on the read side — instead the auth backend
+        # gates effective perms per tenant via the RoleAssignment join: a role
+        # attached through an own-reach grant in tenant_a never projects into
+        # tenant_b.
         role_a = Role.objects.create(
             tenant=self.tenant_a,
             name="Alpha Admin",
@@ -39,11 +52,8 @@ class TenantRoleSecurityTests(TestCase):
         self.assertEqual(role_a.tenant, self.tenant_a)
         self.assertIn(role_a, Role.objects.filter(tenant=self.tenant_a))
         self.assertNotIn(role_a, Role.objects.filter(tenant=self.tenant_b))
-        membership = Membership.objects.create(
-            user=self.user_a, tenant=self.tenant_a,
-        )
-        membership.roles.add(role_a)
-        from core.auth import MembershipBackend
+        grant(self.user_a, self.tenant_a, role_a)
+
         backend = MembershipBackend()
         self.assertIn('assets.view_asset', backend._effective_perms_for_tenant(self.user_a, self.tenant_a))
         self.assertNotIn('assets.view_asset', backend._effective_perms_for_tenant(self.user_a, self.tenant_b))
@@ -59,11 +69,11 @@ class TenantRoleSecurityTests(TestCase):
             'perm_asset_delete': False,
             'perm_add_delegated_assetrequest': True,
         }
-        
+
         form = TenantRoleForm(data=form_data, tenant=self.tenant_a, user=self.super_user)
         self.assertTrue(form.is_valid(), form.errors)
         role = form.save()
-        
+
         # Verify packed permissions list
         self.assertIn('assets.view_asset', role.permissions)
         self.assertIn('assets.add_asset', role.permissions)
@@ -72,7 +82,7 @@ class TenantRoleSecurityTests(TestCase):
         self.assertIn('assets.add_delegated_assetrequest', role.permissions)
         # Dashboard permissions are automatically added
         self.assertIn('extras.view_dashboard', role.permissions)
-        
+
         # Verify deserialization into form initial values
         edit_form = TenantRoleForm(instance=role, tenant=self.tenant_a, user=self.super_user)
         self.assertTrue(edit_form.fields['perm_asset_read'].initial)
@@ -87,73 +97,61 @@ class TenantRoleSecurityTests(TestCase):
             name="ReadOnly Member",
             permissions=["assets.view_asset", "extras.view_dashboard"]
         )
-        membership = Membership.objects.create(user=self.user_a,
-            tenant=self.tenant_a,
-        )
-        membership.roles.add(role)
+        assignment = grant(self.user_a, self.tenant_a, role)
 
-        set_current_membership(membership)
+        set_current_membership(assignment.membership)
         set_current_tenant(self.tenant_a)
-        
+
         self.assertTrue(self.user_a.has_perm('assets.view_asset'))
         self.assertFalse(self.user_a.has_perm('assets.add_asset'))
         self.assertFalse(self.user_a.has_perm('assets.delete_asset'))
         set_current_membership(None)
         set_current_tenant(None)
 
-    def test_provider_staff_tenant_projection(self):
-        # H4 (High): Test that provider-scoped role permissions project onto
-        # a customer tenant if a provider staff membership exists and has the tenant in scope.
-        from organization.models import Provider
-        provider = Provider.objects.create(name="MSP Provider", slug="msp-provider")
-        
-        # Link tenant_a to the provider
-        self.tenant_a.provider = provider
+    def test_managed_reach_projects_tenant_permissions_without_stripping(self):
+        # H4 (High), ported to the per-grant model: an MSP-staff member's
+        # managed-reach RoleAssignment on their membership at the managing
+        # (is_provider) tenant projects the role's permissions into a managed
+        # tenant the grant's refinement covers. There is no capability
+        # vocabulary left to strip (that's DELETED, see RBAC_STAGE2_SPEC.md §6) —
+        # whatever the role carries projects as-is; the escalation guard (not
+        # stripping) is what keeps grants honest.
+        msp = Tenant.objects.create(name="MSP Provider", slug="msp-provider-h4", is_provider=True)
+        self.tenant_a.managed_by = msp
         self.tenant_a.save()
-        
-        # Create provider staff membership
+
         staff_user = User.objects.create_user(
             username='staffuser', email='staff@example.com', password='password123'
         )
-        
         staff_role = Role.objects.create(
-            provider=provider,
+            tenant=msp,
             name="MSP Tech",
-            permissions=["assets.view_asset", "assets.change_asset", "organization.manage_staff"],
+            permissions=["assets.view_asset", "assets.change_asset"],
         )
-        
-        staff_membership = Membership.objects.create(
-            user=staff_user,
-            provider=provider,
-            tenant_scope=Membership.SCOPE_ALL,
-            is_active=True,
+        staff_membership = Membership.objects.create(user=staff_user, tenant=msp, is_active=True)
+        assignment = RoleAssignment.objects.create(
+            membership=staff_membership, role=staff_role,
+            reach=RoleAssignment.REACH_MANAGED, managed_scope=RoleAssignment.SCOPE_ALL,
         )
-        staff_membership.roles.add(staff_role)
-        
-        from core.auth import MembershipBackend
+
         backend = MembershipBackend()
-        
-        # 1. Scope = SCOPE_ALL -> Should have permission in tenant_a (which belongs to the provider)
-        # but NOT in tenant_b (which does not belong to the provider)
+        # 1. SCOPE_ALL -> covered in tenant_a (managed by msp) but NOT tenant_b
+        # (unmanaged — a different/no provider).
         self.assertTrue(backend.has_perm(staff_user, 'assets.view_asset', self.tenant_a))
         self.assertFalse(backend.has_perm(staff_user, 'assets.view_asset', self.tenant_b))
-        # L4: Provider capabilities should be stripped in the tenant projection
-        self.assertFalse(backend.has_perm(staff_user, 'organization.manage_staff', self.tenant_a))
-        
-        # 2. Scope = SCOPE_EXPLICIT without tenant_a assigned -> Should NOT have permission in tenant_a
-        staff_membership.tenant_scope = Membership.SCOPE_EXPLICIT
-        staff_membership.save()
-        # clear cache
-        if hasattr(staff_user, f'_perms_tenant_{self.tenant_a.pk}'):
-            delattr(staff_user, f'_perms_tenant_{self.tenant_a.pk}')
+
+        # 2. SCOPE_EXPLICIT without tenant_a assigned -> no coverage. Saving the
+        # assignment busts the user's perm cache via the RoleAssignment post_save
+        # signal (organization/signals.py) — no manual cache-clearing needed.
+        assignment.managed_scope = RoleAssignment.SCOPE_EXPLICIT
+        assignment.save()
         self.assertFalse(backend.has_perm(staff_user, 'assets.view_asset', self.tenant_a))
-        
-        # 3. Scope = SCOPE_EXPLICIT with tenant_a assigned -> Should have permission in tenant_a
-        staff_membership.assigned_tenants.add(self.tenant_a)
-        if hasattr(staff_user, f'_perms_tenant_{self.tenant_a.pk}'):
-            delattr(staff_user, f'_perms_tenant_{self.tenant_a.pk}')
+
+        # 3. SCOPE_EXPLICIT with tenant_a assigned -> covered again. The m2m_changed
+        # signal on assigned_tenants busts the cache too.
+        assignment.assigned_tenants.add(self.tenant_a)
         self.assertTrue(backend.has_perm(staff_user, 'assets.view_asset', self.tenant_a))
-        
+
         set_current_membership(None)
         set_current_tenant(None)
 
@@ -161,11 +159,10 @@ class TenantRoleSecurityTests(TestCase):
         # M6 (design): Role.permissions is deliberately NOT hard-validated at the model layer.
         # A global pre_save signal (core/signals.py) runs clean() on every save, so a hard
         # codename check would break the seed (whose tenant Administrator role is granted the
-        # full permission set, including organization.manage_*) and the validate_role_permissions
-        # audit command (which must be able to persist a stale codename in order to detect it).
+        # full permission set) and the validate_role_permissions audit command (which must be
+        # able to persist a stale codename in order to detect it).
         # Codename hygiene is enforced by the form (drops unknown codenames) and audited
-        # post-hoc by validate_role_permissions; manage_* is kept off tenant projections by the
-        # backend (L4), not by rejecting the write.
+        # post-hoc by validate_role_permissions.
         role = Role.objects.create(
             tenant=self.tenant_a,
             name="Tolerant Role",
@@ -186,11 +183,11 @@ class TenantRoleSecurityTests(TestCase):
             'perm_approve_purchaseorder': True,
             'perm_receive_purchaseorder': True,
         }
-        
+
         form = TenantRoleForm(data=form_data, tenant=self.tenant_a, user=self.super_user)
         self.assertTrue(form.is_valid(), form.errors)
         role = form.save()
-        
+
         # Verify packed permissions list
         self.assertIn('procurement.view_purchaseorder', role.permissions)
         self.assertIn('procurement.add_purchaseorder', role.permissions)
@@ -198,7 +195,7 @@ class TenantRoleSecurityTests(TestCase):
         self.assertIn('procurement.delete_purchaseorder', role.permissions)
         self.assertIn('procurement.approve_purchaseorder', role.permissions)
         self.assertIn('procurement.receive_purchaseorder', role.permissions)
-        
+
         # Verify deserialization
         edit_form = TenantRoleForm(instance=role, tenant=self.tenant_a, user=self.super_user)
         self.assertTrue(edit_form.fields['perm_purchaseorder_read'].initial)
@@ -207,22 +204,19 @@ class TenantRoleSecurityTests(TestCase):
         self.assertTrue(edit_form.fields['perm_purchaseorder_delete'].initial)
         self.assertTrue(edit_form.fields['perm_approve_purchaseorder'].initial)
         self.assertTrue(edit_form.fields['perm_receive_purchaseorder'].initial)
-        
+
         # Verify backend resolution for user
-        membership = Membership.objects.create(user=self.user_a,
-            tenant=self.tenant_a,
-        )
-        membership.roles.add(role)
-        set_current_membership(membership)
+        assignment = grant(self.user_a, self.tenant_a, role)
+        set_current_membership(assignment.membership)
         set_current_tenant(self.tenant_a)
-        
+
         self.assertTrue(self.user_a.has_perm('procurement.view_purchaseorder'))
         self.assertTrue(self.user_a.has_perm('procurement.add_purchaseorder'))
         self.assertTrue(self.user_a.has_perm('procurement.change_purchaseorder'))
         self.assertTrue(self.user_a.has_perm('procurement.delete_purchaseorder'))
         self.assertTrue(self.user_a.has_perm('procurement.approve_purchaseorder'))
         self.assertTrue(self.user_a.has_perm('procurement.receive_purchaseorder'))
-        
+
         set_current_membership(None)
         set_current_tenant(None)
 
@@ -233,12 +227,9 @@ class TenantRoleSecurityTests(TestCase):
             name="Reader",
             permissions=["assets.view_asset", "extras.view_dashboard"]
         )
-        membership_a = Membership.objects.create(user=self.user_a,
-            tenant=self.tenant_a,
-        )
-        membership_a.roles.add(reader_role)
+        assignment_a = grant(self.user_a, self.tenant_a, reader_role)
 
-        set_current_membership(membership_a)
+        set_current_membership(assignment_a.membership)
         set_current_tenant(self.tenant_a)
 
         # User A tries to create a role with Delete Asset permission (Privilege Escalation!)
@@ -248,12 +239,12 @@ class TenantRoleSecurityTests(TestCase):
             'perm_asset_read': True,
             'perm_asset_delete': True, # User A does not have delete_asset!
         }
-        
+
         form = TenantRoleForm(data=form_data, tenant=self.tenant_a, user=self.user_a)
         self.assertFalse(form.is_valid())
         self.assertIn('__all__', form.errors)
         self.assertTrue(any("Privilege escalation detected" in e for e in form.errors['__all__']))
-        
+
         set_current_membership(None)
         set_current_tenant(None)
 
@@ -283,52 +274,91 @@ class TenantRoleSecurityTests(TestCase):
         finally:
             del MATRIX_MODELS['mock_invalid']
 
-    def test_role_deletion_clears_membership_m2m(self):
-        """Deleting a Role removes it from the M2M join table.
-
-        With roles as a ManyToManyField on Membership, there is no FK PROTECT
-        constraint — deleting (or soft-deleting) a role simply removes the M2M rows so
-        the membership continues to exist but no longer carries that role's permissions.
-        """
+    def test_role_soft_delete_excludes_from_effective_perms_but_keeps_assignment(self):
+        """Role uses SoftDeleteMixin, so role.delete() sets ``deleted_at`` rather than
+        removing the row — unlike the old roles-M2M world, there is no FK PROTECT (or
+        CASCADE) to observe on delete. The RoleAssignment pointing at a soft-deleted
+        role survives as the audit trail, but the auth backend (and the Role
+        post_save cache-busting signal) treat a soft-deleted role as inert: its
+        permissions stop projecting immediately."""
         role = Role.objects.create(
-            tenant=self.tenant_a,
-            name="Deletable?",
-            permissions=["assets.view_asset"]
+            tenant=self.tenant_a, name="Deletable?", permissions=["assets.view_asset"],
         )
-        membership = Membership.objects.create(user=self.user_a,
-            tenant=self.tenant_a,
+        assignment = grant(self.user_a, self.tenant_a, role)
+
+        backend = MembershipBackend()
+        self.assertIn('assets.view_asset', backend._effective_perms_for_tenant(self.user_a, self.tenant_a))
+
+        role.delete()  # soft delete (default) — sets deleted_at, still a save()
+        self.assertIsNotNone(role.deleted_at)
+
+        # The grant row itself survives — it's the audit trail, not a live-permission
+        # source — and so does the membership.
+        self.assertTrue(RoleAssignment.objects.filter(pk=assignment.pk).exists())
+        self.assertTrue(Membership.objects.filter(pk=assignment.membership_id).exists())
+
+        # But the soft-deleted role's permissions no longer project. The Role
+        # post_save cache-busting signal clears the cache on a freshly DB-fetched
+        # user instance (it walks `role.assignments`), not on this test's
+        # long-lived `self.user_a` handle — re-fetch to observe the post-delete
+        # state cleanly (a real request always starts from a fresh user instance
+        # too, so this isn't a product bug, just a test-object-identity artifact).
+        fresh_user_a = User.objects.get(pk=self.user_a.pk)
+        self.assertNotIn(
+            'assets.view_asset',
+            backend._effective_perms_for_tenant(fresh_user_a, self.tenant_a),
         )
-        membership.roles.add(role)
 
-        self.assertIn(role, membership.roles.all())
+    def test_context_tenant_deep_link_wins_over_active_tenant(self):
+        """RoleForm owner resolution on create: the ``?tenant=`` deep-link context
+        (passed as the ``tenant`` kwarg) wins over the ambient active tenant —
+        opening the "add role" page from tenant B's detail view must never
+        silently file the new role under whatever tenant happens to be active in
+        the session."""
+        set_current_tenant(self.tenant_a)
+        try:
+            form_data = {
+                'name': 'Deep-Linked Role',
+                'description': 'Created via ?tenant= deep link while Tenant A is active',
+                'perm_asset_read': True,
+            }
+            form = TenantRoleForm(data=form_data, tenant=self.tenant_b, user=self.super_user)
+            self.assertTrue(form.is_valid(), form.errors)
+            role = form.save()
+            self.assertEqual(role.tenant, self.tenant_b)
+        finally:
+            set_current_tenant(None)
 
-        # Deleting the role must not raise — M2M rows are cascaded by the DB.
-        role.delete()
+    def test_no_tenant_context_falls_back_to_active_tenant(self):
+        """With no ``?tenant=`` deep-link, the role is filed under the ambient
+        active tenant."""
+        set_current_tenant(self.tenant_a)
+        try:
+            form = TenantRoleForm(
+                data={'name': 'Ambient Role', 'description': '', 'perm_asset_read': True},
+                user=self.super_user,
+            )
+            self.assertTrue(form.is_valid(), form.errors)
+            role = form.save()
+            self.assertEqual(role.tenant, self.tenant_a)
+        finally:
+            set_current_tenant(None)
 
-        membership.refresh_from_db()
-        # Role is gone from the membership's effective role set.
-        self.assertNotIn(role, membership.roles.all())
-        # The membership itself still exists.
-        self.assertTrue(Membership.objects.filter(pk=membership.pk).exists())
-
-    def test_global_mode_tenant_selection(self):
-        # In global mode (no tenant in kwargs), tenant is selected in form fields
-        form_data = {
-            'name': 'Global Role',
-            'tenant': self.tenant_b.pk,
-            'description': 'Created in global mode',
-            'perm_asset_read': True,
-        }
-        form = TenantRoleForm(data=form_data, user=self.super_user)
-        self.assertTrue(form.is_valid(), form.errors)
-        role = form.save()
-        self.assertEqual(role.tenant, self.tenant_b)
+    def test_no_tenant_context_at_all_is_rejected(self):
+        """No deep-link and no active tenant: the form refuses to guess and
+        raises instead of filing the role somewhere arbitrary."""
+        form = TenantRoleForm(
+            data={'name': 'Homeless Role', 'description': '', 'perm_asset_read': True},
+            user=self.super_user,
+        )
+        self.assertFalse(form.is_valid())
+        self.assertIn('No tenant context', ' '.join(form.non_field_errors()))
 
     def test_generic_detail_view_permissions_enforced(self):
         from assets.models import Asset, StatusLabel
         from model_bakery import baker
         from django.urls import reverse
-        
+
         # Create an asset in Tenant A
         status = baker.make(StatusLabel, type='deployable', name="Deployable")
         asset = Asset.objects.create(
@@ -337,17 +367,14 @@ class TenantRoleSecurityTests(TestCase):
             asset_tag="AST-999",
             status=status
         )
-        
+
         # User A is a Reader (only has view_asset)
         reader_role = Role.objects.create(
             tenant=self.tenant_a,
             name="Reader",
             permissions=["assets.view_asset"]
         )
-        membership_a = Membership.objects.create(user=self.user_a,
-            tenant=self.tenant_a,
-        )
-        membership_a.roles.add(reader_role)
+        grant(self.user_a, self.tenant_a, reader_role)
 
         # User B is a Software Manager (only has view_software, no view_asset)
         sw_role = Role.objects.create(
@@ -355,28 +382,25 @@ class TenantRoleSecurityTests(TestCase):
             name="SW Manager",
             permissions=["software.view_software"]
         )
-        membership_b = Membership.objects.create(user=self.user_b,
-            tenant=self.tenant_a,
-        )
-        membership_b.roles.add(sw_role)
-        
+        grant(self.user_b, self.tenant_a, sw_role)
+
         # Login User A (with view_asset permission)
         self.client.force_login(self.user_a)
         session = self.client.session
         session['active_tenant_id'] = self.tenant_a.pk
         session.save()
-        
+
         # Access asset detail view (should succeed - status code 200)
         url = reverse('assets:asset_detail', kwargs={'pk': asset.pk})
         response = self.client.get(url)
         self.assertEqual(response.status_code, 200)
-        
+
         # Login User B (without view_asset permission)
         self.client.force_login(self.user_b)
         session = self.client.session
         session['active_tenant_id'] = self.tenant_a.pk
         session.save()
-        
+
         # Access asset detail view (should fail - status code 403 Forbidden)
         response = self.client.get(url)
         self.assertEqual(response.status_code, 403)
@@ -386,7 +410,7 @@ class TenantRoleSecurityTests(TestCase):
         from model_bakery import baker
         from django.contrib.contenttypes.models import ContentType
         from django.urls import reverse
-        
+
         rule = baker.make(AlertRule, tenant=self.tenant_a)
         ct = ContentType.objects.get_for_model(self.user_a)
         alert = AlertLog.objects.create(
@@ -398,17 +422,14 @@ class TenantRoleSecurityTests(TestCase):
             tenant=self.tenant_a,
             status=AlertLog.STATUS_ACTIVE
         )
-        
+
         # User A has change_alertlog
         alert_admin_role = Role.objects.create(
             tenant=self.tenant_a,
             name="Alert Admin",
             permissions=["extras.change_alertlog"]
         )
-        membership_a = Membership.objects.create(user=self.user_a,
-            tenant=self.tenant_a,
-        )
-        membership_a.roles.add(alert_admin_role)
+        grant(self.user_a, self.tenant_a, alert_admin_role)
 
         # User B does not have change_alertlog
         reader_role = Role.objects.create(
@@ -416,33 +437,30 @@ class TenantRoleSecurityTests(TestCase):
             name="Reader",
             permissions=["assets.view_asset"]
         )
-        membership_b = Membership.objects.create(user=self.user_b,
-            tenant=self.tenant_a,
-        )
-        membership_b.roles.add(reader_role)
-        
+        grant(self.user_b, self.tenant_a, reader_role)
+
         # Login User A
         self.client.force_login(self.user_a)
         session = self.client.session
         session['active_tenant_id'] = self.tenant_a.pk
         session.save()
-        
+
         url = reverse('extras:alertlog_acknowledge', kwargs={'pk': alert.pk})
         response = self.client.post(url)
         self.assertEqual(response.status_code, 302) # Redirects on success
         alert.refresh_from_db()
         self.assertEqual(alert.status, AlertLog.STATUS_ACKNOWLEDGED)
-        
+
         # Reset alert status
         alert.status = AlertLog.STATUS_ACTIVE
         alert.save()
-        
+
         # Login User B (no permission)
         self.client.force_login(self.user_b)
         session = self.client.session
         session['active_tenant_id'] = self.tenant_a.pk
         session.save()
-        
+
         response = self.client.post(url)
         self.assertEqual(response.status_code, 403) # Forbidden
         alert.refresh_from_db()
@@ -452,7 +470,7 @@ class TenantRoleSecurityTests(TestCase):
         from extras.models import ReportTemplate, ScheduledReport
         from model_bakery import baker
         from django.urls import reverse
-        
+
         template = baker.make(ReportTemplate, tenant=self.tenant_a, name="Test Report Template")
         sched = ScheduledReport.objects.create(
             name="Monthly Report",
@@ -460,17 +478,14 @@ class TenantRoleSecurityTests(TestCase):
             report=template,
             frequency='monthly'
         )
-        
+
         # User A has view_reporttemplate and view_scheduledreport
         report_admin_role = Role.objects.create(
             tenant=self.tenant_a,
             name="Report Admin",
             permissions=["extras.view_reporttemplate", "extras.view_scheduledreport"]
         )
-        membership_a = Membership.objects.create(user=self.user_a,
-            tenant=self.tenant_a,
-        )
-        membership_a.roles.add(report_admin_role)
+        grant(self.user_a, self.tenant_a, report_admin_role)
 
         # User B does not have report permissions
         reader_role = Role.objects.create(
@@ -478,35 +493,32 @@ class TenantRoleSecurityTests(TestCase):
             name="Reader",
             permissions=["assets.view_asset"]
         )
-        membership_b = Membership.objects.create(user=self.user_b,
-            tenant=self.tenant_a,
-        )
-        membership_b.roles.add(reader_role)
-        
+        grant(self.user_b, self.tenant_a, reader_role)
+
         # Login User A
         self.client.force_login(self.user_a)
         session = self.client.session
         session['active_tenant_id'] = self.tenant_a.pk
         session.save()
-        
+
         download_url = reverse('extras:reporttemplate_download', kwargs={'pk': template.pk})
         trigger_url = reverse('extras:scheduledreport_trigger', kwargs={'pk': sched.pk})
-        
+
         response = self.client.get(download_url)
         self.assertEqual(response.status_code, 200) # Succeeds
-        
+
         response = self.client.post(trigger_url)
         self.assertEqual(response.status_code, 302) # Redirect on success
-        
+
         # Login User B (no permission)
         self.client.force_login(self.user_b)
         session = self.client.session
         session['active_tenant_id'] = self.tenant_a.pk
         session.save()
-        
+
         response = self.client.get(download_url)
         self.assertEqual(response.status_code, 403) # Forbidden
-        
+
         response = self.client.post(trigger_url)
         self.assertEqual(response.status_code, 403) # Forbidden
 
@@ -566,12 +578,9 @@ class TenantRoleSecurityTests(TestCase):
             name="Extras Regression Role",
             permissions=[change_alertlog_str, view_reporttemplate_str],
         )
-        membership = Membership.objects.create(user=self.user_a,
-            tenant=self.tenant_a,
-        )
-        membership.roles.add(role)
+        assignment = grant(self.user_a, self.tenant_a, role)
         set_current_tenant(self.tenant_a)
-        set_current_membership(membership)
+        set_current_membership(assignment.membership)
         self.assertTrue(
             self.user_a.has_perm(change_alertlog_str),
             f"user_a should have {change_alertlog_str} via TenantMembershipBackend",
@@ -609,235 +618,316 @@ class TenantRoleSecurityTests(TestCase):
         self.assertIn(change_alertlog_str, saved.permissions)
         self.assertIn(view_reporttemplate_str, saved.permissions)
 
+        set_current_membership(None)
+        set_current_tenant(None)
+
+
+class SharedRoleTests(TestCase):
+    """``shared_with_managed`` is the successor to the deleted ``is_default``
+    role-cloning: a role owned by a managing tenant projects LIVE into its
+    managed tenants instead of being copied on tenant creation. There is one
+    definition, not N clones to drift out of sync.
+
+    Covers the three properties that matter: the shared definition is
+    assignable in a managed tenant (via an own-reach grant there), an edit at
+    the owner propagates immediately (no clone to re-sync), and the definition
+    itself is never editable from the managed tenant (editing is gated on
+    holding permissions in the OWNING tenant, which a managed-tenant admin
+    never has)."""
+
+    def setUp(self):
+        set_current_tenant(None)
+        set_current_membership(None)
+
+        self.super_user = User.objects.create_superuser(
+            username='su-shared', email='su-shared@example.com', password='password123',
+        )
+        self.msp_tenant = Tenant.objects.create(
+            name="Shared MSP", slug="shared-msp", is_provider=True,
+        )
+        self.customer_tenant = Tenant.objects.create(
+            name="Shared Customer", slug="shared-customer", managed_by=self.msp_tenant,
+        )
+        self.shared_role = Role.objects.create(
+            tenant=self.msp_tenant, name="MSP Technician",
+            permissions=["assets.view_asset"], shared_with_managed=True,
+        )
+        self.private_role = Role.objects.create(
+            tenant=self.msp_tenant, name="MSP Internal",
+            permissions=["organization.delete_tenant"], shared_with_managed=False,
+        )
+
+    def tearDown(self):
+        set_current_tenant(None)
+        set_current_membership(None)
+
+    def test_role_picker_offers_shared_but_not_private_roles(self):
+        # The role-picker query documented in RBAC_STAGE2_SPEC.md §7 (implemented
+        # by MembershipForm): Q(tenant=T) | Q(tenant=T.managed_by, shared_with_managed=True).
+        form = MembershipForm(user=self.super_user, tenant=self.customer_tenant)
+        offered = set(form.fields['own_roles'].queryset)
+        self.assertIn(self.shared_role, offered)
+        self.assertNotIn(self.private_role, offered)
+
+    def test_shared_role_is_assignable_in_managed_tenant(self):
+        member = User.objects.create_user(username='cust-member', email='cust-member@example.com')
+        form = MembershipForm(
+            data={
+                'user': member.pk, 'tenant': self.customer_tenant.pk,
+                'own_roles': [self.shared_role.pk],
+                'is_active': True,
+            },
+            user=self.super_user, tenant=self.customer_tenant,
+        )
+        self.assertTrue(form.is_valid(), form.errors)
+        membership = form.save()
+        assignment = RoleAssignment.objects.get(
+            membership=membership, role=self.shared_role, reach=RoleAssignment.REACH_OWN,
+        )
+        # It's the SAME role row, not a clone — still owned by the MSP tenant.
+        self.assertEqual(assignment.role.tenant, self.msp_tenant)
+
+        backend = MembershipBackend()
+        self.assertIn(
+            'assets.view_asset',
+            backend._effective_perms_for_tenant(member, self.customer_tenant),
+        )
+
+    def test_private_role_is_not_assignable_in_managed_tenant(self):
+        member = User.objects.create_user(username='cust-member2', email='cust-member2@example.com')
+        # The private role isn't even offered by the picker (see
+        # test_role_picker_offers_shared_but_not_private_roles above): its queryset
+        # is `Q(tenant=T) | Q(tenant=T.managed_by, shared_with_managed=True)`, which
+        # excludes an unshared MSP-owned role. Submitting its pk anyway is rejected
+        # as an invalid choice on the `own_roles` field itself — the clean()-level
+        # "not available in the selected tenant" guard is unreachable here since
+        # the field-level rejection empties `cleaned_data['own_roles']` first.
+        form = MembershipForm(
+            data={
+                'user': member.pk, 'tenant': self.customer_tenant.pk,
+                'own_roles': [self.private_role.pk],
+                'is_active': True,
+            },
+            user=self.super_user, tenant=self.customer_tenant,
+        )
+        self.assertFalse(form.is_valid())
+        self.assertIn('own_roles', form.errors)
+        self.assertFalse(
+            RoleAssignment.objects.filter(role=self.private_role, membership__user=member).exists()
+        )
+
+    def test_shared_role_edit_propagates_live_not_a_clone(self):
+        member = User.objects.create_user(username='cust-member3', email='cust-member3@example.com')
+        grant(member, self.customer_tenant, self.shared_role)  # own-reach at the managed tenant
+
+        backend = MembershipBackend()
+        self.assertNotIn(
+            'assets.change_asset',
+            backend._effective_perms_for_tenant(member, self.customer_tenant),
+        )
+
+        # Edit the ONE shared definition at its owning (MSP) tenant...
+        self.shared_role.permissions = list(self.shared_role.permissions) + ['assets.change_asset']
+        self.shared_role.save()
+
+        # ...and it shows up immediately for the customer-tenant member — no clone
+        # to re-sync, because there never was one. The Role post_save cache-busting
+        # signal clears the cache on a freshly DB-fetched user instance (it walks
+        # `role.assignments`), not on this test's long-lived `member` handle, so
+        # re-fetch to observe it cleanly (a real request always starts from a fresh
+        # user instance too).
+        fresh_member = User.objects.get(pk=member.pk)
+        self.assertIn(
+            'assets.change_asset',
+            backend._effective_perms_for_tenant(fresh_member, self.customer_tenant),
+        )
+
+    def test_shared_role_not_editable_from_managed_tenant(self):
+        # A customer-tenant admin who can change roles WITHIN their own tenant has
+        # no membership/assignment whatsoever at the shared role's owning (MSP)
+        # tenant, so has_perm(obj=shared_role) resolves the MSP tenant as context
+        # and finds nothing there.
+        admin_role = Role.objects.create(
+            tenant=self.customer_tenant, name="Customer Admin",
+            permissions=['organization.change_role', 'organization.view_role'],
+        )
+        customer_admin = User.objects.create_user(
+            username='cust-admin', email='cust-admin@example.com',
+        )
+        grant(customer_admin, self.customer_tenant, admin_role)
+
+        self.assertFalse(customer_admin.has_perm('organization.change_role', obj=self.shared_role))
+        # The same permission DOES work on a role the admin actually owns.
+        own_role = Role.objects.create(tenant=self.customer_tenant, name="Own Role", permissions=[])
+        self.assertTrue(customer_admin.has_perm('organization.change_role', obj=own_role))
+
+
+class RoleDeleteConfirmSharedWarningTests(TestCase):
+    """Delete-confirm wording for a shared role with live assignments in a managed
+    tenant (RBAC_STAGE3_SPEC.md §4): "grants survive as audit but stop resolving" —
+    wording only, since Role.delete() (soft delete) + the auth backend's
+    role.deleted_at check already implement that semantics as of stage 2. The
+    warning fires only when BOTH hold: the role is shared_with_managed AND at
+    least one RoleAssignment actually lives in one of its managed tenants."""
+
+    def setUp(self):
+        set_current_tenant(None)
+        set_current_membership(None)
+
+        self.superuser = User.objects.create_superuser(
+            username='su-delete-warn', email='su-delete-warn@example.com', password='pw',
+        )
+        self.msp_tenant = Tenant.objects.create(
+            name="Delete-Warn MSP", slug="delete-warn-msp", is_provider=True,
+        )
+        self.customer_tenant = Tenant.objects.create(
+            name="Delete-Warn Customer", slug="delete-warn-customer", managed_by=self.msp_tenant,
+        )
+        self.client.force_login(self.superuser)
+
+    def tearDown(self):
+        set_current_tenant(None)
+        set_current_membership(None)
+
+    def _delete_url(self, pk, tenant):
+        from django.urls import reverse
+        return f"{reverse('organization:role_delete', kwargs={'pk': pk})}?switch_tenant={tenant.pk}"
+
+    def test_delete_confirm_warns_when_a_shared_role_has_a_managed_tenant_assignment(self):
+        role = Role.objects.create(
+            tenant=self.msp_tenant, name="Shared With Grants", permissions=[],
+            shared_with_managed=True,
+        )
+        member = User.objects.create_user(username='cust-del-warn', email='cust-del-warn@example.com')
+        grant(member, self.customer_tenant, role)  # own-reach grant AT the managed tenant
+
+        resp = self.client.get(self._delete_url(role.pk, self.msp_tenant))
+        self.assertEqual(resp.status_code, 200)
+        self.assertContains(resp, "survive as an audit trail")
+
+    def test_delete_confirm_silent_when_a_shared_role_has_no_managed_tenant_assignments(self):
+        role = Role.objects.create(
+            tenant=self.msp_tenant, name="Shared No Grants", permissions=[],
+            shared_with_managed=True,
+        )
+        resp = self.client.get(self._delete_url(role.pk, self.msp_tenant))
+        self.assertEqual(resp.status_code, 200)
+        self.assertNotContains(resp, "survive as an audit trail")
+
+    def test_delete_confirm_silent_for_a_non_shared_role_even_with_assignments(self):
+        # Assignments at the OWNING tenant itself (not a managed one) never
+        # trigger the warning, and neither does shared_with_managed=False.
+        role = Role.objects.create(
+            tenant=self.msp_tenant, name="Private With Grants", permissions=[],
+            shared_with_managed=False,
+        )
+        staff = User.objects.create_user(username='staff-del-warn', email='staff-del-warn@example.com')
+        grant(staff, self.msp_tenant, role)
+
+        resp = self.client.get(self._delete_url(role.pk, self.msp_tenant))
+        self.assertEqual(resp.status_code, 200)
+        self.assertNotContains(resp, "survive as an audit trail")
+
 
 class RBACCoverageTests(TestCase):
     def setUp(self):
         set_current_tenant(None)
         set_current_membership(None)
-        
+
         self.super_user = User.objects.create_superuser(
             username='superuser', email='super@example.com', password='password123'
         )
-        from organization.models import Provider
-        self.provider, _ = Provider.objects.get_or_create(slug="msp-provider-coverage", defaults={"name": "MSP Provider Coverage"})
-        self.tenant_a, _ = Tenant.objects.get_or_create(slug="tenant-a-coverage", defaults={"name": "Tenant A Coverage", "provider": self.provider})
+        self.msp_tenant, _ = Tenant.objects.get_or_create(
+            slug="msp-provider-coverage",
+            defaults={"name": "MSP Provider Coverage", "is_provider": True},
+        )
+        self.tenant_a, _ = Tenant.objects.get_or_create(
+            slug="tenant-a-coverage",
+            defaults={"name": "Tenant A Coverage", "managed_by": self.msp_tenant},
+        )
 
     def test_tenant_group_hierarchy_and_cycle(self):
         # M7: Test get_descendant_tenant_group_ids with hierarchy and cycle
         from organization.models import TenantGroup
         from organization.access import get_descendant_tenant_group_ids
-        
+
         g1 = TenantGroup.objects.create(name="Group 1", slug="g1")
         g2 = TenantGroup.objects.create(name="Group 2", slug="g2", parent=g1)
         g3 = TenantGroup.objects.create(name="Group 3", slug="g3", parent=g2)
-        
+
         # Verify hierarchy walk
         descendants = get_descendant_tenant_group_ids(g1.pk)
         self.assertEqual(descendants, {g1.pk, g2.pk, g3.pk})
-        
+
         # Introduce a cycle manually (parent=g3 for g1)
         TenantGroup.objects.filter(pk=g1.pk).update(parent=g3)
-        
+
         # Verify it doesn't infinite loop and returns the cycle set
         descendants_cycle = get_descendant_tenant_group_ids(g1.pk)
         self.assertEqual(descendants_cycle, {g1.pk, g2.pk, g3.pk})
 
-    def test_tenant_in_scope_tenant_groups(self):
-        # M7: Test _tenant_in_scope for SCOPE_TENANT_GROUP
+    def test_managed_scope_tenant_group_walks_descendants(self):
+        # M7 successor: RoleAssignment.covers_tenant is now the single source of
+        # truth for managed-scope resolution (it replaces the deleted
+        # MembershipBackend._tenant_in_scope).
         from organization.models import TenantGroup
-        from core.auth import MembershipBackend
-        
-        g1 = TenantGroup.objects.create(name="Group 1", slug="g1")
-        g2 = TenantGroup.objects.create(name="Group 2", slug="g2", parent=g1)
-        
-        tenant_in_g2 = Tenant.objects.create(name="Tenant in G2", slug="t-g2", group=g2, provider=self.provider)
-        tenant_sibling = Tenant.objects.create(name="Tenant Sibling", slug="t-sib", provider=self.provider)
-        
+
+        g1 = TenantGroup.objects.create(name="Group 1", slug="g1-cov")
+        g2 = TenantGroup.objects.create(name="Group 2", slug="g2-cov", parent=g1)
+
+        tenant_in_g2 = Tenant.objects.create(
+            name="Tenant in G2", slug="t-g2-cov", group=g2, managed_by=self.msp_tenant,
+        )
+        tenant_sibling = Tenant.objects.create(
+            name="Tenant Sibling", slug="t-sib-cov", managed_by=self.msp_tenant,
+        )
+
         user = User.objects.create_user(username='tech', email='tech@example.com')
-        staff_membership = Membership.objects.create(
-            user=user,
-            provider=self.provider,
-            tenant_scope=Membership.SCOPE_TENANT_GROUP,
-            scope_group=g1,
-            is_active=True,
+        role = Role.objects.create(tenant=self.msp_tenant, name="Group-Scoped Tech", permissions=[])
+        membership = Membership.objects.create(user=user, tenant=self.msp_tenant, is_active=True)
+        assignment = RoleAssignment.objects.create(
+            membership=membership, role=role,
+            reach=RoleAssignment.REACH_MANAGED,
+            managed_scope=RoleAssignment.SCOPE_TENANT_GROUP, scope_group=g1,
         )
-        
-        backend = MembershipBackend()
-        self.assertTrue(backend._tenant_in_scope(staff_membership, tenant_in_g2))
-        self.assertFalse(backend._tenant_in_scope(staff_membership, tenant_sibling))
 
-    def test_instantiate_default_provider_roles(self):
-        # M8: Test instantiate_default_provider_roles
-        default_role = Role.objects.create(
-            provider=self.provider,
-            name="Default Tech Role",
-            permissions=["assets.view_asset", "organization.manage_staff"],
-            is_default=True,
-        )
-        
-        # Create a new tenant under this provider
-        new_tenant = Tenant.objects.create(name="New Tenant", slug="new-tenant", provider=self.provider)
-        
-        # Verify that the role was cloned into the new tenant
-        cloned_role = Role.objects.filter(tenant=new_tenant, name=default_role.name).first()
-        self.assertIsNotNone(cloned_role)
-        self.assertEqual(cloned_role.description, default_role.description)
-        self.assertIn("assets.view_asset", cloned_role.permissions)
-        self.assertNotIn("organization.manage_staff", cloned_role.permissions)
+        self.assertTrue(assignment.covers_tenant(tenant_in_g2))
+        self.assertFalse(assignment.covers_tenant(tenant_sibling))
 
-    def test_cache_invalidation_signals_and_m2m(self):
-        # M9: Test cache-invalidation signals including M2M updates
-        from core.auth import MembershipBackend
+    def test_cache_invalidation_signals_on_assignment_create_delete(self):
+        # M9 successor: cache-invalidation is now keyed off RoleAssignment
+        # post_save/post_delete (organization/signals.py), not the deleted
+        # Membership.roles M2M.
         backend = MembershipBackend()
-        
+
         user = User.objects.create_user(username='memberuser', email='member@example.com')
         role = Role.objects.create(
-            tenant=self.tenant_a,
-            name="Viewer",
-            permissions=["assets.view_asset"]
+            tenant=self.tenant_a, name="Viewer", permissions=["assets.view_asset"],
         )
-        membership = Membership.objects.create(
-            user=user,
-            tenant=self.tenant_a,
-            is_active=True,
-        )
-        
+        membership = Membership.objects.create(user=user, tenant=self.tenant_a, is_active=True)
+
         self.assertNotIn("assets.view_asset", backend._effective_perms_for_tenant(user, self.tenant_a))
-        
-        # Add role (M2M change)
-        membership.roles.add(role)
+
+        # Create an assignment (post_save signal busts the cache).
+        assignment = RoleAssignment.objects.create(
+            membership=membership, role=role, reach=RoleAssignment.REACH_OWN,
+        )
         self.assertIn("assets.view_asset", backend._effective_perms_for_tenant(user, self.tenant_a))
-        
-        # Remove role (M2M change)
-        membership.roles.remove(role)
+
+        # Delete it (post_delete signal busts the cache).
+        assignment.delete()
         self.assertNotIn("assets.view_asset", backend._effective_perms_for_tenant(user, self.tenant_a))
 
-    def test_technician_quick_form(self):
-        # M10: Test TechnicianQuickForm validation, scoping, and privilege escalation guards
-        from organization.forms import TechnicianQuickForm
-        
-        role = Role.objects.create(
-            provider=self.provider,
-            name="MSP Admin Role",
-            permissions=["assets.view_asset", "organization.manage_staff"]
-        )
-        
-        non_admin_user = User.objects.create_user(username='nonadmin', email='nonadmin@example.com')
-        
-        form = TechnicianQuickForm(
-            user=non_admin_user,
-            data={
-                'email': 'newtech@example.com',
-                'first_name': 'New',
-                'last_name': 'Tech',
-                'provider': self.provider.pk,
-                'role': role.pk,
-                'tenant_scope': Membership.SCOPE_ALL,
-            }
-        )
-        self.assertFalse(form.is_valid())
-        self.assertIn('role', form.errors)
-        
-        form_super = TechnicianQuickForm(
-            user=self.super_user,
-            data={
-                'email': 'newtech@example.com',
-                'first_name': 'New',
-                'last_name': 'Tech',
-                'provider': self.provider.pk,
-                'role': role.pk,
-                'tenant_scope': Membership.SCOPE_ALL,
-            }
-        )
-        self.assertTrue(form_super.is_valid(), form_super.errors)
-        user, membership = form_super.save()
-        self.assertEqual(user.email, 'newtech@example.com')
-        self.assertEqual(membership.provider, self.provider)
-        self.assertIn(role, membership.roles.all())
+    def test_technician_quick_route_redirects_to_unified_preset(self):
+        # Stage 3 deletes TechnicianQuickForm. The compatibility route is now a
+        # GET-only redirect into the unified, guarded membership form.
+        self.client.force_login(self.super_user)
 
+        response = self.client.get(reverse('organization:technician_quick_add'))
 
-class ProviderRoleCapabilityRoundTripTests(TestCase):
-    """Regression: editing a provider-scoped role through the UI must NOT strip its
-    provider capabilities (``organization.manage_*``).
-
-    The ``RoleForm`` always carried the ``cap_*`` checkbox fields, but the template never
-    rendered them — so a browser POST omitted every capability and ``RoleForm.clean()``
-    rebuilt ``permissions`` without them, silently deleting ``manage_*`` on the first save.
-    """
-    def setUp(self):
-        from django.urls import reverse
-        from organization.models import Provider
-        set_current_tenant(None)
-        set_current_membership(None)
-        self.reverse = reverse
-        self.tenant = Tenant.objects.create(name="Home", slug="home")
-        self.provider = Provider.objects.create(name="Northwind MSP", slug="northwind")
-        self.superuser = User.objects.create_superuser(
-            username='su', email='su@example.com', password='password123',
+        self.assertRedirects(
+            response,
+            reverse('organization:membership_create')
+            + f'?preset=technician&tenant={self.msp_tenant.pk}',
+            fetch_redirect_response=False,
         )
-        self.role = Role.objects.create(
-            provider=self.provider, scope=Role.SCOPE_PROVIDER, name="Provider Administrator",
-            permissions=[
-                'organization.manage_provider', 'organization.manage_tenants',
-                'organization.manage_staff', 'organization.manage_groups',
-                'assets.view_asset',
-            ],
-        )
-
-    def test_edit_page_renders_capability_checkboxes(self):
-        # Template regression guard: the four provider-capability inputs must appear in
-        # the rendered edit page. Their absence is the root cause of the silent strip.
-        self.client.force_login(self.superuser)
-        session = self.client.session
-        session['active_tenant_id'] = self.tenant.pk
-        session.save()
-        resp = self.client.get(self.reverse('organization:role_update', kwargs={'pk': self.role.pk}))
-        self.assertEqual(resp.status_code, 200)
-        for cap in ('cap_manage_provider', 'cap_manage_tenants', 'cap_manage_staff', 'cap_manage_groups'):
-            self.assertContains(resp, f'name="{cap}"')
-
-    def test_unchanged_resubmit_preserves_capabilities(self):
-        # Build the POST a browser sends when opening the form and saving unchanged:
-        # every initially-checked checkbox is submitted, unchecked ones are omitted.
-        from django import forms as djforms
-        seed = TenantRoleForm(instance=self.role, user=self.superuser)
-        data = {'name': self.role.name, 'description': self.role.description or ''}
-        for fname, field in seed.fields.items():
-            if field.disabled:
-                continue
-            if isinstance(field, djforms.BooleanField):
-                if seed[fname].value():
-                    data[fname] = 'on'
-        bound = TenantRoleForm(data=data, instance=self.role, user=self.superuser)
-        self.assertTrue(bound.is_valid(), bound.errors)
-        bound.save()
-        self.role.refresh_from_db()
-        for cap in ('organization.manage_provider', 'organization.manage_tenants',
-                    'organization.manage_staff', 'organization.manage_groups'):
-            self.assertIn(cap, self.role.permissions)
-        self.assertIn('assets.view_asset', self.role.permissions)
-
-    def test_clone_provider_role_requires_provider_picker(self):
-        # Regression: cloning a provider-scoped role must require/render the PROVIDER picker,
-        # not the tenant field (which the template hides for provider scope) — otherwise the
-        # clone is unsubmittable. Mirror RoleCloneView: an unsaved copy keeping scope=provider
-        # with both FKs nulled.
-        clone = Role(
-            name="Provider Administrator (copy)", scope=Role.SCOPE_PROVIDER,
-            permissions=list(self.role.permissions),
-        )
-        form = TenantRoleForm(instance=clone, user=self.superuser)
-        self.assertTrue(form.is_provider_scoped)
-        self.assertTrue(form.fields['provider'].required)
-        self.assertFalse(form.fields['tenant'].required)
-        # Submitting with the provider picked validates and saves a provider-scoped role.
-        data = {
-            'name': clone.name, 'description': '', 'provider': self.provider.pk,
-            'perm_asset_read': 'on', 'cap_manage_staff': 'on',
-        }
-        bound = TenantRoleForm(data=data, instance=clone, user=self.superuser)
-        self.assertTrue(bound.is_valid(), bound.errors)
-        saved = bound.save()
-        self.assertEqual(saved.scope, Role.SCOPE_PROVIDER)
-        self.assertEqual(saved.provider_id, self.provider.pk)
-        self.assertIn('organization.manage_staff', saved.permissions)

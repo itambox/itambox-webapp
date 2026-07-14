@@ -49,17 +49,20 @@ def user_requires_mfa(user) -> bool:
     if getattr(user, 'is_superuser', False):
         return True
     # Lazy imports to avoid an import cycle at app-load (settings/middleware).
-    from organization.models import Membership
     from core.auth.provisioning import PRIVILEGED_ROLE_NAMES
+    from organization.models import Role
 
     privileged_names_lower = {name.lower() for name in PRIVILEGED_ROLE_NAMES}
-    # Fetch roles via the M2M: a membership now holds 0..n roles so we traverse
-    # the M2M join (memberships -> roles) to get each role's name + permissions.
+    # Every role the user carries via any active membership's RoleAssignment
+    # rows, across ALL tenants and reaches — MFA policy must not depend on the
+    # ambient tenant context, so this rides _base_manager (the tenant-scoped
+    # default manager would silently narrow the check to the active tenant).
     # The mutating-perm check needs the JSON inspected in Python.
-    from organization.models import Role
-    roles = Role.objects.filter(memberships__user=user).values_list(
-        'name', 'permissions',
-    )
+    roles = Role._base_manager.filter(
+        deleted_at__isnull=True,
+        assignments__membership__user=user,
+        assignments__membership__is_active=True,
+    ).values_list('name', 'permissions').distinct()
     return any(
         _role_is_privileged(name, permissions, privileged_names_lower)
         for name, permissions in roles

@@ -10,9 +10,10 @@ Designed to be mixed into ``Command`` in seed_data.py:
 ``_seed_organizations`` must run after ``_seed_catalog`` (it reads
 ``self._demo_depreciation_afa`` / ``self._depreciations`` / ``self._manufacturers``).
 It populates ``self._regions``, ``self._sitegroups``, ``self._tgroups``,
-``self._tenants``, ``self._tenant_meta``, ``self._sites``, ``self._locations``,
-``self._tenant_locations``, ``self._tenant_holders``, ``self._orgs``,
-``self._contact_roles`` and ``self._contacts``.
+``self._tenants``, ``self._tenant_meta``, ``self._provider_tenant`` (the
+``is_provider`` MSP tenant every other tenant is ``managed_by``), ``self._sites``,
+``self._locations``, ``self._tenant_locations``, ``self._tenant_holders``,
+``self._orgs``, ``self._contact_roles`` and ``self._contacts``.
 
 The ``PROFILES`` / ``FIRST_NAMES`` / ``LAST_NAMES`` class attributes and the
 ``_org_spec`` / ``_make_holders`` helpers live here and are read by later phases
@@ -301,28 +302,24 @@ class SeedOrganizationsMixin:
                 holders = self._make_holders(tenant, org['domain'], t['headcount'])
                 self._tenant_holders[t['slug']] = holders
 
-        # Provider (MSP) layer: create the Northwind provider and link every tenant to it, so the
-        # MSP admin surfaces (provider dashboard, customer-tenants list, technician onboarding,
-        # provider-staff -> tenant permission projection) are populated and the "Provider (MSP)"
-        # nav group is shown. Single-company installs simply have no Provider rows and the whole
-        # layer stays hidden.
-        from organization.models import Provider
-        provider, _ = Provider.objects.get_or_create(
-            slug='northwind-msp',
-            defaults={
-                'name': 'Northwind Managed Services',
-                'description': ('Berlin-based managed-service provider administering its own IT '
-                                'and its customers from a single ITAMbox install.'),
-            })
-        self._provider = provider
-        internal = self._tenants.get('northwind-internal-it')
-        if internal is not None and provider.internal_tenant_id != internal.pk:
-            provider.internal_tenant = internal
-            provider.save(update_fields=['internal_tenant'])
+        # MSP layer: the Northwind operating company is the managing (provider) tenant;
+        # every other seeded tenant — the customers AND the MSP's own corporate holding —
+        # points at it via ``managed_by``, so the MSP admin surfaces (customer-tenants
+        # list, technician onboarding, managed-reach role assignments) are populated.
+        # Single-company installs simply have no ``is_provider`` tenant and the whole
+        # layer stays hidden. ``is_provider`` is set (and saved) BEFORE any ``managed_by``
+        # points at the tenant — Tenant.clean() enforces that ordering.
+        msp_tenant = self._tenants['northwind-internal-it']
+        if not msp_tenant.is_provider:
+            msp_tenant.is_provider = True
+            msp_tenant.save(update_fields=['is_provider'])
+        self._provider_tenant = msp_tenant
         for tenant in self._tenants.values():
-            if tenant.provider_id != provider.pk:
-                tenant.provider = provider
-                tenant.save(update_fields=['provider'])
+            if tenant.pk == msp_tenant.pk:
+                continue
+            if tenant.managed_by_id != msp_tenant.pk:
+                tenant.managed_by = msp_tenant
+                tenant.save(update_fields=['managed_by'])
 
         # Contacts: a primary customer contact per customer group/tenant + vendor reps
         self._contact_roles = {}

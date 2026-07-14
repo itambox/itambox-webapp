@@ -1,15 +1,42 @@
 from contextlib import contextmanager
 from django.contrib.auth import get_user_model
 from core.managers import set_current_tenant, set_current_membership
-from organization.models import Tenant, Membership, Role
+from organization.models import Tenant, Membership, Role, RoleAssignment
 
 User = get_user_model()
+
+
+def grant(user, tenant, role, reach=RoleAssignment.REACH_OWN, granted_by=None,
+          managed_scope=None, scope_group=None, assigned_tenants=None):
+    """Test helper: bind ``user`` to ``tenant`` with ``role`` via one RoleAssignment.
+
+    Creates (or reuses) the Membership anchor and adds a single assignment row —
+    the canonical grant shape after the per-grant RBAC collapse. Returns the
+    assignment. Use ``reach=RoleAssignment.REACH_MANAGED`` (+ optional refinement)
+    for MSP-staff grants on an ``is_provider`` tenant.
+    """
+    membership, _ = Membership.objects.get_or_create(user=user, tenant=tenant)
+    assignment, _ = RoleAssignment.objects.get_or_create(
+        membership=membership, role=role, reach=reach,
+        defaults={
+            'granted_by': granted_by,
+            'managed_scope': managed_scope,
+            'scope_group': scope_group,
+        },
+    )
+    if assigned_tenants:
+        assignment.assigned_tenants.set(assigned_tenants)
+    return assignment
+
 
 class TenantTestMixin:
     """
     Mixin for Django TestCase classes to easily manage tenant-scoped authentication,
     RBAC contexts, and session variables in testing.
     """
+
+    # Re-exported so test modules can call ``self.grant(...)`` without importing.
+    grant = staticmethod(grant)
 
     def setup_tenant_context(self, name="Test Tenant", slug="test-tenant", permissions=None):
         """
@@ -28,10 +55,8 @@ class TenantTestMixin:
             name="Test Role",
             permissions=permissions
         )
-        self.tenant_membership = Membership.objects.create(user=self.tenant_user,
-            tenant=self.tenant,
-        )
-        self.tenant_membership.roles.add(self.tenant_role)
+        self.tenant_assignment = grant(self.tenant_user, self.tenant, self.tenant_role)
+        self.tenant_membership = self.tenant_assignment.membership
 
     def set_active_tenant(self, tenant, membership=None):
         """
@@ -79,10 +104,7 @@ class TenantTestMixin:
                     name="Dynamic Role",
                     permissions=role_permissions
                 )
-                membership = Membership.objects.create(user=user,
-                    tenant=tenant,
-                )
-                membership.roles.add(role)
+                membership = grant(user, tenant, role).membership
             self.set_active_tenant(tenant, membership)
         else:
             self.set_active_tenant(tenant, None)

@@ -1,14 +1,16 @@
 # itambox/organization/tables.py
+from types import SimpleNamespace
+
 import django_tables2 as tables
 from django_tables2.utils import A
 from .models import (
     Site, Region, SiteGroup, Location, Tenant, TenantGroup,
     AssetHolder, Contact, ContactRole, ContactAssignment,
-    Role, Membership, CostCenter, Provider,
+    Role, Membership, RoleAssignment, CostCenter, TenantResourceGrant,
 )
 from core.tables import ActionsColumn, BaseTable, CountLinkColumn, ToggleColumn
 from extras.tables import TagColumn
-from .templatetags.rbac_badges import membership_kind_badge, role_scope_badge
+from .templatetags.rbac_badges import membership_kind_badge, reach_badge, shared_role_badge
 
 from assets.models import Asset, AssetAssignment
 from django.urls import reverse
@@ -111,7 +113,7 @@ class TenantTable(BaseTable):
     pk = ToggleColumn(accessor='pk')
     name = tables.LinkColumn('organization:tenant_detail', args=[A('pk')], verbose_name=_('Name'))
     group = tables.LinkColumn('organization:tenantgroup_detail', args=[A('group_id')], accessor='group')
-    provider = tables.LinkColumn('organization:provider_detail', args=[A('provider_id')], accessor='provider', verbose_name=_('Provider'))
+    managed_by = tables.LinkColumn('organization:tenant_detail', args=[A('managed_by_id')], accessor='managed_by', verbose_name=_('Managed by'))
     site_count = CountLinkColumn('organization:site_list', 'tenant', verbose_name=_('Sites'), orderable=False)
     location_count = CountLinkColumn('organization:location_list', 'tenant', verbose_name=_('Locations'), orderable=False)
     tags = TagColumn(url_name='organization:tenant_list')
@@ -119,8 +121,8 @@ class TenantTable(BaseTable):
 
     class Meta(BaseTable.Meta):
         model = Tenant
-        fields = ('pk', 'name', 'slug', 'group', 'provider', 'description', 'site_count', 'location_count', 'tags', 'actions')
-        default_columns = ('pk', 'name', 'group', 'provider', 'site_count', 'location_count', 'tags', 'actions')
+        fields = ('pk', 'name', 'slug', 'group', 'managed_by', 'description', 'site_count', 'location_count', 'tags', 'actions')
+        default_columns = ('pk', 'name', 'group', 'managed_by', 'site_count', 'location_count', 'tags', 'actions')
 
 
 # --- AssetHolder Table ---
@@ -237,25 +239,25 @@ class ContactAssignmentTable(BaseTable):
 class RoleTable(BaseTable):
     pk = ToggleColumn(accessor='pk')
     name = tables.LinkColumn('organization:role_detail', args=[A('pk')], verbose_name=_('Name'))
-    kind = tables.Column(verbose_name=_('Kind'), accessor='scope', orderable=True, empty_values=())
-    container = tables.Column(verbose_name=_('Owner'), accessor='owner', orderable=False)
+    tenant = tables.Column(verbose_name=_('Owner'), accessor='tenant', orderable=True)
+    shared = tables.Column(verbose_name=_('Shared'), accessor='shared_with_managed', orderable=True, empty_values=())
     description = tables.Column()
     member_count = tables.Column(verbose_name=_('Members'), orderable=True, empty_values=[])
     actions = ActionsColumn()
 
     class Meta(BaseTable.Meta):
         model = Role
-        fields = ('pk', 'name', 'kind', 'container', 'description', 'member_count', 'actions')
-        default_columns = ('pk', 'name', 'kind', 'container', 'description', 'member_count', 'actions')
+        fields = ('pk', 'name', 'tenant', 'shared', 'description', 'member_count', 'actions')
+        default_columns = ('pk', 'name', 'tenant', 'shared', 'description', 'member_count', 'actions')
 
-    def render_kind(self, record):
-        return role_scope_badge(record)
-
-    def render_container(self, value, record):
-        owner = record.owner
-        if owner is None:
+    def render_tenant(self, value, record):
+        tenant = record.tenant
+        if tenant is None:
             return '—'
-        return format_html('<a href="{}">{}</a>', owner.get_absolute_url(), owner)
+        return format_html('<a href="{}">{}</a>', tenant.get_absolute_url(), tenant)
+
+    def render_shared(self, value, record):
+        return shared_role_badge(record) or '—'
 
     def render_member_count(self, value, record):
         count = getattr(record, 'member_count', 0) or 0
@@ -266,33 +268,51 @@ class RoleTable(BaseTable):
 class MembershipTable(BaseTable):
     pk = ToggleColumn(accessor='pk')
     user = tables.LinkColumn('users:user_detail', args=[A('user.pk')], verbose_name=_('User'))
-    kind = tables.Column(verbose_name=_('Kind'), accessor='kind', orderable=False, empty_values=())
-    container = tables.Column(verbose_name=_('Container'), accessor='container', orderable=False)
-    roles = tables.Column(verbose_name=_('Roles'), orderable=False)
+    # Shown only in a multi-tenant context (group scope / superuser global) — the
+    # MembershipListView excludes it under a single active tenant, where every row
+    # shares that tenant. Never render a mixed table without this identifier.
+    tenant = tables.LinkColumn(
+        'organization:tenant_detail', args=[A('tenant_id')], accessor='tenant',
+        verbose_name=_('Tenant'),
+    )
+    roles = tables.Column(verbose_name=_('Roles'), accessor='assignments', orderable=False, empty_values=())
+    kind = tables.Column(verbose_name=_('Reach'), accessor='pk', orderable=False, empty_values=())
     is_active = tables.BooleanColumn(verbose_name=_('Active'))
     joined_at = tables.DateTimeColumn(format="Y-m-d H:i", verbose_name=_('Joined'))
     actions = ActionsColumn(actions=('edit', 'delete'))
 
     class Meta(BaseTable.Meta):
         model = Membership
-        fields = ('pk', 'user', 'kind', 'container', 'roles', 'is_active', 'joined_at', 'actions')
-        default_columns = ('pk', 'user', 'kind', 'container', 'roles', 'is_active', 'joined_at', 'actions')
+        fields = ('pk', 'user', 'tenant', 'roles', 'kind', 'is_active', 'joined_at', 'actions')
+        default_columns = ('pk', 'user', 'tenant', 'roles', 'kind', 'is_active', 'joined_at', 'actions')
 
     def render_kind(self, record):
-        return membership_kind_badge(record)
-
-    def render_container(self, value, record):
-        owner = record.container
-        if owner is None:
-            return '—'
-        return format_html('<a href="{}">{}</a>', owner.get_absolute_url(), owner)
+        # Purple "Staff" when any grant carries managed reach, blue "Member" otherwise.
+        # Prefer the list view's Exists() annotation (``has_managed_reach``) so the
+        # badge costs zero queries per row; fall back to the model property (one
+        # exists() query) for callers that pass an unannotated queryset. The badge
+        # helper only reads ``.is_staff_membership``, which is a read-only property
+        # on Membership — an annotation cannot reuse that name, so hand the helper
+        # the precomputed answer instead.
+        staff = getattr(record, 'has_managed_reach', None)
+        if staff is None:
+            staff = record.is_staff_membership
+        return membership_kind_badge(SimpleNamespace(is_staff_membership=bool(staff)))
 
     def render_roles(self, value, record):
-        links = []
-        for role in record.roles.all():
-            url = reverse('organization:role_detail', kwargs={'pk': role.pk})
-            links.append(format_html('<a href="{}">{}</a>', url, role.name))
-        return mark_safe(', '.join(links)) if links else _('(none)')
+        # Aggregated from the prefetched assignments: link per role, "Shared" badge
+        # on shared-in definitions, reach badge on managed-reach grants.
+        parts = []
+        for assignment in record.assignments.all():
+            url = reverse('organization:role_detail', kwargs={'pk': assignment.role_id})
+            link = format_html('<a href="{}">{}</a>', url, assignment.role.name)
+            shared = shared_role_badge(assignment.role)
+            if shared:
+                link = format_html('{} {}', link, shared)
+            if assignment.reach == RoleAssignment.REACH_MANAGED:
+                link = format_html('{} {}', link, reach_badge(assignment))
+            parts.append(link)
+        return mark_safe(', '.join(parts)) if parts else _('(none)')
 
 
 class CostCenterTable(BaseTable):
@@ -311,17 +331,58 @@ class CostCenterTable(BaseTable):
         default_columns = ('pk', 'code', 'name', 'tenant', 'parent', 'child_count', 'is_active', 'actions')
 
 
-# --- Provider (MSP) Table ---
-class ProviderTable(BaseTable):
+class TenantResourceGrantTable(BaseTable):
+    """Grants involving the active tenant (given and received)."""
     pk = ToggleColumn(accessor='pk')
-    name = tables.LinkColumn('organization:provider_detail', args=[A('pk')], verbose_name=_('Name'))
-    slug = tables.Column(verbose_name=_('Slug'))
-    description = tables.Column(verbose_name=_('Description'))
-    actions = ActionsColumn()
+    tenant = tables.Column(verbose_name=_('Owner'))
+    grantee = tables.Column(verbose_name=_('Grantee'), empty_values=(), orderable=False)
+    resource = tables.Column(verbose_name=_('Shared pool'), empty_values=(), orderable=False)
+    access_level = tables.Column(verbose_name=_('Access'))
+    granted_by = tables.Column(verbose_name=_('Granted by'))
+    created_at = tables.DateTimeColumn(verbose_name=_('Granted at'), format='Y-m-d H:i')
+    actions = tables.Column(
+        verbose_name='',
+        orderable=False,
+        empty_values=(),
+        attrs={
+            'th': {'class': 'col-actions-wide text-nowrap'},
+            'td': {'class': 'text-end text-nowrap noprint p-1 col-actions-wide'}
+        }
+    )
 
     class Meta(BaseTable.Meta):
-        model = Provider
-        fields = ('pk', 'name', 'slug', 'description', 'actions')
-        default_columns = ('pk', 'name', 'slug', 'description', 'actions')
+        model = TenantResourceGrant
+        fields = ('pk', 'tenant', 'grantee', 'resource', 'access_level',
+                  'granted_by', 'created_at', 'actions')
+        default_columns = ('pk', 'tenant', 'grantee', 'resource', 'access_level',
+                           'created_at', 'actions')
 
+    def render_grantee(self, record):
+        if record.grantee_tenant_id:
+            return str(record.grantee_tenant)
+        return format_html(
+            '{} <span class="badge bg-azure-lt">{}</span>',
+            record.grantee_tenant_group, _('Group (incl. descendants)'),
+        )
 
+    def render_resource(self, record):
+        resource = record.resource  # GenericFK; may be gone (revoked orphans)
+        if resource is None:
+            return format_html(
+                '<span class="text-muted">{} #{}</span>',
+                record.resource_type.model, record.resource_id,
+            )
+        return str(resource)
+
+    def render_actions(self, record):
+        request = getattr(self, 'request', None)
+        if not request or not self.has_perm(
+            request.user, 'organization.delete_tenantresourcegrant', record,
+        ):
+            return mark_safe('<span class="text-muted small">&mdash;</span>')
+        revoke_url = reverse('organization:tenantresourcegrant_delete', kwargs={'pk': record.pk})
+        return format_html(
+            '<a href="{}" class="btn btn-sm btn-outline-danger" title="{}">'
+            '<i class="mdi mdi-link-variant-off"></i> {}</a>',
+            revoke_url, _('Revoke this grant'), _('Revoke'),
+        )

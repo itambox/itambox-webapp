@@ -13,7 +13,7 @@ from django.utils.translation import gettext_lazy as _
 from django.utils import timezone
 
 from core.models import ChangeLoggingMixin, StandardModel
-from core.managers import SoftDeleteManager, AllObjectsManager
+from core.managers import SoftDeleteManager, AllObjectsManager, TenantScopingAllObjectsManager
 from core.mixins import AutoSlugMixin, SoftDeleteMixin
 
 
@@ -76,6 +76,12 @@ class User(AbstractUser):
             "API tokens and account status (is_active) are unaffected."
         ),
     )
+    # NOTE: email is deliberately NOT globally unique. SSO (OIDC/SAML/LDAP), SCIM,
+    # and the SnipeIT importer all provision accounts independently of email, and
+    # forcing email-based identity would either break those flows or invite
+    # email-based account-linking takeover. Inline onboarding therefore resolves
+    # identity at the write path (users.services): it reuses a single match, fails
+    # closed on an ambiguous email, and never silently merges accounts.
 
 
 class UserPreference(models.Model):
@@ -140,18 +146,6 @@ class Token(ChangeLoggingMixin, models.Model):
         related_name='tokens',
         db_index=True,
         verbose_name=_("Tenant"),
-    )
-    # Provider-scoped tokens (nullable): a token with a provider set may drive the
-    # provider-level SCIM endpoint (provision provider staff / provider-scoped groups).
-    # NULL = an ordinary tenant-scoped token (the default), unchanged behaviour.
-    provider = models.ForeignKey(
-        to='organization.Provider',
-        on_delete=models.CASCADE,
-        related_name='tokens',
-        blank=True,
-        null=True,
-        db_index=True,
-        verbose_name=_("Provider"),
     )
     created = models.DateTimeField(auto_now_add=True)
     expires = models.DateTimeField(blank=True, null=True, db_index=True, verbose_name=_("Expires"))
@@ -255,24 +249,30 @@ class Token(ChangeLoggingMixin, models.Model):
 
 
 class UserGroup(AutoSlugMixin, StandardModel, SoftDeleteMixin):
-    """A global, cross-cutting group of users granted one or more Roles.
+    """A cross-cutting group of users granted one or more Roles.
 
-    A group is NOT bound to a single tenant: its ``roles`` may reference roles from
-    any number of tenants or providers, and a member is granted each role's permissions
-    in that role's container — which in turn grants access to those containers (no
-    per-tenant Membership required). This models MSP teams (e.g. "Senior Technicians"
-    holding admin roles across customers A, B and C) as well as single-tenant groups.
+    A group is NOT bound to a single tenant for permission purposes: its ``roles`` may
+    reference roles from any number of tenants, and a member is granted each role's
+    permissions in that role's owning tenant — which in turn grants access to those
+    tenants (no per-tenant Membership required). This models MSP teams (e.g. "Senior
+    Technicians" holding admin roles across customers A, B and C) as well as
+    single-tenant groups.
 
     A user's effective permissions in a tenant are the additive union of every group
-    role for that tenant plus the user's own Membership roles/direct_permissions there.
+    role owned by that tenant plus the user's own assignment-carried roles there.
     Lives in the identity layer (``users``) because it answers "who can do what",
     not "what exists in the business". Group management is gated by the standard
-    Django permission ``users.change_usergroup`` / ``users.add_usergroup`` —
-    superusers and provider admins (via the ``organization.manage_groups`` capability
-    attached to a provider-scoped Role) grant it through the unified RBAC.
+    Django permissions ``users.change_usergroup`` / ``users.add_usergroup`` through
+    the unified RBAC (one vocabulary — the manage_groups capability is gone).
     """
+    # Default manager stays deliberately unscoped (group admin views scope their
+    # querysets explicitly — groups are cross-cutting); all_objects rides the
+    # tenant-scoping variant so recycle-bin/export surfaces honour the tenant
+    # boundary now that groups carry an owning-tenant FK. allow_global_tenant
+    # keeps NULL-tenant (global, superuser-managed) groups visible.
     objects = SoftDeleteManager()
-    all_objects = AllObjectsManager()
+    all_objects = TenantScopingAllObjectsManager()
+    allow_global_tenant = True
 
     name = models.CharField(max_length=100, verbose_name=_("Name"))
     slug = models.SlugField(max_length=100, verbose_name=_("Slug"))
@@ -291,19 +291,20 @@ class UserGroup(AutoSlugMixin, StandardModel, SoftDeleteMixin):
         blank=True,
         verbose_name=_("Members"),
     )
-    # SCIM provisioning scope (functional, not decorative): every provider-SCIM group
-    # operation filters ``UserGroup.objects.filter(provider=self.provider)``, so a group's
-    # ``provider`` decides which provider's SCIM token may list/create/update/delete it, and
-    # name/slug uniqueness is scoped to it. NULL = a global group (managed in the UI by
-    # superusers / global group admins, outside provider SCIM). It does not affect permission
-    # *resolution* — that is driven entirely by the group's ``roles``.
-    provider = models.ForeignKey(
-        'organization.Provider',
+    # Owning tenant + SCIM provisioning scope (functional, not decorative): every
+    # tenant-SCIM group operation filters ``UserGroup.objects.filter(tenant=...)``, so a
+    # group's ``tenant`` decides which tenant's SCIM token may list/create/update/delete
+    # it, and name/slug uniqueness is scoped to it. For MSP teams this is the managing
+    # (is_provider) tenant. NULL = a global group (managed in the UI by superusers only,
+    # outside SCIM). It does not affect permission *resolution* — that is driven entirely
+    # by the group's ``roles``.
+    tenant = models.ForeignKey(
+        'organization.Tenant',
         on_delete=models.SET_NULL,
         related_name='user_groups',
         blank=True,
         null=True,
-        verbose_name=_("Provider"),
+        verbose_name=_("Tenant"),
     )
     is_active = models.BooleanField(default=True, db_index=True, verbose_name=_("Active"))
 
@@ -312,27 +313,27 @@ class UserGroup(AutoSlugMixin, StandardModel, SoftDeleteMixin):
         verbose_name = _("User Group")
         verbose_name_plural = _("User Groups")
         constraints = [
-            # Unique (provider, name) for provider-specific groups
+            # Unique (tenant, name) for tenant-owned groups
             models.UniqueConstraint(
-                fields=['provider', 'name'],
-                condition=models.Q(deleted_at__isnull=True) & models.Q(provider__isnull=False),
-                name='users_usergroup_unique_provider_name_active',
+                fields=['tenant', 'name'],
+                condition=models.Q(deleted_at__isnull=True) & models.Q(tenant__isnull=False),
+                name='users_usergroup_unique_tenant_name_active',
             ),
-            # Unique name for global groups (where provider is NULL)
+            # Unique name for global groups (where tenant is NULL)
             models.UniqueConstraint(
                 fields=['name'],
-                condition=models.Q(deleted_at__isnull=True) & models.Q(provider__isnull=True),
+                condition=models.Q(deleted_at__isnull=True) & models.Q(tenant__isnull=True),
                 name='users_usergroup_unique_global_name_active',
             ),
             # Same for slug
             models.UniqueConstraint(
-                fields=['provider', 'slug'],
-                condition=models.Q(deleted_at__isnull=True) & models.Q(provider__isnull=False),
-                name='users_usergroup_unique_provider_slug_active',
+                fields=['tenant', 'slug'],
+                condition=models.Q(deleted_at__isnull=True) & models.Q(tenant__isnull=False),
+                name='users_usergroup_unique_tenant_slug_active',
             ),
             models.UniqueConstraint(
                 fields=['slug'],
-                condition=models.Q(deleted_at__isnull=True) & models.Q(provider__isnull=True),
+                condition=models.Q(deleted_at__isnull=True) & models.Q(tenant__isnull=True),
                 name='users_usergroup_unique_global_slug_active',
             ),
         ]

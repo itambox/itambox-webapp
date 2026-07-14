@@ -137,9 +137,10 @@ class InventorySymmetryAndHTMXTests(TestCase):
             username='testadmin', password='testpassword', is_staff=True, is_superuser=True
         )
         self.client.login(username='testadmin', password='testpassword')
+        self.tenant = Tenant.objects.create(name="Tenant Symmetry", slug="tenant-symmetry")
         self.manufacturer = Manufacturer.objects.create(name='SymmetryLogitech', slug='symmetrylogitech')
-        self.site = Site.objects.create(name='OfficeSymmetry', slug='officesymmetry')
-        self.location = Location.objects.create(name='DeskSymmetry', slug='desksymmetry', site=self.site)
+        self.site = Site.objects.create(name='OfficeSymmetry', slug='officesymmetry', tenant=self.tenant)
+        self.location = Location.objects.create(name='DeskSymmetry', slug='desksymmetry', site=self.site, tenant=self.tenant)
         self.cat_mouse = _create_category('MouseSymmetry', accessory=True)
         self.cat_toner = _create_category('TonerSymmetry', consumable=True)
         

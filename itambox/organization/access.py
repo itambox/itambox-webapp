@@ -1,12 +1,11 @@
-"""Cross-tenant access helpers (unified RBAC).
+"""Cross-tenant access helpers (unified RBAC, one container type).
 
 A (non-superuser) user's accessible tenants are the union of:
 
-  1. their active tenant ``Membership`` rows (tenant members),
-  2. tenants of every ``Role`` granted to them via an active, non-deleted ``UserGroup``
-     (groups are global and may grant roles across many tenants — the MSP "team" model), and
-  3. tenants reachable through an active provider ``Membership`` (provider staff)
-     per its ``tenant_scope`` (explicit / tenant_group / all).
+  1. their active ``Membership`` rows,
+  2. tenants owning a ``Role`` granted to them via an active, non-deleted ``UserGroup``, and
+  3. managed tenants reachable through managed-reach ``RoleAssignment`` rows on their
+     active memberships at managing (``is_provider``) tenants.
 
 This is the single source of truth for "which tenants may this user enter", used by
 ``TenantMiddleware`` and the tenant switcher. Permission *content* within a tenant is
@@ -14,8 +13,15 @@ resolved separately by :class:`core.auth.MembershipBackend`.
 """
 
 
-def get_descendant_tenant_group_ids(group_id):
-    """Return ``group_id`` plus the ids of all its descendant TenantGroups (inclusive)."""
+def get_descendant_tenant_group_ids(group_id, live_only=False):
+    """Return ``group_id`` plus the ids of all its descendant TenantGroups (inclusive).
+
+    With ``live_only=True`` the walk prunes at soft-deleted nodes (a deleted
+    subgroup and everything below it is excluded), matching the descendant walk
+    inside ``TenantScopingQuerySet.filter_by_tenant`` — use it wherever the
+    result must agree with what the scoped querysets show. The default keeps the
+    raw tree for reach/audit semantics (``RoleAssignment.covers_tenant`` etc.).
+    """
     if group_id is None:
         return set()
     # inline import: avoid AppRegistryNotReady / a core<->organization cycle at load
@@ -24,11 +30,11 @@ def get_descendant_tenant_group_ids(group_id):
     ids = {group_id}
     frontier = [group_id]
     while frontier:
-        children = list(
-            TenantGroup._base_manager.filter(parent_id__in=frontier)
-            .exclude(pk__in=ids)
-            .values_list('pk', flat=True)
-        )
+        children_qs = TenantGroup._base_manager.filter(
+            parent_id__in=frontier).exclude(pk__in=ids)
+        if live_only:
+            children_qs = children_qs.filter(deleted_at__isnull=True)
+        children = list(children_qs.values_list('pk', flat=True))
         if not children:
             break
         ids.update(children)
@@ -36,25 +42,79 @@ def get_descendant_tenant_group_ids(group_id):
     return ids
 
 
-def provider_accessible_tenant_ids(user):
-    """Tenant ids reachable via the user's active provider Memberships (step 3 above).
+def get_ancestor_tenant_group_ids(group_id):
+    """Return ``group_id`` plus the ids of all its ancestor TenantGroups (inclusive).
 
-    The per-scope tenant-id resolution lives on the model as
-    ``Membership.scoped_tenant_ids`` (the canonical helper); this function just unions it
-    across the user's active provider memberships. One membership → one set of scope
-    queries, so this scales with the number of provider memberships a single user holds
-    (small in practice), not with the tenant count.
+    Cycle-safe upward walk over the raw tree (no soft-delete pruning), matching
+    the reach/audit semantics of the descendant walk above. Used by the
+    resource-access resolver: a grant to group G covers every tenant whose
+    group chain passes through G, so coverage is "G is an ancestor-or-self of
+    the tenant's group".
+    """
+    if group_id is None:
+        return set()
+    # inline import: avoid AppRegistryNotReady / a core<->organization cycle at load
+    from organization.models import TenantGroup
+
+    seen = set()
+    node = group_id
+    while node is not None and node not in seen:
+        seen.add(node)
+        node = (
+            TenantGroup._base_manager.filter(pk=node)
+            .values_list('parent_id', flat=True).first()
+        )
+    return seen
+
+
+def shared_resource_ids(model, tenant):
+    """Pool ids of ``model`` shared TO ``tenant`` by live TenantResourceGrants.
+
+    Coverage matches the phase-3 resolver: a direct grant to the tenant, or a
+    grant to an ancestor TenantGroup of the tenant's group (group grants
+    include descendants). Any access level counts — 'view' already conveys
+    visibility. Returns a values queryset usable inside ``pk__in`` (a single
+    subquery, no evaluation here); empty when ``tenant`` is None.
+    """
+    # inline imports: avoid AppRegistryNotReady / an organization-internal cycle at load
+    from django.contrib.contenttypes.models import ContentType
+    from django.db.models import Q
+    from organization.models import TenantResourceGrant
+
+    if tenant is None:
+        return TenantResourceGrant.objects.none().values_list('resource_id', flat=True)
+    ct = ContentType.objects.get_for_model(model)
+    grantee_q = Q(grantee_tenant_id=tenant.pk)
+    ancestor_group_ids = get_ancestor_tenant_group_ids(tenant.group_id)
+    if ancestor_group_ids:
+        grantee_q |= Q(grantee_tenant_group_id__in=ancestor_group_ids)
+    return (
+        TenantResourceGrant.objects
+        .filter(resource_type=ct)
+        .filter(grantee_q)
+        .values_list('resource_id', flat=True)
+    )
+
+
+def managed_accessible_tenant_ids(user):
+    """Managed-tenant ids reachable via the user's managed-reach assignments (step 3).
+
+    The per-scope resolution lives on the model as ``RoleAssignment.scoped_tenant_ids``
+    (the canonical helper); this function just unions it across the user's active
+    managed-reach assignments.
     """
     if user is None or not getattr(user, 'is_authenticated', False):
         return set()
-    from organization.models import Membership
+    from organization.models import RoleAssignment
 
     ids = set()
-    staff_memberships = Membership.objects.filter(
-        user=user, is_active=True, provider__isnull=False,
-    ).select_related('provider', 'scope_group')
-    for pm in staff_memberships:
-        ids |= pm.scoped_tenant_ids()
+    assignments = RoleAssignment.objects.filter(
+        reach=RoleAssignment.REACH_MANAGED,
+        membership__user=user,
+        membership__is_active=True,
+    ).select_related('membership', 'scope_group')
+    for assignment in assignments:
+        ids |= assignment.scoped_tenant_ids()
     return ids
 
 
@@ -66,124 +126,129 @@ def accessible_tenant_ids(user):
 
     ids = set(
         Membership.objects.filter(
-            user=user, is_active=True, tenant__isnull=False,
+            user=user, is_active=True,
         ).values_list('tenant_id', flat=True)
     )
-    # Tenant-scoped Roles attached via UserGroups (cross-tenant access).
+    # Roles attached via UserGroups grant access to the role's owning tenant.
     ids |= set(
         Role._base_manager.filter(
-            scope=Role.SCOPE_TENANT, deleted_at__isnull=True,
+            deleted_at__isnull=True,
             user_groups__members=user,
             user_groups__is_active=True,
             user_groups__deleted_at__isnull=True,
         ).values_list('tenant_id', flat=True)
     )
-    # Provider staff (MSP) scopes.
-    ids |= provider_accessible_tenant_ids(user)
+    # Managed reach.
+    ids |= managed_accessible_tenant_ids(user)
     return ids
 
 
-def accessible_provider_ids(user):
-    """Return the set of provider IDs ``user`` may operate against."""
-    if user is None or not getattr(user, 'is_authenticated', False):
-        return set()
-    from organization.models import Membership
-    return set(
-        Membership.objects.filter(
-            user=user, is_active=True, provider__isnull=False,
-        ).values_list('provider_id', flat=True)
-    )
-
-
-def tenant_access_report(tenant):
+def tenant_access_report(tenant, external_only=False):
     """Return who can access ``tenant`` and how — for the per-tenant "Who Has Access" audit.
 
-    Result is a list of dicts ``{user, sources, permissions, kinds}`` sorted by
-    username, where ``sources`` is a sorted list drawn from
-    ``{'membership', 'group', 'provider'}``, ``permissions`` is the user's effective
-    permission set in this tenant, and ``kinds`` is the set of membership kinds
-    (``'member'`` / ``'staff'``) that apply (so a user with both a direct member row AND
-    provider-staff coverage shows both).
+    Result is a list of dicts ``{user, sources, groups, permissions}`` sorted by username,
+    where ``sources`` is a sorted list drawn from ``{'membership', 'group', 'managed'}``,
+    ``groups`` is the sorted list of user-group names contributing access (empty when
+    none), and ``permissions`` is the user's effective permission set in this tenant.
+
+    With ``external_only=True`` the report is restricted to users who reach the tenant
+    WITHOUT a local membership row (any ``is_active`` state): provider staff arriving via
+    managed-reach grants at ``tenant.managed_by`` and members of user groups carrying
+    this tenant's roles. This feeds the read-only "Access from outside this tenant"
+    panel on the members list — grants shown there are managed where they live.
     """
-    from organization.models import Membership, Role
+    from django.db.models import Prefetch
+    from organization.models import Membership, RoleAssignment, Tenant
     from users.models import UserGroup
-
-    # 1. Fetch all direct memberships for this tenant
-    direct_memberships = Membership.objects.filter(
-        tenant=tenant, is_active=True
-    ).select_related('user').prefetch_related('roles')
-
-    # 2. Fetch all user groups with roles in this tenant
-    user_groups = UserGroup.objects.filter(
-        roles__scope=Role.SCOPE_TENANT, roles__tenant=tenant, is_active=True
-    ).prefetch_related('members', 'roles')
-
-    # 3. Fetch provider staff if there is a provider
-    staff_memberships = []
-    if getattr(tenant, 'provider_id', None):
-        staff_memberships = Membership.objects.filter(
-            provider_id=tenant.provider_id, is_active=True,
-        ).select_related('user', 'scope_group').prefetch_related('roles', 'assigned_tenants')
 
     user_data = {}
 
     def _get_user_entry(user):
         if user.pk not in user_data:
             user_data[user.pk] = {
-                'user': user,
-                'sources': set(),
-                'kinds': set(),
-                'permissions': set()
+                'user': user, 'sources': set(), 'groups': set(), 'permissions': set(),
             }
         return user_data[user.pk]
 
-    # Process direct memberships
-    for m in direct_memberships:
-        entry = _get_user_entry(m.user)
-        entry['sources'].add('membership')
-        entry['kinds'].add(m.kind)
-        entry['permissions'].update(m.direct_permissions or [])
-        for role in m.roles.all():
-            if role.deleted_at is None and role.scope == Role.SCOPE_TENANT:
-                entry['permissions'].update(role.permissions or [])
+    # 1. Direct memberships: own-reach assignments in this tenant.
+    #    (Skipped for external_only — local members are excluded below anyway.)
+    if not external_only:
+        direct = RoleAssignment.objects.filter(
+            reach=RoleAssignment.REACH_OWN,
+            membership__tenant=tenant,
+            membership__is_active=True,
+        ).select_related('membership__user', 'role')
+        seen_membership_users = set()
+        for assignment in direct:
+            entry = _get_user_entry(assignment.membership.user)
+            entry['sources'].add('membership')
+            seen_membership_users.add(assignment.membership.user_id)
+            if assignment.role.deleted_at is None:
+                entry['permissions'].update(assignment.role.permissions or [])
+        # Role-less members still belong to the tenant (zero perms, but visible).
+        for membership in Membership.objects.filter(
+            tenant=tenant, is_active=True,
+        ).exclude(user_id__in=seen_membership_users).select_related('user'):
+            _get_user_entry(membership.user)['sources'].add('membership')
 
-    # Process user groups
-    for g in user_groups:
+    # 2. User groups carrying roles owned by this tenant.
+    for group in UserGroup.objects.filter(
+        roles__tenant=tenant, roles__deleted_at__isnull=True, is_active=True,
+    ).distinct().prefetch_related('members', 'roles'):
         group_perms = set()
-        for role in g.roles.all():
-            if role.deleted_at is None and role.scope == Role.SCOPE_TENANT and role.tenant_id == tenant.pk:
+        for role in group.roles.all():
+            if role.deleted_at is None and role.tenant_id == tenant.pk:
                 group_perms.update(role.permissions or [])
         if group_perms:
-            for user in g.members.all():
+            for user in group.members.all():
                 entry = _get_user_entry(user)
                 entry['sources'].add('group')
+                entry['groups'].add(group.name)
                 entry['permissions'].update(group_perms)
 
-    # Process provider staff
-    for pm in staff_memberships:
-        if pm.covers_tenant(tenant):
-            entry = _get_user_entry(pm.user)
-            entry['sources'].add('provider')
-            entry['kinds'].add(Membership.KIND_STAFF)
-            # Only provider-scoped roles project into tenant context, with provider
-            # capabilities (organization.manage_*) stripped via the canonical helper
-            # (Membership.project_permissions_for_tenant). A staff membership's own
-            # direct_permissions are provider-context only and do NOT project here.
-            for role in pm.roles.all():
-                if role.deleted_at is None and role.scope == Role.SCOPE_PROVIDER:
-                    entry['permissions'].update(
-                        Membership.project_permissions_for_tenant(role.permissions)
-                    )
+    # 3. Managed reach from the managing tenant.
+    if tenant.managed_by_id:
+        staff_assignments = RoleAssignment.objects.filter(
+            reach=RoleAssignment.REACH_MANAGED,
+            membership__tenant_id=tenant.managed_by_id,
+            membership__is_active=True,
+        ).select_related('membership__user', 'role', 'scope_group').prefetch_related(
+            # _base_manager: the explicit-scope tenants are managed customers, which
+            # the tenant-scoped default manager would hide; prefetching here lets
+            # covers_tenant() read the cache instead of one query per assignment.
+            Prefetch('assigned_tenants', queryset=Tenant._base_manager.all()),
+        )
+        for assignment in staff_assignments:
+            if assignment.role.deleted_at is None and assignment.covers_tenant(tenant):
+                entry = _get_user_entry(assignment.membership.user)
+                entry['sources'].add('managed')
+                entry['permissions'].update(assignment.role.permissions or [])
 
-    # Format the report
+    if external_only:
+        # "Without a local membership row" is literal: even a suspended
+        # (is_active=False) membership means the person is managed on the members
+        # list itself, not in the outside-access panel. Membership's default
+        # manager is deliberately unscoped, so this works from any tenant context.
+        local_user_ids = set(
+            Membership.objects.filter(tenant=tenant).values_list('user_id', flat=True)
+        )
+        user_data = {
+            pk: data for pk, data in user_data.items() if pk not in local_user_ids
+        }
+
     report = []
     for data in user_data.values():
+        user = data['user']
+        # A globally-disabled account (is_active=False) or one barred from
+        # interactive login (can_login=False) holds the grant but cannot actually
+        # use it — flag it so the panel does not claim it "can access".
+        inactive = not (user.is_active and getattr(user, 'can_login', True))
         report.append({
-            'user': data['user'],
+            'user': user,
             'sources': sorted(data['sources']),
-            'kinds': sorted(data['kinds']),
+            'groups': sorted(data['groups']),
             'permissions': sorted(data['permissions']),
+            'inactive': inactive,
         })
-
     report.sort(key=lambda r: (r['user'].username or '').lower())
     return report

@@ -16,6 +16,27 @@ def pytest_configure(config):
     settings.DATABASES['default']['TEST']['NAME'] = db_name
 
 
+@pytest.fixture(scope='session', autouse=True)
+def _prime_urlconf_without_tenant_context():
+    """Import the root URLconf (and thus every view module) once at session start,
+    while NO tenant context is active.
+
+    Many views carry a class-level ``queryset = Model.objects.all()``. That
+    attribute is evaluated when the view module is imported, and the tenant-scoping
+    manager reads the *current* tenant context at that moment. On a real server the
+    URLconf loads at startup with no active request, so those querysets bake
+    UNSCOPED (per-request ``filter_by_tenant()`` then scopes them correctly). In the
+    test process, without this, whichever test first calls ``reverse()`` inside an
+    active tenant context would freeze every view's queryset to that tenant —
+    producing order-dependent cross-tenant 404s (see the "import-baked view
+    querysets" hazard). Forcing the import here makes the bake deterministic and
+    context-free, matching production.
+    """
+    from django.urls import get_resolver
+    get_resolver().url_patterns  # noqa: B018 — accessing the property triggers the full import
+    yield
+
+
 @pytest.fixture(autouse=True)
 def clear_thread_locals():
     yield

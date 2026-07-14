@@ -1,0 +1,76 @@
+digraph itambox_data_model {
+  graph [bgcolor="#FFFFFF", compound=true, fontname="Arial", newrank=true, nodesep=0.4, pad=0.25, rankdir=LR, ranksep=1.2, splines=polyline];
+  node [color="#52606D", fontname="Arial", fontsize=11, margin="0.14,0.08", shape=box, style="rounded,filled"];
+  edge [color="#667085", fontcolor="#475467", fontname="Arial", fontsize=8, penwidth=1.0];
+
+  subgraph cluster_organization {
+    label="organization";
+    color="#98A2B3";
+    fontcolor="#344054";
+    fontname="Arial Bold";
+    fontsize=13;
+    penwidth=1.2;
+    style="rounded";
+    "organization.AssetHolder" [fillcolor="#E2F4F3", label="AssetHolder"];
+    "organization.Contact" [fillcolor="#E2F4F3", label="Contact"];
+    "organization.ContactAssignment" [fillcolor="#E2F4F3", label="ContactAssignment"];
+    "organization.ContactRole" [fillcolor="#E2F4F3", label="ContactRole"];
+    "organization.CostCenter" [fillcolor="#E2F4F3", label="CostCenter"];
+    "organization.Location" [fillcolor="#E2F4F3", label="Location"];
+    "organization.Membership" [fillcolor="#E2F4F3", label="Membership"];
+    "organization.Region" [fillcolor="#E2F4F3", label="Region"];
+    "organization.Role" [fillcolor="#E2F4F3", label="Role"];
+    "organization.RoleAssignment" [fillcolor="#E2F4F3", label="RoleAssignment"];
+    "organization.Site" [fillcolor="#E2F4F3", label="Site"];
+    "organization.SiteGroup" [fillcolor="#E2F4F3", label="SiteGroup"];
+    "organization.Tenant" [fillcolor="#E2F4F3", label="Tenant"];
+    "organization.TenantGroup" [fillcolor="#E2F4F3", label="TenantGroup"];
+  }
+
+  subgraph cluster_users {
+    label="users";
+    color="#98A2B3";
+    fontcolor="#344054";
+    fontname="Arial Bold";
+    fontsize=13;
+    penwidth=1.2;
+    style="rounded";
+    "users.Token" [fillcolor="#EDEDED", label="Token"];
+    "users.User" [fillcolor="#EDEDED", label="User"];
+    "users.UserGroup" [fillcolor="#EDEDED", label="UserGroup"];
+    "users.UserPreference" [fillcolor="#EDEDED", label="UserPreference"];
+  }
+
+  "organization.AssetHolder" -> "users.User" [label="user (optional, foreign key)", tooltip="user (optional, foreign key)", arrowhead="normal"];
+  "organization.AssetHolder" -> "organization.Tenant" [label="tenant (optional, foreign key)", tooltip="tenant (optional, foreign key)", arrowhead="normal"];
+  "organization.Contact" -> "organization.Tenant" [label="tenant (optional, foreign key)", tooltip="tenant (optional, foreign key)", arrowhead="normal"];
+  "organization.ContactAssignment" -> "organization.Contact" [label="contact (required, foreign key)", tooltip="contact (required, foreign key)", arrowhead="normal"];
+  "organization.ContactAssignment" -> "organization.ContactRole" [label="role (required, foreign key)", tooltip="role (required, foreign key)", arrowhead="normal"];
+  "organization.CostCenter" -> "organization.Tenant" [label="tenant (optional, foreign key)", tooltip="tenant (optional, foreign key)", arrowhead="normal"];
+  "organization.CostCenter" -> "organization.CostCenter" [label="parent (optional, foreign key)", tooltip="parent (optional, foreign key)", arrowhead="normal"];
+  "organization.Location" -> "organization.Site" [label="site (required, foreign key)", tooltip="site (required, foreign key)", arrowhead="normal"];
+  "organization.Location" -> "organization.Location" [label="parent (optional, foreign key)", tooltip="parent (optional, foreign key)", arrowhead="normal"];
+  "organization.Location" -> "organization.Tenant" [label="tenant (optional, foreign key)", tooltip="tenant (optional, foreign key)", arrowhead="normal"];
+  "organization.Membership" -> "users.User" [label="user (required, foreign key)", tooltip="user (required, foreign key)", arrowhead="normal"];
+  "organization.Membership" -> "organization.Tenant" [label="tenant (required, foreign key)", tooltip="tenant (required, foreign key)", arrowhead="normal"];
+  "organization.Region" -> "organization.Region" [label="parent (optional, foreign key)", tooltip="parent (optional, foreign key)", arrowhead="normal"];
+  "organization.Role" -> "organization.Tenant" [label="tenant (required, foreign key)", tooltip="tenant (required, foreign key)", arrowhead="normal"];
+  "organization.RoleAssignment" -> "organization.Membership" [label="membership (required, foreign key)", tooltip="membership (required, foreign key)", arrowhead="normal"];
+  "organization.RoleAssignment" -> "organization.Role" [label="role (required, foreign key)", tooltip="role (required, foreign key)", arrowhead="normal"];
+  "organization.RoleAssignment" -> "organization.TenantGroup" [label="scope_group (optional, foreign key)", tooltip="scope_group (optional, foreign key)", arrowhead="normal"];
+  "organization.RoleAssignment" -> "users.User" [label="granted_by (optional, foreign key)", tooltip="granted_by (optional, foreign key)", arrowhead="normal"];
+  "organization.RoleAssignment" -> "organization.Tenant" [label="assigned_tenants (optional, many-to-many)", tooltip="assigned_tenants (optional, many-to-many)", arrowhead="normal", arrowtail="normal", dir="both", style="dashed"];
+  "organization.Site" -> "organization.Region" [label="region (optional, foreign key)", tooltip="region (optional, foreign key)", arrowhead="normal"];
+  "organization.Site" -> "organization.SiteGroup" [label="group (optional, foreign key)", tooltip="group (optional, foreign key)", arrowhead="normal"];
+  "organization.Site" -> "organization.Tenant" [label="tenant (optional, foreign key)", tooltip="tenant (optional, foreign key)", arrowhead="normal"];
+  "organization.SiteGroup" -> "organization.SiteGroup" [label="parent (optional, foreign key)", tooltip="parent (optional, foreign key)", arrowhead="normal"];
+  "organization.Tenant" -> "organization.TenantGroup" [label="group (optional, foreign key)", tooltip="group (optional, foreign key)", arrowhead="normal"];
+  "organization.Tenant" -> "organization.Tenant" [label="managed_by (optional, foreign key)", tooltip="managed_by (optional, foreign key)", arrowhead="normal"];
+  "organization.TenantGroup" -> "organization.TenantGroup" [label="parent (optional, foreign key)", tooltip="parent (optional, foreign key)", arrowhead="normal"];
+  "users.Token" -> "users.User" [label="user (required, foreign key)", tooltip="user (required, foreign key)", arrowhead="normal"];
+  "users.Token" -> "organization.Tenant" [label="tenant (required, foreign key)", tooltip="tenant (required, foreign key)", arrowhead="normal"];
+  "users.UserGroup" -> "organization.Tenant" [label="tenant (optional, foreign key)", tooltip="tenant (optional, foreign key)", arrowhead="normal"];
+  "users.UserGroup" -> "organization.Role" [label="roles (optional, many-to-many)", tooltip="roles (optional, many-to-many)", arrowhead="normal", arrowtail="normal", dir="both", style="dashed"];
+  "users.UserGroup" -> "users.User" [label="members (optional, many-to-many)", tooltip="members (optional, many-to-many)", arrowhead="normal", arrowtail="normal", dir="both", style="dashed"];
+  "users.UserPreference" -> "users.User" [label="user (required, one-to-one)", tooltip="user (required, one-to-one)", arrowhead="normal", arrowtail="normal", dir="both", penwidth=1.4];
+}

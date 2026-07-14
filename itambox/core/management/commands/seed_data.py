@@ -4,8 +4,9 @@ Seed the database with a coherent, presentation-ready demo dataset.
 The narrative is a **Managed Service Provider (MSP)** — "Northwind Managed
 Services" — that runs its own internal IT and manages IT for a handful of
 customers across regulated industries (pharma, banking, asset management, plus
-a few smaller single-tenant clients). MSP staff hold cross-tenant memberships
-with scoped roles, which is what makes the multi-tenant story tangible.
+a few smaller single-tenant clients). MSP staff hold one membership at the
+managing (``is_provider``) tenant with managed-reach role assignments into the
+customer tenants, which is what makes the multi-tenant story tangible.
 
 Every app is touched with realistic, headcount-driven daily data: organization
 hierarchy, access (users/roles/memberships), assets + assignments + custody,
@@ -132,7 +133,8 @@ class Command(SeedCatalogMixin, SeedOrganizationsMixin, SeedAccessMixin, SeedAss
             ('inventory', 'Component'), ('inventory', 'Accessory'), ('inventory', 'Consumable'),
             ('licenses', 'License'), ('software', 'Software'),
             ('subscriptions', 'Subscription'), ('subscriptions', 'Provider'),
-            ('organization', 'Membership'), ('organization', 'TenantInvitation'),
+            ('organization', 'RoleAssignment'),
+            ('organization', 'Membership'),
             ('organization', 'Role'),
             ('organization', 'ContactAssignment'), ('organization', 'Contact'),
             ('organization', 'ContactRole'),

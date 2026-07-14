@@ -45,8 +45,6 @@ class RateLimitMiddleware:
         rate_limited_paths = [
             '/accounts/login/',
             '/accounts/password_reset/',
-            '/organization/invite-user/',
-            '/organization/accept-invitation/',
         ]
         
         path = request.path
@@ -66,12 +64,12 @@ class RateLimitMiddleware:
 
             rl_cache = _get_cache()
             # Fail OPEN, not closed: a cache-backend outage (Redis/Valkey blip,
-            # connection reset, ...) must not 500 every login/password-reset/
-            # invite request across all tenants. Skipping the rate-limit check
+            # connection reset, ...) must not 500 every login/password-reset
+            # request across all tenants. Skipping the rate-limit check
             # for the duration of an outage is the safer tradeoff here — the
             # alternative (fail closed / 503) would turn a transient cache
             # hiccup into a full authentication outage, which is worse than
-            # briefly relaxing the rate limiter. This only affects the four
+            # briefly relaxing the rate limiter. This only affects the
             # sensitive paths above; it does not touch cache usage elsewhere.
             try:
                 request_count = rl_cache.get(key)

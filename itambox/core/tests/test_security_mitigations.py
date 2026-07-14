@@ -1,11 +1,15 @@
 """Regression tests for the security-review mitigations."""
+import socket
 import uuid
+from unittest.mock import MagicMock, patch
+from urllib.parse import urlsplit
 
 from django.contrib.contenttypes.models import ContentType
 from django.core.exceptions import ValidationError
 from django.test import TestCase
 from model_bakery import baker
 
+from core.http import request_pinned
 from core.managers import set_current_tenant
 from core.models import ObjectChange
 from core.validators import validate_external_url
@@ -44,6 +48,87 @@ class SSRFValidatorTests(TestCase):
             validate_external_url('')
         with self.assertRaises(ValidationError):
             validate_external_url('http:///nohost')
+
+    @patch('socket.getaddrinfo')
+    def test_dns_resolution_failure_fails_closed(self, mock_getaddrinfo):
+        """Release blocker #1: an unresolvable host must be REJECTED, not silently
+        allowed through. A resolver error (transient outage, or an attacker's DNS
+        answering differently at validation time vs. send time) used to return an
+        empty result and let the URL through; it must now fail closed."""
+        mock_getaddrinfo.side_effect = socket.gaierror()
+        with self.assertRaises(ValidationError):
+            validate_external_url('https://doesnotexist.invalid/x')
+
+
+class RequestPinnedTests(TestCase):
+    """core.http.request_pinned: DNS-rebinding-safe outbound sender.
+
+    Connects to the FIRST resolved address (not the hostname) while preserving the
+    hostname as the Host header / TLS SNI target, and never follows redirects."""
+
+    def _make_pinned_response(self, status_code=200):
+        # A response returned by a mocked HTTPAdapter.send bypasses real urllib3
+        # machinery, so requests.Session.send's own post-processing (redirect
+        # resolution, cookie extraction) must be steered away from treating
+        # MagicMock auto-attributes as real values: is_redirect must be falsy
+        # (else Session.send tries to parse a MagicMock as a redirect Location),
+        # and raw must be falsy (else cookie extraction tries to read headers off
+        # a MagicMock and blows up in the stdlib http.cookiejar internals).
+        resp = MagicMock(status_code=status_code)
+        resp.is_redirect = False
+        resp.raw = None
+        return resp
+
+    @patch('requests.adapters.HTTPAdapter.send')
+    @patch('socket.getaddrinfo')
+    def test_pinned_to_resolved_ip_with_original_host_header(self, mock_getaddrinfo, mock_send):
+        mock_getaddrinfo.return_value = [
+            (socket.AF_INET, socket.SOCK_STREAM, socket.IPPROTO_TCP, '', ('93.184.216.34', 443)),
+        ]
+        mock_send.return_value = self._make_pinned_response()
+
+        request_pinned('POST', 'https://hooks.example.com/x', json={})
+
+        self.assertEqual(mock_send.call_count, 1)
+        sent_request = mock_send.call_args[0][0]
+        # The socket target is the resolved IP, not the hostname...
+        self.assertEqual(urlsplit(sent_request.url).netloc, '93.184.216.34')
+        # ...but the server still sees the original hostname via the Host header.
+        self.assertEqual(sent_request.headers['Host'], 'hooks.example.com')
+
+    @patch('requests.adapters.HTTPAdapter.send')
+    @patch('socket.getaddrinfo')
+    def test_pinned_ipv6_address_uses_bracketed_form(self, mock_getaddrinfo, mock_send):
+        mock_getaddrinfo.return_value = [
+            (socket.AF_INET6, socket.SOCK_STREAM, socket.IPPROTO_TCP, '',
+             ('2606:2800:220:1:248:1893:25c8:1946', 443, 0, 0)),
+        ]
+        mock_send.return_value = self._make_pinned_response()
+
+        request_pinned('POST', 'https://hooks.example.com/x', json={})
+
+        sent_request = mock_send.call_args[0][0]
+        self.assertEqual(
+            urlsplit(sent_request.url).netloc, '[2606:2800:220:1:248:1893:25c8:1946]',
+        )
+        self.assertEqual(sent_request.headers['Host'], 'hooks.example.com')
+
+    @patch('requests.Session.request')
+    def test_redirects_are_never_followed(self, mock_session_request):
+        """A 3xx pointing at an internal address would bypass the pinning guard
+        entirely, so redirects must be disabled at the requests layer. Asserted
+        directly on what core.http passes to Session.request (allow_redirects is
+        popped by Session.send before reaching the adapter, so it can't be
+        observed at the HTTPAdapter.send seam used by the other tests here)."""
+        mock_session_request.return_value = self._make_pinned_response()
+
+        # A public IP literal skips DNS entirely, keeping this test focused on the
+        # redirect flag rather than resolution.
+        request_pinned('POST', 'https://93.184.216.34/x', json={})
+
+        self.assertEqual(mock_session_request.call_count, 1)
+        _, kwargs = mock_session_request.call_args
+        self.assertIs(kwargs['allow_redirects'], False)
 
 
 class ChangelogTenantScopingTests(TestCase):

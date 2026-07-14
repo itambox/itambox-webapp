@@ -13,6 +13,32 @@ from .models import Accessory, AccessoryAssignment, AccessoryStock, Consumable, 
 from .mixins import CheckableInventoryTableMixin
 
 
+class SharePoolActionMixin:
+    """'Share' row action for stock tables (ADR-0001 phase 4b).
+
+    Gated by organization.add_tenantresourcegrant anchored at the POOL —
+    its tenant is the owner, so only owner-side operators see the button.
+    """
+
+    def share_pool_html(self, request, record):
+        if not request or not self.has_perm(
+            request.user, 'organization.add_tenantresourcegrant', record,
+        ):
+            return ''
+        from django.contrib.contenttypes.models import ContentType
+        ct = ContentType.objects.get_for_model(type(record))
+        share_url = reverse(
+            'organization:tenantresourcegrant_add',
+            kwargs={'content_type_id': ct.pk, 'resource_id': record.pk},
+        )
+        return format_html(
+            '  <a class="btn btn-sm btn-action d-flex align-items-center" href="{}" title="{}">'
+            '    <i class="mdi mdi-share-variant-outline me-1"></i> {}'
+            '  </a>',
+            share_url, _('Share this pool with another tenant'), _('Share'),
+        )
+
+
 class AccessoryTable(CheckableInventoryTableMixin, BaseTable):
     pk = ToggleColumn(accessor='pk')
     name = tables.LinkColumn('inventory:accessory_detail', args=[A('pk')], verbose_name=_('Name'))
@@ -37,7 +63,8 @@ class AccessoryTable(CheckableInventoryTableMixin, BaseTable):
             return format_html('<span class="badge bg-warning-lt text-warning font-weight-bold">{} (Low)</span>', value)
         return value
 
-class AccessoryStockTable(BaseTable):
+
+class AccessoryStockTable(SharePoolActionMixin, BaseTable):
     pk = ToggleColumn(accessor='pk')
     accessory = tables.LinkColumn('inventory:accessory_detail', args=[A('accessory.pk')], verbose_name=_('Accessory'))
     location = tables.LinkColumn('organization:location_detail', args=[A('location.pk')], verbose_name=_('Location'))
@@ -60,7 +87,8 @@ class AccessoryStockTable(BaseTable):
     def render_actions(self, record):
         request = getattr(self, 'request', None)
         if not request or not self.has_perm(request.user, 'inventory.change_accessory', record.accessory):
-            return mark_safe('<span class="text-muted small">—</span>')
+            shared = self.share_pool_html(request, record)
+            return shared or mark_safe('<span class="text-muted small">—</span>')
         
         checkout_url = reverse('inventory:accessory_checkout', kwargs={'pk': record.accessory.pk})
         delete_url = reverse('inventory:accessorystock_delete', kwargs={'pk': record.pk})
@@ -89,6 +117,7 @@ class AccessoryStockTable(BaseTable):
             '  <a class="btn btn-sm btn-action btn-action-danger px-2 d-flex align-items-center" href="{}" title="Delete">'
             '    <i class="mdi mdi-trash-can-outline m-0"></i>'
             '  </a>'
+            '{}'
             '</div>',
             add_stock_html,
             checkout_url,
@@ -96,7 +125,8 @@ class AccessoryStockTable(BaseTable):
             checkout_title,
             checkout_title,
             checkout_title,
-            delete_url
+            delete_url,
+            self.share_pool_html(request, record),
         )
 
     def render_qty(self, value, record):
@@ -183,7 +213,8 @@ class ConsumableTable(CheckableInventoryTableMixin, BaseTable):
             return format_html('<span class="badge bg-warning-lt text-warning font-weight-bold">{} (Low Stock)</span>', value)
         return value
 
-class ConsumableStockTable(BaseTable):
+
+class ConsumableStockTable(SharePoolActionMixin, BaseTable):
     pk = ToggleColumn(accessor='pk')
     consumable = tables.LinkColumn('inventory:consumable_detail', args=[A('consumable.pk')], verbose_name=_('Consumable'))
     location = tables.LinkColumn('organization:location_detail', args=[A('location.pk')], verbose_name=_('Location'))
@@ -206,7 +237,8 @@ class ConsumableStockTable(BaseTable):
     def render_actions(self, record):
         request = getattr(self, 'request', None)
         if not request or not self.has_perm(request.user, 'inventory.change_consumable', record.consumable):
-            return mark_safe('<span class="text-muted small">—</span>')
+            shared = self.share_pool_html(request, record)
+            return shared or mark_safe('<span class="text-muted small">—</span>')
         
         checkout_url = reverse('inventory:consumable_checkout', kwargs={'pk': record.consumable.pk})
         delete_url = reverse('inventory:consumablestock_delete', kwargs={'pk': record.pk})
@@ -235,6 +267,7 @@ class ConsumableStockTable(BaseTable):
             '  <a class="btn btn-sm btn-action btn-action-danger px-2 d-flex align-items-center" href="{}" title="Delete">'
             '    <i class="mdi mdi-trash-can-outline m-0"></i>'
             '  </a>'
+            '{}'
             '</div>',
             add_stock_html,
             checkout_url,
@@ -242,7 +275,8 @@ class ConsumableStockTable(BaseTable):
             checkout_title,
             checkout_title,
             checkout_title,
-            delete_url
+            delete_url,
+            self.share_pool_html(request, record),
         )
 
     def render_qty(self, value, record):
@@ -315,7 +349,8 @@ class ComponentTable(CheckableInventoryTableMixin, BaseTable):
         fields = ('pk', 'name', 'manufacturer', 'category', 'part_number', 'total_stock', 'available_stock', 'min_qty', 'tenant', 'tags', 'actions')
         default_columns = ('pk', 'name', 'manufacturer', 'category', 'part_number', 'total_stock', 'available_stock', 'min_qty', 'tenant', 'tags', 'actions')
 
-class ComponentStockTable(BaseTable):
+
+class ComponentStockTable(SharePoolActionMixin, BaseTable):
     pk = ToggleColumn(accessor='pk')
     component = tables.LinkColumn('inventory:component_detail', args=[A('component.pk')], verbose_name=_('Component'))
     location = tables.LinkColumn('organization:location_detail', args=[A('location.pk')], verbose_name=_('Location'))
@@ -338,7 +373,8 @@ class ComponentStockTable(BaseTable):
     def render_actions(self, record):
         request = getattr(self, 'request', None)
         if not request or not self.has_perm(request.user, 'inventory.change_component', record.component):
-            return mark_safe('<span class="text-muted small">—</span>')
+            shared = self.share_pool_html(request, record)
+            return shared or mark_safe('<span class="text-muted small">—</span>')
         
         checkout_url = reverse('inventory:component_checkout', kwargs={'pk': record.component.pk})
         delete_url = reverse('inventory:componentstock_delete', kwargs={'pk': record.pk})
@@ -367,6 +403,7 @@ class ComponentStockTable(BaseTable):
             '  <a class="btn btn-sm btn-action btn-action-danger px-2 d-flex align-items-center" href="{}" title="Delete">'
             '    <i class="mdi mdi-trash-can-outline m-0"></i>'
             '  </a>'
+            '{}'
             '</div>',
             add_stock_html,
             checkout_url,
@@ -374,7 +411,8 @@ class ComponentStockTable(BaseTable):
             checkout_title,
             checkout_title,
             checkout_title,
-            delete_url
+            delete_url,
+            self.share_pool_html(request, record),
         )
 
     def render_qty(self, value, record):

@@ -13,9 +13,49 @@ from decimal import Decimal
 
 User = get_user_model()
 
+
+class _SeededStatusLabelsMixin:
+    """Restore the migration-seeded StatusLabel defaults for this class.
+
+    A TransactionTestCase (here or in an earlier, possibly crashed run against
+    the reused test DB) flushes every table, and flush's post_migrate does NOT
+    re-run data migrations — so the defaults from
+    assets/migrations/0003_seed_status_labels.py can be missing. Each class
+    re-seeds inside its own class-level transaction (idempotent get_or_create;
+    rolls back with the class, so it never pollutes anything else).
+    """
+    @classmethod
+    def setUpTestData(cls):
+        ComponentTrackingTestCase._restore_seeded_status_labels()
+        super().setUpTestData()
+
+
 class ComponentTrackingTestCase(TransactionTestCase):
+    # TransactionTestCase teardown TRUNCATEs every table (flush), which — unlike
+    # TestCase's savepoint rollback — permanently destroys the migration-seeded
+    # StatusLabel defaults (assets/migrations/0003_seed_status_labels.py); flush's
+    # post_migrate does NOT re-run data migrations. serialized_rollback restores
+    # a DB snapshot instead, but in full-suite runs the deserialize collides with
+    # post_migrate-recreated rows (duplicate content types/permissions), so we
+    # deterministically re-seed via the migration's own idempotent function:
+    # before each test here (a prior flush may have emptied the table) and once
+    # after the class for every later module in the session. Unrelated to the
+    # RBAC collapse; found while diagnosing cascading setUp failures.
+
+    @staticmethod
+    def _restore_seeded_status_labels():
+        from importlib import import_module
+        from django.apps import apps as global_apps
+        seed = import_module('assets.migrations.0003_seed_status_labels')
+        seed.seed_status_labels(global_apps, None)
+
+    @classmethod
+    def tearDownClass(cls):
+        super().tearDownClass()
+        cls._restore_seeded_status_labels()
 
     def setUp(self):
+        self._restore_seeded_status_labels()
         self.user = User.objects.create_user(username='testadmin', password='testpassword', is_staff=True, is_superuser=True)
         self.client.login(username='testadmin', password='testpassword')
 
@@ -23,6 +63,12 @@ class ComponentTrackingTestCase(TransactionTestCase):
         self.category = Category.objects.create(name="Memory", slug="memory", applies_to={"component": True})
 
         from organization.models import Site, Location
+        # NOTE: deliberately no tenant on this shared fixture — the global
+        # "tenant field required" form monkey-patch (core/apps.py) activates
+        # for every form in this TransactionTestCase the moment ANY Tenant
+        # row exists in the DB. Tests that need stock (which, per ADR-0001
+        # phase 4, requires a tenant-owned location) create their own
+        # tenant-scoped location locally instead of mutating this shared one.
         self.site = Site.objects.create(name="HQ", slug="hq")
         self.location = Location.objects.create(name="Warehouse", slug="warehouse", site=self.site)
         self.acc_category = Category.objects.create(name="Keyboard", slug="keyboard", applies_to={"accessory": True})
@@ -221,6 +267,18 @@ class ComponentTrackingTestCase(TransactionTestCase):
 
     def test_accessory_crud_and_checkout_views(self):
         from inventory.models import AccessoryStock
+        from organization.models import Tenant
+
+        # ADR-0001 phase 4: stock requires a location owned by a tenant. Use a
+        # tenant-scoped location local to this test (not the shared
+        # self.location) — the moment a Tenant row exists, the global "tenant
+        # field required" form monkey-patch (core/apps.py) kicks in for every
+        # form in this TransactionTestCase, so it must not leak into other
+        # test methods via setUp.
+        tenant = Tenant.objects.create(name="Accessory Crud Co", slug="accessory-crud-co")
+        self.location.tenant = tenant
+        self.location.save(update_fields=['tenant'])
+
         # Create Accessory
         acc = Accessory.objects.create(
             manufacturer=self.manufacturer,
@@ -255,7 +313,11 @@ class ComponentTrackingTestCase(TransactionTestCase):
             'part_number': 'MS-WM126',
             'min_qty': 3,
             'allow_overallocate': True,
-            'notes': 'Office standard mouse'
+            'notes': 'Office standard mouse',
+            # A Tenant now exists in the DB (created above for the stock
+            # location), which flips AccessoryForm's 'tenant' field to
+            # required (core/apps.py's global "tenant required" monkey-patch).
+            'tenant': tenant.pk,
         }
         response = self.client.post(reverse('inventory:accessory_create'), data=post_data)
         self.assertEqual(response.status_code, 302)
@@ -390,7 +452,7 @@ class ComponentTrackingTestCase(TransactionTestCase):
         self.assertFalse(receipt.accepted)
 
 
-class AssetProcurementTestCase(TestCase):
+class AssetProcurementTestCase(_SeededStatusLabelsMixin, TestCase):
     def setUp(self):
         self.user = User.objects.create_user(username='testadmin', password='testpassword', is_staff=True, is_superuser=True)
         self.client.login(username='testadmin', password='testpassword')
@@ -478,7 +540,7 @@ class AssetProcurementTestCase(TestCase):
         self.assertEqual(minimal_asset.supplier, None)
 
 
-class StatusLabelTestCase(TestCase):
+class StatusLabelTestCase(_SeededStatusLabelsMixin, TestCase):
     def setUp(self):
         self.user = User.objects.create_user(username='testadmin', password='testpassword', is_staff=True, is_superuser=True)
         self.client.login(username='testadmin', password='testpassword')
@@ -536,7 +598,7 @@ class StatusLabelTestCase(TestCase):
         self.assertFalse(StatusLabel.objects.filter(slug='archived-awaiting-disposal').exists())
 
 
-class AssetMaintenanceAndLifecycleTestCase(TestCase):
+class AssetMaintenanceAndLifecycleTestCase(_SeededStatusLabelsMixin, TestCase):
     def setUp(self):
         # Create user
         self.user = User.objects.create_user(username='testadmin', password='testpassword', is_staff=True, is_superuser=True)
@@ -789,7 +851,7 @@ class AssetMaintenanceAndLifecycleTestCase(TestCase):
         self.assertContains(response, 'Dell Technologies')
 
 
-class EnterpriseITAMTestCase(TestCase):
+class EnterpriseITAMTestCase(_SeededStatusLabelsMixin, TestCase):
     def setUp(self):
         # Create superuser to bypass permission checks in CBVs
         self.user = User.objects.create_user(username='testadmin', password='testpassword', is_staff=True, is_superuser=True)
@@ -924,7 +986,7 @@ class EnterpriseITAMTestCase(TestCase):
         self.assertContains(response, "Estimated value (indicative)")
 
     def test_atomic_kit_checkout_flow(self):
-        from organization.models import AssetHolder, Site, Location
+        from organization.models import AssetHolder, Site, Location, Tenant
         from software.models import Software
         from licenses.models import License
         from inventory.models import AccessoryStock
@@ -934,15 +996,17 @@ class EnterpriseITAMTestCase(TestCase):
             model="MacBook Pro",
             slug="apple-macbook-pro"
         )
-        
+
         acc_cat = Category.objects.create(
             name="Chargers",
             slug="chargers",
             applies_to={"accessory": True}
         )
 
+        # ADR-0001 phase 4: stock requires a location owned by a tenant.
+        tenant = Tenant.objects.create(name="Enterprise ITAM Co", slug="enterprise-itam-co")
         site = Site.objects.create(name="HQ", slug="hq")
-        location = Location.objects.create(name="Warehouse", slug="warehouse", site=site)
+        location = Location.objects.create(name="Warehouse", slug="warehouse", site=site, tenant=tenant)
 
         charger = Accessory.objects.create(
             manufacturer=self.manufacturer,
@@ -1136,7 +1200,7 @@ class EnterpriseITAMTestCase(TestCase):
         self.assertNotIn(holder_a, holders_qs_kit)
 
 
-class CategoryTestCase(TestCase):
+class CategoryTestCase(_SeededStatusLabelsMixin, TestCase):
     def setUp(self):
         self.user = User.objects.create_user(username='testadmin', password='testpassword', is_staff=True, is_superuser=True)
         self.client.login(username='testadmin', password='testpassword')

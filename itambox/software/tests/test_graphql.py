@@ -4,7 +4,8 @@ from django.contrib.auth import get_user_model
 from core.schema import schema
 from software.models import Software
 from assets.models import Manufacturer
-from organization.models import Tenant, Role, Membership
+from organization.models import Tenant, Role
+from core.tests.mixins import grant
 from itambox.middleware import set_current_tenant
 
 
@@ -27,8 +28,7 @@ class SoftwareGraphQLTenantPinningTestCase(TestCase):
                 'software.change_software', 'software.delete_software',
             ],
         )
-        membership = Membership.objects.create(user=self.user, tenant=self.tenant)
-        membership.roles.add(role)
+        grant(self.user, self.tenant, role)
         set_current_tenant(self.tenant)
         self.manufacturer = Manufacturer.objects.create(name='Acme', slug='acme-sw')
         self.factory = RequestFactory()

@@ -17,6 +17,7 @@ from django.test import TestCase
 from django.contrib.auth import get_user_model
 from django.urls import reverse
 
+from core.tests.mixins import grant
 from organization.models import Tenant, Role, Membership, AssetHolder
 from assets.models import Manufacturer, StatusLabel, Asset
 from software.models import Software
@@ -36,9 +37,8 @@ class SeatCreateCrossTenantTests(TestCase):
             name='Admin',
             permissions=['licenses.add_licenseseatassignment', 'licenses.view_licenseseatassignment'],
         )
-        self.membership_b = Membership.objects.create(user=self.user_b, tenant=self.tenant_b,
-        )
-        self.membership_b.roles.add(self.role_b)
+        self.assignment_b = grant(self.user_b, self.tenant_b, self.role_b)
+        self.membership_b = self.assignment_b.membership
 
         self.mfr = Manufacturer.objects.create(name='Microsoft', slug='microsoft')
 
@@ -89,9 +89,8 @@ class GlobalLicenseMintTests(TestCase):
             name='Admin',
             permissions=['licenses.add_license', 'licenses.view_license'],
         )
-        self.membership_b = Membership.objects.create(user=self.user_b, tenant=self.tenant_b,
-        )
-        self.membership_b.roles.add(self.role_b)
+        self.assignment_b = grant(self.user_b, self.tenant_b, self.role_b)
+        self.membership_b = self.assignment_b.membership
         self.mfr = Manufacturer.objects.create(name='Microsoft', slug='microsoft')
         self.software_b = Software.objects.create(
             name='Office B', manufacturer=self.mfr, tenant=self.tenant_b
@@ -136,8 +135,7 @@ class SeatOverAllocationTests(TestCase):
                 'licenses.change_licenseseatassignment',
             ],
         )
-        m = Membership.objects.create(user=self.user, tenant=self.tenant)
-        m.roles.add(role)
+        grant(self.user, self.tenant, role)
         self.mfr = Manufacturer.objects.create(name='MS', slug='ms-seat')
         self.software = Software.objects.create(name='Office', manufacturer=self.mfr, tenant=self.tenant)
         self.status = StatusLabel.objects.create(name='Deployable Seat', slug='dep-seat', type='deployable')

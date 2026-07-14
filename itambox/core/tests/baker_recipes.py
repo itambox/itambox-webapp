@@ -1,5 +1,5 @@
 from model_bakery.recipe import Recipe, foreign_key
-from organization.models import Tenant, TenantGroup, Role, Membership
+from organization.models import Tenant, TenantGroup, Role, Membership, RoleAssignment
 from django.contrib.auth import get_user_model
 
 User = get_user_model()
@@ -30,12 +30,18 @@ user = Recipe(
     email="testuser@example.com"
 )
 
-# Membership.role was replaced by a `roles` M2M (+ `direct_permissions`),
-# which model_bakery cannot populate via `foreign_key`. The recipe creates a
-# membership with no roles; callers that need one add it after make, e.g.:
-#     m = baker.make_recipe('core.tenant_membership'); m.roles.add(role)
+# A Membership is just the (user, tenant) anchor; what the user may DO is a
+# separate RoleAssignment row. Callers that need a grant use the
+# `role_assignment` recipe below, or `core.tests.mixins.grant(...)`.
 tenant_membership = Recipe(
     Membership,
     user=foreign_key(user),
     tenant=foreign_key(tenant),
+)
+
+role_assignment = Recipe(
+    RoleAssignment,
+    membership=foreign_key(tenant_membership),
+    role=foreign_key(tenant_role),
+    reach=RoleAssignment.REACH_OWN,
 )

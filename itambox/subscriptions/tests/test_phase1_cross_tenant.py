@@ -4,7 +4,8 @@ from django.urls import reverse
 from django.contrib.contenttypes.models import ContentType
 
 from core.managers import set_current_tenant
-from organization.models import Tenant, Role, Membership
+from core.tests.mixins import grant
+from organization.models import Tenant, Role
 from assets.models import Asset, StatusLabel
 from subscriptions.models import Provider, Subscription, SubscriptionAssignment
 
@@ -36,15 +37,13 @@ class SubscriptionAssignmentCrossTenantTests(TestCase):
         self.role_a = Role.objects.create(
             tenant=self.tenant_a, name='Admin', permissions=list(ASSIGNMENT_PERMS)
         )
-        _membership_a = Membership.objects.create(user=self.user_a, tenant=self.tenant_a)
-        _membership_a.roles.add(self.role_a)
+        grant(self.user_a, self.tenant_a, self.role_a)
 
         # Tenant B membership/role (same perms — block must be from scoping, not perms)
         self.role_b = Role.objects.create(
             tenant=self.tenant_b, name='Admin', permissions=list(ASSIGNMENT_PERMS)
         )
-        _membership_b = Membership.objects.create(user=self.user_b, tenant=self.tenant_b)
-        _membership_b.roles.add(self.role_b)
+        grant(self.user_b, self.tenant_b, self.role_b)
 
         # Shared metadata
         self.status = StatusLabel.objects.create(name='Active', slug='active', type='deployable')

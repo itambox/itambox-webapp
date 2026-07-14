@@ -18,6 +18,7 @@ from django.contrib.auth import get_user_model
 
 from organization.models import Tenant, TenantGroup, Role, Membership
 from core.managers import set_current_tenant, set_current_tenant_group
+from core.tests.mixins import grant
 from itambox.middleware import _current_user
 
 User = get_user_model()
@@ -38,8 +39,7 @@ class TenantGroupScopingTests(TestCase):
         self.member = User.objects.create_user(username='tgm', password='pw')
         self.superuser = User.objects.create_superuser(username='tgs', email='s@x.com', password='pw')
         role = Role.objects.create(tenant=self.tenant, name='R', permissions=[])
-        m = Membership.objects.create(user=self.member, tenant=self.tenant)
-        m.roles.add(role)
+        m = grant(self.member, self.tenant, role).membership
 
     def _visible_slugs(self):
         return set(TenantGroup.objects.values_list('slug', flat=True))
@@ -72,8 +72,7 @@ class TenantGroupScopingTests(TestCase):
         # unrelated group they are a member of.
         unrelated_tenant = Tenant.objects.create(name='U', slug='tg-ut', group=self.unrelated)
         role = Role.objects.create(tenant=unrelated_tenant, name='RU', permissions=[])
-        mu = Membership.objects.create(user=self.member, tenant=unrelated_tenant)
-        mu.roles.add(role)
+        mu = grant(self.member, unrelated_tenant, role).membership
 
         _current_user.set(self.member)
         set_current_tenant(None)

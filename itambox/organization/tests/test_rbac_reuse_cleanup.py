@@ -1,208 +1,278 @@
-"""Coverage for the RBAC reuse/cleanup bundle (L5/L6/L7/L9/N1).
+"""Coverage for the RBAC badge helpers after the Provider-collapse (stage 2).
 
-  * L6/L7 -- ``Role.SCOPE_CHOICES`` / ``Membership.KIND_CHOICES`` are the single
-    canonical source for both the filterset choice labels and the badge wording
-    used by ``organization.templatetags.rbac_badges``; every call site must agree,
-    byte-for-byte, on wording, markup, and escaping.
-  * L9 -- ``Membership.is_provider_staff`` is a plain bool, same as its siblings.
-  * N1 -- ``RoleListView.queryset`` must ``select_related('tenant', 'provider')``
-    so ``Role.owner`` never triggers a per-row query on the list page.
+``organization.templatetags.rbac_badges`` is the single source of markup for
+three post-collapse concepts:
+
+  * an assignment's **reach** (``RoleAssignment.reach``: this tenant vs.
+    managed tenants) -- ``reach_badge``
+  * whether a **membership** carries any managed-reach grant at all ("staff")
+    -- ``membership_kind_badge`` (backed by ``Membership.is_staff_membership``)
+  * whether a **role definition** is shared down to managed tenants --
+    ``shared_role_badge``
+
+There is no more role "scope" (``Role.SCOPE_CHOICES`` is gone -- a Role is
+always tenant-owned) and no more membership "kind" field (``Membership``
+carries no KIND_* constants -- staff-ness is derived from its assignments).
+Those choice-label-consistency tests have no successor: the wording they
+guarded no longer exists anywhere to drift. What replaces them here is
+coverage that ``organization/tables.py`` (``RoleTable``/``MembershipTable``)
+actually goes through these helpers and renders without crashing.
 """
-from django.db import connection
 from django.template import Context, Template
 from django.test import TestCase
-from django.test.utils import CaptureQueriesContext
 from django.utils.safestring import SafeString
 
 from core.tests.mixins import TenantTestMixin
-from organization.filters import MembershipFilterSet, RoleFilterSet
-from organization.models import Membership, Provider, Role
-from organization.templatetags.rbac_badges import membership_kind_badge, role_scope_badge
-from organization.views.role_views import RoleListView
+from organization.models import Membership, Role, RoleAssignment, Tenant
+from organization.tables import MembershipTable, RoleTable
+from organization.templatetags.rbac_badges import (
+    membership_kind_badge,
+    reach_badge,
+    shared_role_badge,
+)
 
 
-class KindScopeChoiceLabelConsistencyTests(TestCase):
-    """L7: the filtersets must reference the model's own canonical choices constant,
-    never an independent hand-copied label list -- and the filter VALUES (used in
-    saved URLs / the API) must stay exactly what they were before this cleanup."""
+class ReachBadgeTests(TestCase):
+    """``reach_badge`` is the single source of markup for an assignment's
+    reach: purple for managed reach, blue for own-tenant reach. Accepts
+    either a ``RoleAssignment`` instance or a bare reach value string (some
+    call sites only have the string, not a full row) -- no DB needed."""
 
-    def test_role_scope_choices_wording(self):
-        self.assertEqual(
-            [(value, str(label)) for value, label in Role.SCOPE_CHOICES],
-            [(Role.SCOPE_TENANT, 'Tenant role'), (Role.SCOPE_PROVIDER, 'Provider role')],
-        )
-
-    def test_membership_kind_choices_wording(self):
-        self.assertEqual(
-            [(value, str(label)) for value, label in Membership.KIND_CHOICES],
-            [(Membership.KIND_MEMBER, 'Tenant member'), (Membership.KIND_STAFF, 'Provider staff (technician)')],
-        )
-
-    def test_role_filterset_scope_choices_are_role_scope_choices(self):
-        choices = RoleFilterSet.base_filters['scope'].extra['choices']
-        self.assertEqual(list(choices), list(Role.SCOPE_CHOICES))
-
-    def test_membership_filterset_kind_choices_are_membership_kind_choices(self):
-        choices = MembershipFilterSet.base_filters['kind'].extra['choices']
-        self.assertEqual(list(choices), list(Membership.KIND_CHOICES))
-
-    def test_filter_values_unchanged_for_url_api_stability(self):
-        # Only the label duplication was the debt (L7) -- the values a saved filter
-        # URL or an API query string carries must never move.
-        self.assertEqual([value for value, _label in Role.SCOPE_CHOICES], ['tenant', 'provider'])
-        self.assertEqual([value for value, _label in Membership.KIND_CHOICES], ['member', 'staff'])
-
-    def test_membership_get_kind_display_matches_kind_choices(self):
-        # get_kind_display() is hand-written (kind is a derived @property, not a real
-        # choices field, so there is no Django-generated accessor) -- it must still
-        # agree with KIND_CHOICES exactly.
-        member = Membership(tenant_id=1)
-        staff = Membership(provider_id=1)
-        self.assertEqual(str(member.get_kind_display()), dict(Membership.KIND_CHOICES)[Membership.KIND_MEMBER])
-        self.assertEqual(str(staff.get_kind_display()), dict(Membership.KIND_CHOICES)[Membership.KIND_STAFF])
-
-
-class MembershipIsProviderStaffTests(TestCase):
-    """L9: ``is_provider_staff`` returns a plain bool, matching the truthy style of
-    its siblings (``container``, ``kind``, ``get_kind_display``, ``save()``) -- no
-    behavior change versus the prior ``is not None`` spelling."""
-
-    def test_provider_membership_is_provider_staff(self):
-        self.assertIs(Membership(provider_id=1).is_provider_staff, True)
-
-    def test_tenant_membership_is_not_provider_staff(self):
-        self.assertIs(Membership(tenant_id=1).is_provider_staff, False)
-
-    def test_unbound_membership_is_not_provider_staff(self):
-        self.assertIs(Membership().is_provider_staff, False)
-
-
-class BadgeHelperTests(TenantTestMixin, TestCase):
-    """L6: ``role_scope_badge`` / ``membership_kind_badge`` are the single source of
-    markup for the Role.scope / Membership.kind badges -- every template and
-    django-tables2 ``render_kind`` method goes through them, so wording and markup
-    can never drift apart again. Canonical wording is always the model's own
-    ``get_scope_display()`` / ``get_kind_display()``."""
-
-    def setUp(self):
-        self.setup_tenant_context()
-        self.provider = Provider.objects.create(name='Northwind MSP', slug='northwind-msp')
-        self.tenant_role = Role.objects.create(tenant=self.tenant, name='Ops', permissions=[])
-        self.provider_role = Role.objects.create(
-            provider=self.provider, scope=Role.SCOPE_PROVIDER, name='MSP Ops', permissions=[],
-        )
-
-    def tearDown(self):
-        self.clear_tenant_context()
-
-    # ------------------------------------------------------------------ role_scope_badge
-    def test_tenant_role_badge_no_icon(self):
-        html = role_scope_badge(self.tenant_role)
+    def test_own_reach_badge(self):
+        html = reach_badge(RoleAssignment.REACH_OWN)
         self.assertIsInstance(html, SafeString)
-        self.assertEqual(str(html), '<span class="badge bg-blue-lt text-blue">Tenant role</span>')
+        self.assertEqual(str(html), '<span class="badge bg-blue-lt text-blue">This tenant</span>')
 
-    def test_provider_role_badge_no_icon(self):
-        html = role_scope_badge(self.provider_role)
-        self.assertEqual(str(html), '<span class="badge bg-purple-lt text-purple">Provider role</span>')
+    def test_managed_reach_badge(self):
+        html = reach_badge(RoleAssignment.REACH_MANAGED)
+        self.assertEqual(str(html), '<span class="badge bg-purple-lt text-purple">Managed tenants</span>')
 
-    def test_role_badge_with_icon_uses_the_right_icon_per_scope(self):
-        # role_form.html / role_detail.html use a different icon for each scope
-        # (mdi-domain for provider, mdi-office-building for tenant) -- preserved
-        # exactly by the shared helper.
+    def test_unrecognized_value_defaults_to_own(self):
+        # Defensive default -- a bogus/blank value must never crash, and must
+        # never silently render as the more-privileged-looking "managed" badge.
+        html = reach_badge('bogus')
+        self.assertEqual(str(html), '<span class="badge bg-blue-lt text-blue">This tenant</span>')
+
+    def test_accepts_a_roleassignment_instance(self):
+        # Wording/markup must come from the same branch whether called with the
+        # raw string or the row that carries it (unsaved instance -- no DB hit).
+        assignment = RoleAssignment(reach=RoleAssignment.REACH_MANAGED)
+        self.assertEqual(str(reach_badge(assignment)), str(reach_badge(RoleAssignment.REACH_MANAGED)))
+
+    def test_icon_uses_the_right_icon_per_reach(self):
         self.assertEqual(
-            str(role_scope_badge(self.tenant_role, icon=True)),
+            str(reach_badge(RoleAssignment.REACH_OWN, icon=True)),
             '<span class="badge bg-blue-lt text-blue">'
-            '<i class="mdi mdi-office-building me-1"></i>Tenant role</span>',
+            '<i class="mdi mdi-office-building me-1"></i>This tenant</span>',
         )
         self.assertEqual(
-            str(role_scope_badge(self.provider_role, icon=True)),
+            str(reach_badge(RoleAssignment.REACH_MANAGED, icon=True)),
             '<span class="badge bg-purple-lt text-purple">'
-            '<i class="mdi mdi-domain me-1"></i>Provider role</span>',
+            '<i class="mdi mdi-domain me-1"></i>Managed tenants</span>',
         )
 
-    def test_role_badge_icon_markup_is_not_double_escaped(self):
-        # The icon fragment is itself built with format_html() and then nested inside
-        # the outer format_html() call -- it must come through as literal markup, not
-        # HTML-entity-escaped text.
-        html = str(role_scope_badge(self.provider_role, icon=True))
+    def test_icon_markup_is_not_double_escaped(self):
+        # The icon fragment is built with format_html() and then nested inside
+        # the outer format_html() call -- it must come through as literal
+        # markup, not HTML-entity-escaped text.
+        html = str(reach_badge(RoleAssignment.REACH_MANAGED, icon=True))
         self.assertIn('<i class="mdi mdi-domain me-1"></i>', html)
         self.assertNotIn('&lt;i', html)
         self.assertNotIn('&gt;', html)
 
-    def test_role_badge_extra_class(self):
-        # role_detail.html additionally carries "align-middle ms-2" on the badge.
-        html = role_scope_badge(self.provider_role, icon=True, extra_class='align-middle ms-2')
+    def test_extra_class_is_appended(self):
+        html = reach_badge(RoleAssignment.REACH_MANAGED, icon=True, extra_class='align-middle ms-2')
         self.assertEqual(
             str(html),
             '<span class="badge bg-purple-lt text-purple align-middle ms-2">'
-            '<i class="mdi mdi-domain me-1"></i>Provider role</span>',
+            '<i class="mdi mdi-domain me-1"></i>Managed tenants</span>',
         )
 
-    def test_role_badge_accepts_bool_for_role_form_is_provider_scoped(self):
-        # RoleForm.is_provider_scoped is authoritative before a pk-less instance's own
-        # ``scope`` field is trustworthy (see that property's docstring) -- role_form.html
-        # passes the bare bool, not a Role instance.
-        self.assertEqual(str(role_scope_badge(True)), str(role_scope_badge(self.provider_role)))
-        self.assertEqual(str(role_scope_badge(False)), str(role_scope_badge(self.tenant_role)))
-
-    def test_role_scope_badge_template_tag_matches_python_helper(self):
-        tpl = Template('{% load rbac_badges %}{% role_scope_badge role %}')
-        rendered = tpl.render(Context({'role': self.provider_role}))
-        self.assertEqual(rendered, str(role_scope_badge(self.provider_role)))
-
-    # ------------------------------------------------------------------ membership_kind_badge
-    def test_tenant_member_badge(self):
-        membership = Membership(tenant=self.tenant)
-        html = membership_kind_badge(membership)
-        self.assertIsInstance(html, SafeString)
-        self.assertEqual(str(html), '<span class="badge bg-blue-lt text-blue">Tenant member</span>')
-
-    def test_provider_staff_badge_uses_canonical_wording(self):
-        # Canonical wording is get_kind_display()'s -- "Provider staff (technician)" --
-        # not the old drifted table label "Provider staff".
-        membership = Membership(provider=self.provider)
-        html = membership_kind_badge(membership)
-        self.assertEqual(
-            str(html),
-            '<span class="badge bg-purple-lt text-purple">Provider staff (technician)</span>',
-        )
+    def test_template_tag_matches_python_helper(self):
+        tpl = Template('{% load rbac_badges %}{% reach_badge reach %}')
+        rendered = tpl.render(Context({'reach': RoleAssignment.REACH_MANAGED}))
+        self.assertEqual(rendered, str(reach_badge(RoleAssignment.REACH_MANAGED)))
 
 
-class RoleListQueryCountTests(TenantTestMixin, TestCase):
-    """N1: RoleListView.queryset must select_related the FKs RoleTable.render_container
-    dereferences via Role.owner (tenant XOR provider), or every row triggers its own
-    Tenant/Provider query.
-
-    Filters the (module-level, import-time "baked") queryset down to this test's own
-    rows by pk so the assertion is independent of whatever tenant context happened to
-    be active when the view module was first imported.
-    """
+class MembershipKindBadgeTests(TenantTestMixin, TestCase):
+    """``membership_kind_badge`` shows purple "Staff" iff the membership
+    carries at least one managed-reach ``RoleAssignment``
+    (``Membership.is_staff_membership``); plain blue "Member" otherwise --
+    including a membership with zero assignments. Needs real DB rows: the
+    property queries ``self.assignments``."""
 
     def setUp(self):
         self.setup_tenant_context()
-        self.provider = Provider.objects.create(name='Northwind MSP', slug='northwind-msp')
-        self.role_pks = []
-        for i in range(3):
-            role = Role.objects.create(tenant=self.tenant, name=f'Tenant Role {i}', permissions=[])
-            self.role_pks.append(role.pk)
-        for i in range(3):
-            role = Role.objects.create(
-                provider=self.provider, scope=Role.SCOPE_PROVIDER, name=f'Provider Role {i}', permissions=[],
-            )
-            self.role_pks.append(role.pk)
+        self.msp_tenant = Tenant.objects.create(
+            name='Northwind MSP', slug='northwind-msp', is_provider=True,
+        )
+        self.own_role = Role.objects.create(tenant=self.msp_tenant, name='Local Admin', permissions=[])
+        self.managed_role = Role.objects.create(
+            tenant=self.msp_tenant, name='MSP Technician', permissions=[], shared_with_managed=True,
+        )
 
     def tearDown(self):
         self.clear_tenant_context()
 
-    def test_role_list_queryset_touches_owner_with_a_single_query(self):
-        qs = RoleListView.queryset.filter(pk__in=self.role_pks)
-        with CaptureQueriesContext(connection) as ctx:
-            roles = list(qs)
-            owners = [str(role.owner) if role.owner else '—' for role in roles]
-        self.assertEqual(len(roles), 6)
-        self.assertEqual(len(owners), 6)
-        self.assertEqual(
-            len(ctx.captured_queries), 1,
-            "RoleListView.queryset must select_related('tenant', 'provider') so Role.owner "
-            "never triggers a query per row (N1).",
+    def test_membership_with_no_assignments_is_a_member(self):
+        membership = Membership.objects.create(user=self.tenant_user, tenant=self.msp_tenant)
+        html = membership_kind_badge(membership)
+        self.assertIsInstance(html, SafeString)
+        self.assertEqual(str(html), '<span class="badge bg-blue-lt text-blue">Member</span>')
+
+    def test_membership_with_only_own_reach_is_a_member(self):
+        assignment = self.grant(self.tenant_user, self.msp_tenant, self.own_role)
+        html = membership_kind_badge(assignment.membership)
+        self.assertEqual(str(html), '<span class="badge bg-blue-lt text-blue">Member</span>')
+
+    def test_membership_with_any_managed_reach_assignment_is_staff(self):
+        self.grant(self.tenant_user, self.msp_tenant, self.own_role)
+        assignment = self.grant(
+            self.tenant_user, self.msp_tenant, self.managed_role,
+            reach=RoleAssignment.REACH_MANAGED,
         )
+        html = membership_kind_badge(assignment.membership)
+        self.assertEqual(
+            str(html), '<span class="badge bg-purple-lt text-purple">Staff</span>',
+        )
+
+
+class SharedRoleBadgeTests(TenantTestMixin, TestCase):
+    """``shared_role_badge`` marks a role definition shared down to managed
+    tenants; renders nothing (falsy, not a "No" badge) for an unshared role
+    and for any object with no such attribute at all (defensive getattr)."""
+
+    def setUp(self):
+        self.setup_tenant_context()
+
+    def tearDown(self):
+        self.clear_tenant_context()
+
+    def test_shared_role_shows_the_badge(self):
+        role = Role.objects.create(
+            tenant=self.tenant, name='MSP Technician', permissions=[], shared_with_managed=True,
+        )
+        html = shared_role_badge(role)
+        self.assertIsInstance(html, SafeString)
+        self.assertEqual(str(html), '<span class="badge bg-teal-lt text-teal">Shared</span>')
+
+    def test_unshared_role_renders_nothing(self):
+        role = Role.objects.create(tenant=self.tenant, name='Local Only', permissions=[])
+        self.assertEqual(shared_role_badge(role), '')
+
+    def test_object_without_the_attribute_renders_nothing(self):
+        # Defensive getattr(..., False) -- must not blow up on a bare/partial
+        # object that doesn't carry shared_with_managed at all.
+        self.assertEqual(shared_role_badge(object()), '')
+
+
+class TableRenderingTests(TenantTestMixin, TestCase):
+    """``organization/tables.py`` (``RoleTable``/``MembershipTable``) renders
+    its badge columns through the helpers above -- this is the guard against
+    the tables and the helpers drifting apart again (e.g. a signature change
+    in rbac_badges silently breaking a ``render_*`` method). Every declared
+    column on both tables must render without raising."""
+
+    def setUp(self):
+        self.setup_tenant_context()
+        self.msp_tenant = Tenant.objects.create(
+            name='Northwind MSP', slug='northwind-msp', is_provider=True,
+        )
+        self.customer = Tenant.objects.create(
+            name='Acme Customer', slug='acme-customer', managed_by=self.msp_tenant,
+        )
+
+    def tearDown(self):
+        self.clear_tenant_context()
+
+    # ------------------------------------------------------------------ RoleTable
+    def test_role_table_shared_and_tenant_columns(self):
+        shared_role = Role.objects.create(
+            tenant=self.msp_tenant, name='MSP Technician', permissions=[], shared_with_managed=True,
+        )
+        local_role = Role.objects.create(tenant=self.msp_tenant, name='Local Admin', permissions=[])
+        qs = Role.objects.filter(pk__in=[shared_role.pk, local_role.pk]).select_related('tenant')
+        table = RoleTable(qs)
+        rows_by_pk = {row.record.pk: row for row in table.rows}
+
+        shared_cell = rows_by_pk[shared_role.pk].get_cell('shared')
+        self.assertIn('Shared', shared_cell)
+        self.assertIn('bg-teal-lt', shared_cell)
+
+        unshared_cell = rows_by_pk[local_role.pk].get_cell('shared')
+        self.assertEqual(unshared_cell, '—')
+
+        tenant_cell = rows_by_pk[shared_role.pk].get_cell('tenant')
+        self.assertIn(self.msp_tenant.get_absolute_url(), tenant_cell)
+        self.assertIn('Northwind MSP', tenant_cell)
+
+    def test_role_table_full_render_does_not_crash(self):
+        role = Role.objects.create(
+            tenant=self.msp_tenant, name='MSP Technician', permissions=[], shared_with_managed=True,
+        )
+        qs = RoleTable.Meta.model.objects.filter(pk=role.pk).select_related('tenant')
+        table = RoleTable(qs)
+        row = table.rows[0]
+        for name in RoleTable.Meta.fields:
+            row.get_cell(name)  # must not raise
+
+    # ------------------------------------------------------------------ MembershipTable
+    def test_membership_table_kind_badge_and_role_links(self):
+        own_role = Role.objects.create(tenant=self.msp_tenant, name='Local Admin', permissions=[])
+        managed_role = Role.objects.create(
+            tenant=self.msp_tenant, name='MSP Technician', permissions=[], shared_with_managed=True,
+        )
+
+        member_assignment = self.grant(self.tenant_user, self.msp_tenant, own_role)
+        member_membership = member_assignment.membership
+
+        staff_user = self.tenant_admin
+        self.grant(staff_user, self.msp_tenant, own_role)
+        staff_assignment = self.grant(
+            staff_user, self.msp_tenant, managed_role, reach=RoleAssignment.REACH_MANAGED,
+        )
+        staff_membership = staff_assignment.membership
+
+        qs = Membership.objects.filter(
+            pk__in=[member_membership.pk, staff_membership.pk],
+        ).select_related('user', 'tenant')
+        table = MembershipTable(qs)
+        rows_by_pk = {row.record.pk: row for row in table.rows}
+
+        member_kind_cell = rows_by_pk[member_membership.pk].get_cell('kind')
+        self.assertIn('Member', member_kind_cell)
+        self.assertIn('bg-blue-lt', member_kind_cell)
+
+        staff_kind_cell = rows_by_pk[staff_membership.pk].get_cell('kind')
+        self.assertIn('Staff', staff_kind_cell)
+        self.assertIn('bg-purple-lt', staff_kind_cell)
+
+        # An own-reach grant's link carries no reach badge; a managed-reach
+        # grant's link does (RoleAssignment.reach == REACH_MANAGED check in
+        # MembershipTable.render_roles).
+        member_roles_cell = rows_by_pk[member_membership.pk].get_cell('roles')
+        self.assertIn(own_role.name, member_roles_cell)
+        self.assertNotIn('badge', member_roles_cell)
+
+        staff_roles_cell = rows_by_pk[staff_membership.pk].get_cell('roles')
+        self.assertIn(own_role.name, staff_roles_cell)
+        self.assertIn(managed_role.name, staff_roles_cell)
+        self.assertIn('bg-purple-lt', staff_roles_cell)
+
+    def test_membership_table_renders_none_placeholder_with_no_assignments(self):
+        membership = Membership.objects.create(user=self.tenant_admin, tenant=self.customer)
+        qs = Membership.objects.filter(pk=membership.pk).select_related('user', 'tenant')
+        table = MembershipTable(qs)
+        cell = table.rows[0].get_cell('roles')
+        self.assertIn('none', cell.lower())
+
+    def test_membership_table_full_render_does_not_crash(self):
+        role = Role.objects.create(tenant=self.msp_tenant, name='Local Admin', permissions=[])
+        assignment = self.grant(self.tenant_user, self.msp_tenant, role)
+        qs = MembershipTable.Meta.model.objects.filter(
+            pk=assignment.membership.pk,
+        ).select_related('user', 'tenant')
+        table = MembershipTable(qs)
+        row = table.rows[0]
+        for name in MembershipTable.Meta.fields:
+            row.get_cell(name)  # must not raise

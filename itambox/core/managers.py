@@ -7,7 +7,6 @@ import contextvars
 _current_tenant = contextvars.ContextVar('current_tenant', default=None)
 _current_tenant_group = contextvars.ContextVar('current_tenant_group', default=None)
 _current_membership = contextvars.ContextVar('current_membership', default=None)
-_current_provider_membership = contextvars.ContextVar('current_provider_membership', default=None)
 _descendant_group_ids_cache = contextvars.ContextVar('descendant_group_ids_cache', default=None)
 
 def set_current_tenant(tenant: Optional[Any]) -> None:
@@ -30,15 +29,6 @@ def set_current_membership(membership: Optional[Any]) -> None:
 
 def get_current_membership() -> Optional[Any]:
     return _current_membership.get()
-
-def set_current_provider_membership(membership: Optional[Any]) -> None:
-    # The user's Membership for the active tenant's provider (if any). Set by
-    # TenantMiddleware; available to views that need provider context. Does not affect
-    # ORM tenant scoping (provider staff still operate one tenant at a time).
-    _current_provider_membership.set(membership)
-
-def get_current_provider_membership() -> Optional[Any]:
-    return _current_provider_membership.get()
 
 
 
@@ -64,6 +54,28 @@ class AllObjectsManager(models.Manager.from_queryset(SoftDeleteQuerySet)):
 
 
 class TenantScopingQuerySet(models.QuerySet):
+    @staticmethod
+    def _member_visible_group_ids(user):
+        """The set of TenantGroup ids that contain a tenant ``user`` can access.
+
+        Derived from the canonical ``accessible_tenant_ids`` (direct memberships +
+        UserGroup-derived + managed reach), not direct Membership rows alone, so a
+        member reaching a tenant only through a group grant or managed reach still
+        sees that tenant's group. ``_base_manager`` (unscoped) keeps this off the
+        tenant-scoped path and avoids recursion back into ``filter_by_tenant``.
+        """
+        from django.apps import apps
+        # inline imports: avoid a core.managers -> organization import cycle at load.
+        from organization.access import accessible_tenant_ids
+        Tenant = apps.get_model('organization', 'Tenant')
+        accessible = accessible_tenant_ids(user)
+        group_ids = set(
+            Tenant._base_manager.filter(pk__in=accessible)
+            .values_list('group_id', flat=True)
+        )
+        group_ids.discard(None)
+        return group_ids
+
     def filter_by_tenant(self) -> QuerySet:
         active_tenant = get_current_tenant()
         active_group = get_current_tenant_group()
@@ -84,14 +96,24 @@ class TenantScopingQuerySet(models.QuerySet):
 
                 TenantGroup = apps.get_model('organization', 'TenantGroup')
                 descendant_ids = [group_id]
+                seen = {group_id}
                 to_check = [group_id]
                 while to_check:
                     # _base_manager (unscoped): TenantGroup.objects is itself
                     # tenant-scoped now, so using it here would recurse back into
                     # filter_by_tenant. The descendant walk needs the true tree.
-                    children = list(TenantGroup._base_manager.filter(parent_id__in=to_check, deleted_at__isnull=True).values_list('pk', flat=True))
+                    # exclude(seen): a parent cycle in bad data must terminate the
+                    # walk, not hang every scoped request (mirrors the cycle-safe
+                    # walk in organization.access.get_descendant_tenant_group_ids).
+                    children = list(
+                        TenantGroup._base_manager
+                        .filter(parent_id__in=to_check, deleted_at__isnull=True)
+                        .exclude(pk__in=seen)
+                        .values_list('pk', flat=True)
+                    )
                     if not children:
                         break
+                    seen.update(children)
                     descendant_ids.extend(children)
                     to_check = children
                 cache[group_id] = descendant_ids
@@ -104,12 +126,24 @@ class TenantScopingQuerySet(models.QuerySet):
                 from itambox.middleware import get_current_user
                 user = get_current_user()
                 if user and user.is_superuser:
-                    allowed_tenant_ids = list(Tenant._base_manager.filter(group_id__in=allowed_group_ids).values_list('pk', flat=True))
+                    allowed_tenant_ids = list(Tenant._base_manager.filter(group_id__in=allowed_group_ids, deleted_at__isnull=True).values_list('pk', flat=True))
                 elif user:
-                    from organization.models import Membership
-                    allowed_tenant_ids = list(Membership.objects.filter(user=user, tenant__group_id__in=allowed_group_ids).values_list('tenant_id', flat=True))
+                    # A member's group scope must cover EVERY tenant they can reach
+                    # in the group — direct memberships, UserGroup-derived tenants,
+                    # and managed-reach tenants — not just direct Membership rows, so
+                    # a reach-only tenant does not vanish after "Show All". Intersect
+                    # the canonical accessible set with the group subtree.
+                    # inline imports: avoid a core.managers -> organization cycle at load.
+                    from organization.access import accessible_tenant_ids
+                    accessible = accessible_tenant_ids(user)
+                    allowed_tenant_ids = list(
+                        Tenant._base_manager.filter(
+                            pk__in=accessible, group_id__in=allowed_group_ids,
+                            deleted_at__isnull=True,
+                        ).values_list('pk', flat=True)
+                    )
                 else:
-                    allowed_tenant_ids = list(Tenant._base_manager.filter(group_id__in=allowed_group_ids).values_list('pk', flat=True))
+                    allowed_tenant_ids = list(Tenant._base_manager.filter(group_id__in=allowed_group_ids, deleted_at__isnull=True).values_list('pk', flat=True))
 
             # If the query is for the Tenant model itself:
             if self.model._meta.model_name == 'tenant':
@@ -155,30 +189,22 @@ class TenantScopingQuerySet(models.QuerySet):
                     scope_ids = expand_to_ancestors(get_descendant_group_ids(active_group.pk))
                     if tg_user is None or getattr(tg_user, 'is_superuser', False):
                         return self.filter(pk__in=scope_ids)
-                    # A member never sees a group they hold no membership in (e.g. a
-                    # descendant/sibling group inside the scoped subtree): intersect
-                    # the scope with their own accessible groups + ancestors. The
-                    # scoped group itself always survives — middleware only grants a
-                    # group scope to a member with a tenant directly in that group.
-                    from organization.models import Membership
-                    member_group_ids = set(
-                        Membership.objects.filter(user=tg_user)
-                        .values_list('tenant__group_id', flat=True)
-                    )
-                    member_group_ids.discard(None)
+                    # A member never sees a group none of their ACCESSIBLE tenants
+                    # sit in (e.g. a descendant/sibling group inside the scoped
+                    # subtree): intersect the scope with the groups of every tenant
+                    # they can reach (direct, UserGroup, or managed) plus ancestors.
+                    # The scoped group itself always survives — middleware only grants
+                    # a group scope to a member who can access a tenant in it.
+                    member_group_ids = self._member_visible_group_ids(tg_user)
                     return self.filter(pk__in=(scope_ids & expand_to_ancestors(member_group_ids)))
 
                 # No explicit group scope (single-tenant scope): superusers and
                 # system/anonymous contexts see all; a member sees the groups
-                # containing a tenant they belong to, plus those groups' ancestors.
+                # containing a tenant they can ACCESS (direct, UserGroup, or
+                # managed), plus those groups' ancestors.
                 if tg_user is None or getattr(tg_user, 'is_superuser', False):
                     return self
-                from organization.models import Membership
-                member_group_ids = set(
-                    Membership.objects.filter(user=tg_user)
-                    .values_list('tenant__group_id', flat=True)
-                )
-                member_group_ids.discard(None)
+                member_group_ids = self._member_visible_group_ids(tg_user)
                 return self.filter(pk__in=expand_to_ancestors(member_group_ids))
 
             allowed_group_ids = []

@@ -11,7 +11,7 @@ from django.test import TestCase, RequestFactory
 from django.contrib.auth import get_user_model
 
 from assets.models import Manufacturer
-from organization.models import Site, Location, AssetHolder
+from organization.models import Site, Location, AssetHolder, Tenant
 from inventory.models import (
     Accessory, AccessoryStock, AccessoryAssignment,
     Consumable, ConsumableStock, ConsumableAssignment,
@@ -29,10 +29,11 @@ class AccessoryStockFanoutTests(TestCase):
     aggregate by the other relation's row count."""
 
     def setUp(self):
+        self.tenant = Tenant.objects.create(name="Tenant Fanout Acc", slug="tenant-fanout-acc")
         self.manufacturer = Manufacturer.objects.create(name='Logitech', slug='logitech')
-        self.site = Site.objects.create(name='Warehouse', slug='warehouse')
-        self.loc_a = Location.objects.create(name='Shelf A', slug='shelf-a', site=self.site)
-        self.loc_b = Location.objects.create(name='Shelf B', slug='shelf-b', site=self.site)
+        self.site = Site.objects.create(name='Warehouse', slug='warehouse', tenant=self.tenant)
+        self.loc_a = Location.objects.create(name='Shelf A', slug='shelf-a', site=self.site, tenant=self.tenant)
+        self.loc_b = Location.objects.create(name='Shelf B', slug='shelf-b', site=self.site, tenant=self.tenant)
         self.holder1 = AssetHolder.objects.create(first_name='Jane', last_name='Doe', upn='jane.doe')
         self.holder2 = AssetHolder.objects.create(first_name='John', last_name='Roe', upn='john.roe')
 
@@ -81,10 +82,11 @@ class ConsumableStockFanoutTests(TestCase):
     """Consumable has the same bug across stocks x consumptions."""
 
     def setUp(self):
+        self.tenant = Tenant.objects.create(name="Tenant Fanout Con", slug="tenant-fanout-con")
         self.manufacturer = Manufacturer.objects.create(name='HP', slug='hp')
-        self.site = Site.objects.create(name='Depot', slug='depot')
-        self.loc_a = Location.objects.create(name='Bin A', slug='bin-a', site=self.site)
-        self.loc_b = Location.objects.create(name='Bin B', slug='bin-b', site=self.site)
+        self.site = Site.objects.create(name='Depot', slug='depot', tenant=self.tenant)
+        self.loc_a = Location.objects.create(name='Bin A', slug='bin-a', site=self.site, tenant=self.tenant)
+        self.loc_b = Location.objects.create(name='Bin B', slug='bin-b', site=self.site, tenant=self.tenant)
         self.holder1 = AssetHolder.objects.create(first_name='Amy', last_name='Lee', upn='amy.lee')
         self.holder2 = AssetHolder.objects.create(first_name='Bob', last_name='Kim', upn='bob.kim')
 

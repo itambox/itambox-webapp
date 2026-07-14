@@ -58,6 +58,7 @@ urlpatterns = [
     path('tenants/<int:pk>/edit/', views.TenantEditView.as_view(), name='tenant_update'),
     path('tenants/<int:pk>/delete/', views.TenantDeleteView.as_view(), name='tenant_delete'),
     path('tenants/<int:pk>/access/', views.TenantAccessView.as_view(), name='tenant_access'),
+    path('tenants/<int:pk>/managed/', views.TenantManagedTenantsTabView.as_view(), name='tenant_managed_tenants_tab'),
     path('tenants/<int:pk>/ldap-sync/', views.tenant_ldap_sync, name='tenant_ldap_sync'),
 
     # Asset Holders
@@ -93,7 +94,7 @@ urlpatterns = [
     path('contact-assignments/add/', views.ContactAssignmentCreateView.as_view(), name='contactassignment_create'),
     path('contact-assignments/<int:pk>/delete/', views.ContactAssignmentDeleteView.as_view(), name='contactassignment_delete'),
 
-    # Roles (unified — tenant- and provider-scoped)
+    # Roles (tenant-owned permission sets)
     path('roles/', views.RoleListView.as_view(), name='role_list'),
     path('roles/add/', views.RoleEditView.as_view(), name='role_create'),
     path('roles/delete/', views.RoleBulkDeleteView.as_view(), name='role_bulk_delete'),
@@ -104,6 +105,12 @@ urlpatterns = [
     path('roles/<int:pk>/assign/', views.RoleAssignUsersView.as_view(), name='role_assign_users'),
 
     # Cost Centers
+    path('resource-grants/', views.TenantResourceGrantListView.as_view(), name='tenantresourcegrant_list'),
+    path('resource-grants/add/<int:content_type_id>/<int:resource_id>/',
+         views.TenantResourceGrantCreateView.as_view(), name='tenantresourcegrant_add'),
+    path('resource-grants/<int:pk>/delete/', views.TenantResourceGrantRevokeView.as_view(),
+         name='tenantresourcegrant_delete'),
+
     path('cost-centers/', views.CostCenterListView.as_view(), name='costcenter_list'),
     path('cost-centers/add/', views.CostCenterEditView.as_view(), name='costcenter_create'),
     path('cost-centers/edit/', views.CostCenterBulkEditView.as_view(), name='costcenter_bulk_edit'),
@@ -112,17 +119,6 @@ urlpatterns = [
     path('cost-centers/<int:pk>/edit/', views.CostCenterEditView.as_view(), name='costcenter_update'),
     path('cost-centers/<int:pk>/clone/', views.CostCenterCloneView.as_view(), name='costcenter_clone'),
     path('cost-centers/<int:pk>/delete/', views.CostCenterDeleteView.as_view(), name='costcenter_delete'),
-
-    # Invitations
-    path('invite-user/', views.InviteUserView.as_view(), name='invite_user'),
-    path('accept-invitation/<uuid:token>/', views.AcceptInvitationView.as_view(), name='accept_invitation'),
-
-    # Providers (MSP)
-    path('providers/', views.ProviderListView.as_view(), name='provider_list'),
-    path('providers/add/', views.ProviderEditView.as_view(), name='provider_create'),
-    path('providers/<int:pk>/', views.ProviderDetailView.as_view(), name='provider_detail'),
-    path('providers/<int:pk>/edit/', views.ProviderEditView.as_view(), name='provider_update'),
-    path('providers/<int:pk>/delete/', views.ProviderDeleteView.as_view(), name='provider_delete'),
 
     # Quick onboarding
     path('onboard/technician/', views.TechnicianQuickAddView.as_view(), name='technician_quick_add'),

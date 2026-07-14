@@ -17,7 +17,7 @@ from extras.dashboard.forms import DashboardWidgetAddForm, DashboardWidgetConfig
 from extras.dashboard.utils import get_dashboard, get_default_dashboard
 from extras.dashboard.widgets import get_widget, get_registered_widgets
 from extras.models import Dashboard
-from organization.access import accessible_provider_ids, accessible_tenant_ids
+from organization.access import accessible_tenant_ids
 from organization.models import Tenant, Membership
 
 
@@ -355,9 +355,7 @@ class DashboardView(LoginRequiredMixin, BaseHTMXView, TemplateView):
         # tenant-less dashboard, show a "no accessible workspace" landing page.
         # Superusers legitimately operate with no membership, so they are exempt.
         user = request.user
-        if not user.is_superuser and (
-            not accessible_tenant_ids(user) and not accessible_provider_ids(user)
-        ):
+        if not user.is_superuser and not accessible_tenant_ids(user):
             return TemplateResponse(
                 request, 'registration/no_workspace.html', status=403,
             )

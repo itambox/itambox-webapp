@@ -6,6 +6,7 @@ from django.utils import timezone
 from organization.models import Tenant, Membership, Role, AssetHolder
 from users.models import Token, UserGroup
 from rest_framework import status
+from core.tests.mixins import grant
 
 User = get_user_model()
 
@@ -44,11 +45,8 @@ class SCIMProvisioningTests(TestCase):
             ]
         )
 
-        # Create Tenant Memberships — create first, then add roles (no role= kwarg).
-        admin_membership = Membership.objects.create(user=self.admin_user,
-            tenant=self.tenant,
-        )
-        admin_membership.roles.add(self.role_admin)
+        # Create Tenant Memberships — grant() creates the membership + assignment together.
+        admin_membership = grant(self.admin_user, self.tenant, self.role_admin).membership
 
         # Setup tokens — tenant is explicit (not left to the model's current-tenant-context
         # fallback) so each token is unambiguously scoped to self.tenant, matching the URLs
@@ -136,10 +134,9 @@ class SCIMProvisioningTests(TestCase):
         self.assertEqual(data["totalResults"], 1)
         self.assertEqual(data["Resources"][0]["userName"], self.admin_user.username)
 
-        # Create another user in tenant to test filters — create membership, then add role.
+        # Create another user in tenant to test filters.
         user2 = User.objects.create_user(username="user2", email="user2@acme.com")
-        m2 = Membership.objects.create(user=user2, tenant=self.tenant)
-        m2.roles.add(self.role_member)
+        grant(user2, self.tenant, self.role_member)
 
         # Total count is 2
         response = self.client.get(url, **self.auth_headers)
@@ -188,7 +185,7 @@ class SCIMProvisioningTests(TestCase):
         self.assertTrue(user.is_active)
 
         membership = Membership.objects.get(user=user, tenant=self.tenant)
-        self.assertFalse(membership.roles.exists())
+        self.assertFalse(membership.assignments.exists())
 
         holder = AssetHolder.objects.get(user=user, tenant=self.tenant)
         self.assertEqual(holder.email, "newuser@example.com")
@@ -234,10 +231,9 @@ class SCIMProvisioningTests(TestCase):
         self.assertEqual(unlinked_holder.user, user)
 
     def test_user_detail_put_patch_delete(self):
-        # Create user — create membership, then add role.
+        # Create user with a role via the standard grant helper.
         user = User.objects.create_user(username="testuser", email="test@acme.com")
-        m = Membership.objects.create(user=user, tenant=self.tenant)
-        m.roles.add(self.role_member)
+        grant(user, self.tenant, self.role_member)
         AssetHolder.objects.create(
             user=user, first_name="Test", last_name="User", upn="test@acme.com", email="test@acme.com", tenant=self.tenant
         )
@@ -353,8 +349,7 @@ class SCIMProvisioningTests(TestCase):
     def test_filter_parsing_bracketed_emails(self):
         url = reverse('api:scim:user-list', kwargs={'tenant_slug': self.tenant.slug})
         user2 = User.objects.create_user(username="user2", email="user2@acme.com")
-        m2 = Membership.objects.create(user=user2, tenant=self.tenant)
-        m2.roles.add(self.role_member)
+        grant(user2, self.tenant, self.role_member)
 
         response = self.client.get(f"{url}?filter=emails[type eq \"work\"].value eq \"user2@acme.com\"", **self.auth_headers)
         self.assertEqual(response.status_code, status.HTTP_200_OK)
@@ -398,8 +393,7 @@ class SCIMProvisioningTests(TestCase):
         shared = User.objects.create_user(username="shared", email="shared@x.com", is_active=True)
         Membership.objects.create(user=shared, tenant=self.tenant)
         other_role = Role.objects.create(tenant=self.other_tenant, name="Member", permissions=[])
-        other_m = Membership.objects.create(user=shared, tenant=self.other_tenant)
-        other_m.roles.add(other_role)
+        grant(shared, self.other_tenant, other_role)
 
         detail_url = reverse('api:scim:user-detail', kwargs={'tenant_slug': self.tenant.slug, 'pk': shared.id})
         patch_payload = {
@@ -430,13 +424,11 @@ class SCIMProvisioningTests(TestCase):
         backend = TenantMembershipBackend()
 
         shared = User.objects.create_user(username="shared2", email="shared2@x.com", is_active=True)
-        m_this = Membership.objects.create(user=shared, tenant=self.tenant)
-        m_this.roles.add(self.role_member)
+        grant(shared, self.tenant, self.role_member)
         other_role = Role.objects.create(
             tenant=self.other_tenant, name="Member", permissions=["assets.view_asset"]
         )
-        m_other = Membership.objects.create(user=shared, tenant=self.other_tenant)
-        m_other.roles.add(other_role)
+        grant(shared, self.other_tenant, other_role)
 
         # Baseline: the membership grants access in this tenant.
         self.assertTrue(backend.has_perm(User.objects.get(pk=shared.pk), 'assets.view_asset', obj=self.tenant))
@@ -474,8 +466,7 @@ class SCIMProvisioningTests(TestCase):
         """Control for WS1-3: a user whose ONLY membership is this tenant is still fully
         updatable (the guard must not over-block single-tenant users)."""
         solo = User.objects.create_user(username="solo", email="solo@acme.com", is_active=True)
-        m = Membership.objects.create(user=solo, tenant=self.tenant)
-        m.roles.add(self.role_member)
+        grant(solo, self.tenant, self.role_member)
         detail_url = reverse('api:scim:user-detail', kwargs={'tenant_slug': self.tenant.slug, 'pk': solo.id})
         put_payload = {
             "schemas": ["urn:ietf:params:scim:schemas:core:2.0:User"],
@@ -496,8 +487,7 @@ class SCIMProvisioningTests(TestCase):
         leak usernames."""
         foreign_role = Role.objects.create(tenant=self.other_tenant, name="Member", permissions=[])
         foreign_user = User.objects.create_user(username="foreignuser", email="foreign@other.com")
-        fm = Membership.objects.create(user=foreign_user, tenant=self.other_tenant)
-        fm.roles.add(foreign_role)
+        grant(foreign_user, self.other_tenant, foreign_role)
 
         list_url = reverse('api:scim:group-list', kwargs={'tenant_slug': self.tenant.slug})
         payload = {

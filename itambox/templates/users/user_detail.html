@@ -1,5 +1,6 @@
 {% extends 'generic/object_detail.html' %}
 {% load i18n %}
+{% load rbac_badges %}
 
 {% block object_details %}
 <div class="table-responsive">
@@ -87,18 +88,15 @@
             <div class="list-group-item d-flex justify-content-between align-items-center">
                 <div>
                     <i class="mdi mdi-domain me-1"></i>
-                    <strong>{% if membership.tenant_id %}{{ membership.tenant.name }}{% else %}{{ membership.provider.name }}{% endif %}</strong>
-                    <span class="badge bg-secondary-lt ms-1">{{ membership.get_kind_display }}</span>
-                    {% with roles=membership.roles.all %}
-                    {% if roles %}
-                    ({% for r in roles %}{{ r.name }}{% if not forloop.last %}, {% endif %}{% endfor %})
+                    <strong>{{ membership.tenant.name }}</strong>
+                    {% membership_kind_badge membership %}
+                    {% with assignments=membership.assignments.all %}
+                    {% if assignments %}
+                    ({% for assignment in assignments %}{{ assignment.role.name }}{% if assignment.reach == 'managed' %} {% reach_badge assignment %}{% endif %}{% if not forloop.last %}, {% endif %}{% endfor %})
                     {% else %}
                     <span class="text-muted small">({% translate "no roles" %})</span>
                     {% endif %}
                     {% endwith %}
-                    {% if membership.direct_permissions %}
-                    <span class="badge bg-secondary-lt ms-1" title="{% translate "Direct permission grants" %}">+{{ membership.direct_permissions|length }}</span>
-                    {% endif %}
                 </div>
                 <a href="{% url 'organization:membership_delete' pk=membership.pk %}" class="btn btn-sm btn-outline-danger" title="{% translate "Remove Membership" %}">
                     <i class="mdi mdi-trash-can-outline"></i>
