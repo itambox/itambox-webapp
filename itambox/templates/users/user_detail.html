@@ -90,9 +90,9 @@
                     <i class="mdi mdi-domain me-1"></i>
                     <strong>{{ membership.tenant.name }}</strong>
                     {% membership_kind_badge membership %}
-                    {% with assignments=membership.assignments.all %}
-                    {% if assignments %}
-                    ({% for assignment in assignments %}{{ assignment.role.name }}{% if assignment.reach == 'managed' %} {% reach_badge assignment %}{% endif %}{% if not forloop.last %}, {% endif %}{% endfor %})
+                    {% with grants=membership.role_grants.all %}
+                    {% if grants %}
+                    ({% for grant in grants %}{{ grant.role.name }}{% if grant.reach == 'managed' %} {% reach_badge grant %}{% endif %}{% if not forloop.last %}, {% endif %}{% endfor %})
                     {% else %}
                     <span class="text-muted small">({% translate "no roles" %})</span>
                     {% endif %}

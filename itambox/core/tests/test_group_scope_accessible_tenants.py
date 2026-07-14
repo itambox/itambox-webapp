@@ -16,8 +16,15 @@ from core.managers import (
 )
 from core.tests.mixins import grant
 from itambox.middleware import _current_user
-from organization.models import Tenant, TenantGroup, Role, RoleAssignment
-from users.models import UserGroup
+from organization.models import (
+    Membership,
+    Role,
+    RoleGrant,
+    RoleGrantScope,
+    Tenant,
+    TenantGroup,
+)
+from users.models import GroupMembership, UserGroup
 
 User = get_user_model()
 
@@ -65,7 +72,8 @@ class GroupScopeAccessibleTenantsTests(TestCase):
         user = User.objects.create_user(username=username, password='pw')
         grant(
             user, self.provider, self.tech_role,
-            reach=RoleAssignment.REACH_MANAGED, managed_scope=RoleAssignment.SCOPE_EXPLICIT,
+            reach=RoleGrant.REACH_MANAGED,
+            managed_scope=RoleGrantScope.SCOPE_TENANT,
             assigned_tenants=assigned,
         )
         return user
@@ -78,10 +86,15 @@ class GroupScopeAccessibleTenantsTests(TestCase):
 
     def test_usergroup_derived_tenant_stays_visible_under_its_group(self):
         ug_user = User.objects.create_user(username='ws5_ug', password='pw')
-        role_a = Role.objects.create(tenant=self.cust_a, name='A Local', permissions=[])
         ug = UserGroup.objects.create(name='WS5 Team', slug='ws5-team', tenant=self.provider)
-        ug.roles.add(role_a)
-        ug.members.add(ug_user)
+        membership = Membership.objects.create(user=ug_user, tenant=self.provider)
+        GroupMembership.objects.create(user_group=ug, membership=membership)
+        group_grant = RoleGrant.objects.create(user_group=ug, role=self.tech_role)
+        RoleGrantScope.objects.create(
+            role_grant=group_grant,
+            scope_type=RoleGrantScope.SCOPE_TENANT,
+            tenant=self.cust_a,
+        )
         slugs = self._visible_tenant_slugs(ug_user, self.region)
         self.assertIn('ws5-a', slugs)
         self.assertNotIn('ws5-b', slugs)
@@ -92,7 +105,8 @@ class GroupScopeAccessibleTenantsTests(TestCase):
         grant(user, self.cust_a, role_a)  # direct membership in A
         grant(
             user, self.provider, self.tech_role,
-            reach=RoleAssignment.REACH_MANAGED, managed_scope=RoleAssignment.SCOPE_EXPLICIT,
+            reach=RoleGrant.REACH_MANAGED,
+            managed_scope=RoleGrantScope.SCOPE_TENANT,
             assigned_tenants=[self.cust_b],
         )  # managed reach to B
         slugs = self._visible_tenant_slugs(user, self.region)
@@ -144,7 +158,8 @@ class GroupVisibilityAccessibleTests(TestCase):
         staff = User.objects.create_user(username='ws5g_staff', password='pw')
         grant(
             staff, self.provider, self.tech,
-            reach=RoleAssignment.REACH_MANAGED, managed_scope=RoleAssignment.SCOPE_EXPLICIT,
+            reach=RoleGrant.REACH_MANAGED,
+            managed_scope=RoleGrantScope.SCOPE_TENANT,
             assigned_tenants=[self.cust],
         )
         _current_user.set(staff)

@@ -7,17 +7,20 @@ from django.db.models import Count, ProtectedError, Q
 from django.http import Http404, HttpResponseRedirect
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse, reverse_lazy
+from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
 from django.views.generic import View
 
-from core.auth.guards import validate_assignment_grant
+from core.auth.guards import validate_role_grant
+from core.mfa import role_is_privileged
 from itambox.views.generic import (
     ObjectListView, ObjectDetailView, ObjectEditView, ObjectDeleteView,
     ObjectBulkDeleteView, ObjectCloneView,
 )
+from itambox.views.generic.mixins import filter_permitted_rows
 from itambox.views.generic.utils import safe_return_url
 
-from ..models import Role, Membership, RoleAssignment, Tenant
+from ..models import Role, Membership, RoleGrant, RoleGrantScope, Tenant
 from ..forms import RoleForm, RoleFilterForm, RoleAssignUsersForm
 from ..forms.role_form import MATRIX_MODELS, CUSTOM_PERMISSIONS
 from ..tables import RoleTable
@@ -30,12 +33,28 @@ def _roles_visible_in(tenant):
     outside the active tenant's scope."""
     q = Q(tenant=tenant)
     if tenant.managed_by_id:
-        q |= Q(tenant_id=tenant.managed_by_id, shared_with_managed=True)
+        q |= Q(
+            tenant_id=tenant.managed_by_id,
+            tenant__is_provider=True,
+            shared_with_managed=True,
+        )
     return Role._base_manager.filter(deleted_at__isnull=True).filter(q)
 
 
 def _annotate_member_count(qs):
-    return qs.annotate(member_count=Count('assignments__membership', distinct=True))
+    live_grants = (
+        Q(role_grants__valid_until__isnull=True)
+        | Q(role_grants__valid_until__gt=timezone.now())
+    )
+    return qs.annotate(member_count=Count(
+        'role_grants__membership',
+        filter=(
+            live_grants
+            & Q(role_grants__membership__is_active=True)
+            & Q(role_grants__scopes__isnull=False)
+        ),
+        distinct=True,
+    ))
 
 
 class RoleListView(ObjectListView):
@@ -82,7 +101,11 @@ class RoleDetailView(ObjectDetailView):
             return False  # non-superuser global context: fail closed
         if role.tenant_id == active.pk:  # owner context
             return user.has_perm('organization.view_role', obj=role)
-        if role.shared_with_managed and active.managed_by_id == role.tenant_id:
+        if (
+            role.shared_with_managed
+            and role.tenant.is_provider
+            and active.managed_by_id == role.tenant_id
+        ):
             # Shared-in: authorize against the managed tenant, not the provider role.
             return user.has_perm('organization.view_role', obj=active)
         return False  # fail closed
@@ -109,7 +132,14 @@ class RoleDetailView(ObjectDetailView):
         members_url = f"{reverse('organization:membership_list')}?role={role.pk}"
         if active is not None:
             member_count = (
-                RoleAssignment.objects.filter(role=role, membership__tenant=active)
+                RoleGrant.objects.filter(
+                    role=role,
+                    membership__tenant=active,
+                    membership__is_active=True,
+                    scopes__isnull=False,
+                ).filter(
+                    Q(valid_until__isnull=True) | Q(valid_until__gt=timezone.now())
+                )
                 .values('membership_id').distinct().count()
             )
         else:
@@ -121,6 +151,7 @@ class RoleDetailView(ObjectDetailView):
             active is not None
             and active.managed_by_id == role.tenant_id
             and role.shared_with_managed
+            and role.tenant.is_provider
         )
         # Never link the owning-tenant name to a page the viewer cannot open: link
         # only when they may view that tenant, otherwise the template renders plain
@@ -142,7 +173,7 @@ class RoleDetailView(ObjectDetailView):
         if not role_editable:
             # Edit/Delete must not surface on a shared-in role viewed from a managed
             # tenant, even for a superuser: ``has_perm(obj=role)`` resolves against
-            # the role's OWNING tenant (RoleAssignment-agnostic superuser bypass in
+            # the role's OWNING tenant (RoleGrant-agnostic superuser bypass in
             # MembershipBackend.has_perm), so ``can_change``/``can_delete`` can be
             # True here while RoleEditView's tenant-scoped queryset still 404s on
             # this pk. role_editable is the authoritative gate for this page.
@@ -214,18 +245,25 @@ class RoleDeleteView(ObjectDeleteView):
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         role = self.object
-        # Role.delete() is a soft delete (SoftDeleteMixin): RoleAssignment rows
-        # survive it (RoleAssignment.survive_parent_soft_delete) as the audit
+        # Role.delete() is a soft delete (SoftDeleteMixin): RoleGrant rows
+        # survive it (RoleGrant.survive_parent_soft_delete) as the audit
         # trail, but a deleted role's permissions stop projecting everywhere
         # immediately (MembershipBackend checks role.deleted_at). Surface that
         # explicitly when other tenants actually hold live grants against this
         # shared definition — deleting it is not undone by "it's just soft".
-        if role.shared_with_managed and RoleAssignment.objects.filter(
-            role=role, membership__tenant__managed_by_id=role.tenant_id,
+        if role.shared_with_managed and RoleGrant.objects.filter(
+            role=role,
+            scopes__scope_type__in=(
+                RoleGrantScope.SCOPE_TENANT,
+                RoleGrantScope.SCOPE_TENANT_GROUP,
+                RoleGrantScope.SCOPE_ALL_MANAGED,
+            ),
+        ).filter(
+            Q(valid_until__isnull=True) | Q(valid_until__gt=timezone.now())
         ).exists():
             context['extra_warning'] = _(
                 "This role is shared with managed tenants and still has active "
-                "assignments there. Deleting it does not remove those grants — "
+                "managed scopes. Deleting it does not remove those grants — "
                 "they survive as an audit trail but immediately stop granting "
                 "access."
             )
@@ -248,8 +286,19 @@ class RoleBulkDeleteView(ObjectBulkDeleteView):
             messages.warning(request, _("No roles were selected."))
             return HttpResponseRedirect(return_url)
 
-        queryset = self._get_queryset(pks)
-        objects_to_delete = list(queryset)
+        # The dispatch gate is ambient: in a tenant-group scope it passes when
+        # ``delete_role`` is held in any accessible tenant. Re-anchor the check
+        # at each role's owning tenant before deleting a mixed-tenant selection.
+        objects_to_delete, skipped = filter_permitted_rows(
+            request.user, self._get_queryset(pks), model, 'delete',
+        )
+        if skipped:
+            messages.warning(request, _(
+                "Skipped %(count)s %(objects)s you do not have permission to delete."
+            ) % {
+                'count': skipped,
+                'objects': model._meta.verbose_name_plural,
+            })
         if not objects_to_delete:
             messages.warning(request, _("No valid roles selected for deletion."))
             return HttpResponseRedirect(return_url)
@@ -264,7 +313,7 @@ class RoleBulkDeleteView(ObjectBulkDeleteView):
                 messages.success(request, _("Deleted %(count)d role(s).") % {'count': count})
                 return HttpResponseRedirect(return_url)
             except ProtectedError:
-                blocked = ', '.join(str(o) for o in objects_to_delete if o.assignments.exists())
+                blocked = ', '.join(str(o) for o in objects_to_delete if o.role_grants.exists())
                 messages.error(
                     request,
                     _("Cannot delete: the following roles are still referenced and are protected: %(names)s.") % {'names': blocked},
@@ -291,7 +340,7 @@ class RoleBulkDeleteView(ObjectBulkDeleteView):
 
 class RoleAssignUsersView(LoginRequiredMixin, View):
     """Bulk-add users to a Role: get_or_create a Membership at the role's tenant
-    plus an own-reach RoleAssignment per user."""
+    plus a direct RoleGrant with an own-tenant scope per user."""
     template_name = 'organization/roles/role_assign_users.html'
 
     def _get_role(self, pk):
@@ -308,8 +357,11 @@ class RoleAssignUsersView(LoginRequiredMixin, View):
     def _guard_grant(self, request, role):
         """Privilege-escalation guard for granting this role at its own tenant."""
         try:
-            validate_assignment_grant(
-                request.user, role, role.tenant, reach=RoleAssignment.REACH_OWN,
+            validate_role_grant(
+                request.user,
+                role,
+                role.tenant,
+                scope_type=RoleGrantScope.SCOPE_OWN,
             )
         except ValidationError as e:
             raise PermissionDenied(", ".join(e.messages))
@@ -319,7 +371,11 @@ class RoleAssignUsersView(LoginRequiredMixin, View):
         if not self._check_perms(request, role):
             raise PermissionDenied
         self._guard_grant(request, role)
-        return render(request, self.template_name, {'role': role, 'form': RoleAssignUsersForm()})
+        return render(
+            request,
+            self.template_name,
+            {'role': role, 'form': RoleAssignUsersForm(role=role)},
+        )
 
     def post(self, request, pk, *args, **kwargs):
         role = self._get_role(pk)
@@ -327,9 +383,11 @@ class RoleAssignUsersView(LoginRequiredMixin, View):
             raise PermissionDenied
         self._guard_grant(request, role)
 
-        form = RoleAssignUsersForm(request.POST)
+        form = RoleAssignUsersForm(request.POST, role=role)
         if form.is_valid():
             users = form.cleaned_data['users']
+            reason = form.cleaned_data.get('reason') or ''
+            valid_until = form.cleaned_data.get('valid_until')
             added = updated = unchanged = 0
             with transaction.atomic():
                 for user in users:
@@ -337,13 +395,37 @@ class RoleAssignUsersView(LoginRequiredMixin, View):
                         user=user, tenant=role.tenant,
                         defaults={'is_active': True},
                     )
-                    _assignment, assignment_created = RoleAssignment.objects.get_or_create(
-                        membership=membership, role=role, reach=RoleAssignment.REACH_OWN,
-                        defaults={'granted_by': request.user},
-                    )
+                    existing_own = RoleGrant.objects.filter(
+                        membership=membership,
+                        role=role,
+                        scopes__scope_type=RoleGrantScope.SCOPE_OWN,
+                    ).filter(
+                        Q(valid_until__isnull=True) | Q(valid_until__gt=timezone.now())
+                    ).first()
+                    grant_created = False
+                    scope_created = False
+                    if existing_own is None:
+                        elevated = role_is_privileged(role)
+                        grant = RoleGrant(
+                            membership=membership,
+                            role=role,
+                            granted_by=request.user,
+                            reason=reason if elevated else '',
+                            valid_until=valid_until if elevated else None,
+                        )
+                        grant.full_clean()
+                        grant.save()
+                        grant_created = True
+                        scope = RoleGrantScope(
+                            role_grant=grant,
+                            scope_type=RoleGrantScope.SCOPE_OWN,
+                        )
+                        scope.full_clean()
+                        scope.save()
+                        scope_created = True
                     if membership_created:
                         added += 1
-                    elif assignment_created:
+                    elif grant_created or scope_created:
                         updated += 1
                     else:
                         unchanged += 1

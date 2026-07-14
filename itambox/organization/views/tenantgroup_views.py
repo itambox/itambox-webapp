@@ -26,7 +26,6 @@ class TenantGroupListView(ObjectListView):
     table = TenantGroupTable
     action_buttons = ('add',)
 
-
 class TenantGroupDetailView(ObjectDetailView):
     queryset = TenantGroup.objects.prefetch_related(
         'children', 'tags', 'tenants'

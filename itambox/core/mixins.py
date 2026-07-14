@@ -234,7 +234,7 @@ class SoftDeleteMixin(models.Model):
                             # Non-soft-deletable cascade children are physically
                             # deleted with the (soft-deleted!) parent — EXCEPT
                             # models opting out via survive_parent_soft_delete
-                            # (e.g. RoleAssignment: grant rows are audit trail
+                            # (e.g. RoleGrant: grant rows are audit trail
                             # and must outlive a soft-deleted Role so a restore
                             # re-arms them). They still cascade on hard delete.
                             if getattr(instance, 'survive_parent_soft_delete', False):
@@ -298,5 +298,4 @@ class SubscribableMixin(models.Model):
     def __init_subclass__(cls, **kwargs):
         super().__init_subclass__(**kwargs)
         registry.register_feature(cls, 'subscribable')
-
 

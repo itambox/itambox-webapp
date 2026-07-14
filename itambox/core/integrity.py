@@ -18,6 +18,8 @@ from dataclasses import dataclass, field
 
 from django.apps import apps
 
+from core.mfa import role_is_privileged
+
 # Classification of a (resource-owner tenant, other-party tenant) pair.
 CLASS_SAME_TENANT = 'same-tenant'
 CLASS_PROVIDER_MANAGED = 'provider-to-managed'
@@ -637,136 +639,165 @@ def check_custody_receipts(topology=None):
 
 # --------------------------------------------------------------------------- 8
 def check_rbac_grants(topology=None):
-    """RBAC grants whose role owner and principal tenant are inconsistent.
-
-    Legitimate shapes today (and under ADR-0001):
-      * own-reach grant of a role owned by the membership's tenant;
-      * own-reach grant of a provider role with ``shared_with_managed=True``
-        to a membership in a tenant managed by that provider;
-      * managed-reach grant of a provider-owned role on a membership in that
-        same provider tenant, covering tenants it still manages.
-    Everything else is flagged. UserGroups additionally violate the target
-    design when they have no owning tenant, carry roles owned by another
-    tenant, or contain members without an active membership in the owning
-    tenant (candidates for the phase-5 GroupMembership backfill).
-    """
+    """Find malformed canonical RoleGrant aggregates and group principals."""
     topo = topology or TenantTopology()
-    return _check_role_assignments(topo) + _check_user_groups(topo)
+    return _check_role_grants(topo) + _check_group_memberships(topo)
 
 
-def _own_reach_finding(topo, a):
-    """Finding for an inconsistent own-reach RoleAssignment, or None."""
-    m_tenant_id = a.membership.tenant_id
-    role_tenant_id = a.role.tenant_id
-    if role_tenant_id == m_tenant_id:
+def _own_scope_finding(topo, grant):
+    """Return a finding for an invalid own scope, or None."""
+    owner_id = grant.principal_tenant_id
+    role_tenant_id = grant.role.tenant_id
+    if role_tenant_id == owner_id:
         return None
     shared_ok = (
-        a.role.shared_with_managed
-        and topo.tenants.get(m_tenant_id, {}).get('managed_by_id') == role_tenant_id
+        grant.membership_id
+        and grant.role.shared_with_managed
+        and topo.tenants.get(role_tenant_id, {}).get('is_provider')
+        and topo.tenants.get(owner_id, {}).get('managed_by_id') == role_tenant_id
     )
     if shared_ok:
         return None
     return Finding(
         check='rbac_grant_inconsistent',
-        model='organization.RoleAssignment', pk=a.pk,
-        summary=(f'RoleAssignment #{a.pk} (own reach): role '
-                 f'"{a.role.name}" owned by "{topo.name(role_tenant_id)}" granted '
-                 f'to a membership in "{topo.name(m_tenant_id)}" without a valid '
+        model='organization.RoleGrant', pk=grant.pk,
+        summary=(f'RoleGrant #{grant.pk} (own scope): role '
+                 f'"{grant.role.name}" owned by "{topo.name(role_tenant_id)}" granted '
+                 f'to a principal in "{topo.name(owner_id)}" without a valid '
                  f'shared-role relationship'),
-        classification=topo.classify(role_tenant_id, m_tenant_id),
-        details={'role_id': a.role_id, 'role_tenant_id': role_tenant_id,
-                 'membership_id': a.membership_id,
-                 'membership_tenant_id': m_tenant_id,
-                 'shared_with_managed': a.role.shared_with_managed},
+        classification=topo.classify(role_tenant_id, owner_id),
+        details={'role_id': grant.role_id, 'role_tenant_id': role_tenant_id,
+                 'membership_id': grant.membership_id,
+                 'user_group_id': grant.user_group_id,
+                 'principal_tenant_id': owner_id,
+                 'shared_with_managed': grant.role.shared_with_managed},
     )
 
 
-def _managed_reach_finding(topo, a, RoleAssignment):
-    """Finding for an inconsistent managed-reach RoleAssignment, or None."""
-    m_tenant_id = a.membership.tenant_id
-    role_tenant_id = a.role.tenant_id
+def _managed_scope_finding(topo, grant, scope):
+    """Return a finding for an invalid managed scope, or None."""
+    owner_id = grant.principal_tenant_id
+    role_tenant_id = grant.role.tenant_id
     problems = []
-    if not topo.tenants.get(m_tenant_id, {}).get('is_provider'):
-        problems.append('membership tenant is not a provider')
-    if role_tenant_id != m_tenant_id:
+    if not topo.tenants.get(owner_id, {}).get('is_provider'):
+        problems.append('principal tenant is not a provider')
+    if role_tenant_id != owner_id:
         problems.append(
-            f'managed-reach role must be owned by the granting provider, '
+            f'managed-scope role must be owned by the granting provider, '
             f'but is owned by "{topo.name(role_tenant_id)}"')
-    if a.managed_scope == RoleAssignment.SCOPE_TENANT_GROUP and not a.scope_group_id:
+    if scope.scope_type == 'tenant_group' and not scope.tenant_group_id:
         problems.append('tenant_group scope without a scope group')
-    if a.managed_scope != RoleAssignment.SCOPE_TENANT_GROUP and a.scope_group_id:
-        problems.append('scope group set but managed_scope is not tenant_group')
     stale = []
-    if (a.managed_scope or RoleAssignment.SCOPE_EXPLICIT) == RoleAssignment.SCOPE_EXPLICIT:
-        Tenant = apps.get_model('organization', 'Tenant')
-        for t_id, managed_by_id in Tenant._base_manager.filter(
-                reach_assignments=a).values_list('pk', 'managed_by_id'):
-            if managed_by_id != m_tenant_id:
-                stale.append(t_id)
-        if stale:
-            problems.append(
-                f'explicit coverage includes tenant(s) no longer managed by '
-                f'the provider: {sorted(stale)}')
+    if scope.scope_type == 'tenant' and scope.tenant_id:
+        managed_by_id = topo.tenants.get(scope.tenant_id, {}).get('managed_by_id')
+        if managed_by_id != owner_id:
+            stale.append(scope.tenant_id)
+            problems.append('target tenant is no longer managed by the provider')
     if not problems:
         return None
     return Finding(
         check='rbac_grant_inconsistent',
-        model='organization.RoleAssignment', pk=a.pk,
-        summary=f'RoleAssignment #{a.pk} (managed reach): ' + '; '.join(problems),
+        model='organization.RoleGrant', pk=grant.pk,
+        summary=f'RoleGrant #{grant.pk} (managed scope): ' + '; '.join(problems),
         classification=CLASS_INVALID,
-        details={'role_id': a.role_id, 'role_tenant_id': role_tenant_id,
-                 'membership_id': a.membership_id,
-                 'membership_tenant_id': m_tenant_id,
-                 'managed_scope': a.managed_scope,
+        details={'role_id': grant.role_id, 'role_tenant_id': role_tenant_id,
+                 'membership_id': grant.membership_id,
+                 'user_group_id': grant.user_group_id,
+                 'principal_tenant_id': owner_id,
+                 'scope_type': scope.scope_type,
                  'stale_tenant_ids': sorted(stale)},
     )
 
 
-def _check_role_assignments(topo):
-    RoleAssignment = apps.get_model('organization', 'RoleAssignment')
+def _check_role_grants(topo):
+    RoleGrant = apps.get_model('organization', 'RoleGrant')
     findings = []
-    assignments = RoleAssignment._base_manager.select_related(
-        'membership', 'membership__tenant', 'role', 'scope_group',
-    ).filter(role__deleted_at__isnull=True)
-    for a in assignments:
-        if a.reach == RoleAssignment.REACH_OWN:
-            finding = _own_reach_finding(topo, a)
-        else:
-            finding = _managed_reach_finding(topo, a, RoleAssignment)
-        if finding is not None:
-            findings.append(finding)
+    grants = RoleGrant._base_manager.select_related(
+        'membership', 'membership__tenant', 'user_group', 'user_group__tenant',
+        'role', 'role__tenant',
+    ).prefetch_related('scopes').filter(role__deleted_at__isnull=True)
+    for grant in grants:
+        has_membership = grant.membership_id is not None
+        has_group = grant.user_group_id is not None
+        if has_membership == has_group:
+            findings.append(Finding(
+                check='rbac_grant_inconsistent',
+                model='organization.RoleGrant', pk=grant.pk,
+                summary=f'RoleGrant #{grant.pk} does not have exactly one principal',
+                classification=CLASS_INVALID,
+                details={},
+            ))
+            continue
+        if has_group and grant.role.tenant_id != grant.user_group.tenant_id:
+            findings.append(Finding(
+                check='rbac_grant_inconsistent',
+                model='organization.RoleGrant', pk=grant.pk,
+                summary=(f'RoleGrant #{grant.pk}: group and role have different owners'),
+                classification=topo.classify(
+                    grant.user_group.tenant_id, grant.role.tenant_id,
+                ),
+                details={'user_group_id': grant.user_group_id,
+                         'role_id': grant.role_id},
+            ))
+        scopes = list(grant.scopes.all())
+        if not scopes:
+            findings.append(Finding(
+                check='rbac_grant_inconsistent',
+                model='organization.RoleGrant', pk=grant.pk,
+                summary=f'RoleGrant #{grant.pk} has no scope',
+                classification=CLASS_INVALID,
+                details={},
+            ))
+        if has_membership:
+            if role_is_privileged(grant.role) and (
+                not (grant.reason or '').strip() or grant.valid_until is None
+            ):
+                findings.append(Finding(
+                    check='rbac_grant_inconsistent',
+                    model='organization.RoleGrant', pk=grant.pk,
+                    summary=(f'RoleGrant #{grant.pk}: elevated direct grant lacks '
+                             f'a reason or expiration'),
+                    classification=CLASS_INVALID,
+                    details={'membership_id': grant.membership_id,
+                             'role_id': grant.role_id},
+                ))
+        for scope in scopes:
+            finding = (
+                _own_scope_finding(topo, grant)
+                if scope.scope_type == 'own'
+                else _managed_scope_finding(topo, grant, scope)
+            )
+            if finding is not None:
+                findings.append(finding)
     return findings
 
 
-def _group_member_findings(topo, group, Membership):
-    """Findings for group members lacking an active membership in the owner."""
+def _group_membership_findings(topo, group):
+    """Find GroupMembership rows that do not belong to the group owner."""
     findings = []
-    member_ids = {u.pk for u in group.members.all()}
-    if not member_ids:
-        return findings
-    with_membership = set(Membership._base_manager.filter(
-        tenant_id=group.tenant_id, user_id__in=member_ids,
-        is_active=True,
-    ).values_list('user_id', flat=True))
-    for user_id in sorted(member_ids - with_membership):
-        findings.append(Finding(
-            check='rbac_group_inconsistent',
-            model='users.UserGroup', pk=group.pk,
-            summary=(f'UserGroup #{group.pk} "{group.name}": member user '
-                     f'#{user_id} has no active membership in owning tenant '
-                     f'"{topo.name(group.tenant_id)}"'),
-            classification=CLASS_AMBIGUOUS,
-            details={'user_id': user_id, 'tenant_id': group.tenant_id},
-        ))
+    for link in group.group_memberships.all():
+        if link.membership.tenant_id != group.tenant_id:
+            findings.append(Finding(
+                check='rbac_group_inconsistent',
+                model='users.GroupMembership', pk=link.pk,
+                summary=(f'GroupMembership #{link.pk}: membership tenant '
+                         f'"{topo.name(link.membership.tenant_id)}" differs from '
+                         f'group owner "{topo.name(group.tenant_id)}"'),
+                classification=topo.classify(
+                    group.tenant_id, link.membership.tenant_id,
+                ),
+                details={'user_group_id': group.pk,
+                         'membership_id': link.membership_id},
+            ))
     return findings
 
 
-def _check_user_groups(topo):
+def _check_group_memberships(topo):
     UserGroup = apps.get_model('users', 'UserGroup')
-    Membership = apps.get_model('organization', 'Membership')
-    Role = apps.get_model('organization', 'Role')
     findings = []
-    groups = _live(UserGroup._base_manager.filter(is_active=True)).prefetch_related('members')
+    groups = _live(UserGroup._base_manager.filter(is_active=True)).prefetch_related(
+        'group_memberships__membership',
+    )
     for group in groups:
         if group.tenant_id is None:
             findings.append(Finding(
@@ -777,24 +808,8 @@ def _check_user_groups(topo):
                 classification=CLASS_AMBIGUOUS,
                 details={},
             ))
-        # NOTE: group.roles.all() would go through Role's tenant-scoped default
-        # manager (M2M related managers derive from _default_manager) and
-        # silently hide foreign-tenant roles under an active-tenant context —
-        # fetch the role rows unscoped instead.
-        if group.tenant_id is not None:
-            for role in Role._base_manager.filter(
-                    user_groups=group, deleted_at__isnull=True,
-            ).exclude(tenant_id=group.tenant_id):
-                findings.append(Finding(
-                    check='rbac_group_inconsistent',
-                    model='users.UserGroup', pk=group.pk,
-                    summary=(f'UserGroup #{group.pk} "{group.name}" (owner '
-                             f'"{topo.name(group.tenant_id)}") carries role "{role.name}" '
-                             f'owned by "{topo.name(role.tenant_id)}"'),
-                    classification=topo.classify(group.tenant_id, role.tenant_id),
-                    details={'role_id': role.pk, 'role_tenant_id': role.tenant_id},
-                ))
-            findings += _group_member_findings(topo, group, Membership)
+        else:
+            findings += _group_membership_findings(topo, group)
     return findings
 
 

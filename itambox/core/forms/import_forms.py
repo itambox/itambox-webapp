@@ -42,6 +42,15 @@ IMPORT_EXCLUDED_MODELS = frozenset({
     'extras.scheduledreport', 'extras.reporttemplate',
     # Other config (relations / JSON / secrets)
     'extras.eventrule', 'extras.webhookendpoint', 'extras.dashboard',
+    # Authentication and canonical RBAC aggregates. The generic importer is an
+    # UPSERT surface built from raw model fields; using it here would bypass
+    # RoleForm/MembershipForm escalation checks, group provenance, scoped-grant
+    # validation, and User privilege controls. These objects are administered
+    # only through their security-aware UI/API/directory workflows.
+    'organization.membership', 'organization.role',
+    'organization.rolegrant', 'organization.rolegrantscope',
+    'organization.tenantresourcegrant',
+    'users.groupmembership', 'users.token', 'users.user', 'users.usergroup',
 })
 
 

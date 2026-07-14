@@ -5,8 +5,8 @@ The narrative is a **Managed Service Provider (MSP)** — "Northwind Managed
 Services" — that runs its own internal IT and manages IT for a handful of
 customers across regulated industries (pharma, banking, asset management, plus
 a few smaller single-tenant clients). MSP staff hold one membership at the
-managing (``is_provider``) tenant with managed-reach role assignments into the
-customer tenants, which is what makes the multi-tenant story tangible.
+managing (``is_provider``) tenant with scoped role grants into the customer
+tenants, which is what makes the multi-tenant story tangible.
 
 Every app is touched with realistic, headcount-driven daily data: organization
 hierarchy, access (users/roles/memberships), assets + assignments + custody,
@@ -133,7 +133,7 @@ class Command(SeedCatalogMixin, SeedOrganizationsMixin, SeedAccessMixin, SeedAss
             ('inventory', 'Component'), ('inventory', 'Accessory'), ('inventory', 'Consumable'),
             ('licenses', 'License'), ('software', 'Software'),
             ('subscriptions', 'Subscription'), ('subscriptions', 'Provider'),
-            ('organization', 'RoleAssignment'),
+            ('organization', 'RoleGrantScope'), ('organization', 'RoleGrant'),
             ('organization', 'Membership'),
             ('organization', 'Role'),
             ('organization', 'ContactAssignment'), ('organization', 'Contact'),

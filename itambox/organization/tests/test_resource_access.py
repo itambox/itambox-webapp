@@ -170,6 +170,41 @@ class ResolveStockAccessTests(TenantTestMixin, TestCase):
         assert decision.reason == REASON_GROUP_GRANT
         assert decision.grant == grant_row
 
+    def test_group_grant_becomes_inert_when_ancestor_group_is_deleted(self):
+        middle_group = TenantGroup.objects.create(
+            name='RA Middle',
+            slug='ra-middle',
+            parent=self.root_group,
+        )
+        self.child_group.parent = middle_group
+        self.child_group.save(update_fields=['parent'])
+        grant_row = self._use_grant(
+            grantee_tenant=None,
+            grantee_tenant_group=self.root_group,
+        )
+        before = resolve_stock_access(
+            self.tech,
+            self.stock,
+            TenantResourceGrant.ACCESS_USE,
+            PERM,
+            active_tenant=self.grantee,
+        )
+        assert before.allowed
+
+        middle_group.delete()
+
+        grant_row.refresh_from_db()
+        assert grant_row.deleted_at is None
+        after = resolve_stock_access(
+            self.tech,
+            self.stock,
+            TenantResourceGrant.ACCESS_USE,
+            PERM,
+            active_tenant=self.grantee,
+        )
+        assert not after.allowed
+        assert after.reason == DENIED_NO_GRANT
+
     def test_group_grant_on_own_group(self):
         self._use_grant(grantee_tenant=None, grantee_tenant_group=self.child_group)
         decision = resolve_stock_access(

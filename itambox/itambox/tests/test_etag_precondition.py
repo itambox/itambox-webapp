@@ -16,6 +16,7 @@ from rest_framework import status
 from rest_framework.test import APITestCase
 
 from assets.models import Manufacturer
+from core.tests.mixins import grant
 from software.models import Software
 
 User = get_user_model()
@@ -33,7 +34,7 @@ class ETagPreconditionTests(APITestCase):
         self.staff.set_password('password123')
         self.staff.save()
 
-        from organization.models import Tenant, Role, Membership, RoleAssignment
+        from organization.models import Role, Tenant
         self.tenant = baker.make(Tenant, name='Test Tenant', slug='test-tenant')
         self.role = baker.make(
             Role,
@@ -46,12 +47,7 @@ class ETagPreconditionTests(APITestCase):
                 'software.delete_software',
             ],
         )
-        self.membership = baker.make(
-            Membership,
-            user=self.staff,
-            tenant=self.tenant,
-        )
-        RoleAssignment.objects.create(membership=self.membership, role=self.role)
+        self.membership = grant(self.staff, self.tenant, self.role).membership
 
         self.manufacturer = baker.make(Manufacturer, name='Microsoft', slug='microsoft')
         self.software = baker.make(

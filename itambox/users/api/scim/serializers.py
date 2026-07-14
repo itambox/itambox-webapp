@@ -1,8 +1,7 @@
 from rest_framework import serializers
 from django.contrib.auth import get_user_model
-from django.utils import timezone
 from organization.models import Membership
-from users.models import UserGroup
+from users.models import GroupMembership, UserGroup
 
 User = get_user_model()
 
@@ -58,9 +57,14 @@ class SCIMUserSerializer(serializers.ModelSerializer):
         tenant = self.context.get('tenant')
         if not tenant:
             return []
-        # Groups are cross-tenant; report the ones this user belongs to that grant a
-        # role in THIS tenant (SCIM /Groups maps to UserGroup, scoped per tenant for read).
-        user_groups = UserGroup.objects.filter(members=obj, roles__tenant=tenant).distinct()
+        # SCIM group discovery is ownership-scoped. Provider groups projected into
+        # this tenant are authorization details, not directory groups owned by the
+        # customer, and must not leak through its SCIM endpoint.
+        user_groups = UserGroup.objects.filter(
+            tenant=tenant,
+            group_memberships__membership__user=obj,
+            group_memberships__membership__tenant=tenant,
+        ).distinct()
         return [
             {
                 'value': str(g.id),
@@ -96,16 +100,24 @@ class SCIMGroupSerializer(serializers.ModelSerializer):
         return ["urn:ietf:params:scim:schemas:core:2.0:Group"]
 
     def get_members(self, obj):
-        # Member $ref URLs are built from the request's tenant slug in context (the
-        # group's own owning tenant is a SCIM-scoping detail, not a URL source here).
+        # A group contains tenant Membership principals, never arbitrary global users.
+        # The owner predicate is redundant for valid rows, but keeps serialization
+        # fail-closed if pre-constraint data is ever imported.
         tenant_slug = self.context.get('tenant_slug', '')
+        group_memberships = GroupMembership.objects.filter(
+            user_group=obj,
+            membership__tenant=obj.tenant,
+        ).select_related('membership__user')
         return [
             {
-                'value': str(user.id),
-                'display': user.username,
-                '$ref': f"/api/tenants/{tenant_slug}/scim/v2/Users/{user.id}"
+                'value': str(group_membership.membership.user_id),
+                'display': group_membership.membership.user.username,
+                '$ref': (
+                    f"/api/tenants/{tenant_slug}/scim/v2/Users/"
+                    f"{group_membership.membership.user_id}"
+                ),
             }
-            for user in obj.members.all()
+            for group_membership in group_memberships
         ]
 
     def get_meta(self, obj):

@@ -8,10 +8,11 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 from rest_framework.permissions import IsAuthenticated
 
+from core.auth.guards import validate_group_membership_grant
 from core.managers import set_current_tenant
 from itambox.middleware import set_current_user
 from organization.models import Tenant, Membership
-from users.models import UserGroup
+from users.models import GroupMembership, UserGroup
 from users.api.scim.serializers import (
     SCIMUserSerializer, SCIMGroupSerializer, SCIMServiceProviderConfigSerializer
 )
@@ -25,8 +26,8 @@ User = get_user_model()
 _UNSET = object()
 
 
-def sync_provider_group_members(tenant, group, member_ids):
-    """Reconcile ``group.members`` to ``member_ids``, restricted to staff of ``tenant``.
+def sync_provider_group_members(tenant, group, member_ids, *, actor):
+    """Reconcile canonical group memberships to owning-provider staff.
 
     ``tenant`` is the managing (``is_provider``) tenant this SCIM endpoint is mounted
     for. Only users with an active ``Membership`` in THIS tenant may be added. A
@@ -35,17 +36,18 @@ def sync_provider_group_members(tenant, group, member_ids):
     enumeration oracle). New staff are provisioned exclusively through SCIM /Users;
     unknown or non-staff ids are skipped.
 
-    Deliberately unguarded (no validate_group_membership_grant): SCIM provisioning is
-    trusted operator configuration — the IdP mapping, not an in-app actor, decides who
-    belongs to which staff group.
+    SCIM owns only rows whose ``source`` is ``scim``. Rows created manually or by
+    another identity source are never converted or removed during reconciliation.
+    Adding a new row runs the canonical escalation guard because joining a
+    role-bearing group can confer permissions and managed reach.
     """
-    valid_member_ids = set()
+    memberships_by_user_id = {}
     for uid in member_ids:
         membership = Membership.objects.filter(
             user_id=uid, tenant=tenant, is_active=True
         ).first()
         if membership:
-            valid_member_ids.add(uid)
+            memberships_by_user_id[uid] = membership
         else:
             logger.warning(
                 "SCIM provider group sync skipped user id %s: not active staff of provider %s "
@@ -54,18 +56,48 @@ def sync_provider_group_members(tenant, group, member_ids):
 
     # Apply only the delta (add/remove) so ChangeLoggingMixin does not fire on unchanged
     # members.
-    current_members = set(group.members.values_list('id', flat=True))
-    to_add = valid_member_ids - current_members
-    to_remove = current_members - valid_member_ids
-    if to_add:
-        group.members.add(*to_add)
-    if to_remove:
-        group.members.remove(*to_remove)
+    if group.tenant_id != tenant.pk:
+        raise ValueError('Provider SCIM may modify only groups owned by its provider tenant.')
+
+    current_rows = {
+        row.membership.user_id: row
+        for row in group.group_memberships.select_related('membership__user')
+    }
+    additions = set(memberships_by_user_id) - set(current_rows)
+    if additions:
+        validate_group_membership_grant(actor, group)
+
+    for user_id, membership in memberships_by_user_id.items():
+        row = current_rows.get(user_id)
+        if row is None:
+            GroupMembership.objects.create(
+                user_group=group,
+                membership=membership,
+                source=GroupMembership.SOURCE_SCIM,
+                external_id=str(user_id),
+                added_by=actor,
+            )
+            continue
+        if row.source == GroupMembership.SOURCE_SCIM and row.external_id != str(user_id):
+            row.external_id = str(user_id)
+            row.save(update_fields=['external_id'])
+
+    desired_user_ids = set(memberships_by_user_id)
+    for user_id, row in current_rows.items():
+        if row.source == GroupMembership.SOURCE_SCIM and user_id not in desired_user_ids:
+            row.delete()
 
 
 class SCIMProviderMixin:
     authentication_classes = [SCIMProviderBearerTokenAuthentication]
     permission_classes = [IsAuthenticated]
+
+    def require_group_permission(self, request, permission):
+        """Enforce the method-specific UserGroup permission in the provider tenant."""
+        if not request.user.has_perm(permission, obj=self.tenant):
+            raise exceptions.PermissionDenied(
+                f'{permission} is required for this provider SCIM group operation.'
+            )
 
     def handle_exception(self, exc):
         from django.core.exceptions import ValidationError as DjangoValidationError
@@ -259,10 +291,10 @@ class SCIMProviderUserListView(SCIMProviderMixin, APIView):
 
             with transaction.atomic():
                 # SCIM provisions identity only: a bare membership at the managing
-                # tenant with NO RoleAssignment rows — zero permissions and zero reach
-                # until granted in-app (matching the old empty explicit scope). Were a
+                # tenant with NO RoleGrant rows — zero permissions and zero reach
+                # until granted in-app. Were a
                 # provisioning config ever to map roles, it would resolve them against
-                # this tenant's own roles and create assignments with granted_by=None —
+                # this tenant's own roles and create grants with granted_by=None —
                 # SCIM is trusted operator configuration, deliberately unguarded.
                 Membership.objects.create(user=user, tenant=self.tenant, is_active=active)
         else:
@@ -498,7 +530,7 @@ class SCIMProviderUserDetailView(SCIMProviderMixin, APIView):
         with transaction.atomic():
             # Remove only the membership at this managing tenant. Delete per-instance so
             # each removal is change-logged (QuerySet.delete() bypasses
-            # ChangeLoggingMixin). Deleting the membership CASCADEs its RoleAssignment
+            # ChangeLoggingMixin). Deleting the membership CASCADEs its RoleGrant
             # rows, revoking own AND managed reach in one stroke.
             for membership in Membership.objects.filter(user=user, tenant=self.tenant):
                 membership.delete()
@@ -512,6 +544,7 @@ class SCIMProviderUserDetailView(SCIMProviderMixin, APIView):
 
 class SCIMProviderGroupListView(SCIMProviderMixin, APIView):
     def get(self, request, *args, **kwargs):
+        self.require_group_permission(request, 'users.view_usergroup')
         queryset = UserGroup.objects.filter(tenant=self.tenant)
 
         try:
@@ -543,6 +576,7 @@ class SCIMProviderGroupListView(SCIMProviderMixin, APIView):
         }, status=status.HTTP_200_OK)
 
     def post(self, request, *args, **kwargs):
+        self.require_group_permission(request, 'users.add_usergroup')
         name = request.data.get('displayName')
         if not name:
             return Response({
@@ -588,7 +622,9 @@ class SCIMProviderGroupListView(SCIMProviderMixin, APIView):
                 tenant=self.tenant,
                 name=name,
             )
-            sync_provider_group_members(self.tenant, group, member_ids)
+            sync_provider_group_members(
+                self.tenant, group, member_ids, actor=request.user,
+            )
 
         serializer = SCIMGroupSerializer(group, context={'request': request, 'tenant_slug': self.tenant.slug})
         return Response(serializer.data, status=status.HTTP_201_CREATED)
@@ -596,11 +632,13 @@ class SCIMProviderGroupListView(SCIMProviderMixin, APIView):
 
 class SCIMProviderGroupDetailView(SCIMProviderMixin, APIView):
     def get(self, request, pk, *args, **kwargs):
+        self.require_group_permission(request, 'users.view_usergroup')
         group = get_object_or_404(UserGroup.objects.filter(tenant=self.tenant), id=pk)
         serializer = SCIMGroupSerializer(group, context={'request': request, 'tenant_slug': self.tenant.slug})
         return Response(serializer.data, status=status.HTTP_200_OK)
 
     def put(self, request, pk, *args, **kwargs):
+        self.require_group_permission(request, 'users.change_usergroup')
         group = get_object_or_404(UserGroup.objects.filter(tenant=self.tenant), id=pk)
 
         name = request.data.get('displayName')
@@ -636,16 +674,21 @@ class SCIMProviderGroupDetailView(SCIMProviderMixin, APIView):
         with transaction.atomic():
             group.name = name
             group.save()
-            sync_provider_group_members(self.tenant, group, member_ids)
+            sync_provider_group_members(
+                self.tenant, group, member_ids, actor=request.user,
+            )
 
         serializer = SCIMGroupSerializer(group, context={'request': request, 'tenant_slug': self.tenant.slug})
         return Response(serializer.data, status=status.HTTP_200_OK)
 
     def patch(self, request, pk, *args, **kwargs):
+        self.require_group_permission(request, 'users.change_usergroup')
         group = get_object_or_404(UserGroup.objects.filter(tenant=self.tenant), id=pk)
 
         # Build the desired member id set from the current group state, then apply PATCH ops.
-        current_member_ids = set(group.members.values_list('id', flat=True))
+        current_member_ids = set(
+            group.group_memberships.values_list('membership__user_id', flat=True)
+        )
 
         with transaction.atomic():
             for op in request.data.get('Operations', []):
@@ -731,12 +774,15 @@ class SCIMProviderGroupDetailView(SCIMProviderMixin, APIView):
                                     }, status=status.HTTP_400_BAD_REQUEST)
 
             group.save()
-            sync_provider_group_members(self.tenant, group, current_member_ids)
+            sync_provider_group_members(
+                self.tenant, group, current_member_ids, actor=request.user,
+            )
 
         serializer = SCIMGroupSerializer(group, context={'request': request, 'tenant_slug': self.tenant.slug})
         return Response(serializer.data, status=status.HTTP_200_OK)
 
     def delete(self, request, pk, *args, **kwargs):
+        self.require_group_permission(request, 'users.delete_usergroup')
         group = get_object_or_404(UserGroup.objects.filter(tenant=self.tenant), id=pk)
         with transaction.atomic():
             # Soft-delete via the model's delete() for change-logging.

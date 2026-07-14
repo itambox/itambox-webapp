@@ -1,211 +1,297 @@
-"""Regression tests for the UserGroup grant-path escalation guards (RBAC review §3-B/§3-C).
+"""Escalation guards for canonical group membership and managed scopes."""
 
-Two write paths could grant cross-tenant access without checking whether the acting
-group-admin actually held the permissions being conferred:
-
-  * §3-B — ``UserGroupForm.tenant`` (the group's owning/SCIM-scope tenant, formerly
-    ``provider``): an MSP-A group admin could point a group at MSP-B (a managing
-    tenant they do not administer), handing B's SCIM-synced staff every role the
-    group already carried (cross-tenant takeover). The ``tenant`` value must be
-    scoped and validated against the actor's ``users.change_usergroup`` on that
-    tenant.
-  * §3-C — ``UserGroupAssignUsersView``: adding a member is itself a grant (the member
-    inherits every role the group carries, plus each role's tenant access), but the view
-    must gate this on an actual per-role permission check, not just group-admin status
-    on some unrelated tenant.
-
-These tests assert both paths reject a low-privilege actor and still allow superusers
-and legitimate same-tenant grants.
-
-Post RBAC structural collapse (RBAC_STAGE2_SPEC.md): ``organization.Provider`` is
-deleted — a "provider"/MSP tenant is now ``Tenant(is_provider=True)``; grants are
-per-``RoleAssignment`` rows (``reach='own'`` in these tests) hung off a
-``Membership``, created here via ``core.tests.mixins.grant``.
-"""
 from django.contrib.auth import get_user_model
 from django.test import TestCase
 from django.urls import reverse
 
-from core.managers import set_current_tenant, set_current_membership
-from core.tests.mixins import TenantTestMixin, grant
-from organization.models import Tenant, Role
-from users.models import UserGroup
+from core.tests.mixins import grant
+from organization.models import Membership, Role, RoleGrant, RoleGrantScope, Tenant
+from users.forms import GroupManagedRoleGrantForm, UserGroupForm
+from users.models import GroupMembership, UserGroup
 
 User = get_user_model()
 
 
-class UserGroupEscalationTests(TenantTestMixin, TestCase):
+def tenant(name, *, provider=False, managed_by=None):
+    return Tenant.objects.create(
+        name=name,
+        slug=name.lower().replace(' ', '-'),
+        is_provider=provider,
+        managed_by=managed_by,
+    )
+
+
+def user(name, *, superuser=False):
+    creator = User.objects.create_superuser if superuser else User.objects.create_user
+    return creator(username=name, email=f'{name}@example.com', password='pw')
+
+
+def group_grant(group, role, scope_type=RoleGrantScope.SCOPE_OWN, target=None):
+    role_grant = RoleGrant.objects.create(user_group=group, role=role)
+    kwargs = {'role_grant': role_grant, 'scope_type': scope_type}
+    if scope_type == RoleGrantScope.SCOPE_TENANT:
+        kwargs['tenant'] = target
+    RoleGrantScope.objects.create(**kwargs)
+    return role_grant
+
+
+def managed_data(role, target, *, grant_id='', initial_forms=0):
+    return {
+        'managed-TOTAL_FORMS': '1',
+        'managed-INITIAL_FORMS': str(initial_forms),
+        'managed-MIN_NUM_FORMS': '0',
+        'managed-MAX_NUM_FORMS': '1000',
+        'managed-0-id': grant_id,
+        'managed-0-role': role.pk,
+        'managed-0-managed_scope': GroupManagedRoleGrantForm.SCOPE_EXPLICIT,
+        'managed-0-scope_group': '',
+        'managed-0-assigned_tenants': [target.pk],
+        'managed-0-DELETE': '',
+    }
+
+
+class GroupShapeEscalationTests(TestCase):
     def setUp(self):
-        set_current_tenant(None)
-        set_current_membership(None)
-
-        # Two managing (MSP) tenants. The acting group-admin manages only tenant A.
-        self.tenant_a = Tenant.objects.create(name="MSP A", slug="msp-a", is_provider=True)
-        self.tenant_b = Tenant.objects.create(name="MSP B", slug="msp-b", is_provider=True)
-
-        # Tenant-A group admin: an own-reach role granting users.change_usergroup at A.
-        self.admin_a = User.objects.create_user(
-            username="admin_a", email="admin_a@example.com", password="pw",
+        self.superuser = user('root', superuser=True)
+        self.tenant_a = tenant('Tenant A')
+        self.tenant_b = tenant('Tenant B')
+        self.role_a = Role.objects.create(tenant=self.tenant_a, name='A Reader')
+        self.role_b = Role.objects.create(tenant=self.tenant_b, name='B Reader')
+        self.membership_a = Membership.objects.create(
+            user=user('member-a'), tenant=self.tenant_a,
         )
-        role_a = Role.objects.create(
-            tenant=self.tenant_a, name="A Group Admin",
-            permissions=["users.change_usergroup"],
-        )
-        self.assignment_a = grant(self.admin_a, self.tenant_a, role_a)
-        self.staff_a = self.assignment_a.membership
-
-        self.superuser = User.objects.create_superuser(
-            username="root", email="root@example.com", password="pw",
+        self.membership_b = Membership.objects.create(
+            user=user('member-b'), tenant=self.tenant_b,
         )
 
-    def tearDown(self):
-        set_current_tenant(None)
-        set_current_membership(None)
+    def test_form_rejects_foreign_role_and_membership(self):
+        form = UserGroupForm(
+            data={
+                'name': 'Invalid',
+                'tenant': self.tenant_a.pk,
+                'roles': [self.role_b.pk],
+                'members': [self.membership_b.pk],
+                'is_active': True,
+            },
+            user=self.superuser,
+            tenant=self.tenant_a,
+        )
+        self.assertFalse(form.is_valid())
+        self.assertIn('roles', form.errors)
+        self.assertIn('members', form.errors)
 
-    def _flush(self, user):
-        for attr in list(user.__dict__):
-            if attr.startswith('_perms_') or attr.startswith('_tenant_membership_'):
-                delattr(user, attr)
-
-    # ------------------------------------------------------------------ §3-B tenant scope
-
-    def test_group_admin_cannot_set_foreign_tenant_on_create(self):
-        """(a) A tenant-A group admin cannot create a group scoped to tenant B."""
-        from users.forms import UserGroupForm
-        self._flush(self.admin_a)
-        data = {
-            'name': 'Takeover', 'roles': [], 'members': [],
-            'tenant': self.tenant_b.pk, 'is_active': True,
-        }
-        form = UserGroupForm(data=data, user=self.admin_a)
+    def test_edit_rejects_tampered_owner(self):
+        group = UserGroup.objects.create(name='A Team', tenant=self.tenant_a)
+        form = UserGroupForm(
+            data={
+                'name': group.name,
+                'tenant': self.tenant_b.pk,
+                'roles': [],
+                'members': [],
+                'is_active': True,
+            },
+            instance=group,
+            user=self.superuser,
+        )
         self.assertFalse(form.is_valid())
         self.assertIn('tenant', form.errors)
 
-    def test_group_admin_tenant_queryset_scoped(self):
-        """The owning-tenant choice is scoped to tenants the actor manages (B excluded)."""
-        from users.forms import UserGroupForm
-        self._flush(self.admin_a)
-        form = UserGroupForm(user=self.admin_a)
-        tenant_pks = set(form.fields['tenant'].queryset.values_list('pk', flat=True))
-        self.assertIn(self.tenant_a.pk, tenant_pks)
-        self.assertNotIn(self.tenant_b.pk, tenant_pks)
 
-    def test_group_admin_cannot_change_group_to_foreign_tenant(self):
-        """(b) Cannot move an existing group onto a tenant they don't administer."""
-        from users.forms import UserGroupForm
-        group = UserGroup.objects.create(name="Existing", tenant=self.tenant_a)
-        self._flush(self.admin_a)
+class ManagedScopeEscalationTests(TestCase):
+    def setUp(self):
+        self.provider = tenant('Provider', provider=True)
+        self.customer_a = tenant('Customer A', managed_by=self.provider)
+        self.customer_b = tenant('Customer B', managed_by=self.provider)
+        self.actor = user('provider-admin')
+        actor_role = Role.objects.create(
+            tenant=self.provider,
+            name='Group Grant Manager',
+            permissions=[
+                'users.add_usergroup',
+                'users.change_usergroup',
+                'organization.add_rolegrant',
+                'organization.change_rolegrant',
+                'assets.view_asset',
+            ],
+        )
+        actor_grant = grant(self.actor, self.provider, actor_role)
+        RoleGrantScope.objects.create(
+            role_grant=actor_grant,
+            scope_type=RoleGrantScope.SCOPE_TENANT,
+            tenant=self.customer_a,
+        )
+        self.projected_role = Role.objects.create(
+            tenant=self.provider,
+            name='Reader',
+            permissions=['assets.view_asset'],
+        )
+
+    def form_for_target(self, target):
         data = {
-            'name': 'Existing', 'roles': [], 'members': [],
-            'tenant': self.tenant_b.pk, 'is_active': True,
-        }
-        form = UserGroupForm(data=data, instance=group, user=self.admin_a)
-        self.assertFalse(form.is_valid())
-        self.assertIn('tenant', form.errors)
-
-    def test_group_admin_same_tenant_is_allowed(self):
-        """(e-tenant) A legitimate same-tenant group creation succeeds."""
-        from users.forms import UserGroupForm
-        self._flush(self.admin_a)
-        data = {
-            'name': 'Legit', 'roles': [], 'members': [],
-            'tenant': self.tenant_a.pk, 'is_active': True,
-        }
-        form = UserGroupForm(data=data, user=self.admin_a)
-        self.assertTrue(form.is_valid(), form.errors)
-
-    def test_superuser_can_set_any_tenant(self):
-        """(d-tenant) A superuser bypasses the tenant-ownership guard."""
-        from users.forms import UserGroupForm
-        data = {
-            'name': 'SU Group', 'roles': [], 'members': [],
-            'tenant': self.tenant_b.pk, 'is_active': True,
-        }
-        form = UserGroupForm(data=data, user=self.superuser)
-        self.assertTrue(form.is_valid(), form.errors)
-
-    # ------------------------------------------------------------------ §3-C member-assign
-
-    def _group_with_foreign_role(self):
-        """A group carrying a tenant-Administrator role the tenant-A admin does NOT hold."""
-        tenant = Tenant.objects.create(name="Cust", slug="cust")
-        admin_role = Role.objects.create(
-            tenant=tenant, name="Administrator",
-            permissions=["assets.delete_asset", "assets.change_asset"],
-        )
-        group = UserGroup.objects.create(name="Priv Team")
-        group.roles.add(admin_role)
-        return group
-
-    def test_assign_view_blocks_grant_of_unheld_role_perms(self):
-        """(c) The assign view blocks adding a member to a group whose roles' perms the
-        actor lacks — no member is added and the actor stays on the form."""
-        group = self._group_with_foreign_role()
-        target = User.objects.create_user(
-            username="victim", email="victim@example.com", password="pw",
-        )
-        self.client.force_login(self.admin_a)
-        url = reverse('users:usergroup_assign_users', kwargs={'pk': group.pk})
-        resp = self.client.post(url, {'users': [target.pk]})
-        # Re-rendered form (200), no redirect to detail, member NOT added.
-        self.assertEqual(resp.status_code, 200)
-        self.assertFalse(group.members.filter(pk=target.pk).exists())
-
-    def test_assign_view_superuser_bypasses(self):
-        """(d) A superuser may add members regardless of the group's roles."""
-        group = self._group_with_foreign_role()
-        target = User.objects.create_user(
-            username="ok_user", email="ok_user@example.com", password="pw",
-        )
-        self.client.force_login(self.superuser)
-        url = reverse('users:usergroup_assign_users', kwargs={'pk': group.pk})
-        resp = self.client.post(url, {'users': [target.pk]})
-        self.assertEqual(resp.status_code, 302)
-        self.assertTrue(group.members.filter(pk=target.pk).exists())
-
-    def test_assign_view_allows_grant_of_held_role_perms(self):
-        """(e) A same-tenant role whose perms the actor DOES hold is grantable."""
-        # Grant the tenant-A admin an extra own-reach role holding only
-        # assets.view_asset at tenant A, then a group carrying a tenant-A role
-        # requiring only that held perm.
-        held_role = Role.objects.create(
-            tenant=self.tenant_a, name="A View",
-            permissions=["assets.view_asset"],
-        )
-        grant(self.admin_a, self.tenant_a, held_role)
-        group = UserGroup.objects.create(name="A Viewers")
-        group.roles.add(
-            Role.objects.create(
-                tenant=self.tenant_a, name="A Viewers Role",
-                permissions=["assets.view_asset"],
-            )
-        )
-        target = User.objects.create_user(
-            username="grantee", email="grantee@example.com", password="pw",
-        )
-        self.client.force_login(self.admin_a)
-        url = reverse('users:usergroup_assign_users', kwargs={'pk': group.pk})
-        resp = self.client.post(url, {'users': [target.pk]})
-        self.assertEqual(resp.status_code, 302)
-        self.assertTrue(group.members.filter(pk=target.pk).exists())
-
-    def test_form_members_field_escalation_guard(self):
-        """The form path is covered too: adding members to a group carrying roles the actor
-        cannot grant errors on the ``members`` field (not just the assign view)."""
-        from users.forms import UserGroupForm
-        group = self._group_with_foreign_role()
-        target = User.objects.create_user(
-            username="form_victim", email="form_victim@example.com", password="pw",
-        )
-        # Keep the group's existing (foreign) roles; add a member via the form.
-        role_pks = list(group.roles.values_list('pk', flat=True))
-        self._flush(self.admin_a)
-        data = {
-            'name': group.name, 'roles': role_pks, 'members': [target.pk],
+            'name': 'Provider Readers',
+            'tenant': self.provider.pk,
+            'roles': [],
+            'members': [],
             'is_active': True,
         }
-        form = UserGroupForm(data=data, instance=group, user=self.admin_a)
+        data.update(managed_data(self.projected_role, target))
+        return UserGroupForm(
+            data=data,
+            user=self.actor,
+            tenant=self.provider,
+        )
+
+    def test_actor_can_author_scope_within_own_managed_reach(self):
+        form = self.form_for_target(self.customer_a)
+        self.assertTrue(form.is_valid(), form.errors)
+        group = form.save()
+        self.assertTrue(
+            group.role_grants.filter(
+                role=self.projected_role,
+                scopes__tenant=self.customer_a,
+            ).exists()
+        )
+
+    def test_actor_cannot_author_scope_outside_own_managed_reach(self):
+        form = self.form_for_target(self.customer_b)
         self.assertFalse(form.is_valid())
-        # Failure is attributed to members (or roles); the message mentions escalation.
-        errs = ' '.join(e for el in form.errors.values() for e in el).lower()
-        self.assertIn("escalation", errs)
+        errors = ' '.join(
+            message
+            for row_errors in form.managed_formset.errors
+            for messages in row_errors.values()
+            for message in messages
+        ).lower()
+        self.assertIn('outside your own reach', errors)
+
+
+class UserGroupReactivationEscalationTests(TestCase):
+    def setUp(self):
+        self.tenant = tenant('Reactivation Tenant')
+        self.actor = user('reactivation-admin')
+        actor_role = Role.objects.create(
+            tenant=self.tenant,
+            name='Group editor',
+            permissions=['users.change_usergroup'],
+        )
+        grant(self.actor, self.tenant, actor_role)
+        self.member = Membership.objects.create(
+            user=user('reactivated-member'),
+            tenant=self.tenant,
+        )
+        self.privileged_role = Role.objects.create(
+            tenant=self.tenant,
+            name='Asset deleter',
+            permissions=['assets.delete_asset'],
+        )
+        self.group = UserGroup.objects.create(
+            name='Inactive asset admins',
+            tenant=self.tenant,
+            is_active=False,
+        )
+        GroupMembership.objects.create(
+            user_group=self.group,
+            membership=self.member,
+        )
+        group_grant(self.group, self.privileged_role)
+
+    def reactivation_data(self):
+        return {
+            'name': self.group.name,
+            'tenant': self.tenant.pk,
+            'roles': [self.privileged_role.pk],
+            'members': [self.member.pk],
+            'is_active': True,
+        }
+
+    def test_form_revalidates_existing_own_scope_roles_on_reactivation(self):
+        form = UserGroupForm(
+            data=self.reactivation_data(),
+            instance=self.group,
+            user=self.actor,
+            tenant=self.tenant,
+        )
+
+        self.assertFalse(form.is_valid())
+        self.assertIn(
+            'assets.delete_asset',
+            ' '.join(form.non_field_errors()),
+        )
+
+    def test_edit_view_cannot_reactivate_roles_actor_cannot_grant(self):
+        self.client.force_login(self.actor)
+        session = self.client.session
+        session['active_tenant_id'] = self.tenant.pk
+        session.pop('active_tenant_group_id', None)
+        session.save()
+
+        response = self.client.post(
+            reverse('users:usergroup_update', args=[self.group.pk]),
+            self.reactivation_data(),
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.group.refresh_from_db()
+        self.assertFalse(self.group.is_active)
+        self.assertIn(
+            'assets.delete_asset',
+            ' '.join(response.context['form'].non_field_errors()),
+        )
+
+
+class AssignMembershipEscalationTests(TestCase):
+    def setUp(self):
+        self.tenant = tenant('Tenant')
+        self.actor = user('group-admin')
+        actor_role = Role.objects.create(
+            tenant=self.tenant,
+            name='Group Admin',
+            permissions=['users.change_usergroup', 'assets.view_asset'],
+        )
+        grant(self.actor, self.tenant, actor_role)
+        self.target_membership = Membership.objects.create(
+            user=user('target'),
+            tenant=self.tenant,
+        )
+        self.client.force_login(self.actor)
+
+    def test_assign_blocks_role_permissions_actor_does_not_hold(self):
+        group = UserGroup.objects.create(name='Admins', tenant=self.tenant)
+        privileged_role = Role.objects.create(
+            tenant=self.tenant,
+            name='Asset Deleter',
+            permissions=['assets.delete_asset'],
+        )
+        group_grant(group, privileged_role)
+
+        response = self.client.post(
+            reverse('users:usergroup_assign_users', args=[group.pk]),
+            {'memberships': [self.target_membership.pk]},
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertFalse(
+            GroupMembership.objects.filter(
+                user_group=group,
+                membership=self.target_membership,
+            ).exists()
+        )
+
+    def test_assign_allows_held_role_and_writes_group_membership(self):
+        group = UserGroup.objects.create(name='Readers', tenant=self.tenant)
+        reader_role = Role.objects.create(
+            tenant=self.tenant,
+            name='Reader',
+            permissions=['assets.view_asset'],
+        )
+        group_grant(group, reader_role)
+
+        response = self.client.post(
+            reverse('users:usergroup_assign_users', args=[group.pk]),
+            {'memberships': [self.target_membership.pk]},
+        )
+        self.assertEqual(response.status_code, 302)
+        row = GroupMembership.objects.get(
+            user_group=group,
+            membership=self.target_membership,
+        )
+        self.assertEqual(row.source, GroupMembership.SOURCE_MANUAL)
+        self.assertEqual(row.added_by, self.actor)

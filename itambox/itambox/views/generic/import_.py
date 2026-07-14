@@ -25,13 +25,32 @@ from core.managers import get_current_tenant
 from core.models import Job
 from itambox.utils import get_model_viewname
 from itambox.views.htmx import BaseHTMXView
+from itambox.views.generic.mixins import user_can_mutate_model
 
 logger = logging.getLogger(__name__)
+
+SUPERUSER_ONLY_IMPORT_MODELS = frozenset({
+    # The generic form bypasses TenantForm, so reserve imports that can write
+    # management topology (group / managed_by / is_provider) for superusers.
+    'organization.tenant',
+})
 
 
 class ObjectImportView(PermissionRequiredMixin, LoginRequiredMixin, BaseHTMXView, TemplateView):
     model_form = None
     template_name = 'generic/object_import.html'
+
+    def has_permission(self):
+        model = self._get_model()
+        if (
+            model._meta.label_lower in SUPERUSER_ONLY_IMPORT_MODELS
+            and not self.request.user.is_superuser
+        ):
+            return False
+        return (
+            user_can_mutate_model(self.request.user, model)
+            and super().has_permission()
+        )
 
     def get_permission_required(self):
         model = self._get_model()

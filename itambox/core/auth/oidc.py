@@ -1,12 +1,13 @@
 import logging
 from django.conf import settings
 from django.core.exceptions import ImproperlyConfigured, SuspiciousOperation
-from django.db import models
+from django.db import IntegrityError, models, transaction
 from django.contrib.auth import get_user_model
 from django.contrib.auth.models import Permission
 from mozilla_django_oidc.auth import OIDCAuthenticationBackend
 from mozilla_django_oidc.utils import import_from_settings
 from mozilla_django_oidc.views import OIDCAuthenticationRequestView, OIDCAuthenticationCallbackView
+from core.auth.provisioning import provision_membership, provision_provider_membership
 from core.managers import get_current_tenant, set_current_tenant
 
 logger = logging.getLogger(__name__)
@@ -184,8 +185,63 @@ class TenantOIDCBackend(TenantOIDCSettingsMixin, OIDCAuthenticationBackend):
         if not tenant:
             return
 
-        from organization.models import AssetHolder, Role, Membership
-        from django.db.utils import IntegrityError
+        groups_claim = claims.get('groups', [])
+        if isinstance(groups_claim, str):
+            groups_claim = [groups_claim]
+        elif not isinstance(groups_claim, list):
+            groups_claim = []
+
+        tenant_configs = getattr(settings, 'ITAMBOX_TENANT_OIDC_CONFIGS', {})
+
+        # inline import: avoids loading organization models while Django's auth
+        # backends are initialized during app setup.
+        from organization.models import AssetHolder, Membership
+
+        # Provider-staff claims provision provider identity, not a local
+        # customer identity. Resolve them before creating/linking a customer
+        # profile or membership. A matching mapping is terminal even when its
+        # provider role is missing, so configuration errors fail closed instead
+        # of silently falling back to customer JIT provisioning.
+        if tenant.managed_by_id and groups_claim:
+            managing_config = tenant_configs.get(tenant.managed_by.slug, {})
+            staff_role_mapping = managing_config.get(
+                'OIDC_GROUP_PROVIDER_ROLE_MAPPING',
+                {},
+            )
+            for group in groups_claim:
+                if group not in staff_role_mapping:
+                    continue
+                with transaction.atomic():
+                    provider_membership = provision_provider_membership(
+                        user,
+                        tenant.managed_by,
+                        staff_role_mapping[group],
+                        'OIDC',
+                    )
+                    if provider_membership is not None:
+                        # This user is provider staff, not a customer-local
+                        # principal. Removing the current customer's Membership
+                        # hard-deletes its direct grants and group links by
+                        # cascade. Preserve operational holder history by
+                        # unlinking the global User instead of deleting holders.
+                        customer_membership = (
+                            Membership._base_manager.select_for_update().filter(
+                                user=user,
+                                tenant=tenant,
+                            ).first()
+                        )
+                        if customer_membership is not None:
+                            customer_membership.delete()
+                        customer_holders = list(
+                            AssetHolder._base_manager.select_for_update().filter(
+                                user=user,
+                                tenant=tenant,
+                            )
+                        )
+                        for holder in customer_holders:
+                            holder.user = None
+                            holder.save(update_fields=['user'])
+                return
 
         # 1. Profile Provisioning / Linking
         upn = claims.get('upn') or claims.get('email') or user.email
@@ -198,8 +254,6 @@ class TenantOIDCBackend(TenantOIDCSettingsMixin, OIDCAuthenticationBackend):
                 holder = AssetHolder.objects.filter(tenant=tenant, upn=upn).first()
             if not holder and email:
                 holder = AssetHolder.objects.filter(tenant=tenant, email=email).first()
-
-            from django.db import transaction
 
             if holder and holder.user is None:
                 holder.user = user
@@ -228,13 +282,6 @@ class TenantOIDCBackend(TenantOIDCSettingsMixin, OIDCAuthenticationBackend):
                     holder = None
 
         # 2. Membership & Role Syncing
-        groups_claim = claims.get('groups', [])
-        if isinstance(groups_claim, str):
-            groups_claim = [groups_claim]
-        elif not isinstance(groups_claim, list):
-            groups_claim = []
-
-        tenant_configs = getattr(settings, 'ITAMBOX_TENANT_OIDC_CONFIGS', {})
         tenant_config = tenant_configs.get(tenant.slug, {})
         group_role_mapping = tenant_config.get('OIDC_GROUP_ROLE_MAPPING', {})
 
@@ -265,24 +312,7 @@ class TenantOIDCBackend(TenantOIDCSettingsMixin, OIDCAuthenticationBackend):
 
         # Safe JIT provisioning: never auto-create a privileged role from a group
         # claim; assign Admin/Manager only if the operator created them deliberately.
-        from core.auth.provisioning import provision_membership
         provision_membership(user, tenant, db_role_name, self.get_permissions_for_role, 'OIDC')
-
-        # 3. MSP-staff group claims: if this tenant is managed by an is_provider tenant
-        # and the MANAGING tenant's OIDC config (its own slug in
-        # ITAMBOX_TENANT_OIDC_CONFIGS) maps any of the user's group claims to one of
-        # its roles, provision a membership + managed-reach assignment there. No
-        # mapping / no managing tenant → no-op, so non-MSP installs are unaffected.
-        # The mapping key keeps its legacy name (operator-facing config contract).
-        if tenant.managed_by_id and groups_claim:
-            managing_config = tenant_configs.get(tenant.managed_by.slug, {})
-            staff_role_mapping = managing_config.get('OIDC_GROUP_PROVIDER_ROLE_MAPPING', {})
-            for group in groups_claim:
-                mapped_staff_role = staff_role_mapping.get(group)
-                if mapped_staff_role:
-                    from core.auth.provisioning import provision_provider_membership
-                    provision_provider_membership(user, tenant.managed_by, mapped_staff_role, 'OIDC')
-                    break
 
     def get_permissions_for_role(self, role_name):
         from organization.forms.role_form import MATRIX_MODELS

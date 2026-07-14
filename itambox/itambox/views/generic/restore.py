@@ -4,6 +4,7 @@ import logging
 from django.contrib import messages
 from django.contrib.auth.mixins import LoginRequiredMixin, PermissionRequiredMixin
 from django.contrib.contenttypes.models import ContentType
+from django.core.exceptions import PermissionDenied, ValidationError
 from django.db import transaction
 from django.http import HttpResponse, HttpResponseRedirect
 from django.shortcuts import get_object_or_404
@@ -11,11 +12,26 @@ from django.urls import reverse
 from django.utils.translation import gettext as _
 from django.views.generic import View
 
+from core.auth.guards import (
+    validate_group_membership_grant,
+    validate_role_reactivation_grants,
+)
 from itambox.utils import get_model_viewname
-from itambox.views.generic.mixins import filter_permitted_rows
+from itambox.views.generic.mixins import (
+    filter_permitted_rows,
+    user_can_mutate_model,
+)
 from itambox.views.generic.utils import safe_return_url
 
 logger = logging.getLogger(__name__)
+
+
+def _validate_restore_grant_authority(user, obj):
+    """Reject restores that would reactivate grants the actor could not create."""
+    if obj._meta.label_lower == 'organization.role':
+        validate_role_reactivation_grants(user, obj)
+    elif obj._meta.label_lower == 'users.usergroup' and obj.is_active:
+        validate_group_membership_grant(user, obj)
 
 
 class HtmxActionMixin:
@@ -54,13 +70,30 @@ class ObjectRestoreView(HtmxActionMixin, PermissionRequiredMixin, LoginRequiredM
         manager = getattr(self.model, 'all_objects', self.model._base_manager)
         self.object = get_object_or_404(manager, pk=self.kwargs['object_id'])
 
+        if not user_can_mutate_model(self.request.user, self.model):
+            return False
+
         if not self.request.user.is_superuser and not self.request.user.has_perm('core.change_recyclebin'):
             return False
 
         return self.request.user.has_perm(f'{app_label}.change_{model_name}', self.object)
 
     def post(self, request, *args, **kwargs):
-        self.object.restore()
+        try:
+            with transaction.atomic():
+                _validate_restore_grant_authority(request.user, self.object)
+                self.object.restore()
+        except ValidationError as exc:
+            logger.warning(
+                "Blocked unsafe restore of %s pk=%s by user pk=%s: %s",
+                self.model._meta.label_lower,
+                self.object.pk,
+                request.user.pk,
+                '; '.join(exc.messages),
+            )
+            raise PermissionDenied(_(
+                "Restoring this object would grant permissions outside your authority."
+            )) from exc
 
         success_msg = _("Restored {model} {object}").format(
             model=self.model._meta.verbose_name,
@@ -84,6 +117,9 @@ class ObjectPurgeView(HtmxActionMixin, PermissionRequiredMixin, LoginRequiredMix
 
         manager = getattr(self.model, 'all_objects', self.model._base_manager)
         self.object = get_object_or_404(manager, pk=self.kwargs['object_id'])
+
+        if not user_can_mutate_model(self.request.user, self.model):
+            return False
 
         if not self.request.user.is_superuser and not self.request.user.has_perm('core.delete_recyclebin'):
             return False
@@ -114,6 +150,9 @@ class ObjectBulkRestoreView(HtmxActionMixin, PermissionRequiredMixin, LoginRequi
         app_label = self.model._meta.app_label
         model_name = self.model._meta.model_name
 
+        if not user_can_mutate_model(self.request.user, self.model):
+            return False
+
         if not self.request.user.is_superuser and not self.request.user.has_perm('core.change_recyclebin'):
             return False
 
@@ -136,14 +175,40 @@ class ObjectBulkRestoreView(HtmxActionMixin, PermissionRequiredMixin, LoginRequi
                 "Skipped %(count)s %(objects)s you do not have permission to change."
             ) % {'count': skipped, 'objects': self.model._meta.verbose_name_plural})
 
-        count = 0
+        safe_rows = []
+        unsafe_skipped = 0
         with transaction.atomic():
             for obj in rows:
+                try:
+                    _validate_restore_grant_authority(request.user, obj)
+                except ValidationError as exc:
+                    unsafe_skipped += 1
+                    logger.warning(
+                        "Skipped unsafe bulk restore of %s pk=%s by user pk=%s: %s",
+                        self.model._meta.label_lower,
+                        obj.pk,
+                        request.user.pk,
+                        '; '.join(exc.messages),
+                    )
+                else:
+                    safe_rows.append(obj)
+
+            # Validate the complete batch before restoring anything. Otherwise
+            # one restore could grant authority that changes a later decision.
+            for obj in safe_rows:
                 obj.restore()
-                count += 1
+
+        if unsafe_skipped:
+            messages.warning(request, _(
+                "Skipped %(count)s %(objects)s because restoring them would grant "
+                "permissions outside your authority."
+            ) % {
+                'count': unsafe_skipped,
+                'objects': self.model._meta.verbose_name_plural,
+            })
 
         success_msg = _("Successfully restored {count} {model_plural}.").format(
-            count=count,
+            count=len(safe_rows),
             model_plural=self.model._meta.verbose_name_plural,
         )
 
@@ -161,6 +226,9 @@ class ObjectBulkPurgeView(HtmxActionMixin, PermissionRequiredMixin, LoginRequire
         self.model = self.content_type.model_class()
         app_label = self.model._meta.app_label
         model_name = self.model._meta.model_name
+
+        if not user_can_mutate_model(self.request.user, self.model):
+            return False
 
         if not self.request.user.is_superuser and not self.request.user.has_perm('core.delete_recyclebin'):
             return False

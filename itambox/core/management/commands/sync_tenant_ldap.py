@@ -1,29 +1,82 @@
 import logging
-try:
-    import ldap
-except ImportError:
-    import sys
-    class DummyLDAP:
-        SCOPE_BASE = 0
-        SCOPE_ONELEVEL = 1
-        SCOPE_SUBTREE = 2
-        RES_SEARCH_ENTRY = 100
-        OPT_REFERRALS = 2
-        OPT_PROTOCOL_VERSION = 4
-        class LDAPError(Exception):
-            pass
-    ldap = DummyLDAP()
-    sys.modules['ldap'] = ldap
+from datetime import timedelta
 
 from django.contrib.auth import get_user_model
 from django.core.management.base import BaseCommand, CommandError
 from django.conf import settings
-from core.managers import set_current_tenant, get_current_tenant
+from django.db.models import Q
+from django.utils import timezone
+from core.auth.ldap import ldap
+from core.mfa import role_is_privileged
 from core.tasks.context import TaskContext
-from organization.models import Tenant
+from itambox.middleware import get_current_user
+from organization.models import Membership, Role, RoleGrant, RoleGrantScope, Tenant
 
 logger = logging.getLogger('django_auth_ldap')
 User = get_user_model()
+
+LDAP_GRANT_REASON = 'LDAP directory synchronization'
+LDAP_PRIVILEGED_GRANT_LIFETIME = timedelta(days=1)
+
+
+def _ensure_ldap_role_grant(membership, role):
+    """Ensure LDAP's own-scope role without taking ownership of manual grants."""
+    now = timezone.now()
+    desired_valid_until = (
+        now + LDAP_PRIVILEGED_GRANT_LIFETIME
+        if role_is_privileged(role)
+        else None
+    )
+
+    # LDAP owns a grant only when both durable markers match exactly. The outer
+    # TaskContext actor is intentionally change-log attribution, not granted_by:
+    # granted_by=None distinguishes this system-managed row from a manual grant.
+    ldap_owned = list(
+        membership.role_grants.filter(
+            role=role,
+            reason=LDAP_GRANT_REASON,
+            granted_by__isnull=True,
+        ).order_by('pk')
+    )
+    if len(ldap_owned) == 1:
+        grant = ldap_owned[0]
+        if grant.valid_until != desired_valid_until:
+            grant.valid_until = desired_valid_until
+            grant.full_clean()
+            grant.save(update_fields=['valid_until'])
+        RoleGrantScope.objects.get_or_create(
+            role_grant=grant,
+            scope_type=RoleGrantScope.SCOPE_OWN,
+        )
+        return grant
+
+    equivalent_grants = membership.role_grants.filter(
+        role=role,
+        scopes__scope_type=RoleGrantScope.SCOPE_OWN,
+    ).distinct()
+    active_equivalent = equivalent_grants.filter(
+        Q(valid_until__isnull=True) | Q(valid_until__gt=now)
+    )
+
+    # An active manual grant already supplies the requested access. Multiple
+    # LDAP-marked rows are also left alone: choosing one would be ambiguous.
+    if active_equivalent.exists():
+        return active_equivalent.order_by('pk').first()
+
+    grant = RoleGrant(
+        membership=membership,
+        role=role,
+        reason=LDAP_GRANT_REASON,
+        valid_until=desired_valid_until,
+        granted_by=None,
+    )
+    grant.full_clean()
+    grant.save()
+    RoleGrantScope.objects.create(
+        role_grant=grant,
+        scope_type=RoleGrantScope.SCOPE_OWN,
+    )
+    return grant
 
 
 class Command(BaseCommand):
@@ -46,13 +99,14 @@ class Command(BaseCommand):
         # TaskContext sets the tenant scope AND wires _request_id + _current_user
         # so that ChangeLoggingMixin records ObjectChange entries for all User/
         # Membership saves that happen during the sync.
-        # No user_id is available when the command is invoked directly from the
-        # CLI (no --user argument). Changes are attributed to a system/anonymous
-        # actor (user=None). When called via sync_tenant_ldap_task the outer
-        # TaskContext in core/tasks/ldap.py already provides the actor user;
-        # the nested TaskContext here is a no-op override that restores correctly
-        # on exit thanks to TaskContext's save/restore logic.
-        with TaskContext(tenant_id=tenant.pk, user_id=None):
+        # Direct CLI execution has no actor and remains system-attributed. When
+        # called from sync_tenant_ldap_task, carry its actor into this nested
+        # context instead of replacing it with user=None.
+        outer_actor = get_current_user()
+        with TaskContext(
+            tenant_id=tenant.pk,
+            user_id=getattr(outer_actor, 'pk', None),
+        ):
             self._run_sync(tenant)
 
     def _run_sync(self, tenant):
@@ -161,7 +215,6 @@ class Command(BaseCommand):
                         )
                         
                         # Add user to tenant membership as member by default
-                        from organization.models import Membership, Role, RoleAssignment
                         tenant_role, _ = Role.objects.get_or_create(
                             tenant=tenant,
                             name='Member',
@@ -184,13 +237,7 @@ class Command(BaseCommand):
                             user=user,
                             tenant=tenant,
                         )
-                        # LDAP sync is trusted operator config (like SCIM/SSO JIT):
-                        # own-reach grant without an acting user, so granted_by=None.
-                        RoleAssignment.objects.get_or_create(
-                            membership=membership,
-                            role=tenant_role,
-                            reach=RoleAssignment.REACH_OWN,
-                        )
+                        _ensure_ldap_role_grant(membership, tenant_role)
 
                         if created:
                             created_count += 1

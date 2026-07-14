@@ -260,7 +260,7 @@ class MitigationsPhase4Tests(TestCase):
         
         # Verify Membership is provisioned with proper Admin role
         membership = Membership.objects.get(user=ldap_user, tenant=self.tenant)
-        self.assertEqual(membership.assignments.first().role.name, 'Admin')
+        self.assertEqual(membership.role_grants.first().role.name, 'Admin')
 
     def test_saml_user_profile_and_membership_syncing(self):
         backend = TenantSaml2Backend()
@@ -298,4 +298,4 @@ class MitigationsPhase4Tests(TestCase):
         
         # Verify Membership is provisioned with Manager role
         membership = Membership.objects.get(user=saml_user, tenant=self.tenant)
-        self.assertEqual(membership.assignments.first().role.name, 'Manager')
+        self.assertEqual(membership.role_grants.first().role.name, 'Manager')

@@ -4,7 +4,7 @@ from django.test import TestCase
 from django.urls import reverse
 from django.utils import timezone
 from organization.models import Tenant, Membership, Role, AssetHolder
-from users.models import Token, UserGroup
+from users.models import GroupMembership, Token, UserGroup
 from rest_framework import status
 from core.tests.mixins import grant
 
@@ -45,8 +45,10 @@ class SCIMProvisioningTests(TestCase):
             ]
         )
 
-        # Create Tenant Memberships — grant() creates the membership + assignment together.
-        admin_membership = grant(self.admin_user, self.tenant, self.role_admin).membership
+        # Create Tenant Memberships — grant() creates the membership + role grant together.
+        self.admin_membership = grant(
+            self.admin_user, self.tenant, self.role_admin,
+        ).membership
 
         # Setup tokens — tenant is explicit (not left to the model's current-tenant-context
         # fallback) so each token is unambiguously scoped to self.tenant, matching the URLs
@@ -180,12 +182,12 @@ class SCIMProvisioningTests(TestCase):
 
         # Verify User and AssetHolder and Membership.
         # SCIM /Users provisioning creates the membership with NO role assigned —
-        # roles are granted in-app via UserGroup, not at provisioning time.
+        # roles are granted in-app, not at provisioning time.
         user = User.objects.get(username="newuser@example.com")
         self.assertTrue(user.is_active)
 
         membership = Membership.objects.get(user=user, tenant=self.tenant)
-        self.assertFalse(membership.assignments.exists())
+        self.assertFalse(membership.role_grants.exists())
 
         holder = AssetHolder.objects.get(user=user, tenant=self.tenant)
         self.assertEqual(holder.email, "newuser@example.com")
@@ -293,13 +295,10 @@ class SCIMProvisioningTests(TestCase):
         self.assertFalse(Membership.objects.filter(user=user, tenant=self.tenant).exists())
 
     def test_group_endpoint_is_read_only(self):
-        """SCIM /Groups is READ-ONLY: user groups are global and managed centrally
-        (not provisioned per-tenant via SCIM, which would let one tenant's IdP mint
-        cross-tenant groups). Reads are scoped to groups that grant a role in THIS
-        tenant; all writes return 403."""
+        """SCIM /Groups is read-only and exposes only tenant-owned groups."""
         list_url = reverse('api:scim:group-list', kwargs={'tenant_slug': self.tenant.slug})
 
-        # 1. GET list — no group grants this tenant yet.
+        # 1. GET list — this tenant owns no groups yet.
         response = self.client.get(list_url, **self.auth_headers)
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(response.json()["totalResults"], 0)
@@ -313,19 +312,50 @@ class SCIMProvisioningTests(TestCase):
         self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
         self.assertFalse(UserGroup.objects.filter(name="Software Managers").exists())
 
-        # 3. A global group carrying a role in THIS tenant is visible (read-only).
-        group = UserGroup.objects.create(name="Software Managers")
-        group.roles.add(self.role_member)  # role_member belongs to self.tenant
+        # 3. A group owned by THIS tenant is visible; another tenant's group is not.
+        group = UserGroup.objects.create(tenant=self.tenant, name="Software Managers")
+        GroupMembership.objects.create(
+            user_group=group,
+            membership=self.admin_membership,
+            source=GroupMembership.SOURCE_SCIM,
+            external_id=str(self.admin_user.id),
+        )
+        other_group = UserGroup.objects.create(
+            tenant=self.other_tenant,
+            name="Other Tenant Group",
+        )
+        other_membership = Membership.objects.create(
+            user=self.admin_user,
+            tenant=self.other_tenant,
+        )
+        GroupMembership.objects.create(
+            user_group=other_group,
+            membership=other_membership,
+            source=GroupMembership.SOURCE_SCIM,
+            external_id=str(self.admin_user.id),
+        )
         response = self.client.get(list_url, **self.auth_headers)
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(response.json()["totalResults"], 1)
         self.assertEqual(response.json()["Resources"][0]["displayName"], "Software Managers")
+
+        user_detail_url = reverse(
+            'api:scim:user-detail',
+            kwargs={'tenant_slug': self.tenant.slug, 'pk': self.admin_user.id},
+        )
+        user_response = self.client.get(user_detail_url, **self.auth_headers)
+        self.assertEqual(user_response.status_code, status.HTTP_200_OK)
+        self.assertEqual(
+            [entry['display'] for entry in user_response.json()['groups']],
+            ['Software Managers'],
+        )
 
         # 4. GET detail works.
         detail_url = reverse('api:scim:group-detail', kwargs={'tenant_slug': self.tenant.slug, 'pk': group.id})
         response = self.client.get(detail_url, **self.auth_headers)
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(response.json()["displayName"], "Software Managers")
+        self.assertEqual(response.json()["members"][0]["value"], str(self.admin_user.id))
 
         # 5. PUT / PATCH / DELETE are all rejected; the group is unchanged.
         put_payload = dict(post_payload, displayName="Renamed")
@@ -420,8 +450,8 @@ class SCIMProvisioningTests(TestCase):
         """active=false on a multi-tenant user suspends THIS tenant's membership (revoking
         access here) while leaving the global account and other tenants untouched; the SCIM
         response reflects the per-tenant state, and active=true restores access."""
-        from core.auth import TenantMembershipBackend
-        backend = TenantMembershipBackend()
+        from core.auth import MembershipBackend
+        backend = MembershipBackend()
 
         shared = User.objects.create_user(username="shared2", email="shared2@x.com", is_active=True)
         grant(shared, self.tenant, self.role_member)
@@ -482,9 +512,7 @@ class SCIMProvisioningTests(TestCase):
         self.assertFalse(solo.is_active)
 
     def test_scim_group_post_is_rejected(self):
-        """Group creation via tenant SCIM is rejected outright (groups are global and
-        managed centrally), so it cannot create a group, provision a foreign user, or
-        leak usernames."""
+        """Read-only tenant SCIM cannot create groups or provision foreign users."""
         foreign_role = Role.objects.create(tenant=self.other_tenant, name="Member", permissions=[])
         foreign_user = User.objects.create_user(username="foreignuser", email="foreign@other.com")
         grant(foreign_user, self.other_tenant, foreign_role)
