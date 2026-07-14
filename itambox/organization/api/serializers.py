@@ -1,5 +1,6 @@
 from rest_framework import serializers
 from django.contrib.contenttypes.models import ContentType
+from django.utils.translation import gettext_lazy as _
 
 from itambox.api.base import BaseModelSerializer
 from itambox.api.fields import ContentTypeField, validate_gfk_target_tenant
@@ -176,6 +177,18 @@ class TenantSerializer(BaseModelSerializer):
     group_id = serializers.PrimaryKeyRelatedField(
         queryset=TenantGroup.objects, source='group', write_only=True, required=False, allow_null=True
     )
+
+    def validate(self, attrs):
+        request = self.context.get('request')
+        if (
+            'group' in attrs
+            and request is not None
+            and not request.user.is_superuser
+        ):
+            raise serializers.ValidationError({
+                'group_id': _('Only superusers may assign or change a tenant group.'),
+            })
+        return super().validate(attrs)
 
     class Meta:
         model = Tenant

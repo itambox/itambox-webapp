@@ -12,7 +12,8 @@ These tests cover:
 
 Fixture note (RBAC stage-2 structural collapse): the old ``Provider`` model + Membership
 ``roles`` M2M are gone. A managing (MSP) organization is now a ``Tenant(is_provider=True)``;
-grants are per-row ``RoleAssignment``s created via the ``grant()`` test helper. The view's
+grants are canonical ``RoleGrant`` rows with explicit scopes, created via the ``grant()``
+test helper. The view's
 own permission check (``organization.change_membership`` on the membership's tenant) is
 unchanged — only the fixture setup below is migrated.
 """
@@ -44,7 +45,7 @@ class MembershipSendResetActionTests(TenantTestMixin, TestCase):
         )
 
         # The acting manager: a non-superuser staff member holding manager_role via an
-        # own-reach RoleAssignment at the managing tenant.
+        # own RoleGrant scope at the managing tenant.
         self.manager = User.objects.create_user(
             username="manager", email="manager@example.com",
             password="pw", is_active=True,

@@ -4,7 +4,7 @@ The badges in ``RoleTable``/``MembershipTable`` and the hand-written badges in
 ``role_form.html`` / ``role_detail.html`` / ``usergroup_detail.html`` go through
 these functions — the single source of truth for wording and markup. After the
 Provider collapse there is no role "scope" and no membership "kind" anymore;
-what remains meaningful is an assignment's ``reach`` (this tenant vs managed
+what remains meaningful is a grant's ``reach`` (this tenant vs managed
 tenants), whether a membership carries any managed reach ("staff"), and whether
 a role definition is shared with managed tenants.
 """
@@ -12,28 +12,28 @@ from django import template
 from django.utils.html import format_html
 from django.utils.translation import gettext_lazy as _
 
-from ..models import RoleAssignment
+from ..models import RoleGrant
 
 register = template.Library()
 
 _REACH_ICONS = {
-    RoleAssignment.REACH_MANAGED: 'mdi-domain',
-    RoleAssignment.REACH_OWN: 'mdi-office-building',
+    RoleGrant.REACH_MANAGED: 'mdi-domain',
+    RoleGrant.REACH_OWN: 'mdi-office-building',
 }
 
 
 @register.simple_tag
-def reach_badge(assignment_or_reach, icon=False, extra_class=''):
-    """Badge for an assignment's reach: purple for managed reach, blue for own tenant.
+def reach_badge(grant_or_reach, icon=False, extra_class=''):
+    """Badge for a grant's reach: purple for managed reach, blue for own tenant.
 
-    Accepts a ``RoleAssignment`` instance or a bare reach value string. Wording always
+    Accepts a ``RoleGrant`` instance or a bare reach value string. Wording always
     comes from ``REACH_CHOICES`` labels, never a hand-copied string.
     """
-    reach = getattr(assignment_or_reach, 'reach', assignment_or_reach)
-    if reach not in dict(RoleAssignment.REACH_CHOICES):
-        reach = RoleAssignment.REACH_OWN
-    label = dict(RoleAssignment.REACH_CHOICES)[reach]
-    is_managed = reach == RoleAssignment.REACH_MANAGED
+    reach = getattr(grant_or_reach, 'reach', grant_or_reach)
+    if reach not in dict(RoleGrant.REACH_CHOICES):
+        reach = RoleGrant.REACH_OWN
+    label = dict(RoleGrant.REACH_CHOICES)[reach]
+    is_managed = reach == RoleGrant.REACH_MANAGED
     css_class = 'bg-purple-lt text-purple' if is_managed else 'bg-blue-lt text-blue'
     if extra_class:
         css_class = f'{css_class} {extra_class}'

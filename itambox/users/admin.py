@@ -4,6 +4,8 @@ from django.contrib.auth.admin import UserAdmin as BaseUserAdmin
 from django.contrib.auth.models import Group
 from django.utils.translation import gettext_lazy as _
 
+from users.models import GroupMembership
+
 try:
     admin.site.unregister(Group)
 except admin.sites.NotRegistered:
@@ -29,3 +31,14 @@ class UserAdmin(BaseUserAdmin):
     add_fieldsets = BaseUserAdmin.add_fieldsets + (
         (_('Login capability'), {'fields': ('can_login',)}),
     )
+
+
+@admin.register(GroupMembership)
+class GroupMembershipAdmin(admin.ModelAdmin):
+    list_display = ('user_group', 'membership', 'source', 'external_id', 'added_at')
+    list_filter = ('source', 'user_group__tenant')
+    search_fields = (
+        'user_group__name', 'membership__user__username',
+        'membership__tenant__name', 'external_id',
+    )
+    raw_id_fields = ('user_group', 'membership', 'added_by')

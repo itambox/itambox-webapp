@@ -1,4 +1,4 @@
-"""Access seed mixin: users, per-tenant roles, memberships + role assignments.
+"""Access seed mixin: users, per-tenant roles, memberships, and grants.
 
 Designed to be mixed into ``Command`` in seed_data.py:
 
@@ -14,16 +14,20 @@ Designed to be mixed into ``Command`` in seed_data.py:
 by every later phase that needs an acting user).
 
 Grant shape (per-grant RBAC): a person is anchored to a tenant by ONE
-``Membership``; everything they may do is carried by ``RoleAssignment`` rows on
-that membership. MSP staff hold a single membership at the managing
-(``is_provider``) tenant — reach into the managed tenants is a managed-reach
-assignment, never a second membership.
+``Membership``; everything they may do is carried by ``RoleGrant`` rows and
+their additive ``RoleGrantScope`` children. MSP staff hold a single membership
+at the managing (``is_provider``) tenant; scopes project their grants into
+managed tenants, never a second membership.
 """
 
+from datetime import timedelta
 import random
 
 from django.contrib.auth import get_user_model
 from django.contrib.auth.models import Permission
+from django.utils import timezone
+
+from core.mfa import role_is_privileged
 
 User = get_user_model()
 
@@ -34,25 +38,74 @@ class SeedAccessMixin:
     """Mixin for Command(BaseCommand).  Reads/writes self._ registries."""
 
     def _seed_access(self):
-        from organization.models import Role, Membership, RoleAssignment
-        self.stdout.write('--- Access: users, roles, role assignments ---')
+        from organization.models import Membership, Role, RoleGrant, RoleGrantScope
 
-        def grant(user, tenant, role, reach=RoleAssignment.REACH_OWN, granted_by=None,
-                  managed_scope=None, assigned_tenants=None):
-            """Local mirror of ``core.tests.mixins.grant`` (seed must not import test code):
-            get_or_create the Membership anchor + one RoleAssignment row per grant."""
+        self.stdout.write('--- Access: users, roles, role grants ---')
+        seed_grant_expiry = timezone.now() + timedelta(days=3650)
+
+        def grant(
+            user,
+            tenant,
+            role,
+            *,
+            granted_by=None,
+            scope_type=RoleGrantScope.SCOPE_OWN,
+            scoped_tenants=None,
+            reason='',
+        ):
+            """Create a membership-backed grant and its requested additive scopes."""
             membership, _ = Membership.objects.get_or_create(user=user, tenant=tenant)
-            assignment, _ = RoleAssignment.objects.get_or_create(
-                membership=membership, role=role, reach=reach,
-                defaults={'granted_by': granted_by, 'managed_scope': managed_scope})
-            if assigned_tenants is not None:
-                # The single supported writer for explicit coverage (audited when a
-                # request context exists; seeds run without one, so just applies).
-                assignment.set_assigned_tenants(assigned_tenants, actor=granted_by)
-            return assignment
+            privileged = role_is_privileged(role)
+            if privileged and not reason.strip():
+                raise ValueError(f'Privileged seed grant {role} requires a reason.')
+
+            role_grant = RoleGrant.objects.filter(
+                membership=membership,
+                role=role,
+            ).order_by('pk').first()
+            if role_grant is None:
+                role_grant = RoleGrant(
+                    membership=membership,
+                    role=role,
+                    granted_by=granted_by,
+                    reason=reason,
+                    valid_until=seed_grant_expiry if privileged else None,
+                )
+                role_grant.full_clean()
+                role_grant.save()
+            elif privileged:
+                # ``--skip-drop`` refreshes seeded elevated grants to an
+                # explicitly justified, future-dated state.
+                role_grant.granted_by = granted_by
+                role_grant.reason = reason
+                role_grant.valid_until = seed_grant_expiry
+                role_grant.full_clean()
+                role_grant.save(update_fields=['granted_by', 'reason', 'valid_until'])
+
+            if scope_type == RoleGrantScope.SCOPE_TENANT:
+                if not scoped_tenants:
+                    raise ValueError('A tenant-scoped seed grant requires at least one tenant.')
+                scope_specs = [
+                    {'scope_type': scope_type, 'tenant': scoped_tenant}
+                    for scoped_tenant in (scoped_tenants or ())
+                ]
+            else:
+                scope_specs = [{'scope_type': scope_type}]
+
+            for scope_spec in scope_specs:
+                if RoleGrantScope.objects.filter(role_grant=role_grant, **scope_spec).exists():
+                    continue
+                scope = RoleGrantScope(role_grant=role_grant, **scope_spec)
+                scope.full_clean()
+                scope.save()
+            return role_grant
 
         # Build permission catalogs from Django's permission table.
-        all_perms = list(Permission.objects.select_related('content_type').all())
+        all_perms = [
+            permission
+            for permission in Permission.objects.select_related('content_type')
+            if permission.content_type.model_class() is not None
+        ]
 
         def perm_str(p):
             return f"{p.content_type.app_label}.{p.codename}"
@@ -98,7 +151,7 @@ class SeedAccessMixin:
 
         # MSP staff (login users). (username, full_name, kind, assigned_group_slugs or None=all)
         # ONE membership at the MSP tenant per person; reach into managed tenants is a
-        # managed-reach RoleAssignment (no per-customer-tenant staff memberships).
+        # scoped RoleGrant (no per-customer-tenant staff memberships).
         self._users = {}
         self._engineer_users = []
         msp_domain = 'northwind-it.com'
@@ -126,7 +179,12 @@ class SeedAccessMixin:
                 self._engineer_users.append(user)
 
             # Local power inside the MSP tenant itself (engineers = full Administrator).
-            grant(user, msp_tenant, self._roles[(msp_slug, own_role_for_kind[kind])])
+            grant(
+                user,
+                msp_tenant,
+                self._roles[(msp_slug, own_role_for_kind[kind])],
+                reason=f'Demo seed: {kind} access in the provider tenant.',
+            )
 
             # Reach into the managed tenants.
             if kind == 'account':
@@ -134,14 +192,14 @@ class SeedAccessMixin:
                 assigned = [t for slug, t in self._tenants.items()
                             if self._tenant_meta[slug]['group_slug'] in group_scope]
                 grant(user, msp_tenant, shared_readonly_role,
-                      reach=RoleAssignment.REACH_MANAGED,
-                      managed_scope=RoleAssignment.SCOPE_EXPLICIT,
-                      assigned_tenants=assigned)
+                      scope_type=RoleGrantScope.SCOPE_TENANT,
+                      scoped_tenants=assigned,
+                      reason='Demo seed: account access to assigned managed tenants.')
             else:
                 # Engineers and helpdesk operate every managed tenant as technicians.
                 grant(user, msp_tenant, msp_tech_role,
-                      reach=RoleAssignment.REACH_MANAGED,
-                      managed_scope=RoleAssignment.SCOPE_ALL)
+                      scope_type=RoleGrantScope.SCOPE_ALL_MANAGED,
+                      reason=f'Demo seed: {kind} access to all managed tenants.')
 
         if not self._engineer_users:
             self._engineer_users = list(self._users.values())
@@ -166,7 +224,8 @@ class SeedAccessMixin:
             for t in org['tenants']:
                 slug = t['slug']
                 grant(user, self._tenants[slug], self._roles[(slug, 'Administrator')],
-                      granted_by=self._provisioner)
+                      granted_by=self._provisioner,
+                      reason='Demo seed: customer administrator access.')
                 # Link this login to a holder profile in their first tenant.
                 holders = self._tenant_holders.get(slug, [])
                 if holders and holders[0].user_id is None:
@@ -203,7 +262,8 @@ class SeedAccessMixin:
                 holder.user = user
                 holder.save(update_fields=['user'])
                 grant(user, tenant, self._roles[(slug, role_name)],
-                      granted_by=self._provisioner)
+                      granted_by=self._provisioner,
+                      reason=f'Demo seed: {role_name} access for a customer user.')
                 if role_name == 'Asset Manager':
                     team_leads += 1
                 else:
@@ -211,15 +271,21 @@ class SeedAccessMixin:
 
         managed_count = sum(1 for t in self._tenants.values()
                             if t.managed_by_id == msp_tenant.pk)
-        staff_reach = RoleAssignment.objects.filter(
-            reach=RoleAssignment.REACH_MANAGED, membership__tenant=msp_tenant).count()
+        staff_reach = RoleGrant.objects.filter(
+            membership__tenant=msp_tenant,
+            scopes__scope_type__in=(
+                RoleGrantScope.SCOPE_TENANT,
+                RoleGrantScope.SCOPE_TENANT_GROUP,
+                RoleGrantScope.SCOPE_ALL_MANAGED,
+            ),
+        ).distinct().count()
         self.stdout.write(f'  MSP layer: 1 managing tenant, {managed_count} managed tenants, '
-                          f'{staff_reach} managed-reach staff assignments.')
+                          f'{staff_reach} managed-scope staff grants.')
 
         total_memberships = Membership.objects.count()
-        total_assignments = RoleAssignment.objects.count()
+        total_grants = RoleGrant.objects.count()
         self.stdout.write(f'  {team_leads} single-tenant team leads (Asset Manager), '
                           f'{end_users} single-tenant read-only end users.')
         self.stdout.write(f'  {len(self._roles)} roles, {len(self._users)} login users '
                           f'({customer_admins} customer admins), {total_memberships} memberships, '
-                          f'{total_assignments} role assignments.')
+                          f'{total_grants} role grants.')

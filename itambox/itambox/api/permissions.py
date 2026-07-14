@@ -7,6 +7,15 @@ class IsSuperuser(BasePermission):
         return bool(request.user and request.user.is_superuser)
 
 
+class IsSuperuserOrReadOnly(BasePermission):
+    """Allow normal read authorization, but reserve mutations for superusers."""
+
+    def has_permission(self, request, view):
+        return request.method in SAFE_METHODS or bool(
+            request.user and request.user.is_superuser
+        )
+
+
 class TokenPermissions(BasePermission):
     perms_map = {
         'GET': ['%(app_label)s.view_%(model_name)s'],
@@ -86,7 +95,7 @@ class TokenPermissions(BasePermission):
             return True
 
         # Pass the object so the permission check resolves against the object's own
-        # tenant (TenantMembershipBackend._resolve_tenant), making it self-sufficient
+        # tenant (MembershipBackend._resolve_tenant), making it self-sufficient
         # rather than relying on StrictTenantPermission to catch a tenant mismatch.
         if request.user.has_perms(perms, obj):
             return True

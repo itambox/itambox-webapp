@@ -24,7 +24,7 @@ from ..access import get_ancestor_tenant_group_ids
 def _grants_involving(tenant):
     """Live grants given BY or received BY ``tenant`` (direct or via group)."""
     q = Q(tenant=tenant) | Q(grantee_tenant=tenant)
-    ancestor_ids = get_ancestor_tenant_group_ids(tenant.group_id)
+    ancestor_ids = get_ancestor_tenant_group_ids(tenant.group_id, live_only=True)
     if ancestor_ids:
         q |= Q(grantee_tenant_group_id__in=ancestor_ids)
     return TenantResourceGrant.objects.filter(q)

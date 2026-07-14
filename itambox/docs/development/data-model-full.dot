@@ -138,11 +138,13 @@ digraph itambox_data_model {
     "organization.Membership" [fillcolor="#E2F4F3", label="Membership"];
     "organization.Region" [fillcolor="#E2F4F3", label="Region"];
     "organization.Role" [fillcolor="#E2F4F3", label="Role"];
-    "organization.RoleAssignment" [fillcolor="#E2F4F3", label="RoleAssignment"];
+    "organization.RoleGrant" [fillcolor="#E2F4F3", label="RoleGrant"];
+    "organization.RoleGrantScope" [fillcolor="#E2F4F3", label="RoleGrantScope"];
     "organization.Site" [fillcolor="#E2F4F3", label="Site"];
     "organization.SiteGroup" [fillcolor="#E2F4F3", label="SiteGroup"];
     "organization.Tenant" [fillcolor="#E2F4F3", label="Tenant"];
     "organization.TenantGroup" [fillcolor="#E2F4F3", label="TenantGroup"];
+    "organization.TenantResourceGrant" [fillcolor="#E2F4F3", label="TenantResourceGrant"];
   }
 
   subgraph cluster_procurement {
@@ -192,6 +194,7 @@ digraph itambox_data_model {
     fontsize=13;
     penwidth=1.2;
     style="rounded";
+    "users.GroupMembership" [fillcolor="#EDEDED", label="GroupMembership"];
     "users.Token" [fillcolor="#EDEDED", label="Token"];
     "users.User" [fillcolor="#EDEDED", label="User"];
     "users.UserGroup" [fillcolor="#EDEDED", label="UserGroup"];
@@ -308,9 +311,13 @@ digraph itambox_data_model {
   "inventory.AccessoryAssignment" -> "organization.Location" [label="assigned_location (optional, foreign key)", tooltip="assigned_location (optional, foreign key)", arrowhead="normal"];
   "inventory.AccessoryAssignment" -> "assets.Asset" [label="assigned_asset (optional, foreign key)", tooltip="assigned_asset (optional, foreign key)", arrowhead="normal"];
   "inventory.AccessoryAssignment" -> "organization.Location" [label="from_location (optional, foreign key)", tooltip="from_location (optional, foreign key)", arrowhead="normal"];
+  "inventory.AccessoryAssignment" -> "organization.Tenant" [label="source_tenant (optional, foreign key)", tooltip="source_tenant (optional, foreign key)", arrowhead="normal"];
+  "inventory.AccessoryAssignment" -> "organization.Tenant" [label="target_tenant (optional, foreign key)", tooltip="target_tenant (optional, foreign key)", arrowhead="normal"];
+  "inventory.AccessoryAssignment" -> "organization.TenantResourceGrant" [label="resource_grant (optional, foreign key)", tooltip="resource_grant (optional, foreign key)", arrowhead="normal"];
   "inventory.AccessoryAssignment" -> "inventory.Accessory" [label="accessory (required, foreign key)", tooltip="accessory (required, foreign key)", arrowhead="normal"];
   "inventory.AccessoryAssignment" -> "extras.Tag" [label="tags (optional, many-to-many)", tooltip="tags (optional, many-to-many)", arrowhead="normal", arrowtail="normal", dir="both", style="dashed"];
   "inventory.AccessoryStock" -> "organization.Location" [label="location (required, foreign key)", tooltip="location (required, foreign key)", arrowhead="normal"];
+  "inventory.AccessoryStock" -> "organization.Tenant" [label="tenant (required, foreign key)", tooltip="tenant (required, foreign key)", arrowhead="normal"];
   "inventory.AccessoryStock" -> "inventory.Accessory" [label="accessory (required, foreign key)", tooltip="accessory (required, foreign key)", arrowhead="normal"];
   "inventory.Component" -> "assets.Manufacturer" [label="manufacturer (required, foreign key)", tooltip="manufacturer (required, foreign key)", arrowhead="normal"];
   "inventory.Component" -> "assets.Category" [label="category (optional, foreign key)", tooltip="category (optional, foreign key)", arrowhead="normal"];
@@ -319,10 +326,14 @@ digraph itambox_data_model {
   "inventory.Component" -> "extras.Tag" [label="tags (optional, many-to-many)", tooltip="tags (optional, many-to-many)", arrowhead="normal", arrowtail="normal", dir="both", style="dashed"];
   "inventory.ComponentAllocation" -> "organization.AssetHolder" [label="assigned_holder (optional, foreign key)", tooltip="assigned_holder (optional, foreign key)", arrowhead="normal"];
   "inventory.ComponentAllocation" -> "organization.Location" [label="assigned_location (optional, foreign key)", tooltip="assigned_location (optional, foreign key)", arrowhead="normal"];
+  "inventory.ComponentAllocation" -> "organization.Tenant" [label="source_tenant (optional, foreign key)", tooltip="source_tenant (optional, foreign key)", arrowhead="normal"];
+  "inventory.ComponentAllocation" -> "organization.Tenant" [label="target_tenant (optional, foreign key)", tooltip="target_tenant (optional, foreign key)", arrowhead="normal"];
+  "inventory.ComponentAllocation" -> "organization.TenantResourceGrant" [label="resource_grant (optional, foreign key)", tooltip="resource_grant (optional, foreign key)", arrowhead="normal"];
   "inventory.ComponentAllocation" -> "inventory.Component" [label="component (required, foreign key)", tooltip="component (required, foreign key)", arrowhead="normal"];
   "inventory.ComponentAllocation" -> "assets.Asset" [label="assigned_asset (optional, foreign key)", tooltip="assigned_asset (optional, foreign key)", arrowhead="normal"];
   "inventory.ComponentAllocation" -> "organization.Location" [label="from_location (optional, foreign key)", tooltip="from_location (optional, foreign key)", arrowhead="normal"];
   "inventory.ComponentAllocation" -> "extras.Tag" [label="tags (optional, many-to-many)", tooltip="tags (optional, many-to-many)", arrowhead="normal", arrowtail="normal", dir="both", style="dashed"];
+  "inventory.ComponentStock" -> "organization.Tenant" [label="tenant (required, foreign key)", tooltip="tenant (required, foreign key)", arrowhead="normal"];
   "inventory.ComponentStock" -> "inventory.Component" [label="component (required, foreign key)", tooltip="component (required, foreign key)", arrowhead="normal"];
   "inventory.ComponentStock" -> "organization.Location" [label="location (required, foreign key)", tooltip="location (required, foreign key)", arrowhead="normal"];
   "inventory.Consumable" -> "assets.Manufacturer" [label="manufacturer (required, foreign key)", tooltip="manufacturer (required, foreign key)", arrowhead="normal"];
@@ -334,9 +345,13 @@ digraph itambox_data_model {
   "inventory.ConsumableAssignment" -> "organization.Location" [label="assigned_location (optional, foreign key)", tooltip="assigned_location (optional, foreign key)", arrowhead="normal"];
   "inventory.ConsumableAssignment" -> "assets.Asset" [label="assigned_asset (optional, foreign key)", tooltip="assigned_asset (optional, foreign key)", arrowhead="normal"];
   "inventory.ConsumableAssignment" -> "organization.Location" [label="from_location (optional, foreign key)", tooltip="from_location (optional, foreign key)", arrowhead="normal"];
+  "inventory.ConsumableAssignment" -> "organization.Tenant" [label="source_tenant (optional, foreign key)", tooltip="source_tenant (optional, foreign key)", arrowhead="normal"];
+  "inventory.ConsumableAssignment" -> "organization.Tenant" [label="target_tenant (optional, foreign key)", tooltip="target_tenant (optional, foreign key)", arrowhead="normal"];
+  "inventory.ConsumableAssignment" -> "organization.TenantResourceGrant" [label="resource_grant (optional, foreign key)", tooltip="resource_grant (optional, foreign key)", arrowhead="normal"];
   "inventory.ConsumableAssignment" -> "inventory.Consumable" [label="consumable (required, foreign key)", tooltip="consumable (required, foreign key)", arrowhead="normal"];
   "inventory.ConsumableAssignment" -> "extras.Tag" [label="tags (optional, many-to-many)", tooltip="tags (optional, many-to-many)", arrowhead="normal", arrowtail="normal", dir="both", style="dashed"];
   "inventory.ConsumableStock" -> "organization.Location" [label="location (required, foreign key)", tooltip="location (required, foreign key)", arrowhead="normal"];
+  "inventory.ConsumableStock" -> "organization.Tenant" [label="tenant (required, foreign key)", tooltip="tenant (required, foreign key)", arrowhead="normal"];
   "inventory.ConsumableStock" -> "inventory.Consumable" [label="consumable (required, foreign key)", tooltip="consumable (required, foreign key)", arrowhead="normal"];
   "inventory.Kit" -> "organization.Tenant" [label="tenant (optional, foreign key)", tooltip="tenant (optional, foreign key)", arrowhead="normal"];
   "inventory.Kit" -> "extras.Tag" [label="tags (optional, many-to-many)", tooltip="tags (optional, many-to-many)", arrowhead="normal", arrowtail="normal", dir="both", style="dashed"];
@@ -374,11 +389,13 @@ digraph itambox_data_model {
   "organization.Region" -> "organization.Region" [label="parent (optional, foreign key)", tooltip="parent (optional, foreign key)", arrowhead="normal"];
   "organization.Region" -> "extras.Tag" [label="tags (optional, many-to-many)", tooltip="tags (optional, many-to-many)", arrowhead="normal", arrowtail="normal", dir="both", style="dashed"];
   "organization.Role" -> "organization.Tenant" [label="tenant (required, foreign key)", tooltip="tenant (required, foreign key)", arrowhead="normal"];
-  "organization.RoleAssignment" -> "organization.Membership" [label="membership (required, foreign key)", tooltip="membership (required, foreign key)", arrowhead="normal"];
-  "organization.RoleAssignment" -> "organization.Role" [label="role (required, foreign key)", tooltip="role (required, foreign key)", arrowhead="normal"];
-  "organization.RoleAssignment" -> "organization.TenantGroup" [label="scope_group (optional, foreign key)", tooltip="scope_group (optional, foreign key)", arrowhead="normal"];
-  "organization.RoleAssignment" -> "users.User" [label="granted_by (optional, foreign key)", tooltip="granted_by (optional, foreign key)", arrowhead="normal"];
-  "organization.RoleAssignment" -> "organization.Tenant" [label="assigned_tenants (optional, many-to-many)", tooltip="assigned_tenants (optional, many-to-many)", arrowhead="normal", arrowtail="normal", dir="both", style="dashed"];
+  "organization.RoleGrant" -> "organization.Membership" [label="membership (optional, foreign key)", tooltip="membership (optional, foreign key)", arrowhead="normal"];
+  "organization.RoleGrant" -> "users.UserGroup" [label="user_group (optional, foreign key)", tooltip="user_group (optional, foreign key)", arrowhead="normal"];
+  "organization.RoleGrant" -> "organization.Role" [label="role (required, foreign key)", tooltip="role (required, foreign key)", arrowhead="normal"];
+  "organization.RoleGrant" -> "users.User" [label="granted_by (optional, foreign key)", tooltip="granted_by (optional, foreign key)", arrowhead="normal"];
+  "organization.RoleGrantScope" -> "organization.RoleGrant" [label="role_grant (required, foreign key)", tooltip="role_grant (required, foreign key)", arrowhead="normal"];
+  "organization.RoleGrantScope" -> "organization.Tenant" [label="tenant (optional, foreign key)", tooltip="tenant (optional, foreign key)", arrowhead="normal"];
+  "organization.RoleGrantScope" -> "organization.TenantGroup" [label="tenant_group (optional, foreign key)", tooltip="tenant_group (optional, foreign key)", arrowhead="normal"];
   "organization.Site" -> "organization.Region" [label="region (optional, foreign key)", tooltip="region (optional, foreign key)", arrowhead="normal"];
   "organization.Site" -> "organization.SiteGroup" [label="group (optional, foreign key)", tooltip="group (optional, foreign key)", arrowhead="normal"];
   "organization.Site" -> "organization.Tenant" [label="tenant (optional, foreign key)", tooltip="tenant (optional, foreign key)", arrowhead="normal"];
@@ -391,6 +408,10 @@ digraph itambox_data_model {
   "organization.Tenant" -> "extras.Tag" [label="tags (optional, many-to-many)", tooltip="tags (optional, many-to-many)", arrowhead="normal", arrowtail="normal", dir="both", style="dashed"];
   "organization.TenantGroup" -> "organization.TenantGroup" [label="parent (optional, foreign key)", tooltip="parent (optional, foreign key)", arrowhead="normal"];
   "organization.TenantGroup" -> "extras.Tag" [label="tags (optional, many-to-many)", tooltip="tags (optional, many-to-many)", arrowhead="normal", arrowtail="normal", dir="both", style="dashed"];
+  "organization.TenantResourceGrant" -> "organization.Tenant" [label="tenant (required, foreign key)", tooltip="tenant (required, foreign key)", arrowhead="normal"];
+  "organization.TenantResourceGrant" -> "organization.Tenant" [label="grantee_tenant (optional, foreign key)", tooltip="grantee_tenant (optional, foreign key)", arrowhead="normal"];
+  "organization.TenantResourceGrant" -> "organization.TenantGroup" [label="grantee_tenant_group (optional, foreign key)", tooltip="grantee_tenant_group (optional, foreign key)", arrowhead="normal"];
+  "organization.TenantResourceGrant" -> "users.User" [label="granted_by (optional, foreign key)", tooltip="granted_by (optional, foreign key)", arrowhead="normal"];
   "procurement.Contract" -> "organization.Tenant" [label="tenant (optional, foreign key)", tooltip="tenant (optional, foreign key)", arrowhead="normal"];
   "procurement.Contract" -> "assets.Supplier" [label="supplier (optional, foreign key)", tooltip="supplier (optional, foreign key)", arrowhead="normal"];
   "procurement.Contract" -> "procurement.PurchaseOrder" [label="purchase_order (optional, foreign key)", tooltip="purchase_order (optional, foreign key)", arrowhead="normal"];
@@ -425,10 +446,11 @@ digraph itambox_data_model {
   "subscriptions.Subscription" -> "extras.Tag" [label="tags (optional, many-to-many)", tooltip="tags (optional, many-to-many)", arrowhead="normal", arrowtail="normal", dir="both", style="dashed"];
   "subscriptions.SubscriptionAssignment" -> "subscriptions.Subscription" [label="subscription (required, foreign key)", tooltip="subscription (required, foreign key)", arrowhead="normal"];
   "subscriptions.SubscriptionAssignment" -> "users.User" [label="assigned_by (optional, foreign key)", tooltip="assigned_by (optional, foreign key)", arrowhead="normal"];
+  "users.GroupMembership" -> "users.UserGroup" [label="user_group (required, foreign key)", tooltip="user_group (required, foreign key)", arrowhead="normal"];
+  "users.GroupMembership" -> "organization.Membership" [label="membership (required, foreign key)", tooltip="membership (required, foreign key)", arrowhead="normal"];
+  "users.GroupMembership" -> "users.User" [label="added_by (optional, foreign key)", tooltip="added_by (optional, foreign key)", arrowhead="normal"];
   "users.Token" -> "users.User" [label="user (required, foreign key)", tooltip="user (required, foreign key)", arrowhead="normal"];
   "users.Token" -> "organization.Tenant" [label="tenant (required, foreign key)", tooltip="tenant (required, foreign key)", arrowhead="normal"];
-  "users.UserGroup" -> "organization.Tenant" [label="tenant (optional, foreign key)", tooltip="tenant (optional, foreign key)", arrowhead="normal"];
-  "users.UserGroup" -> "organization.Role" [label="roles (optional, many-to-many)", tooltip="roles (optional, many-to-many)", arrowhead="normal", arrowtail="normal", dir="both", style="dashed"];
-  "users.UserGroup" -> "users.User" [label="members (optional, many-to-many)", tooltip="members (optional, many-to-many)", arrowhead="normal", arrowtail="normal", dir="both", style="dashed"];
+  "users.UserGroup" -> "organization.Tenant" [label="tenant (required, foreign key)", tooltip="tenant (required, foreign key)", arrowhead="normal"];
   "users.UserPreference" -> "users.User" [label="user (required, one-to-one)", tooltip="user (required, one-to-one)", arrowhead="normal", arrowtail="normal", dir="both", penwidth=1.4];
 }

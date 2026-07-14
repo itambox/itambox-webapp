@@ -5,8 +5,8 @@ Covers the policy helpers (``core.mfa``), the enforcement middleware
 view (``core.views.mfa.MFASetupView``).
 
 MFA is enforced only for *local password* sessions of superusers / holders of a
-*privileged* role. Privilege keys on the role's ``permissions`` JSON (any
-add/change/delete capability) and the canonical privileged role names
+*privileged* role. Privilege keys on the role's ``permissions`` JSON (anything
+other than a read-only ``view_*`` capability) and the canonical privileged role names
 (``Admin``/``Manager``), never on a role-name regex — so a ``Manager`` and any
 custom role granting writes are covered, while a read-only ``Viewer`` is not.
 SSO/LDAP/SAML/OIDC sessions set a different ``_auth_user_backend`` on the session
@@ -54,7 +54,7 @@ class MFAPolicyHelperTests(TestCase):
     """user_requires_mfa(): superuser / privileged role -> True; read-only -> False.
 
     Privilege is keyed on the canonical privileged role names (Admin/Manager)
-    and on the ``permissions`` JSON (any add/change/delete grant), NOT a role
+    and on the ``permissions`` JSON (any non-view grant), NOT a role
     name regex. The legacy ``^(admin|owner)$`` regex let a fully-permissioned
     ``Manager`` (the role SSO auto-provisions) bypass MFA — these tests pin the
     privilege-based behaviour.
@@ -92,8 +92,8 @@ class MFAPolicyHelperTests(TestCase):
         )
         m_admin = grant(self.admin_user, self.tenant, admin_role).membership
 
-        # H4: a custom-named role that is NOT a canonical name but grants
-        # add/change/delete is privileged by its permissions.
+        # H4: a custom-named role that is NOT a canonical name but grants a
+        # non-view permission is privileged by its permissions.
         self.custom_user = User.objects.create_user(
             username='custom-mfa', email='custom-mfa@example.com', password='pw-mfa',
         )
@@ -272,7 +272,7 @@ class MFAEnforcementMiddlewareTests(TestCase):
         membership = Membership.objects.get(
             user=self.member_user, tenant=self.tenant,
         )
-        membership.assignments.all().delete()
+        membership.role_grants.all().delete()
         grant(self.member_user, self.tenant, privileged)
 
         # Next request on the SAME session is now gated.

@@ -1,6 +1,5 @@
 {% extends "generic/object_detail.html" %}
 {% load i18n %}
-{% load rbac_badges %}
 
 {% block extra_page_actions %}
 <a href="{% url 'users:usergroup_assign_users' pk=object.pk %}" class="btn btn-ghost-secondary">
@@ -14,10 +13,9 @@
     <i class="mdi mdi-information-outline me-2 mt-1"></i>
     <div class="small">
         {% blocktranslate trimmed %}
-        A <strong>User Group</strong> grants its roles to every member across one or more
-        tenants — no per-tenant membership is needed. This is the cross-tenant "team"
-        model. Contrast with a <strong>Membership</strong>, which binds one user to exactly
-        one tenant.
+        A <strong>User Group</strong> contains memberships from exactly one owning tenant.
+        Its role grants may apply there or be projected into explicitly scoped managed
+        tenants. Directory memberships remain controlled by their identity source.
         {% endblocktranslate %}
     </div>
 </div>
@@ -29,11 +27,7 @@
     <div class="col-md-4 mb-3">
         <label class="form-label text-muted">{% translate "SCIM scope / owning tenant" %}</label>
         <div>
-            {% if object.tenant %}
-                <a href="{% url 'organization:tenant_detail' pk=object.tenant.pk %}">{{ object.tenant.name }}</a>
-            {% else %}
-                <span class="badge bg-secondary-lt">{% translate "Global (UI-managed)" %}</span>
-            {% endif %}
+            <a href="{% url 'organization:tenant_detail' pk=object.tenant.pk %}">{{ object.tenant.name }}</a>
         </div>
     </div>
     <div class="col-md-4 mb-3">
@@ -66,28 +60,37 @@
 <hr class="my-4">
 
 <h4 class="card-title text-primary mb-3">{% translate "Assigned Roles" %}</h4>
-{% with roles=object.roles.all %}
-{% if roles %}
+{% if grants %}
 <div class="table-responsive">
     <table class="table table-hover align-middle border mb-0">
         <thead class="table-light">
             <tr>
                 <th>{% translate "Role" %}</th>
                 <th>{% translate "Tenant" %}</th>
-                <th>{% translate "Shared" %}</th>
+                <th>{% translate "Scope" %}</th>
                 <th>{% translate "Permissions" %}</th>
             </tr>
         </thead>
         <tbody>
-            {% for role in roles %}
+            {% for grant in grants %}
             <tr>
                 <td>
-                    <a href="{% url 'organization:role_detail' pk=role.pk %}">{{ role.name }}</a>
+                    <a href="{% url 'organization:role_detail' pk=grant.role.pk %}">{{ grant.role.name }}</a>
                 </td>
-                <td>{{ role.tenant.name }}</td>
-                <td>{% shared_role_badge role %}</td>
+                <td>{{ grant.role.tenant.name }}</td>
                 <td>
-                    <span class="badge bg-secondary-lt">{{ role.permissions|length }} {% translate "permission(s)" %}</span>
+                    {% for scope in grant.scopes.all %}
+                        <span class="badge bg-blue-lt me-1">
+                            {{ scope.get_scope_type_display }}
+                            {% if scope.tenant %}: {{ scope.tenant.name }}{% endif %}
+                            {% if scope.tenant_group %}: {{ scope.tenant_group.name }}{% endif %}
+                        </span>
+                    {% empty %}
+                        <span class="badge bg-danger-lt">{% translate "No scope" %}</span>
+                    {% endfor %}
+                </td>
+                <td>
+                    <span class="badge bg-secondary-lt">{{ grant.role.permissions|length }} {% translate "permission(s)" %}</span>
                 </td>
             </tr>
             {% endfor %}
@@ -97,5 +100,4 @@
 {% else %}
 <p class="text-muted"><em>{% translate "No roles assigned to this group." %}</em></p>
 {% endif %}
-{% endwith %}
 {% endblock object_details %}

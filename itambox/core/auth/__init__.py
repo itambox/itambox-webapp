@@ -1,6 +1,8 @@
 import logging
 from django.contrib.auth import get_user_model
 from django.contrib.auth.backends import ModelBackend
+from django.utils import timezone
+from core.auth.cache import synchronize_authorization_cache
 from core.managers import (
     get_current_tenant,
     get_current_tenant_group,
@@ -47,10 +49,9 @@ class MembershipBackend:
     ``user.has_perm(perm, obj=...)`` is the only authorization currency. A user's
     permissions inside a tenant ``T`` are the additive union of:
 
-      1. own-reach :class:`RoleAssignment` rows on their active ``Membership(T)``;
-      2. roles owned by ``T`` carried by an active ``UserGroup`` they belong to;
-      3. managed-reach assignments on their active membership at ``T.managed_by``
-         (the managing/provider tenant) whose refinement covers ``T``.
+      1. direct ``RoleGrant`` rows on an active Membership;
+      2. group ``RoleGrant`` rows inherited through membership-backed groups;
+      3. additive ``RoleGrantScope`` children that cover ``T``.
 
     There is no second resolution path: administering a provider tenant is simply
     holding permissions inside THAT tenant (rule 1/2 there), and nothing is
@@ -67,67 +68,32 @@ class MembershipBackend:
         Cached on the user as ``_perms_tenant_<pk>`` so the dozens of ``has_perm`` checks
         in a single request cost at most three queries.
         """
+        synchronize_authorization_cache(user_obj)
         cache_key = f'_perms_tenant_{tenant.pk}'
         if hasattr(user_obj, cache_key):
-            return getattr(user_obj, cache_key)
+            permissions, valid_until = getattr(user_obj, cache_key)
+            if valid_until is None or valid_until > timezone.now():
+                return permissions
 
-        # inline imports: avoid AppRegistryNotReady at module load
-        from organization.models import Role, RoleAssignment
+        # inline import: avoids AppRegistryNotReady at auth-backend import time.
+        from organization.rbac import resolve_effective_permissions_with_expiry
 
-        perms = set()
-
-        # (1) Own-reach assignments on the user's active membership in this tenant.
-        for perm_list in Role._base_manager.filter(
-            deleted_at__isnull=True,
-            assignments__reach=RoleAssignment.REACH_OWN,
-            assignments__membership__user=user_obj,
-            assignments__membership__tenant=tenant,
-            assignments__membership__is_active=True,
-        ).values_list('permissions', flat=True):
-            perms.update(perm_list or [])
-
-        # (2) Cross-tenant UserGroups: any active group the user belongs to whose attached
-        # roles are owned by THIS tenant. _base_manager keeps the lookup context-independent.
-        for perm_list in Role._base_manager.filter(
-            tenant=tenant, deleted_at__isnull=True,
-            user_groups__members=user_obj,
-            user_groups__is_active=True,
-            user_groups__deleted_at__isnull=True,
-        ).values_list('permissions', flat=True):
-            perms.update(perm_list or [])
-
-        # (3) Managed-reach projection from the managing tenant (single hop, depth 1).
-        if tenant.managed_by_id:
-            for assignment in RoleAssignment.objects.filter(
-                reach=RoleAssignment.REACH_MANAGED,
-                membership__user=user_obj,
-                membership__tenant_id=tenant.managed_by_id,
-                membership__is_active=True,
-            ).select_related('role', 'scope_group', 'membership'):
-                if assignment.role.deleted_at is None and assignment.covers_tenant(tenant):
-                    perms.update(assignment.role.permissions or [])
-
-        result = frozenset(perms)
-        setattr(user_obj, cache_key, result)
-        return result
+        permissions, valid_until = resolve_effective_permissions_with_expiry(
+            user_obj,
+            tenant,
+        )
+        setattr(user_obj, cache_key, (permissions, valid_until))
+        return permissions
 
     # ------------------------------------------------------------------ context resolution
     def _object_tenant(self, user_obj, obj):
         """The tenant carried by ``obj`` (a Tenant instance IS its own context), or
         ``None`` for a tenant-less (global/shared) object."""
-        from organization.models import Tenant, Membership
+        from organization.models import Tenant
 
         obj_tenant = getattr(obj, 'tenant', None)
         if obj_tenant is None and isinstance(obj, Tenant):
             obj_tenant = obj
-        if obj_tenant is not None:
-            # Pre-cache the (possibly None) active tenant membership for later calls.
-            mem_cache_key = f'_tenant_membership_{obj_tenant.pk}'
-            if not hasattr(user_obj, mem_cache_key):
-                membership = Membership.objects.filter(
-                    user=user_obj, tenant=obj_tenant, is_active=True,
-                ).first()
-                setattr(user_obj, mem_cache_key, membership)
         return obj_tenant
 
     def _group_scope_tenants(self, user_obj):
@@ -140,6 +106,7 @@ class MembershipBackend:
         permission gate agrees with what the scoped querysets will show.
         Cached on the user per group for the request's many ``has_perm`` calls.
         """
+        synchronize_authorization_cache(user_obj)
         if get_current_tenant() is not None:
             return None
         group = get_current_tenant_group()
@@ -165,7 +132,7 @@ class MembershipBackend:
 
     def _ambient_tenant(self, user_obj):
         """Single-tenant ambient context: bound membership → current tenant →
-        first active membership's tenant → first managed-reachable tenant."""
+        first active membership's tenant → first scoped managed tenant."""
         from organization.models import Tenant, Membership
 
         membership = get_current_membership()
@@ -249,7 +216,3 @@ class MembershipBackend:
         if tenant is None:
             return False
         return any(p.startswith(prefix) for p in self._effective_perms_for_tenant(user_obj, tenant))
-
-
-# Backwards-compat alias: existing settings reference TenantMembershipBackend.
-TenantMembershipBackend = MembershipBackend

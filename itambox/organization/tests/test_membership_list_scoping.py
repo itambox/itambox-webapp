@@ -16,7 +16,7 @@ from core.managers import (
     set_current_tenant, set_current_tenant_group, set_current_membership,
 )
 from core.tests.mixins import grant
-from organization.models import Membership, Role, RoleAssignment, Tenant, TenantGroup
+from organization.models import Membership, Role, RoleGrantScope, Tenant, TenantGroup
 
 User = get_user_model()
 
@@ -46,7 +46,7 @@ class MembershipListScopingTests(TestCase):
         grant(self.staff, self.provider, view_role)
         grant(
             self.staff, self.provider, view_role,
-            reach=RoleAssignment.REACH_MANAGED, managed_scope=RoleAssignment.SCOPE_ALL,
+            reach='managed', managed_scope=RoleGrantScope.SCOPE_ALL_MANAGED,
         )
 
         # Local members in each tenant.
@@ -140,8 +140,8 @@ class MembershipListScopingTests(TestCase):
             user = User.objects.create_user(username=username, password='pw')
             m = grant(user, self.provider, shared).membership
             # A second assignment per membership to exercise the assignment prefetch.
-            grant(user, self.provider, shared, reach=RoleAssignment.REACH_MANAGED,
-                  managed_scope=RoleAssignment.SCOPE_ALL)
+            grant(user, self.provider, shared, reach='managed',
+                  managed_scope=RoleGrantScope.SCOPE_ALL_MANAGED)
             return m
 
         for i in range(2):

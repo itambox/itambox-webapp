@@ -1,9 +1,9 @@
 from django.contrib import admin
-from django.utils.translation import gettext_lazy as _
 from .models import (
     Region, SiteGroup, Tenant, Location, TenantGroup, Site,
     Contact, ContactRole, ContactAssignment,
-    Membership, Role, RoleAssignment, CostCenter, TenantResourceGrant,
+    Membership, Role, RoleGrant, RoleGrantScope,
+    CostCenter, TenantResourceGrant,
 )
 
 
@@ -63,11 +63,23 @@ class MembershipAdmin(admin.ModelAdmin):
     search_fields = ('user__username', 'user__email', 'tenant__name')
 
 
-class RoleAssignmentAdmin(admin.ModelAdmin):
-    list_display = ('membership', 'role', 'reach', 'managed_scope', 'granted_by', 'granted_at')
-    list_filter = ('reach', 'managed_scope')
-    search_fields = ('membership__user__username', 'membership__tenant__name', 'role__name')
-    raw_id_fields = ('membership', 'role', 'granted_by')
+class RoleGrantScopeInline(admin.TabularInline):
+    model = RoleGrantScope
+    extra = 0
+    raw_id_fields = ('tenant', 'tenant_group')
+
+class RoleGrantAdmin(admin.ModelAdmin):
+    list_display = (
+        'role', 'membership', 'user_group', 'valid_until',
+        'granted_by', 'granted_at',
+    )
+    list_filter = ('role__tenant', 'valid_until')
+    search_fields = (
+        'role__name', 'membership__user__username',
+        'membership__tenant__name', 'user_group__name', 'reason',
+    )
+    raw_id_fields = ('membership', 'user_group', 'role', 'granted_by')
+    inlines = (RoleGrantScopeInline,)
 
 
 class RoleAdmin(admin.ModelAdmin):
@@ -111,7 +123,7 @@ admin.site.register(Contact, ContactAdmin)
 admin.site.register(ContactRole, ContactRoleAdmin)
 admin.site.register(ContactAssignment, ContactAssignmentAdmin)
 admin.site.register(Membership, MembershipAdmin)
-admin.site.register(RoleAssignment, RoleAssignmentAdmin)
+admin.site.register(RoleGrant, RoleGrantAdmin)
 admin.site.register(Role, RoleAdmin)
 admin.site.register(CostCenter, CostCenterAdmin)
 admin.site.register(TenantResourceGrant, TenantResourceGrantAdmin)

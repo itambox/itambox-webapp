@@ -1,8 +1,17 @@
-from django.test import TestCase
+from django.test import TestCase, override_settings
 from django.contrib.auth import get_user_model
 from django.urls import reverse
 from unittest.mock import patch
-from organization.models import Tenant, TenantGroup, AssetHolder, Role
+
+from core.tests.mixins import grant
+from organization.models import (
+    AssetHolder,
+    Membership,
+    Role,
+    RoleGrantScope,
+    Tenant,
+    TenantGroup,
+)
 
 User = get_user_model()
 
@@ -104,7 +113,6 @@ class TenantViewTests(TestCase):
 
     @patch('django_q.tasks.async_task')
     def test_tenant_ldap_sync_view(self, mock_async):
-        from django.test import override_settings
         with override_settings(ITAMBOX_TENANT_LDAP_CONFIGS={'acme-corp': {'SERVER_URI': 'ldap://localhost'}}):
             url = reverse('organization:tenant_ldap_sync', kwargs={'pk': self.tenant.pk})
             response = self.client.post(url)
@@ -115,6 +123,7 @@ class TenantViewTests(TestCase):
             job = Job.objects.filter(name=f"LDAP Sync: {self.tenant.name}").first()
             self.assertIsNotNone(job)
             self.assertEqual(job.status, Job.STATUS_PENDING)
+            self.assertEqual(job.tenant, self.tenant)
             
             # Verify async_task was called
             mock_async.assert_called_once()
@@ -122,6 +131,7 @@ class TenantViewTests(TestCase):
             self.assertEqual(args[0], 'core.tasks.sync_tenant_ldap_task')
             self.assertEqual(args[1], job.pk)
             self.assertEqual(args[2], self.tenant.slug)
+            self.assertEqual(args[4], self.tenant.pk)
 
     @patch('core.tasks.ldap.call_command')
     def test_sync_tenant_ldap_task(self, mock_call_command):
@@ -143,6 +153,78 @@ class TenantViewTests(TestCase):
         mock_call_command.assert_called_once()
         self.assertEqual(mock_call_command.call_args[0][0], 'sync_tenant_ldap')
         self.assertEqual(mock_call_command.call_args[1]['tenant'], self.tenant.slug)
+
+
+@override_settings(ITAMBOX_TENANT_LDAP_CONFIGS={
+    'ldap-sibling-a': {'SERVER_URI': 'ldap://a.example.test'},
+    'ldap-sibling-b': {'SERVER_URI': 'ldap://b.example.test'},
+})
+class TenantLDAPSyncGroupScopeTests(TestCase):
+    def setUp(self):
+        self.group = TenantGroup.objects.create(
+            name='LDAP sibling group', slug='ldap-sibling-group',
+        )
+        self.tenant_a = Tenant.objects.create(
+            name='LDAP Sibling A', slug='ldap-sibling-a', group=self.group,
+        )
+        self.tenant_b = Tenant.objects.create(
+            name='LDAP Sibling B', slug='ldap-sibling-b', group=self.group,
+        )
+        self.actor = User.objects.create_user(
+            username='ldap-sibling-admin', password='pw',
+        )
+        change_role = Role.objects.create(
+            tenant=self.tenant_a,
+            name='LDAP settings editor',
+            permissions=['organization.change_tenant'],
+        )
+        view_role = Role.objects.create(
+            tenant=self.tenant_b,
+            name='LDAP sibling viewer',
+            permissions=['organization.view_tenant'],
+        )
+        grant(self.actor, self.tenant_a, change_role)
+        grant(self.actor, self.tenant_b, view_role)
+
+        self.client.force_login(self.actor)
+        session = self.client.session
+        session['active_tenant_group_id'] = self.group.pk
+        session.pop('active_tenant_id', None)
+        session.save()
+
+    @patch('django_q.tasks.async_task')
+    def test_group_scope_cannot_borrow_change_permission_from_sibling(self, mock_async):
+        from core.models import Job
+
+        response = self.client.post(
+            reverse('organization:tenant_ldap_sync', args=[self.tenant_b.pk]),
+        )
+
+        self.assertEqual(response.status_code, 302)
+        self.assertEqual(response.url, self.tenant_b.get_absolute_url())
+        self.assertFalse(
+            Job.objects.filter(name=f'LDAP Sync: {self.tenant_b.name}').exists()
+        )
+        mock_async.assert_not_called()
+
+    @patch('django_q.tasks.async_task')
+    def test_group_scope_job_and_task_are_bound_to_requested_tenant(self, mock_async):
+        from core.models import Job
+
+        response = self.client.post(
+            reverse('organization:tenant_ldap_sync', args=[self.tenant_a.pk]),
+        )
+
+        self.assertEqual(response.status_code, 302)
+        job = Job.objects.get(name=f'LDAP Sync: {self.tenant_a.name}')
+        self.assertEqual(job.tenant, self.tenant_a)
+        mock_async.assert_called_once()
+        args = mock_async.call_args.args
+        self.assertEqual(args[0], 'core.tasks.sync_tenant_ldap_task')
+        self.assertEqual(args[1], job.pk)
+        self.assertEqual(args[2], self.tenant_a.slug)
+        self.assertEqual(args[3], self.actor.pk)
+        self.assertEqual(args[4], self.tenant_a.pk)
 
 class TenantGroupViewTests(TestCase):
     def setUp(self):
@@ -242,12 +324,11 @@ class MultiTenantMembershipTests(TestCase):
         )
 
     def test_tenant_membership_creation_and_string_representation(self):
-        from organization.models import RoleAssignment
-        from core.tests.mixins import grant
         membership = grant(self.user, self.tenant_a, self.role_member).membership
         self.assertTrue(
-            membership.assignments.filter(
-                role=self.role_member, reach=RoleAssignment.REACH_OWN,
+            membership.role_grants.filter(
+                role=self.role_member,
+                scopes__scope_type=RoleGrantScope.SCOPE_OWN,
             ).exists()
         )
         self.assertEqual(str(membership), f"{self.user} @ {self.tenant_a}")
@@ -256,8 +337,6 @@ class MultiTenantMembershipTests(TestCase):
         """The invitation flow is gone — holder binding now fires on membership creation
         (organization/signals.py bind_asset_holder_on_membership): an unclaimed AssetHolder
         in the joined tenant with a matching email (case-insensitive) is claimed."""
-        from organization.models import Membership, RoleAssignment
-
         holder = AssetHolder.objects.create(
             first_name="Beate",
             last_name="Office",
@@ -270,10 +349,7 @@ class MultiTenantMembershipTests(TestCase):
         joining_user = User.objects.create_user(
             username='beate_user', email='beate@example.com', password='password123'
         )
-        membership = Membership.objects.create(user=joining_user, tenant=self.tenant_a)
-        RoleAssignment.objects.create(
-            membership=membership, role=self.role_member, reach=RoleAssignment.REACH_OWN,
-        )
+        grant(joining_user, self.tenant_a, self.role_member)
 
         holder.refresh_from_db()
         self.assertEqual(holder.user, joining_user)
@@ -311,7 +387,6 @@ class MultiTenantMembershipTests(TestCase):
         self.assertIsNone(wrong_email.user)           # email must match
 
     def test_tenant_membership_backend_permissions(self):
-        from organization.models import Membership, RoleAssignment
         from core.managers import set_current_membership
 
         def _flush():
@@ -322,14 +397,10 @@ class MultiTenantMembershipTests(TestCase):
                     delattr(self.user, attr)
 
         def _set_role(membership, role):
-            # Successor to the deleted roles-M2M `.set([...])`: swap the single
-            # own-reach RoleAssignment row for this membership.
-            RoleAssignment.objects.filter(
-                membership=membership, reach=RoleAssignment.REACH_OWN,
+            membership.role_grants.filter(
+                scopes__scope_type=RoleGrantScope.SCOPE_OWN,
             ).delete()
-            RoleAssignment.objects.create(
-                membership=membership, role=role, reach=RoleAssignment.REACH_OWN,
-            )
+            grant(self.user, membership.tenant, role)
 
         reader_mem = Membership.objects.create(user=self.user,
             tenant=self.tenant_a,
@@ -358,17 +429,11 @@ class MultiTenantMembershipTests(TestCase):
         set_current_membership(None)
 
     def test_tenant_switching_middleware(self):
-        from organization.models import Membership, RoleAssignment
         from django.contrib.sessions.middleware import SessionMiddleware
         from itambox.middleware import TenantMiddleware
         from django.test import RequestFactory
 
-        mem = Membership.objects.create(user=self.user,
-            tenant=self.tenant_a,
-        )
-        RoleAssignment.objects.create(
-            membership=mem, role=self.role_member, reach=RoleAssignment.REACH_OWN,
-        )
+        mem = grant(self.user, self.tenant_a, self.role_member).membership
 
         factory = RequestFactory()
         

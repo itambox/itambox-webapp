@@ -323,6 +323,13 @@ class TenantDeleteView(ObjectDeleteView):
 class TenantBulkEditView(ObjectBulkEditView):
     queryset = Tenant.objects.all()
 
+    def _get_bulk_edit_form(self, data=None, model=None):
+        form = super()._get_bulk_edit_form(data=data, model=model)
+        if not self.request.user.is_superuser:
+            for field_name in ('group', 'is_provider', 'managed_by'):
+                form.fields.pop(field_name, None)
+        return form
+
 
 class TenantBulkDeleteView(ObjectBulkDeleteView):
     queryset = Tenant.objects.all()
@@ -336,13 +343,14 @@ def tenant_ldap_sync(request, pk):
     from django.db import transaction
     from core.models import Job
     from django.contrib.contenttypes.models import ContentType
-    from core.managers import get_current_tenant
     from django.urls import reverse, NoReverseMatch
 
     tenant = get_object_or_404(Tenant, pk=pk)
 
-    # Security check: verify user has permission to sync LDAP or change tenant
-    if not request.user.has_perm('organization.change_tenant'):
+    # LDAP synchronization mutates the tenant named by the URL. Under a
+    # tenant-group context an ambient permission can come from a sibling, so
+    # anchor authorization at this exact target tenant.
+    if not request.user.has_perm('organization.change_tenant', obj=tenant):
         messages.error(request, _("You do not have permission to sync directory settings for this tenant."))
         return redirect(tenant.get_absolute_url())
 
@@ -352,12 +360,11 @@ def tenant_ldap_sync(request, pk):
         return redirect(tenant.get_absolute_url())
 
     ct = ContentType.objects.get_for_model(Tenant)
-    current_tenant = get_current_tenant()
-    tenant_id = current_tenant.pk if current_tenant else None
+    tenant_id = tenant.pk
 
     job = Job.objects.create(
         name=f"LDAP Sync: {tenant.name}",
-        tenant=current_tenant,
+        tenant=tenant,
         model=ct,
         status=Job.STATUS_PENDING
     )
