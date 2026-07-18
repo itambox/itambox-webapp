@@ -126,7 +126,7 @@ class MultiTenantAuthTestCase(TestCase):
         # Search base check
         search = backend.settings.USER_SEARCH
         self.assertEqual(search.base_dn, "ou=users,dc=alpha,dc=com")
-        self.assertEqual(search.filter_format, "(uid=%(user)s)")
+        self.assertEqual(search.filterstr, "(uid=%(user)s)")
 
         # 3. Beta Tenant active
         set_current_tenant(self.tenant_beta)
@@ -136,7 +136,7 @@ class MultiTenantAuthTestCase(TestCase):
         # Search base check
         search = backend.settings.USER_SEARCH
         self.assertEqual(search.base_dn, "ou=staff,dc=beta,dc=org")
-        self.assertEqual(search.filter_format, "(sAMAccountName=%(user)s)")
+        self.assertEqual(search.filterstr, "(sAMAccountName=%(user)s)")
 
     def test_saml_config_loader_routing(self):
         """Test that load_saml_config compiles the correct SPConfig per active tenant."""
