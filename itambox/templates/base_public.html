@@ -7,6 +7,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover"/>
     <meta http-equiv="X-UA-Compatible" content="ie=edge"/>
     <title>{% block title %}{% translate "ITAMbox" %}{% endblock %}</title>
+    {% include "includes/pwa_head.html" %}
     <link rel="icon" type="image/svg+xml" href="{% static 'dist/brand/favicon.svg' %}">
     {# FOUC prevention: apply stored theme before CSS loads (same logic as base.html) #}
     <script nonce="{{ request.csp_nonce }}">
@@ -25,5 +26,6 @@
       {% endblock %}
     </div>
     {# JS bundled via itambox.js above #}
+    {% include "includes/pwa_service_worker.html" %}
   </body>
 </html>

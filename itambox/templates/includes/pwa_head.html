@@ -1,0 +1,9 @@
+{% load static %}
+{# Shared installability metadata for authenticated and public pages. #}
+<link rel="manifest" href="{% url 'manifest.json' %}">
+<meta name="theme-color" content="#4f46e5" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#818cf8" media="(prefers-color-scheme: dark)">
+<link rel="apple-touch-icon" href="{% static 'pwa/icon-192.png' %}">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
