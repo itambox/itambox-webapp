@@ -13,8 +13,8 @@ This guide covers the recommended Docker Compose installation path. A bare-metal
 ## 1. Clone and configure
 
 ```bash
-git clone https://github.com/your-org/itambox.git
-cd itambox
+git clone https://github.com/itambox/itambox-webapp.git
+cd itambox-webapp
 cp .env.example .env
 ```
 
