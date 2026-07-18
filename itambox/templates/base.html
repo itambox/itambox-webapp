@@ -12,18 +12,11 @@
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover"/>
     <meta http-equiv="X-UA-Compatible" content="ie=edge"/>
     <title>{% block title %}{% translate "ITAMbox" %}{% endblock %}</title>
-    
+
     <meta name="csrf-token" content="{{ csrf_token }}">
-    
-    {# PWA Meta and Capabilities #}
-    <link rel="manifest" href="{% url 'manifest.json' %}">
-    <meta name="theme-color" content="#4f46e5" media="(prefers-color-scheme: light)">
-    <meta name="theme-color" content="#818cf8" media="(prefers-color-scheme: dark)">
+
+    {% include "includes/pwa_head.html" %}
     <link rel="icon" type="image/svg+xml" href="{% static 'dist/brand/favicon.svg' %}">
-    <meta name="apple-mobile-web-app-capable" content="yes">
-    <meta name="mobile-web-app-capable" content="yes">
-    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-    <link rel="apple-touch-icon" href="{% static 'dist/logo-icon-192.png' %}">
     {# FOUC prevention: apply stored theme before CSS loads #}
     <script nonce="{{ request.csp_nonce }}">
         (function(){try{var t=localStorage.getItem('itambox.theme');if(t)document.documentElement.setAttribute('data-bs-theme',t);else if(window.matchMedia('(prefers-color-scheme:dark)').matches)document.documentElement.setAttribute('data-bs-theme','dark');}catch(e){}})();
@@ -113,17 +106,6 @@
     {# Standalone OOB target for dynamic title swaps #}
     <span id="page-title-block" style="display:none" aria-hidden="true">{% translate "ITAMbox" %}</span>
 
-    {# PWA Service Worker Registration #}
-    <script nonce="{{ request.csp_nonce }}">
-        if ('serviceWorker' in navigator) {
-            window.addEventListener('load', function() {
-                navigator.serviceWorker.register('{% url "service-worker.js" %}').then(function(registration) {
-                    console.log('ServiceWorker registration successful with scope: ', registration.scope);
-                }, function(err) {
-                    console.log('ServiceWorker registration failed: ', err);
-                });
-            });
-        }
-    </script>
+    {% include "includes/pwa_service_worker.html" %}
 </body>
 </html>

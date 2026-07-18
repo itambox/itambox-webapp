@@ -1,4 +1,4 @@
-const CACHE_NAME = 'itambox-pwa-cache-v24';
+const CACHE_NAME = 'itambox-pwa-cache-v25';
 const OFFLINE_URL = '/offline/';
 
 // Core assets to pre-cache on service worker installation
@@ -8,9 +8,8 @@ const PRECACHE_ASSETS = [
   '/static/dist/itambox.js',
   '/static/dist/vendor/bootstrap.bundle.min.js',
   '/static/dist/vendor/htmx.min.js',
-  '/static/dist/logo-icon-192.png',
-  '/static/dist/logo-icon-512.png',
-  '/static/dist/logo-icon.svg'
+  '/static/pwa/icon-192.png',
+  '/static/pwa/icon-512.png'
 ];
 
 self.addEventListener('install', (event) => {
