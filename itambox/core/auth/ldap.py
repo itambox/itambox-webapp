@@ -3,7 +3,7 @@ import sys
 from django.conf import settings
 from core.managers import get_current_tenant, set_current_tenant
 
-try:
+try:  # noqa: C901
     import ldap
     from django_auth_ldap.backend import LDAPBackend
     from django_auth_ldap.config import LDAPSearch
@@ -18,7 +18,7 @@ except ImportError:
         RES_SEARCH_ENTRY = 100
         OPT_REFERRALS = 2
         OPT_PROTOCOL_VERSION = 4
-        
+
         class LDAPError(Exception):
             pass
 
@@ -28,12 +28,16 @@ except ImportError:
     class DummyLDAPConnection:
         def set_option(self, *args, **kwargs):
             pass
+
         def simple_bind_s(self, *args, **kwargs):
             pass
+
         def search(self, *args, **kwargs):
             return 1
+
         def result(self, *args, **kwargs):
             return None, None
+
         def unbind_s(self):
             pass
 
@@ -41,10 +45,13 @@ except ImportError:
     sys.modules['ldap'] = ldap
 
     class LDAPSearch:
-        def __init__(self, base_dn, scope, filter_format=None):
+        __slots__ = ('base_dn', 'scope', 'filterstr', 'attrlist')
+
+        def __init__(self, base_dn, scope, filterstr="(objectClass=*)", attrlist=None):
             self.base_dn = base_dn
             self.scope = scope
-            self.filter_format = filter_format
+            self.filterstr = filterstr
+            self.attrlist = attrlist
 
     class DummySettings:
         def __getattr__(self, name):
@@ -85,7 +92,7 @@ class TenantLDAPSettings:
     def __init__(self, config):
         self._config = config
 
-    def __getattr__(self, name):
+    def __getattr__(self, name):  # noqa: C901
         # Resolve config lookup (check both UPPERCASE and lowercase keys)
         val = self._config.get(name)
         if val is None:
@@ -97,7 +104,7 @@ class TenantLDAPSettings:
                 base_dn = val.get('base_dn') or val.get('base') or ''
                 filter_str = val.get('filter') or '(uid=%(user)s)'
                 scope_str = val.get('scope') or 'SUBTREE'
-                
+
                 scope = ldap.SCOPE_SUBTREE
                 if scope_str.upper() == 'BASE':
                     scope = ldap.SCOPE_BASE
@@ -162,7 +169,7 @@ class MultiTenantLDAPBackend(LDAPBackend):
         except Exception:
             return False
 
-    def authenticate(self, request, username=None, password=None, **kwargs):
+    def authenticate(self, request, username=None, password=None, **kwargs):  # noqa: C901
         # Resolve active tenant from UPN/email suffix if not already set
         if not get_current_tenant() and username and '@' in username:
             parts = username.split('@')
@@ -198,12 +205,12 @@ class MultiTenantLDAPBackend(LDAPBackend):
             self.sync_ldap_user_profile_and_memberships(user)
         return user
 
-    def sync_ldap_user_profile_and_memberships(self, user):
+    def sync_ldap_user_profile_and_memberships(self, user):  # noqa: C901
         tenant = get_current_tenant()
         if not tenant:
             return
 
-        from organization.models import AssetHolder, Role, Membership
+        from organization.models import AssetHolder
         from django.db.utils import IntegrityError
         from django.db import transaction
 
@@ -227,7 +234,7 @@ class MultiTenantLDAPBackend(LDAPBackend):
                                 return val.decode('utf-8')
                             return str(val)
                         return None
-                    
+
                     upn = get_attr('userPrincipalName') or get_attr('mail')
                     email = get_attr('mail') or email
                     first_name = get_attr('givenName') or first_name
@@ -318,7 +325,7 @@ class MultiTenantLDAPBackend(LDAPBackend):
         from organization.forms.role_form import MATRIX_MODELS
         from django.contrib.auth.models import Permission
         perms = set()
-        for key, info in MATRIX_MODELS.items():
+        for _key, info in MATRIX_MODELS.items():
             app = info['app']
             model = info['model_name']
             if role_name == 'Admin':
@@ -357,4 +364,3 @@ class MultiTenantLDAPBackend(LDAPBackend):
 
     def get_all_permissions(self, user_obj, obj=None):
         return set()
-
