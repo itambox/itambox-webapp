@@ -1,4 +1,3 @@
-import json
 from unittest.mock import patch, MagicMock
 from django.test import TestCase, override_settings
 from django.core.management import call_command, CommandError
@@ -66,7 +65,7 @@ class MultiTenantAuthTestCase(TestCase):
         set_current_tenant(None)
         self.tenant_alpha = Tenant.objects.create(name="Alpha Tenant", slug="tenant-alpha")
         self.tenant_beta = Tenant.objects.create(name="Beta Tenant", slug="tenant-beta")
-        
+
         # Patch xmlsec binary lookup to avoid SigverError on environments without xmlsec
         import sys
         self.xmlsec_patcher = patch('saml2.sigver.get_xmlsec_binary', return_value=sys.executable)
@@ -75,7 +74,7 @@ class MultiTenantAuthTestCase(TestCase):
         # Patch requests.request to return dummy metadata XML
         self.requests_patcher = patch('requests.request')
         self.mock_request = self.requests_patcher.start()
-        
+
         mock_resp = MagicMock()
         mock_resp.status_code = 200
         mock_resp.text = """<?xml version="1.0" encoding="utf-8"?>
@@ -89,6 +88,7 @@ class MultiTenantAuthTestCase(TestCase):
 
         # Patch builtins.open to return dummy metadata XML for local file checks
         original_open = open
+
         def mock_open_file(file, *args, **kwargs):
             if isinstance(file, str) and 'beta_metadata.xml' in file:
                 from io import BytesIO
@@ -110,8 +110,13 @@ class MultiTenantAuthTestCase(TestCase):
 
         # 1. No active tenant context
         set_current_tenant(None)
-        # Should fallback to global defaults or raises default attribute access
-        self.assertIsNone(backend.settings.SERVER_URI)
+        # backend.settings.SERVER_URI itself is platform-dependent: with real
+        # django-auth-ldap installed it falls back to the library default
+        # (ldap://localhost), while the Windows dummy backend (no python-ldap
+        # wheel) returns None. The stable, platform-independent guarantee is
+        # that the backend is not configured without a tenant context, since
+        # _is_configured() requires USER_SEARCH or USER_DN_TEMPLATE.
+        self.assertFalse(backend._is_configured())
 
         # 2. Alpha Tenant active
         set_current_tenant(self.tenant_alpha)
@@ -121,7 +126,7 @@ class MultiTenantAuthTestCase(TestCase):
         # Search base check
         search = backend.settings.USER_SEARCH
         self.assertEqual(search.base_dn, "ou=users,dc=alpha,dc=com")
-        self.assertEqual(search.filter_format, "(uid=%(user)s)")
+        self.assertEqual(search.filterstr, "(uid=%(user)s)")
 
         # 3. Beta Tenant active
         set_current_tenant(self.tenant_beta)
@@ -131,7 +136,7 @@ class MultiTenantAuthTestCase(TestCase):
         # Search base check
         search = backend.settings.USER_SEARCH
         self.assertEqual(search.base_dn, "ou=staff,dc=beta,dc=org")
-        self.assertEqual(search.filter_format, "(sAMAccountName=%(user)s)")
+        self.assertEqual(search.filterstr, "(sAMAccountName=%(user)s)")
 
     def test_saml_config_loader_routing(self):
         """Test that load_saml_config compiles the correct SPConfig per active tenant."""
@@ -159,7 +164,7 @@ class MultiTenantAuthTestCase(TestCase):
         # Mock simple_bind_s and search results to prevent actual LDAP connection
         with patch('django_auth_ldap.backend.LDAPBackend.authenticate') as mock_auth:
             mock_auth.return_value = None
-            
+
             # Auth query with UPN username matching tenant alpha slug
             backend.authenticate(request=None, username="user1@tenant-alpha", password="password")
             self.assertEqual(get_current_tenant(), self.tenant_alpha)
@@ -175,10 +180,10 @@ class MultiTenantAuthTestCase(TestCase):
         # Setup LDAP connection mocks
         mock_conn = MagicMock()
         mock_ldap_init.return_value = mock_conn
-        
+
         # Mock search results returning 1 user entry: 'john.doe'
         mock_conn.search.return_value = 1
-        
+
         # Mock connection results generator: first search result entry then None
         mock_conn.result.side_effect = [
             (ldap.RES_SEARCH_ENTRY, [

@@ -3,11 +3,12 @@ from django.urls import reverse
 from rest_framework.test import APITestCase
 from rest_framework import status
 from subscriptions.models import (
-    Provider, Subscription, SubscriptionAssignment,
+    Provider, Subscription,
     SubscriptionTypeChoices, SubscriptionStatusChoices, BillingCycleChoices,
 )
 
 User = get_user_model()
+
 
 class SubscriptionAPITests(APITestCase):
     def setUp(self):
@@ -62,8 +63,19 @@ class SubscriptionAPITests(APITestCase):
         )
         grant(self.staff, self.tenant, role)
 
+    def _login_as_staff(self):
+        # TokenPermissions fails closed when a non-superuser request has no
+        # active tenant. force_authenticate() bypasses TenantMiddleware's
+        # session-based tenant binding entirely, so authenticate through a
+        # real session and bind the active tenant the same way a browser
+        # login would.
+        self.client.force_login(self.staff)
+        session = self.client.session
+        session['active_tenant_id'] = self.tenant.pk
+        session.save()
+
     def test_provider_api_crud(self):
-        self.client.force_authenticate(user=self.staff)
+        self._login_as_staff()
 
         # List
         list_url = reverse('api:subscriptions_api:provider-list')
@@ -96,7 +108,7 @@ class SubscriptionAPITests(APITestCase):
         self.assertEqual(response.status_code, status.HTTP_204_NO_CONTENT)
 
     def test_subscription_api_crud(self):
-        self.client.force_authenticate(user=self.staff)
+        self._login_as_staff()
 
         # List
         list_url = reverse('api:subscriptions_api:subscription-list')

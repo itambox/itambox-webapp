@@ -67,6 +67,17 @@ class JournalEntryTenantIsolationAPITests(APITestCase):
             content_object=self.asset_b, user=self.superuser, comment='B note',
         )
 
+    def _login_as(self, user, tenant):
+        # TokenPermissions fails closed when a non-superuser request has no
+        # active tenant. force_authenticate() bypasses TenantMiddleware's
+        # session-based tenant binding entirely, so authenticate through a
+        # real session and bind the active tenant the same way a browser
+        # login would.
+        self.client.force_login(user)
+        session = self.client.session
+        session['active_tenant_id'] = tenant.pk
+        session.save()
+
     def _ids(self, resp):
         data = resp.data
         rows = data['results'] if isinstance(data, dict) and 'results' in data else data
@@ -79,7 +90,7 @@ class JournalEntryTenantIsolationAPITests(APITestCase):
         # Mutating API requests require an If-Match precondition (optimistic
         # concurrency). The weak ETag is W/"<updated_at iso>".
         entry.refresh_from_db()
-        return f'W/"{entry.updated_at.isoformat()}"'
+        return 'W/"{0}"'.format(entry.updated_at.isoformat())
 
     # --- read scoping -------------------------------------------------------
 
@@ -88,7 +99,7 @@ class JournalEntryTenantIsolationAPITests(APITestCase):
         self.assertEqual(self.entry_b.tenant, self.tenant_b)
 
     def test_list_scoped_to_own_tenant(self):
-        self.client.force_authenticate(user=self.staff_a)
+        self._login_as(self.staff_a, self.tenant_a)
         resp = self.client.get(reverse('api:extras_api:journalentry-list'))
         self.assertEqual(resp.status_code, status.HTTP_200_OK)
         ids = self._ids(resp)
@@ -96,7 +107,7 @@ class JournalEntryTenantIsolationAPITests(APITestCase):
         self.assertNotIn(self.entry_b.pk, ids)
 
     def test_retrieve_other_tenant_entry_404(self):
-        self.client.force_authenticate(user=self.staff_a)
+        self._login_as(self.staff_a, self.tenant_a)
         resp = self.client.get(self._detail(self.entry_b.pk))
         self.assertEqual(resp.status_code, status.HTTP_404_NOT_FOUND)
 
@@ -116,7 +127,7 @@ class JournalEntryTenantIsolationAPITests(APITestCase):
             content_object=tag, user=self.superuser, comment='global note',
         )
         self.assertIsNone(global_entry.tenant)
-        self.client.force_authenticate(user=self.staff_a)
+        self._login_as(self.staff_a, self.tenant_a)
         resp = self.client.get(reverse('api:extras_api:journalentry-list'))
         self.assertIn(global_entry.pk, self._ids(resp))
         self.assertEqual(self.client.get(self._detail(global_entry.pk)).status_code, status.HTTP_200_OK)
@@ -124,7 +135,7 @@ class JournalEntryTenantIsolationAPITests(APITestCase):
     # --- create boundary ----------------------------------------------------
 
     def test_create_on_own_object(self):
-        self.client.force_authenticate(user=self.staff_a)
+        self._login_as(self.staff_a, self.tenant_a)
         resp = self.client.post(
             reverse('api:extras_api:journalentry-list'),
             data={'model': self.asset_ct_str, 'object_id': self.asset_a.pk, 'comment': 'new'},
@@ -137,7 +148,7 @@ class JournalEntryTenantIsolationAPITests(APITestCase):
 
     def test_create_on_other_tenant_object_rejected(self):
         # Tenant-scoped target (Asset): resolved out by the scoped manager.
-        self.client.force_authenticate(user=self.staff_a)
+        self._login_as(self.staff_a, self.tenant_a)
         resp = self.client.post(
             reverse('api:extras_api:journalentry-list'),
             data={'model': self.asset_ct_str, 'object_id': self.asset_b.pk, 'comment': 'sneaky'},
@@ -151,7 +162,7 @@ class JournalEntryTenantIsolationAPITests(APITestCase):
         # Job is tenant-owned but its default manager is NOT tenant-scoping, so a
         # plain .exists() guard would pass. validate_gfk_target_tenant compares
         # obj.tenant to the active tenant and must reject the tenant-B Job.
-        self.client.force_authenticate(user=self.staff_a)
+        self._login_as(self.staff_a, self.tenant_a)
         resp = self.client.post(
             reverse('api:extras_api:journalentry-list'),
             data={'model': 'core.job', 'object_id': self.job_b.pk, 'comment': 'cross'},
@@ -164,7 +175,7 @@ class JournalEntryTenantIsolationAPITests(APITestCase):
     # --- update / delete scoping & immutability -----------------------------
 
     def test_update_own_entry_succeeds(self):
-        self.client.force_authenticate(user=self.staff_a)
+        self._login_as(self.staff_a, self.tenant_a)
         resp = self.client.patch(
             self._detail(self.entry_a.pk), {'comment': 'edited'}, format='json',
             HTTP_IF_MATCH=self._etag(self.entry_a),
@@ -174,21 +185,21 @@ class JournalEntryTenantIsolationAPITests(APITestCase):
         self.assertEqual(self.entry_a.comment, 'edited')
 
     def test_update_other_tenant_entry_404(self):
-        self.client.force_authenticate(user=self.staff_a)
+        self._login_as(self.staff_a, self.tenant_a)
         resp = self.client.patch(self._detail(self.entry_b.pk), {'comment': 'hijack'}, format='json')
         self.assertEqual(resp.status_code, status.HTTP_404_NOT_FOUND)
         self.entry_b.refresh_from_db()
         self.assertEqual(self.entry_b.comment, 'B note')
 
     def test_delete_own_entry_succeeds(self):
-        self.client.force_authenticate(user=self.staff_a)
+        self._login_as(self.staff_a, self.tenant_a)
         resp = self.client.delete(
             self._detail(self.entry_a.pk), HTTP_IF_MATCH=self._etag(self.entry_a),
         )
         self.assertEqual(resp.status_code, status.HTTP_204_NO_CONTENT)
 
     def test_delete_other_tenant_entry_404(self):
-        self.client.force_authenticate(user=self.staff_a)
+        self._login_as(self.staff_a, self.tenant_a)
         resp = self.client.delete(self._detail(self.entry_b.pk))
         self.assertEqual(resp.status_code, status.HTTP_404_NOT_FOUND)
         # entry_b survives (objects fails open in the test body -> sees all).
@@ -196,7 +207,7 @@ class JournalEntryTenantIsolationAPITests(APITestCase):
 
     def test_update_does_not_reassign_author(self):
         # A different same-tenant member edits the entry; authorship is immutable.
-        self.client.force_authenticate(user=self.staff_a2)
+        self._login_as(self.staff_a2, self.tenant_a)
         resp = self.client.patch(
             self._detail(self.entry_a.pk), {'comment': 'by a2'}, format='json',
             HTTP_IF_MATCH=self._etag(self.entry_a),
@@ -208,7 +219,7 @@ class JournalEntryTenantIsolationAPITests(APITestCase):
 
     def test_update_cannot_retarget_object(self):
         # model/object_id are immutable on update: a retarget attempt is ignored.
-        self.client.force_authenticate(user=self.staff_a)
+        self._login_as(self.staff_a, self.tenant_a)
         resp = self.client.patch(
             self._detail(self.entry_a.pk),
             {'object_id': self.asset_b.pk}, format='json',
