@@ -17,6 +17,7 @@ Including another URLconf
 from django.contrib import admin
 from django.urls import path, include
 from django.views.generic import TemplateView, RedirectView
+from django.views.decorators.cache import never_cache
 from django.views.i18n import JavaScriptCatalog
 from assets import views as asset_views # Import the assets views
 from extras.dashboard import views as dashboard_views
@@ -50,8 +51,16 @@ from core.views.mfa import MFASetupView
 # Main URL Patterns
 urlpatterns = [
     # PWA Routes
-    path('manifest.json', TemplateView.as_view(template_name='manifest.json', content_type='application/json'), name='manifest.json'),
-    path('service-worker.js', TemplateView.as_view(template_name='service-worker.js', content_type='application/javascript'), name='service-worker.js'),
+    path(
+        'manifest.json',
+        never_cache(TemplateView.as_view(template_name='manifest.json', content_type='application/json')),
+        name='manifest.json',
+    ),
+    path(
+        'service-worker.js',
+        never_cache(TemplateView.as_view(template_name='service-worker.js', content_type='application/javascript')),
+        name='service-worker.js',
+    ),
     path('offline/', TemplateView.as_view(template_name='offline.html'), name='offline'),
 
     path('admin/', admin.site.urls),
