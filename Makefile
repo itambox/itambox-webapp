@@ -1,6 +1,21 @@
 # ==============================================================================
 # ITAMbox Development Automation Makefile
 # ==============================================================================
+#
+# POSIX-oriented: these recipes require a Bourne-compatible shell and GNU
+# Make. On Windows, use Git Bash or WSL; GNU Make must be installed separately
+# (e.g. via Chocolatey, Scoop, or MSYS2). Native PowerShell/cmd cannot run
+# `make` recipes.
+
+ifeq ($(OS),Windows_NT)
+    HOST_PYTHON := python
+    VENV_BIN := .venv/Scripts
+else
+    HOST_PYTHON := python3
+    VENV_BIN := .venv/bin
+endif
+
+VENV_PYTHON := $(VENV_BIN)/python
 
 .PHONY: help setup run migrate seed test lint clean
 
@@ -17,27 +32,26 @@ help:
 	@echo "  make clean   - Remove cache, temporary database, and virtual environment"
 
 setup:
-	python3 -m venv .venv
-	.venv/bin/pip install --upgrade pip
-	.venv/bin/pip install -r requirements.txt
-	.venv/bin/pip install -e .[postgres,redis,dev]
-	.venv/bin/pre-commit install
+	$(HOST_PYTHON) -m venv .venv
+	$(VENV_PYTHON) -m pip install --upgrade pip
+	$(VENV_PYTHON) -m pip install -r requirements-dev.txt
+	$(VENV_PYTHON) -m pre_commit install
 
 run:
-	.venv/bin/python itambox/manage.py migrate
-	ITAMBOX_DEBUG=true .venv/bin/python itambox/manage.py runserver
+	$(VENV_PYTHON) itambox/manage.py migrate
+	ITAMBOX_DEBUG=true $(VENV_PYTHON) itambox/manage.py runserver
 
 migrate:
-	.venv/bin/python itambox/manage.py migrate
+	$(VENV_PYTHON) itambox/manage.py migrate
 
 seed:
-	.venv/bin/python itambox/manage.py seed_data
+	$(VENV_PYTHON) itambox/manage.py seed_data
 
 test:
-	cd itambox && ../.venv/bin/pytest
+	cd itambox && ../$(VENV_PYTHON) -m pytest
 
 lint:
-	.venv/bin/pre-commit run --all-files
+	$(VENV_PYTHON) -m pre_commit run --all-files
 
 clean:
 	find . -type d -name "__pycache__" -exec rm -rf {} +

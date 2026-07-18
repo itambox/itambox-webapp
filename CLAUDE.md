@@ -70,7 +70,11 @@ Version pins live in `itambox/requirements.txt` and `pyproject.toml` — check t
 
 ## Development commands
 
-All commands run from `itambox/`.
+Canonical local setup: `pip install -r requirements-dev.txt` from the repository root (layers pytest/flake8/pre-commit/django-debug-toolbar on top of `itambox/requirements.txt`), or `make setup` (see [Makefile](Makefile); requires Git Bash or WSL, plus GNU Make installed separately on Windows). `itambox/requirements.txt` alone remains the runtime-only install.
+
+Native Windows Python is a supported development environment — the app and normal tests run there. `itambox/requirements.txt` marks `django-auth-ldap` `platform_system != "Windows"` because its `python-ldap` dependency has no Windows wheel; `core/auth/ldap.py` falls back to a disabled LDAP backend in that case, so LDAP integration/development requires Docker, Linux, or WSL. `python-magic` is likewise excluded via `platform_system != "Windows"` marker (import can hang indefinitely without libmagic DLL); `core/validators.py` falls back to extension checks/Pillow. Docker/Linux/WSL retain full libmagic signature validation. Production remains Docker/Linux with the full dependency set.
+
+All other commands below run from `itambox/`.
 
 ### Django
 ```bash

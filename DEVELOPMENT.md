@@ -6,12 +6,12 @@
 2. **Environment Variables**: Copy `.env.example` to `.env` and configure the PostgreSQL connection credentials (e.g., `ITAMBOX_DB_ENGINE=django.db.backends.postgresql`, `ITAMBOX_DB_NAME`, `ITAMBOX_DB_USER`, `ITAMBOX_DB_PASSWORD`, `ITAMBOX_DB_HOST`, `ITAMBOX_DB_PORT`).
 
 ```bash
-# Create virtual environment
+# Create virtual environment (from the repository root)
 python -m venv .venv
-source .venv/bin/activate  # or .venv\Scripts\activate on Windows
+source .venv/bin/activate  # On Windows Git Bash: source .venv/Scripts/activate; PowerShell: .\.venv\Scripts\Activate.ps1
 
-# Install dependencies
-pip install -r requirements.txt
+# Install dependencies (tests + lint + runtime, from repo root)
+pip install -r requirements-dev.txt
 
 # Run migrations
 cd itambox
@@ -23,6 +23,31 @@ python manage.py seed_data
 # Start dev server
 ITAMBOX_DEBUG=true python manage.py runserver
 ```
+
+`requirements-dev.txt` (repository root) is the canonical set for
+contributors and CI — it layers pytest/flake8/pre-commit/django-debug-toolbar
+on top of `itambox/requirements.txt`, which stays runtime-only (e.g. for
+production images). `make setup` runs the equivalent install; see the
+[Makefile](Makefile) — its recipes require Git Bash or WSL, plus GNU Make
+installed separately on Windows.
+
+### Native Windows support
+
+Native Windows Python is a supported development environment: the app,
+migrations, seed data, and the normal test suite all run there. Two
+dependencies are excluded on native Windows only via PEP 508 markers:
+
+- `django-auth-ldap` is excluded via `platform_system != "Windows"` marker
+  in `itambox/requirements.txt` (its `python-ldap` dependency has no Windows
+  binary wheel). `core/auth/ldap.py` falls back to a disabled LDAP backend,
+  so local LDAP integration isn't available — use Docker, Linux, or WSL for
+  that.
+- `python-magic` is excluded via `platform_system != "Windows"` marker in
+  `itambox/requirements.txt` (import can hang indefinitely without libmagic
+  DLL). `core/validators.py` falls back to extension checks and Pillow.
+  Docker/Linux/WSL retain full libmagic signature validation.
+
+Production always runs in Docker/Linux with the full dependency set.
 
 ### Seed Data Modes
 

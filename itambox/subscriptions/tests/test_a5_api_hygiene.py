@@ -39,8 +39,9 @@ class A5ApiHygieneTests(APITestCase):
 
         self.tg = TenantGroup.objects.create(name="A5 TG", slug="a5-tg")
         self.tenant = Tenant.objects.create(name="A5 Tenant", slug="a5-tenant", group=self.tg)
-        # The AssetHolder profile gives StrictTenantPermission a resolvable
-        # tenant scope under force_authenticate (no session).
+        # The AssetHolder profile resolves StrictTenantPermission's object-level
+        # scope; TokenPermissions' request-level check still needs the active
+        # tenant bound on the session (see _login_as_staff below).
         AssetHolder.objects.create(
             user=self.staff, first_name="A5", last_name="Staff",
             upn="a5.staff", email="a5_staff@example.com", tenant=self.tenant,
@@ -74,6 +75,17 @@ class A5ApiHygieneTests(APITestCase):
         )
         grant(self.staff, self.tenant, role)
 
+    def _login_as_staff(self):
+        # TokenPermissions fails closed when a non-superuser request has no
+        # active tenant. force_authenticate() bypasses TenantMiddleware's
+        # session-based tenant binding entirely, so authenticate through a
+        # real session and bind the active tenant the same way a browser
+        # login would.
+        self.client.force_login(self.staff)
+        session = self.client.session
+        session['active_tenant_id'] = self.tenant.pk
+        session.save()
+
     # ----- WS3-3 -----------------------------------------------------------
 
     @staticmethod
@@ -82,11 +94,11 @@ class A5ApiHygieneTests(APITestCase):
         # responses don't carry the header, so derive the current token the same
         # way the server does for mutating requests.
         obj.refresh_from_db()
-        return f'W/"{obj.updated_at.isoformat()}"'
+        return 'W/"{0}"'.format(obj.updated_at.isoformat())
 
     def test_update_status_requires_if_match(self):
         """A status write with no If-Match is refused (428), not last-writer-wins."""
-        self.client.force_authenticate(user=self.staff)
+        self._login_as_staff()
         url = reverse(
             'api:subscriptions_api:subscription-update-status',
             kwargs={'pk': self.subscription.pk},
@@ -98,7 +110,7 @@ class A5ApiHygieneTests(APITestCase):
 
     def test_update_status_stale_if_match_yields_412(self):
         """A stale (no-longer-current) If-Match loses the concurrency race."""
-        self.client.force_authenticate(user=self.staff)
+        self._login_as_staff()
         url = reverse(
             'api:subscriptions_api:subscription-update-status',
             kwargs={'pk': self.subscription.pk},
@@ -113,7 +125,7 @@ class A5ApiHygieneTests(APITestCase):
 
     def test_update_status_records_accurate_changelog_diff(self):
         """A valid status write records an UPDATE ObjectChange with the real diff."""
-        self.client.force_authenticate(user=self.staff)
+        self._login_as_staff()
         etag = self._etag_for(self.subscription)
 
         ct = ContentType.objects.get_for_model(Subscription)
@@ -156,7 +168,7 @@ class A5ApiHygieneTests(APITestCase):
     def test_protected_error_409_reports_count_not_pks(self):
         """Deleting a provider that a subscription PROTECTs returns a 409 whose
         body carries a COUNT of dependents, not the enumerated str()/pk."""
-        self.client.force_authenticate(user=self.staff)
+        self._login_as_staff()
         provider_detail = reverse(
             'api:subscriptions_api:provider-detail', kwargs={'pk': self.provider.pk},
         )
