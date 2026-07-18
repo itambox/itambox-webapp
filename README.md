@@ -110,12 +110,12 @@ docker compose exec app python manage.py createsuperuser
 2. **Configure Environment**: Copy `.env.example` to `.env` and update the database connection variables (`ITAMBOX_DB_HOST`, `ITAMBOX_DB_PORT`, etc.).
 
 ```bash
-# Set up virtual environment
-python3 -m venv .venv
-source .venv/bin/activate  # On Windows: .venv\Scripts\activate
+# Set up virtual environment (from the repository root)
+python -m venv .venv
+source .venv/bin/activate  # On Windows Git Bash: source .venv/Scripts/activate; PowerShell: .\.venv\Scripts\Activate.ps1
 
-# Install dependencies
-pip install -r requirements.txt
+# Install dependencies for contributing (tests + lint + runtime, from repo root)
+pip install -r requirements-dev.txt
 
 # Run migrations and seed data
 cd itambox
@@ -127,6 +127,22 @@ ITAMBOX_DEBUG=true python manage.py runserver
 
 # App is now live at http://127.0.0.1:8000
 ```
+
+Runtime-only installs (e.g. building a production image) should use
+`itambox/requirements.txt` instead — `requirements-dev.txt` (repository root)
+is the canonical superset for contributors and CI, and also underlies the
+`make setup` target in the [Makefile](Makefile). The `Makefile` targets
+require Git Bash or WSL, plus GNU Make installed separately on Windows.
+
+**Native Windows development:** the app, migrations, seed data, and the test
+suite all run under a native Windows Python install. `django-auth-ldap` is
+skipped there (no Windows wheel for its `python-ldap` dependency) —
+`core/auth/ldap.py` falls back to a disabled LDAP backend, so local LDAP
+integration isn't available. Use Docker, Linux, or WSL if you need to work on
+LDAP. `python-magic` is excluded via PEP 508 marker on native Windows (import
+can hang indefinitely); `core/validators.py` falls back to extension checks
+and Pillow. Docker/Linux/WSL retain full libmagic signature validation.
+Production always runs in Docker/Linux with the full dependency set.
 
 ---
 
