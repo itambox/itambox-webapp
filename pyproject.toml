@@ -19,13 +19,16 @@ dependencies = [
     "django-filter>=25.2,<25.3",
     "django-htmx>=1.21,<1.28",
     "django-template-partials>=25.3,<25.4",
+    "Jinja2>=3.1,<4.0",
     "django-crispy-forms>=2.6,<2.7",
     "crispy-bootstrap5>=2026.3,<2027",
     "django-taggit>=6.1,<6.2",
     "drf-spectacular>=0.29,<0.30",
     "Pillow>=10.0,<12.0",
     "requests>=2.31,<3.0",
-    "django-auth-ldap>=5.1,<6.0",
+    # Excluded on native Windows: pulls python-ldap, which has no Windows binary
+    # wheel and fails to build there. Docker/Linux/WSL images are unaffected.
+    "django-auth-ldap>=5.1,<6.0; platform_system != \"Windows\"",
     "djangosaml2>=1.9,<2.0",
     "segno>=1.6,<2.0",
     "python-barcode>=0.15,<1.0",
@@ -97,6 +100,3 @@ omit = [
 # 80 was unattainable so every run "failed" the gate and it enforced nothing.
 fail_under = 45
 show_missing = true
-
-
-
