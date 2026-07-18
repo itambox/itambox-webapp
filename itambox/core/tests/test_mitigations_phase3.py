@@ -160,7 +160,7 @@ class MitigationsPhase3Tests(TestCase):
         # re-validate that the authenticating token's tenant is still accessible
         # (not revoked/deleted) for the lifetime of the request, on top of the
         # RBAC baseline (a69cae7) this budget was originally authored against.
-        with self.assertNumQueries(18):
+        with self.assertNumQueries(22):
             response = self.client.post(
                 self.graphql_url,
                 data=json.dumps({'query': query}),
