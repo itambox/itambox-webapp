@@ -57,6 +57,7 @@ python-magic>=0.4.27,<0.5; platform_system != "Windows"
 segno>=1.6,<2.0
 python-barcode>=0.15,<1.0
 markdown>=3.10,<3.11
+Jinja2>=3.1,<4.0
 xhtml2pdf>=0.2.16,<0.3
 # Pin svglib < 1.6: 1.6 pulls rlpycairo -> pycairo, which needs the cairo C
 # headers (libcairo2-dev + pkg-config) to compile. svglib 1.5.x renders SVGs via
