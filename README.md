@@ -68,7 +68,7 @@ dataset (a managed-service provider, customer tenants, assets, licenses, …):
 
 ```bash
 # Clone the repository
-git clone https://github.com/itambox-itam/itambox-webapp.git
+git clone https://github.com/itambox/itambox-webapp.git
 cd itambox-webapp
 
 # Optional: pin the admin password up front (otherwise a strong one is
