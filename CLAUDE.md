@@ -130,6 +130,27 @@ python manage.py qcluster   # Start django-q2 worker
 
 In tests, `Q_CLUSTER['sync'] = True` is set automatically so tasks run inline.
 
+### Lint (flake8 + flake8-bugbear)
+```bash
+# From the repository root (not itambox/) -- blocking gate, same command CI and
+# pre-commit both run:
+python scripts/check_flake8_baseline.py
+
+# After deliberately reducing debt, regenerate the baseline to match. Do this
+# on Linux with the pinned CI toolchain; Windows-only regeneration can omit a
+# small CRLF-sensitive pycodestyle subset that Linux reports:
+python scripts/check_flake8_baseline.py --write-baseline
+```
+Policy (`select`/`ignore`, each ignore documented with a reason) lives in `setup.cfg`
+at the repo root. The pinned Flake8/Bugbear toolchain is blocking; the ~4k
+pre-existing violations are grandfathered via `scripts/flake8_baseline.json`, a
+per-`(file, error code)` violation count checked in
+`scripts/check_flake8_baseline.py`. Linux CI requires exact equality: increases
+are regressions, while reductions require regenerating the baseline in the same
+reviewed cleanup so old headroom cannot later hide reintroduced debt. Windows
+permits only the documented ten CRLF-sensitive findings to be absent.
+`make lint` / `pre-commit run --all-files` use the identical managed toolchain.
+
 ### Docs (MkDocs)
 ```bash
 # Build docs to static/docs/ (run from itambox/)
