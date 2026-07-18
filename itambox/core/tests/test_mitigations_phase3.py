@@ -4,7 +4,7 @@ from django.urls import reverse
 from django.contrib.auth import get_user_model
 from model_bakery import baker
 
-from organization.models import Tenant, TenantGroup, Membership, Role, Location, Site
+from organization.models import Tenant, TenantGroup, Role, Location, Site
 from assets.models import Asset, AssetType, StatusLabel, AssetRole, Manufacturer, Category, Supplier, Depreciation
 from software.models import Software
 from licenses.models import License
@@ -42,7 +42,7 @@ class MitigationsPhase3Tests(TestCase):
         self.asset_role = AssetRole.objects.create(name="Laptop", slug="laptop")
         self.status = StatusLabel.objects.create(name="Ready", slug="ready", type=StatusLabel.TYPE_DEPLOYABLE)
         self.depreciation = Depreciation.objects.create(name="Standard", months=36)
-        
+
         self.category = Category.objects.create(
             name="Laptop Cat",
             slug="laptop-cat",
@@ -58,14 +58,14 @@ class MitigationsPhase3Tests(TestCase):
         )
         self.location = Location.objects.create(name="Office", slug="office", tenant=self.tenant, site=self.site)
         self.supplier = Supplier.objects.create(name="Dell Supplier", slug="dell-supplier")
-        
+
         # Create Assets
         self.asset = Asset.objects.create(
             name="Laptop", asset_tag="TAG-1", asset_type=self.asset_type,
             status=self.status, tenant=self.tenant, location=self.location,
             supplier=self.supplier
         )
-        
+
         # Create Software & License
         self.software = Software.objects.create(name="Slack", manufacturer=self.manufacturer)
         self.license = License.objects.create(
@@ -88,13 +88,13 @@ class MitigationsPhase3Tests(TestCase):
 
         # Clear/initialize active group
         set_current_tenant_group(root_group)
-        
+
         # Cache should be None initially
         self.assertIsNone(_descendant_group_ids_cache.get())
-        
+
         # Trigger filter execution (runs DB query once for descendant list)
         list(Asset.objects.all())
-        
+
         # Cache must contain group details now
         cache = _descendant_group_ids_cache.get()
         self.assertIsNotNone(cache)
@@ -103,7 +103,7 @@ class MitigationsPhase3Tests(TestCase):
             set(cache[root_group.pk]),
             {root_group.pk, child_group.pk, grandchild_group.pk}
         )
-        
+
         # Subsequent evaluations should execute 0 tenantgroup queries
         with self.assertNumQueries(2):  # exactly 2 queries: 1 to assets, 1 to assets (again)
             list(Asset.objects.all())
@@ -142,21 +142,25 @@ class MitigationsPhase3Tests(TestCase):
           }
         }
         '''
-        
+
         # Create a second asset to ensure N+1 is not present
         Asset.objects.create(
             name="Laptop 2", asset_tag="TAG-2", asset_type=self.asset_type,
             status=self.status, tenant=self.tenant, location=self.location,
             supplier=self.supplier
         )
-        
+
         # The key assertion is the single JOIN'd Asset query (select_related works — no
         # N+1 on asset relations). The remaining queries are auth/tenant/permission
         # overhead: token + last_used, tenant, TenantGroup, the membership lookup,
         # additive RoleGrant resolution (grant + prefetched scopes), a bounded
         # own-tenant coverage lookup, and session read/write. Managed projection is
-        # skipped because this tenant is not managed by a provider.
-        with self.assertNumQueries(19):
+        # skipped because this tenant is not managed by a provider. Three further
+        # bounded queries come from token revocation hardening (cf774f2): they
+        # re-validate that the authenticating token's tenant is still accessible
+        # (not revoked/deleted) for the lifetime of the request, on top of the
+        # RBAC baseline (a69cae7) this budget was originally authored against.
+        with self.assertNumQueries(22):
             response = self.client.post(
                 self.graphql_url,
                 data=json.dumps({'query': query}),
