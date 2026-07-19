@@ -13,6 +13,21 @@ const scimToken = requiredEnv('E2E_SCIM_TOKEN');
 const scimHeaders = { Authorization: `Bearer ${scimToken}` };
 const scimUrl = (path: string) => `/api/tenants/${scimTenantSlug}/scim/v2/${path}`;
 
+async function expectAssetHolder(
+  request: APIRequestContext,
+  username: string,
+  email: string,
+) {
+  const response = await request.get(
+    `/api/organization/asset-holders/?q=${encodeURIComponent(username)}`,
+  );
+  expect(response.status()).toBe(200);
+  const body = await response.json();
+  expect(body.results).toEqual(
+    expect.arrayContaining([expect.objectContaining({ upn: email, email })]),
+  );
+}
+
 test.describe('SSO and SCIM 2.0 Provisioning Specs', () => {
   let scimRequest: APIRequestContext;
 
@@ -92,21 +107,17 @@ test.describe('SSO and SCIM 2.0 Provisioning Specs', () => {
   test('4. SCIM User profile sync: Syncing a user via SCIM provisions matching AssetHolder', async ({ request }) => {
     // Verify that syncing a user automatically creates an AssetHolder in organization
     const uniqueUser = `scim.holder.sync.${Date.now()}`;
+    const email = `${uniqueUser}@example.com`;
     const payload = {
       schemas: ["urn:ietf:params:scim:schemas:core:2.0:User"],
       userName: uniqueUser,
       name: { givenName: "Holder", familyName: "Sync" },
-      emails: [{ value: `${uniqueUser}@example.com`, primary: true }]
+      emails: [{ value: email, primary: true }]
     };
 
     const response = await scimRequest.post(scimUrl('Users'), { data: payload });
-    if (response.status() === 201) {
-      // User created. Let's verify AssetHolder exists via REST API
-      const holdersResponse = await request.get(`/api/v1/organization/assetholders/?search=${uniqueUser}`);
-      expect(holdersResponse.status()).toBe(200);
-      const holdersJson = await holdersResponse.json();
-      expect(holdersJson.results.length).toBeGreaterThan(0);
-    }
+    expect(response.status()).toBe(201);
+    await expectAssetHolder(request, uniqueUser, email);
   });
 
   test('5. Tenant SCIM group creation is rejected by the read-only contract', async ({ request }) => {
@@ -190,8 +201,7 @@ test.describe('SSO and SCIM 2.0 Provisioning Specs', () => {
 
   // TIER 3: Cross-Feature Combinations (combo 2)
 
-  test('11. Combo 2: SCIM sync -> OIDC Auth -> Verify permissions', async ({ request, playwright }) => {
-    // 1. Sync user and group mapping via SCIM
+  test('11. SCIM group writes and failed OIDC callbacks do not grant permissions', async ({ playwright }) => {
     const uniqueUser = `scim.combo.${Date.now()}`;
     const userPayload = {
       schemas: ["urn:ietf:params:scim:schemas:core:2.0:User"],
@@ -201,84 +211,63 @@ test.describe('SSO and SCIM 2.0 Provisioning Specs', () => {
     };
 
     const userRes = await scimRequest.post(scimUrl('Users'), { data: userPayload });
-    if (userRes.status() === 201) {
-      const userJson = await userRes.json();
-      const userId = userJson.id;
+    expect(userRes.status()).toBe(201);
+    const userJson = await userRes.json();
 
-      // Map user to an admin group via SCIM Group sync
-      const groupPayload = {
+    const groupRes = await scimRequest.post(scimUrl('Groups'), {
+      data: {
         schemas: ["urn:ietf:params:scim:schemas:core:2.0:Group"],
         displayName: "IT-Admins",
-        members: [{ value: userId, display: uniqueUser }]
-      };
-      await scimRequest.post(scimUrl('Groups'), { data: groupPayload });
-
-      // 2. Authenticate via OIDC (Simulate OIDC callback setting session for this user)
-      const callbackContext = await playwright.request.newContext({
-        baseURL: process.env.E2E_BASE_URL || 'http://localhost:8000',
-      });
-      const authRes = await callbackContext.get(`/oidc/callback/?code=combo_code&state=combo_state&username=${uniqueUser}`);
-
-      if (authRes.status() === 200 || authRes.status() === 302) {
-        // 3. Verify user has correct Tenant roles/permissions
-        const permissionsRes = await callbackContext.get(`/api/v1/users/config/`);
-        expect(permissionsRes.status()).toBe(200);
+        members: [{ value: userJson.id, display: uniqueUser }]
       }
-    } else {
-      console.log(`SCIM OIDC Combo skipped/failed: ${userRes.status()}`);
-    }
+    });
+    expect(groupRes.status()).toBe(403);
+
+    const callbackContext = await playwright.request.newContext({
+      baseURL: process.env.E2E_BASE_URL || 'http://localhost:8000',
+    });
+    await callbackContext.get(
+      `/oidc/callback/?code=combo_code&state=combo_state&username=${uniqueUser}`,
+    );
+
+    const permissionsRes = await callbackContext.get('/api/users/config/');
+    expect(permissionsRes.status()).toBe(401);
+    await callbackContext.dispose();
   });
 
   // TIER 4: Real-World Scenarios (workload 2)
 
-  test('12. Workload 2: Enterprise Tenant provisioning scenario', async ({ request }) => {
-    // 1. Sync multiple users via SCIM
-    const users = ["scim.ent.1", "scim.ent.2"];
-    const createdUserIds: string[] = [];
+  test('12. Enterprise SCIM provisioning creates holders while groups stay read-only', async ({ request }) => {
+    const suffix = Date.now();
+    const users = [`scim.ent.1.${suffix}`, `scim.ent.2.${suffix}`];
+    const createdUsers: Array<{ id: string; username: string; email: string }> = [];
 
-    for (const u of users) {
-      const payload = {
-        schemas: ["urn:ietf:params:scim:schemas:core:2.0:User"],
-        userName: u,
-        name: { givenName: u, familyName: "Enterprise" },
-        emails: [{ value: `${u}@enterprise.com`, primary: true }]
-      };
-      const res = await scimRequest.post(scimUrl('Users'), { data: payload });
-      if (res.status() === 201) {
-        const json = await res.json();
-        createdUserIds.push(json.id);
-      }
+    for (const username of users) {
+      const email = `${username}@enterprise.com`;
+      const response = await scimRequest.post(scimUrl('Users'), {
+        data: {
+          schemas: ["urn:ietf:params:scim:schemas:core:2.0:User"],
+          userName: username,
+          name: { givenName: username, familyName: "Enterprise" },
+          emails: [{ value: email, primary: true }]
+        }
+      });
+      expect(response.status()).toBe(201);
+      const body = await response.json();
+      createdUsers.push({ id: body.id, username, email });
     }
 
-    if (createdUserIds.length === users.length) {
-      // 2. Tenant SCIM deliberately keeps group authorization read-only.
-      const groupPayload = {
+    const groupRes = await scimRequest.post(scimUrl('Groups'), {
+      data: {
         schemas: ["urn:ietf:params:scim:schemas:core:2.0:Group"],
         displayName: "Enterprise-Staff",
-        members: createdUserIds.map(id => ({ value: id }))
-      };
-      const groupRes = await scimRequest.post(scimUrl('Groups'), { data: groupPayload });
-      expect(groupRes.status()).toBe(403);
-
-      // 3. Verify AssetHolder profiles
-      for (const username of users) {
-        const holderRes = await request.get(`/api/v1/organization/assetholders/?search=${username}`);
-        const holderJson = await holderRes.json();
-        expect(holderJson.results.length).toBeGreaterThan(0);
-
-        const holderId = holderJson.results[0].id;
-
-        // 4. Perform standard hardware allocations to them
-        const allocationPayload = {
-          asset: 1, // assume asset 1 exists
-          assigned_user: holderId,
-          notes: "Enterprise SCIM provisioning allocation"
-        };
-        const allocRes = await request.post('/api/v1/assets/assignments/', { data: allocationPayload });
-        expect(allocRes.status()).toBeDefined();
+        members: createdUsers.map(user => ({ value: user.id }))
       }
-    } else {
-      console.log(`Enterprise Tenant SCIM provisioning skipped/failed due to incomplete setup`);
+    });
+    expect(groupRes.status()).toBe(403);
+
+    for (const user of createdUsers) {
+      await expectAssetHolder(request, user.username, user.email);
     }
   });
 

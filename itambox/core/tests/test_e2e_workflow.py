@@ -87,5 +87,8 @@ def test_scim_e2e_uses_bearer_auth_and_preserves_tenant_anti_harvesting():
     assert "Unauthenticated SCIM request targeting a non-existent tenant fails closed" in spec
     assert "expect(response.status()).toBe(401);" in spec
     assert "expect(groupRes.status()).toBe(403);" in spec
+    assert "expect(permissionsRes.status()).toBe(401);" in spec
     assert "playwright.request.newContext()" not in spec
-    assert "/api/tenants/default/scim/" not in spec
+    assert "/api/v1/" not in spec
+    assert "/api/organization/asset-holders/?q=${encodeURIComponent(" in spec
+    assert "/api/users/config/" in spec
