@@ -57,25 +57,24 @@ class TaskContext:
 
         try:
             self._resolve_principal_and_tenant()
+            _current_user.set(self.user)
+            if self.tenant:
+                set_current_tenant(self.tenant)
+                if self.user:
+                    membership = Membership._base_manager.filter(
+                        user=self.user,
+                        tenant=self.tenant,
+                        is_active=True,
+                    ).first()
+                    if membership:
+                        set_current_membership(membership)
+
+            # Wire up change-logging contextvars so ChangeLoggingMixin records
+            # ObjectChange rows for all saves inside this task.
+            _request_id.set(uuid.uuid4())
         except Exception:
             self._restore_context()
             raise
-
-        _current_user.set(self.user)
-        if self.tenant:
-            set_current_tenant(self.tenant)
-            if self.user:
-                membership = Membership._base_manager.filter(
-                    user=self.user,
-                    tenant=self.tenant,
-                    is_active=True,
-                ).first()
-                if membership:
-                    set_current_membership(membership)
-
-        # Wire up change-logging contextvars so ChangeLoggingMixin records
-        # ObjectChange rows for all saves inside this task.
-        _request_id.set(uuid.uuid4())
 
         return self
 

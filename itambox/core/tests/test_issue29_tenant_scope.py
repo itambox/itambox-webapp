@@ -707,6 +707,42 @@ class AllAccessibleMiddlewareTests(TestCase):
         self.assertEqual(get_current_membership(), outer_membership)
         self.assertEqual(_current_user.get(), self.member)
 
+    def test_task_context_enter_failure_restores_every_ambient_context(self):
+        from core.tasks.context import TaskContext
+        from itambox.middleware import _request_id
+
+        outer_membership = Membership._base_manager.get(
+            user=self.member,
+            tenant=self.provider,
+        )
+        previous_request_id = _request_id.get()
+        self.addCleanup(_request_id.set, previous_request_id)
+        request_marker = object()
+        _request_id.set(request_marker)
+        _current_user.set(self.member)
+        set_current_tenant(self.provider)
+        set_current_tenant_group(self.group)
+        set_current_membership(outer_membership)
+        set_current_all_accessible(True)
+
+        with (
+            mock.patch.object(
+                Membership._base_manager,
+                'filter',
+                side_effect=RuntimeError('membership-db-failure'),
+            ),
+            self.assertRaisesRegex(RuntimeError, 'membership-db-failure'),
+        ):
+            with TaskContext(tenant_id=self.cust.pk, user_id=self.member.pk):
+                self.fail('failed task initialization must not enter the body')
+
+        self.assertIs(_request_id.get(), request_marker)
+        self.assertEqual(_current_user.get(), self.member)
+        self.assertEqual(get_current_tenant(), self.provider)
+        self.assertEqual(get_current_tenant_group(), self.group)
+        self.assertEqual(get_current_membership(), outer_membership)
+        self.assertTrue(get_current_all_accessible())
+
     def test_task_context_resolves_target_outside_outer_users_scope(self):
         from core.tasks.context import TaskContext
 
