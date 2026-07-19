@@ -88,6 +88,7 @@ def test_scim_e2e_uses_bearer_auth_and_preserves_tenant_anti_harvesting():
     assert "expect(response.status()).toBe(401);" in spec
     assert "expect(groupRes.status()).toBe(403);" in spec
     assert "expect(permissionsRes.status()).toBe(401);" in spec
+    assert "storageState: { cookies: [], origins: [] }" in spec
     assert "const uniqueUser = `scim.test.user.${Date.now()}`;" in spec
     assert "const duplicateUser = `duplicate.user.${Date.now()}`;" in spec
     assert "expect(firstResponse.status()).toBe(201);" in spec

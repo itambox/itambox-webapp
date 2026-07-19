@@ -215,6 +215,7 @@ test.describe('SSO and SCIM 2.0 Provisioning Specs', () => {
 
     const callbackContext = await playwright.request.newContext({
       baseURL: process.env.E2E_BASE_URL || 'http://localhost:8000',
+      storageState: { cookies: [], origins: [] },
     });
     await callbackContext.get(
       `/oidc/callback/?code=combo_code&state=combo_state&username=${uniqueUser}`,
