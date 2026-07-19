@@ -42,9 +42,13 @@ $itambox-sidebar-width: 18rem; // 288px — Tabler default is 15rem/240px (+48px
         color: var(--tblr-body-color) !important;
     }
 
-    // Keep the brand in normal flow on mobile so it never overlaps the
-    // right-hand action icons (notifications / theme toggle / profile).
+    // Keep the mobile header on one row and scale the brand before it can
+    // overlap the right-hand actions (notifications / theme / profile).
     @media (max-width: 991.98px) {
+        > .container-fluid {
+            flex-wrap: nowrap;
+        }
+
         .navbar-brand {
             position: static;
             transform: none;
@@ -56,9 +60,14 @@ $itambox-sidebar-width: 18rem; // 288px — Tabler default is 15rem/240px (+48px
 
             .navbar-brand-image {
                 height: 28px !important;
-                min-height: 28px !important;
                 max-width: 100%;
             }
+        }
+    }
+
+    @media (max-width: 360px) {
+        .navbar-brand .navbar-brand-image {
+            height: 22px !important;
         }
     }
 
