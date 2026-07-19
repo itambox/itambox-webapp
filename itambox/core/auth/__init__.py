@@ -7,6 +7,8 @@ from core.managers import (
     get_current_tenant,
     get_current_tenant_group,
     get_current_membership,
+    get_current_all_accessible,
+    get_current_scope_conflict,
     set_current_tenant,
     set_current_membership,
 )
@@ -97,37 +99,60 @@ class MembershipBackend:
         return obj_tenant
 
     def _group_scope_tenants(self, user_obj):
-        """Accessible tenants inside the active tenant-group scope, or ``None``
-        when no group scope applies (single active tenant, or no scope at all).
+        """Tenants the ambient permission gate must aggregate over, or ``None``
+        when a single active tenant (or no scope) applies.
 
-        Mirrors ``TenantScopingQuerySet.filter_by_tenant``'s member branch —
-        the canonical accessible set (memberships, UserGroup grants, managed
-        reach) intersected with the scoped group's subtree — so the ambient
-        permission gate agrees with what the scoped querysets will show.
-        Cached on the user per group for the request's many ``has_perm`` calls.
+        Under a tenant-group scope this is the canonical accessible set
+        (memberships, UserGroup grants, managed reach) intersected with the
+        scoped group's subtree; under the "All accessible tenants" scope it is
+        the full accessible set. Either way the ambient gate agrees with what the
+        scoped querysets will show. Cached on the user for the request's many
+        ``has_perm`` calls.
         """
         synchronize_authorization_cache(user_obj)
         if get_current_tenant() is not None:
             return None
+        if get_current_all_accessible():
+            # "All accessible tenants" scope: the gate passes when the permission
+            # is held in ANY canonically accessible tenant, and fails closed when
+            # it is held in none — mirroring the tenant-group union below.
+            cache_key = '_all_accessible_scope_tenants'
+            if hasattr(user_obj, cache_key):
+                tenants, valid_until = getattr(user_obj, cache_key)
+                if valid_until is None or valid_until > timezone.now():
+                    return tenants
+            # inline imports: avoid AppRegistryNotReady / a core<->organization cycle at load
+            from organization.models import Tenant
+            from organization.access import accessible_tenant_ids_with_expiry
+            ids, valid_until = accessible_tenant_ids_with_expiry(user_obj)
+            tenants = list(Tenant._base_manager.filter(
+                pk__in=ids,
+                deleted_at__isnull=True,
+            ))
+            setattr(user_obj, cache_key, (tenants, valid_until))
+            return tenants
         group = get_current_tenant_group()
         if group is None:
             return None
         cache_key = f'_group_scope_tenants_{group.pk}'
         if hasattr(user_obj, cache_key):
-            return getattr(user_obj, cache_key)
+            tenants, valid_until = getattr(user_obj, cache_key)
+            if valid_until is None or valid_until > timezone.now():
+                return tenants
         # inline imports: avoid AppRegistryNotReady / a core<->organization cycle at load
         from organization.models import Tenant
         from organization.access import (
-            accessible_tenant_ids, get_descendant_tenant_group_ids,
+            accessible_tenant_ids_with_expiry, get_descendant_tenant_group_ids,
         )
         # live_only: prune soft-deleted subgroups exactly like filter_by_tenant's
         # walk, so the gate never counts a tenant the scoped querysets will hide.
+        ids, valid_until = accessible_tenant_ids_with_expiry(user_obj)
         tenants = list(Tenant._base_manager.filter(
-            pk__in=accessible_tenant_ids(user_obj),
+            pk__in=ids,
             group_id__in=get_descendant_tenant_group_ids(group.pk, live_only=True),
             deleted_at__isnull=True,
         ))
-        setattr(user_obj, cache_key, tenants)
+        setattr(user_obj, cache_key, (tenants, valid_until))
         return tenants
 
     def _ambient_tenant(self, user_obj):
@@ -173,13 +198,33 @@ class MembershipBackend:
         return self._ambient_tenant(user_obj)
 
     # ------------------------------------------------------------------ public API
+    @staticmethod
+    def _aggregate_scope_allows_ambient_permission(perm):
+        """The member-only all-accessible scope is an aggregate read view.
+
+        It has no single tenant anchor, so an objectless mutation permission
+        would let a permission held in tenant A authorize a job/import touching
+        tenant B (or create a tenant-less global row). Only conventional
+        ``view_*`` permissions are safe to aggregate. Mutations remain available
+        after selecting one tenant, or through an explicit object-bound check.
+        """
+        codename = perm.rsplit('.', 1)[-1]
+        return codename.startswith('view_')
+
     def has_perm(self, user_obj, perm, obj=None):
         if not user_obj.is_active:
             return False
         if user_obj.is_superuser:
             return True
+        if get_current_scope_conflict(user_obj):
+            return False
         tenant = self._object_tenant(user_obj, obj) if obj is not None else None
         if tenant is None:
+            if (
+                get_current_all_accessible()
+                and not self._aggregate_scope_allows_ambient_permission(perm)
+            ):
+                return False
             # Ambient check (list/add gates, nav). Under an active tenant-group
             # scope the page aggregates every accessible tenant in the subtree,
             # so the gate passes when the permission is held in ANY of them and
@@ -203,12 +248,18 @@ class MembershipBackend:
             return False
         if user_obj.is_superuser:
             return True
+        if get_current_scope_conflict(user_obj):
+            return False
         prefix = app_label + '.'
         # Same group-union semantics as the ambient has_perm gate above.
         group_tenants = self._group_scope_tenants(user_obj)
         if group_tenants is not None:
             return any(
                 p.startswith(prefix)
+                and (
+                    not get_current_all_accessible()
+                    or self._aggregate_scope_allows_ambient_permission(p)
+                )
                 for tenant in group_tenants
                 for p in self._effective_perms_for_tenant(user_obj, tenant)
             )

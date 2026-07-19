@@ -1,4 +1,5 @@
 """Canonical tenant, RBAC, and explicitly shared-resource access helpers."""
+from django.utils import timezone
 
 
 def get_descendant_tenant_group_ids(group_id, live_only=False):
@@ -74,12 +75,55 @@ def shared_resource_ids(model, tenant):
     )
 
 
-def accessible_tenant_ids(user):
+def accessible_tenant_ids_with_expiry(user):
+    """``(frozenset(tenant_ids), valid_until)`` — see ``accessible_tenant_ids``
+    for the memoization contract this adds to. ``valid_until`` is the earliest
+    time the memo can go stale purely from the clock: a ``RoleGrant.valid_until``
+    lapsing fires no save/signal, so a memo keyed only on the write-driven cache
+    generation would keep serving an expired grant's tenant forever. ``None``
+    means nothing cached here carries a clock-based expiry.
+    """
     if user is None or not getattr(user, 'is_authenticated', False):
-        return set()
+        return frozenset(), None
+    cache_key = '_accessible_tenant_ids'
+    expiry_key = '_accessible_tenant_ids_valid_until'
+    # Request-local memoization keyed to the user instance. filter_by_tenant()
+    # calls this for EVERY tenant-scoped model rendered on a page; under a
+    # tenant-group scope that recomputed the full grant walk dozens of times per
+    # request, turning a query-heavy page into a ~20s wait (issue #29). The
+    # shared authorization-cache generation — bumped by every Membership /
+    # RoleGrant / RoleGrantScope / GroupMembership / UserGroup / Role write and
+    # by Tenant / TenantGroup topology changes (organization.signals) — is
+    # consulted first, so the memo can never serve a write-invalidated
+    # accessible set; the valid_until check below additionally covers the
+    # signal-less case of a grant expiring purely by the clock. A cache-backend
+    # outage makes synchronize_authorization_cache() fail open to a fresh local
+    # version on every call, which forces a recompute below rather than ever
+    # serving a stale set while the shared cache is unreachable.
+    can_cache = hasattr(user, '__dict__')
+    if can_cache:
+        # inline import: avoids an organization.access -> core.auth import cycle
+        # at load (core.auth resolves permissions through organization.rbac).
+        from core.auth.cache import synchronize_authorization_cache
+        synchronize_authorization_cache(user)
+        cached = user.__dict__.get(cache_key)
+        if cached is not None:
+            cached_valid_until = user.__dict__.get(expiry_key)
+            if cached_valid_until is None or cached_valid_until > timezone.now():
+                return cached, cached_valid_until
     # inline import: avoids organization.access <-> organization.rbac at load time.
-    from organization.rbac import resolve_accessible_tenant_ids
-    return resolve_accessible_tenant_ids(user)
+    from organization.rbac import resolve_accessible_tenant_ids_with_expiry
+    result, valid_until = resolve_accessible_tenant_ids_with_expiry(user)
+    result = frozenset(result)
+    if can_cache:
+        user.__dict__[cache_key] = result
+        user.__dict__[expiry_key] = valid_until
+    return result, valid_until
+
+
+def accessible_tenant_ids(user):
+    # Copy out so a caller mutating the set can't corrupt the memo.
+    return set(accessible_tenant_ids_with_expiry(user)[0])
 
 
 def managed_accessible_tenant_ids(user):

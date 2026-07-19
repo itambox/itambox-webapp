@@ -84,9 +84,20 @@ class TokenAuthentication(BaseAuthentication):
         if not token.last_used or (timezone.now() - token.last_used).total_seconds() > 60:
             Token.objects.filter(pk=token.pk).update(last_used=timezone.now())
 
-        from core.managers import set_current_tenant, set_current_membership
+        from core.managers import (
+            set_current_tenant, set_current_tenant_group,
+            set_current_membership, set_current_all_accessible,
+        )
         from organization.models import Membership
         set_current_tenant(token.tenant)
+        # A token is bound to exactly one tenant (never a group or the
+        # all-accessible scope) — clear both explicitly rather than relying on
+        # TenantMiddleware having already zeroed them for the pre-auth anonymous
+        # request, so a leaked/ambient group or all-accessible context can never
+        # combine with the tenant just set into the contradictory state
+        # core.managers.get_current_scope_conflict() would fail closed on.
+        set_current_tenant_group(None)
+        set_current_all_accessible(False)
         membership = Membership.objects.filter(
             user=token.user, tenant=token.tenant, is_active=True,
         ).first()
@@ -99,6 +110,7 @@ class TokenAuthentication(BaseAuthentication):
             request.active_tenant = token.tenant
             request.active_tenant_group = None
             request.active_membership = membership
+            request.active_all_accessible = False
 
         return (token.user, token)
 
@@ -108,7 +120,7 @@ class TokenAuthentication(BaseAuthentication):
 
 try:
     from drf_spectacular.extensions import OpenApiAuthenticationExtension
-    
+
     class TokenAuthenticationScheme(OpenApiAuthenticationExtension):
         target_class = TokenAuthentication
         name = 'TokenAuth'
