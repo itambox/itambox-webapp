@@ -88,6 +88,12 @@ def test_scim_e2e_uses_bearer_auth_and_preserves_tenant_anti_harvesting():
     assert "expect(response.status()).toBe(401);" in spec
     assert "expect(groupRes.status()).toBe(403);" in spec
     assert "expect(permissionsRes.status()).toBe(401);" in spec
+    assert "expect(response.status()).toBeDefined();" not in spec
+    assert "if (response.status() === 302)" not in spec
+    assert "OIDC login initiation rejects an unknown tenant" in spec
+    assert "OIDC callback without initiation fails closed" in spec
+    assert "OIDC provider errors terminate an existing session" in spec
+    assert "expect(response.headers()['location']).toBe('/');" in spec
     assert "storageState: { cookies: [], origins: [] }" in spec
     assert "const uniqueUser = `scim.test.user.${Date.now()}`;" in spec
     assert "const duplicateUser = `duplicate.user.${Date.now()}`;" in spec

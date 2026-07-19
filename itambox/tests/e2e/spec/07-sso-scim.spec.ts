@@ -55,25 +55,31 @@ test.describe('SSO and SCIM 2.0 Provisioning Specs', () => {
 
   // TIER 1: Feature Coverage (>= 5 tests)
 
-  test('1. OIDC login flow redirection: /oidc/authenticate/ initiates a redirect', async ({ request }) => {
-    // Navigate to authenticate endpoint without following redirects automatically to inspect status/location
-    const response = await request.get('/oidc/authenticate/', { maxRedirects: 0 });
-
-    // It should be a redirect (302) to the OIDC provider's authorization page
-    if (response.status() === 302) {
-      const location = response.headers()['location'];
-      expect(location).toBeDefined();
-      expect(location).toContain('auth'); // typical authorize url keyword
-    } else {
-      console.log(`OIDC redirect returned status: ${response.status()}`);
-    }
+  test('1. OIDC login initiation rejects an unknown tenant', async ({ request }) => {
+    const response = await request.get('/oidc/authenticate/e2e-missing-tenant/', {
+      maxRedirects: 0,
+    });
+    expect(response.status()).toBe(404);
   });
 
-  test('2. OIDC callback validation: POST/GET to /oidc/callback/ with tokens authenticates session', async ({ request }) => {
-    // If we pass mock/configured auth codes to OIDC callback, it should validate and redirect or return failure
-    const response = await request.get('/oidc/callback/?code=mockcode123&state=mockstate123', { maxRedirects: 0 });
-    // Should return 302 redirect on successful auth (to dashboard) or 400/403/Redirect on mock failures
-    expect(response.status()).toBeDefined();
+  test('2. OIDC callback without initiation fails closed', async ({ playwright }) => {
+    const callbackContext = await playwright.request.newContext({
+      baseURL: process.env.E2E_BASE_URL || 'http://localhost:8000',
+      storageState: { cookies: [], origins: [] },
+    });
+    try {
+      const response = await callbackContext.get(
+        '/oidc/callback/?code=mockcode123&state=mockstate123',
+        { maxRedirects: 0 },
+      );
+      expect(response.status()).toBe(302);
+      expect(response.headers()['location']).toBe('/');
+
+      const permissionsRes = await callbackContext.get('/api/users/config/');
+      expect(permissionsRes.status()).toBe(401);
+    } finally {
+      await callbackContext.dispose();
+    }
   });
 
   test('3. SCIM User Provisioning creates a user in the configured tenant', async () => {
@@ -134,10 +140,16 @@ test.describe('SSO and SCIM 2.0 Provisioning Specs', () => {
 
   // TIER 2: Boundary & Corner Cases (>= 5 tests)
 
-  test('6. OIDC callback with invalid or expired state parameter returns login failure', async ({ request }) => {
-    const response = await request.get('/oidc/callback/?code=mockcode123&state=expired_state', { maxRedirects: 0 });
-    // Should either redirect to a login failure page or return an error page/response
-    expect(response.status()).toBeDefined();
+  test('6. OIDC provider errors terminate an existing session', async ({ request }) => {
+    const response = await request.get(
+      '/oidc/callback/?error=access_denied&state=expired_state',
+      { maxRedirects: 0 },
+    );
+    expect(response.status()).toBe(302);
+    expect(response.headers()['location']).toBe('/');
+
+    const permissionsRes = await request.get('/api/users/config/');
+    expect(permissionsRes.status()).toBe(401);
   });
 
   test('7. SCIM User creation with duplicate username returns 409 Conflict', async () => {
@@ -217,14 +229,17 @@ test.describe('SSO and SCIM 2.0 Provisioning Specs', () => {
       baseURL: process.env.E2E_BASE_URL || 'http://localhost:8000',
       storageState: { cookies: [], origins: [] },
     });
-    await callbackContext.get(
-      `/oidc/callback/?code=combo_code&state=combo_state&username=${uniqueUser}`,
-      { maxRedirects: 0 },
-    );
+    try {
+      await callbackContext.get(
+        `/oidc/callback/?code=combo_code&state=combo_state&username=${uniqueUser}`,
+        { maxRedirects: 0 },
+      );
 
-    const permissionsRes = await callbackContext.get('/api/users/config/');
-    expect(permissionsRes.status()).toBe(401);
-    await callbackContext.dispose();
+      const permissionsRes = await callbackContext.get('/api/users/config/');
+      expect(permissionsRes.status()).toBe(401);
+    } finally {
+      await callbackContext.dispose();
+    }
   });
 
   // TIER 4: Real-World Scenarios (workload 2)
