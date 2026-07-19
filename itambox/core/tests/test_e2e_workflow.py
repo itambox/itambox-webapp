@@ -12,6 +12,9 @@ PREFLIGHT_PATH = (
 E2E_PACKAGE_PATH = (
     REPOSITORY_ROOT / "itambox" / "tests" / "e2e" / "package.json"
 )
+SCIM_SPEC_PATH = (
+    REPOSITORY_ROOT / "itambox" / "tests" / "e2e" / "spec" / "07-sso-scim.spec.ts"
+)
 
 
 def test_e2e_workflow_generates_masked_ephemeral_credentials_before_seeding():
@@ -46,3 +49,15 @@ def test_preflight_parses_marked_superuser_count_despite_noisy_django_output():
     assert "__E2E_SUPERUSER_COUNT__=" in preflight
     assert "const count = parseSuperuserCount(userResult);" in preflight
     assert "node --test preflight-output.test.mjs" in package
+
+
+def test_scim_negative_paths_match_authentication_and_url_routing_contracts():
+    spec = SCIM_SPEC_PATH.read_text(encoding="utf-8")
+
+    assert (
+        "Unauthenticated SCIM request targeting a non-existent tenant fails closed"
+        in spec
+    )
+    assert "expect(response.status()).toBe(401);" in spec
+    assert "SCIM User patch with a malformed resource ID returns 404" in spec
+    assert "expect(response.status()).toBe(404);" in spec
