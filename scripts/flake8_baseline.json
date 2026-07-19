@@ -7356,14 +7356,6 @@
       "count": 1
     },
     {
-      "path": "itambox/conftest.py",
-      "code": "W391",
-      "message": "blank line at end of file",
-      "source": "",
-      "context": "Module:body/FunctionDef:clear_thread_locals:body/Try#2:handlers/ExceptHandler:Name(id='Exception', ctx=Load()):None:body",
-      "count": 1
-    },
-    {
       "path": "itambox/core/apps.py",
       "code": "B950",
       "message": "line too long (138 > 120 characters)",
@@ -9845,24 +9837,8 @@
     },
     {
       "path": "itambox/core/managers.py",
-      "code": "B950",
-      "message": "line too long (160 > 120 characters)",
-      "source": "                    allowed_tenant_ids = list(Tenant._base_manager.filter(group_id__in=allowed_group_ids, deleted_at__isnull=True).values_list('pk', flat=True))",
-      "context": "Module:body/ClassDef:TenantScopingQuerySet:body/FunctionDef:filter_by_tenant:body/If:BoolOp(op=Or(), values=[Name(id='active_tenant', ctx=Load()), Name(id='active_group', ctx=Load())]):body/If:Name(id='active_tenant', ctx=Load()):orelse/If:BoolOp(op=And(), values=[Name(id='user', ctx=Load()), Attribute(value=Name(id='user', ctx=Load()), attr='is_superuser', ctx=Load())]):body",
-      "count": 1
-    },
-    {
-      "path": "itambox/core/managers.py",
-      "code": "B950",
-      "message": "line too long (160 > 120 characters)",
-      "source": "                    allowed_tenant_ids = list(Tenant._base_manager.filter(group_id__in=allowed_group_ids, deleted_at__isnull=True).values_list('pk', flat=True))",
-      "context": "Module:body/ClassDef:TenantScopingQuerySet:body/FunctionDef:filter_by_tenant:body/If:BoolOp(op=Or(), values=[Name(id='active_tenant', ctx=Load()), Name(id='active_group', ctx=Load())]):body/If:Name(id='active_tenant', ctx=Load()):orelse/If:BoolOp(op=And(), values=[Name(id='user', ctx=Load()), Attribute(value=Name(id='user', ctx=Load()), attr='is_superuser', ctx=Load())]):orelse/If:Name(id='user', ctx=Load()):orelse",
-      "count": 1
-    },
-    {
-      "path": "itambox/core/managers.py",
       "code": "C901",
-      "message": "'TenantScopingQuerySet.filter_by_tenant' is too complex (31)",
+      "message": "'TenantScopingQuerySet.filter_by_tenant' is too complex (30)",
       "source": "    def filter_by_tenant(self) -> QuerySet:",
       "context": "Module:body/ClassDef:TenantScopingQuerySet:body/FunctionDef:filter_by_tenant:self",
       "count": 1
@@ -9933,18 +9909,10 @@
     },
     {
       "path": "itambox/core/managers.py",
-      "code": "W391",
-      "message": "blank line at end of file",
-      "source": "",
-      "context": "Module:body/ClassDef:TenantScopingAllObjectsManager:body/FunctionDef:get_queryset:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/core/managers.py",
       "code": "W504",
       "message": "line break after binary operator",
       "source": "                            models.Q(filter_tenants__id__in=allowed_tenant_ids) |",
-      "context": "Module:body/ClassDef:TenantScopingQuerySet:body/FunctionDef:filter_by_tenant:body/If:BoolOp(op=Or(), values=[Name(id='active_tenant', ctx=Load()), Name(id='active_group', ctx=Load())]):body/Try#2:body/Try:body/If:Name(id='allow_global', ctx=Load()):body",
+      "context": "Module:body/ClassDef:TenantScopingQuerySet:body/FunctionDef:filter_by_tenant:body/If:BoolOp(op=Or(), values=[Name(id='active_tenant', ctx=Load()), Name(id='active_group', ctx=Load()), Name(id='all_accessible', ctx=Load())]):body/Try#2:body/Try:body/If:Name(id='allow_global', ctx=Load()):body",
       "count": 1
     },
     {
@@ -9952,7 +9920,7 @@
       "code": "W504",
       "message": "line break after binary operator",
       "source": "                            models.Q(tenant_id__in=allowed_tenant_ids) |",
-      "context": "Module:body/ClassDef:TenantScopingQuerySet:body/FunctionDef:filter_by_tenant:body/If:BoolOp(op=Or(), values=[Name(id='active_tenant', ctx=Load()), Name(id='active_group', ctx=Load())]):body/Try#2:body/Try:body/If:Name(id='allow_global', ctx=Load()):body",
+      "context": "Module:body/ClassDef:TenantScopingQuerySet:body/FunctionDef:filter_by_tenant:body/If:BoolOp(op=Or(), values=[Name(id='active_tenant', ctx=Load()), Name(id='active_group', ctx=Load()), Name(id='all_accessible', ctx=Load())]):body/Try#2:body/Try:body/If:Name(id='allow_global', ctx=Load()):body",
       "count": 1
     },
     {
@@ -9960,7 +9928,7 @@
       "code": "W504",
       "message": "line break after binary operator",
       "source": "                            models.Q(tenant_id__in=allowed_tenant_ids) |",
-      "context": "Module:body/ClassDef:TenantScopingQuerySet:body/FunctionDef:filter_by_tenant:body/If:BoolOp(op=Or(), values=[Name(id='active_tenant', ctx=Load()), Name(id='active_group', ctx=Load())]):body/Try#2:body/Try:body/If:Name(id='allow_global', ctx=Load()):orelse",
+      "context": "Module:body/ClassDef:TenantScopingQuerySet:body/FunctionDef:filter_by_tenant:body/If:BoolOp(op=Or(), values=[Name(id='active_tenant', ctx=Load()), Name(id='active_group', ctx=Load()), Name(id='all_accessible', ctx=Load())]):body/Try#2:body/Try:body/If:Name(id='allow_global', ctx=Load()):orelse",
       "count": 1
     },
     {
@@ -19324,14 +19292,6 @@
       "count": 1
     },
     {
-      "path": "itambox/itambox/api/authentication.py",
-      "code": "W293",
-      "message": "blank line contains whitespace",
-      "source": "    ",
-      "context": "Module:body/Try:self",
-      "count": 1
-    },
-    {
       "path": "itambox/itambox/api/base.py",
       "code": "F401",
       "message": "'itambox.api.exceptions.SerializerNotFound' imported but unused",
@@ -19550,7 +19510,7 @@
     {
       "path": "itambox/itambox/middleware.py",
       "code": "C901",
-      "message": "'TenantMiddleware.process_request' is too complex (32)",
+      "message": "'TenantMiddleware.process_request' is too complex (27)",
       "source": "    def process_request(self, request):",
       "context": "Module:body/ClassDef:TenantMiddleware:body/FunctionDef:process_request:self",
       "count": 1
@@ -19609,22 +19569,6 @@
       "message": "'.ratelimit.RateLimitMiddleware' imported but unused",
       "source": "from .ratelimit import RateLimitMiddleware",
       "context": "Module:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/itambox/middleware.py",
-      "code": "W292",
-      "message": "no newline at end of file",
-      "source": "        return response",
-      "context": "Module:body/ClassDef:TenantMiddleware:body/FunctionDef:process_response:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/itambox/middleware.py",
-      "code": "W293",
-      "message": "blank line contains whitespace",
-      "source": "    ",
-      "context": "Module:body/ClassDef:CSPMiddleware:body",
       "count": 1
     },
     {
@@ -23097,14 +23041,6 @@
       "message": "'core.models.VaultModel' imported but unused",
       "source": "from core.models import BaseModel, ChangeLoggingMixin, StandardModel, VaultModel, DeletableVaultModel",
       "context": "Module:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/organization/rbac.py",
-      "code": "C901",
-      "message": "'accessible_tenant_ids' is too complex (11)",
-      "source": "def accessible_tenant_ids(user):",
-      "context": "Module:body/FunctionDef:accessible_tenant_ids:self",
       "count": 1
     },
     {

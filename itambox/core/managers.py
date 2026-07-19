@@ -200,7 +200,7 @@ class TenantScopingQuerySet(models.QuerySet):
         tenant/group-topology writes; a cache outage forces recomputation.
         """
         if user is None or not hasattr(user, '__dict__'):
-            return set()
+            return frozenset()
         from core.auth.cache import synchronize_authorization_cache
         from organization.access import get_ancestor_tenant_group_ids
 
@@ -234,7 +234,8 @@ class TenantScopingQuerySet(models.QuerySet):
             # inline import: avoid a core.managers -> itambox.middleware circular
             # import at module load.
             from itambox.middleware import get_current_user
-            if get_current_scope_conflict(get_current_user()):
+            current_user = get_current_user()
+            if get_current_scope_conflict(current_user):
                 return self.none()
 
             from django.apps import apps
@@ -291,8 +292,7 @@ class TenantScopingQuerySet(models.QuerySet):
             if self.model._meta.model_name == 'tenantgroup':
                 # inline imports: avoid a core.managers -> middleware /
                 # organization circular import at module load.
-                from itambox.middleware import get_current_user
-                tg_user = get_current_user()
+                tg_user = current_user
                 TenantGroupModel = apps.get_model('organization', 'TenantGroup')
 
                 def expand_to_ancestors(seed_ids):
@@ -357,9 +357,8 @@ class TenantScopingQuerySet(models.QuerySet):
                     # Derived from the canonical accessible_tenant_ids, so no extra
                     # RBAC resolution; only runs for the (few) models that carry a
                     # tenant_group field.
-                    from itambox.middleware import get_current_user
                     group_ids = self._all_accessible_group_ids(
-                        get_current_user(),
+                        current_user,
                         allowed_tenant_ids,
                         Tenant,
                     )

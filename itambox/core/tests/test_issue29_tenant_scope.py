@@ -310,6 +310,19 @@ class AllAccessibleScopeTests(TestCase):
         ):
             self.assertNotIn(self.cust_b.pk, accessible_tenant_ids(self.member))
 
+    def test_all_accessible_queryset_drops_clock_expired_grant_without_write(self):
+        self.assertIn('i29a-b', self._all_accessible_slugs(self.member))
+
+        after_expiry = self.managed_grant.valid_until + timedelta(seconds=1)
+        with (
+            mock.patch('organization.access.timezone.now', return_value=after_expiry),
+            mock.patch('organization.rbac.timezone.now', return_value=after_expiry),
+        ):
+            visible = set(Tenant.objects.values_list('slug', flat=True))
+
+        self.assertNotIn('i29a-b', visible)
+        self.assertEqual(visible, {'i29a-p', 'i29a-a', 'i29a-c'})
+
     def test_cache_outage_recomputes_instead_of_serving_local_memo(self):
         from organization.access import accessible_tenant_ids
 
