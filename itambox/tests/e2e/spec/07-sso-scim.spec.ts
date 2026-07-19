@@ -140,16 +140,35 @@ test.describe('SSO and SCIM 2.0 Provisioning Specs', () => {
 
   // TIER 2: Boundary & Corner Cases (>= 5 tests)
 
-  test('6. OIDC provider errors terminate an existing session', async ({ request }) => {
-    const response = await request.get(
-      '/oidc/callback/?error=access_denied&state=expired_state',
-      { maxRedirects: 0 },
-    );
-    expect(response.status()).toBe(302);
-    expect(response.headers()['location']).toBe('/');
+  test('6. OIDC provider errors terminate an existing session', async ({ browser }) => {
+    const authenticatedContext = await browser.newContext({
+      baseURL: process.env.E2E_BASE_URL || 'http://localhost:8000',
+    });
+    try {
+      const page = await authenticatedContext.newPage();
+      await page.goto('/');
+      await page.fill('input[name="username"]', requiredEnv('E2E_USERNAME'));
+      await page.fill('input[name="password"]', requiredEnv('E2E_PASSWORD'));
+      await Promise.all([
+        page.waitForNavigation({ waitUntil: 'networkidle' }),
+        page.click('button[type="submit"]'),
+      ]);
 
-    const permissionsRes = await request.get('/api/users/config/');
-    expect(permissionsRes.status()).toBe(401);
+      const beforeLogout = await authenticatedContext.request.get('/api/users/config/');
+      expect(beforeLogout.status()).toBe(200);
+
+      const response = await authenticatedContext.request.get(
+        '/oidc/callback/?error=access_denied&state=expired_state',
+        { maxRedirects: 0 },
+      );
+      expect(response.status()).toBe(302);
+      expect(response.headers()['location']).toBe('/');
+
+      const permissionsRes = await authenticatedContext.request.get('/api/users/config/');
+      expect(permissionsRes.status()).toBe(401);
+    } finally {
+      await authenticatedContext.close();
+    }
   });
 
   test('7. SCIM User creation with duplicate username returns 409 Conflict', async () => {
