@@ -41,19 +41,17 @@ jobs:
       ITAMBOX_DB_SSLMODE: disable
       DJANGO_SUPERUSER_USERNAME: e2e-admin
       DJANGO_SUPERUSER_EMAIL: e2e@itambox.local
-      DJANGO_SUPERUSER_PASSWORD: ${{ secrets.E2E_PASSWORD }}
       E2E_USERNAME: e2e-admin
-      E2E_PASSWORD: ${{ secrets.E2E_PASSWORD }}
       E2E_BASE_URL: http://localhost:8000
       # Playwright's webServer config uses a venv path; in CI we manage the server
       # ourselves for reliability and to avoid venv path assumptions.
       E2E_NO_WEBSERVER: "1"
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: Set up Python 3.12
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v6
         with:
           python-version: "3.12"
           cache: 'pip'
@@ -70,7 +68,7 @@ jobs:
           pip install -r requirements-dev.txt
 
       - name: Set up Node.js 20
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v7
         with:
           node-version: "20"
           cache: 'npm'
@@ -106,6 +104,14 @@ jobs:
       - name: Run migrations
         working-directory: ./itambox
         run: python manage.py migrate
+
+      - name: Generate ephemeral E2E credentials
+        shell: bash
+        run: |
+          E2E_PASSWORD="$(python -c 'import secrets; print(secrets.token_urlsafe(32))')"
+          echo "::add-mask::$E2E_PASSWORD"
+          echo "E2E_PASSWORD=$E2E_PASSWORD" >> "$GITHUB_ENV"
+          echo "DJANGO_SUPERUSER_PASSWORD=$E2E_PASSWORD" >> "$GITHUB_ENV"
 
       - name: Seed test data (minimal)
         working-directory: ./itambox
