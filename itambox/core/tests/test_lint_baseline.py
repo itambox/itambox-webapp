@@ -33,6 +33,7 @@ def _finding(
     code="F401",
     message="'os' imported but unused",
     source="import os",
+    context="Module:body",
     count=1,
 ):
     return {
@@ -40,26 +41,39 @@ def _finding(
         "code": code,
         "message": message,
         "source": source,
+        "context": context,
         "count": count,
     }
 
 
 def _baseline(*findings):
     return {
-        "schema_version": 2,
+        "schema_version": 3,
         "canonical_python": "3.12",
         "findings": list(findings),
     }
+
+
+def _with_policy(root, baseline, targets=("pkg",)):
+    baseline = dict(baseline)
+    baseline["policy_sha256"] = _load_script(
+        "check_flake8_baseline_fixture_policy"
+    ).compute_policy_fingerprint(root, list(targets))
+    return baseline
+
+
+def _write_fixture_policy(root):
+    (root / "setup.cfg").write_text(
+        "[flake8]\nselect = B,C,E,F,W,B9\nignore = E203, E501, W503\n",
+        encoding="utf-8",
+    )
 
 
 @pytest.fixture
 def fixture_project(tmp_path):
     """A throwaway one-file "project" with its own flake8 config, isolated from the
     real repo's setup.cfg and scripts/flake8_baseline.json."""
-    (tmp_path / "setup.cfg").write_text(
-        "[flake8]\nselect = B,C,E,F,W,B9\nignore = E203, E501, W503\n",
-        encoding="utf-8",
-    )
+    _write_fixture_policy(tmp_path)
     pkg = tmp_path / "pkg"
     pkg.mkdir()
     module = pkg / "mod.py"
@@ -70,6 +84,7 @@ def fixture_project(tmp_path):
 def _run(fixture_project, baseline):
     root, _module = fixture_project
     baseline_path = root / "flake8_baseline.json"
+    baseline = _with_policy(root, baseline)
     baseline_path.write_text(json.dumps(baseline), encoding="utf-8")
     result = subprocess.run(
         [sys.executable, str(SCRIPT), "pkg", "--baseline", str(baseline_path), "--cwd", str(root)],
@@ -111,7 +126,86 @@ def test_unchanged_finding_identity_survives_line_shift(fixture_project):
     assert result.returncode == 0, result.stdout + result.stderr
 
 
-def test_b907_multiline_anchor_is_stable_across_reported_rows(fixture_project):
+def test_same_source_finding_moved_between_named_scopes_is_new_identity(tmp_path):
+    gate = _load_script("check_flake8_baseline_scope_identity")
+    module = tmp_path / "mod.py"
+    message = "'os' imported but unused"
+    module.write_text(
+        "def first():\n    import os\n\ndef second():\n    pass\n",
+        encoding="utf-8",
+    )
+    old, _examples = gate.parse_findings(
+        f"mod.py:2:5: F401 {message}\n",
+        tmp_path,
+    )
+    module.write_text(
+        "def first():\n    pass\n\ndef second():\n    import os\n",
+        encoding="utf-8",
+    )
+    new, _examples = gate.parse_findings(
+        f"mod.py:5:5: F401 {message}\n",
+        tmp_path,
+    )
+
+    assert old != new
+    assert old - new == old
+    assert new - old == new
+
+
+def test_finding_on_blank_line_uses_nearest_ast_context(tmp_path):
+    gate = _load_script("check_flake8_baseline_blank_line_context")
+    module = tmp_path / "mod.py"
+    module.write_text("import os\n\ndef function():\n    pass\n", encoding="utf-8")
+
+    findings, _examples = gate.parse_findings(
+        "mod.py:2:1: E303 too many blank lines (2)\n",
+        tmp_path,
+    )
+
+    assert len(findings) == 1
+    assert next(iter(findings))[4] == "Module:body"
+
+
+def test_finding_in_whitespace_only_module_uses_module_context(tmp_path):
+    gate = _load_script("check_flake8_baseline_empty_module_context")
+    module = tmp_path / "mod.py"
+    module.write_text(" \n", encoding="utf-8")
+
+    findings, _examples = gate.parse_findings(
+        "mod.py:1:1: W293 blank line contains whitespace\n",
+        tmp_path,
+    )
+
+    assert len(findings) == 1
+    assert next(iter(findings))[4] == "Module:body"
+
+
+def test_blank_line_finding_moved_between_functions_is_new_identity(tmp_path):
+    gate = _load_script("check_flake8_baseline_blank_scope_identity")
+    module = tmp_path / "mod.py"
+    module.write_text(
+        "def first():\n    value = 1\n    \n\ndef second():\n    value = 2\n",
+        encoding="utf-8",
+    )
+    old, _examples = gate.parse_findings(
+        "mod.py:3:1: W293 blank line contains whitespace\n",
+        tmp_path,
+    )
+    module.write_text(
+        "def first():\n    value = 1\n\ndef second():\n    value = 2\n    \n",
+        encoding="utf-8",
+    )
+    new, _examples = gate.parse_findings(
+        "mod.py:6:1: W293 blank line contains whitespace\n",
+        tmp_path,
+    )
+
+    assert old != new
+
+
+def test_b907_multiline_statement_anchor_is_stable_across_reported_rows(
+    fixture_project,
+):
     root, module = fixture_project
     module.write_text(
         "def render(checkin_url):\n"
@@ -162,6 +256,33 @@ def test_b907_url_anchor_is_stable_across_reported_rows(fixture_project):
     assert row_one == row_two
 
 
+def test_python311_b907_statement_replacement_is_blocked(monkeypatch):
+    gate = _load_script("check_flake8_baseline_b907_replacement")
+    old = (
+        "pkg/mod.py",
+        "B907",
+        "'url' is manually surrounded by quotes, consider using the `!r` conversion flag.",
+        "html = f'<a href=\"{url}\">link</a>'",
+        "Module:body",
+    )
+    new = (
+        old[0],
+        old[1],
+        old[2],
+        "html = f'<img src=\"{url}\">'",
+        old[4],
+    )
+    monkeypatch.setattr(gate.sys, "version_info", (3, 11))
+
+    regressions, stale = gate.compare_baseline(
+        gate.collections.Counter({new: 1}),
+        gate.collections.Counter({old: 1}),
+    )
+
+    assert regressions == gate.collections.Counter({new: 1})
+    assert stale == gate.collections.Counter({old: 1})
+
+
 def test_violation_count_exceeding_baseline_fails(fixture_project):
     root, module = fixture_project
     # Two unused imports: baseline only grandfathers one exact F401 identity.
@@ -195,12 +316,17 @@ def _load_script(name):
     return module
 
 
+def _baseline_for(root, *findings):
+    return _with_policy(root, _baseline(*findings))
+
+
 def test_write_baseline_refuses_new_identity(
     fixture_project, monkeypatch,
 ):
     root, _module = fixture_project
     baseline_path = root / "flake8_baseline.json"
-    baseline_path.write_text(json.dumps(_baseline()), encoding="utf-8")
+    original = _baseline_for(root)
+    baseline_path.write_text(json.dumps(original), encoding="utf-8")
     gate = _load_script("check_flake8_baseline_write_regression")
     monkeypatch.setattr(gate.sys, "version_info", (3, 12))
     monkeypatch.setattr(
@@ -227,7 +353,7 @@ def test_write_baseline_refuses_new_identity(
     )
 
     assert gate.main() != 0
-    assert json.loads(baseline_path.read_text(encoding="utf-8")) == _baseline()
+    assert json.loads(baseline_path.read_text(encoding="utf-8")) == original
 
 
 def test_write_baseline_updates_after_cleanup(
@@ -236,7 +362,7 @@ def test_write_baseline_updates_after_cleanup(
     root, _module = fixture_project
     baseline_path = root / "flake8_baseline.json"
     baseline_path.write_text(
-        json.dumps(_baseline(_finding())),
+        json.dumps(_baseline_for(root, _finding())),
         encoding="utf-8",
     )
     gate = _load_script("check_flake8_baseline_write_cleanup")
@@ -257,7 +383,7 @@ def test_write_baseline_updates_after_cleanup(
     )
 
     assert gate.main() == 0
-    assert json.loads(baseline_path.read_text(encoding="utf-8")) == _baseline()
+    assert json.loads(baseline_path.read_text(encoding="utf-8")) == _baseline_for(root)
 
 
 def test_write_baseline_refuses_noncanonical_python(
@@ -265,7 +391,7 @@ def test_write_baseline_refuses_noncanonical_python(
 ):
     root, _module = fixture_project
     baseline_path = root / "flake8_baseline.json"
-    baseline_path.write_text(json.dumps(_baseline()), encoding="utf-8")
+    baseline_path.write_text(json.dumps(_baseline_for(root)), encoding="utf-8")
     gate = _load_script("check_flake8_baseline_write_python311")
     monkeypatch.setattr(gate.sys, "version_info", (3, 11))
     monkeypatch.setattr(gate, "run_flake8", lambda targets, cwd: ("", "", 0))
@@ -287,6 +413,38 @@ def test_write_baseline_refuses_noncanonical_python(
     assert "outside Python 3.12" in capsys.readouterr().err
 
 
+def test_write_baseline_refuses_weakened_flake8_policy(
+    fixture_project, monkeypatch, capsys,
+):
+    root, _module = fixture_project
+    baseline_path = root / "flake8_baseline.json"
+    original = _baseline_for(root, _finding())
+    baseline_path.write_text(json.dumps(original), encoding="utf-8")
+    (root / "setup.cfg").write_text(
+        "[flake8]\nselect = NOT_A_CODE\n",
+        encoding="utf-8",
+    )
+    gate = _load_script("check_flake8_baseline_weakened_policy")
+    monkeypatch.setattr(gate.sys, "version_info", (3, 12))
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        [
+            str(SCRIPT),
+            "pkg",
+            "--baseline",
+            str(baseline_path),
+            "--cwd",
+            str(root),
+            "--write-baseline",
+        ],
+    )
+
+    assert gate.main() == 2
+    assert "policy" in capsys.readouterr().err.lower()
+    assert json.loads(baseline_path.read_text(encoding="utf-8")) == original
+
+
 def test_python311_fstring_shortfall_is_interpreter_version_aware(monkeypatch):
     gate = _load_script("check_flake8_baseline_python_compat")
     key = (
@@ -294,6 +452,7 @@ def test_python311_fstring_shortfall_is_interpreter_version_aware(monkeypatch):
         "E226",
         "missing whitespace around arithmetic operator",
         "value = f'{1+1}'",
+        "Module:body",
     )
     baseline = gate.collections.Counter({key: 1})
 
@@ -307,46 +466,10 @@ def test_python311_fstring_shortfall_is_interpreter_version_aware(monkeypatch):
     assert not regressions
     assert stale == baseline
 
-
-def test_python311_b907_source_shift_is_compatible_but_message_change_fails(monkeypatch):
-    gate = _load_script("check_flake8_baseline_b907_python_compat")
-    baseline_key = (
-        "pkg/mod.py",
-        "B907",
-        "'url' is manually surrounded by quotes",
-        "f'href=\"{url}\"'",
-    )
-    shifted_key = (
-        "pkg/mod.py",
-        "B907",
-        baseline_key[2],
-        "'<a '  # Python 3.11 reports the multiline f-string start",
-    )
-    changed_key = (
-        "pkg/mod.py",
-        "B907",
-        "'other_url' is manually surrounded by quotes",
-        "f'href=\"{other_url}\"'",
-    )
-    baseline = gate.collections.Counter({baseline_key: 1})
-
-    monkeypatch.setattr(gate.sys, "version_info", (3, 11))
-    regressions, stale = gate.compare_baseline(
-        gate.collections.Counter({shifted_key: 1}), baseline,
-    )
+    monkeypatch.setattr(gate.sys, "version_info", (3, 10))
+    regressions, stale = gate.compare_baseline(gate.collections.Counter(), baseline)
     assert not regressions
-    assert not stale
-    regressions, _stale = gate.compare_baseline(
-        gate.collections.Counter({changed_key: 1}), baseline,
-    )
-    assert regressions
-
-    monkeypatch.setattr(gate.sys, "version_info", (3, 12))
-    regressions, stale = gate.compare_baseline(
-        gate.collections.Counter({shifted_key: 1}), baseline,
-    )
-    assert regressions
-    assert stale
+    assert stale == baseline
 
 
 def test_malformed_identity_baseline_fails_closed(fixture_project):
@@ -362,14 +485,74 @@ def test_malformed_identity_baseline_fails_closed(fixture_project):
     assert "invalid flake8 baseline" in result.stderr
 
 
+def test_unknown_baseline_metadata_fails_closed(tmp_path):
+    gate = _load_script("check_flake8_baseline_unknown_metadata")
+    baseline_path = tmp_path / "baseline.json"
+    baseline_path.write_text(
+        json.dumps(
+            {
+                "schema_version": 3,
+                "canonical_python": "3.12",
+                "policy_sha256": "expected",
+                "findings": [],
+                "unexpected": "ignored-policy-data",
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    with pytest.raises(ValueError, match="top-level fields"):
+        gate.load_baseline(baseline_path, "expected")
+
+
+def test_unknown_stdout_with_success_status_fails_closed(tmp_path):
+    gate = _load_script("check_flake8_baseline_unknown_success")
+    _findings, _examples, failure = gate.validate_flake8_result(
+        "INTERNAL PLUGIN FAILURE\n",
+        "",
+        0,
+        tmp_path,
+    )
+    assert failure == 2
+
+
+def test_finding_output_with_success_status_fails_closed(tmp_path):
+    module = tmp_path / "mod.py"
+    module.write_text("import os\n", encoding="utf-8")
+    gate = _load_script("check_flake8_baseline_inconsistent_success")
+    _findings, _examples, failure = gate.validate_flake8_result(
+        "mod.py:1:1: F401 'os' imported but unused\n",
+        "",
+        0,
+        tmp_path,
+    )
+    assert failure == 2
+
+
+def test_unknown_stdout_mixed_with_finding_fails_closed(tmp_path):
+    module = tmp_path / "mod.py"
+    module.write_text("import os\n", encoding="utf-8")
+    gate = _load_script("check_flake8_baseline_unknown_mixed")
+    _findings, _examples, failure = gate.validate_flake8_result(
+        "mod.py:1:1: F401 'os' imported but unused\n"
+        "INTERNAL PLUGIN FAILURE\n",
+        "",
+        1,
+        tmp_path,
+    )
+    assert failure == 2
+
+
 def test_operational_exit_one_without_findings_fails_closed(monkeypatch, tmp_path, capsys):
     """A Flake8/plugin config failure must not look like a clean empty run."""
     spec = importlib.util.spec_from_file_location("check_flake8_baseline_under_test", SCRIPT)
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
 
+    _write_fixture_policy(tmp_path)
+    (tmp_path / "pkg").mkdir()
     baseline_path = tmp_path / "flake8_baseline.json"
-    baseline_path.write_text(json.dumps(_baseline()), encoding="utf-8")
+    baseline_path.write_text(json.dumps(_baseline_for(tmp_path)), encoding="utf-8")
     monkeypatch.setattr(
         module,
         "run_flake8",
@@ -378,7 +561,7 @@ def test_operational_exit_one_without_findings_fails_closed(monkeypatch, tmp_pat
     monkeypatch.setattr(
         sys,
         "argv",
-        [str(SCRIPT), "--baseline", str(baseline_path), "--cwd", str(tmp_path)],
+        [str(SCRIPT), "pkg", "--baseline", str(baseline_path), "--cwd", str(tmp_path)],
     )
 
     assert module.main() != 0
@@ -394,9 +577,13 @@ def test_operational_stderr_with_baseline_covered_findings_fails_closed(
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
 
+    _write_fixture_policy(tmp_path)
+    pkg = tmp_path / "pkg"
+    pkg.mkdir()
+    (pkg / "mod.py").write_text(VIOLATING_MODULE, encoding="utf-8")
     baseline_path = tmp_path / "flake8_baseline.json"
     baseline_path.write_text(
-        json.dumps(_baseline(_finding())),
+        json.dumps(_baseline_for(tmp_path, _finding())),
         encoding="utf-8",
     )
     monkeypatch.setattr(
@@ -411,7 +598,7 @@ def test_operational_stderr_with_baseline_covered_findings_fails_closed(
     monkeypatch.setattr(
         sys,
         "argv",
-        [str(SCRIPT), "--baseline", str(baseline_path), "--cwd", str(tmp_path)],
+        [str(SCRIPT), "pkg", "--baseline", str(baseline_path), "--cwd", str(tmp_path)],
     )
 
     assert module.main() != 0
