@@ -23,7 +23,7 @@ jobs:
           bash -n scripts/tests/test_docker_smoke_helpers.sh
 
       - name: Set up Python
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v6
         with:
           python-version: "3.12"
 
