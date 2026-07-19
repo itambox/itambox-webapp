@@ -4,7 +4,7 @@ djangorestframework>=3.16,<3.17
 drf-spectacular[sidecar]>=0.29,<0.30
 
 # UI / tables / forms
-django-tables2>=2.7,<2.8
+django-tables2>=3.0.0,<3.1
 django-filter>=25.2,<25.3
 django-htmx>=1.21,<1.28
 django-template-partials>=25.3,<25.4
