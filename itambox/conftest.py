@@ -45,11 +45,13 @@ def clear_thread_locals():
             set_current_tenant,
             set_current_tenant_group,
             set_current_membership,
+            set_current_all_accessible,
             _descendant_group_ids_cache,
         )
         set_current_tenant(None)
         set_current_tenant_group(None)
         set_current_membership(None)
+        set_current_all_accessible(False)
         # Explicitly clear the descendant-group cache too: the setters above reset
         # it transitively, but resetting it here guarantees a clean slate even if a
         # setter raised partway through, avoiding order-dependent flakiness.
@@ -63,6 +65,3 @@ def clear_thread_locals():
         _current_user.set(None)
     except Exception:
         pass
-
-
-

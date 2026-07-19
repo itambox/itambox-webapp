@@ -113,12 +113,16 @@ class MembershipListView(ObjectListView):
         return qs.filter(tenant_id__in=allowed)
 
     def _context_tenant_ids(self, user, active_group):
-        """Tenant ids visible in the active group / global context (see get_queryset).
+        """Tenant ids visible in the active group / all-accessible / global context
+        (see get_queryset).
 
         Group scope → the group subtree's tenants, intersected with the canonical
-        accessible set for a non-superuser. Global (superuser, no active tenant or
-        group) → every tenant. A non-superuser never reaches the global case
-        (middleware always resolves them an active tenant).
+        accessible set for a non-superuser. All-accessible scope → exactly the
+        canonical accessible set, same as every other tenant-scoped surface under
+        that scope. Global (superuser, no active tenant/group) → every tenant. A
+        non-superuser outside a group or all-accessible scope never reaches the
+        empty-set fallback in practice (middleware always resolves them an active
+        tenant, group, or all-accessible scope).
         """
         # inline import: keep accessible_tenant_ids as the single source of truth
         # without a module-load cycle risk.
@@ -135,6 +139,8 @@ class MembershipListView(ObjectListView):
             return set(
                 Tenant._base_manager.filter(deleted_at__isnull=True).values_list('pk', flat=True)
             )
+        if getattr(self.request, 'active_all_accessible', False):
+            return accessible_tenant_ids(user)
         return set()
 
     def _show_tenant_column(self):

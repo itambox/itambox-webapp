@@ -4,6 +4,11 @@ from django.utils import timezone
 from rest_framework import exceptions
 from rest_framework.test import APIRequestFactory
 
+from core.managers import (
+    get_current_all_accessible,
+    get_current_tenant,
+    set_current_all_accessible,
+)
 from itambox.api.authentication import TokenAuthentication
 from organization.models import Membership, Tenant
 from users.models import Token
@@ -120,6 +125,17 @@ class TokenTenantBindingAuthTests(TestCase):
         self.assertEqual(request.active_tenant, self.tenant)
         self.assertEqual(request.active_membership, self.membership)
         self.assertIsNone(request.active_tenant_group)
+
+    def test_authentication_replaces_all_accessible_with_token_tenant(self):
+        set_current_all_accessible(True)
+
+        request = self._request()
+        self.auth.authenticate(request)
+
+        self.assertFalse(get_current_all_accessible())
+        self.assertEqual(get_current_tenant(), self.tenant)
+        self.assertEqual(request.active_tenant, self.tenant)
+        self.assertFalse(getattr(request, 'active_all_accessible', False))
 
     def test_inactive_membership_revokes_token_authentication(self):
         self.membership.is_active = False

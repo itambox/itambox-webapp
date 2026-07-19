@@ -67,7 +67,7 @@ class CurrentUserMiddleware:
 class CSPMiddleware:
     """
     Adds Content-Security-Policy headers to all responses.
-    
+
     Uses a cryptographically secure random nonce for inline scripts to eliminate
     the need for 'unsafe-inline' in script-src.
     """
@@ -126,7 +126,9 @@ class CSPMiddleware:
 
 from core.managers import (
     set_current_tenant, set_current_tenant_group, set_current_membership,
+    set_current_all_accessible,
     get_current_tenant, get_current_tenant_group, get_current_membership,
+    get_current_all_accessible,
 )
 
 class TenantMiddleware:
@@ -146,34 +148,17 @@ class TenantMiddleware:
             raise e
         return self.process_response(request, response, prev)
 
-    def process_request(self, request):
-        # Snapshot the context active on entry so process_response can restore it
-        # rather than clobbering it to None (the setters also clear the descendant
-        # cache, so restore goes through them too).
-        prev = (
-            get_current_tenant(),
-            get_current_tenant_group(),
-            get_current_membership(),
-        )
-        if not hasattr(request, 'user') or not request.user.is_authenticated:
-            request.active_tenant = None
-            request.active_tenant_group = None
-            request.active_membership = None
-            set_current_tenant(None)
-            set_current_tenant_group(None)
-            set_current_membership(None)
-            return prev
-
-        # 1. Resolve selected tenant or group from Session or URL Query Parameter
-        session_tenant_id = request.session.get('active_tenant_id')
-        session_group_id = request.session.get('active_tenant_group_id')
-
+    @staticmethod
+    def _resolve_switch_params(request, session_tenant_id, session_group_id, session_all_accessible):
+        """Apply a switch_tenant / switch_tenant_group / switch_all_accessible
+        query param to the session-derived scope. Selecting a single tenant or
+        a group always leaves the all-accessible scope; entering the
+        all-accessible scope always drops any single tenant/group pin.
+        """
         query_tenant_id = request.GET.get('switch_tenant')
         query_group_id = request.GET.get('switch_tenant_group')
+        query_all_accessible = request.GET.get('switch_all_accessible')
 
-        from organization.models import Membership, Tenant, TenantGroup
-
-        # If query parameters are provided to switch, update them
         if query_tenant_id is not None:
             if query_tenant_id == '':
                 session_tenant_id = None
@@ -184,6 +169,8 @@ class TenantMiddleware:
             request.session['active_tenant_id'] = session_tenant_id
             if 'active_tenant_group_id' in request.session:
                 del request.session['active_tenant_group_id']
+            session_all_accessible = False
+            request.session.pop('active_all_accessible', None)
 
         elif query_group_id is not None:
             if query_group_id == '':
@@ -195,12 +182,78 @@ class TenantMiddleware:
             request.session['active_tenant_group_id'] = session_group_id
             if 'active_tenant_id' in request.session:
                 del request.session['active_tenant_id']
+            session_all_accessible = False
+            request.session.pop('active_all_accessible', None)
+
+        elif query_all_accessible is not None:
+            # Enter the all-accessible scope; drop any single tenant/group pin.
+            session_tenant_id = None
+            session_group_id = None
+            session_all_accessible = True
+            request.session['active_all_accessible'] = True
+            request.session.pop('active_tenant_id', None)
+            request.session.pop('active_tenant_group_id', None)
+
+        return session_tenant_id, session_group_id, session_all_accessible
+
+    @staticmethod
+    def _resolve_all_accessible(request, accessible, session_all_accessible):
+        """Fail closed: the all-accessible scope is only honoured for a member
+        who actually reaches at least one tenant. With none, the scope is
+        refused (never widened to global) and resolution falls through to the
+        first-accessible-tenant default.
+        """
+        if accessible:
+            return True, session_all_accessible
+        request.session.pop('active_all_accessible', None)
+        return False, False
+
+    def process_request(self, request):
+        # Snapshot the context active on entry so process_response can restore it
+        # rather than clobbering it to None (the setters also clear the descendant
+        # cache, so restore goes through them too).
+        prev = (
+            get_current_tenant(),
+            get_current_tenant_group(),
+            get_current_membership(),
+            get_current_all_accessible(),
+        )
+        if not hasattr(request, 'user') or not request.user.is_authenticated:
+            request.active_tenant = None
+            request.active_tenant_group = None
+            request.active_membership = None
+            request.active_all_accessible = False
+            set_current_tenant(None)
+            set_current_tenant_group(None)
+            set_current_membership(None)
+            set_current_all_accessible(False)
+            return prev
+
+        # 1. Resolve selected tenant or group from Session or URL Query Parameter
+        session_tenant_id = request.session.get('active_tenant_id')
+        session_group_id = request.session.get('active_tenant_group_id')
+        # "All accessible tenants" is a distinct scope state for a non-superuser:
+        # no single tenant/group is selected, yet the request is NOT global.
+        session_all_accessible = bool(request.session.get('active_all_accessible'))
+
+        from organization.models import Membership, Tenant, TenantGroup
+
+        # If query parameters are provided to switch, update them. Selecting a
+        # single tenant or a group always leaves the all-accessible scope.
+        session_tenant_id, session_group_id, session_all_accessible = self._resolve_switch_params(
+            request, session_tenant_id, session_group_id, session_all_accessible,
+        )
 
         active_tenant = None
         active_tenant_group = None
         active_membership = None
+        active_all_accessible = False
 
         if request.user.is_superuser:
+            # A superuser already has the global scope; they are never placed into
+            # the member-only all-accessible state. Drop any stale session flag.
+            session_all_accessible = False
+            request.session.pop('active_all_accessible', None)
             # Superusers can access any tenant or group
             if session_tenant_id:
                 try:
@@ -231,7 +284,12 @@ class TenantMiddleware:
                 except (TypeError, ValueError):
                     return None
 
-            if session_tenant_id:
+            if session_all_accessible:
+                active_all_accessible, session_all_accessible = self._resolve_all_accessible(
+                    request, accessible, session_all_accessible,
+                )
+
+            elif session_tenant_id:
                 if _as_int(session_tenant_id) in accessible:
                     active_tenant = Tenant._base_manager.filter(pk=session_tenant_id).first()
                     # May be None when access is via a group grant (no direct membership).
@@ -271,8 +329,9 @@ class TenantMiddleware:
                     session_group_id = None
 
             # If nothing resolved, default to the first accessible tenant (a direct
-            # membership first, else a group-granted tenant).
-            if not active_tenant and not active_tenant_group:
+            # membership first, else a group-granted tenant). The all-accessible
+            # scope is a resolved state, so it suppresses this single-tenant default.
+            if not active_tenant and not active_tenant_group and not active_all_accessible:
                 active_membership = Membership.objects.filter(
                     user=request.user,
                     is_active=True,
@@ -296,22 +355,26 @@ class TenantMiddleware:
         request.active_tenant = active_tenant
         request.active_tenant_group = active_tenant_group
         request.active_membership = active_membership
+        request.active_all_accessible = active_all_accessible
 
         # Call core manager thread context setter
         set_current_tenant(active_tenant)
         set_current_tenant_group(active_tenant_group)
         set_current_membership(active_membership)
+        set_current_all_accessible(active_all_accessible)
 
         return prev
 
     def process_response(self, request, response, prev=None):
         if prev is not None:
-            prev_tenant, prev_group, prev_membership = prev
+            prev_tenant, prev_group, prev_membership, prev_all_accessible = prev
             set_current_tenant(prev_tenant)
             set_current_tenant_group(prev_group)
             set_current_membership(prev_membership)
+            set_current_all_accessible(prev_all_accessible)
         else:
             set_current_tenant(None)
             set_current_tenant_group(None)
             set_current_membership(None)
+            set_current_all_accessible(False)
         return response
