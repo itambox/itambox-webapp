@@ -201,3 +201,15 @@ pytest -v
 ```
 
 Tests run under pytest-django (with `model_bakery` for fixtures) and use the Django test `Client` for views. Model tests verify field constraints, properties, and signals. FilterSet tests verify individual filter parameters. View tests cover HTTP 200/302 for all CRUD operations.
+
+### Production Docker Compose smoke test
+
+`scripts/docker-smoke-test.sh` (repository root) builds the production images from `Dockerfile`/`docker-compose.yml`, boots the full stack (app, worker, PostgreSQL, Valkey) behind freshly generated ephemeral secrets, and verifies migrations, `manage.py check --deploy`, `/health/`, compiled static assets, the Valkey cache, and worker stability. It's fully self-contained — ephemeral secrets, an isolated compose project, and an OS-assigned port — so it won't collide with your own `.env`/dev server, and it tears everything down on exit. Runs in CI via `.github/workflows/docker-smoke.yml`; run it locally with:
+
+```bash
+# From the repository root; requires Docker with Compose v2.24.4 or newer.
+./scripts/docker-smoke-test.sh
+
+# Helper-function unit tests (no Docker required):
+scripts/tests/test_docker_smoke_helpers.sh
+```

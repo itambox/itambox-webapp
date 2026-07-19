@@ -1,0 +1,69 @@
+name: Docker Compose Smoke Test
+
+on:
+  push:
+    branches: [master, main]
+  pull_request:
+    branches: [master, main]
+  workflow_dispatch:
+
+concurrency:
+  group: docker-smoke-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  helpers:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Validate shell syntax
+        run: |
+          bash -n scripts/docker-smoke-test.sh
+          bash -n scripts/tests/test_docker_smoke_helpers.sh
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install PyYAML
+        run: pip install --quiet pyyaml
+
+      - name: Validate workflow/compose YAML syntax
+        run: |
+          python - <<'PYEOF'
+          import yaml
+          for path in (".github/workflows/docker-smoke.yml", "docker-compose.yml"):
+              with open(path, encoding="utf-8") as f:
+                  yaml.safe_load(f)
+              print(f"{path}: valid YAML")
+          PYEOF
+
+      - name: Run secret-generation helper unit tests
+        run: scripts/tests/test_docker_smoke_helpers.sh
+
+  smoke:
+    needs: helpers
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Docker / Compose versions
+        run: |
+          docker version
+          docker compose version
+
+      - name: Run production Docker Compose smoke test
+        id: smoke
+        run: ./scripts/docker-smoke-test.sh
+
+      - name: Upload smoke test diagnostics
+        if: failure() && steps.smoke.outputs.log-dir != ''
+        uses: actions/upload-artifact@v4
+        with:
+          name: docker-smoke-logs
+          path: ${{ steps.smoke.outputs.log-dir }}
+          if-no-files-found: warn
+          retention-days: 7
