@@ -17,7 +17,7 @@ endif
 
 VENV_PYTHON := $(VENV_BIN)/python
 
-.PHONY: help setup run migrate seed test lint clean
+.PHONY: help setup run migrate seed test lint e2e clean
 
 help:
 	@echo "ITAMbox Development Automation Command Hub"
@@ -29,6 +29,7 @@ help:
 	@echo "  make seed    - Wipe database and seed mock organization and assets data"
 	@echo "  make test    - Run all automated unit and integration tests"
 	@echo "  make lint    - Run pre-commit style and syntax checks on all files"
+	@echo "  make e2e     - Run Playwright end-to-end browser test suite"
 	@echo "  make clean   - Remove cache, temporary database, and virtual environment"
 
 setup:
@@ -52,6 +53,10 @@ test:
 
 lint:
 	$(VENV_PYTHON) -m pre_commit run --all-files
+
+e2e:
+	@echo "Running Playwright E2E suite..."
+	cd itambox/tests/e2e && npm ci && npm test
 
 clean:
 	find . -type d -name "__pycache__" -exec rm -rf {} +
