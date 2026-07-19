@@ -1,0 +1,162 @@
+name: E2E (Playwright)
+
+on:
+  push:
+    branches: [master, main]
+  pull_request:
+    branches: [master, main]
+  workflow_dispatch:
+
+concurrency:
+  group: e2e-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  e2e:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_DB: itambox_e2e
+          POSTGRES_USER: itambox_e2e
+          POSTGRES_PASSWORD: itambox_e2e
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U itambox_e2e"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    env:
+      ITAMBOX_ENV: dev
+      ITAMBOX_DB_NAME: itambox_e2e
+      ITAMBOX_DB_USER: itambox_e2e
+      ITAMBOX_DB_PASSWORD: itambox_e2e
+      ITAMBOX_DB_HOST: localhost
+      ITAMBOX_DB_PORT: "5432"
+      ITAMBOX_DB_SSLMODE: disable
+      DJANGO_SUPERUSER_USERNAME: e2e-admin
+      DJANGO_SUPERUSER_EMAIL: e2e@itambox.local
+      E2E_USERNAME: e2e-admin
+      E2E_BASE_URL: http://localhost:8000
+      # Playwright's webServer config uses a venv path; in CI we manage the server
+      # ourselves for reliability and to avoid venv path assumptions.
+      E2E_NO_WEBSERVER: "1"
+
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+          cache: 'pip'
+
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            libldap2-dev libsasl2-dev xmlsec1 libmagic1
+
+      - name: Install Python dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements-dev.txt
+
+      - name: Set up Node.js 20
+        uses: actions/setup-node@v7
+        with:
+          node-version: "20"
+          cache: 'npm'
+          cache-dependency-path: itambox/package-lock.json
+
+      - name: Install frontend dependencies
+        working-directory: ./itambox
+        run: npm ci
+
+      - name: Build frontend assets
+        working-directory: ./itambox
+        run: npm run build:all
+
+      - name: Install E2E dependencies
+        working-directory: ./itambox/tests/e2e
+        run: npm ci
+
+      - name: Install Playwright browsers
+        working-directory: ./itambox/tests/e2e
+        run: npx playwright install --with-deps chromium
+
+      - name: Create venv shim for preflight-check
+        run: |
+          # preflight-check.mjs expects a .venv directory; create a shim that
+          # points to the system Python so prerequisite checks pass in CI.
+          mkdir -p .venv/bin
+          ln -sf "$(which python)" .venv/bin/python
+
+      - name: Run Django system checks
+        working-directory: ./itambox
+        run: python manage.py check
+
+      - name: Run migrations
+        working-directory: ./itambox
+        run: python manage.py migrate
+
+      - name: Generate ephemeral E2E credentials
+        shell: bash
+        run: |
+          E2E_PASSWORD="$(python -c 'import secrets; print(secrets.token_urlsafe(32))')"
+          echo "::add-mask::$E2E_PASSWORD"
+          echo "E2E_PASSWORD=$E2E_PASSWORD" >> "$GITHUB_ENV"
+          echo "DJANGO_SUPERUSER_PASSWORD=$E2E_PASSWORD" >> "$GITHUB_ENV"
+
+      - name: Seed test data (minimal)
+        working-directory: ./itambox
+        run: python manage.py seed_data --production
+
+      - name: Start Django dev server
+        working-directory: ./itambox
+        run: |
+          echo "Starting Django dev server on port 8000..."
+          python manage.py runserver 0.0.0.0:8000 &
+          DJANGO_PID=$!
+          echo "DJANGO_PID=$DJANGO_PID" >> "$GITHUB_ENV"
+          # Wait for the server to be ready (up to 30 seconds)
+          for i in $(seq 1 30); do
+            if curl -s -o /dev/null -w "%{http_code}" http://localhost:8000/ | grep -q "200\|301\|302"; then
+              echo "Django server ready (attempt $i)."
+              break
+            fi
+            sleep 1
+          done
+
+      - name: Run E2E tests
+        id: e2e
+        working-directory: ./itambox/tests/e2e
+        run: npm test
+        timeout-minutes: 15
+
+      - name: Stop Django dev server
+        if: always()
+        working-directory: ./itambox
+        run: |
+          if [ -n "$DJANGO_PID" ]; then
+            kill "$DJANGO_PID" 2>/dev/null || true
+          fi
+          # Fallback: kill any remaining runserver processes
+          pkill -f "manage.py runserver" 2>/dev/null || true
+
+      - name: Upload Playwright traces on failure
+        if: failure() && steps.e2e.outcome == 'failure'
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-traces
+          path: |
+            itambox/tests/e2e/test-results/
+            itambox/tests/e2e/playwright-report/
+            itambox/tests/e2e/storageStateError.png
+          if-no-files-found: warn
+          retention-days: 7

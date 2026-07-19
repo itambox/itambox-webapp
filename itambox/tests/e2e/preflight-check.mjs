@@ -20,6 +20,8 @@ import { resolve, dirname } from 'path';
 import { fileURLToPath } from 'url';
 import { platform } from 'os';
 
+import { parseSuperuserCount } from './preflight-output.mjs';
+
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const repoRoot = resolve(__dirname, '..', '..', '..');
 
@@ -115,11 +117,11 @@ if (existsSync(pythonExe) && existsSync(managePy)) {
 
 // ── Check 5: seed data / superuser ──────────────────────────────────────────
 if (existsSync(pythonExe) && existsSync(managePy)) {
-  const shellCmd = `"${pythonExe}" manage.py shell -c "from django.contrib.auth import get_user_model; print(get_user_model().objects.filter(is_superuser=True, is_active=True).count())" 2>&1`;
+  const shellCmd = `"${pythonExe}" manage.py shell -c "from django.contrib.auth import get_user_model; print('__E2E_SUPERUSER_COUNT__=' + str(get_user_model().objects.filter(is_superuser=True, is_active=True).count()))" 2>&1`;
   const userResult = run(shellCmd, { cwd: resolve(repoRoot, 'itambox') });
   if (userResult !== null) {
-    const count = parseInt(userResult.trim(), 10);
-    if (!isNaN(count) && count > 0) {
+    const count = parseSuperuserCount(userResult);
+    if (count !== null && count > 0) {
       ok(`Seed data present (${count} active superuser(s))`);
     } else {
       fail('No active superuser found. Run: make seed');
