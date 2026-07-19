@@ -15,6 +15,9 @@ _LOCAL_VERSION_ATTR = '_authorization_cache_version'
 _LOCAL_CACHE_PREFIXES = (
     '_perms_tenant_',
     '_group_scope_tenants_',
+    '_all_accessible_scope_tenants',
+    '_all_accessible_group_ids',
+    '_accessible_tenant_ids',
 )
 
 

@@ -7,6 +7,11 @@ import contextvars
 _current_tenant = contextvars.ContextVar('current_tenant', default=None)
 _current_tenant_group = contextvars.ContextVar('current_tenant_group', default=None)
 _current_membership = contextvars.ContextVar('current_membership', default=None)
+# "All accessible tenants" scope for a non-superuser: no single tenant/group is
+# active, yet the request is NOT global — it is scoped to exactly the tenants the
+# canonical resolver authorizes (issue #29). Distinct from the superuser global
+# scope (all three None + is_superuser) so it can never widen into it.
+_current_all_accessible = contextvars.ContextVar('current_all_accessible', default=False)
 _descendant_group_ids_cache = contextvars.ContextVar('descendant_group_ids_cache', default=None)
 
 def set_current_tenant(tenant: Optional[Any]) -> None:
@@ -29,6 +34,39 @@ def set_current_membership(membership: Optional[Any]) -> None:
 
 def get_current_membership() -> Optional[Any]:
     return _current_membership.get()
+
+
+def set_current_all_accessible(flag: bool) -> None:
+    _current_all_accessible.set(bool(flag))
+    _descendant_group_ids_cache.set(None)
+
+
+def get_current_all_accessible() -> bool:
+    return _current_all_accessible.get()
+
+
+def get_current_scope_conflict(user: Optional[Any]) -> bool:
+    """True when more than one of tenant / group / all-accessible scope is
+    active for an authenticated non-superuser.
+
+    The session/middleware resolution, token authentication, and TaskContext
+    each set at most one of these by construction, so a contradiction here
+    means the contextvars were poked directly (a bug, or a background task
+    inheriting stale ambient state from a wrapping request). Tenant-scoping
+    consumers must fail closed to nothing in that case rather than silently
+    prioritize one of the contradictory states — a superuser has no such
+    ambiguity (they keep their own global/explicit-scope path regardless).
+    """
+    if (
+        user is None
+        or not getattr(user, 'is_authenticated', False)
+        or getattr(user, 'is_superuser', False)
+    ):
+        return False
+    active_states = (
+        get_current_tenant(), get_current_tenant_group(), get_current_all_accessible(),
+    )
+    return sum(bool(state) for state in active_states) > 1
 
 
 
@@ -76,11 +114,130 @@ class TenantScopingQuerySet(models.QuerySet):
         group_ids.discard(None)
         return group_ids
 
+    @staticmethod
+    def _group_scope_tenant_ids(active_group, get_descendant_group_ids, Tenant):
+        """Resolve allowed tenant ids for an active tenant-group scope.
+
+        A member's group scope must cover EVERY tenant they can reach in the
+        group — direct memberships, UserGroup-derived tenants, and
+        managed-reach tenants — not just direct Membership rows, so a
+        reach-only tenant does not vanish after "Show All". Intersects the
+        canonical accessible set with the group subtree; superusers and
+        system/anonymous contexts see the whole subtree.
+        """
+        allowed_group_ids = get_descendant_group_ids(active_group.pk)
+        # inline import: avoid a core.managers -> itambox.middleware circular
+        # import at module load.
+        from itambox.middleware import get_current_user
+        user = get_current_user()
+        if user and user.is_superuser:
+            return list(
+                Tenant._base_manager.filter(
+                    group_id__in=allowed_group_ids,
+                    deleted_at__isnull=True,
+                ).values_list('pk', flat=True)
+            )
+        if user:
+            # inline import: avoid a core.managers -> organization cycle at load.
+            from organization.access import accessible_tenant_ids
+            accessible = accessible_tenant_ids(user)
+            return list(
+                Tenant._base_manager.filter(
+                    pk__in=accessible, group_id__in=allowed_group_ids,
+                    deleted_at__isnull=True,
+                ).values_list('pk', flat=True)
+            )
+        return list(
+            Tenant._base_manager.filter(
+                group_id__in=allowed_group_ids,
+                deleted_at__isnull=True,
+            ).values_list('pk', flat=True)
+        )
+
+    def _resolve_allowed_tenant_ids(self, active_tenant, active_group, get_descendant_group_ids, Tenant):
+        """Resolve the allowed tenant id set for whichever scope (single
+        tenant / group / all-accessible) is currently active.
+        """
+        if active_tenant:
+            return [active_tenant.pk]
+        if active_group:
+            return self._group_scope_tenant_ids(active_group, get_descendant_group_ids, Tenant)
+        # "All accessible tenants" scope: no single tenant or group is active,
+        # but the request is NOT global. This never returns the unscoped
+        # queryset, so it can never widen into the superuser/global view.
+        # inline import: avoid a core.managers -> itambox.middleware circular
+        # import at module load.
+        from itambox.middleware import get_current_user
+        return self._all_accessible_tenant_ids(get_current_user())
+
+    @staticmethod
+    def _all_accessible_tenant_ids(user):
+        """Resolve the "all accessible tenants" scope to EXACTLY the canonical
+        accessible set (direct memberships, UserGroup-derived, and managed
+        reach). Any principal that is not an authenticated non-superuser fails
+        closed to no tenants — middleware only grants this scope to such
+        members, and a superuser keeps their own global path.
+        """
+        if (
+            user is not None
+            and getattr(user, 'is_authenticated', False)
+            and not getattr(user, 'is_superuser', False)
+        ):
+            # inline import: avoid a core.managers -> organization circular
+            # import at module load.
+            from organization.access import accessible_tenant_ids
+            return list(accessible_tenant_ids(user))
+        return []
+
+    @staticmethod
+    def _all_accessible_group_ids(user, allowed_tenant_ids, Tenant):
+        """Live own/ancestor groups for the aggregate tenant set.
+
+        Models with a ``tenant_group`` field all need the same projection. Cache
+        it on the bound User instance so dozens of scoped querysets do not repeat
+        one tenant-group query plus one query per ancestor depth. The shared
+        authorization generation invalidates this memo on membership/grant or
+        tenant/group-topology writes; a cache outage forces recomputation.
+        """
+        if user is None or not hasattr(user, '__dict__'):
+            return frozenset()
+        from core.auth.cache import synchronize_authorization_cache
+        from organization.access import get_ancestor_tenant_group_ids
+
+        synchronize_authorization_cache(user)
+        tenant_key = tuple(sorted(allowed_tenant_ids))
+        cached = user.__dict__.get('_all_accessible_group_ids')
+        if cached is not None and cached[0] == tenant_key:
+            return cached[1]
+
+        own_group_ids = set(
+            Tenant._base_manager.filter(pk__in=tenant_key)
+            .exclude(group_id__isnull=True)
+            .values_list('group_id', flat=True)
+        )
+        group_ids = set()
+        for own_group_id in own_group_ids:
+            group_ids |= get_ancestor_tenant_group_ids(
+                own_group_id,
+                live_only=True,
+            )
+        result = frozenset(group_ids)
+        user.__dict__['_all_accessible_group_ids'] = (tenant_key, result)
+        return result
+
     def filter_by_tenant(self) -> QuerySet:
         active_tenant = get_current_tenant()
         active_group = get_current_tenant_group()
+        all_accessible = get_current_all_accessible()
 
-        if active_tenant or active_group:
+        if active_tenant or active_group or all_accessible:
+            # inline import: avoid a core.managers -> itambox.middleware circular
+            # import at module load.
+            from itambox.middleware import get_current_user
+            current_user = get_current_user()
+            if get_current_scope_conflict(current_user):
+                return self.none()
+
             from django.apps import apps
             Tenant = apps.get_model('organization', 'Tenant')
 
@@ -119,31 +276,9 @@ class TenantScopingQuerySet(models.QuerySet):
                 cache[group_id] = descendant_ids
                 return descendant_ids
 
-            if active_tenant:
-                allowed_tenant_ids = [active_tenant.pk]
-            else:
-                allowed_group_ids = get_descendant_group_ids(active_group.pk)
-                from itambox.middleware import get_current_user
-                user = get_current_user()
-                if user and user.is_superuser:
-                    allowed_tenant_ids = list(Tenant._base_manager.filter(group_id__in=allowed_group_ids, deleted_at__isnull=True).values_list('pk', flat=True))
-                elif user:
-                    # A member's group scope must cover EVERY tenant they can reach
-                    # in the group — direct memberships, UserGroup-derived tenants,
-                    # and managed-reach tenants — not just direct Membership rows, so
-                    # a reach-only tenant does not vanish after "Show All". Intersect
-                    # the canonical accessible set with the group subtree.
-                    # inline imports: avoid a core.managers -> organization cycle at load.
-                    from organization.access import accessible_tenant_ids
-                    accessible = accessible_tenant_ids(user)
-                    allowed_tenant_ids = list(
-                        Tenant._base_manager.filter(
-                            pk__in=accessible, group_id__in=allowed_group_ids,
-                            deleted_at__isnull=True,
-                        ).values_list('pk', flat=True)
-                    )
-                else:
-                    allowed_tenant_ids = list(Tenant._base_manager.filter(group_id__in=allowed_group_ids, deleted_at__isnull=True).values_list('pk', flat=True))
+            allowed_tenant_ids = self._resolve_allowed_tenant_ids(
+                active_tenant, active_group, get_descendant_group_ids, Tenant,
+            )
 
             # If the query is for the Tenant model itself:
             if self.model._meta.model_name == 'tenant':
@@ -157,8 +292,7 @@ class TenantScopingQuerySet(models.QuerySet):
             if self.model._meta.model_name == 'tenantgroup':
                 # inline imports: avoid a core.managers -> middleware /
                 # organization circular import at module load.
-                from itambox.middleware import get_current_user
-                tg_user = get_current_user()
+                tg_user = current_user
                 TenantGroupModel = apps.get_model('organization', 'TenantGroup')
 
                 def expand_to_ancestors(seed_ids):
@@ -218,7 +352,17 @@ class TenantScopingQuerySet(models.QuerySet):
             # Filter by tenant group if field exists
             try:
                 self.model._meta.get_field('tenant_group')
-                qs = qs.filter(models.Q(tenant_group_id__in=allowed_group_ids) | models.Q(tenant_group__isnull=True))
+                group_ids = allowed_group_ids
+                if all_accessible and not active_tenant and not active_group:
+                    # Derived from the canonical accessible_tenant_ids, so no extra
+                    # RBAC resolution; only runs for the (few) models that carry a
+                    # tenant_group field.
+                    group_ids = self._all_accessible_group_ids(
+                        current_user,
+                        allowed_tenant_ids,
+                        Tenant,
+                    )
+                qs = qs.filter(models.Q(tenant_group_id__in=group_ids) | models.Q(tenant_group__isnull=True))
             except FieldDoesNotExist:
                 pass
 
@@ -307,7 +451,3 @@ class TenantScopingSoftDeleteManager(models.Manager.from_queryset(TenantScopingS
 class TenantScopingAllObjectsManager(models.Manager.from_queryset(TenantScopingSoftDeleteQuerySet)):
     def get_queryset(self):
         return super().get_queryset().filter_by_tenant()
-
-
-
-
