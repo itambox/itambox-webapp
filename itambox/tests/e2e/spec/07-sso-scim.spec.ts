@@ -76,16 +76,17 @@ test.describe('SSO and SCIM 2.0 Provisioning Specs', () => {
     expect(response.status()).toBeDefined();
   });
 
-  test('3. SCIM User Provisioning creates a user in the configured tenant', async ({ request }) => {
+  test('3. SCIM User Provisioning creates a user in the configured tenant', async () => {
+    const uniqueUser = `scim.test.user.${Date.now()}`;
     const scimUserPayload = {
       schemas: ["urn:ietf:params:scim:schemas:core:2.0:User"],
-      userName: "scim.test.user",
+      userName: uniqueUser,
       name: {
         givenName: "Scim",
         familyName: "Test"
       },
       emails: [{
-        value: "scim.test@example.com",
+        value: `${uniqueUser}@example.com`,
         primary: true
       }],
       active: true
@@ -95,13 +96,10 @@ test.describe('SSO and SCIM 2.0 Provisioning Specs', () => {
       data: scimUserPayload
     });
 
-    if (response.status() === 201) {
-      const json = await response.json();
-      expect(json.userName).toBe("scim.test.user");
-      expect(json.id).toBeDefined();
-    } else {
-      console.log(`SCIM User creation returned status: ${response.status()}`);
-    }
+    expect(response.status()).toBe(201);
+    const json = await response.json();
+    expect(json.userName).toBe(uniqueUser);
+    expect(json.id).toBeDefined();
   });
 
   test('4. SCIM User profile sync: Syncing a user via SCIM provisions matching AssetHolder', async ({ request }) => {
@@ -142,24 +140,20 @@ test.describe('SSO and SCIM 2.0 Provisioning Specs', () => {
     expect(response.status()).toBeDefined();
   });
 
-  test('7. SCIM User creation with duplicate username returns 409 Conflict', async ({ request }) => {
+  test('7. SCIM User creation with duplicate username returns 409 Conflict', async () => {
+    const duplicateUser = `duplicate.user.${Date.now()}`;
     const payload = {
       schemas: ["urn:ietf:params:scim:schemas:core:2.0:User"],
-      userName: "duplicate.user",
+      userName: duplicateUser,
       name: { givenName: "Dup", familyName: "User" },
-      emails: [{ value: "dup@example.com", primary: true }]
+      emails: [{ value: `${duplicateUser}@example.com`, primary: true }]
     };
 
-    // First creation
-    await scimRequest.post(scimUrl('Users'), { data: payload });
+    const firstResponse = await scimRequest.post(scimUrl('Users'), { data: payload });
+    expect(firstResponse.status()).toBe(201);
 
-    // Second creation (duplicate username)
-    const response = await scimRequest.post(scimUrl('Users'), { data: payload });
-    if (response.status() === 409) {
-      expect(response.status()).toBe(409);
-    } else {
-      console.log(`Duplicate SCIM User returned status: ${response.status()}`);
-    }
+    const duplicateResponse = await scimRequest.post(scimUrl('Users'), { data: payload });
+    expect(duplicateResponse.status()).toBe(409);
   });
 
   test('8. Unauthenticated SCIM request targeting a non-existent tenant fails closed', async ({ request }) => {
@@ -179,7 +173,7 @@ test.describe('SSO and SCIM 2.0 Provisioning Specs', () => {
     expect(response.status()).toBe(404);
   });
 
-  test('10. SCIM Group update with non-existent member IDs returns a clean error', async ({ request }) => {
+  test('10. Tenant SCIM group updates are rejected by the read-only contract', async () => {
     const groupPatchPayload = {
       schemas: ["urn:ietf:params:scim:api:messages:2.0:PatchOp"],
       Operations: [{
@@ -189,14 +183,10 @@ test.describe('SSO and SCIM 2.0 Provisioning Specs', () => {
       }]
     };
 
-    const response = await scimRequest.patch(scimUrl('Groups/some-group-id'), {
+    const groupPatchResponse = await scimRequest.patch(scimUrl('Groups/2147483647'), {
       data: groupPatchPayload
     });
-
-    if (response.status() === 200 || response.status() === 400 || response.status() === 404) {
-      // Must not crash the application (no 500)
-      expect(response.status()).not.toBe(500);
-    }
+    expect(groupPatchResponse.status()).toBe(403);
   });
 
   // TIER 3: Cross-Feature Combinations (combo 2)

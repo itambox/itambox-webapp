@@ -88,6 +88,11 @@ def test_scim_e2e_uses_bearer_auth_and_preserves_tenant_anti_harvesting():
     assert "expect(response.status()).toBe(401);" in spec
     assert "expect(groupRes.status()).toBe(403);" in spec
     assert "expect(permissionsRes.status()).toBe(401);" in spec
+    assert "const uniqueUser = `scim.test.user.${Date.now()}`;" in spec
+    assert "const duplicateUser = `duplicate.user.${Date.now()}`;" in spec
+    assert "expect(firstResponse.status()).toBe(201);" in spec
+    assert "expect(duplicateResponse.status()).toBe(409);" in spec
+    assert "expect(groupPatchResponse.status()).toBe(403);" in spec
     assert "playwright.request.newContext()" not in spec
     assert "/api/v1/" not in spec
     assert "/api/organization/asset-holders/?q=${encodeURIComponent(" in spec
