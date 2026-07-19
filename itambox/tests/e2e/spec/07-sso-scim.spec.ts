@@ -218,6 +218,7 @@ test.describe('SSO and SCIM 2.0 Provisioning Specs', () => {
     });
     await callbackContext.get(
       `/oidc/callback/?code=combo_code&state=combo_state&username=${uniqueUser}`,
+      { maxRedirects: 0 },
     );
 
     const permissionsRes = await callbackContext.get('/api/users/config/');
