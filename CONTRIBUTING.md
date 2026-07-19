@@ -10,7 +10,7 @@ ITAMbox is a standard Django application. Set up your local environment as follo
 
 1.  **Fork and Clone the Repository:**
     ```bash
-    git clone https://github.com/your-username/itambox-webapp.git
+    git clone https://github.com/itambox/itambox-webapp.git
     cd itambox-webapp
     ```
 
