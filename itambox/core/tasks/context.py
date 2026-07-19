@@ -1,9 +1,12 @@
 import logging
 import uuid
 from django.contrib.auth import get_user_model
+from django.core.exceptions import PermissionDenied
 from core.managers import (
     set_current_tenant, set_current_membership,
     get_current_tenant, get_current_membership,
+    set_current_tenant_group, get_current_tenant_group,
+    set_current_all_accessible, get_current_all_accessible,
 )
 from organization.models import Tenant, Membership
 
@@ -39,37 +42,75 @@ class TaskContext:
         self._prev_user = _current_user.get()
         self._prev_tenant = get_current_tenant()
         self._prev_membership = get_current_membership()
+        self._prev_tenant_group = get_current_tenant_group()
+        self._prev_all_accessible = get_current_all_accessible()
 
-        if self.tenant_id:
-            try:
-                self.tenant = Tenant.objects.get(pk=self.tenant_id)
-            except Tenant.DoesNotExist:
-                pass
+        # Every task starts from an explicit, isolated scope. In particular,
+        # TaskContext(None, None) is a system/global task and must not inherit a
+        # caller's tenant, group, all-accessible flag, or membership. A scoped
+        # task binds only an ACTIVE membership for exactly its user and tenant.
+        set_current_tenant(None)
+        set_current_tenant_group(None)
+        set_current_membership(None)
+        set_current_all_accessible(False)
+        _current_user.set(None)
 
-        if self.user_id:
-            try:
+        try:
+            # Base managers are intentional bootstrap paths: an inline task may
+            # target a tenant outside the wrapping request's scope. Explicit bad
+            # identifiers are fatal; silently continuing would turn a scoped job
+            # into a tenantless/global one.
+            if self.tenant_id is not None:
+                self.tenant = Tenant._base_manager.get(
+                    pk=self.tenant_id,
+                    deleted_at__isnull=True,
+                )
+            if self.user_id is not None:
                 User = get_user_model()
-                self.user = User.objects.get(pk=self.user_id)
-            except Exception:
-                pass
+                self.user = User._base_manager.get(pk=self.user_id)
+                if not self.user.is_active:
+                    raise PermissionDenied('Inactive task principal')
 
+            # A user-bound tenant task must prove canonical access to the target.
+            # System tasks (no user) and superusers retain their explicit paths.
+            if (
+                self.tenant is not None
+                and self.user is not None
+                and not self.user.is_superuser
+            ):
+                from organization.access import accessible_tenant_ids
+                if self.tenant.pk not in accessible_tenant_ids(self.user):
+                    raise PermissionDenied('Task principal cannot access target tenant')
+        except Exception:
+            self._restore_context()
+            raise
+
+        _current_user.set(self.user)
         if self.tenant:
             set_current_tenant(self.tenant)
             if self.user:
-                membership = Membership.objects.filter(user=self.user, tenant=self.tenant).first()
+                membership = Membership._base_manager.filter(
+                    user=self.user,
+                    tenant=self.tenant,
+                    is_active=True,
+                ).first()
                 if membership:
                     set_current_membership(membership)
 
         # Wire up change-logging contextvars so ChangeLoggingMixin records
         # ObjectChange rows for all saves inside this task.
         _request_id.set(uuid.uuid4())
-        _current_user.set(self.user)
 
         return self
 
-    def __exit__(self, exc_type, exc_val, exc_tb):
+    def _restore_context(self):
         from itambox.middleware import _request_id, _current_user
         _request_id.set(self._prev_request_id)
         _current_user.set(self._prev_user)
         set_current_tenant(self._prev_tenant)
+        set_current_tenant_group(self._prev_tenant_group)
         set_current_membership(self._prev_membership)
+        set_current_all_accessible(self._prev_all_accessible)
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        self._restore_context()

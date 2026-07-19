@@ -50,8 +50,59 @@ def effective_permissions(user, tenant):
     return effective_permissions_with_expiry(user, tenant)[0]
 
 
-def accessible_tenant_ids(user):
-    """Tenant ids reachable through active memberships or additive grant scopes."""
+def _scope_contribution(scope, grant, owner_id, live_tenants):
+    """Tenant ids contributed by a single grant scope, plus whether the grant
+    should count toward the accessible-set expiry (only when it actually
+    contributed an id).
+    """
+    if scope.scope_type == RoleGrantScope.SCOPE_OWN:
+        owner = live_tenants.filter(pk=owner_id).first()
+        if owner is not None and grant.covers_tenant(owner):
+            return {owner.pk}, True
+        return set(), False
+
+    if scope.scope_type == RoleGrantScope.SCOPE_TENANT:
+        target = live_tenants.filter(pk=scope.tenant_id).first()
+        if target is not None and grant.covers_tenant(target):
+            return {target.pk}, True
+        return set(), False
+
+    if scope.scope_type == RoleGrantScope.SCOPE_ALL_MANAGED:
+        if owner_id != grant.role.tenant_id or not grant.role.tenant.is_provider:
+            return set(), False
+        managed_ids = set(
+            live_tenants.filter(managed_by_id=grant.role.tenant_id)
+            .values_list('pk', flat=True)
+        )
+        return managed_ids, bool(managed_ids)
+
+    if scope.scope_type == RoleGrantScope.SCOPE_TENANT_GROUP:
+        if owner_id != grant.role.tenant_id or not grant.role.tenant.is_provider:
+            return set(), False
+        managed_ids = set(
+            live_tenants.filter(
+                managed_by_id=grant.role.tenant_id,
+                group_id__in=get_descendant_tenant_group_ids(
+                    scope.tenant_group_id,
+                    live_only=True,
+                ),
+            ).values_list('pk', flat=True)
+        )
+        return managed_ids, bool(managed_ids)
+
+    return set(), False
+
+
+def accessible_tenant_ids_with_expiry(user):
+    """Tenant ids reachable through active memberships or additive grant scopes,
+    plus the earliest ``valid_until`` among the grants that contributed one.
+
+    ``RoleGrant.valid_until`` expires purely by the clock — no save/signal fires
+    when a grant lapses — so a memo of the accessible set must know when it can
+    no longer be trusted. Direct memberships carry no expiry of their own (only
+    ``is_active``, which IS signal-backed), so only grant-contributed ids affect
+    the returned expiry.
+    """
     live_tenants = Tenant._base_manager.filter(deleted_at__isnull=True)
     tenant_ids = set(
         live_tenants.filter(
@@ -59,41 +110,33 @@ def accessible_tenant_ids(user):
             memberships__is_active=True,
         ).values_list('pk', flat=True)
     )
+    valid_until = None
+
+    def _note_expiry(grant):
+        nonlocal valid_until
+        if grant.valid_until is not None and (
+            valid_until is None or grant.valid_until < valid_until
+        ):
+            valid_until = grant.valid_until
 
     for grant in applicable_grants(user):
         owner_id = grant.principal_tenant_id
         for scope in grant.scopes.all():
-            if scope.scope_type == RoleGrantScope.SCOPE_OWN:
-                owner = live_tenants.filter(pk=owner_id).first()
-                if owner is not None and grant.covers_tenant(owner):
-                    tenant_ids.add(owner.pk)
-            elif scope.scope_type == RoleGrantScope.SCOPE_TENANT:
-                target = live_tenants.filter(pk=scope.tenant_id).first()
-                if target is not None and grant.covers_tenant(target):
-                    tenant_ids.add(target.pk)
-            elif scope.scope_type == RoleGrantScope.SCOPE_ALL_MANAGED:
-                if owner_id != grant.role.tenant_id or not grant.role.tenant.is_provider:
-                    continue
-                tenant_ids.update(
-                    live_tenants.filter(managed_by_id=grant.role.tenant_id)
-                    .values_list('pk', flat=True)
-                )
-            elif scope.scope_type == RoleGrantScope.SCOPE_TENANT_GROUP:
-                if owner_id != grant.role.tenant_id or not grant.role.tenant.is_provider:
-                    continue
-                tenant_ids.update(
-                    live_tenants.filter(
-                        managed_by_id=grant.role.tenant_id,
-                        group_id__in=get_descendant_tenant_group_ids(
-                            scope.tenant_group_id,
-                            live_only=True,
-                        ),
-                    ).values_list('pk', flat=True)
-                )
-    return tenant_ids
+            ids, counts_toward_expiry = _scope_contribution(scope, grant, owner_id, live_tenants)
+            if ids:
+                tenant_ids.update(ids)
+            if counts_toward_expiry:
+                _note_expiry(grant)
+    return frozenset(tenant_ids), valid_until
+
+
+def accessible_tenant_ids(user):
+    """Tenant ids reachable through active memberships or additive grant scopes."""
+    return set(accessible_tenant_ids_with_expiry(user)[0])
 
 
 # Stable public names used by the auth backend and tenant-scoping layer.
 resolve_effective_permissions = effective_permissions
 resolve_effective_permissions_with_expiry = effective_permissions_with_expiry
 resolve_accessible_tenant_ids = accessible_tenant_ids
+resolve_accessible_tenant_ids_with_expiry = accessible_tenant_ids_with_expiry
