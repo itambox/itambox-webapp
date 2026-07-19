@@ -191,7 +191,7 @@ The canonical API implementation lives in `itambox/api/`. All app-level API code
 
 ### Content Security Policy
 
-`CSPMiddleware` (`itambox/middleware.py`) sets the CSP header. Inline scripts are nonce'd per request (`request.csp_nonce`) — `script-src` does not allow `'unsafe-inline'`. Styles still rely on `'unsafe-inline'` in `style-src`: the ~675 inline `style=` attributes across templates can't carry a nonce, so this is tracked tech-debt pending an inline-style refactor (move inline styles to CSS classes).
+`CSPMiddleware` (`itambox/middleware.py`) sets the CSP header. Inline scripts are nonce'd per request (`request.csp_nonce`) — `script-src` does not allow `'unsafe-inline'`. Styles still rely on `'unsafe-inline'` in `style-src`: the 164 inline `style=` attributes across templates (`git grep -oE 'style=["\']' -- '*.html' | wc -l`) can't carry a nonce, so this is tracked tech-debt pending an inline-style refactor (move inline styles to CSS classes).
 
 ## Architecture: GraphQL
 

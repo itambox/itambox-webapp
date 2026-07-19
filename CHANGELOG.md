@@ -47,4 +47,4 @@ Version numbers follow [Semantic Versioning](https://semver.org/).
 
 ---
 
-[1.0.0-alpha1]: https://github.com/itambox-itam/itambox-webapp/commits/main
+[1.0.0-alpha1]: https://github.com/itambox/itambox-webapp/commits/main

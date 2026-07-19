@@ -6,12 +6,12 @@ We take the security of ITAMbox seriously. If you discover a vulnerability, plea
 
 ## Supported Versions
 
-Only the latest active major and minor releases receive security updates. 
+ITAMbox has not yet reached a tagged release — the current version, `1.0.0-alpha1`, is still unreleased and under active development on `main` (see [CHANGELOG.md](CHANGELOG.md)). Until the first tag is cut, security fixes are only provided against `main`; this table will be updated to list supported release lines once `v1.0.0` is tagged.
 
-| Version | Supported          |
-| ------- | ------------------ |
-| 1.0.x   | :white_check_mark: |
-| < 1.0.0 | :x:                |
+| Version                 | Supported          |
+| ----------------------- | ------------------ |
+| `main` (`1.0.0-alpha1`) | :white_check_mark: |
+| Any tagged release      | none yet           |
 
 ---
 
