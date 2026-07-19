@@ -56,31 +56,7 @@ class TaskContext:
         _current_user.set(None)
 
         try:
-            # Base managers are intentional bootstrap paths: an inline task may
-            # target a tenant outside the wrapping request's scope. Explicit bad
-            # identifiers are fatal; silently continuing would turn a scoped job
-            # into a tenantless/global one.
-            if self.tenant_id is not None:
-                self.tenant = Tenant._base_manager.get(
-                    pk=self.tenant_id,
-                    deleted_at__isnull=True,
-                )
-            if self.user_id is not None:
-                User = get_user_model()
-                self.user = User._base_manager.get(pk=self.user_id)
-                if not self.user.is_active:
-                    raise PermissionDenied('Inactive task principal')
-
-            # A user-bound tenant task must prove canonical access to the target.
-            # System tasks (no user) and superusers retain their explicit paths.
-            if (
-                self.tenant is not None
-                and self.user is not None
-                and not self.user.is_superuser
-            ):
-                from organization.access import accessible_tenant_ids
-                if self.tenant.pk not in accessible_tenant_ids(self.user):
-                    raise PermissionDenied('Task principal cannot access target tenant')
+            self._resolve_principal_and_tenant()
         except Exception:
             self._restore_context()
             raise
@@ -102,6 +78,34 @@ class TaskContext:
         _request_id.set(uuid.uuid4())
 
         return self
+
+    def _resolve_principal_and_tenant(self):
+        """Load and authorize the task's explicit scope via unscoped managers."""
+        # Base managers are intentional bootstrap paths: an inline task may
+        # target a tenant outside the wrapping request's scope. Explicit bad
+        # identifiers are fatal; silently continuing would turn a scoped job
+        # into a tenantless/global one.
+        if self.tenant_id is not None:
+            self.tenant = Tenant._base_manager.get(
+                pk=self.tenant_id,
+                deleted_at__isnull=True,
+            )
+        if self.user_id is not None:
+            User = get_user_model()
+            self.user = User._base_manager.get(pk=self.user_id)
+            if not self.user.is_active:
+                raise PermissionDenied('Inactive task principal')
+
+        # A user-bound tenant task must prove canonical access to the target.
+        # System tasks (no user) and superusers retain their explicit paths.
+        if (
+            self.tenant is not None
+            and self.user is not None
+            and not self.user.is_superuser
+        ):
+            from organization.access import accessible_tenant_ids
+            if self.tenant.pk not in accessible_tenant_ids(self.user):
+                raise PermissionDenied('Task principal cannot access target tenant')
 
     def _restore_context(self):
         from itambox.middleware import _request_id, _current_user
