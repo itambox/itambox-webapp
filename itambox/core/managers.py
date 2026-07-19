@@ -131,7 +131,12 @@ class TenantScopingQuerySet(models.QuerySet):
         from itambox.middleware import get_current_user
         user = get_current_user()
         if user and user.is_superuser:
-            return list(Tenant._base_manager.filter(group_id__in=allowed_group_ids, deleted_at__isnull=True).values_list('pk', flat=True))
+            return list(
+                Tenant._base_manager.filter(
+                    group_id__in=allowed_group_ids,
+                    deleted_at__isnull=True,
+                ).values_list('pk', flat=True)
+            )
         if user:
             # inline import: avoid a core.managers -> organization cycle at load.
             from organization.access import accessible_tenant_ids
@@ -142,7 +147,12 @@ class TenantScopingQuerySet(models.QuerySet):
                     deleted_at__isnull=True,
                 ).values_list('pk', flat=True)
             )
-        return list(Tenant._base_manager.filter(group_id__in=allowed_group_ids, deleted_at__isnull=True).values_list('pk', flat=True))
+        return list(
+            Tenant._base_manager.filter(
+                group_id__in=allowed_group_ids,
+                deleted_at__isnull=True,
+            ).values_list('pk', flat=True)
+        )
 
     def _resolve_allowed_tenant_ids(self, active_tenant, active_group, get_descendant_group_ids, Tenant):
         """Resolve the allowed tenant id set for whichever scope (single
