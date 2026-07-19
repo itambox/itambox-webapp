@@ -4,7 +4,7 @@
   "private": true,
   "description": "ITAMbox end-to-end browser test suite (Playwright)",
   "scripts": {
-    "pretest": "node preflight-check.mjs",
+    "pretest": "node --test preflight-output.test.mjs && node preflight-check.mjs",
     "test": "playwright test",
     "test:headed": "playwright test --headed",
     "test:debug": "playwright test --debug",

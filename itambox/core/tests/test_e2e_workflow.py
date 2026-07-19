@@ -6,6 +6,12 @@ WORKFLOW_PATH = REPOSITORY_ROOT / ".github" / "workflows" / "e2e.yml"
 PLAYWRIGHT_CONFIG_PATH = (
     REPOSITORY_ROOT / "itambox" / "tests" / "e2e" / "playwright.config.ts"
 )
+PREFLIGHT_PATH = (
+    REPOSITORY_ROOT / "itambox" / "tests" / "e2e" / "preflight-check.mjs"
+)
+E2E_PACKAGE_PATH = (
+    REPOSITORY_ROOT / "itambox" / "tests" / "e2e" / "package.json"
+)
 
 
 def test_e2e_workflow_generates_masked_ephemeral_credentials_before_seeding():
@@ -30,3 +36,13 @@ def test_playwright_retains_failure_diagnostics_uploaded_by_workflow():
     assert "video: 'retain-on-failure'" in config
     assert "itambox/tests/e2e/test-results/" in workflow
     assert "itambox/tests/e2e/playwright-report/" in workflow
+
+
+def test_preflight_parses_marked_superuser_count_despite_noisy_django_output():
+    preflight = PREFLIGHT_PATH.read_text(encoding="utf-8")
+    package = E2E_PACKAGE_PATH.read_text(encoding="utf-8")
+
+    assert "import { parseSuperuserCount } from './preflight-output.mjs';" in preflight
+    assert "__E2E_SUPERUSER_COUNT__=" in preflight
+    assert "const count = parseSuperuserCount(userResult);" in preflight
+    assert "node --test preflight-output.test.mjs" in package
