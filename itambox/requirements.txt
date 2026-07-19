@@ -46,7 +46,7 @@ psycopg2-binary>=2.9,<3.0
 
 # Cache / broker (used when ITAMBOX_CACHE_BACKEND=redis)
 django-redis>=5.4,<6.0
-redis>=5.2,<6.0
+redis>=8.0.1,<9.0
 
 # Media / documents / labels
 Pillow>=10.0,<12.0
