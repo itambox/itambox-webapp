@@ -16,21 +16,6 @@ jobs:
     runs-on: [self-hosted, Linux, ARM64, itambox-ci]
     timeout-minutes: 30
 
-    services:
-      postgres:
-        image: postgres:16@sha256:33f923b05f64ca54ac4401c01126a6b92afe839a0aa0a52bc5aeb5cc958e5f20
-        env:
-          POSTGRES_DB: itambox_ci
-          POSTGRES_USER: itambox_ci
-          POSTGRES_PASSWORD: itambox_ci
-        ports:
-          - 5432:5432
-        options: >-
-          --health-cmd "pg_isready -U itambox_ci"
-          --health-interval 10s
-          --health-timeout 5s
-          --health-retries 5
-
     env:
       ITAMBOX_ENV: dev
       ITAMBOX_DB_NAME: itambox_ci
@@ -42,6 +27,56 @@ jobs:
 
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+
+      - name: Start PostgreSQL in the runner network namespace
+        shell: bash
+        run: |
+          runner_id=$(docker inspect --format '{{.Id}}' "${HOSTNAME}")
+          [[ ${runner_id} =~ ^[0-9a-f]{64}$ ]]
+          runner_identity=$(docker inspect \
+            --format '{{.Name}}|{{index .Config.Labels "io.itambox.role"}}|{{.State.Running}}' \
+            "${runner_id}")
+          [[ ${runner_identity} == '/itambox-ci-runner|ci-runner|true' ]]
+
+          # Recover automatically if a cancelled/crashed prior run skipped its
+          # always() cleanup step.
+          docker rm --force itambox-ci-postgres 2>/dev/null || true
+
+          docker run --detach \
+            --name itambox-ci-postgres \
+            --network "container:${runner_id}" \
+            --read-only \
+            --tmpfs /tmp:rw,nosuid,nodev,noexec,size=64m \
+            --tmpfs /var/lib/postgresql/data:rw,nosuid,nodev,noexec,size=1g \
+            --tmpfs /var/run/postgresql:rw,nosuid,nodev,noexec,size=16m \
+            --security-opt no-new-privileges \
+            --env POSTGRES_DB=itambox_ci \
+            --env POSTGRES_USER=itambox_ci \
+            --env POSTGRES_PASSWORD=itambox_ci \
+            postgres:16@sha256:33f923b05f64ca54ac4401c01126a6b92afe839a0aa0a52bc5aeb5cc958e5f20 \
+            postgres -c listen_addresses=127.0.0.1
+
+          # Retry an authenticated TCP query from the Actions runner itself.
+          # This cannot succeed against PostgreSQL's temporary Unix-socket-only
+          # initialization server and proves localhost namespace sharing.
+          postgres_ready=false
+          for attempt in $(seq 1 60); do
+            if PGCONNECT_TIMEOUT=2 PGPASSWORD=itambox_ci psql \
+              --host 127.0.0.1 \
+              --port 5432 \
+              --username itambox_ci \
+              --dbname itambox_ci \
+              --no-password \
+              --command 'SELECT 1;' >/dev/null 2>&1; then
+              postgres_ready=true
+              break
+            fi
+            sleep 2
+          done
+          if [[ ${postgres_ready} != true ]]; then
+            docker logs itambox-ci-postgres
+            exit 1
+          fi
 
       - name: Set up Python 3.12
         uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6
@@ -65,3 +100,7 @@ jobs:
       - name: Run tests
         working-directory: ./itambox
         run: pytest --cov=. --cov-report=term --cov-fail-under=45
+
+      - name: Remove PostgreSQL
+        if: always()
+        run: docker rm --force itambox-ci-postgres 2>/dev/null || true
