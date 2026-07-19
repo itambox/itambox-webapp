@@ -18,8 +18,19 @@ model_bakery>=1.17,<2.0
 factory_boy>=3.3,<4.0
 tblib>=3.0,<4.0
 
-# Lint (see .github/workflows/ci.yml "lint" job)
-flake8>=7.0,<8.0
+# Lint (see .github/workflows/ci.yml "lint" job and .pre-commit-config.yaml).
+# flake8-bugbear supplies the B/B9 codes in setup.cfg's [flake8] select --
+# without it, `select = B,C,E,F,W,B9` silently matches nothing for those
+# prefixes instead of failing, so it must be installed alongside flake8, not
+# just declared as a pre-commit additional_dependency.
+# These versions are exact because scripts/flake8_baseline.json is derived
+# from their diagnostics. Updating any of them requires regenerating and reviewing
+# the baseline in the same PR.
+flake8==7.0.0
+flake8-bugbear==24.12.12
+mccabe==0.7.0
+pycodestyle==2.11.1
+pyflakes==3.2.0
 
 # Git hook runner for `make lint` / `make setup`
 pre-commit>=4.0,<5.0
