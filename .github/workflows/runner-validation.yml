@@ -21,11 +21,15 @@ jobs:
           docker info --format '{{json .SecurityOptions}}' | grep -q 'name=rootless'
           test ! -e /srv/itambox
           test ! -e /etc/itambox
+          # The rootless gateway must expose no HTTP service. The production
+          # bridge must remain unreachable; the root-owned live verifier proves
+          # that denial separately with the host nftables counter.
           for target in \
             http://127.0.0.1:9120 \
             http://127.0.0.1:9130 \
             http://169.254.169.254 \
             http://172.18.0.1 \
+            http://172.19.0.1 \
             http://152.53.19.147:22; do
             if curl --silent --show-error --max-time 2 "${target}" >/dev/null 2>&1; then
               echo "unexpected access to ${target}" >&2
