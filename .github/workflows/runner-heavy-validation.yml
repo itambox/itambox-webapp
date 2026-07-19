@@ -1,9 +1,7 @@
 name: Self-hosted runner heavy validation
 
 on:
-  push:
-    branches:
-      - ci/self-hosted-runner
+  workflow_dispatch:
 
 permissions:
   contents: read
