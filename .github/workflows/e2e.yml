@@ -42,6 +42,7 @@ jobs:
       DJANGO_SUPERUSER_USERNAME: e2e-admin
       DJANGO_SUPERUSER_EMAIL: e2e@itambox.local
       E2E_USERNAME: e2e-admin
+      E2E_TENANT_SLUG: northwind-internal-it
       E2E_BASE_URL: http://localhost:8000
       # Playwright's webServer config uses a venv path; in CI we manage the server
       # ourselves for reliability and to avoid venv path assumptions.
@@ -113,9 +114,49 @@ jobs:
           echo "E2E_PASSWORD=$E2E_PASSWORD" >> "$GITHUB_ENV"
           echo "DJANGO_SUPERUSER_PASSWORD=$E2E_PASSWORD" >> "$GITHUB_ENV"
 
-      - name: Seed test data (minimal)
+      - name: Seed full E2E fixture data
         working-directory: ./itambox
-        run: python manage.py seed_data --production
+        run: |
+          # The existing browser suite exercises real assets, tenants, GraphQL,
+          # HTMX, and SCIM flows, so the minimal production bootstrap is not enough.
+          # This database is a disposable, job-local PostgreSQL service.
+          python manage.py seed_data --force
+
+      - name: Provision E2E principal and SCIM token
+        working-directory: ./itambox
+        run: |
+          python manage.py shell <<'PY'
+          import os
+
+          from django.contrib.auth import get_user_model
+          from organization.models import Tenant
+          from users.models import Token
+
+          User = get_user_model()
+          user, _ = User.objects.get_or_create(
+              username=os.environ["E2E_USERNAME"],
+              defaults={"email": os.environ["DJANGO_SUPERUSER_EMAIL"]},
+          )
+          user.email = os.environ["DJANGO_SUPERUSER_EMAIL"]
+          user.is_active = True
+          user.is_staff = True
+          user.is_superuser = True
+          user.set_password(os.environ["E2E_PASSWORD"])
+          user.save()
+
+          tenant = Tenant._base_manager.get(slug=os.environ["E2E_TENANT_SLUG"])
+          Token.objects.filter(user=user, description="GitHub Actions E2E SCIM").delete()
+          token = Token.objects.create(
+              user=user,
+              tenant=tenant,
+              write_enabled=True,
+              description="GitHub Actions E2E SCIM",
+          )
+          plaintext = token.key
+          print(f"::add-mask::{plaintext}")
+          with open(os.environ["GITHUB_ENV"], "a", encoding="utf-8") as env_file:
+              env_file.write(f"E2E_SCIM_TOKEN={plaintext}\n")
+          PY
 
       - name: Start Django dev server
         working-directory: ./itambox

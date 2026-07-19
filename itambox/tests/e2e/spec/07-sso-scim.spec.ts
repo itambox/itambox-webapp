@@ -1,6 +1,31 @@
-import { test, expect } from '@playwright/test';
+import { test, expect, APIRequestContext } from '@playwright/test';
+
+function requiredEnv(name: string): string {
+  const value = process.env[name];
+  if (!value) {
+    throw new Error(`E2E prerequisite missing: ${name}`);
+  }
+  return value;
+}
+
+const scimTenantSlug = requiredEnv('E2E_TENANT_SLUG');
+const scimToken = requiredEnv('E2E_SCIM_TOKEN');
+const scimHeaders = { Authorization: `Bearer ${scimToken}` };
+const scimUrl = (path: string) => `/api/tenants/${scimTenantSlug}/scim/v2/${path}`;
 
 test.describe('SSO and SCIM 2.0 Provisioning Specs', () => {
+  let scimRequest: APIRequestContext;
+
+  test.beforeAll(async ({ playwright }) => {
+    scimRequest = await playwright.request.newContext({
+      baseURL: process.env.E2E_BASE_URL || 'http://localhost:8000',
+      extraHTTPHeaders: scimHeaders,
+    });
+  });
+
+  test.afterAll(async () => {
+    await scimRequest.dispose();
+  });
 
   test.beforeEach(async ({ page }) => {
     page.on('console', msg => {
@@ -36,7 +61,7 @@ test.describe('SSO and SCIM 2.0 Provisioning Specs', () => {
     expect(response.status()).toBeDefined();
   });
 
-  test('3. SCIM User Provisioning: POST /api/tenants/default/scim/v2/Users creates user', async ({ request }) => {
+  test('3. SCIM User Provisioning creates a user in the configured tenant', async ({ request }) => {
     const scimUserPayload = {
       schemas: ["urn:ietf:params:scim:schemas:core:2.0:User"],
       userName: "scim.test.user",
@@ -51,7 +76,7 @@ test.describe('SSO and SCIM 2.0 Provisioning Specs', () => {
       active: true
     };
 
-    const response = await request.post('/api/tenants/default/scim/v2/Users', {
+    const response = await scimRequest.post(scimUrl('Users'), {
       data: scimUserPayload
     });
 
@@ -74,7 +99,7 @@ test.describe('SSO and SCIM 2.0 Provisioning Specs', () => {
       emails: [{ value: `${uniqueUser}@example.com`, primary: true }]
     };
 
-    const response = await request.post('/api/tenants/default/scim/v2/Users', { data: payload });
+    const response = await scimRequest.post(scimUrl('Users'), { data: payload });
     if (response.status() === 201) {
       // User created. Let's verify AssetHolder exists via REST API
       const holdersResponse = await request.get(`/api/v1/organization/assetholders/?search=${uniqueUser}`);
@@ -84,23 +109,18 @@ test.describe('SSO and SCIM 2.0 Provisioning Specs', () => {
     }
   });
 
-  test('5. SCIM Group sync: POST /api/tenants/default/scim/v2/Groups creates group and maps roles', async ({ request }) => {
+  test('5. Tenant SCIM group creation is rejected by the read-only contract', async ({ request }) => {
     const scimGroupPayload = {
       schemas: ["urn:ietf:params:scim:schemas:core:2.0:Group"],
       displayName: "IT-Admins",
       members: []
     };
 
-    const response = await request.post('/api/tenants/default/scim/v2/Groups', {
+    const response = await scimRequest.post(scimUrl('Groups'), {
       data: scimGroupPayload
     });
 
-    if (response.status() === 201) {
-      const json = await response.json();
-      expect(json.displayName).toBe("IT-Admins");
-    } else {
-      console.log(`SCIM Group sync returned status: ${response.status()}`);
-    }
+    expect(response.status()).toBe(403);
   });
 
   // TIER 2: Boundary & Corner Cases (>= 5 tests)
@@ -120,10 +140,10 @@ test.describe('SSO and SCIM 2.0 Provisioning Specs', () => {
     };
 
     // First creation
-    await request.post('/api/tenants/default/scim/v2/Users', { data: payload });
+    await scimRequest.post(scimUrl('Users'), { data: payload });
 
     // Second creation (duplicate username)
-    const response = await request.post('/api/tenants/default/scim/v2/Users', { data: payload });
+    const response = await scimRequest.post(scimUrl('Users'), { data: payload });
     if (response.status() === 409) {
       expect(response.status()).toBe(409);
     } else {
@@ -133,16 +153,18 @@ test.describe('SSO and SCIM 2.0 Provisioning Specs', () => {
 
   test('8. Unauthenticated SCIM request targeting a non-existent tenant fails closed', async ({ request }) => {
     const response = await request.get('/api/tenants/non-existent-tenant-999/scim/v2/Users');
-    // Authentication runs before tenant lookup to avoid tenant enumeration.
+    // Authentication runs before tenant disclosure, so an anonymous caller must
+    // not be able to enumerate which tenant slugs exist.
     expect(response.status()).toBe(401);
   });
 
-  test('9. SCIM User patch with a malformed resource ID returns 404 before body parsing', async ({ request }) => {
-    const response = await request.patch('/api/tenants/default/scim/v2/Users/some-user-id', {
+  test('9. SCIM User patch with a malformed resource ID returns 404 without crashing', async ({ request }) => {
+    const response = await scimRequest.patch(scimUrl('Users/some-user-id'), {
       headers: { 'Content-Type': 'application/scim+json' },
       data: "{invalid json payload"
     });
-    // The integer-ID route does not match, so Django rejects the URL first.
+    // User detail routes accept integer IDs. Django rejects this malformed ID
+    // before dispatching the request body to the SCIM view.
     expect(response.status()).toBe(404);
   });
 
@@ -156,7 +178,7 @@ test.describe('SSO and SCIM 2.0 Provisioning Specs', () => {
       }]
     };
 
-    const response = await request.patch('/api/tenants/default/scim/v2/Groups/some-group-id', {
+    const response = await scimRequest.patch(scimUrl('Groups/some-group-id'), {
       data: groupPatchPayload
     });
 
@@ -178,7 +200,7 @@ test.describe('SSO and SCIM 2.0 Provisioning Specs', () => {
       emails: [{ value: `${uniqueUser}@example.com`, primary: true }]
     };
 
-    const userRes = await request.post('/api/tenants/default/scim/v2/Users', { data: userPayload });
+    const userRes = await scimRequest.post(scimUrl('Users'), { data: userPayload });
     if (userRes.status() === 201) {
       const userJson = await userRes.json();
       const userId = userJson.id;
@@ -189,10 +211,12 @@ test.describe('SSO and SCIM 2.0 Provisioning Specs', () => {
         displayName: "IT-Admins",
         members: [{ value: userId, display: uniqueUser }]
       };
-      await request.post('/api/tenants/default/scim/v2/Groups', { data: groupPayload });
+      await scimRequest.post(scimUrl('Groups'), { data: groupPayload });
 
       // 2. Authenticate via OIDC (Simulate OIDC callback setting session for this user)
-      const callbackContext = await playwright.request.newContext();
+      const callbackContext = await playwright.request.newContext({
+        baseURL: process.env.E2E_BASE_URL || 'http://localhost:8000',
+      });
       const authRes = await callbackContext.get(`/oidc/callback/?code=combo_code&state=combo_state&username=${uniqueUser}`);
 
       if (authRes.status() === 200 || authRes.status() === 302) {
@@ -219,7 +243,7 @@ test.describe('SSO and SCIM 2.0 Provisioning Specs', () => {
         name: { givenName: u, familyName: "Enterprise" },
         emails: [{ value: `${u}@enterprise.com`, primary: true }]
       };
-      const res = await request.post('/api/tenants/default/scim/v2/Users', { data: payload });
+      const res = await scimRequest.post(scimUrl('Users'), { data: payload });
       if (res.status() === 201) {
         const json = await res.json();
         createdUserIds.push(json.id);
@@ -227,14 +251,14 @@ test.describe('SSO and SCIM 2.0 Provisioning Specs', () => {
     }
 
     if (createdUserIds.length === users.length) {
-      // 2. Sync security group with the users
+      // 2. Tenant SCIM deliberately keeps group authorization read-only.
       const groupPayload = {
         schemas: ["urn:ietf:params:scim:schemas:core:2.0:Group"],
         displayName: "Enterprise-Staff",
         members: createdUserIds.map(id => ({ value: id }))
       };
-      const groupRes = await request.post('/api/tenants/default/scim/v2/Groups', { data: groupPayload });
-      expect(groupRes.status()).toBe(201);
+      const groupRes = await scimRequest.post(scimUrl('Groups'), { data: groupPayload });
+      expect(groupRes.status()).toBe(403);
 
       // 3. Verify AssetHolder profiles
       for (const username of users) {
