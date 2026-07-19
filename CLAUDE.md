@@ -130,6 +130,28 @@ python manage.py qcluster   # Start django-q2 worker
 
 In tests, `Q_CLUSTER['sync'] = True` is set automatically so tasks run inline.
 
+### Lint (flake8 + flake8-bugbear)
+```bash
+# From the repository root (not itambox/) -- blocking gate, same command CI and
+# pre-commit both run:
+python scripts/check_flake8_baseline.py
+
+# After deliberately reducing debt, regenerate with the pinned toolchain on
+# canonical Python 3.12. Other interpreter versions are refused:
+python scripts/check_flake8_baseline.py --write-baseline
+```
+Policy (`select`/`ignore`, each ignore documented with a reason) lives in `setup.cfg`
+at the repo root. The pinned Flake8/Bugbear toolchain is blocking; the ~4k
+pre-existing violations are grandfathered via `scripts/flake8_baseline.json`, a
+schema-v3 identity baseline keyed by path, code, message, source statement, and
+stable AST context. Its policy SHA-256 binds it to the effective Flake8 config,
+targets, and exact tool versions. Canonical Python 3.12 requires exact identity
+equality: increases are regressions, while reductions require regenerating the
+baseline in the same reviewed cleanup so old headroom cannot hide reintroduced
+debt. Python 3.11 may omit only the ten explicitly budgeted E226/E231 f-string
+tokenizer findings; there are no OS-specific exceptions. `make lint` /
+`pre-commit run --all-files` use the same managed policy.
+
 ### Docs (MkDocs)
 ```bash
 # Build docs to static/docs/ (run from itambox/)
