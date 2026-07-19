@@ -1,14 +1,18 @@
 {
-  "name": "e2e",
+  "name": "itambox-e2e",
   "version": "1.0.0",
-  "description": "",
-  "main": "index.js",
+  "private": true,
+  "description": "ITAMbox end-to-end browser test suite (Playwright)",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "pretest": "node preflight-check.mjs",
+    "test": "playwright test",
+    "test:headed": "playwright test --headed",
+    "test:debug": "playwright test --debug",
+    "report": "playwright show-report"
   },
   "keywords": [],
-  "author": "",
-  "license": "ISC",
+  "author": "ITAMbox",
+  "license": "UNLICENSED",
   "type": "commonjs",
   "devDependencies": {
     "@playwright/test": "^1.60.0"
