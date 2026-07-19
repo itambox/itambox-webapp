@@ -1,13 +1,13 @@
 """
 scripts/check_flake8_baseline.py is the blocking-lint gate (see .github/workflows/ci.yml
 "lint" job and .pre-commit-config.yaml): it runs the exact pinned Flake8 toolchain and
-requires file/error-code counts to match scripts/flake8_baseline.json. Increases are
-regressions; decreases require updating the baseline in the same cleanup, preventing
-removed debt from later being reintroduced inside stale headroom.
+requires every path/code/message/source/AST-context identity to match the policy-bound
+schema-v3 baseline. New identities are regressions; removed identities require updating
+the baseline in the same cleanup, preventing fixed debt from becoming stale headroom.
 
 These tests exercise the gate script itself, end-to-end, against throwaway fixture
 projects (never the real 4k-violation baseline) so they stay fast and are not coupled to
-itambox's own lint debt shrinking or growing over time. This is the "newly introduced
+ITAMbox's own lint debt shrinking or growing over time. This is the "newly introduced
 blocking violation causes nonzero exit" proof required by issue #15.
 """
 import importlib.util
@@ -144,6 +144,34 @@ def test_same_source_finding_moved_between_named_scopes_is_new_identity(tmp_path
     )
     new, _examples = gate.parse_findings(
         f"mod.py:5:5: F401 {message}\n",
+        tmp_path,
+    )
+
+    assert old != new
+    assert old - new == old
+    assert new - old == new
+
+
+def test_same_finding_moved_between_identical_sibling_if_blocks_is_new_identity(
+    tmp_path,
+):
+    gate = _load_script("check_flake8_baseline_sibling_if_identity")
+    module = tmp_path / "mod.py"
+    message = "'os' imported but unused"
+    module.write_text(
+        "def f(flag):\n    if flag:\n        import os\n    if flag:\n        pass\n",
+        encoding="utf-8",
+    )
+    old, _examples = gate.parse_findings(
+        f"mod.py:3:9: F401 {message}\n",
+        tmp_path,
+    )
+    module.write_text(
+        "def f(flag):\n    if flag:\n        pass\n    if flag:\n        import os\n",
+        encoding="utf-8",
+    )
+    new, _examples = gate.parse_findings(
+        f"mod.py:5:9: F401 {message}\n",
         tmp_path,
     )
 
@@ -445,16 +473,11 @@ def test_write_baseline_refuses_weakened_flake8_policy(
     assert json.loads(baseline_path.read_text(encoding="utf-8")) == original
 
 
-def test_python311_fstring_shortfall_is_interpreter_version_aware(monkeypatch):
+def test_python311_exact_fstring_shortfall_is_interpreter_version_aware(monkeypatch):
     gate = _load_script("check_flake8_baseline_python_compat")
-    key = (
-        "itambox/assets/tests/test_requests.py",
-        "E226",
-        "missing whitespace around arithmetic operator",
-        "value = f'{1+1}'",
-        "Module:body",
-    )
-    baseline = gate.collections.Counter({key: 1})
+    baseline = gate.PYTHON311_FSTRING_SHORTFALL.copy()
+    assert len(baseline) == 7
+    assert sum(baseline.values()) == 10
 
     monkeypatch.setattr(gate.sys, "version_info", (3, 11))
     regressions, stale = gate.compare_baseline(gate.collections.Counter(), baseline)
@@ -467,6 +490,25 @@ def test_python311_fstring_shortfall_is_interpreter_version_aware(monkeypatch):
     assert stale == baseline
 
     monkeypatch.setattr(gate.sys, "version_info", (3, 10))
+    regressions, stale = gate.compare_baseline(gate.collections.Counter(), baseline)
+    assert not regressions
+    assert stale == baseline
+
+
+def test_python311_does_not_hide_unlisted_identity_with_allowed_path_and_code(
+    monkeypatch,
+):
+    gate = _load_script("check_flake8_baseline_python_compat_unlisted")
+    unlisted_key = (
+        "itambox/assets/tests/test_requests.py",
+        "E226",
+        "missing whitespace around arithmetic operator",
+        "value = f'{1+1}'",
+        "Module:body",
+    )
+    baseline = gate.collections.Counter({unlisted_key: 1})
+
+    monkeypatch.setattr(gate.sys, "version_info", (3, 11))
     regressions, stale = gate.compare_baseline(gate.collections.Counter(), baseline)
     assert not regressions
     assert stale == baseline
@@ -505,6 +547,20 @@ def test_unknown_baseline_metadata_fails_closed(tmp_path):
         gate.load_baseline(baseline_path, "expected")
 
 
+def test_unsorted_baseline_fails_closed(tmp_path):
+    gate = _load_script("check_flake8_baseline_unsorted")
+    baseline_path = tmp_path / "baseline.json"
+    baseline = _baseline(
+        _finding(path="z.py"),
+        _finding(path="a.py"),
+    )
+    baseline["policy_sha256"] = "expected"
+    baseline_path.write_text(json.dumps(baseline), encoding="utf-8")
+
+    with pytest.raises(ValueError, match="sorted"):
+        gate.load_baseline(baseline_path, "expected")
+
+
 def test_unknown_stdout_with_success_status_fails_closed(tmp_path):
     gate = _load_script("check_flake8_baseline_unknown_success")
     _findings, _examples, failure = gate.validate_flake8_result(
@@ -523,6 +579,17 @@ def test_finding_output_with_success_status_fails_closed(tmp_path):
     _findings, _examples, failure = gate.validate_flake8_result(
         "mod.py:1:1: F401 'os' imported but unused\n",
         "",
+        0,
+        tmp_path,
+    )
+    assert failure == 2
+
+
+def test_whitespace_only_stderr_fails_closed(tmp_path):
+    gate = _load_script("check_flake8_baseline_whitespace_stderr")
+    _findings, _examples, failure = gate.validate_flake8_result(
+        "",
+        " \n",
         0,
         tmp_path,
     )

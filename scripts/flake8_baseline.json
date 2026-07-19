@@ -6512,7 +6512,7 @@
       "code": "W293",
       "message": "blank line contains whitespace",
       "source": "                ",
-      "context": "Module:body/ClassDef:RequestClaimView:body/FunctionDef:perform_action:body/With:[(\"Call(func=Attribute(value=Name(id='transaction', ctx=Load()), attr='atomic', ctx=Load()), args=[], keywords=[])\", None)]:body/For:Name(id='req', ctx=Store()):Name(id='requests_to_claim', ctx=Load()):self",
+      "context": "Module:body/ClassDef:RequestClaimView:body/FunctionDef:perform_action:body/With:[(\"Call(func=Attribute(value=Name(id='transaction', ctx=Load()), attr='atomic', ctx=Load()), args=[], keywords=[])\", None)]:body/For:Name(id='req', ctx=Store()):Name(id='requests_to_claim', ctx=Load())#2:self",
       "count": 1
     },
     {
@@ -7360,7 +7360,7 @@
       "code": "W391",
       "message": "blank line at end of file",
       "source": "",
-      "context": "Module:body/FunctionDef:clear_thread_locals:body/Try:handlers/ExceptHandler:Name(id='Exception', ctx=Load()):None:body",
+      "context": "Module:body/FunctionDef:clear_thread_locals:body/Try#2:handlers/ExceptHandler:Name(id='Exception', ctx=Load()):None:body",
       "count": 1
     },
     {
@@ -8160,7 +8160,7 @@
       "code": "B907",
       "message": "'asset_tag' is manually surrounded by quotes, consider using the `!r` conversion flag.",
       "source": "self._log(f\"  ! asset {sid} '{asset_tag}': {exc}\")",
-      "context": "Module:body/ClassDef:SnipeITImporter:body/FunctionDef:_import_hardware:body/For:Name(id='row', ctx=Store()):Call(func=Attribute(value=Attribute(value=Name(id='self', ctx=Load()), attr='client', ctx=Load()), attr='get_all', ctx=Load()), args=[Constant(value='/api/v1/hardware')], keywords=[]):body/Try:handlers/ExceptHandler:Name(id='Exception', ctx=Load()):exc:body",
+      "context": "Module:body/ClassDef:SnipeITImporter:body/FunctionDef:_import_hardware:body/For:Name(id='row', ctx=Store()):Call(func=Attribute(value=Attribute(value=Name(id='self', ctx=Load()), attr='client', ctx=Load()), attr='get_all', ctx=Load()), args=[Constant(value='/api/v1/hardware')], keywords=[]):body/Try#1:handlers/ExceptHandler:Name(id='Exception', ctx=Load()):exc:body",
       "count": 1
     },
     {
@@ -8512,7 +8512,7 @@
       "code": "B007",
       "message": "Loop control variable 'tenant' not used within the loop body. If this is intended, start the name with an underscore.",
       "source": "        for slug, tenant in self._tenants.items():",
-      "context": "Module:body/ClassDef:SeedAssetsMixin:body/FunctionDef:_seed_assets:body/For:Tuple(elts=[Name(id='slug', ctx=Store()), Name(id='tenant', ctx=Store())], ctx=Store()):Call(func=Attribute(value=Attribute(value=Name(id='self', ctx=Load()), attr='_tenants', ctx=Load()), attr='items', ctx=Load()), args=[], keywords=[]):self",
+      "context": "Module:body/ClassDef:SeedAssetsMixin:body/FunctionDef:_seed_assets:body/For:Tuple(elts=[Name(id='slug', ctx=Store()), Name(id='tenant', ctx=Store())], ctx=Store()):Call(func=Attribute(value=Attribute(value=Name(id='self', ctx=Load()), attr='_tenants', ctx=Load()), attr='items', ctx=Load()), args=[], keywords=[])#3:self",
       "count": 1
     },
     {
@@ -8648,7 +8648,7 @@
       "code": "B007",
       "message": "Loop control variable 'tenant' not used within the loop body. If this is intended, start the name with an underscore.",
       "source": "        for slug, tenant in self._tenants.items():",
-      "context": "Module:body/ClassDef:SeedComplianceMixin:body/FunctionDef:_seed_compliance:body/For:Tuple(elts=[Name(id='slug', ctx=Store()), Name(id='tenant', ctx=Store())], ctx=Store()):Call(func=Attribute(value=Attribute(value=Name(id='self', ctx=Load()), attr='_tenants', ctx=Load()), attr='items', ctx=Load()), args=[], keywords=[]):self",
+      "context": "Module:body/ClassDef:SeedComplianceMixin:body/FunctionDef:_seed_compliance:body/For:Tuple(elts=[Name(id='slug', ctx=Store()), Name(id='tenant', ctx=Store())], ctx=Store()):Call(func=Attribute(value=Attribute(value=Name(id='self', ctx=Load()), attr='_tenants', ctx=Load()), attr='items', ctx=Load()), args=[], keywords=[])#2:self",
       "count": 1
     },
     {
@@ -8664,7 +8664,7 @@
       "code": "E741",
       "message": "ambiguous variable name 'l'",
       "source": "                    loc_candidates = [l for l in locs",
-      "context": "Module:body/ClassDef:SeedComplianceMixin:body/FunctionDef:_seed_compliance:body/For:Tuple(elts=[Name(id='slug', ctx=Store()), Name(id='tenant', ctx=Store())], ctx=Store()):Call(func=Attribute(value=Attribute(value=Name(id='self', ctx=Load()), attr='_tenants', ctx=Load()), attr='items', ctx=Load()), args=[], keywords=[]):body/For:Tuple(elts=[Name(id='idx', ctx=Store()), Name(id='audit_date', ctx=Store())], ctx=Store()):Call(func=Name(id='enumerate', ctx=Load()), args=[Name(id='session_dates', ctx=Load())], keywords=[]):body/If:BoolOp(op=And(), values=[Name(id='locs', ctx=Load()), Compare(left=Call(func=Attribute(value=Name(id='random', ctx=Load()), attr='random', ctx=Load()), args=[], keywords=[]), ops=[Lt()], comparators=[Constant(value=0.4)])]):body",
+      "context": "Module:body/ClassDef:SeedComplianceMixin:body/FunctionDef:_seed_compliance:body/For:Tuple(elts=[Name(id='slug', ctx=Store()), Name(id='tenant', ctx=Store())], ctx=Store()):Call(func=Attribute(value=Attribute(value=Name(id='self', ctx=Load()), attr='_tenants', ctx=Load()), attr='items', ctx=Load()), args=[], keywords=[])#1:body/For:Tuple(elts=[Name(id='idx', ctx=Store()), Name(id='audit_date', ctx=Store())], ctx=Store()):Call(func=Name(id='enumerate', ctx=Load()), args=[Name(id='session_dates', ctx=Load())], keywords=[]):body/If:BoolOp(op=And(), values=[Name(id='locs', ctx=Load()), Compare(left=Call(func=Attribute(value=Name(id='random', ctx=Load()), attr='random', ctx=Load()), args=[], keywords=[]), ops=[Lt()], comparators=[Constant(value=0.4)])]):body",
       "count": 1
     },
     {
@@ -9656,7 +9656,7 @@
       "code": "B907",
       "message": "'username' is manually surrounded by quotes, consider using the `!r` conversion flag.",
       "source": "self.stdout.write(f'  Created superuser \"{username}\" (password from DJANGO_SUPERUSER_PASSWORD).')",
-      "context": "Module:body/ClassDef:Command:body/FunctionDef:_seed_minimal:body/If:UnaryOp(op=Not(), operand=Call(func=Attribute(value=Call(func=Attribute(value=Attribute(value=Name(id='User', ctx=Load()), attr='objects', ctx=Load()), attr='filter', ctx=Load()), args=[], keywords=[keyword(arg='is_superuser', value=Constant(value=True))]), attr='exists', ctx=Load()), args=[], keywords=[])):body/If:Name(id='generated', ctx=Load()):orelse",
+      "context": "Module:body/ClassDef:Command:body/FunctionDef:_seed_minimal:body/If:UnaryOp(op=Not(), operand=Call(func=Attribute(value=Call(func=Attribute(value=Attribute(value=Name(id='User', ctx=Load()), attr='objects', ctx=Load()), attr='filter', ctx=Load()), args=[], keywords=[keyword(arg='is_superuser', value=Constant(value=True))]), attr='exists', ctx=Load()), args=[], keywords=[])):body/If:Name(id='generated', ctx=Load())#2:orelse",
       "count": 1
     },
     {
@@ -9664,7 +9664,7 @@
       "code": "B907",
       "message": "'username' is manually surrounded by quotes, consider using the `!r` conversion flag.",
       "source": "self.stdout.write(self.style.WARNING(\n                    f'  Created superuser \"{username}\" with a generated password: {password}\\n'\n                    f'  Store it now and change it after first login.'))",
-      "context": "Module:body/ClassDef:Command:body/FunctionDef:_seed_minimal:body/If:UnaryOp(op=Not(), operand=Call(func=Attribute(value=Call(func=Attribute(value=Attribute(value=Name(id='User', ctx=Load()), attr='objects', ctx=Load()), attr='filter', ctx=Load()), args=[], keywords=[keyword(arg='is_superuser', value=Constant(value=True))]), attr='exists', ctx=Load()), args=[], keywords=[])):body/If:Name(id='generated', ctx=Load()):body",
+      "context": "Module:body/ClassDef:Command:body/FunctionDef:_seed_minimal:body/If:UnaryOp(op=Not(), operand=Call(func=Attribute(value=Call(func=Attribute(value=Attribute(value=Name(id='User', ctx=Load()), attr='objects', ctx=Load()), attr='filter', ctx=Load()), args=[], keywords=[keyword(arg='is_superuser', value=Constant(value=True))]), attr='exists', ctx=Load()), args=[], keywords=[])):body/If:Name(id='generated', ctx=Load())#2:body",
       "count": 1
     },
     {
@@ -9712,7 +9712,7 @@
       "code": "B007",
       "message": "Loop control variable 'dn' not used within the loop body. If this is intended, start the name with an underscore.",
       "source": "                    for dn, entry in result_data:",
-      "context": "Module:body/ClassDef:Command:body/FunctionDef:_run_sync:body/Try:body/While:Constant(value=True):body/If:Compare(left=Name(id='result_type', ctx=Load()), ops=[Eq()], comparators=[Attribute(value=Name(id='ldap', ctx=Load()), attr='RES_SEARCH_ENTRY', ctx=Load())]):body/For:Tuple(elts=[Name(id='dn', ctx=Store()), Name(id='entry', ctx=Store())], ctx=Store()):Name(id='result_data', ctx=Load()):self",
+      "context": "Module:body/ClassDef:Command:body/FunctionDef:_run_sync:body/Try#3:body/While:Constant(value=True):body/If:Compare(left=Name(id='result_type', ctx=Load()), ops=[Eq()], comparators=[Attribute(value=Name(id='ldap', ctx=Load()), attr='RES_SEARCH_ENTRY', ctx=Load())]):body/For:Tuple(elts=[Name(id='dn', ctx=Store()), Name(id='entry', ctx=Store())], ctx=Store()):Name(id='result_data', ctx=Load()):self",
       "count": 1
     },
     {
@@ -9720,7 +9720,7 @@
       "code": "B904",
       "message": "Within an `except` clause, raise exceptions with `raise ... from err` or `raise ... from None` to distinguish them from errors in exception handling.  See https://docs.python.org/3/tutorial/errors.html#exception-chaining for details.",
       "source": "            raise CommandError(\"django-auth-ldap is not installed. Run: pip install django-auth-ldap\")",
-      "context": "Module:body/ClassDef:Command:body/FunctionDef:_run_sync:body/Try:handlers/ExceptHandler:Name(id='ImportError', ctx=Load()):None:body",
+      "context": "Module:body/ClassDef:Command:body/FunctionDef:_run_sync:body/Try#1:handlers/ExceptHandler:Name(id='ImportError', ctx=Load()):None:body",
       "count": 1
     },
     {
@@ -9728,7 +9728,7 @@
       "code": "B904",
       "message": "Within an `except` clause, raise exceptions with `raise ... from err` or `raise ... from None` to distinguish them from errors in exception handling.  See https://docs.python.org/3/tutorial/errors.html#exception-chaining for details.",
       "source": "            raise CommandError(f\"LDAP bind failed: {e}\")",
-      "context": "Module:body/ClassDef:Command:body/FunctionDef:_run_sync:body/Try:handlers/ExceptHandler:Attribute(value=Name(id='ldap', ctx=Load()), attr='LDAPError', ctx=Load()):e:body",
+      "context": "Module:body/ClassDef:Command:body/FunctionDef:_run_sync:body/Try#2:handlers/ExceptHandler:Attribute(value=Name(id='ldap', ctx=Load()), attr='LDAPError', ctx=Load()):e:body",
       "count": 1
     },
     {
@@ -9736,7 +9736,7 @@
       "code": "B904",
       "message": "Within an `except` clause, raise exceptions with `raise ... from err` or `raise ... from None` to distinguish them from errors in exception handling.  See https://docs.python.org/3/tutorial/errors.html#exception-chaining for details.",
       "source": "            raise CommandError(f\"LDAP search failed: {e}\")",
-      "context": "Module:body/ClassDef:Command:body/FunctionDef:_run_sync:body/Try:handlers/ExceptHandler:Attribute(value=Name(id='ldap', ctx=Load()), attr='LDAPError', ctx=Load()):e:body",
+      "context": "Module:body/ClassDef:Command:body/FunctionDef:_run_sync:body/Try#3:handlers/ExceptHandler:Attribute(value=Name(id='ldap', ctx=Load()), attr='LDAPError', ctx=Load()):e:body",
       "count": 1
     },
     {
@@ -9760,7 +9760,7 @@
       "code": "B907",
       "message": "'tenant.slug' is manually surrounded by quotes, consider using the `!r` conversion flag.",
       "source": "self.stdout.write(self.style.SUCCESS(\n                f\"LDAP sync complete for tenant '{tenant.slug}'. Created: {created_count}, Updated: {updated_count}\"\n            ))",
-      "context": "Module:body/ClassDef:Command:body/FunctionDef:_run_sync:body/Try:body",
+      "context": "Module:body/ClassDef:Command:body/FunctionDef:_run_sync:body/Try#3:body",
       "count": 1
     },
     {
@@ -9776,7 +9776,7 @@
       "code": "B950",
       "message": "line too long (135 > 120 characters)",
       "source": "                                    'organization.view_assetholder', 'organization.add_assetholder', 'organization.change_assetholder',",
-      "context": "Module:body/ClassDef:Command:body/FunctionDef:_run_sync:body/Try:body/While:Constant(value=True):body/If:Compare(left=Name(id='result_type', ctx=Load()), ops=[Eq()], comparators=[Attribute(value=Name(id='ldap', ctx=Load()), attr='RES_SEARCH_ENTRY', ctx=Load())]):body/For:Tuple(elts=[Name(id='dn', ctx=Store()), Name(id='entry', ctx=Store())], ctx=Store()):Name(id='result_data', ctx=Load()):body",
+      "context": "Module:body/ClassDef:Command:body/FunctionDef:_run_sync:body/Try#3:body/While:Constant(value=True):body/If:Compare(left=Name(id='result_type', ctx=Load()), ops=[Eq()], comparators=[Attribute(value=Name(id='ldap', ctx=Load()), attr='RES_SEARCH_ENTRY', ctx=Load())]):body/For:Tuple(elts=[Name(id='dn', ctx=Store()), Name(id='entry', ctx=Store())], ctx=Store()):Name(id='result_data', ctx=Load()):body",
       "count": 1
     },
     {
@@ -9784,7 +9784,7 @@
       "code": "B950",
       "message": "line too long (144 > 120 characters)",
       "source": "                        last_name = sn_vals[0].decode('utf-8') if sn_vals and isinstance(sn_vals[0], bytes) else (sn_vals[0] if sn_vals else '')",
-      "context": "Module:body/ClassDef:Command:body/FunctionDef:_run_sync:body/Try:body/While:Constant(value=True):body/If:Compare(left=Name(id='result_type', ctx=Load()), ops=[Eq()], comparators=[Attribute(value=Name(id='ldap', ctx=Load()), attr='RES_SEARCH_ENTRY', ctx=Load())]):body/For:Tuple(elts=[Name(id='dn', ctx=Store()), Name(id='entry', ctx=Store())], ctx=Store()):Name(id='result_data', ctx=Load()):body",
+      "context": "Module:body/ClassDef:Command:body/FunctionDef:_run_sync:body/Try#3:body/While:Constant(value=True):body/If:Compare(left=Name(id='result_type', ctx=Load()), ops=[Eq()], comparators=[Attribute(value=Name(id='ldap', ctx=Load()), attr='RES_SEARCH_ENTRY', ctx=Load())]):body/For:Tuple(elts=[Name(id='dn', ctx=Store()), Name(id='entry', ctx=Store())], ctx=Store()):Name(id='result_data', ctx=Load()):body",
       "count": 1
     },
     {
@@ -9792,7 +9792,7 @@
       "code": "B950",
       "message": "line too long (145 > 120 characters)",
       "source": "                        first_name = gn_vals[0].decode('utf-8') if gn_vals and isinstance(gn_vals[0], bytes) else (gn_vals[0] if gn_vals else '')",
-      "context": "Module:body/ClassDef:Command:body/FunctionDef:_run_sync:body/Try:body/While:Constant(value=True):body/If:Compare(left=Name(id='result_type', ctx=Load()), ops=[Eq()], comparators=[Attribute(value=Name(id='ldap', ctx=Load()), attr='RES_SEARCH_ENTRY', ctx=Load())]):body/For:Tuple(elts=[Name(id='dn', ctx=Store()), Name(id='entry', ctx=Store())], ctx=Store()):Name(id='result_data', ctx=Load()):body",
+      "context": "Module:body/ClassDef:Command:body/FunctionDef:_run_sync:body/Try#3:body/While:Constant(value=True):body/If:Compare(left=Name(id='result_type', ctx=Load()), ops=[Eq()], comparators=[Attribute(value=Name(id='ldap', ctx=Load()), attr='RES_SEARCH_ENTRY', ctx=Load())]):body/For:Tuple(elts=[Name(id='dn', ctx=Store()), Name(id='entry', ctx=Store())], ctx=Store()):Name(id='result_data', ctx=Load()):body",
       "count": 1
     },
     {
@@ -9800,7 +9800,7 @@
       "code": "B950",
       "message": "line too long (150 > 120 characters)",
       "source": "                        email = mail_vals[0].decode('utf-8') if mail_vals and isinstance(mail_vals[0], bytes) else (mail_vals[0] if mail_vals else '')",
-      "context": "Module:body/ClassDef:Command:body/FunctionDef:_run_sync:body/Try:body/While:Constant(value=True):body/If:Compare(left=Name(id='result_type', ctx=Load()), ops=[Eq()], comparators=[Attribute(value=Name(id='ldap', ctx=Load()), attr='RES_SEARCH_ENTRY', ctx=Load())]):body/For:Tuple(elts=[Name(id='dn', ctx=Store()), Name(id='entry', ctx=Store())], ctx=Store()):Name(id='result_data', ctx=Load()):body",
+      "context": "Module:body/ClassDef:Command:body/FunctionDef:_run_sync:body/Try#3:body/While:Constant(value=True):body/If:Compare(left=Name(id='result_type', ctx=Load()), ops=[Eq()], comparators=[Attribute(value=Name(id='ldap', ctx=Load()), attr='RES_SEARCH_ENTRY', ctx=Load())]):body/For:Tuple(elts=[Name(id='dn', ctx=Store()), Name(id='entry', ctx=Store())], ctx=Store()):Name(id='result_data', ctx=Load()):body",
       "count": 1
     },
     {
@@ -9816,7 +9816,7 @@
       "code": "F401",
       "message": "'django_auth_ldap.config.LDAPSearch' imported but unused",
       "source": "            from django_auth_ldap.config import LDAPSearch",
-      "context": "Module:body/ClassDef:Command:body/FunctionDef:_run_sync:body/Try:body",
+      "context": "Module:body/ClassDef:Command:body/FunctionDef:_run_sync:body/Try#1:body",
       "count": 1
     },
     {
@@ -9832,7 +9832,7 @@
       "code": "W293",
       "message": "blank line contains whitespace",
       "source": "                        ",
-      "context": "Module:body/ClassDef:Command:body/FunctionDef:_run_sync:body/Try:body/While:Constant(value=True):body/If:Compare(left=Name(id='result_type', ctx=Load()), ops=[Eq()], comparators=[Attribute(value=Name(id='ldap', ctx=Load()), attr='RES_SEARCH_ENTRY', ctx=Load())]):body/For:Tuple(elts=[Name(id='dn', ctx=Store()), Name(id='entry', ctx=Store())], ctx=Store()):Name(id='result_data', ctx=Load()):self",
+      "context": "Module:body/ClassDef:Command:body/FunctionDef:_run_sync:body/Try#3:body/While:Constant(value=True):body/If:Compare(left=Name(id='result_type', ctx=Load()), ops=[Eq()], comparators=[Attribute(value=Name(id='ldap', ctx=Load()), attr='RES_SEARCH_ENTRY', ctx=Load())]):body/For:Tuple(elts=[Name(id='dn', ctx=Store()), Name(id='entry', ctx=Store())], ctx=Store()):Name(id='result_data', ctx=Load()):self",
       "count": 1
     },
     {
@@ -9944,7 +9944,7 @@
       "code": "W504",
       "message": "line break after binary operator",
       "source": "                            models.Q(filter_tenants__id__in=allowed_tenant_ids) |",
-      "context": "Module:body/ClassDef:TenantScopingQuerySet:body/FunctionDef:filter_by_tenant:body/If:BoolOp(op=Or(), values=[Name(id='active_tenant', ctx=Load()), Name(id='active_group', ctx=Load())]):body/Try:body/Try:body/If:Name(id='allow_global', ctx=Load()):body",
+      "context": "Module:body/ClassDef:TenantScopingQuerySet:body/FunctionDef:filter_by_tenant:body/If:BoolOp(op=Or(), values=[Name(id='active_tenant', ctx=Load()), Name(id='active_group', ctx=Load())]):body/Try#2:body/Try:body/If:Name(id='allow_global', ctx=Load()):body",
       "count": 1
     },
     {
@@ -9952,7 +9952,7 @@
       "code": "W504",
       "message": "line break after binary operator",
       "source": "                            models.Q(tenant_id__in=allowed_tenant_ids) |",
-      "context": "Module:body/ClassDef:TenantScopingQuerySet:body/FunctionDef:filter_by_tenant:body/If:BoolOp(op=Or(), values=[Name(id='active_tenant', ctx=Load()), Name(id='active_group', ctx=Load())]):body/Try:body/Try:body/If:Name(id='allow_global', ctx=Load()):body",
+      "context": "Module:body/ClassDef:TenantScopingQuerySet:body/FunctionDef:filter_by_tenant:body/If:BoolOp(op=Or(), values=[Name(id='active_tenant', ctx=Load()), Name(id='active_group', ctx=Load())]):body/Try#2:body/Try:body/If:Name(id='allow_global', ctx=Load()):body",
       "count": 1
     },
     {
@@ -9960,7 +9960,7 @@
       "code": "W504",
       "message": "line break after binary operator",
       "source": "                            models.Q(tenant_id__in=allowed_tenant_ids) |",
-      "context": "Module:body/ClassDef:TenantScopingQuerySet:body/FunctionDef:filter_by_tenant:body/If:BoolOp(op=Or(), values=[Name(id='active_tenant', ctx=Load()), Name(id='active_group', ctx=Load())]):body/Try:body/Try:body/If:Name(id='allow_global', ctx=Load()):orelse",
+      "context": "Module:body/ClassDef:TenantScopingQuerySet:body/FunctionDef:filter_by_tenant:body/If:BoolOp(op=Or(), values=[Name(id='active_tenant', ctx=Load()), Name(id='active_group', ctx=Load())]):body/Try#2:body/Try:body/If:Name(id='allow_global', ctx=Load()):orelse",
       "count": 1
     },
     {
@@ -11856,7 +11856,7 @@
       "code": "E241",
       "message": "multiple spaces after ':'",
       "source": "                    'asset':       'asset_target',",
-      "context": "Module:body/FunctionDef:bulk_checkout_task:body/With:[(\"Call(func=Name(id='TaskContext', ctx=Load()), args=[], keywords=[keyword(arg='tenant_id', value=Name(id='tenant_id', ctx=Load())), keyword(arg='user_id', value=Name(id='user_id', ctx=Load()))])\", \"Name(id='ctx', ctx=Store())\")]:body/Try:body/Try:body",
+      "context": "Module:body/FunctionDef:bulk_checkout_task:body/With:[(\"Call(func=Name(id='TaskContext', ctx=Load()), args=[], keywords=[keyword(arg='tenant_id', value=Name(id='tenant_id', ctx=Load())), keyword(arg='user_id', value=Name(id='user_id', ctx=Load()))])\", \"Name(id='ctx', ctx=Store())\")]:body/Try:body/Try#2:body",
       "count": 1
     },
     {
@@ -11864,7 +11864,7 @@
       "code": "E241",
       "message": "multiple spaces after ':'",
       "source": "                    'asset':       ('assets', 'asset'),",
-      "context": "Module:body/FunctionDef:bulk_checkout_task:body/With:[(\"Call(func=Name(id='TaskContext', ctx=Load()), args=[], keywords=[keyword(arg='tenant_id', value=Name(id='tenant_id', ctx=Load())), keyword(arg='user_id', value=Name(id='user_id', ctx=Load()))])\", \"Name(id='ctx', ctx=Store())\")]:body/Try:body/Try:body",
+      "context": "Module:body/FunctionDef:bulk_checkout_task:body/With:[(\"Call(func=Name(id='TaskContext', ctx=Load()), args=[], keywords=[keyword(arg='tenant_id', value=Name(id='tenant_id', ctx=Load())), keyword(arg='user_id', value=Name(id='user_id', ctx=Load()))])\", \"Name(id='ctx', ctx=Store())\")]:body/Try:body/Try#2:body",
       "count": 1
     },
     {
@@ -11872,7 +11872,7 @@
       "code": "E241",
       "message": "multiple spaces after ':'",
       "source": "                    'location':    'location',",
-      "context": "Module:body/FunctionDef:bulk_checkout_task:body/With:[(\"Call(func=Name(id='TaskContext', ctx=Load()), args=[], keywords=[keyword(arg='tenant_id', value=Name(id='tenant_id', ctx=Load())), keyword(arg='user_id', value=Name(id='user_id', ctx=Load()))])\", \"Name(id='ctx', ctx=Store())\")]:body/Try:body/Try:body",
+      "context": "Module:body/FunctionDef:bulk_checkout_task:body/With:[(\"Call(func=Name(id='TaskContext', ctx=Load()), args=[], keywords=[keyword(arg='tenant_id', value=Name(id='tenant_id', ctx=Load())), keyword(arg='user_id', value=Name(id='user_id', ctx=Load()))])\", \"Name(id='ctx', ctx=Store())\")]:body/Try:body/Try#2:body",
       "count": 1
     },
     {
@@ -11880,7 +11880,7 @@
       "code": "E241",
       "message": "multiple spaces after ':'",
       "source": "                    'location':    ('organization', 'location'),",
-      "context": "Module:body/FunctionDef:bulk_checkout_task:body/With:[(\"Call(func=Name(id='TaskContext', ctx=Load()), args=[], keywords=[keyword(arg='tenant_id', value=Name(id='tenant_id', ctx=Load())), keyword(arg='user_id', value=Name(id='user_id', ctx=Load()))])\", \"Name(id='ctx', ctx=Store())\")]:body/Try:body/Try:body",
+      "context": "Module:body/FunctionDef:bulk_checkout_task:body/With:[(\"Call(func=Name(id='TaskContext', ctx=Load()), args=[], keywords=[keyword(arg='tenant_id', value=Name(id='tenant_id', ctx=Load())), keyword(arg='user_id', value=Name(id='user_id', ctx=Load()))])\", \"Name(id='ctx', ctx=Store())\")]:body/Try:body/Try#2:body",
       "count": 1
     },
     {
@@ -11928,7 +11928,7 @@
       "code": "W293",
       "message": "blank line contains whitespace",
       "source": "                ",
-      "context": "Module:body/FunctionDef:import_csv_task:body/With:[(\"Call(func=Name(id='TaskContext', ctx=Load()), args=[], keywords=[keyword(arg='tenant_id', value=Name(id='tenant_id', ctx=Load())), keyword(arg='user_id', value=Name(id='user_id', ctx=Load()))])\", \"Name(id='ctx', ctx=Store())\")]:body/Try:body/Try:self",
+      "context": "Module:body/FunctionDef:import_csv_task:body/With:[(\"Call(func=Name(id='TaskContext', ctx=Load()), args=[], keywords=[keyword(arg='tenant_id', value=Name(id='tenant_id', ctx=Load())), keyword(arg='user_id', value=Name(id='user_id', ctx=Load()))])\", \"Name(id='ctx', ctx=Store())\")]:body/Try:body/Try#2:self",
       "count": 3
     },
     {
@@ -11936,7 +11936,7 @@
       "code": "W293",
       "message": "blank line contains whitespace",
       "source": "                    ",
-      "context": "Module:body/FunctionDef:import_csv_task:body/With:[(\"Call(func=Name(id='TaskContext', ctx=Load()), args=[], keywords=[keyword(arg='tenant_id', value=Name(id='tenant_id', ctx=Load())), keyword(arg='user_id', value=Name(id='user_id', ctx=Load()))])\", \"Name(id='ctx', ctx=Store())\")]:body/Try:body/Try:body/If:Name(id='errors', ctx=Load()):self",
+      "context": "Module:body/FunctionDef:import_csv_task:body/With:[(\"Call(func=Name(id='TaskContext', ctx=Load()), args=[], keywords=[keyword(arg='tenant_id', value=Name(id='tenant_id', ctx=Load())), keyword(arg='user_id', value=Name(id='user_id', ctx=Load()))])\", \"Name(id='ctx', ctx=Store())\")]:body/Try:body/Try#2:body/If:Name(id='errors', ctx=Load()):self",
       "count": 1
     },
     {
@@ -12064,7 +12064,7 @@
       "code": "B950",
       "message": "line too long (137 > 120 characters)",
       "source": "                job.append_log(f\"Selected template: {label_template.name} ({label_template.page_width}x{label_template.page_height} in)\")",
-      "context": "Module:body/FunctionDef:generate_label_pdf_batch_task:body/With:[(\"Call(func=Name(id='TaskContext', ctx=Load()), args=[], keywords=[keyword(arg='tenant_id', value=Name(id='tenant_id', ctx=Load())), keyword(arg='user_id', value=Name(id='user_id', ctx=Load()))])\", \"Name(id='ctx', ctx=Store())\")]:body/Try:body/Try:body",
+      "context": "Module:body/FunctionDef:generate_label_pdf_batch_task:body/With:[(\"Call(func=Name(id='TaskContext', ctx=Load()), args=[], keywords=[keyword(arg='tenant_id', value=Name(id='tenant_id', ctx=Load())), keyword(arg='user_id', value=Name(id='user_id', ctx=Load()))])\", \"Name(id='ctx', ctx=Store())\")]:body/Try:body/Try#2:body",
       "count": 1
     },
     {
@@ -19440,7 +19440,7 @@
       "code": "B904",
       "message": "Within an `except` clause, raise exceptions with `raise ... from err` or `raise ... from None` to distinguish them from errors in exception handling.  See https://docs.python.org/3/tutorial/errors.html#exception-chaining for details.",
       "source": "        raise ValidationError(",
-      "context": "Module:body/FunctionDef:get_related_object_by_attrs:body/Try:handlers/ExceptHandler:Tuple(elts=[Name(id='TypeError', ctx=Load()), Name(id='ValueError', ctx=Load())], ctx=Load()):None:body",
+      "context": "Module:body/FunctionDef:get_related_object_by_attrs:body/Try#1:handlers/ExceptHandler:Tuple(elts=[Name(id='TypeError', ctx=Load()), Name(id='ValueError', ctx=Load())], ctx=Load()):None:body",
       "count": 1
     },
     {
@@ -19448,7 +19448,7 @@
       "code": "B904",
       "message": "Within an `except` clause, raise exceptions with `raise ... from err` or `raise ... from None` to distinguish them from errors in exception handling.  See https://docs.python.org/3/tutorial/errors.html#exception-chaining for details.",
       "source": "        raise ValidationError(_(\"Related object not found using the provided numeric ID: {id}\").format(id=pk))",
-      "context": "Module:body/FunctionDef:get_related_object_by_attrs:body/Try:handlers/ExceptHandler:Name(id='ObjectDoesNotExist', ctx=Load()):None:body",
+      "context": "Module:body/FunctionDef:get_related_object_by_attrs:body/Try#2:handlers/ExceptHandler:Name(id='ObjectDoesNotExist', ctx=Load()):None:body",
       "count": 1
     },
     {
@@ -20672,7 +20672,7 @@
       "code": "W291",
       "message": "trailing whitespace",
       "source": "                    data['table'] = table_class(list(data['queryset'][:10]), request=request) ",
-      "context": "Module:body/ClassDef:SearchView:body/FunctionDef:get:body/If:Name(id='query', ctx=Load()):body/For:Tuple(elts=[Name(id='model', ctx=Store()), Name(id='data', ctx=Store())], ctx=Store()):Call(func=Attribute(value=Name(id='results_data', ctx=Load()), attr='items', ctx=Load()), args=[], keywords=[]):body/If:Name(id='table_class', ctx=Load()):body",
+      "context": "Module:body/ClassDef:SearchView:body/FunctionDef:get:body/If:Name(id='query', ctx=Load())#2:body/For:Tuple(elts=[Name(id='model', ctx=Store()), Name(id='data', ctx=Store())], ctx=Store()):Call(func=Attribute(value=Name(id='results_data', ctx=Load()), attr='items', ctx=Load()), args=[], keywords=[]):body/If:Name(id='table_class', ctx=Load()):body",
       "count": 1
     },
     {
@@ -20680,7 +20680,7 @@
       "code": "W291",
       "message": "trailing whitespace",
       "source": "            results_data = search_backend.search(query, user=request.user, obj_types=obj_types, lookup=lookup) ",
-      "context": "Module:body/ClassDef:SearchView:body/FunctionDef:get:body/If:Name(id='query', ctx=Load()):body",
+      "context": "Module:body/ClassDef:SearchView:body/FunctionDef:get:body/If:Name(id='query', ctx=Load())#2:body",
       "count": 1
     },
     {
@@ -26496,7 +26496,7 @@
       "code": "B904",
       "message": "Within an `except` clause, raise exceptions with `raise ... from err` or `raise ... from None` to distinguish them from errors in exception handling.  See https://docs.python.org/3/tutorial/errors.html#exception-chaining for details.",
       "source": "            raise GraphQLError(",
-      "context": "Module:body/ClassDef:UpdateSubscriptionAssignment:body/FunctionDef:mutate:body/Try:handlers/ExceptHandler:Name(id='ValidationError', ctx=Load()):e:body",
+      "context": "Module:body/ClassDef:UpdateSubscriptionAssignment:body/FunctionDef:mutate:body/Try#2:handlers/ExceptHandler:Name(id='ValidationError', ctx=Load()):e:body",
       "count": 1
     },
     {
@@ -26512,7 +26512,7 @@
       "code": "B904",
       "message": "Within an `except` clause, raise exceptions with `raise ... from err` or `raise ... from None` to distinguish them from errors in exception handling.  See https://docs.python.org/3/tutorial/errors.html#exception-chaining for details.",
       "source": "            raise PermissionDenied(_(\"Permission denied.\"))",
-      "context": "Module:body/ClassDef:UpdateSubscriptionAssignment:body/FunctionDef:mutate:body/Try:handlers/ExceptHandler:Attribute(value=Name(id='SubscriptionAssignment', ctx=Load()), attr='DoesNotExist', ctx=Load()):None:body",
+      "context": "Module:body/ClassDef:UpdateSubscriptionAssignment:body/FunctionDef:mutate:body/Try#1:handlers/ExceptHandler:Attribute(value=Name(id='SubscriptionAssignment', ctx=Load()), attr='DoesNotExist', ctx=Load()):None:body",
       "count": 1
     },
     {
@@ -27424,7 +27424,7 @@
       "code": "E111",
       "message": "indentation is not a multiple of 4",
       "source": "                     self.fields['theme'].initial = initial_theme",
-      "context": "Module:body/ClassDef:UserPreferencesForm:body/FunctionDef:__init__:body/Try:body/If:BoolOp(op=And(), values=[Name(id='prefs', ctx=Load()), Attribute(value=Name(id='prefs', ctx=Load()), attr='data', ctx=Load())]):body/If:Compare(left=Name(id='initial_theme', ctx=Load()), ops=[In()], comparators=[Call(func=Name(id='dict', ctx=Load()), args=[Attribute(value=Name(id='UserPreference', ctx=Load()), attr='THEME_CHOICES', ctx=Load())], keywords=[])]):body",
+      "context": "Module:body/ClassDef:UserPreferencesForm:body/FunctionDef:__init__:body/Try#1:body/If:BoolOp(op=And(), values=[Name(id='prefs', ctx=Load()), Attribute(value=Name(id='prefs', ctx=Load()), attr='data', ctx=Load())]):body/If:Compare(left=Name(id='initial_theme', ctx=Load()), ops=[In()], comparators=[Call(func=Name(id='dict', ctx=Load()), args=[Attribute(value=Name(id='UserPreference', ctx=Load()), attr='THEME_CHOICES', ctx=Load())], keywords=[])]):body",
       "count": 1
     },
     {
@@ -27472,7 +27472,7 @@
       "code": "E114",
       "message": "indentation is not a multiple of 4 (comment)",
       "source": "                     # Fallback if stored pref is invalid",
-      "context": "Module:body/ClassDef:UserPreferencesForm:body/FunctionDef:__init__:body/Try:body/If:BoolOp(op=And(), values=[Name(id='prefs', ctx=Load()), Attribute(value=Name(id='prefs', ctx=Load()), attr='data', ctx=Load())]):body/If:Compare(left=Name(id='initial_theme', ctx=Load()), ops=[In()], comparators=[Call(func=Name(id='dict', ctx=Load()), args=[Attribute(value=Name(id='UserPreference', ctx=Load()), attr='THEME_CHOICES', ctx=Load())], keywords=[])]):self",
+      "context": "Module:body/ClassDef:UserPreferencesForm:body/FunctionDef:__init__:body/Try#1:body/If:BoolOp(op=And(), values=[Name(id='prefs', ctx=Load()), Attribute(value=Name(id='prefs', ctx=Load()), attr='data', ctx=Load())]):body/If:Compare(left=Name(id='initial_theme', ctx=Load()), ops=[In()], comparators=[Call(func=Name(id='dict', ctx=Load()), args=[Attribute(value=Name(id='UserPreference', ctx=Load()), attr='THEME_CHOICES', ctx=Load())], keywords=[])]):self",
       "count": 1
     },
     {
@@ -27496,7 +27496,7 @@
       "code": "E114",
       "message": "indentation is not a multiple of 4 (comment)",
       "source": "             # Use THEME_LIGHT as the default",
-      "context": "Module:body/ClassDef:UserPreferencesForm:body/FunctionDef:__init__:body/Try:self",
+      "context": "Module:body/ClassDef:UserPreferencesForm:body/FunctionDef:__init__:body/Try#1:self",
       "count": 1
     },
     {
@@ -27504,7 +27504,7 @@
       "code": "E116",
       "message": "unexpected indentation (comment)",
       "source": "             # Use THEME_LIGHT as the default",
-      "context": "Module:body/ClassDef:UserPreferencesForm:body/FunctionDef:__init__:body/Try:self",
+      "context": "Module:body/ClassDef:UserPreferencesForm:body/FunctionDef:__init__:body/Try#1:self",
       "count": 1
     },
     {
@@ -27512,7 +27512,7 @@
       "code": "E117",
       "message": "over-indented",
       "source": "                     self.fields['theme'].initial = initial_theme",
-      "context": "Module:body/ClassDef:UserPreferencesForm:body/FunctionDef:__init__:body/Try:body/If:BoolOp(op=And(), values=[Name(id='prefs', ctx=Load()), Attribute(value=Name(id='prefs', ctx=Load()), attr='data', ctx=Load())]):body/If:Compare(left=Name(id='initial_theme', ctx=Load()), ops=[In()], comparators=[Call(func=Name(id='dict', ctx=Load()), args=[Attribute(value=Name(id='UserPreference', ctx=Load()), attr='THEME_CHOICES', ctx=Load())], keywords=[])]):body",
+      "context": "Module:body/ClassDef:UserPreferencesForm:body/FunctionDef:__init__:body/Try#1:body/If:BoolOp(op=And(), values=[Name(id='prefs', ctx=Load()), Attribute(value=Name(id='prefs', ctx=Load()), attr='data', ctx=Load())]):body/If:Compare(left=Name(id='initial_theme', ctx=Load()), ops=[In()], comparators=[Call(func=Name(id='dict', ctx=Load()), args=[Attribute(value=Name(id='UserPreference', ctx=Load()), attr='THEME_CHOICES', ctx=Load())], keywords=[])]):body",
       "count": 1
     },
     {
@@ -27528,7 +27528,7 @@
       "code": "E117",
       "message": "over-indented (comment)",
       "source": "                     # Fallback if stored pref is invalid",
-      "context": "Module:body/ClassDef:UserPreferencesForm:body/FunctionDef:__init__:body/Try:body/If:BoolOp(op=And(), values=[Name(id='prefs', ctx=Load()), Attribute(value=Name(id='prefs', ctx=Load()), attr='data', ctx=Load())]):body/If:Compare(left=Name(id='initial_theme', ctx=Load()), ops=[In()], comparators=[Call(func=Name(id='dict', ctx=Load()), args=[Attribute(value=Name(id='UserPreference', ctx=Load()), attr='THEME_CHOICES', ctx=Load())], keywords=[])]):self",
+      "context": "Module:body/ClassDef:UserPreferencesForm:body/FunctionDef:__init__:body/Try#1:body/If:BoolOp(op=And(), values=[Name(id='prefs', ctx=Load()), Attribute(value=Name(id='prefs', ctx=Load()), attr='data', ctx=Load())]):body/If:Compare(left=Name(id='initial_theme', ctx=Load()), ops=[In()], comparators=[Call(func=Name(id='dict', ctx=Load()), args=[Attribute(value=Name(id='UserPreference', ctx=Load()), attr='THEME_CHOICES', ctx=Load())], keywords=[])]):self",
       "count": 1
     },
     {
@@ -27760,7 +27760,7 @@
       "code": "W293",
       "message": "blank line contains whitespace",
       "source": "                ",
-      "context": "Module:body/ClassDef:UserPreferencesForm:body/FunctionDef:__init__:body/Try:body/If:BoolOp(op=And(), values=[Name(id='prefs', ctx=Load()), Attribute(value=Name(id='prefs', ctx=Load()), attr='data', ctx=Load())]):self",
+      "context": "Module:body/ClassDef:UserPreferencesForm:body/FunctionDef:__init__:body/Try#1:body/If:BoolOp(op=And(), values=[Name(id='prefs', ctx=Load()), Attribute(value=Name(id='prefs', ctx=Load()), attr='data', ctx=Load())]):self",
       "count": 3
     },
     {
@@ -27768,7 +27768,7 @@
       "code": "W293",
       "message": "blank line contains whitespace",
       "source": "                ",
-      "context": "Module:body/ClassDef:UserPreferencesForm:body/FunctionDef:__init__:body/Try:self",
+      "context": "Module:body/ClassDef:UserPreferencesForm:body/FunctionDef:__init__:body/Try#1:self",
       "count": 1
     },
     {
@@ -27776,7 +27776,7 @@
       "code": "W293",
       "message": "blank line contains whitespace",
       "source": "                    ",
-      "context": "Module:body/ClassDef:UserPreferencesForm:body/FunctionDef:__init__:body/Try:body/If:BoolOp(op=And(), values=[Name(id='prefs', ctx=Load()), Attribute(value=Name(id='prefs', ctx=Load()), attr='data', ctx=Load())]):self",
+      "context": "Module:body/ClassDef:UserPreferencesForm:body/FunctionDef:__init__:body/Try#1:body/If:BoolOp(op=And(), values=[Name(id='prefs', ctx=Load()), Attribute(value=Name(id='prefs', ctx=Load()), attr='data', ctx=Load())]):self",
       "count": 1
     },
     {

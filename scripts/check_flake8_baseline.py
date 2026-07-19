@@ -46,13 +46,76 @@ REQUIRED_TOOL_VERSIONS = {
 }
 # Python 3.11 treats each f-string as one STRING token. Python 3.12 exposes the
 # inner operators/commas to pycodestyle. CI on canonical Python 3.12 enforces
-# every identity; supported Python 3.11 developer hooks may be short only by
-# these reviewed path/code counts. New identities are never exempted.
-PYTHON311_FSTRING_SHORTFALL = {
-    ("itambox/assets/tests/test_requests.py", "E226"): 4,
-    ("itambox/core/importers/snipeit.py", "E231"): 4,
-    ("itambox/core/reports/charts.py", "E226"): 2,
-}
+# every identity; supported Python 3.11 developer hooks may omit only these
+# seven exact reviewed identities (ten occurrences). New identities are never
+# exempted merely because they share a path or error code.
+PYTHON311_FSTRING_SHORTFALL = collections.Counter(
+    {
+        (
+            "itambox/assets/tests/test_requests.py",
+            "E226",
+            "missing whitespace around arithmetic operator",
+            "            'form-0-asset_tag': "
+            'f"{seq.prefix}{next_tag_val+2:0{seq.zero_padding}d}",',
+            "Module:body/ClassDef:RequisitionSystemTestCase:body/"
+            "FunctionDef:test_request_bulk_receive_workflow:body",
+        ): 1,
+        (
+            "itambox/assets/tests/test_requests.py",
+            "E226",
+            "missing whitespace around arithmetic operator",
+            "            'form-1-asset_tag': "
+            'f"{seq.prefix}{next_tag_val+1:0{seq.zero_padding}d}",',
+            "Module:body/ClassDef:RequisitionSystemTestCase:body/"
+            "FunctionDef:test_request_bulk_receive_workflow:body",
+        ): 1,
+        (
+            "itambox/assets/tests/test_requests.py",
+            "E226",
+            "missing whitespace around arithmetic operator",
+            "        self.assertContains(response, "
+            'f"{seq.prefix}{next_tag_val+1:0{seq.zero_padding}d}")',
+            "Module:body/ClassDef:RequisitionSystemTestCase:body/"
+            "FunctionDef:test_request_bulk_receive_workflow:body",
+        ): 1,
+        (
+            "itambox/assets/tests/test_requests.py",
+            "E226",
+            "missing whitespace around arithmetic operator",
+            "        self.assertEqual(req2.asset.asset_tag, "
+            'f"{seq.prefix}{next_tag_val+1:0{seq.zero_padding}d}")',
+            "Module:body/ClassDef:RequisitionSystemTestCase:body/"
+            "FunctionDef:test_request_bulk_receive_workflow:body",
+        ): 1,
+        (
+            "itambox/core/importers/snipeit.py",
+            "E231",
+            "missing whitespace after ','",
+            '            f"  {key}: {c.get(\'created\',0)} created, '
+            '{c.get(\'updated\',0)} updated, "',
+            "Module:body/ClassDef:SnipeITImporter:body/FunctionDef:_finish:body",
+        ): 2,
+        (
+            "itambox/core/importers/snipeit.py",
+            "E231",
+            "missing whitespace after ','",
+            '            f"{c.get(\'skipped\',0)} skipped, '
+            '{c.get(\'failed\',0)} failed"',
+            "Module:body/ClassDef:SnipeITImporter:body/FunctionDef:_finish:body",
+        ): 2,
+        (
+            "itambox/core/reports/charts.py",
+            "E226",
+            "missing whitespace around arithmetic operator",
+            '        pct_str = f"{(item[\'value\']/total)*100:.1f}%"',
+            "Module:body/FunctionDef:generate_doughnut_chart:body/"
+            "For:Tuple(elts=[Name(id='idx', ctx=Store()), "
+            "Name(id='item', ctx=Store())], ctx=Store()):"
+            "Call(func=Name(id='enumerate', ctx=Load()), "
+            "args=[Name(id='visible_items', ctx=Load())], keywords=[]):body",
+        ): 2,
+    }
+)
 
 
 def verify_toolchain():
@@ -240,19 +303,37 @@ def _parent_relations(syntax_tree):
     return parents
 
 
+def _context_label_with_sibling_ordinal(node, parents):
+    label = _context_label(node)
+    if label is None or node not in parents:
+        return label
+    parent, field = parents[node]
+    siblings = getattr(parent, field, None)
+    if not isinstance(siblings, list):
+        return label
+    equivalent = [
+        sibling
+        for sibling in siblings
+        if isinstance(sibling, ast.AST) and _context_label(sibling) == label
+    ]
+    if len(equivalent) < 2:
+        return label
+    return f"{label}#{equivalent.index(node) + 1}"
+
+
 def _source_context(syntax_tree, row, path):
     statement = _statement_for_row(syntax_tree, row, path)
     if statement is None:
         return "Module:body"
     parents = _parent_relations(syntax_tree)
     parts = []
-    statement_label = _context_label(statement)
+    statement_label = _context_label_with_sibling_ordinal(statement, parents)
     if statement_label is not None:
         parts.append(f"{statement_label}:self")
     child = statement
     while child in parents:
         parent, field = parents[child]
-        label = _context_label(parent)
+        label = _context_label_with_sibling_ordinal(parent, parents)
         if label is not None:
             parts.append(f"{label}:{field}")
         child = parent
@@ -342,6 +423,7 @@ def load_baseline(baseline_path, expected_policy_fingerprint):
         raise ValueError("baseline findings must be a list")
 
     baseline = collections.Counter()
+    ordered_identities = []
     required = {"path", "code", "message", "source", "context", "count"}
     for index, row in enumerate(rows):
         if not isinstance(row, dict) or set(row) != required:
@@ -361,6 +443,9 @@ def load_baseline(baseline_path, expected_policy_fingerprint):
         if values in baseline:
             raise ValueError(f"baseline finding {index} duplicates an identity")
         baseline[values] = count
+        ordered_identities.append(values)
+    if ordered_identities != sorted(ordered_identities):
+        raise ValueError("baseline findings must be sorted by identity")
     return baseline
 
 
@@ -391,7 +476,7 @@ def write_baseline(findings, baseline_path, policy_fingerprint):
 
 def validate_flake8_result(output, error_output, status, cwd):
     """Return parsed findings or a fail-closed process status."""
-    if error_output.strip():
+    if error_output:
         print(output)
         print(error_output, file=sys.stderr)
         print("flake8 wrote unexpected stderr; refusing to pass", file=sys.stderr)
@@ -427,11 +512,10 @@ def _apply_python311_shortfall(stale_entries):
     remaining = stale_entries.copy()
     budgets = PYTHON311_FSTRING_SHORTFALL.copy()
     for key in sorted(stale_entries):
-        path_code = key[:2]
-        allowed = min(remaining[key], budgets.get(path_code, 0))
+        allowed = min(remaining[key], budgets.get(key, 0))
         if allowed:
             remaining[key] -= allowed
-            budgets[path_code] -= allowed
+            budgets[key] -= allowed
             if remaining[key] == 0:
                 del remaining[key]
     return remaining
