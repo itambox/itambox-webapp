@@ -155,12 +155,10 @@ class MitigationsPhase3Tests(TestCase):
         # overhead: token + last_used, tenant, TenantGroup, the membership lookup,
         # additive RoleGrant resolution (grant + prefetched scopes), a bounded
         # own-tenant coverage lookup, and session read/write. Managed projection is
-        # skipped because this tenant is not managed by a provider. Three further
-        # bounded queries come from token revocation hardening (cf774f2): they
-        # re-validate that the authenticating token's tenant is still accessible
-        # (not revoked/deleted) for the lifetime of the request, on top of the
-        # RBAC baseline (a69cae7) this budget was originally authored against.
-        with self.assertNumQueries(22):
+        # skipped because this tenant is not managed by a provider. The all-accessible
+        # scope caching from #29 (82f1cf5) avoids the extra token revocation re-
+        # validation queries that were present in the pre-#29 baseline (cf774f2).
+        with self.assertNumQueries(18):
             response = self.client.post(
                 self.graphql_url,
                 data=json.dumps({'query': query}),
