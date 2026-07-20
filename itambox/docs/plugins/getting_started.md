@@ -2,7 +2,7 @@
 
 !!! warning "Status: Beta"
     The plugin system is under active development. APIs may change between minor releases.
-    Production use is supported but test your plugin against each ITAMbox upgrade before deploying.
+    There is no stable production compatibility contract yet. Pin both ITAMbox and plugin revisions, and test each combination in a non-production environment before deployment.
 
 ITAMbox features a powerful, extensible plugin system modeled after **NetBox**. This allows developers to extend the core functionality of ITAMbox without modifying the core codebase.
 
@@ -11,6 +11,7 @@ ITAMbox features a powerful, extensible plugin system modeled after **NetBox**. 
 ## What Can Plugins Do?
 
 Plugins can hook into several parts of the ITAMbox application:
+
 - **Custom Models**: Create database models with built-in auditing, tagging, and journaling.
 - **Web UI & API Endpoints**: Add custom views, routes, and REST API/GraphQL endpoints.
 - **Sidebar & Menus**: Inject items into the main sidebar menu.

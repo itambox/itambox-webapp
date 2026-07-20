@@ -6,12 +6,12 @@ We take the security of ITAMbox seriously. If you discover a vulnerability, plea
 
 ## Supported Versions
 
-ITAMbox has not yet reached a tagged release — the current version, `1.0.0-alpha1`, is still unreleased and under active development on `main` (see [CHANGELOG.md](CHANGELOG.md)). Until the first tag is cut, security fixes are only provided against `main`; this table will be updated to list supported release lines once `v1.0.0` is tagged.
+ITAMbox has not yet reached a tagged release. The current version metadata, `1.0.0-alpha1`, describes unreleased development on `main`; there is no supported release line or guaranteed remediation timeline yet. Reports against the current source are still welcome and help maintainers assess prerelease risk. See [CHANGELOG.md](CHANGELOG.md) for release status.
 
-| Version                 | Supported          |
-| ----------------------- | ------------------ |
-| `main` (`1.0.0-alpha1`) | :white_check_mark: |
-| Any tagged release      | none yet           |
+| Target | Status |
+|---|---|
+| `main` (`1.0.0-alpha1`) | Pre-release; reports accepted without a fix-time guarantee |
+| Tagged releases | None published |
 
 ---
 
@@ -21,9 +21,11 @@ ITAMbox has not yet reached a tagged release — the current version, `1.0.0-alp
 
 If you discover a security concern (e.g., credential exposure, multi-tenant bypass, symmetric decryption issues), report it privately:
 
-1.  Send a detailed email to: **security@itambox.dev** (subject prefix: `[ITAMbox Security]`)
-2.  Provide a clear description of the vulnerability, including:
-    *   Steps or proof-of-concept code to reproduce the issue.
-    *   The potential impact of the vulnerability.
-    *   The specific version of ITAMbox affected.
-3.  We will acknowledge receipt within 48 hours and work with you to coordinate a patched release before public disclosure.
+1. Email [security@itambox.dev](mailto:security@itambox.dev) with the subject prefix `[ITAMbox Security]`.
+2. Provide a clear description of the vulnerability, including:
+   - Steps or proof-of-concept code to reproduce the issue.
+   - The potential impact of the vulnerability.
+   - The specific version of ITAMbox affected.
+3. Maintainers will assess reproducibility, impact, and next steps as availability permits. Response and remediation times are not guaranteed during the prerelease period.
+
+Please avoid public disclosure while a report is being assessed. If a coordinated disclosure is feasible, the reporter and maintainers can agree on timing after the issue and remediation path are understood.

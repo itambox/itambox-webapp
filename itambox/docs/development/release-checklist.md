@@ -1,25 +1,27 @@
-# Release Checklist
+# Release checklist
 
-Use this checklist for every tagged release.
+Use this checklist when preparing a future tagged release. No tagged release or container-publishing workflow exists yet, so establish and review the release plan before creating the first tag.
 
 ## Pre-release
 
-- [ ] All tests pass: `pytest -q --no-cov`
+- [ ] The canonical gates under "Run the checks" in the repository-root `CONTRIBUTING.md` pass, including lint, smoke, full tests, and Playwright.
 - [ ] No open critical/security issues on the milestone
-- [ ] `docs/` is up to date for any new features
-- [ ] API schema regenerated: `python manage.py spectacular --file schema.yaml` (commit if changed)
-- [ ] Docs build clean: `cd itambox && mkdocs build --strict` (run from repo root; output goes to `static/docs/`)
+- [ ] Documentation and module-maturity labels match the tagged code.
+- [ ] If the REST API changed, generate and review its schema with `python itambox/manage.py spectacular --file schema.yaml` from the repository root.
+- [ ] Documentation builds cleanly with `mkdocs build -f itambox/mkdocs.yml --strict`.
+- [ ] A source-built production Compose smoke test passes from a clean checkout of the release candidate.
 
 ## Version bump
 
-- [ ] Update `itambox/release.py` → `VERSION = "X.Y.Z"`
-- [ ] `pyproject.toml` `version` field matches (update manually — no build tooling sync yet)
-- [ ] Verify `GET /api/status/` returns the new version
+- [ ] Update `itambox/itambox/release.py` to `VERSION = "X.Y.Z"`.
+- [ ] Update `pyproject.toml` metadata to the same version.
+- [ ] Search for the previous version and review every remaining occurrence before tagging.
 
 ## Changelog
 
 - [ ] Add `## [X.Y.Z] - YYYY-MM-DD` section to `CHANGELOG.md`
 - [ ] Fill in `Added`, `Changed`, `Fixed`, `Security` sub-sections from `git log` since last tag
+- [ ] Replace the `Unreleased` comparison link with the new tag range and verify all repository links.
 - [ ] Commit: `chore(release): bump version to X.Y.Z`
 
 ## Tag
@@ -29,16 +31,13 @@ git tag -a vX.Y.Z -m "Release vX.Y.Z"
 git push origin vX.Y.Z
 ```
 
-## Build & publish image
+## Distribution
 
-```bash
-docker build -t itambox:X.Y.Z -t itambox:latest .
-docker push itambox:X.Y.Z
-docker push itambox:latest
-```
+The repository does not currently publish a container image. Do not document `docker compose pull` or a registry image until a registry, immutable tag policy, provenance process, and publishing workflow are implemented and tested.
 
 ## Post-release
 
-- [ ] Refresh demo instance: `docker compose pull && docker compose exec app python manage.py migrate`
-- [ ] Create GitHub Release from the tag; paste CHANGELOG section as release notes
+- [ ] Create a GitHub Release from the tag and use the matching changelog section as release notes.
+- [ ] Verify the tag from a clean checkout with the documented source-build installation path.
+- [ ] Confirm that README, installation, upgrade, and security pages describe the newly published artifacts and support status accurately.
 - [ ] Close the milestone

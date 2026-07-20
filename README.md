@@ -1,169 +1,160 @@
 <p align="center">
-  <img src="https://raw.githubusercontent.com/tabler/tabler/master/src/assets/brand/tabler-logo.svg" alt="ITAMbox Logo" width="100" height="100">
+  <a href="https://itambox.dev">
+    <img src="assets/itambox-profile-banner.svg" alt="ITAMbox — Modern open source IT asset management" width="100%">
+  </a>
 </p>
 
 <h1 align="center">ITAMbox</h1>
 
 <p align="center">
-  <strong>IT Asset Management (ITAM) platform built on Django, Tabler, and HTMX</strong>
+  <strong>Self-hosted IT asset management for hardware, software, custody, procurement, and compliance.</strong>
 </p>
 
 <p align="center">
-  <a href="https://www.python.org/"><img src="https://img.shields.io/badge/python-3.11%20%7C%203.12-blue.svg" alt="Python"></a>
-  <a href="https://www.djangoproject.com/"><img src="https://img.shields.io/badge/django-5.2-green.svg" alt="Django"></a>
-  <a href="https://htmx.org/"><img src="https://img.shields.io/badge/frontend-HTMX-orange.svg" alt="HTMX"></a>
-  <a href="https://tabler.io/"><img src="https://img.shields.io/badge/styling-Tabler%20CSS-blueviolet.svg" alt="Tabler CSS"></a>
-  <a href="https://github.com/netbox-community/netbox"><img src="https://img.shields.io/badge/inspired%20by-NetBox-blue.svg" alt="Inspired by NetBox"></a>
-  <a href="https://opensource.org/licenses/Apache-2.0"><img src="https://img.shields.io/badge/license-Apache%202.0-red.svg" alt="License"></a>
+  <a href="https://itambox.dev">Website</a>
+  · <a href="itambox/docs/index.md">Documentation</a>
+  · <a href="CHANGELOG.md">Changelog</a>
+  · <a href="CONTRIBUTING.md">Contributing</a>
+  · <a href="SECURITY.md">Security</a>
 </p>
 
-ITAMbox is an IT asset management (ITAM) and tracking application. Inspired by the strict data modeling approach of **NetBox**, it is designed as a lightweight, customizable inventory tool for hardware, software licenses, maintenance history, and asset financials.
+<p align="center">
+  <a href="LICENSE"><img src="https://img.shields.io/badge/license-Apache--2.0-6f42c1.svg" alt="Apache-2.0 license"></a>
+  <img src="https://img.shields.io/badge/status-pre--release-d97706.svg" alt="Pre-release status">
+  <img src="https://img.shields.io/badge/python-3.11%2B-3776ab.svg" alt="Python 3.11 or newer">
+  <img src="https://img.shields.io/badge/database-PostgreSQL%2015%2B-4169e1.svg" alt="PostgreSQL 15 or newer">
+</p>
 
----
+ITAMbox gives internal IT teams and managed service providers one tenant-aware system for assets, stock, software, licenses, subscriptions, procurement, custody, and audits. REST/OpenAPI covers tenant-scoped application resources; the built-in GraphQL schema covers assets, software, licenses, inventory, and subscriptions, with extension points for plugins.
 
-## Key Features
+> [!IMPORTANT]
+> This repository is pre-release. `1.0.0-alpha1` is current version metadata, not a published tag or supported release line. APIs, migrations, routes, and configuration may change before the first release. Use a disposable environment for evaluation and do not assume upgrade or support guarantees until a release is tagged.
 
-*   **Dynamic Custom Fieldsets:** Add custom metadata fields (text, number, date, boolean, dropdowns) to specific `AssetTypes` on the fly. Data is stored in a `JSONField` on the `Asset` model, removing the need for database schema migrations.
-*   **Maintenance & TCO Ledger:** Logs support events, upgrades, and repair costs. Calculates asset downtime automatically and aggregates initial cost with maintenance records to compute a true Total Cost of Ownership (TCO).
-*   **Symmetric Encryption at Rest:** Protects software product keys and credentials in the database using standard `AES-256 Fernet` cryptography (keys derived from Django's `SECRET_KEY`). Includes a transparent fallback header (`enc$`) for backward-compatibility with plaintext values.
-*   **Valuation & Straight-Line Depreciation:** Computes real-time book value using purchase cost, customized lifespans, and salvage values, complete with visual progress metrics.
-*   **Onboarding Kits:** Group multiple hardware types, accessories, and software seats into pre-defined kits. Checkout runs inside an atomic transaction block, rolling back entirely if any kit item is out of stock.
-*   **Responsive HTMX-based UI:** Page navigation, search filters, and active tab lists update instantly without full page reloads, using simple HTML-swaps and Out-of-Band (OOB) triggers.
+## What ITAMbox covers
 
----
+| Area | Included workflows |
+|---|---|
+| Asset lifecycle | Hardware catalogues, assignments, check-in and check-out, reservations, warranties, maintenance, depreciation, disposal, and total cost tracking |
+| Inventory and stock | Accessories, consumables, components, kits, location-level stock, barcode and QR scanning, and bulk operations |
+| Software and licenses | Installed-software records, license-seat assignment, suppliers, cost centers, and software catalogue management |
+| Subscriptions and procurement — Beta | SaaS subscriptions, purchase orders and lines, contracts, fulfillment links, and asset-request workflows |
+| Governance | Tenant and tenant-group scoping, role-based access, delegated resource grants, custody receipts, audit campaigns, change history, retention, and recycle-bin workflows |
+| Customization | Custom fields, tags, imports and exports, labels, saved filters, attachments, and journals |
+| Reporting and automation — Beta | Dashboards, reports, alerts, notification channels, event rules, webhooks, and background jobs |
+| Identity and integrations | LDAP, SAML, OIDC, TOTP for privileged local accounts, Intune discovery, REST/OpenAPI, and scoped GraphQL; SCIM and plugins are Beta |
 
-## Tech Stack
+See [module maturity](itambox/docs/development/module-maturity.md) for the current Stable and Beta designations. SCIM is Beta: tenant endpoints provision Users and expose Groups read-only, while provider-scoped endpoints provision both Users and provider-owned Groups.
 
-*   **Backend:** Django 5.2, Python 3.11+, Django REST Framework (DRF)
-*   **Frontend:** Tabler CSS (Bootstrap 5), HTMX, django-htmx, django-template-partials
-*   **Database:** PostgreSQL 15+ (required for all environments)
-*   **Core Libraries:** django-tables2 (interactive grids), django-filter (filtering panels), django-crispy-forms (crispy form renderers), cryptography (symmetric AES-256)
+## Architecture
 
----
+- Django 5.2 on Python 3.11 or newer
+- PostgreSQL 15 or newer; SQLite is intentionally unsupported
+- Server-rendered Tabler UI with HTMX, TypeScript, and SCSS
+- Django REST Framework with OpenAPI, Swagger UI, and ReDoc
+- Graphene-Django for the scoped GraphQL schema
+- django-q2 workers using the PostgreSQL ORM broker; Valkey or Redis provides shared production cache, rate-limit state, and SAML replay protection
+- MkDocs for operator, integration, model, and developer documentation
 
-## System Architecture
+The generated [data-model documentation](itambox/docs/development/data-model.md) maps the domain models and their relationships. Start with [DEVELOPMENT.md](DEVELOPMENT.md) for implementation conventions and the accepted [tenancy, RBAC, and resource-sharing ADR](itambox/docs/development/adr-0001-tenancy-rbac-and-resource-sharing.md) for authorization boundaries.
 
-### Entity Relationship Diagram
+## Evaluate from source
 
-The full, generated relationship graph is maintained in the
-[data-model documentation](itambox/docs/development/data-model.md). It groups
-all concrete domain models by Django app and labels their direct ORM
-relationships.
-
-### HTMX Navigation
-
-ITAMbox uses a dual-template layout to achieve a fast interface without a complex JavaScript frontend framework:
-1.  **Full Request:** Renders the outer shell (`base.html`) containing the sidebar, top navigation, and dependencies.
-2.  **HTMX Request:** Dynamically swaps out the `#page-content-wrapper` block using a partial template (`base_htmx.html`), updating the active breadcrumbs, actions, tables, and tabs in a single roundtrip.
-3.  **Out-of-Band (OOB) Swaps:** Modifies peripheral elements like `<title>` tags and toast notifications on demand.
-
----
-
-## Getting Started
-
-### Evaluate with Docker Compose (demo data)
-
-To spin up the PostgreSQL database and application server with a full demo
-dataset (a managed-service provider, customer tenants, assets, licenses, …):
+The documented evaluation path uses development settings. It requires Python 3.11 or newer, Node.js 20, and PostgreSQL 15 or newer. Use a fresh database and a PostgreSQL role that can create test databases and install the `btree_gist` extension.
 
 ```bash
-# Clone the repository
 git clone https://github.com/itambox/itambox-webapp.git
 cd itambox-webapp
-
-# Optional: pin the admin password up front (otherwise a strong one is
-# generated and printed ONCE by the seed step below — capture it!)
-export DJANGO_SUPERUSER_PASSWORD=change-me
-
-# Build and start services
-docker compose up -d --build
-
-# Run database migrations
-docker compose exec app python manage.py migrate
-
-# Seed demo data (safe on a fresh database; re-seeding an existing
-# non-debug database clears domain data and therefore requires --force)
-docker compose exec app python manage.py seed_data
-```
-
-The app is now live at `http://localhost:8000`. Sign in as `admin` with the
-password printed by the seed step (or your `DJANGO_SUPERUSER_PASSWORD`), or
-explore the demo roles — e.g. MSP engineer `lars.eklund`, password
-`itambox2026`.
-
-### Production first run
-
-Production installs do **not** use demo data. After configuring `.env`
-(`ITAMBOX_SECRET_KEY`, `ITAMBOX_FIELD_ENCRYPTION_KEYS`,
-`ITAMBOX_CACHE_BACKEND=redis` for multi-worker deployments — see
-`.env.example`):
-
-```bash
-docker compose up -d --build
-docker compose exec app python manage.py migrate
-docker compose exec app python manage.py createsuperuser
-```
-
-### Local Virtualenv Setup
-
-1. **Set up PostgreSQL**: Ensure a PostgreSQL 15+ server is running locally (e.g., via Docker or system service).
-2. **Configure Environment**: Copy `.env.example` to `.env` and update the database connection variables (`ITAMBOX_DB_HOST`, `ITAMBOX_DB_PORT`, etc.).
-
-```bash
-# Set up virtual environment (from the repository root)
 python -m venv .venv
-source .venv/bin/activate  # On Windows Git Bash: source .venv/Scripts/activate; PowerShell: .\.venv\Scripts\Activate.ps1
-
-# Install dependencies for contributing (tests + lint + runtime, from repo root)
-pip install -r requirements-dev.txt
-
-# Run migrations and seed data
-cd itambox
-python manage.py migrate
-python manage.py seed_data
-
-# Start local server in debug mode
-ITAMBOX_DEBUG=true python manage.py runserver
-
-# App is now live at http://127.0.0.1:8000
+source .venv/bin/activate               # Windows Git Bash: source .venv/Scripts/activate
+python -m pip install -r requirements-dev.txt
+cp .env.example .env                    # PowerShell: Copy-Item .env.example .env
 ```
 
-Runtime-only installs (e.g. building a production image) should use
-`itambox/requirements.txt` instead — `requirements-dev.txt` (repository root)
-is the canonical superset for contributors and CI, and also underlies the
-`make setup` target in the [Makefile](Makefile). The `Makefile` targets
-require Git Bash or WSL, plus GNU Make installed separately on Windows.
-
-**Native Windows development:** the app, migrations, seed data, and the test
-suite all run under a native Windows Python install. `django-auth-ldap` is
-skipped there (no Windows wheel for its `python-ldap` dependency) —
-`core/auth/ldap.py` falls back to a disabled LDAP backend, so local LDAP
-integration isn't available. Use Docker, Linux, or WSL if you need to work on
-LDAP. `python-magic` is excluded via PEP 508 marker on native Windows (import
-can hang indefinitely); `core/validators.py` falls back to extension checks
-and Pillow. Docker/Linux/WSL retain full libmagic signature validation.
-Production always runs in Docker/Linux with the full dependency set.
-
----
-
-## Running Tests
-
-Automated unit and integration tests cover model signals, validation constraints, FilterSets, and CRUD APIs. The suite uses `pytest` (pytest-django) and runs from the `itambox/` directory. Tests require a running PostgreSQL instance on port `5433` (the project uses a disposable Postgres container for local testing; SQLite is rejected by settings):
+Set `ITAMBOX_ENV=dev` and the `ITAMBOX_DB_*` values in `.env`, then build the frontend and initialize the application:
 
 ```bash
 cd itambox
-
-# Run all tests
-pytest
-
-# Test specific applications
-pytest assets/tests/
-pytest subscriptions/tests/
-pytest core/tests/
+npm ci
+npm run build:all
+python manage.py migrate
+python manage.py seed_data --skip-drop
+python manage.py runserver
 ```
 
----
+Open <http://127.0.0.1:8000> and sign in as `lars.eklund` with the demo password `itambox2026`. The seed contains public credentials and sample organizations; keep it local and use it only with a disposable evaluation database. `--skip-drop` prevents the command from clearing existing records, but it still creates and updates demo data.
+
+See [CONTRIBUTING.md](CONTRIBUTING.md) for platform-specific activation commands, database setup, test prerequisites, and the complete quality gates.
+
+## Production deployment with Docker Compose
+
+The included Compose stack builds the application and worker from source and runs them with PostgreSQL 16 and Valkey 8. It enforces production settings and expects HTTPS termination at a reverse proxy; direct browser access to the published HTTP port is not a supported deployment path.
+
+```bash
+cp .env.example .env
+# Configure production secrets, database credentials, hosts, CSRF origins,
+# SMTP, and the external HTTPS URL before continuing.
+
+docker compose build
+docker compose run --rm app python manage.py migrate
+docker compose run --rm app python manage.py createsuperuser
+```
+
+Configure the reverse proxy, TLS, and port restriction before starting the long-running services, then start the stack:
+
+```bash
+docker compose up -d
+```
+
+Back up PostgreSQL, uploaded media, `ITAMBOX_SECRET_KEY`, `ITAMBOX_FIELD_ENCRYPTION_KEYS`, and `ITAMBOX_API_TOKEN_PEPPERS` together. Follow the [installation guide](itambox/docs/operations/installation.md), [backup and restore guide](itambox/docs/operations/backup-restore.md), and [upgrade guide](itambox/docs/operations/upgrades.md).
+
+> [!NOTE]
+> ITAMbox does not publish a Python package or prebuilt container image. `pyproject.toml` supplies project metadata only; the documented install paths use the repository's source checkout or a locally built Docker image.
+
+## Development and verification
+
+The canonical contributor environment uses Python 3.12 in CI, PostgreSQL 16, and Node.js 20. Typical full gates are:
+
+```bash
+# Repository root
+pre-commit run --all-files
+python scripts/check_flake8_baseline.py
+
+# itambox/
+python manage.py makemigrations --check --dry-run
+python manage.py check
+pytest --cov=. --cov-report=term --cov-fail-under=45
+npm ci
+npm run build:all
+npm run typecheck
+npx eslint static/src
+```
+
+The full pytest suite is not xdist-safe; run it serially. [CONTRIBUTING.md](CONTRIBUTING.md) documents change-specific checks, Playwright prerequisites, and the isolated production smoke test.
+
+## Documentation
+
+The repository includes operator, integration, model, plugin, and development guides under [`itambox/docs/`](itambox/docs/index.md). MkDocs is installed separately from the application development requirements:
+
+```bash
+python -m pip install mkdocs mkdocs-material
+cd itambox
+mkdocs serve
+```
+
+Useful starting points:
+
+- [Installation](itambox/docs/operations/installation.md)
+- [Backup and restore](itambox/docs/operations/backup-restore.md)
+- [Upgrades](itambox/docs/operations/upgrades.md)
+- [Bulk import](itambox/docs/integration/bulk_import_guide.md)
+- [SCIM provisioning](itambox/docs/integration/scim.md)
+- [REST and GraphQL integration](itambox/docs/integration/developer_guide.md)
+- [Plugin development](itambox/docs/plugins/getting_started.md)
+
+## Security
+
+Do not report vulnerabilities in a public issue. Follow [SECURITY.md](SECURITY.md) and contact [security@itambox.dev](mailto:security@itambox.dev) privately.
 
 ## License
 
-This project is licensed under the Apache License 2.0.
+ITAMbox is licensed under the [Apache License 2.0](LICENSE). Third-party attribution is recorded in [NOTICE](NOTICE).
