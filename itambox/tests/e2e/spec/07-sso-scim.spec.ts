@@ -150,7 +150,12 @@ test.describe('SSO and SCIM 2.0 Provisioning Specs', () => {
       await page.fill('input[name="username"]', requiredEnv('E2E_USERNAME'));
       await page.fill('input[name="password"]', requiredEnv('E2E_PASSWORD'));
       await Promise.all([
-        page.waitForNavigation({ waitUntil: 'networkidle' }),
+        // Wait for the post-login document 'load' rather than 'networkidle':
+        // the authenticated dashboard registers a service worker and lazy-loads
+        // HTMX panels, so the network never goes idle and 'networkidle' hangs
+        // until the test timeout. 'load' is deterministic and sufficient — the
+        // session cookie is set by the login redirect before the page loads.
+        page.waitForNavigation({ waitUntil: 'load' }),
         page.click('button[type="submit"]'),
       ]);
 
