@@ -26,8 +26,8 @@ Asset Box utilizes a strict state-governed workflow managed via **Status Labels*
 | Field | Description | Type | Required |
 | --- | --- | --- | --- |
 | **Asset Role** | The functional category of the asset (e.g. `Developer Laptop`). | Foreign Key | No |
-| **Asset Tag** | A unique barcode tag (e.g. `ASSET-000102`). Auto-generated if left blank. | String | Yes |
-| **Asset Type** | The model template from the Catalog (Manufacturer + Model details). | Foreign Key | Yes |
+| **Asset Tag** | A unique barcode tag (e.g. `ASSET-000102`). Auto-generated from the tag sequence if left blank. | String | No |
+| **Asset Type** | The model template from the Catalog (Manufacturer + Model details). May be blank for assets created before the type catalog is ready. | Foreign Key | No |
 | **Cost Center** | The cost center of the asset. | Foreign Key | No |
 | **Currency** | ISO 4217 code. Leave blank to use the tenant default currency. | Choice | No |
 | **Current Book Value** | Materialized current financial value computed via straight-line depreciation. | Decimal | No (Auto) |
@@ -45,10 +45,10 @@ Asset Box utilizes a strict state-governed workflow managed via **Status Labels*
 | **Purchase Cost** | The total cost of acquisition. | Decimal | No |
 | **Purchase Date** | The date the asset was purchased. | Date | No |
 | **Purchase Order Line** | The purchase order line of the asset. | Foreign Key | No |
-| **Requestable** | Toggle allowing end-users to request this asset via self-service. | Boolean | Yes |
+| **Requestable** | Toggle allowing end-users to request this asset via self-service. Defaults to enabled. | Boolean | No |
 | **Salvage Value** | Estimated value at the end of its useful lifespan. | Decimal | No |
 | **Serial Number** | The manufacturer's unique hardware serial number. | String | No |
-| **Status** | The current operational Status Label. | Foreign Key | Yes |
+| **Status** | The current operational Status Label. Falls back to the default status label when not set explicitly. | Foreign Key | No |
 | **Supplier** | The vendor or supplier from whom the asset was purchased. | Foreign Key | No |
 | **Tenant** | Cost center department owning the asset. | Foreign Key | No |
 

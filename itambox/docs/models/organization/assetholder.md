@@ -13,7 +13,7 @@ An **Asset Holder** represents a logical or physical recipient eligible to recei
 | **Last Name** | The last name of the holder. | String | Yes |
 | **Tenant** | Optional department/tenant this holder is associated with for cost tracking. | Foreign Key | No |
 | **Upn** | The user principal name of the asset holder. | String | Yes |
-| **User** | Optional one-to-one link to a Django user authentication profile. | OneToOne | No |
+| **User** | Optional link to a Django user authentication profile. A user may be linked to multiple AssetHolders. | ForeignKey | No |
 
 ## Property Properties
 

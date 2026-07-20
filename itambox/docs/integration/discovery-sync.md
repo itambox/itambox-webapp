@@ -29,24 +29,24 @@ slug**:
 ```json
 {
   "acme": {
-    "azure_tenant_id": "<Directory tenant ID from Azure>",
-    "client_id":       "<Application client ID from Azure>",
-    "client_secret":   "<Client secret value>",
-    "create_missing":  true,
-    "default_status":  "deployable",
-    "sync_software":   true
+    "TENANT_ID":      "<Directory tenant ID from Azure>",
+    "CLIENT_ID":      "<Application client ID from Azure>",
+    "CLIENT_SECRET":  "<Client secret value>",
+    "CREATE_MISSING": true,
+    "DEFAULT_STATUS": "deployable",
+    "SYNC_SOFTWARE":  true
   }
 }
 ```
 
 | Key | Type | Default | Purpose |
 |-----|------|---------|---------|
-| `azure_tenant_id` | string | required | Azure Directory (tenant) ID |
-| `client_id` | string | required | Azure Application (client) ID |
-| `client_secret` | string | required | Azure client secret value |
-| `create_missing` | bool | `false` | Create an Asset for every device not already in ITAMbox |
-| `default_status` | string | `"deployable"` | StatusLabel slug assigned to auto-created assets |
-| `sync_software` | bool | `true` | Upsert InstalledSoftware records from detected apps |
+| `TENANT_ID` | string | required | Azure Directory (tenant) ID |
+| `CLIENT_ID` | string | required | Azure Application (client) ID |
+| `CLIENT_SECRET` | string | required | Azure client secret value |
+| `CREATE_MISSING` | bool | `false` | Create an Asset for every device not already in ITAMbox |
+| `DEFAULT_STATUS` | string | `"deployable"` | StatusLabel slug assigned to auto-created assets |
+| `SYNC_SOFTWARE` | bool | `true` | Upsert InstalledSoftware records from detected apps |
 
 Secrets stay in the environment — never store them in the database.
 

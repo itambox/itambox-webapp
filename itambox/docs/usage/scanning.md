@@ -8,7 +8,7 @@ ITAMbox supports barcode and QR-code scanning in two modes: a **hardware scanner
 
 Most USB / Bluetooth HID barcode scanners emulate a keyboard. To use one:
 
-1. Open any asset audit session or the **Find by Scan** view (`/scan/`).
+1. Open any asset audit session or the **Find by Scan** view (`/scan/resolve/`).
 2. Click inside the scan input field so it has keyboard focus.
 3. Configure your scanner to append **Enter** (newline) after each scan.
 4. Scan the barcode — ITAMbox reads the input and resolves it automatically.
@@ -35,7 +35,7 @@ ITAMbox can activate your device camera to scan barcodes and QR codes without a 
 
 To scan with the camera:
 
-1. Open an audit session detail page or the **Find by Scan** view.
+1. Open an audit session detail page or the **Find by Scan** view (`/scan/resolve/`).
 2. Tap **Scan with Camera** (the camera icon in the action bar).
 3. Grant camera permission when prompted.
 4. Point the camera at a barcode or QR code — ITAMbox decodes it automatically and resolves the asset.

@@ -1,6 +1,6 @@
 # Custody Templates
 
-A **Custody Template** defines the terms of service, End User License Agreements (EULAs), disclaimer statements, and digital signature requirements when checking out assets to holders (users). 
+A **Custody Template** defines the terms of service, End User License Agreements (EULAs), disclaimer statements, and digital signature requirements when checking out assets to holders (users).
 
 Custody Templates can be scoped globally, to specific Tenant Groups (e.g. parent conglomerate scope), or to individual Tenants (e.g. division-specific scope). Additionally, a template can be restricted to override terms for a specific asset **Category** (e.g., restricting a strict EULA to Category: `High-Risk Production Laptops` within Tenant: `R&D`).
 

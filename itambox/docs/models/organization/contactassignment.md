@@ -12,4 +12,3 @@ A **Contact Assignment** maps a `Contact` to a target database object (such as a
 | **Object ID** | The unique primary key of the target object. | Integer | Yes |
 | **Priority** | Priority level: `Primary`, `Secondary`, `Tertiary`, `Inactive`. | Choice | No |
 | **Role** | The functional role of the contact for this assignment (e.g. `Emergency Contact`). | Foreign Key | Yes |
-

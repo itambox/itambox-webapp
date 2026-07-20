@@ -13,4 +13,3 @@ A **Contact** represents a real-world individual or external organization associ
 | **Phone** | Primary telephone number. | String | No |
 | **Title** | The job title or function of the contact. | String | No |
 | **Web URL** | Website page link. | URL | No |
-
