@@ -3,6 +3,7 @@ __pycache__/
 *.pyc
 *.pyo
 *.pyd
+.pytest_cache/
 
 # Virtual environment
 .venv/
@@ -82,4 +83,4 @@ itambox/static/docs/
 
 # Claude Code local config + agent worktrees (personal settings, transient worktrees)
 .claude/
-
+.hermes/
