@@ -213,6 +213,10 @@ class MembershipBackend:
         group_tenants = self._group_scope_tenants(user_obj)
         if group_tenants is None:
             return frozenset()
+        # Precompute tenant→perms map so _effective_perms_for_tenant short-circuits
+        # to a dict lookup instead of iterating all grants per tenant (fix #3 for #56).
+        from organization.rbac import build_accessible_tenant_permissions_map
+        build_accessible_tenant_permissions_map(user_obj)
         all_perms = set()
         for tenant in group_tenants:
             all_perms.update(self._effective_perms_for_tenant(user_obj, tenant))
