@@ -209,6 +209,11 @@ class TenantMiddleware:
         return False, False
 
     def process_request(self, request):
+        # Reset the per-request descendant-group-ids cache so a reused WSGI
+        # worker thread can never serve stale results from a prior request.
+        from organization.access import _descendant_group_ids_cache
+        _descendant_group_ids_cache.set(None)
+
         # Snapshot the context active on entry so process_response can restore it
         # rather than clobbering it to None (the setters also clear the descendant
         # cache, so restore goes through them too).

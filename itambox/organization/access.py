@@ -1,10 +1,28 @@
 """Canonical tenant, RBAC, and explicitly shared-resource access helpers."""
+import contextvars
+
 from django.utils import timezone
+
+
+# Request-local memo for the recursive descendant walk below. Each request runs
+# in its own context, so the cache lives for the request lifetime and is
+# discarded when the context ends. Keyed by (group_id, live_only).
+_descendant_group_ids_cache = contextvars.ContextVar(
+    'descendant_tenant_group_ids_cache',
+    default=None,
+)
 
 
 def get_descendant_tenant_group_ids(group_id, live_only=False):
     if group_id is None:
         return set()
+    cache = _descendant_group_ids_cache.get()
+    if cache is None:
+        cache = {}
+        _descendant_group_ids_cache.set(cache)
+    cache_key = (group_id, live_only)
+    if cache_key in cache:
+        return cache[cache_key]
     # inline import: avoids organization model import during app initialization.
     from organization.models import TenantGroup
 
@@ -12,7 +30,8 @@ def get_descendant_tenant_group_ids(group_id, live_only=False):
         pk=group_id,
         deleted_at__isnull=True,
     ).exists():
-        return set()
+        cache[cache_key] = set()
+        return cache[cache_key]
 
     ids = {group_id}
     frontier = [group_id]
@@ -27,6 +46,7 @@ def get_descendant_tenant_group_ids(group_id, live_only=False):
             break
         ids.update(children)
         frontier = children
+    cache[cache_key] = ids
     return ids
 
 
