@@ -1,0 +1,113 @@
+name: Self-hosted runner validation
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: runner-validation-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  isolation:
+    runs-on: [self-hosted, Linux, ARM64, itambox-ci]
+    timeout-minutes: 10
+    steps:
+      - name: Verify rootless execution boundary
+        run: |
+          set -Eeuo pipefail
+          docker info --format '{{json .SecurityOptions}}' | grep -q 'name=rootless'
+          test ! -e /srv/itambox
+          test ! -e /etc/itambox
+          # The rootless gateway must expose no HTTP service. The production
+          # bridge must remain unreachable; the root-owned live verifier proves
+          # that denial separately with the host nftables counter.
+          for target in \
+            http://127.0.0.1:9120 \
+            http://127.0.0.1:9130 \
+            http://169.254.169.254 \
+            http://172.18.0.1 \
+            http://172.19.0.1 \
+            http://152.53.19.147:22; do
+            if curl --silent --show-error --max-time 2 "${target}" >/dev/null 2>&1; then
+              echo "unexpected access to ${target}" >&2
+              exit 1
+            fi
+          done
+          curl --fail --silent --show-error --max-time 15 https://api.github.com/zen >/dev/null
+          echo "runner isolation boundary: PASS"
+
+  lint:
+    needs: isolation
+    runs-on: [self-hosted, Linux, ARM64, itambox-ci]
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
+
+      - name: Set up Python
+        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Install flake8
+        run: |
+          python -m pip install --upgrade pip
+          pip install \
+            "flake8==7.0.0" \
+            "flake8-bugbear==24.12.12" \
+            "mccabe==0.7.0" \
+            "pycodestyle==2.11.1" \
+            "pyflakes==3.2.0"
+
+      - name: Lint with flake8
+        run: python scripts/check_flake8_baseline.py
+
+  docs:
+    needs: lint
+    runs-on: [self-hosted, Linux, ARM64, itambox-ci]
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
+
+      - name: Set up Python
+        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Install mkdocs
+        run: |
+          python -m pip install --upgrade pip
+          pip install "mkdocs>=1.6.1,<2.0" "mkdocs-material>=9.5"
+
+      - name: Build docs
+        working-directory: ./itambox
+        run: mkdocs build --strict
+
+  frontend:
+    needs: docs
+    runs-on: [self-hosted, Linux, ARM64, itambox-ci]
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
+
+      - name: Set up Node.js 20
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
+        with:
+          node-version: "20"
+          cache: npm
+          cache-dependency-path: itambox/package-lock.json
+
+      - name: Install dependencies
+        working-directory: ./itambox
+        run: npm ci
+
+      - name: Build and check frontend
+        working-directory: ./itambox
+        run: |
+          npm run build:all
+          npx tsc --noEmit
+          npx eslint static/src
