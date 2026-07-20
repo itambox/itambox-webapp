@@ -39,7 +39,10 @@ COPY itambox/ .
 # Bring in the compiled frontend from the node stage.
 COPY --from=frontend /app/static/dist ./static/dist
 
-# Collect static assets at build time. collectstatic needs neither a database
+# Build MkDocs documentation into static/docs so collectstatic picks it up.
+RUN python -m mkdocs build
+
+# Collect static assets at build time.
 # nor real secrets; pass a throwaway key so the prod SECRET_KEY guard does not
 # trip during the build.
 RUN ITAMBOX_SECRET_KEY=build-time-collectstatic-only-not-a-real-secret \
