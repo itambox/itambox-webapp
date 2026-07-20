@@ -198,6 +198,28 @@ class MembershipBackend:
         return self._ambient_tenant(user_obj)
 
     # ------------------------------------------------------------------ public API
+    def _all_accessible_permissions(self, user_obj):
+        """Union of all permissions across all accessible tenants.
+
+        Memoized on the user under ``_all_accessible_perms`` so ambient
+        ``has_perm`` / ``has_module_perms`` checks under the all-accessible
+        scope become single set lookups instead of iterating every tenant
+        on every call (fix #2 for issue #56).
+        """
+        synchronize_authorization_cache(user_obj)
+        cached = user_obj.__dict__.get('_all_accessible_perms')
+        if cached is not None:
+            return cached
+        group_tenants = self._group_scope_tenants(user_obj)
+        if group_tenants is None:
+            return frozenset()
+        all_perms = set()
+        for tenant in group_tenants:
+            all_perms.update(self._effective_perms_for_tenant(user_obj, tenant))
+        result = frozenset(all_perms)
+        user_obj.__dict__['_all_accessible_perms'] = result
+        return result
+
     @staticmethod
     def _aggregate_scope_allows_ambient_permission(perm):
         """The member-only all-accessible scope is an aggregate read view.
@@ -234,6 +256,8 @@ class MembershipBackend:
             # first-membership fallback would stomp the group context mid-request.
             group_tenants = self._group_scope_tenants(user_obj)
             if group_tenants is not None:
+                if get_current_all_accessible():
+                    return perm in self._all_accessible_permissions(user_obj)
                 return any(
                     perm in self._effective_perms_for_tenant(user_obj, tenant)
                     for tenant in group_tenants
@@ -254,6 +278,13 @@ class MembershipBackend:
         # Same group-union semantics as the ambient has_perm gate above.
         group_tenants = self._group_scope_tenants(user_obj)
         if group_tenants is not None:
+            if get_current_all_accessible():
+                all_perms = self._all_accessible_permissions(user_obj)
+                return any(
+                    p.startswith(prefix)
+                    and self._aggregate_scope_allows_ambient_permission(p)
+                    for p in all_perms
+                )
             return any(
                 p.startswith(prefix)
                 and (
