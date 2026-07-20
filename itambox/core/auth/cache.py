@@ -19,6 +19,9 @@ _LOCAL_CACHE_PREFIXES = (
     '_all_accessible_group_ids',
     '_accessible_tenant_ids',
     '_applicable_grants',
+    '_authorization_synced',
+    '_all_accessible_perms',
+    '_tenant_permissions_map',
 )
 
 
@@ -98,6 +101,8 @@ def invalidate_authorization_topology(*, using=None):
 
 def synchronize_authorization_cache(user):
     """Clear local values when another model instance/process changed RBAC."""
+    if hasattr(user, '__dict__') and user.__dict__.get('_authorization_synced'):
+        return
     try:
         keys = (_cache_key(user.pk), _TOPOLOGY_CACHE_KEY)
         versions = cache.get_many(keys)
@@ -110,3 +115,5 @@ def synchronize_authorization_cache(user):
     if getattr(user, _LOCAL_VERSION_ATTR, object()) != version:
         clear_local_authorization_cache(user)
         setattr(user, _LOCAL_VERSION_ATTR, version)
+    if hasattr(user, '__dict__'):
+        user.__dict__['_authorization_synced'] = True
