@@ -7,7 +7,7 @@
  * with `node preflight-check.mjs` for a standalone prerequisite report.
  *
  * Checks:
- *   1. E2E_USERNAME / E2E_PASSWORD are set
+ *   1. E2E_USERNAME / E2E_PASSWORD / E2E_TENANT_SLUG / E2E_SCIM_TOKEN are set
  *   2. Python virtual environment exists
  *   3. Django system checks pass
  *   4. Database migrations are applied
@@ -69,6 +69,18 @@ if (process.env.E2E_PASSWORD) {
   ok('E2E_PASSWORD is set');
 } else {
   fail('E2E_PASSWORD is not set');
+}
+
+if (process.env.E2E_TENANT_SLUG) {
+  ok(`E2E_TENANT_SLUG = ${process.env.E2E_TENANT_SLUG}`);
+} else {
+  fail('E2E_TENANT_SLUG is not set');
+}
+
+if (process.env.E2E_SCIM_TOKEN) {
+  ok('E2E_SCIM_TOKEN is set');
+} else {
+  fail('E2E_SCIM_TOKEN is not set');
 }
 
 // ── Check 2: virtual environment ────────────────────────────────────────────
@@ -141,6 +153,8 @@ if (errors === 0) {
   console.error('Quick start:');
   console.error('  export E2E_USERNAME=admin');
   console.error('  export E2E_PASSWORD=admin123');
+  console.error('  export E2E_TENANT_SLUG=northwind-internal-it');
+  console.error('  export E2E_SCIM_TOKEN=<tenant-scoped-write-token>');
   console.error('  make seed          # ensure seed data exists');
   console.error('  make migrate       # ensure migrations are applied');
   console.error('  cd itambox/tests/e2e && npm test\n');
