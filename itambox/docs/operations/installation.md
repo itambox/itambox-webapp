@@ -1,99 +1,87 @@
 # Installation
 
-This guide covers the recommended Docker Compose installation path. A bare-metal install (virtualenv + system Postgres) follows the same steps without the `docker compose` wrappers.
+This guide covers the source-built Docker Compose production stack. For a disposable evaluation with development settings and demo data, use "Evaluate from source" in the repository-root `README.md` instead.
+
+ITAMbox has no published container image or tagged release yet. Pin every deployment to a reviewed commit; do not deploy a moving branch without reviewing its migrations and changelog.
 
 ## Prerequisites
 
-| Requirement | Minimum |
-|---|---|
-| Docker | 24+ with Compose v2 |
-| Disk | 2 GB free (app + DB volumes) |
-| RAM | 1 GB (2 GB recommended for the worker) |
+- Docker Engine 24 or newer with Docker Compose v2.24.4 or newer
+- A DNS name and TLS-capable reverse proxy or ingress
+- Durable storage for PostgreSQL and uploaded media
+- A secrets manager or encrypted backup location
 
-## 1. Clone and configure
+## 1. Clone and pin the source
 
 ```bash
 git clone https://github.com/itambox/itambox-webapp.git
 cd itambox-webapp
+DEPLOY_REVISION='full-reviewed-commit-sha'
+git checkout --detach "$DEPLOY_REVISION"
 cp .env.example .env
 ```
 
-Edit `.env` and fill in every value marked **REQUIRED**. See the full variable reference below.
+## 2. Configure production values
 
-## 2. Environment variables
+The Compose file forces `ITAMBOX_ENV=prod` for the application and worker. Edit `.env` before building:
 
-All settings are loaded from a `.env` file at the repo root (or one directory above). The loader is a hand-rolled parser — no `python-dotenv` required.
+| Variable | Production requirement |
+|---|---|
+| `ITAMBOX_SECRET_KEY` | Long random Django secret; production refuses the development fallback |
+| `ITAMBOX_FIELD_ENCRYPTION_KEYS` | Dedicated comma-separated Fernet keyring; the first key encrypts and all listed keys decrypt |
+| `ITAMBOX_API_TOKEN_PEPPERS` | JSON object mapping numeric rotation IDs to dedicated secrets of at least 50 characters |
+| `ITAMBOX_DB_NAME`, `ITAMBOX_DB_USER`, `ITAMBOX_DB_PASSWORD` | PostgreSQL database credentials |
+| `ITAMBOX_ALLOWED_HOSTS` | External host names plus `127.0.0.1` for the container health probe |
+| `ITAMBOX_CSRF_TRUSTED_ORIGINS` | Scheme-qualified external HTTPS origins |
+| `ITAMBOX_EMAIL_*` | Working SMTP settings for resets, alerts, and reports |
 
-| Variable | Purpose | Default / Notes |
-|---|---|---|
-| `ITAMBOX_ENV` | Runtime mode: `dev` or `prod` | Fails closed to `prod` when unset |
-| `ITAMBOX_SECRET_KEY` | **REQUIRED in prod.** Django secret key — keep it secret, never commit it. | Insecure dev default if unset (emits warning) |
-| `ITAMBOX_DB_NAME` | PostgreSQL database name | `itambox` |
-| `ITAMBOX_DB_USER` | PostgreSQL user | `itambox` |
-| `ITAMBOX_DB_PASSWORD` | **REQUIRED in prod.** PostgreSQL password | — |
-| `ITAMBOX_DB_HOST` | PostgreSQL host | `localhost` |
-| `ITAMBOX_DB_PORT` | PostgreSQL port | `5432` |
-| `ITAMBOX_CACHE_BACKEND` | Cache backend: `locmem` or `redis` (Redis wire protocol; run **Valkey**, the BSD-licensed fork) | `locmem` |
-| `ITAMBOX_REDIS_URL` | Valkey/Redis connection string (`redis://` protocol; used when cache=redis) | `redis://127.0.0.1:6379/1` |
-| `RATELIMIT_CACHE` | Django cache alias used for rate limiting | `default` |
-| `ITAMBOX_TENANT_LDAP_CONFIGS` | JSON object of per-tenant LDAP configs (advanced) | `{}` |
-| `ITAMBOX_TENANT_SAML_CONFIGS` | JSON object of per-tenant SAML configs (advanced) | `{}` |
-| `ITAMBOX_TENANT_OIDC_CONFIGS` | JSON object of per-tenant OIDC configs (advanced) | `{}` |
-
-!!! warning "Secret key critical"
-    ITAMbox encrypts sensitive values (e.g. SMTP passwords) using a Fernet key derived from `ITAMBOX_SECRET_KEY`. **Losing or rotating the secret key will permanently brick all encrypted data.** Back up `.env` alongside your database dump — they are a unit.
-
-## 3. Start services
+Generate independent values rather than reusing one secret:
 
 ```bash
-docker compose up -d
+python -c "import secrets; print(secrets.token_urlsafe(64))"
+python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"
+python -c "import secrets; print(secrets.token_urlsafe(48))"
 ```
 
-## 4. Run migrations
+The last value can be placed in a pepper mapping such as `{"1":"<generated-value>"}`. Invalid JSON is ignored and falls back to a `SECRET_KEY`-derived pepper, so verify the syntax before admitting users.
+
+!!! danger "Back up the complete secret set"
+    Back up `.env`, especially `ITAMBOX_SECRET_KEY`, `ITAMBOX_FIELD_ENCRYPTION_KEYS`, and `ITAMBOX_API_TOKEN_PEPPERS`, with the database and media. Losing the field-encryption keyring makes encrypted SMTP passwords, license keys, and webhook secrets unreadable. Losing token peppers invalidates existing API tokens.
+
+## 3. Build and initialize
 
 ```bash
-docker compose exec app python manage.py migrate
+docker compose build
+docker compose run --rm app python manage.py migrate
+docker compose run --rm app python manage.py createsuperuser
 ```
+
+The image builds frontend assets and runs `collectstatic`; WhiteNoise serves those assets from the application image. A separate static-file volume or web-server mapping is not required by the included stack.
+
+Do not run the full `seed_data` command against production. Its demo dataset contains public credentials and, without `--skip-drop`, clears domain data. Use the development evaluation path instead.
 
 !!! warning "PostgreSQL `btree_gist` extension required"
-    One migration (`assets.0051`) creates an exclusion constraint that prevents
-    overlapping asset reservations, which needs the `btree_gist` extension. The
-    migration runs `CREATE EXTENSION btree_gist`, a **non-trusted** extension that
-    requires a database **superuser** (or a role with `CREATE` on the database).
-    The bundled `docker compose` Postgres role is a superuser, so the default
-    path just works. On **managed/external Postgres** (RDS, Cloud SQL, Azure)
-    with a least-privilege migration role, pre-create the extension once as an
-    admin **before** running `migrate`, otherwise migration aborts and the
-    overlap guard is not installed:
+    Migration `assets.0051` creates the `btree_gist` extension for reservation overlap constraints. The bundled PostgreSQL role can create it. For a managed or least-privilege external database, create the extension as an administrator before running migrations:
 
     ```sql
     CREATE EXTENSION IF NOT EXISTS btree_gist;
     ```
 
-## 5. Create a superuser
+## 4. Terminate TLS at a reverse proxy
+
+Production settings redirect HTTP to HTTPS and set secure-only session and CSRF cookies. Before starting the long-running services, route the external HTTPS host to the app's HTTP upstream on port 8000, preserve the `Host` header, and set `X-Forwarded-Proto: https`. Do not present `http://localhost:8000` as the user-facing URL.
+
+Restrict the published port to the trusted proxy or firewall boundary; `docker-compose.yml` publishes port 8000 but does not provide TLS itself.
+
+## 5. Verify
 
 ```bash
-docker compose exec app python manage.py createsuperuser
+docker compose up -d
+docker compose ps
+docker compose logs --tail=100 app worker
+curl -I https://itam.example.com/health/
 ```
 
-## 6. (Optional) Load demo data
+Replace the example host with the configured external URL, then sign in with the superuser created during initialization.
 
-```bash
-docker compose exec app python manage.py seed_data
-```
-
-This loads a coherent MSP demo dataset — useful for evaluating the product before entering real data.
-
-## 7. Access the app
-
-Open `http://localhost:8000` (or the port mapped in `docker-compose.yml`). Log in with the superuser credentials you created above.
-
-## Static files (production)
-
-In production, collect static files and serve them from a web server or CDN:
-
-```bash
-docker compose exec app python manage.py collectstatic --no-input
-```
-
-Configure `STATIC_ROOT` and a suitable web server (Nginx, Caddy) to serve the `static/` directory.
+Next, establish a tested [backup and restore](backup-restore.md) process before loading production data. Follow the [upgrade guide](upgrades.md) for later source revisions.

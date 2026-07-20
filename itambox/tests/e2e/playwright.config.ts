@@ -24,11 +24,11 @@ export default defineConfig({
     ? undefined
     : {
         command: process.platform === 'win32'
-          ? '..\\..\\.venv\\Scripts\\python.exe manage.py runserver 8000'
-          : '../../.venv/bin/python manage.py runserver 8000',
+          ? '..\\.venv\\Scripts\\python.exe manage.py runserver 8000'
+          : '../.venv/bin/python manage.py runserver 8000',
         url: 'http://localhost:8000/',
         reuseExistingServer: !process.env.CI,
-        cwd: '..',
+        cwd: '../..',
         stdout: 'pipe',
         stderr: 'pipe',
         timeout: 30000,

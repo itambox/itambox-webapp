@@ -1,61 +1,77 @@
-# Upgrades
+# Updating a deployment
 
-## Contract
+ITAMbox is pre-release and currently ships as source, not as a published container image. There is no compatibility or version-skipping guarantee yet. Treat every target revision as a potentially breaking change and test it against a restored copy of production first.
 
-1. **Back up first.** Always take a full database dump and copy your `.env` before upgrading. See [Backup & Restore](backup-restore.md).
-2. Pull and rebuild.
-3. Run migrations.
-4. Collect static files.
-5. Restart app + worker.
+## Preflight
 
-## Step-by-step
+1. Select and review an exact target commit.
+2. Review the repository-root `CHANGELOG.md`, migrations, and configuration changes between the deployed and target commits.
+3. Capture the current revision with `git rev-parse HEAD` and retain or export the currently running application image; rebuilding an old commit later may resolve newer base images or dependency versions.
+4. Take a complete [database, media, and secret backup](backup-restore.md) and verify that it can be read.
+5. Plan a maintenance window; prerelease migrations are not guaranteed to be compatible with the old application.
+
+## Source-built Compose update
 
 ```bash
-# 1. Back up (see backup-restore.md for the full pg_dump one-liner)
-docker compose exec db pg_dump -U $ITAMBOX_DB_USER $ITAMBOX_DB_NAME > backup-$(date +%F).sql
+set -Eeuo pipefail
+writers_stopped=false
 
-# 2. Pull the new image (or git pull + rebuild for source installs)
-docker compose pull
-# — or for source installs —
-git pull && docker compose build
+report_failed_upgrade() {
+  rc=$?
+  trap - EXIT
+  if ((rc != 0)) && [[ "$writers_stopped" == true ]]; then
+    echo "Upgrade failed after writers were stopped. Do not admit traffic; inspect the stack and follow the rollback plan." >&2
+  fi
+  exit "$rc"
+}
+trap report_failed_upgrade EXIT
 
-# 3. Run database migrations
-docker compose exec app python manage.py migrate
+# Record the rollback revision before changing the checkout.
+ROLLBACK_REVISION=$(git rev-parse HEAD)
+printf 'rollback revision: %s\n' "$ROLLBACK_REVISION"
 
-# 4. Collect static files
-docker compose exec app python manage.py collectstatic --no-input
+# Fetch and select the reviewed target revision explicitly.
+git fetch origin
+TARGET_REVISION='full-reviewed-target-commit-sha'
+git checkout --detach "$TARGET_REVISION"
 
-# 5. Restart
+# Build the new application and frontend assets from source.
+docker compose build --pull
+
+# Stop writers, migrate with the new image, and restart.
+writers_stopped=true
+docker compose stop app worker
+docker compose run --rm app python manage.py migrate
 docker compose up -d
+writers_stopped=false
+
+# Inspect startup after the deployment.
+docker compose ps
+docker compose logs --tail=100 app worker
 ```
 
-## Version skipping policy
-
-!!! warning "Do not skip major versions"
-    While ITAMbox is pre-1.0, every alpha/beta release may include breaking migrations. Always upgrade sequentially — never jump from `1.0.0-alpha1` directly to `1.0.0-alpha5`. Patch releases within the same minor (e.g. `1.0.1` → `1.0.2`) are always safe to apply in one step.
-
-Once `v1.0.0` is tagged, the policy hardens: **never skip across major versions**. Upgrade 1.x → 2.x via the designated LTS bridge release documented in that version's upgrade notes.
+`collectstatic` runs while the application image is built, so the included stack does not need a separate post-deployment collection step.
 
 ## Rollback
 
-If a migration fails mid-upgrade:
+Do not assume a Django migration can be reversed safely. A migration may be irreversible or may discard data when reversed. The reliable rollback is the complete pre-update set:
+
+1. Stop the application and worker.
+2. Restore the retained previous image, or check out and rebuild the recorded previous revision. A rebuild is not necessarily byte-identical when base images or ranged dependencies have moved.
+3. Restore the matching database, media, and secrets using [Backup and restore](backup-restore.md).
+4. Start the prior application and verify login, attachments, encrypted fields, and background processing.
+
+If an update fails before any migration runs, returning to the previous source revision and rebuilding may be sufficient. Once a migration starts, use the tested backup-based rollback unless that specific migration has been reviewed and proven reversible.
+
+## Identifying the deployed revision
+
+`/api/status/`, the login page, and the application footer report ITAMbox version metadata. That value identifies the declared software version (currently prerelease metadata), not the exact deployed Git commit. Use it as a sanity check and record the source revision separately in the deployment system:
 
 ```bash
-# Roll back the last migration batch
-docker compose exec app python manage.py migrate <app_label> <previous_migration>
-
-# Restore the DB from your pre-upgrade backup if needed
-docker compose exec -T db psql -U $ITAMBOX_DB_USER $ITAMBOX_DB_NAME < backup-YYYY-MM-DD.sql
+curl -fsS https://itam.example.com/api/status/
+git rev-parse HEAD
+git status --short
+docker compose images
 ```
 
-Check `manage.py showmigrations` to identify the last applied migration before the failure.
-
-## Checking the running version
-
-The current version is exposed at the `/api/status/` endpoint:
-
-```bash
-curl -s http://localhost:8000/api/status/ | python -m json.tool
-```
-
-It also appears in the UI footer and on the login page.
+Keep the checkout clean and pin the recorded commit so a later rebuild uses the same source.

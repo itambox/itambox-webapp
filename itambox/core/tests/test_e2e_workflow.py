@@ -41,6 +41,16 @@ def test_playwright_retains_failure_diagnostics_uploaded_by_workflow():
     assert "itambox/tests/e2e/playwright-report/" in workflow
 
 
+def test_playwright_local_web_server_resolves_from_django_project_directory():
+    config = PLAYWRIGHT_CONFIG_PATH.read_text(encoding="utf-8")
+    django_project = REPOSITORY_ROOT / "itambox"
+
+    assert (django_project / "manage.py").is_file()
+    assert "cwd: '../..'" in config
+    assert "'..\\\\.venv\\\\Scripts\\\\python.exe manage.py runserver 8000'" in config
+    assert "'../.venv/bin/python manage.py runserver 8000'" in config
+
+
 def test_preflight_parses_marked_superuser_count_despite_noisy_django_output():
     preflight = PREFLIGHT_PATH.read_text(encoding="utf-8")
     package = E2E_PACKAGE_PATH.read_text(encoding="utf-8")

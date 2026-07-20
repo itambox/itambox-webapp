@@ -6,10 +6,10 @@ ITAMbox modules are graded **Stable** or **Beta**. The grade appears as a badge 
 
 | Grade | Meaning |
 |-------|---------|
-| **Stable** | The data model and API are considered settled. Breaking changes follow a deprecation cycle. |
+| **Stable** | The data model and API are more settled and receive compatibility review. Before the first tagged compatibility baseline, this grade does not guarantee a deprecation cycle across arbitrary source revisions. |
 | **Beta** | The module is functional and in active use, but the data model, API shape, or feature set may change between minor releases without a separate deprecation notice. Migrations may be required. Feedback is actively sought. |
 
-Beta does **not** mean the module may lose data or is unsafe to use in production. It means the interfaces are not yet frozen.
+Beta is an interface-maturity label, not a data-safety or production-support guarantee. Evaluate the specific deployed revision and its documented limitations before production use.
 
 ## Current grades
 
