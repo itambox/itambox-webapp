@@ -56,6 +56,11 @@ def applicable_grants(user):
 
 def effective_permissions_with_expiry(user, tenant):
     """Return permissions plus the first expiry that can change that result."""
+    # Check the precomputed per-tenant permissions map first (fix #3 for issue #56).
+    if hasattr(user, '__dict__'):
+        perm_map = user.__dict__.get('_tenant_permissions_map')
+        if perm_map is not None and tenant.pk in perm_map:
+            return perm_map[tenant.pk], None
     permissions = set()
     valid_until = None
     for grant in applicable_grants(user):
@@ -70,6 +75,39 @@ def effective_permissions_with_expiry(user, tenant):
 
 def effective_permissions(user, tenant):
     return effective_permissions_with_expiry(user, tenant)[0]
+
+
+def build_accessible_tenant_permissions_map(user, grants=None):
+    """Precompute ``{tenant_pk: frozenset(perms)}`` in one pass over grants.
+
+    Cached on ``user.__dict__['_tenant_permissions_map']`` with the same
+    authorization-cache generation guard as other request-local memos
+    (fix #3 for issue #56).
+    """
+    if not hasattr(user, '__dict__'):
+        return {}
+    # inline import: avoids an organization.rbac -> core.auth import cycle at load.
+    from core.auth.cache import synchronize_authorization_cache
+    synchronize_authorization_cache(user)
+    cached = user.__dict__.get('_tenant_permissions_map')
+    if cached is not None:
+        return cached
+    if grants is None:
+        grants = applicable_grants(user)
+    tenant_perms = {}
+    for grant in grants:
+        perms = grant.role.permissions
+        if not perms:
+            continue
+        covered_ids = set(grant.scoped_tenant_ids())
+        owner_id = grant.principal_tenant_id
+        if owner_id is not None:
+            covered_ids.add(owner_id)
+        for tid in covered_ids:
+            tenant_perms.setdefault(tid, set()).update(perms)
+    result = {pk: frozenset(perms) for pk, perms in tenant_perms.items()}
+    user.__dict__['_tenant_permissions_map'] = result
+    return result
 
 
 def _scope_contribution(scope, grant, owner_id, live_tenants):
