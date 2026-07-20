@@ -55,7 +55,7 @@ See [module maturity](itambox/docs/development/module-maturity.md) for the curre
 - django-q2 workers using the PostgreSQL ORM broker; Valkey or Redis provides shared production cache, rate-limit state, and SAML replay protection
 - MkDocs for operator, integration, model, and developer documentation
 
-The generated [data-model documentation](itambox/docs/development/data-model.md) maps the domain models and their relationships. Start with [DEVELOPMENT.md](DEVELOPMENT.md) for implementation conventions and the accepted [tenancy, RBAC, and resource-sharing ADR](itambox/docs/development/adr-0001-tenancy-rbac-and-resource-sharing.md) for authorization boundaries.
+Start with [DEVELOPMENT.md](DEVELOPMENT.md) for implementation conventions.
 
 ## Evaluate from source
 
