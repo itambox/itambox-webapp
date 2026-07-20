@@ -16,8 +16,8 @@
 # ephemeral and torn down on exit. Nothing here touches a real deployment.
 #
 # Usage: scripts/docker-smoke-test.sh
-# Requires: Docker with Compose v2.24.4+ (for fail-closed !override), curl,
-# and python3 (or python) on PATH.
+# Requires: Docker with Compose v2.24.4+ (for fail-closed !override) and
+# python3 (or python) on PATH.
 #
 # Tunables (env vars): SMOKE_DB_TIMEOUT, SMOKE_APP_TIMEOUT,
 # SMOKE_WORKER_GRACE_PERIOD (all in seconds).
@@ -252,7 +252,6 @@ trap cleanup EXIT
 # ------------------------------------------------------------------------------
 preflight_checks() {
   local compose_version
-  require_cmd curl
   require_cmd docker
   PYTHON_BIN="$(find_python)"
   if ! docker compose version >/dev/null 2>&1; then
@@ -323,17 +322,30 @@ run_deploy_check() {
     python manage.py check --deploy --tag security --fail-level WARNING
 }
 
-verify_health_endpoint() {
-  local timeout="$1" waited=0 http_code body_file url
-  body_file="$WORKDIR/health-response.json"
-  url="http://127.0.0.1:$HOST_PORT/health/"
+app_http_get() {
+  local path="$1"
+  compose exec -T app python - "$path" <<'PYEOF'
+import sys
+import urllib.request
 
-  while true; do
-    http_code="$(curl -s -o "$body_file" -w '%{http_code}' --max-time 5 \
-      -H 'Host: 127.0.0.1' -H 'X-Forwarded-Proto: https' "$url" || echo 000)"
-    [[ "$http_code" == "200" ]] && break
+request = urllib.request.Request(
+    f"http://127.0.0.1:8000{sys.argv[1]}",
+    headers={"Host": "127.0.0.1", "X-Forwarded-Proto": "https"},
+)
+with urllib.request.urlopen(request, timeout=5) as response:
+    if response.status != 200:
+        raise SystemExit(f"unexpected HTTP status: {response.status}")
+    sys.stdout.buffer.write(response.read())
+PYEOF
+}
+
+verify_health_endpoint() {
+  local timeout="$1" waited=0 body_file
+  body_file="$WORKDIR/health-response.json"
+
+  while ! app_http_get /health/ > "$body_file"; do
     if (( waited >= timeout )); then
-      die "timed out after ${timeout}s waiting for a healthy /health/ response (last HTTP code: $http_code)"
+      die "timed out after ${timeout}s waiting for a healthy /health/ response"
     fi
     sleep 3
     waited=$((waited + 3))
@@ -350,12 +362,10 @@ PYEOF
 }
 
 verify_static_assets() {
-  local asset code
+  local asset
   for asset in dist/itambox.js dist/itambox.css; do
-    code="$(curl -s -o /dev/null -w '%{http_code}' --max-time 5 \
-      -H 'Host: 127.0.0.1' -H 'X-Forwarded-Proto: https' \
-      "http://127.0.0.1:$HOST_PORT/static/$asset")"
-    [[ "$code" == "200" ]] || die "expected /static/$asset to return 200, got $code (npm build or collectstatic broken in the image?)"
+    app_http_get "/static/$asset" >/dev/null \
+      || die "expected /static/$asset to return 200 (npm build or collectstatic broken in the image?)"
     log "static asset OK: /static/$asset"
   done
 }

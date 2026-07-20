@@ -86,7 +86,7 @@ jobs:
           [[ ${postgres_id} =~ ^[0-9a-f]{64}$ ]]
 
           postgres_healthy=false
-          for attempt in $(seq 1 60); do
+          for _ in $(seq 1 60); do
             container_state=$(docker inspect \
               --format '{{.State.Status}}|{{if .State.Health}}{{.State.Health.Status}}{{else}}missing{{end}}' \
               "${postgres_id}")
@@ -108,7 +108,7 @@ jobs:
           # This cannot succeed against PostgreSQL's temporary Unix-socket-only
           # initialization server and proves localhost namespace sharing.
           postgres_ready=false
-          for attempt in $(seq 1 60); do
+          for _ in $(seq 1 60); do
             if PGCONNECT_TIMEOUT=2 PGPASSWORD=itambox_ci psql \
               --host 127.0.0.1 \
               --port 5432 \

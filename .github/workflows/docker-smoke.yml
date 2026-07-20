@@ -3,9 +3,10 @@ name: Docker Compose Smoke Test
 on:
   push:
     branches: [master, main]
-  pull_request:
-    branches: [master, main]
   workflow_dispatch:
+
+permissions:
+  contents: read
 
 concurrency:
   group: docker-smoke-${{ github.workflow }}-${{ github.ref }}
@@ -13,9 +14,9 @@ concurrency:
 
 jobs:
   helpers:
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, Linux, ARM64, itambox-ci]
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
 
       - name: Validate shell syntax
         run: |
@@ -23,7 +24,7 @@ jobs:
           bash -n scripts/tests/test_docker_smoke_helpers.sh
 
       - name: Set up Python
-        uses: actions/setup-python@v6
+        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6
         with:
           python-version: "3.12"
 
@@ -45,13 +46,15 @@ jobs:
 
   smoke:
     needs: helpers
-    runs-on: ubuntu-latest
-    timeout-minutes: 25
+    runs-on: [self-hosted, Linux, ARM64, itambox-ci]
+    timeout-minutes: 60
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
 
       - name: Docker / Compose versions
         run: |
+          security_options="$(docker info --format '{{json .SecurityOptions}}')"
+          [[ "$security_options" == *name=rootless* ]]
           docker version
           docker compose version
 
@@ -61,7 +64,7 @@ jobs:
 
       - name: Upload smoke test diagnostics
         if: failure() && steps.smoke.outputs.log-dir != ''
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: docker-smoke-logs
           path: ${{ steps.smoke.outputs.log-dir }}
