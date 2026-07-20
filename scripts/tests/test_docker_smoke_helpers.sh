@@ -109,17 +109,46 @@ assert "smoke port replaces rather than appends to public production binding" "$
 assert "smoke port is loopback-only with an OS-assigned host port" "$(grep -q '127.0.0.1::8000' "$tmp_override"; echo $?)"
 assert "override does not retain the public production 8000:8000 binding" "$(! grep -qE '^[[:space:]]*-[[:space:]]*[\"'\'']?8000:8000' "$tmp_override"; echo $?)"
 
+echo "== app-local HTTP probe =="
+tmp_probe_calls="$(mktemp "${TMPDIR:-/tmp}/itambox-smoke-probe.XXXXXX")"
+compose() {
+  printf '%s\n' "$*" >> "$tmp_probe_calls"
+  printf '%s' '{"status":"ok","checks":{"database":"ok"}}'
+}
+probe_body="$(app_http_get /health/)"
+unset -f compose
+assert "HTTP probe executes inside the app container" "$(grep -Fq 'exec -T app' "$tmp_probe_calls"; echo $?)"
+assert "HTTP probe passes the requested health path" "$(grep -Fq '/health/' "$tmp_probe_calls"; echo $?)"
+assert "HTTP probe returns the response body" "$([[ "$probe_body" == '{"status":"ok","checks":{"database":"ok"}}' ]]; echo $?)"
+
+echo "== health verification uses app-local probe =="
+tmp_health="$(mktemp -d "${TMPDIR:-/tmp}/itambox-smoke-health.XXXXXX")"
+set +e
+(
+  trap - EXIT
+  WORKDIR="$tmp_health"
+  app_http_get() { printf '%s' '{"status":"ok","checks":{"database":"ok"}}'; }
+  curl() { return 7; }
+  verify_health_endpoint 0
+)
+health_probe_status=$?
+set -e
+assert "health verification succeeds through the app-local probe without runner curl" "$([[ $health_probe_status -eq 0 ]]; echo $?)"
+
 echo "== static asset build paths =="
 tmp_static_urls="$(mktemp "${TMPDIR:-/tmp}/itambox-smoke-static.XXXXXX")"
-curl() {
-  printf '%s\n' "${@: -1}" >> "$tmp_static_urls"
-  printf '%s' 200
+app_http_get() {
+  printf '%s\n' "$1" >> "$tmp_static_urls"
 }
-HOST_PORT=49152
+curl() { return 7; }
+set +e
 verify_static_assets
-unset -f curl
-assert "JavaScript smoke check targets the built dist path" "$(grep -Fxq 'http://127.0.0.1:49152/static/dist/itambox.js' "$tmp_static_urls"; echo $?)"
-assert "CSS smoke check targets the built dist path" "$(grep -Fxq 'http://127.0.0.1:49152/static/dist/itambox.css' "$tmp_static_urls"; echo $?)"
+static_probe_status=$?
+set -e
+unset -f app_http_get curl
+assert "static checks do not use runner-local curl" "$([[ $static_probe_status -eq 0 ]]; echo $?)"
+assert "JavaScript smoke check targets the built dist path" "$(grep -Fxq '/static/dist/itambox.js' "$tmp_static_urls"; echo $?)"
+assert "CSS smoke check targets the built dist path" "$(grep -Fxq '/static/dist/itambox.css' "$tmp_static_urls"; echo $?)"
 
 echo "== deployment check warning policy =="
 if grep -Fq 'python manage.py check --deploy --fail-level WARNING' "$REPO_ROOT/scripts/docker-smoke-test.sh"; then
@@ -201,6 +230,8 @@ tmp_cleanup="$(mktemp -d "${TMPDIR:-/tmp}/itambox-smoke-cleanup-test.XXXXXX")"
 set +e
 (
   trap - EXIT
+  # Read indirectly by cleanup() from the sourced smoke-test script.
+  # shellcheck disable=SC2034
   WORKDIR="$tmp_cleanup"
   LOG_DIR="$tmp_cleanup/logs"
   ENV_FILE="$tmp_cleanup/smoke.env"
@@ -222,7 +253,8 @@ assert "teardown diagnostics are preserved on failure" "$([[ -f "$tmp_cleanup/lo
 rm -rf "$tmp_cleanup"
 rm -rf "$tmp_worker"
 rm -rf "$tmp_worker_grep"
-rm -f "$tmp_env" "$tmp_override" "$tmp_static_urls"
+rm -rf "$tmp_health"
+rm -f "$tmp_env" "$tmp_override" "$tmp_probe_calls" "$tmp_static_urls"
 
 echo
 if [[ "$FAILURES" -eq 0 ]]; then
