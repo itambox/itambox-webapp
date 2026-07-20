@@ -15,4 +15,3 @@ A **SaaS Provider** represents a cloud platform hosting provider, software vendo
 | **Slug** | URL-friendly identifier (auto-generated if blank). | Slug | Yes |
 | **Tenant** | Optional tenant scoping this provider. Null represents system-wide/global. | ForeignKey | No |
 | **Tenant Group** | Optional tenant group scoping this provider. | ForeignKey | No |
-

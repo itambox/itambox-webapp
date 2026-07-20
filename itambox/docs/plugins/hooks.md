@@ -132,9 +132,9 @@ Register in `__init__.py` using its dotted path string for lazy-loading:
 
 ```python
 registry.register_plugin_viewset(
-    'itambox_esign', 
-    '', 
-    'itambox_esign.api.views.DocuSignViewSet', 
+    'itambox_esign',
+    '',
+    'itambox_esign.api.views.DocuSignViewSet',
     basename='itambox_esign'
 )
 ```

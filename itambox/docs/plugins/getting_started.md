@@ -77,9 +77,14 @@ config = EsignPluginConfig
 
 ## 2. Registering the Plugin
 
-To enable your plugin, add its package name to the `PLUGINS` list in `core/settings/base.py`:
+To enable your plugin, add its package name to the `ITAMBOX_PLUGINS` environment
+variable (comma-separated), or configure it directly in `core/settings/base.py`:
 
 ```python
+# Environment variable (preferred — survives updates):
+# ITAMBOX_PLUGINS=itambox_esign
+
+# Or in code:
 PLUGINS = [
     'itambox_esign',
 ]

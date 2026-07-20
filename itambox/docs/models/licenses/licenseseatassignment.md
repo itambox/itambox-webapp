@@ -22,4 +22,3 @@ Under compliance and database-level checking constraints, a license seat assignm
 | **Installed Software** | The installed software of the license seat assignment. | Foreign Key | No |
 | **License** | The software entitlement from which the seat is drawn. | Foreign Key | Yes |
 | **Notes** | Optional details outlining allocation details or subscription terms. | Text | No |
-

@@ -75,11 +75,11 @@ The import system supports **UPSERT** (Update + Insert) functionality. By includ
 ### Example: Updating an Asset
 
 ```csv
-id,name,asset_tag,serial_number,description
-101,Server-01,SRV-001,SN123456,Updated description
+id,name,asset_tag,serial_number,notes
+101,Server-01,SRV-001,SN123456,Updated notes
 ```
 
-This will update Asset with ID `101` with the new `name`, `asset_tag`, `serial_number`, and `description`.
+This will update Asset with ID `101` with the new `name`, `asset_tag`, `serial_number`, and `notes`.
 
 > **Note**: If the `id` value does not match any existing record, the row will be treated as a new insert.
 
@@ -117,9 +117,8 @@ The import process follows a two-phase UI flow to ensure data integrity and prov
 | Column | Required | Type | Description |
 |--------|----------|------|-------------|
 | `name` | Yes | String | Asset name |
-| `asset_tag` | Yes | String | Unique asset tag identifier |
+| `asset_tag` | No | String | Unique asset tag identifier (auto-generated from tag sequence if blank) |
 | `serial_number` | No | String | Manufacturer serial number |
-| `description` | No | Text | Asset description |
 | `purchase_date` | No | Date | Date of purchase (YYYY-MM-DD) |
 | `purchase_cost` | No | Decimal | Purchase cost/price |
 | `order_number` | No | String | Purchase order number |
@@ -132,6 +131,8 @@ The import process follows a two-phase UI flow to ensure data integrity and prov
 | `manufacturer` | Yes | Relational | Manufacturer name, slug, or ID |
 | `model` | Yes | String | Model name/number |
 | `part_number` | No | String | Manufacturer part number |
+| `category` | No | Relational | Asset type category |
+| `asset_role` | No | Relational | Asset role |
 | `description` | No | Text | Asset type description |
 | `comments` | No | Text | Additional comments |
 
@@ -164,9 +165,10 @@ The import process follows a two-phase UI flow to ensure data integrity and prov
 | `category` | No | String | Accessory category |
 | `slug` | No | String | URL-friendly identifier (auto-generated if empty) |
 | `part_number` | No | String | Manufacturer part number |
-| `qty` | No | Integer | Current quantity in stock |
 | `min_qty` | No | Integer | Minimum quantity threshold |
 | `notes` | No | Text | Additional notes |
+
+> **Note**: The `qty` (current quantity in stock) field is managed through the **AccessoryStock** model and is **not** directly importable on the catalog item. Use the AccessoryStock import path for stock-level operations.
 
 ### Consumable
 
@@ -177,9 +179,10 @@ The import process follows a two-phase UI flow to ensure data integrity and prov
 | `category` | No | String | Consumable category |
 | `slug` | No | String | URL-friendly identifier (auto-generated if empty) |
 | `part_number` | No | String | Manufacturer part number |
-| `qty` | No | Integer | Current quantity in stock |
 | `min_qty` | No | Integer | Minimum quantity threshold |
 | `notes` | No | Text | Additional notes |
+
+> **Note**: The `qty` (current quantity in stock) field is managed through the **ConsumableStock** model and is **not** directly importable on the catalog item. Use the ConsumableStock import path for stock-level operations.
 
 ### License
 
@@ -213,12 +216,12 @@ The import process follows a two-phase UI flow to ensure data integrity and prov
 
 | Model | Required Fields | Optional Fields |
 |-------|----------------|-----------------|
-| **Asset** | `name`, `asset_tag` | `serial_number`, `description`, `purchase_date`, `purchase_cost`, `order_number`, `notes` |
-| **Asset Type** | `manufacturer`, `model` | `part_number`, `description`, `comments` |
+| **Asset** | `name` | `asset_tag`, `serial_number`, `purchase_date`, `purchase_cost`, `order_number`, `notes` |
+| **Asset Type** | `manufacturer`, `model` | `part_number`, `category`, `asset_role`, `description`, `comments` |
 | **Manufacturer** | `name` | `slug`, `description` |
 | **Location** | `name`, `site` | `slug`, `status`, `parent`, `facility`, `description` |
-| **Accessory** | `name`, `manufacturer` | `category`, `slug`, `part_number`, `qty`, `min_qty`, `notes` |
-| **Consumable** | `name`, `manufacturer` | `category`, `slug`, `part_number`, `qty`, `min_qty`, `notes` |
+| **Accessory** | `name`, `manufacturer` | `category`, `slug`, `part_number`, `min_qty`, `notes` |
+| **Consumable** | `name`, `manufacturer` | `category`, `slug`, `part_number`, `min_qty`, `notes` |
 | **License** | `name`, `software` | `license_type`, `product_key`, `seats`, `purchase_date`, `purchase_cost`, `order_number`, `expiration_date`, `notes` |
 | **Asset Holder** | `first_name`, `last_name`, `upn` | `email`, `description`, `comments` |
 
@@ -232,3 +235,38 @@ The import process follows a two-phase UI flow to ensure data integrity and prov
 4. **Use slugs for relational fields**: Slugs are URL-friendly and less prone to encoding issues than full names.
 5. **Preview before confirming**: Always review the preview table to catch errors before starting the import.
 6. **Monitor the Job**: After confirming, navigate to the Job Detail view to track progress and handle any failures.
+
+---
+
+## Dynamic Import Path for All Importable Models
+
+Every model in ITAMbox that is not explicitly excluded can be imported via the generic import path:
+
+```
+/import/<app_label>/<model_name>/
+```
+
+For example:
+- `/import/assets/asset/` — Assets
+- `/import/assets/assettype/` — Asset Types
+- `/import/assets/manufacturer/` — Manufacturers
+- `/import/inventory/accessory/` — Accessories
+- `/import/inventory/consumable/` — Consumables
+- `/import/organization/location/` — Locations
+- `/import/organization/assetholder/` — Asset Holders
+- `/import/licenses/license/` — Licenses
+
+This single view (`GenericObjectImportView`) serves **all** importable models — you do not need a per-model view. The curated import forms registered in `assets/forms/import_forms.py` provide domain-accurate field lists for each model automatically.
+
+### Excluded Models
+
+Some models are excluded from bulk import because they represent generated logs, system records, or complex configuration managed exclusively through the UI or API. These are defined in `IMPORT_EXCLUDED_MODELS` (in `core/forms/import_forms.py`) and return a **404** if accessed via the generic import path:
+
+| App | Excluded Models |
+|-----|----------------|
+| `core` | `objectchange`, `notification`, `job` |
+| `extras` | `alertlog`, `event`, `journalentry`, `alertrule`, `notificationchannel`, `scheduledreport`, `reporttemplate`, `eventrule`, `webhookendpoint`, `dashboard` |
+| `organization` | `membership`, `role`, `rolegrant`, `rolegrantscope`, `tenantresourcegrant` |
+| `users` | `groupmembership`, `token`, `user`, `usergroup` |
+
+> **Rule of thumb**: If a model is **not** in the table above, it is importable via `/import/<app_label>/<model_name>/`.

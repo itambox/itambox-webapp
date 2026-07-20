@@ -17,4 +17,3 @@ An **Alert Rule** defines threshold limits or time-horizon conditions that trigg
 | **Severity** | Rule severity: `info`, `warning`, `critical`. | Choice | Yes |
 | **Tenant** | Scopes target queries and ownership. | Foreign Key | No |
 | **Threshold Value** | Numeric value (e.g. unit count or days horizon). | Integer | Yes |
-
