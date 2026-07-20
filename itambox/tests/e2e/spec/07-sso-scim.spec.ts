@@ -141,8 +141,14 @@ test.describe('SSO and SCIM 2.0 Provisioning Specs', () => {
   // TIER 2: Boundary & Corner Cases (>= 5 tests)
 
   test('6. OIDC provider errors terminate an existing session', async ({ browser }) => {
+    // Use an isolated, unauthenticated context. browser.newContext() inherits
+    // the project's authenticated storageState (see playwright.config.ts `use`),
+    // so '/' would render the dashboard with no login form and the fill() below
+    // would hang until the test times out. This scenario must establish its own
+    // session so it can then observe that session being terminated.
     const authenticatedContext = await browser.newContext({
       baseURL: process.env.E2E_BASE_URL || 'http://localhost:8000',
+      storageState: { cookies: [], origins: [] },
     });
     try {
       const page = await authenticatedContext.newPage();
