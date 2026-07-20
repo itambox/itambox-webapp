@@ -7,7 +7,26 @@ from organization.models import RoleGrant, RoleGrantScope, Tenant
 
 
 def applicable_grants(user):
-    """Return every live direct/group grant whose principal belongs to ``user``."""
+    """Return every live direct/group grant whose principal belongs to ``user``.
+
+    Request-local memoization keyed to the user instance mirrors
+    ``accessible_tenant_ids_with_expiry`` (organization.access): this query runs
+    several joins and is called once per distinct tenant per request, so an
+    all-accessible scope re-ran the full grant walk for every accessible tenant
+    (issue #56). The shared authorization-cache generation is consulted first,
+    so the memo can never serve a write-invalidated grant set; a cache-backend
+    outage makes ``synchronize_authorization_cache`` fail open to a fresh local
+    version, forcing a recompute rather than serving a stale set.
+    """
+    can_cache = hasattr(user, '__dict__')
+    if can_cache:
+        # inline import: avoids an organization.rbac -> core.auth import cycle at
+        # load (core.auth resolves permissions through organization.rbac).
+        from core.auth.cache import synchronize_authorization_cache
+        synchronize_authorization_cache(user)
+        cached = user.__dict__.get('_applicable_grants')
+        if cached is not None:
+            return cached
     now = timezone.now()
     principal = (
         Q(membership__user=user, membership__is_active=True)
@@ -19,7 +38,7 @@ def applicable_grants(user):
             user_group__group_memberships__membership__tenant_id=F('user_group__tenant_id'),
         )
     )
-    return list(
+    grants = list(
         RoleGrant.objects.filter(principal, role__deleted_at__isnull=True)
         .filter(Q(valid_until__isnull=True) | Q(valid_until__gt=now))
         .select_related(
@@ -30,6 +49,9 @@ def applicable_grants(user):
         .prefetch_related('scopes', 'scopes__tenant', 'scopes__tenant_group')
         .distinct()
     )
+    if can_cache:
+        user.__dict__['_applicable_grants'] = grants
+    return grants
 
 
 def effective_permissions_with_expiry(user, tenant):

@@ -18,6 +18,7 @@ _LOCAL_CACHE_PREFIXES = (
     '_all_accessible_scope_tenants',
     '_all_accessible_group_ids',
     '_accessible_tenant_ids',
+    '_applicable_grants',
 )
 
 
