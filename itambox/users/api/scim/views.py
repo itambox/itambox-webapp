@@ -30,7 +30,7 @@ def link_or_create_assetholder(user, tenant):
     upn = email or user.username
     first_name = user.first_name or user.username
     last_name = user.last_name or ""
-    
+
     # Check if user already has an AssetHolder profile in this tenant
     holder = AssetHolder.objects.filter(user=user, tenant=tenant).first()
     if not holder:
@@ -38,7 +38,7 @@ def link_or_create_assetholder(user, tenant):
         holder = AssetHolder.objects.filter(upn=upn, tenant=tenant, user__isnull=True).first()
         if not holder and email:
             holder = AssetHolder.objects.filter(email=email, tenant=tenant, user__isnull=True).first()
-            
+
     if holder:
         try:
             if not holder.user:
@@ -94,7 +94,7 @@ class SCIMTenantMixin:
         tenant_slug = self.kwargs.get('tenant_slug')
         if not tenant_slug:
             raise exceptions.ValidationError("tenant_slug is required")
-        
+
         try:
             self.tenant = Tenant._base_manager.get(slug=tenant_slug)
         except Tenant.DoesNotExist:
@@ -161,14 +161,17 @@ class SCIMUserListView(SCIMTenantMixin, APIView):
         try:
             q_obj = parse_scim_filter(filter_str, 'user')
         except SCIMFilterError as e:
+            # Log the parser detail server-side; return a generic client message
+            # so the raw (echoed) filter expression is not reflected back.
+            logger.warning("Rejected SCIM filter: %s", e)
             return Response({
                 "schemas": ["urn:ietf:params:scim:api:messages:2.0:Error"],
                 "status": "400",
-                "detail": str(e)
+                "detail": "Invalid SCIM filter."
             }, status=status.HTTP_400_BAD_REQUEST)
-        
+
         queryset = User.objects.filter(memberships__tenant=self.tenant).filter(q_obj).distinct().prefetch_related('groups')
-        
+
         try:
             start_index = int(request.query_params.get('startIndex', 1))
         except ValueError:
@@ -178,19 +181,19 @@ class SCIMUserListView(SCIMTenantMixin, APIView):
         except ValueError:
             count = 50
         count = min(count, 200)  # Enforce maxResults upper bound
-            
+
         if start_index < 1:
             start_index = 1
-            
+
         total_results = queryset.count()
         sliced_queryset = queryset[start_index - 1 : start_index - 1 + count]
-        
+
         serializer = SCIMUserSerializer(
-            sliced_queryset, 
-            many=True, 
+            sliced_queryset,
+            many=True,
             context={'request': request, 'tenant_slug': self.tenant.slug, 'tenant': self.tenant}
         )
-        
+
         return Response({
             "schemas": ["urn:ietf:params:scim:api:messages:2.0:ListResponse"],
             "totalResults": total_results,
@@ -219,7 +222,7 @@ class SCIMUserListView(SCIMTenantMixin, APIView):
         emails = request.data.get('emails', [])
         if emails and isinstance(emails, list):
             email = emails[0].get('value', '')
-            
+
         if email and len(email) > 254:
             return Response({
                 "schemas": ["urn:ietf:params:scim:api:messages:2.0:Error"],
@@ -263,7 +266,7 @@ class SCIMUserListView(SCIMTenantMixin, APIView):
                     "status": "409",
                     "detail": "User already exists in this tenant"
                 }, status=status.HTTP_409_CONFLICT)
-            
+
             with transaction.atomic():
                 # SCIM provisions identity only: a bare membership with NO RoleGrant
                 # rows — permissions are granted in-app. Were a
@@ -289,7 +292,7 @@ class SCIMUserListView(SCIMTenantMixin, APIView):
                 link_or_create_assetholder(user, self.tenant)
 
         serializer = SCIMUserSerializer(
-            user, 
+            user,
             context={'request': request, 'tenant_slug': self.tenant.slug, 'tenant': self.tenant}
         )
         return Response(serializer.data, status=status.HTTP_201_CREATED)
@@ -367,7 +370,7 @@ class SCIMUserDetailView(SCIMTenantMixin, APIView):
 
     def put(self, request, pk, *args, **kwargs):
         user = get_object_or_404(User.objects.filter(memberships__tenant=self.tenant).distinct(), id=pk)
-        
+
         username = request.data.get('userName')
         if not username:
             return Response({
@@ -387,7 +390,7 @@ class SCIMUserDetailView(SCIMTenantMixin, APIView):
         emails = request.data.get('emails', [])
         if emails and isinstance(emails, list):
             email = emails[0].get('value', '')
-            
+
         if email and len(email) > 254:
             return Response({
                 "schemas": ["urn:ietf:params:scim:api:messages:2.0:Error"],
@@ -528,16 +531,19 @@ class SCIMGroupListView(SCIMTenantMixin, APIView):
         try:
             q_obj = parse_scim_filter(filter_str, 'group')
         except SCIMFilterError as e:
+            # Log the parser detail server-side; return a generic client message
+            # so the raw (echoed) filter expression is not reflected back.
+            logger.warning("Rejected SCIM filter: %s", e)
             return Response({
                 "schemas": ["urn:ietf:params:scim:api:messages:2.0:Error"],
                 "status": "400",
-                "detail": str(e)
+                "detail": "Invalid SCIM filter."
             }, status=status.HTTP_400_BAD_REQUEST)
-        
+
         # Tenant SCIM exposes only groups owned by this tenant. Provider groups
         # projected here remain private to the provider administration surface.
         queryset = UserGroup.objects.filter(tenant=self.tenant).filter(q_obj)
-        
+
         try:
             start_index = int(request.query_params.get('startIndex', 1))
         except ValueError:
@@ -547,15 +553,15 @@ class SCIMGroupListView(SCIMTenantMixin, APIView):
         except ValueError:
             count = 50
         count = min(count, 200)  # Enforce maxResults upper bound
-            
+
         if start_index < 1:
             start_index = 1
-            
+
         total_results = queryset.count()
         sliced_queryset = queryset[start_index - 1 : start_index - 1 + count]
-        
+
         serializer = SCIMGroupSerializer(sliced_queryset, many=True, context={'request': request, 'tenant_slug': self.tenant.slug})
-        
+
         return Response({
             "schemas": ["urn:ietf:params:scim:api:messages:2.0:ListResponse"],
             "totalResults": total_results,

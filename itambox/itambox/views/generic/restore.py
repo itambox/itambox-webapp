@@ -162,7 +162,7 @@ class ObjectBulkRestoreView(HtmxActionMixin, PermissionRequiredMixin, LoginRequi
         pks = request.POST.getlist('pk')
         if not pks:
             messages.warning(request, _("No items selected."))
-            return HttpResponseRedirect(request.META.get('HTTP_REFERER', '/'))
+            return HttpResponseRedirect(safe_return_url(request, request.META.get('HTTP_REFERER'), '/'))
 
         manager = getattr(self.model, 'all_objects', self.model._base_manager)
         queryset = manager.filter(pk__in=pks, deleted_at__isnull=False)
@@ -239,7 +239,7 @@ class ObjectBulkPurgeView(HtmxActionMixin, PermissionRequiredMixin, LoginRequire
         pks = request.POST.getlist('pk')
         if not pks:
             messages.warning(request, _("No items selected."))
-            return HttpResponseRedirect(request.META.get('HTTP_REFERER', '/'))
+            return HttpResponseRedirect(safe_return_url(request, request.META.get('HTTP_REFERER'), '/'))
 
         manager = getattr(self.model, 'all_objects', self.model._base_manager)
         queryset = manager.filter(pk__in=pks, deleted_at__isnull=False)

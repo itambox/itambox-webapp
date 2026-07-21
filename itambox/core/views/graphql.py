@@ -224,7 +224,7 @@ class PrivateGraphQLView(GraphQLView):
             if not request.user.is_authenticated:
                 from django.shortcuts import resolve_url
                 return redirect(f"{resolve_url(settings.LOGIN_URL)}?next={quote(request.get_full_path())}")
-        
+
         elif request.method == 'POST':
             if request.user.is_authenticated:
                 from django.middleware.csrf import CsrfViewMiddleware
@@ -245,11 +245,13 @@ class PrivateGraphQLView(GraphQLView):
                         TenantMiddleware().process_request(request)
                     else:
                         return HttpResponse(_('Unauthorized'), status=401)
-                except exceptions.AuthenticationFailed as e:
-                    return JsonResponse({'errors': [{'message': str(e)}]}, status=401)
+                except exceptions.AuthenticationFailed:
+                    # Return a generic message; the specific failure reason must not
+                    # leak to the client (aligns with the broad-except branch below).
+                    return JsonResponse({'errors': [{'message': str(_('Authentication failed'))}]}, status=401)
                 except Exception as e:
                     return JsonResponse({'errors': [{'message': str(_('Authentication failed'))}]}, status=401)
-            
+
             # Perform rate limiting / throttling checks
             from rest_framework.throttling import AnonRateThrottle, UserRateThrottle
             throttles = [AnonRateThrottle(), UserRateThrottle()]
@@ -260,5 +262,5 @@ class PrivateGraphQLView(GraphQLView):
                         {'errors': [{'message': str(_('Request was throttled. Expected available in %(wait)s seconds.') % {'wait': wait})}]},
                         status=429
                     )
-                    
+
         return super().dispatch(request, *args, **kwargs)

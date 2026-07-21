@@ -152,7 +152,7 @@
       return;
     }
 
-    const containerId = form.id === 'bulk-print-form' ? 'bulk-print-pks' : 
+    const containerId = form.id === 'bulk-print-form' ? 'bulk-print-pks' :
                         'bulk-checkout-inventory-pks';
     let container = form.querySelector<HTMLElement>('#' + containerId);
     if (!container) {
@@ -179,8 +179,8 @@
     const btn = (event.target as HTMLElement).closest<HTMLElement>('.btn-bulk-scan-seed');
     if (!btn) return;
     event.preventDefault();
-    const url = btn.getAttribute('data-scan-url');
-    if (!url) return;
+    const rawUrl = btn.getAttribute('data-scan-url');
+    if (!rawUrl) return;
     const checked = document.querySelectorAll<HTMLInputElement>(
       '#object-list-table-container input[type="checkbox"][name="pk"]:checked',
     );
@@ -188,11 +188,19 @@
       alert(gettext('No items selected.'));
       return;
     }
-    const params = new URLSearchParams();
+    // Parse the DOM-supplied URL and enforce an http(s) allowlist before navigating,
+    // building the query via the URL API rather than string concatenation.
+    let target: URL;
+    try {
+      target = new URL(rawUrl, window.location.origin);
+    } catch {
+      return;
+    }
+    if (target.protocol !== 'http:' && target.protocol !== 'https:') return;
     checked.forEach(function (cb) {
-      params.append('pk', cb.value);
+      target.searchParams.append('pk', cb.value);
     });
-    window.location.href = url + '?' + params.toString();
+    window.location.href = target.toString();
   });
 
   // Delegated click handler for bulk delete/edit/restore/purge, scoped to the

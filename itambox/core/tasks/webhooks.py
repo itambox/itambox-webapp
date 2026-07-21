@@ -18,7 +18,7 @@ def send_webhook_task(url, method, headers, secret, event_action, event_model_ap
     from django.core.exceptions import ValidationError
     # inline import: core.http imports core.validators (django-loaded); keep the task
     # module import-light for django-q payload loading.
-    from core.http import request_pinned
+    from core.http import request_pinned, webhook_target_kind
 
     # Re-derive the (encrypted-at-rest) secret from the endpoint at run time so it never has
     # to be persisted in the django_q payload / retry Schedule.kwargs (both stored plaintext).
@@ -33,11 +33,12 @@ def send_webhook_task(url, method, headers, secret, event_action, event_model_ap
     # AND pins the connection to the validated address — the request cannot be
     # re-routed by a second DNS answer between check and use (DNS rebinding),
     # and redirects are never followed. A blocked URL is final — do not retry.
+    target_kind = webhook_target_kind(url)
     try:
-        if 'hooks.slack.com' in url:
+        if target_kind == 'slack':
             payload = {'text': f"Event: {event_action} on {event_model_name} (ID: {event_object_id})"}
             response = request_pinned('POST', url, json=payload, timeout=10)
-        elif 'webhook.office.com' in url or 'outlook.office.com/webhook' in url:
+        elif target_kind == 'teams':
             payload = {
                 '@type': 'MessageCard',
                 '@context': 'https://schema.org/extensions',

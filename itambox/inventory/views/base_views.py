@@ -10,6 +10,7 @@ from django.utils.translation import gettext_lazy as _
 
 from ..models import Accessory, Consumable, AccessoryStock, ConsumableStock, Component, ComponentStock
 from inventory.services import checkout_inventory_item
+from itambox.views.generic.utils import safe_return_url
 
 
 class InventoryListView(LoginRequiredMixin, View):
@@ -72,11 +73,11 @@ def bulk_checkout_inventory(request):
             raise ValueError()
     except ValueError:
         messages.error(request, _("Invalid checkout quantity specified."))
-        return HttpResponseRedirect(request.META.get('HTTP_REFERER', '/'))
+        return HttpResponseRedirect(safe_return_url(request, request.META.get('HTTP_REFERER'), '/'))
 
     if not object_pks:
         messages.error(request, _("No items selected."))
-        return HttpResponseRedirect(request.META.get('HTTP_REFERER', '/'))
+        return HttpResponseRedirect(safe_return_url(request, request.META.get('HTTP_REFERER'), '/'))
 
     from organization.models import AssetHolder, Location
     from assets.models import Asset
@@ -88,10 +89,10 @@ def bulk_checkout_inventory(request):
     filled = [t for t in [holder_id, location_id, asset_id] if t]
     if len(filled) == 0:
         messages.error(request, _("You must select either an Asset Holder, a Location, or an Asset."))
-        return HttpResponseRedirect(request.META.get('HTTP_REFERER', '/'))
+        return HttpResponseRedirect(safe_return_url(request, request.META.get('HTTP_REFERER'), '/'))
     if len(filled) > 1:
         messages.error(request, _("Please select only one target (Asset Holder, Location, or Asset)."))
-        return HttpResponseRedirect(request.META.get('HTTP_REFERER', '/'))
+        return HttpResponseRedirect(safe_return_url(request, request.META.get('HTTP_REFERER'), '/'))
 
     holder = None
     location = None
@@ -123,7 +124,7 @@ def bulk_checkout_inventory(request):
             from_location_id = request.POST.get('from_location')
             if not from_location_id:
                 messages.error(request, _("No source location specified."))
-                return HttpResponseRedirect(request.META.get('HTTP_REFERER', '/'))
+                return HttpResponseRedirect(safe_return_url(request, request.META.get('HTTP_REFERER'), '/'))
             from_location = get_object_or_404(Location, pk=from_location_id)
 
             for pk in object_pks:
@@ -178,4 +179,4 @@ def bulk_checkout_inventory(request):
     elif model_name_str in ('inventory.component', 'inventory.componentstock'):
         redirect_url = reverse('inventory:component_list')
 
-    return HttpResponseRedirect(request.META.get('HTTP_REFERER', redirect_url))
+    return HttpResponseRedirect(safe_return_url(request, request.META.get('HTTP_REFERER'), redirect_url))

@@ -42,9 +42,13 @@ def parse_scim_filter(filter_str, model_type='user'):
     # E.g. id eq 123
 
     # We match: (attribute) (operator) (value)
-    # The value can be double-quoted, single-quoted, or unquoted (like true/false/numbers)
+    # The value can be double-quoted, single-quoted, or unquoted (like true/false/numbers).
+    # Whitespace quantifiers are possessive (\s*+ / \s++, Python 3.11+): the tokens
+    # around each whitespace run are non-whitespace, so nothing is ever given back —
+    # this removes the polynomial backtracking (ReDoS) on crafted space runs while
+    # matching exactly the same expressions.
     pattern = re.compile(
-        r'^\s*([a-zA-Z0-9_\.]+)\s+(eq|co|sw|ew|gt|ge|lt|le|pr)\s*(?:"([^"]*)"|\'([^\']*)\'|([^\s"\'\)]+))?\s*$',
+        r'^\s*+([a-zA-Z0-9_\.]+)\s++(eq|co|sw|ew|gt|ge|lt|le|pr)\s*+(?:"([^"]*)"|\'([^\']*)\'|([^\s"\'\)]+))?\s*+$',
         re.IGNORECASE
     )
 

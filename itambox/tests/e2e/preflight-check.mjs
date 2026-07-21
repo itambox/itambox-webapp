@@ -60,7 +60,7 @@ console.log('\nE2E Prerequisites');
 console.log('─────────────────\n');
 
 if (process.env.E2E_USERNAME) {
-  ok(`E2E_USERNAME = ${process.env.E2E_USERNAME}`);
+  ok('E2E_USERNAME is set');
 } else {
   fail('E2E_USERNAME is not set');
 }
