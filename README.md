@@ -4,8 +4,6 @@
   </a>
 </p>
 
-<h1 align="center">ITAMbox</h1>
-
 <p align="center">
   <strong>Self-hosted IT asset management for hardware, software, custody, procurement, and compliance.</strong>
 </p>
