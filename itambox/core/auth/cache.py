@@ -19,7 +19,6 @@ _LOCAL_CACHE_PREFIXES = (
     '_all_accessible_group_ids',
     '_accessible_tenant_ids',
     '_applicable_grants',
-    '_authorization_synced',
     '_all_accessible_perms',
     '_tenant_permissions_map',
 )
@@ -100,9 +99,24 @@ def invalidate_authorization_topology(*, using=None):
 
 
 def synchronize_authorization_cache(user):
-    """Clear local values when another model instance/process changed RBAC."""
-    if hasattr(user, '__dict__') and user.__dict__.get('_authorization_synced'):
-        return
+    """Clear local values when another model instance/process changed RBAC.
+
+    Always re-reads the two-key shared generation pair and compares it against
+    what this object last saw — there is no "already synced, skip" shortcut.
+    Write-side signal handlers publish invalidation by user id only (see
+    ``organization/signals.py``); they cannot reach back into a Python object
+    already held by this process. A one-shot-per-object skip therefore made a
+    long-lived ``user`` instance (a view that writes a RoleGrant/Membership/
+    Role and immediately rechecks ``has_perm`` on the same object, or a test
+    reusing ``self.user`` across a mutation) permanently blind to its own
+    write once it had synced a single time — including under a cache outage,
+    where every call must recompute rather than trust a local memo made
+    before the outage started. The request-local memos this call gates
+    (``_applicable_grants``, ``_tenant_permissions_map``, ``_perms_tenant_*``,
+    ...) are what make repeated ``has_perm`` checks cheap; this is a two-key
+    ``cache.get_many`` round trip, negligible next to the grant-walk queries
+    those memos avoid.
+    """
     try:
         keys = (_cache_key(user.pk), _TOPOLOGY_CACHE_KEY)
         versions = cache.get_many(keys)
@@ -115,5 +129,3 @@ def synchronize_authorization_cache(user):
     if getattr(user, _LOCAL_VERSION_ATTR, object()) != version:
         clear_local_authorization_cache(user)
         setattr(user, _LOCAL_VERSION_ATTR, version)
-    if hasattr(user, '__dict__'):
-        user.__dict__['_authorization_synced'] = True

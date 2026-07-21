@@ -205,6 +205,13 @@ class MembershipBackend:
         ``has_perm`` / ``has_module_perms`` checks under the all-accessible
         scope become single set lookups instead of iterating every tenant
         on every call (fix #2 for issue #56).
+
+        Prebuilds ``build_accessible_tenant_permissions_map`` once before the
+        per-tenant loop below (phase 3 correction for issue #56): that map is
+        a single-pass precompute of the same ``covers_tenant()`` union each
+        ``_effective_perms_for_tenant`` call below would otherwise re-derive
+        per tenant, but nothing called it in production, so it stayed dormant
+        and the per-tenant loop kept paying the full per-grant walk N times.
         """
         synchronize_authorization_cache(user_obj)
         cached = user_obj.__dict__.get('_all_accessible_perms')
@@ -213,6 +220,9 @@ class MembershipBackend:
         group_tenants = self._group_scope_tenants(user_obj)
         if group_tenants is None:
             return frozenset()
+        # inline import: avoids AppRegistryNotReady at auth-backend import time.
+        from organization.rbac import build_accessible_tenant_permissions_map
+        build_accessible_tenant_permissions_map(user_obj)
         all_perms = set()
         for tenant in group_tenants:
             all_perms.update(self._effective_perms_for_tenant(user_obj, tenant))

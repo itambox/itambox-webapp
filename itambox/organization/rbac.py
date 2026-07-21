@@ -60,7 +60,7 @@ def effective_permissions_with_expiry(user, tenant):
     if hasattr(user, '__dict__'):
         perm_map = user.__dict__.get('_tenant_permissions_map')
         if perm_map is not None and tenant.pk in perm_map:
-            return perm_map[tenant.pk], None
+            return perm_map[tenant.pk]
     permissions = set()
     valid_until = None
     for grant in applicable_grants(user):
@@ -77,12 +77,49 @@ def effective_permissions(user, tenant):
     return effective_permissions_with_expiry(user, tenant)[0]
 
 
+def _grant_candidate_tenant_ids(grant):
+    """Tenant ids a grant might cover: its scoped (managed) reach plus its own
+    principal tenant. Membership here is not itself coverage — the caller
+    still confirms each id with ``grant.covers_tenant()``.
+    """
+    candidate_ids = grant.scoped_tenant_ids()
+    owner_id = grant.principal_tenant_id
+    if owner_id is not None:
+        candidate_ids.add(owner_id)
+    return candidate_ids
+
+
+def _accumulate_grant_coverage(
+    grant, perms, candidate_ids, tenants_by_id, tenant_perms, tenant_valid_until,
+):
+    """Add ``perms`` to every candidate tenant ``grant`` actually covers, and
+    track the earliest ``valid_until`` contributed to each of those tenants.
+    """
+    for tid in candidate_ids:
+        tenant = tenants_by_id.get(tid)
+        if tenant is None or not grant.covers_tenant(tenant):
+            continue
+        tenant_perms.setdefault(tid, set()).update(perms)
+        if grant.valid_until is None:
+            continue
+        earliest = tenant_valid_until.get(tid)
+        if earliest is None or grant.valid_until < earliest:
+            tenant_valid_until[tid] = grant.valid_until
+
+
 def build_accessible_tenant_permissions_map(user, grants=None):
-    """Precompute ``{tenant_pk: frozenset(perms)}`` in one pass over grants.
+    """Precompute ``{tenant_pk: (frozenset(perms), valid_until)}`` in one pass.
 
     Cached on ``user.__dict__['_tenant_permissions_map']`` with the same
     authorization-cache generation guard as other request-local memos
-    (fix #3 for issue #56).
+    (fix #3 for issue #56). Each entry's coverage is derived from
+    ``grant.covers_tenant(tenant)`` — the same check ``effective_permissions``
+    uses — rather than re-deriving scope semantics here: an ALL_MANAGED or
+    TENANT_GROUP-only grant does not cover its own principal tenant, so the
+    owner id is only added when a scope on the grant actually covers it
+    (phase 3 correction for issue #56; the previous version added the owner id
+    unconditionally, leaking a managed-only grant's permissions into the
+    principal's own tenant).
     """
     if not hasattr(user, '__dict__'):
         return {}
@@ -94,18 +131,37 @@ def build_accessible_tenant_permissions_map(user, grants=None):
         return cached
     if grants is None:
         grants = applicable_grants(user)
-    tenant_perms = {}
+
+    grant_candidates = []
+    all_candidate_ids = set()
     for grant in grants:
         perms = grant.role.permissions
         if not perms:
             continue
-        covered_ids = set(grant.scoped_tenant_ids())
-        owner_id = grant.principal_tenant_id
-        if owner_id is not None:
-            covered_ids.add(owner_id)
-        for tid in covered_ids:
-            tenant_perms.setdefault(tid, set()).update(perms)
-    result = {pk: frozenset(perms) for pk, perms in tenant_perms.items()}
+        candidate_ids = _grant_candidate_tenant_ids(grant)
+        if not candidate_ids:
+            continue
+        grant_candidates.append((grant, perms, candidate_ids))
+        all_candidate_ids.update(candidate_ids)
+
+    tenants_by_id = {
+        tenant.pk: tenant
+        for tenant in Tenant._base_manager.filter(
+            pk__in=all_candidate_ids, deleted_at__isnull=True,
+        )
+    }
+
+    tenant_perms = {}
+    tenant_valid_until = {}
+    for grant, perms, candidate_ids in grant_candidates:
+        _accumulate_grant_coverage(
+            grant, perms, candidate_ids, tenants_by_id, tenant_perms, tenant_valid_until,
+        )
+
+    result = {
+        pk: (frozenset(perms), tenant_valid_until.get(pk))
+        for pk, perms in tenant_perms.items()
+    }
     user.__dict__['_tenant_permissions_map'] = result
     return result
 

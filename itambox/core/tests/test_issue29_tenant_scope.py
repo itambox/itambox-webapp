@@ -105,6 +105,29 @@ class GroupScopeResolutionPerfTests(TestCase):
             'exactly one request-local resolution',
         )
 
+    def test_group_scope_tenant_ids_resolve_once_per_request(self):
+        """Phase 3 correction for issue #56: ``_group_scope_tenant_ids`` re-ran
+        its Tenant intersection SELECT on every call even though the
+        underlying ``accessible_tenant_ids`` resolution was already memoized.
+        Repeated resolution for the same user/group in one request must not
+        repeat that query.
+        """
+        from core.managers import TenantScopingQuerySet
+
+        self._activate_group_scope()
+
+        def get_descendant_group_ids(group_id):
+            return [group_id]
+
+        first = TenantScopingQuerySet._group_scope_tenant_ids(
+            self.region, get_descendant_group_ids, Tenant,
+        )
+        with self.assertNumQueries(0):
+            second = TenantScopingQuerySet._group_scope_tenant_ids(
+                self.region, get_descendant_group_ids, Tenant,
+            )
+        self.assertEqual(first, second)
+
     def test_warm_accessible_tenant_cache_costs_zero_database_queries(self):
         from organization.access import accessible_tenant_ids
 
@@ -119,10 +142,12 @@ class GroupScopeResolutionPerfTests(TestCase):
         from assets.models import Asset
 
         self._activate_group_scope()
-        # Warm both request-local memos. Each later read performs exactly one
-        # tenant/group intersection SELECT plus the requested Asset SELECT.
+        # Warm both request-local memos, including the group's resolved
+        # tenant-id list (phase 3 correction for issue #56). Each later read
+        # now costs exactly the requested Asset SELECT — the tenant/group
+        # intersection SELECT no longer repeats per read.
         list(Asset.objects.all())
-        with self.assertNumQueries(20):
+        with self.assertNumQueries(10):
             for _ in range(10):
                 list(Asset.objects.all())
 
@@ -263,6 +288,30 @@ class AllAccessibleScopeTests(TestCase):
     def test_all_accessible_fail_closed_without_any_access(self):
         stranger = User.objects.create_user(username='i29a-stranger', password='pw')
         self.assertEqual(self._all_accessible_slugs(stranger), set())
+
+    def test_all_accessible_ambient_check_prebuilds_tenant_permissions_map(self):
+        """Phase 3 correction for issue #56: ``_all_accessible_permissions`` iterated
+        every accessible tenant via ``_effective_perms_for_tenant`` without ever
+        calling ``build_accessible_tenant_permissions_map`` — the corrected
+        single-pass map (see test_phase3_permissions_map.py) was defined but
+        never wired into the production ambient-permission path, so it stayed
+        dormant. Resolving an ambient permission under the all-accessible scope
+        must now populate that map as a side effect, not just leave it callable.
+        """
+        self.role_a.permissions = ['assets.view_asset']
+        self.role_a.save(update_fields=['permissions'])
+
+        _current_user.set(self.member)
+        set_current_tenant(None)
+        set_current_tenant_group(None)
+        set_current_all_accessible(True)
+
+        self.assertIsNone(self.member.__dict__.get('_tenant_permissions_map'))
+        self.assertTrue(self.member.has_perm('assets.view_asset'))
+
+        perm_map = self.member.__dict__.get('_tenant_permissions_map')
+        self.assertIsNotNone(perm_map)
+        self.assertIn('assets.view_asset', perm_map[self.cust_a.pk][0])
 
     def test_all_accessible_ten_asset_reads_are_exactly_ten_queries_when_warm(self):
         from assets.models import Asset

@@ -124,6 +124,16 @@ class TenantScopingQuerySet(models.QuerySet):
         reach-only tenant does not vanish after "Show All". Intersects the
         canonical accessible set with the group subtree; superusers and
         system/anonymous contexts see the whole subtree.
+
+        The underlying ``accessible_tenant_ids`` resolution is already
+        request-memoized, but this method's own intersection SELECT still ran
+        on every call — once per tenant-scoped queryset rendered under the
+        scope (issue #56 phase 3). Cache the resolved id list on the user,
+        keyed by group, so repeated resolution for the same user/group in one
+        request costs zero further queries. ``_group_scope_tenants_`` is
+        already an authorization-cache-invalidation prefix (used by the
+        ambient permission gate's own per-group cache), so this key is
+        covered by the same write-invalidation without any change there.
         """
         allowed_group_ids = get_descendant_group_ids(active_group.pk)
         # inline import: avoid a core.managers -> itambox.middleware circular
@@ -138,15 +148,29 @@ class TenantScopingQuerySet(models.QuerySet):
                 ).values_list('pk', flat=True)
             )
         if user:
+            can_cache = hasattr(user, '__dict__')
+            cache_key = f'_group_scope_tenants_ids_{active_group.pk}'
+            if can_cache:
+                # inline import: avoid a core.managers -> core.auth package
+                # circular import at module load (core.auth.__init__ imports
+                # core.managers).
+                from core.auth.cache import synchronize_authorization_cache
+                synchronize_authorization_cache(user)
+                cached = user.__dict__.get(cache_key)
+                if cached is not None:
+                    return cached
             # inline import: avoid a core.managers -> organization cycle at load.
             from organization.access import accessible_tenant_ids
             accessible = accessible_tenant_ids(user)
-            return list(
+            result = list(
                 Tenant._base_manager.filter(
                     pk__in=accessible, group_id__in=allowed_group_ids,
                     deleted_at__isnull=True,
                 ).values_list('pk', flat=True)
             )
+            if can_cache:
+                user.__dict__[cache_key] = result
+            return result
         return list(
             Tenant._base_manager.filter(
                 group_id__in=allowed_group_ids,

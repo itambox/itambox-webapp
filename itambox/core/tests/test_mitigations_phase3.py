@@ -158,7 +158,10 @@ class MitigationsPhase3Tests(TestCase):
         # skipped because this tenant is not managed by a provider. The all-accessible
         # scope caching from #29 (82f1cf5) avoids the extra token revocation re-
         # validation queries that were present in the pre-#29 baseline (cf774f2).
-        with self.assertNumQueries(18):
+        # build_accessible_tenant_permissions_map (phase 3 for issue #56) folds the
+        # per-tenant scoped-tenant-id/coverage walk into the one bounded Tenant lookup
+        # above instead of re-deriving it per grant, dropping 2 queries from this path.
+        with self.assertNumQueries(16):
             response = self.client.post(
                 self.graphql_url,
                 data=json.dumps({'query': query}),
