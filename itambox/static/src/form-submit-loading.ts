@@ -6,7 +6,7 @@
  * to provide crisp visual feedback and prevent accidental double-submits.
  */
 (function () {
-  let activeSubmits: Map<HTMLFormElement, HTMLElement> = new Map();
+  const activeSubmits: Map<HTMLFormElement, HTMLElement> = new Map();
 
   function showLoadingState(form: HTMLFormElement, submitter?: HTMLElement): void {
     if (!form || activeSubmits.has(form)) return;
