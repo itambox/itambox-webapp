@@ -21,7 +21,7 @@
     modals.forEach(function (modal) {
       try {
         const inst = bootstrap.Modal.getOrCreateInstance(modal);
-        
+
         // Restore focus to trigger element on hide to prevent aria-hidden focus warnings
         modal.addEventListener('hide.bs.modal', function () {
           if (triggerEl && typeof triggerEl.focus === 'function') {
@@ -35,12 +35,35 @@
         modal.addEventListener('hidden.bs.modal', function () {
           modal.remove();
         }, { once: true });
-        
+
         inst.show();
       } catch (_e) {
         console.warn('ITAMbox modal auto-show failed:', _e);
       }
     });
+  });
+
+  // 1b. Cancel-inside-modal guard.
+  // Modal forms carry an hx-target pointing at their own modal body, and the
+  // global `hx-boost="true"` on <body> turns plain <a href> controls (e.g. the
+  // crispy "Cancel" link) into boosted requests that INHERIT that hx-target — so
+  // clicking Cancel would load the whole cancel_url page into the modal body
+  // instead of closing the modal. A boosted anchor navigation inside a modal is
+  // never what we want, so abort the request and just dismiss the modal.
+  document.body.addEventListener('htmx:beforeRequest', function (evt: Event) {
+    const detail = (evt as CustomEvent).detail;
+    const elt = detail && (detail.elt as HTMLElement | undefined);
+    if (!elt || elt.tagName !== 'A') return;               // only anchors (Cancel/back links)
+    const modal = elt.closest('.modal') as HTMLElement | null;
+    if (!modal) return;                                    // only when inside a modal
+    const verb = detail.requestConfig && detail.requestConfig.verb;
+    if (!detail.boosted && verb !== 'get') return;         // form POSTs etc. are untouched
+    evt.preventDefault();                                  // abort the boosted page-load-into-modal
+    try {
+      bootstrap.Modal.getOrCreateInstance(modal).hide();
+    } catch (_e) {
+      console.warn('ITAMbox modal cancel-dismiss failed:', _e);
+    }
   });
 
   // 2. Dynamic target fields toggling for checkout and request forms (Assets, Licenses, Subscriptions)
@@ -51,7 +74,7 @@
 
     const holderDiv = form.querySelector('#div_id_asset_holder, #div_id_assigned_holder, #div_id_assigned_user') as HTMLElement | null;
     const locationDiv = form.querySelector('#div_id_location, #div_id_assigned_location') as HTMLElement | null;
-    
+
     // For requests, we have both #div_id_assigned_asset and #div_id_asset (which is the requested asset itself).
     // We only want to toggle the target #div_id_assigned_asset, not the requested asset.
     const isRequestForm = !!form.querySelector('[name=assigned_asset], [name=assigned_user], [name=assigned_location]');
