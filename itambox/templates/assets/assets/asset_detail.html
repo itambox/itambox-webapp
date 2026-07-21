@@ -268,10 +268,11 @@
         <div class="card border-0 shadow-sm">
             <div class="card-header border-0 bg-transparent d-flex justify-content-between align-items-center">
                 <h3 class="card-title">{% translate "Installed Physical Modules / Components" %}</h3>
-                <a href="{% url 'inventory:componentallocation_create' %}?asset={{ object.pk }}" class="btn btn-sm btn-primary">
-                    <i class="mdi mdi-plus"></i>
-                    {% translate "Add Component" %}
-                </a>
+                <button type="button" class="btn btn-sm btn-primary"
+                        hx-get="{% url 'inventory:componentallocation_create' %}?asset={{ object.pk }}&_quickadd=1"
+                        hx-target="#modal-placeholder">
+                    <i class="mdi mdi-plus"></i> {% translate "Add Component" %}
+                </button>
             </div>
             {% if components_table.rows %}
                 <div class="table-responsive">
