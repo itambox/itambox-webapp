@@ -45,9 +45,7 @@
                 </div>
                 <!-- Page title actions -->
                 <div class="col-auto ms-auto d-print-none">
-                    <div id="page-actions-block">
-                        {% block page_actions %}{% endblock %}
-                    </div>
+                    {% block page_actions %}<div id="page-actions-block"></div>{% endblock %}
                 </div>
             </div>
             {# Tabs Block #}
