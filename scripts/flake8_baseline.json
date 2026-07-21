@@ -26804,38 +26804,6 @@
       "count": 1
     },
     {
-      "path": "itambox/users/api/scim/filters.py",
-      "code": "E302",
-      "message": "expected 2 blank lines, found 1",
-      "source": "def parse_scim_filter(filter_str, model_type='user'):",
-      "context": "Module:body/FunctionDef:parse_scim_filter:self",
-      "count": 1
-    },
-    {
-      "path": "itambox/users/api/scim/filters.py",
-      "code": "W293",
-      "message": "blank line contains whitespace",
-      "source": "    ",
-      "context": "Module:body/FunctionDef:parse_scim_filter:self",
-      "count": 5
-    },
-    {
-      "path": "itambox/users/api/scim/filters.py",
-      "code": "W293",
-      "message": "blank line contains whitespace",
-      "source": "        ",
-      "context": "Module:body/FunctionDef:parse_scim_filter:self",
-      "count": 1
-    },
-    {
-      "path": "itambox/users/api/scim/filters.py",
-      "code": "W293",
-      "message": "blank line contains whitespace",
-      "source": "            ",
-      "context": "Module:body/FunctionDef:parse_scim_filter:self",
-      "count": 1
-    },
-    {
       "path": "itambox/users/api/scim/provider_authentication.py",
       "code": "B904",
       "message": "Within an `except` clause, raise exceptions with `raise ... from err` or `raise ... from None` to distinguish them from errors in exception handling.  See https://docs.python.org/3/tutorial/errors.html#exception-chaining for details.",

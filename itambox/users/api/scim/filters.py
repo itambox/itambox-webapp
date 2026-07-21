@@ -6,6 +6,19 @@ class SCIMFilterError(ValueError):
     """Raised when a SCIM filter expression cannot be parsed."""
     pass
 
+
+# Upper bound on a SCIM filter expression before it reaches the parser regex.
+# The grammar has adjacent whitespace groups (\s+ ... \s*) that backtrack
+# polynomially on long crafted inputs (ReDoS); real filters are short.
+MAX_SCIM_FILTER_LENGTH = 512
+
+
+def _reject_oversized_filter(filter_str):
+    """Raise SCIMFilterError if the expression exceeds the ReDoS length bound."""
+    if len(filter_str) > MAX_SCIM_FILTER_LENGTH:
+        raise SCIMFilterError("SCIM filter expression is too long.")
+
+
 def parse_scim_filter(filter_str, model_type='user'):
     if not filter_str:
         return Q()
@@ -14,6 +27,9 @@ def parse_scim_filter(filter_str, model_type='user'):
     filter_str = filter_str.strip()
     if not filter_str:
         return Q()
+
+    # Bound the input before any regex work (see MAX_SCIM_FILTER_LENGTH).
+    _reject_oversized_filter(filter_str)
 
     # Normalize common bracketed filter paths (e.g. emails[type eq "work"].value -> email)
     filter_str = re.sub(r'emails\[type\s+eq\s+["\']?[a-zA-Z0-9_-]+["\']?\]\.value', 'email', filter_str, flags=re.IGNORECASE)
@@ -24,28 +40,28 @@ def parse_scim_filter(filter_str, model_type='user'):
     # E.g. displayName eq "Admins"
     # E.g. userName sw "test"
     # E.g. id eq 123
-    
+
     # We match: (attribute) (operator) (value)
     # The value can be double-quoted, single-quoted, or unquoted (like true/false/numbers)
     pattern = re.compile(
         r'^\s*([a-zA-Z0-9_\.]+)\s+(eq|co|sw|ew|gt|ge|lt|le|pr)\s*(?:"([^"]*)"|\'([^\']*)\'|([^\s"\'\)]+))?\s*$',
         re.IGNORECASE
     )
-    
+
     match = pattern.match(filter_str)
     if not match:
         raise SCIMFilterError(f"Invalid SCIM filter expression: {filter_str}")
-        
+
     attr, op, val_double, val_single, val_unquoted = match.groups()
     val = val_double or val_single or val_unquoted
     op = op.lower()
-    
+
     if op != 'pr' and val is None:
         raise SCIMFilterError(f"Operator '{op}' requires a value.")
-    
+
     # Normalize attribute name
     attr_lower = attr.lower()
-    
+
     # Map SCIM attributes to Django model fields
     field_name = None
     if model_type == 'user':
@@ -64,7 +80,7 @@ def parse_scim_filter(filter_str, model_type='user'):
             field_name = 'name'
         elif attr_lower in ('id', 'externalid'):
             field_name = 'id'
-            
+
     if not field_name:
         field_name = attr
 

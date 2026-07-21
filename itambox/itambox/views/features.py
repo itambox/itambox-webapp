@@ -722,8 +722,12 @@ class WebhookEndpointEditView(ObjectEditView):
                 from core.events import _send_teams_notification
                 success = _send_teams_notification(url, test_payload, test_title)
             else:
-                import requests
-                resp = requests.post(url, json={'test': True, 'message': test_payload}, timeout=10)
+                # SSRF-hardened send: request_pinned re-validates at send time,
+                # pins the connection to the already-validated IP (closing the
+                # DNS-rebinding TOCTOU gap) and never follows redirects — unlike a
+                # raw requests.post, which re-resolves DNS and follows 3xx.
+                from core.http import request_pinned
+                resp = request_pinned('POST', url, json={'test': True, 'message': test_payload}, timeout=10)
                 success = resp.status_code < 400
         except Exception as e:
             messages.error(request, _("Test failed: %(error)s") % {'error': e})

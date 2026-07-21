@@ -2,17 +2,32 @@
  * ITAMbox — Report Template Designer and Column Sequence Manager.
  */
 (function () {
+  // Escape user-controlled text (column/field labels) before interpolating it
+  // into innerHTML templates below — labels may originate from custom-field
+  // names and could otherwise carry markup (stored XSS).
+  function escapeHtml(value: string): string {
+    return value.replace(/[&<>"']/g, (ch) => {
+      switch (ch) {
+        case '&': return '&amp;';
+        case '<': return '&lt;';
+        case '>': return '&gt;';
+        case '"': return '&quot;';
+        default: return '&#39;';
+      }
+    });
+  }
+
   function generateJinja2FromForm(): string {
     const descInput = document.querySelector('textarea[name="description"]') as HTMLTextAreaElement | null;
     const typeSelect = document.querySelector('select[name="report_type"]') as HTMLSelectElement | null;
 
     const description = descInput ? descInput.value || gettext('Visual inventory compilation.') : gettext('Visual inventory compilation.');
     const reportType = typeSelect ? typeSelect.value : 'asset_summary';
-    
+
     // Get selected checkboxes
     const checkedInputs = document.querySelectorAll('input[name="included_columns"]:checked') as NodeListOf<HTMLInputElement>;
     let selectedCols = Array.from(checkedInputs).map(el => el.value);
-    
+
     if (selectedCols.length === 0) {
       // fallback defaults based on report type
       if (reportType === 'asset_summary') {
@@ -39,7 +54,7 @@
         selectedCols = ['subscription_name', 'provider', 'billing_cycle', 'cost', 'end_date'];
       }
     }
-    
+
     // Header display names map
     const headersMap: Record<string, string> = {
       'asset_tag': gettext('Asset Tag'),
@@ -129,15 +144,15 @@
       'custody_ip_address': gettext('IP Address'),
       'custody_created_date': gettext('Created Date')
     };
-    
+
     const headers = selectedCols.map(col => headersMap[col] || col);
-    
+
     const summaryCardInput = document.querySelector('input[name="include_summary_cards"]') as HTMLInputElement | null;
     const stylePresetSelect = document.querySelector('select[name="style_preset"]') as HTMLSelectElement | null;
-    
+
     const includeSummary = summaryCardInput ? summaryCardInput.checked : false;
     const stylePreset = stylePresetSelect ? stylePresetSelect.value || 'default' : 'default';
-    
+
     // Per-preset CSS overrides (single source mirrors templates/core/reports/polished_report.html).
     // Single-quoted to avoid nested template literals; the chosen preset is baked in here.
     const presetCss: Record<string, string> = {
@@ -214,11 +229,11 @@
   function initReportTemplateForm() {
     const advancedModeCheckbox = document.querySelector('input[name="advanced_mode"]') as HTMLInputElement | null;
     const templateContentDiv = document.querySelector('textarea[name="template_content"]') as HTMLTextAreaElement | null;
-    
+
     if (!advancedModeCheckbox || !templateContentDiv) return;
-    
+
     const templateGroup = (templateContentDiv.closest('.mb-3') || templateContentDiv.closest('.form-group')) as HTMLElement | null;
-    
+
     const visualControls: HTMLElement[] = [
       'included_columns',
       'include_summary_cards',
@@ -236,12 +251,12 @@
     const colsContainer = document.getElementById('div_id_included_columns');
     if (colsContainer) {
       visualControls.push(colsContainer);
-      
+
       const formChecks = Array.from(colsContainer.querySelectorAll('.form-check')) as HTMLElement[];
       if (formChecks.length > 0) {
         // Hide standard inputs
         formChecks.forEach(el => el.style.display = 'none');
-        
+
         // Read saved sequence from the json_script element (autoescaped by Django).
         const savedSeqEl = document.getElementById('report-template-saved-sequence');
         let savedSeq: string[] = [];
@@ -255,7 +270,7 @@
             savedSeq = [];
           }
         }
-        
+
         if (savedSeq.length > 0) {
           const formChecksMap: Record<string, HTMLElement> = {};
           formChecks.forEach(checkDiv => {
@@ -277,7 +292,7 @@
             colsContainer.appendChild(checkDiv);
           });
         }
-        
+
         let managerWrapper = document.getElementById('visual-cols-manager-wrapper');
         if (!managerWrapper) {
           managerWrapper = document.createElement('div');
@@ -306,11 +321,11 @@
           `;
           colsContainer.appendChild(managerWrapper);
         }
-        
+
         const activeList = managerWrapper.querySelector('#active-cols-list') as HTMLElement;
         const availableList = managerWrapper.querySelector('#available-cols-list') as HTMLElement;
         const reportTypeSelect = document.querySelector('select[name="report_type"]') as HTMLSelectElement | null;
-        
+
         const columnsByReportType: Record<string, string[]> = {
           'asset_summary': [
             'asset_tag', 'name', 'manufacturer', 'model', 'serial_number',
@@ -341,31 +356,31 @@
           'hardware_inventory': ['hw_item_type', 'hw_name', 'hw_manufacturer', 'hw_category', 'hw_part_number', 'hw_total_stock', 'hw_available', 'hw_min_qty', 'hw_status'],
           'custody_compliance': ['custody_asset', 'custody_holder', 'custody_status', 'custody_accepted_date', 'custody_eula_version', 'custody_signature_provider', 'custody_qms_reference', 'custody_ip_address', 'custody_created_date']
         };
-        
+
         function renderVisualColumns() {
           activeList.innerHTML = '';
           availableList.innerHTML = '';
-          
+
           const selectedType = reportTypeSelect ? reportTypeSelect.value : 'asset_summary';
           const validCols = columnsByReportType[selectedType] || [];
-          
+
           const currentChecks = Array.from(colsContainer!.querySelectorAll('.form-check')) as HTMLElement[];
           let activeCount = 0;
-          
+
           currentChecks.forEach((checkDiv) => {
             const input = checkDiv.querySelector('input') as HTMLInputElement | null;
             const label = checkDiv.querySelector('label') as HTMLElement | null;
             if (!input) return;
-            
+
             const val = input.value;
             if (!validCols.includes(val)) {
               input.checked = false;
               return;
             }
-            
+
             const isChecked = input.checked;
             const labelText = label ? label.textContent || val : val;
-            
+
             if (isChecked) {
               activeCount++;
               const activeBadge = document.createElement('div');
@@ -375,7 +390,7 @@
               activeBadge.innerHTML = `
                   <div class="d-flex align-items-center">
                       <span class="badge bg-primary text-primary-fg me-2" style="font-size: 10px;">${activeCount}</span>
-                      <span class="small fw-semibold text-primary">${labelText.trim()}</span>
+                      <span class="small fw-semibold text-primary">${escapeHtml(labelText.trim())}</span>
                   </div>
                   <div class="d-flex align-items-center gap-1">
                       <button type="button" class="btn btn-sm btn-icon btn-outline-primary py-0 px-1 border-0 btn-move-up" title="${gettext('Move Up')}">
@@ -389,13 +404,13 @@
                       </button>
                   </div>
               `;
-              
+
               activeBadge.querySelector('.btn-remove-col')!.addEventListener('click', function() {
                 input.checked = false;
                 colsContainer!.appendChild(checkDiv);
                 renderVisualColumns();
               });
-              
+
               activeBadge.querySelector('.btn-move-up')!.addEventListener('click', function() {
                 const prev = checkDiv.previousElementSibling;
                 if (prev && prev.classList.contains('form-check')) {
@@ -403,7 +418,7 @@
                   renderVisualColumns();
                 }
               });
-              
+
               activeBadge.querySelector('.btn-move-down')!.addEventListener('click', function() {
                 const next = checkDiv.nextElementSibling;
                 if (next && next.classList.contains('form-check')) {
@@ -411,7 +426,7 @@
                   renderVisualColumns();
                 }
               });
-              
+
               activeList.appendChild(activeBadge);
             } else {
               const availPill = document.createElement('button');
@@ -422,26 +437,26 @@
               availPill.style.fontWeight = '500';
               availPill.innerHTML = `
                   <i class="mdi mdi-plus me-1"></i>
-                  ${labelText.trim()}
+                  ${escapeHtml(labelText.trim())}
               `;
-              
+
               availPill.addEventListener('click', function() {
                 input.checked = true;
                 colsContainer!.appendChild(checkDiv);
                 renderVisualColumns();
               });
-              
+
               availableList.appendChild(availPill);
             }
           });
-          
+
           if (activeCount === 0) {
             activeList.innerHTML = '<span class="text-muted small text-center my-auto py-3 italic">' + gettext('No columns selected. Click available columns to add them.') + '</span>';
           }
         }
-        
+
         renderVisualColumns();
-        
+
         if (reportTypeSelect) {
           reportTypeSelect.addEventListener('change', function() {
             const selectedType = reportTypeSelect.value;
@@ -469,11 +484,11 @@
       newBtn.style.fontSize = '12px';
       newBtn.innerHTML = '<i class="mdi mdi-refresh"></i> ' + gettext('Bootstrap from Visual Builder');
       regenBtn = newBtn;
-      
+
       if (templateGroup && templateContentDiv) {
         templateGroup.insertBefore(regenBtn, templateContentDiv);
       }
-      
+
       regenBtn.addEventListener('click', function(e) {
         e.preventDefault();
         if (confirm(gettext('Are you sure you want to overwrite the current custom template with the selections from the Visual Builder?'))) {
@@ -483,13 +498,13 @@
         }
       });
     }
-    
+
     function toggleFields() {
       const isAdvanced = advancedModeCheckbox!.checked;
       if (isAdvanced) {
         if (templateGroup) templateGroup.style.display = 'block';
         visualControls.forEach(el => el.style.display = 'none');
-        
+
         if (templateContentDiv!.value.trim() === '') {
           templateContentDiv!.value = generateJinja2FromForm();
         }
@@ -498,14 +513,14 @@
         visualControls.forEach(el => el.style.display = 'block');
       }
     }
-    
+
     advancedModeCheckbox.addEventListener('change', toggleFields);
     toggleFields(); // initial run
 
     // Live Preview Button Setup
     const submitBtn = document.querySelector('input[name="submit"]') || document.querySelector('button[type="submit"]') || document.querySelector('.btn-primary');
     const existingPreviewBtn = document.getElementById('btn-preview-report');
-    
+
     if (submitBtn && !existingPreviewBtn) {
       const previewBtn = document.createElement('button');
       previewBtn.type = 'button';
@@ -514,9 +529,9 @@
       previewBtn.style.borderRadius = '6px';
       previewBtn.style.fontWeight = '600';
       previewBtn.innerHTML = '<i class="mdi mdi-eye-outline me-1"></i> ' + gettext('Preview Report');
-      
+
       submitBtn.parentNode!.insertBefore(previewBtn, submitBtn.nextSibling);
-      
+
       previewBtn.addEventListener('click', function(e) {
         e.preventDefault();
         openReportPreviewModal();
@@ -527,7 +542,7 @@
   function openReportPreviewModal() {
     const spinner = document.getElementById('previewSpinner');
     const frame = document.getElementById('previewFrame') as HTMLIFrameElement | null;
-    
+
     if (spinner) {
       spinner.classList.remove('d-none');
       spinner.classList.add('d-flex');
@@ -601,7 +616,7 @@
       }
     });
   }
-  
+
   if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', initReportTemplateForm);
   } else {
