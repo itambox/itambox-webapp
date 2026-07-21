@@ -49,6 +49,28 @@ jobs:
           python-version: "3.12"
           cache: pip
 
+      # python-ldap (pulled by django-auth-ldap) needs libldap2/sasl headers for
+      # source builds. Some ubuntu images miss these packages by default.
+      - name: Install system deps for python-ldap
+        run: |
+          if command -v apt-get >/dev/null; then
+            if [ "$(id -u)" -eq 0 ]; then
+              apt-get update
+              apt-get install -y --no-install-recommends \
+                gcc \
+                libldap2-dev \
+                libsasl2-dev \
+                libssl-dev
+            else
+              sudo apt-get update
+              sudo apt-get install -y --no-install-recommends \
+                gcc \
+                libldap2-dev \
+                libsasl2-dev \
+                libssl-dev
+            fi
+          fi
+
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
