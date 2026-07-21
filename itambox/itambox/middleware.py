@@ -46,14 +46,24 @@ class CurrentUserMiddleware:
         user = request.user if hasattr(request, 'user') and request.user.is_authenticated else None
         # Keep the reset tokens so the prior context is restored (not clobbered to
         # None) — correct for nested/async-shared contexts under ASGI.
+        request_id = uuid.uuid4()
+        user_token = _current_user.set(user)
+        request_id_token = _request_id.set(request_id)
+        from core.auth.cache import begin_authorization_request
+
+        authorization_token = begin_authorization_request(request_id)
         return (
-            _current_user.set(user),
-            _request_id.set(uuid.uuid4()),
+            user_token,
+            request_id_token,
+            authorization_token,
         )
 
     def process_response(self, request, response, tokens=None):
         if tokens is not None:
-            user_token, request_id_token = tokens
+            user_token, request_id_token, authorization_token = tokens
+            from core.auth.cache import end_authorization_request
+
+            end_authorization_request(authorization_token)
             _current_user.reset(user_token)
             _request_id.reset(request_id_token)
         else:
@@ -61,6 +71,9 @@ class CurrentUserMiddleware:
             # invoked outside __call__): clear to None as before.
             _current_user.set(None)
             _request_id.set(None)
+            from core.auth.cache import end_authorization_request
+
+            end_authorization_request()
         return response
 
 
