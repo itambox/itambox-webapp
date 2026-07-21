@@ -106,7 +106,7 @@ export class AssetScanner {
           if (raw.startsWith("'") && raw.endsWith("'")) {
             raw = raw.slice(1, -1).trim();
           }
-          
+
           // Normalize full-width colons
           raw = raw.replace(/：/g, ':');
 
@@ -199,8 +199,7 @@ function initAuditScanner(): void {
   if (!openBtn || openBtn.dataset.scannerInitialized) return;
   openBtn.dataset.scannerInitialized = 'true';
   const searchField = document.getElementById('barcode-scan-input') as HTMLInputElement | null;
-  let instance: AssetScanner;
-  instance = new AssetScanner({
+  const instance = new AssetScanner({
     readerId: 'scanner-reader',
     modalId: 'scanner-modal',
     torchId: 'toggle-torch-btn',
