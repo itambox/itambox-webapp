@@ -20822,14 +20822,6 @@
     {
       "path": "itambox/licenses/forms.py",
       "code": "F401",
-      "message": "'.models.LicenseSeatAssignment' imported but unused",
-      "source": "from .models import License, LicenseSeatAssignment",
-      "context": "Module:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/licenses/forms.py",
-      "code": "F401",
       "message": "'crispy_forms.layout.Column' imported but unused",
       "source": "from crispy_forms.layout import Layout, Fieldset, Div, Row, Column",
       "context": "Module:body",
@@ -20841,22 +20833,6 @@
       "message": "'crispy_forms.layout.Row' imported but unused",
       "source": "from crispy_forms.layout import Layout, Fieldset, Div, Row, Column",
       "context": "Module:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/licenses/forms.py",
-      "code": "W293",
-      "message": "blank line contains whitespace",
-      "source": "        ",
-      "context": "Module:body/ClassDef:LicenseCheckOutForm:body/FunctionDef:__init__:self",
-      "count": 1
-    },
-    {
-      "path": "itambox/licenses/forms.py",
-      "code": "W293",
-      "message": "blank line contains whitespace",
-      "source": "            ",
-      "context": "Module:body/ClassDef:LicenseCheckOutForm:body/FunctionDef:__init__:self",
       "count": 1
     },
     {
@@ -21321,14 +21297,6 @@
       "message": "line too long (144 > 120 characters)",
       "source": "    queryset = License.objects.with_counts().select_related('software', 'software__manufacturer', 'tenant', 'supplier').prefetch_related('tags')",
       "context": "Module:body/ClassDef:LicenseListView:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/licenses/views.py",
-      "code": "E302",
-      "message": "expected 2 blank lines, found 1",
-      "source": "class LicenseDeleteView(ObjectDeleteView):",
-      "context": "Module:body/ClassDef:LicenseDeleteView:self",
       "count": 1
     },
     {

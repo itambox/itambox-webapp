@@ -14,6 +14,7 @@ from itambox.views.generic import (
 )
 from itambox.utils import get_paginate_count
 from itambox.panels import Panel
+from itambox.quick_add import QuickAddMixin
 from .models import License, LicenseSeatAssignment
 from . import forms
 from . import tables
@@ -94,6 +95,25 @@ class LicenseEditView(ObjectEditView):
     model_form = forms.LicenseForm
     template_name = 'generic/object_edit.html'
     default_return_url = 'licenses:license_list'
+
+
+class LicenseSeatAssignmentEditView(QuickAddMixin, ObjectEditView):
+    """Assign/edit a license seat on an asset (quick-add modal from the asset
+    detail Licenses tab; mirrors WarrantyEditView)."""
+    queryset = LicenseSeatAssignment.objects.all()
+    model = LicenseSeatAssignment
+    model_form = forms.LicenseSeatAssignmentForm
+    template_name = 'generic/object_edit.html'
+    default_return_url = 'licenses:license_list'
+    quick_add_reload = True
+
+    def get_initial(self):
+        initial = super().get_initial()
+        asset_id = self.request.GET.get('asset')
+        if asset_id:
+            initial['asset'] = asset_id
+        return initial
+
 
 class LicenseDeleteView(ObjectDeleteView):
     queryset = License.objects.all()

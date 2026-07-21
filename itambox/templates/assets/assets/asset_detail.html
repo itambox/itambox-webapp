@@ -344,7 +344,11 @@
 
     {% translate "Allocated Software Licenses" as t_seats %}
     {% translate "No software license seats allocated to this asset." as e_seats %}
-    {% include 'generic/includes/related_table_tab.html' with tab="license-seats" table=license_seats_table title=t_seats empty=e_seats %}
+    {% translate "Assign License" as t_add_license %}
+    {% url 'licenses:licenseseatassignment_create' as lic_add_base %}
+    {% with asset_pk=object.pk|stringformat:"s" %}
+    {% include 'generic/includes/related_table_tab.html' with tab="license-seats" table=license_seats_table title=t_seats empty=e_seats add_modal_url=lic_add_base|add:"?asset="|add:asset_pk|add:"&_quickadd=1" add_label=t_add_license %}
+    {% endwith %}
 
     <div class="tab-pane fade {% if request.GET.tab == 'warranties' %}show active{% endif %}" id="warranties" role="tabpanel">
         <div class="card border-0 shadow-sm">
