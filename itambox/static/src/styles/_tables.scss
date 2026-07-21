@@ -108,7 +108,9 @@
     th.col-checkout,
     td.col-checkout {
         position: sticky !important;
-        right: 100px !important;
+        // Sits immediately left of the sticky actions column, so this offset must
+        // equal the col-actions width below (120px).
+        right: 120px !important;
         z-index: 2 !important;
         background-color: var(--tblr-bg-surface) !important;
         white-space: nowrap;
@@ -123,11 +125,16 @@
         background-color: var(--tblr-bg-surface-secondary, #f4f6fa) !important;
     }
 
+    // 120px fits the standard action set (copy + edit + dropdown ≈ 106px) plus
+    // cell padding. At 100px the buttons spilled ~6px past the cell, overflowing
+    // the table horizontally; that horizontal scrollbar's height then pushed
+    // short pages just over the viewport, producing a spurious vertical page
+    // scrollbar. Keep col-checkout's `right` offset (above) in lockstep.
     th.col-actions,
     td.col-actions {
-        min-width: 100px !important;
-        width: 100px !important;
-        max-width: 100px !important;
+        min-width: 120px !important;
+        width: 120px !important;
+        max-width: 120px !important;
         position: sticky !important;
         right: 0 !important;
         z-index: 2 !important;

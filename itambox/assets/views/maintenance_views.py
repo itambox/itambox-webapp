@@ -2,6 +2,7 @@ from django.urls import reverse_lazy
 from django.utils.translation import gettext_lazy as _
 
 from itambox.panels import Panel
+from itambox.quick_add import QuickAddMixin
 from itambox.views.generic import (
     ObjectListView, ObjectDetailView, ObjectEditView, ObjectDeleteView, ObjectCloneView
 )
@@ -30,12 +31,15 @@ class AssetMaintenanceDetailView(ObjectDetailView):
     )
 
 
-class AssetMaintenanceEditView(ObjectEditView):
+class AssetMaintenanceEditView(QuickAddMixin, ObjectEditView):
     queryset = AssetMaintenance.objects.all()
     model = AssetMaintenance
     model_form = AssetMaintenanceForm
     template_name = 'generic/object_edit.html'
     default_return_url = 'assets:assetmaintenance_list'
+    # When opened as a quick-add modal from an asset's Maintenances tab, save and
+    # reload back to the asset detail (mirrors WarrantyEditView).
+    quick_add_reload = True
 
     def get_initial(self):
         initial = super().get_initial()

@@ -191,7 +191,7 @@
                 <div class="card-body pt-0">{{ object.notes|linebreaksbr }}</div>
             </div>
             {% endif %}
-            
+
             {# Asset has no `comments` or `description` field (only `notes`, above); dead cards removed. #}
         </div>
 
@@ -291,10 +291,11 @@
         <div class="card border-0 shadow-sm">
             <div class="card-header border-0 bg-transparent d-flex justify-content-between align-items-center">
                 <h3 class="card-title">{% translate "Asset Repair &amp; Upgrade History" %}</h3>
-                <a href="{% url 'assets:assetmaintenance_create' %}?asset={{ object.pk }}" class="btn btn-sm btn-primary">
-                    <i class="mdi mdi-plus"></i>
-                    {% translate "Record Maintenance" %}
-                </a>
+                <button type="button" class="btn btn-sm btn-primary"
+                        hx-get="{% url 'assets:assetmaintenance_create' %}?asset={{ object.pk }}&_quickadd=1"
+                        hx-target="#modal-placeholder">
+                    <i class="mdi mdi-plus"></i> {% translate "Record Maintenance" %}
+                </button>
             </div>
             {% if maintenances_table.rows %}
                 <div class="table-responsive">
