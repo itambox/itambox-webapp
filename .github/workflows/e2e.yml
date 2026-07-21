@@ -14,8 +14,23 @@ concurrency:
 
 jobs:
   e2e:
-    runs-on: [self-hosted, Linux, ARM64, itambox-ci]
+    runs-on: ubuntu-latest
     timeout-minutes: 60
+
+    services:
+      postgres:
+        image: postgres:16@sha256:33f923b05f64ca54ac4401c01126a6b92afe839a0aa0a52bc5aeb5cc958e5f20
+        env:
+          POSTGRES_DB: itambox_e2e
+          POSTGRES_USER: itambox_e2e
+          POSTGRES_PASSWORD: itambox_e2e
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd="pg_isready --host=127.0.0.1 --port=5432 --username=itambox_e2e --dbname=itambox_e2e"
+          --health-interval=2s
+          --health-timeout=2s
+          --health-retries=30
 
     env:
       ITAMBOX_ENV: dev
@@ -37,107 +52,6 @@ jobs:
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
 
-      - name: Start PostgreSQL in the runner network namespace
-        id: postgres
-        shell: bash
-        run: |
-          security_options=$(docker info --format '{{json .SecurityOptions}}')
-          [[ ${security_options} == *name=rootless* ]]
-
-          runner_id=$(docker inspect --format '{{.Id}}' "${HOSTNAME}")
-          [[ ${runner_id} =~ ^[0-9a-f]{64}$ ]]
-          runner_identity=$(docker inspect \
-            --format '{{.Name}}|{{index .Config.Labels "io.itambox.role"}}|{{.State.Running}}' \
-            "${runner_id}")
-          [[ ${runner_identity} == '/itambox-ci-runner|ci-runner|true' ]]
-
-          container_id_output=$(docker container ls --all --quiet --no-trunc)
-          grep -Fxq "${runner_id}" <<<"${container_id_output}"
-          mapfile -t unexpected_ids < <(grep -Fvx "${runner_id}" <<<"${container_id_output}" || true)
-          ((${#unexpected_ids[@]} == 0))
-          if PGCONNECT_TIMEOUT=1 PGPASSWORD=itambox_e2e psql \
-            --host 127.0.0.1 --port 5432 --username itambox_e2e --dbname itambox_e2e \
-            --no-password --command 'SELECT 1;' >/dev/null 2>&1; then
-            echo "a PostgreSQL service already occupies the runner namespace" >&2
-            exit 1
-          fi
-
-          postgres_name="postgres-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
-          postgres_id=
-          cleanup_failed_start() {
-            rc=$?
-            if ((rc != 0)) && [[ ${postgres_id} =~ ^[0-9a-f]{64}$ ]]; then
-              docker rm --force "${postgres_id}" >/dev/null 2>&1 || true
-            fi
-            exit "${rc}"
-          }
-          trap cleanup_failed_start EXIT
-
-          postgres_id=$(docker run --detach \
-            --name "${postgres_name}" \
-            --network "container:${runner_id}" \
-            --read-only \
-            --tmpfs /tmp:rw,nosuid,nodev,noexec,size=64m \
-            --tmpfs /var/lib/postgresql/data:rw,nosuid,nodev,noexec,size=1g \
-            --tmpfs /var/run/postgresql:rw,nosuid,nodev,noexec,size=16m \
-            --security-opt no-new-privileges \
-            --env POSTGRES_DB=itambox_e2e \
-            --env POSTGRES_USER=itambox_e2e \
-            --env POSTGRES_PASSWORD=itambox_e2e \
-            --label io.itambox.role=postgres-sidecar \
-            --label "io.itambox.github-run-id=${GITHUB_RUN_ID}" \
-            --health-cmd='pg_isready --host 127.0.0.1 --port 5432 --username itambox_e2e --dbname itambox_e2e' \
-            --health-interval=2s \
-            --health-timeout=2s \
-            --health-retries=30 \
-            postgres:16@sha256:33f923b05f64ca54ac4401c01126a6b92afe839a0aa0a52bc5aeb5cc958e5f20 \
-            postgres -c listen_addresses=127.0.0.1)
-          [[ ${postgres_id} =~ ^[0-9a-f]{64}$ ]]
-
-          postgres_healthy=false
-          for _ in $(seq 1 60); do
-            container_state=$(docker inspect \
-              --format '{{.State.Status}}|{{if .State.Health}}{{.State.Health.Status}}{{else}}missing{{end}}' \
-              "${postgres_id}")
-            case ${container_state} in
-              running\|healthy)
-                postgres_healthy=true
-                break
-                ;;
-              exited\|*|dead\|*|*\|unhealthy|*\|missing)
-                docker logs "${postgres_id}"
-                exit 1
-                ;;
-            esac
-            sleep 2
-          done
-          [[ ${postgres_healthy} == true ]]
-
-          # Retry an authenticated TCP query from the Actions runner itself.
-          # This cannot succeed against PostgreSQL's temporary Unix-socket-only
-          # initialization server and proves localhost namespace sharing.
-          postgres_ready=false
-          for _ in $(seq 1 60); do
-            if PGCONNECT_TIMEOUT=2 PGPASSWORD=itambox_e2e psql \
-              --host 127.0.0.1 \
-              --port 5432 \
-              --username itambox_e2e \
-              --dbname itambox_e2e \
-              --no-password \
-              --command 'SELECT 1;' >/dev/null 2>&1; then
-              postgres_ready=true
-              break
-            fi
-            sleep 2
-          done
-          if [[ ${postgres_ready} != true ]]; then
-            docker logs "${postgres_id}"
-            exit 1
-          fi
-          [[ $(docker inspect --format '{{.State.Running}}|{{.State.Health.Status}}' "${postgres_id}") == 'true|healthy' ]]
-          echo "container_id=${postgres_id}" >>"${GITHUB_OUTPUT}"
-          trap - EXIT
-
       - name: Set up Python 3.12
         uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
         with:
@@ -145,7 +59,7 @@ jobs:
           cache: 'pip'
 
       # python-ldap (pulled by django-auth-ldap) needs libldap2/sasl headers for
-      # source builds. The self-hosted ARM64 runner may not include them by default.
+      # source builds on Ubuntu runners.
       - name: Install system deps for python-ldap
         run: |
           if command -v apt-get >/dev/null; then
@@ -309,30 +223,3 @@ jobs:
             itambox/tests/e2e/storageStateError.png
           if-no-files-found: warn
           retention-days: 7
-
-      - name: Remove PostgreSQL
-        if: always()
-        env:
-          POSTGRES_ID: ${{ steps.postgres.outputs.container_id }}
-        run: |
-          postgres_id=${POSTGRES_ID:-}
-          postgres_name="postgres-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
-          expected_identity="/${postgres_name}|${GITHUB_RUN_ID}"
-          if [[ -z ${postgres_id} ]]; then
-            candidate_output=$(docker container ls --all --quiet --no-trunc \
-              --filter "label=io.itambox.github-run-id=${GITHUB_RUN_ID}" \
-              --filter "name=^/${postgres_name}$")
-            candidate_ids=()
-            while IFS= read -r candidate_id; do
-              [[ -z ${candidate_id} ]] || candidate_ids+=("${candidate_id}")
-            done <<<"${candidate_output}"
-            ((${#candidate_ids[@]} <= 1))
-            ((${#candidate_ids[@]} == 0)) && exit 0
-            postgres_id=${candidate_ids[0]}
-          fi
-          [[ ${postgres_id} =~ ^[0-9a-f]{64}$ ]]
-          actual_identity=$(docker inspect \
-            --format '{{.Name}}|{{index .Config.Labels "io.itambox.github-run-id"}}' \
-            "${postgres_id}")
-          [[ ${actual_identity} == "${expected_identity}" ]]
-          docker rm --force "${postgres_id}" >/dev/null
