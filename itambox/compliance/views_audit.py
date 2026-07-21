@@ -1,5 +1,6 @@
 import csv
 import json
+import logging
 
 import django_tables2 as tables
 from django_tables2.utils import A
@@ -27,6 +28,7 @@ from compliance.forms_filter import AuditSessionFilterForm
 from compliance.reconciliation import audit_asset, close_audit_session, rehome_audit_session_mismatches, flag_missing_assets
 
 User = get_user_model()
+logger = logging.getLogger(__name__)
 
 
 class AuditSessionTable(BaseTable):
@@ -169,8 +171,15 @@ class AssetAuditScanView(LoginRequiredMixin, PermissionRequiredMixin, View):
                     verification_method='barcode'
                 )
             except ValidationError as err:
-                msg = err.message if hasattr(err, 'message') else str(err)
-                response = HttpResponse(f"<div class='alert alert-danger mb-0'>{msg}</div>", status=400)
+                # Log the specific validation detail server-side; return a generic
+                # message so exception text is never reflected to the client.
+                logger.warning("Audit scan rejected for asset %s: %s", getattr(asset, 'pk', None), err)
+                response = HttpResponse(
+                    "<div class='alert alert-danger mb-0'>"
+                    + str(_("Audit scan could not be recorded."))
+                    + "</div>",
+                    status=400,
+                )
                 response['HX-Trigger'] = 'playAuditFailSound'
                 return response
 
