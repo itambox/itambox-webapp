@@ -12460,30 +12460,6 @@
       "count": 1
     },
     {
-      "path": "itambox/core/templatetags/utility_tags.py",
-      "code": "W292",
-      "message": "no newline at end of file",
-      "source": "    return get_status_color(status)",
-      "context": "Module:body/FunctionDef:status_color:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/core/templatetags/utility_tags.py",
-      "code": "W293",
-      "message": "blank line contains whitespace",
-      "source": "    ",
-      "context": "Module:body/FunctionDef:update_querystring:self",
-      "count": 3
-    },
-    {
-      "path": "itambox/core/templatetags/utility_tags.py",
-      "code": "W293",
-      "message": "blank line contains whitespace",
-      "source": "        ",
-      "context": "Module:body/FunctionDef:update_querystring:self",
-      "count": 1
-    },
-    {
       "path": "itambox/core/tests/test_alert_views.py",
       "code": "E702",
       "message": "multiple statements on one line (semicolon)",
