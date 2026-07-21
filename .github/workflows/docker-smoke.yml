@@ -14,7 +14,7 @@ concurrency:
 
 jobs:
   helpers:
-    runs-on: [self-hosted, Linux, ARM64, itambox-ci]
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
 
@@ -46,15 +46,13 @@ jobs:
 
   smoke:
     needs: helpers
-    runs-on: [self-hosted, Linux, ARM64, itambox-ci]
+    runs-on: ubuntu-latest
     timeout-minutes: 60
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
 
       - name: Docker / Compose versions
         run: |
-          security_options="$(docker info --format '{{json .SecurityOptions}}')"
-          [[ "$security_options" == *name=rootless* ]]
           docker version
           docker compose version
 
