@@ -26876,62 +26876,6 @@
       "count": 1
     },
     {
-      "path": "itambox/subscriptions/views.py",
-      "code": "W293",
-      "message": "blank line contains whitespace",
-      "source": "        ",
-      "context": "Module:body/ClassDef:SubscriptionDetailView:body/FunctionDef:get_context_data:self",
-      "count": 1
-    },
-    {
-      "path": "itambox/subscriptions/views.py",
-      "code": "W293",
-      "message": "blank line contains whitespace",
-      "source": "            ",
-      "context": "Module:body/ClassDef:SubscriptionCancelView:body/FunctionDef:post:body/If:Call(func=Attribute(value=Name(id='form', ctx=Load()), attr='is_valid', ctx=Load()), args=[], keywords=[]):self",
-      "count": 1
-    },
-    {
-      "path": "itambox/subscriptions/views.py",
-      "code": "W293",
-      "message": "blank line contains whitespace",
-      "source": "            ",
-      "context": "Module:body/ClassDef:SubscriptionCheckoutView:body/FunctionDef:post:body/If:Call(func=Attribute(value=Name(id='form', ctx=Load()), attr='is_valid', ctx=Load()), args=[], keywords=[]):self",
-      "count": 3
-    },
-    {
-      "path": "itambox/subscriptions/views.py",
-      "code": "W293",
-      "message": "blank line contains whitespace",
-      "source": "            ",
-      "context": "Module:body/ClassDef:SubscriptionDetailView:body/FunctionDef:get_context_data:self",
-      "count": 2
-    },
-    {
-      "path": "itambox/subscriptions/views.py",
-      "code": "W293",
-      "message": "blank line contains whitespace",
-      "source": "            ",
-      "context": "Module:body/ClassDef:SubscriptionRenewView:body/FunctionDef:post:body/If:Call(func=Attribute(value=Name(id='form', ctx=Load()), attr='is_valid', ctx=Load()), args=[], keywords=[]):self",
-      "count": 1
-    },
-    {
-      "path": "itambox/subscriptions/views.py",
-      "code": "W293",
-      "message": "blank line contains whitespace",
-      "source": "                ",
-      "context": "Module:body/ClassDef:SubscriptionCheckoutView:body/FunctionDef:post:body/If:Call(func=Attribute(value=Name(id='form', ctx=Load()), attr='is_valid', ctx=Load()), args=[], keywords=[]):self",
-      "count": 1
-    },
-    {
-      "path": "itambox/subscriptions/views.py",
-      "code": "W391",
-      "message": "blank line at end of file",
-      "source": "",
-      "context": "Module:body/ClassDef:SubscriptionAssignmentDeleteView:body/FunctionDef:get_success_url:body",
-      "count": 1
-    },
-    {
       "path": "itambox/users/api/scim/authentication.py",
       "code": "B904",
       "message": "Within an `except` clause, raise exceptions with `raise ... from err` or `raise ... from None` to distinguish them from errors in exception handling.  See https://docs.python.org/3/tutorial/errors.html#exception-chaining for details.",
