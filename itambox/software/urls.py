@@ -11,4 +11,6 @@ urlpatterns = [
     path('software/<int:pk>/edit/', views.SoftwareEditView.as_view(), name='software_update'),
     path('software/<int:pk>/clone/', views.SoftwareCloneView.as_view(), name='software_clone'),
     path('software/<int:pk>/delete/', views.SoftwareDeleteView.as_view(), name='software_delete'),
-] 
+    # Installed software (per-asset)
+    path('installed/add/', views.InstalledSoftwareEditView.as_view(), name='installedsoftware_create'),
+]

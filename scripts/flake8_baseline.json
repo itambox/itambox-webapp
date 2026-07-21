@@ -25612,54 +25612,6 @@
       "count": 1
     },
     {
-      "path": "itambox/software/forms.py",
-      "code": "F401",
-      "message": "'crispy_forms.helper.FormHelper' imported but unused",
-      "source": "from crispy_forms.helper import FormHelper",
-      "context": "Module:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/software/forms.py",
-      "code": "F401",
-      "message": "'crispy_forms.layout.Column' imported but unused",
-      "source": "from crispy_forms.layout import Layout, Fieldset, Div, Row, Column",
-      "context": "Module:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/software/forms.py",
-      "code": "F401",
-      "message": "'crispy_forms.layout.Row' imported but unused",
-      "source": "from crispy_forms.layout import Layout, Fieldset, Div, Row, Column",
-      "context": "Module:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/software/forms.py",
-      "code": "W291",
-      "message": "trailing whitespace",
-      "source": "    filterset_class = SoftwareFilterSet ",
-      "context": "Module:body/ClassDef:SoftwareFilterForm:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/software/forms.py",
-      "code": "W291",
-      "message": "trailing whitespace",
-      "source": "# --- Software Filter Form --- ",
-      "context": "Module:body/ClassDef:SoftwareFilterForm:self",
-      "count": 1
-    },
-    {
-      "path": "itambox/software/forms.py",
-      "code": "W292",
-      "message": "no newline at end of file",
-      "source": "    filterset_class = SoftwareFilterSet ",
-      "context": "Module:body/ClassDef:SoftwareFilterForm:body",
-      "count": 1
-    },
-    {
       "path": "itambox/software/models.py",
       "code": "E302",
       "message": "expected 2 blank lines, found 0",
@@ -25956,22 +25908,6 @@
       "count": 1
     },
     {
-      "path": "itambox/software/urls.py",
-      "code": "W291",
-      "message": "trailing whitespace",
-      "source": "] ",
-      "context": "Module:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/software/urls.py",
-      "code": "W292",
-      "message": "no newline at end of file",
-      "source": "] ",
-      "context": "Module:body",
-      "count": 1
-    },
-    {
       "path": "itambox/software/views.py",
       "code": "E261",
       "message": "at least two spaces before inline comment",
@@ -25993,14 +25929,6 @@
       "message": "at least two spaces before inline comment",
       "source": "    template_name = 'software/software_detail.html' # Use a specific template or generic one",
       "context": "Module:body/ClassDef:SoftwareDetailView:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/software/views.py",
-      "code": "E302",
-      "message": "expected 2 blank lines, found 1",
-      "source": "class SoftwareDeleteView(ObjectDeleteView):",
-      "context": "Module:body/ClassDef:SoftwareDeleteView:self",
       "count": 1
     },
     {
@@ -26041,22 +25969,6 @@
       "message": "'itambox.utils.get_paginate_count' imported but unused",
       "source": "        from itambox.utils import get_paginate_count",
       "context": "Module:body/ClassDef:SoftwareDetailView:body/FunctionDef:get_context_data:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/software/views.py",
-      "code": "W291",
-      "message": "trailing whitespace",
-      "source": "    default_return_url = 'software:software_list' ",
-      "context": "Module:body/ClassDef:SoftwareEditView:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/software/views.py",
-      "code": "W291",
-      "message": "trailing whitespace",
-      "source": "    template_name = 'generic/object_edit.html' ",
-      "context": "Module:body/ClassDef:SoftwareEditView:body",
       "count": 1
     },
     {

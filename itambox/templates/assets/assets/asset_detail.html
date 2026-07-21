@@ -312,7 +312,11 @@
 
     {% translate "Installed Software Inventory" as t_software %}
     {% translate "No catalog software items registered on this asset." as e_software %}
-    {% include 'generic/includes/related_table_tab.html' with tab="software" table=software_table title=t_software empty=e_software %}
+    {% translate "Install Software" as t_add_software %}
+    {% url 'software:installedsoftware_create' as sw_add_base %}
+    {% with asset_pk=object.pk|stringformat:"s" %}
+    {% include 'generic/includes/related_table_tab.html' with tab="software" table=software_table title=t_software empty=e_software add_modal_url=sw_add_base|add:"?asset="|add:asset_pk|add:"&_quickadd=1" add_label=t_add_software %}
+    {% endwith %}
 
     {% if accessory_table.rows %}
     {% translate "Assigned Accessories" as t_acc %}
