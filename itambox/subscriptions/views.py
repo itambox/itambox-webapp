@@ -2,6 +2,7 @@ from django.db.models import Count, Q
 from django_tables2 import RequestConfig
 from itambox.views.generic import ObjectListView, ObjectDetailView, ObjectEditView, ObjectDeleteView, ObjectBulkEditView, ObjectBulkDeleteView, ObjectCloneView
 from itambox.utils import get_paginate_count
+from itambox.views.generic.utils import safe_return_url
 from itambox.panels import Panel
 from django.shortcuts import render, redirect, get_object_or_404
 from django.http import HttpResponse, HttpResponseBadRequest
@@ -428,10 +429,14 @@ class SubscriptionAssignmentDeleteView(ObjectDeleteView):
     template_name = 'generic/object_confirm_delete.html'
 
     def get_success_url(self):
-        return_url = self.request.GET.get('return_url') or self.request.POST.get('return_url')
-        if return_url:
-            return return_url
         obj = self.object
         if obj and obj.assigned_object and hasattr(obj.assigned_object, 'get_absolute_url'):
-            return obj.assigned_object.get_absolute_url()
-        return reverse('dashboard')
+            fallback = obj.assigned_object.get_absolute_url()
+        else:
+            fallback = reverse('dashboard')
+        # Only honor a caller-supplied return_url when it is same-host (open-redirect guard).
+        return safe_return_url(
+            self.request,
+            self.request.GET.get('return_url') or self.request.POST.get('return_url'),
+            fallback,
+        )

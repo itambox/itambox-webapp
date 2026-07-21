@@ -698,27 +698,33 @@ class WebhookEndpointEditView(ObjectEditView):
         return super().post(request, *args, **kwargs)
 
     def _test_webhook(self, request):
+        # request.get_full_path() is the current (server-resolved) request path, so
+        # this is a same-origin post-redirect-get; safe_return_url keeps CodeQL's
+        # url-redirection guard satisfied and defensively rejects any off-host value.
+        self_url = safe_return_url(request, request.get_full_path(), request.path)
         url = request.POST.get('url', '')
         if not url:
             messages.error(request, _("No URL configured."))
-            return redirect(request.get_full_path())
+            return redirect(self_url)
 
         from django.core.exceptions import ValidationError
         from core.validators import validate_external_url
+        from core.http import webhook_target_kind
         try:
             validate_external_url(url)
         except ValidationError as e:
             messages.error(request, _("Webhook test blocked: %(reason)s") % {'reason': '; '.join(e.messages)})
-            return redirect(request.get_full_path())
+            return redirect(self_url)
 
         success = False
         try:
             test_payload = str(_("Test notification from ITAMbox"))
             test_title = str(_("ITAMbox Test"))
-            if 'hooks.slack.com' in url:
+            target_kind = webhook_target_kind(url)
+            if target_kind == 'slack':
                 from core.events import _send_slack_notification
                 success = _send_slack_notification(url, test_payload, test_title)
-            elif 'webhook.office.com' in url or 'outlook.office.com/webhook' in url:
+            elif target_kind == 'teams':
                 from core.events import _send_teams_notification
                 success = _send_teams_notification(url, test_payload, test_title)
             else:
@@ -735,7 +741,7 @@ class WebhookEndpointEditView(ObjectEditView):
             messages.success(request, _("Webhook test succeeded!"))
         else:
             messages.error(request, _("Webhook test failed."))
-        return redirect(request.get_full_path())
+        return redirect(self_url)
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)

@@ -21,6 +21,27 @@ from urllib.parse import urlsplit, urlunsplit
 from core.validators import validate_external_url
 
 
+def webhook_target_kind(url):
+    """Classify a webhook URL as 'slack', 'teams', or None by its HOST.
+
+    Payload-format selection only — NOT a security control (SSRF is handled by
+    validate_external_url / request_pinned). Parsing the host instead of a bare
+    substring match stops ``https://evil.example/hooks.slack.com`` or
+    ``https://hooks.slack.com.evil.example`` from being misclassified.
+    """
+    parts = urlsplit(url)
+    host = (parts.hostname or '').lower()
+    if host == 'hooks.slack.com':
+        return 'slack'
+    # Teams incoming webhooks live on a per-tenant <tenant>.webhook.office.com
+    # host; legacy connectors use outlook.office.com/webhook.
+    if host == 'webhook.office.com' or host.endswith('.webhook.office.com'):
+        return 'teams'
+    if host == 'outlook.office.com' and parts.path.startswith('/webhook'):
+        return 'teams'
+    return None
+
+
 class _PinnedSNIAdapter(HTTPAdapter):
     """Connect to a pinned IP while TLS verifies the ORIGINAL hostname (SNI)."""
 

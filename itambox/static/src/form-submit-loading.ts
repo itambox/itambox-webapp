@@ -34,8 +34,14 @@
     if (submitBtn instanceof HTMLInputElement) {
       submitBtn.value = gettext('Saving...');
     } else {
-      const spinnerHtml = '<span class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>';
-      submitBtn.innerHTML = spinnerHtml + submitBtn.textContent?.trim();
+      // Build nodes explicitly: the button's own text is set via textContent (never
+      // reinterpreted as HTML); the spinner is a trusted, statically-built element.
+      const label = submitBtn.textContent?.trim() ?? '';
+      const spinner = document.createElement('span');
+      spinner.className = 'spinner-border spinner-border-sm me-2';
+      spinner.setAttribute('role', 'status');
+      spinner.setAttribute('aria-hidden', 'true');
+      submitBtn.replaceChildren(spinner, document.createTextNode(label));
     }
 
     activeSubmits.set(form, submitBtn);
