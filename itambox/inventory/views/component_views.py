@@ -13,6 +13,7 @@ from itambox.views.generic import (
     ObjectCloneView,
 )
 from itambox.views.generic.service_views import GenericTransactionView, SimplePostView
+from itambox.quick_add import QuickAddMixin
 from itambox.panels import Panel
 
 from ..models import Component, ComponentStock, ComponentAllocation
@@ -164,12 +165,28 @@ class ComponentAllocationListView(ObjectListView):
         return context
 
 
-class ComponentAllocationEditView(ObjectEditView):
+class ComponentAllocationEditView(QuickAddMixin, ObjectEditView):
     queryset = ComponentAllocation.objects.all()
     model = ComponentAllocation
     model_form = forms.ComponentAllocationForm
     template_name = 'generic/object_edit.html'
     default_return_url = 'inventory:component_list'
+    quick_add_reload = True
+
+    def get_initial(self):
+        initial = super().get_initial()
+        asset_id = self.request.GET.get('asset')
+        if asset_id:
+            initial['assigned_asset'] = asset_id
+        return initial
+
+    def get_quick_add_redirect_url(self):
+        # ComponentAllocation targets assigned_asset (not `asset`); reload back to
+        # that asset's detail after a quick-add from its Components tab.
+        asset = getattr(self.object, 'assigned_asset', None)
+        if asset is not None:
+            return asset.get_absolute_url()
+        return super().get_quick_add_redirect_url()
 
 
 class ComponentAllocationDeleteView(ObjectDeleteView):

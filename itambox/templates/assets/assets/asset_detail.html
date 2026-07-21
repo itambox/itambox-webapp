@@ -268,10 +268,11 @@
         <div class="card border-0 shadow-sm">
             <div class="card-header border-0 bg-transparent d-flex justify-content-between align-items-center">
                 <h3 class="card-title">{% translate "Installed Physical Modules / Components" %}</h3>
-                <a href="{% url 'inventory:componentallocation_create' %}?asset={{ object.pk }}" class="btn btn-sm btn-primary">
-                    <i class="mdi mdi-plus"></i>
-                    {% translate "Add Component" %}
-                </a>
+                <button type="button" class="btn btn-sm btn-primary"
+                        hx-get="{% url 'inventory:componentallocation_create' %}?asset={{ object.pk }}&_quickadd=1"
+                        hx-target="#modal-placeholder">
+                    <i class="mdi mdi-plus"></i> {% translate "Add Component" %}
+                </button>
             </div>
             {% if components_table.rows %}
                 <div class="table-responsive">
@@ -312,7 +313,11 @@
 
     {% translate "Installed Software Inventory" as t_software %}
     {% translate "No catalog software items registered on this asset." as e_software %}
-    {% include 'generic/includes/related_table_tab.html' with tab="software" table=software_table title=t_software empty=e_software %}
+    {% translate "Install Software" as t_add_software %}
+    {% url 'software:installedsoftware_create' as sw_add_base %}
+    {% with asset_pk=object.pk|stringformat:"s" %}
+    {% include 'generic/includes/related_table_tab.html' with tab="software" table=software_table title=t_software empty=e_software add_modal_url=sw_add_base|add:"?asset="|add:asset_pk|add:"&_quickadd=1" add_label=t_add_software %}
+    {% endwith %}
 
     {% if accessory_table.rows %}
     {% translate "Assigned Accessories" as t_acc %}
@@ -340,7 +345,11 @@
 
     {% translate "Allocated Software Licenses" as t_seats %}
     {% translate "No software license seats allocated to this asset." as e_seats %}
-    {% include 'generic/includes/related_table_tab.html' with tab="license-seats" table=license_seats_table title=t_seats empty=e_seats %}
+    {% translate "Assign License" as t_add_license %}
+    {% url 'licenses:licenseseatassignment_create' as lic_add_base %}
+    {% with asset_pk=object.pk|stringformat:"s" %}
+    {% include 'generic/includes/related_table_tab.html' with tab="license-seats" table=license_seats_table title=t_seats empty=e_seats add_modal_url=lic_add_base|add:"?asset="|add:asset_pk|add:"&_quickadd=1" add_label=t_add_license %}
+    {% endwith %}
 
     <div class="tab-pane fade {% if request.GET.tab == 'warranties' %}show active{% endif %}" id="warranties" role="tabpanel">
         <div class="card border-0 shadow-sm">

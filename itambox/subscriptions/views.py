@@ -94,12 +94,12 @@ class SubscriptionDetailView(ObjectDetailView):
 
         # Prefetch generic foreign key content objects cleanly
         assignments_qs = subscription.assignments.select_related('assigned_by', 'content_type')
-        
+
         # 1. Map content types to primary keys to batch load related models in 1 query per type
         gfk_mapping = {}
         for assignment in assignments_qs:
             gfk_mapping.setdefault(assignment.content_type, []).append(assignment.object_id)
-            
+
         # Batch execute query scans per unique model class
         prefetch_cache = {}
         for content_type, object_ids in gfk_mapping.items():
@@ -108,7 +108,7 @@ class SubscriptionDetailView(ObjectDetailView):
                 prefetch_cache[content_type] = {
                     obj.pk: obj for obj in model_class.objects.filter(pk__in=object_ids)
                 }
-            
+
         # 2. Re-assign resolved target objects onto assignments in-memory
         for assignment in assignments_qs:
             assignment.assigned_object = prefetch_cache.get(
@@ -166,7 +166,7 @@ class SubscriptionRenewView(LoginRequiredMixin, PermissionRequiredMixin, View):
             renewal_date = form.cleaned_data['renewal_date']
             renewal_cost = form.cleaned_data['renewal_cost']
             subscription.renew(renewal_date, renewal_cost)
-            
+
             # Create Journal Entry
             from extras.models import JournalEntry
             obj_type = ContentType.objects.get_for_model(Subscription)
@@ -215,7 +215,7 @@ class SubscriptionCancelView(LoginRequiredMixin, PermissionRequiredMixin, View):
             cancellation_date = form.cleaned_data['cancellation_date']
             reason = form.cleaned_data['reason']
             subscription.cancel(cancellation_date, reason)
-            
+
             # Create Journal Entry
             from extras.models import JournalEntry
             obj_type = ContentType.objects.get_for_model(Subscription)
@@ -297,16 +297,16 @@ class SubscriptionCheckoutView(LoginRequiredMixin, PermissionRequiredMixin, View
         if form.is_valid():
             target_type = form.cleaned_data['target_type']
             notes = form.cleaned_data['notes']
-            
+
             if target_type == 'holder':
                 target_obj = form.cleaned_data['assigned_holder']
             elif target_type == 'asset':
                 target_obj = form.cleaned_data['asset']
             else:
                 target_obj = form.cleaned_data['location']
-                
+
             content_type = ContentType.objects.get_for_model(target_obj)
-            
+
             # Create SubscriptionAssignment
             assignment = SubscriptionAssignment.objects.create(
                 subscription=subscription,
@@ -315,7 +315,7 @@ class SubscriptionCheckoutView(LoginRequiredMixin, PermissionRequiredMixin, View
                 assigned_by=request.user,
                 notes=notes
             )
-            
+
             messages.success(request, _("Assigned subscription '%(name)s' successfully to %(target)s.") % {"name": subscription.name, "target": target_obj})
             if request.htmx:
                 response = HttpResponse(status=204)
@@ -350,6 +350,22 @@ class ProviderBulkDeleteView(ObjectBulkDeleteView):
 class SubscriptionAssignmentCreateView(LoginRequiredMixin, PermissionRequiredMixin, View):
     permission_required = 'subscriptions.add_subscriptionassignment'
     template_name = 'subscriptions/subscriptionassignments/subscriptionassignment_form.html'
+    quick_add_template = 'generic/includes/quick_add_modal.html'
+
+    def _is_quickadd(self):
+        return self.request.GET.get('_quickadd') == '1'
+
+    def _render_quickadd(self, request, form):
+        # Render the shared quick-add modal. The modal template owns the <form>
+        # wrapper, so suppress the crispy helper's own form tag.
+        if not hasattr(form, 'helper') or form.helper is None:
+            from crispy_forms.helper import FormHelper
+            form.helper = FormHelper(form)
+        form.helper.form_tag = False
+        return render(request, self.quick_add_template, {
+            'quick_add_form': form,
+            'model_label': _("Subscription"),
+        })
 
     def get(self, request, *args, **kwargs):
         content_type_id = request.GET.get('content_type')
@@ -362,6 +378,8 @@ class SubscriptionAssignmentCreateView(LoginRequiredMixin, PermissionRequiredMix
         target_obj = get_object_or_404(content_type.model_class().objects.all(), id=object_id)
 
         form = forms.SubscriptionAssignmentForm(content_type=content_type, object_id=object_id)
+        if self._is_quickadd():
+            return self._render_quickadd(request, form)
         context = {
             'form': form,
             'target_obj': target_obj,
@@ -386,9 +404,15 @@ class SubscriptionAssignmentCreateView(LoginRequiredMixin, PermissionRequiredMix
             assignment = form.save(commit=False)
             assignment.assigned_by = request.user
             assignment.save()
+            if self._is_quickadd():
+                response = HttpResponse(status=204)
+                response['HX-Redirect'] = target_obj.get_absolute_url()
+                return response
             messages.success(request, _("Assigned subscription successfully to %(target)s.") % {"target": target_obj})
             return redirect(target_obj.get_absolute_url())
 
+        if self._is_quickadd():
+            return self._render_quickadd(request, form)
         context = {
             'form': form,
             'target_obj': target_obj,
@@ -411,4 +435,3 @@ class SubscriptionAssignmentDeleteView(ObjectDeleteView):
         if obj and obj.assigned_object and hasattr(obj.assigned_object, 'get_absolute_url'):
             return obj.assigned_object.get_absolute_url()
         return reverse('dashboard')
-

@@ -12460,30 +12460,6 @@
       "count": 1
     },
     {
-      "path": "itambox/core/templatetags/utility_tags.py",
-      "code": "W292",
-      "message": "no newline at end of file",
-      "source": "    return get_status_color(status)",
-      "context": "Module:body/FunctionDef:status_color:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/core/templatetags/utility_tags.py",
-      "code": "W293",
-      "message": "blank line contains whitespace",
-      "source": "    ",
-      "context": "Module:body/FunctionDef:update_querystring:self",
-      "count": 3
-    },
-    {
-      "path": "itambox/core/templatetags/utility_tags.py",
-      "code": "W293",
-      "message": "blank line contains whitespace",
-      "source": "        ",
-      "context": "Module:body/FunctionDef:update_querystring:self",
-      "count": 1
-    },
-    {
       "path": "itambox/core/tests/test_alert_views.py",
       "code": "E702",
       "message": "multiple statements on one line (semicolon)",
@@ -20846,14 +20822,6 @@
     {
       "path": "itambox/licenses/forms.py",
       "code": "F401",
-      "message": "'.models.LicenseSeatAssignment' imported but unused",
-      "source": "from .models import License, LicenseSeatAssignment",
-      "context": "Module:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/licenses/forms.py",
-      "code": "F401",
       "message": "'crispy_forms.layout.Column' imported but unused",
       "source": "from crispy_forms.layout import Layout, Fieldset, Div, Row, Column",
       "context": "Module:body",
@@ -20865,22 +20833,6 @@
       "message": "'crispy_forms.layout.Row' imported but unused",
       "source": "from crispy_forms.layout import Layout, Fieldset, Div, Row, Column",
       "context": "Module:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/licenses/forms.py",
-      "code": "W293",
-      "message": "blank line contains whitespace",
-      "source": "        ",
-      "context": "Module:body/ClassDef:LicenseCheckOutForm:body/FunctionDef:__init__:self",
-      "count": 1
-    },
-    {
-      "path": "itambox/licenses/forms.py",
-      "code": "W293",
-      "message": "blank line contains whitespace",
-      "source": "            ",
-      "context": "Module:body/ClassDef:LicenseCheckOutForm:body/FunctionDef:__init__:self",
       "count": 1
     },
     {
@@ -21345,14 +21297,6 @@
       "message": "line too long (144 > 120 characters)",
       "source": "    queryset = License.objects.with_counts().select_related('software', 'software__manufacturer', 'tenant', 'supplier').prefetch_related('tags')",
       "context": "Module:body/ClassDef:LicenseListView:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/licenses/views.py",
-      "code": "E302",
-      "message": "expected 2 blank lines, found 1",
-      "source": "class LicenseDeleteView(ObjectDeleteView):",
-      "context": "Module:body/ClassDef:LicenseDeleteView:self",
       "count": 1
     },
     {
@@ -25636,54 +25580,6 @@
       "count": 1
     },
     {
-      "path": "itambox/software/forms.py",
-      "code": "F401",
-      "message": "'crispy_forms.helper.FormHelper' imported but unused",
-      "source": "from crispy_forms.helper import FormHelper",
-      "context": "Module:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/software/forms.py",
-      "code": "F401",
-      "message": "'crispy_forms.layout.Column' imported but unused",
-      "source": "from crispy_forms.layout import Layout, Fieldset, Div, Row, Column",
-      "context": "Module:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/software/forms.py",
-      "code": "F401",
-      "message": "'crispy_forms.layout.Row' imported but unused",
-      "source": "from crispy_forms.layout import Layout, Fieldset, Div, Row, Column",
-      "context": "Module:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/software/forms.py",
-      "code": "W291",
-      "message": "trailing whitespace",
-      "source": "    filterset_class = SoftwareFilterSet ",
-      "context": "Module:body/ClassDef:SoftwareFilterForm:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/software/forms.py",
-      "code": "W291",
-      "message": "trailing whitespace",
-      "source": "# --- Software Filter Form --- ",
-      "context": "Module:body/ClassDef:SoftwareFilterForm:self",
-      "count": 1
-    },
-    {
-      "path": "itambox/software/forms.py",
-      "code": "W292",
-      "message": "no newline at end of file",
-      "source": "    filterset_class = SoftwareFilterSet ",
-      "context": "Module:body/ClassDef:SoftwareFilterForm:body",
-      "count": 1
-    },
-    {
       "path": "itambox/software/models.py",
       "code": "E302",
       "message": "expected 2 blank lines, found 0",
@@ -25980,22 +25876,6 @@
       "count": 1
     },
     {
-      "path": "itambox/software/urls.py",
-      "code": "W291",
-      "message": "trailing whitespace",
-      "source": "] ",
-      "context": "Module:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/software/urls.py",
-      "code": "W292",
-      "message": "no newline at end of file",
-      "source": "] ",
-      "context": "Module:body",
-      "count": 1
-    },
-    {
       "path": "itambox/software/views.py",
       "code": "E261",
       "message": "at least two spaces before inline comment",
@@ -26017,14 +25897,6 @@
       "message": "at least two spaces before inline comment",
       "source": "    template_name = 'software/software_detail.html' # Use a specific template or generic one",
       "context": "Module:body/ClassDef:SoftwareDetailView:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/software/views.py",
-      "code": "E302",
-      "message": "expected 2 blank lines, found 1",
-      "source": "class SoftwareDeleteView(ObjectDeleteView):",
-      "context": "Module:body/ClassDef:SoftwareDeleteView:self",
       "count": 1
     },
     {
@@ -26065,22 +25937,6 @@
       "message": "'itambox.utils.get_paginate_count' imported but unused",
       "source": "        from itambox.utils import get_paginate_count",
       "context": "Module:body/ClassDef:SoftwareDetailView:body/FunctionDef:get_context_data:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/software/views.py",
-      "code": "W291",
-      "message": "trailing whitespace",
-      "source": "    default_return_url = 'software:software_list' ",
-      "context": "Module:body/ClassDef:SoftwareEditView:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/software/views.py",
-      "code": "W291",
-      "message": "trailing whitespace",
-      "source": "    template_name = 'generic/object_edit.html' ",
-      "context": "Module:body/ClassDef:SoftwareEditView:body",
       "count": 1
     },
     {
@@ -26897,62 +26753,6 @@
       "message": "local variable 'assignment' is assigned to but never used",
       "source": "            assignment = SubscriptionAssignment.objects.create(",
       "context": "Module:body/ClassDef:SubscriptionCheckoutView:body/FunctionDef:post:body/If:Call(func=Attribute(value=Name(id='form', ctx=Load()), attr='is_valid', ctx=Load()), args=[], keywords=[]):body",
-      "count": 1
-    },
-    {
-      "path": "itambox/subscriptions/views.py",
-      "code": "W293",
-      "message": "blank line contains whitespace",
-      "source": "        ",
-      "context": "Module:body/ClassDef:SubscriptionDetailView:body/FunctionDef:get_context_data:self",
-      "count": 1
-    },
-    {
-      "path": "itambox/subscriptions/views.py",
-      "code": "W293",
-      "message": "blank line contains whitespace",
-      "source": "            ",
-      "context": "Module:body/ClassDef:SubscriptionCancelView:body/FunctionDef:post:body/If:Call(func=Attribute(value=Name(id='form', ctx=Load()), attr='is_valid', ctx=Load()), args=[], keywords=[]):self",
-      "count": 1
-    },
-    {
-      "path": "itambox/subscriptions/views.py",
-      "code": "W293",
-      "message": "blank line contains whitespace",
-      "source": "            ",
-      "context": "Module:body/ClassDef:SubscriptionCheckoutView:body/FunctionDef:post:body/If:Call(func=Attribute(value=Name(id='form', ctx=Load()), attr='is_valid', ctx=Load()), args=[], keywords=[]):self",
-      "count": 3
-    },
-    {
-      "path": "itambox/subscriptions/views.py",
-      "code": "W293",
-      "message": "blank line contains whitespace",
-      "source": "            ",
-      "context": "Module:body/ClassDef:SubscriptionDetailView:body/FunctionDef:get_context_data:self",
-      "count": 2
-    },
-    {
-      "path": "itambox/subscriptions/views.py",
-      "code": "W293",
-      "message": "blank line contains whitespace",
-      "source": "            ",
-      "context": "Module:body/ClassDef:SubscriptionRenewView:body/FunctionDef:post:body/If:Call(func=Attribute(value=Name(id='form', ctx=Load()), attr='is_valid', ctx=Load()), args=[], keywords=[]):self",
-      "count": 1
-    },
-    {
-      "path": "itambox/subscriptions/views.py",
-      "code": "W293",
-      "message": "blank line contains whitespace",
-      "source": "                ",
-      "context": "Module:body/ClassDef:SubscriptionCheckoutView:body/FunctionDef:post:body/If:Call(func=Attribute(value=Name(id='form', ctx=Load()), attr='is_valid', ctx=Load()), args=[], keywords=[]):self",
-      "count": 1
-    },
-    {
-      "path": "itambox/subscriptions/views.py",
-      "code": "W391",
-      "message": "blank line at end of file",
-      "source": "",
-      "context": "Module:body/ClassDef:SubscriptionAssignmentDeleteView:body/FunctionDef:get_success_url:body",
       "count": 1
     },
     {

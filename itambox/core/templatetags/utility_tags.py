@@ -75,9 +75,9 @@ def update_querystring(request, **kwargs):
     """
     if not request:
         return ''
-    
+
     query_params = request.GET.copy() # Get a mutable copy
-    
+
     # Update parameters from kwargs
     for key, value in kwargs.items():
         if value is not None:
@@ -89,7 +89,7 @@ def update_querystring(request, **kwargs):
     keys_to_delete = [k for k, v in query_params.items() if v == '']
     for key in keys_to_delete:
         del query_params[key]
-        
+
     # Don't include page=1 in the query string (it's the default)
     if 'page' in query_params and query_params['page'] == '1':
         del query_params['page']
@@ -100,12 +100,60 @@ def update_querystring(request, **kwargs):
 
     # Encode the parameters
     encoded_params = query_params.urlencode(safe='/')
-    
+
     # Return with leading '?' only if there are encoded params
     if encoded_params and encoded_params.strip():
         return '?' + encoded_params
     else:
         return '' # Should ideally not be reached due to the dict check
+
+
+class _QuerystringReplaceNode(template.Node):
+    def __init__(self, kwargs):
+        self.kwargs = kwargs
+
+    def render(self, context):
+        request = context.get('request')
+        if request is None:
+            return ''
+        params = request.GET.copy()
+        for key_expr, value_expr in self.kwargs:
+            key = key_expr.resolve(context)
+            value = value_expr.resolve(context)
+            if key in (None, ''):
+                continue
+            key = str(key)
+            if value in (None, ''):
+                params.pop(key, None)
+            else:
+                params[key] = str(value)
+        # Parity with update_querystring: drop empties and the default page=1.
+        for k in [k for k, v in params.items() if v == '']:
+            del params[k]
+        if params.get('page') == '1':
+            del params['page']
+        encoded = params.urlencode(safe='/')
+        return '?' + encoded if encoded.strip() else ''
+
+
+@register.tag(name='querystring_replace')
+def querystring_replace(parser, token):
+    """
+    Like update_querystring, but resolves parameter KEYS from the context too
+    (not only values) — needed for django-tables2 sort links where the sort
+    parameter name is dynamic, e.g.:
+        {% querystring_replace table.prefixed_order_by_field=column.order_by_alias.next %}
+    Reads `request` from the template context (request context processor).
+    """
+    kwargs = []
+    for bit in token.split_contents()[1:]:
+        if '=' not in bit:
+            raise template.TemplateSyntaxError(
+                "'querystring_replace' arguments must be key=value pairs"
+            )
+        key, value = bit.split('=', 1)
+        kwargs.append((parser.compile_filter(key), parser.compile_filter(value)))
+    return _QuerystringReplaceNode(kwargs)
 
 
 @register.filter

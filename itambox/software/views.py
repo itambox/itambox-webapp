@@ -10,6 +10,7 @@ from itambox.views.generic import (
 )
 from django.db.models import Count, Q
 from itambox.panels import Panel
+from itambox.quick_add import QuickAddMixin
 from .models import Software, InstalledSoftware
 from .tables import InstalledSoftwareTable
 from . import forms
@@ -82,8 +83,27 @@ class SoftwareDetailView(ObjectDetailView):
 class SoftwareEditView(ObjectEditView):
     queryset = Software.objects.all()
     model_form = forms.SoftwareForm
-    template_name = 'generic/object_edit.html' 
-    default_return_url = 'software:software_list' 
+    template_name = 'generic/object_edit.html'
+    default_return_url = 'software:software_list'
+
+
+class InstalledSoftwareEditView(QuickAddMixin, ObjectEditView):
+    """Record/edit a software installation on an asset (quick-add modal from the
+    asset detail Software tab; mirrors WarrantyEditView)."""
+    queryset = InstalledSoftware.objects.all()
+    model = InstalledSoftware
+    model_form = forms.InstalledSoftwareForm
+    template_name = 'generic/object_edit.html'
+    default_return_url = 'software:software_list'
+    quick_add_reload = True
+
+    def get_initial(self):
+        initial = super().get_initial()
+        asset_id = self.request.GET.get('asset')
+        if asset_id:
+            initial['asset'] = asset_id
+        return initial
+
 
 class SoftwareDeleteView(ObjectDeleteView):
     queryset = Software.objects.all()

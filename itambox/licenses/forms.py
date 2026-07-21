@@ -7,7 +7,9 @@ from .filters import LicenseFilterSet
 from .models import License, LicenseSeatAssignment
 from crispy_forms.helper import FormHelper
 from crispy_forms.layout import Layout, Fieldset, Div, Row, Column
+from crispy_forms.layout import HTML, Submit
 from django.urls import reverse
+from django.utils.html import format_html
 from assets.models import Asset, Supplier
 from organization.models import AssetHolder
 
@@ -146,6 +148,56 @@ class LicenseFilterForm(FilterForm):
     filterset_class = LicenseFilterSet
 
 
+class LicenseSeatAssignmentForm(forms.ModelForm):
+    """Assign a license seat to an asset (asset-scoped quick-add)."""
+
+    class Meta:
+        model = LicenseSeatAssignment
+        fields = ['license', 'asset', 'notes']
+        widgets = {
+            'license': forms.Select(attrs={'class': 'form-select', 'data-tom-select': ''}),
+            'asset': forms.Select(attrs={'class': 'form-select', 'data-tom-select': ''}),
+            'notes': forms.Textarea(attrs={'class': 'form-control', 'rows': 3}),
+        }
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.helper = FormHelper(self)
+        self.helper.form_method = 'post'
+        self.helper.form_tag = True
+
+        button_text = _('Assign License')
+        try:
+            cancel_url = reverse('licenses:license_list')
+        except Exception:
+            cancel_url = '/'
+
+        self.helper.layout = Layout(
+            'asset',
+            'license',
+            'notes',
+            HTML('<div class="mt-3">'),
+            Submit('submit', button_text, css_class='btn btn-primary'),
+            HTML(format_html(
+                '<a href="{}" class="btn btn-outline-secondary ms-2" data-no-dirty-track="true">Cancel</a>',
+                cancel_url,
+            )),
+            HTML('</div>'),
+        )
+
+    def clean(self):
+        cleaned = super().clean()
+        lic = cleaned.get('license')
+        asset = cleaned.get('asset')
+        if lic and asset and not self.instance.pk:
+            # Friendly pre-checks; the model's DB constraints enforce these too.
+            if LicenseSeatAssignment.objects.filter(license=lic, asset=asset).exists():
+                raise forms.ValidationError(_("This asset already holds a seat on this license."))
+            if lic.available_seats <= 0:
+                raise forms.ValidationError(_("No seats available on this license."))
+        return cleaned
+
+
 class LicenseCheckOutForm(forms.Form):
     TARGET_CHOICES = [
         ('holder', _('Asset Holder')),
@@ -192,12 +244,12 @@ class LicenseCheckOutForm(forms.Form):
     def __init__(self, *args, **kwargs):
         license_obj = kwargs.pop('license', None)
         super().__init__(*args, **kwargs)
-        
+
         # If tenant is restricted, filter candidates
         if license_obj and license_obj.tenant:
             self.fields['assigned_holder'].queryset = AssetHolder.objects.filter(tenant=license_obj.tenant).order_by('last_name', 'first_name')
             self.fields['asset'].queryset = Asset.objects.filter(tenant=license_obj.tenant).exclude(status__type='undeployable').order_by('name')
-            
+
         self.helper = FormHelper()
         self.helper.form_tag = False
         self.helper.layout = Layout(

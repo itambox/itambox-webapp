@@ -11,15 +11,21 @@ Params:
   title      card header heading (required)
   empty      empty-state text (required)
   icon       optional full MDI class for the empty state, e.g. "mdi mdi-devices"
-  add_url    optional "+ Add" button href
-  add_label  optional "+ Add" button label            default "Add"
+  add_url        optional "+ Add" button href (plain boosted link)
+  add_modal_url  optional "+ Add" quick-add modal href (hx-get -> #modal-placeholder)
+  add_label      optional "+ Add" button label            default "Add"
 {% endcomment %}
 <div class="tab-pane fade {% if request.GET.tab == tab %}show active{% endif %}" id="{{ tab }}" role="tabpanel">
     <div class="card border-0 shadow-sm">
-        <div class="card-header border-0 bg-transparent{% if add_url %} d-flex justify-content-between align-items-center{% endif %}">
+        <div class="card-header border-0 bg-transparent{% if add_url or add_modal_url %} d-flex justify-content-between align-items-center{% endif %}">
             <h3 class="card-title">{{ title }}</h3>
-            {% if add_url %}
-                {% translate "Add" as default_add %}
+            {% translate "Add" as default_add %}
+            {% if add_modal_url %}
+                <button type="button" class="btn btn-sm btn-primary"
+                        hx-get="{{ add_modal_url }}" hx-target="#modal-placeholder">
+                    <i class="mdi mdi-plus"></i> {{ add_label|default:default_add }}
+                </button>
+            {% elif add_url %}
                 <a href="{{ add_url }}" class="btn btn-sm btn-primary">
                     <i class="mdi mdi-plus"></i>
                     {{ add_label|default:default_add }}
