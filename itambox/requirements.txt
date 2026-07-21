@@ -36,7 +36,7 @@ mozilla-django-oidc>=5.0.2,<6.0.0
 pyOpenSSL>=24.3,<27
 
 # API / web
-django-cors-headers>=4.4,<5.0
+django-cors-headers>=4.9.0,<5.0
 requests>=2.31,<3.0
 gunicorn>=26.0.0,<27.0
 whitenoise>=6.6,<7.0
