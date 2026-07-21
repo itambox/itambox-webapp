@@ -936,9 +936,11 @@ class ReportTemplatePreviewView(PermissionRequiredMixin, View):
                 rendered_html = django_template.render(Context(context_data))
 
             return HttpResponse(rendered_html)
-        except Exception as e:
+        except Exception:
+            # Full detail (with traceback) goes to the server log; the client gets a
+            # generic message so exception text is never reflected in the response.
             logger.exception("Template Render Error in preview")
-            return HttpResponse(f"<h3>{gettext('Template Render Error:')}</h3><pre>{str(e)}</pre>", status=400)
+            return HttpResponse(f"<h3>{gettext('Template render failed. See the server log for details.')}</h3>", status=400)
 
 
 @method_decorator(login_required, name='dispatch')
@@ -1037,7 +1039,8 @@ class ReportTemplateDownloadView(PermissionRequiredMixin, LoginRequiredMixin, Vi
             disposition = 'inline' if request.GET.get('print') == 'true' else 'attachment'
             response['Content-Disposition'] = f'{disposition}; filename="{safe_name}_{stamp}.html"'
             return response
-        except Exception as e:
+        except Exception:
+            # Full detail (with traceback) goes to the server log; the client gets a
+            # generic message so exception text is never reflected in the response.
             logger.exception("Template Render Error in download")
-            return HttpResponse(f"<h3>{gettext('Template Render Error:')}</h3><pre>{str(e)}</pre>", status=400)
-
+            return HttpResponse(f"<h3>{gettext('Template render failed. See the server log for details.')}</h3>", status=400)

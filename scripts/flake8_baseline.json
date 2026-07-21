@@ -16548,14 +16548,6 @@
       "count": 1
     },
     {
-      "path": "itambox/extras/views.py",
-      "code": "W391",
-      "message": "blank line at end of file",
-      "source": "",
-      "context": "Module:body/ClassDef:ReportTemplateDownloadView:body/FunctionDef:get:body/Try:handlers/ExceptHandler:Name(id='Exception', ctx=Load()):e:body",
-      "count": 1
-    },
-    {
       "path": "itambox/inventory/abstract_models.py",
       "code": "B950",
       "message": "line too long (135 > 120 characters)",

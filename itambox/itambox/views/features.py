@@ -698,10 +698,12 @@ class WebhookEndpointEditView(ObjectEditView):
         return super().post(request, *args, **kwargs)
 
     def _test_webhook(self, request):
-        # request.get_full_path() is the current (server-resolved) request path, so
-        # this is a same-origin post-redirect-get; safe_return_url keeps CodeQL's
-        # url-redirection guard satisfied and defensively rejects any off-host value.
-        self_url = safe_return_url(request, request.get_full_path(), request.path)
+        # Same-origin post-redirect-get back to the current form. The fallback must
+        # be an untainted constant (a reversed route): using request.path here would
+        # let user-controlled input reach redirect() on the fallback branch.
+        self_url = safe_return_url(
+            request, request.get_full_path(), reverse('extras:webhookendpoint_list')
+        )
         url = request.POST.get('url', '')
         if not url:
             messages.error(request, _("No URL configured."))
