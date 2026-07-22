@@ -9,6 +9,9 @@ These tests exercise the gate script itself, end-to-end, against throwaway fixtu
 projects (never the real 4k-violation baseline) so they stay fast and are not coupled to
 ITAMbox's own lint debt shrinking or growing over time. This is the "newly introduced
 blocking violation causes nonzero exit" proof required by issue #15.
+
+The gate refuses non-canonical interpreters, so the subprocess-driven tests here
+require running the suite on Python 3.12 (the supported baseline, see issue #16).
 """
 import importlib.util
 import json
@@ -284,7 +287,7 @@ def test_b907_url_anchor_is_stable_across_reported_rows(fixture_project):
     assert row_one == row_two
 
 
-def test_python311_b907_statement_replacement_is_blocked(monkeypatch):
+def test_b907_statement_replacement_is_blocked():
     gate = _load_script("check_flake8_baseline_b907_replacement")
     old = (
         "pkg/mod.py",
@@ -300,7 +303,6 @@ def test_python311_b907_statement_replacement_is_blocked(monkeypatch):
         "html = f'<img src=\"{url}\">'",
         old[4],
     )
-    monkeypatch.setattr(gate.sys, "version_info", (3, 11))
 
     regressions, stale = gate.compare_baseline(
         gate.collections.Counter({new: 1}),
@@ -473,45 +475,54 @@ def test_write_baseline_refuses_weakened_flake8_policy(
     assert json.loads(baseline_path.read_text(encoding="utf-8")) == original
 
 
-def test_python311_exact_fstring_shortfall_is_interpreter_version_aware(monkeypatch):
+def test_no_interpreter_specific_shortfall_remains(monkeypatch):
+    """The former Python 3.11 f-string budget is gone: stale baseline entries
+    are reported identically no matter which interpreter compares them."""
     gate = _load_script("check_flake8_baseline_python_compat")
-    baseline = gate.PYTHON311_FSTRING_SHORTFALL.copy()
-    assert len(baseline) == 7
-    assert sum(baseline.values()) == 10
-
-    monkeypatch.setattr(gate.sys, "version_info", (3, 11))
-    regressions, stale = gate.compare_baseline(gate.collections.Counter(), baseline)
-    assert not regressions
-    assert not stale
-
-    monkeypatch.setattr(gate.sys, "version_info", (3, 12))
-    regressions, stale = gate.compare_baseline(gate.collections.Counter(), baseline)
-    assert not regressions
-    assert stale == baseline
-
-    monkeypatch.setattr(gate.sys, "version_info", (3, 10))
-    regressions, stale = gate.compare_baseline(gate.collections.Counter(), baseline)
-    assert not regressions
-    assert stale == baseline
-
-
-def test_python311_does_not_hide_unlisted_identity_with_allowed_path_and_code(
-    monkeypatch,
-):
-    gate = _load_script("check_flake8_baseline_python_compat_unlisted")
-    unlisted_key = (
+    assert not hasattr(gate, "PYTHON311_FSTRING_SHORTFALL")
+    key = (
         "itambox/assets/tests/test_requests.py",
         "E226",
         "missing whitespace around arithmetic operator",
         "value = f'{1+1}'",
         "Module:body",
     )
-    baseline = gate.collections.Counter({unlisted_key: 1})
+    baseline = gate.collections.Counter({key: 1})
 
+    for version_info in ((3, 10), (3, 11), (3, 12), (3, 13)):
+        monkeypatch.setattr(gate.sys, "version_info", version_info)
+        regressions, stale = gate.compare_baseline(
+            gate.collections.Counter(), baseline
+        )
+        assert not regressions
+        assert stale == baseline
+
+
+def test_check_mode_refuses_noncanonical_python(
+    fixture_project, monkeypatch, capsys,
+):
+    """The blocking gate itself (not just --write-baseline) refuses to run
+    outside canonical Python 3.12."""
+    root, _module = fixture_project
+    baseline_path = root / "flake8_baseline.json"
+    baseline_path.write_text(json.dumps(_baseline_for(root)), encoding="utf-8")
+    gate = _load_script("check_flake8_baseline_check_python311")
     monkeypatch.setattr(gate.sys, "version_info", (3, 11))
-    regressions, stale = gate.compare_baseline(gate.collections.Counter(), baseline)
-    assert not regressions
-    assert stale == baseline
+    monkeypatch.setattr(
+        gate,
+        "run_flake8",
+        lambda targets, cwd: pytest.fail(
+            "Flake8 must not run on a non-canonical interpreter"
+        ),
+    )
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        [str(SCRIPT), "pkg", "--baseline", str(baseline_path), "--cwd", str(root)],
+    )
+
+    assert gate.main() == 2
+    assert "outside Python 3.12" in capsys.readouterr().err
 
 
 def test_malformed_identity_baseline_fails_closed(fixture_project):
@@ -620,6 +631,7 @@ def test_operational_exit_one_without_findings_fails_closed(monkeypatch, tmp_pat
     (tmp_path / "pkg").mkdir()
     baseline_path = tmp_path / "flake8_baseline.json"
     baseline_path.write_text(json.dumps(_baseline_for(tmp_path)), encoding="utf-8")
+    monkeypatch.setattr(module.sys, "version_info", (3, 12))
     monkeypatch.setattr(
         module,
         "run_flake8",
@@ -653,6 +665,7 @@ def test_operational_stderr_with_baseline_covered_findings_fails_closed(
         json.dumps(_baseline_for(tmp_path, _finding())),
         encoding="utf-8",
     )
+    monkeypatch.setattr(module.sys, "version_info", (3, 12))
     monkeypatch.setattr(
         module,
         "run_flake8",
@@ -678,6 +691,7 @@ def test_missing_or_wrong_plugin_version_fails_before_flake8(monkeypatch, tmp_pa
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
 
+    monkeypatch.setattr(module.sys, "version_info", (3, 12))
     monkeypatch.setattr(
         module,
         "version",

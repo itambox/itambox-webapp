@@ -11,9 +11,10 @@ the same error code in the same file. Removed identities make the baseline stale
 and require a reviewed cleanup update, so fixed debt never becomes headroom.
 
 The canonical baseline is generated with Python 3.12 and the pinned Flake8
-toolchain. Python 3.11 tokenizes f-string expressions differently and therefore
-omits ten known findings; that reviewed compatibility shortfall is keyed to the
-interpreter version, never the operating system.
+toolchain. The gate refuses to run on any other interpreter: tokenizer
+behaviour differs across Python versions (which findings Flake8 reports and
+where), so results from a non-canonical interpreter are not comparable to the
+baseline. There are no interpreter- or OS-specific exceptions.
 """
 import argparse
 import ast
@@ -44,78 +45,6 @@ REQUIRED_TOOL_VERSIONS = {
     "pycodestyle": "2.11.1",
     "pyflakes": "3.2.0",
 }
-# Python 3.11 treats each f-string as one STRING token. Python 3.12 exposes the
-# inner operators/commas to pycodestyle. CI on canonical Python 3.12 enforces
-# every identity; supported Python 3.11 developer hooks may omit only these
-# seven exact reviewed identities (ten occurrences). New identities are never
-# exempted merely because they share a path or error code.
-PYTHON311_FSTRING_SHORTFALL = collections.Counter(
-    {
-        (
-            "itambox/assets/tests/test_requests.py",
-            "E226",
-            "missing whitespace around arithmetic operator",
-            "            'form-0-asset_tag': "
-            'f"{seq.prefix}{next_tag_val+2:0{seq.zero_padding}d}",',
-            "Module:body/ClassDef:RequisitionSystemTestCase:body/"
-            "FunctionDef:test_request_bulk_receive_workflow:body",
-        ): 1,
-        (
-            "itambox/assets/tests/test_requests.py",
-            "E226",
-            "missing whitespace around arithmetic operator",
-            "            'form-1-asset_tag': "
-            'f"{seq.prefix}{next_tag_val+1:0{seq.zero_padding}d}",',
-            "Module:body/ClassDef:RequisitionSystemTestCase:body/"
-            "FunctionDef:test_request_bulk_receive_workflow:body",
-        ): 1,
-        (
-            "itambox/assets/tests/test_requests.py",
-            "E226",
-            "missing whitespace around arithmetic operator",
-            "        self.assertContains(response, "
-            'f"{seq.prefix}{next_tag_val+1:0{seq.zero_padding}d}")',
-            "Module:body/ClassDef:RequisitionSystemTestCase:body/"
-            "FunctionDef:test_request_bulk_receive_workflow:body",
-        ): 1,
-        (
-            "itambox/assets/tests/test_requests.py",
-            "E226",
-            "missing whitespace around arithmetic operator",
-            "        self.assertEqual(req2.asset.asset_tag, "
-            'f"{seq.prefix}{next_tag_val+1:0{seq.zero_padding}d}")',
-            "Module:body/ClassDef:RequisitionSystemTestCase:body/"
-            "FunctionDef:test_request_bulk_receive_workflow:body",
-        ): 1,
-        (
-            "itambox/core/importers/snipeit.py",
-            "E231",
-            "missing whitespace after ','",
-            '            f"  {key}: {c.get(\'created\',0)} created, '
-            '{c.get(\'updated\',0)} updated, "',
-            "Module:body/ClassDef:SnipeITImporter:body/FunctionDef:_finish:body",
-        ): 2,
-        (
-            "itambox/core/importers/snipeit.py",
-            "E231",
-            "missing whitespace after ','",
-            '            f"{c.get(\'skipped\',0)} skipped, '
-            '{c.get(\'failed\',0)} failed"',
-            "Module:body/ClassDef:SnipeITImporter:body/FunctionDef:_finish:body",
-        ): 2,
-        (
-            "itambox/core/reports/charts.py",
-            "E226",
-            "missing whitespace around arithmetic operator",
-            '        pct_str = f"{(item[\'value\']/total)*100:.1f}%"',
-            "Module:body/FunctionDef:generate_doughnut_chart:body/"
-            "For:Tuple(elts=[Name(id='idx', ctx=Store()), "
-            "Name(id='item', ctx=Store())], ctx=Store()):"
-            "Call(func=Name(id='enumerate', ctx=Load()), "
-            "args=[Name(id='visible_items', ctx=Load())], keywords=[]):body",
-        ): 2,
-    }
-)
 
 
 def verify_toolchain():
@@ -177,9 +106,10 @@ def _normalise_path(raw_path, cwd):
 def _source_anchor(code, source_text, source_lines, syntax_tree, row, path):
     """Return a row-stable source anchor for one finding.
 
-    Python 3.11 and 3.12 attribute B907 on a multiline f-string to different
-    physical lines. Anchor B907 to the smallest enclosing statement so both
-    interpreters identify the same debt without weakening code/message checks.
+    Flake8 may attribute B907 on a multiline f-string to any physical line of
+    the construct (the reported row has varied across interpreter releases).
+    Anchor B907 to the smallest enclosing statement so the identity does not
+    depend on which line is reported, without weakening code/message checks.
     Other checks keep their exact reported source line.
     """
     if code != "B907":
@@ -506,26 +436,9 @@ def validate_flake8_result(output, error_output, status, cwd):
     return findings, examples, None
 
 
-def _apply_python311_shortfall(stale_entries):
-    if sys.version_info[:2] != (3, 11):
-        return stale_entries
-    remaining = stale_entries.copy()
-    budgets = PYTHON311_FSTRING_SHORTFALL.copy()
-    for key in sorted(stale_entries):
-        allowed = min(remaining[key], budgets.get(key, 0))
-        if allowed:
-            remaining[key] -= allowed
-            budgets[key] -= allowed
-            if remaining[key] == 0:
-                del remaining[key]
-    return remaining
-
-
-def compare_baseline(findings, baseline, *, allow_python311_shortfall=True):
+def compare_baseline(findings, baseline):
     regressions = findings - baseline
     stale_entries = baseline - findings
-    if allow_python311_shortfall:
-        stale_entries = _apply_python311_shortfall(stale_entries)
     return regressions, stale_entries
 
 
@@ -611,6 +524,16 @@ def parse_args():
 
 def main():
     args = parse_args()
+    if sys.version_info[:2] != CANONICAL_PYTHON:
+        print(
+            "Refusing to run the flake8 baseline gate outside Python "
+            f"{CANONICAL_PYTHON[0]}.{CANONICAL_PYTHON[1]} "
+            f"(running {sys.version_info[0]}.{sys.version_info[1]}); "
+            "tokenizer differences make findings incomparable to the "
+            "canonical baseline.",
+            file=sys.stderr,
+        )
+        return 2
     toolchain_problems = verify_toolchain()
     if toolchain_problems:
         print(
@@ -639,17 +562,7 @@ def main():
         return failure_status
 
     if args.write_baseline:
-        if sys.version_info[:2] != CANONICAL_PYTHON:
-            print(
-                "Refusing canonical baseline regeneration outside Python 3.12.",
-                file=sys.stderr,
-            )
-            return 2
-        regressions, _stale = compare_baseline(
-            findings,
-            baseline,
-            allow_python311_shortfall=False,
-        )
+        regressions, _stale = compare_baseline(findings, baseline)
         if regressions:
             return report_mismatches(
                 regressions,

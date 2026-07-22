@@ -144,8 +144,8 @@ stable AST context. Its policy SHA-256 binds it to the effective Flake8 config,
 targets, and exact tool versions. Canonical Python 3.12 requires exact identity
 equality: increases are regressions, while reductions require regenerating the
 baseline in the same reviewed cleanup so old headroom cannot hide reintroduced
-debt. Python 3.11 may omit only the ten explicitly budgeted E226/E231 f-string
-tokenizer findings; there are no OS-specific exceptions. `make lint` /
+debt. The gate refuses to run on any interpreter other than canonical Python
+3.12; there are no interpreter- or OS-specific exceptions. `make lint` /
 `pre-commit run --all-files` use the same managed policy.
 
 ### Docs (MkDocs)

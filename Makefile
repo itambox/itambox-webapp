@@ -8,10 +8,10 @@
 # `make` recipes.
 
 ifeq ($(OS),Windows_NT)
-    HOST_PYTHON := python
+    HOST_PYTHON := py -3.12
     VENV_BIN := .venv/Scripts
 else
-    HOST_PYTHON := python3
+    HOST_PYTHON := python3.12
     VENV_BIN := .venv/bin
 endif
 
