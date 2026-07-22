@@ -9,7 +9,7 @@ from graphene_django.views import GraphQLView
 from rest_framework import exceptions
 
 from itambox.api.authentication import TokenAuthentication
-from itambox.middleware import TenantMiddleware, CurrentUserMiddleware
+from itambox.middleware import TenantMiddleware, set_current_user
 
 
 def field_count_limit_validator(max_fields=500, max_aliases=50):
@@ -239,8 +239,9 @@ class PrivateGraphQLView(GraphQLView):
                         user, token = auth_result
                         request.user = user
                         request.auth = token
-                        # Re-run current user middleware to bind context user
-                        CurrentUserMiddleware().process_request(request)
+                        # Token auth runs after middleware; bind the authenticated
+                        # principal without starting a second request lifecycle.
+                        set_current_user(user)
                         # Re-run tenant middleware to set tenant context
                         TenantMiddleware().process_request(request)
                     else:
