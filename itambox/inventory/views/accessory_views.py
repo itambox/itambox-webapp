@@ -3,7 +3,7 @@ from django.db import transaction
 from django.http import Http404, HttpResponse, HttpResponseForbidden
 from django.shortcuts import render, get_object_or_404, redirect
 from django.contrib import messages
-from django.contrib.auth.mixins import LoginRequiredMixin
+from django.contrib.auth.mixins import LoginRequiredMixin, PermissionRequiredMixin
 from django.urls import reverse, reverse_lazy
 from django.utils.html import format_html
 from django.views.generic import View
@@ -246,7 +246,9 @@ class AccessoryAssignmentListView(ObjectListView):
         return context
 
 
-class AccessoryStockAdjustView(LoginRequiredMixin, View):
+class AccessoryStockAdjustView(LoginRequiredMixin, PermissionRequiredMixin, View):
+    permission_required = 'inventory.change_accessorystock'
+
     def post(self, request, pk):
         with transaction.atomic():
             try:
@@ -286,7 +288,9 @@ class AccessoryStockAdjustView(LoginRequiredMixin, View):
         ))
 
 
-class AccessoryStockCreateModalView(LoginRequiredMixin, View):
+class AccessoryStockCreateModalView(LoginRequiredMixin, PermissionRequiredMixin, View):
+    permission_required = 'inventory.add_accessorystock'
+
     def get(self, request, pk):
         accessory = get_object_or_404(Accessory, pk=pk)
         from ..forms import AccessoryStockModalForm

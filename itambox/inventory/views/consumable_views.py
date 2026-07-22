@@ -3,7 +3,7 @@ from django.db import transaction
 from django.http import Http404, HttpResponse, HttpResponseForbidden
 from django.shortcuts import render, get_object_or_404, redirect
 from django.contrib import messages
-from django.contrib.auth.mixins import LoginRequiredMixin
+from django.contrib.auth.mixins import LoginRequiredMixin, PermissionRequiredMixin
 from django.urls import reverse, reverse_lazy
 from django.utils.html import format_html
 from django.views.generic import View
@@ -217,7 +217,9 @@ class ConsumableAssignmentListView(ObjectListView):
         return context
 
 
-class ConsumableStockAdjustView(LoginRequiredMixin, View):
+class ConsumableStockAdjustView(LoginRequiredMixin, PermissionRequiredMixin, View):
+    permission_required = 'inventory.change_consumablestock'
+
     def post(self, request, pk):
         with transaction.atomic():
             try:
@@ -255,7 +257,9 @@ class ConsumableStockAdjustView(LoginRequiredMixin, View):
         ))
 
 
-class ConsumableStockCreateModalView(LoginRequiredMixin, View):
+class ConsumableStockCreateModalView(LoginRequiredMixin, PermissionRequiredMixin, View):
+    permission_required = 'inventory.add_consumablestock'
+
     def get(self, request, pk):
         consumable = get_object_or_404(Consumable, pk=pk)
         from ..forms import ConsumableStockModalForm
