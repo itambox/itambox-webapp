@@ -2,7 +2,7 @@ import json
 from django.db import transaction
 from django.http import Http404, HttpResponse, HttpResponseForbidden
 from django.shortcuts import render, get_object_or_404, redirect
-from django.contrib.auth.mixins import LoginRequiredMixin
+from django.contrib.auth.mixins import LoginRequiredMixin, PermissionRequiredMixin
 from django.urls import reverse, reverse_lazy
 from django.utils.html import format_html
 from django.views.generic import View
@@ -196,7 +196,9 @@ class ComponentAllocationDeleteView(ObjectDeleteView):
     success_url = reverse_lazy('inventory:component_list')
 
 
-class ComponentStockAdjustView(LoginRequiredMixin, View):
+class ComponentStockAdjustView(LoginRequiredMixin, PermissionRequiredMixin, View):
+    permission_required = 'inventory.change_componentstock'
+
     def post(self, request, pk):
         with transaction.atomic():
             try:
@@ -234,7 +236,9 @@ class ComponentStockAdjustView(LoginRequiredMixin, View):
         ))
 
 
-class ComponentStockCreateModalView(LoginRequiredMixin, View):
+class ComponentStockCreateModalView(LoginRequiredMixin, PermissionRequiredMixin, View):
+    permission_required = 'inventory.add_componentstock'
+
     def get(self, request, pk):
         component = get_object_or_404(Component, pk=pk)
         from ..forms import ComponentStockModalForm

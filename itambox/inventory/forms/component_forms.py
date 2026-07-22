@@ -294,12 +294,16 @@ class ComponentAllocationFilterForm(FilterForm):
 
 
 class ComponentStockModalForm(forms.ModelForm):
+    qty = forms.IntegerField(
+        min_value=1,
+        widget=forms.NumberInput(attrs={'class': 'form-control', 'min': 1}),
+    )
+
     class Meta:
         model = ComponentStock
         fields = ['location', 'qty']
         widgets = {
             'location': forms.Select(attrs={'class': 'form-select'}),
-            'qty': forms.NumberInput(attrs={'class': 'form-control', 'min': 1}),
         }
 
     def __init__(self, *args, **kwargs):
