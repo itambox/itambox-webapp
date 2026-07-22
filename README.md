@@ -19,7 +19,7 @@
 <p align="center">
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-Apache--2.0-6f42c1.svg" alt="Apache-2.0 license"></a>
   <img src="https://img.shields.io/badge/status-pre--release-d97706.svg" alt="Pre-release status">
-  <img src="https://img.shields.io/badge/python-3.11%2B-3776ab.svg" alt="Python 3.11 or newer">
+  <img src="https://img.shields.io/badge/python-3.12%2B-3776ab.svg" alt="Python 3.12 minimum; Python 3.12 currently qualified">
   <img src="https://img.shields.io/badge/database-PostgreSQL%2015%2B-4169e1.svg" alt="PostgreSQL 15 or newer">
 </p>
 
@@ -45,7 +45,7 @@ See [module maturity](itambox/docs/development/module-maturity.md) for the curre
 
 ## Architecture
 
-- Django 5.2 on Python 3.11 or newer
+- Django 5.2 with Python 3.12 as the currently qualified interpreter (`>=3.12` metadata minimum)
 - PostgreSQL 15 or newer; SQLite is intentionally unsupported
 - Server-rendered Tabler UI with HTMX, TypeScript, and SCSS
 - Django REST Framework with OpenAPI, Swagger UI, and ReDoc
@@ -57,7 +57,7 @@ Start with [DEVELOPMENT.md](DEVELOPMENT.md) for implementation conventions.
 
 ## Evaluate from source
 
-The documented evaluation path uses development settings. It requires Python 3.11 or newer, Node.js 20, and PostgreSQL 15 or newer. Use a fresh database and a PostgreSQL role that can create test databases and install the `btree_gist` extension.
+The documented evaluation path uses development settings. Use the currently qualified Python 3.12 interpreter, Node.js 20, and PostgreSQL 15 or newer. Use a fresh database and a PostgreSQL role that can create test databases and install the `btree_gist` extension.
 
 ```bash
 git clone https://github.com/itambox/itambox-webapp.git

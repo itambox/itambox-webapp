@@ -2,8 +2,9 @@
 
 ## Quick Start
 
-1. **Database Requirements**: ITAMbox strictly requires a running PostgreSQL 15+ database. Ensure a server is active locally or accessible.
-2. **Environment Variables**: Copy `.env.example` to `.env` and configure the PostgreSQL connection credentials (e.g., `ITAMBOX_DB_ENGINE=django.db.backends.postgresql`, `ITAMBOX_DB_NAME`, `ITAMBOX_DB_USER`, `ITAMBOX_DB_PASSWORD`, `ITAMBOX_DB_HOST`, `ITAMBOX_DB_PORT`).
+1. **Python Requirements**: ITAMbox requires Python 3.12 or newer; 3.12 is the canonical interpreter for CI, Docker, lint, and native Windows development (see the [Python version policy](CONTRIBUTING.md#python-version-policy)).
+2. **Database Requirements**: ITAMbox strictly requires a running PostgreSQL 15+ database. Ensure a server is active locally or accessible.
+3. **Environment Variables**: Copy `.env.example` to `.env` and configure the PostgreSQL connection credentials (e.g., `ITAMBOX_DB_ENGINE=django.db.backends.postgresql`, `ITAMBOX_DB_NAME`, `ITAMBOX_DB_USER`, `ITAMBOX_DB_PASSWORD`, `ITAMBOX_DB_HOST`, `ITAMBOX_DB_PORT`).
 
 ```bash
 # Create virtual environment (from the repository root)
@@ -33,7 +34,7 @@ installed separately on Windows.
 
 ### Native Windows support
 
-Native Windows Python is a supported development environment: the app,
+Native Windows Python 3.12 is a supported development environment: the app,
 migrations, seed data, and the normal test suite all run there. Two
 dependencies are excluded on native Windows only via PEP 508 markers:
 

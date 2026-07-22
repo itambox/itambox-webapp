@@ -72,7 +72,7 @@ Version pins live in `itambox/requirements.txt` and `pyproject.toml` — check t
 
 Canonical local setup: `pip install -r requirements-dev.txt` from the repository root (layers pytest/flake8/pre-commit/django-debug-toolbar on top of `itambox/requirements.txt`), or `make setup` (see [Makefile](Makefile); requires Git Bash or WSL, plus GNU Make installed separately on Windows). `itambox/requirements.txt` alone remains the runtime-only install.
 
-Native Windows Python is a supported development environment — the app and normal tests run there. `itambox/requirements.txt` marks `django-auth-ldap` `platform_system != "Windows"` because its `python-ldap` dependency has no Windows wheel; `core/auth/ldap.py` falls back to a disabled LDAP backend in that case, so LDAP integration/development requires Docker, Linux, or WSL. `python-magic` is likewise excluded via `platform_system != "Windows"` marker (import can hang indefinitely without libmagic DLL); `core/validators.py` falls back to extension checks/Pillow. Docker/Linux/WSL retain full libmagic signature validation. Production remains Docker/Linux with the full dependency set.
+Native Windows Python 3.12 is a supported development environment — the app and normal tests run there. `itambox/requirements.txt` marks `django-auth-ldap` `platform_system != "Windows"` because its `python-ldap` dependency has no Windows wheel; `core/auth/ldap.py` falls back to a disabled LDAP backend in that case, so LDAP integration/development requires Docker, Linux, or WSL. `python-magic` is likewise excluded via `platform_system != "Windows"` marker (import can hang indefinitely without libmagic DLL); `core/validators.py` falls back to extension checks/Pillow. Docker/Linux/WSL retain full libmagic signature validation. Production remains Docker/Linux with the full dependency set.
 
 All other commands below run from `itambox/`.
 
@@ -148,8 +148,8 @@ stable AST context. Its policy SHA-256 binds it to the effective Flake8 config,
 targets, and exact tool versions. Canonical Python 3.12 requires exact identity
 equality: increases are regressions, while reductions require regenerating the
 baseline in the same reviewed cleanup so old headroom cannot hide reintroduced
-debt. Python 3.11 may omit only the ten explicitly budgeted E226/E231 f-string
-tokenizer findings; there are no OS-specific exceptions. `make lint` /
+debt. The gate refuses to run on any interpreter other than canonical Python
+3.12; there are no interpreter- or OS-specific exceptions. `make lint` /
 `pre-commit run --all-files` use the same managed policy.
 
 ### Docs (MkDocs)

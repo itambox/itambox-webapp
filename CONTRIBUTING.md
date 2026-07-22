@@ -13,14 +13,20 @@ ITAMbox accepts focused changes through pull requests. This guide describes the 
 
 | Tool | Supported version or purpose |
 |---|---|
-| Python | 3.11 or newer; CI and the canonical lint baseline use 3.12 |
+| Python | Minimum metadata version 3.12; Python 3.12 is the currently qualified and canonical interpreter for CI, Docker, native Windows development, and lint |
 | PostgreSQL | 15 or newer; CI uses PostgreSQL 16 and SQLite is not supported |
 | Node.js | 20, with the npm version supplied by that release |
 | Git | Current maintained release |
 | Docker Compose | Optional for deployment and production smoke tests; the smoke test requires v2.24.4 or newer |
 | GNU Make | Optional convenience wrapper; on Windows, use it from Git Bash or WSL |
 
-Native Windows Python is supported for the application and normal test suite. LDAP development requires Docker, Linux, or WSL because `python-ldap` has no supported native Windows wheel. Native Windows also uses the documented file-validation fallback instead of libmagic. See [DEVELOPMENT.md](DEVELOPMENT.md#native-windows-support).
+Native Windows Python 3.12 is supported for the application and normal test suite. LDAP development requires Docker, Linux, or WSL because `python-ldap` has no supported native Windows wheel. Native Windows also uses the documented file-validation fallback instead of libmagic. See [DEVELOPMENT.md](DEVELOPMENT.md#native-windows-support).
+
+### Python version policy
+
+Project metadata requires Python 3.12 or newer, but Python 3.12 is the only currently qualified and canonical interpreter: production Docker images, every blocking CI workflow, native Windows development, and the Flake8 identity baseline all run on it. Python 3.11 and older are not supported, and the lint gate refuses non-canonical interpreters rather than producing results that cannot be compared to the baseline.
+
+Newer Python minor versions (3.13 and later) satisfy the metadata minimum but are evaluated conservatively and separately before becoming supported. A new version is adopted only after, on that interpreter: every pinned dependency installs from a compatible release (including native Windows wheels), the full test suite and the deterministic gates pass in CI, the Flake8 identity baseline is re-validated against the pinned toolchain (tokenizer changes can alter reported findings), and the dependency lock is resolved and validated. Until that evaluation lands as its own reviewed change, newer interpreters are unsupported for development and production even if the application appears to run on them.
 
 ## Set up a development checkout
 
