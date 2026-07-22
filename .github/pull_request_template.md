@@ -19,12 +19,12 @@
 
 <!-- Check the gates that apply and mark the rest N/A in the notes below. -->
 
-- [ ] Relevant pytest targets pass
-- [ ] `python scripts/check_flake8_baseline.py` passes
-- [ ] `pre-commit run --all-files` passes
-- [ ] `python itambox/manage.py makemigrations --check --dry-run` passes
+- [ ] Relevant `uv run --locked --group dev pytest ...` targets pass
+- [ ] `uv run --locked --only-group dev python scripts/check_flake8_baseline.py` passes
+- [ ] `uv run --locked --group dev pre-commit run --all-files` passes
+- [ ] `uv run --locked --group dev python itambox/manage.py makemigrations --check --dry-run` passes
 - [ ] Frontend build, typecheck, and ESLint pass when frontend files changed
-- [ ] `python -m mkdocs build -f itambox/mkdocs.yml --strict` passes when documentation changed
+- [ ] `uv run --locked --only-group docs mkdocs build -f itambox/mkdocs.yml --strict` passes when documentation changed
 - [ ] Playwright or production Compose smoke tests pass when applicable
 - [ ] New or changed behavior has regression coverage
 

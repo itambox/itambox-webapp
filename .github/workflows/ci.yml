@@ -47,7 +47,13 @@ jobs:
         uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
         with:
           python-version: ${{ matrix.python-version }}
-          cache: 'pip'
+
+      - name: Set up uv
+        uses: astral-sh/setup-uv@c771a70e6277c0a99b617c7a806ffedaca235ff9 # v9.0.0
+        with:
+          version: "0.11.31"
+          enable-cache: true
+          cache-dependency-glob: uv.lock
 
       # python-ldap (pulled by django-auth-ldap) needs libldap2/sasl headers for
       # source builds. ubuntu-latest images can miss these under transient updates.
@@ -58,38 +64,47 @@ jobs:
               apt-get update
               apt-get install -y --no-install-recommends \
                 gcc \
+                libmagic1 \
                 libldap2-dev \
                 libsasl2-dev \
-                libssl-dev
+                libssl-dev \
+                xmlsec1
             else
               sudo apt-get update
               sudo apt-get install -y --no-install-recommends \
                 gcc \
+                libmagic1 \
                 libldap2-dev \
                 libsasl2-dev \
-                libssl-dev
+                libssl-dev \
+                xmlsec1
             fi
           fi
 
       - name: Install dependencies
         run: |
-          python -m pip install --upgrade pip
-          pip install -r requirements-dev.txt
+          uv lock --check
+          uv sync --locked --group dev
+
+      - name: Verify native runtime bindings
+        run: |
+          uv run --locked --no-sync python -c "import ldap, magic; print(ldap.__version__); print(magic.from_buffer(b'ITAMbox'))"
+          xmlsec1 --version
 
       - name: Check for missing migrations
         working-directory: ./itambox
         run: |
-          python manage.py makemigrations --check --dry-run
+          uv run --locked --no-sync python manage.py makemigrations --check --dry-run
 
       - name: Run Django system checks
         working-directory: ./itambox
         run: |
-          python manage.py check
+          uv run --locked --no-sync python manage.py check
 
       - name: Run tests
         working-directory: ./itambox
         run: |
-          pytest --cov=. --cov-report=term --cov-fail-under=45
+          uv run --locked --no-sync pytest --cov=. --cov-report=term --cov-fail-under=45
 
   lint:
     runs-on: ubuntu-latest
@@ -101,23 +116,22 @@ jobs:
         uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
         with:
           python-version: "3.12"
-          cache: 'pip'
 
-      - name: Install flake8
+      - name: Set up uv
+        uses: astral-sh/setup-uv@c771a70e6277c0a99b617c7a806ffedaca235ff9 # v9.0.0
+        with:
+          version: "0.11.31"
+          enable-cache: true
+          cache-dependency-glob: uv.lock
+
+      - name: Install lint dependencies
         run: |
-          python -m pip install --upgrade pip
-          # Keep exactly in sync with requirements-dev.txt: the checked-in
-          # violation baseline is tool-version-specific.
-          pip install \
-            "flake8==7.0.0" \
-            "flake8-bugbear==24.12.12" \
-            "mccabe==0.7.0" \
-            "pycodestyle==2.11.1" \
-            "pyflakes==3.2.0"
+          uv lock --check
+          uv sync --locked --only-group dev
 
       - name: Lint with flake8 (blocking baseline gate)
         run: |
-          python scripts/check_flake8_baseline.py
+          uv run --locked --no-sync python scripts/check_flake8_baseline.py
 
   docs:
     runs-on: ubuntu-latest
@@ -129,16 +143,22 @@ jobs:
         uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
         with:
           python-version: "3.12"
-          cache: 'pip'
 
-      - name: Install mkdocs
+      - name: Set up uv
+        uses: astral-sh/setup-uv@c771a70e6277c0a99b617c7a806ffedaca235ff9 # v9.0.0
+        with:
+          version: "0.11.31"
+          enable-cache: true
+          cache-dependency-glob: uv.lock
+
+      - name: Install documentation dependencies
         run: |
-          python -m pip install --upgrade pip
-          pip install "mkdocs>=1.6.1,<2.0" "mkdocs-material>=9.5"
+          uv lock --check
+          uv sync --locked --only-group docs
 
       - name: Build docs (strict — fails on broken nav entries or unresolved links)
         working-directory: ./itambox
-        run: mkdocs build --strict
+        run: uv run --locked --no-sync mkdocs build --strict
 
   frontend:
     runs-on: ubuntu-latest

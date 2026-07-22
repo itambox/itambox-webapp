@@ -1,9 +1,11 @@
 # Management Commands
 
-ITAMbox ships a set of Django management commands for maintenance, troubleshooting, and data operations. All commands are invoked from the repository root (or the directory containing `manage.py`):
+ITAMbox ships a set of Django management commands for maintenance, troubleshooting, and data operations. For a local source checkout, synchronize the locked development environment from the repository root, then invoke commands from `itambox/` through uv:
 
 ```bash
-python manage.py <command> [options]
+uv sync --locked --group dev
+cd itambox
+uv run --locked --group dev python manage.py <command> [options]
 ```
 
 In the Docker Compose stack, prefix with `docker compose run --rm app`:
@@ -11,6 +13,8 @@ In the Docker Compose stack, prefix with `docker compose run --rm app`:
 ```bash
 docker compose run --rm app python manage.py <command> [options]
 ```
+
+The command reference below shows the inner `python manage.py ...` portion for brevity. Wrap local source-checkout invocations with `uv run --locked --group dev`, or use the Docker Compose prefix above.
 
 ---
 
@@ -288,7 +292,7 @@ Synchronise users from an LDAP directory into a specific tenant. Creates or upda
 
 **Prerequisites**
 
-- `django-auth-ldap` must be installed (`pip install django-auth-ldap`)
+- Use the locked Linux/WSL development environment or the Docker image; native Windows intentionally excludes `django-auth-ldap` because `python-ldap` has no supported Windows wheel
 - `ITAMBOX_TENANT_LDAP_CONFIGS` must contain an entry for the target tenant slug with at minimum `SERVER_URI`, `BIND_DN`, `BIND_PASSWORD`, and `USER_SEARCH_BASE`
 
 **Options**

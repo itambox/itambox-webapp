@@ -77,7 +77,8 @@ def test_e2e_workflow_provisions_full_demo_and_masked_scim_credentials():
     workflow = WORKFLOW_PATH.read_text(encoding="utf-8")
 
     assert "E2E_TENANT_SLUG: northwind-internal-it" in workflow
-    assert "python manage.py seed_data --force" in workflow
+    assert "uv run --locked --no-sync python manage.py seed_data --force" in workflow
+    assert "uv run --locked --no-sync python manage.py runserver" in workflow
     assert "seed_data --production" not in workflow
     assert "Token.objects.create(" in workflow
     assert "::add-mask::" in workflow

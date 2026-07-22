@@ -9711,14 +9711,6 @@
       "path": "itambox/core/management/commands/sync_tenant_ldap.py",
       "code": "B904",
       "message": "Within an `except` clause, raise exceptions with `raise ... from err` or `raise ... from None` to distinguish them from errors in exception handling.  See https://docs.python.org/3/tutorial/errors.html#exception-chaining for details.",
-      "source": "            raise CommandError(\"django-auth-ldap is not installed. Run: pip install django-auth-ldap\")",
-      "context": "Module:body/ClassDef:Command:body/FunctionDef:_run_sync:body/Try#1:handlers/ExceptHandler:Name(id='ImportError', ctx=Load()):None:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/core/management/commands/sync_tenant_ldap.py",
-      "code": "B904",
-      "message": "Within an `except` clause, raise exceptions with `raise ... from err` or `raise ... from None` to distinguish them from errors in exception handling.  See https://docs.python.org/3/tutorial/errors.html#exception-chaining for details.",
       "source": "            raise CommandError(f\"LDAP bind failed: {e}\")",
       "context": "Module:body/ClassDef:Command:body/FunctionDef:_run_sync:body/Try#2:handlers/ExceptHandler:Attribute(value=Name(id='ldap', ctx=Load()), attr='LDAPError', ctx=Load()):e:body",
       "count": 1
@@ -9801,30 +9793,6 @@
       "message": "'Command._run_sync' is too complex (26)",
       "source": "    def _run_sync(self, tenant):",
       "context": "Module:body/ClassDef:Command:body/FunctionDef:_run_sync:self",
-      "count": 1
-    },
-    {
-      "path": "itambox/core/management/commands/sync_tenant_ldap.py",
-      "code": "F401",
-      "message": "'django_auth_ldap.config.LDAPSearch' imported but unused",
-      "source": "            from django_auth_ldap.config import LDAPSearch",
-      "context": "Module:body/ClassDef:Command:body/FunctionDef:_run_sync:body/Try#1:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/core/management/commands/sync_tenant_ldap.py",
-      "code": "W293",
-      "message": "blank line contains whitespace",
-      "source": "        ",
-      "context": "Module:body/ClassDef:Command:body/FunctionDef:_run_sync:self",
-      "count": 1
-    },
-    {
-      "path": "itambox/core/management/commands/sync_tenant_ldap.py",
-      "code": "W293",
-      "message": "blank line contains whitespace",
-      "source": "                        ",
-      "context": "Module:body/ClassDef:Command:body/FunctionDef:_run_sync:body/Try#3:body/While:Constant(value=True):body/If:Compare(left=Name(id='result_type', ctx=Load()), ops=[Eq()], comparators=[Attribute(value=Name(id='ldap', ctx=Load()), attr='RES_SEARCH_ENTRY', ctx=Load())]):body/For:Tuple(elts=[Name(id='dn', ctx=Store()), Name(id='entry', ctx=Store())], ctx=Store()):Name(id='result_data', ctx=Load()):self",
       "count": 1
     },
     {
@@ -12799,14 +12767,6 @@
       "path": "itambox/core/tests/test_management_commands.py",
       "code": "F401",
       "message": "'unittest.mock.MagicMock' imported but unused",
-      "source": "from unittest.mock import patch, MagicMock",
-      "context": "Module:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/core/tests/test_management_commands.py",
-      "code": "F401",
-      "message": "'unittest.mock.patch' imported but unused",
       "source": "from unittest.mock import patch, MagicMock",
       "context": "Module:body",
       "count": 1

@@ -62,9 +62,8 @@ The documented evaluation path uses development settings. Use the currently qual
 ```bash
 git clone https://github.com/itambox/itambox-webapp.git
 cd itambox-webapp
-python -m venv .venv
-source .venv/bin/activate               # Windows Git Bash: source .venv/Scripts/activate
-python -m pip install -r requirements-dev.txt
+python -m pip install "uv==0.11.31"
+uv sync --locked --group dev
 cp .env.example .env                    # PowerShell: Copy-Item .env.example .env
 ```
 
@@ -74,9 +73,9 @@ Set `ITAMBOX_ENV=dev` and the `ITAMBOX_DB_*` values in `.env`, then build the fr
 cd itambox
 npm ci
 npm run build:all
-python manage.py migrate
-python manage.py seed_data --skip-drop
-python manage.py runserver
+uv run --locked --group dev python manage.py migrate
+uv run --locked --group dev python manage.py seed_data --skip-drop
+uv run --locked --group dev python manage.py runserver
 ```
 
 Open <http://127.0.0.1:8000> and sign in as `lars.eklund` with the demo password `itambox2026`. The seed contains public credentials and sample organizations; keep it local and use it only with a disposable evaluation database. `--skip-drop` prevents the command from clearing existing records, but it still creates and updates demo data.
@@ -106,7 +105,7 @@ docker compose up -d
 Back up PostgreSQL, uploaded media, `ITAMBOX_SECRET_KEY`, `ITAMBOX_FIELD_ENCRYPTION_KEYS`, and `ITAMBOX_API_TOKEN_PEPPERS` together. Follow the [installation guide](itambox/docs/operations/installation.md), [backup and restore guide](itambox/docs/operations/backup-restore.md), and [upgrade guide](itambox/docs/operations/upgrades.md).
 
 > [!NOTE]
-> ITAMbox does not publish a Python package or prebuilt container image. `pyproject.toml` supplies project metadata only; the documented install paths use the repository's source checkout or a locally built Docker image.
+> ITAMbox does not publish a Python package or prebuilt container image. `pyproject.toml` defines project metadata and the direct dependency policy; the documented install paths use the repository's source checkout or a locally built Docker image.
 
 ## Development and verification
 
@@ -114,13 +113,13 @@ The canonical contributor environment uses Python 3.12 in CI, PostgreSQL 16, and
 
 ```bash
 # Repository root
-pre-commit run --all-files
-python scripts/check_flake8_baseline.py
+uv run --locked --group dev pre-commit run --all-files
+uv run --locked --only-group dev python scripts/check_flake8_baseline.py
 
 # itambox/
-python manage.py makemigrations --check --dry-run
-python manage.py check
-pytest --cov=. --cov-report=term --cov-fail-under=45
+uv run --locked --group dev python manage.py makemigrations --check --dry-run
+uv run --locked --group dev python manage.py check
+uv run --locked --group dev pytest --cov=. --cov-report=term --cov-fail-under=45
 npm ci
 npm run build:all
 npm run typecheck
@@ -131,12 +130,12 @@ The full pytest suite is not xdist-safe; run it serially. [CONTRIBUTING.md](CONT
 
 ## Documentation
 
-The repository includes operator, integration, model, plugin, and development guides under [`itambox/docs/`](itambox/docs/index.md). MkDocs is installed separately from the application development requirements:
+The repository includes operator, integration, model, plugin, and development guides under [`itambox/docs/`](itambox/docs/index.md). MkDocs is isolated in the locked `docs` group:
 
 ```bash
-python -m pip install mkdocs mkdocs-material
+uv sync --locked --only-group docs
 cd itambox
-mkdocs serve
+uv run --locked --only-group docs mkdocs serve
 ```
 
 Useful starting points:

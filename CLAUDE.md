@@ -66,13 +66,13 @@ Django + PostgreSQL (SQLite is rejected at settings load). Beyond Django itself:
 - **Tests** — pytest-django + model_bakery. pytest-xdist is installed but NOT enabled: the suite isn't xdist-safe yet (cross-test shared state — MEDIA_ROOT, requests-mock + django-q timing).
 - **Docs** — MkDocs.
 
-Version pins live in `itambox/requirements.txt` and `pyproject.toml` — check there rather than trusting a number quoted here.
+Direct dependency policy lives in `pyproject.toml`; exact cross-platform versions live in `uv.lock`. Use uv `0.11.31` with `--locked` rather than installing ad hoc packages.
 
 ## Development commands
 
-Canonical local setup: `pip install -r requirements-dev.txt` from the repository root (layers pytest/flake8/pre-commit/django-debug-toolbar on top of `itambox/requirements.txt`), or `make setup` (see [Makefile](Makefile); requires Git Bash or WSL, plus GNU Make installed separately on Windows). `itambox/requirements.txt` alone remains the runtime-only install.
+Canonical local setup: install uv `0.11.31`, then run `uv sync --locked --group dev` from the repository root, or use `make setup` (see [Makefile](Makefile); requires Git Bash or WSL, plus GNU Make installed separately on Windows). Runtime-only environments use `uv sync --locked --no-dev`.
 
-Native Windows Python 3.12 is a supported development environment — the app and normal tests run there. `itambox/requirements.txt` marks `django-auth-ldap` `platform_system != "Windows"` because its `python-ldap` dependency has no Windows wheel; `core/auth/ldap.py` falls back to a disabled LDAP backend in that case, so LDAP integration/development requires Docker, Linux, or WSL. `python-magic` is likewise excluded via `platform_system != "Windows"` marker (import can hang indefinitely without libmagic DLL); `core/validators.py` falls back to extension checks/Pillow. Docker/Linux/WSL retain full libmagic signature validation. Production remains Docker/Linux with the full dependency set.
+Native Windows Python 3.12 is a supported development environment — the app and normal tests run there. `pyproject.toml` marks `django-auth-ldap` `platform_system != "Windows"` because its `python-ldap` dependency has no Windows wheel; `core/auth/ldap.py` falls back to a disabled LDAP backend in that case, so LDAP integration/development requires Docker, Linux, or WSL. `python-magic` is likewise excluded via `platform_system != "Windows"` marker (import can hang indefinitely without libmagic DLL); `core/validators.py` falls back to extension checks/Pillow. Docker/Linux/WSL retain full libmagic signature validation. Production remains Docker/Linux with the full dependency set.
 
 All other commands below run from `itambox/`.
 
@@ -80,29 +80,29 @@ All other commands below run from `itambox/`.
 ```bash
 # Env selection: ITAMBOX_ENV=dev|prod. Fails closed to prod when neither
 # ITAMBOX_ENV nor ITAMBOX_DEBUG is set (test runs default to dev).
-DJANGO_SETTINGS_MODULE=core.settings.dev python manage.py runserver
+DJANGO_SETTINGS_MODULE=core.settings.dev uv run --locked --group dev python manage.py runserver
 
-python manage.py makemigrations
-python manage.py migrate
-python manage.py createsuperuser
+uv run --locked --group dev python manage.py makemigrations
+uv run --locked --group dev python manage.py migrate
+uv run --locked --group dev python manage.py createsuperuser
 ```
 
 ### Tests (pytest-django)
 ```bash
 # Run all tests
-pytest
+uv run --locked --group dev pytest
 
 # Run a single test file
-pytest assets/tests/test_assignments.py
+uv run --locked --group dev pytest assets/tests/test_assignments.py
 
 # Run a single test
-pytest assets/tests/test_assignments.py::TestAssetAssignment::test_active_assignment
+uv run --locked --group dev pytest assets/tests/test_assignments.py::TestAssetAssignment::test_active_assignment
 
 # Run with coverage
-pytest --cov=. --cov-report=html
+uv run --locked --group dev pytest --cov=. --cov-report=html
 
 # Adversarial GraphQL suite (uses a separate test DB to avoid collisions)
-pytest assets/tests/test_graphql_adversarial.py
+uv run --locked --group dev pytest assets/tests/test_graphql_adversarial.py
 ```
 
 Tests require a running PostgreSQL instance. SQLite is explicitly rejected by settings. The `conftest.py` at `itambox/` clears tenant/user contextvars after each test via an `autouse` fixture.
@@ -125,7 +125,7 @@ npm run watch:css   # CSS only
 
 ### Background worker
 ```bash
-python manage.py qcluster   # Start django-q2 worker
+uv run --locked --group dev python manage.py qcluster   # Start django-q2 worker
 ```
 
 In tests, `Q_CLUSTER['sync'] = True` is set automatically so tasks run inline.
@@ -134,11 +134,11 @@ In tests, `Q_CLUSTER['sync'] = True` is set automatically so tasks run inline.
 ```bash
 # From the repository root (not itambox/) -- blocking gate, same command CI and
 # pre-commit both run:
-python scripts/check_flake8_baseline.py
+uv run --locked --only-group dev python scripts/check_flake8_baseline.py
 
 # After deliberately reducing debt, regenerate with the pinned toolchain on
 # canonical Python 3.12. Other interpreter versions are refused:
-python scripts/check_flake8_baseline.py --write-baseline
+uv run --locked --only-group dev python scripts/check_flake8_baseline.py --write-baseline
 ```
 Policy (`select`/`ignore`, each ignore documented with a reason) lives in `setup.cfg`
 at the repo root. The pinned Flake8/Bugbear toolchain is blocking; the ~4k
@@ -155,16 +155,16 @@ debt. The gate refuses to run on any interpreter other than canonical Python
 ### Docs (MkDocs)
 ```bash
 # Build docs to static/docs/ (run from itambox/)
-mkdocs build --strict
+uv run --locked --only-group docs mkdocs build --strict
 
 # Live-reload preview
-mkdocs serve
+uv run --locked --only-group docs mkdocs serve
 ```
 
 ### API schema
 ```bash
 # Regenerate schema.yaml after model/serializer changes
-python manage.py spectacular --file schema.yaml
+uv run --locked --group dev python manage.py spectacular --file schema.yaml
 ```
 
 ## Architecture: tenant scoping
@@ -232,11 +232,11 @@ Tasks live in `core/tasks/`. Each task function should be wrapped in `TaskContex
 A fully-wired model touches every layer below. Skipping one leaves a half-wired feature (a model with no API, a list view with no filter, an object missing from search). Mirror an existing model in the same app rather than inventing structure.
 
 1. **Model** — add to `<app>/models.py` (or `models/`). Inherit `BaseModel`; add `ChangeLoggingMixin` for audit history and `AutoSlugMixin` if it needs a slug. Tenant-scoped models get the tenant FK + the appropriate manager (see "Architecture: tenant scoping"); soft-delete uniqueness uses `UniqueConstraint(condition=Q(deleted_at__isnull=True))`, never `unique=True`.
-2. **Migration** — `python manage.py makemigrations <app>` (never hand-write).
+2. **Migration** — `uv run --locked --group dev python manage.py makemigrations <app>` (never hand-write).
 3. **Filtering** — add a `FilterSet` to `<app>/filters.py` and a filter form to `<app>/forms/` (the list view wires them as `filterset` / `filterset_form`).
 4. **Form** — add a crispy `ModelForm` to `<app>/forms/`; for CSV import add a form to `<app>/forms/import_forms.py` decorated with `@register_import_form` (auto-wires to the centralized import view).
 5. **Table** — add a `django_tables2` table to `<app>/tables.py`.
-6. **REST API** — serializer in `<app>/api/serializers.py`, viewset in `<app>/api/views.py`, route in `<app>/api/urls.py` (bases from `itambox.api.*`); then regenerate the schema with `python manage.py spectacular --file schema.yaml`.
+6. **REST API** — serializer in `<app>/api/serializers.py`, viewset in `<app>/api/views.py`, route in `<app>/api/urls.py` (bases from `itambox.api.*`); then regenerate the schema with `uv run --locked --group dev python manage.py spectacular --file schema.yaml`.
 7. **UI views** — subclass the generics in `<app>/views.py` (or `views/`): `ObjectListView` / `ObjectDetailView` / `ObjectEditView` / `ObjectDeleteView` / `ObjectCloneView` / `ObjectBulkEditView` / `ObjectBulkDeleteView`; set `queryset`, `filterset`, `filterset_form`, `table`, and detail `Panel`s.
 8. **URLs** — add the pk-based route set to `<app>/urls.py` (`list` / `add` / `<pk>/` / `<pk>/edit/` / `<pk>/clone/` / `<pk>/delete/` + bulk + any custom actions).
 9. **Search** — register a `SearchIndex` in `<app>/search.py` with `@register_search()` if the model should appear in global search.

@@ -6,9 +6,9 @@
 
 version: 2
 updates:
-  # Check for Python pip dependency updates (itambox/requirements.txt)
+  # Check the root pyproject.toml and uv.lock dependency graph.
   - package-ecosystem: "pip"
-    directory: "/itambox"
+    directory: "/"
     schedule:
       interval: "weekly"
       day: "monday"

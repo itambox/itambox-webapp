@@ -1,8 +1,7 @@
 # syntax=docker/dockerfile:1
+FROM ghcr.io/astral-sh/uv:0.11.31@sha256:ecd4de2f060c64bea0ff8ecb182ddf46ba3fcccdc8a60cfdbaf20d1a047d7437 AS uv
 
 # ---- Stage 1: build the frontend (SCSS + vendor copy + JS bundle) ----
-# The compiled output lives in static/dist (git-ignored) and must be built so
-# the image is reproducible rather than depending on the builder's disk state.
 FROM node:20-slim AS frontend
 WORKDIR /app
 COPY itambox/package.json itambox/package-lock.json ./
@@ -11,40 +10,64 @@ COPY itambox/ ./
 RUN npm run build:all
 
 
-# ---- Stage 2: Python runtime ----
-FROM python:3.12-slim
+# ---- Stage 2: resolve the exact production Python environment ----
+FROM python:3.12-slim-bookworm AS python-deps
+
+ENV UV_COMPILE_BYTECODE=1 \
+    UV_LINK_MODE=copy \
+    UV_PYTHON_DOWNLOADS=never
+
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends \
+        gcc libldap2-dev libsasl2-dev libssl-dev \
+    && rm -rf /var/lib/apt/lists/*
+COPY --from=uv /uv /uvx /bin/
+
+WORKDIR /app
+COPY pyproject.toml uv.lock ./
+RUN uv sync --locked --no-dev --no-install-project
+
+
+# ---- Stage 3: build documentation from its locked dependency group ----
+FROM python:3.12-slim-bookworm AS docs
+
+ENV UV_LINK_MODE=copy \
+    UV_PYTHON_DOWNLOADS=never
+
+COPY --from=uv /uv /uvx /bin/
+
+WORKDIR /app
+COPY pyproject.toml uv.lock ./
+RUN uv sync --locked --only-group docs --no-install-project
+COPY itambox/mkdocs.yml ./itambox/mkdocs.yml
+COPY itambox/docs/ ./itambox/docs/
+WORKDIR /app/itambox
+RUN /app/.venv/bin/mkdocs build --strict
+
+
+# ---- Stage 4: minimal runtime image ----
+FROM python:3.12-slim-bookworm
 
 ENV PYTHONUNBUFFERED=1 \
     PYTHONDONTWRITEBYTECODE=1 \
-    PIP_NO_CACHE_DIR=1 \
-    ITAMBOX_ENV=prod
+    ITAMBOX_ENV=prod \
+    PATH="/app/.venv/bin:${PATH}"
 
 WORKDIR /app
 
-# System deps:
-#   gcc                         - build any sdist-only wheels
-#   postgresql-client           - pg_isready / psql for ops & entrypoint waits
-#   libldap2-dev, libsasl2-dev  - python-ldap (django-auth-ldap)
-#   xmlsec1                      - pysaml2 (djangosaml2) signature handling
-#   libmagic1                    - python-magic MIME sniffing for upload validators
+# Runtime tools and libraries for PostgreSQL, LDAP, SAML/xmlsec, and libmagic.
 RUN apt-get update \
     && apt-get install -y --no-install-recommends \
-        gcc postgresql-client libldap2-dev libsasl2-dev xmlsec1 libmagic1 \
+        postgresql-client libldap-2.5-0 libsasl2-2 xmlsec1 libmagic1 \
     && rm -rf /var/lib/apt/lists/*
 
-COPY itambox/requirements.txt .
-RUN pip install -r requirements.txt
-
+COPY --from=python-deps /app/.venv /app/.venv
 COPY itambox/ .
-# Bring in the compiled frontend from the node stage.
 COPY --from=frontend /app/static/dist ./static/dist
+COPY --from=docs /app/itambox/static/docs ./static/docs
 
-# Build MkDocs documentation into static/docs so collectstatic picks it up.
-RUN python -m mkdocs build
-
-# Collect static assets at build time.
-# nor real secrets; pass a throwaway key so the prod SECRET_KEY guard does not
-# trip during the build.
+# Collect static assets at build time. No database access is required, but prod
+# settings reject missing secrets, so use a throwaway build-only value.
 RUN ITAMBOX_SECRET_KEY=build-time-collectstatic-only-not-a-real-secret \
     python manage.py collectstatic --noinput
 
