@@ -1,6 +1,7 @@
 from types import SimpleNamespace
 from unittest import mock
 
+from django.http import HttpResponse
 from django.test import RequestFactory, SimpleTestCase
 
 from core.auth.cache import (
@@ -8,7 +9,12 @@ from core.auth.cache import (
     invalidate_user_authorization_cache,
     synchronize_authorization_cache,
 )
-from itambox.middleware import CurrentUserMiddleware
+from core.views.graphql import GraphQLView, PrivateGraphQLView
+from itambox.middleware import (
+    CurrentUserMiddleware,
+    get_current_request_id,
+    get_current_user,
+)
 
 
 class RequestLocalAuthorizationSyncTests(SimpleTestCase):
@@ -199,3 +205,53 @@ class RequestLocalAuthorizationSyncTests(SimpleTestCase):
         synchronize_authorization_cache(outer_instance)
 
         self.assertEqual(get_many.call_count, 3)
+
+
+class GraphQLTokenAuthorizationContextTests(SimpleTestCase):
+    def test_token_authentication_reuses_outer_authorization_request(self):
+        request = RequestFactory().post(
+            '/graphql/',
+            data='{}',
+            content_type='application/json',
+        )
+        request.user = SimpleNamespace(is_authenticated=False)
+        authenticated_user = SimpleNamespace(
+            pk=42,
+            is_authenticated=True,
+            is_active=True,
+        )
+        middleware = CurrentUserMiddleware(get_response=lambda _request: None)
+        tokens = middleware.process_request(request)
+        outer_request_id = get_current_request_id()
+
+        try:
+            with (
+                mock.patch(
+                    'core.views.graphql.TokenAuthentication.authenticate',
+                    return_value=(authenticated_user, object()),
+                ),
+                mock.patch('core.views.graphql.TenantMiddleware.process_request'),
+                mock.patch(
+                    'rest_framework.throttling.AnonRateThrottle.allow_request',
+                    return_value=True,
+                ),
+                mock.patch(
+                    'rest_framework.throttling.UserRateThrottle.allow_request',
+                    return_value=True,
+                ),
+                mock.patch.object(
+                    GraphQLView,
+                    'dispatch',
+                    return_value=HttpResponse(status=200),
+                ),
+            ):
+                response = PrivateGraphQLView.dispatch(
+                    PrivateGraphQLView.__new__(PrivateGraphQLView),
+                    request,
+                )
+
+            self.assertEqual(response.status_code, 200)
+            self.assertIs(get_current_user(), authenticated_user)
+            self.assertEqual(get_current_request_id(), outer_request_id)
+        finally:
+            middleware.process_response(request, None, tokens)
