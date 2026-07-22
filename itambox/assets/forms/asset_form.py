@@ -183,6 +183,7 @@ class AssetForm(CrispyFormMixin, forms.ModelForm):
 
     def __init__(self, *args, **kwargs):
         request = kwargs.pop('request', None)
+        explicit_initial = kwargs.get('initial') or {}
         super().__init__(*args, **kwargs)
         scope_tenant_field(self)
         self.helper = FormHelper(self)
@@ -192,7 +193,7 @@ class AssetForm(CrispyFormMixin, forms.ModelForm):
         cancel_url = reverse('assets:asset_list')
 
         asset_type_id = None
-        if self.data and self.data.get('asset_type'):
+        if self.is_bound and 'asset_type' in self.data:
             try:
                 asset_type_id = int(self.data.get('asset_type'))
             except (ValueError, TypeError):
@@ -202,13 +203,14 @@ class AssetForm(CrispyFormMixin, forms.ModelForm):
                 asset_type_id = int(request.GET.get('asset_type'))
             except (ValueError, TypeError):
                 pass
-        elif self.initial and self.initial.get('asset_type'):
-            asset_type_val = self.initial.get('asset_type')
+        elif 'asset_type' in explicit_initial:
+            asset_type_val = explicit_initial.get('asset_type')
             if isinstance(asset_type_val, AssetType):
                 asset_type_id = asset_type_val.pk
             else:
                 asset_type_id = asset_type_val
-            asset_type_id = self.instance.asset_type.pk
+        else:
+            asset_type_id = self.instance.asset_type_id
 
         if self.instance and self.instance.pk:
             if self.instance.requestable is None:
