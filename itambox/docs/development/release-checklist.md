@@ -7,8 +7,8 @@ Use this checklist when preparing a future tagged release. No tagged release or 
 - [ ] The canonical gates under "Run the checks" in the repository-root `CONTRIBUTING.md` pass, including lint, smoke, full tests, and Playwright.
 - [ ] No open critical/security issues on the milestone
 - [ ] Documentation and module-maturity labels match the tagged code.
-- [ ] If the REST API changed, generate and review its schema with `python itambox/manage.py spectacular --file schema.yaml` from the repository root.
-- [ ] Documentation builds cleanly with `mkdocs build -f itambox/mkdocs.yml --strict`.
+- [ ] If the REST API changed, generate and review its schema with `uv run --locked --group dev --env-file .env.example python itambox/manage.py spectacular --file schema.yaml` from the repository root.
+- [ ] Documentation builds cleanly with `uv run --locked --only-group docs mkdocs build -f itambox/mkdocs.yml --strict`.
 - [ ] A source-built production Compose smoke test passes from a clean checkout of the release candidate.
 
 ## Version bump

@@ -35,31 +35,27 @@ Fork the repository if you do not have branch access, then clone your fork. Orga
 ```bash
 git clone https://github.com/itambox/itambox-webapp.git
 cd itambox-webapp
-python -m venv .venv
+python -m pip install --user "uv==0.11.31"
+uv --version
 ```
 
-Activate the virtual environment for your shell:
+Synchronize the canonical development environment and install the Git hooks:
 
 ```bash
-# Linux, macOS, or WSL
-source .venv/bin/activate
-
-# Windows Git Bash
-source .venv/Scripts/activate
-
-# Windows PowerShell
-.\.venv\Scripts\Activate.ps1
+uv lock --check
+uv sync --locked --group dev
+uv run --locked --group dev pre-commit install
 ```
 
-Install the canonical development toolchain from the repository root:
+uv owns the repository-root `.venv`. `pyproject.toml` is the sole source of
+direct dependencies and `uv.lock` is the exact environment contract. Do not use
+`pip install .` or `pip install -e .`; ITAMbox deliberately does not build a
+Python package.
 
-```bash
-python -m pip install --upgrade pip
-python -m pip install -r requirements-dev.txt
-pre-commit install
-```
-
-`requirements-dev.txt` is the supported contributor install. Do not use `pip install .` or `pip install -e .`; ITAMbox deliberately does not build a Python package.
+For a dependency change, edit only `pyproject.toml`, regenerate `uv.lock` with
+uv `0.11.31`, and review both files together. Use `uv lock --upgrade-package
+<name>` for a targeted update or `uv lock --upgrade` for a deliberate full
+refresh; normal setup and CI must use `--locked` and must never rewrite the lock.
 
 Copy the environment template, select development mode, and point it at a PostgreSQL database whose user can create test databases and install the `btree_gist` extension.
 
@@ -85,9 +81,9 @@ Build the frontend and initialize the application:
 cd itambox
 npm ci
 npm run build:all
-python manage.py migrate
-python manage.py seed_data --skip-drop
-python manage.py runserver
+uv run --locked --group dev python manage.py migrate
+uv run --locked --group dev python manage.py seed_data --skip-drop
+uv run --locked --group dev python manage.py runserver
 ```
 
 The seed creates and updates public demo users, organizations, and assets. Use it only against a disposable development database. `--skip-drop` prevents the command from clearing existing records; running `seed_data` without that flag resets domain data. The application is available at <http://127.0.0.1:8000>.
@@ -139,16 +135,16 @@ Run targeted tests while developing, then run the relevant full gates before ope
 From the repository root:
 
 ```bash
-pre-commit run --all-files
-python scripts/check_flake8_baseline.py
+uv run --locked --group dev pre-commit run --all-files
+uv run --locked --only-group dev python scripts/check_flake8_baseline.py
 ```
 
 From `itambox/`:
 
 ```bash
-python manage.py makemigrations --check --dry-run
-python manage.py check
-pytest --cov=. --cov-report=term --cov-fail-under=45
+uv run --locked --group dev python manage.py makemigrations --check --dry-run
+uv run --locked --group dev python manage.py check
+uv run --locked --group dev pytest --cov=. --cov-report=term --cov-fail-under=45
 
 npm ci
 npm run build:all
@@ -156,26 +152,26 @@ npm run typecheck
 npx eslint static/src
 ```
 
-Documentation dependencies are installed separately from `requirements-dev.txt`:
+Documentation dependencies are isolated in their own locked group:
 
 ```bash
-python -m pip install mkdocs mkdocs-material
+uv sync --locked --only-group docs
 cd itambox
-mkdocs build --strict
+uv run --locked --only-group docs mkdocs build --strict
 ```
 
 Changes to authentication, authorization, tenant scoping, GraphQL, or background-task attribution should also run the relevant adversarial and boundary suites, including:
 
 ```bash
-pytest assets/tests/test_graphql_adversarial.py
-pytest core/tests/test_tenant_security.py core/tests/test_security_boundaries.py
+uv run --locked --group dev pytest assets/tests/test_graphql_adversarial.py
+uv run --locked --group dev pytest core/tests/test_tenant_security.py core/tests/test_security_boundaries.py
 ```
 
 For UI flows, run the Playwright suite. Its preflight requires the repository-root `.venv`, an available migrated database, an active superuser, `E2E_USERNAME` and `E2E_PASSWORD`, and an installed Playwright browser:
 
 ```bash
 cd itambox
-python manage.py createsuperuser
+uv run --locked --group dev python manage.py createsuperuser
 cd tests/e2e
 npm ci
 npx playwright install chromium

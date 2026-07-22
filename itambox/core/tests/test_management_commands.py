@@ -1,9 +1,11 @@
 import io
+from types import SimpleNamespace
 from unittest.mock import patch, MagicMock
-from django.test import TransactionTestCase
+from django.test import SimpleTestCase, TransactionTestCase, override_settings
 from django.core.management import call_command, CommandError
 from django.contrib.auth import get_user_model
 
+from core.management.commands.sync_tenant_ldap import Command as SyncTenantLDAPCommand
 from core.models import Job, EmailSettings
 from organization.models import Tenant
 from licenses.models import License
@@ -52,3 +54,32 @@ class ManagementCommandsTestCase(TransactionTestCase):
     def test_sync_tenant_ldap_command_invalid(self):
         with self.assertRaises(CommandError):
             call_command('sync_tenant_ldap', tenant='non-existent-tenant')
+
+
+class SyncTenantLDAPDependencyTest(SimpleTestCase):
+    @override_settings(ITAMBOX_TENANT_LDAP_CONFIGS={
+        'test': {
+            'SERVER_URI': 'ldap://127.0.0.1',
+            'BIND_DN': 'cn=bind,dc=example,dc=test',
+            'BIND_PASSWORD': 'test',
+            'USER_SEARCH_BASE': 'ou=users,dc=example,dc=test',
+            'USER_SEARCH_FILTER': '(uid=%(user)s)',
+        },
+    })
+    @patch(
+        'core.management.commands.sync_tenant_ldap.django_auth_ldap_installed',
+        False,
+    )
+    @patch('core.management.commands.sync_tenant_ldap.ldap.initialize')
+    def test_sync_tenant_ldap_requires_locked_native_dependencies(self, mock_ldap_init):
+        stdout = io.StringIO()
+        command = SyncTenantLDAPCommand(stdout=stdout)
+
+        with self.assertRaisesRegex(
+            CommandError,
+            'locked Linux/WSL or Docker environment',
+        ):
+            command._run_sync(SimpleNamespace(slug='test', name='Test'))
+
+        self.assertNotIn('Connecting to LDAP server', stdout.getvalue())
+        mock_ldap_init.assert_not_called()

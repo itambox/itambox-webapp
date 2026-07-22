@@ -31,7 +31,7 @@ This changelog follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) 
 - Moved shared API infrastructure to `itambox.api` and standardized tenant-aware REST behavior.
 - Standardized HTMX navigation, partial rendering, modal actions, toast events, and table refresh behavior.
 - Made PostgreSQL mandatory in every environment and moved production cache, rate-limit, and SAML replay state to a shared Valkey or Redis backend. django-q2 continues to use PostgreSQL's ORM broker.
-- Separated runtime and contributor dependencies. ITAMbox is installed from a source checkout or locally built container image and is intentionally not a pip-installable package.
+- Standardized direct Python dependencies in `pyproject.toml` with an exact cross-platform `uv.lock`; CI, contributors, documentation, and Docker now consume the same locked resolution. ITAMbox remains intentionally non-packageable.
 - Added explicit Stable and Beta maturity labels so prerelease compatibility expectations are visible per module.
 
 ### Removed

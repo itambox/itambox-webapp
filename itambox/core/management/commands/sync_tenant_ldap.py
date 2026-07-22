@@ -6,7 +6,7 @@ from django.core.management.base import BaseCommand, CommandError
 from django.conf import settings
 from django.db.models import Q
 from django.utils import timezone
-from core.auth.ldap import ldap
+from core.auth.ldap import django_auth_ldap_installed, ldap
 from core.mfa import role_is_privileged
 from core.tasks.context import TaskContext
 from itambox.middleware import get_current_user
@@ -17,6 +17,11 @@ User = get_user_model()
 
 LDAP_GRANT_REASON = 'LDAP directory synchronization'
 LDAP_PRIVILEGED_GRANT_LIFETIME = timedelta(days=1)
+
+
+def _require_real_ldap_backend():
+    if not django_auth_ldap_installed:
+        raise ImportError
 
 
 def _ensure_ldap_role_grant(membership, role):
@@ -124,7 +129,7 @@ class Command(BaseCommand):
         bind_password = config.get('BIND_PASSWORD') or config.get('bind_password')
         user_search_base = config.get('USER_SEARCH_BASE') or config.get('user_search_base')
         user_search_filter = config.get('USER_SEARCH_FILTER') or config.get('user_search_filter')
-        
+
         # Fallback to nested dict USER_SEARCH if base or filter are not directly configured
         if not user_search_base or not user_search_filter:
             user_search = config.get('USER_SEARCH') or config.get('user_search')
@@ -145,9 +150,12 @@ class Command(BaseCommand):
             raise CommandError("LDAP user_search_base is required in the configuration.")
 
         try:
-            from django_auth_ldap.config import LDAPSearch
+            _require_real_ldap_backend()
         except ImportError:
-            raise CommandError("django-auth-ldap is not installed. Run: pip install django-auth-ldap")
+            raise CommandError(
+                "django-auth-ldap is unavailable. Use the locked Linux/WSL or Docker environment; "
+                "native Windows does not support LDAP synchronization."
+            ) from None
 
         self.stdout.write(f"Connecting to LDAP server: {server_uri}...")
         conn = ldap.initialize(server_uri)
@@ -213,7 +221,7 @@ class Command(BaseCommand):
                                 'is_active': True,
                             }
                         )
-                        
+
                         # Add user to tenant membership as member by default
                         tenant_role, _ = Role.objects.get_or_create(
                             tenant=tenant,

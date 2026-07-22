@@ -56,7 +56,13 @@ jobs:
         uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
         with:
           python-version: "3.12"
-          cache: 'pip'
+
+      - name: Set up uv
+        uses: astral-sh/setup-uv@c771a70e6277c0a99b617c7a806ffedaca235ff9 # v9.0.0
+        with:
+          version: "0.11.31"
+          enable-cache: true
+          cache-dependency-glob: uv.lock
 
       # python-ldap (pulled by django-auth-ldap) needs libldap2/sasl headers for
       # source builds on Ubuntu runners.
@@ -67,23 +73,27 @@ jobs:
               apt-get update
               apt-get install -y --no-install-recommends \
                 gcc \
+                libmagic1 \
                 libldap2-dev \
                 libsasl2-dev \
-                libssl-dev
+                libssl-dev \
+                xmlsec1
             else
               sudo apt-get update
               sudo apt-get install -y --no-install-recommends \
                 gcc \
+                libmagic1 \
                 libldap2-dev \
                 libsasl2-dev \
-                libssl-dev
+                libssl-dev \
+                xmlsec1
             fi
           fi
 
       - name: Install Python dependencies
         run: |
-          python -m pip install --upgrade pip
-          pip install -r requirements-dev.txt
+          uv lock --check
+          uv sync --locked --group dev
 
       - name: Set up Node.js 20
         uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
@@ -111,20 +121,13 @@ jobs:
         working-directory: ./itambox/tests/e2e
         run: npx playwright install --with-deps chromium
 
-      - name: Create venv shim for preflight-check
-        run: |
-          # preflight-check.mjs expects a .venv directory; create a shim that
-          # points to the system Python so prerequisite checks pass in CI.
-          mkdir -p .venv/bin
-          ln -sf "$(which python)" .venv/bin/python
-
       - name: Run Django system checks
         working-directory: ./itambox
-        run: python manage.py check
+        run: uv run --locked --no-sync python manage.py check
 
       - name: Run migrations
         working-directory: ./itambox
-        run: python manage.py migrate
+        run: uv run --locked --no-sync python manage.py migrate
 
       - name: Generate ephemeral E2E credentials
         shell: bash
@@ -140,12 +143,12 @@ jobs:
           # The existing browser suite exercises real assets, tenants, GraphQL,
           # HTMX, and SCIM flows, so the minimal production bootstrap is not enough.
           # This database is a disposable, job-local PostgreSQL service.
-          python manage.py seed_data --force
+          uv run --locked --no-sync python manage.py seed_data --force
 
       - name: Provision E2E principal and SCIM token
         working-directory: ./itambox
         run: |
-          python manage.py shell <<'PY'
+          uv run --locked --no-sync python manage.py shell <<'PY'
           import os
 
           from django.contrib.auth import get_user_model
@@ -182,7 +185,7 @@ jobs:
         working-directory: ./itambox
         run: |
           echo "Starting Django dev server on loopback port 8000..."
-          python manage.py runserver 127.0.0.1:8000 &
+          uv run --locked --no-sync python manage.py runserver 127.0.0.1:8000 &
           DJANGO_PID=$!
           echo "DJANGO_PID=$DJANGO_PID" >> "$GITHUB_ENV"
           django_ready=false

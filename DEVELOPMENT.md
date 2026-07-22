@@ -7,28 +7,25 @@
 3. **Environment Variables**: Copy `.env.example` to `.env` and configure the PostgreSQL connection credentials (e.g., `ITAMBOX_DB_ENGINE=django.db.backends.postgresql`, `ITAMBOX_DB_NAME`, `ITAMBOX_DB_USER`, `ITAMBOX_DB_PASSWORD`, `ITAMBOX_DB_HOST`, `ITAMBOX_DB_PORT`).
 
 ```bash
-# Create virtual environment (from the repository root)
-python -m venv .venv
-source .venv/bin/activate  # On Windows Git Bash: source .venv/Scripts/activate; PowerShell: .\.venv\Scripts\Activate.ps1
-
-# Install dependencies (tests + lint + runtime, from repo root)
-pip install -r requirements-dev.txt
+# Install the pinned resolver and synchronize tests + lint + runtime.
+python -m pip install "uv==0.11.31"
+uv sync --locked --group dev
 
 # Run migrations
 cd itambox
-python manage.py migrate
+uv run --locked --group dev python manage.py migrate
 
 # Seed sample data (400+ records across all models)
-python manage.py seed_data
+uv run --locked --group dev python manage.py seed_data
 
 # Start dev server
-ITAMBOX_DEBUG=true python manage.py runserver
+ITAMBOX_DEBUG=true uv run --locked --group dev python manage.py runserver
 ```
 
-`requirements-dev.txt` (repository root) is the canonical set for
-contributors and CI — it layers pytest/flake8/pre-commit/django-debug-toolbar
-on top of `itambox/requirements.txt`, which stays runtime-only (e.g. for
-production images). `make setup` runs the equivalent install; see the
+`pyproject.toml` is the sole direct dependency source and `uv.lock` is the
+canonical exact resolution for contributors, CI, and Docker. The `dev` group
+adds pytest/flake8/pre-commit/django-debug-toolbar; production uses `--no-dev`.
+`make setup` runs the equivalent synchronization; see the
 [Makefile](Makefile) — its recipes require Git Bash or WSL, plus GNU Make
 installed separately on Windows.
 
@@ -39,12 +36,12 @@ migrations, seed data, and the normal test suite all run there. Two
 dependencies are excluded on native Windows only via PEP 508 markers:
 
 - `django-auth-ldap` is excluded via `platform_system != "Windows"` marker
-  in `itambox/requirements.txt` (its `python-ldap` dependency has no Windows
+  in `pyproject.toml` (its `python-ldap` dependency has no Windows
   binary wheel). `core/auth/ldap.py` falls back to a disabled LDAP backend,
   so local LDAP integration isn't available — use Docker, Linux, or WSL for
   that.
 - `python-magic` is excluded via `platform_system != "Windows"` marker in
-  `itambox/requirements.txt` (import can hang indefinitely without libmagic
+  `pyproject.toml` (import can hang indefinitely without libmagic
   DLL). `core/validators.py` falls back to extension checks and Pillow.
   Docker/Linux/WSL retain full libmagic signature validation.
 
@@ -54,9 +51,9 @@ Production always runs in Docker/Linux with the full dependency set.
 
 | Command | Effect |
 |---------|--------|
-| `python manage.py seed_data` | Full wipe + reseed |
-| `python manage.py seed_data --skip-drop` | Add data without clearing existing |
-| `python manage.py seed_data --production` | Minimal seed (admin + status labels only) |
+| `uv run --locked --group dev python manage.py seed_data` | Full wipe + reseed |
+| `uv run --locked --group dev python manage.py seed_data --skip-drop` | Add data without clearing existing |
+| `uv run --locked --group dev python manage.py seed_data --production` | Minimal seed (admin + status labels only) |
 
 ## Tenant FK Pattern
 
@@ -190,15 +187,15 @@ The suite uses `pytest` (pytest-django). Run all commands from `itambox/`.
 
 ```bash
 # Run all tests
-pytest
+uv run --locked --group dev pytest
 
 # Run specific app
-pytest subscriptions/tests/
-pytest assets/tests/
-pytest core/tests/
+uv run --locked --group dev pytest subscriptions/tests/
+uv run --locked --group dev pytest assets/tests/
+uv run --locked --group dev pytest core/tests/
 
 # Run with verbose output
-pytest -v
+uv run --locked --group dev pytest -v
 ```
 
 Tests run under pytest-django (with `model_bakery` for fixtures) and use the Django test `Client` for views. Model tests verify field constraints, properties, and signals. FilterSet tests verify individual filter parameters. View tests cover HTTP 200/302 for all CRUD operations.

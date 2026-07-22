@@ -1,0 +1,15 @@
+.git
+.github
+.venv
+**/__pycache__
+**/*.py[cod]
+**/.pytest_cache
+**/.coverage
+**/htmlcov
+**/node_modules
+.env
+media
+itambox/static/dist
+itambox/static/docs
+itambox/tests/e2e/test-results
+itambox/tests/e2e/playwright-report

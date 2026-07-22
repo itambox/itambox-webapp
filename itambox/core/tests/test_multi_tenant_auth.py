@@ -174,6 +174,10 @@ class MultiTenantAuthTestCase(TestCase):
             backend.authenticate(request=None, username="user1@tenant-beta.org", password="password")
             self.assertEqual(get_current_tenant(), self.tenant_beta)
 
+    @patch(
+        'core.management.commands.sync_tenant_ldap.django_auth_ldap_installed',
+        True,
+    )
     @patch('ldap.initialize')
     def test_sync_tenant_ldap_command(self, mock_ldap_init):
         """Test that sync_tenant_ldap command fetches configurations and syncs users for the specified tenant."""

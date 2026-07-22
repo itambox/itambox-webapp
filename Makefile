@@ -7,15 +7,8 @@
 # (e.g. via Chocolatey, Scoop, or MSYS2). Native PowerShell/cmd cannot run
 # `make` recipes.
 
-ifeq ($(OS),Windows_NT)
-    HOST_PYTHON := py -3.12
-    VENV_BIN := .venv/Scripts
-else
-    HOST_PYTHON := python3.12
-    VENV_BIN := .venv/bin
-endif
-
-VENV_PYTHON := $(VENV_BIN)/python
+UV := uv
+UV_DEV := $(UV) run --locked --group dev
 
 .PHONY: help setup run migrate seed test lint e2e clean
 
@@ -33,26 +26,25 @@ help:
 	@echo "  make clean   - Remove cache, temporary database, and virtual environment"
 
 setup:
-	$(HOST_PYTHON) -m venv .venv
-	$(VENV_PYTHON) -m pip install --upgrade pip
-	$(VENV_PYTHON) -m pip install -r requirements-dev.txt
-	$(VENV_PYTHON) -m pre_commit install
+	$(UV) lock --check
+	$(UV) sync --locked --group dev
+	$(UV_DEV) pre-commit install
 
 run:
-	$(VENV_PYTHON) itambox/manage.py migrate
-	ITAMBOX_DEBUG=true $(VENV_PYTHON) itambox/manage.py runserver
+	$(UV_DEV) python itambox/manage.py migrate
+	ITAMBOX_DEBUG=true $(UV_DEV) python itambox/manage.py runserver
 
 migrate:
-	$(VENV_PYTHON) itambox/manage.py migrate
+	$(UV_DEV) python itambox/manage.py migrate
 
 seed:
-	$(VENV_PYTHON) itambox/manage.py seed_data
+	$(UV_DEV) python itambox/manage.py seed_data
 
 test:
-	cd itambox && ../$(VENV_PYTHON) -m pytest
+	cd itambox && $(UV_DEV) pytest
 
 lint:
-	$(VENV_PYTHON) -m pre_commit run --all-files
+	$(UV_DEV) pre-commit run --all-files
 
 e2e:
 	@echo "Running Playwright E2E suite..."
