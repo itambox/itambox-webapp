@@ -48,6 +48,16 @@ RUN /app/.venv/bin/mkdocs build --strict
 # ---- Stage 4: minimal runtime image ----
 FROM python:3.12-slim-bookworm
 
+ARG ITAMBOX_VERSION=dev
+ARG ITAMBOX_REVISION=unknown
+ARG ITAMBOX_SOURCE=https://github.com/itambox/itambox-webapp
+
+LABEL org.opencontainers.image.title="ITAMbox" \
+      org.opencontainers.image.description="Open-source IT asset management" \
+      org.opencontainers.image.version="${ITAMBOX_VERSION}" \
+      org.opencontainers.image.revision="${ITAMBOX_REVISION}" \
+      org.opencontainers.image.source="${ITAMBOX_SOURCE}"
+
 ENV PYTHONUNBUFFERED=1 \
     PYTHONDONTWRITEBYTECODE=1 \
     ITAMBOX_ENV=prod \

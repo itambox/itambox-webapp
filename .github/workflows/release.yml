@@ -1,0 +1,210 @@
+name: Release
+
+on:
+  pull_request:
+    paths:
+      - ".github/workflows/release.yml"
+      - ".github/ISSUE_TEMPLATE/bug_report.md"
+      - "CHANGELOG.md"
+      - "Dockerfile"
+      - "README.md"
+      - "SECURITY.md"
+      - "pyproject.toml"
+      - "uv.lock"
+      - "itambox/itambox/release.py"
+      - "itambox/docs/development/release-checklist.md"
+      - "scripts/release_policy.py"
+      - "scripts/tests/test_release_policy.py"
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Dotted SemVer release identity (for example 1.0.0-alpha.1)"
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: false
+
+env:
+  ITAMBOX_SOURCE: https://github.com/${{ github.repository }}
+
+jobs:
+  rehearsal:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.12"
+
+      - name: Validate release metadata
+        id: metadata
+        shell: bash
+        run: |
+          python -m unittest scripts.tests.test_release_policy
+          VERSION="$(python -c 'import tomllib; print(tomllib.load(open("pyproject.toml", "rb"))["project"]["version"])')"
+          python scripts/release_policy.py verify --version "$VERSION"
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+
+      - name: Build release image without publishing
+        env:
+          ITAMBOX_VERSION: ${{ steps.metadata.outputs.version }}
+        run: |
+          docker build \
+            --build-arg "ITAMBOX_VERSION=$ITAMBOX_VERSION" \
+            --build-arg "ITAMBOX_REVISION=$GITHUB_SHA" \
+            --build-arg "ITAMBOX_SOURCE=$ITAMBOX_SOURCE" \
+            --tag itambox:release-rehearsal \
+            .
+
+      - name: Verify release image identity
+        env:
+          ITAMBOX_VERSION: ${{ steps.metadata.outputs.version }}
+        shell: bash
+        run: |
+          docker image inspect itambox:release-rehearsal > image-inspect.json
+          python - <<'PY'
+          import json
+          import os
+
+          labels = json.load(open("image-inspect.json", encoding="utf-8"))[0]["Config"]["Labels"]
+          expected = {
+              "org.opencontainers.image.version": os.environ["ITAMBOX_VERSION"],
+              "org.opencontainers.image.revision": os.environ["GITHUB_SHA"],
+              "org.opencontainers.image.source": os.environ["ITAMBOX_SOURCE"],
+          }
+          for name, value in expected.items():
+              if labels.get(name) != value:
+                  raise SystemExit(f"invalid image label {name}: {labels.get(name)!r} != {value!r}")
+          print("Release image labels verified")
+          PY
+
+  validate-dispatch-ref:
+    if: github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Reject release preparation outside main
+        shell: bash
+        run: |
+          test "$GITHUB_REF" = "refs/heads/main" || {
+            echo "Release preparation must be dispatched from main" >&2
+            exit 1
+          }
+
+  prepare-release:
+    needs: validate-dispatch-ref
+    if: github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    permissions:
+      contents: write
+      pull-requests: read
+    env:
+      GH_TOKEN: ${{ github.token }}
+      RELEASE_VERSION: ${{ inputs.version }}
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          fetch-depth: 0
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.12"
+
+      - name: Validate requested version and reviewed commit
+        shell: bash
+        run: |
+          set -euo pipefail
+          python scripts/release_policy.py verify --version "$RELEASE_VERSION"
+          gh api "repos/${GITHUB_REPOSITORY}/commits/${GITHUB_SHA}/pulls" > associated-pulls.json
+          python - <<'PY'
+          import json
+          import os
+
+          pulls = json.load(open("associated-pulls.json", encoding="utf-8"))
+          reviewed = any(
+              pull.get("merged_at")
+              and pull.get("merge_commit_sha") == os.environ["GITHUB_SHA"]
+              and pull.get("base", {}).get("ref") == "main"
+              for pull in pulls
+          )
+          if not reviewed:
+              raise SystemExit("release commit is not the reviewed result of a PR merged into main")
+          print("Reviewed main-branch release commit verified")
+          PY
+          if git ls-remote --exit-code --tags origin "refs/tags/v${RELEASE_VERSION}" >/dev/null 2>&1; then
+            echo "Tag v${RELEASE_VERSION} already exists" >&2
+            exit 1
+          fi
+          if gh release view "v${RELEASE_VERSION}" >/dev/null 2>&1; then
+            echo "Release v${RELEASE_VERSION} already exists" >&2
+            exit 1
+          fi
+
+      - name: Build release image from reviewed main commit
+        run: |
+          docker build \
+            --build-arg "ITAMBOX_VERSION=$RELEASE_VERSION" \
+            --build-arg "ITAMBOX_REVISION=$GITHUB_SHA" \
+            --build-arg "ITAMBOX_SOURCE=$ITAMBOX_SOURCE" \
+            --tag "itambox:${RELEASE_VERSION}" \
+            .
+
+      - name: Verify and archive release image
+        shell: bash
+        run: |
+          docker image inspect "itambox:${RELEASE_VERSION}" > image-inspect.json
+          python - <<'PY'
+          import json
+          import os
+
+          labels = json.load(open("image-inspect.json", encoding="utf-8"))[0]["Config"]["Labels"]
+          expected = {
+              "org.opencontainers.image.version": os.environ["RELEASE_VERSION"],
+              "org.opencontainers.image.revision": os.environ["GITHUB_SHA"],
+              "org.opencontainers.image.source": os.environ["ITAMBOX_SOURCE"],
+          }
+          for name, value in expected.items():
+              if labels.get(name) != value:
+                  raise SystemExit(f"invalid image label {name}: {labels.get(name)!r} != {value!r}")
+          PY
+          docker save "itambox:${RELEASE_VERSION}" | gzip -9 > "itambox-${RELEASE_VERSION}.tar.gz"
+          sha256sum "itambox-${RELEASE_VERSION}.tar.gz" > "itambox-${RELEASE_VERSION}.tar.gz.sha256"
+          python scripts/release_policy.py notes \
+            --version "$RELEASE_VERSION" > release-notes.md
+
+      - name: Retain reviewed image candidate
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: itambox-${{ inputs.version }}
+          path: |
+            itambox-${{ inputs.version }}.tar.gz
+            itambox-${{ inputs.version }}.tar.gz.sha256
+            image-inspect.json
+          if-no-files-found: error
+          retention-days: 14
+
+      - name: Prepare draft GitHub release
+        shell: bash
+        run: |
+          flags=(
+            --draft
+            --target "$GITHUB_SHA"
+            --title "ITAMbox v${RELEASE_VERSION}"
+            --notes-file release-notes.md
+          )
+          if [[ "$RELEASE_VERSION" == *-* ]]; then
+            flags+=(--prerelease)
+          fi
+          gh release create "v${RELEASE_VERSION}" "${flags[@]}" \
+            "itambox-${RELEASE_VERSION}.tar.gz" \
+            "itambox-${RELEASE_VERSION}.tar.gz.sha256"
