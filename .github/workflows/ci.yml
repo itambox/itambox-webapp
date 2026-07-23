@@ -3,6 +3,18 @@ name: CI
 on:
   push:
     branches: [master, main]
+  pull_request:
+    paths:
+      - ".github/workflows/ci.yml"
+      - "itambox/**/migrations/**"
+      - "itambox/**/models.py"
+      - "itambox/**/models/**"
+      - "itambox/docs/development/migration-verification.md"
+      - "itambox/mkdocs.yml"
+      - "scripts/migration_audit.py"
+      - "scripts/migration_audit.json"
+      - "scripts/tests/test_migration_audit.py"
+      - "uv.lock"
   workflow_dispatch:
 
 permissions:
@@ -55,6 +67,11 @@ jobs:
           enable-cache: true
           cache-dependency-glob: uv.lock
 
+      - name: Check static migration audit
+        run: |
+          python -m unittest scripts.tests.test_migration_audit
+          python scripts/migration_audit.py --check
+
       # python-ldap (pulled by django-auth-ldap) needs libldap2/sasl headers for
       # source builds. ubuntu-latest images can miss these under transient updates.
       - name: Install system deps for python-ldap
@@ -96,6 +113,11 @@ jobs:
         run: |
           uv run --locked --no-sync python manage.py makemigrations --check --dry-run
 
+      - name: Apply migrations to a fresh database
+        working-directory: ./itambox
+        run: |
+          uv run --locked --no-sync python manage.py migrate --noinput
+
       - name: Run Django system checks
         working-directory: ./itambox
         run: |
@@ -104,7 +126,7 @@ jobs:
       - name: Run tests
         working-directory: ./itambox
         run: |
-          uv run --locked --no-sync pytest --cov=. --cov-report=term --cov-fail-under=45
+          uv run --locked --no-sync pytest --create-db --cov=. --cov-report=term --cov-fail-under=45
 
   lint:
     runs-on: ubuntu-latest
