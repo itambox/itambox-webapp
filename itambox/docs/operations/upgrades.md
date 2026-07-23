@@ -2,6 +2,11 @@
 
 ITAMbox is pre-release and currently ships as source, not as a published container image. There is no compatibility or version-skipping guarantee yet. Treat every target revision as a potentially breaking change and test it against a restored copy of production first.
 
+Releases that change migrations, storage, encryption, or other recovery-critical
+behavior must also pass the isolated [Recovery qualification drill](recovery-drill.md).
+That runbook proves predecessor restore, candidate upgrade, fresh-install schema
+parity, restore-first rollback, and re-upgrade without exposing protected values.
+
 ## Preflight
 
 1. Select and review an exact target commit.

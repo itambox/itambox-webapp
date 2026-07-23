@@ -5,6 +5,9 @@ repos:
       - id: trailing-whitespace
       - id: end-of-file-fixer
       - id: check-yaml
+        # MkDocs intentionally uses a Python constructor tag for SuperFences;
+        # validate that file with `mkdocs build --strict` instead.
+        exclude: ^itambox/mkdocs\.yml$
       - id: check-added-large-files
 
   # Managed, pinned environment so missing Bugbear or diagnostic dependency

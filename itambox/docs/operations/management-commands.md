@@ -20,6 +20,62 @@ The command reference below shows the inner `python manage.py ...` portion for b
 
 ## Command Reference
 
+### `capture_recovery_evidence`
+
+Emit comparable, non-plaintext evidence for explicit synthetic recovery
+canaries: an encrypted license key, SMTP password, webhook secret, API token,
+and media attachment.
+
+| | |
+|---|---|
+| **Usage** | `python manage.py capture_recovery_evidence --revision SHA --license-pk PK --email-settings-pk PK --webhook-pk PK --attachment-pk PK` |
+| **Production-safe** | Read-only, but intended only for an approved isolated recovery drill with synthetic canaries. |
+| **When to use** | Before and after restore, upgrade, rollback, and re-upgrade in the [Recovery qualification drill](recovery-drill.md). |
+
+The command requires `ITAMBOX_RECOVERY_PROBE_KEY` (at least 32 bytes) and a
+synthetic plaintext token in `ITAMBOX_RECOVERY_API_TOKEN`. It emits only
+domain-separated HMAC-SHA256 values, ciphertext-at-rest flags, selected object
+counts, token-verification status, PostgreSQL version, complete applied-migration
+identity, media-name HMAC and byte size, and `declared_revision`. The declared
+revision is caller-supplied metadata, not a runtime attestation; bind it to an
+OCI image label or exact mounted checkout as required by the drill. The command
+never emits protected plaintexts, raw media name, or the probe key.
+
+All PK options are required. License, webhook, attachment target, and API token
+must belong to the same non-null tenant. The token must resolve, be unexpired,
+belong to an active tenant and active user, and remain accessible to that user.
+The command also fails closed if a selected record is missing, a protected value
+is empty or not encrypted, or the declared revision is not a full lowercase
+40-character Git SHA.
+
+---
+
+### `capture_schema_evidence`
+
+Emit a stable, read-only PostgreSQL schema inventory as compact JSON.
+
+| | |
+|---|---|
+| **Usage** | `python manage.py capture_schema_evidence` |
+| **Production-safe** | Yes (read-only PostgreSQL catalog queries). |
+| **When to use** | Comparing fresh-install and upgraded schemas during migration and recovery qualification. |
+
+The inventory includes public columns with PostgreSQL-formatted types and array
+dimensions, constraint definitions, index definitions, installed extensions,
+PostgreSQL version, Django content-type and permission natural keys, and summary
+counts. Physical constraint and index names are omitted while semantic
+definitions and duplicate entries are preserved. This allows equivalent
+migration histories to compare byte-for-byte without hiding missing or redundant
+database and authorization objects.
+
+```bash
+python manage.py capture_schema_evidence > schema-evidence.json
+```
+
+The command requires PostgreSQL and fails on another database backend.
+
+---
+
 ### `compile_locales`
 
 Compile `.po` translation catalogs to `.mo` binaries using a pure-Python `msgfmt` implementation — no GNU gettext required.
