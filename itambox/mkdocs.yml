@@ -156,6 +156,7 @@ nav:
       - Installation: 'operations/installation.md'
       - Upgrades: 'operations/upgrades.md'
       - Backup & Restore: 'operations/backup-restore.md'
+      - Recovery Qualification Drill: 'operations/recovery-drill.md'
       - Data Retention: 'operations/data-retention.md'
       - Management Commands: 'operations/management-commands.md'
   - Development:

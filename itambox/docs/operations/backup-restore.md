@@ -13,6 +13,10 @@
 
 `ITAMBOX_API_TOKEN_PEPPERS` is separate from field encryption. Losing it invalidates existing API tokens. Preserve all rotation IDs still used by issued tokens.
 
+For a destructive release-qualification exercise that combines this recovery
+set with an upgrade, fresh-install parity check, restore-first rollback, and
+re-upgrade, follow the [Recovery qualification drill](recovery-drill.md).
+
 ## Compose backup
 
 For a point-in-time set that keeps database, media, and secrets aligned, pause writers first:

@@ -142,6 +142,11 @@ Odin verification must retain logs proving:
 Evidence must contain hashes and counts, never credentials, connection strings,
 tokens, production row contents, or raw backups.
 
+Execute and record these checks together with backup restore, protected-value
+evidence, fresh-install parity, restore-first rollback, and re-upgrade by
+following the operator-facing
+[Recovery qualification drill](../operations/recovery-drill.md).
+
 ## Prerequisites and rollback
 
 Local database verification requires Python 3.12, `uv` 0.11.31, the locked
