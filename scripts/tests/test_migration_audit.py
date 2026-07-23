@@ -54,6 +54,7 @@ class MigrationAuditTests(unittest.TestCase):
                             database_operations=[],
                             state_operations=[],
                         ),
+                        migrations.BtreeGistExtension(),
                     ]
                 """,
             )
@@ -109,6 +110,12 @@ class MigrationAuditTests(unittest.TestCase):
         )
         self.assertEqual(users["operations"]["RunPython"]["with_reverse"], 1)
         self.assertEqual(users["operations"]["RunSQL"]["with_noop_reverse"], 1)
+        beta = next(
+            migration
+            for migration in inventory["migrations"]
+            if migration["id"] == "beta.0001_initial"
+        )
+        self.assertEqual(beta["operations"]["BtreeGistExtension"]["count"], 1)
         self.assertEqual(
             inventory["reviewed_semantics"]["required_fresh"],
             ["users.0001_initial"],
@@ -139,6 +146,431 @@ class MigrationAuditTests(unittest.TestCase):
         self.assertEqual(before, after)
         json.loads(first)
 
+    def test_replacements_partition_historical_migrations_and_summarize_quotient(self):
+        with tempfile.TemporaryDirectory() as temporary_directory:
+            root = Path(temporary_directory)
+            self._write_plain_migration(root, "alpha", "0001_initial")
+            self._write_migration(
+                root,
+                "alpha",
+                "0002_second",
+                """
+                from django.db import migrations
+                class Migration(migrations.Migration):
+                    dependencies = [("alpha", "0001_initial")]
+                    operations = []
+                """,
+            )
+            self._write_migration(
+                root,
+                "beta",
+                "0001_initial",
+                """
+                from django.db import migrations
+                class Migration(migrations.Migration):
+                    dependencies = [("alpha", "0002_second")]
+                    operations = []
+                """,
+            )
+            self._write_replacement(
+                root,
+                "alpha",
+                "0001_squashed",
+                [("alpha", "0001_initial"), ("alpha", "0002_second")],
+            )
+            self._write_replacement(
+                root,
+                "beta",
+                "0001_squashed",
+                [("beta", "0001_initial")],
+            )
+
+            inventory = build_inventory(
+                root, semantic_dispositions={}, expected_blockers=[]
+            )
+
+        self.assertEqual(
+            inventory["historical_graph"],
+            {
+                "edges": [
+                    ["alpha.0001_initial", "alpha.0002_second"],
+                    ["alpha.0002_second", "beta.0001_initial"],
+                ],
+                "leaves": ["beta.0001_initial"],
+                "nodes": [
+                    "alpha.0001_initial",
+                    "alpha.0002_second",
+                    "beta.0001_initial",
+                ],
+                "roots": ["alpha.0001_initial"],
+            },
+        )
+        self.assertEqual(
+            inventory["effective_graph"],
+            {
+                "edges": [["alpha.0001_squashed", "beta.0001_squashed"]],
+                "leaves": ["beta.0001_squashed"],
+                "nodes": ["alpha.0001_squashed", "beta.0001_squashed"],
+                "roots": ["alpha.0001_squashed"],
+            },
+        )
+        self.assertEqual(
+            [
+                (migration["id"], migration["is_replacement"], migration["replaces"])
+                for migration in inventory["migrations"]
+            ],
+            [
+                ("alpha.0001_initial", False, []),
+                (
+                    "alpha.0001_squashed",
+                    True,
+                    ["alpha.0001_initial", "alpha.0002_second"],
+                ),
+                ("alpha.0002_second", False, []),
+                ("beta.0001_initial", False, []),
+                ("beta.0001_squashed", True, ["beta.0001_initial"]),
+            ],
+        )
+
+    def test_replacement_targets_must_exist(self):
+        with tempfile.TemporaryDirectory() as temporary_directory:
+            root = Path(temporary_directory)
+            self._write_plain_migration(root, "alpha", "0001_initial")
+            self._write_replacement(
+                root,
+                "alpha",
+                "0001_squashed",
+                [("alpha", "0001_initial"), ("alpha", "0099_missing")],
+            )
+
+            with self.assertRaisesRegex(ValueError, "unknown replacement targets"):
+                build_inventory(root, semantic_dispositions={}, expected_blockers=[])
+
+    def test_replacements_must_cover_every_historical_migration(self):
+        with tempfile.TemporaryDirectory() as temporary_directory:
+            root = Path(temporary_directory)
+            self._write_plain_migration(root, "alpha", "0001_initial")
+            self._write_plain_migration(root, "alpha", "0002_second")
+            self._write_replacement(
+                root,
+                "alpha",
+                "0001_squashed",
+                [("alpha", "0001_initial")],
+            )
+
+            with self.assertRaisesRegex(
+                ValueError, r"replacement coverage incomplete.*alpha\.0002_second"
+            ):
+                build_inventory(root, semantic_dispositions={}, expected_blockers=[])
+
+    def test_empty_replaces_declaration_triggers_coverage_validation(self):
+        with tempfile.TemporaryDirectory() as temporary_directory:
+            root = Path(temporary_directory)
+            self._write_plain_migration(root, "alpha", "0001_initial")
+            self._write_replacement(root, "alpha", "0001_squashed", [])
+
+            with self.assertRaisesRegex(
+                ValueError, r"replacement coverage incomplete.*alpha\.0001_initial"
+            ):
+                build_inventory(root, semantic_dispositions={}, expected_blockers=[])
+
+    def test_replacement_targets_must_not_be_duplicated(self):
+        with tempfile.TemporaryDirectory() as temporary_directory:
+            root = Path(temporary_directory)
+            self._write_plain_migration(root, "alpha", "0001_initial")
+            self._write_replacement(
+                root,
+                "alpha",
+                "0001_squashed",
+                [("alpha", "0001_initial"), ("alpha", "0001_initial")],
+            )
+
+            with self.assertRaisesRegex(
+                ValueError, r"duplicate replacement targets.*alpha\.0001_initial"
+            ):
+                build_inventory(root, semantic_dispositions={}, expected_blockers=[])
+
+    def test_effective_replacement_quotient_must_be_acyclic(self):
+        with tempfile.TemporaryDirectory() as temporary_directory:
+            root = Path(temporary_directory)
+            self._write_plain_migration(root, "alpha", "0001_initial")
+            self._write_migration(
+                root,
+                "beta",
+                "0001_initial",
+                """
+                from django.db import migrations
+                class Migration(migrations.Migration):
+                    dependencies = [("alpha", "0001_initial")]
+                    operations = []
+                """,
+            )
+            self._write_migration(
+                root,
+                "beta",
+                "0002_second",
+                """
+                from django.db import migrations
+                class Migration(migrations.Migration):
+                    dependencies = []
+                    operations = []
+                """,
+            )
+            self._write_migration(
+                root,
+                "alpha",
+                "0002_second",
+                """
+                from django.db import migrations
+                class Migration(migrations.Migration):
+                    dependencies = [("beta", "0002_second")]
+                    operations = []
+                """,
+            )
+            self._write_replacement(
+                root,
+                "alpha",
+                "0001_squashed",
+                [("alpha", "0001_initial"), ("alpha", "0002_second")],
+            )
+            self._write_replacement(
+                root,
+                "beta",
+                "0001_squashed",
+                [("beta", "0001_initial"), ("beta", "0002_second")],
+            )
+
+            with self.assertRaisesRegex(
+                ValueError, "effective replacement graph contains a cycle"
+            ):
+                build_inventory(root, semantic_dispositions={}, expected_blockers=[])
+
+    def test_effective_graph_includes_explicit_replacement_dependencies(self):
+        with tempfile.TemporaryDirectory() as temporary_directory:
+            root = Path(temporary_directory)
+            self._write_plain_migration(root, "alpha", "0001_initial")
+            self._write_plain_migration(root, "beta", "0001_initial")
+            self._write_replacement(
+                root,
+                "alpha",
+                "0001_squashed",
+                [("alpha", "0001_initial")],
+            )
+            self._write_replacement(
+                root,
+                "beta",
+                "0001_squashed",
+                [("beta", "0001_initial")],
+                dependencies=[("alpha", "0001_squashed")],
+            )
+
+            inventory = build_inventory(
+                root, semantic_dispositions={}, expected_blockers=[]
+            )
+
+        self.assertEqual(
+            inventory["effective_graph"]["edges"],
+            [["alpha.0001_squashed", "beta.0001_squashed"]],
+        )
+
+    def test_effective_graph_includes_explicit_replacement_run_before_edges(self):
+        with tempfile.TemporaryDirectory() as temporary_directory:
+            root = Path(temporary_directory)
+            self._write_plain_migration(root, "alpha", "0001_initial")
+            self._write_plain_migration(root, "beta", "0001_initial")
+            self._write_replacement(
+                root,
+                "alpha",
+                "0001_squashed",
+                [("alpha", "0001_initial")],
+                run_before=[("beta", "0001_squashed")],
+            )
+            self._write_replacement(
+                root,
+                "beta",
+                "0001_squashed",
+                [("beta", "0001_initial")],
+            )
+
+            inventory = build_inventory(
+                root, semantic_dispositions={}, expected_blockers=[]
+            )
+
+        self.assertEqual(
+            inventory["effective_graph"]["edges"],
+            [["alpha.0001_squashed", "beta.0001_squashed"]],
+        )
+
+    def test_effective_graph_rejects_cycle_in_explicit_and_redirected_edge_union(self):
+        with tempfile.TemporaryDirectory() as temporary_directory:
+            root = Path(temporary_directory)
+            self._write_plain_migration(root, "alpha", "0001_initial")
+            self._write_migration(
+                root,
+                "beta",
+                "0001_initial",
+                """
+                from django.db import migrations
+                class Migration(migrations.Migration):
+                    dependencies = [("alpha", "0001_initial")]
+                    operations = []
+                """,
+            )
+            self._write_replacement(
+                root,
+                "alpha",
+                "0001_squashed",
+                [("alpha", "0001_initial")],
+                dependencies=[("beta", "0001_squashed")],
+            )
+            self._write_replacement(
+                root,
+                "beta",
+                "0001_squashed",
+                [("beta", "0001_initial")],
+            )
+
+            with self.assertRaisesRegex(
+                ValueError, "effective replacement graph contains a cycle"
+            ):
+                build_inventory(root, semantic_dispositions={}, expected_blockers=[])
+
+    def test_unknown_first_party_explicit_replacement_dependency_fails_clearly(self):
+        with tempfile.TemporaryDirectory() as temporary_directory:
+            root = Path(temporary_directory)
+            self._write_plain_migration(root, "alpha", "0001_initial")
+            self._write_replacement(
+                root,
+                "alpha",
+                "0001_squashed",
+                [("alpha", "0001_initial")],
+                dependencies=[("alpha", "0099_missing")],
+            )
+
+            with self.assertRaisesRegex(
+                ValueError,
+                r"unknown first-party replacement dependency targets.*alpha\.0099_missing",
+            ):
+                build_inventory(root, semantic_dispositions={}, expected_blockers=[])
+
+    def test_third_party_replacement_dependencies_are_outside_effective_graph(self):
+        with tempfile.TemporaryDirectory() as temporary_directory:
+            root = Path(temporary_directory)
+            self._write_plain_migration(root, "alpha", "0001_initial")
+            self._write_replacement(
+                root,
+                "alpha",
+                "0001_squashed",
+                [("alpha", "0001_initial")],
+                dependencies=[("contenttypes", "0002_remove_content_type_name")],
+            )
+
+            inventory = build_inventory(
+                root, semantic_dispositions={}, expected_blockers=[]
+            )
+
+        self.assertEqual(inventory["effective_graph"]["edges"], [])
+        self.assertEqual(
+            inventory["effective_graph"]["nodes"], ["alpha.0001_squashed"]
+        )
+
+    def test_issue88_shard_requires_immediate_predecessor_dependency(self):
+        with tempfile.TemporaryDirectory() as temporary_directory:
+            root = Path(temporary_directory)
+            self._write_plain_migration(root, "alpha", "0001_initial")
+            self._write_plain_migration(root, "beta", "0001_initial")
+            self._write_replacement(
+                root,
+                "alpha",
+                "0000_issue88_shard_01_alpha",
+                [("alpha", "0001_initial")],
+            )
+            self._write_replacement(
+                root,
+                "beta",
+                "0100_issue88_shard_02_beta",
+                [("beta", "0001_initial")],
+            )
+
+            with self.assertRaisesRegex(
+                ValueError, "issue88 shard lacks immediate predecessor"
+            ):
+                build_inventory(root, semantic_dispositions={}, expected_blockers=[])
+
+    def test_issue88_shard_requires_previous_same_app_dependency(self):
+        with tempfile.TemporaryDirectory() as temporary_directory:
+            root = Path(temporary_directory)
+            self._write_plain_migration(root, "alpha", "0001_initial")
+            self._write_plain_migration(root, "alpha", "0002_second")
+            self._write_plain_migration(root, "beta", "0001_initial")
+            self._write_replacement(
+                root,
+                "alpha",
+                "0000_issue88_shard_01_alpha",
+                [("alpha", "0001_initial")],
+            )
+            self._write_replacement(
+                root,
+                "beta",
+                "0100_issue88_shard_02_beta",
+                [("beta", "0001_initial")],
+                dependencies=[("alpha", "0000_issue88_shard_01_alpha")],
+            )
+            self._write_replacement(
+                root,
+                "alpha",
+                "0100_issue88_shard_03_alpha",
+                [("alpha", "0002_second")],
+                dependencies=[("beta", "0100_issue88_shard_02_beta")],
+            )
+
+            with self.assertRaisesRegex(
+                ValueError, "issue88 shard lacks previous same-app shard"
+            ):
+                build_inventory(root, semantic_dispositions={}, expected_blockers=[])
+
+    def test_post_transition_migration_requires_effective_leaf_dependency(self):
+        with tempfile.TemporaryDirectory() as temporary_directory:
+            root = Path(temporary_directory)
+            self._write_plain_migration(root, "alpha", "0001_initial")
+            self._write_replacement(
+                root,
+                "alpha",
+                "0000_issue88_shard_01_alpha",
+                [("alpha", "0001_initial")],
+            )
+            self._write_migration(
+                root,
+                "extras",
+                "0101_issue88_drop_legacy_webhook_name_like",
+                """
+                from django.db import migrations
+                class Migration(migrations.Migration):
+                    dependencies = []
+                    operations = [
+                        migrations.RunSQL(
+                            "DROP INDEX IF EXISTS legacy_index",
+                            reverse_sql=migrations.RunSQL.noop,
+                        ),
+                    ]
+                """,
+            )
+            dispositions = {
+                "extras.0101_issue88_drop_legacy_webhook_name_like": {
+                    "disposition": "upgrade-only",
+                    "rationale": "Synthetic post-transition fixture.",
+                },
+            }
+
+            with self.assertRaisesRegex(
+                ValueError, "post-transition migration lacks effective leaf dependency"
+            ):
+                build_inventory(
+                    root,
+                    semantic_dispositions=dispositions,
+                    expected_blockers=[],
+                )
+
     def test_repository_graph_and_reviewed_semantics_are_exact(self):
         repository_root = Path(__file__).resolve().parents[2]
 
@@ -146,6 +578,19 @@ class MigrationAuditTests(unittest.TestCase):
 
         self.assertEqual(inventory["summary"]["first_party_nodes"], 262)
         self.assertEqual(inventory["summary"]["first_party_edges"], 522)
+        self.assertEqual(inventory["summary"]["replacement_shards"], 62)
+        self.assertEqual(inventory["summary"]["replacement_targets"], 262)
+        self.assertEqual(inventory["summary"]["explicit_replacement_chain_edges"], 61)
+        self.assertEqual(inventory["summary"]["post_transition_migrations"], 1)
+        self.assertEqual(
+            inventory["post_transition_migrations"],
+            ["extras.0101_issue88_drop_legacy_webhook_name_like"],
+        )
+        self.assertEqual(inventory["summary"]["missing_replacement_targets"], 0)
+        self.assertEqual(inventory["summary"]["duplicate_replacement_targets"], 0)
+        self.assertTrue(
+            inventory["summary"]["effective_replacement_quotient_acyclic"]
+        )
         self.assertEqual(
             inventory["summary"]["global_roots"],
             ["users.0010_user"],
@@ -169,6 +614,7 @@ class MigrationAuditTests(unittest.TestCase):
                 "RunPython": 38,
                 "RunSQL": 11,
                 "SeparateDatabaseAndState": 24,
+                "BtreeGistExtension": 1,
             },
         )
         self.assertEqual(
@@ -188,7 +634,19 @@ class MigrationAuditTests(unittest.TestCase):
             [
                 "assets.0003_seed_status_labels",
                 "assets.0043_seed_depreciation_policies",
+                "assets.0051_assetreservation_assetreservation_no_overlap",
+                "assets.0100_issue88_shard_42_assets_relations",
+                "assets.0100_issue88_shard_43_assets_seed",
             ],
+        )
+        replacement_extension = next(
+            migration
+            for migration in inventory["migrations"]
+            if migration["id"] == "assets.0100_issue88_shard_42_assets_relations"
+        )
+        self.assertEqual(
+            replacement_extension["operations"]["BtreeGistExtension"]["count"],
+            1,
         )
         self.assertEqual(
             inventory["reviewed_semantics"]["blockers"],
@@ -208,6 +666,15 @@ class MigrationAuditTests(unittest.TestCase):
         self.assertEqual(
             inventory["reviewed_semantics"]["review_blocker"],
             ["organization.0027_drop_legacy_role_models"],
+        )
+        self.assertEqual(len(inventory["effective_graph"]["nodes"]), 62)
+        self.assertEqual(
+            inventory["effective_graph"]["roots"],
+            ["users.0000_issue88_shard_01_users_bootstrap"],
+        )
+        self.assertEqual(
+            inventory["effective_graph"]["leaves"],
+            ["users.0100_issue88_shard_62_users_relations"],
         )
 
         custom_operation_ids = {
@@ -234,6 +701,38 @@ class MigrationAuditTests(unittest.TestCase):
         normalized = textwrap.dedent(source).strip()
         path.write_text(normalized + "\n", encoding="utf-8")
         return path
+
+    def _write_plain_migration(self, root, app, name):
+        return self._write_migration(
+            root,
+            app,
+            name,
+            """
+            from django.db import migrations
+            class Migration(migrations.Migration):
+                dependencies = []
+                operations = []
+            """,
+        )
+
+    def _write_replacement(
+        self, root, app, name, replaces, dependencies=None, run_before=None
+    ):
+        dependencies = [] if dependencies is None else dependencies
+        run_before = [] if run_before is None else run_before
+        return self._write_migration(
+            root,
+            app,
+            name,
+            f"""
+            from django.db import migrations
+            class Migration(migrations.Migration):
+                replaces = {replaces!r}
+                dependencies = {dependencies!r}
+                run_before = {run_before!r}
+                operations = []
+            """,
+        )
 
 
 if __name__ == "__main__":
