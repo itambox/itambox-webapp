@@ -161,3 +161,4 @@ nav:
   - Development:
       - Release Checklist: 'development/release-checklist.md'
       - Module Maturity: 'development/module-maturity.md'
+      - Migration Verification: 'development/migration-verification.md'
