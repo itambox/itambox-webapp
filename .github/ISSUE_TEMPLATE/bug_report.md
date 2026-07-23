@@ -11,7 +11,7 @@ assignees: ''
 
 <!-- Security vulnerabilities must be reported privately through SECURITY.md, not here. -->
 
-- ITAMbox revision or version: <!-- e.g., commit SHA or 1.0.0-alpha1 -->
+- ITAMbox revision or version: <!-- e.g., commit SHA or 1.0.0-alpha.1 -->
 - Installation method: <!-- source checkout or Docker Compose -->
 - Python version: <!-- e.g., 3.12 -->
 - Django version: <!-- e.g., 5.2 -->

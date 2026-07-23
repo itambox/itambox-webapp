@@ -2,9 +2,11 @@
 
 Notable user-visible, operational, compatibility, and security changes to ITAMbox are recorded here. Internal refactors and routine dependency updates are omitted unless they change supported behavior or deployment requirements.
 
-This changelog follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and [Semantic Versioning](https://semver.org/spec/v2.0.0.html). The source currently reports `1.0.0-alpha1`, but no version has been tagged or published yet. Until the first tag exists, release material remains under **Unreleased**.
+This changelog follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and [Semantic Versioning](https://semver.org/spec/v2.0.0.html). Public tags use dotted prereleases such as `v1.0.0-alpha.1`; Python metadata maps the same identity to its PEP 440 form (`1.0.0a1`) where required.
 
 ## [Unreleased]
+
+## [1.0.0-alpha.1] - 2026-07-24
 
 ### Added
 
@@ -65,9 +67,10 @@ This changelog follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) 
 ### Known limitations
 
 - SaaS subscriptions, procurement, reporting, webhooks and event rules, SCIM, and the plugin lifecycle remain Beta. Their interfaces may change during the prerelease series.
-- There is no tagged release, published container image, or compatibility baseline yet. Evaluate and deploy only from a pinned source revision.
+- This alpha establishes the first compatibility baseline. Until the draft release is reviewed and published, evaluate and deploy only from a pinned source revision.
 - Alpha upgrades may include breaking migrations. No general version-skipping policy exists yet; review and test the exact target revision with a complete backup and rollback plan.
 - The full pytest suite is not safe to run with `pytest-xdist`; use the default serial configuration.
 - SQLite is not supported. PostgreSQL 15 or newer is required for development, tests, and production.
 
-[Unreleased]: https://github.com/itambox/itambox-webapp/commits/main
+[Unreleased]: https://github.com/itambox/itambox-webapp/compare/v1.0.0-alpha.1...HEAD
+[1.0.0-alpha.1]: https://github.com/itambox/itambox-webapp/releases/tag/v1.0.0-alpha.1

@@ -6,11 +6,11 @@ We take the security of ITAMbox seriously. If you discover a vulnerability, plea
 
 ## Supported Versions
 
-ITAMbox has not yet reached a tagged release. The current version metadata, `1.0.0-alpha1`, describes unreleased development on `main`; there is no supported release line or guaranteed remediation timeline yet. Reports against the current source are still welcome and help maintainers assess prerelease risk. See [CHANGELOG.md](CHANGELOG.md) for release status.
+ITAMbox has not yet reached a tagged release. Current version metadata describes unreleased development on `main`; there is no supported release line or guaranteed remediation timeline yet. Reports against the current source are still welcome and help maintainers assess prerelease risk. See [CHANGELOG.md](CHANGELOG.md) for the current release identity and status.
 
 | Target | Status |
 |---|---|
-| `main` (`1.0.0-alpha1`) | Pre-release; reports accepted without a fix-time guarantee |
+| `main` | Pre-release; reports accepted without a fix-time guarantee |
 | Tagged releases | None published |
 
 ---
