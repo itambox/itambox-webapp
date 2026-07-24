@@ -214,10 +214,15 @@ def evaluate_trivy(
         findings.extend(report_findings)
         seen_targets.update(report_targets)
 
-    missing_targets = (expected_targets or set()) - seen_targets
-    if missing_targets:
-        missing = ", ".join(sorted(missing_targets))
-        raise SecurityGateError(f"missing expected Trivy targets: {missing}")
+    if expected_targets is not None:
+        missing_targets = expected_targets - seen_targets
+        if missing_targets:
+            missing = ", ".join(sorted(missing_targets))
+            raise SecurityGateError(f"missing expected Trivy targets: {missing}")
+        unexpected_targets = seen_targets - expected_targets
+        if unexpected_targets:
+            unexpected = ", ".join(sorted(unexpected_targets))
+            raise SecurityGateError(f"unexpected Trivy targets: {unexpected}")
 
     visible: list[dict[str, str]] = []
     suppressed = 0
@@ -305,7 +310,7 @@ def main(argv: list[str] | None = None) -> int:
                 [_load_json(path) for path in args.report],
                 suppressions,
                 args.sarif,
-                expected_targets=set(args.expect_target),
+                expected_targets=set(args.expect_target) if args.expect_target else None,
             )
             _print_result("dependency vulnerabilities", result)
         else:

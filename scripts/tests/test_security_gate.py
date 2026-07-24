@@ -134,6 +134,12 @@ class FindingPolicyTests(unittest.TestCase):
             }]
             with self.assertRaisesRegex(SecurityGateError, "invalid Trivy severity"):
                 evaluate_trivy([report], [], sarif)
+            report["Results"] = [
+                {"Target": "uv.lock", "Vulnerabilities": None},
+                {"Target": "unexpected.lock", "Vulnerabilities": None},
+            ]
+            with self.assertRaisesRegex(SecurityGateError, "unexpected Trivy targets"):
+                evaluate_trivy([report], [], sarif, expected_targets={"uv.lock"})
 
     def test_gitleaks_requires_exact_fingerprint_path_and_rule_suppression(self):
         finding = {"Fingerprint": "abc:src/app.py:rule", "File": "src/app.py", "RuleID": "rule"}
