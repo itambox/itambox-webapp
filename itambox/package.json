@@ -32,7 +32,7 @@
     "@tabler/core": "^1.1.0",
     "apexcharts": "^5.13.0",
     "bootstrap": "^5.3.3",
-    "gridstack": "^10.3.0",
+    "gridstack": "^13.1.0",
     "html5-qrcode": "^2.3.8",
     "htmx.org": "^2.0.4",
     "tom-select": "^2.3.1"
