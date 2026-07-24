@@ -95,7 +95,7 @@ jobs:
         run: |
           set +x
           bash scripts/install_security_tools.sh "$RUNNER_TEMP/security-tools" trivy
-          if ! "$RUNNER_TEMP/security-tools/trivy" image --quiet --scanners vuln \
+          if ! "$RUNNER_TEMP/security-tools/trivy" image --quiet --scanners vuln --ignore-unfixed \
             --format json --output "$RUNNER_TEMP/trivy-image.json" \
             itambox:release-rehearsal \
             >"$RUNNER_TEMP/trivy.stdout" 2>"$RUNNER_TEMP/trivy.stderr"; then
@@ -191,7 +191,7 @@ jobs:
           PY
           set +x
           bash scripts/install_security_tools.sh "$RUNNER_TEMP/security-tools" trivy
-          if ! "$RUNNER_TEMP/security-tools/trivy" image --quiet --scanners vuln \
+          if ! "$RUNNER_TEMP/security-tools/trivy" image --quiet --scanners vuln --ignore-unfixed \
             --format json --output "$RUNNER_TEMP/trivy-image.json" \
             "itambox:${RELEASE_VERSION}" \
             >"$RUNNER_TEMP/trivy.stdout" 2>"$RUNNER_TEMP/trivy.stderr"; then

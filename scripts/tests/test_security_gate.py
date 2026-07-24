@@ -143,6 +143,7 @@ class SecurityAutomationContractTests(unittest.TestCase):
 
     def test_release_rehearsal_scans_the_same_image_before_draft_creation(self):
         workflow = (REPOSITORY_ROOT / ".github" / "workflows" / "release.yml").read_text(encoding="utf-8")
+        self.assertGreaterEqual(workflow.count("--ignore-unfixed"), 2)
         for image in ("itambox:release-rehearsal", 'itambox:${RELEASE_VERSION}'):
             build = workflow.index(image)
             scan = workflow.index('security-tools/trivy" image', build)

@@ -13,9 +13,9 @@ The `Security` workflow runs for every pull request and `main` push, weekly, and
 | E2E dependencies | `itambox/tests/e2e/package-lock.json` | unsuppressed `HIGH` or `CRITICAL` |
 | Secrets in a PR/push | every introduced commit in the exact base-to-head range | every unsuppressed finding |
 | Repository history | all reachable commits on the weekly/manual run | every unsuppressed finding |
-| Release image | the exact locally built rehearsal/draft candidate | unsuppressed `HIGH` or `CRITICAL` |
+| Release image | the exact locally built rehearsal/draft candidate | unsuppressed, fix-available `HIGH` or `CRITICAL` |
 
-Scanner, vulnerability-database, report-parser, and suppression-policy failures block rather than degrading to best effort. `MEDIUM`, `LOW`, and `UNKNOWN` vulnerabilities remain visible in Code Scanning but do not currently block. GitHub Secret Scanning and Push Protection remain complementary provider-aware controls.
+Scanner, vulnerability-database, report-parser, and suppression-policy failures block rather than degrading to best effort. Image findings for which the operating-system or package vendor has not published a fix are re-evaluated on every run but do not block an otherwise unremediable release. `MEDIUM`, `LOW`, and `UNKNOWN` vulnerabilities do not currently block. GitHub Secret Scanning and Push Protection remain complementary provider-aware controls.
 
 Trivy `0.72.0` and Gitleaks `8.30.1` are downloaded from their public OSS releases and verified against literal SHA-256 digests in `scripts/install_security_tools.sh`. Dependabot monitors Python, both npm roots, and GitHub Actions.
 
