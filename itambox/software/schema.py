@@ -1,18 +1,45 @@
 import graphene
+from django.core.exceptions import PermissionDenied, ValidationError
+from django.utils.translation import gettext_lazy as _
 from graphene_django import DjangoObjectType
-from .models import Software
+from graphql import GraphQLError
+
 from assets.models import Manufacturer
 from core.graphql_utils import check_permission, get_object_or_denied, paginate_queryset
-from graphql import GraphQLError
-from django.core.exceptions import ValidationError, PermissionDenied
-from django.utils.translation import gettext_lazy as _
+
+from .models import Software
+
 
 class SoftwareNode(DjangoObjectType):
     class Meta:
         model = Software
-        fields = ("id", "name", "manufacturer", "version", "category", "license_type", "website", "description", "created_at", "updated_at")
+        fields = (
+            "id",
+            "name",
+            "manufacturer",
+            "version",
+            "category",
+            "license_type",
+            "website",
+            "description",
+            "created_at",
+            "updated_at",
+        )
 
-SOFTWARE_SORTABLE_FIELDS = {"name", "-name", "version", "-version", "category", "-category", "created_at", "-created_at", "updated_at", "-updated_at"}
+
+SOFTWARE_SORTABLE_FIELDS = {
+    "name",
+    "-name",
+    "version",
+    "-version",
+    "category",
+    "-category",
+    "created_at",
+    "-created_at",
+    "updated_at",
+    "-updated_at",
+}
+
 
 class Query(graphene.ObjectType):
     software_list = graphene.List(
@@ -26,8 +53,8 @@ class Query(graphene.ObjectType):
     software = graphene.Field(SoftwareNode, id=graphene.ID(required=True))
 
     def resolve_software_list(self, info, limit=None, offset=None, sort_by=None, **kwargs):
-        check_permission(info, 'software.view_software')
-        qs = Software.objects.select_related('manufacturer').all()
+        check_permission(info, "software.view_software")
+        qs = Software.objects.select_related("manufacturer").all()
         for key, val in kwargs.items():
             if val is not None:
                 qs = qs.filter(**{key: val})
@@ -36,11 +63,12 @@ class Query(graphene.ObjectType):
         return paginate_queryset(qs, limit, offset)
 
     def resolve_software(self, info, id):
-        check_permission(info, 'software.view_software')
+        check_permission(info, "software.view_software")
         try:
-            return Software.objects.select_related('manufacturer').get(pk=id)
+            return Software.objects.select_related("manufacturer").get(pk=id)
         except Software.DoesNotExist:
             return None
+
 
 class CreateSoftware(graphene.Mutation):
     class Arguments:
@@ -55,12 +83,12 @@ class CreateSoftware(graphene.Mutation):
     software = graphene.Field(SoftwareNode)
 
     def mutate(self, info, manufacturer_id, **kwargs):
-        user = check_permission(info, 'software.add_software')
-        active_tenant = getattr(info.context, 'active_tenant', None)
+        user = check_permission(info, "software.add_software")
+        active_tenant = getattr(info.context, "active_tenant", None)
         manufacturer = get_object_or_denied(Manufacturer, manufacturer_id, user, tenant=active_tenant)
-        
+
         software = Software(manufacturer=manufacturer, tenant=active_tenant)
-        ALLOWED_FIELDS = {'name', 'version', 'category', 'license_type', 'website', 'description'}
+        ALLOWED_FIELDS = {"name", "version", "category", "license_type", "website", "description"}
         for key, val in kwargs.items():
             if key in ALLOWED_FIELDS:
                 setattr(software, key, val)
@@ -77,10 +105,11 @@ class CreateSoftware(graphene.Mutation):
         except ValidationError as e:
             raise GraphQLError(
                 "Validation failed",
-                extensions={"validation_errors": e.message_dict if hasattr(e, 'message_dict') else e.messages}
+                extensions={"validation_errors": e.message_dict if hasattr(e, "message_dict") else e.messages},
             )
         software.save()
         return CreateSoftware(software=software)
+
 
 class UpdateSoftware(graphene.Mutation):
     class Arguments:
@@ -96,10 +125,10 @@ class UpdateSoftware(graphene.Mutation):
     software = graphene.Field(SoftwareNode)
 
     def mutate(self, info, id, **kwargs):
-        user = check_permission(info, 'software.change_software')
-        active_tenant = getattr(info.context, 'active_tenant', None)
+        user = check_permission(info, "software.change_software")
+        active_tenant = getattr(info.context, "active_tenant", None)
         software = get_object_or_denied(Software, id, user, tenant=active_tenant)
-        check_permission(info, 'software.change_software', obj=software)
+        check_permission(info, "software.change_software", obj=software)
 
         # In a tenant-group context (active_tenant is None) get_object_or_denied skips its
         # explicit tenant filter and can resolve a global row; block non-superusers from
@@ -107,23 +136,26 @@ class UpdateSoftware(graphene.Mutation):
         if software.tenant is None and not user.is_superuser:
             raise PermissionDenied(_("Only superusers can modify global software."))
 
-        if 'manufacturer_id' in kwargs:
-            software.manufacturer = get_object_or_denied(Manufacturer, kwargs.pop('manufacturer_id'), user, tenant=active_tenant)
-            
-        ALLOWED_FIELDS = {'name', 'version', 'category', 'license_type', 'website', 'description'}
+        if "manufacturer_id" in kwargs:
+            software.manufacturer = get_object_or_denied(
+                Manufacturer, kwargs.pop("manufacturer_id"), user, tenant=active_tenant
+            )
+
+        ALLOWED_FIELDS = {"name", "version", "category", "license_type", "website", "description"}
         for key, val in kwargs.items():
             if key in ALLOWED_FIELDS:
                 setattr(software, key, val)
-            
+
         try:
             software.full_clean()
         except ValidationError as e:
             raise GraphQLError(
                 "Validation failed",
-                extensions={"validation_errors": e.message_dict if hasattr(e, 'message_dict') else e.messages}
+                extensions={"validation_errors": e.message_dict if hasattr(e, "message_dict") else e.messages},
             )
         software.save()
         return UpdateSoftware(software=software)
+
 
 class DeleteSoftware(graphene.Mutation):
     class Arguments:
@@ -132,14 +164,15 @@ class DeleteSoftware(graphene.Mutation):
     success = graphene.Boolean()
 
     def mutate(self, info, id):
-        user = check_permission(info, 'software.delete_software')
-        active_tenant = getattr(info.context, 'active_tenant', None)
+        user = check_permission(info, "software.delete_software")
+        active_tenant = getattr(info.context, "active_tenant", None)
         software = get_object_or_denied(Software, id, user, tenant=active_tenant)
-        check_permission(info, 'software.delete_software', obj=software)
+        check_permission(info, "software.delete_software", obj=software)
         if software.tenant is None and not user.is_superuser:
             raise PermissionDenied(_("Only superusers can delete global software."))
         software.delete()
         return DeleteSoftware(success=True)
+
 
 class Mutation(graphene.ObjectType):
     create_software = CreateSoftware.Field()

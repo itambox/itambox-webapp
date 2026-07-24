@@ -1,130 +1,146 @@
-from django import forms
-from django.urls import reverse
-from django.template.loader import render_to_string
-from django.utils.translation import gettext_lazy as _
 from crispy_forms.helper import FormHelper
-from crispy_forms.layout import Layout, Submit, HTML, Row, Column, Fieldset, Div
+from crispy_forms.layout import HTML, Column, Div, Fieldset, Layout, Row, Submit
+from django import forms
+from django.template.loader import render_to_string
+from django.urls import reverse
+from django.utils.translation import gettext_lazy as _
 
 from core.forms import CrispyFormMixin, scope_tenant_field
-from extras.models import Tag, CustomField
-from organization.models import Location, CostCenter
+from extras.models import CustomField, Tag
+from organization.models import CostCenter, Location
 from procurement.models import PurchaseOrderLine
-from ..models import Asset, AssetType, AssetRole, StatusLabel
-from ..models.choices import WarrantyTypeChoices
 
+from ..models import Asset, AssetRole, AssetType, StatusLabel
+from ..models.choices import WarrantyTypeChoices
 from .fields import StatusModelChoiceField
 
 
 class AssetForm(CrispyFormMixin, forms.ModelForm):
     asset_type = forms.ModelChoiceField(
-        queryset=AssetType.objects.select_related('manufacturer').all(),
+        queryset=AssetType.objects.select_related("manufacturer").all(),
         label=_("Asset Type"),
         required=True,
-        widget=forms.Select(attrs={
-            'class': 'form-select',
-            'data-tom-select': '',
-            'hx-post': '',
-            'hx-trigger': 'change',
-            'hx-target': 'closest form',
-            'hx-swap': 'outerHTML',
-            'hx-vals': '{"_reload": "1"}',
-            'hx-include': 'closest form',
-        })
+        widget=forms.Select(
+            attrs={
+                "class": "form-select",
+                "data-tom-select": "",
+                "hx-post": "",
+                "hx-trigger": "change",
+                "hx-target": "closest form",
+                "hx-swap": "outerHTML",
+                "hx-vals": '{"_reload": "1"}',
+                "hx-include": "closest form",
+            }
+        ),
     )
     asset_role = forms.ModelChoiceField(
         queryset=AssetRole.objects.all(),
         label=_("Asset Role"),
         required=False,
-        widget=forms.Select(attrs={'class': 'form-select', 'data-tom-select': ''})
+        widget=forms.Select(attrs={"class": "form-select", "data-tom-select": ""}),
     )
     status = StatusModelChoiceField(
         queryset=StatusLabel.objects.all(),
         label=_("Status"),
         required=True,
-        widget=forms.Select(attrs={'class': 'form-select', 'data-tom-select': ''})
+        widget=forms.Select(attrs={"class": "form-select", "data-tom-select": ""}),
     )
     location = forms.ModelChoiceField(
         queryset=Location.objects.all(),
         required=False,
-        widget=forms.Select(attrs={'class': 'form-select', 'data-tom-select': ''})
+        widget=forms.Select(attrs={"class": "form-select", "data-tom-select": ""}),
     )
     purchase_date = forms.DateField(
-        widget=forms.DateInput(attrs={'type': 'date', 'class': 'form-control'}),
-        required=False
+        widget=forms.DateInput(attrs={"type": "date", "class": "form-control"}), required=False
     )
     requestable = forms.ChoiceField(
         choices=[
-            ('', 'Inherit from Asset Type (Default)'),
-            ('true', 'Yes (Force Requestable)'),
-            ('false', 'No (Force Unrequestable)'),
+            ("", "Inherit from Asset Type (Default)"),
+            ("true", "Yes (Force Requestable)"),
+            ("false", "No (Force Unrequestable)"),
         ],
         required=False,
-        widget=forms.Select(attrs={'class': 'form-select'}),
-        label=_("Requestable Status")
+        widget=forms.Select(attrs={"class": "form-select"}),
+        label=_("Requestable Status"),
     )
 
     # Optional inline warranty (non-model fields). When the dates are filled in,
     # the view creates a Warranty for this asset via create_inline_warranty().
     warranty_provider = forms.CharField(
-        label=_("Warranty Provider"),
-        required=False,
-        widget=forms.TextInput(attrs={'class': 'form-control'})
+        label=_("Warranty Provider"), required=False, widget=forms.TextInput(attrs={"class": "form-control"})
     )
     warranty_type = forms.ChoiceField(
         label=_("Warranty Type"),
         required=False,
-        choices=[('', '---------')] + list(WarrantyTypeChoices.choices),
-        widget=forms.Select(attrs={'class': 'form-select'})
+        choices=[("", "---------")] + list(WarrantyTypeChoices.choices),
+        widget=forms.Select(attrs={"class": "form-select"}),
     )
     warranty_start_date = forms.DateField(
         label=_("Warranty Start Date"),
         required=False,
-        widget=forms.DateInput(attrs={'type': 'date', 'class': 'form-control'})
+        widget=forms.DateInput(attrs={"type": "date", "class": "form-control"}),
     )
     warranty_end_date = forms.DateField(
         label=_("Warranty End Date"),
         required=False,
-        widget=forms.DateInput(attrs={'type': 'date', 'class': 'form-control'})
+        widget=forms.DateInput(attrs={"type": "date", "class": "form-control"}),
     )
     warranty_cost = forms.DecimalField(
         label=_("Warranty Cost"),
         required=False,
-        widget=forms.NumberInput(attrs={'class': 'form-control', 'step': '0.01'})
+        widget=forms.NumberInput(attrs={"class": "form-control", "step": "0.01"}),
     )
 
     class Meta:
         model = Asset
         fields = [
-            'name', 'asset_tag', 'serial_number', 'asset_type',
-            'asset_role', 'status', 'location', 'tenant',
-            'purchase_date',
-            'purchase_cost', 'salvage_value', 'currency', 'order_number', 'supplier',
-            'purchase_order_line', 'cost_center',
-            'in_service_date', 'depreciation_override',
-            'notes', 'tags', 'requestable'
+            "name",
+            "asset_tag",
+            "serial_number",
+            "asset_type",
+            "asset_role",
+            "status",
+            "location",
+            "tenant",
+            "purchase_date",
+            "purchase_cost",
+            "salvage_value",
+            "currency",
+            "order_number",
+            "supplier",
+            "purchase_order_line",
+            "cost_center",
+            "in_service_date",
+            "depreciation_override",
+            "notes",
+            "tags",
+            "requestable",
         ]
         widgets = {
-            'name': forms.TextInput(attrs={'class': 'form-control'}),
-            'asset_tag': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Leave blank to auto-generate'}),
-            'serial_number': forms.TextInput(attrs={'class': 'form-control'}),
-            'purchase_cost': forms.NumberInput(attrs={'class': 'form-control', 'step': '0.01'}),
-            'salvage_value': forms.NumberInput(attrs={'class': 'form-control', 'step': '0.01'}),
-            'currency': forms.Select(attrs={'class': 'form-select', 'data-tom-select': ''}),
-            'order_number': forms.TextInput(attrs={'class': 'form-control'}),
-            'in_service_date': forms.DateInput(attrs={'class': 'form-control', 'type': 'date'}),
-            'depreciation_override': forms.Select(attrs={'class': 'form-select', 'data-tom-select': ''}),
-            'notes': forms.Textarea(attrs={'class': 'form-control', 'rows': 3}),
-            'tenant': forms.Select(attrs={'class': 'form-select', 'data-tom-select': ''}),
-            'tags': forms.SelectMultiple(attrs={'class': 'form-select', 'data-tom-select': ''}),
-            'supplier': forms.Select(attrs={'class': 'form-select', 'data-tom-select': ''}),
-            'purchase_order_line': forms.Select(attrs={'class': 'form-select', 'data-tom-select': ''}),
-            'cost_center': forms.Select(attrs={'class': 'form-select', 'data-tom-select': ''}),
+            "name": forms.TextInput(attrs={"class": "form-control"}),
+            "asset_tag": forms.TextInput(
+                attrs={"class": "form-control", "placeholder": "Leave blank to auto-generate"}
+            ),
+            "serial_number": forms.TextInput(attrs={"class": "form-control"}),
+            "purchase_cost": forms.NumberInput(attrs={"class": "form-control", "step": "0.01"}),
+            "salvage_value": forms.NumberInput(attrs={"class": "form-control", "step": "0.01"}),
+            "currency": forms.Select(attrs={"class": "form-select", "data-tom-select": ""}),
+            "order_number": forms.TextInput(attrs={"class": "form-control"}),
+            "in_service_date": forms.DateInput(attrs={"class": "form-control", "type": "date"}),
+            "depreciation_override": forms.Select(attrs={"class": "form-select", "data-tom-select": ""}),
+            "notes": forms.Textarea(attrs={"class": "form-control", "rows": 3}),
+            "tenant": forms.Select(attrs={"class": "form-select", "data-tom-select": ""}),
+            "tags": forms.SelectMultiple(attrs={"class": "form-select", "data-tom-select": ""}),
+            "supplier": forms.Select(attrs={"class": "form-select", "data-tom-select": ""}),
+            "purchase_order_line": forms.Select(attrs={"class": "form-select", "data-tom-select": ""}),
+            "cost_center": forms.Select(attrs={"class": "form-select", "data-tom-select": ""}),
         }
 
     def clean_status(self):
-        status = self.cleaned_data.get('status')
+        status = self.cleaned_data.get("status")
         if isinstance(status, str):
             from django.db.models import Q
+
             status_obj = StatusLabel.objects.filter(Q(slug=status) | Q(name__iexact=status)).first()
             if status_obj:
                 return status_obj
@@ -132,79 +148,87 @@ class AssetForm(CrispyFormMixin, forms.ModelForm):
         return status
 
     def clean_requestable(self):
-        val = self.cleaned_data.get('requestable')
-        if val == 'true':
+        val = self.cleaned_data.get("requestable")
+        if val == "true":
             return True
-        elif val == 'false':
+        elif val == "false":
             return False
         return None
 
     def clean(self):
         cleaned_data = super().clean()
         warranty_fields = (
-            'warranty_provider', 'warranty_type',
-            'warranty_start_date', 'warranty_end_date', 'warranty_cost',
+            "warranty_provider",
+            "warranty_type",
+            "warranty_start_date",
+            "warranty_end_date",
+            "warranty_cost",
         )
         any_filled = any(cleaned_data.get(f) for f in warranty_fields)
         if any_filled:
-            start = cleaned_data.get('warranty_start_date')
-            end = cleaned_data.get('warranty_end_date')
+            start = cleaned_data.get("warranty_start_date")
+            end = cleaned_data.get("warranty_end_date")
             if not start:
                 self.add_error(
-                    'warranty_start_date',
+                    "warranty_start_date",
                     _("Start date is required when adding a warranty."),
                 )
             if not end:
                 self.add_error(
-                    'warranty_end_date',
+                    "warranty_end_date",
                     _("End date is required when adding a warranty."),
                 )
             if start and end and end < start:
                 self.add_error(
-                    'warranty_end_date',
+                    "warranty_end_date",
                     _("End date cannot be before the start date."),
                 )
         return cleaned_data
 
     def create_inline_warranty(self, asset):
         cd = self.cleaned_data
-        start = cd.get('warranty_start_date')
-        end = cd.get('warranty_end_date')
+        start = cd.get("warranty_start_date")
+        end = cd.get("warranty_end_date")
         if not (start and end):
             return None
         from ..models import Warranty  # inline import: avoid import cycle at module load
-        kwargs = dict(asset=asset, start_date=start, end_date=end,
-                      provider=cd.get('warranty_provider') or '',
-                      cost=cd.get('warranty_cost'))
-        wt = cd.get('warranty_type')
+
+        kwargs = dict(
+            asset=asset,
+            start_date=start,
+            end_date=end,
+            provider=cd.get("warranty_provider") or "",
+            cost=cd.get("warranty_cost"),
+        )
+        wt = cd.get("warranty_type")
         if wt:
-            kwargs['warranty_type'] = wt
+            kwargs["warranty_type"] = wt
         return Warranty.objects.create(**kwargs)
 
     def __init__(self, *args, **kwargs):
-        request = kwargs.pop('request', None)
-        explicit_initial = kwargs.get('initial') or {}
+        request = kwargs.pop("request", None)
+        explicit_initial = kwargs.get("initial") or {}
         super().__init__(*args, **kwargs)
         scope_tenant_field(self)
         self.helper = FormHelper(self)
-        self.helper.form_method = 'post'
+        self.helper.form_method = "post"
         self.helper.form_tag = True
 
-        cancel_url = reverse('assets:asset_list')
+        cancel_url = reverse("assets:asset_list")
 
         asset_type_id = None
-        if self.is_bound and 'asset_type' in self.data:
+        if self.is_bound and "asset_type" in self.data:
             try:
-                asset_type_id = int(self.data.get('asset_type'))
+                asset_type_id = int(self.data.get("asset_type"))
             except (ValueError, TypeError):
                 pass
-        elif request and request.GET.get('asset_type'):
+        elif request and request.GET.get("asset_type"):
             try:
-                asset_type_id = int(request.GET.get('asset_type'))
+                asset_type_id = int(request.GET.get("asset_type"))
             except (ValueError, TypeError):
                 pass
-        elif 'asset_type' in explicit_initial:
-            asset_type_val = explicit_initial.get('asset_type')
+        elif "asset_type" in explicit_initial:
+            asset_type_val = explicit_initial.get("asset_type")
             if isinstance(asset_type_val, AssetType):
                 asset_type_id = asset_type_val.pk
             else:
@@ -214,56 +238,59 @@ class AssetForm(CrispyFormMixin, forms.ModelForm):
 
         if self.instance and self.instance.pk:
             if self.instance.requestable is None:
-                self.initial['requestable'] = ''
+                self.initial["requestable"] = ""
             elif self.instance.requestable is True:
-                self.initial['requestable'] = 'true'
+                self.initial["requestable"] = "true"
             else:
-                self.initial['requestable'] = 'false'
+                self.initial["requestable"] = "false"
 
         # Ensure asset_tag is required in the form
-        self.fields['asset_tag'].required = True
+        self.fields["asset_tag"].required = True
 
         from django.utils.safestring import mark_safe
+
         # Configure quick-add buttons inside labels instead of layout divs
-        if 'asset_type' in self.fields:
-            url_type = reverse('assets:assettype_create') + '?_quickadd=1'
-            self.fields['asset_type'].label = mark_safe(
+        if "asset_type" in self.fields:
+            url_type = reverse("assets:assettype_create") + "?_quickadd=1"
+            self.fields["asset_type"].label = mark_safe(
                 f'Asset Type <button type="button" class="btn btn-link p-0 ms-1 align-baseline border-0 bg-transparent text-primary" style="font-size: 1.1rem; line-height: 1;" title="Add new Asset Type" hx-get="{url_type}" hx-target="#modal-placeholder"><i class="mdi mdi-plus-circle-outline"></i></button>'
             )
 
-        if 'asset_role' in self.fields:
-            url_role = reverse('assets:assetrole_create') + '?_quickadd=1'
-            self.fields['asset_role'].label = mark_safe(
+        if "asset_role" in self.fields:
+            url_role = reverse("assets:assetrole_create") + "?_quickadd=1"
+            self.fields["asset_role"].label = mark_safe(
                 f'Asset Role <button type="button" class="btn btn-link p-0 ms-1 align-baseline border-0 bg-transparent text-primary" style="font-size: 1.1rem; line-height: 1;" title="Add new Asset Role" hx-get="{url_role}" hx-target="#modal-placeholder"><i class="mdi mdi-plus-circle-outline"></i></button>'
             )
 
-        if 'location' in self.fields:
-            url_loc = reverse('organization:location_create') + '?_quickadd=1'
-            self.fields['location'].label = mark_safe(
+        if "location" in self.fields:
+            url_loc = reverse("organization:location_create") + "?_quickadd=1"
+            self.fields["location"].label = mark_safe(
                 f'Location <button type="button" class="btn btn-link p-0 ms-1 align-baseline border-0 bg-transparent text-primary" style="font-size: 1.1rem; line-height: 1;" title="Add new Location" hx-get="{url_loc}" hx-target="#modal-placeholder"><i class="mdi mdi-plus-circle-outline"></i></button>'
             )
 
-
         # Hook up HTMX trigger on tenant field to update suggestion on change
-        if 'tenant' in self.fields:
-            self.fields['tenant'].widget.attrs.update({
-                'hx-post': '',
-                'hx-trigger': 'change',
-                'hx-target': 'closest form',
-                'hx-swap': 'outerHTML',
-                'hx-vals': '{"_reload": "1"}',
-                'hx-include': 'closest form',
-            })
+        if "tenant" in self.fields:
+            self.fields["tenant"].widget.attrs.update(
+                {
+                    "hx-post": "",
+                    "hx-trigger": "change",
+                    "hx-target": "closest form",
+                    "hx-swap": "outerHTML",
+                    "hx-vals": '{"_reload": "1"}',
+                    "hx-include": "closest form",
+                }
+            )
 
         # Calculate suggested tag based on selected tenant and asset_type
         # 1. Resolve tenant
         from organization.models import Tenant
+
         selected_tenant = None
         raw_tenant = None
-        if self.is_bound and self.data.get('tenant'):
-            raw_tenant = self.data.get('tenant')
-        elif self.initial.get('tenant'):
-            raw_tenant = self.initial.get('tenant')
+        if self.is_bound and self.data.get("tenant"):
+            raw_tenant = self.data.get("tenant")
+        elif self.initial.get("tenant"):
+            raw_tenant = self.initial.get("tenant")
         elif self.instance and self.instance.tenant:
             raw_tenant = self.instance.tenant
 
@@ -284,9 +311,9 @@ class AssetForm(CrispyFormMixin, forms.ModelForm):
         # selected tenant when one is resolvable. Asset.clean() validates the
         # final selection as defence-in-depth.
         tenant_scoped_fk_fields = {
-            'location': Location,
-            'cost_center': CostCenter,
-            'purchase_order_line': PurchaseOrderLine,
+            "location": Location,
+            "cost_center": CostCenter,
+            "purchase_order_line": PurchaseOrderLine,
         }
         for fk_field_name, fk_model in tenant_scoped_fk_fields.items():
             if fk_field_name in self.fields:
@@ -305,32 +332,34 @@ class AssetForm(CrispyFormMixin, forms.ModelForm):
 
         # 3. Resolve sequence preview
         from django.utils.safestring import mark_safe
+
         from ..models import AssetTagSequence
+
         dummy_asset = Asset(tenant=selected_tenant, asset_type=selected_type)
         seq = AssetTagSequence.resolve_sequence_for_asset(dummy_asset)
         if seq:
             suggested_tag = seq.next_tag_preview
-            self.fields['asset_tag'].help_text = mark_safe(
+            self.fields["asset_tag"].help_text = mark_safe(
                 f'<span class="text-muted small">Suggested: <a href="#" class="text-primary font-monospace" data-fill-target="id_asset_tag" data-fill-value="{suggested_tag}">{suggested_tag}</a></span>'
             )
         else:
-            self.fields['asset_tag'].help_text = mark_safe(
+            self.fields["asset_tag"].help_text = mark_safe(
                 f'<span class="text-muted small">No active tag sequence found for this scope.</span>'
             )
 
         # Default the asset role from the selected asset type if not already set
         if not self.instance.pk and asset_type_id:
             current_role = None
-            if self.data and 'asset_role' in self.data:
-                current_role = self.data.get('asset_role')
-            elif self.initial and 'asset_role' in self.initial:
-                current_role = self.initial.get('asset_role')
-                
+            if self.data and "asset_role" in self.data:
+                current_role = self.data.get("asset_role")
+            elif self.initial and "asset_role" in self.initial:
+                current_role = self.initial.get("asset_role")
+
             if not current_role:
                 try:
                     asset_type_obj = AssetType.objects.get(pk=asset_type_id)
                     if asset_type_obj.asset_role:
-                        self.fields['asset_role'].initial = asset_type_obj.asset_role
+                        self.fields["asset_role"].initial = asset_type_obj.asset_role
                 except AssetType.DoesNotExist:
                     pass
 
@@ -338,6 +367,7 @@ class AssetForm(CrispyFormMixin, forms.ModelForm):
         # to any fieldset) plus the selected asset type's fieldset fields that
         # target Asset.
         from django.contrib.contenttypes.models import ContentType
+
         asset_ct = ContentType.objects.get_for_model(Asset)
         custom_fields = CustomField.objects.filter(object_types=asset_ct, fieldsets__isnull=True)
         if asset_type_id:
@@ -364,38 +394,38 @@ class AssetForm(CrispyFormMixin, forms.ModelForm):
                     label=field.label,
                     required=field.required,
                     initial=initial_value,
-                    widget=forms.TextInput(attrs={'class': 'form-control'})
+                    widget=forms.TextInput(attrs={"class": "form-control"}),
                 )
             elif field.field_type == CustomField.FIELD_TYPE_NUMBER:
                 form_field = forms.DecimalField(
                     label=field.label,
                     required=field.required,
                     initial=initial_value,
-                    widget=forms.NumberInput(attrs={'class': 'form-control'})
+                    widget=forms.NumberInput(attrs={"class": "form-control"}),
                 )
             elif field.field_type == CustomField.FIELD_TYPE_DATE:
                 form_field = forms.DateField(
                     label=field.label,
                     required=field.required,
                     initial=initial_value,
-                    widget=forms.DateInput(attrs={'type': 'date', 'class': 'form-control'})
+                    widget=forms.DateInput(attrs={"type": "date", "class": "form-control"}),
                 )
             elif field.field_type == CustomField.FIELD_TYPE_BOOLEAN:
                 form_field = forms.BooleanField(
                     label=field.label,
                     required=field.required,
                     initial=initial_value or False,
-                    widget=forms.CheckboxInput(attrs={'class': 'form-check-input'})
+                    widget=forms.CheckboxInput(attrs={"class": "form-check-input"}),
                 )
             elif field.field_type == CustomField.FIELD_TYPE_SELECT:
-                choice_lines = [line.strip() for line in (field.choices or '').split('\n') if line.strip()]
-                choices = [('', '---------')] + [(choice, choice) for choice in choice_lines]
+                choice_lines = [line.strip() for line in (field.choices or "").split("\n") if line.strip()]
+                choices = [("", "---------")] + [(choice, choice) for choice in choice_lines]
                 form_field = forms.ChoiceField(
                     label=field.label,
                     required=field.required,
                     choices=choices,
                     initial=initial_value,
-                    widget=forms.Select(attrs={'class': 'form-select'})
+                    widget=forms.Select(attrs={"class": "form-select"}),
                 )
 
             if form_field:
@@ -405,63 +435,41 @@ class AssetForm(CrispyFormMixin, forms.ModelForm):
         # Assignment -> Procurement & Financial -> Lifecycle -> Custom -> Notes.
         layout_elements = [
             Fieldset(
-                _('Identity'),
-                Div(
-                    Div('name', css_class='col-md-6'),
-                    Div('asset_tag', css_class='col-md-6'),
-                    css_class='row'
-                ),
-                Div(
-                    Div('serial_number', css_class='col-md-6'),
-                    Div('status', css_class='col-md-6'),
-                    css_class='row'
-                ),
+                _("Identity"),
+                Div(Div("name", css_class="col-md-6"), Div("asset_tag", css_class="col-md-6"), css_class="row"),
+                Div(Div("serial_number", css_class="col-md-6"), Div("status", css_class="col-md-6"), css_class="row"),
             ),
             Fieldset(
-                _('Classification'),
-                Div(
-                    Div('asset_type', css_class='col-md-6'),
-                    Div('asset_role', css_class='col-md-6'),
-                    css_class='row'
-                ),
+                _("Classification"),
+                Div(Div("asset_type", css_class="col-md-6"), Div("asset_role", css_class="col-md-6"), css_class="row"),
             ),
             Fieldset(
-                _('Assignment'),
-                Div(
-                    Div('location', css_class='col-md-6'),
-                    Div('tenant', css_class='col-md-6'),
-                    css_class='row'
-                ),
+                _("Assignment"),
+                Div(Div("location", css_class="col-md-6"), Div("tenant", css_class="col-md-6"), css_class="row"),
             ),
             Fieldset(
-                _('Procurement & Financial'),
+                _("Procurement & Financial"),
                 Div(
-                    Div('purchase_date', css_class='col-md-4'),
-                    Div('order_number', css_class='col-md-4'),
-                    Div('supplier', css_class='col-md-4'),
-                    css_class='row'
+                    Div("purchase_date", css_class="col-md-4"),
+                    Div("order_number", css_class="col-md-4"),
+                    Div("supplier", css_class="col-md-4"),
+                    css_class="row",
                 ),
+                Div(Div("purchase_order_line", css_class="col-md-6"), css_class="row"),
                 Div(
-                    Div('purchase_order_line', css_class='col-md-6'),
-                    css_class='row'
+                    Div("purchase_cost", css_class="col-md-4"),
+                    Div("currency", css_class="col-md-4"),
+                    Div("salvage_value", css_class="col-md-4"),
+                    css_class="row",
                 ),
-                Div(
-                    Div('purchase_cost', css_class='col-md-4'),
-                    Div('currency', css_class='col-md-4'),
-                    Div('salvage_value', css_class='col-md-4'),
-                    css_class='row'
-                ),
-                Div(
-                    Div('cost_center', css_class='col-md-6'),
-                    css_class='row'
-                ),
+                Div(Div("cost_center", css_class="col-md-6"), css_class="row"),
             ),
             Fieldset(
-                _('Lifecycle'),
+                _("Lifecycle"),
                 Div(
-                    Div('in_service_date', css_class='col-md-6'),
-                    Div('depreciation_override', css_class='col-md-6'),
-                    css_class='row'
+                    Div("in_service_date", css_class="col-md-6"),
+                    Div("depreciation_override", css_class="col-md-6"),
+                    css_class="row",
                 ),
             ),
         ]
@@ -469,44 +477,38 @@ class AssetForm(CrispyFormMixin, forms.ModelForm):
         if self.custom_field_keys:
             cf_divs = []
             for i in range(0, len(self.custom_field_keys), 2):
-                chunk = self.custom_field_keys[i:i+2]
-                row_cols = [Div(key, css_class='col-md-6') for key in chunk]
-                cf_divs.append(Div(*row_cols, css_class='row'))
-            layout_elements.append(
-                Fieldset(
-                    _('Custom Specifications'),
-                    *cf_divs,
-                    css_class='mb-4 border p-3 rounded'
-                )
-            )
+                chunk = self.custom_field_keys[i : i + 2]
+                row_cols = [Div(key, css_class="col-md-6") for key in chunk]
+                cf_divs.append(Div(*row_cols, css_class="row"))
+            layout_elements.append(Fieldset(_("Custom Specifications"), *cf_divs, css_class="mb-4 border p-3 rounded"))
 
         layout_elements.append(
             Fieldset(
-                _('Optional: Warranty'),
-                HTML('<p class="text-muted small">' + str(_('Fill in to create a warranty for this asset; leave blank to skip.')) + '</p>'),
-                Div(
-                    Div('warranty_provider', css_class='col-md-6'),
-                    Div('warranty_type', css_class='col-md-6'),
-                    css_class='row'
+                _("Optional: Warranty"),
+                HTML(
+                    '<p class="text-muted small">'
+                    + str(_("Fill in to create a warranty for this asset; leave blank to skip."))
+                    + "</p>"
                 ),
                 Div(
-                    Div('warranty_start_date', css_class='col-md-4'),
-                    Div('warranty_end_date', css_class='col-md-4'),
-                    Div('warranty_cost', css_class='col-md-4'),
-                    css_class='row'
+                    Div("warranty_provider", css_class="col-md-6"),
+                    Div("warranty_type", css_class="col-md-6"),
+                    css_class="row",
+                ),
+                Div(
+                    Div("warranty_start_date", css_class="col-md-4"),
+                    Div("warranty_end_date", css_class="col-md-4"),
+                    Div("warranty_cost", css_class="col-md-4"),
+                    css_class="row",
                 ),
             )
         )
 
         layout_elements.append(
             Fieldset(
-                _('Notes & Tags'),
-                Div(
-                    Div('tags', css_class='col-md-6'),
-                    Div('requestable', css_class='col-md-6'),
-                    css_class='row'
-                ),
-                'notes',
+                _("Notes & Tags"),
+                Div(Div("tags", css_class="col-md-6"), Div("requestable", css_class="col-md-6"), css_class="row"),
+                "notes",
             )
         )
 
@@ -519,12 +521,12 @@ class AssetForm(CrispyFormMixin, forms.ModelForm):
 
         custom_field_data = {}
         for key, value in self.cleaned_data.items():
-            if key.startswith('cf_'):
+            if key.startswith("cf_"):
                 field_name = key[3:]
                 if value is not None:
                     if isinstance(value, (int, float, bool)):
                         custom_field_data[field_name] = value
-                    elif hasattr(value, 'isoformat'):
+                    elif hasattr(value, "isoformat"):
                         custom_field_data[field_name] = value.isoformat()
                     else:
                         custom_field_data[field_name] = str(value)

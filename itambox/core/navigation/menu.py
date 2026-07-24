@@ -9,15 +9,17 @@ def _msp_layer_active(user):
     """Whether any managing (``is_provider``) tenant exists (cached per-request on the
     user object). ``_base_manager``: this is cross-tenant machinery — the tenant-scoped
     default manager would silently return nothing outside a matching tenant context."""
-    cached = getattr(user, '_msp_layer_active_cache', None)
+    cached = getattr(user, "_msp_layer_active_cache", None)
     if cached is None:
         # inline import: organization models are not loadable at navigation module import
         # time (AppRegistryNotReady).
         from organization.models import Tenant
+
         cached = Tenant._base_manager.filter(
-            is_provider=True, deleted_at__isnull=True,
+            is_provider=True,
+            deleted_at__isnull=True,
         ).exists()
-        setattr(user, '_msp_layer_active_cache', cached)
+        setattr(user, "_msp_layer_active_cache", cached)
     return cached
 
 
@@ -31,24 +33,28 @@ def _user_provider_tenants(user):
     ids = accessible_tenant_ids(user)
     if not ids:
         return []
-    return list(Tenant._base_manager.filter(
-        pk__in=ids, is_provider=True, deleted_at__isnull=True,
-    ))
+    return list(
+        Tenant._base_manager.filter(
+            pk__in=ids,
+            is_provider=True,
+            deleted_at__isnull=True,
+        )
+    )
 
 
 def _can_admin_provider(user):
     """Show MSP-admin nav only when a managing tenant exists AND the user can administer
     one: superuser, or holds ``organization.add_membership`` / ``organization.change_tenant``
     on one of their ``is_provider`` tenants."""
-    if not getattr(user, 'is_authenticated', False):
+    if not getattr(user, "is_authenticated", False):
         return False
     if not _msp_layer_active(user):
         return False
     if user.is_superuser:
         return True
     return any(
-        user.has_perm('organization.add_membership', obj=tenant)
-        or user.has_perm('organization.change_tenant', obj=tenant)
+        user.has_perm("organization.add_membership", obj=tenant)
+        or user.has_perm("organization.change_tenant", obj=tenant)
         for tenant in _user_provider_tenants(user)
     )
 
@@ -61,7 +67,7 @@ def can_manage_user_groups(user):
     (``users/views.py`` ``GlobalGroupAdminMixin`` / ``can_manage_user_groups``) —
     same logic, so the nav never shows an entry the view would reject (or hides
     one it would allow)."""
-    if not getattr(user, 'is_authenticated', False):
+    if not getattr(user, "is_authenticated", False):
         return False
     if user.is_superuser:
         return True
@@ -75,38 +81,38 @@ def can_manage_user_groups(user):
         return False
     # _base_manager: cross-tenant machinery must not ride the tenant-scoped manager.
     return any(
-        user.has_perm('users.add_usergroup', obj=tenant)
-        or user.has_perm('users.change_usergroup', obj=tenant)
+        user.has_perm("users.add_usergroup", obj=tenant) or user.has_perm("users.change_usergroup", obj=tenant)
         for tenant in Tenant._base_manager.filter(pk__in=ids, deleted_at__isnull=True)
     )
 
+
 ORG_MENU = Menu(
-    label=_('Organization'),
-    icon_class='mdi mdi-domain',
+    label=_("Organization"),
+    icon_class="mdi mdi-domain",
     groups=(
         MenuGroup(
-            label=_('Sites & Locations'),
+            label=_("Sites & Locations"),
             items=(
-                get_model_item('organization', 'site', _('Sites')),
-                get_model_item('organization', 'region', _('Regions')),
-                get_model_item('organization', 'sitegroup', _('Site Groups')),
-                get_model_item('organization', 'location', _('Locations')),
+                get_model_item("organization", "site", _("Sites")),
+                get_model_item("organization", "region", _("Regions")),
+                get_model_item("organization", "sitegroup", _("Site Groups")),
+                get_model_item("organization", "location", _("Locations")),
             ),
         ),
         MenuGroup(
-            label=_('Tenancy'),
+            label=_("Tenancy"),
             items=(
-                get_model_item('organization', 'tenant', _('Tenants')),
-                get_model_item('organization', 'tenantgroup', _('Tenant Groups')),
-                get_model_item('organization', 'assetholder', _('Asset Holders')),
-                get_model_item('organization', 'tenantresourcegrant', _('Resource Grants'), actions=()),
+                get_model_item("organization", "tenant", _("Tenants")),
+                get_model_item("organization", "tenantgroup", _("Tenant Groups")),
+                get_model_item("organization", "assetholder", _("Asset Holders")),
+                get_model_item("organization", "tenantresourcegrant", _("Resource Grants"), actions=()),
             ),
         ),
         MenuGroup(
-            label=_('Contacts'),
+            label=_("Contacts"),
             items=(
-                get_model_item('organization', 'contact', _('Contacts')),
-                get_model_item('organization', 'contactrole', _('Contact Roles')),
+                get_model_item("organization", "contact", _("Contacts")),
+                get_model_item("organization", "contactrole", _("Contact Roles")),
             ),
         ),
     ),
@@ -114,344 +120,340 @@ ORG_MENU = Menu(
 
 
 ASSETS_MENU = Menu(
-    label=_('Assets'),
-    icon_class='mdi mdi-server',
+    label=_("Assets"),
+    icon_class="mdi mdi-server",
     groups=(
         MenuGroup(
-            label=_('Hardware'),
-            items=(
-                get_model_item('assets', 'asset', _('Assets')),
-            ),
+            label=_("Hardware"),
+            items=(get_model_item("assets", "asset", _("Assets")),),
         ),
         MenuGroup(
-            label=_('Bulk Actions'),
+            label=_("Bulk Actions"),
             items=(
                 MenuItem(
-                    link='assets:asset_bulk_checkout_scan',
-                    link_text=_('Bulk Check-out'),
-                    permissions=['assets.change_asset'],
+                    link="assets:asset_bulk_checkout_scan",
+                    link_text=_("Bulk Check-out"),
+                    permissions=["assets.change_asset"],
                     buttons=(),
                 ),
                 MenuItem(
-                    link='assets:asset_bulk_checkin_scan',
-                    link_text=_('Bulk Check-in'),
-                    permissions=['assets.change_asset'],
+                    link="assets:asset_bulk_checkin_scan",
+                    link_text=_("Bulk Check-in"),
+                    permissions=["assets.change_asset"],
                     buttons=(),
                 ),
                 MenuItem(
-                    link='assets:asset_bulk_dispose_scan',
-                    link_text=_('Bulk Disposal'),
-                    permissions=['assets.add_assetdisposal'],
+                    link="assets:asset_bulk_dispose_scan",
+                    link_text=_("Bulk Disposal"),
+                    permissions=["assets.add_assetdisposal"],
                     buttons=(),
                 ),
             ),
         ),
         MenuGroup(
-            label=_('Catalog'),
+            label=_("Catalog"),
             items=(
-                get_model_item('assets', 'assettype', _('Asset Types')),
-                get_model_item('assets', 'manufacturer', _('Manufacturers')),
-                get_model_item('assets', 'category', _('Categories')),
+                get_model_item("assets", "assettype", _("Asset Types")),
+                get_model_item("assets", "manufacturer", _("Manufacturers")),
+                get_model_item("assets", "category", _("Categories")),
             ),
         ),
         MenuGroup(
-            label=_('Classification'),
+            label=_("Classification"),
             items=(
-                get_model_item('assets', 'assetrole', _('Asset Roles')),
-                get_model_item('assets', 'statuslabel', _('Status Labels')),
+                get_model_item("assets", "assetrole", _("Asset Roles")),
+                get_model_item("assets", "statuslabel", _("Status Labels")),
             ),
         ),
         MenuGroup(
-            label=_('Lifecycle'),
+            label=_("Lifecycle"),
             items=(
-                get_model_item('assets', 'warranty', _('Warranties')),
-                get_model_item('assets', 'assetmaintenance', _('Maintenances')),
-                get_model_item('assets', 'assetreservation', _('Reservations')),
-                get_model_item('assets', 'assetdisposal', _('Disposals')),
+                get_model_item("assets", "warranty", _("Warranties")),
+                get_model_item("assets", "assetmaintenance", _("Maintenances")),
+                get_model_item("assets", "assetreservation", _("Reservations")),
+                get_model_item("assets", "assetdisposal", _("Disposals")),
             ),
         ),
     ),
 )
 
 INVENTORY_MENU = Menu(
-    label=_('Inventory & Stock'),
-    icon_class='mdi mdi-package-variant-closed',
+    label=_("Inventory & Stock"),
+    icon_class="mdi mdi-package-variant-closed",
     groups=(
         MenuGroup(
-            label=_('Stock'),
+            label=_("Stock"),
             items=(
                 MenuItem(
-                    link='inventory:component_list',
-                    link_text=_('Components'),
-                    permissions=['inventory.view_component'],
+                    link="inventory:component_list",
+                    link_text=_("Components"),
+                    permissions=["inventory.view_component"],
                     buttons=(
                         MenuItemButton(
-                            link='inventory:component_create',
-                            title=_('Add Component'),
-                            icon_class='mdi mdi-plus-thick',
-                            permissions=['inventory.add_component'],
+                            link="inventory:component_create",
+                            title=_("Add Component"),
+                            icon_class="mdi mdi-plus-thick",
+                            permissions=["inventory.add_component"],
                         ),
                         MenuItemButton(
-                            link='/import/inventory/component/',
-                            title=_('Import Components'),
-                            icon_class='mdi mdi-upload',
-                            permissions=['inventory.add_component'],
-                            color='outline text-success',
+                            link="/import/inventory/component/",
+                            title=_("Import Components"),
+                            icon_class="mdi mdi-upload",
+                            permissions=["inventory.add_component"],
+                            color="outline text-success",
                         ),
                     ),
                 ),
                 MenuItem(
-                    link='inventory:accessory_list',
-                    link_text=_('Accessories'),
-                    permissions=['inventory.view_accessory'],
+                    link="inventory:accessory_list",
+                    link_text=_("Accessories"),
+                    permissions=["inventory.view_accessory"],
                     buttons=(
                         MenuItemButton(
-                            link='inventory:accessory_create',
-                            title=_('Add Accessory'),
-                            icon_class='mdi mdi-plus-thick',
-                            permissions=['inventory.add_accessory'],
+                            link="inventory:accessory_create",
+                            title=_("Add Accessory"),
+                            icon_class="mdi mdi-plus-thick",
+                            permissions=["inventory.add_accessory"],
                         ),
                         MenuItemButton(
-                            link='/import/inventory/accessory/',
-                            title=_('Import Accessories'),
-                            icon_class='mdi mdi-upload',
-                            permissions=['inventory.add_accessory'],
-                            color='outline text-success',
+                            link="/import/inventory/accessory/",
+                            title=_("Import Accessories"),
+                            icon_class="mdi mdi-upload",
+                            permissions=["inventory.add_accessory"],
+                            color="outline text-success",
                         ),
                     ),
                 ),
                 MenuItem(
-                    link='inventory:consumable_list',
-                    link_text=_('Consumables'),
-                    permissions=['inventory.view_consumable'],
+                    link="inventory:consumable_list",
+                    link_text=_("Consumables"),
+                    permissions=["inventory.view_consumable"],
                     buttons=(
                         MenuItemButton(
-                            link='inventory:consumable_create',
-                            title=_('Add Consumable'),
-                            icon_class='mdi mdi-plus-thick',
-                            permissions=['inventory.add_consumable'],
+                            link="inventory:consumable_create",
+                            title=_("Add Consumable"),
+                            icon_class="mdi mdi-plus-thick",
+                            permissions=["inventory.add_consumable"],
                         ),
                         MenuItemButton(
-                            link='/import/inventory/consumable/',
-                            title=_('Import Consumables'),
-                            icon_class='mdi mdi-upload',
-                            permissions=['inventory.add_consumable'],
-                            color='outline text-success',
+                            link="/import/inventory/consumable/",
+                            title=_("Import Consumables"),
+                            icon_class="mdi mdi-upload",
+                            permissions=["inventory.add_consumable"],
+                            color="outline text-success",
                         ),
                     ),
                 ),
             ),
         ),
         MenuGroup(
-            label=_('Bundles'),
-            items=(
-                get_model_item('inventory', 'kit', _('Kits')),
-            ),
+            label=_("Bundles"),
+            items=(get_model_item("inventory", "kit", _("Kits")),),
         ),
     ),
 )
 
 SOFTWARE_MENU = Menu(
-    label=_('Software & Licensing'),
-    icon_class='mdi mdi-file-certificate',
+    label=_("Software & Licensing"),
+    icon_class="mdi mdi-file-certificate",
     groups=(
         MenuGroup(
-            label=_('Licensing'),
+            label=_("Licensing"),
             items=(
-                get_model_item('software', 'software', _('Software')),
-                get_model_item('licenses', 'license', _('Licenses')),
+                get_model_item("software", "software", _("Software")),
+                get_model_item("licenses", "license", _("Licenses")),
             ),
         ),
         MenuGroup(
-            label=_('SaaS'),
+            label=_("SaaS"),
             items=(
-                get_model_item('subscriptions', 'subscription', _('Subscriptions')),
-                get_model_item('subscriptions', 'provider', _('Providers')),
+                get_model_item("subscriptions", "subscription", _("Subscriptions")),
+                get_model_item("subscriptions", "provider", _("Providers")),
             ),
         ),
     ),
 )
 
 OPERATIONS_MENU = Menu(
-    label=_('Operations'),
-    icon_class='mdi mdi-clipboard-text-clock',
+    label=_("Operations"),
+    icon_class="mdi mdi-clipboard-text-clock",
     groups=(
         MenuGroup(
-            label=_('Procurement'),
+            label=_("Procurement"),
             beta=True,
             items=(
                 MenuItem(
-                    link='procurement:purchaseorder_list',
-                    link_text=_('Purchase Orders'),
-                    permissions=['procurement.view_purchaseorder'],
+                    link="procurement:purchaseorder_list",
+                    link_text=_("Purchase Orders"),
+                    permissions=["procurement.view_purchaseorder"],
                     buttons=(
                         MenuItemButton(
-                            link='procurement:purchaseorder_create',
-                            title=_('Add'),
-                            icon_class='mdi mdi-plus-thick',
-                            permissions=['procurement.add_purchaseorder'],
+                            link="procurement:purchaseorder_create",
+                            title=_("Add"),
+                            icon_class="mdi mdi-plus-thick",
+                            permissions=["procurement.add_purchaseorder"],
                         ),
                         MenuItemButton(
-                            link='/import/procurement/purchaseorder/',
-                            title=_('Import'),
-                            icon_class='mdi mdi-upload',
-                            permissions=['procurement.add_purchaseorder'],
-                            color='outline text-success',
+                            link="/import/procurement/purchaseorder/",
+                            title=_("Import"),
+                            icon_class="mdi mdi-upload",
+                            permissions=["procurement.add_purchaseorder"],
+                            color="outline text-success",
                         ),
                     ),
                 ),
                 MenuItem(
-                    link='assets:request_list',
-                    link_text=_('Requests'),
-                    permissions=['assets.view_assetrequest'],
+                    link="assets:request_list",
+                    link_text=_("Requests"),
+                    permissions=["assets.view_assetrequest"],
                     buttons=(
                         MenuItemButton(
-                            link='assets:request_create',
-                            title=_('Add'),
-                            icon_class='mdi mdi-plus-thick',
-                            permissions=['assets.add_assetrequest'],
+                            link="assets:request_create",
+                            title=_("Add"),
+                            icon_class="mdi mdi-plus-thick",
+                            permissions=["assets.add_assetrequest"],
                         ),
                         MenuItemButton(
-                            link='/import/assets/assetrequest/',
-                            title=_('Import'),
-                            icon_class='mdi mdi-upload',
-                            permissions=['assets.add_assetrequest'],
-                            color='outline text-success',
+                            link="/import/assets/assetrequest/",
+                            title=_("Import"),
+                            icon_class="mdi mdi-upload",
+                            permissions=["assets.add_assetrequest"],
+                            color="outline text-success",
                         ),
                     ),
                 ),
-                get_model_item('assets', 'supplier', _('Suppliers')),
-                get_model_item('procurement', 'contract', _('Contracts')),
+                get_model_item("assets", "supplier", _("Suppliers")),
+                get_model_item("procurement", "contract", _("Contracts")),
             ),
         ),
         MenuGroup(
-            label=_('Finance'),
+            label=_("Finance"),
             items=(
-                get_model_item('assets', 'depreciation', _('Depreciation')),
-                get_model_item('organization', 'costcenter', _('Cost Centers')),
+                get_model_item("assets", "depreciation", _("Depreciation")),
+                get_model_item("organization", "costcenter", _("Cost Centers")),
             ),
         ),
         MenuGroup(
-            label=_('Compliance'),
+            label=_("Compliance"),
             items=(
                 MenuItem(
-                    link='compliance:auditsession_list',
-                    link_text=_('Audit Sessions'),
-                    permissions=['compliance.view_auditsession'],
+                    link="compliance:auditsession_list",
+                    link_text=_("Audit Sessions"),
+                    permissions=["compliance.view_auditsession"],
                     buttons=(
                         MenuItemButton(
-                            link='compliance:auditsession_create',
-                            title=_('Add'),
-                            icon_class='mdi mdi-plus-thick',
-                            permissions=['compliance.add_auditsession'],
+                            link="compliance:auditsession_create",
+                            title=_("Add"),
+                            icon_class="mdi mdi-plus-thick",
+                            permissions=["compliance.add_auditsession"],
                         ),
                         MenuItemButton(
-                            link='/import/compliance/auditsession/',
-                            title=_('Import'),
-                            icon_class='mdi mdi-upload',
-                            permissions=['compliance.add_auditsession'],
-                            color='outline text-success',
+                            link="/import/compliance/auditsession/",
+                            title=_("Import"),
+                            icon_class="mdi mdi-upload",
+                            permissions=["compliance.add_auditsession"],
+                            color="outline text-success",
                         ),
                     ),
                 ),
-                get_model_item('compliance', 'custodytemplate', _('Custody Templates')),
+                get_model_item("compliance", "custodytemplate", _("Custody Templates")),
             ),
         ),
     ),
 )
 
 MONITORING_MENU = Menu(
-    label=_('Monitoring & Reporting'),
-    icon_class='mdi mdi-bell-alert-outline',
+    label=_("Monitoring & Reporting"),
+    icon_class="mdi mdi-bell-alert-outline",
     groups=(
         MenuGroup(
-            label=_('Alerting'),
+            label=_("Alerting"),
             items=(
                 MenuItem(
-                    link='extras:alertlog_list',
-                    link_text=_('Alerts Center'),
-                    permissions=['extras.view_alertlog'],
+                    link="extras:alertlog_list",
+                    link_text=_("Alerts Center"),
+                    permissions=["extras.view_alertlog"],
                     buttons=(),
                 ),
                 MenuItem(
-                    link='extras:alertrule_list',
-                    link_text=_('Alert Rules'),
-                    permissions=['extras.view_alertrule'],
+                    link="extras:alertrule_list",
+                    link_text=_("Alert Rules"),
+                    permissions=["extras.view_alertrule"],
                     buttons=(
                         MenuItemButton(
-                            link='extras:alertrule_create',
-                            title=_('Add'),
-                            icon_class='mdi mdi-plus-thick',
-                            permissions=['extras.add_alertrule'],
+                            link="extras:alertrule_create",
+                            title=_("Add"),
+                            icon_class="mdi mdi-plus-thick",
+                            permissions=["extras.add_alertrule"],
                         ),
                     ),
                 ),
                 MenuItem(
-                    link='extras:notificationchannel_list',
-                    link_text=_('Notification Channels'),
-                    permissions=['extras.view_notificationchannel'],
+                    link="extras:notificationchannel_list",
+                    link_text=_("Notification Channels"),
+                    permissions=["extras.view_notificationchannel"],
                     buttons=(
                         MenuItemButton(
-                            link='extras:notificationchannel_create',
-                            title=_('Add'),
-                            icon_class='mdi mdi-plus-thick',
-                            permissions=['extras.add_notificationchannel'],
+                            link="extras:notificationchannel_create",
+                            title=_("Add"),
+                            icon_class="mdi mdi-plus-thick",
+                            permissions=["extras.add_notificationchannel"],
                         ),
                     ),
                 ),
             ),
         ),
         MenuGroup(
-            label=_('Reporting'),
+            label=_("Reporting"),
             beta=True,
             items=(
                 MenuItem(
-                    link='extras:scheduledreport_list',
-                    link_text=_('Scheduled Reports'),
-                    permissions=['extras.view_scheduledreport'],
+                    link="extras:scheduledreport_list",
+                    link_text=_("Scheduled Reports"),
+                    permissions=["extras.view_scheduledreport"],
                     buttons=(
                         MenuItemButton(
-                            link='extras:scheduledreport_create',
-                            title=_('Add'),
-                            icon_class='mdi mdi-plus-thick',
-                            permissions=['extras.add_scheduledreport'],
+                            link="extras:scheduledreport_create",
+                            title=_("Add"),
+                            icon_class="mdi mdi-plus-thick",
+                            permissions=["extras.add_scheduledreport"],
                         ),
                     ),
                 ),
                 MenuItem(
-                    link='extras:reporttemplate_list',
-                    link_text=_('Report Templates'),
-                    permissions=['extras.view_reporttemplate'],
+                    link="extras:reporttemplate_list",
+                    link_text=_("Report Templates"),
+                    permissions=["extras.view_reporttemplate"],
                     buttons=(
                         MenuItemButton(
-                            link='extras:reporttemplate_create',
-                            title=_('Add'),
-                            icon_class='mdi mdi-plus-thick',
-                            permissions=['extras.add_reporttemplate'],
+                            link="extras:reporttemplate_create",
+                            title=_("Add"),
+                            icon_class="mdi mdi-plus-thick",
+                            permissions=["extras.add_reporttemplate"],
                         ),
                     ),
                 ),
             ),
         ),
         MenuGroup(
-            label=_('Activity'),
+            label=_("Activity"),
             items=(
                 MenuItem(
-                    link='objectchange_list',
-                    link_text=_('Changelog'),
-                    permissions=['core.view_objectchange'],
+                    link="objectchange_list",
+                    link_text=_("Changelog"),
+                    permissions=["core.view_objectchange"],
                     buttons=(),
                 ),
                 MenuItem(
-                    link='journalentry_list',
-                    link_text=_('Journal Entries'),
-                    permissions=['extras.view_journalentry'],
+                    link="journalentry_list",
+                    link_text=_("Journal Entries"),
+                    permissions=["extras.view_journalentry"],
                     buttons=(),
                 ),
                 MenuItem(
-                    link='job_list',
-                    link_text=_('Background Jobs'),
-                    permissions=['core.view_job'],
+                    link="job_list",
+                    link_text=_("Background Jobs"),
+                    permissions=["core.view_job"],
                     buttons=(),
                 ),
             ),
@@ -460,101 +462,101 @@ MONITORING_MENU = Menu(
 )
 
 EXTRAS_MENU = Menu(
-    label=_('Customization'),
-    icon_class='mdi mdi-tune',
+    label=_("Customization"),
+    icon_class="mdi mdi-tune",
     groups=(
         MenuGroup(
-            label=_('Data Model'),
+            label=_("Data Model"),
             items=(
-                get_model_item('extras', 'customfield', _('Custom Fields')),
-                get_model_item('extras', 'customfieldset', _('Custom Fieldsets')),
-                get_model_item('extras', 'savedfilter', _('Saved Filters')),
+                get_model_item("extras", "customfield", _("Custom Fields")),
+                get_model_item("extras", "customfieldset", _("Custom Fieldsets")),
+                get_model_item("extras", "savedfilter", _("Saved Filters")),
             ),
         ),
         MenuGroup(
-            label=_('Tagging'),
+            label=_("Tagging"),
             items=(
-                get_model_item('extras', 'tag', _('Tags')),
+                get_model_item("extras", "tag", _("Tags")),
                 MenuItem(
-                    link='assets:assettagsequence_list',
-                    link_text=_('Asset Tag Sequences'),
-                    permissions=['assets.view_assettagsequence'],
+                    link="assets:assettagsequence_list",
+                    link_text=_("Asset Tag Sequences"),
+                    permissions=["assets.view_assettagsequence"],
                     buttons=(
                         MenuItemButton(
-                            link='assets:assettagsequence_create',
-                            title=_('Add'),
-                            icon_class='mdi mdi-plus-thick',
-                            permissions=['assets.add_assettagsequence'],
+                            link="assets:assettagsequence_create",
+                            title=_("Add"),
+                            icon_class="mdi mdi-plus-thick",
+                            permissions=["assets.add_assettagsequence"],
                         ),
                         MenuItemButton(
-                            link='/import/assets/assettagsequence/',
-                            title=_('Import'),
-                            icon_class='mdi mdi-upload',
-                            permissions=['assets.add_assettagsequence'],
-                            color='outline text-success',
+                            link="/import/assets/assettagsequence/",
+                            title=_("Import"),
+                            icon_class="mdi mdi-upload",
+                            permissions=["assets.add_assettagsequence"],
+                            color="outline text-success",
                         ),
                     ),
                 ),
             ),
         ),
         MenuGroup(
-            label=_('Templates'),
+            label=_("Templates"),
             items=(
                 MenuItem(
-                    link='extras:exporttemplate_list',
-                    link_text=_('Export Templates'),
-                    permissions=['extras.view_exporttemplate'],
+                    link="extras:exporttemplate_list",
+                    link_text=_("Export Templates"),
+                    permissions=["extras.view_exporttemplate"],
                     buttons=(
                         MenuItemButton(
-                            link='extras:exporttemplate_create',
-                            title=_('Add'),
-                            icon_class='mdi mdi-plus-thick',
-                            permissions=['extras.add_exporttemplate'],
+                            link="extras:exporttemplate_create",
+                            title=_("Add"),
+                            icon_class="mdi mdi-plus-thick",
+                            permissions=["extras.add_exporttemplate"],
                         ),
                     ),
                 ),
                 MenuItem(
-                    link='extras:labeltemplate_list',
-                    link_text=_('Label Templates'),
-                    permissions=['extras.view_labeltemplate'],
+                    link="extras:labeltemplate_list",
+                    link_text=_("Label Templates"),
+                    permissions=["extras.view_labeltemplate"],
                     buttons=(
                         MenuItemButton(
-                            link='extras:labeltemplate_create',
-                            title=_('Add'),
-                            icon_class='mdi mdi-plus-thick',
-                            permissions=['extras.add_labeltemplate'],
+                            link="extras:labeltemplate_create",
+                            title=_("Add"),
+                            icon_class="mdi mdi-plus-thick",
+                            permissions=["extras.add_labeltemplate"],
                         ),
                     ),
                 ),
             ),
         ),
         MenuGroup(
-            label=_('Automation'),
+            label=_("Automation"),
             beta=True,
             items=(
                 MenuItem(
-                    link='extras:webhookendpoint_list',
-                    link_text=_('Webhook Endpoints'),
-                    permissions=['extras.view_webhookendpoint'],
+                    link="extras:webhookendpoint_list",
+                    link_text=_("Webhook Endpoints"),
+                    permissions=["extras.view_webhookendpoint"],
                     buttons=(
                         MenuItemButton(
-                            link='extras:webhookendpoint_create',
-                            title=_('Add'),
-                            icon_class='mdi mdi-plus-thick',
-                            permissions=['extras.add_webhookendpoint'],
+                            link="extras:webhookendpoint_create",
+                            title=_("Add"),
+                            icon_class="mdi mdi-plus-thick",
+                            permissions=["extras.add_webhookendpoint"],
                         ),
                     ),
                 ),
                 MenuItem(
-                    link='extras:eventrule_list',
-                    link_text=_('Event Rules'),
-                    permissions=['extras.view_eventrule'],
+                    link="extras:eventrule_list",
+                    link_text=_("Event Rules"),
+                    permissions=["extras.view_eventrule"],
                     buttons=(
                         MenuItemButton(
-                            link='extras:eventrule_create',
-                            title=_('Add'),
-                            icon_class='mdi mdi-plus-thick',
-                            permissions=['extras.add_eventrule'],
+                            link="extras:eventrule_create",
+                            title=_("Add"),
+                            icon_class="mdi mdi-plus-thick",
+                            permissions=["extras.add_eventrule"],
                         ),
                     ),
                 ),
@@ -564,61 +566,61 @@ EXTRAS_MENU = Menu(
 )
 
 ADMIN_MENU = Menu(
-    label=_('Admin'),
-    icon_class='mdi mdi-shield-account',
+    label=_("Admin"),
+    icon_class="mdi mdi-shield-account",
     groups=(
         MenuGroup(
-            label=_('Access Control'),
+            label=_("Access Control"),
             items=(
                 MenuItem(
-                    link='users:user_list',
-                    link_text=_('Users'),
-                    permissions=['users.view_user'],
+                    link="users:user_list",
+                    link_text=_("Users"),
+                    permissions=["users.view_user"],
                     buttons=(
                         MenuItemButton(
-                            link='users:user_create',
-                            title=_('Add'),
-                            icon_class='mdi mdi-plus-thick',
-                            permissions=['users.add_user'],
+                            link="users:user_create",
+                            title=_("Add"),
+                            icon_class="mdi mdi-plus-thick",
+                            permissions=["users.add_user"],
                         ),
                     ),
                 ),
                 MenuItem(
-                    link='organization:role_list',
-                    link_text=_('Roles'),
-                    permissions=['organization.view_role'],
+                    link="organization:role_list",
+                    link_text=_("Roles"),
+                    permissions=["organization.view_role"],
                     buttons=(
                         MenuItemButton(
-                            link='organization:role_create',
-                            title=_('Add'),
-                            icon_class='mdi mdi-plus-thick',
-                            permissions=['organization.add_role'],
+                            link="organization:role_create",
+                            title=_("Add"),
+                            icon_class="mdi mdi-plus-thick",
+                            permissions=["organization.add_role"],
                         ),
                     ),
                 ),
                 MenuItem(
-                    link='organization:membership_list',
-                    link_text=_('Memberships'),
-                    permissions=['organization.view_membership'],
+                    link="organization:membership_list",
+                    link_text=_("Memberships"),
+                    permissions=["organization.view_membership"],
                     buttons=(
                         MenuItemButton(
-                            link='organization:membership_create',
-                            title=_('Add'),
-                            icon_class='mdi mdi-plus-thick',
-                            permissions=['organization.add_membership'],
+                            link="organization:membership_create",
+                            title=_("Add"),
+                            icon_class="mdi mdi-plus-thick",
+                            permissions=["organization.add_membership"],
                         ),
                     ),
                 ),
                 MenuItem(
-                    link='users:usergroup_list',
-                    link_text=_('User Groups'),
+                    link="users:usergroup_list",
+                    link_text=_("User Groups"),
                     permissions=(),
                     condition=can_manage_user_groups,
                     buttons=(
                         MenuItemButton(
-                            link='users:usergroup_create',
-                            title=_('Add'),
-                            icon_class='mdi mdi-plus-thick',
+                            link="users:usergroup_create",
+                            title=_("Add"),
+                            icon_class="mdi mdi-plus-thick",
                             permissions=(),
                         ),
                     ),
@@ -626,11 +628,11 @@ ADMIN_MENU = Menu(
             ),
         ),
         MenuGroup(
-            label=_('Provider (MSP)'),
+            label=_("Provider (MSP)"),
             items=(
                 MenuItem(
-                    link='organization:technician_quick_add',
-                    link_text=_('Add Technician'),
+                    link="organization:technician_quick_add",
+                    link_text=_("Add Technician"),
                     permissions=(),
                     condition=_can_admin_provider,
                     buttons=(),
@@ -638,11 +640,11 @@ ADMIN_MENU = Menu(
             ),
         ),
         MenuGroup(
-            label=_('System'),
+            label=_("System"),
             items=(
                 MenuItem(
-                    link='admin:index',
-                    link_text=_('Admin Panel'),
+                    link="admin:index",
+                    link_text=_("Admin Panel"),
                     permissions=(),
                     staff_only=True,
                     buttons=(),
@@ -656,6 +658,7 @@ ADMIN_MENU = Menu(
 @cache
 def get_menus():
     from itambox.registry import registry
+
     from . import Menu, MenuGroup, MenuItem, MenuItemButton
 
     menus = [
@@ -677,46 +680,49 @@ def get_menus():
             menu_instance = menu_cls
 
         groups = []
-        for group in getattr(menu_instance, 'groups', []):
+        for group in getattr(menu_instance, "groups", []):
             items = []
-            for item in getattr(group, 'items', []):
+            for item in getattr(group, "items", []):
                 if isinstance(item, type):
                     item_inst = item()
                 else:
                     item_inst = item
 
                 buttons = []
-                for btn in getattr(item_inst, 'buttons', []):
+                for btn in getattr(item_inst, "buttons", []):
                     if isinstance(btn, type):
                         btn_inst = btn()
                     else:
                         btn_inst = btn
-                    buttons.append(MenuItemButton(
-                        link=getattr(btn_inst, 'link', None),
-                        title=getattr(btn_inst, 'title', None),
-                        icon_class=getattr(btn_inst, 'icon_class', None),
-                        permissions=getattr(btn_inst, 'permissions', ()),
-                        color=getattr(btn_inst, 'color', None),
-                    ))
+                    buttons.append(
+                        MenuItemButton(
+                            link=getattr(btn_inst, "link", None),
+                            title=getattr(btn_inst, "title", None),
+                            icon_class=getattr(btn_inst, "icon_class", None),
+                            permissions=getattr(btn_inst, "permissions", ()),
+                            color=getattr(btn_inst, "color", None),
+                        )
+                    )
 
-                items.append(MenuItem(
-                    link=getattr(item_inst, 'link', None),
-                    link_text=getattr(item_inst, 'link_text', None),
-                    permissions=getattr(item_inst, 'permissions', ()),
-                    auth_required=getattr(item_inst, 'auth_required', False),
-                    staff_only=getattr(item_inst, 'staff_only', False),
-                    buttons=buttons,
-                ))
-            groups.append(MenuGroup(
-                label=getattr(group, 'label', ''),
-                items=items
-            ))
+                items.append(
+                    MenuItem(
+                        link=getattr(item_inst, "link", None),
+                        link_text=getattr(item_inst, "link_text", None),
+                        permissions=getattr(item_inst, "permissions", ()),
+                        auth_required=getattr(item_inst, "auth_required", False),
+                        staff_only=getattr(item_inst, "staff_only", False),
+                        buttons=buttons,
+                    )
+                )
+            groups.append(MenuGroup(label=getattr(group, "label", ""), items=items))
 
-        menus.append(Menu(
-            label=getattr(menu_instance, 'label', ''),
-            icon_class=getattr(menu_instance, 'icon_class', 'mdi mdi-puzzle'),
-            groups=groups
-        ))
+        menus.append(
+            Menu(
+                label=getattr(menu_instance, "label", ""),
+                icon_class=getattr(menu_instance, "icon_class", "mdi mdi-puzzle"),
+                groups=groups,
+            )
+        )
 
     # Dynamically append registered PluginNavigationItem classes
     standalone_items = []
@@ -727,39 +733,41 @@ def get_menus():
             item_inst = item_cls
 
         buttons = []
-        for btn in getattr(item_inst, 'buttons', []):
+        for btn in getattr(item_inst, "buttons", []):
             if isinstance(btn, type):
                 btn_inst = btn()
             else:
                 btn_inst = btn
-            buttons.append(MenuItemButton(
-                link=getattr(btn_inst, 'link', None),
-                title=getattr(btn_inst, 'title', None),
-                icon_class=getattr(btn_inst, 'icon_class', None),
-                permissions=getattr(btn_inst, 'permissions', ()),
-                color=getattr(btn_inst, 'color', None),
-            ))
+            buttons.append(
+                MenuItemButton(
+                    link=getattr(btn_inst, "link", None),
+                    title=getattr(btn_inst, "title", None),
+                    icon_class=getattr(btn_inst, "icon_class", None),
+                    permissions=getattr(btn_inst, "permissions", ()),
+                    color=getattr(btn_inst, "color", None),
+                )
+            )
 
-        standalone_items.append(MenuItem(
-            link=getattr(item_inst, 'link', None),
-            link_text=getattr(item_inst, 'link_text', None),
-            permissions=getattr(item_inst, 'permissions', ()),
-            auth_required=getattr(item_inst, 'auth_required', False),
-            staff_only=getattr(item_inst, 'staff_only', False),
-            buttons=buttons,
-        ))
+        standalone_items.append(
+            MenuItem(
+                link=getattr(item_inst, "link", None),
+                link_text=getattr(item_inst, "link_text", None),
+                permissions=getattr(item_inst, "permissions", ()),
+                auth_required=getattr(item_inst, "auth_required", False),
+                staff_only=getattr(item_inst, "staff_only", False),
+                buttons=buttons,
+            )
+        )
 
     if standalone_items:
         plugins_menu = None
         for m in menus:
-            if m.label == 'Plugins':
+            if m.label == "Plugins":
                 plugins_menu = m
                 break
         if not plugins_menu:
             plugins_menu = Menu(
-                label=_('Plugins'),
-                icon_class='mdi mdi-puzzle',
-                groups=[MenuGroup(label=_('Plugin List'), items=[])]
+                label=_("Plugins"), icon_class="mdi mdi-puzzle", groups=[MenuGroup(label=_("Plugin List"), items=[])]
             )
             menus.append(plugins_menu)
 

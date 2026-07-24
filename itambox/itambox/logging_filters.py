@@ -13,5 +13,5 @@ class RequestIDFilter(logging.Filter):
     """
 
     def filter(self, record):
-        record.request_id = get_current_request_id() or '-'
+        record.request_id = get_current_request_id() or "-"
         return True

@@ -7,6 +7,9 @@
 #
 # Dependency order (no cycles):
 #   utils -> mixins -> {table_config, restore, import_, delete, edit, detail, list_, bulk}
+# Ruff's import sorting would move the features re-export to the top and create
+# a runtime circular import, so preserve this explicitly documented order.
+# isort: off
 
 from itambox.views.htmx import BaseHTMXView  # noqa: F401
 
@@ -56,40 +59,41 @@ from itambox.views.generic.bulk import (  # noqa: F401
 # ObjectExportView lives in itambox.views.features; import it last to avoid the
 # circular-import that arises when features.py imports back into generic.
 from itambox.views.features import ObjectExportView  # noqa: F401, E402
+# isort: on
 
 __all__ = [
     # htmx base
-    'BaseHTMXView',
+    "BaseHTMXView",
     # utils
-    'safe_return_url',
+    "safe_return_url",
     # mixins
-    'CachedObjectMixin',
-    'ObjectPermissionRequiredMixin',
-    'GetReturnURLMixin',
-    'ActionsMixin',
-    'TableMixin',
-    'TenantScopingViewMixin',
-    'BulkViewMixin',
-    'HtmxActionMixin',
+    "CachedObjectMixin",
+    "ObjectPermissionRequiredMixin",
+    "GetReturnURLMixin",
+    "ActionsMixin",
+    "TableMixin",
+    "TenantScopingViewMixin",
+    "BulkViewMixin",
+    "HtmxActionMixin",
     # table config
-    'table_config',
+    "table_config",
     # restore / purge
-    'ObjectRestoreView',
-    'ObjectPurgeView',
-    'ObjectBulkRestoreView',
-    'ObjectBulkPurgeView',
+    "ObjectRestoreView",
+    "ObjectPurgeView",
+    "ObjectBulkRestoreView",
+    "ObjectBulkPurgeView",
     # import
-    'ObjectImportView',
-    'GenericObjectImportView',
+    "ObjectImportView",
+    "GenericObjectImportView",
     # CRUD
-    'ObjectDeleteView',
-    'ObjectEditView',
-    'ObjectCloneView',
-    'ObjectDetailView',
-    'ObjectListView',
+    "ObjectDeleteView",
+    "ObjectEditView",
+    "ObjectCloneView",
+    "ObjectDetailView",
+    "ObjectListView",
     # bulk
-    'ObjectBulkEditView',
-    'ObjectBulkDeleteView',
+    "ObjectBulkEditView",
+    "ObjectBulkDeleteView",
     # export (late import to avoid circular)
-    'ObjectExportView',
+    "ObjectExportView",
 ]

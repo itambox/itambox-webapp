@@ -1,39 +1,39 @@
-from django.urls import reverse_lazy
 from django.contrib import messages
 from django.http import HttpResponseRedirect
 from django.shortcuts import get_object_or_404
+from django.urls import reverse_lazy
 from django.utils.translation import gettext_lazy as _
 
+from assets.filters import AssetDisposalFilterSet
+from assets.forms import AssetDisposalFilterForm, AssetDisposalForm
+from assets.models import Asset, AssetDisposal
+from assets.tables import AssetDisposalTable
 from itambox.panels import Panel
 from itambox.quick_add import QuickAddMixin
 from itambox.views.generic import (
-    ObjectListView, ObjectDetailView, ObjectEditView, ObjectDeleteView,
+    ObjectDeleteView,
+    ObjectDetailView,
+    ObjectEditView,
+    ObjectListView,
 )
-
-from assets.models import AssetDisposal, Asset
-from assets.forms import AssetDisposalForm, AssetDisposalFilterForm
-from assets.filters import AssetDisposalFilterSet
-from assets.tables import AssetDisposalTable
 
 
 class AssetDisposalListView(ObjectListView):
-    queryset = AssetDisposal.objects.select_related('asset', 'asset__asset_type__manufacturer')
+    queryset = AssetDisposal.objects.select_related("asset", "asset__asset_type__manufacturer")
     filterset = AssetDisposalFilterSet
     filterset_form = AssetDisposalFilterForm
     table = AssetDisposalTable
-    action_buttons = ('add',)
+    action_buttons = ("add",)
 
 
 class AssetDisposalDetailView(ObjectDetailView):
-    queryset = AssetDisposal.objects.select_related(
-        'asset', 'asset__asset_type__manufacturer', 'asset__tenant'
-    )
-    template_name = 'assets/assetdisposal_detail.html'
+    queryset = AssetDisposal.objects.select_related("asset", "asset__asset_type__manufacturer", "asset__tenant")
+    template_name = "assets/assetdisposal_detail.html"
 
     layout = (
-        ((Panel('overview', _('Disposal Overview')),),),
-        ((Panel('sanitization', _('Data Sanitization')),),),
-        ((Panel('financial', _('Financial / Proceeds')),),),
+        ((Panel("overview", _("Disposal Overview")),),),
+        ((Panel("sanitization", _("Data Sanitization")),),),
+        ((Panel("financial", _("Financial / Proceeds")),),),
     )
 
 
@@ -41,23 +41,23 @@ class AssetDisposalEditView(QuickAddMixin, ObjectEditView):
     queryset = AssetDisposal.objects.all()
     model = AssetDisposal
     model_form = AssetDisposalForm
-    template_name = 'generic/object_edit.html'
-    default_return_url = 'assets:assetdisposal_list'
+    template_name = "generic/object_edit.html"
+    default_return_url = "assets:assetdisposal_list"
     quick_add_reload = True
 
     def get_initial(self):
         initial = super().get_initial()
-        asset_id = self.request.GET.get('asset')
+        asset_id = self.request.GET.get("asset")
         if asset_id:
-            initial['asset'] = asset_id
+            initial["asset"] = asset_id
         return initial
 
 
 class AssetDisposalDeleteView(ObjectDeleteView):
     queryset = AssetDisposal.objects.all()
     model = AssetDisposal
-    template_name = 'generic/object_confirm_delete.html'
-    success_url = reverse_lazy('assets:assetdisposal_list')
+    template_name = "generic/object_confirm_delete.html"
+    success_url = reverse_lazy("assets:assetdisposal_list")
 
 
 class AssetDisposeActionView(ObjectEditView):
@@ -69,15 +69,16 @@ class AssetDisposeActionView(ObjectEditView):
     the asset status / disposed_at fields are updated atomically alongside the
     disposal record.
     """
+
     queryset = AssetDisposal.objects.all()
     model = AssetDisposal
     model_form = AssetDisposalForm
-    template_name = 'assets/assetdispose_action.html'
-    default_return_url = 'assets:asset_list'
+    template_name = "assets/assetdispose_action.html"
+    default_return_url = "assets:asset_list"
 
     def get_object(self, queryset=None):
         # The asset pk comes from the URL; the disposal may or may not exist yet.
-        asset = get_object_or_404(Asset, pk=self.kwargs['pk'])
+        asset = get_object_or_404(Asset, pk=self.kwargs["pk"])
         try:
             return AssetDisposal.all_objects.get(asset=asset)
         except AssetDisposal.DoesNotExist:
@@ -85,12 +86,13 @@ class AssetDisposeActionView(ObjectEditView):
 
     def get_initial(self):
         initial = super().get_initial() or {}
-        initial['asset'] = self.kwargs.get('pk')
+        initial["asset"] = self.kwargs.get("pk")
         return initial
 
     def form_valid(self, form):
-        from assets.services import dispose_asset
         from django.core.exceptions import ValidationError as DjangoValidationError
+
+        from assets.services import dispose_asset
 
         data = form.cleaned_data
         # B1: re-fetch the asset through the tenant-scoped manager before
@@ -98,20 +100,20 @@ class AssetDisposeActionView(ObjectEditView):
         # whose queryset is import-frozen and unscoped, so a crafted POST could
         # otherwise submit (and destructively dispose) another tenant's asset by
         # pk. Asset.objects is tenant-scoped, so a cross-tenant pk 404s here.
-        asset = get_object_or_404(Asset.objects, pk=data['asset'].pk)
+        asset = get_object_or_404(Asset.objects, pk=data["asset"].pk)
         try:
             disposal = dispose_asset(
                 asset=asset,
-                disposal_method=data['disposal_method'],
-                disposal_date=data['disposal_date'],
-                data_sanitization_method=data.get('data_sanitization_method', 'none'),
-                sanitization_certificate=data.get('sanitization_certificate', ''),
-                sanitized_by=data.get('sanitized_by', ''),
-                recipient=data.get('recipient', ''),
-                proceeds=data.get('proceeds'),
-                currency=data.get('currency', ''),
-                weee_compliant=data.get('weee_compliant', False),
-                notes=data.get('notes', ''),
+                disposal_method=data["disposal_method"],
+                disposal_date=data["disposal_date"],
+                data_sanitization_method=data.get("data_sanitization_method", "none"),
+                sanitization_certificate=data.get("sanitization_certificate", ""),
+                sanitized_by=data.get("sanitized_by", ""),
+                recipient=data.get("recipient", ""),
+                proceeds=data.get("proceeds"),
+                currency=data.get("currency", ""),
+                weee_compliant=data.get("weee_compliant", False),
+                notes=data.get("notes", ""),
                 user=self.request.user,
             )
         except DjangoValidationError as exc:
@@ -119,7 +121,6 @@ class AssetDisposeActionView(ObjectEditView):
             return self.form_invalid(form)
 
         messages.success(
-            self.request,
-            _("Asset '%(asset)s' has been marked as disposed and archived.") % {"asset": asset}
+            self.request, _("Asset '%(asset)s' has been marked as disposed and archived.") % {"asset": asset}
         )
         return HttpResponseRedirect(asset.get_absolute_url())

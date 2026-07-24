@@ -1,55 +1,59 @@
+from crispy_forms.helper import FormHelper
+from crispy_forms.layout import HTML, Column, Div, Field, Fieldset, Layout, Row, Submit
 from django import forms
-from django.utils.translation import gettext_lazy as _
 from django.contrib.contenttypes.models import ContentType
 from django.db.models import Q
-from .models import Tag, CustomField, CustomFieldset, SavedFilter
-from crispy_forms.helper import FormHelper
-from crispy_forms.layout import Layout, Submit, HTML, Div, Field, Fieldset, Row, Column
 from django.urls import reverse
-from core.forms import FilterForm, ColorFieldFormMixin
+from django.utils.translation import gettext_lazy as _
+
+from core.forms import ColorFieldFormMixin, FilterForm
 from core.managers import get_current_tenant
+
 from .filters import TagFilter
+from .models import CustomField, CustomFieldset, SavedFilter, Tag
+
 
 class TagForm(ColorFieldFormMixin, forms.ModelForm):
     # color is handled by ColorFieldFormMixin (prepends '#' on init, strips on clean)
     color = forms.CharField(
         max_length=7,
         required=False,
-        widget=forms.TextInput(attrs={'type': 'color', 'class': 'form-control form-control-color'})
+        widget=forms.TextInput(attrs={"type": "color", "class": "form-control form-control-color"}),
     )
 
     class Meta:
         model = Tag
-        fields = ['name', 'slug', 'color', 'description']
+        fields = ["name", "slug", "color", "description"]
         widgets = {
-            'name': forms.TextInput(attrs={'class': 'form-control'}),
-            'slug': forms.TextInput(attrs={'class': 'form-control'}),
-            'description': forms.TextInput(attrs={'class': 'form-control'}),
+            "name": forms.TextInput(attrs={"class": "form-control"}),
+            "slug": forms.TextInput(attrs={"class": "form-control"}),
+            "description": forms.TextInput(attrs={"class": "form-control"}),
         }
         help_texts = {
-            'slug': _('URL-friendly identifier.'),
-            'color': _('Hexadecimal color code (e.g., 00ff00 for green).')
+            "slug": _("URL-friendly identifier."),
+            "color": _("Hexadecimal color code (e.g., 00ff00 for green)."),
         }
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.helper = FormHelper(self)
-        self.helper.form_method = 'post'
+        self.helper.form_method = "post"
         self.helper.form_tag = True
-        button_text = _('Update') if self.instance.pk else _('Create')
-        cancel_url = reverse('extras:tag_list')
+        button_text = _("Update") if self.instance.pk else _("Create")
+        cancel_url = reverse("extras:tag_list")
         self.helper.layout = Layout(
-            'name',
-            'slug',
-            'color',
-            'description',
+            "name",
+            "slug",
+            "color",
+            "description",
             HTML('<div class="mt-3">'),
-            Submit('submit', button_text, css_class='btn btn-primary'),
+            Submit("submit", button_text, css_class="btn btn-primary"),
             HTML(f'<a href="{cancel_url}" class="btn btn-outline-secondary ms-2">{_("Cancel")}</a>'),
-            HTML('</div>')
+            HTML("</div>"),
         )
 
-# --- Tag Filter Form --- 
+
+# --- Tag Filter Form ---
 class TagFilterForm(FilterForm):
     filterset_class = TagFilter
 
@@ -57,90 +61,95 @@ class TagFilterForm(FilterForm):
 class CustomFieldForm(forms.ModelForm):
     class Meta:
         model = CustomField
-        fields = ['name', 'label', 'field_type', 'choices', 'required', 'object_types']
+        fields = ["name", "label", "field_type", "choices", "required", "object_types"]
         widgets = {
-            'name': forms.TextInput(attrs={'class': 'form-control'}),
-            'label': forms.TextInput(attrs={'class': 'form-control'}),
-            'field_type': forms.Select(attrs={'class': 'form-select'}),
-            'choices': forms.Textarea(attrs={'class': 'form-control', 'rows': 3, 'placeholder': 'Value 1\nValue 2'}),
-            'required': forms.CheckboxInput(attrs={'class': 'form-check-input'}),
-            'object_types': forms.SelectMultiple(attrs={'class': 'form-select', 'size': 8}),
+            "name": forms.TextInput(attrs={"class": "form-control"}),
+            "label": forms.TextInput(attrs={"class": "form-control"}),
+            "field_type": forms.Select(attrs={"class": "form-select"}),
+            "choices": forms.Textarea(attrs={"class": "form-control", "rows": 3, "placeholder": "Value 1\nValue 2"}),
+            "required": forms.CheckboxInput(attrs={"class": "form-check-input"}),
+            "object_types": forms.SelectMultiple(attrs={"class": "form-select", "size": 8}),
         }
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.helper = FormHelper(self)
-        self.helper.form_method = 'post'
+        self.helper.form_method = "post"
         self.helper.form_tag = True
-        self.fields['name'].widget.attrs['slugify'] = 'label'
+        self.fields["name"].widget.attrs["slugify"] = "label"
 
         # Only models that actually store custom field data are selectable.
         from django.contrib.contenttypes.models import ContentType
+
         from itambox.registry import registry
+
         supported = [
             ContentType.objects.get_for_model(model).pk
             for model, features in registry.model_features.items()
-            if 'custom_field_data' in features and not model._meta.abstract
+            if "custom_field_data" in features and not model._meta.abstract
         ]
-        self.fields['object_types'].queryset = (
-            ContentType.objects.filter(pk__in=supported).order_by('app_label', 'model')
+        self.fields["object_types"].queryset = ContentType.objects.filter(pk__in=supported).order_by(
+            "app_label", "model"
         )
-        self.fields['object_types'].help_text = _(
+        self.fields["object_types"].help_text = _(
             "Models this field applies to. Fields applying to Asset Type act as "
             "hardware specifications; fields applying to Asset are per-device details."
         )
 
-        button_text = _('Update') if self.instance.pk else _('Create')
-        cancel_url = reverse('extras:customfield_list')
+        button_text = _("Update") if self.instance.pk else _("Create")
+        cancel_url = reverse("extras:customfield_list")
 
         self.helper.layout = Layout(
-            'label',
-            'name',
-            'field_type',
-            'choices',
-            Div('required', css_class='mb-3 form-check'),
-            'object_types',
+            "label",
+            "name",
+            "field_type",
+            "choices",
+            Div("required", css_class="mb-3 form-check"),
+            "object_types",
             HTML('<div class="mt-3">'),
-            Submit('submit', button_text, css_class='btn btn-primary'),
+            Submit("submit", button_text, css_class="btn btn-primary"),
             HTML(f'<a href="{cancel_url}" class="btn btn-outline-secondary ms-2">{_("Cancel")}</a>'),
-            HTML('</div>')
+            HTML("</div>"),
         )
+
 
 class CustomFieldsetForm(forms.ModelForm):
     class Meta:
         model = CustomFieldset
-        fields = ['name', 'fields']
+        fields = ["name", "fields"]
         widgets = {
-            'name': forms.TextInput(attrs={'class': 'form-control'}),
-            'fields': forms.SelectMultiple(attrs={'class': 'form-select', 'size': 10}),
+            "name": forms.TextInput(attrs={"class": "form-control"}),
+            "fields": forms.SelectMultiple(attrs={"class": "form-select", "size": 10}),
         }
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.helper = FormHelper(self)
-        self.helper.form_method = 'post'
+        self.helper.form_method = "post"
         self.helper.form_tag = True
-        
-        button_text = _('Update') if self.instance.pk else _('Create')
-        cancel_url = reverse('extras:customfieldset_list')
+
+        button_text = _("Update") if self.instance.pk else _("Create")
+        cancel_url = reverse("extras:customfieldset_list")
 
         self.helper.layout = Layout(
-            'name',
-            'fields',
+            "name",
+            "fields",
             HTML('<div class="mt-3">'),
-            Submit('submit', button_text, css_class='btn btn-primary'),
+            Submit("submit", button_text, css_class="btn btn-primary"),
             HTML(f'<a href="{cancel_url}" class="btn btn-outline-secondary ms-2">{_("Cancel")}</a>'),
-            HTML('</div>')
+            HTML("</div>"),
         )
 
 
 class CustomFieldFilterForm(FilterForm):
     from .filters import CustomFieldFilterSet
+
     filterset_class = CustomFieldFilterSet
 
 
 class CustomFieldsetFilterForm(FilterForm):
     from .filters import CustomFieldsetFilterSet
+
     filterset_class = CustomFieldsetFilterSet
 
 
@@ -149,43 +158,42 @@ class SavedFilterForm(forms.ModelForm):
     # edited here. ``tenant``/``created_by`` are set by the view, not the user.
     class Meta:
         model = SavedFilter
-        fields = ['name', 'description', 'content_type', 'shared', 'enabled']
+        fields = ["name", "description", "content_type", "shared", "enabled"]
         widgets = {
-            'name': forms.TextInput(attrs={'class': 'form-control'}),
-            'description': forms.Textarea(attrs={'class': 'form-control', 'rows': 3}),
-            'content_type': forms.Select(attrs={'class': 'form-select'}),
-            'shared': forms.CheckboxInput(attrs={'class': 'form-check-input'}),
-            'enabled': forms.CheckboxInput(attrs={'class': 'form-check-input'}),
+            "name": forms.TextInput(attrs={"class": "form-control"}),
+            "description": forms.Textarea(attrs={"class": "form-control", "rows": 3}),
+            "content_type": forms.Select(attrs={"class": "form-select"}),
+            "shared": forms.CheckboxInput(attrs={"class": "form-check-input"}),
+            "enabled": forms.CheckboxInput(attrs={"class": "form-check-input"}),
         }
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.helper = FormHelper(self)
-        self.helper.form_method = 'post'
+        self.helper.form_method = "post"
         self.helper.form_tag = True
 
-        self.fields['content_type'].queryset = (
-            ContentType.objects.order_by('app_label', 'model')
-        )
+        self.fields["content_type"].queryset = ContentType.objects.order_by("app_label", "model")
 
-        button_text = _('Update') if self.instance.pk else _('Create')
-        cancel_url = reverse('extras:savedfilter_list')
+        button_text = _("Update") if self.instance.pk else _("Create")
+        cancel_url = reverse("extras:savedfilter_list")
 
         self.helper.layout = Layout(
-            'name',
-            'description',
-            'content_type',
-            Div('shared', css_class='mb-3 form-check'),
-            Div('enabled', css_class='mb-3 form-check'),
+            "name",
+            "description",
+            "content_type",
+            Div("shared", css_class="mb-3 form-check"),
+            Div("enabled", css_class="mb-3 form-check"),
             HTML('<div class="mt-3">'),
-            Submit('submit', button_text, css_class='btn btn-primary'),
+            Submit("submit", button_text, css_class="btn btn-primary"),
             HTML(f'<a href="{cancel_url}" class="btn btn-outline-secondary ms-2">{_("Cancel")}</a>'),
-            HTML('</div>')
+            HTML("</div>"),
         )
 
 
 class SavedFilterFilterForm(FilterForm):
     from .filters import SavedFilterFilterSet
+
     filterset_class = SavedFilterFilterSet
 
 
@@ -198,12 +206,24 @@ class SavedFilterFilterForm(FilterForm):
 
 import json as _json
 
+from crispy_forms.layout import HTML, Column, Div, Field, Fieldset, Layout, Row, Submit
 from django.contrib.contenttypes.models import ContentType
-from crispy_forms.layout import Layout, Field, HTML, Div, Submit, Row, Column, Fieldset
-from .models import WebhookEndpoint, EventRule, Event, ExportTemplate, LabelTemplate, ReportTemplate, ScheduledReport, AlertRule, NotificationChannel
-from itambox.middleware import get_current_user
+
 from core.forms.import_forms import is_model_importable
 from core.validators import validate_external_url
+from itambox.middleware import get_current_user
+
+from .models import (
+    AlertRule,
+    Event,
+    EventRule,
+    ExportTemplate,
+    LabelTemplate,
+    NotificationChannel,
+    ReportTemplate,
+    ScheduledReport,
+    WebhookEndpoint,
+)
 
 
 def logged_content_types():
@@ -222,7 +242,7 @@ def logged_content_types():
             continue
         if issubclass(model, ChangeLoggingMixin) and model.__name__ not in _SIGNAL_SKIP_MODELS:
             ids.append(ct.id)
-    return ContentType.objects.filter(id__in=ids).order_by('app_label', 'model')
+    return ContentType.objects.filter(id__in=ids).order_by("app_label", "model")
 
 
 def exportable_content_types():
@@ -241,51 +261,68 @@ def exportable_content_types():
             continue
         if is_model_importable(model):
             ids.append(ct.id)
-    return ContentType.objects.filter(id__in=ids).order_by('app_label', 'model')
+    return ContentType.objects.filter(id__in=ids).order_by("app_label", "model")
 
 
-SLACK_PAYLOAD_PRESET = _json.dumps({
-    "blocks": [
-        {"type": "header", "text": {"type": "plain_text", "text": "ITAMbox Event: {{ event }}"}},
-        {"type": "section", "fields": [
-            {"type": "mrkdwn", "text": "*Model:*\n{{ model }}"},
-            {"type": "mrkdwn", "text": "*Object ID:*\n{{ object_id }}"}
-        ]},
-        {"type": "section", "text": {"type": "mrkdwn", "text": "```{{ data | tojson }}```"}},
-    ]
-}, indent=2)
-
-TEAMS_PAYLOAD_PRESET = _json.dumps({
-    "type": "message",
-    "attachments": [
-        {
-            "contentType": "application/vnd.microsoft.card.adaptive",
-            "content": {
-                "type": "AdaptiveCard",
-                "body": [
-                    {"type": "TextBlock", "text": "ITAMbox Event: {{ event }}", "weight": "Bolder", "size": "Medium"},
-                    {"type": "FactSet", "facts": [
-                        {"title": "Model", "value": "{{ model }}"},
-                        {"title": "Object ID", "value": "{{ object_id }}"}
-                    ]},
-                    {"type": "TextBlock", "text": "```{{ data | tojson }}```", "wrap": True}
+SLACK_PAYLOAD_PRESET = _json.dumps(
+    {
+        "blocks": [
+            {"type": "header", "text": {"type": "plain_text", "text": "ITAMbox Event: {{ event }}"}},
+            {
+                "type": "section",
+                "fields": [
+                    {"type": "mrkdwn", "text": "*Model:*\n{{ model }}"},
+                    {"type": "mrkdwn", "text": "*Object ID:*\n{{ object_id }}"},
                 ],
-                "$schema": "http://adaptivecards.io/schemas/adaptive-card.json",
-                "version": "1.2"
+            },
+            {"type": "section", "text": {"type": "mrkdwn", "text": "```{{ data | tojson }}```"}},
+        ]
+    },
+    indent=2,
+)
+
+TEAMS_PAYLOAD_PRESET = _json.dumps(
+    {
+        "type": "message",
+        "attachments": [
+            {
+                "contentType": "application/vnd.microsoft.card.adaptive",
+                "content": {
+                    "type": "AdaptiveCard",
+                    "body": [
+                        {
+                            "type": "TextBlock",
+                            "text": "ITAMbox Event: {{ event }}",
+                            "weight": "Bolder",
+                            "size": "Medium",
+                        },
+                        {
+                            "type": "FactSet",
+                            "facts": [
+                                {"title": "Model", "value": "{{ model }}"},
+                                {"title": "Object ID", "value": "{{ object_id }}"},
+                            ],
+                        },
+                        {"type": "TextBlock", "text": "```{{ data | tojson }}```", "wrap": True},
+                    ],
+                    "$schema": "http://adaptivecards.io/schemas/adaptive-card.json",
+                    "version": "1.2",
+                },
             }
-        }
-    ]
-}, indent=2)
+        ],
+    },
+    indent=2,
+)
 
 PAYLOAD_PRESET_CHOICES = [
-    ('', _('Custom')),
-    ('slack', _('Slack Block Kit')),
-    ('teams', _('Microsoft Teams (Adaptive Card)')),
+    ("", _("Custom")),
+    ("slack", _("Slack Block Kit")),
+    ("teams", _("Microsoft Teams (Adaptive Card)")),
 ]
 
 PRESET_PAYLOADS = {
-    'slack': SLACK_PAYLOAD_PRESET,
-    'teams': TEAMS_PAYLOAD_PRESET,
+    "slack": SLACK_PAYLOAD_PRESET,
+    "teams": TEAMS_PAYLOAD_PRESET,
 }
 
 
@@ -293,67 +330,79 @@ class WebhookEndpointForm(forms.ModelForm):
     payload_preset = forms.ChoiceField(
         choices=PAYLOAD_PRESET_CHOICES,
         required=False,
-        label=_('Payload Preset'),
-        help_text=_('Select a preset to pre-fill the payload template above'),
+        label=_("Payload Preset"),
+        help_text=_("Select a preset to pre-fill the payload template above"),
     )
 
     class Meta:
         model = WebhookEndpoint
-        fields = ['name', 'url', 'http_method', 'headers', 'payload_preset', 'secret', 'enabled', 'retry_count', 'retry_backoff', 'tenant']
+        fields = [
+            "name",
+            "url",
+            "http_method",
+            "headers",
+            "payload_preset",
+            "secret",
+            "enabled",
+            "retry_count",
+            "retry_backoff",
+            "tenant",
+        ]
         widgets = {
-            'headers': forms.Textarea(attrs={'rows': 4}),
-            'tenant': forms.Select(attrs={'class': 'form-select'}),
+            "headers": forms.Textarea(attrs={"rows": 4}),
+            "tenant": forms.Select(attrs={"class": "form-select"}),
         }
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         user = get_current_user()
-        is_admin = bool(user and (user.is_superuser or getattr(user, 'is_staff', False)))
-        if not is_admin and 'tenant' in self.fields:
-            self.fields.pop('tenant')
+        is_admin = bool(user and (user.is_superuser or getattr(user, "is_staff", False)))
+        if not is_admin and "tenant" in self.fields:
+            self.fields.pop("tenant")
 
         if self.instance and self.instance.headers:
-            self.initial['headers'] = _json.dumps(self.instance.headers, indent=2)
+            self.initial["headers"] = _json.dumps(self.instance.headers, indent=2)
 
         # BUG FIX: show the decrypted secret on edit so we don't re-encrypt
         # the stored "enc$..." ciphertext as if it were a plaintext value.
         if self.instance and self.instance.pk and self.instance.secret:
-            self.initial['secret'] = self.instance.secret_decrypted
+            self.initial["secret"] = self.instance.secret_decrypted
 
         self.helper = FormHelper()
         tenant_row = (
             Row(
-                Column('tenant', css_class='col-md-6'),
-                css_class='row g-3',
+                Column("tenant", css_class="col-md-6"),
+                css_class="row g-3",
             )
-            if is_admin else None
+            if is_admin
+            else None
         )
         layout_fields = [
             Fieldset(
-                _('Identity'),
+                _("Identity"),
                 Row(
-                    Column('name', css_class='col-md-6'),
-                    Column('url', css_class='col-md-6'),
-                    css_class='row g-3',
+                    Column("name", css_class="col-md-6"),
+                    Column("url", css_class="col-md-6"),
+                    css_class="row g-3",
                 ),
                 Row(
-                    Column('http_method', css_class='col-md-4'),
-                    Column('enabled', css_class='col-md-4'),
-                    Column('secret', css_class='col-md-4'),
-                    css_class='row g-3',
+                    Column("http_method", css_class="col-md-4"),
+                    Column("enabled", css_class="col-md-4"),
+                    Column("secret", css_class="col-md-4"),
+                    css_class="row g-3",
                 ),
             ),
             Fieldset(
-                _('Payload'),
-                'payload_preset',
-                'headers',
+                _("Payload"),
+                "payload_preset",
+                "headers",
             ),
             Fieldset(
-                _('Retry'),
+                _("Retry"),
                 Row(
-                    Column('retry_count', css_class='col-md-6'),
-                    Column('retry_backoff', css_class='col-md-6'),
-                    css_class='row g-3',
+                    Column("retry_count", css_class="col-md-6"),
+                    Column("retry_backoff", css_class="col-md-6"),
+                    css_class="row g-3",
                 ),
             ),
         ]
@@ -361,21 +410,21 @@ class WebhookEndpointForm(forms.ModelForm):
             layout_fields.append(tenant_row)
         layout_fields += [
             HTML('<div class="mt-4"></div>'),
-            Submit('submit', _('Save Webhook Endpoint'), css_class='btn btn-primary'),
+            Submit("submit", _("Save Webhook Endpoint"), css_class="btn btn-primary"),
             HTML(
                 '<a href="{% url \'extras:webhookendpoint_list\' %}" class="btn btn-outline-secondary ms-2" '
-                'data-no-dirty-track="true">' + str(_('Cancel')) + '</a>'
+                'data-no-dirty-track="true">' + str(_("Cancel")) + "</a>"
             ),
         ]
         self.helper.layout = Layout(*layout_fields)
 
     def clean_headers(self):
-        data = self.cleaned_data['headers']
+        data = self.cleaned_data["headers"]
         if isinstance(data, str):
             try:
                 return _json.loads(data)
             except _json.JSONDecodeError:
-                raise forms.ValidationError(_('Headers must be valid JSON.'))
+                raise forms.ValidationError(_("Headers must be valid JSON."))
         return data
 
 
@@ -383,122 +432,130 @@ class EventRuleForm(forms.ModelForm):
     events = forms.MultipleChoiceField(
         choices=Event.ACTION_CHOICES,
         widget=forms.CheckboxSelectMultiple,
-        label=_('Trigger Events'),
-        help_text=_('Fire this rule when any of the selected change types occur on the target model.'),
+        label=_("Trigger Events"),
+        help_text=_("Fire this rule when any of the selected change types occur on the target model."),
     )
     payload_preset = forms.ChoiceField(
         choices=PAYLOAD_PRESET_CHOICES,
         required=False,
-        label=_('Payload Preset'),
-        help_text=_('Select a preset to pre-fill the action config'),
+        label=_("Payload Preset"),
+        help_text=_("Select a preset to pre-fill the action config"),
     )
 
     class Meta:
         model = EventRule
-        fields = ['name', 'model', 'events', 'action_type', 'webhook', 'conditions', 'action_config', 'enabled', 'tenant']
+        fields = [
+            "name",
+            "model",
+            "events",
+            "action_type",
+            "webhook",
+            "conditions",
+            "action_config",
+            "enabled",
+            "tenant",
+        ]
         widgets = {
-            'conditions': forms.Textarea(attrs={'rows': 3}),
-            'action_config': forms.Textarea(attrs={'rows': 4}),
-            'tenant': forms.Select(attrs={'class': 'form-select'}),
+            "conditions": forms.Textarea(attrs={"rows": 3}),
+            "action_config": forms.Textarea(attrs={"rows": 4}),
+            "tenant": forms.Select(attrs={"class": "form-select"}),
         }
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         user = get_current_user()
-        is_admin = bool(user and (user.is_superuser or getattr(user, 'is_staff', False)))
-        if not is_admin and 'tenant' in self.fields:
-            self.fields.pop('tenant')
+        is_admin = bool(user and (user.is_superuser or getattr(user, "is_staff", False)))
+        if not is_admin and "tenant" in self.fields:
+            self.fields.pop("tenant")
 
         # Only models that emit Events are selectable — others would never trigger the rule.
-        self.fields['model'].queryset = logged_content_types()
-        self.fields['model'].label = _('Target Model')
-        self.fields['webhook'].queryset = WebhookEndpoint.objects.filter(enabled=True)
-        self.fields['webhook'].label = _('Webhook Endpoint')
-        self.fields['webhook'].help_text = _(
-            'Required for Webhook rules. Manage endpoints under Webhook Endpoints. '
+        self.fields["model"].queryset = logged_content_types()
+        self.fields["model"].label = _("Target Model")
+        self.fields["webhook"].queryset = WebhookEndpoint.objects.filter(enabled=True)
+        self.fields["webhook"].label = _("Webhook Endpoint")
+        self.fields["webhook"].help_text = _(
+            "Required for Webhook rules. Manage endpoints under Webhook Endpoints. "
             'Leave blank only if you supply a "url" in Action Configuration below.'
         )
-        self.fields['conditions'].required = False
-        self.fields['action_config'].required = False
+        self.fields["conditions"].required = False
+        self.fields["action_config"].required = False
         if self.instance and self.instance.pk:
             if self.instance.events:
-                self.initial['events'] = self.instance.events
+                self.initial["events"] = self.instance.events
             if self.instance.conditions:
-                self.initial['conditions'] = _json.dumps(self.instance.conditions, indent=2)
+                self.initial["conditions"] = _json.dumps(self.instance.conditions, indent=2)
             if self.instance.action_config:
-                self.initial['action_config'] = _json.dumps(self.instance.action_config, indent=2)
+                self.initial["action_config"] = _json.dumps(self.instance.action_config, indent=2)
 
         self.helper = FormHelper()
         layout_fields = [
             Fieldset(
-                _('Identity'),
+                _("Identity"),
                 Row(
-                    Column('name', css_class='col-md-6'),
-                    Column('enabled', css_class='col-md-6'),
-                    css_class='row g-3',
+                    Column("name", css_class="col-md-6"),
+                    Column("enabled", css_class="col-md-6"),
+                    css_class="row g-3",
                 ),
             ),
             Fieldset(
-                _('Trigger'),
+                _("Trigger"),
                 Row(
-                    Column('model', css_class='col-md-6'),
-                    Column('action_type', css_class='col-md-6'),
-                    css_class='row g-3',
+                    Column("model", css_class="col-md-6"),
+                    Column("action_type", css_class="col-md-6"),
+                    css_class="row g-3",
                 ),
-                'events',
+                "events",
             ),
             Fieldset(
-                _('Action'),
-                'webhook',
-                'payload_preset',
-                'conditions',
-                'action_config',
+                _("Action"),
+                "webhook",
+                "payload_preset",
+                "conditions",
+                "action_config",
             ),
         ]
         if is_admin:
-            layout_fields.append(
-                Row(Column('tenant', css_class='col-md-6'), css_class='row g-3')
-            )
+            layout_fields.append(Row(Column("tenant", css_class="col-md-6"), css_class="row g-3"))
         layout_fields += [
             HTML('<div class="mt-4"></div>'),
-            Submit('submit', _('Save Event Rule'), css_class='btn btn-primary'),
+            Submit("submit", _("Save Event Rule"), css_class="btn btn-primary"),
             HTML(
                 '<a href="{% url \'extras:eventrule_list\' %}" class="btn btn-outline-secondary ms-2" '
-                'data-no-dirty-track="true">' + str(_('Cancel')) + '</a>'
+                'data-no-dirty-track="true">' + str(_("Cancel")) + "</a>"
             ),
         ]
         self.helper.layout = Layout(*layout_fields)
 
     def clean_conditions(self):
-        data = self.cleaned_data['conditions']
+        data = self.cleaned_data["conditions"]
         if isinstance(data, str):
             if not data.strip():
                 return {}
             try:
                 return _json.loads(data)
             except _json.JSONDecodeError:
-                raise forms.ValidationError(_('Conditions must be valid JSON.'))
+                raise forms.ValidationError(_("Conditions must be valid JSON."))
         return data or {}
 
     def clean_action_config(self):
-        data = self.cleaned_data['action_config']
+        data = self.cleaned_data["action_config"]
         if isinstance(data, str):
             if not data.strip():
                 return {}
             try:
                 return _json.loads(data)
             except _json.JSONDecodeError:
-                raise forms.ValidationError(_('Action config must be valid JSON.'))
+                raise forms.ValidationError(_("Action config must be valid JSON."))
         return data or {}
 
     def clean(self):
         cleaned = super().clean()
-        action_type = cleaned.get('action_type')
+        action_type = cleaned.get("action_type")
         if action_type == EventRule.ACTION_WEBHOOK:
-            config = cleaned.get('action_config') or {}
-            if not cleaned.get('webhook') and not config.get('url'):
+            config = cleaned.get("action_config") or {}
+            if not cleaned.get("webhook") and not config.get("url"):
                 self.add_error(
-                    'webhook',
+                    "webhook",
                     'Select a Webhook Endpoint (or provide a "url" in Action Configuration) for a Webhook rule.',
                 )
         return cleaned
@@ -507,9 +564,9 @@ class EventRuleForm(forms.ModelForm):
 class LabelTemplateForm(forms.ModelForm):
     class Meta:
         model = LabelTemplate
-        fields = ['name', 'description', 'page_width', 'page_height', 'barcode_format', 'template_code']
+        fields = ["name", "description", "page_width", "page_height", "barcode_format", "template_code"]
         widgets = {
-            'template_code': forms.Textarea(attrs={'rows': 10}),
+            "template_code": forms.Textarea(attrs={"rows": 10}),
         }
 
     def __init__(self, *args, **kwargs):
@@ -517,31 +574,31 @@ class LabelTemplateForm(forms.ModelForm):
         self.helper = FormHelper()
         self.helper.layout = Layout(
             Fieldset(
-                _('Identity'),
+                _("Identity"),
                 Row(
-                    Column('name', css_class='col-md-8'),
-                    Column('barcode_format', css_class='col-md-4'),
-                    css_class='row g-3',
+                    Column("name", css_class="col-md-8"),
+                    Column("barcode_format", css_class="col-md-4"),
+                    css_class="row g-3",
                 ),
-                'description',
+                "description",
             ),
             Fieldset(
-                _('Page Size'),
+                _("Page Size"),
                 Row(
-                    Column('page_width', css_class='col-md-6'),
-                    Column('page_height', css_class='col-md-6'),
-                    css_class='row g-3',
+                    Column("page_width", css_class="col-md-6"),
+                    Column("page_height", css_class="col-md-6"),
+                    css_class="row g-3",
                 ),
             ),
             Fieldset(
-                _('Template'),
-                'template_code',
+                _("Template"),
+                "template_code",
             ),
             HTML('<div class="mt-4"></div>'),
-            Submit('submit', _('Save Label Template'), css_class='btn btn-primary'),
+            Submit("submit", _("Save Label Template"), css_class="btn btn-primary"),
             HTML(
                 '<a href="{% url \'extras:labeltemplate_list\' %}" class="btn btn-outline-secondary ms-2" '
-                'data-no-dirty-track="true">' + str(_('Cancel')) + '</a>'
+                'data-no-dirty-track="true">' + str(_("Cancel")) + "</a>"
             ),
         )
 
@@ -557,85 +614,97 @@ class ExportTemplateForm(forms.ModelForm):
     class Meta:
         model = ExportTemplate
         fields = [
-            'name', 'content_type', 'description', 'template_code',
-            'mime_type', 'file_extension', 'as_attachment',
+            "name",
+            "content_type",
+            "description",
+            "template_code",
+            "mime_type",
+            "file_extension",
+            "as_attachment",
         ]
         widgets = {
-            'description': forms.Textarea(attrs={'rows': 2}),
-            'template_code': forms.Textarea(attrs={
-                'rows': 16,
-                'class': 'font-monospace',
-                'spellcheck': 'false',
-                'data-no-dirty-track': 'false',
-            }),
+            "description": forms.Textarea(attrs={"rows": 2}),
+            "template_code": forms.Textarea(
+                attrs={
+                    "rows": 16,
+                    "class": "font-monospace",
+                    "spellcheck": "false",
+                    "data-no-dirty-track": "false",
+                }
+            ),
         }
         help_texts = {
-            'template_code': _(
-                'Jinja2 template rendered once over the whole result set. The full '
-                'queryset is available as <code>queryset</code> — loop it with '
-                '<code>{% for obj in queryset %}…{% endfor %}</code> and emit your own '
-                'header row. Built-in filters such as <code>|tojson</code> are available.'
+            "template_code": _(
+                "Jinja2 template rendered once over the whole result set. The full "
+                "queryset is available as <code>queryset</code> — loop it with "
+                "<code>{% for obj in queryset %}…{% endfor %}</code> and emit your own "
+                "header row. Built-in filters such as <code>|tojson</code> are available."
             ),
-            'mime_type': _('Sent as the Content-Type header, e.g. text/csv or application/json.'),
-            'file_extension': _('Appended to the download filename (without a leading dot).'),
-            'as_attachment': _('Download the result as a file. Disable to render inline in the browser (useful for previewing).'),
+            "mime_type": _("Sent as the Content-Type header, e.g. text/csv or application/json."),
+            "file_extension": _("Appended to the download filename (without a leading dot)."),
+            "as_attachment": _(
+                "Download the result as a file. Disable to render inline in the browser (useful for previewing)."
+            ),
         }
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.fields['content_type'].queryset = exportable_content_types()
-        self.fields['content_type'].label = _('Model')
-        self.fields['content_type'].help_text = _('The object type this template can export.')
-        self.fields['file_extension'].required = False
+        self.fields["content_type"].queryset = exportable_content_types()
+        self.fields["content_type"].label = _("Model")
+        self.fields["content_type"].help_text = _("The object type this template can export.")
+        self.fields["file_extension"].required = False
 
         self.helper = FormHelper()
         self.helper.layout = Layout(
             Fieldset(
-                _('Identity'),
+                _("Identity"),
                 Row(
-                    Column('name', css_class='col-md-7'),
-                    Column('content_type', css_class='col-md-5'),
-                    css_class='row g-3',
+                    Column("name", css_class="col-md-7"),
+                    Column("content_type", css_class="col-md-5"),
+                    css_class="row g-3",
                 ),
-                'description',
+                "description",
             ),
             Fieldset(
-                _('Output'),
+                _("Output"),
                 Row(
-                    Column('mime_type', css_class='col-md-6'),
-                    Column('file_extension', css_class='col-md-3'),
-                    Column('as_attachment', css_class='col-md-3 d-flex align-items-end'),
-                    css_class='row g-3',
+                    Column("mime_type", css_class="col-md-6"),
+                    Column("file_extension", css_class="col-md-3"),
+                    Column("as_attachment", css_class="col-md-3 d-flex align-items-end"),
+                    css_class="row g-3",
                 ),
             ),
             Fieldset(
-                _('Template'),
-                'template_code',
+                _("Template"),
+                "template_code",
             ),
             HTML('<div class="mt-4"></div>'),
-            Submit('submit', _('Save Export Template'), css_class='btn btn-primary'),
+            Submit("submit", _("Save Export Template"), css_class="btn btn-primary"),
             HTML(
                 '<a href="{% url \'extras:exporttemplate_list\' %}" class="btn btn-outline-secondary ms-2" '
-                'data-no-dirty-track="true">' + str(_('Cancel')) + '</a>'
+                'data-no-dirty-track="true">' + str(_("Cancel")) + "</a>"
             ),
         )
 
     def clean_file_extension(self):
         # Normalise: drop a leading dot and lowercase so filenames stay tidy.
-        ext = (self.cleaned_data.get('file_extension') or '').strip().lstrip('.').lower()
+        ext = (self.cleaned_data.get("file_extension") or "").strip().lstrip(".").lower()
         return ext
 
     def clean_template_code(self):
-        code = self.cleaned_data.get('template_code') or ''
+        code = self.cleaned_data.get("template_code") or ""
         # inline import: jinja2 is only needed when validating template authoring,
         # not on every forms.py import.
         from jinja2 import TemplateSyntaxError
+
         try:
             ExportTemplate.get_jinja_environment().from_string(code)
         except TemplateSyntaxError as exc:
             raise forms.ValidationError(
-                _('Template syntax error on line %(line)s: %(message)s') % {
-                    'line': exc.lineno, 'message': exc.message,
+                _("Template syntax error on line %(line)s: %(message)s")
+                % {
+                    "line": exc.lineno,
+                    "message": exc.message,
                 }
             )
         return code
@@ -662,16 +731,18 @@ def _resolve_nonadmin_write_tenant(form, user):
     instance's tenant untouched. Raises ``ValidationError`` when a non-admin
     create has no single active tenant.
     """
-    if user is None or user.is_superuser or getattr(user, 'is_staff', False):
+    if user is None or user.is_superuser or getattr(user, "is_staff", False):
         return None
     if form.instance.pk:
         return None
     tenant = get_current_tenant()
     if tenant is None:
         raise forms.ValidationError(
-            _('This record must belong to a single tenant. Switch to one '
-              'specific tenant before saving — the active scope spans multiple '
-              'tenants.')
+            _(
+                "This record must belong to a single tenant. Switch to one "
+                "specific tenant before saving — the active scope spans multiple "
+                "tenants."
+            )
         )
     return tenant
 
@@ -679,147 +750,162 @@ def _resolve_nonadmin_write_tenant(form, user):
 class ReportTemplateForm(forms.ModelForm):
     COLUMN_CHOICES = [
         # Asset Inventory Summary Columns
-        ('asset_tag', _('Asset Tag')),
-        ('name', _('Asset Name')),
-        ('manufacturer', _('Manufacturer')),
-        ('model', _('Model')),
-        ('serial_number', _('Serial Number')),
-        ('status', _('Status Label')),
-        ('location', _('Location')),
-        ('assigned_to', _('Asset Holder')),
-        ('purchase_cost', _('Purchase Cost')),
-        ('purchase_date', _('Purchase Date')),
-        ('warranty_months', _('Warranty (Months)')),
+        ("asset_tag", _("Asset Tag")),
+        ("name", _("Asset Name")),
+        ("manufacturer", _("Manufacturer")),
+        ("model", _("Model")),
+        ("serial_number", _("Serial Number")),
+        ("status", _("Status Label")),
+        ("location", _("Location")),
+        ("assigned_to", _("Asset Holder")),
+        ("purchase_cost", _("Purchase Cost")),
+        ("purchase_date", _("Purchase Date")),
+        ("warranty_months", _("Warranty (Months)")),
         # License Utilization Columns
-        ('license_name', _('License Name')),
-        ('software', _('Software')),
-        ('seats', _('Total Seats')),
-        ('assigned_seats', _('Assigned Seats')),
-        ('available_seats', _('Available Seats')),
-        ('utilization_rate', _('Utilization Rate')),
+        ("license_name", _("License Name")),
+        ("software", _("Software")),
+        ("seats", _("Total Seats")),
+        ("assigned_seats", _("Assigned Seats")),
+        ("available_seats", _("Available Seats")),
+        ("utilization_rate", _("Utilization Rate")),
         # Subscription Renewals Columns
-        ('subscription_name', _('Subscription Name')),
-        ('provider', _('Provider')),
-        ('billing_cycle', _('Billing Cycle')),
-        ('cost', _('Cost')),
-        ('end_date', _('End Date')),
+        ("subscription_name", _("Subscription Name")),
+        ("provider", _("Provider")),
+        ("billing_cycle", _("Billing Cycle")),
+        ("cost", _("Cost")),
+        ("end_date", _("End Date")),
         # Asset Maintenance Columns
-        ('maintenance_asset', _('Asset')),
-        ('maintenance_type', _('Type')),
-        ('maintenance_status', _('Status')),
-        ('maintenance_cost', _('Cost')),
-        ('maintenance_start_date', _('Start Date')),
-        ('maintenance_completion_date', _('Completion Date')),
-        ('maintenance_downtime', _('Downtime (Days)')),
+        ("maintenance_asset", _("Asset")),
+        ("maintenance_type", _("Type")),
+        ("maintenance_status", _("Status")),
+        ("maintenance_cost", _("Cost")),
+        ("maintenance_start_date", _("Start Date")),
+        ("maintenance_completion_date", _("Completion Date")),
+        ("maintenance_downtime", _("Downtime (Days)")),
         # Asset Depreciation Columns
-        ('salvage_value', _('Salvage Value')),
-        ('depreciation_months', _('Depreciation Lifespan (Months)')),
-        ('current_value', _('Depreciated Value')),
+        ("salvage_value", _("Salvage Value")),
+        ("depreciation_months", _("Depreciation Lifespan (Months)")),
+        ("current_value", _("Depreciated Value")),
         # Software Inventory Columns
-        ('software_name', _('Software Product')),
-        ('version', _('Version')),
-        ('category', _('Category')),
-        ('license_type', _('License Type')),
-        ('installed_count', _('Installed Count')),
+        ("software_name", _("Software Product")),
+        ("version", _("Version")),
+        ("category", _("Category")),
+        ("license_type", _("License Type")),
+        ("installed_count", _("Installed Count")),
         # Contract Renewals & Expirations Columns
-        ('contract_number', _('Contract #')),
-        ('contract_name', _('Contract Name')),
-        ('contract_type', _('Contract Type')),
-        ('contract_status', _('Contract Status')),
-        ('contract_supplier', _('Supplier')),
-        ('contract_start_date', _('Start Date')),
-        ('contract_end_date', _('End Date')),
-        ('contract_renewal_date', _('Renewal Date')),
-        ('contract_days_until_expiry', _('Days Until Expiry')),
-        ('contract_cost', _('Contract Cost')),
-        ('contract_billing_cycle', _('Billing Cycle')),
-        ('contract_auto_renew', _('Auto-Renew')),
-        ('contract_covered_assets', _('Covered Assets')),
-        ('contract_sla_response_time', _('SLA Response Time')),
-        ('contract_sla_resolution_time', _('SLA Resolution Time')),
-        ('contract_coverage_hours', _('Coverage Hours')),
+        ("contract_number", _("Contract #")),
+        ("contract_name", _("Contract Name")),
+        ("contract_type", _("Contract Type")),
+        ("contract_status", _("Contract Status")),
+        ("contract_supplier", _("Supplier")),
+        ("contract_start_date", _("Start Date")),
+        ("contract_end_date", _("End Date")),
+        ("contract_renewal_date", _("Renewal Date")),
+        ("contract_days_until_expiry", _("Days Until Expiry")),
+        ("contract_cost", _("Contract Cost")),
+        ("contract_billing_cycle", _("Billing Cycle")),
+        ("contract_auto_renew", _("Auto-Renew")),
+        ("contract_covered_assets", _("Covered Assets")),
+        ("contract_sla_response_time", _("SLA Response Time")),
+        ("contract_sla_resolution_time", _("SLA Resolution Time")),
+        ("contract_coverage_hours", _("Coverage Hours")),
         # Warranty Expiration Columns
-        ('warranty_asset', _('Asset')),
-        ('warranty_type', _('Warranty Type')),
-        ('warranty_provider', _('Provider')),
-        ('warranty_start_date', _('Start Date')),
-        ('warranty_end_date', _('End Date')),
-        ('warranty_days_remaining', _('Days Remaining')),
-        ('warranty_status', _('Status')),
-        ('warranty_cost', _('Warranty Cost')),
-        ('warranty_reference', _('Reference')),
+        ("warranty_asset", _("Asset")),
+        ("warranty_type", _("Warranty Type")),
+        ("warranty_provider", _("Provider")),
+        ("warranty_start_date", _("Start Date")),
+        ("warranty_end_date", _("End Date")),
+        ("warranty_days_remaining", _("Days Remaining")),
+        ("warranty_status", _("Status")),
+        ("warranty_cost", _("Warranty Cost")),
+        ("warranty_reference", _("Reference")),
         # Asset Disposal & End-of-Life Columns
-        ('disposal_asset', _('Asset')),
-        ('disposal_date', _('Disposal Date')),
-        ('disposal_method', _('Disposal Method')),
-        ('disposal_sanitization_method', _('Data Sanitization Method')),
-        ('disposal_sanitization_certificate', _('Sanitization Certificate')),
-        ('disposal_sanitized_by', _('Sanitized By')),
-        ('disposal_recipient', _('Recipient')),
-        ('disposal_proceeds', _('Proceeds')),
-        ('disposal_weee_compliant', _('WEEE Compliant')),
-        ('disposal_notes', _('Notes')),
+        ("disposal_asset", _("Asset")),
+        ("disposal_date", _("Disposal Date")),
+        ("disposal_method", _("Disposal Method")),
+        ("disposal_sanitization_method", _("Data Sanitization Method")),
+        ("disposal_sanitization_certificate", _("Sanitization Certificate")),
+        ("disposal_sanitized_by", _("Sanitized By")),
+        ("disposal_recipient", _("Recipient")),
+        ("disposal_proceeds", _("Proceeds")),
+        ("disposal_weee_compliant", _("WEEE Compliant")),
+        ("disposal_notes", _("Notes")),
         # Hardware Inventory (Accessories, Consumables, Components) Columns
-        ('hw_item_type', _('Item Type')),
-        ('hw_name', _('Name')),
-        ('hw_manufacturer', _('Manufacturer')),
-        ('hw_category', _('Category')),
-        ('hw_part_number', _('Part Number')),
-        ('hw_total_stock', _('Total Stock')),
-        ('hw_available', _('Available')),
-        ('hw_min_qty', _('Safety Threshold')),
-        ('hw_status', _('Stock Status')),
+        ("hw_item_type", _("Item Type")),
+        ("hw_name", _("Name")),
+        ("hw_manufacturer", _("Manufacturer")),
+        ("hw_category", _("Category")),
+        ("hw_part_number", _("Part Number")),
+        ("hw_total_stock", _("Total Stock")),
+        ("hw_available", _("Available")),
+        ("hw_min_qty", _("Safety Threshold")),
+        ("hw_status", _("Stock Status")),
         # Custody & EULA Sign-off Compliance Columns
-        ('custody_asset', _('Asset')),
-        ('custody_holder', _('Holder')),
-        ('custody_status', _('Acceptance Status')),
-        ('custody_accepted_date', _('Accepted Date')),
-        ('custody_eula_version', _('EULA Version')),
-        ('custody_signature_provider', _('Signature Provider')),
-        ('custody_qms_reference', _('QMS Reference')),
-        ('custody_ip_address', _('IP Address')),
-        ('custody_created_date', _('Created Date')),
-        ('license_count', _('License Count')),
+        ("custody_asset", _("Asset")),
+        ("custody_holder", _("Holder")),
+        ("custody_status", _("Acceptance Status")),
+        ("custody_accepted_date", _("Accepted Date")),
+        ("custody_eula_version", _("EULA Version")),
+        ("custody_signature_provider", _("Signature Provider")),
+        ("custody_qms_reference", _("QMS Reference")),
+        ("custody_ip_address", _("IP Address")),
+        ("custody_created_date", _("Created Date")),
+        ("license_count", _("License Count")),
     ]
 
     included_columns = forms.MultipleChoiceField(
         choices=COLUMN_CHOICES,
-        widget=forms.CheckboxSelectMultiple(attrs={'class': 'form-check-input'}),
+        widget=forms.CheckboxSelectMultiple(attrs={"class": "form-check-input"}),
         required=False,
         label=_("Included Columns"),
-        help_text=_("Select the columns to include in your visual report grid. Only columns matching your report type will render.")
+        help_text=_(
+            "Select the columns to include in your visual report grid. Only columns matching your report type will render."
+        ),
     )
 
     class Meta:
         model = ReportTemplate
         fields = [
-            'name', 'description', 'report_type', 'included_columns',
-            'include_summary_cards', 'include_distribution_chart',
-            'group_by_field', 'style_preset', 'advanced_mode', 'template_content', 'tenant', 'filter_tenants'
+            "name",
+            "description",
+            "report_type",
+            "included_columns",
+            "include_summary_cards",
+            "include_distribution_chart",
+            "group_by_field",
+            "style_preset",
+            "advanced_mode",
+            "template_content",
+            "tenant",
+            "filter_tenants",
         ]
         widgets = {
-            'template_content': forms.Textarea(attrs={'rows': 15, 'style': 'font-family: monospace;'}),
-            'tenant': forms.Select(attrs={'class': 'form-select'}),
-            'filter_tenants': forms.SelectMultiple(attrs={'class': 'form-select', 'data-tom-select': ''})
+            "template_content": forms.Textarea(attrs={"rows": 15, "style": "font-family: monospace;"}),
+            "tenant": forms.Select(attrs={"class": "form-select"}),
+            "filter_tenants": forms.SelectMultiple(attrs={"class": "form-select", "data-tom-select": ""}),
         }
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         user = get_current_user()
-        if user and not (user.is_superuser or (hasattr(user, 'is_staff') and user.is_staff)):
-            if 'tenant' in self.fields:
-                self.fields.pop('tenant')
-            if 'filter_tenants' in self.fields:
-                self.fields.pop('filter_tenants')
+        if user and not (user.is_superuser or (hasattr(user, "is_staff") and user.is_staff)):
+            if "tenant" in self.fields:
+                self.fields.pop("tenant")
+            if "filter_tenants" in self.fields:
+                self.fields.pop("filter_tenants")
         else:
-            if 'tenant' in self.fields:
-                self.fields['tenant'].required = False
-                self.fields['tenant'].label = _("Scope / Tenant Filter")
-                self.fields['tenant'].empty_label = _("--------- All Tenants ---------")
-                self.fields['tenant'].help_text = _("Select a specific tenant to restrict this report's compiled data strictly to that tenant. Choose 'All Tenants' (blank) to aggregate data globally across all tenants.")
-            if 'filter_tenants' in self.fields:
-                self.fields['filter_tenants'].label = _("Filter Tenants (Scoping Constellation)")
-                self.fields['filter_tenants'].help_text = _("Select one or more specific tenants to filter this report's compiled data. If none are selected, aggregates data globally across all tenants.")
+            if "tenant" in self.fields:
+                self.fields["tenant"].required = False
+                self.fields["tenant"].label = _("Scope / Tenant Filter")
+                self.fields["tenant"].empty_label = _("--------- All Tenants ---------")
+                self.fields["tenant"].help_text = _(
+                    "Select a specific tenant to restrict this report's compiled data strictly to that tenant. Choose 'All Tenants' (blank) to aggregate data globally across all tenants."
+                )
+            if "filter_tenants" in self.fields:
+                self.fields["filter_tenants"].label = _("Filter Tenants (Scoping Constellation)")
+                self.fields["filter_tenants"].help_text = _(
+                    "Select one or more specific tenants to filter this report's compiled data. If none are selected, aggregates data globally across all tenants."
+                )
 
     def clean(self):
         cleaned_data = super().clean()
@@ -841,93 +927,109 @@ class ScheduledReportForm(forms.ModelForm):
     class Meta:
         model = ScheduledReport
         fields = [
-            'name', 'report', 'recipients', 'frequency', 'cron_expression', 'start_time',
-            'format', 'channels', 'save_to_archive', 'is_active', 'tenant', 'filter_tenants'
+            "name",
+            "report",
+            "recipients",
+            "frequency",
+            "cron_expression",
+            "start_time",
+            "format",
+            "channels",
+            "save_to_archive",
+            "is_active",
+            "tenant",
+            "filter_tenants",
         ]
         widgets = {
-            'recipients': forms.Textarea(attrs={'rows': 2, 'placeholder': 'recipient1@example.com, recipient2@example.com'}),
-            'tenant': forms.Select(attrs={'class': 'form-select'}),
-            'report': forms.Select(attrs={'class': 'form-select'}),
-            'filter_tenants': forms.SelectMultiple(attrs={'class': 'form-select', 'data-tom-select': ''}),
-            'channels': forms.SelectMultiple(attrs={'class': 'form-select', 'data-tom-select': ''}),
-            'cron_expression': forms.TextInput(attrs={'placeholder': 'e.g. 0 8 * * 1-5', 'class': 'form-control'}),
-            'start_time': forms.TimeInput(attrs={'type': 'time', 'class': 'form-control'}),
+            "recipients": forms.Textarea(
+                attrs={"rows": 2, "placeholder": "recipient1@example.com, recipient2@example.com"}
+            ),
+            "tenant": forms.Select(attrs={"class": "form-select"}),
+            "report": forms.Select(attrs={"class": "form-select"}),
+            "filter_tenants": forms.SelectMultiple(attrs={"class": "form-select", "data-tom-select": ""}),
+            "channels": forms.SelectMultiple(attrs={"class": "form-select", "data-tom-select": ""}),
+            "cron_expression": forms.TextInput(attrs={"placeholder": "e.g. 0 8 * * 1-5", "class": "form-control"}),
+            "start_time": forms.TimeInput(attrs={"type": "time", "class": "form-control"}),
         }
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         user = get_current_user()
-        if user and not (user.is_superuser or (hasattr(user, 'is_staff') and user.is_staff)):
-            if 'tenant' in self.fields:
-                self.fields.pop('tenant')
-            if 'filter_tenants' in self.fields:
-                self.fields.pop('filter_tenants')
+        if user and not (user.is_superuser or (hasattr(user, "is_staff") and user.is_staff)):
+            if "tenant" in self.fields:
+                self.fields.pop("tenant")
+            if "filter_tenants" in self.fields:
+                self.fields.pop("filter_tenants")
             # Report/channel choices follow the active canonical read scope
             # (single tenant, tenant group, or All accessible) resolved by the
             # tenant-scoping managers — never an arbitrary AssetHolder profile
             # tenant, which under a multi-tenant scope would hide records the
             # actor can legitimately reach (issue #134).
-            self.fields['report'].queryset = ReportTemplate.objects.all()
-            self.fields['channels'].queryset = NotificationChannel.objects.all()
+            self.fields["report"].queryset = ReportTemplate.objects.all()
+            self.fields["channels"].queryset = NotificationChannel.objects.all()
         else:
-            if 'tenant' in self.fields:
-                self.fields['tenant'].required = False
-                self.fields['tenant'].label = _("Scope / Tenant Filter")
-                self.fields['tenant'].empty_label = _("--------- All Tenants ---------")
-                self.fields['tenant'].help_text = _("Select a specific tenant to restrict this scheduled report's compiled data strictly to that tenant. Choose 'All Tenants' (blank) to aggregate data globally across all tenants.")
-            if 'filter_tenants' in self.fields:
-                self.fields['filter_tenants'].label = _("Filter Tenants (Scoping Constellation)")
-                self.fields['filter_tenants'].help_text = _("Select one or more specific tenants to filter this scheduled report's compiled data. If none are selected, aggregates data globally across all tenants.")
+            if "tenant" in self.fields:
+                self.fields["tenant"].required = False
+                self.fields["tenant"].label = _("Scope / Tenant Filter")
+                self.fields["tenant"].empty_label = _("--------- All Tenants ---------")
+                self.fields["tenant"].help_text = _(
+                    "Select a specific tenant to restrict this scheduled report's compiled data strictly to that tenant. Choose 'All Tenants' (blank) to aggregate data globally across all tenants."
+                )
+            if "filter_tenants" in self.fields:
+                self.fields["filter_tenants"].label = _("Filter Tenants (Scoping Constellation)")
+                self.fields["filter_tenants"].help_text = _(
+                    "Select one or more specific tenants to filter this scheduled report's compiled data. If none are selected, aggregates data globally across all tenants."
+                )
 
-        is_admin = bool(user and (user.is_superuser or getattr(user, 'is_staff', False)))
+        is_admin = bool(user and (user.is_superuser or getattr(user, "is_staff", False)))
         self.helper = FormHelper()
         admin_fieldset_fields = []
         if is_admin:
             admin_fieldset_fields = [
                 Row(
-                    Column('tenant', css_class='col-md-6'),
-                    Column('filter_tenants', css_class='col-md-6'),
-                    css_class='row g-3',
+                    Column("tenant", css_class="col-md-6"),
+                    Column("filter_tenants", css_class="col-md-6"),
+                    css_class="row g-3",
                 ),
             ]
         layout_fields = [
             Fieldset(
-                _('Identity'),
+                _("Identity"),
                 Row(
-                    Column('name', css_class='col-md-6'),
-                    Column('report', css_class='col-md-6'),
-                    css_class='row g-3',
+                    Column("name", css_class="col-md-6"),
+                    Column("report", css_class="col-md-6"),
+                    css_class="row g-3",
                 ),
             ),
             Fieldset(
-                _('Schedule'),
+                _("Schedule"),
                 Row(
-                    Column('frequency', css_class='col-md-4'),
-                    Column('cron_expression', css_class='col-md-4'),
-                    Column('start_time', css_class='col-md-4'),
-                    css_class='row g-3',
+                    Column("frequency", css_class="col-md-4"),
+                    Column("cron_expression", css_class="col-md-4"),
+                    Column("start_time", css_class="col-md-4"),
+                    css_class="row g-3",
                 ),
             ),
             Fieldset(
-                _('Delivery'),
-                'recipients',
-                'channels',
+                _("Delivery"),
+                "recipients",
+                "channels",
                 Row(
-                    Column('format', css_class='col-md-4'),
-                    Column('save_to_archive', css_class='col-md-4'),
-                    Column('is_active', css_class='col-md-4'),
-                    css_class='row g-3',
+                    Column("format", css_class="col-md-4"),
+                    Column("save_to_archive", css_class="col-md-4"),
+                    Column("is_active", css_class="col-md-4"),
+                    css_class="row g-3",
                 ),
             ),
         ]
         if admin_fieldset_fields:
-            layout_fields.append(Fieldset(_('Scope'), *admin_fieldset_fields))
+            layout_fields.append(Fieldset(_("Scope"), *admin_fieldset_fields))
         layout_fields += [
             HTML('<div class="mt-4"></div>'),
-            Submit('submit', _('Save Scheduled Report'), css_class='btn btn-primary'),
+            Submit("submit", _("Save Scheduled Report"), css_class="btn btn-primary"),
             HTML(
                 '<a href="{% url \'extras:scheduledreport_list\' %}" class="btn btn-outline-secondary ms-2" '
-                'data-no-dirty-track="true">' + str(_('Cancel')) + '</a>'
+                'data-no-dirty-track="true">' + str(_("Cancel")) + "</a>"
             ),
         ]
         self.helper.layout = Layout(*layout_fields)
@@ -961,82 +1063,88 @@ class AlertRuleForm(forms.ModelForm):
     class Meta:
         model = AlertRule
         fields = [
-            'name', 'description', 'alert_type', 'threshold_value', 'severity',
-            'is_active', 'is_muted', 'renotify_interval_days', 'channels', 'tenant',
+            "name",
+            "description",
+            "alert_type",
+            "threshold_value",
+            "severity",
+            "is_active",
+            "is_muted",
+            "renotify_interval_days",
+            "channels",
+            "tenant",
         ]
         widgets = {
-            'channels': forms.SelectMultiple(attrs={'class': 'form-select', 'data-tom-select': ''}),
-            'tenant': forms.Select(attrs={'class': 'form-select'})
+            "channels": forms.SelectMultiple(attrs={"class": "form-select", "data-tom-select": ""}),
+            "tenant": forms.Select(attrs={"class": "form-select"}),
         }
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         user = get_current_user()
-        if user and not (user.is_superuser or (hasattr(user, 'is_staff') and user.is_staff)):
-            if 'tenant' in self.fields:
-                self.fields.pop('tenant')
+        if user and not (user.is_superuser or (hasattr(user, "is_staff") and user.is_staff)):
+            if "tenant" in self.fields:
+                self.fields.pop("tenant")
 
         # Make the threshold label/help reflect what the number actually means
         # for the selected alert type (days horizon vs. unit count).
         alert_type = (
-            self.data.get('alert_type')
-            or self.initial.get('alert_type')
-            or getattr(self.instance, 'alert_type', None)
+            self.data.get("alert_type") or self.initial.get("alert_type") or getattr(self.instance, "alert_type", None)
         )
-        threshold = self.fields['threshold_value']
+        threshold = self.fields["threshold_value"]
         if alert_type in self._DAYS_ALERT_TYPES:
-            threshold.label = _('Days horizon')
-            threshold.help_text = _('Alert when the date is within this many days.')
+            threshold.label = _("Days horizon")
+            threshold.help_text = _("Alert when the date is within this many days.")
         elif alert_type == AlertRule.ALERT_TYPE_LOW_STOCK:
-            threshold.label = _('Stock threshold (units)')
-            threshold.help_text = _('Alert when available stock is at or below this many units '
-                                    '(per-item minimum quantity overrides this when set).')
+            threshold.label = _("Stock threshold (units)")
+            threshold.help_text = _(
+                "Alert when available stock is at or below this many units "
+                "(per-item minimum quantity overrides this when set)."
+            )
         else:
-            threshold.help_text = _('Limit count or days horizon, depending on alert type.')
+            threshold.help_text = _("Limit count or days horizon, depending on alert type.")
 
-        self.fields['renotify_interval_days'].label = _('Re-notify every (days)')
+        self.fields["renotify_interval_days"].label = _("Re-notify every (days)")
 
-        is_admin = bool(user and (user.is_superuser or getattr(user, 'is_staff', False)))
+        is_admin = bool(user and (user.is_superuser or getattr(user, "is_staff", False)))
         self.helper = FormHelper()
         layout_fields = [
             Fieldset(
-                _('Identity'),
+                _("Identity"),
                 Row(
-                    Column('name', css_class='col-md-8'),
-                    Column('severity', css_class='col-md-4'),
-                    css_class='row g-3',
+                    Column("name", css_class="col-md-8"),
+                    Column("severity", css_class="col-md-4"),
+                    css_class="row g-3",
                 ),
-                'description',
+                "description",
             ),
             Fieldset(
-                _('Alert Configuration'),
+                _("Alert Configuration"),
                 Row(
-                    Column('alert_type', css_class='col-md-6'),
-                    Column('threshold_value', css_class='col-md-6'),
-                    css_class='row g-3',
+                    Column("alert_type", css_class="col-md-6"),
+                    Column("threshold_value", css_class="col-md-6"),
+                    css_class="row g-3",
                 ),
                 Row(
-                    Column('renotify_interval_days', css_class='col-md-4'),
-                    Column('is_active', css_class='col-md-4'),
-                    Column('is_muted', css_class='col-md-4'),
-                    css_class='row g-3',
+                    Column("renotify_interval_days", css_class="col-md-4"),
+                    Column("is_active", css_class="col-md-4"),
+                    Column("is_muted", css_class="col-md-4"),
+                    css_class="row g-3",
                 ),
             ),
             Fieldset(
-                _('Notifications'),
-                'channels',
+                _("Notifications"),
+                "channels",
             ),
         ]
         if is_admin:
-            layout_fields.append(
-                Row(Column('tenant', css_class='col-md-6'), css_class='row g-3')
-            )
+            layout_fields.append(Row(Column("tenant", css_class="col-md-6"), css_class="row g-3"))
         layout_fields += [
             HTML('<div class="mt-4"></div>'),
-            Submit('submit', _('Save Alert Rule'), css_class='btn btn-primary'),
+            Submit("submit", _("Save Alert Rule"), css_class="btn btn-primary"),
             HTML(
                 '<a href="{% url \'extras:alertrule_list\' %}" class="btn btn-outline-secondary ms-2" '
-                'data-no-dirty-track="true">' + str(_('Cancel')) + '</a>'
+                'data-no-dirty-track="true">' + str(_("Cancel")) + "</a>"
             ),
         ]
         self.helper.layout = Layout(*layout_fields)
@@ -1069,87 +1177,94 @@ class NotificationChannelForm(forms.ModelForm):
 
     webhook_url = forms.URLField(
         required=False,
-        label=_('Incoming webhook URL'),
-        widget=forms.URLInput(attrs={'placeholder': 'https://hooks.slack.com/services/...'}),
-        help_text=_('Paste the incoming-webhook URL from Slack or Microsoft Teams.'),
+        label=_("Incoming webhook URL"),
+        widget=forms.URLInput(attrs={"placeholder": "https://hooks.slack.com/services/..."}),
+        help_text=_("Paste the incoming-webhook URL from Slack or Microsoft Teams."),
     )
     email_recipients = forms.CharField(
         required=False,
-        label=_('Recipient email addresses'),
-        widget=forms.Textarea(attrs={'rows': 3, 'placeholder': 'alice@example.com, bob@example.com'}),
-        help_text=_('Comma- or newline-separated email addresses.'),
+        label=_("Recipient email addresses"),
+        widget=forms.Textarea(attrs={"rows": 3, "placeholder": "alice@example.com, bob@example.com"}),
+        help_text=_("Comma- or newline-separated email addresses."),
     )
     in_app_recipient_users = forms.ModelMultipleChoiceField(
         required=False,
         queryset=None,
-        label=_('Specific recipients'),
-        widget=forms.SelectMultiple(attrs={'class': 'form-select', 'data-tom-select': ''}),
+        label=_("Specific recipients"),
+        widget=forms.SelectMultiple(attrs={"class": "form-select", "data-tom-select": ""}),
         help_text=_("Optional. Leave empty to notify every member of this channel's tenant."),
     )
 
     field_order = [
-        'name', 'channel_type',
-        'webhook_url', 'email_recipients', 'in_app_recipient_users',
-        'enabled', 'tenant',
+        "name",
+        "channel_type",
+        "webhook_url",
+        "email_recipients",
+        "in_app_recipient_users",
+        "enabled",
+        "tenant",
     ]
 
     class Meta:
         model = NotificationChannel
-        fields = ['name', 'channel_type', 'enabled', 'tenant']
+        fields = ["name", "channel_type", "enabled", "tenant"]
         widgets = {
-            'channel_type': forms.Select(attrs={'class': 'form-select'}),
-            'tenant': forms.Select(attrs={'class': 'form-select'}),
+            "channel_type": forms.Select(attrs={"class": "form-select"}),
+            "tenant": forms.Select(attrs={"class": "form-select"}),
         }
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         from django.contrib.auth import get_user_model
+
         User = get_user_model()
 
         user = get_current_user()
-        is_admin = bool(user and (user.is_superuser or getattr(user, 'is_staff', False)))
+        is_admin = bool(user and (user.is_superuser or getattr(user, "is_staff", False)))
 
         # Scope the in-app recipient choices: admins see everyone, tenant
         # users see only their own tenant's members.
         if is_admin:
-            self.fields['in_app_recipient_users'].queryset = User.objects.filter(is_active=True)
+            self.fields["in_app_recipient_users"].queryset = User.objects.filter(is_active=True)
         else:
             from core.managers import get_current_tenant
+
             tenant = get_current_tenant()
             if tenant:
-                self.fields['in_app_recipient_users'].queryset = User.objects.filter(
+                self.fields["in_app_recipient_users"].queryset = User.objects.filter(
                     asset_holder_profiles__tenant=tenant, is_active=True
                 ).distinct()
             else:
-                self.fields['in_app_recipient_users'].queryset = User.objects.none()
-            if 'tenant' in self.fields:
-                self.fields.pop('tenant')
+                self.fields["in_app_recipient_users"].queryset = User.objects.none()
+            if "tenant" in self.fields:
+                self.fields.pop("tenant")
 
         # Pre-fill typed fields from the stored config JSON (edit view).
         config = (self.instance.config or {}) if self.instance else {}
         if config:
-            self.initial.setdefault('webhook_url', config.get('webhook_url', ''))
-            recipients = config.get('recipients') or []
+            self.initial.setdefault("webhook_url", config.get("webhook_url", ""))
+            recipients = config.get("recipients") or []
             if recipients:
-                self.initial.setdefault('email_recipients', '\n'.join(recipients))
-            recipient_users = config.get('recipient_users') or []
+                self.initial.setdefault("email_recipients", "\n".join(recipients))
+            recipient_users = config.get("recipient_users") or []
             if recipient_users:
-                self.initial.setdefault('in_app_recipient_users', recipient_users)
+                self.initial.setdefault("in_app_recipient_users", recipient_users)
 
     def clean(self):
         import re
-        from django.core.validators import validate_email
+
         from django.core.exceptions import ValidationError as DjangoValidationError
+        from django.core.validators import validate_email
 
         cleaned = super().clean()
-        channel_type = cleaned.get('channel_type')
+        channel_type = cleaned.get("channel_type")
         config = {}
 
         if channel_type == NotificationChannel.TYPE_EMAIL:
-            raw = cleaned.get('email_recipients') or ''
-            parts = [p.strip() for p in re.split(r'[,\n;]+', raw) if p.strip()]
+            raw = cleaned.get("email_recipients") or ""
+            parts = [p.strip() for p in re.split(r"[,\n;]+", raw) if p.strip()]
             if not parts:
-                self.add_error('email_recipients', _('Enter at least one recipient email address.'))
+                self.add_error("email_recipients", _("Enter at least one recipient email address."))
             else:
                 bad = []
                 for addr in parts:
@@ -1159,16 +1274,16 @@ class NotificationChannelForm(forms.ModelForm):
                         bad.append(addr)
                 if bad:
                     self.add_error(
-                        'email_recipients',
-                        _('Invalid email address(es): %(bad)s') % {'bad': ', '.join(bad)},
+                        "email_recipients",
+                        _("Invalid email address(es): %(bad)s") % {"bad": ", ".join(bad)},
                     )
                 else:
-                    config['recipients'] = parts
+                    config["recipients"] = parts
 
         elif channel_type in (NotificationChannel.TYPE_SLACK, NotificationChannel.TYPE_TEAMS):
-            url = (cleaned.get('webhook_url') or '').strip()
+            url = (cleaned.get("webhook_url") or "").strip()
             if not url:
-                self.add_error('webhook_url', _('This channel type requires an incoming webhook URL.'))
+                self.add_error("webhook_url", _("This channel type requires an incoming webhook URL."))
             else:
                 # SSRF guard: apply the same boundary check used by WebhookEndpoint.clean
                 # and the DRF serializer so the UI form cannot persist a loopback/
@@ -1176,14 +1291,14 @@ class NotificationChannelForm(forms.ModelForm):
                 try:
                     validate_external_url(url)
                 except DjangoValidationError as exc:
-                    self.add_error('webhook_url', exc.message)
+                    self.add_error("webhook_url", exc.message)
                 else:
-                    config['webhook_url'] = url
+                    config["webhook_url"] = url
 
         elif channel_type == NotificationChannel.TYPE_IN_APP:
-            users = cleaned.get('in_app_recipient_users')
+            users = cleaned.get("in_app_recipient_users")
             if users:
-                config['recipient_users'] = [u.pk for u in users]
+                config["recipient_users"] = [u.pk for u in users]
             # Empty is valid — delivery falls back to all tenant members.
 
         self._assembled_config = config
@@ -1192,7 +1307,7 @@ class NotificationChannelForm(forms.ModelForm):
 
     def save(self, commit=True):
         instance = super().save(commit=False)
-        instance.config = getattr(self, '_assembled_config', {}) or {}
+        instance.config = getattr(self, "_assembled_config", {}) or {}
         tenant = _resolve_nonadmin_write_tenant(self, get_current_user())
         if tenant is not None:
             instance.tenant = tenant
@@ -1204,30 +1319,35 @@ class NotificationChannelForm(forms.ModelForm):
 
 class ObjectChangeFilterForm(FilterForm):
     from core.filters import ObjectChangeFilterSet
+
     filterset_class = ObjectChangeFilterSet
 
 
 class JournalEntryFilterForm(FilterForm):
     from extras.filters import JournalEntryFilterSet
+
     filterset_class = JournalEntryFilterSet
 
 
 class AlertRuleFilterForm(FilterForm):
     from extras.filters import AlertRuleFilterSet
+
     filterset_class = AlertRuleFilterSet
 
 
 class NotificationChannelFilterForm(FilterForm):
     from extras.filters import NotificationChannelFilterSet
+
     filterset_class = NotificationChannelFilterSet
 
 
 class ReportTemplateFilterForm(FilterForm):
     from extras.filters import ReportTemplateFilterSet
+
     filterset_class = ReportTemplateFilterSet
 
 
 class ScheduledReportFilterForm(FilterForm):
     from extras.filters import ScheduledReportFilterSet
-    filterset_class = ScheduledReportFilterSet
 
+    filterset_class = ScheduledReportFilterSet

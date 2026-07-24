@@ -1,11 +1,11 @@
 from django_filters.rest_framework import DjangoFilterBackend
 
-from itambox.api.permissions import TokenPermissions, StrictTenantPermission
+from itambox.api.permissions import StrictTenantPermission, TokenPermissions
 from itambox.api.viewsets import ITAMBoxModelViewSet
-
-from procurement.models import Contract, PurchaseOrder, PurchaseOrderLine
 from procurement.filters import ContractFilterSet, PurchaseOrderFilterSet
-from .serializers import ContractSerializer, PurchaseOrderSerializer, PurchaseOrderLineSerializer
+from procurement.models import Contract, PurchaseOrder, PurchaseOrderLine
+
+from .serializers import ContractSerializer, PurchaseOrderLineSerializer, PurchaseOrderSerializer
 
 
 class ContractViewSet(ITAMBoxModelViewSet):
@@ -19,10 +19,14 @@ class ContractViewSet(ITAMBoxModelViewSet):
     - `StrictTenantPermission` enforces the boundary at object-level on
       detail endpoints.
     """
+
     permission_classes = [TokenPermissions, StrictTenantPermission]
     queryset = Contract.objects.select_related(
-        'tenant', 'supplier', 'purchase_order', 'cost_center',
-    ).prefetch_related('assets')
+        "tenant",
+        "supplier",
+        "purchase_order",
+        "cost_center",
+    ).prefetch_related("assets")
     serializer_class = ContractSerializer
     filter_backends = (DjangoFilterBackend,)
     filterset_class = ContractFilterSet
@@ -39,10 +43,14 @@ class PurchaseOrderViewSet(ITAMBoxModelViewSet):
     - `StrictTenantPermission` enforces the boundary at object-level on
       detail endpoints.
     """
+
     permission_classes = [TokenPermissions, StrictTenantPermission]
     queryset = PurchaseOrder.objects.select_related(
-        'tenant', 'supplier', 'destination_location', 'created_by',
-    ).prefetch_related('lines')
+        "tenant",
+        "supplier",
+        "destination_location",
+        "created_by",
+    ).prefetch_related("lines")
     serializer_class = PurchaseOrderSerializer
     filter_backends = (DjangoFilterBackend,)
     filterset_class = PurchaseOrderFilterSet
@@ -59,9 +67,15 @@ class PurchaseOrderLineViewSet(ITAMBoxModelViewSet):
     - `StrictTenantPermission` enforces the boundary at object-level on
       detail endpoints.
     """
+
     permission_classes = [TokenPermissions, StrictTenantPermission]
     queryset = PurchaseOrderLine.objects.select_related(
-        'tenant', 'purchase_order', 'asset_type', 'component',
-        'accessory', 'consumable', 'license',
+        "tenant",
+        "purchase_order",
+        "asset_type",
+        "component",
+        "accessory",
+        "consumable",
+        "license",
     )
     serializer_class = PurchaseOrderLineSerializer

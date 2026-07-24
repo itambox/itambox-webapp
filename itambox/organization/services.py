@@ -6,6 +6,7 @@ restriction applied to a model whose default manager does not filter by
 tenant, plus the centralized cross-tenant resource-access resolver
 (ADR-0001, remediation plan phase 3).
 """
+
 from dataclasses import dataclass
 from typing import Optional
 
@@ -16,17 +17,16 @@ from core.managers import get_current_tenant
 from .access import accessible_tenant_ids, get_ancestor_tenant_group_ids
 from .models import Tenant, TenantResourceGrant
 
-
 # Access-control models whose default manager is deliberately unscoped (their
 # tenant resolution is itself an *input* to tenant scoping, so they cannot ride
 # the tenant-scoping manager — see TenantScopingQuerySet.filter_by_tenant() in
 # core/managers.py). Generic, model-agnostic code (ObjectExportView) must apply
 # ``visible_to_containers`` to these instead.
 _UNFILTERED_CONTAINER_MODELS = {
-    ('organization', 'membership'),
-    ('organization', 'rolegrant'),
-    ('organization', 'tenantresourcegrant'),
-    ('users', 'token'),
+    ("organization", "membership"),
+    ("organization", "rolegrant"),
+    ("organization", "tenantresourcegrant"),
+    ("users", "token"),
 }
 
 
@@ -50,21 +50,20 @@ def visible_to_containers(user, qs, perm):
         return qs
     candidate_ids = accessible_tenant_ids(user)
     allowed = [
-        t.pk for t in Tenant._base_manager.filter(
-            pk__in=candidate_ids, deleted_at__isnull=True,
+        t.pk
+        for t in Tenant._base_manager.filter(
+            pk__in=candidate_ids,
+            deleted_at__isnull=True,
         )
         if user.has_perm(perm, obj=t)
     ]
     model = qs.model
     field_names = {f.name for f in model._meta.get_fields()}
-    if 'tenant' in field_names:
+    if "tenant" in field_names:
         return qs.filter(tenant_id__in=allowed)
-    if {'membership', 'user_group'} <= field_names:
-        return qs.filter(
-            Q(membership__tenant_id__in=allowed)
-            | Q(user_group__tenant_id__in=allowed)
-        )
-    if 'membership' in field_names:
+    if {"membership", "user_group"} <= field_names:
+        return qs.filter(Q(membership__tenant_id__in=allowed) | Q(user_group__tenant_id__in=allowed))
+    if "membership" in field_names:
         return qs.filter(membership__tenant_id__in=allowed)
     return qs.none()  # unknown shape — fail closed
 
@@ -90,14 +89,14 @@ _ACCESS_ORDER = {
 }
 
 # Machine-readable decision reasons.
-REASON_SAME_TENANT = 'same-tenant'
-REASON_DIRECT_GRANT = 'direct-grant'
-REASON_GROUP_GRANT = 'group-grant'
-DENIED_NO_ACTIVE_TENANT = 'no-active-tenant'
-DENIED_OWNER_UNRESOLVABLE = 'owner-unresolvable'
-DENIED_NO_GRANT = 'no-grant'
-DENIED_INSUFFICIENT_LEVEL = 'insufficient-access-level'
-DENIED_RBAC = 'rbac-denied'
+REASON_SAME_TENANT = "same-tenant"
+REASON_DIRECT_GRANT = "direct-grant"
+REASON_GROUP_GRANT = "group-grant"
+DENIED_NO_ACTIVE_TENANT = "no-active-tenant"
+DENIED_OWNER_UNRESOLVABLE = "owner-unresolvable"
+DENIED_NO_GRANT = "no-grant"
+DENIED_INSUFFICIENT_LEVEL = "insufficient-access-level"
+DENIED_RBAC = "rbac-denied"
 
 
 @dataclass(frozen=True)
@@ -105,6 +104,7 @@ class ResourceAccessDecision:
     """The resolver's verdict. ``grant`` is the exact row that authorized a
     cross-tenant access so the caller can record provenance (phase 4:
     ``assignment.resource_grant``); it is ``None`` for same-tenant access."""
+
     allowed: bool
     reason: str
     owner_tenant_id: Optional[int] = None
@@ -160,7 +160,10 @@ def resolve_stock_access(user, stock, access_level, perm, active_tenant=None):
 
     if _ACCESS_ORDER[grant.access_level] < _ACCESS_ORDER[access_level]:
         return ResourceAccessDecision(
-            False, DENIED_INSUFFICIENT_LEVEL, owner_tenant_id, grant,
+            False,
+            DENIED_INSUFFICIENT_LEVEL,
+            owner_tenant_id,
+            grant,
         )
     if not rbac_ok():
         return ResourceAccessDecision(False, DENIED_RBAC, owner_tenant_id, grant)
@@ -171,6 +174,7 @@ def _find_covering_grant(owner_tenant_id, active_tenant, stock):
     """The live grant covering (pool, active tenant), preferring a direct
     grant over an ancestor-group grant. Returns ``(grant, reason)``."""
     from django.contrib.contenttypes.models import ContentType
+
     ct = ContentType.objects.get_for_model(type(stock))
     base = TenantResourceGrant.objects.filter(
         tenant_id=owner_tenant_id,
@@ -185,10 +189,7 @@ def _find_covering_grant(owner_tenant_id, active_tenant, stock):
         live_only=True,
     )
     if ancestor_group_ids:
-        grant = (
-            base.filter(grantee_tenant_group_id__in=ancestor_group_ids)
-            .order_by('created_at').first()
-        )
+        grant = base.filter(grantee_tenant_group_id__in=ancestor_group_ids).order_by("created_at").first()
         if grant is not None:
             return grant, REASON_GROUP_GRANT
     return None, DENIED_NO_GRANT

@@ -1,13 +1,15 @@
 import graphene
-from graphene_django import DjangoObjectType
-from .models import Provider, Subscription, SubscriptionAssignment
-from organization.models import Tenant, TenantGroup, Contact, ContactRole, ContactAssignment
-from django.contrib.contenttypes.models import ContentType
 from django.contrib.auth import get_user_model
-from core.graphql_utils import check_permission, get_object_or_denied, generate_slug, paginate_queryset
-from graphql import GraphQLError
-from django.core.exceptions import ValidationError, PermissionDenied
+from django.contrib.contenttypes.models import ContentType
+from django.core.exceptions import PermissionDenied, ValidationError
 from django.utils.translation import gettext_lazy as _
+from graphene_django import DjangoObjectType
+from graphql import GraphQLError
+
+from core.graphql_utils import check_permission, generate_slug, get_object_or_denied, paginate_queryset
+from organization.models import Contact, ContactAssignment, ContactRole, Tenant, TenantGroup
+
+from .models import Provider, Subscription, SubscriptionAssignment
 
 
 def _resolve_owner(owner_id, user, active_tenant):
@@ -24,6 +26,7 @@ def _resolve_owner(owner_id, user, active_tenant):
     owner = get_object_or_denied(user_model, owner_id, user)
     if active_tenant is not None:
         from organization.models import Membership
+
         if not Membership.objects.filter(user=owner, tenant=active_tenant).exists():
             raise PermissionDenied(_("Owner must be a member of the active tenant."))
     return owner
@@ -31,30 +34,36 @@ def _resolve_owner(owner_id, user, active_tenant):
 
 # Node definitions
 
+
 class ContentTypeNode(DjangoObjectType):
     class Meta:
         model = ContentType
         fields = ("id", "app_label", "model")
+
 
 class TenantGroupNode(DjangoObjectType):
     class Meta:
         model = TenantGroup
         fields = ("id", "name", "slug")
 
+
 class ContactRoleNode(DjangoObjectType):
     class Meta:
         model = ContactRole
         fields = ("id", "name", "slug", "description")
+
 
 class ContactNode(DjangoObjectType):
     class Meta:
         model = Contact
         fields = ("id", "name", "title", "phone", "email", "web_url", "description", "comments")
 
+
 class ContactAssignmentNode(DjangoObjectType):
     class Meta:
         model = ContactAssignment
         fields = ("id", "contact", "role", "priority")
+
 
 class ProviderNode(DjangoObjectType):
     contacts = graphene.List(ContactAssignmentNode)
@@ -62,12 +71,23 @@ class ProviderNode(DjangoObjectType):
     class Meta:
         model = Provider
         fields = (
-            "id", "name", "slug", "account_id", "portal_url", "admin_notes",
-            "is_active", "tenant", "tenant_group", "contacts", "created_at", "updated_at"
+            "id",
+            "name",
+            "slug",
+            "account_id",
+            "portal_url",
+            "admin_notes",
+            "is_active",
+            "tenant",
+            "tenant_group",
+            "contacts",
+            "created_at",
+            "updated_at",
         )
 
     def resolve_contacts(self, info):
         return self.contacts.all()
+
 
 class SubscriptionNode(DjangoObjectType):
     cost_center_id = graphene.ID()
@@ -76,11 +96,28 @@ class SubscriptionNode(DjangoObjectType):
     class Meta:
         model = Subscription
         fields = (
-            "id", "name", "slug", "provider", "type", "status",
-            "start_date", "renewal_date", "renewal_cost", "currency",
-            "billing_cycle", "term_months", "auto_renewal", "licensed_quantity",
-            "contract_reference", "cancellation_date", "owner",
-            "description", "notes", "tenant", "created_at", "updated_at"
+            "id",
+            "name",
+            "slug",
+            "provider",
+            "type",
+            "status",
+            "start_date",
+            "renewal_date",
+            "renewal_cost",
+            "currency",
+            "billing_cycle",
+            "term_months",
+            "auto_renewal",
+            "licensed_quantity",
+            "contract_reference",
+            "cancellation_date",
+            "owner",
+            "description",
+            "notes",
+            "tenant",
+            "created_at",
+            "updated_at",
         )
 
     def resolve_cost_center_id(self, info):
@@ -89,28 +126,44 @@ class SubscriptionNode(DjangoObjectType):
     def resolve_cost_center_name(self, info):
         return str(self.cost_center) if self.cost_center_id else None
 
+
 class SubscriptionAssignmentNode(DjangoObjectType):
     content_type = graphene.Field(ContentTypeNode)
 
     class Meta:
         model = SubscriptionAssignment
         fields = (
-            "id", "subscription", "content_type", "object_id",
-            "assigned_date", "assigned_by", "notes", "created_at", "updated_at"
+            "id",
+            "subscription",
+            "content_type",
+            "object_id",
+            "assigned_date",
+            "assigned_by",
+            "notes",
+            "created_at",
+            "updated_at",
         )
+
 
 # Sortable fields configuration
 
-PROVIDER_SORTABLE_FIELDS = {
-    "name", "-name", "created_at", "-created_at", "updated_at", "-updated_at"
-}
+PROVIDER_SORTABLE_FIELDS = {"name", "-name", "created_at", "-created_at", "updated_at", "-updated_at"}
 
 SUBSCRIPTION_SORTABLE_FIELDS = {
-    "name", "-name", "renewal_date", "-renewal_date", "renewal_cost", "-renewal_cost",
-    "created_at", "-created_at", "updated_at", "-updated_at"
+    "name",
+    "-name",
+    "renewal_date",
+    "-renewal_date",
+    "renewal_cost",
+    "-renewal_cost",
+    "created_at",
+    "-created_at",
+    "updated_at",
+    "-updated_at",
 }
 
 # Queries
+
 
 class Query(graphene.ObjectType):
     providers = graphene.List(
@@ -143,9 +196,9 @@ class Query(graphene.ObjectType):
     subscription_assignment = graphene.Field(SubscriptionAssignmentNode, id=graphene.ID(required=True))
 
     def resolve_providers(self, info, limit=None, offset=None, sort_by=None, **kwargs):
-        check_permission(info, 'subscriptions.view_provider')
+        check_permission(info, "subscriptions.view_provider")
         # TenantScopingManager automatically handles thread-local active tenant/group and global fallback scoping.
-        qs = Provider.objects.prefetch_related('contacts__contact', 'contacts__role').all()
+        qs = Provider.objects.prefetch_related("contacts__contact", "contacts__role").all()
         for key, val in kwargs.items():
             if val is not None:
                 qs = qs.filter(**{key: val})
@@ -154,16 +207,16 @@ class Query(graphene.ObjectType):
         return paginate_queryset(qs, limit, offset)
 
     def resolve_provider(self, info, id):
-        check_permission(info, 'subscriptions.view_provider')
+        check_permission(info, "subscriptions.view_provider")
         try:
-            return Provider.objects.prefetch_related('contacts__contact', 'contacts__role').get(pk=id)
+            return Provider.objects.prefetch_related("contacts__contact", "contacts__role").get(pk=id)
         except Provider.DoesNotExist:
             return None
 
     def resolve_subscriptions(self, info, limit=None, offset=None, sort_by=None, **kwargs):
-        check_permission(info, 'subscriptions.view_subscription')
+        check_permission(info, "subscriptions.view_subscription")
         # TenantScopingSoftDeleteManager handles tenant scoping and active filtering.
-        qs = Subscription.objects.select_related('provider', 'tenant', 'owner').all()
+        qs = Subscription.objects.select_related("provider", "tenant", "owner").all()
         for key, val in kwargs.items():
             if val is not None:
                 qs = qs.filter(**{key: val})
@@ -172,18 +225,18 @@ class Query(graphene.ObjectType):
         return paginate_queryset(qs, limit, offset)
 
     def resolve_subscription(self, info, id):
-        check_permission(info, 'subscriptions.view_subscription')
+        check_permission(info, "subscriptions.view_subscription")
         try:
-            return Subscription.objects.select_related('provider', 'tenant', 'owner').get(pk=id)
+            return Subscription.objects.select_related("provider", "tenant", "owner").get(pk=id)
         except Subscription.DoesNotExist:
             return None
 
     def resolve_subscription_assignments(self, info, limit=None, offset=None, **kwargs):
-        check_permission(info, 'subscriptions.view_subscriptionassignment')
-        active_tenant = getattr(info.context, 'active_tenant', None)
+        check_permission(info, "subscriptions.view_subscriptionassignment")
+        active_tenant = getattr(info.context, "active_tenant", None)
         # SubscriptionAssignment has no direct tenant field, scope via its subscription
         qs = SubscriptionAssignment.objects.select_related(
-            'subscription', 'subscription__provider', 'assigned_by', 'content_type'
+            "subscription", "subscription__provider", "assigned_by", "content_type"
         ).filter(subscription__tenant=active_tenant)
         for key, val in kwargs.items():
             if val is not None:
@@ -191,17 +244,22 @@ class Query(graphene.ObjectType):
         return paginate_queryset(qs, limit, offset)
 
     def resolve_subscription_assignment(self, info, id):
-        check_permission(info, 'subscriptions.view_subscriptionassignment')
-        active_tenant = getattr(info.context, 'active_tenant', None)
+        check_permission(info, "subscriptions.view_subscriptionassignment")
+        active_tenant = getattr(info.context, "active_tenant", None)
         try:
-            return SubscriptionAssignment.objects.select_related(
-                'subscription', 'subscription__provider', 'assigned_by', 'content_type'
-            ).filter(subscription__tenant=active_tenant).get(pk=id)
+            return (
+                SubscriptionAssignment.objects.select_related(
+                    "subscription", "subscription__provider", "assigned_by", "content_type"
+                )
+                .filter(subscription__tenant=active_tenant)
+                .get(pk=id)
+            )
         except SubscriptionAssignment.DoesNotExist:
             return None
 
 
 # Provider Mutations
+
 
 class CreateProvider(graphene.Mutation):
     class Arguments:
@@ -217,13 +275,13 @@ class CreateProvider(graphene.Mutation):
     provider = graphene.Field(ProviderNode)
 
     def mutate(self, info, **kwargs):
-        user = check_permission(info, 'subscriptions.add_provider')
-        active_tenant = getattr(info.context, 'active_tenant', None)
+        user = check_permission(info, "subscriptions.add_provider")
+        active_tenant = getattr(info.context, "active_tenant", None)
 
         provider = Provider()
 
-        if 'tenant_id' in kwargs:
-            tenant_id = kwargs.pop('tenant_id')
+        if "tenant_id" in kwargs:
+            tenant_id = kwargs.pop("tenant_id")
             if tenant_id:
                 provider.tenant = get_object_or_denied(Tenant, tenant_id, user)
             else:
@@ -231,8 +289,8 @@ class CreateProvider(graphene.Mutation):
         else:
             provider.tenant = active_tenant
 
-        if 'tenant_group_id' in kwargs:
-            tenant_group_id = kwargs.pop('tenant_group_id')
+        if "tenant_group_id" in kwargs:
+            tenant_group_id = kwargs.pop("tenant_group_id")
             if tenant_group_id:
                 provider.tenant_group = get_object_or_denied(TenantGroup, tenant_group_id, user)
                 # If they set tenant_group, tenant must be null (based on constraint)
@@ -240,7 +298,7 @@ class CreateProvider(graphene.Mutation):
             else:
                 provider.tenant_group = None
         else:
-            active_tenant_group = getattr(info.context, 'active_tenant_group', None)
+            active_tenant_group = getattr(info.context, "active_tenant_group", None)
             if not provider.tenant and active_tenant_group:
                 provider.tenant_group = active_tenant_group
 
@@ -248,9 +306,7 @@ class CreateProvider(graphene.Mutation):
         if provider.tenant is None and provider.tenant_group is None and not user.is_superuser:
             raise PermissionDenied(_("Only superusers can create global providers."))
 
-        ALLOWED_FIELDS = {
-            'name', 'slug', 'account_id', 'portal_url', 'admin_notes', 'is_active'
-        }
+        ALLOWED_FIELDS = {"name", "slug", "account_id", "portal_url", "admin_notes", "is_active"}
         for key, val in kwargs.items():
             if key in ALLOWED_FIELDS:
                 setattr(provider, key, val)
@@ -262,7 +318,7 @@ class CreateProvider(graphene.Mutation):
         except ValidationError as e:
             raise GraphQLError(
                 "Validation failed",
-                extensions={"validation_errors": e.message_dict if hasattr(e, 'message_dict') else e.messages}
+                extensions={"validation_errors": e.message_dict if hasattr(e, "message_dict") else e.messages},
             )
         provider.save()
         return CreateProvider(provider=provider)
@@ -283,26 +339,26 @@ class UpdateProvider(graphene.Mutation):
     provider = graphene.Field(ProviderNode)
 
     def mutate(self, info, id, **kwargs):
-        user = check_permission(info, 'subscriptions.change_provider')
-        active_tenant = getattr(info.context, 'active_tenant', None)
-        
+        user = check_permission(info, "subscriptions.change_provider")
+        active_tenant = getattr(info.context, "active_tenant", None)
+
         provider = get_object_or_denied(Provider, id, user, tenant=active_tenant)
-        check_permission(info, 'subscriptions.change_provider', obj=provider)
+        check_permission(info, "subscriptions.change_provider", obj=provider)
 
         # Global object restriction for non-superusers
         if provider.tenant is None and provider.tenant_group is None and not user.is_superuser:
             raise PermissionDenied(_("Only superusers can modify global providers."))
 
-        if 'tenant_id' in kwargs:
-            tenant_id = kwargs.pop('tenant_id')
+        if "tenant_id" in kwargs:
+            tenant_id = kwargs.pop("tenant_id")
             if tenant_id:
                 provider.tenant = get_object_or_denied(Tenant, tenant_id, user)
                 provider.tenant_group = None
             else:
                 provider.tenant = None
 
-        if 'tenant_group_id' in kwargs:
-            tenant_group_id = kwargs.pop('tenant_group_id')
+        if "tenant_group_id" in kwargs:
+            tenant_group_id = kwargs.pop("tenant_group_id")
             if tenant_group_id:
                 provider.tenant_group = get_object_or_denied(TenantGroup, tenant_group_id, user)
                 provider.tenant = None
@@ -313,9 +369,7 @@ class UpdateProvider(graphene.Mutation):
         if provider.tenant is None and provider.tenant_group is None and not user.is_superuser:
             raise PermissionDenied(_("Only superusers can make providers global."))
 
-        ALLOWED_FIELDS = {
-            'name', 'slug', 'account_id', 'portal_url', 'admin_notes', 'is_active'
-        }
+        ALLOWED_FIELDS = {"name", "slug", "account_id", "portal_url", "admin_notes", "is_active"}
         for key, val in kwargs.items():
             if key in ALLOWED_FIELDS:
                 setattr(provider, key, val)
@@ -325,7 +379,7 @@ class UpdateProvider(graphene.Mutation):
         except ValidationError as e:
             raise GraphQLError(
                 "Validation failed",
-                extensions={"validation_errors": e.message_dict if hasattr(e, 'message_dict') else e.messages}
+                extensions={"validation_errors": e.message_dict if hasattr(e, "message_dict") else e.messages},
             )
         provider.save()
         return UpdateProvider(provider=provider)
@@ -338,11 +392,11 @@ class DeleteProvider(graphene.Mutation):
     success = graphene.Boolean()
 
     def mutate(self, info, id):
-        user = check_permission(info, 'subscriptions.delete_provider')
-        active_tenant = getattr(info.context, 'active_tenant', None)
+        user = check_permission(info, "subscriptions.delete_provider")
+        active_tenant = getattr(info.context, "active_tenant", None)
 
         provider = get_object_or_denied(Provider, id, user, tenant=active_tenant)
-        check_permission(info, 'subscriptions.delete_provider', obj=provider)
+        check_permission(info, "subscriptions.delete_provider", obj=provider)
 
         # Global object restriction for non-superusers
         if provider.tenant is None and provider.tenant_group is None and not user.is_superuser:
@@ -354,6 +408,7 @@ class DeleteProvider(graphene.Mutation):
 
 # Subscription Mutations
 
+
 def _resolve_cost_center(cost_center_id, user):
     """Resolve a CostCenter by PK. Returns None if cost_center_id is falsy.
     Uses apps.get_model to avoid a hard import while the model is being
@@ -362,7 +417,8 @@ def _resolve_cost_center(cost_center_id, user):
         return None
     try:
         from django.apps import apps
-        CostCenter = apps.get_model('organization', 'CostCenter')
+
+        CostCenter = apps.get_model("organization", "CostCenter")
     except LookupError:
         raise GraphQLError(str(_("CostCenter model is not yet available.")))
     return get_object_or_denied(CostCenter, cost_center_id, user)
@@ -393,8 +449,8 @@ class CreateSubscription(graphene.Mutation):
     subscription = graphene.Field(SubscriptionNode)
 
     def mutate(self, info, provider_id, **kwargs):
-        user = check_permission(info, 'subscriptions.add_subscription')
-        active_tenant = getattr(info.context, 'active_tenant', None)
+        user = check_permission(info, "subscriptions.add_subscription")
+        active_tenant = getattr(info.context, "active_tenant", None)
 
         provider = get_object_or_denied(Provider, provider_id, user, tenant=active_tenant)
         subscription = Subscription(provider=provider, tenant=active_tenant)
@@ -404,16 +460,29 @@ class CreateSubscription(graphene.Mutation):
         if subscription.tenant is None and not user.is_superuser:
             raise PermissionDenied(_("Only superusers can create global subscriptions."))
 
-        if 'owner_id' in kwargs:
-            subscription.owner = _resolve_owner(kwargs.pop('owner_id'), user, active_tenant)
+        if "owner_id" in kwargs:
+            subscription.owner = _resolve_owner(kwargs.pop("owner_id"), user, active_tenant)
 
-        if 'cost_center_id' in kwargs:
-            subscription.cost_center = _resolve_cost_center(kwargs.pop('cost_center_id'), user)
+        if "cost_center_id" in kwargs:
+            subscription.cost_center = _resolve_cost_center(kwargs.pop("cost_center_id"), user)
 
         ALLOWED_FIELDS = {
-            'name', 'slug', 'type', 'status', 'start_date', 'renewal_date', 'renewal_cost',
-            'currency', 'billing_cycle', 'term_months', 'auto_renewal', 'licensed_quantity',
-            'contract_reference', 'cancellation_date', 'description', 'notes'
+            "name",
+            "slug",
+            "type",
+            "status",
+            "start_date",
+            "renewal_date",
+            "renewal_cost",
+            "currency",
+            "billing_cycle",
+            "term_months",
+            "auto_renewal",
+            "licensed_quantity",
+            "contract_reference",
+            "cancellation_date",
+            "description",
+            "notes",
         }
         for key, val in kwargs.items():
             if key in ALLOWED_FIELDS:
@@ -426,7 +495,7 @@ class CreateSubscription(graphene.Mutation):
         except ValidationError as e:
             raise GraphQLError(
                 "Validation failed",
-                extensions={"validation_errors": e.message_dict if hasattr(e, 'message_dict') else e.messages}
+                extensions={"validation_errors": e.message_dict if hasattr(e, "message_dict") else e.messages},
             )
         subscription.save()
         return CreateSubscription(subscription=subscription)
@@ -458,25 +527,40 @@ class UpdateSubscription(graphene.Mutation):
     subscription = graphene.Field(SubscriptionNode)
 
     def mutate(self, info, id, **kwargs):
-        user = check_permission(info, 'subscriptions.change_subscription')
-        active_tenant = getattr(info.context, 'active_tenant', None)
+        user = check_permission(info, "subscriptions.change_subscription")
+        active_tenant = getattr(info.context, "active_tenant", None)
 
         subscription = get_object_or_denied(Subscription, id, user, tenant=active_tenant)
-        check_permission(info, 'subscriptions.change_subscription', obj=subscription)
+        check_permission(info, "subscriptions.change_subscription", obj=subscription)
 
-        if 'provider_id' in kwargs:
-            subscription.provider = get_object_or_denied(Provider, kwargs.pop('provider_id'), user, tenant=active_tenant)
+        if "provider_id" in kwargs:
+            subscription.provider = get_object_or_denied(
+                Provider, kwargs.pop("provider_id"), user, tenant=active_tenant
+            )
 
-        if 'owner_id' in kwargs:
-            subscription.owner = _resolve_owner(kwargs.pop('owner_id'), user, active_tenant)
+        if "owner_id" in kwargs:
+            subscription.owner = _resolve_owner(kwargs.pop("owner_id"), user, active_tenant)
 
-        if 'cost_center_id' in kwargs:
-            subscription.cost_center = _resolve_cost_center(kwargs.pop('cost_center_id'), user)
+        if "cost_center_id" in kwargs:
+            subscription.cost_center = _resolve_cost_center(kwargs.pop("cost_center_id"), user)
 
         ALLOWED_FIELDS = {
-            'name', 'slug', 'type', 'status', 'start_date', 'renewal_date', 'renewal_cost',
-            'currency', 'billing_cycle', 'term_months', 'auto_renewal', 'licensed_quantity',
-            'contract_reference', 'cancellation_date', 'description', 'notes'
+            "name",
+            "slug",
+            "type",
+            "status",
+            "start_date",
+            "renewal_date",
+            "renewal_cost",
+            "currency",
+            "billing_cycle",
+            "term_months",
+            "auto_renewal",
+            "licensed_quantity",
+            "contract_reference",
+            "cancellation_date",
+            "description",
+            "notes",
         }
         for key, val in kwargs.items():
             if key in ALLOWED_FIELDS:
@@ -487,7 +571,7 @@ class UpdateSubscription(graphene.Mutation):
         except ValidationError as e:
             raise GraphQLError(
                 "Validation failed",
-                extensions={"validation_errors": e.message_dict if hasattr(e, 'message_dict') else e.messages}
+                extensions={"validation_errors": e.message_dict if hasattr(e, "message_dict") else e.messages},
             )
         subscription.save()
         return UpdateSubscription(subscription=subscription)
@@ -500,17 +584,18 @@ class DeleteSubscription(graphene.Mutation):
     success = graphene.Boolean()
 
     def mutate(self, info, id):
-        user = check_permission(info, 'subscriptions.delete_subscription')
-        active_tenant = getattr(info.context, 'active_tenant', None)
+        user = check_permission(info, "subscriptions.delete_subscription")
+        active_tenant = getattr(info.context, "active_tenant", None)
 
         subscription = get_object_or_denied(Subscription, id, user, tenant=active_tenant)
-        check_permission(info, 'subscriptions.delete_subscription', obj=subscription)
+        check_permission(info, "subscriptions.delete_subscription", obj=subscription)
 
         subscription.delete()
         return DeleteSubscription(success=True)
 
 
 # Subscription Assignment Mutations
+
 
 class CreateSubscriptionAssignment(graphene.Mutation):
     class Arguments:
@@ -522,12 +607,12 @@ class CreateSubscriptionAssignment(graphene.Mutation):
     subscription_assignment = graphene.Field(SubscriptionAssignmentNode)
 
     def mutate(self, info, subscription_id, content_type_id, object_id, **kwargs):
-        user = check_permission(info, 'subscriptions.add_subscriptionassignment')
-        active_tenant = getattr(info.context, 'active_tenant', None)
+        user = check_permission(info, "subscriptions.add_subscriptionassignment")
+        active_tenant = getattr(info.context, "active_tenant", None)
 
         subscription = get_object_or_denied(Subscription, subscription_id, user, tenant=active_tenant)
         content_type = ContentType.objects.get(pk=content_type_id)
-        
+
         # Verify the target object exists and is scoped to the tenant
         model_class = content_type.model_class()
         if not model_class:
@@ -535,21 +620,18 @@ class CreateSubscriptionAssignment(graphene.Mutation):
         get_object_or_denied(model_class, object_id, user, tenant=active_tenant)
 
         assignment = SubscriptionAssignment(
-            subscription=subscription,
-            content_type=content_type,
-            object_id=object_id,
-            assigned_by=user
+            subscription=subscription, content_type=content_type, object_id=object_id, assigned_by=user
         )
 
-        if 'notes' in kwargs:
-            assignment.notes = kwargs['notes']
+        if "notes" in kwargs:
+            assignment.notes = kwargs["notes"]
 
         try:
             assignment.full_clean()
         except ValidationError as e:
             raise GraphQLError(
                 "Validation failed",
-                extensions={"validation_errors": e.message_dict if hasattr(e, 'message_dict') else e.messages}
+                extensions={"validation_errors": e.message_dict if hasattr(e, "message_dict") else e.messages},
             )
         assignment.save()
         return CreateSubscriptionAssignment(subscription_assignment=assignment)
@@ -563,27 +645,29 @@ class UpdateSubscriptionAssignment(graphene.Mutation):
     subscription_assignment = graphene.Field(SubscriptionAssignmentNode)
 
     def mutate(self, info, id, **kwargs):
-        user = check_permission(info, 'subscriptions.change_subscriptionassignment')
-        active_tenant = getattr(info.context, 'active_tenant', None)
+        user = check_permission(info, "subscriptions.change_subscriptionassignment")
+        active_tenant = getattr(info.context, "active_tenant", None)
 
         try:
-            assignment = SubscriptionAssignment.objects.select_related('subscription').filter(
-                subscription__tenant=active_tenant
-            ).get(pk=id)
+            assignment = (
+                SubscriptionAssignment.objects.select_related("subscription")
+                .filter(subscription__tenant=active_tenant)
+                .get(pk=id)
+            )
         except SubscriptionAssignment.DoesNotExist:
             raise PermissionDenied(_("Permission denied."))
 
-        check_permission(info, 'subscriptions.change_subscriptionassignment', obj=assignment)
+        check_permission(info, "subscriptions.change_subscriptionassignment", obj=assignment)
 
-        if 'notes' in kwargs:
-            assignment.notes = kwargs['notes']
+        if "notes" in kwargs:
+            assignment.notes = kwargs["notes"]
 
         try:
             assignment.full_clean()
         except ValidationError as e:
             raise GraphQLError(
                 "Validation failed",
-                extensions={"validation_errors": e.message_dict if hasattr(e, 'message_dict') else e.messages}
+                extensions={"validation_errors": e.message_dict if hasattr(e, "message_dict") else e.messages},
             )
         assignment.save()
         return UpdateSubscriptionAssignment(subscription_assignment=assignment)
@@ -596,17 +680,19 @@ class DeleteSubscriptionAssignment(graphene.Mutation):
     success = graphene.Boolean()
 
     def mutate(self, info, id):
-        user = check_permission(info, 'subscriptions.delete_subscriptionassignment')
-        active_tenant = getattr(info.context, 'active_tenant', None)
+        user = check_permission(info, "subscriptions.delete_subscriptionassignment")
+        active_tenant = getattr(info.context, "active_tenant", None)
 
         try:
-            assignment = SubscriptionAssignment.objects.select_related('subscription').filter(
-                subscription__tenant=active_tenant
-            ).get(pk=id)
+            assignment = (
+                SubscriptionAssignment.objects.select_related("subscription")
+                .filter(subscription__tenant=active_tenant)
+                .get(pk=id)
+            )
         except SubscriptionAssignment.DoesNotExist:
             raise PermissionDenied(_("Permission denied."))
 
-        check_permission(info, 'subscriptions.delete_subscriptionassignment', obj=assignment)
+        check_permission(info, "subscriptions.delete_subscriptionassignment", obj=assignment)
 
         assignment.delete()
         return DeleteSubscriptionAssignment(success=True)

@@ -1,62 +1,119 @@
 import graphene
-from graphene_django import DjangoObjectType
-from .models import Asset, StatusLabel, AssetRole, Manufacturer, Depreciation, AssetType, Supplier, Category
-from organization.models import Location, Tenant
-from core.graphql_utils import check_permission, get_object_or_denied, paginate_queryset
-from graphql import GraphQLError
 from django.core.exceptions import ValidationError
+from graphene_django import DjangoObjectType
+from graphql import GraphQLError
+
+from core.graphql_utils import check_permission, get_object_or_denied, paginate_queryset
+from organization.models import Location, Tenant
+
+from .models import Asset, AssetRole, AssetType, Category, Depreciation, Manufacturer, StatusLabel, Supplier
+
 
 class TenantNode(DjangoObjectType):
     class Meta:
         model = Tenant
         fields = ("id", "name", "slug")
 
+
 class LocationNode(DjangoObjectType):
     class Meta:
         model = Location
         fields = ("id", "name", "slug", "site", "tenant")
+
 
 class StatusLabelNode(DjangoObjectType):
     class Meta:
         model = StatusLabel
         fields = ("id", "name", "slug", "type", "description", "color", "created_at", "updated_at")
 
+
 class AssetRoleNode(DjangoObjectType):
     class Meta:
         model = AssetRole
         fields = ("id", "name", "slug", "description", "color", "created_at", "updated_at")
+
 
 class ManufacturerNode(DjangoObjectType):
     class Meta:
         model = Manufacturer
         fields = ("id", "name", "slug", "description", "created_at", "updated_at", "software_products")
 
+
 class DepreciationNode(DjangoObjectType):
     class Meta:
         model = Depreciation
         fields = ("id", "name", "months", "created_at", "updated_at")
 
+
 class AssetTypeNode(DjangoObjectType):
     class Meta:
         model = AssetType
-        fields = ("id", "slug", "manufacturer", "model", "part_number", "eol_months", "depreciation", "category", "asset_role", "description", "requestable", "created_at", "updated_at")
+        fields = (
+            "id",
+            "slug",
+            "manufacturer",
+            "model",
+            "part_number",
+            "eol_months",
+            "depreciation",
+            "category",
+            "asset_role",
+            "description",
+            "requestable",
+            "created_at",
+            "updated_at",
+        )
+
 
 class SupplierNode(DjangoObjectType):
     class Meta:
         model = Supplier
         fields = ("id", "name", "slug", "website", "address", "notes", "created_at", "updated_at")
 
+
 class CategoryNode(DjangoObjectType):
     class Meta:
         model = Category
         fields = ("id", "name", "slug", "color", "description", "applies_to", "created_at", "updated_at")
 
+
 class AssetNode(DjangoObjectType):
     class Meta:
         model = Asset
-        fields = ("id", "name", "asset_tag", "serial_number", "asset_type", "asset_role", "status", "location", "tenant", "purchase_date", "supplier", "order_number", "requestable", "created_at", "updated_at")
+        fields = (
+            "id",
+            "name",
+            "asset_tag",
+            "serial_number",
+            "asset_type",
+            "asset_role",
+            "status",
+            "location",
+            "tenant",
+            "purchase_date",
+            "supplier",
+            "order_number",
+            "requestable",
+            "created_at",
+            "updated_at",
+        )
 
-ASSET_SORTABLE_FIELDS = {"name", "-name", "asset_tag", "-asset_tag", "serial_number", "-serial_number", "purchase_date", "-purchase_date", "created_at", "-created_at", "updated_at", "-updated_at"}
+
+ASSET_SORTABLE_FIELDS = {
+    "name",
+    "-name",
+    "asset_tag",
+    "-asset_tag",
+    "serial_number",
+    "-serial_number",
+    "purchase_date",
+    "-purchase_date",
+    "created_at",
+    "-created_at",
+    "updated_at",
+    "-updated_at",
+}
+
 
 class Query(graphene.ObjectType):
     assets = graphene.List(
@@ -73,23 +130,25 @@ class Query(graphene.ObjectType):
     asset = graphene.Field(AssetNode, id=graphene.ID(required=True))
 
     def resolve_assets(self, info, limit=None, offset=None, sort_by=None, **kwargs):
-        check_permission(info, 'assets.view_asset')
-        active_tenant = getattr(info.context, 'active_tenant', None)
-        qs = Asset.objects.select_related(
-            'asset_type',
-            'asset_type__manufacturer',
-            'asset_type__category',
-            'asset_type__depreciation',
-            'asset_type__asset_role',
-            'asset_role',
-            'status',
-            'location',
-            'location__site',
-            'tenant',
-            'supplier'
-        ).prefetch_related(
-            'asset_type__manufacturer__software_products'
-        ).filter(tenant=active_tenant)
+        check_permission(info, "assets.view_asset")
+        active_tenant = getattr(info.context, "active_tenant", None)
+        qs = (
+            Asset.objects.select_related(
+                "asset_type",
+                "asset_type__manufacturer",
+                "asset_type__category",
+                "asset_type__depreciation",
+                "asset_type__asset_role",
+                "asset_role",
+                "status",
+                "location",
+                "location__site",
+                "tenant",
+                "supplier",
+            )
+            .prefetch_related("asset_type__manufacturer__software_products")
+            .filter(tenant=active_tenant)
+        )
         for key, val in kwargs.items():
             if val is not None:
                 qs = qs.filter(**{key: val})
@@ -98,26 +157,30 @@ class Query(graphene.ObjectType):
         return paginate_queryset(qs, limit, offset)
 
     def resolve_asset(self, info, id):
-        check_permission(info, 'assets.view_asset')
-        active_tenant = getattr(info.context, 'active_tenant', None)
+        check_permission(info, "assets.view_asset")
+        active_tenant = getattr(info.context, "active_tenant", None)
         try:
-            return Asset.objects.select_related(
-                'asset_type',
-                'asset_type__manufacturer',
-                'asset_type__category',
-                'asset_type__depreciation',
-                'asset_type__asset_role',
-                'asset_role',
-                'status',
-                'location',
-                'location__site',
-                'tenant',
-                'supplier'
-            ).prefetch_related(
-                'asset_type__manufacturer__software_products'
-            ).filter(tenant=active_tenant).get(pk=id)
+            return (
+                Asset.objects.select_related(
+                    "asset_type",
+                    "asset_type__manufacturer",
+                    "asset_type__category",
+                    "asset_type__depreciation",
+                    "asset_type__asset_role",
+                    "asset_role",
+                    "status",
+                    "location",
+                    "location__site",
+                    "tenant",
+                    "supplier",
+                )
+                .prefetch_related("asset_type__manufacturer__software_products")
+                .filter(tenant=active_tenant)
+                .get(pk=id)
+            )
         except Asset.DoesNotExist:
             return None
+
 
 class CreateAsset(graphene.Mutation):
     class Arguments:
@@ -138,36 +201,46 @@ class CreateAsset(graphene.Mutation):
     asset = graphene.Field(AssetNode)
 
     def mutate(self, info, **kwargs):
-        user = check_permission(info, 'assets.add_asset')
-        active_tenant = getattr(info.context, 'active_tenant', None)
-        
+        user = check_permission(info, "assets.add_asset")
+        active_tenant = getattr(info.context, "active_tenant", None)
+
         asset = Asset(tenant=active_tenant)
-        
-        if 'asset_type_id' in kwargs:
-            asset.asset_type = get_object_or_denied(AssetType, kwargs.pop('asset_type_id'), user, tenant=active_tenant)
-        if 'asset_role_id' in kwargs:
-            asset.asset_role = get_object_or_denied(AssetRole, kwargs.pop('asset_role_id'), user, tenant=active_tenant)
-        if 'status_id' in kwargs:
-            asset.status = get_object_or_denied(StatusLabel, kwargs.pop('status_id'), user, tenant=active_tenant)
-        if 'location_id' in kwargs:
-            asset.location = get_object_or_denied(Location, kwargs.pop('location_id'), user, tenant=active_tenant)
-        if 'supplier_id' in kwargs:
-            asset.supplier = get_object_or_denied(Supplier, kwargs.pop('supplier_id'), user, tenant=active_tenant)
-            
-        ALLOWED_FIELDS = {'name', 'asset_tag', 'serial_number', 'purchase_date', 'purchase_cost', 'salvage_value', 'order_number', 'notes'}
+
+        if "asset_type_id" in kwargs:
+            asset.asset_type = get_object_or_denied(AssetType, kwargs.pop("asset_type_id"), user, tenant=active_tenant)
+        if "asset_role_id" in kwargs:
+            asset.asset_role = get_object_or_denied(AssetRole, kwargs.pop("asset_role_id"), user, tenant=active_tenant)
+        if "status_id" in kwargs:
+            asset.status = get_object_or_denied(StatusLabel, kwargs.pop("status_id"), user, tenant=active_tenant)
+        if "location_id" in kwargs:
+            asset.location = get_object_or_denied(Location, kwargs.pop("location_id"), user, tenant=active_tenant)
+        if "supplier_id" in kwargs:
+            asset.supplier = get_object_or_denied(Supplier, kwargs.pop("supplier_id"), user, tenant=active_tenant)
+
+        ALLOWED_FIELDS = {
+            "name",
+            "asset_tag",
+            "serial_number",
+            "purchase_date",
+            "purchase_cost",
+            "salvage_value",
+            "order_number",
+            "notes",
+        }
         for key, val in kwargs.items():
             if key in ALLOWED_FIELDS:
                 setattr(asset, key, val)
-            
+
         try:
             asset.full_clean()
         except ValidationError as e:
             raise GraphQLError(
                 "Validation failed",
-                extensions={"validation_errors": e.message_dict if hasattr(e, 'message_dict') else e.messages}
+                extensions={"validation_errors": e.message_dict if hasattr(e, "message_dict") else e.messages},
             )
         asset.save()
         return CreateAsset(asset=asset)
+
 
 class UpdateAsset(graphene.Mutation):
     class Arguments:
@@ -189,36 +262,46 @@ class UpdateAsset(graphene.Mutation):
     asset = graphene.Field(AssetNode)
 
     def mutate(self, info, id, **kwargs):
-        user = check_permission(info, 'assets.change_asset')
-        active_tenant = getattr(info.context, 'active_tenant', None)
+        user = check_permission(info, "assets.change_asset")
+        active_tenant = getattr(info.context, "active_tenant", None)
         asset = get_object_or_denied(Asset, id, user, tenant=active_tenant)
-        check_permission(info, 'assets.change_asset', obj=asset)
-        
-        if 'asset_type_id' in kwargs:
-            asset.asset_type = get_object_or_denied(AssetType, kwargs.pop('asset_type_id'), user, tenant=active_tenant)
-        if 'asset_role_id' in kwargs:
-            asset.asset_role = get_object_or_denied(AssetRole, kwargs.pop('asset_role_id'), user, tenant=active_tenant)
-        if 'status_id' in kwargs:
-            asset.status = get_object_or_denied(StatusLabel, kwargs.pop('status_id'), user, tenant=active_tenant)
-        if 'location_id' in kwargs:
-            asset.location = get_object_or_denied(Location, kwargs.pop('location_id'), user, tenant=active_tenant)
-        if 'supplier_id' in kwargs:
-            asset.supplier = get_object_or_denied(Supplier, kwargs.pop('supplier_id'), user, tenant=active_tenant)
-            
-        ALLOWED_FIELDS = {'name', 'asset_tag', 'serial_number', 'purchase_date', 'purchase_cost', 'salvage_value', 'order_number', 'notes'}
+        check_permission(info, "assets.change_asset", obj=asset)
+
+        if "asset_type_id" in kwargs:
+            asset.asset_type = get_object_or_denied(AssetType, kwargs.pop("asset_type_id"), user, tenant=active_tenant)
+        if "asset_role_id" in kwargs:
+            asset.asset_role = get_object_or_denied(AssetRole, kwargs.pop("asset_role_id"), user, tenant=active_tenant)
+        if "status_id" in kwargs:
+            asset.status = get_object_or_denied(StatusLabel, kwargs.pop("status_id"), user, tenant=active_tenant)
+        if "location_id" in kwargs:
+            asset.location = get_object_or_denied(Location, kwargs.pop("location_id"), user, tenant=active_tenant)
+        if "supplier_id" in kwargs:
+            asset.supplier = get_object_or_denied(Supplier, kwargs.pop("supplier_id"), user, tenant=active_tenant)
+
+        ALLOWED_FIELDS = {
+            "name",
+            "asset_tag",
+            "serial_number",
+            "purchase_date",
+            "purchase_cost",
+            "salvage_value",
+            "order_number",
+            "notes",
+        }
         for key, val in kwargs.items():
             if key in ALLOWED_FIELDS:
                 setattr(asset, key, val)
-            
+
         try:
             asset.full_clean()
         except ValidationError as e:
             raise GraphQLError(
                 "Validation failed",
-                extensions={"validation_errors": e.message_dict if hasattr(e, 'message_dict') else e.messages}
+                extensions={"validation_errors": e.message_dict if hasattr(e, "message_dict") else e.messages},
             )
         asset.save()
         return UpdateAsset(asset=asset)
+
 
 class DeleteAsset(graphene.Mutation):
     class Arguments:
@@ -227,12 +310,13 @@ class DeleteAsset(graphene.Mutation):
     success = graphene.Boolean()
 
     def mutate(self, info, id):
-        user = check_permission(info, 'assets.delete_asset')
-        active_tenant = getattr(info.context, 'active_tenant', None)
+        user = check_permission(info, "assets.delete_asset")
+        active_tenant = getattr(info.context, "active_tenant", None)
         asset = get_object_or_denied(Asset, id, user, tenant=active_tenant)
-        check_permission(info, 'assets.delete_asset', obj=asset)
+        check_permission(info, "assets.delete_asset", obj=asset)
         asset.delete()
         return DeleteAsset(success=True)
+
 
 class Mutation(graphene.ObjectType):
     create_asset = CreateAsset.Field()

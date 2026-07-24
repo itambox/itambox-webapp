@@ -11,7 +11,6 @@ from dataclasses import dataclass
 from functools import total_ordering
 from pathlib import Path
 
-
 _VERSION_RE = re.compile(
     r"^(?P<major>0|[1-9]\d*)\."
     r"(?P<minor>0|[1-9]\d*)\."
@@ -66,8 +65,7 @@ def parse_version(value: str) -> ReleaseVersion:
     match = _VERSION_RE.fullmatch(value)
     if match is None:
         raise ReleasePolicyError(
-            f"invalid release version {value!r}; expected X.Y.Z or "
-            "X.Y.Z-alpha.N, X.Y.Z-beta.N, or X.Y.Z-rc.N"
+            f"invalid release version {value!r}; expected X.Y.Z or X.Y.Z-alpha.N, X.Y.Z-beta.N, or X.Y.Z-rc.N"
         )
     groups = match.groupdict()
     return ReleaseVersion(
@@ -144,29 +142,24 @@ def validate_repository(root: Path, expected_version: str | None = None) -> Rele
     source_version = parse_version(source_raw)
     if project_version.semver != source_version.semver:
         raise ReleasePolicyError(
-            "release.py does not match pyproject.toml: "
-            f"{source_version.semver!r} != {project_version.semver!r}"
+            f"release.py does not match pyproject.toml: {source_version.semver!r} != {project_version.semver!r}"
         )
     if locked_raw != project_version.pep440:
         raise ReleasePolicyError(
-            f"uv.lock version {locked_raw!r} does not match pyproject.toml "
-            f"identity {project_version.pep440!r}"
+            f"uv.lock version {locked_raw!r} does not match pyproject.toml identity {project_version.pep440!r}"
         )
     if readme_raw != project_version.semver:
         raise ReleasePolicyError(
-            f"README.md version {readme_raw!r} does not match pyproject.toml "
-            f"version {project_version.semver!r}"
+            f"README.md version {readme_raw!r} does not match pyproject.toml version {project_version.semver!r}"
         )
     if expected_version is not None and project_version.semver != expected_version:
         raise ReleasePolicyError(
-            f"pyproject.toml version {project_version.semver!r} does not match "
-            f"requested release {expected_version!r}"
+            f"pyproject.toml version {project_version.semver!r} does not match requested release {expected_version!r}"
         )
 
     extract_release_notes(root / "CHANGELOG.md", project_version.semver)
     release_link = (
-        f"[{project_version.semver}]: "
-        f"https://github.com/itambox/itambox-webapp/releases/tag/v{project_version.semver}"
+        f"[{project_version.semver}]: https://github.com/itambox/itambox-webapp/releases/tag/v{project_version.semver}"
     )
     if release_link not in (root / "CHANGELOG.md").read_text(encoding="utf-8"):
         raise ReleasePolicyError(f"CHANGELOG.md is missing the release link for {project_version.semver}")
@@ -192,10 +185,7 @@ def main(argv: list[str] | None = None) -> int:
     args = _build_parser().parse_args(argv)
     version = validate_repository(args.root.resolve(), expected_version=args.version)
     if args.command == "verify":
-        print(
-            f"release metadata valid: {version.semver} "
-            f"(PEP 440: {version.pep440}, tag: v{version.semver})"
-        )
+        print(f"release metadata valid: {version.semver} (PEP 440: {version.pep440}, tag: v{version.semver})")
     else:
         print(extract_release_notes(args.root / "CHANGELOG.md", version.semver))
     return 0

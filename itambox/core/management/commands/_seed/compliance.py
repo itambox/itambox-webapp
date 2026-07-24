@@ -12,12 +12,12 @@ Registered on ``self`` when done:
   self._custody_receipts list[CustodyReceipt]  (adds to any already created in
                                                  _seed_assets; does not replace them)
 """
+
 import datetime
 import hashlib
 import random
 
 from django.utils import timezone
-
 
 # ── helpers ───────────────────────────────────────────────────────────────────
 
@@ -52,17 +52,17 @@ class SeedComplianceMixin:
     """Mixin for Command — provides _seed_compliance()."""
 
     def _seed_compliance(self):
-        from compliance.models import (
-            AuditSession,
-            AssetAudit,
-            CustodyReceipt,
-        )
         from compliance.choices import (
             AuditSessionStatusChoices,
             AuditVerificationMethodChoices,
         )
+        from compliance.models import (
+            AssetAudit,
+            AuditSession,
+            CustodyReceipt,
+        )
 
-        self.stdout.write('--- Compliance: audit sessions & custody receipts ---')
+        self.stdout.write("--- Compliance: audit sessions & custody receipts ---")
 
         actors = self._engineer_users or [self._provisioner]
 
@@ -82,7 +82,7 @@ class SeedComplianceMixin:
             session_dates = _audit_schedule(n_sessions)
 
             for idx, audit_date in enumerate(session_dates):
-                is_last = (idx == len(session_dates) - 1)
+                is_last = idx == len(session_dates) - 1
                 # The most-recent session may still be active; older ones are completed.
                 if is_last and random.random() < 0.35:
                     status = AuditSessionStatusChoices.ACTIVE
@@ -100,8 +100,7 @@ class SeedComplianceMixin:
                 # assets physically sitting there so the session isn't empty.
                 session_location = None
                 if locs and random.random() < 0.4:
-                    loc_candidates = [l for l in locs
-                                      if any(a.location_id == l.pk for a in tenant_assets)]
+                    loc_candidates = [l for l in locs if any(a.location_id == l.pk for a in tenant_assets)]
                     session_location = random.choice(loc_candidates or locs)
 
                 if session_location:
@@ -154,30 +153,31 @@ class SeedComplianceMixin:
                     obs_status = asset.status
                     if random.random() < 0.15:
                         # Pick a different status from the registry if available
-                        other_statuses = [s for k, s in self._status_labels.items()
-                                          if s != asset.status]
+                        other_statuses = [s for k, s in self._status_labels.items() if s != asset.status]
                         if other_statuses:
                             obs_status = random.choice(other_statuses)
 
-                    v_method = random.choice([
-                        AuditVerificationMethodChoices.MANUAL,
-                        AuditVerificationMethodChoices.MANUAL,
-                        AuditVerificationMethodChoices.BARCODE,
-                        AuditVerificationMethodChoices.AUTO,
-                    ])
-                    notes = ''
+                    v_method = random.choice(
+                        [
+                            AuditVerificationMethodChoices.MANUAL,
+                            AuditVerificationMethodChoices.MANUAL,
+                            AuditVerificationMethodChoices.BARCODE,
+                            AuditVerificationMethodChoices.AUTO,
+                        ]
+                    )
+                    notes = ""
                     if obs_status != asset.status:
-                        notes = 'Status mismatch observed during physical audit.'
+                        notes = "Status mismatch observed during physical audit."
 
                     AssetAudit.objects.get_or_create(
                         session=session,
                         asset=asset,
                         defaults={
-                            'auditor': engineer,
-                            'location': obs_loc,
-                            'status': obs_status,
-                            'verification_method': v_method,
-                            'notes': notes,
+                            "auditor": engineer,
+                            "location": obs_loc,
+                            "status": obs_status,
+                            "verification_method": v_method,
+                            "notes": notes,
                         },
                     )
                     total_asset_audits += 1
@@ -197,13 +197,11 @@ class SeedComplianceMixin:
             if not tenant_assets:
                 continue
 
-            is_helix = self._tenant_meta[slug].get('group_slug') == 'helix-biopharma'
+            is_helix = self._tenant_meta[slug].get("group_slug") == "helix-biopharma"
 
             for asset in tenant_assets:
                 # Only assets with an active user assignment carry a custody receipt.
-                active_assign = asset.assignments.filter(
-                    is_active=True, assigned_user__isnull=False
-                ).first()
+                active_assign = asset.assignments.filter(is_active=True, assigned_user__isnull=False).first()
                 if not active_assign:
                     continue
 
@@ -214,11 +212,10 @@ class SeedComplianceMixin:
                     continue
 
                 # Determine the best matching custody template.
-                cat = (asset.asset_type.category.slug
-                       if asset.asset_type and asset.asset_type.category else None)
-                if f'{slug}:{cat}' in self._custody_templates:
-                    tmpl = self._custody_templates[f'{slug}:{cat}']
-                elif is_helix and cat == 'laptops' and self._gxp_custody_template:
+                cat = asset.asset_type.category.slug if asset.asset_type and asset.asset_type.category else None
+                if f"{slug}:{cat}" in self._custody_templates:
+                    tmpl = self._custody_templates[f"{slug}:{cat}"]
+                elif is_helix and cat == "laptops" and self._gxp_custody_template:
                     tmpl = self._gxp_custody_template
                 else:
                     tmpl = self._custody_templates.get(cat)
@@ -231,18 +228,18 @@ class SeedComplianceMixin:
                     continue
 
                 # Date the receipt near the assignment (within 1–7 days after).
-                assign_date = (active_assign.created_at.date()
-                               if hasattr(active_assign, 'created_at') and active_assign.created_at
-                               else _days_ago(random.randint(30, 600)))
+                assign_date = (
+                    active_assign.created_at.date()
+                    if hasattr(active_assign, "created_at") and active_assign.created_at
+                    else _days_ago(random.randint(30, 600))
+                )
                 receipt_date = assign_date + datetime.timedelta(days=random.randint(0, 7))
                 receipt_dt = _as_dt(receipt_date)
 
                 # 75 % signed/accepted; 25 % still pending.
                 accepted = random.random() < 0.75
                 if accepted:
-                    h = hashlib.sha256(
-                        f"{asset.asset_tag}-{holder.pk}-{receipt_date}".encode()
-                    ).hexdigest()[:64]
+                    h = hashlib.sha256(f"{asset.asset_tag}-{holder.pk}-{receipt_date}".encode()).hexdigest()[:64]
                     receipt = CustodyReceipt.objects.create(
                         asset=asset,
                         holder=holder,
@@ -250,14 +247,14 @@ class SeedComplianceMixin:
                         eula_text=tmpl.eula_text,
                         disclaimer=tmpl.disclaimer,
                         qms_reference=tmpl.qms_reference,
-                        eula_version='1.0',
+                        eula_version="1.0",
                         accepted=True,
                         acceptance_status=CustodyReceipt.STATUS_ACCEPTED,
                         accepted_date=receipt_dt,
                         signed_at=receipt_dt,
                         verification_hash=h,
-                        signature_canvas=f'data:image/png;base64,SIGNED_{asset.asset_tag}',
-                        acceptance_method='link',
+                        signature_canvas=f"data:image/png;base64,SIGNED_{asset.asset_tag}",
+                        acceptance_method="link",
                     )
                 else:
                     receipt = CustodyReceipt.objects.create(
@@ -267,11 +264,11 @@ class SeedComplianceMixin:
                         eula_text=tmpl.eula_text,
                         disclaimer=tmpl.disclaimer,
                         qms_reference=tmpl.qms_reference,
-                        eula_version='1.0',
+                        eula_version="1.0",
                         accepted=False,
                         acceptance_status=CustodyReceipt.STATUS_PENDING,
                         signed_at=receipt_dt,
-                        acceptance_method='link',
+                        acceptance_method="link",
                     )
 
                 actor = random.choice(actors)
@@ -280,7 +277,7 @@ class SeedComplianceMixin:
                 new_receipts += 1
 
         self.stdout.write(
-            f'  {len(self._audit_sessions)} audit sessions, '
-            f'{total_asset_audits} asset audit rows, '
-            f'{new_receipts} new custody receipts.'
+            f"  {len(self._audit_sessions)} audit sessions, "
+            f"{total_asset_audits} asset audit rows, "
+            f"{new_receipts} new custody receipts."
         )

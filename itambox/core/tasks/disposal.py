@@ -7,6 +7,7 @@ so a re-run never overwrites an existing disposal record. ``proceeds`` is
 per-asset (``proceeds_map``); when absent the service freezes the depreciated
 book value.
 """
+
 import datetime
 import logging
 from decimal import Decimal, InvalidOperation
@@ -15,6 +16,7 @@ from django.db import transaction
 from django.utils.translation import gettext as _
 
 from core.models import Job, Notification
+
 from .context import TaskContext
 from .utils import reverse_job_detail
 
@@ -33,7 +35,7 @@ def _parse_date(value):
 
 
 def _parse_proceeds(value):
-    if value in (None, ''):
+    if value in (None, ""):
         return None
     try:
         parsed = Decimal(str(value))
@@ -43,8 +45,7 @@ def _parse_proceeds(value):
     return parsed if parsed >= 0 else None
 
 
-def bulk_dispose_task(job_id, asset_pks, user_id, tenant_id=None,
-                      disposal_kwargs=None, proceeds_map=None):
+def bulk_dispose_task(job_id, asset_pks, user_id, tenant_id=None, disposal_kwargs=None, proceeds_map=None):
     """Asynchronously dispose selected hardware assets."""
     disposal_kwargs = disposal_kwargs or {}
     proceeds_map = proceeds_map or {}
@@ -67,20 +68,20 @@ def bulk_dispose_task(job_id, asset_pks, user_id, tenant_id=None,
                 from assets.models import Asset, AssetDisposal
                 from assets.services import dispose_asset
 
-                disposal_date = _parse_date(disposal_kwargs.get('disposal_date'))
+                disposal_date = _parse_date(disposal_kwargs.get("disposal_date"))
                 if disposal_date is None:
                     disposal_date = datetime.date.today()
 
                 shared = {
-                    'disposal_method': disposal_kwargs.get('disposal_method', 'destruction'),
-                    'disposal_date': disposal_date,
-                    'data_sanitization_method': disposal_kwargs.get('data_sanitization_method', 'none'),
-                    'sanitization_certificate': disposal_kwargs.get('sanitization_certificate', ''),
-                    'sanitized_by': disposal_kwargs.get('sanitized_by', ''),
-                    'recipient': disposal_kwargs.get('recipient', ''),
-                    'currency': disposal_kwargs.get('currency', ''),
-                    'weee_compliant': disposal_kwargs.get('weee_compliant', False),
-                    'notes': disposal_kwargs.get('notes', ''),
+                    "disposal_method": disposal_kwargs.get("disposal_method", "destruction"),
+                    "disposal_date": disposal_date,
+                    "data_sanitization_method": disposal_kwargs.get("data_sanitization_method", "none"),
+                    "sanitization_certificate": disposal_kwargs.get("sanitization_certificate", ""),
+                    "sanitized_by": disposal_kwargs.get("sanitized_by", ""),
+                    "recipient": disposal_kwargs.get("recipient", ""),
+                    "currency": disposal_kwargs.get("currency", ""),
+                    "weee_compliant": disposal_kwargs.get("weee_compliant", False),
+                    "notes": disposal_kwargs.get("notes", ""),
                 }
 
                 success_count = 0
@@ -92,8 +93,7 @@ def bulk_dispose_task(job_id, asset_pks, user_id, tenant_id=None,
                         asset = Asset.objects.get(pk=pk)
 
                         already_disposed = (
-                            asset.disposed_at is not None
-                            or AssetDisposal.all_objects.filter(asset=asset).exists()
+                            asset.disposed_at is not None or AssetDisposal.all_objects.filter(asset=asset).exists()
                         )
                         if already_disposed:
                             skipped_count += 1
@@ -124,16 +124,18 @@ def bulk_dispose_task(job_id, asset_pks, user_id, tenant_id=None,
                     )
                     return
 
-                job.mark_completed(result={
-                    'disposed': success_count,
-                    'skipped': skipped_count,
-                    'failed': failure_count,
-                    'total': len(asset_pks),
-                })
+                job.mark_completed(
+                    result={
+                        "disposed": success_count,
+                        "skipped": skipped_count,
+                        "failed": failure_count,
+                        "total": len(asset_pks),
+                    }
+                )
                 Notification.objects.create(
                     user=ctx.user,
                     subject=_("Bulk Disposal Complete"),
-                    message=_("Disposed %(count)s asset(s).") % {'count': success_count},
+                    message=_("Disposed %(count)s asset(s).") % {"count": success_count},
                     level=Notification.LEVEL_SUCCESS,
                     target_url=reverse_job_detail(job.pk),
                 )
@@ -144,7 +146,7 @@ def bulk_dispose_task(job_id, asset_pks, user_id, tenant_id=None,
                 Notification.objects.create(
                     user=ctx.user,
                     subject=_("Bulk Disposal Error"),
-                    message=_("A system exception occurred during disposal: %(error)s") % {'error': str(e)},
+                    message=_("A system exception occurred during disposal: %(error)s") % {"error": str(e)},
                     level=Notification.LEVEL_DANGER,
                     target_url=reverse_job_detail(job.pk),
                 )

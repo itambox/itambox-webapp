@@ -8,7 +8,7 @@ from itambox.api.exceptions import SerializerNotFound
 
 
 class BaseModelSerializer(serializers.ModelSerializer):
-    url = serializers.HyperlinkedIdentityField(view_name='')
+    url = serializers.HyperlinkedIdentityField(view_name="")
     display = serializers.SerializerMethodField(read_only=True)
 
     def __init__(self, *args, nested=False, fields=None, omit=None, **kwargs):
@@ -20,7 +20,7 @@ class BaseModelSerializer(serializers.ModelSerializer):
             self.validators = []
 
         if self.nested and not fields and not omit:
-            self._include_fields = getattr(self.Meta, 'brief_fields', ())
+            self._include_fields = getattr(self.Meta, "brief_fields", ())
 
         super().__init__(*args, **kwargs)
 
@@ -28,6 +28,7 @@ class BaseModelSerializer(serializers.ModelSerializer):
         if self.nested:
             queryset = self.Meta.model.objects.all()
             from itambox.api.utils import get_related_object_by_attrs
+
             return get_related_object_by_attrs(queryset, data)
         return super().to_internal_value(data)
 
@@ -73,7 +74,7 @@ class ValidatedModelSerializer(BaseModelSerializer):
         instance._m2m_values = m2m_values
         instance.full_clean(validate_unique=False)
 
-        if 'custom_field_data' in attrs:
-            data['custom_field_data'] = instance.custom_field_data
+        if "custom_field_data" in attrs:
+            data["custom_field_data"] = instance.custom_field_data
 
         return data

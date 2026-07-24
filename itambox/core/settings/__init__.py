@@ -17,22 +17,22 @@ Selects the settings module using a *fail-closed* strategy:
 import os
 import sys
 
-ENV = os.environ.get('ITAMBOX_ENV', None)
+ENV = os.environ.get("ITAMBOX_ENV", None)
 
 if ENV is None:
-    _is_testing = 'test' in sys.argv or any('test' in arg or 'pytest' in arg for arg in sys.argv)
-    _debug_raw = os.environ.get('ITAMBOX_DEBUG')
+    _is_testing = "test" in sys.argv or any("test" in arg or "pytest" in arg for arg in sys.argv)
+    _debug_raw = os.environ.get("ITAMBOX_DEBUG")
     if _is_testing:
-        ENV = 'dev'
+        ENV = "dev"
     elif _debug_raw is not None:
-        ENV = 'dev' if _debug_raw.lower() in ('true', '1', 't') else 'prod'
+        ENV = "dev" if _debug_raw.lower() in ("true", "1", "t") else "prod"
     else:
         # Nothing configured: fail closed to production.
-        ENV = 'prod'
+        ENV = "prod"
 
-if ENV == 'prod':
+if ENV == "prod":
     from .prod import *
-elif ENV == 'dev':
+elif ENV == "dev":
     from .dev import *
 else:
     from .base import *

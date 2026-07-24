@@ -5,18 +5,17 @@ from django.urls import reverse_lazy
 from django.utils.translation import gettext_lazy as _
 
 __all__ = (
-    'Menu',
-    'MenuGroup',
-    'MenuItem',
-    'MenuItemButton',
-    'get_model_buttons',
-    'get_model_item',
+    "Menu",
+    "MenuGroup",
+    "MenuItem",
+    "MenuItemButton",
+    "get_model_buttons",
+    "get_model_item",
 )
 
 
 @dataclass
 class MenuItemButton:
-
     link: str
     title: str
     icon_class: str
@@ -26,7 +25,7 @@ class MenuItemButton:
 
     def __post_init__(self):
         if self.link:
-            if isinstance(self.link, str) and '/' in self.link:
+            if isinstance(self.link, str) and "/" in self.link:
                 self._url = self.link
             elif not isinstance(self.link, str):
                 self._url = self.link
@@ -40,7 +39,6 @@ class MenuItemButton:
 
 @dataclass
 class MenuItem:
-
     link: str
     link_text: str
     _url: str | None = field(default=None, init=False)
@@ -56,7 +54,7 @@ class MenuItem:
 
     def __post_init__(self):
         if self.link:
-            if isinstance(self.link, str) and '/' in self.link:
+            if isinstance(self.link, str) and "/" in self.link:
                 self._url = self.link
             elif not isinstance(self.link, str):
                 self._url = self.link
@@ -70,7 +68,6 @@ class MenuItem:
 
 @dataclass
 class MenuGroup:
-
     label: str
     items: Sequence[MenuItem]
     beta: bool = False
@@ -78,41 +75,42 @@ class MenuGroup:
 
 @dataclass
 class Menu:
-
     label: str
     icon_class: str
     groups: Sequence[MenuGroup]
 
     @property
     def name(self):
-        return self.label.replace(' ', '_').replace('&', '')
+        return self.label.replace(" ", "_").replace("&", "")
 
 
-def get_model_item(app_label, model_name, label, actions=('add', 'import')):
+def get_model_item(app_label, model_name, label, actions=("add", "import")):
     return MenuItem(
-        link=f'{app_label}:{model_name}_list',
+        link=f"{app_label}:{model_name}_list",
         link_text=label,
-        permissions=[f'{app_label}.view_{model_name}'],
-        buttons=get_model_buttons(app_label, model_name, actions)
+        permissions=[f"{app_label}.view_{model_name}"],
+        buttons=get_model_buttons(app_label, model_name, actions),
     )
 
 
-def get_model_buttons(app_label, model_name, actions=('add', 'import')):
+def get_model_buttons(app_label, model_name, actions=("add", "import")):
     buttons = []
 
-    if 'add' in actions:
+    if "add" in actions:
         buttons.append(
             MenuItemButton(
-                link=f'{app_label}:{model_name}_create',
-                title=_('Add'),
-                icon_class='mdi mdi-plus-thick',
-                permissions=[f'{app_label}.add_{model_name}']
+                link=f"{app_label}:{model_name}_create",
+                title=_("Add"),
+                icon_class="mdi mdi-plus-thick",
+                permissions=[f"{app_label}.add_{model_name}"],
             )
         )
 
-    if 'import' in actions:
+    if "import" in actions:
         from django.apps import apps
+
         from core.forms.import_forms import is_model_importable
+
         try:
             model = apps.get_model(app_label, model_name)
         except LookupError:
@@ -121,11 +119,11 @@ def get_model_buttons(app_label, model_name, actions=('add', 'import')):
         if model is not None and is_model_importable(model):
             buttons.append(
                 MenuItemButton(
-                    link=f'/import/{app_label}/{model_name}/',
-                    title=_('Import'),
-                    icon_class='mdi mdi-upload',
-                    permissions=[f'{app_label}.add_{model_name}'],
-                    color='outline text-success'
+                    link=f"/import/{app_label}/{model_name}/",
+                    title=_("Import"),
+                    icon_class="mdi mdi-upload",
+                    permissions=[f"{app_label}.add_{model_name}"],
+                    color="outline text-success",
                 )
             )
 

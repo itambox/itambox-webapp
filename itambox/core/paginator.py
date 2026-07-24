@@ -9,8 +9,8 @@ from django.utils.inspect import method_has_no_args
 from itambox.constants import DEFAULT_PAGINATE_COUNT
 
 __all__ = (
-    'EnhancedPage',
-    'EnhancedPaginator',
+    "EnhancedPage",
+    "EnhancedPaginator",
 )
 
 # Fallback used when ITAMBOX_PAGINATOR_COUNT_CAP is unset. Chosen high enough
@@ -19,9 +19,7 @@ DEFAULT_PAGINATOR_COUNT_CAP = 100000
 
 
 class EnhancedPaginator(Paginator):
-    default_page_lengths = (
-        25, 50, 100, 250, 500, 1000
-    )
+    default_page_lengths = (25, 50, 100, 250, 500, 1000)
 
     def __init__(self, object_list, per_page, orphans=None, **kwargs):
         try:
@@ -49,7 +47,7 @@ class EnhancedPaginator(Paginator):
     @cached_property
     def _count_cap(self):
         """The configured count cap, or None to disable capping."""
-        cap = getattr(settings, 'ITAMBOX_PAGINATOR_COUNT_CAP', DEFAULT_PAGINATOR_COUNT_CAP)
+        cap = getattr(settings, "ITAMBOX_PAGINATOR_COUNT_CAP", DEFAULT_PAGINATOR_COUNT_CAP)
         try:
             cap = int(cap)
         except (TypeError, ValueError):
@@ -73,7 +71,7 @@ class EnhancedPaginator(Paginator):
 
         # Mirror Django's own detection of a real ``.count()`` method (a
         # QuerySet), excluding builtins like ``list.count`` that require an arg.
-        c = getattr(object_list, 'count', None)
+        c = getattr(object_list, "count", None)
         if not (callable(c) and not inspect.isbuiltin(c) and method_has_no_args(c)):
             # Lists / in-memory iterables — identical to Django's len() path.
             # len() is O(1) here, so capping buys nothing.
@@ -86,7 +84,7 @@ class EnhancedPaginator(Paginator):
         # stops scanning past the cap. ``qs[:cap + 1].count()`` emits
         # COUNT(*) over a LIMIT-ed subquery.
         try:
-            return object_list[:cap + 1].count()
+            return object_list[: cap + 1].count()
         except TypeError:
             # Not sliceable in the QuerySet sense — fall back to the full count.
             return c()
@@ -132,7 +130,7 @@ class EnhancedPaginator(Paginator):
             return self.count
 
         object_list = self.object_list
-        c = getattr(object_list, 'count', None)
+        c = getattr(object_list, "count", None)
         if callable(c) and not inspect.isbuiltin(c) and method_has_no_args(c):
             return c()
         return len(object_list)
@@ -173,7 +171,6 @@ class EnhancedPaginator(Paginator):
 
 
 class EnhancedPage(Page):
-
     def smart_pages(self):
         if self.paginator.num_pages <= 5:
             return self.paginator.page_range

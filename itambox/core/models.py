@@ -14,18 +14,29 @@ from django.utils import timezone
 from django.utils.http import urlencode
 from django.utils.translation import gettext_lazy as _
 
+from core.choices import JobStatusChoices, ObjectChangeActionChoices
+from core.managers import (
+    AllObjectsManager,
+    SoftDeleteManager,
+    TenantScopingAllObjectsManager,
+    TenantScopingManager,
+    TenantScopingSoftDeleteManager,
+)
+from core.mixins import (
+    CloneableMixin,
+    ExportableMixin,
+    FileAttachmentMixin,
+    ImageAttachmentMixin,
+    JournalingMixin,
+    SoftDeleteMixin,
+    TaggableMixin,
+)
+from core.validators import validate_file_attachment, validate_image_attachment
+
 # Local application
 from itambox.middleware import get_current_request_id, get_current_user
 from itambox.registry import registry
-from core.choices import ObjectChangeActionChoices, JobStatusChoices
-from core.managers import TenantScopingManager, SoftDeleteManager, AllObjectsManager, TenantScopingSoftDeleteManager, TenantScopingAllObjectsManager
-from core.mixins import (
-    JournalingMixin, TaggableMixin,
-    ImageAttachmentMixin, FileAttachmentMixin, ExportableMixin, CloneableMixin,
-    SoftDeleteMixin
-)
 from itambox.utils import serialize_object
-from core.validators import validate_image_attachment, validate_file_attachment
 
 
 class BaseModel(models.Model):
@@ -38,6 +49,7 @@ class BaseModel(models.Model):
     def clean(self):
         super().clean()
         from core.validators import CustomValidator
+
         CustomValidator.validate_object(self)
 
 
@@ -51,94 +63,49 @@ class ObjectChange(models.Model):
     allow_global_tenant = True
 
     tenant = models.ForeignKey(
-        to='organization.Tenant',
+        to="organization.Tenant",
         on_delete=models.SET_NULL,
-        related_name='+',
+        related_name="+",
         blank=True,
         null=True,
         db_index=True,
         verbose_name=_("Tenant"),
     )
-    time = models.DateTimeField(
-        default=timezone.now,
-        editable=False,
-        db_index=True
-    )
+    time = models.DateTimeField(default=timezone.now, editable=False, db_index=True)
     user = models.ForeignKey(
         to=settings.AUTH_USER_MODEL,
         on_delete=models.SET_NULL,
-        related_name='changes',
+        related_name="changes",
         blank=True,
         null=True,
         verbose_name=_("User"),
     )
-    user_name = models.CharField(
-        max_length=150,
-        editable=False
-    )
-    request_id = models.UUIDField(
-        editable=False
-    )
+    user_name = models.CharField(max_length=150, editable=False)
+    request_id = models.UUIDField(editable=False)
     action = models.CharField(
         max_length=50,
         choices=ObjectChangeActionChoices(),
         db_index=True,
         verbose_name=_("Action"),
     )
-    changed_object_type = models.ForeignKey(
-        to=ContentType,
-        on_delete=models.PROTECT,
-        related_name='+'
-    )
-    changed_object_id = models.PositiveBigIntegerField(
-        db_index=True
-    )
-    changed_object = GenericForeignKey(
-        ct_field='changed_object_type',
-        fk_field='changed_object_id'
-    )
+    changed_object_type = models.ForeignKey(to=ContentType, on_delete=models.PROTECT, related_name="+")
+    changed_object_id = models.PositiveBigIntegerField(db_index=True)
+    changed_object = GenericForeignKey(ct_field="changed_object_type", fk_field="changed_object_id")
     related_object_type = models.ForeignKey(
-        to=ContentType,
-        on_delete=models.PROTECT,
-        related_name='+',
-        blank=True,
-        null=True
+        to=ContentType, on_delete=models.PROTECT, related_name="+", blank=True, null=True
     )
-    related_object_id = models.PositiveBigIntegerField(
-        blank=True,
-        null=True,
-        db_index=True
-    )
-    related_object = GenericForeignKey(
-        ct_field='related_object_type',
-        fk_field='related_object_id'
-    )
-    object_repr = models.CharField(
-        max_length=200,
-        editable=False
-    )
-    prechange_data = models.JSONField(
-        editable=False,
-        blank=True,
-        null=True
-    )
-    postchange_data = models.JSONField(
-        editable=False,
-        blank=True,
-        null=True
-    )
-    object_type_repr = models.CharField(
-        max_length=100,
-        editable=False,
-        blank=True,
-        null=True
-    )
+    related_object_id = models.PositiveBigIntegerField(blank=True, null=True, db_index=True)
+    related_object = GenericForeignKey(ct_field="related_object_type", fk_field="related_object_id")
+    object_repr = models.CharField(max_length=200, editable=False)
+    prechange_data = models.JSONField(editable=False, blank=True, null=True)
+    postchange_data = models.JSONField(editable=False, blank=True, null=True)
+    object_type_repr = models.CharField(max_length=100, editable=False, blank=True, null=True)
 
     class Meta:
-        ordering = ['-time']
+        ordering = ["-time"]
         indexes = [
-            models.Index(fields=['changed_object_type', 'changed_object_id']),
-            models.Index(fields=['related_object_type', 'related_object_id']),
+            models.Index(fields=["changed_object_type", "changed_object_id"]),
+            models.Index(fields=["related_object_type", "related_object_id"]),
         ]
 
     def __str__(self):
@@ -149,7 +116,7 @@ class ObjectChange(models.Model):
         )
 
     def get_absolute_url(self):
-        return reverse('objectchange', args=[self.pk])
+        return reverse("objectchange", args=[self.pk])
 
     def save(self, *args, **kwargs):
         if not self.object_type_repr:
@@ -157,18 +124,19 @@ class ObjectChange(models.Model):
         super().save(*args, **kwargs)
 
     def get_changed_object_url(self):
-        if hasattr(self.changed_object, 'get_absolute_url'):
+        if hasattr(self.changed_object, "get_absolute_url"):
             return self.changed_object.get_absolute_url()
         return None
 
 
 # Per-request cache of validated user pks for the changelog. Keyed on request_id
 # so it auto-invalidates when a new request/task begins (no cross-request leak).
-_user_validation_cache = contextvars.ContextVar('user_validation_cache', default=None)
+_user_validation_cache = contextvars.ContextVar("user_validation_cache", default=None)
 
 
-def write_object_change(*, instance, action, user, request_id, change_tenant,
-                        prechange_data=None, postchange_data=None):
+def write_object_change(
+    *, instance, action, user, request_id, change_tenant, prechange_data=None, postchange_data=None
+):
     """Create the ``ObjectChange`` audit row for a logged change.
 
     Single source of truth for the audit-row payload shape, shared by
@@ -181,7 +149,7 @@ def write_object_change(*, instance, action, user, request_id, change_tenant,
     return ObjectChange._base_manager.create(
         tenant=change_tenant,
         user=user,
-        user_name=user.username if user else 'System',
+        user_name=user.username if user else "System",
         request_id=request_id,
         action=action,
         changed_object_type=ct,
@@ -194,7 +162,7 @@ def write_object_change(*, instance, action, user, request_id, change_tenant,
 
 
 class ChangeLoggingMixin:
-    _change_logging_excluded_fields = ['updated_at']
+    _change_logging_excluded_fields = ["updated_at"]
 
     # Optional ORM path (e.g. 'asset__tenant') used to derive the changelog
     # tenant for models that carry no `tenant` field/property of their own.
@@ -212,16 +180,14 @@ class ChangeLoggingMixin:
 
     def __init__(self, *args, **kwargs):
         self._changelog_action = None
-        self._changelog_message = ''
+        self._changelog_message = ""
         self._prechange_snapshot = None
         super().__init__(*args, **kwargs)
 
     def snapshot(self):
-        self._prechange_snapshot = serialize_object(
-            self, exclude_fields=self._change_logging_excluded_fields
-        )
+        self._prechange_snapshot = serialize_object(self, exclude_fields=self._change_logging_excluded_fields)
 
-    def _log_change(self, action, prechange_data=None, postchange_data=None, message='', user=None):
+    def _log_change(self, action, prechange_data=None, postchange_data=None, message="", user=None):
         # ``user`` overrides the acting user for this row (e.g. an explicit actor
         # passed to log_m2m_change); otherwise the ambient request user is used.
         if user is None:
@@ -239,6 +205,7 @@ class ChangeLoggingMixin:
             validated = cache[1]
             if user.pk not in validated:
                 from django.contrib.auth import get_user_model
+
                 User = get_user_model()
                 if User.objects.filter(pk=user.pk).exists():
                     validated.add(user.pk)
@@ -252,8 +219,9 @@ class ChangeLoggingMixin:
         # on a relation (e.g. AssetAudit -> asset.tenant); finally fall back to the
         # active request tenant for objects that carry no tenant of their own.
         from core.managers import get_current_tenant
+
         try:
-            change_tenant = getattr(self, 'tenant', None)
+            change_tenant = getattr(self, "tenant", None)
         except Exception:
             change_tenant = None
         if change_tenant is None and self.changelog_tenant_lookup:
@@ -281,7 +249,7 @@ class ChangeLoggingMixin:
         # null-safely if any hop is missing so callers fall through to the next
         # fallback rather than raising on orphaned/partial relations.
         obj = self
-        for attr in lookup.split('__'):
+        for attr in lookup.split("__"):
             try:
                 obj = getattr(obj, attr, None)
             except ObjectDoesNotExist:
@@ -313,11 +281,9 @@ class ChangeLoggingMixin:
         m2m_field = self._meta.get_field(field_name)
         through = m2m_field.remote_field.through
         source_fn = m2m_field.m2m_field_name()
-        target_col = m2m_field.m2m_reverse_field_name() + '_id'
-        current_ids = sorted(
-            through._base_manager.filter(**{source_fn: self}).values_list(target_col, flat=True)
-        )
-        target_ids = sorted({getattr(v, 'pk', v) for v in (new_values or [])})
+        target_col = m2m_field.m2m_reverse_field_name() + "_id"
+        current_ids = sorted(through._base_manager.filter(**{source_fn: self}).values_list(target_col, flat=True))
+        target_ids = sorted({getattr(v, "pk", v) for v in (new_values or [])})
         if target_ids == current_ids:
             return False
         prechange = serialize_object(self, exclude_fields=self._change_logging_excluded_fields)
@@ -327,7 +293,9 @@ class ChangeLoggingMixin:
         postchange[field_name] = target_ids
         self._log_change(
             action=ObjectChangeActionChoices.ACTION_UPDATE,
-            prechange_data=prechange, postchange_data=postchange, user=actor,
+            prechange_data=prechange,
+            postchange_data=postchange,
+            user=actor,
         )
         return True
 
@@ -348,7 +316,9 @@ class ChangeLoggingMixin:
                 # filters would hide the row from the default manager.
                 original_instance = self.__class__._base_manager.filter(pk=self.pk).first()
                 if original_instance is not None:
-                    prechange_data = serialize_object(original_instance, exclude_fields=self._change_logging_excluded_fields)
+                    prechange_data = serialize_object(
+                        original_instance, exclude_fields=self._change_logging_excluded_fields
+                    )
 
         super().save(*args, **kwargs)
 
@@ -360,7 +330,12 @@ class ChangeLoggingMixin:
         if action == ObjectChangeActionChoices.ACTION_UPDATE and prechange_data == postchange_data:
             return
 
-        self._log_change(action=action, prechange_data=prechange_data, postchange_data=postchange_data, message=self._changelog_message)
+        self._log_change(
+            action=action,
+            prechange_data=prechange_data,
+            postchange_data=postchange_data,
+            message=self._changelog_message,
+        )
 
     def delete(self, *args, **kwargs):
         # Resolve force_hard_delete from EITHER the kwarg (a direct
@@ -372,7 +347,8 @@ class ChangeLoggingMixin:
         # first. (Never treat a positional arg as the flag: positionally,
         # delete()'s first arg is Django's `using`.)
         from core.mixins import SoftDeleteMixin
-        force_hard = bool(kwargs.pop('force_hard_delete', False)) or getattr(self, '_force_hard_delete', False)
+
+        force_hard = bool(kwargs.pop("force_hard_delete", False)) or getattr(self, "_force_hard_delete", False)
         self._force_hard_delete = force_hard
 
         if not get_current_request_id():
@@ -394,37 +370,42 @@ class ChangeLoggingMixin:
 
         super().delete(*args, **kwargs)
 
-
     @classmethod
     def __init_subclass__(cls, **kwargs):
         super().__init_subclass__(**kwargs)
-        registry.register_feature(cls, 'change_logging')
+        registry.register_feature(cls, "change_logging")
 
     def get_changelog_url(self):
         ct = ContentType.objects.get_for_model(self.__class__)
-        return reverse('objectchange_list') + '?' + urlencode({
-            'changed_object_type': ct.pk,
-            'changed_object_id': self.pk,
-        })
+        return (
+            reverse("objectchange_list")
+            + "?"
+            + urlencode(
+                {
+                    "changed_object_type": ct.pk,
+                    "changed_object_id": self.pk,
+                }
+            )
+        )
 
 
 class Notification(models.Model):
-    LEVEL_INFO = 'info'
-    LEVEL_WARNING = 'warning'
-    LEVEL_SUCCESS = 'success'
-    LEVEL_DANGER = 'danger'
+    LEVEL_INFO = "info"
+    LEVEL_WARNING = "warning"
+    LEVEL_SUCCESS = "success"
+    LEVEL_DANGER = "danger"
 
     LEVEL_CHOICES = [
-        (LEVEL_INFO, 'Info'),
-        (LEVEL_WARNING, 'Warning'),
-        (LEVEL_SUCCESS, 'Success'),
-        (LEVEL_DANGER, 'Danger'),
+        (LEVEL_INFO, "Info"),
+        (LEVEL_WARNING, "Warning"),
+        (LEVEL_SUCCESS, "Success"),
+        (LEVEL_DANGER, "Danger"),
     ]
 
     user = models.ForeignKey(
         to=settings.AUTH_USER_MODEL,
         on_delete=models.CASCADE,
-        related_name='notifications',
+        related_name="notifications",
         null=True,
         blank=True,
         help_text=_("Target user for the notification. Null represents global broadcast alert."),
@@ -434,16 +415,17 @@ class Notification(models.Model):
     message = models.TextField(verbose_name=_("Message"))
     level = models.CharField(max_length=20, choices=LEVEL_CHOICES, default=LEVEL_INFO, verbose_name=_("Level"))
     is_read = models.BooleanField(default=False, verbose_name=_("Is Read"))
-    target_url = models.CharField(max_length=500, blank=True, help_text=_("Optional destination URL when clicked."), verbose_name=_("Target URL"))
+    target_url = models.CharField(
+        max_length=500, blank=True, help_text=_("Optional destination URL when clicked."), verbose_name=_("Target URL")
+    )
     created_at = models.DateTimeField(auto_now_add=True)
 
-
     class Meta:
-        ordering = ('-created_at',)
+        ordering = ("-created_at",)
         verbose_name = "Notification"
         verbose_name_plural = "Notifications"
         indexes = [
-            models.Index(fields=['user', 'is_read']),
+            models.Index(fields=["user", "is_read"]),
         ]
 
     def __str__(self):
@@ -451,10 +433,10 @@ class Notification(models.Model):
 
 
 class Job(ChangeLoggingMixin, BaseModel):
-    STATUS_PENDING = 'pending'
-    STATUS_RUNNING = 'running'
-    STATUS_COMPLETED = 'completed'
-    STATUS_FAILED = 'failed'
+    STATUS_PENDING = "pending"
+    STATUS_RUNNING = "running"
+    STATUS_COMPLETED = "completed"
+    STATUS_FAILED = "failed"
 
     STATUS_CHOICES = JobStatusChoices()
 
@@ -462,17 +444,19 @@ class Job(ChangeLoggingMixin, BaseModel):
     # Tenant the job was enqueued for. Null means a system-level job
     # (e.g. management commands); those are only visible to superusers.
     tenant = models.ForeignKey(
-        'organization.Tenant',
+        "organization.Tenant",
         on_delete=models.CASCADE,
-        related_name='jobs',
+        related_name="jobs",
         null=True,
         blank=True,
         verbose_name=_("Tenant"),
     )
     model = models.ForeignKey(ContentType, on_delete=models.SET_NULL, null=True, blank=True)
     object_id = models.PositiveBigIntegerField(null=True, blank=True)
-    content_object = GenericForeignKey('model', 'object_id')
-    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default=STATUS_PENDING, db_index=True, verbose_name=_("Status"))
+    content_object = GenericForeignKey("model", "object_id")
+    status = models.CharField(
+        max_length=20, choices=STATUS_CHOICES, default=STATUS_PENDING, db_index=True, verbose_name=_("Status")
+    )
     data = models.JSONField(default=dict, blank=True, verbose_name=_("Data"))
     result = models.JSONField(null=True, blank=True, verbose_name=_("Result"))
     logs = models.TextField(blank=True, verbose_name=_("Logs"))
@@ -482,18 +466,18 @@ class Job(ChangeLoggingMixin, BaseModel):
     scheduled_for = models.DateTimeField(null=True, blank=True, db_index=True, verbose_name=_("Scheduled For"))
 
     class Meta:
-        ordering = ['-created']
+        ordering = ["-created"]
         verbose_name = _("Job")
         verbose_name_plural = _("Jobs")
         indexes = [
-            models.Index(fields=['status', 'scheduled_for']),
+            models.Index(fields=["status", "scheduled_for"]),
         ]
 
     def __str__(self):
         return f"Job: {self.name} ({self.get_status_display()})"
 
     def get_absolute_url(self):
-        return reverse('job_detail', kwargs={'pk': self.pk})
+        return reverse("job_detail", kwargs={"pk": self.pk})
 
     def mark_running(self):
         """
@@ -507,7 +491,7 @@ class Job(ChangeLoggingMixin, BaseModel):
             started=started,
         )
         if not updated:
-            self.refresh_from_db(fields=['status', 'started', 'logs'])
+            self.refresh_from_db(fields=["status", "started", "logs"])
             return False
         self.status = self.STATUS_RUNNING
         self.started = started
@@ -518,9 +502,9 @@ class Job(ChangeLoggingMixin, BaseModel):
         self.completed = timezone.now()
         if result is not None:
             self.result = result
-        self.save(update_fields=['status', 'completed', 'result'])
+        self.save(update_fields=["status", "completed", "result"])
 
-    def cancel(self, reason=''):
+    def cancel(self, reason=""):
         """
         Atomically cancel a still-pending job. Returns False if a worker
         already picked it up (or it has finished) — a running task cannot
@@ -534,7 +518,7 @@ class Job(ChangeLoggingMixin, BaseModel):
             logs=logs,
         )
         if not updated:
-            self.refresh_from_db(fields=['status', 'started', 'completed'])
+            self.refresh_from_db(fields=["status", "started", "completed"])
             return False
         self.status = self.STATUS_FAILED
         self.completed = completed
@@ -546,32 +530,37 @@ class Job(ChangeLoggingMixin, BaseModel):
         self.completed = timezone.now()
         if error:
             self.logs = f"{self.logs}\n{error}" if self.logs else str(error)
-        self.save(update_fields=['status', 'completed', 'logs'])
+        self.save(update_fields=["status", "completed", "logs"])
 
     def append_log(self, message):
         timestamp = timezone.now().isoformat()
         entry = f"[{timestamp}] {message}"
         self.logs = f"{self.logs}\n{entry}" if self.logs else entry
-        self.save(update_fields=['logs'])
+        self.save(update_fields=["logs"])
 
 
 class EmailSettings(ChangeLoggingMixin, BaseModel):
     # Keep the encrypted SMTP password ciphertext out of the changelog JSON
     # (serialize_object would otherwise dump it into every ObjectChange row).
-    _change_logging_excluded_fields = ['updated_at', 'smtp_password']
+    _change_logging_excluded_fields = ["updated_at", "smtp_password"]
     # System-wide singleton (no tenant) — attribute changes globally, not to the
     # ambient request tenant.
     changelog_global = True
 
-    smtp_host = models.CharField(max_length=255, default='localhost', verbose_name=_("SMTP Host"))
+    smtp_host = models.CharField(max_length=255, default="localhost", verbose_name=_("SMTP Host"))
     smtp_port = models.PositiveIntegerField(default=25, verbose_name=_("SMTP Port"))
     smtp_use_tls = models.BooleanField(default=True, verbose_name=_("SMTP Use TLS"))
     smtp_username = models.CharField(max_length=255, blank=True, verbose_name=_("SMTP Username"))
     smtp_password = models.CharField(max_length=1000, blank=True, verbose_name=_("SMTP Password"))
-    from_address = models.EmailField(max_length=255, default='itambox@localhost', verbose_name=_("From Address"))
-    from_name = models.CharField(max_length=255, default='ITAMbox Notifications', verbose_name=_("From Name"))
+    from_address = models.EmailField(max_length=255, default="itambox@localhost", verbose_name=_("From Address"))
+    from_name = models.CharField(max_length=255, default="ITAMbox Notifications", verbose_name=_("From Name"))
     enabled = models.BooleanField(default=False, verbose_name=_("Enabled"))
-    test_recipient = models.EmailField(max_length=255, blank=True, help_text=_("Email address for test notifications"), verbose_name=_("Test Recipient"))
+    test_recipient = models.EmailField(
+        max_length=255,
+        blank=True,
+        help_text=_("Email address for test notifications"),
+        verbose_name=_("Test Recipient"),
+    )
 
     class Meta:
         verbose_name = "Email Settings"
@@ -586,6 +575,7 @@ class EmailSettings(ChangeLoggingMixin, BaseModel):
         self.pk = 1
         if self.smtp_password and not self.smtp_password.startswith("enc$"):
             from core.crypto import encrypt_string
+
             self.smtp_password = encrypt_string(self.smtp_password)
         super().save(*args, **kwargs)
 
@@ -595,6 +585,7 @@ class EmailSettings(ChangeLoggingMixin, BaseModel):
             return ""
         if self.smtp_password.startswith("enc$"):
             from core.crypto import decrypt_string
+
             return decrypt_string(self.smtp_password)
         return self.smtp_password
 
@@ -603,11 +594,7 @@ class EmailSettings(ChangeLoggingMixin, BaseModel):
         return cls.objects.first()
 
 
-
-
-
-class StandardModel(JournalingMixin, TaggableMixin, ExportableMixin,
-                    CloneableMixin, ChangeLoggingMixin, BaseModel):
+class StandardModel(JournalingMixin, TaggableMixin, ExportableMixin, CloneableMixin, ChangeLoggingMixin, BaseModel):
     class Meta:
         abstract = True
 
@@ -627,10 +614,7 @@ class RecycleBin(models.Model):
         managed = False
         default_permissions = ()
         permissions = [
-            ('view_recyclebin', _('Can view Recycle Bin')),
-            ('change_recyclebin', _('Can restore from Recycle Bin')),
-            ('delete_recyclebin', _('Can purge from Recycle Bin')),
+            ("view_recyclebin", _("Can view Recycle Bin")),
+            ("change_recyclebin", _("Can restore from Recycle Bin")),
+            ("delete_recyclebin", _("Can purge from Recycle Bin")),
         ]
-
-
-

@@ -9,14 +9,16 @@ D2-2: authorization must flow through the role's actual JSON permissions
       ``Role.name`` string match — the same magic-string backdoor pattern
       removed from the (since-deleted) invitation flow.
 """
+
 from django.contrib.auth import get_user_model
 from django.test import TestCase
 from django.urls import reverse
 from django.utils import timezone
-from organization.models import Tenant, Role
-from users.models import Token
 from rest_framework import status
+
 from core.tests.mixins import grant
+from organization.models import Role, Tenant
+from users.models import Token
 
 User = get_user_model()
 
@@ -34,11 +36,13 @@ class SCIMTokenTenantScopeTests(TestCase):
         # user genuinely qualifies for SCIM provisioning in either tenant on its own —
         # isolating the test to the token-scope check alone.
         role_a = Role.objects.create(
-            tenant=self.tenant_a, name="Provisioner",
+            tenant=self.tenant_a,
+            name="Provisioner",
             permissions=["organization.change_membership"],
         )
         role_b = Role.objects.create(
-            tenant=self.tenant_b, name="Provisioner",
+            tenant=self.tenant_b,
+            name="Provisioner",
             permissions=["organization.change_membership"],
         )
         grant(self.user, self.tenant_a, role_a)
@@ -46,21 +50,22 @@ class SCIMTokenTenantScopeTests(TestCase):
 
         # Token explicitly scoped to tenant A only.
         self.token_a = Token.objects.create(
-            user=self.user, tenant=self.tenant_a,
+            user=self.user,
+            tenant=self.tenant_a,
             expires=timezone.now() + timezone.timedelta(days=1),
         )
-        self.headers_a = {'HTTP_AUTHORIZATION': f'Bearer {self.token_a.key}'}
+        self.headers_a = {"HTTP_AUTHORIZATION": f"Bearer {self.token_a.key}"}
 
     def test_token_scoped_to_tenant_a_is_rejected_against_tenant_b(self):
         """Fail-before: without the D2-1 fix this returns 200 because the user's
         membership+role in tenant B independently satisfies the (unscoped) check."""
-        url = reverse('api:scim:service-provider-config', kwargs={'tenant_slug': self.tenant_b.slug})
+        url = reverse("api:scim:service-provider-config", kwargs={"tenant_slug": self.tenant_b.slug})
         response = self.client.get(url, **self.headers_a)
         self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
 
     def test_token_scoped_to_tenant_a_still_works_against_tenant_a(self):
         """Control: the same token remains valid for its own tenant."""
-        url = reverse('api:scim:service-provider-config', kwargs={'tenant_slug': self.tenant_a.slug})
+        url = reverse("api:scim:service-provider-config", kwargs={"tenant_slug": self.tenant_a.slug})
         response = self.client.get(url, **self.headers_a)
         self.assertEqual(response.status_code, status.HTTP_200_OK)
 
@@ -73,34 +78,37 @@ class SCIMRolePermissionAuthorizationTests(TestCase):
 
     def _token_for(self, user):
         token = Token.objects.create(
-            user=user, tenant=self.tenant,
+            user=user,
+            tenant=self.tenant,
             expires=timezone.now() + timezone.timedelta(days=1),
         )
-        return {'HTTP_AUTHORIZATION': f'Bearer {token.key}'}
+        return {"HTTP_AUTHORIZATION": f"Bearer {token.key}"}
 
     def test_role_named_admin_without_the_permission_is_rejected(self):
         """Fail-before: today this passes purely because the role is named 'Admin',
         even though it grants no user/membership-management permission at all."""
         user = User.objects.create_user(username="thin_admin", email="thin@x.com")
         role = Role.objects.create(
-            tenant=self.tenant, name="Admin",
+            tenant=self.tenant,
+            name="Admin",
             permissions=["assets.view_asset"],
         )
         grant(user, self.tenant, role)
 
-        url = reverse('api:scim:service-provider-config', kwargs={'tenant_slug': self.tenant.slug})
+        url = reverse("api:scim:service-provider-config", kwargs={"tenant_slug": self.tenant.slug})
         response = self.client.get(url, **self._token_for(user))
         self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
 
     def test_role_named_owner_without_the_permission_is_rejected(self):
         user = User.objects.create_user(username="thin_owner", email="thin_owner@x.com")
         role = Role.objects.create(
-            tenant=self.tenant, name="Owner",
+            tenant=self.tenant,
+            name="Owner",
             permissions=["assets.view_asset"],
         )
         grant(user, self.tenant, role)
 
-        url = reverse('api:scim:service-provider-config', kwargs={'tenant_slug': self.tenant.slug})
+        url = reverse("api:scim:service-provider-config", kwargs={"tenant_slug": self.tenant.slug})
         response = self.client.get(url, **self._token_for(user))
         self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
 
@@ -109,17 +117,18 @@ class SCIMRolePermissionAuthorizationTests(TestCase):
         authorizes SCIM access regardless of its display name (name-agnostic)."""
         user = User.objects.create_user(username="real_provisioner", email="real@x.com")
         role = Role.objects.create(
-            tenant=self.tenant, name="HRIS Sync",
+            tenant=self.tenant,
+            name="HRIS Sync",
             permissions=["organization.change_membership"],
         )
         grant(user, self.tenant, role)
 
-        url = reverse('api:scim:service-provider-config', kwargs={'tenant_slug': self.tenant.slug})
+        url = reverse("api:scim:service-provider-config", kwargs={"tenant_slug": self.tenant.slug})
         response = self.client.get(url, **self._token_for(user))
         self.assertEqual(response.status_code, status.HTTP_200_OK)
 
     def test_superuser_bypasses_the_permission_check(self):
         user = User.objects.create_user(username="root", email="root@x.com", is_superuser=True)
-        url = reverse('api:scim:service-provider-config', kwargs={'tenant_slug': self.tenant.slug})
+        url = reverse("api:scim:service-provider-config", kwargs={"tenant_slug": self.tenant.slug})
         response = self.client.get(url, **self._token_for(user))
         self.assertEqual(response.status_code, status.HTTP_200_OK)

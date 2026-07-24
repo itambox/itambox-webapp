@@ -6,6 +6,7 @@ save by the global pre_save validator (which runs ``clean()``), so invalid
 states are exercised both at the validation layer (friendly errors) and at
 the DB layer (constraints, via ``bulk_create`` which skips signals).
 """
+
 from django.contrib.contenttypes.models import ContentType
 from django.core.exceptions import ValidationError
 from django.db import IntegrityError, transaction
@@ -14,22 +15,32 @@ from django.test import TestCase
 from assets.models import Manufacturer
 from inventory.models import Accessory, AccessoryStock
 from organization.models import (
-    Location, Site, Tenant, TenantGroup, TenantResourceGrant,
+    Location,
+    Site,
+    Tenant,
+    TenantGroup,
+    TenantResourceGrant,
 )
 
 
 def _build_world():
     """Provider + managed tenant + a stock pool at a provider location."""
-    provider = Tenant.objects.create(name='TRG Provider', slug='trg-provider', is_provider=True)
-    managed = Tenant.objects.create(name='TRG Managed', slug='trg-managed', managed_by=provider)
-    other = Tenant.objects.create(name='TRG Other', slug='trg-other')
-    site = Site.objects.create(name='TRG Site', slug='trg-site', tenant=provider)
+    provider = Tenant.objects.create(name="TRG Provider", slug="trg-provider", is_provider=True)
+    managed = Tenant.objects.create(name="TRG Managed", slug="trg-managed", managed_by=provider)
+    other = Tenant.objects.create(name="TRG Other", slug="trg-other")
+    site = Site.objects.create(name="TRG Site", slug="trg-site", tenant=provider)
     location = Location.objects.create(
-        name='TRG Depot', slug='trg-depot', site=site, tenant=provider,
+        name="TRG Depot",
+        slug="trg-depot",
+        site=site,
+        tenant=provider,
     )
-    manufacturer = Manufacturer.objects.create(name='TRG Mfg', slug='trg-mfg')
+    manufacturer = Manufacturer.objects.create(name="TRG Mfg", slug="trg-mfg")
     accessory = Accessory.objects.create(
-        name='TRG Dock', slug='trg-dock', manufacturer=manufacturer, tenant=provider,
+        name="TRG Dock",
+        slug="trg-dock",
+        manufacturer=manufacturer,
+        tenant=provider,
     )
     stock = AccessoryStock.objects.create(accessory=accessory, location=location, qty=10)
     return provider, managed, other, location, accessory, stock
@@ -42,8 +53,7 @@ def _stock_ct():
 class TenantResourceGrantValidationTests(TestCase):
     @classmethod
     def setUpTestData(cls):
-        (cls.provider, cls.managed, cls.other,
-         cls.location, cls.accessory, cls.stock) = _build_world()
+        (cls.provider, cls.managed, cls.other, cls.location, cls.accessory, cls.stock) = _build_world()
 
     def _grant_kwargs(self, **overrides):
         kwargs = dict(
@@ -62,10 +72,13 @@ class TenantResourceGrantValidationTests(TestCase):
         assert grant.resource == self.stock
 
     def test_valid_group_grant_saves(self):
-        group = TenantGroup.objects.create(name='TRG Group', slug='trg-group')
-        grant = TenantResourceGrant.objects.create(**self._grant_kwargs(
-            grantee_tenant=None, grantee_tenant_group=group,
-        ))
+        group = TenantGroup.objects.create(name="TRG Group", slug="trg-group")
+        grant = TenantResourceGrant.objects.create(
+            **self._grant_kwargs(
+                grantee_tenant=None,
+                grantee_tenant_group=group,
+            )
+        )
         assert grant.grantee_tenant_group == group
 
     def test_grant_to_unrelated_tenant_is_allowed(self):
@@ -74,11 +87,13 @@ class TenantResourceGrantValidationTests(TestCase):
         TenantResourceGrant.objects.create(**self._grant_kwargs(grantee_tenant=self.other))
 
     def test_both_grantees_rejected(self):
-        group = TenantGroup.objects.create(name='TRG G2', slug='trg-g2')
+        group = TenantGroup.objects.create(name="TRG G2", slug="trg-g2")
         with self.assertRaises(ValidationError):
-            TenantResourceGrant.objects.create(**self._grant_kwargs(
-                grantee_tenant_group=group,
-            ))
+            TenantResourceGrant.objects.create(
+                **self._grant_kwargs(
+                    grantee_tenant_group=group,
+                )
+            )
 
     def test_no_grantee_rejected(self):
         with self.assertRaises(ValidationError):
@@ -86,30 +101,40 @@ class TenantResourceGrantValidationTests(TestCase):
 
     def test_owner_as_grantee_rejected(self):
         with self.assertRaises(ValidationError):
-            TenantResourceGrant.objects.create(**self._grant_kwargs(
-                grantee_tenant=self.provider,
-            ))
+            TenantResourceGrant.objects.create(
+                **self._grant_kwargs(
+                    grantee_tenant=self.provider,
+                )
+            )
 
     def test_unapproved_resource_model_rejected(self):
         tenant_ct = ContentType.objects.get_for_model(Tenant)
         with self.assertRaises(ValidationError):
-            TenantResourceGrant.objects.create(**self._grant_kwargs(
-                resource_type=tenant_ct, resource_id=self.managed.pk,
-            ))
+            TenantResourceGrant.objects.create(
+                **self._grant_kwargs(
+                    resource_type=tenant_ct,
+                    resource_id=self.managed.pk,
+                )
+            )
 
     def test_missing_resource_rejected(self):
         with self.assertRaises(ValidationError):
-            TenantResourceGrant.objects.create(**self._grant_kwargs(
-                resource_id=self.stock.pk + 999_999,
-            ))
+            TenantResourceGrant.objects.create(
+                **self._grant_kwargs(
+                    resource_id=self.stock.pk + 999_999,
+                )
+            )
 
     def test_resource_owned_by_other_tenant_rejected(self):
         # The pool sits at a provider-owned location; the managed tenant
         # cannot claim to be its owner.
         with self.assertRaises(ValidationError):
-            TenantResourceGrant.objects.create(**self._grant_kwargs(
-                tenant=self.managed, grantee_tenant=self.other,
-            ))
+            TenantResourceGrant.objects.create(
+                **self._grant_kwargs(
+                    tenant=self.managed,
+                    grantee_tenant=self.other,
+                )
+            )
 
     def test_resource_at_tenantless_location_rejected(self):
         # ADR-0001 phase 4: AbstractStock now derives+requires a tenant from
@@ -118,26 +143,32 @@ class TenantResourceGrantValidationTests(TestCase):
         # this guard defends against — a grant referencing a pool whose
         # owning location has since lost its tenant (e.g. tenant offboarding)
         # — by clearing the location's tenant AFTER the stock already exists.
-        site = Site.objects.create(name='TRG NoT Site', slug='trg-not-site')
+        site = Site.objects.create(name="TRG NoT Site", slug="trg-not-site")
         loc = Location.objects.create(
-            name='TRG NoT', slug='trg-not', site=site, tenant=self.provider,
+            name="TRG NoT",
+            slug="trg-not",
+            site=site,
+            tenant=self.provider,
         )
         orphan_stock = AccessoryStock.objects.create(
-            accessory=self.accessory, location=loc, qty=1,
+            accessory=self.accessory,
+            location=loc,
+            qty=1,
         )
         loc.tenant = None
         loc.save()
         with self.assertRaises(ValidationError):
-            TenantResourceGrant.objects.create(**self._grant_kwargs(
-                resource_id=orphan_stock.pk,
-            ))
+            TenantResourceGrant.objects.create(
+                **self._grant_kwargs(
+                    resource_id=orphan_stock.pk,
+                )
+            )
 
 
 class TenantResourceGrantConstraintTests(TestCase):
     @classmethod
     def setUpTestData(cls):
-        (cls.provider, cls.managed, cls.other,
-         cls.location, cls.accessory, cls.stock) = _build_world()
+        (cls.provider, cls.managed, cls.other, cls.location, cls.accessory, cls.stock) = _build_world()
 
     def _grant_kwargs(self, **overrides):
         kwargs = dict(
@@ -153,24 +184,30 @@ class TenantResourceGrantConstraintTests(TestCase):
     def test_db_rejects_double_grantee(self):
         # bulk_create skips the pre_save validator — the CHECK constraint is
         # the last line of defense.
-        group = TenantGroup.objects.create(name='TRG CG', slug='trg-cg')
+        group = TenantGroup.objects.create(name="TRG CG", slug="trg-cg")
         with self.assertRaises(IntegrityError), transaction.atomic():
-            TenantResourceGrant.objects.bulk_create([
-                TenantResourceGrant(**self._grant_kwargs(grantee_tenant_group=group)),
-            ])
+            TenantResourceGrant.objects.bulk_create(
+                [
+                    TenantResourceGrant(**self._grant_kwargs(grantee_tenant_group=group)),
+                ]
+            )
 
     def test_db_rejects_owner_grantee_identity(self):
         with self.assertRaises(IntegrityError), transaction.atomic():
-            TenantResourceGrant.objects.bulk_create([
-                TenantResourceGrant(**self._grant_kwargs(grantee_tenant=self.provider)),
-            ])
+            TenantResourceGrant.objects.bulk_create(
+                [
+                    TenantResourceGrant(**self._grant_kwargs(grantee_tenant=self.provider)),
+                ]
+            )
 
     def test_one_active_grant_per_resource_and_grantee(self):
         TenantResourceGrant.objects.create(**self._grant_kwargs())
         with self.assertRaises(IntegrityError), transaction.atomic():
-            TenantResourceGrant.objects.create(**self._grant_kwargs(
-                access_level=TenantResourceGrant.ACCESS_VIEW,
-            ))
+            TenantResourceGrant.objects.create(
+                **self._grant_kwargs(
+                    access_level=TenantResourceGrant.ACCESS_VIEW,
+                )
+            )
 
     def test_revoke_then_regrant_is_allowed(self):
         grant = TenantResourceGrant.objects.create(**self._grant_kwargs())
@@ -199,9 +236,7 @@ class TenantResourceGrantOrphanCleanupTests(TestCase):
         )
         stock.delete()  # stock is hard-delete (no soft-delete mixin)
         grant.refresh_from_db()
-        assert grant.deleted_at is not None, (
-            'hard-deleting the pool must revoke (soft-delete) its grants'
-        )
+        assert grant.deleted_at is not None, "hard-deleting the pool must revoke (soft-delete) its grants"
 
     def test_deleting_stock_leaves_revoked_grants_untouched(self):
         provider, managed, other, location, accessory, stock = _build_world()

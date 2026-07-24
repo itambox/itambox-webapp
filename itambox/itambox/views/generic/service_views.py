@@ -1,11 +1,12 @@
 import json
 import logging
+
 from django.contrib import messages
 from django.contrib.auth.mixins import LoginRequiredMixin, PermissionRequiredMixin
 from django.core.exceptions import ImproperlyConfigured, PermissionDenied, ValidationError
 from django.db import transaction
 from django.http import Http404, HttpResponse
-from django.shortcuts import redirect, get_object_or_404, render
+from django.shortcuts import get_object_or_404, redirect, render
 from django.utils.translation import gettext_lazy as _
 from django.views.generic import FormView, View
 
@@ -18,7 +19,7 @@ class GenericTransactionView(PermissionRequiredMixin, LoginRequiredMixin, BaseHT
     queryset = None
     model_form = None
     service_callable = None
-    context_object_name = 'object'
+    context_object_name = "object"
     success_message = _("Operation completed successfully.")
     hx_trigger = "tableRefreshRequired"
     form_field_map = {}
@@ -72,24 +73,23 @@ class GenericTransactionView(PermissionRequiredMixin, LoginRequiredMixin, BaseHT
     def get_queryset(self):
         if self.queryset is None:
             raise ImproperlyConfigured(
-                f"{self.__class__.__name__} is missing a QuerySet. Define "
-                f"{self.__class__.__name__}.queryset."
+                f"{self.__class__.__name__} is missing a QuerySet. Define {self.__class__.__name__}.queryset."
             )
         queryset = self.queryset.all()
-        if hasattr(queryset, 'filter_by_tenant'):
+        if hasattr(queryset, "filter_by_tenant"):
             queryset = queryset.filter_by_tenant()
         return queryset
 
     def get_object(self):
         # Cached: this is called from has_permission, get_form_kwargs,
         # form_valid and get_context_data within a single request.
-        if getattr(self, '_cached_object', None) is None:
-            self._cached_object = get_object_or_404(self.get_queryset(), pk=self.kwargs.get('pk'))
+        if getattr(self, "_cached_object", None) is None:
+            self._cached_object = get_object_or_404(self.get_queryset(), pk=self.kwargs.get("pk"))
         return self._cached_object
 
     def get_form_kwargs(self):
         kwargs = super().get_form_kwargs()
-        kwargs['instance'] = self.get_object()
+        kwargs["instance"] = self.get_object()
         return kwargs
 
     def get_context_data(self, **kwargs):
@@ -115,18 +115,17 @@ class GenericTransactionView(PermissionRequiredMixin, LoginRequiredMixin, BaseHT
         try:
             with transaction.atomic():
                 result = self.__class__.service_callable(
-                    obj, user=self.request.user, request=self.request,
-                    **self.get_service_kwargs(form)
+                    obj, user=self.request.user, request=self.request, **self.get_service_kwargs(form)
                 )
                 self.post_service(obj, form, result)
 
-            if getattr(self.request, 'htmx', False):
+            if getattr(self.request, "htmx", False):
                 if self.hx_redirect_on_success:
                     # Full navigation follows, so queue a Django message for the
                     # next render instead of a toast trigger.
                     messages.success(self.request, self.get_success_message(result))
                     response = HttpResponse(status=204)
-                    response['HX-Redirect'] = obj.get_absolute_url()
+                    response["HX-Redirect"] = obj.get_absolute_url()
                     return response
                 return self._htmx_success_response(obj, result)
             messages.success(self.request, self.get_success_message(result))
@@ -142,10 +141,8 @@ class GenericTransactionView(PermissionRequiredMixin, LoginRequiredMixin, BaseHT
             return self.form_invalid(form)
 
     def form_invalid(self, form):
-        if getattr(self.request, 'htmx', False) and self.error_partial:
-            response = render(
-                self.request, self.error_partial, self.get_context_data(form=form)
-            )
+        if getattr(self.request, "htmx", False) and self.error_partial:
+            response = render(self.request, self.error_partial, self.get_context_data(form=form))
             # 422 signals a validation failure; the client opts this status into
             # swapping (htmx:beforeSwap handler in static/src/state.ts).
             response.status_code = 422
@@ -157,12 +154,9 @@ class GenericTransactionView(PermissionRequiredMixin, LoginRequiredMixin, BaseHT
         trigger_data = {
             "closeModalEvent": None,
             self.hx_trigger: None,
-            "showMessage": {
-                "message": str(self.get_success_message(result)),
-                "level": "success"
-            }
+            "showMessage": {"message": str(self.get_success_message(result)), "level": "success"},
         }
-        response['HX-Trigger'] = json.dumps(trigger_data)
+        response["HX-Trigger"] = json.dumps(trigger_data)
         return response
 
     def get_success_message(self, result=None):
@@ -207,27 +201,27 @@ class SimplePostView(PermissionRequiredMixin, LoginRequiredMixin, View):
         obj = self.get_object()
         try:
             result = self.perform_action(obj, request)
-            if getattr(request, 'htmx', False):
+            if getattr(request, "htmx", False):
                 return self._htmx_success_response(obj, result)
-            messages.success(request, result.get('message', _('Action completed successfully.')))
+            messages.success(request, result.get("message", _("Action completed successfully.")))
             return self.get_success_redirect(obj, result)
         except PermissionDenied as e:
             # A per-object authorization failure raised inside perform_action
             # (views that opt out of declarative perms via permission_required = ()).
             # For HTMX, surface a toast instead of swapping a raw 403 page into the
             # modal; for full-page requests, let the standard 403 handler run.
-            if getattr(request, 'htmx', False):
+            if getattr(request, "htmx", False):
                 return self._htmx_error_response(str(e) or str(_("You do not have permission to perform this action.")))
             raise
         except ValidationError as e:
-            if hasattr(e, 'message_dict'):
+            if hasattr(e, "message_dict"):
                 msg = "; ".join([f"{k}: {', '.join(v)}" for k, v in e.message_dict.items()])
-            elif hasattr(e, 'messages'):
+            elif hasattr(e, "messages"):
                 msg = "; ".join(e.messages)
             else:
                 msg = str(e)
-            
-            if getattr(request, 'htmx', False):
+
+            if getattr(request, "htmx", False):
                 return self._htmx_error_response(msg)
             messages.error(request, msg)
             return redirect(obj.get_absolute_url())
@@ -235,24 +229,21 @@ class SimplePostView(PermissionRequiredMixin, LoginRequiredMixin, View):
     def get_queryset(self):
         if self.queryset is None:
             raise ImproperlyConfigured(
-                f"{self.__class__.__name__} is missing a QuerySet. Define "
-                f"{self.__class__.__name__}.queryset."
+                f"{self.__class__.__name__} is missing a QuerySet. Define {self.__class__.__name__}.queryset."
             )
         queryset = self.queryset.all()
-        if hasattr(queryset, 'filter_by_tenant'):
+        if hasattr(queryset, "filter_by_tenant"):
             queryset = queryset.filter_by_tenant()
         return queryset
 
     def get_object(self):
-        if getattr(self, '_cached_object', None) is not None:
+        if getattr(self, "_cached_object", None) is not None:
             return self._cached_object
-        pk = self.kwargs.get('pk')
+        pk = self.kwargs.get("pk")
         if pk is not None:
             self._cached_object = get_object_or_404(self.get_queryset(), pk=pk)
             return self._cached_object
-        raise NotImplementedError(
-            f"{self.__class__.__name__} must define 'queryset' or override get_object()"
-        )
+        raise NotImplementedError(f"{self.__class__.__name__} must define 'queryset' or override get_object()")
 
     def perform_action(self, obj, request):
         raise NotImplementedError
@@ -262,22 +253,16 @@ class SimplePostView(PermissionRequiredMixin, LoginRequiredMixin, View):
 
     def _htmx_success_response(self, obj, result):
         response = HttpResponse(status=204)
-        response['HX-Trigger'] = json.dumps({
-            "closeModalEvent": None,
-            self.hx_trigger: None,
-            "showMessage": {
-                "message": str(result.get('message', _('Done.'))),
-                "level": "success"
+        response["HX-Trigger"] = json.dumps(
+            {
+                "closeModalEvent": None,
+                self.hx_trigger: None,
+                "showMessage": {"message": str(result.get("message", _("Done."))), "level": "success"},
             }
-        })
+        )
         return response
 
     def _htmx_error_response(self, message):
         response = HttpResponse(status=204)
-        response['HX-Trigger'] = json.dumps({
-            "showMessage": {
-                "message": message,
-                "level": "danger"
-            }
-        })
+        response["HX-Trigger"] = json.dumps({"showMessage": {"message": message, "level": "danger"}})
         return response

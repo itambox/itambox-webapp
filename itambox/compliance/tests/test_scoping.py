@@ -1,6 +1,8 @@
 from django.test import TestCase
-from organization.models import Tenant, TenantGroup
+
 from compliance.models import CustodyTemplate
+from organization.models import Tenant, TenantGroup
+
 
 class CustodyTemplateTenantScopingTests(TestCase):
     def setUp(self):
@@ -32,11 +34,13 @@ class CustodyTemplateTenantScopingTests(TestCase):
 
     def tearDown(self):
         from core.managers import set_current_tenant, set_current_tenant_group
+
         set_current_tenant(None)
         set_current_tenant_group(None)
 
     def test_tenant_a_scoping(self):
         from core.managers import set_current_tenant, set_current_tenant_group
+
         set_current_tenant(self.tenant_a)
         set_current_tenant_group(None)
 
@@ -56,6 +60,7 @@ class CustodyTemplateTenantScopingTests(TestCase):
 
     def test_tenant_group_x_scoping(self):
         from core.managers import set_current_tenant, set_current_tenant_group
+
         set_current_tenant(None)
         set_current_tenant_group(self.group_x)
 
@@ -75,6 +80,7 @@ class CustodyTemplateTenantScopingTests(TestCase):
 
     def test_global_scoping_no_filter(self):
         from core.managers import set_current_tenant, set_current_tenant_group
+
         set_current_tenant(None)
         set_current_tenant_group(None)
 

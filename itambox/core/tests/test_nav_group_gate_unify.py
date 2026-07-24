@@ -44,7 +44,9 @@ class TestNavGroupGateUnify(TenantTestMixin):
         denied by both gates."""
         tenant = Tenant.objects.create(name="Plain Co", slug="plain-co")
         user = User.objects.create_user(
-            username='plain_member', email='plain_member@example.com', password='password',
+            username="plain_member",
+            email="plain_member@example.com",
+            password="password",
         )
         role = Role.objects.create(tenant=tenant, name="No Perms", permissions=[])
         grant(user, tenant, role)
@@ -58,10 +60,14 @@ class TestNavGroupGateUnify(TenantTestMixin):
         RoleGrant on their tenant is recognized by both gates."""
         tenant = Tenant.objects.create(name="Admin Co", slug="admin-co")
         user = User.objects.create_user(
-            username='tenant_admin', email='tenant_admin@example.com', password='password',
+            username="tenant_admin",
+            email="tenant_admin@example.com",
+            password="password",
         )
         role = Role.objects.create(
-            tenant=tenant, name="Group Admin", permissions=['users.change_usergroup'],
+            tenant=tenant,
+            name="Group Admin",
+            permissions=["users.change_usergroup"],
         )
         grant(user, tenant, role)
 
@@ -72,7 +78,9 @@ class TestNavGroupGateUnify(TenantTestMixin):
     def test_superuser_allowed_by_both_gates(self):
         """Superusers bypass the permission check entirely in both gates."""
         user = User.objects.create_superuser(
-            username='super_admin', email='super_admin@example.com', password='password',
+            username="super_admin",
+            email="super_admin@example.com",
+            password="password",
         )
 
         assert is_global_group_admin(user) is True
@@ -90,20 +98,29 @@ class TestNavGroupGateUnify(TenantTestMixin):
         managed tenant so both gates enumerate it identically.
         """
         provider_tenant = Tenant.objects.create(
-            name="MSP Provider", slug="msp-provider", is_provider=True,
+            name="MSP Provider",
+            slug="msp-provider",
+            is_provider=True,
         )
         customer_tenant = Tenant.objects.create(
-            name="Managed Customer", slug="managed-customer", managed_by=provider_tenant,
+            name="Managed Customer",
+            slug="managed-customer",
+            managed_by=provider_tenant,
         )
         user = User.objects.create_user(
-            username='msp_tech', email='msp_tech@example.com', password='password',
+            username="msp_tech",
+            email="msp_tech@example.com",
+            password="password",
         )
         managed_role = Role.objects.create(
-            tenant=provider_tenant, name="MSP Group Admin",
-            permissions=['users.add_usergroup'],
+            tenant=provider_tenant,
+            name="MSP Group Admin",
+            permissions=["users.add_usergroup"],
         )
         grant(
-            user, provider_tenant, managed_role,
+            user,
+            provider_tenant,
+            managed_role,
             reach=RoleGrant.REACH_MANAGED,
             managed_scope=RoleGrantScope.SCOPE_ALL_MANAGED,
         )
@@ -120,22 +137,30 @@ class TestNavGroupGateUnify(TenantTestMixin):
         backend would reject, or nav hiding one the backend would allow)."""
         tenant = Tenant.objects.create(name="Parity Co", slug="parity-co")
         granted_role = Role.objects.create(
-            tenant=tenant, name="Parity Admin", permissions=['users.add_usergroup'],
+            tenant=tenant,
+            name="Parity Admin",
+            permissions=["users.add_usergroup"],
         )
 
         granted = User.objects.create_user(
-            username='parity_granted', email='parity_granted@example.com', password='password',
+            username="parity_granted",
+            email="parity_granted@example.com",
+            password="password",
         )
         grant(granted, tenant, granted_role)
 
         denied = User.objects.create_user(
-            username='parity_denied', email='parity_denied@example.com', password='password',
+            username="parity_denied",
+            email="parity_denied@example.com",
+            password="password",
         )
         no_perm_role = Role.objects.create(tenant=tenant, name="No Perms 2", permissions=[])
         grant(denied, tenant, no_perm_role)
 
         superuser = User.objects.create_superuser(
-            username='parity_super', email='parity_super@example.com', password='password',
+            username="parity_super",
+            email="parity_super@example.com",
+            password="password",
         )
 
         for user, expected in ((granted, True), (denied, False), (superuser, True)):

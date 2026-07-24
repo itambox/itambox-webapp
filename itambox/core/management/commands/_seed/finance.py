@@ -29,78 +29,78 @@ def _days_ago(n):
 
 _CC_TEMPLATES = {
     # MSP own tenants
-    'msp': [
-        ('IT / Infrastructure',     'CC-110', 'Core infrastructure, DC, network, security tooling'),
-        ('End-User Computing',       'CC-120', 'Laptops, mobile devices, peripherals, helpdesk'),
-        ('Operations',               'CC-130', 'NOC, service-desk tools, monitoring'),
-        ('Sales & Marketing',        'CC-140', 'CRM, demo gear, travel tech'),
+    "msp": [
+        ("IT / Infrastructure", "CC-110", "Core infrastructure, DC, network, security tooling"),
+        ("End-User Computing", "CC-120", "Laptops, mobile devices, peripherals, helpdesk"),
+        ("Operations", "CC-130", "NOC, service-desk tools, monitoring"),
+        ("Sales & Marketing", "CC-140", "CRM, demo gear, travel tech"),
     ],
     # Pharma
-    'pharma_rnd': [
-        ('IT / Infrastructure',     'CC-110', 'Core network, server, storage'),
-        ('End-User Computing',       'CC-120', 'Workstations and laptops for research staff'),
-        ('R&D Systems',              'CC-200', 'Lab informatics, LIMS, scientific software'),
-        ('GxP Compliance',           'CC-210', 'Validated systems, audit trail tooling'),
+    "pharma_rnd": [
+        ("IT / Infrastructure", "CC-110", "Core network, server, storage"),
+        ("End-User Computing", "CC-120", "Workstations and laptops for research staff"),
+        ("R&D Systems", "CC-200", "Lab informatics, LIMS, scientific software"),
+        ("GxP Compliance", "CC-210", "Validated systems, audit trail tooling"),
     ],
-    'pharma_mfg': [
-        ('IT / Infrastructure',     'CC-110', 'Plant network and server infrastructure'),
-        ('Manufacturing Systems',    'CC-300', 'MES, SCADA, line terminals'),
-        ('QA / Validation',          'CC-310', 'QA workstations, calibration systems'),
+    "pharma_mfg": [
+        ("IT / Infrastructure", "CC-110", "Plant network and server infrastructure"),
+        ("Manufacturing Systems", "CC-300", "MES, SCADA, line terminals"),
+        ("QA / Validation", "CC-310", "QA workstations, calibration systems"),
     ],
-    'pharma_commercial': [
-        ('IT / Infrastructure',     'CC-110', 'Office network and servers'),
-        ('End-User Computing',       'CC-120', 'Sales laptops and phones'),
-        ('CRM & Digital Marketing',  'CC-140', 'Salesforce, marketing automation'),
+    "pharma_commercial": [
+        ("IT / Infrastructure", "CC-110", "Office network and servers"),
+        ("End-User Computing", "CC-120", "Sales laptops and phones"),
+        ("CRM & Digital Marketing", "CC-140", "Salesforce, marketing automation"),
     ],
     # Banking
-    'bank_retail': [
-        ('IT / Infrastructure',     'CC-110', 'Data centre, network, storage'),
-        ('End-User Computing',       'CC-120', 'Branch and back-office desktops'),
-        ('Core Banking',             'CC-400', 'Core banking platform and middleware'),
-        ('Compliance & RegTech',     'CC-410', 'AML, KYC, audit tooling'),
+    "bank_retail": [
+        ("IT / Infrastructure", "CC-110", "Data centre, network, storage"),
+        ("End-User Computing", "CC-120", "Branch and back-office desktops"),
+        ("Core Banking", "CC-400", "Core banking platform and middleware"),
+        ("Compliance & RegTech", "CC-410", "AML, KYC, audit tooling"),
     ],
-    'bank_invest': [
-        ('IT / Infrastructure',     'CC-110', 'Trading infrastructure'),
-        ('Trading Technology',       'CC-420', 'Bloomberg terminals, OMS, market-data feeds'),
-        ('Risk Systems',             'CC-430', 'Pre-trade risk, VaR tooling'),
+    "bank_invest": [
+        ("IT / Infrastructure", "CC-110", "Trading infrastructure"),
+        ("Trading Technology", "CC-420", "Bloomberg terminals, OMS, market-data feeds"),
+        ("Risk Systems", "CC-430", "Pre-trade risk, VaR tooling"),
     ],
-    'bank_risk': [
-        ('IT / Infrastructure',     'CC-110', 'Office and server infrastructure'),
-        ('Risk Analytics',           'CC-430', 'Risk-modelling workstations and software'),
+    "bank_risk": [
+        ("IT / Infrastructure", "CC-110", "Office and server infrastructure"),
+        ("Risk Analytics", "CC-430", "Risk-modelling workstations and software"),
     ],
     # Asset management
-    'fund_portfolio': [
-        ('IT / Infrastructure',     'CC-110', 'Office network and servers'),
-        ('Portfolio Management',     'CC-500', 'Portfolio and order-management systems'),
-        ('Compliance',               'CC-510', 'Regulatory reporting and record-keeping'),
+    "fund_portfolio": [
+        ("IT / Infrastructure", "CC-110", "Office network and servers"),
+        ("Portfolio Management", "CC-500", "Portfolio and order-management systems"),
+        ("Compliance", "CC-510", "Regulatory reporting and record-keeping"),
     ],
-    'fund_ops': [
-        ('IT / Infrastructure',     'CC-110', 'Office infrastructure'),
-        ('Fund Administration',      'CC-520', 'NAV calculation, transfer-agent systems'),
+    "fund_ops": [
+        ("IT / Infrastructure", "CC-110", "Office infrastructure"),
+        ("Fund Administration", "CC-520", "NAV calculation, transfer-agent systems"),
     ],
     # Legal
-    'legal': [
-        ('IT / Infrastructure',     'CC-110', 'Network, servers, backup'),
-        ('End-User Computing',       'CC-120', 'Attorney workstations and laptops'),
-        ('Document Management',      'CC-600', 'DMS, e-discovery, contract tooling'),
+    "legal": [
+        ("IT / Infrastructure", "CC-110", "Network, servers, backup"),
+        ("End-User Computing", "CC-120", "Attorney workstations and laptops"),
+        ("Document Management", "CC-600", "DMS, e-discovery, contract tooling"),
     ],
     # Architecture
-    'architecture': [
-        ('IT / Infrastructure',     'CC-110', 'Network, servers, render farm'),
-        ('Design & Visualisation',   'CC-700', 'CAD workstations, render nodes, GPU cluster'),
-        ('End-User Computing',       'CC-120', 'General office laptops and peripherals'),
+    "architecture": [
+        ("IT / Infrastructure", "CC-110", "Network, servers, render farm"),
+        ("Design & Visualisation", "CC-700", "CAD workstations, render nodes, GPU cluster"),
+        ("End-User Computing", "CC-120", "General office laptops and peripherals"),
     ],
     # Logistics
-    'logistics': [
-        ('IT / Infrastructure',     'CC-110', 'Depot network and servers'),
-        ('Warehouse Technology',     'CC-800', 'Scanners, terminals, WMS'),
-        ('Fleet & Tracking',         'CC-810', 'GPS/IoT devices, telemetry'),
+    "logistics": [
+        ("IT / Infrastructure", "CC-110", "Depot network and servers"),
+        ("Warehouse Technology", "CC-800", "Scanners, terminals, WMS"),
+        ("Fleet & Tracking", "CC-810", "GPS/IoT devices, telemetry"),
     ],
     # Default fallback for any profile not listed above
-    '_default': [
-        ('IT / Infrastructure',     'CC-110', 'Core infrastructure'),
-        ('End-User Computing',       'CC-120', 'End-user devices and helpdesk'),
-        ('Operations',               'CC-130', 'Business operations'),
+    "_default": [
+        ("IT / Infrastructure", "CC-110", "Core infrastructure"),
+        ("End-User Computing", "CC-120", "End-user devices and helpdesk"),
+        ("Operations", "CC-130", "Business operations"),
     ],
 }
 
@@ -112,57 +112,75 @@ _CC_TEMPLATES = {
 
 _CONTRACT_TEMPLATES = [
     (
-        '{supplier} Hardware Support — {tenant_code}',
-        'maintenance', 'annual',
+        "{supplier} Hardware Support — {tenant_code}",
+        "maintenance",
+        "annual",
         (2_400, 9_600),
-        '4 business hours', '1 business day', '9-5 Mon-Fri',
-        'Standard next-business-day on-site hardware maintenance.',
-        ['dell-direct', 'bechtle-ag', 'cdw-deutschland'],
+        "4 business hours",
+        "1 business day",
+        "9-5 Mon-Fri",
+        "Standard next-business-day on-site hardware maintenance.",
+        ["dell-direct", "bechtle-ag", "cdw-deutschland"],
         12,
     ),
     (
-        '{supplier} Premium Care — {tenant_code}',
-        'maintenance', 'annual',
+        "{supplier} Premium Care — {tenant_code}",
+        "maintenance",
+        "annual",
         (4_800, 18_000),
-        '2 business hours', '4 business hours', '24x7',
-        'ProSupport Plus: 24×7 on-site with accidental-damage coverage.',
-        ['dell-direct', 'apple-business'],
+        "2 business hours",
+        "4 business hours",
+        "24x7",
+        "ProSupport Plus: 24×7 on-site with accidental-damage coverage.",
+        ["dell-direct", "apple-business"],
         24,
     ),
     (
-        '{supplier} Network SLA — {tenant_code}',
-        'support', 'annual',
+        "{supplier} Network SLA — {tenant_code}",
+        "support",
+        "annual",
         (3_600, 12_000),
-        '4 business hours', '8 business hours', '24x7',
-        'TAC support + SmartNet for all network infrastructure devices.',
-        ['bechtle-ag', 'insight-enterprises'],
+        "4 business hours",
+        "8 business hours",
+        "24x7",
+        "TAC support + SmartNet for all network infrastructure devices.",
+        ["bechtle-ag", "insight-enterprises"],
         12,
     ),
     (
-        '{supplier} Software Assurance — {tenant_code}',
-        'support', 'annual',
+        "{supplier} Software Assurance — {tenant_code}",
+        "support",
+        "annual",
         (1_200, 6_000),
-        'Next business day', '3 business days', '9-5 Mon-Fri',
-        'Software assurance, version entitlement and L2/L3 helpdesk.',
-        ['cdw-deutschland', 'insight-enterprises', 'northwind-procurement'],
+        "Next business day",
+        "3 business days",
+        "9-5 Mon-Fri",
+        "Software assurance, version entitlement and L2/L3 helpdesk.",
+        ["cdw-deutschland", "insight-enterprises", "northwind-procurement"],
         12,
     ),
     (
-        '{supplier} Server Infrastructure SLA — {tenant_code}',
-        'support', 'annual',
+        "{supplier} Server Infrastructure SLA — {tenant_code}",
+        "support",
+        "annual",
         (5_000, 22_000),
-        '2 business hours', '6 business hours', '24x7',
-        'Mission-critical server support with 4-hour hardware replacement.',
-        ['dell-direct', 'bechtle-ag'],
+        "2 business hours",
+        "6 business hours",
+        "24x7",
+        "Mission-critical server support with 4-hour hardware replacement.",
+        ["dell-direct", "bechtle-ag"],
         24,
     ),
     (
-        '{supplier} Managed Endpoint Lease — {tenant_code}',
-        'lease', 'monthly',
+        "{supplier} Managed Endpoint Lease — {tenant_code}",
+        "lease",
+        "monthly",
         (800, 3_200),
-        'Next business day', '3 business days', '9-5 Mon-Fri',
-        'Device-as-a-service: refresh every 36 months, loaner pool included.',
-        ['dell-direct', 'cdw-deutschland'],
+        "Next business day",
+        "3 business days",
+        "9-5 Mon-Fri",
+        "Device-as-a-service: refresh every 36 months, loaner pool included.",
+        ["dell-direct", "cdw-deutschland"],
         36,
     ),
 ]
@@ -177,8 +195,9 @@ class SeedFinanceMixin:
 
     def _get_engine(self):
         """Return the shared ChangeLogEngine, creating it once if needed."""
-        if not hasattr(self, '_engine') or self._engine is None:
+        if not hasattr(self, "_engine") or self._engine is None:
             from core.management.commands._seed.engine import ChangeLogEngine
+
             self._engine = ChangeLogEngine(stdout=self.stdout, style=self.style)
         return self._engine
 
@@ -190,17 +209,17 @@ class SeedFinanceMixin:
         from organization.models import CostCenter
 
         engine = self._get_engine()
-        self.stdout.write('--- Finance: cost centres ---')
+        self.stdout.write("--- Finance: cost centres ---")
 
-        self._cost_centers = {}   # tenant_slug -> [CostCenter]
+        self._cost_centers = {}  # tenant_slug -> [CostCenter]
         total = 0
 
         for slug, tenant in self._tenants.items():
             meta = self._tenant_meta.get(slug, {})
-            profile = meta.get('profile', '_default')
-            currency = meta.get('currency', 'EUR')
+            profile = meta.get("profile", "_default")
+            currency = meta.get("currency", "EUR")
 
-            templates = _CC_TEMPLATES.get(profile, _CC_TEMPLATES['_default'])
+            templates = _CC_TEMPLATES.get(profile, _CC_TEMPLATES["_default"])
 
             # Onboarding was ~2 years ago for all tenants; scatter slightly.
             onboard_days = random.randint(700, 760)
@@ -234,9 +253,7 @@ class SeedFinanceMixin:
 
             self._cost_centers[slug] = ccs
 
-        self.stdout.write(
-            f'  {total} cost centres across {len(self._cost_centers)} tenants.'
-        )
+        self.stdout.write(f"  {total} cost centres across {len(self._cost_centers)} tenants.")
 
     # ──────────────────────────────────────────────────────────────────────────
     # 2. Contracts + cost-centre backfill
@@ -245,13 +262,13 @@ class SeedFinanceMixin:
     def _seed_contracts_and_costing(self):
         from procurement.models import (
             Contract,
-            ContractTypeChoices,
-            ContractStatusChoices,
             ContractBillingCycleChoices,
+            ContractStatusChoices,
+            ContractTypeChoices,
         )
 
         engine = self._get_engine()
-        self.stdout.write('--- Finance: contracts & costing ---')
+        self.stdout.write("--- Finance: contracts & costing ---")
 
         self._contracts = []
         contract_count = 0
@@ -259,7 +276,7 @@ class SeedFinanceMixin:
 
         for slug, tenant in self._tenants.items():
             meta = self._tenant_meta.get(slug, {})
-            currency = meta.get('currency', 'EUR')
+            currency = meta.get("currency", "EUR")
             ccs = self._cost_centers.get(slug, [])
 
             # Pick 2–4 contract templates per tenant
@@ -278,7 +295,6 @@ class SeedFinanceMixin:
                 preferred_suppliers,
                 duration_months,
             ) in chosen_templates:
-
                 # Pick a supplier — prefer the hint list, fall back to any
                 supplier = None
                 for sup_slug in preferred_suppliers:
@@ -291,7 +307,7 @@ class SeedFinanceMixin:
                 # Contract name
                 name = name_tpl.format(
                     supplier=supplier.name,
-                    tenant_code=meta.get('code', slug.upper()[:6]),
+                    tenant_code=meta.get("code", slug.upper()[:6]),
                 )
 
                 # Dates: started somewhere in the past 2 years
@@ -312,9 +328,7 @@ class SeedFinanceMixin:
                 cc = random.choice(ccs) if ccs else None
 
                 contract_number = (
-                    f"CTR-{meta.get('code', slug[:6].upper())}"
-                    f"-{start_date.year}"
-                    f"-{random.randint(100, 999)}"
+                    f"CTR-{meta.get('code', slug[:6].upper())}-{start_date.year}-{random.randint(100, 999)}"
                 )
 
                 contract = Contract.objects.create(
@@ -336,7 +350,7 @@ class SeedFinanceMixin:
                     coverage_hours=coverage,
                     sla_terms=notes,
                     cost_center=cc,
-                    notes='',
+                    notes="",
                 )
 
                 eng_user = random.choice(self._engineer_users)
@@ -384,15 +398,15 @@ class SeedFinanceMixin:
                     )
                 else:
                     asset.cost_center = cc
-                    asset.save(update_fields=['cost_center'])
+                    asset.save(update_fields=["cost_center"])
                     engine.touch_created(asset, when)
                 asset_cc_count += 1
 
         # ── Backfill cost_center on licenses ────────────────────────────
         lic_cc_count = 0
-        licenses = getattr(self, '_licenses', [])
+        licenses = getattr(self, "_licenses", [])
         for lic in licenses:
-            slug = getattr(getattr(lic, 'tenant', None), 'slug', None)
+            slug = getattr(getattr(lic, "tenant", None), "slug", None)
             if not slug:
                 continue
             ccs = self._cost_centers.get(slug, [])
@@ -410,14 +424,14 @@ class SeedFinanceMixin:
                     )
                 else:
                     lic.cost_center = cc
-                    lic.save(update_fields=['cost_center'])
+                    lic.save(update_fields=["cost_center"])
                 lic_cc_count += 1
 
         # ── Backfill cost_center on subscriptions ───────────────────────
         sub_cc_count = 0
-        subscriptions = getattr(self, '_subscriptions', [])
+        subscriptions = getattr(self, "_subscriptions", [])
         for sub in subscriptions:
-            slug = getattr(getattr(sub, 'tenant', None), 'slug', None)
+            slug = getattr(getattr(sub, "tenant", None), "slug", None)
             if not slug:
                 continue
             ccs = self._cost_centers.get(slug, [])
@@ -435,11 +449,11 @@ class SeedFinanceMixin:
                     )
                 else:
                     sub.cost_center = cc
-                    sub.save(update_fields=['cost_center'])
+                    sub.save(update_fields=["cost_center"])
                 sub_cc_count += 1
 
         self.stdout.write(
-            f'  {contract_count} contracts ({renewal_count} with logged renewal edits); '
-            f'cost-centre backfill: {asset_cc_count} assets, '
-            f'{lic_cc_count} licenses, {sub_cc_count} subscriptions.'
+            f"  {contract_count} contracts ({renewal_count} with logged renewal edits); "
+            f"cost-centre backfill: {asset_cc_count} assets, "
+            f"{lic_cc_count} licenses, {sub_cc_count} subscriptions."
         )

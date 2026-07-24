@@ -1,6 +1,6 @@
-import json
-import hmac
 import hashlib
+import hmac
+import json
 import logging
 
 import requests
@@ -27,23 +27,21 @@ def _resolve_instance_tenant_id(instance):
     the instance itself closes that regardless of context. Returns the tenant pk, or ``None``
     for a tenant-less/global object (in which case only global ``tenant=None`` rules fire).
     """
-    tenant_id = getattr(instance, 'tenant_id', None)
+    tenant_id = getattr(instance, "tenant_id", None)
     if tenant_id is not None:
         return tenant_id
     # Models that derive their tenant through a relation (assignments/stock) declare a
     # ``tenant_lookup`` ORM path (e.g. 'asset__tenant'); walk it to the owning tenant.
     # Fall back to ``changelog_tenant_lookup`` (used by models such as AssetAudit that
     # only declare the changelog attribute) so their events match tenant EventRules.
-    lookup = getattr(type(instance), 'tenant_lookup', None) or getattr(
-        type(instance), 'changelog_tenant_lookup', None
-    )
+    lookup = getattr(type(instance), "tenant_lookup", None) or getattr(type(instance), "changelog_tenant_lookup", None)
     if lookup:
         obj = instance
-        for part in lookup.split('__'):
+        for part in lookup.split("__"):
             obj = getattr(obj, part, None)
             if obj is None:
                 return None
-        return getattr(obj, 'pk', None)
+        return getattr(obj, "pk", None)
     return None
 
 
@@ -59,7 +57,7 @@ def dispatch_event(sender, instance, action, created=None):
         model=ct,
         object_id=instance.pk,
         action=action,
-        data={'app_label': ct.app_label, 'model_name': ct.model},
+        data={"app_label": ct.app_label, "model_name": ct.model},
     )
 
     process_event_rules(event, _resolve_instance_tenant_id(instance))
@@ -73,17 +71,19 @@ def process_event_rules(event, instance_tenant_id=None):
     ambient tenant contextvar (which fails open in system contexts). See
     ``_resolve_instance_tenant_id``.
     """
-    rules = EventRule._base_manager.filter(
-        model=event.model,
-        enabled=True,
-        deleted_at__isnull=True,
-    ).filter(
-        Q(tenant_id=instance_tenant_id) | Q(tenant__isnull=True)
-    ).select_related('webhook')
+    rules = (
+        EventRule._base_manager.filter(
+            model=event.model,
+            enabled=True,
+            deleted_at__isnull=True,
+        )
+        .filter(Q(tenant_id=instance_tenant_id) | Q(tenant__isnull=True))
+        .select_related("webhook")
+    )
 
     if not rules.exists():
         event.processed = True
-        event.save(update_fields=['processed'])
+        event.save(update_fields=["processed"])
         return
 
     for rule in rules:
@@ -102,7 +102,7 @@ def process_event_rules(event, instance_tenant_id=None):
             logger.exception("Event rule %s action failed for event %s", rule.pk, event.pk)
 
     event.processed = True
-    event.save(update_fields=['processed'])
+    event.save(update_fields=["processed"])
 
 
 def _check_conditions(conditions, event):
@@ -111,8 +111,8 @@ def _check_conditions(conditions, event):
     if not conditions:
         return True
 
-    condition_type = conditions.get('type', 'and')
-    rules = conditions.get('rules', [])
+    condition_type = conditions.get("type", "and")
+    rules = conditions.get("rules", [])
 
     if not rules:
         return True
@@ -121,12 +121,12 @@ def _check_conditions(conditions, event):
     for rule in rules:
         # A nested group has the same shape as the top level ({'type', 'rules'});
         # a leaf condition has 'field'/'op'. Detect groups by the 'rules' key.
-        if isinstance(rule, dict) and 'rules' in rule:
+        if isinstance(rule, dict) and "rules" in rule:
             results.append(_check_conditions(rule, event))
         else:
             results.append(_evaluate_condition(rule, event))
 
-    if condition_type == 'or':
+    if condition_type == "or":
         return any(results)
     return all(results)
 
@@ -134,9 +134,9 @@ def _check_conditions(conditions, event):
 def _evaluate_condition(rule, event):
     """Evaluate a single condition rule against the event."""
 
-    field = rule.get('field')
-    op = rule.get('op')
-    value = rule.get('value')
+    field = rule.get("field")
+    op = rule.get("op")
+    value = rule.get("value")
 
     if not field or not op:
         return True
@@ -144,20 +144,20 @@ def _evaluate_condition(rule, event):
     data = event.data or {}
     actual = data.get(field)
 
-    if op == 'eq':
+    if op == "eq":
         return actual == value
-    elif op == 'neq':
+    elif op == "neq":
         return actual != value
-    elif op == 'contains':
+    elif op == "contains":
         return str(value) in str(actual) if actual else False
-    elif op == 'in':
+    elif op == "in":
         return actual in (value if isinstance(value, list) else [value])
-    elif op == 'gt':
+    elif op == "gt":
         try:
             return float(actual) > float(value)
         except (TypeError, ValueError):
             return False
-    elif op == 'lt':
+    elif op == "lt":
         try:
             return float(actual) < float(value)
         except (TypeError, ValueError):
@@ -200,33 +200,35 @@ def _send_webhook(rule, event):
         retry_count = endpoint.retry_count
         retry_backoff = endpoint.retry_backoff
         # Allow header overrides from action_config without leaking the secret into JSON.
-        headers = {**headers, **(config.get('headers') or {})}
+        headers = {**headers, **(config.get("headers") or {})}
     else:
-        url = config.get('url')
+        url = config.get("url")
         if not url:
             return
-        method = config.get('method', 'POST')
-        headers = config.get('headers', {})
-        secret = config.get('secret', '')
+        method = config.get("method", "POST")
+        headers = config.get("headers", {})
+        secret = config.get("secret", "")
         match = WebhookEndpoint.objects.filter(url=url, enabled=True).first()
         retry_count = match.retry_count if match else 3
         retry_backoff = match.retry_backoff if match else 60
 
     if not url:
         return
-    method = (method or 'POST').upper()
+    method = (method or "POST").upper()
 
-    from django_q.tasks import async_task
-    from django.db import transaction
     from django.conf import settings
+    from django.db import transaction
+    from django_q.tasks import async_task
 
     # For an endpoint-linked webhook, pass the endpoint pk (NOT the decrypted secret) so the
     # task re-derives it at run time — this keeps the secret out of the django_q payload /
     # the retry Schedule.kwargs (which are stored plaintext). Legacy action_config webhooks
     # have no endpoint and their secret already lives plaintext in the rule config.
     task_kwargs = dict(
-        url=url, method=method, headers=headers,
-        secret='' if endpoint is not None else secret,
+        url=url,
+        method=method,
+        headers=headers,
+        secret="" if endpoint is not None else secret,
         webhook_endpoint_id=endpoint.pk if endpoint is not None else None,
         event_action=event.action,
         event_model_app_label=event.model.app_label,
@@ -238,10 +240,10 @@ def _send_webhook(rule, event):
         retry_backoff=retry_backoff,
     )
 
-    if getattr(settings, 'Q_CLUSTER', {}).get('sync', False):
-        async_task('core.tasks.send_webhook_task', **task_kwargs)
+    if getattr(settings, "Q_CLUSTER", {}).get("sync", False):
+        async_task("core.tasks.send_webhook_task", **task_kwargs)
     else:
-        transaction.on_commit(lambda: async_task('core.tasks.send_webhook_task', **task_kwargs))
+        transaction.on_commit(lambda: async_task("core.tasks.send_webhook_task", **task_kwargs))
 
 
 def _render_template(template, event):
@@ -281,21 +283,26 @@ def _send_notification(rule, event):
     from core.models import Notification
 
     config = rule.action_config or {}
-    level = config.get('level', 'info')
-    subject = config.get('subject', _("Event: %(action)s on %(model)s") % {
-        'action': event.action, 'model': event.model.model,
-    })
-    body = config.get('body', str(event.data))
+    level = config.get("level", "info")
+    subject = config.get(
+        "subject",
+        _("Event: %(action)s on %(model)s")
+        % {
+            "action": event.action,
+            "model": event.model.model,
+        },
+    )
+    body = config.get("body", str(event.data))
 
     # Render against a sanitized namespace (see _render_template) so an
     # attacker-editable action_config can't traverse a live ORM object.
     subject = _render_template(subject, event)
     body = _render_template(body, event)
 
-    target_url = ''
+    target_url = ""
     try:
         model_class = event.model.model_class()
-        if model_class and hasattr(model_class, 'get_absolute_url'):
+        if model_class and hasattr(model_class, "get_absolute_url"):
             instance = model_class.objects.filter(pk=event.object_id).first()
             if instance:
                 target_url = instance.get_absolute_url()
@@ -307,17 +314,18 @@ def _send_notification(rule, event):
         # user=None row that any authenticated user could open by pk (cross-tenant leak of the
         # rule's subject/body + the target object's URL). Mirrors the IN_APP channel branch.
         User = get_user_model()
-        users = User.objects.filter(
-            memberships__tenant_id=rule.tenant_id, is_active=True
-        ).distinct()
-        Notification.objects.bulk_create([
-            Notification(user=u, subject=subject, message=body, level=level, target_url=target_url)
-            for u in users
-        ])
+        users = User.objects.filter(memberships__tenant_id=rule.tenant_id, is_active=True).distinct()
+        Notification.objects.bulk_create(
+            [Notification(user=u, subject=subject, message=body, level=level, target_url=target_url) for u in users]
+        )
     else:
         # Truly system-wide (tenant=None) rule may broadcast.
         Notification.objects.create(
-            user=None, subject=subject, message=body, level=level, target_url=target_url,
+            user=None,
+            subject=subject,
+            message=body,
+            level=level,
+            target_url=target_url,
         )
 
 
@@ -330,10 +338,12 @@ def _post_pinned(webhook_url, payload):
     Returns the response, or None when the URL is blocked.
     """
     from django.core.exceptions import ValidationError
+
     # inline import: keep event-dispatch import-light; core.http pulls requests.
     from core.http import request_pinned
+
     try:
-        return request_pinned('POST', webhook_url, json=payload, timeout=10)
+        return request_pinned("POST", webhook_url, json=payload, timeout=10)
     except ValidationError as exc:
         logger.error("Outbound notification to %s blocked by SSRF guard: %s", webhook_url, exc)
         return None
@@ -341,18 +351,12 @@ def _post_pinned(webhook_url, payload):
 
 def _send_slack_notification(webhook_url, message_text, title=None):
     payload = {
-        'text': message_text,
+        "text": message_text,
     }
     if title:
-        payload['blocks'] = [
-            {
-                'type': 'header',
-                'text': {'type': 'plain_text', 'text': title}
-            },
-            {
-                'type': 'section',
-                'text': {'type': 'mrkdwn', 'text': message_text}
-            }
+        payload["blocks"] = [
+            {"type": "header", "text": {"type": "plain_text", "text": title}},
+            {"type": "section", "text": {"type": "mrkdwn", "text": message_text}},
         ]
     try:
         response = _post_pinned(webhook_url, payload)
@@ -368,12 +372,12 @@ def _send_slack_notification(webhook_url, message_text, title=None):
 
 def _send_teams_notification(webhook_url, message_text, title=None):
     payload = {
-        '@type': 'MessageCard',
-        '@context': 'https://schema.org/extensions',
-        'summary': title or message_text[:80],
-        'themeColor': '0076D7',
-        'title': title or str(_('ITAMbox Notification')),
-        'text': message_text,
+        "@type": "MessageCard",
+        "@context": "https://schema.org/extensions",
+        "summary": title or message_text[:80],
+        "themeColor": "0076D7",
+        "title": title or str(_("ITAMbox Notification")),
+        "text": message_text,
     }
     try:
         response = _post_pinned(webhook_url, payload)
@@ -396,20 +400,21 @@ def send_notification_to_channel(channel, subject, body):
     """
     if channel.channel_type == NotificationChannel.TYPE_SLACK:
         return _send_slack_notification(
-            webhook_url=channel.config.get('webhook_url', ''),
+            webhook_url=channel.config.get("webhook_url", ""),
             message_text=body,
             title=subject,
         )
 
     elif channel.channel_type == NotificationChannel.TYPE_TEAMS:
         return _send_teams_notification(
-            webhook_url=channel.config.get('webhook_url', ''),
+            webhook_url=channel.config.get("webhook_url", ""),
             message_text=body,
             title=subject,
         )
 
     elif channel.channel_type == NotificationChannel.TYPE_EMAIL:
-        from django.core.mail import get_connection, EmailMessage
+        from django.core.mail import EmailMessage, get_connection
+
         from core.models import EmailSettings
 
         email_config = EmailSettings.load()
@@ -420,18 +425,18 @@ def send_notification_to_channel(channel, subject, body):
             )
             return False
 
-        recipients = channel.config.get('recipients', [])
+        recipients = channel.config.get("recipients", [])
         if not recipients:
             logger.warning("Email channel '%s': no recipients configured in config.", channel.name)
             return False
 
         try:
             connection = get_connection(
-                backend='django.core.mail.backends.smtp.EmailBackend',
+                backend="django.core.mail.backends.smtp.EmailBackend",
                 host=email_config.smtp_host,
                 port=email_config.smtp_port,
-                username=email_config.smtp_username or '',
-                password=email_config.smtp_password_decrypted or '',
+                username=email_config.smtp_username or "",
+                password=email_config.smtp_password_decrypted or "",
                 use_tls=email_config.smtp_use_tls,
                 fail_silently=False,
             )
@@ -450,10 +455,11 @@ def send_notification_to_channel(channel, subject, body):
 
     elif channel.channel_type == NotificationChannel.TYPE_IN_APP:
         from core.models import Notification
+
         User = get_user_model()
 
         # Resolve target users: explicit list in config → tenant members → global staff
-        user_ids = channel.config.get('recipient_users', [])
+        user_ids = channel.config.get("recipient_users", [])
         if user_ids:
             users = list(User.objects.filter(pk__in=user_ids, is_active=True))
         elif channel.tenant_id:
@@ -473,12 +479,8 @@ def send_notification_to_channel(channel, subject, body):
             logger.warning("In-App channel '%s': no recipients found — notifications not sent.", channel.name)
             return False
 
-        Notification.objects.bulk_create([
-            Notification(user=user, subject=subject, message=body)
-            for user in users
-        ])
+        Notification.objects.bulk_create([Notification(user=user, subject=subject, message=body) for user in users])
         return True
 
     logger.warning("send_notification_to_channel: unhandled channel type '%s'.", channel.channel_type)
     return False
-

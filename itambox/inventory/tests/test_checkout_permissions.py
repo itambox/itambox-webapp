@@ -13,16 +13,10 @@ inventory side effects that leak into later tests in the same process (a known
 cross-test isolation limitation of this suite), so the positive case is asserted
 with a non-mutating GET.
 """
+
 from django.test import TestCase
 from django.urls import reverse
 from model_bakery import baker
-
-from organization.models import AssetHolder
-from inventory.models import (
-    Accessory, Consumable, Component, Kit,
-    AccessoryAssignment, ComponentAllocation,
-)
-from core.tests.mixins import TenantTestMixin
 
 # Import the view modules at collection time (no tenant context active) so their
 # `queryset = Model.objects.all()` class attributes bake UNSCOPED. Otherwise the
@@ -31,11 +25,21 @@ from core.tests.mixins import TenantTestMixin
 # querysets to the wrong tenant and 404-ing every object here. (Harmless in
 # production, where the URLconf loads at startup with no tenant.)
 import inventory.views  # noqa: F401,E402
+from core.tests.mixins import TenantTestMixin
+from inventory.models import (
+    Accessory,
+    AccessoryAssignment,
+    Component,
+    ComponentAllocation,
+    Consumable,
+    Kit,
+)
+from organization.models import AssetHolder
 
 
 class InventoryCheckoutPermissionTests(TenantTestMixin, TestCase):
     def setUp(self):
-        self.setup_tenant_context(name='Inv Tenant', slug='inv-tenant')
+        self.setup_tenant_context(name="Inv Tenant", slug="inv-tenant")
         self.set_active_tenant(self.tenant)
         self.holder = baker.make(AssetHolder, tenant=self.tenant)
         self.accessory = baker.make(Accessory, tenant=self.tenant)
@@ -51,12 +55,12 @@ class InventoryCheckoutPermissionTests(TenantTestMixin, TestCase):
 
         # (url name, pk, required permission)
         self.endpoints = [
-            ('inventory:accessory_checkout', self.accessory.pk, 'inventory.change_accessory'),
-            ('inventory:accessory_checkin', self.acc_assignment.pk, 'inventory.change_accessory'),
-            ('inventory:consumable_checkout', self.consumable.pk, 'inventory.change_consumable'),
-            ('inventory:component_checkout', self.component.pk, 'inventory.change_component'),
-            ('inventory:component_checkin', self.comp_allocation.pk, 'inventory.change_component'),
-            ('inventory:kit_checkout_modal', self.kit.pk, 'inventory.change_kit'),
+            ("inventory:accessory_checkout", self.accessory.pk, "inventory.change_accessory"),
+            ("inventory:accessory_checkin", self.acc_assignment.pk, "inventory.change_accessory"),
+            ("inventory:consumable_checkout", self.consumable.pk, "inventory.change_consumable"),
+            ("inventory:component_checkout", self.component.pk, "inventory.change_component"),
+            ("inventory:component_checkin", self.comp_allocation.pk, "inventory.change_component"),
+            ("inventory:kit_checkout_modal", self.kit.pk, "inventory.change_kit"),
         ]
 
     def _url(self, name, pk):
@@ -76,7 +80,8 @@ class InventoryCheckoutPermissionTests(TenantTestMixin, TestCase):
                 url = self._url(name, pk)
                 resp = self.client.post(url, {})
                 self.assertIn(
-                    resp.status_code, (302, 403),
+                    resp.status_code,
+                    (302, 403),
                     f"{name} should deny a member lacking {perm} (got {resp.status_code})",
                 )
 
@@ -84,8 +89,10 @@ class InventoryCheckoutPermissionTests(TenantTestMixin, TestCase):
         # Granting the permission must let the request past the gate. Asserted with
         # a non-mutating GET so no inventory side effects leak into later tests.
         self.tenant_role.permissions = [
-            'inventory.change_accessory', 'inventory.change_consumable',
-            'inventory.change_component', 'inventory.change_kit',
+            "inventory.change_accessory",
+            "inventory.change_consumable",
+            "inventory.change_component",
+            "inventory.change_kit",
         ]
         self.tenant_role.save()
         self.client_login_to_tenant(self.tenant_user, self.tenant)
@@ -96,6 +103,7 @@ class InventoryCheckoutPermissionTests(TenantTestMixin, TestCase):
                 # Past the gate the view answers 200 (checkout form), 405 (checkin
                 # has no GET handler) or similar — never a 403 permission denial.
                 self.assertNotEqual(
-                    resp.status_code, 403,
+                    resp.status_code,
+                    403,
                     f"{name} should admit a member holding {perm}",
                 )

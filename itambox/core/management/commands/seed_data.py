@@ -29,25 +29,25 @@ from django.contrib.contenttypes.models import ContentType
 from django.core.management.base import BaseCommand
 from django.db import transaction
 
-from core.management.commands._seed.engine import ChangeLogEngine
-from core.management.commands._seed.catalog import SeedCatalogMixin
-from core.management.commands._seed.organizations import SeedOrganizationsMixin
 from core.management.commands._seed.access import SeedAccessMixin
 from core.management.commands._seed.assets import SeedAssetsMixin
+from core.management.commands._seed.catalog import SeedCatalogMixin
+from core.management.commands._seed.compliance import SeedComplianceMixin
+from core.management.commands._seed.engine import ChangeLogEngine
+from core.management.commands._seed.finance import SeedFinanceMixin
+from core.management.commands._seed.history import SeedHistoryMixin
 from core.management.commands._seed.inventory import SeedInventoryStockMixin
 from core.management.commands._seed.licensing import SeedLicensingMixin
-from core.management.commands._seed.subscriptions import SeedSubscriptionsMixin
-from core.management.commands._seed.maintenance import SeedMaintenanceMixin
-from core.management.commands._seed.procurement import SeedProcurementMixin
-from core.management.commands._seed.operations import SeedOperationsMixin
-from core.management.commands._seed.finance import SeedFinanceMixin
 from core.management.commands._seed.lifecycle import SeedLifecycleMixin
-from core.management.commands._seed.compliance import SeedComplianceMixin
-from core.management.commands._seed.history import SeedHistoryMixin
+from core.management.commands._seed.maintenance import SeedMaintenanceMixin
+from core.management.commands._seed.operations import SeedOperationsMixin
+from core.management.commands._seed.organizations import SeedOrganizationsMixin
+from core.management.commands._seed.procurement import SeedProcurementMixin
+from core.management.commands._seed.subscriptions import SeedSubscriptionsMixin
 
 User = get_user_model()
 
-SEED_PASSWORD = 'itambox2026'
+SEED_PASSWORD = "itambox2026"
 TODAY = datetime.date.today()
 
 
@@ -59,94 +59,145 @@ def days_ahead(n):
     return TODAY + datetime.timedelta(days=n)
 
 
-class Command(SeedCatalogMixin, SeedOrganizationsMixin, SeedAccessMixin, SeedAssetsMixin,
-              SeedInventoryStockMixin, SeedLicensingMixin, SeedSubscriptionsMixin,
-              SeedMaintenanceMixin, SeedProcurementMixin, SeedOperationsMixin,
-              SeedFinanceMixin, SeedLifecycleMixin, SeedComplianceMixin, SeedHistoryMixin,
-              BaseCommand):
+class Command(
+    SeedCatalogMixin,
+    SeedOrganizationsMixin,
+    SeedAccessMixin,
+    SeedAssetsMixin,
+    SeedInventoryStockMixin,
+    SeedLicensingMixin,
+    SeedSubscriptionsMixin,
+    SeedMaintenanceMixin,
+    SeedProcurementMixin,
+    SeedOperationsMixin,
+    SeedFinanceMixin,
+    SeedLifecycleMixin,
+    SeedComplianceMixin,
+    SeedHistoryMixin,
+    BaseCommand,
+):
     help = "Seed the database with a presentation-ready MSP demo dataset."
 
     def add_arguments(self, parser):
-        parser.add_argument('--skip-drop', action='store_true', default=False,
-                            help='Add data without clearing existing records.')
-        parser.add_argument('--production', action='store_true', default=False,
-                            help='Only create minimal essential data (admin user, status labels).')
-        parser.add_argument('--force', action='store_true', default=False,
-                            help='Required to clear data or run with DEBUG disabled.')
+        parser.add_argument(
+            "--skip-drop", action="store_true", default=False, help="Add data without clearing existing records."
+        )
+        parser.add_argument(
+            "--production",
+            action="store_true",
+            default=False,
+            help="Only create minimal essential data (admin user, status labels).",
+        )
+        parser.add_argument(
+            "--force", action="store_true", default=False, help="Required to clear data or run with DEBUG disabled."
+        )
 
     def handle(self, *args, **options):
         from django.core.management.base import CommandError
 
         random.seed(42)  # reproducible dataset
 
-        will_clear = not options['skip_drop']
+        will_clear = not options["skip_drop"]
 
         # This command is destructive: unless --skip-drop is given it TRUNCATEs every
         # domain table via the unfiltered manager. Refuse to do that against a non-DEBUG
         # (production) database unless the operator explicitly passes --force.
-        if will_clear and not settings.DEBUG and not options['force']:
+        if will_clear and not settings.DEBUG and not options["force"]:
             raise CommandError(
-                'Refusing to clear data with DEBUG disabled. This deletes ALL domain '
-                'records. Re-run with --skip-drop to only add data, or --force if you '
-                'really intend to wipe a production database.'
+                "Refusing to clear data with DEBUG disabled. This deletes ALL domain "
+                "records. Re-run with --skip-drop to only add data, or --force if you "
+                "really intend to wipe a production database."
             )
 
         if will_clear:
             self._clear_all_data()
 
-        if options['production']:
+        if options["production"]:
             self._seed_minimal()
         else:
             self._seed_all()
 
-        self.stdout.write(self.style.SUCCESS('\nDatabase seeding complete.'))
+        self.stdout.write(self.style.SUCCESS("\nDatabase seeding complete."))
 
     # ─────────────────────────────────────────────────────────────────
     # Clear
     # ─────────────────────────────────────────────────────────────────
 
     def _clear_all_data(self):
-        self.stdout.write('Clearing all existing data...')
+        self.stdout.write("Clearing all existing data...")
 
         models_to_clear = [
-            ('extras', 'AlertLog'), ('extras', 'AlertRule'),
-            ('extras', 'ScheduledReport'), ('extras', 'ReportTemplate'),
-            ('extras', 'NotificationChannel'), ('extras', 'EventRule'),
-            ('extras', 'WebhookEndpoint'), ('extras', 'LabelTemplate'),
-            ('extras', 'ExportTemplate'), ('extras', 'JournalEntry'),
-            ('core', 'Notification'), ('core', 'ObjectChange'),
-            ('extras', 'Dashboard'),
-            ('procurement', 'FulfillmentLink'), ('procurement', 'PurchaseOrderLine'),
-            ('procurement', 'PurchaseOrder'), ('procurement', 'Contract'),
-            ('assets', 'AssetRequest'), ('compliance', 'AssetAudit'), ('compliance', 'AuditSession'),
-            ('compliance', 'CustodyReceipt'), ('compliance', 'CustodyTemplate'),
-            ('assets', 'AssetMaintenance'),
-            ('licenses', 'LicenseSeatAssignment'),
-            ('subscriptions', 'SubscriptionAssignment'),
-            ('inventory', 'AccessoryAssignment'), ('inventory', 'ConsumableAssignment'),
-            ('inventory', 'ComponentAllocation'), ('inventory', 'ComponentStock'),
-            ('inventory', 'AccessoryStock'), ('inventory', 'ConsumableStock'),
-            ('inventory', 'KitItem'), ('inventory', 'Kit'),
-            ('software', 'InstalledSoftware'), ('assets', 'AssetAssignment'),
-            ('assets', 'Warranty'), ('assets', 'AssetReservation'), ('assets', 'AssetDisposal'),
-            ('assets', 'Asset'), ('assets', 'AssetType'),
-            ('inventory', 'Component'), ('inventory', 'Accessory'), ('inventory', 'Consumable'),
-            ('licenses', 'License'), ('software', 'Software'),
-            ('subscriptions', 'Subscription'), ('subscriptions', 'Provider'),
-            ('organization', 'RoleGrantScope'), ('organization', 'RoleGrant'),
-            ('organization', 'Membership'),
-            ('organization', 'Role'),
-            ('organization', 'ContactAssignment'), ('organization', 'Contact'),
-            ('organization', 'ContactRole'),
-            ('organization', 'Location'), ('organization', 'Site'),
-            ('organization', 'AssetHolder'),
-            ('organization', 'CostCenter'),
-            ('organization', 'Tenant'), ('organization', 'TenantGroup'),
-            ('organization', 'Region'), ('organization', 'SiteGroup'),
-            ('assets', 'AssetRole'), ('assets', 'StatusLabel'),
-            ('assets', 'Manufacturer'), ('assets', 'Supplier'), ('assets', 'Category'),
-            ('extras', 'CustomFieldset'), ('extras', 'CustomField'), ('assets', 'Depreciation'),
-            ('extras', 'Tag'),
+            ("extras", "AlertLog"),
+            ("extras", "AlertRule"),
+            ("extras", "ScheduledReport"),
+            ("extras", "ReportTemplate"),
+            ("extras", "NotificationChannel"),
+            ("extras", "EventRule"),
+            ("extras", "WebhookEndpoint"),
+            ("extras", "LabelTemplate"),
+            ("extras", "ExportTemplate"),
+            ("extras", "JournalEntry"),
+            ("core", "Notification"),
+            ("core", "ObjectChange"),
+            ("extras", "Dashboard"),
+            ("procurement", "FulfillmentLink"),
+            ("procurement", "PurchaseOrderLine"),
+            ("procurement", "PurchaseOrder"),
+            ("procurement", "Contract"),
+            ("assets", "AssetRequest"),
+            ("compliance", "AssetAudit"),
+            ("compliance", "AuditSession"),
+            ("compliance", "CustodyReceipt"),
+            ("compliance", "CustodyTemplate"),
+            ("assets", "AssetMaintenance"),
+            ("licenses", "LicenseSeatAssignment"),
+            ("subscriptions", "SubscriptionAssignment"),
+            ("inventory", "AccessoryAssignment"),
+            ("inventory", "ConsumableAssignment"),
+            ("inventory", "ComponentAllocation"),
+            ("inventory", "ComponentStock"),
+            ("inventory", "AccessoryStock"),
+            ("inventory", "ConsumableStock"),
+            ("inventory", "KitItem"),
+            ("inventory", "Kit"),
+            ("software", "InstalledSoftware"),
+            ("assets", "AssetAssignment"),
+            ("assets", "Warranty"),
+            ("assets", "AssetReservation"),
+            ("assets", "AssetDisposal"),
+            ("assets", "Asset"),
+            ("assets", "AssetType"),
+            ("inventory", "Component"),
+            ("inventory", "Accessory"),
+            ("inventory", "Consumable"),
+            ("licenses", "License"),
+            ("software", "Software"),
+            ("subscriptions", "Subscription"),
+            ("subscriptions", "Provider"),
+            ("organization", "RoleGrantScope"),
+            ("organization", "RoleGrant"),
+            ("organization", "Membership"),
+            ("organization", "Role"),
+            ("organization", "ContactAssignment"),
+            ("organization", "Contact"),
+            ("organization", "ContactRole"),
+            ("organization", "Location"),
+            ("organization", "Site"),
+            ("organization", "AssetHolder"),
+            ("organization", "CostCenter"),
+            ("organization", "Tenant"),
+            ("organization", "TenantGroup"),
+            ("organization", "Region"),
+            ("organization", "SiteGroup"),
+            ("assets", "AssetRole"),
+            ("assets", "StatusLabel"),
+            ("assets", "Manufacturer"),
+            ("assets", "Supplier"),
+            ("assets", "Category"),
+            ("extras", "CustomFieldset"),
+            ("extras", "CustomField"),
+            ("assets", "Depreciation"),
+            ("extras", "Tag"),
         ]
         # Clear every domain table in a single TRUNCATE ... CASCADE. This is
         # reliable and quiet regardless of FK ordering: CASCADE also truncates any
@@ -160,6 +211,7 @@ class Command(SeedCatalogMixin, SeedOrganizationsMixin, SeedAccessMixin, SeedAss
         # spurious "could not fully clear" warnings even when cascade had already
         # emptied the rows.
         from django.db import connection
+
         existing = set(connection.introspection.table_names())
         tables = []
         for app_label, model_name in models_to_clear:
@@ -170,18 +222,16 @@ class Command(SeedCatalogMixin, SeedOrganizationsMixin, SeedAccessMixin, SeedAss
             db_table = model._meta.db_table
             if db_table in existing and db_table not in tables:
                 tables.append(db_table)
-        tables += [t for t in existing
-                   if t.startswith('itambox_esign') and t not in tables]
+        tables += [t for t in existing if t.startswith("itambox_esign") and t not in tables]
 
         if tables:
             with connection.cursor() as cur:
-                cur.execute('TRUNCATE TABLE %s CASCADE'
-                            % ', '.join('"%s"' % t for t in tables))
-            self.stdout.write(f'  Cleared {len(tables)} domain tables.')
+                cur.execute("TRUNCATE TABLE %s CASCADE" % ", ".join('"%s"' % t for t in tables))
+            self.stdout.write(f"  Cleared {len(tables)} domain tables.")
 
         User.objects.filter(is_superuser=False).delete()
         ContentType.objects.clear_cache()
-        self.stdout.write('  Kept superuser accounts, deleted regular users.')
+        self.stdout.write("  Kept superuser accounts, deleted regular users.")
 
     # ─────────────────────────────────────────────────────────────────
     # Minimal Seed (--production)
@@ -190,34 +240,39 @@ class Command(SeedCatalogMixin, SeedOrganizationsMixin, SeedAccessMixin, SeedAss
     def _seed_minimal(self):
         import os
         import secrets as _secrets
+
         from assets.models import StatusLabel
+
         if not User.objects.filter(is_superuser=True).exists():
             # Never ship a hardcoded credential. Use DJANGO_SUPERUSER_PASSWORD when
             # provided (CI/automation), otherwise generate a strong random password
             # and print it once so the operator can capture it.
-            password = os.environ.get('DJANGO_SUPERUSER_PASSWORD')
+            password = os.environ.get("DJANGO_SUPERUSER_PASSWORD")
             generated = password is None
             if generated:
                 password = _secrets.token_urlsafe(18)
-            username = os.environ.get('DJANGO_SUPERUSER_USERNAME', 'admin')
-            email = os.environ.get('DJANGO_SUPERUSER_EMAIL', 'admin@itambox.local')
+            username = os.environ.get("DJANGO_SUPERUSER_USERNAME", "admin")
+            email = os.environ.get("DJANGO_SUPERUSER_EMAIL", "admin@itambox.local")
             User.objects.create_superuser(username=username, email=email, password=password)
             if generated:
-                self.stdout.write(self.style.WARNING(
-                    f'  Created superuser "{username}" with a generated password: {password}\n'
-                    f'  Store it now and change it after first login.'))
+                self.stdout.write(
+                    self.style.WARNING(
+                        f'  Created superuser "{username}" with a generated password: {password}\n'
+                        f"  Store it now and change it after first login."
+                    )
+                )
             else:
                 self.stdout.write(f'  Created superuser "{username}" (password from DJANGO_SUPERUSER_PASSWORD).')
         for name, slug, stype, color in self._status_label_defs():
-            StatusLabel.objects.get_or_create(slug=slug, defaults={'name': name, 'type': stype, 'color': color})
-        self.stdout.write('  Seeded default StatusLabels.')
+            StatusLabel.objects.get_or_create(slug=slug, defaults={"name": name, "type": stype, "color": color})
+        self.stdout.write("  Seeded default StatusLabels.")
 
     # ─────────────────────────────────────────────────────────────────
     # Full Seed
     # ─────────────────────────────────────────────────────────────────
 
     def _seed_all(self):
-        self.stdout.write('\nSeeding MSP demo dataset...\n')
+        self.stdout.write("\nSeeding MSP demo dataset...\n")
         self._engine = ChangeLogEngine(stdout=self.stdout, style=self.style)
         with transaction.atomic():
             # Existing phases run first, in their ORIGINAL order. They rely on the
@@ -235,12 +290,12 @@ class Command(SeedCatalogMixin, SeedOrganizationsMixin, SeedAccessMixin, SeedAss
             self._seed_procurement()
             self._seed_operations()
             # New realistic-dataset phases (appended; order respects data deps).
-            self._seed_cost_centers()          # tenants + engineers
-            self._seed_lifecycle()             # warranties, reservations, disposals (assets)
-            self._seed_contracts_and_costing() # contracts + cost-centre backfill (licenses/subs)
-            self._seed_compliance()            # audit sessions + custody receipts
-            self._seed_export_templates()      # global Jinja export templates (no tenant/random)
-            self._simulate_history()           # real 2-year change history (last)
+            self._seed_cost_centers()  # tenants + engineers
+            self._seed_lifecycle()  # warranties, reservations, disposals (assets)
+            self._seed_contracts_and_costing()  # contracts + cost-centre backfill (licenses/subs)
+            self._seed_compliance()  # audit sessions + custody receipts
+            self._seed_export_templates()  # global Jinja export templates (no tenant/random)
+            self._simulate_history()  # real 2-year change history (last)
 
     # ─────────────────────────────────────────────────────────────────
     # Catalog (shared status-label defs used by both _seed_minimal and _seed_catalog)
@@ -252,9 +307,10 @@ class Command(SeedCatalogMixin, SeedOrganizationsMixin, SeedAccessMixin, SeedAss
 
     def _seed_export_templates(self):
         from django.contrib.contenttypes.models import ContentType
+
         from assets.models import Asset
-        from licenses.models import License
         from extras.models import ExportTemplate
+        from licenses.models import License
 
         asset_csv = (
             "Asset Tag,Name,Serial Number,Status\n"
@@ -266,9 +322,9 @@ class Command(SeedCatalogMixin, SeedOrganizationsMixin, SeedAccessMixin, SeedAss
         asset_json = (
             "[\n"
             "{% for obj in queryset %}"
-            "  {\"asset_tag\": {{ obj.asset_tag|tojson }}, \"name\": {{ obj.name|tojson }}, "
-            "\"serial_number\": {{ obj.serial_number|tojson }}, "
-            "\"status\": {{ obj.status|string|tojson }}}{% if not loop.last %},{% endif %}\n"
+            '  {"asset_tag": {{ obj.asset_tag|tojson }}, "name": {{ obj.name|tojson }}, '
+            '"serial_number": {{ obj.serial_number|tojson }}, '
+            '"status": {{ obj.status|string|tojson }}}{% if not loop.last %},{% endif %}\n'
             "{% endfor %}"
             "]\n"
         )
@@ -281,12 +337,30 @@ class Command(SeedCatalogMixin, SeedOrganizationsMixin, SeedAccessMixin, SeedAss
         )
 
         defs = [
-            (Asset, 'Assets — CSV', 'Flat CSV of every asset (tag, name, serial, status).',
-             asset_csv, 'text/csv', 'csv'),
-            (Asset, 'Assets — JSON', 'JSON array of assets for downstream tooling.',
-             asset_json, 'application/json', 'json'),
-            (License, 'Licenses — CSV', 'Flat CSV of licenses with seat counts and expiry.',
-             license_csv, 'text/csv', 'csv'),
+            (
+                Asset,
+                "Assets — CSV",
+                "Flat CSV of every asset (tag, name, serial, status).",
+                asset_csv,
+                "text/csv",
+                "csv",
+            ),
+            (
+                Asset,
+                "Assets — JSON",
+                "JSON array of assets for downstream tooling.",
+                asset_json,
+                "application/json",
+                "json",
+            ),
+            (
+                License,
+                "Licenses — CSV",
+                "Flat CSV of licenses with seat counts and expiry.",
+                license_csv,
+                "text/csv",
+                "csv",
+            ),
         ]
         created = 0
         for model, name, description, code, mime, ext in defs:
@@ -295,24 +369,24 @@ class Command(SeedCatalogMixin, SeedOrganizationsMixin, SeedAccessMixin, SeedAss
                 content_type=ct,
                 name=name,
                 defaults={
-                    'description': description,
-                    'template_code': code,
-                    'mime_type': mime,
-                    'file_extension': ext,
-                    'as_attachment': True,
+                    "description": description,
+                    "template_code": code,
+                    "mime_type": mime,
+                    "file_extension": ext,
+                    "as_attachment": True,
                 },
             )
             created += int(was_created)
-        self.stdout.write(f'  Seeded export templates ({created} new).')
+        self.stdout.write(f"  Seeded export templates ({created} new).")
 
     @staticmethod
     def _status_label_defs():
         return [
-            ('Available', 'available', 'deployable', '28a745'),
-            ('In Use', 'in-use', 'deployed', '007bff'),
-            ('Pending Repair', 'pending-repair', 'pending', 'ffc107'),
-            ('Retired', 'retired', 'archived', 'dc3545'),
-            ('In Transit', 'in-transit', 'pending', '6f42c1'),
-            ('Decommissioned', 'decommissioned', 'undeployable', '6c757d'),
-            ('Quarantined', 'quarantined', 'pending', 'fd7e14'),
+            ("Available", "available", "deployable", "28a745"),
+            ("In Use", "in-use", "deployed", "007bff"),
+            ("Pending Repair", "pending-repair", "pending", "ffc107"),
+            ("Retired", "retired", "archived", "dc3545"),
+            ("In Transit", "in-transit", "pending", "6f42c1"),
+            ("Decommissioned", "decommissioned", "undeployable", "6c757d"),
+            ("Quarantined", "quarantined", "pending", "fd7e14"),
         ]

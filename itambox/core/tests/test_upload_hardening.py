@@ -20,9 +20,9 @@ class FileAttachmentExtensionTests(SimpleTestCase):
     signature check degrades to a no-op when libmagic is unavailable in the image)."""
 
     def test_dangerous_extensions_rejected(self):
-        for name in ('x.xhtml', 'x.mhtml', 'x.jar', 'x.iso', 'x.hta', 'x.svgz', 'x.jnlp'):
+        for name in ("x.xhtml", "x.mhtml", "x.jar", "x.iso", "x.hta", "x.svgz", "x.jnlp"):
             with self.assertRaises(ValidationError, msg=name):
-                validate_file_attachment(SimpleUploadedFile(name, b'data'))
+                validate_file_attachment(SimpleUploadedFile(name, b"data"))
 
     def test_safe_extension_passes_extension_gate(self):
-        validate_file_attachment(SimpleUploadedFile('doc.pdf', b'%PDF-1.4 minimal'))
+        validate_file_attachment(SimpleUploadedFile("doc.pdf", b"%PDF-1.4 minimal"))

@@ -5,21 +5,21 @@ living only in ObjectExportView. See core/tests/test_csv_utils for the contract.
 """
 
 # Characters a spreadsheet treats as a formula/command trigger at the start of a cell.
-_FORMULA_TRIGGERS = ('=', '+', '-', '@', '\t', '\r')
+_FORMULA_TRIGGERS = ("=", "+", "-", "@", "\t", "\r")
 
 
 def csv_safe(value):
     """Neutralize CSV formula injection: a cell whose first character is one a spreadsheet
     treats as a formula trigger is prefixed with a single quote so it renders as literal
     text rather than being evaluated."""
-    text = '' if value is None else str(value)
+    text = "" if value is None else str(value)
     if text and text[0] in _FORMULA_TRIGGERS:
         return "'" + text
     return text
 
 
-def safe_csv_filename(name, default='export'):
+def safe_csv_filename(name, default="export"):
     """Strip characters that could break out of a Content-Disposition ``filename`` parameter
     (CR/LF header injection, embedded quotes/backslashes)."""
-    cleaned = ''.join(c for c in str(name) if c not in '\r\n"\\').strip()
+    cleaned = "".join(c for c in str(name) if c not in '\r\n"\\').strip()
     return cleaned or default

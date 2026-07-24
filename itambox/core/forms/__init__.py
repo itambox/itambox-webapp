@@ -7,17 +7,17 @@
 # breaking the eager extras dependency.
 
 from .mixins import (
-    OBJ_TYPE_CHOICES,
-    SearchForm,
-    JournalEntryForm,
-    ConfirmationForm,
     BULK_EDIT_FIELD_BLACKLIST,
     BULK_EDIT_FIELD_TYPE_MAP,
+    OBJ_TYPE_CHOICES,
     BulkEditForm,
-    CrispyFormMixin,
-    SlugModelForm,
-    FilterForm,
     ColorFieldFormMixin,
+    ConfirmationForm,
+    CrispyFormMixin,
+    FilterForm,
+    JournalEntryForm,
+    SearchForm,
+    SlugModelForm,
 )
 from .tenant import scope_tenant_field, scope_tenant_group_field
 

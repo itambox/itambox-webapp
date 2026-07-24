@@ -2,67 +2,63 @@ import logging
 
 from django.apps import apps
 from django.conf import settings
-from django.contrib.auth.mixins import LoginRequiredMixin, PermissionRequiredMixin
 from django.contrib import messages
+from django.contrib.auth.mixins import LoginRequiredMixin, PermissionRequiredMixin
 from django.contrib.contenttypes.models import ContentType
 from django.core.exceptions import ImproperlyConfigured
 from django.db import models, transaction
 from django.http import Http404
 from django.shortcuts import redirect
-from django.urls import reverse, NoReverseMatch
+from django.urls import NoReverseMatch, reverse
 from django.utils.translation import gettext as _
 from django.views.generic import TemplateView
 from django_q.tasks import async_task
 
 from core.forms.import_forms import (
-    BulkImportForm,
     IMPORT_EXCLUDED_FIELDS,
+    BulkImportForm,
+    _model_has_concrete_field,
     get_registered_import_form,
     is_model_importable,
-    _model_has_concrete_field,
 )
 from core.managers import get_current_tenant
 from core.models import Job
 from itambox.utils import get_model_viewname
-from itambox.views.htmx import BaseHTMXView
 from itambox.views.generic.mixins import user_can_mutate_model
+from itambox.views.htmx import BaseHTMXView
 
 logger = logging.getLogger(__name__)
 
-SUPERUSER_ONLY_IMPORT_MODELS = frozenset({
-    # The generic form bypasses TenantForm, so reserve imports that can write
-    # management topology (group / managed_by / is_provider) for superusers.
-    'organization.tenant',
-})
+SUPERUSER_ONLY_IMPORT_MODELS = frozenset(
+    {
+        # The generic form bypasses TenantForm, so reserve imports that can write
+        # management topology (group / managed_by / is_provider) for superusers.
+        "organization.tenant",
+    }
+)
 
 
 class ObjectImportView(PermissionRequiredMixin, LoginRequiredMixin, BaseHTMXView, TemplateView):
     model_form = None
-    template_name = 'generic/object_import.html'
+    template_name = "generic/object_import.html"
 
     def has_permission(self):
         model = self._get_model()
-        if (
-            model._meta.label_lower in SUPERUSER_ONLY_IMPORT_MODELS
-            and not self.request.user.is_superuser
-        ):
+        if model._meta.label_lower in SUPERUSER_ONLY_IMPORT_MODELS and not self.request.user.is_superuser:
             return False
-        return (
-            user_can_mutate_model(self.request.user, model)
-            and super().has_permission()
-        )
+        return user_can_mutate_model(self.request.user, model) and super().has_permission()
 
     def get_permission_required(self):
         model = self._get_model()
         if model:
-            return (f'{model._meta.app_label}.add_{model._meta.model_name}',)
-        return ('',)
+            return (f"{model._meta.app_label}.add_{model._meta.model_name}",)
+        return ("",)
 
     def _get_model(self):
-        form_cls = getattr(self, 'model_form', None)
-        if form_cls and hasattr(form_cls, 'model') and form_cls.model:
+        form_cls = getattr(self, "model_form", None)
+        if form_cls and hasattr(form_cls, "model") and form_cls.model:
             return form_cls.model
-        if hasattr(self, 'model') and self.model:
+        if hasattr(self, "model") and self.model:
             return self.model
         return None
 
@@ -113,23 +109,23 @@ class ObjectImportView(PermissionRequiredMixin, LoginRequiredMixin, BaseHTMXView
     def post(self, request, *args, **kwargs):
         form = self.get_form_class()(request.POST, request.FILES)
 
-        if '_preview' in request.POST:
+        if "_preview" in request.POST:
             if form.is_valid():
                 rows = form._rows_data
-                request.session['import_rows'] = rows
-                request.session['import_delimiter'] = form.cleaned_data.get('delimiter', ',')
+                request.session["import_rows"] = rows
+                request.session["import_delimiter"] = form.cleaned_data.get("delimiter", ",")
                 context = {
-                    'form': form,
-                    'preview_rows': rows,
-                    'preview_headers': form.field_names if rows else [],
-                    'title': self._get_title(),
-                    'cancel_url': self._get_cancel_url(),
+                    "form": form,
+                    "preview_rows": rows,
+                    "preview_headers": form.field_names if rows else [],
+                    "title": self._get_title(),
+                    "cancel_url": self._get_cancel_url(),
                 }
                 return self.render_to_response(context)
             return self._render_response(request, form, errors=[str(e) for e in form.errors.values()])
 
-        if '_confirm' in request.POST:
-            rows = request.session.get('import_rows', [])
+        if "_confirm" in request.POST:
+            rows = request.session.get("import_rows", [])
             if rows:
                 model = self._get_model()
                 ct = ContentType.objects.get_for_model(model)
@@ -145,9 +141,9 @@ class ObjectImportView(PermissionRequiredMixin, LoginRequiredMixin, BaseHTMXView
                     status=Job.STATUS_PENDING,
                 )
 
-                if getattr(settings, 'Q_CLUSTER', {}).get('sync', False):
+                if getattr(settings, "Q_CLUSTER", {}).get("sync", False):
                     async_task(
-                        'core.tasks.import_csv_task',
+                        "core.tasks.import_csv_task",
                         job.pk,
                         rows,
                         model._meta.app_label,
@@ -157,30 +153,33 @@ class ObjectImportView(PermissionRequiredMixin, LoginRequiredMixin, BaseHTMXView
                     )
                 else:
                     transaction.on_commit(
-                        lambda job_pk=job.pk, r=rows, app=model._meta.app_label, name=model._meta.model_name, u_pk=request.user.pk, t_id=tenant_id: async_task(
-                            'core.tasks.import_csv_task',
-                            job_pk,
-                            r,
-                            app,
-                            name,
-                            u_pk,
-                            tenant_id=t_id,
+                        lambda job_pk=job.pk, r=rows, app=model._meta.app_label, name=model._meta.model_name, u_pk=request.user.pk, t_id=tenant_id: (
+                            async_task(
+                                "core.tasks.import_csv_task",
+                                job_pk,
+                                r,
+                                app,
+                                name,
+                                u_pk,
+                                tenant_id=t_id,
+                            )
                         )
                     )
 
                 messages.success(
                     request,
-                    _("Asynchronous import job '%(name)s' enqueued successfully! Tracking progress in real-time.") % {'name': job.name},
+                    _("Asynchronous import job '%(name)s' enqueued successfully! Tracking progress in real-time.")
+                    % {"name": job.name},
                 )
 
-                request.session.pop('import_rows', None)
-                request.session.pop('import_delimiter', None)
+                request.session.pop("import_rows", None)
+                request.session.pop("import_delimiter", None)
 
                 try:
-                    return redirect('job_detail', pk=job.pk)
+                    return redirect("job_detail", pk=job.pk)
                 except NoReverseMatch:
                     return redirect(f"/jobs/{job.pk}/")
-            return self._render_response(request, form, errors=[_('No import data found. Please upload a file first.')])
+            return self._render_response(request, form, errors=[_("No import data found. Please upload a file first.")])
 
         return self._render_response(request, form)
 
@@ -194,9 +193,10 @@ class ObjectImportView(PermissionRequiredMixin, LoginRequiredMixin, BaseHTMXView
             return fields_info
 
         form_cls = self.get_form_class()
-        required = set(getattr(form_cls, 'required_fields', []) or [])
-        field_names = (list(getattr(form_cls, 'required_fields', []) or [])
-                       + list(getattr(form_cls, 'optional_fields', []) or []))
+        required = set(getattr(form_cls, "required_fields", []) or [])
+        field_names = list(getattr(form_cls, "required_fields", []) or []) + list(
+            getattr(form_cls, "optional_fields", []) or []
+        )
 
         for name in field_names:
             if name in IMPORT_EXCLUDED_FIELDS:
@@ -204,18 +204,19 @@ class ObjectImportView(PermissionRequiredMixin, LoginRequiredMixin, BaseHTMXView
             try:
                 field = model._meta.get_field(name)
             except Exception:
-                fields_info.append({'name': name, 'required': name in required,
-                                    'accessor': '', 'description': '', 'choices': []})
+                fields_info.append(
+                    {"name": name, "required": name in required, "accessor": "", "description": "", "choices": []}
+                )
                 continue
 
-            description = field.help_text or field.verbose_name or ''
-            description = str(description) if description else ''
+            description = field.help_text or field.verbose_name or ""
+            description = str(description) if description else ""
             is_relation = field.is_relation and field.many_to_one
-            accessor = ''
+            accessor = ""
             choices = []
             if is_relation:
                 related_model = field.related_model
-                accessor = 'slug' if _model_has_concrete_field(related_model, 'slug') else 'name'
+                accessor = "slug" if _model_has_concrete_field(related_model, "slug") else "name"
                 description = _("Relation to {model_name} (resolves by ID, Slug or Name).").format(
                     model_name=str(related_model._meta.verbose_name)
                 )
@@ -226,21 +227,23 @@ class ObjectImportView(PermissionRequiredMixin, LoginRequiredMixin, BaseHTMXView
             elif isinstance(field, models.BooleanField):
                 description = f"{description} Specify true or false"
 
-            fields_info.append({
-                'name': name,
-                'required': name in required,
-                'accessor': accessor,
-                'description': description,
-                'choices': choices,
-            })
+            fields_info.append(
+                {
+                    "name": name,
+                    "required": name in required,
+                    "accessor": accessor,
+                    "description": description,
+                    "choices": choices,
+                }
+            )
         return fields_info
 
     def _render_response(self, request, form, **extra_context):
         context = {
-            'form': form,
-            'title': self._get_title(),
-            'cancel_url': self._get_cancel_url(),
-            'fields': self._get_fields_info(),
+            "form": form,
+            "title": self._get_title(),
+            "cancel_url": self._get_cancel_url(),
+            "fields": self._get_fields_info(),
             **extra_context,
         }
         return self.render_to_response(context)
@@ -248,39 +251,39 @@ class ObjectImportView(PermissionRequiredMixin, LoginRequiredMixin, BaseHTMXView
     def _get_title(self):
         model = self._get_model()
         if model:
-            return _('Import {verbose_name_plural}').format(verbose_name_plural=model._meta.verbose_name_plural)
-        return _('Import Objects')
+            return _("Import {verbose_name_plural}").format(verbose_name_plural=model._meta.verbose_name_plural)
+        return _("Import Objects")
 
     def _get_cancel_url(self):
         model = self._get_model()
         if model:
             try:
-                list_view_name = get_model_viewname(model, 'list')
+                list_view_name = get_model_viewname(model, "list")
                 return reverse(list_view_name)
             except NoReverseMatch:
                 pass
-        return reverse('dashboard')
+        return reverse("dashboard")
 
     def get_context_data(self, **kwargs):
-        context = super().get_context_data(**kwargs) if hasattr(super(), 'get_context_data') else {}
-        context['title'] = kwargs.get('title', self._get_title())
-        context['cancel_url'] = kwargs.get('cancel_url', self._get_cancel_url())
-        context['breadcrumbs'] = [
-            (reverse('dashboard'), _('Dashboard')),
-            (context['cancel_url'], self._get_model()._meta.verbose_name_plural if self._get_model() else _('List')),
-            (None, context['title']),
+        context = super().get_context_data(**kwargs) if hasattr(super(), "get_context_data") else {}
+        context["title"] = kwargs.get("title", self._get_title())
+        context["cancel_url"] = kwargs.get("cancel_url", self._get_cancel_url())
+        context["breadcrumbs"] = [
+            (reverse("dashboard"), _("Dashboard")),
+            (context["cancel_url"], self._get_model()._meta.verbose_name_plural if self._get_model() else _("List")),
+            (None, context["title"]),
         ]
         return context
 
     def render_to_response(self, context, **response_kwargs):
-        context['breadcrumbs'] = context.get('breadcrumbs', [])
+        context["breadcrumbs"] = context.get("breadcrumbs", [])
         return BaseHTMXView.render_to_response(self, context, **response_kwargs)
 
 
 class GenericObjectImportView(ObjectImportView):
     def _get_model(self):
-        app_label = self.kwargs.get('app_label')
-        model_name = self.kwargs.get('model_name')
+        app_label = self.kwargs.get("app_label")
+        model_name = self.kwargs.get("model_name")
         try:
             model = apps.get_model(app_label, model_name)
         except LookupError:

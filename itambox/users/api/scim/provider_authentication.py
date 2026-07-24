@@ -1,13 +1,14 @@
 import logging
 import re
-from rest_framework.authentication import BaseAuthentication, get_authorization_header
-from rest_framework import exceptions
+
 from django.utils import timezone
+from rest_framework import exceptions
+from rest_framework.authentication import BaseAuthentication, get_authorization_header
 
-from users.models import Token
 from organization.models import Tenant
+from users.models import Token
 
-logger = logging.getLogger('itambox.scim.auth')
+logger = logging.getLogger("itambox.scim.auth")
 
 
 class SCIMProviderBearerTokenAuthentication(BaseAuthentication):
@@ -26,10 +27,10 @@ class SCIMProviderBearerTokenAuthentication(BaseAuthentication):
         #    /api/providers/<slug>/ mount is kept for stage 2; only its resolution
         #    target changed (Provider model is gone).
         provider_slug = None
-        if request.resolver_match and 'provider_slug' in request.resolver_match.kwargs:
-            provider_slug = request.resolver_match.kwargs['provider_slug']
+        if request.resolver_match and "provider_slug" in request.resolver_match.kwargs:
+            provider_slug = request.resolver_match.kwargs["provider_slug"]
         else:
-            match = re.search(r'/api/providers/([^/]+)/scim/v2/', request.path)
+            match = re.search(r"/api/providers/([^/]+)/scim/v2/", request.path)
             if match:
                 provider_slug = match.group(1)
 
@@ -39,47 +40,49 @@ class SCIMProviderBearerTokenAuthentication(BaseAuthentication):
         # _base_manager: token auth runs before any tenant context exists, so the
         # tenant-scoped default manager would silently return nothing here.
         tenant = Tenant._base_manager.filter(
-            is_provider=True, deleted_at__isnull=True, slug=provider_slug,
+            is_provider=True,
+            deleted_at__isnull=True,
+            slug=provider_slug,
         ).first()
         if tenant is None:
-            raise exceptions.AuthenticationFailed('Provider not found.')
+            raise exceptions.AuthenticationFailed("Provider not found.")
 
         auth = get_authorization_header(request).split()
 
         # Bearer Auth
-        if auth and auth[0].lower() == b'bearer':
+        if auth and auth[0].lower() == b"bearer":
             if len(auth) == 1:
-                raise exceptions.AuthenticationFailed('Invalid token header. No credentials provided.')
+                raise exceptions.AuthenticationFailed("Invalid token header. No credentials provided.")
             elif len(auth) > 2:
-                raise exceptions.AuthenticationFailed('Invalid token header. Token string should not contain spaces.')
+                raise exceptions.AuthenticationFailed("Invalid token header. Token string should not contain spaces.")
 
             try:
                 token_key = auth[1].decode()
             except UnicodeError:
-                raise exceptions.AuthenticationFailed('Invalid token header. Token string should not contain invalid characters.')
+                raise exceptions.AuthenticationFailed(
+                    "Invalid token header. Token string should not contain invalid characters."
+                )
 
             token = Token.find_by_key(token_key)
             if token is None:
-                raise exceptions.AuthenticationFailed('Invalid token.')
+                raise exceptions.AuthenticationFailed("Invalid token.")
 
             if token.is_expired:
-                raise exceptions.AuthenticationFailed('Token expired.')
+                raise exceptions.AuthenticationFailed("Token expired.")
 
             if token.allowed_ips:
                 from itambox.ratelimit import get_client_ip
+
                 client_ip = get_client_ip(request)
                 if not token.validate_client_ip(client_ip):
                     logger.warning(
-                        'SCIM provider token %s... rejected: source IP %s not in allowed_ips',
-                        token_key[:6], client_ip
+                        "SCIM provider token %s... rejected: source IP %s not in allowed_ips", token_key[:6], client_ip
                     )
-                    raise exceptions.AuthenticationFailed(
-                        'Source IP address is not permitted to use this token.'
-                    )
+                    raise exceptions.AuthenticationFailed("Source IP address is not permitted to use this token.")
 
             user = token.user
             if not user.is_active:
-                raise exceptions.AuthenticationFailed('User inactive or deleted.')
+                raise exceptions.AuthenticationFailed("User inactive or deleted.")
 
             # Authorization: superusers always pass. Everyone else must BOTH (a) present
             # a token scoped to THIS provider tenant (a "provider SCIM token" is simply a
@@ -89,17 +92,16 @@ class SCIMProviderBearerTokenAuthentication(BaseAuthentication):
             # content, never a role-name match. Fail closed otherwise.
             if not user.is_superuser:
                 if token.tenant_id != tenant.pk:
-                    raise exceptions.AuthenticationFailed('Token is not scoped to this provider.')
-                if not user.has_perm('organization.change_membership', obj=tenant):
+                    raise exceptions.AuthenticationFailed("Token is not scoped to this provider.")
+                if not user.has_perm("organization.change_membership", obj=tenant):
                     raise exceptions.AuthenticationFailed(
-                        'User does not have sufficient permissions '
-                        '(organization.change_membership required).'
+                        "User does not have sufficient permissions (organization.change_membership required)."
                     )
 
             # Enforce write_enabled token flag for write methods
-            if request.method in ('POST', 'PUT', 'PATCH', 'DELETE'):
+            if request.method in ("POST", "PUT", "PATCH", "DELETE"):
                 if not token.write_enabled:
-                    raise exceptions.AuthenticationFailed('Token does not have write permissions.')
+                    raise exceptions.AuthenticationFailed("Token does not have write permissions.")
 
             # Update last_used
             if not token.last_used or (timezone.now() - token.last_used).total_seconds() > 60:
@@ -110,4 +112,4 @@ class SCIMProviderBearerTokenAuthentication(BaseAuthentication):
         return None
 
     def authenticate_header(self, request):
-        return 'Bearer'
+        return "Bearer"

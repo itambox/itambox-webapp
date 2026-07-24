@@ -1,11 +1,13 @@
 import re
 
 import django_tables2 as tables
+from django.urls import NoReverseMatch, reverse
 from django.utils.html import format_html
 from django.utils.safestring import mark_safe
 from django.utils.translation import gettext_lazy as _
-from django.urls import reverse, NoReverseMatch
+
 from itambox.utils import get_model_viewname
+
 
 class ColorChipColumn(tables.Column):
     """Renders a colour dot + name linking to the object's detail page. The
@@ -14,25 +16,27 @@ class ColorChipColumn(tables.Column):
     carry a user-pickable colour."""
 
     def __init__(self, *args, **kwargs):
-        kwargs.setdefault('empty_values', ())  # always call render, even for None
+        kwargs.setdefault("empty_values", ())  # always call render, even for None
         super().__init__(*args, **kwargs)
 
     def render(self, value):
         if not value:
             return mark_safe('<span class="text-muted">&mdash;</span>')
-        raw_color = value.color or ''
+        raw_color = value.color or ""
         # Sanitize: accept only valid 3- or 6-digit hex strings; fall back to a
         # neutral grey so that an invalid/arbitrary value stored in the DB cannot
         # inject CSS metacharacters into the style attribute.
-        if re.fullmatch(r'[0-9A-Fa-f]{3,6}', raw_color):
+        if re.fullmatch(r"[0-9A-Fa-f]{3,6}", raw_color):
             safe_color = raw_color
         else:
-            safe_color = '6c757d'
+            safe_color = "6c757d"
         return format_html(
             '<a href="{}" class="text-reset text-decoration-none d-inline-flex align-items-center">'
             '<span class="d-inline-block rounded-circle me-1" '
             'style="width:.6rem;height:.6rem;background-color:#{};"></span>{}</a>',
-            value.get_absolute_url(), safe_color, value.name,
+            value.get_absolute_url(),
+            safe_color,
+            value.name,
         )
 
 
@@ -63,16 +67,8 @@ class CountLinkColumn(tables.Column):
 
 
 class BooleanColumn(tables.Column):
-    TRUE_MARK = mark_safe(
-        '<span class="text-success">'
-        '<i class="mdi mdi-check-circle-outline"></i>'
-        '</span>'
-    )
-    FALSE_MARK = mark_safe(
-        '<span class="text-danger">'
-        '<i class="mdi mdi-close-circle-outline"></i>'
-        '</span>'
-    )
+    TRUE_MARK = mark_safe('<span class="text-success"><i class="mdi mdi-check-circle-outline"></i></span>')
+    FALSE_MARK = mark_safe('<span class="text-danger"><i class="mdi mdi-close-circle-outline"></i></span>')
     EMPTY_MARK = mark_safe('<span class="text-muted">&mdash;</span>')
 
     def __init__(self, *args, true_mark=None, false_mark=None, **kwargs):
@@ -100,14 +96,14 @@ class IDColumn(tables.Column):
     """
 
     def __init__(self, *args, **kwargs):
-        kwargs.setdefault('accessor', 'pk')
-        kwargs.setdefault('verbose_name', _('ID'))
-        kwargs.setdefault('linkify', self._detail_url)
+        kwargs.setdefault("accessor", "pk")
+        kwargs.setdefault("verbose_name", _("ID"))
+        kwargs.setdefault("linkify", self._detail_url)
         super().__init__(*args, **kwargs)
 
     @staticmethod
     def _detail_url(record):
-        get_url = getattr(record, 'get_absolute_url', None)
+        get_url = getattr(record, "get_absolute_url", None)
         if get_url is None:
             return None
         try:
@@ -118,79 +114,81 @@ class IDColumn(tables.Column):
 
 class ToggleColumn(tables.CheckBoxColumn):
     def __init__(self, *args, **kwargs):
-        default = kwargs.pop('default', '')
-        visible = kwargs.pop('visible', True)
-        if 'attrs' not in kwargs:
-            kwargs['attrs'] = {
-                'th': {
-                    'class': 'w-1 text-nowrap',
-                    'aria-label': _('Select all'),
+        default = kwargs.pop("default", "")
+        visible = kwargs.pop("visible", True)
+        if "attrs" not in kwargs:
+            kwargs["attrs"] = {
+                "th": {
+                    "class": "w-1 text-nowrap",
+                    "aria-label": _("Select all"),
                 },
-                'td': {
-                    'class': 'w-1 text-nowrap',
+                "td": {
+                    "class": "w-1 text-nowrap",
                 },
-                'input': {
-                    'class': 'form-check-input',
-                }
+                "input": {
+                    "class": "form-check-input",
+                },
             }
         super().__init__(*args, default=default, visible=visible, **kwargs)
 
     @property
     def header(self):
-        title_text = _('Toggle all')
+        title_text = _("Toggle all")
         return format_html(
             '<input type="checkbox" class="toggle form-check-input" name="select_all" title="{}" aria-label="{}" />',
-            title_text, title_text,
+            title_text,
+            title_text,
         )
 
 
 class ActionsColumn(tables.Column):
     attrs = {
-        'th': {
-            'class': 'col-actions text-nowrap',
+        "th": {
+            "class": "col-actions text-nowrap",
         },
-        'td': {
-            'class': 'text-end text-nowrap noprint p-1 col-actions'
-        }
+        "td": {"class": "text-end text-nowrap noprint p-1 col-actions"},
     }
     empty_values = ()
-    verbose_name = ''
+    verbose_name = ""
     orderable = False
 
     actions = {
-        'edit': {'title': _('Edit'), 'icon': 'pencil', 'css_class': 'primary'},
-        'delete': {'title': _('Delete'), 'icon': 'trash', 'css_class': 'danger'},
+        "edit": {"title": _("Edit"), "icon": "pencil", "css_class": "primary"},
+        "delete": {"title": _("Delete"), "icon": "trash", "css_class": "danger"},
     }
 
-    def __init__(self, *args, actions=('edit', 'delete'), extra_buttons='', split_actions=True, **kwargs):
+    def __init__(self, *args, actions=("edit", "delete"), extra_buttons="", split_actions=True, **kwargs):
         super().__init__(*args, **kwargs)
         self.extra_buttons = extra_buttons
         self.split_actions = split_actions
-        self.actions = {
-            name: self.actions[name] for name in actions if name in self.actions
-        }
+        self.actions = {name: self.actions[name] for name in actions if name in self.actions}
 
     def render(self, record, table, **kwargs):
         if not self.actions and not self.extra_buttons:
-            return ''
-        if not getattr(record, 'pk', None):
-            return ''
+            return ""
+        if not getattr(record, "pk", None):
+            return ""
 
         model = type(record)
 
-        is_deleted = getattr(record, 'deleted_at', None) is not None
+        is_deleted = getattr(record, "deleted_at", None) is not None
         if is_deleted:
             from django.contrib.contenttypes.models import ContentType
+
             ct = ContentType.objects.get_for_model(record)
-            
-            restore_url = reverse('object_restore', kwargs={'content_type_id': ct.pk, 'object_id': record.pk})
-            purge_url = reverse('object_purge', kwargs={'content_type_id': ct.pk, 'object_id': record.pk})
-            
+
+            restore_url = reverse("object_restore", kwargs={"content_type_id": ct.pk, "object_id": record.pk})
+            purge_url = reverse("object_purge", kwargs={"content_type_id": ct.pk, "object_id": record.pk})
+
             restore_title = _("Restore")
             purge_title = _("Delete Permanently")
-            
-            restore_confirm = _("Are you sure you want to restore this {model_name}?").format(model_name=model._meta.verbose_name)
-            purge_confirm = _("Are you sure you want to PERMANENTLY delete this {model_name}? This action cannot be undone!").format(model_name=model._meta.verbose_name)
+
+            restore_confirm = _("Are you sure you want to restore this {model_name}?").format(
+                model_name=model._meta.verbose_name
+            )
+            purge_confirm = _(
+                "Are you sure you want to PERMANENTLY delete this {model_name}? This action cannot be undone!"
+            ).format(model_name=model._meta.verbose_name)
 
             restore_btn = (
                 f'<a class="btn btn-sm btn-soft-success me-1" href="{restore_url}" '
@@ -213,19 +211,19 @@ class ActionsColumn(tables.Column):
         icon_delete = '<i class="mdi mdi-trash-can-outline"></i>'
 
         icons = {
-            'edit': icon_edit,
-            'delete': icon_delete,
+            "edit": icon_edit,
+            "delete": icon_delete,
         }
 
-        html = ''
+        html = ""
         button = None
         dropdown_links = []
 
         for idx, (action, attrs) in enumerate(self.actions.items()):
-            icon = icons.get(action, '')
-            viewname = get_model_viewname(model, 'update' if action == 'edit' else 'delete')
+            icon = icons.get(action, "")
+            viewname = get_model_viewname(model, "update" if action == "edit" else "delete")
             url = None
-            for kwargs in ({'pk': record.pk}, {'slug': getattr(record, 'slug', None)}):
+            for kwargs in ({"pk": record.pk}, {"slug": getattr(record, "slug", None)}):
                 if None in kwargs.values():
                     continue
                 try:
@@ -239,28 +237,26 @@ class ActionsColumn(tables.Column):
             if len(self.actions) == 1 or (self.split_actions and idx == 0):
                 # Ghost treatment: monochrome at rest, accent on hover
                 # (indigo for edit, red for delete). Keeps rows calm.
-                ghost_class = 'btn-action btn-action-danger' if action == 'delete' else 'btn-action'
+                ghost_class = "btn-action btn-action-danger" if action == "delete" else "btn-action"
                 button = (
                     f'<a class="btn btn-sm {ghost_class}" href="{url}" type="button" '
                     f'title="{attrs["title"]}" aria-label="{attrs["title"]}">{icon}</a>'
                 )
             else:
-                dropdown_links.append(
-                    f'<li><a class="dropdown-item" href="{url}">{icon} {attrs["title"]}</a></li>'
-                )
+                dropdown_links.append(f'<li><a class="dropdown-item" href="{url}">{icon} {attrs["title"]}</a></li>')
 
         # Changelog — link to the object's detail page changelog tab, shown at
         # the top of the dropdown for every model with a detail view. The
         # destructive Delete entry stays last, behind a divider.
-        detail_viewname = get_model_viewname(model, 'detail')
-        for detail_kwargs in ({'pk': record.pk}, {'slug': getattr(record, 'slug', None)}):
+        detail_viewname = get_model_viewname(model, "detail")
+        for detail_kwargs in ({"pk": record.pk}, {"slug": getattr(record, "slug", None)}):
             if None in detail_kwargs.values():
                 continue
             try:
                 detail_url = reverse(detail_viewname, kwargs=detail_kwargs)
             except NoReverseMatch:
                 continue
-            changelog_title = _('Changelog')
+            changelog_title = _("Changelog")
             changelog_li = (
                 f'<li><a class="dropdown-item" href="{detail_url}?tab=changelog">'
                 f'<i class="mdi mdi-history"></i> {changelog_title}</a></li>'
@@ -271,15 +267,15 @@ class ActionsColumn(tables.Column):
                 dropdown_links.append(changelog_li)
             break
 
-        toggle_text = _('Toggle Dropdown')
+        toggle_text = _("Toggle Dropdown")
         if button and dropdown_links:
             html += (
                 f'<span class="btn-group dropdown">'
-                f'{button}'
+                f"{button}"
                 f'<a class="btn btn-sm btn-action dropdown-toggle dropdown-toggle-split" type="button" data-bs-toggle="dropdown" aria-expanded="false" aria-label="{toggle_text}">'
-                f'</a>'
+                f"</a>"
                 f'<ul class="dropdown-menu dropdown-menu-end">{"".join(dropdown_links)}</ul>'
-                f'</span>'
+                f"</span>"
             )
         elif button:
             html += button
@@ -287,24 +283,24 @@ class ActionsColumn(tables.Column):
             html += (
                 f'<span class="btn-group dropdown">'
                 f'<a class="btn btn-sm btn-action dropdown-toggle dropdown-toggle-split" type="button" data-bs-toggle="dropdown" aria-expanded="false" aria-label="{toggle_text}">'
-                f'</a>'
+                f"</a>"
                 f'<ul class="dropdown-menu dropdown-menu-end">{"".join(dropdown_links)}</ul>'
-                f'</span>'
+                f"</span>"
             )
 
         # Clone — a standalone leading button shown for any model that has a
         # clone view wired (i.e. uses CloneableMixin + a *_clone URL). Ghost
         # like edit: monochrome at rest, indigo on hover.
-        clone_html = ''
-        clone_viewname = get_model_viewname(model, 'clone')
-        for clone_kwargs in ({'pk': record.pk}, {'slug': getattr(record, 'slug', None)}):
+        clone_html = ""
+        clone_viewname = get_model_viewname(model, "clone")
+        for clone_kwargs in ({"pk": record.pk}, {"slug": getattr(record, "slug", None)}):
             if None in clone_kwargs.values():
                 continue
             try:
                 clone_url = reverse(clone_viewname, kwargs=clone_kwargs)
             except NoReverseMatch:
                 continue
-            clone_title = _('Clone')
+            clone_title = _("Clone")
             clone_html = (
                 f'<a class="btn btn-sm btn-action me-1" href="{clone_url}" '
                 f'title="{clone_title}" aria-label="{clone_title}">'
@@ -318,7 +314,7 @@ class ActionsColumn(tables.Column):
         """Hook for subclasses to prepend extra per-row buttons (e.g. a
         check-out button) ahead of the clone/edit/delete actions. Returns an
         HTML-safe string."""
-        return ''
+        return ""
 
 
 class AssigneeColumn(tables.Column):
@@ -349,12 +345,12 @@ class AssigneeColumn(tables.Column):
         *args,
         location_field=None,
         empty_text=None,
-        assignment_model_path='assets.AssetAssignment',
+        assignment_model_path="assets.AssetAssignment",
         **kwargs,
     ):
-        kwargs.setdefault('verbose_name', _('Assignee'))
-        kwargs.setdefault('orderable', False)
-        kwargs.setdefault('accessor', 'pk')
+        kwargs.setdefault("verbose_name", _("Assignee"))
+        kwargs.setdefault("orderable", False)
+        kwargs.setdefault("accessor", "pk")
         self.location_field = location_field
         self._empty_text = empty_text
         self._assignment_model_path = assignment_model_path
@@ -362,20 +358,21 @@ class AssigneeColumn(tables.Column):
 
     def _get_assignment_model(self):
         from django.apps import apps
+
         return apps.get_model(self._assignment_model_path)
 
     def get_prefetch_fields(self):
         return [
-            'assignments',
-            'assignments__assigned_user',
-            'assignments__assigned_location',
-            'assignments__assigned_asset',
+            "assignments",
+            "assignments__assigned_user",
+            "assignments__assigned_location",
+            "assignments__assigned_asset",
         ]
 
     def render(self, value, record, bound_column, table=None):
         if table is None:
             table = bound_column._table
-        cache_attr = f'_assignee_cache_{id(self)}'
+        cache_attr = f"_assignee_cache_{id(self)}"
         if not hasattr(table, cache_attr):
             self._build_cache(table, record.__class__, cache_attr)
         cache = getattr(table, cache_attr)
@@ -385,13 +382,14 @@ class AssigneeColumn(tables.Column):
             try:
                 url = holder.get_absolute_url()
                 from organization.models import Location
+
                 if isinstance(holder, Location):
                     return format_html('Location: <a href="{}">{}</a>', url, holder)
                 return format_html('<a href="{}">{}</a>', url, holder)
             except Exception:
                 return str(holder)
 
-        if hasattr(record, 'active_assignment') and record.active_assignment is None:
+        if hasattr(record, "active_assignment") and record.active_assignment is None:
             return self.EMPTY_MARK
 
         if self.location_field and hasattr(record, self.location_field):
@@ -409,6 +407,7 @@ class AssigneeColumn(tables.Column):
 
     def _build_cache(self, table, model_class, cache_attr):
         from django.contrib.contenttypes.models import ContentType
+
         AssignmentModel = self._get_assignment_model()
         pks = [row.pk for row in table.data]
         if not pks:
@@ -416,7 +415,7 @@ class AssigneeColumn(tables.Column):
             return
 
         cache = {}
-        
+
         # Check if AssignmentModel has a direct ForeignKey to model_class
         fk_field = None
         for field in AssignmentModel._meta.fields:
@@ -426,30 +425,30 @@ class AssigneeColumn(tables.Column):
 
         if fk_field is not None:
             filter_kwargs = {f"{fk_field.name}_id__in": pks}
-            if hasattr(AssignmentModel, 'is_active'):
-                filter_kwargs['is_active'] = True
+            if hasattr(AssignmentModel, "is_active"):
+                filter_kwargs["is_active"] = True
 
             select_rels = []
             for f in AssignmentModel._meta.fields:
-                if f.name in ('assigned_user', 'assigned_location', 'assigned_asset', 'assigned_holder'):
+                if f.name in ("assigned_user", "assigned_location", "assigned_asset", "assigned_holder"):
                     select_rels.append(f.name)
             assignments = AssignmentModel.objects.filter(**filter_kwargs)
             if select_rels:
                 assignments = assignments.select_related(*select_rels)
-            elif hasattr(AssignmentModel, 'assigned_to_content_type'):
-                assignments = assignments.select_related('assigned_to_content_type')
+            elif hasattr(AssignmentModel, "assigned_to_content_type"):
+                assignments = assignments.select_related("assigned_to_content_type")
 
-            if hasattr(AssignmentModel, 'assigned_to_content_type') and not select_rels:
+            if hasattr(AssignmentModel, "assigned_to_content_type") and not select_rels:
                 # Handle old GenericForeignKey case
                 assigned_to_ids_by_ct = {}
                 for a in assignments:
-                    ct_id = getattr(a, 'assigned_to_content_type_id', None)
+                    ct_id = getattr(a, "assigned_to_content_type_id", None)
                     if not ct_id:
                         continue
                     if ct_id not in assigned_to_ids_by_ct:
                         assigned_to_ids_by_ct[ct_id] = []
                     parent_id = getattr(a, f"{fk_field.name}_id")
-                    assigned_to_ids_by_ct[ct_id].append((parent_id, getattr(a, 'assigned_to_object_id')))
+                    assigned_to_ids_by_ct[ct_id].append((parent_id, getattr(a, "assigned_to_object_id")))
 
                 ct_map = {}
                 for ct_id in assigned_to_ids_by_ct:
@@ -472,20 +471,21 @@ class AssigneeColumn(tables.Column):
                 # Handle explicit FKs case
                 for a in assignments:
                     parent_id = getattr(a, f"{fk_field.name}_id")
-                    target = getattr(a, 'assigned_target', None)
+                    target = getattr(a, "assigned_target", None)
                     if target is None:
-                        target = getattr(a, 'assigned_holder', None) or getattr(a, 'assigned_user', None) or getattr(a, 'assigned_location', None) or getattr(a, 'assigned_asset', None)
+                        target = (
+                            getattr(a, "assigned_holder", None)
+                            or getattr(a, "assigned_user", None)
+                            or getattr(a, "assigned_location", None)
+                            or getattr(a, "assigned_asset", None)
+                        )
                     cache[parent_id] = target
 
         else:
             ct = ContentType.objects.get_for_model(model_class)
-            assignments = AssignmentModel.objects.filter(
-                content_type=ct, object_id__in=pks
-            ).select_related('asset_holder')
-            cache = {
-                a.object_id: a.asset_holder
-                for a in assignments
-                if getattr(a, 'asset_holder', None)
-            }
+            assignments = AssignmentModel.objects.filter(content_type=ct, object_id__in=pks).select_related(
+                "asset_holder"
+            )
+            cache = {a.object_id: a.asset_holder for a in assignments if getattr(a, "asset_holder", None)}
 
         setattr(table, cache_attr, cache)

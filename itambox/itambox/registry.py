@@ -90,9 +90,9 @@ class Registry:
     def get_event_rules(self, model=None, action=None):
         rules = self._event_rules
         if model is not None:
-            rules = [r for r in rules if r['model'] == model]
+            rules = [r for r in rules if r["model"] == model]
         if action is not None:
-            rules = [r for r in rules if action in r.get('events', [])]
+            rules = [r for r in rules if action in r.get("events", [])]
         return rules
 
     def register_webhook(self, webhook_config):

@@ -10,6 +10,17 @@ repos:
         exclude: ^itambox/mkdocs\.yml$
       - id: check-added-large-files
 
+  # Canonical formatter and import sorter. Keep this revision synchronized with
+  # the exact Ruff version in pyproject.toml/uv.lock so local hooks match CI.
+  # Import sorting runs before formatting; Flake8 remains the semantic gate.
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.15.20
+    hooks:
+      - id: ruff-check
+        name: ruff (import sort)
+        args: [--select, I, --fix]
+      - id: ruff-format
+
   # Managed, pinned environment so missing Bugbear or diagnostic dependency
   # drift cannot silently weaken the policy relative to Linux CI.
   - repo: https://github.com/pycqa/flake8

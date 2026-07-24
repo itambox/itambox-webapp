@@ -4,9 +4,9 @@ from django.test import TestCase
 from django.urls import reverse
 
 from assets.models import Asset
-from extras.models import ExportTemplate
-from organization.models import Tenant, Role
 from core.tests.mixins import grant
+from extras.models import ExportTemplate
+from organization.models import Role, Tenant
 
 User = get_user_model()
 
@@ -18,48 +18,46 @@ class ExportTemplateSuperuserGateTests(TestCase):
     Authoring is restricted to superusers; members keep read/render access."""
 
     def setUp(self):
-        self.tenant = Tenant.objects.create(name='Tenant', slug='t-exp')
+        self.tenant = Tenant.objects.create(name="Tenant", slug="t-exp")
         self.role = Role.objects.create(
             tenant=self.tenant,
-            name='Full Extras Role',
+            name="Full Extras Role",
             permissions=[
-                'extras.view_exporttemplate', 'extras.add_exporttemplate',
-                'extras.change_exporttemplate', 'extras.delete_exporttemplate',
+                "extras.view_exporttemplate",
+                "extras.add_exporttemplate",
+                "extras.change_exporttemplate",
+                "extras.delete_exporttemplate",
             ],
         )
-        self.member = User.objects.create_user(username='member', password='pw')
+        self.member = User.objects.create_user(username="member", password="pw")
         grant(self.member, self.tenant, self.role)
-        self.superuser = User.objects.create_superuser(
-            username='root', email='root@example.com', password='pw'
-        )
+        self.superuser = User.objects.create_superuser(username="root", email="root@example.com", password="pw")
         ct = ContentType.objects.get_for_model(Asset)
-        self.template = ExportTemplate.objects.create(
-            name='Asset CSV', content_type=ct, template_code='{{ obj.name }}'
-        )
+        self.template = ExportTemplate.objects.create(name="Asset CSV", content_type=ct, template_code="{{ obj.name }}")
 
     def _login(self, user):
         self.client.force_login(user)
         session = self.client.session
-        session['active_tenant_id'] = self.tenant.pk
+        session["active_tenant_id"] = self.tenant.pk
         session.save()
 
     def test_member_cannot_edit_export_template(self):
         self._login(self.member)
-        url = reverse('extras:exporttemplate_update', kwargs={'pk': self.template.pk})
+        url = reverse("extras:exporttemplate_update", kwargs={"pk": self.template.pk})
         self.assertEqual(self.client.get(url).status_code, 403)
 
     def test_member_cannot_create_export_template(self):
         self._login(self.member)
-        self.assertEqual(self.client.get(reverse('extras:exporttemplate_create')).status_code, 403)
+        self.assertEqual(self.client.get(reverse("extras:exporttemplate_create")).status_code, 403)
 
     def test_member_cannot_delete_export_template(self):
         self._login(self.member)
-        url = reverse('extras:exporttemplate_delete', kwargs={'pk': self.template.pk})
+        url = reverse("extras:exporttemplate_delete", kwargs={"pk": self.template.pk})
         self.assertEqual(self.client.get(url).status_code, 403)
         self.assertEqual(self.client.post(url).status_code, 403)
         self.assertTrue(ExportTemplate.objects.filter(pk=self.template.pk).exists())
 
     def test_superuser_can_edit_export_template(self):
         self._login(self.superuser)
-        url = reverse('extras:exporttemplate_update', kwargs={'pk': self.template.pk})
+        url = reverse("extras:exporttemplate_update", kwargs={"pk": self.template.pk})
         self.assertEqual(self.client.get(url).status_code, 200)

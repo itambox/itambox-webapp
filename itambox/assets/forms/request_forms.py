@@ -2,175 +2,195 @@ from django import forms
 from django.core.exceptions import ValidationError
 from django.utils.translation import gettext_lazy as _
 
-from assets.models import Asset, AssetType, AssetRequest
+from assets.models import Asset, AssetRequest, AssetType
 
 
 class AssetRequestForm(forms.ModelForm):
     CATEGORY_CHOICES = [
-        ('asset_type', 'Asset Type (General Model)'),
-        ('asset', 'Specific Asset (by Tag)'),
-        ('component', 'Component'),
-        ('accessory', 'Accessory'),
-        ('consumable', 'Consumable'),
+        ("asset_type", "Asset Type (General Model)"),
+        ("asset", "Specific Asset (by Tag)"),
+        ("component", "Component"),
+        ("accessory", "Accessory"),
+        ("consumable", "Consumable"),
     ]
     request_category = forms.ChoiceField(
         choices=CATEGORY_CHOICES,
-        widget=forms.Select(attrs={'class': 'form-select', 'id': 'id_request_category'}),
+        widget=forms.Select(attrs={"class": "form-select", "id": "id_request_category"}),
         label=_("Request Category"),
         required=False,
-        initial='asset_type'
+        initial="asset_type",
     )
 
     TARGET_CHOICES = [
-        ('', 'Myself'),
-        ('assetholder', 'Asset Holder'),
-        ('location', 'Location'),
-        ('asset', 'Asset'),
+        ("", "Myself"),
+        ("assetholder", "Asset Holder"),
+        ("location", "Location"),
+        ("asset", "Asset"),
     ]
 
     target_type = forms.ChoiceField(
         choices=TARGET_CHOICES,
         required=False,
-        widget=forms.Select(attrs={'class': 'form-select'}),
-        label=_("Request For")
+        widget=forms.Select(attrs={"class": "form-select"}),
+        label=_("Request For"),
     )
 
     class Meta:
         model = AssetRequest
-        fields = ['request_category', 'asset_type', 'asset', 'component', 'accessory', 'consumable', 'qty', 'target_type', 'assigned_user', 'assigned_location', 'assigned_asset', 'notes']
+        fields = [
+            "request_category",
+            "asset_type",
+            "asset",
+            "component",
+            "accessory",
+            "consumable",
+            "qty",
+            "target_type",
+            "assigned_user",
+            "assigned_location",
+            "assigned_asset",
+            "notes",
+        ]
         widgets = {
-            'asset_type': forms.Select(attrs={'class': 'form-select', 'data-tom-select': ''}),
-            'asset': forms.Select(attrs={'class': 'form-select', 'data-tom-select': ''}),
-            'component': forms.Select(attrs={'class': 'form-select', 'data-tom-select': ''}),
-            'accessory': forms.Select(attrs={'class': 'form-select', 'data-tom-select': ''}),
-            'consumable': forms.Select(attrs={'class': 'form-select', 'data-tom-select': ''}),
-            'qty': forms.NumberInput(attrs={'class': 'form-control', 'min': 1}),
-            'assigned_user': forms.Select(attrs={'class': 'form-select', 'data-tom-select': ''}),
-            'assigned_location': forms.Select(attrs={'class': 'form-select', 'data-tom-select': ''}),
-            'assigned_asset': forms.Select(attrs={'class': 'form-select', 'data-tom-select': ''}),
-            'notes': forms.Textarea(attrs={'class': 'form-control', 'rows': 3}),
+            "asset_type": forms.Select(attrs={"class": "form-select", "data-tom-select": ""}),
+            "asset": forms.Select(attrs={"class": "form-select", "data-tom-select": ""}),
+            "component": forms.Select(attrs={"class": "form-select", "data-tom-select": ""}),
+            "accessory": forms.Select(attrs={"class": "form-select", "data-tom-select": ""}),
+            "consumable": forms.Select(attrs={"class": "form-select", "data-tom-select": ""}),
+            "qty": forms.NumberInput(attrs={"class": "form-control", "min": 1}),
+            "assigned_user": forms.Select(attrs={"class": "form-select", "data-tom-select": ""}),
+            "assigned_location": forms.Select(attrs={"class": "form-select", "data-tom-select": ""}),
+            "assigned_asset": forms.Select(attrs={"class": "form-select", "data-tom-select": ""}),
+            "notes": forms.Textarea(attrs={"class": "form-control", "rows": 3}),
         }
 
     def __init__(self, *args, **kwargs):
-        from django.db.models import Q
-        from core.managers import get_current_tenant
         from crispy_forms.helper import FormHelper
-        from crispy_forms.layout import Layout, Submit, HTML
-        from organization.models import Location, AssetHolder
-        from inventory.models import Component, Accessory, Consumable
+        from crispy_forms.layout import HTML, Layout, Submit
+        from django.db.models import Q
 
-        self.request = kwargs.pop('request', None)
+        from core.managers import get_current_tenant
+        from inventory.models import Accessory, Component, Consumable
+        from organization.models import AssetHolder, Location
+
+        self.request = kwargs.pop("request", None)
         super().__init__(*args, **kwargs)
 
-        self.fields['qty'].required = False
-        self.fields['qty'].initial = 1
+        self.fields["qty"].required = False
+        self.fields["qty"].initial = 1
 
         user = self.request.user if self.request else None
-        can_delegate = (user.is_staff or user.has_perm('assets.add_delegated_assetrequest')) if user else False
+        can_delegate = (user.is_staff or user.has_perm("assets.add_delegated_assetrequest")) if user else False
 
         tenant = get_current_tenant()
 
         # Only allow requestable objects
-        self.fields['asset_type'].queryset = AssetType.objects.filter(requestable=True)
+        self.fields["asset_type"].queryset = AssetType.objects.filter(requestable=True)
         # Only allow requestable and deployable assets
-        self.fields['asset'].queryset = Asset.objects.filter(
-            Q(requestable=True) | Q(requestable__isnull=True, asset_type__requestable=True),
-            status__type='deployable'
+        self.fields["asset"].queryset = Asset.objects.filter(
+            Q(requestable=True) | Q(requestable__isnull=True, asset_type__requestable=True), status__type="deployable"
         )
-        self.fields['component'].queryset = Component.objects.all().order_by('name')
-        self.fields['accessory'].queryset = Accessory.objects.all().order_by('name')
-        self.fields['consumable'].queryset = Consumable.objects.all().order_by('name')
+        self.fields["component"].queryset = Component.objects.all().order_by("name")
+        self.fields["accessory"].queryset = Accessory.objects.all().order_by("name")
+        self.fields["consumable"].queryset = Consumable.objects.all().order_by("name")
 
         if tenant:
-            self.fields['asset'].queryset = self.fields['asset'].queryset.filter(tenant=tenant)
-            self.fields['component'].queryset = self.fields['component'].queryset.filter(tenant=tenant)
-            self.fields['accessory'].queryset = self.fields['accessory'].queryset.filter(tenant=tenant)
-            self.fields['consumable'].queryset = self.fields['consumable'].queryset.filter(tenant=tenant)
-            self.fields['assigned_user'].queryset = AssetHolder.objects.filter(tenant=tenant).order_by('last_name', 'first_name')
-            self.fields['assigned_location'].queryset = Location.objects.filter(tenant=tenant).select_related('site').order_by('site__name', 'name')
-            self.fields['assigned_asset'].queryset = Asset.objects.filter(tenant=tenant).order_by('name')
+            self.fields["asset"].queryset = self.fields["asset"].queryset.filter(tenant=tenant)
+            self.fields["component"].queryset = self.fields["component"].queryset.filter(tenant=tenant)
+            self.fields["accessory"].queryset = self.fields["accessory"].queryset.filter(tenant=tenant)
+            self.fields["consumable"].queryset = self.fields["consumable"].queryset.filter(tenant=tenant)
+            self.fields["assigned_user"].queryset = AssetHolder.objects.filter(tenant=tenant).order_by(
+                "last_name", "first_name"
+            )
+            self.fields["assigned_location"].queryset = (
+                Location.objects.filter(tenant=tenant).select_related("site").order_by("site__name", "name")
+            )
+            self.fields["assigned_asset"].queryset = Asset.objects.filter(tenant=tenant).order_by("name")
         else:
-            self.fields['assigned_user'].queryset = AssetHolder.objects.all().order_by('last_name', 'first_name')
-            self.fields['assigned_location'].queryset = Location.objects.all().select_related('site').order_by('site__name', 'name')
-            self.fields['assigned_asset'].queryset = Asset.objects.all().order_by('name')
+            self.fields["assigned_user"].queryset = AssetHolder.objects.all().order_by("last_name", "first_name")
+            self.fields["assigned_location"].queryset = (
+                Location.objects.all().select_related("site").order_by("site__name", "name")
+            )
+            self.fields["assigned_asset"].queryset = Asset.objects.all().order_by("name")
 
         # Set initial value for request_category and target_type if instance exists
         if self.instance and self.instance.pk:
             if self.instance.asset:
-                self.fields['request_category'].initial = 'asset'
+                self.fields["request_category"].initial = "asset"
             elif self.instance.component:
-                self.fields['request_category'].initial = 'component'
+                self.fields["request_category"].initial = "component"
             elif self.instance.accessory:
-                self.fields['request_category'].initial = 'accessory'
+                self.fields["request_category"].initial = "accessory"
             elif self.instance.consumable:
-                self.fields['request_category'].initial = 'consumable'
+                self.fields["request_category"].initial = "consumable"
             else:
-                self.fields['request_category'].initial = 'asset_type'
+                self.fields["request_category"].initial = "asset_type"
 
             if self.instance.assigned_user:
-                self.fields['target_type'].initial = 'assetholder'
+                self.fields["target_type"].initial = "assetholder"
             elif self.instance.assigned_location:
-                self.fields['target_type'].initial = 'location'
+                self.fields["target_type"].initial = "location"
             elif self.instance.assigned_asset:
-                self.fields['target_type'].initial = 'asset'
+                self.fields["target_type"].initial = "asset"
             else:
-                self.fields['target_type'].initial = ''
+                self.fields["target_type"].initial = ""
 
         if not can_delegate:
-            self.fields['target_type'].choices = [('', 'Myself')]
-            self.fields['target_type'].widget = forms.HiddenInput()
-            self.fields['assigned_user'].widget = forms.HiddenInput()
-            self.fields['assigned_location'].widget = forms.HiddenInput()
-            self.fields['assigned_asset'].widget = forms.HiddenInput()
+            self.fields["target_type"].choices = [("", "Myself")]
+            self.fields["target_type"].widget = forms.HiddenInput()
+            self.fields["assigned_user"].widget = forms.HiddenInput()
+            self.fields["assigned_location"].widget = forms.HiddenInput()
+            self.fields["assigned_asset"].widget = forms.HiddenInput()
 
         self.helper = FormHelper(self)
-        self.helper.form_method = 'post'
+        self.helper.form_method = "post"
         self.helper.form_tag = True
-        
-        cancel_url = '#'
+
+        cancel_url = "#"
         if self.instance and self.instance.pk:
             cancel_url = self.instance.get_absolute_url()
         else:
             from django.urls import reverse
-            cancel_url = reverse('assets:assetrequest_list')
 
-        button_text = _('Update') if self.instance and self.instance.pk else _('Create')
-        
+            cancel_url = reverse("assets:assetrequest_list")
+
+        button_text = _("Update") if self.instance and self.instance.pk else _("Create")
+
         self.helper.layout = Layout(
-            'request_category',
-            'asset_type',
-            'asset',
-            'component',
-            'accessory',
-            'consumable',
-            'qty',
-            'target_type',
-            'assigned_user',
-            'assigned_location',
-            'assigned_asset',
-            'notes',
+            "request_category",
+            "asset_type",
+            "asset",
+            "component",
+            "accessory",
+            "consumable",
+            "qty",
+            "target_type",
+            "assigned_user",
+            "assigned_location",
+            "assigned_asset",
+            "notes",
             HTML('<div class="mt-4"></div>'),
-            Submit('submit', button_text, css_class='btn btn-primary'),
-            HTML(f'<a href="{cancel_url}" class="btn btn-outline-secondary ms-2">Cancel</a>')
+            Submit("submit", button_text, css_class="btn btn-primary"),
+            HTML(f'<a href="{cancel_url}" class="btn btn-outline-secondary ms-2">Cancel</a>'),
         )
 
     def clean(self):
         cleaned_data = super().clean()
-        asset_type = cleaned_data.get('asset_type')
-        asset = cleaned_data.get('asset')
-        target_type = cleaned_data.get('target_type')
-        assigned_user = cleaned_data.get('assigned_user')
-        assigned_location = cleaned_data.get('assigned_location')
-        assigned_asset = cleaned_data.get('assigned_asset')
+        asset_type = cleaned_data.get("asset_type")
+        asset = cleaned_data.get("asset")
+        target_type = cleaned_data.get("target_type")
+        assigned_user = cleaned_data.get("assigned_user")
+        assigned_location = cleaned_data.get("assigned_location")
+        assigned_asset = cleaned_data.get("assigned_asset")
 
-        component = cleaned_data.get('component')
-        accessory = cleaned_data.get('accessory')
-        consumable = cleaned_data.get('consumable')
-        qty = cleaned_data.get('qty')
+        component = cleaned_data.get("component")
+        accessory = cleaned_data.get("accessory")
+        consumable = cleaned_data.get("consumable")
+        qty = cleaned_data.get("qty")
 
         user = self.request.user if self.request else None
-        can_delegate = (user.is_staff or user.has_perm('assets.add_delegated_assetrequest')) if user else False
-        
+        can_delegate = (user.is_staff or user.has_perm("assets.add_delegated_assetrequest")) if user else False
+
         if user and not self.instance.requester_id:
             self.instance.requester = user
 
@@ -185,13 +205,17 @@ class AssetRequestForm(forms.ModelForm):
             categories_filled.append("consumable")
 
         if len(categories_filled) == 0:
-            raise ValidationError(_("You must specify what item you are requesting (Asset, Asset Type, Component, Accessory, or Consumable)."))
+            raise ValidationError(
+                _(
+                    "You must specify what item you are requesting (Asset, Asset Type, Component, Accessory, or Consumable)."
+                )
+            )
         if len(categories_filled) > 1:
             raise ValidationError(_("You cannot request more than one type of item in a single request."))
 
         if qty is None:
             qty = 1
-            cleaned_data['qty'] = 1
+            cleaned_data["qty"] = 1
         elif qty <= 0:
             raise ValidationError({"qty": _("Requested quantity must be greater than zero.")})
 
@@ -199,31 +223,31 @@ class AssetRequestForm(forms.ModelForm):
             raise ValidationError({"asset": _("Selected asset does not match the chosen asset type.")})
 
         # Process target selections based on target_type
-        if target_type == 'assetholder':
+        if target_type == "assetholder":
             if not can_delegate:
                 raise ValidationError(_("You do not have permission to request assets on behalf of others."))
             if not assigned_user:
                 raise ValidationError({"assigned_user": _("Please select an Asset Holder target.")})
-            cleaned_data['assigned_location'] = None
-            cleaned_data['assigned_asset'] = None
-        elif target_type == 'location':
+            cleaned_data["assigned_location"] = None
+            cleaned_data["assigned_asset"] = None
+        elif target_type == "location":
             if not can_delegate:
                 raise ValidationError(_("You do not have permission to request assets on behalf of others."))
             if not assigned_location:
                 raise ValidationError({"assigned_location": _("Please select a Location target.")})
-            cleaned_data['assigned_user'] = None
-            cleaned_data['assigned_asset'] = None
-        elif target_type == 'asset':
+            cleaned_data["assigned_user"] = None
+            cleaned_data["assigned_asset"] = None
+        elif target_type == "asset":
             if not can_delegate:
                 raise ValidationError(_("You do not have permission to request assets on behalf of others."))
             if not assigned_asset:
                 raise ValidationError({"assigned_asset": _("Please select a Parent Asset target.")})
-            cleaned_data['assigned_user'] = None
-            cleaned_data['assigned_location'] = None
-        else: # target_type == '' (Myself)
-            cleaned_data['assigned_user'] = None
-            cleaned_data['assigned_location'] = None
-            cleaned_data['assigned_asset'] = None
+            cleaned_data["assigned_user"] = None
+            cleaned_data["assigned_location"] = None
+        else:  # target_type == '' (Myself)
+            cleaned_data["assigned_user"] = None
+            cleaned_data["assigned_location"] = None
+            cleaned_data["assigned_asset"] = None
 
         return cleaned_data
 
@@ -232,180 +256,170 @@ class AssetRequestActionForm(forms.Form):
     allocated_asset = forms.ModelChoiceField(
         queryset=Asset.objects.none(),
         required=False,
-        widget=forms.Select(attrs={'class': 'form-select', 'data-tom-select': ''}),
-        label=_("Allocate Specific Asset")
+        widget=forms.Select(attrs={"class": "form-select", "data-tom-select": ""}),
+        label=_("Allocate Specific Asset"),
     )
     allocated_location = forms.ModelChoiceField(
         queryset=Asset.objects.none(),  # Populated dynamically in __init__
         required=False,
-        widget=forms.Select(attrs={'class': 'form-select', 'data-tom-select': ''}),
-        label=_("Stock Location")
+        widget=forms.Select(attrs={"class": "form-select", "data-tom-select": ""}),
+        label=_("Stock Location"),
     )
     qty = forms.IntegerField(
         required=False,
-        widget=forms.NumberInput(attrs={'class': 'form-control', 'min': 1}),
-        label=_("Approved Quantity")
+        widget=forms.NumberInput(attrs={"class": "form-control", "min": 1}),
+        label=_("Approved Quantity"),
     )
     response_notes = forms.CharField(
-        widget=forms.Textarea(attrs={'rows': 3, 'class': 'form-control'}),
+        widget=forms.Textarea(attrs={"rows": 3, "class": "form-control"}),
         required=False,
-        label=_("Response/Decision Notes")
+        label=_("Response/Decision Notes"),
     )
 
     def __init__(self, *args, **kwargs):
         from django.db.models import Q
-        from organization.models import Location
+
         from core.managers import get_current_tenant
-        
-        self.request_instance = kwargs.pop('request_instance', None)
-        kwargs.pop('instance', None)
+        from organization.models import Location
+
+        self.request_instance = kwargs.pop("request_instance", None)
+        kwargs.pop("instance", None)
         super().__init__(*args, **kwargs)
-        
+
         tenant = get_current_tenant()
-        
+
         # Populate allocated_location
         loc_qs = Location.objects.filter(status=Location.STATUS_ACTIVE)
         if tenant:
             loc_qs = loc_qs.filter(tenant=tenant)
-        self.fields['allocated_location'].queryset = loc_qs.select_related('site').order_by('site__name', 'name')
+        self.fields["allocated_location"].queryset = loc_qs.select_related("site").order_by("site__name", "name")
 
         if self.request_instance:
             target_type = self.request_instance.asset_type
             # Populate allocated_asset
-            asset_qs = Asset.objects.filter(status__type='deployable')
+            asset_qs = Asset.objects.filter(status__type="deployable")
             if tenant:
                 asset_qs = asset_qs.filter(tenant=tenant)
-            
+
             if target_type:
-                self.fields['allocated_asset'].queryset = asset_qs.filter(
+                self.fields["allocated_asset"].queryset = asset_qs.filter(
                     Q(requestable=True) | Q(requestable__isnull=True, asset_type__requestable=True),
-                    asset_type=target_type
+                    asset_type=target_type,
                 )
             else:
-                self.fields['allocated_asset'].queryset = asset_qs.filter(
+                self.fields["allocated_asset"].queryset = asset_qs.filter(
                     Q(requestable=True) | Q(requestable__isnull=True, asset_type__requestable=True)
                 )
-                
+
             # Pre-populate qty
             if self.request_instance.qty:
-                self.fields['qty'].initial = self.request_instance.qty
+                self.fields["qty"].initial = self.request_instance.qty
 
     def clean(self):
         cleaned_data = super().clean()
-        qty = cleaned_data.get('qty')
-        allocated_location = cleaned_data.get('allocated_location')
-        allocated_asset = cleaned_data.get('allocated_asset')
+        qty = cleaned_data.get("qty")
+        allocated_location = cleaned_data.get("allocated_location")
+        allocated_asset = cleaned_data.get("allocated_asset")
 
         if self.request_instance:
             is_inventory = (
-                self.request_instance.component_id is not None or 
-                self.request_instance.accessory_id is not None or 
-                self.request_instance.consumable_id is not None
+                self.request_instance.component_id is not None
+                or self.request_instance.accessory_id is not None
+                or self.request_instance.consumable_id is not None
             )
-            
+
             # 1. Action form validation: requires stock location for inventory items
             if is_inventory and not allocated_location:
-                raise ValidationError({'allocated_location': _("Stock location is required for inventory items.")})
-                
+                raise ValidationError({"allocated_location": _("Stock location is required for inventory items.")})
+
             # 2. Action form validation: approved qty cannot exceed requested qty
             if qty is not None:
                 if qty <= 0:
-                    raise ValidationError({'qty': _("Quantity must be greater than zero.")})
+                    raise ValidationError({"qty": _("Quantity must be greater than zero.")})
                 if qty > self.request_instance.qty:
-                    raise ValidationError({'qty': _("Approved quantity cannot exceed requested quantity.")})
-                    
+                    raise ValidationError({"qty": _("Approved quantity cannot exceed requested quantity.")})
+
         return cleaned_data
 
 
 class AssetRequestResponseForm(forms.ModelForm):
     class Meta:
         model = AssetRequest
-        fields = ['status', 'response_notes']
+        fields = ["status", "response_notes"]
         widgets = {
-            'status': forms.Select(attrs={'class': 'form-select'}),
-            'response_notes': forms.Textarea(attrs={'class': 'form-control', 'rows': 3}),
+            "status": forms.Select(attrs={"class": "form-select"}),
+            "response_notes": forms.Textarea(attrs={"class": "form-control", "rows": 3}),
         }
 
 
 class AssetReceiveForm(forms.Form):
     request_id = forms.IntegerField(widget=forms.HiddenInput())
-    asset_tag = forms.CharField(
-        max_length=50,
-        widget=forms.TextInput(attrs={'class': 'form-control'})
-    )
-    serial_number = forms.CharField(
-        max_length=100,
-        widget=forms.TextInput(attrs={'class': 'form-control'})
-    )
-    name = forms.CharField(
-        max_length=255,
-        widget=forms.TextInput(attrs={'class': 'form-control'})
-    )
+    asset_tag = forms.CharField(max_length=50, widget=forms.TextInput(attrs={"class": "form-control"}))
+    serial_number = forms.CharField(max_length=100, widget=forms.TextInput(attrs={"class": "form-control"}))
+    name = forms.CharField(max_length=255, widget=forms.TextInput(attrs={"class": "form-control"}))
     status = forms.ModelChoiceField(
-        queryset=Asset.objects.none(),
-        widget=forms.Select(attrs={'class': 'form-select', 'data-tom-select': ''})
+        queryset=Asset.objects.none(), widget=forms.Select(attrs={"class": "form-select", "data-tom-select": ""})
     )
     location = forms.ModelChoiceField(
         queryset=Asset.objects.none(),
         required=False,
-        widget=forms.Select(attrs={'class': 'form-select', 'data-tom-select': ''})
+        widget=forms.Select(attrs={"class": "form-select", "data-tom-select": ""}),
     )
     supplier = forms.ModelChoiceField(
         queryset=Asset.objects.none(),
         required=False,
-        widget=forms.Select(attrs={'class': 'form-select', 'data-tom-select': ''})
+        widget=forms.Select(attrs={"class": "form-select", "data-tom-select": ""}),
     )
     order_number = forms.CharField(
-        max_length=100,
-        required=False,
-        widget=forms.TextInput(attrs={'class': 'form-control'})
+        max_length=100, required=False, widget=forms.TextInput(attrs={"class": "form-control"})
     )
     purchase_cost = forms.DecimalField(
         max_digits=10,
         decimal_places=2,
         required=False,
-        widget=forms.NumberInput(attrs={'class': 'form-control', 'step': '0.01', 'min': '0.00'})
+        widget=forms.NumberInput(attrs={"class": "form-control", "step": "0.01", "min": "0.00"}),
     )
     purchase_date = forms.DateField(
-        required=False,
-        widget=forms.DateInput(attrs={'class': 'form-control', 'type': 'date'})
+        required=False, widget=forms.DateInput(attrs={"class": "form-control", "type": "date"})
     )
 
     def __init__(self, *args, **kwargs):
         from assets.models import StatusLabel, Supplier
-        from organization.models import Location
         from core.managers import get_current_tenant
-        
+        from organization.models import Location
+
         super().__init__(*args, **kwargs)
-        
+
         tenant = get_current_tenant()
-        
+
         # Populate Status Labels
-        self.fields['status'].queryset = StatusLabel.objects.all().order_by('name')
-        
+        self.fields["status"].queryset = StatusLabel.objects.all().order_by("name")
+
         # Populate Locations active for tenant
         loc_qs = Location.objects.filter(status=Location.STATUS_ACTIVE)
         if tenant:
             loc_qs = loc_qs.filter(tenant=tenant)
-        self.fields['location'].queryset = loc_qs.select_related('site').order_by('site__name', 'name')
+        self.fields["location"].queryset = loc_qs.select_related("site").order_by("site__name", "name")
 
         # Populate Suppliers
-        self.fields['supplier'].queryset = Supplier.objects.all().order_by('name')
+        self.fields["supplier"].queryset = Supplier.objects.all().order_by("name")
 
     def clean_asset_tag(self):
-        asset_tag = self.cleaned_data.get('asset_tag', '').strip()
+        asset_tag = self.cleaned_data.get("asset_tag", "").strip()
         if not asset_tag:
             raise ValidationError(_("Asset tag is required."))
         from assets.models import Asset
+
         if Asset.objects.filter(asset_tag=asset_tag).exists():
             raise ValidationError(_("Asset with this tag already exists."))
         return asset_tag
 
     def clean_serial_number(self):
-        serial_number = self.cleaned_data.get('serial_number', '').strip()
+        serial_number = self.cleaned_data.get("serial_number", "").strip()
         if not serial_number:
             raise ValidationError(_("Serial number is required."))
         from assets.models import Asset
+
         if Asset.objects.filter(serial_number=serial_number).exists():
             raise ValidationError(_("Asset with this serial number already exists."))
         return serial_number
@@ -418,26 +432,25 @@ class BaseAssetReceiveFormSet(forms.BaseFormSet):
 
         tags = set()
         serials = set()
-        
+
         for form in self.forms:
             if self.is_bound and not form.is_valid():
                 continue
-            
-            tag = form.cleaned_data.get('asset_tag')
-            serial = form.cleaned_data.get('serial_number')
-            
+
+            tag = form.cleaned_data.get("asset_tag")
+            serial = form.cleaned_data.get("serial_number")
+
             if tag:
                 if tag in tags:
-                    form.add_error('asset_tag', "Duplicate asset tag in this batch.")
+                    form.add_error("asset_tag", "Duplicate asset tag in this batch.")
                 tags.add(tag)
-                
+
             if serial:
                 if serial in serials:
-                    form.add_error('serial_number', "Duplicate serial number in this batch.")
+                    form.add_error("serial_number", "Duplicate serial number in this batch.")
                 serials.add(serial)
 
 
 from django.forms import formset_factory
+
 AssetReceiveFormSet = formset_factory(AssetReceiveForm, formset=BaseAssetReceiveFormSet, extra=0)
-
-

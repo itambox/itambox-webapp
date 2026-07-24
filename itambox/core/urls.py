@@ -14,176 +14,266 @@ Including another URLconf
     1. Import the include() function: from django.urls import include, path
     2. Add a URL to urlpatterns:  path('blog/', include('blog.urls'))
 """
-from django.contrib import admin
-from django.urls import path, include
-from django.views.generic import TemplateView, RedirectView
-from django.views.decorators.cache import never_cache
-from django.views.i18n import JavaScriptCatalog
-from assets import views as asset_views # Import the assets views
-from extras.dashboard import views as dashboard_views
-from itambox.views.generic import (
-    ObjectBulkDeleteView, ObjectBulkEditView, table_config,
-    GenericObjectImportView, ObjectRestoreView, ObjectPurgeView,
-    ObjectBulkRestoreView, ObjectBulkPurgeView,
-)
-from core.views.graphql import PrivateGraphQLView
-from core.schema import schema
-from itambox.views.features import (
-    ObjectChangeListView, ObjectChangeView, ObjectExportView,
-    ImageAttachmentUploadView, ImageAttachmentDeleteView,
-    FileAttachmentUploadView, FileAttachmentDeleteView, JournalEntryCreateView,
-    JournalEntryListView,
-    LabelSelectView, LabelPrintView,
-    FileAttachmentDownloadView, ImageAttachmentServeView,
-)
-from itambox.views.utility import SearchView, health # Import core views, aliased to avoid clash
-from assets.views_scan import ScanResolveView
-from itambox.views.jobs import JobListView, JobDetailView, JobCancelView
-from django.conf import settings # Import settings
-from django.conf.urls.static import static # Import static
+
 import mimetypes
-mimetypes.add_type('application/zip', '.zip')
+
+from django.conf import settings  # Import settings
+from django.conf.urls.static import static  # Import static
+from django.contrib import admin
+from django.urls import include, path
+from django.views.decorators.cache import never_cache
+from django.views.generic import RedirectView, TemplateView
+from django.views.i18n import JavaScriptCatalog
+
+from assets import views as asset_views  # Import the assets views
+from assets.views_scan import ScanResolveView
+from core.schema import schema
+from core.views.graphql import PrivateGraphQLView
+from extras.dashboard import views as dashboard_views
+from itambox.views.features import (
+    FileAttachmentDeleteView,
+    FileAttachmentDownloadView,
+    FileAttachmentUploadView,
+    ImageAttachmentDeleteView,
+    ImageAttachmentServeView,
+    ImageAttachmentUploadView,
+    JournalEntryCreateView,
+    JournalEntryListView,
+    LabelPrintView,
+    LabelSelectView,
+    ObjectChangeListView,
+    ObjectChangeView,
+    ObjectExportView,
+)
+from itambox.views.generic import (
+    GenericObjectImportView,
+    ObjectBulkDeleteView,
+    ObjectBulkEditView,
+    ObjectBulkPurgeView,
+    ObjectBulkRestoreView,
+    ObjectPurgeView,
+    ObjectRestoreView,
+    table_config,
+)
+from itambox.views.jobs import JobCancelView, JobDetailView, JobListView
+from itambox.views.utility import SearchView, health  # Import core views, aliased to avoid clash
+
+mimetypes.add_type("application/zip", ".zip")
 
 from core.auth.oidc import TenantOIDCAuthorizeView, TenantOIDCCallbackView
 from core.views.mfa import MFASetupView
-
 
 # Main URL Patterns
 urlpatterns = [
     # PWA Routes
     path(
-        'manifest.json',
-        never_cache(TemplateView.as_view(template_name='manifest.json', content_type='application/json')),
-        name='manifest.json',
+        "manifest.json",
+        never_cache(TemplateView.as_view(template_name="manifest.json", content_type="application/json")),
+        name="manifest.json",
     ),
     path(
-        'service-worker.js',
-        never_cache(TemplateView.as_view(template_name='service-worker.js', content_type='application/javascript')),
-        name='service-worker.js',
+        "service-worker.js",
+        never_cache(TemplateView.as_view(template_name="service-worker.js", content_type="application/javascript")),
+        name="service-worker.js",
     ),
-    path('offline/', TemplateView.as_view(template_name='offline.html'), name='offline'),
-
-    path('admin/', admin.site.urls),
-    path('accounts/', include('django.contrib.auth.urls')),
+    path("offline/", TemplateView.as_view(template_name="offline.html"), name="offline"),
+    path("admin/", admin.site.urls),
+    path("accounts/", include("django.contrib.auth.urls")),
     # MFA gate (TOTP) for local-password logins; the OTP middleware redirects here.
-    path('accounts/mfa/', MFASetupView.as_view(), name='mfa_setup'),
-    path('', dashboard_views.DashboardView.as_view(), name='dashboard'),  # Root dashboard (extras owns dashboards)
-
+    path("accounts/mfa/", MFASetupView.as_view(), name="mfa_setup"),
+    path("", dashboard_views.DashboardView.as_view(), name="dashboard"),  # Root dashboard (extras owns dashboards)
     # Search Path
-    path('search/', SearchView.as_view(), name='search'),
-
+    path("search/", SearchView.as_view(), name="search"),
     # Global scan-to-find (resolves a barcode/QR code to an asset URL)
-    path('scan/resolve/', ScanResolveView.as_view(), name='scan_resolve'),
-
+    path("scan/resolve/", ScanResolveView.as_view(), name="scan_resolve"),
     # UI Paths
-    path('assets/', include('assets.urls', namespace='assets')),
-    path('components/', include(([
-        path('', RedirectView.as_view(url='/inventory/inventory/?type=components', permanent=True), name='component_list'),
-        path('add/', RedirectView.as_view(url='/inventory/components/add/', permanent=True), name='component_create'),
-        path('<int:pk>/', RedirectView.as_view(url='/inventory/components/%(pk)d/', permanent=True), name='component_detail'),
-        path('<int:pk>/edit/', RedirectView.as_view(url='/inventory/components/%(pk)d/edit/', permanent=True), name='component_update'),
-        path('<int:pk>/delete/', RedirectView.as_view(url='/inventory/components/%(pk)d/delete/', permanent=True), name='component_delete'),
-        path('<int:pk>/clone/', RedirectView.as_view(url='/inventory/components/%(pk)d/clone/', permanent=True), name='component_clone'),
-        path('<int:pk>/add-stock/', RedirectView.as_view(url='/inventory/components/%(pk)d/add-stock/', permanent=True), name='component_add_stock'),
-        path('stocks/', RedirectView.as_view(url='/inventory/component-stocks/', permanent=True), name='componentstock_list'),
-        path('stocks/add/', RedirectView.as_view(url='/inventory/component-stocks/add/', permanent=True), name='componentstock_create'),
-        path('stocks/<int:pk>/edit/', RedirectView.as_view(url='/inventory/component-stocks/%(pk)d/edit/', permanent=True), name='componentstock_update'),
-        path('stocks/<int:pk>/delete/', RedirectView.as_view(url='/inventory/component-stocks/%(pk)d/delete/', permanent=True), name='componentstock_delete'),
-        path('stocks/<int:pk>/adjust/', RedirectView.as_view(url='/inventory/component-stocks/%(pk)d/adjust/', permanent=True), name='componentstock_adjust'),
-        path('allocations/', RedirectView.as_view(url='/inventory/component-allocations/', permanent=True), name='componentallocation_list'),
-        path('allocations/add/', RedirectView.as_view(url='/inventory/component-allocations/add/', permanent=True), name='componentallocation_create'),
-        path('allocations/<int:pk>/edit/', RedirectView.as_view(url='/inventory/component-allocations/%(pk)d/edit/', permanent=True), name='componentallocation_update'),
-        path('allocations/<int:pk>/delete/', RedirectView.as_view(url='/inventory/component-allocations/%(pk)d/delete/', permanent=True), name='componentallocation_delete'),
-    ], 'components'), namespace='components')),
-    path('inventory/', include('inventory.urls', namespace='inventory')),
-    path('compliance/', include('compliance.urls', namespace='compliance')),
-    path('organization/', include('organization.urls', namespace='organization')),
-    path('extras/', include('extras.urls')),
-    path('procurement/', include('procurement.urls', namespace='procurement')),
-    path('software/', include('software.urls', namespace='software')),
-    path('licenses/', include('licenses.urls', namespace='licenses')),
-    path('subscriptions/', include('subscriptions.urls', namespace='subscriptions')),
-    path('tables/config/<str:model_name>/', table_config, name='table_config'),
-    path('user/', include('users.urls')), # Include the users app URLs
-
+    path("assets/", include("assets.urls", namespace="assets")),
+    path(
+        "components/",
+        include(
+            (
+                [
+                    path(
+                        "",
+                        RedirectView.as_view(url="/inventory/inventory/?type=components", permanent=True),
+                        name="component_list",
+                    ),
+                    path(
+                        "add/",
+                        RedirectView.as_view(url="/inventory/components/add/", permanent=True),
+                        name="component_create",
+                    ),
+                    path(
+                        "<int:pk>/",
+                        RedirectView.as_view(url="/inventory/components/%(pk)d/", permanent=True),
+                        name="component_detail",
+                    ),
+                    path(
+                        "<int:pk>/edit/",
+                        RedirectView.as_view(url="/inventory/components/%(pk)d/edit/", permanent=True),
+                        name="component_update",
+                    ),
+                    path(
+                        "<int:pk>/delete/",
+                        RedirectView.as_view(url="/inventory/components/%(pk)d/delete/", permanent=True),
+                        name="component_delete",
+                    ),
+                    path(
+                        "<int:pk>/clone/",
+                        RedirectView.as_view(url="/inventory/components/%(pk)d/clone/", permanent=True),
+                        name="component_clone",
+                    ),
+                    path(
+                        "<int:pk>/add-stock/",
+                        RedirectView.as_view(url="/inventory/components/%(pk)d/add-stock/", permanent=True),
+                        name="component_add_stock",
+                    ),
+                    path(
+                        "stocks/",
+                        RedirectView.as_view(url="/inventory/component-stocks/", permanent=True),
+                        name="componentstock_list",
+                    ),
+                    path(
+                        "stocks/add/",
+                        RedirectView.as_view(url="/inventory/component-stocks/add/", permanent=True),
+                        name="componentstock_create",
+                    ),
+                    path(
+                        "stocks/<int:pk>/edit/",
+                        RedirectView.as_view(url="/inventory/component-stocks/%(pk)d/edit/", permanent=True),
+                        name="componentstock_update",
+                    ),
+                    path(
+                        "stocks/<int:pk>/delete/",
+                        RedirectView.as_view(url="/inventory/component-stocks/%(pk)d/delete/", permanent=True),
+                        name="componentstock_delete",
+                    ),
+                    path(
+                        "stocks/<int:pk>/adjust/",
+                        RedirectView.as_view(url="/inventory/component-stocks/%(pk)d/adjust/", permanent=True),
+                        name="componentstock_adjust",
+                    ),
+                    path(
+                        "allocations/",
+                        RedirectView.as_view(url="/inventory/component-allocations/", permanent=True),
+                        name="componentallocation_list",
+                    ),
+                    path(
+                        "allocations/add/",
+                        RedirectView.as_view(url="/inventory/component-allocations/add/", permanent=True),
+                        name="componentallocation_create",
+                    ),
+                    path(
+                        "allocations/<int:pk>/edit/",
+                        RedirectView.as_view(url="/inventory/component-allocations/%(pk)d/edit/", permanent=True),
+                        name="componentallocation_update",
+                    ),
+                    path(
+                        "allocations/<int:pk>/delete/",
+                        RedirectView.as_view(url="/inventory/component-allocations/%(pk)d/delete/", permanent=True),
+                        name="componentallocation_delete",
+                    ),
+                ],
+                "components",
+            ),
+            namespace="components",
+        ),
+    ),
+    path("inventory/", include("inventory.urls", namespace="inventory")),
+    path("compliance/", include("compliance.urls", namespace="compliance")),
+    path("organization/", include("organization.urls", namespace="organization")),
+    path("extras/", include("extras.urls")),
+    path("procurement/", include("procurement.urls", namespace="procurement")),
+    path("software/", include("software.urls", namespace="software")),
+    path("licenses/", include("licenses.urls", namespace="licenses")),
+    path("subscriptions/", include("subscriptions.urls", namespace="subscriptions")),
+    path("tables/config/<str:model_name>/", table_config, name="table_config"),
+    path("user/", include("users.urls")),  # Include the users app URLs
     # API Paths (prefixed with /api/) - Point directly to the main api.urls
-    path('api/', include('itambox.api.urls', namespace='api')), # Added namespace='api'
-    path('api/plugins/', include('itambox.plugins.urls', namespace='plugins-api')),
-    path('graphql/', PrivateGraphQLView.as_view(schema=schema), name='graphql'),
-
+    path("api/", include("itambox.api.urls", namespace="api")),  # Added namespace='api'
+    path("api/plugins/", include("itambox.plugins.urls", namespace="plugins-api")),
+    path("graphql/", PrivateGraphQLView.as_view(schema=schema), name="graphql"),
     # Path for core app non-API views if any (e.g., User Preferences UI view)
     # path('core/', include('core.urls')), # Example if core had UI views
-
     # Changelog
-    path('changelog/', ObjectChangeListView.as_view(), name='objectchange_list'),
-    path('changelog/<int:pk>/', ObjectChangeView.as_view(), name='objectchange'),
-
+    path("changelog/", ObjectChangeListView.as_view(), name="objectchange_list"),
+    path("changelog/<int:pk>/", ObjectChangeView.as_view(), name="objectchange"),
     # Journal Entries (global activity list)
-    path('journal/', JournalEntryListView.as_view(), name='journalentry_list'),
-
+    path("journal/", JournalEntryListView.as_view(), name="journalentry_list"),
     # Background Jobs & Tasks UI
-    path('jobs/', JobListView.as_view(), name='job_list'),
-    path('jobs/<int:pk>/', JobDetailView.as_view(), name='job_detail'),
-    path('jobs/<int:pk>/cancel/', JobCancelView.as_view(), name='job_cancel'),
-
+    path("jobs/", JobListView.as_view(), name="job_list"),
+    path("jobs/<int:pk>/", JobDetailView.as_view(), name="job_detail"),
+    path("jobs/<int:pk>/cancel/", JobCancelView.as_view(), name="job_cancel"),
     # Bulk Actions
-    path('bulk-delete/', ObjectBulkDeleteView.as_view(), name='bulk_delete'),
-    path('bulk-edit/', ObjectBulkEditView.as_view(), name='bulk_edit'),
-
+    path("bulk-delete/", ObjectBulkDeleteView.as_view(), name="bulk_delete"),
+    path("bulk-edit/", ObjectBulkEditView.as_view(), name="bulk_edit"),
     # Soft Delete Management Actions
-    path('object/<int:content_type_id>/<int:object_id>/restore/', ObjectRestoreView.as_view(), name='object_restore'),
-    path('object/<int:content_type_id>/<int:object_id>/purge/', ObjectPurgeView.as_view(), name='object_purge'),
-    path('object/<int:content_type_id>/bulk-restore/', ObjectBulkRestoreView.as_view(), name='object_bulk_restore'),
-    path('object/<int:content_type_id>/bulk-purge/', ObjectBulkPurgeView.as_view(), name='object_bulk_purge'),
-
+    path("object/<int:content_type_id>/<int:object_id>/restore/", ObjectRestoreView.as_view(), name="object_restore"),
+    path("object/<int:content_type_id>/<int:object_id>/purge/", ObjectPurgeView.as_view(), name="object_purge"),
+    path("object/<int:content_type_id>/bulk-restore/", ObjectBulkRestoreView.as_view(), name="object_bulk_restore"),
+    path("object/<int:content_type_id>/bulk-purge/", ObjectBulkPurgeView.as_view(), name="object_bulk_purge"),
     # Export View
-    path('export/<str:app_label>/<str:model_name>/<int:template_id>/', ObjectExportView.as_view(), name='object_export'),
-
+    path(
+        "export/<str:app_label>/<str:model_name>/<int:template_id>/", ObjectExportView.as_view(), name="object_export"
+    ),
     # Generic Import View
-    path('import/<str:app_label>/<str:model_name>/', GenericObjectImportView.as_view(), name='generic_import'),
-
+    path("import/<str:app_label>/<str:model_name>/", GenericObjectImportView.as_view(), name="generic_import"),
     # i18n
-    path('i18n/', include('django.conf.urls.i18n')),
+    path("i18n/", include("django.conf.urls.i18n")),
     # JS translation catalog (djangojs domain) consumed by static/src/*.ts via gettext()
-    path('jsi18n/', JavaScriptCatalog.as_view(), name='javascript-catalog'),
-
+    path("jsi18n/", JavaScriptCatalog.as_view(), name="javascript-catalog"),
     # SAML SSO
-    path('saml2/', include('djangosaml2.urls')),
-
+    path("saml2/", include("djangosaml2.urls")),
     # OIDC SSO
-    path('oidc/authenticate/', TenantOIDCAuthorizeView.as_view(), name='oidc_authentication_init'),
-    path('oidc/authenticate/<str:tenant_slug>/', TenantOIDCAuthorizeView.as_view(), name='oidc_authentication_init_tenant'),
-    path('oidc/callback/', TenantOIDCCallbackView.as_view(), name='oidc_authentication_callback'),
-
-
+    path("oidc/authenticate/", TenantOIDCAuthorizeView.as_view(), name="oidc_authentication_init"),
+    path(
+        "oidc/authenticate/<str:tenant_slug>/",
+        TenantOIDCAuthorizeView.as_view(),
+        name="oidc_authentication_init_tenant",
+    ),
+    path("oidc/callback/", TenantOIDCCallbackView.as_view(), name="oidc_authentication_callback"),
     # Attachments
-    path('attachments/image/upload/<str:app_label>/<str:model_name>/<int:object_id>/', ImageAttachmentUploadView.as_view(), name='image_attachment_upload'),
-    path('attachments/image/delete/<int:pk>/', ImageAttachmentDeleteView.as_view(), name='image_attachment_delete'),
-    path('attachments/image/<int:pk>/', ImageAttachmentServeView.as_view(), name='image_attachment_serve'),
-    path('attachments/file/upload/<str:app_label>/<str:model_name>/<int:object_id>/', FileAttachmentUploadView.as_view(), name='file_attachment_upload'),
-    path('attachments/file/delete/<int:pk>/', FileAttachmentDeleteView.as_view(), name='file_attachment_delete'),
-    path('attachments/file/<int:pk>/download/', FileAttachmentDownloadView.as_view(), name='file_attachment_download'),
-
+    path(
+        "attachments/image/upload/<str:app_label>/<str:model_name>/<int:object_id>/",
+        ImageAttachmentUploadView.as_view(),
+        name="image_attachment_upload",
+    ),
+    path("attachments/image/delete/<int:pk>/", ImageAttachmentDeleteView.as_view(), name="image_attachment_delete"),
+    path("attachments/image/<int:pk>/", ImageAttachmentServeView.as_view(), name="image_attachment_serve"),
+    path(
+        "attachments/file/upload/<str:app_label>/<str:model_name>/<int:object_id>/",
+        FileAttachmentUploadView.as_view(),
+        name="file_attachment_upload",
+    ),
+    path("attachments/file/delete/<int:pk>/", FileAttachmentDeleteView.as_view(), name="file_attachment_delete"),
+    path("attachments/file/<int:pk>/download/", FileAttachmentDownloadView.as_view(), name="file_attachment_download"),
     # Journal Entries
-    path('journal/add/<str:app_label>/<str:model_name>/<int:object_id>/', JournalEntryCreateView.as_view(), name='journal_entry_add'),
-
+    path(
+        "journal/add/<str:app_label>/<str:model_name>/<int:object_id>/",
+        JournalEntryCreateView.as_view(),
+        name="journal_entry_add",
+    ),
     # Label Printing
-    path('labels/select/<str:app_label>/<str:model_name>/<int:object_id>/', LabelSelectView.as_view(), name='label_select'),
-    path('labels/print/<int:template_id>/<int:object_id>/', LabelPrintView.as_view(), name='label_print'),
-
+    path(
+        "labels/select/<str:app_label>/<str:model_name>/<int:object_id>/",
+        LabelSelectView.as_view(),
+        name="label_select",
+    ),
+    path("labels/print/<int:template_id>/<int:object_id>/", LabelPrintView.as_view(), name="label_print"),
     # Health Check
-    path('health/', health, name='health'),
+    path("health/", health, name="health"),
 ]
 
 # Dynamically register plugin UI URLconfs
-from django.apps import apps
 import importlib
 
+from django.apps import apps
+
 plugin_ui_patterns = []
-for plugin_name in getattr(settings, 'PLUGINS', []):
+for plugin_name in getattr(settings, "PLUGINS", []):
     try:
         plugin_config = apps.get_app_config(plugin_name)
-        base_url = getattr(plugin_config, 'base_url', None) or plugin_name
+        base_url = getattr(plugin_config, "base_url", None) or plugin_name
         try:
             importlib.import_module(f"{plugin_name}.urls")
             plugin_ui_patterns.append(
@@ -195,9 +285,7 @@ for plugin_name in getattr(settings, 'PLUGINS', []):
         pass
 
 if plugin_ui_patterns:
-    urlpatterns.append(
-        path('plugins/', include((plugin_ui_patterns, 'plugins'), namespace='plugins'))
-    )
+    urlpatterns.append(path("plugins/", include((plugin_ui_patterns, "plugins"), namespace="plugins")))
 
 if settings.DEBUG:
     urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
@@ -205,14 +293,15 @@ if settings.DEBUG:
 # Only mount the toolbar when it is actually installed (dev settings). Guarding
 # on DEBUG alone is unsafe: DEBUG can be True under base/prod settings, where
 # debug_toolbar is not in INSTALLED_APPS, which would crash at import time.
-if settings.DEBUG and 'debug_toolbar' in settings.INSTALLED_APPS:
+if settings.DEBUG and "debug_toolbar" in settings.INSTALLED_APPS:
     import debug_toolbar
+
     urlpatterns += [
-        path('__debug__/', include(debug_toolbar.urls)),
+        path("__debug__/", include(debug_toolbar.urls)),
     ]
 
 
 # Custom error handlers — render the branded pages in templates/errors/.
-handler404 = 'itambox.views.errors.handler404'
-handler500 = 'itambox.views.errors.handler500'
-handler403 = 'itambox.views.errors.handler403'
+handler404 = "itambox.views.errors.handler404"
+handler500 = "itambox.views.errors.handler500"
+handler403 = "itambox.views.errors.handler403"

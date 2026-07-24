@@ -1,19 +1,25 @@
 import datetime
-from django.test import TestCase
-from django.core.exceptions import ValidationError
+
 from django.contrib.auth import get_user_model
 from django.contrib.contenttypes.models import ContentType
+from django.core.exceptions import ValidationError
 from django.db import IntegrityError
+from django.test import TestCase
 from django.utils import timezone
-from assets.models import Asset
-from organization.models import AssetHolder, Location, Site, Tenant, TenantGroup, CostCenter
-from subscriptions.models import (
-    Provider, Subscription, SubscriptionAssignment,
-    SubscriptionTypeChoices, SubscriptionStatusChoices, BillingCycleChoices,
-)
 from model_bakery import baker
-from software.models import Software
+
+from assets.models import Asset
 from licenses.models import License, LicenseSeatAssignment
+from organization.models import AssetHolder, CostCenter, Location, Site, Tenant, TenantGroup
+from software.models import Software
+from subscriptions.models import (
+    BillingCycleChoices,
+    Provider,
+    Subscription,
+    SubscriptionAssignment,
+    SubscriptionStatusChoices,
+    SubscriptionTypeChoices,
+)
 
 User = get_user_model()
 
@@ -48,6 +54,7 @@ class SubscriptionSeatRollupTests(TestCase):
         with self.assertRaises(ValidationError):
             lic.clean()
 
+
 class ProviderModelTests(TestCase):
     def setUp(self):
         self.provider = Provider.objects.create(
@@ -62,22 +69,20 @@ class ProviderModelTests(TestCase):
         self.assertTrue(self.provider.is_active)
 
     def test_provider_contact_resolution(self):
-        from organization.models import Contact, ContactRole, ContactAssignment
+        from organization.models import Contact, ContactAssignment, ContactRole
+
         role, _ = ContactRole.objects.get_or_create(
-            slug="primary-contact",
-            defaults={"name": "Primary Contact", "description": "Primary Contact"}
+            slug="primary-contact", defaults={"name": "Primary Contact", "description": "Primary Contact"}
         )
         contact = Contact.objects.create(
-            name="AWS Account Manager",
-            email="manager@aws.example.com",
-            phone="+1-800-555-0199"
+            name="AWS Account Manager", email="manager@aws.example.com", phone="+1-800-555-0199"
         )
         ContactAssignment.objects.create(
             contact=contact,
             role=role,
             content_type=ContentType.objects.get_for_model(Provider),
             object_id=self.provider.pk,
-            priority="primary"
+            priority="primary",
         )
         self.assertEqual(self.provider.primary_contact, contact)
 
@@ -92,6 +97,7 @@ class ProviderModelTests(TestCase):
     def test_provider_inactive_does_not_filter_out(self):
         provider = Provider.objects.create(name="Old Vendor", is_active=False)
         self.assertFalse(Provider.objects.filter(is_active=True).filter(pk=provider.pk).exists())
+
 
 class SubscriptionModelTests(TestCase):
     def setUp(self):
@@ -232,6 +238,7 @@ class SubscriptionModelTests(TestCase):
         )
         self.assertEqual(sub.tenant, tenant)
 
+
 class SubscriptionAssignmentModelTests(TestCase):
     def setUp(self):
         self.provider = Provider.objects.create(name="Microsoft", account_id="ms-001")
@@ -243,9 +250,7 @@ class SubscriptionAssignmentModelTests(TestCase):
         self.tg = TenantGroup.objects.create(name="G", slug="g")
         self.tenant = Tenant.objects.create(name="Tenant", slug="tenant", group=self.tg)
         self.site = Site.objects.create(name="Office", slug="office", tenant=self.tenant)
-        self.location = Location.objects.create(
-            name="Room 101", slug="room-101", site=self.site, tenant=self.tenant
-        )
+        self.location = Location.objects.create(name="Room 101", slug="room-101", site=self.site, tenant=self.tenant)
         self.asset = Asset.objects.create(
             name="Test Asset",
             asset_tag="TAG-001",
@@ -254,9 +259,7 @@ class SubscriptionAssignmentModelTests(TestCase):
             location=self.location,
             tenant=self.tenant,
         )
-        self.user = get_user_model().objects.create_user(
-            username="assigner", password="testpass123"
-        )
+        self.user = get_user_model().objects.create_user(username="assigner", password="testpass123")
 
     def test_assignment_to_asset(self):
         ct = ContentType.objects.get_for_model(Asset)
@@ -283,9 +286,7 @@ class SubscriptionAssignmentModelTests(TestCase):
             )
 
     def test_assignment_to_asset_holder(self):
-        holder = AssetHolder.objects.create(
-            first_name="John", last_name="Doe", upn="john.doe", email="john@test.com"
-        )
+        holder = AssetHolder.objects.create(first_name="John", last_name="Doe", upn="john.doe", email="john@test.com")
         ct = ContentType.objects.get_for_model(AssetHolder)
         assignment = SubscriptionAssignment.objects.create(
             subscription=self.subscription,
@@ -303,6 +304,7 @@ class SubscriptionAssignmentModelTests(TestCase):
         )
         url = assignment.get_absolute_url()
         self.assertIn(str(self.subscription.pk), url)
+
 
 class SubscriptionAutoExpirySignalTests(TestCase):
     def setUp(self):

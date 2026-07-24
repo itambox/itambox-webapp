@@ -3,26 +3,24 @@ from django.contrib.auth.mixins import AccessMixin
 from django.core.exceptions import ImproperlyConfigured
 from django.http import Http404
 from django.shortcuts import get_object_or_404
-from django.urls import reverse, NoReverseMatch
+from django.urls import NoReverseMatch, reverse
 from django.utils.http import url_has_allowed_host_and_scheme
 from django.views.generic import View
 
 from itambox.utils import get_model_viewname
 
-
-SUPERUSER_ONLY_MUTATION_MODELS = frozenset({
-    'organization.tenantgroup',
-})
+SUPERUSER_ONLY_MUTATION_MODELS = frozenset(
+    {
+        "organization.tenantgroup",
+    }
+)
 
 
 def user_can_mutate_model(user, model):
     """Apply model-wide mutation policies shared by every generic write path."""
     if model is None:
         return True
-    return (
-        model._meta.label_lower not in SUPERUSER_ONLY_MUTATION_MODELS
-        or bool(user and user.is_superuser)
-    )
+    return model._meta.label_lower not in SUPERUSER_ONLY_MUTATION_MODELS or bool(user and user.is_superuser)
 
 
 class CachedObjectMixin:
@@ -35,7 +33,7 @@ class CachedObjectMixin:
     """
 
     def get_object(self, *args, **kwargs):
-        if getattr(self, '_cached_object', None) is None:
+        if getattr(self, "_cached_object", None) is None:
             self._cached_object = super().get_object(*args, **kwargs)
         return self._cached_object
 
@@ -63,33 +61,34 @@ class GetReturnURLMixin:
     default_return_url = None
 
     def get_return_url(self, request, obj=None):
-        return_url = request.GET.get('return_url') or request.POST.get('return_url')
-        if return_url and url_has_allowed_host_and_scheme(return_url, allowed_hosts=request.get_host(), require_https=request.is_secure()):
+        return_url = request.GET.get("return_url") or request.POST.get("return_url")
+        if return_url and url_has_allowed_host_and_scheme(
+            return_url, allowed_hosts=request.get_host(), require_https=request.is_secure()
+        ):
             return return_url
-        if obj is not None and obj.pk and hasattr(obj, 'get_absolute_url'):
+        if obj is not None and obj.pk and hasattr(obj, "get_absolute_url"):
             return obj.get_absolute_url()
         if self.default_return_url is not None:
             return reverse(self.default_return_url)
-        if hasattr(self, 'queryset'):
+        if hasattr(self, "queryset"):
             try:
-                return reverse(get_model_viewname(self.queryset.model, 'list'))
+                return reverse(get_model_viewname(self.queryset.model, "list"))
             except NoReverseMatch:
                 pass
-        return reverse('dashboard')
+        return reverse("dashboard")
 
 
 class ActionsMixin:
     actions = ()
 
     def get_permitted_actions(self, user, model=None):
-        model = model or getattr(self, 'model', None)
-        if model is None and hasattr(self, 'queryset'):
+        model = model or getattr(self, "model", None)
+        if model is None and hasattr(self, "queryset"):
             model = self.queryset.model
         permitted = []
         for action in self.actions:
             required_perms = [
-                f'{model._meta.app_label}.{perm}_{model._meta.model_name}'
-                for perm in action.permissions_required
+                f"{model._meta.app_label}.{perm}_{model._meta.model_name}" for perm in action.permissions_required
             ]
             if not required_perms or user.has_perms(required_perms):
                 permitted.append(action)
@@ -97,11 +96,10 @@ class ActionsMixin:
 
 
 class TableMixin:
-
     def get_table(self, data, request, bulk_actions=True):
         table = self.table(data)
-        if bulk_actions and 'pk' in table.base_columns:
-            table.columns.show('pk')
+        if bulk_actions and "pk" in table.base_columns:
+            table.columns.show("pk")
         table.configure(request)
         return table
 
@@ -116,7 +114,7 @@ class TenantScopingViewMixin:
 
     def get_queryset(self):
         queryset = super().get_queryset()
-        if hasattr(queryset, 'filter_by_tenant'):
+        if hasattr(queryset, "filter_by_tenant"):
             queryset = queryset.filter_by_tenant()
         return queryset
 
@@ -135,7 +133,7 @@ def filter_permitted_rows(user, rows, model, action):
     permissions per (user, tenant), so the cost is one resolution per distinct
     tenant, not per row.
     """
-    perm = f'{model._meta.app_label}.{action}_{model._meta.model_name}'
+    perm = f"{model._meta.app_label}.{action}_{model._meta.model_name}"
     permitted, skipped = [], 0
     for obj in rows:
         if user.has_perm(perm, obj=obj):
@@ -154,17 +152,17 @@ class BulkViewMixin:
     """
 
     def _get_model(self):
-        if getattr(self, 'queryset', None) is not None:
+        if getattr(self, "queryset", None) is not None:
             return self.queryset.model
-        if hasattr(self, 'model') and self.model:
+        if hasattr(self, "model") and self.model:
             return self.model
-        if getattr(self, 'form_class', None) and hasattr(self.form_class, '_meta'):
+        if getattr(self, "form_class", None) and hasattr(self.form_class, "_meta"):
             return self.form_class._meta.model
-        if hasattr(self, 'request') and self.request:
-            model_name = self.request.POST.get('model_name') or self.request.GET.get('model_name')
+        if hasattr(self, "request") and self.request:
+            model_name = self.request.POST.get("model_name") or self.request.GET.get("model_name")
             if model_name:
                 try:
-                    app_label, mn = model_name.split('.')
+                    app_label, mn = model_name.split(".")
                     model = apps.get_model(app_label, mn)
                 except (ValueError, LookupError):
                     raise Http404
@@ -172,13 +170,13 @@ class BulkViewMixin:
                 # overridden) has no usable manager — reject it like any non-tenant model.
                 # ``_meta.swapped`` is checked first so the short-circuit never touches the
                 # unavailable ``.objects`` manager.
-                if model._meta.swapped or not hasattr(model.objects, 'filter_by_tenant'):
+                if model._meta.swapped or not hasattr(model.objects, "filter_by_tenant"):
                     raise Http404
                 return model
         return None
 
     def _get_queryset(self, pks):
-        qs = self.queryset if getattr(self, 'queryset', None) is not None else self._get_model().objects.all()
-        if hasattr(qs, 'filter_by_tenant'):
+        qs = self.queryset if getattr(self, "queryset", None) is not None else self._get_model().objects.all()
+        if hasattr(qs, "filter_by_tenant"):
             qs = qs.filter_by_tenant()
         return qs.filter(pk__in=pks)

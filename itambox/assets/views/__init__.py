@@ -1,66 +1,122 @@
-from .asset_views import (
-    AssetListView, AssetDetailView, AssetEditView, AssetDeleteView,
-    AssetCloneView, AssetBulkEditView, AssetBulkDeleteView,
-    AssetCheckoutView, AssetCheckinView, AssetAuditView, asset_label_print,
-    bulk_print_labels,
-)
-from .bulk_scan_views import (
-    AssetScanActionResolveView, BulkCheckinScanView, BulkCheckoutScanView,
-    BulkDisposeScanView, bulk_checkin_assets, bulk_checkout_assets,
-    bulk_dispose_assets,
-)
-from .assetrole_views import (
-    AssetRoleListView, AssetRoleDetailView, AssetRoleEditView, AssetRoleDeleteView,
-    AssetRoleCloneView,
-)
-from .manufacturer_views import (
-    ManufacturerListView, ManufacturerDetailView, ManufacturerEditView,
-    ManufacturerDeleteView, ManufacturerCloneView,
-)
-from .assettype_views import (
-    AssetTypeListView, AssetTypeDetailView, AssetTypeEditView, AssetTypeDeleteView,
-    AssetTypeCloneView,
-)
-from .statuslabel_views import (
-    StatusLabelListView, StatusLabelDetailView, StatusLabelEditView, StatusLabelDeleteView,
-    StatusLabelCloneView,
-)
-from .depreciation_views import (
-    DepreciationListView, DepreciationDetailView, DepreciationEditView, DepreciationDeleteView,
-    DepreciationCloneView,
-)
-from .supplier_views import (
-    SupplierListView, SupplierDetailView, SupplierEditView, SupplierDeleteView, SupplierCloneView,
-)
-from .category_views import (
-    CategoryListView, CategoryDetailView, CategoryEditView, CategoryDeleteView, CategoryCloneView,
-)
-from .asset_request_views import (
-    AssetRequestListView, AssetRequestDetailView, AssetRequestCreateView,
-    AssetRequestEditView, AssetRequestQueueView, AssetRequestDeleteView,
-)
-from .tag_sequence_views import (
-    AssetTagSequenceListView, AssetTagSequenceDetailView,
-    AssetTagSequenceEditView, AssetTagSequenceDeleteView,
-)
 from compliance.views_audit import (
-    AuditSessionListView, AuditSessionDetailView, AuditSessionCreateView,
-    AssetAuditScanView, AuditSessionCloseView, AuditSessionRehomeView,
+    AssetAuditScanView,
+    AuditSessionCloseView,
+    AuditSessionCreateView,
     AuditSessionDeleteView,
-)
-from .maintenance_views import (
-    AssetMaintenanceListView, AssetMaintenanceDetailView, AssetMaintenanceEditView,
-    AssetMaintenanceCloneView, AssetMaintenanceDeleteView,
-)
-from .disposal_views import (
-    AssetDisposalListView, AssetDisposalDetailView, AssetDisposalEditView,
-    AssetDisposalDeleteView, AssetDisposeActionView,
-)
-from .warranty_views import (
-    WarrantyListView, WarrantyDetailView, WarrantyEditView, WarrantyDeleteView,
-)
-from .reservation_views import (
-    AssetReservationListView, AssetReservationDetailView,
-    AssetReservationEditView, AssetReservationDeleteView,
+    AuditSessionDetailView,
+    AuditSessionListView,
+    AuditSessionRehomeView,
 )
 
+from .asset_request_views import (
+    AssetRequestCreateView,
+    AssetRequestDeleteView,
+    AssetRequestDetailView,
+    AssetRequestEditView,
+    AssetRequestListView,
+    AssetRequestQueueView,
+)
+from .asset_views import (
+    AssetAuditView,
+    AssetBulkDeleteView,
+    AssetBulkEditView,
+    AssetCheckinView,
+    AssetCheckoutView,
+    AssetCloneView,
+    AssetDeleteView,
+    AssetDetailView,
+    AssetEditView,
+    AssetListView,
+    asset_label_print,
+    bulk_print_labels,
+)
+from .assetrole_views import (
+    AssetRoleCloneView,
+    AssetRoleDeleteView,
+    AssetRoleDetailView,
+    AssetRoleEditView,
+    AssetRoleListView,
+)
+from .assettype_views import (
+    AssetTypeCloneView,
+    AssetTypeDeleteView,
+    AssetTypeDetailView,
+    AssetTypeEditView,
+    AssetTypeListView,
+)
+from .bulk_scan_views import (
+    AssetScanActionResolveView,
+    BulkCheckinScanView,
+    BulkCheckoutScanView,
+    BulkDisposeScanView,
+    bulk_checkin_assets,
+    bulk_checkout_assets,
+    bulk_dispose_assets,
+)
+from .category_views import (
+    CategoryCloneView,
+    CategoryDeleteView,
+    CategoryDetailView,
+    CategoryEditView,
+    CategoryListView,
+)
+from .depreciation_views import (
+    DepreciationCloneView,
+    DepreciationDeleteView,
+    DepreciationDetailView,
+    DepreciationEditView,
+    DepreciationListView,
+)
+from .disposal_views import (
+    AssetDisposalDeleteView,
+    AssetDisposalDetailView,
+    AssetDisposalEditView,
+    AssetDisposalListView,
+    AssetDisposeActionView,
+)
+from .maintenance_views import (
+    AssetMaintenanceCloneView,
+    AssetMaintenanceDeleteView,
+    AssetMaintenanceDetailView,
+    AssetMaintenanceEditView,
+    AssetMaintenanceListView,
+)
+from .manufacturer_views import (
+    ManufacturerCloneView,
+    ManufacturerDeleteView,
+    ManufacturerDetailView,
+    ManufacturerEditView,
+    ManufacturerListView,
+)
+from .reservation_views import (
+    AssetReservationDeleteView,
+    AssetReservationDetailView,
+    AssetReservationEditView,
+    AssetReservationListView,
+)
+from .statuslabel_views import (
+    StatusLabelCloneView,
+    StatusLabelDeleteView,
+    StatusLabelDetailView,
+    StatusLabelEditView,
+    StatusLabelListView,
+)
+from .supplier_views import (
+    SupplierCloneView,
+    SupplierDeleteView,
+    SupplierDetailView,
+    SupplierEditView,
+    SupplierListView,
+)
+from .tag_sequence_views import (
+    AssetTagSequenceDeleteView,
+    AssetTagSequenceDetailView,
+    AssetTagSequenceEditView,
+    AssetTagSequenceListView,
+)
+from .warranty_views import (
+    WarrantyDeleteView,
+    WarrantyDetailView,
+    WarrantyEditView,
+    WarrantyListView,
+)

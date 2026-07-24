@@ -5,6 +5,7 @@ entries are attributed, locks each asset row with ``select_for_update``, and
 delegates the per-asset state change to the canonical ``checkin_asset`` service
 so single and bulk check-in stay behaviourally identical.
 """
+
 import datetime
 import logging
 
@@ -12,6 +13,7 @@ from django.db import transaction
 from django.utils.translation import gettext as _
 
 from core.models import Job, Notification
+
 from .context import TaskContext
 from .utils import reverse_job_detail
 
@@ -29,8 +31,9 @@ def _parse_date(value):
         return None
 
 
-def bulk_checkin_task(job_id, asset_pks, user_id, tenant_id=None,
-                      status_id=None, location_id=None, checkin_date=None, notes=''):
+def bulk_checkin_task(
+    job_id, asset_pks, user_id, tenant_id=None, status_id=None, location_id=None, checkin_date=None, notes=""
+):
     """Asynchronously check in selected hardware assets.
 
     Assets with no active assignment (and no location) are a no-op in
@@ -102,16 +105,18 @@ def bulk_checkin_task(job_id, asset_pks, user_id, tenant_id=None,
                     )
                     return
 
-                job.mark_completed(result={
-                    'checked_in': success_count,
-                    'skipped': skipped_count,
-                    'failed': failure_count,
-                    'total': len(asset_pks),
-                })
+                job.mark_completed(
+                    result={
+                        "checked_in": success_count,
+                        "skipped": skipped_count,
+                        "failed": failure_count,
+                        "total": len(asset_pks),
+                    }
+                )
                 Notification.objects.create(
                     user=ctx.user,
                     subject=_("Bulk Check-in Complete"),
-                    message=_("Checked in %(count)s asset(s).") % {'count': success_count},
+                    message=_("Checked in %(count)s asset(s).") % {"count": success_count},
                     level=Notification.LEVEL_SUCCESS,
                     target_url=reverse_job_detail(job.pk),
                 )
@@ -122,7 +127,7 @@ def bulk_checkin_task(job_id, asset_pks, user_id, tenant_id=None,
                 Notification.objects.create(
                     user=ctx.user,
                     subject=_("Bulk Check-in Error"),
-                    message=_("A system exception occurred during check-in: %(error)s") % {'error': str(e)},
+                    message=_("A system exception occurred during check-in: %(error)s") % {"error": str(e)},
                     level=Notification.LEVEL_DANGER,
                     target_url=reverse_job_detail(job.pk),
                 )

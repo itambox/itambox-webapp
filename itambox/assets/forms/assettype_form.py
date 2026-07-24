@@ -1,87 +1,100 @@
+from crispy_forms.helper import FormHelper
+from crispy_forms.layout import HTML, Column, Div, Fieldset, Layout, Row, Submit
 from django import forms
 from django.urls import reverse
 from django.utils.translation import gettext_lazy as _
-from crispy_forms.helper import FormHelper
-from crispy_forms.layout import Layout, Submit, HTML, Div, Row, Column, Fieldset
 
 from core.forms import SlugModelForm
 from extras.models import Tag
-from ..models import AssetType, Manufacturer, AssetRole
+
+from ..models import AssetRole, AssetType, Manufacturer
 
 
 class AssetTypeForm(SlugModelForm):
     manufacturer = forms.ModelChoiceField(
-        queryset=Manufacturer.objects.all(),
-        widget=forms.Select(attrs={'class': 'form-select'})
+        queryset=Manufacturer.objects.all(), widget=forms.Select(attrs={"class": "form-select"})
     )
     asset_role = forms.ModelChoiceField(
         queryset=AssetRole.objects.all(),
         required=False,
-        widget=forms.Select(attrs={'class': 'form-select'}),
-        label=_("Asset Role")
+        widget=forms.Select(attrs={"class": "form-select"}),
+        label=_("Asset Role"),
     )
     tags = forms.ModelMultipleChoiceField(
         queryset=Tag.objects.all(),
         required=False,
-        widget=forms.SelectMultiple(attrs={'class': 'form-select', 'data-tomselect-tags': 'true'}),
-        label=_("Tags")
+        widget=forms.SelectMultiple(attrs={"class": "form-select", "data-tomselect-tags": "true"}),
+        label=_("Tags"),
     )
 
     class Meta:
         model = AssetType
         fields = [
-            'manufacturer', 'part_number', 'ean', 'model', 'slug',
-            'eol_months',
-            'category', 'asset_role', 'custom_fieldset', 'depreciation', 'image',
-            'description', 'comments', 'tags', 'requestable'
+            "manufacturer",
+            "part_number",
+            "ean",
+            "model",
+            "slug",
+            "eol_months",
+            "category",
+            "asset_role",
+            "custom_fieldset",
+            "depreciation",
+            "image",
+            "description",
+            "comments",
+            "tags",
+            "requestable",
         ]
         widgets = {
-            'model': forms.TextInput(attrs={'class': 'form-control'}),
-            'slug': forms.TextInput(attrs={'class': 'form-control', 'slugify': 'model'}),
-            'part_number': forms.TextInput(attrs={'class': 'form-control'}),
-            'ean': forms.TextInput(attrs={'class': 'form-control', 'inputmode': 'numeric'}),
-            'eol_months': forms.NumberInput(attrs={'class': 'form-control', 'min': 0}),
-            'category': forms.Select(attrs={'class': 'form-select'}),
-            'custom_fieldset': forms.Select(attrs={'class': 'form-select'}),
-            'depreciation': forms.Select(attrs={'class': 'form-select'}),
-            'image': forms.FileInput(attrs={'class': 'form-control', 'style': 'max-width: 400px;'}),
-            'description': forms.Textarea(attrs={'class': 'form-control', 'rows': 3}),
-            'comments': forms.Textarea(attrs={'class': 'form-control', 'rows': 5}),
+            "model": forms.TextInput(attrs={"class": "form-control"}),
+            "slug": forms.TextInput(attrs={"class": "form-control", "slugify": "model"}),
+            "part_number": forms.TextInput(attrs={"class": "form-control"}),
+            "ean": forms.TextInput(attrs={"class": "form-control", "inputmode": "numeric"}),
+            "eol_months": forms.NumberInput(attrs={"class": "form-control", "min": 0}),
+            "category": forms.Select(attrs={"class": "form-select"}),
+            "custom_fieldset": forms.Select(attrs={"class": "form-select"}),
+            "depreciation": forms.Select(attrs={"class": "form-select"}),
+            "image": forms.FileInput(attrs={"class": "form-control", "style": "max-width: 400px;"}),
+            "description": forms.Textarea(attrs={"class": "form-control", "rows": 3}),
+            "comments": forms.Textarea(attrs={"class": "form-control", "rows": 5}),
         }
         help_texts = {
-            'slug': _('URL-friendly identifier. Leave blank to auto-generate.'),
+            "slug": _("URL-friendly identifier. Leave blank to auto-generate."),
         }
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.helper = FormHelper(self)
-        self.helper.form_method = 'post'
+        self.helper.form_method = "post"
         self.helper.form_tag = True
-        self.fields['slug'].widget.attrs['slugify'] = 'model'
+        self.fields["slug"].widget.attrs["slugify"] = "model"
 
         # Set up HTMX attributes to reload the form when custom_fieldset choice changes
-        self.fields['custom_fieldset'].widget.attrs.update({
-            'hx-post': '',
-            'hx-trigger': 'change',
-            'hx-target': 'closest form',
-            'hx-swap': 'outerHTML',
-            'hx-vals': '{"_reload": "1"}',
-            'hx-include': 'closest form',
-        })
+        self.fields["custom_fieldset"].widget.attrs.update(
+            {
+                "hx-post": "",
+                "hx-trigger": "change",
+                "hx-target": "closest form",
+                "hx-swap": "outerHTML",
+                "hx-vals": '{"_reload": "1"}',
+                "hx-include": "closest form",
+            }
+        )
 
-        button_text = _('Update') if self.instance.pk else _('Create')
-        cancel_url = self.instance.get_absolute_url() if self.instance.pk else reverse('assets:assettype_list')
+        button_text = _("Update") if self.instance.pk else _("Create")
+        cancel_url = self.instance.get_absolute_url() if self.instance.pk else reverse("assets:assettype_list")
 
         # Determine the selected custom fieldset
         custom_fieldset_id = None
-        if self.data and self.data.get('custom_fieldset'):
+        if self.data and self.data.get("custom_fieldset"):
             try:
-                custom_fieldset_id = int(self.data.get('custom_fieldset'))
+                custom_fieldset_id = int(self.data.get("custom_fieldset"))
             except (ValueError, TypeError):
                 pass
-        elif self.initial and self.initial.get('custom_fieldset'):
-            custom_fieldset_val = self.initial.get('custom_fieldset')
-            if hasattr(custom_fieldset_val, 'pk'):
+        elif self.initial and self.initial.get("custom_fieldset"):
+            custom_fieldset_val = self.initial.get("custom_fieldset")
+            if hasattr(custom_fieldset_val, "pk"):
                 custom_fieldset_id = custom_fieldset_val.pk
             else:
                 custom_fieldset_id = custom_fieldset_val
@@ -91,8 +104,11 @@ class AssetTypeForm(SlugModelForm):
         custom_fields = []
         if custom_fieldset_id:
             from django.contrib.contenttypes.models import ContentType
-            from extras.models import CustomFieldset, CustomField
+
+            from extras.models import CustomField, CustomFieldset
+
             from ..models import AssetType as AssetTypeModel
+
             try:
                 fieldset_obj = CustomFieldset.objects.get(pk=custom_fieldset_id)
                 # Fields targeting AssetType act as hardware specifications.
@@ -116,38 +132,38 @@ class AssetTypeForm(SlugModelForm):
                     label=field.label,
                     required=field.required,
                     initial=initial_value,
-                    widget=forms.TextInput(attrs={'class': 'form-control'})
+                    widget=forms.TextInput(attrs={"class": "form-control"}),
                 )
             elif field.field_type == CustomField.FIELD_TYPE_NUMBER:
                 form_field = forms.DecimalField(
                     label=field.label,
                     required=field.required,
                     initial=initial_value,
-                    widget=forms.NumberInput(attrs={'class': 'form-control'})
+                    widget=forms.NumberInput(attrs={"class": "form-control"}),
                 )
             elif field.field_type == CustomField.FIELD_TYPE_DATE:
                 form_field = forms.DateField(
                     label=field.label,
                     required=field.required,
                     initial=initial_value,
-                    widget=forms.DateInput(attrs={'type': 'date', 'class': 'form-control'})
+                    widget=forms.DateInput(attrs={"type": "date", "class": "form-control"}),
                 )
             elif field.field_type == CustomField.FIELD_TYPE_BOOLEAN:
                 form_field = forms.BooleanField(
                     label=field.label,
                     required=field.required,
                     initial=initial_value or False,
-                    widget=forms.CheckboxInput(attrs={'class': 'form-check-input'})
+                    widget=forms.CheckboxInput(attrs={"class": "form-check-input"}),
                 )
             elif field.field_type == CustomField.FIELD_TYPE_SELECT:
-                choice_lines = [line.strip() for line in (field.choices or '').split('\n') if line.strip()]
-                choices = [('', '---------')] + [(choice, choice) for choice in choice_lines]
+                choice_lines = [line.strip() for line in (field.choices or "").split("\n") if line.strip()]
+                choices = [("", "---------")] + [(choice, choice) for choice in choice_lines]
                 form_field = forms.ChoiceField(
                     label=field.label,
                     required=field.required,
                     choices=choices,
                     initial=initial_value,
-                    widget=forms.Select(attrs={'class': 'form-select'})
+                    widget=forms.Select(attrs={"class": "form-select"}),
                 )
 
             if form_field:
@@ -156,75 +172,64 @@ class AssetTypeForm(SlugModelForm):
         # Build dynamic form layout
         layout_elements = [
             Fieldset(
-                _('General Information'),
+                _("General Information"),
+                Row(Column("manufacturer", css_class="col-md-6"), Column("model", css_class="col-md-6")),
                 Row(
-                    Column('manufacturer', css_class='col-md-6'),
-                    Column('model', css_class='col-md-6')
+                    Column("part_number", css_class="col-md-3"),
+                    Column("ean", css_class="col-md-3"),
+                    Column("slug", css_class="col-md-3"),
+                    Column("eol_months", css_class="col-md-3"),
                 ),
-                Row(
-                    Column('part_number', css_class='col-md-3'),
-                    Column('ean', css_class='col-md-3'),
-                    Column('slug', css_class='col-md-3'),
-                    Column('eol_months', css_class='col-md-3')
-                ),
-                Row(
-                    Column('image', css_class='col-md-6'),
-                    Column('description', css_class='col-md-6')
-                ),
+                Row(Column("image", css_class="col-md-6"), Column("description", css_class="col-md-6")),
             ),
             Fieldset(
-                _('Classification & Financial'),
+                _("Classification & Financial"),
                 Row(
-                    Column('category', css_class='col-md-3'),
-                    Column('asset_role', css_class='col-md-3'),
-                    Column('custom_fieldset', css_class='col-md-3'),
-                    Column('depreciation', css_class='col-md-3')
+                    Column("category", css_class="col-md-3"),
+                    Column("asset_role", css_class="col-md-3"),
+                    Column("custom_fieldset", css_class="col-md-3"),
+                    Column("depreciation", css_class="col-md-3"),
                 ),
-                Row(
-                    Column('requestable', css_class='col-md-4 mt-4')
-                ),
+                Row(Column("requestable", css_class="col-md-4 mt-4")),
             ),
         ]
 
         if self.custom_field_keys:
             cf_divs = []
             for i in range(0, len(self.custom_field_keys), 2):
-                chunk = self.custom_field_keys[i:i+2]
-                row_cols = [Column(key, css_class='col-md-6') for key in chunk]
+                chunk = self.custom_field_keys[i : i + 2]
+                row_cols = [Column(key, css_class="col-md-6") for key in chunk]
                 cf_divs.append(Row(*row_cols))
-            
-            layout_elements.append(
-                Fieldset(
-                    _('Specifications'),
-                    *cf_divs
-                )
-            )
+
+            layout_elements.append(Fieldset(_("Specifications"), *cf_divs))
         else:
             layout_elements.append(
                 Fieldset(
-                    _('Specifications'),
+                    _("Specifications"),
                     HTML(
                         '<div class="alert alert-info d-flex align-items-center mb-0" role="alert">'
                         '  <i class="mdi mdi-information-outline me-2"></i>'
-                        '  <div>Select a Custom Fieldset under Classification & Financial to add specifications.</div>'
-                        '</div>'
-                    )
+                        "  <div>Select a Custom Fieldset under Classification & Financial to add specifications.</div>"
+                        "</div>"
+                    ),
                 )
             )
 
-        layout_elements.extend([
-            Fieldset(
-                _('Additional Information'),
-                'comments',
-                Row(
-                    Column('tags', css_class='col-md-8'),
-                )
-            ),
-            HTML('<div class="mt-3">'),
-            Submit('submit', button_text, css_class='btn btn-primary'),
-            HTML(f'<a href="{cancel_url}" class="btn btn-outline-secondary ms-2">Cancel</a>'),
-            HTML('</div>')
-        ])
+        layout_elements.extend(
+            [
+                Fieldset(
+                    _("Additional Information"),
+                    "comments",
+                    Row(
+                        Column("tags", css_class="col-md-8"),
+                    ),
+                ),
+                HTML('<div class="mt-3">'),
+                Submit("submit", button_text, css_class="btn btn-primary"),
+                HTML(f'<a href="{cancel_url}" class="btn btn-outline-secondary ms-2">Cancel</a>'),
+                HTML("</div>"),
+            ]
+        )
 
         self.helper.layout = Layout(*layout_elements)
 
@@ -233,12 +238,12 @@ class AssetTypeForm(SlugModelForm):
 
         custom_field_data = {}
         for key, value in self.cleaned_data.items():
-            if key.startswith('cf_'):
+            if key.startswith("cf_"):
                 field_name = key[3:]
                 if value is not None:
                     if isinstance(value, (int, float, bool)):
                         custom_field_data[field_name] = value
-                    elif hasattr(value, 'isoformat'):
+                    elif hasattr(value, "isoformat"):
                         custom_field_data[field_name] = value.isoformat()
                     else:
                         custom_field_data[field_name] = str(value)

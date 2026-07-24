@@ -1,23 +1,47 @@
 from django_filters.rest_framework import DjangoFilterBackend
-from itambox.api.permissions import TokenPermissions, StrictTenantPermission
-from itambox.api.viewsets import ITAMBoxModelViewSet
-from inventory.models import (
-    Accessory, AccessoryStock, AccessoryAssignment,
-    Consumable, ConsumableStock, ConsumableAssignment,
-    Kit, KitItem, Component, ComponentStock, ComponentAllocation
-)
+
 from inventory.filters import (
-    AccessoryFilterSet, AccessoryStockFilterSet, AccessoryAssignmentFilterSet,
-    ConsumableFilterSet, ConsumableStockFilterSet, ConsumableAssignmentFilterSet,
-    KitFilterSet, KitItemFilterSet,
-    ComponentFilterSet, ComponentStockFilterSet, ComponentAllocationFilterSet
+    AccessoryAssignmentFilterSet,
+    AccessoryFilterSet,
+    AccessoryStockFilterSet,
+    ComponentAllocationFilterSet,
+    ComponentFilterSet,
+    ComponentStockFilterSet,
+    ConsumableAssignmentFilterSet,
+    ConsumableFilterSet,
+    ConsumableStockFilterSet,
+    KitFilterSet,
+    KitItemFilterSet,
+)
+from inventory.models import (
+    Accessory,
+    AccessoryAssignment,
+    AccessoryStock,
+    Component,
+    ComponentAllocation,
+    ComponentStock,
+    Consumable,
+    ConsumableAssignment,
+    ConsumableStock,
+    Kit,
+    KitItem,
 )
 from inventory.services import recipient_assignment_union, shared_stock_union
+from itambox.api.permissions import StrictTenantPermission, TokenPermissions
+from itambox.api.viewsets import ITAMBoxModelViewSet
+
 from .serializers import (
-    AccessorySerializer, AccessoryStockSerializer, AccessoryAssignmentSerializer,
-    ConsumableSerializer, ConsumableStockSerializer, ConsumableAssignmentSerializer,
-    KitSerializer, KitItemSerializer,
-    ComponentSerializer, ComponentStockSerializer, ComponentAllocationSerializer
+    AccessoryAssignmentSerializer,
+    AccessorySerializer,
+    AccessoryStockSerializer,
+    ComponentAllocationSerializer,
+    ComponentSerializer,
+    ComponentStockSerializer,
+    ConsumableAssignmentSerializer,
+    ConsumableSerializer,
+    ConsumableStockSerializer,
+    KitItemSerializer,
+    KitSerializer,
 )
 
 
@@ -27,6 +51,7 @@ class SharedStockVisibilityMixin:
     Widens list/retrieve resolution only; StrictTenantPermission keeps every
     non-SAFE method on a foreign pool a 404.
     """
+
     stock_model = None
 
     def get_queryset(self):
@@ -37,6 +62,7 @@ class RecipientAssignmentVisibilityMixin:
     """Read visibility for assignments TARGETING the active tenant (ADR-0001
     4b: the recipient side of a granted checkout). Mutation stays owner-side
     via StrictTenantPermission."""
+
     assignment_model = None
 
     def get_queryset(self):
@@ -45,7 +71,7 @@ class RecipientAssignmentVisibilityMixin:
 
 class AccessoryViewSet(ITAMBoxModelViewSet):
     permission_classes = [TokenPermissions, StrictTenantPermission]
-    queryset = Accessory.objects.with_counts().select_related('manufacturer', 'tenant').prefetch_related('tags')
+    queryset = Accessory.objects.with_counts().select_related("manufacturer", "tenant").prefetch_related("tags")
     serializer_class = AccessorySerializer
     filter_backends = (DjangoFilterBackend,)
     filterset_class = AccessoryFilterSet
@@ -54,7 +80,7 @@ class AccessoryViewSet(ITAMBoxModelViewSet):
 class AccessoryStockViewSet(SharedStockVisibilityMixin, ITAMBoxModelViewSet):
     stock_model = AccessoryStock
     permission_classes = [TokenPermissions, StrictTenantPermission]
-    queryset = AccessoryStock.objects.select_related('accessory', 'location').all()
+    queryset = AccessoryStock.objects.select_related("accessory", "location").all()
     serializer_class = AccessoryStockSerializer
     filter_backends = (DjangoFilterBackend,)
     filterset_class = AccessoryStockFilterSet
@@ -64,7 +90,7 @@ class AccessoryAssignmentViewSet(RecipientAssignmentVisibilityMixin, ITAMBoxMode
     assignment_model = AccessoryAssignment
     permission_classes = [TokenPermissions, StrictTenantPermission]
     queryset = AccessoryAssignment.objects.select_related(
-        'accessory__manufacturer', 'assigned_holder', 'assigned_location', 'from_location'
+        "accessory__manufacturer", "assigned_holder", "assigned_location", "from_location"
     ).all()
     serializer_class = AccessoryAssignmentSerializer
     filter_backends = (DjangoFilterBackend,)
@@ -73,7 +99,7 @@ class AccessoryAssignmentViewSet(RecipientAssignmentVisibilityMixin, ITAMBoxMode
 
 class ConsumableViewSet(ITAMBoxModelViewSet):
     permission_classes = [TokenPermissions, StrictTenantPermission]
-    queryset = Consumable.objects.with_counts().select_related('manufacturer', 'tenant').prefetch_related('tags')
+    queryset = Consumable.objects.with_counts().select_related("manufacturer", "tenant").prefetch_related("tags")
     serializer_class = ConsumableSerializer
     filter_backends = (DjangoFilterBackend,)
     filterset_class = ConsumableFilterSet
@@ -82,7 +108,7 @@ class ConsumableViewSet(ITAMBoxModelViewSet):
 class ConsumableStockViewSet(SharedStockVisibilityMixin, ITAMBoxModelViewSet):
     stock_model = ConsumableStock
     permission_classes = [TokenPermissions, StrictTenantPermission]
-    queryset = ConsumableStock.objects.select_related('consumable', 'location').all()
+    queryset = ConsumableStock.objects.select_related("consumable", "location").all()
     serializer_class = ConsumableStockSerializer
     filter_backends = (DjangoFilterBackend,)
     filterset_class = ConsumableStockFilterSet
@@ -92,7 +118,7 @@ class ConsumableAssignmentViewSet(RecipientAssignmentVisibilityMixin, ITAMBoxMod
     assignment_model = ConsumableAssignment
     permission_classes = [TokenPermissions, StrictTenantPermission]
     queryset = ConsumableAssignment.objects.select_related(
-        'consumable__manufacturer', 'assigned_holder', 'assigned_location', 'from_location'
+        "consumable__manufacturer", "assigned_holder", "assigned_location", "from_location"
     ).all()
     serializer_class = ConsumableAssignmentSerializer
     filter_backends = (DjangoFilterBackend,)
@@ -101,7 +127,7 @@ class ConsumableAssignmentViewSet(RecipientAssignmentVisibilityMixin, ITAMBoxMod
 
 class KitViewSet(ITAMBoxModelViewSet):
     permission_classes = [TokenPermissions, StrictTenantPermission]
-    queryset = Kit.objects.select_related('tenant').prefetch_related('items', 'tags').all()
+    queryset = Kit.objects.select_related("tenant").prefetch_related("items", "tags").all()
     serializer_class = KitSerializer
     filter_backends = (DjangoFilterBackend,)
     filterset_class = KitFilterSet
@@ -109,9 +135,7 @@ class KitViewSet(ITAMBoxModelViewSet):
 
 class KitItemViewSet(ITAMBoxModelViewSet):
     permission_classes = [TokenPermissions, StrictTenantPermission]
-    queryset = KitItem.objects.select_related(
-        'kit', 'asset_type__manufacturer', 'accessory__manufacturer'
-    ).all()
+    queryset = KitItem.objects.select_related("kit", "asset_type__manufacturer", "accessory__manufacturer").all()
     serializer_class = KitItemSerializer
     filter_backends = (DjangoFilterBackend,)
     filterset_class = KitItemFilterSet
@@ -119,7 +143,9 @@ class KitItemViewSet(ITAMBoxModelViewSet):
 
 class ComponentViewSet(ITAMBoxModelViewSet):
     permission_classes = [TokenPermissions, StrictTenantPermission]
-    queryset = Component.objects.with_counts().select_related('manufacturer', 'tenant', 'category').prefetch_related('tags')
+    queryset = (
+        Component.objects.with_counts().select_related("manufacturer", "tenant", "category").prefetch_related("tags")
+    )
     serializer_class = ComponentSerializer
     filter_backends = (DjangoFilterBackend,)
     filterset_class = ComponentFilterSet
@@ -128,7 +154,7 @@ class ComponentViewSet(ITAMBoxModelViewSet):
 class ComponentStockViewSet(SharedStockVisibilityMixin, ITAMBoxModelViewSet):
     stock_model = ComponentStock
     permission_classes = [TokenPermissions, StrictTenantPermission]
-    queryset = ComponentStock.objects.select_related('component', 'location').all()
+    queryset = ComponentStock.objects.select_related("component", "location").all()
     serializer_class = ComponentStockSerializer
     filter_backends = (DjangoFilterBackend,)
     filterset_class = ComponentStockFilterSet
@@ -138,7 +164,7 @@ class ComponentAllocationViewSet(RecipientAssignmentVisibilityMixin, ITAMBoxMode
     assignment_model = ComponentAllocation
     permission_classes = [TokenPermissions, StrictTenantPermission]
     queryset = ComponentAllocation.objects.select_related(
-        'component__manufacturer', 'assigned_holder', 'assigned_location', 'assigned_asset', 'from_location'
+        "component__manufacturer", "assigned_holder", "assigned_location", "assigned_asset", "from_location"
     ).all()
     serializer_class = ComponentAllocationSerializer
     filter_backends = (DjangoFilterBackend,)

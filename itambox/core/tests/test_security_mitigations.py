@@ -1,4 +1,5 @@
 """Regression tests for the security-review mitigations."""
+
 import socket
 import uuid
 from unittest.mock import MagicMock, patch
@@ -21,35 +22,35 @@ class SSRFValidatorTests(TestCase):
 
     def test_allows_public_https(self):
         # example.com resolves to public addresses.
-        validate_external_url('https://example.com/hook')
+        validate_external_url("https://example.com/hook")
 
     def test_rejects_non_http_scheme(self):
-        for url in ('ftp://example.com', 'file:///etc/passwd', 'gopher://x'):
+        for url in ("ftp://example.com", "file:///etc/passwd", "gopher://x"):
             with self.assertRaises(ValidationError):
                 validate_external_url(url)
 
     def test_rejects_loopback(self):
-        for url in ('http://127.0.0.1/x', 'http://localhost/x', 'http://[::1]/x'):
+        for url in ("http://127.0.0.1/x", "http://localhost/x", "http://[::1]/x"):
             with self.assertRaises(ValidationError):
                 validate_external_url(url)
 
     def test_rejects_link_local_metadata(self):
         # AWS/GCP/Azure instance metadata endpoint.
         with self.assertRaises(ValidationError):
-            validate_external_url('http://169.254.169.254/latest/meta-data/')
+            validate_external_url("http://169.254.169.254/latest/meta-data/")
 
     def test_rejects_private_ranges(self):
-        for url in ('http://10.0.0.5/x', 'http://192.168.1.1/x', 'http://172.16.0.1/x'):
+        for url in ("http://10.0.0.5/x", "http://192.168.1.1/x", "http://172.16.0.1/x"):
             with self.assertRaises(ValidationError):
                 validate_external_url(url)
 
     def test_rejects_empty_and_hostless(self):
         with self.assertRaises(ValidationError):
-            validate_external_url('')
+            validate_external_url("")
         with self.assertRaises(ValidationError):
-            validate_external_url('http:///nohost')
+            validate_external_url("http:///nohost")
 
-    @patch('socket.getaddrinfo')
+    @patch("socket.getaddrinfo")
     def test_dns_resolution_failure_fails_closed(self, mock_getaddrinfo):
         """Release blocker #1: an unresolvable host must be REJECTED, not silently
         allowed through. A resolver error (transient outage, or an attacker's DNS
@@ -57,7 +58,7 @@ class SSRFValidatorTests(TestCase):
         empty result and let the URL through; it must now fail closed."""
         mock_getaddrinfo.side_effect = socket.gaierror()
         with self.assertRaises(ValidationError):
-            validate_external_url('https://doesnotexist.invalid/x')
+            validate_external_url("https://doesnotexist.invalid/x")
 
 
 class RequestPinnedTests(TestCase):
@@ -79,41 +80,47 @@ class RequestPinnedTests(TestCase):
         resp.raw = None
         return resp
 
-    @patch('requests.adapters.HTTPAdapter.send')
-    @patch('socket.getaddrinfo')
+    @patch("requests.adapters.HTTPAdapter.send")
+    @patch("socket.getaddrinfo")
     def test_pinned_to_resolved_ip_with_original_host_header(self, mock_getaddrinfo, mock_send):
         mock_getaddrinfo.return_value = [
-            (socket.AF_INET, socket.SOCK_STREAM, socket.IPPROTO_TCP, '', ('93.184.216.34', 443)),
+            (socket.AF_INET, socket.SOCK_STREAM, socket.IPPROTO_TCP, "", ("93.184.216.34", 443)),
         ]
         mock_send.return_value = self._make_pinned_response()
 
-        request_pinned('POST', 'https://hooks.example.com/x', json={})
+        request_pinned("POST", "https://hooks.example.com/x", json={})
 
         self.assertEqual(mock_send.call_count, 1)
         sent_request = mock_send.call_args[0][0]
         # The socket target is the resolved IP, not the hostname...
-        self.assertEqual(urlsplit(sent_request.url).netloc, '93.184.216.34')
+        self.assertEqual(urlsplit(sent_request.url).netloc, "93.184.216.34")
         # ...but the server still sees the original hostname via the Host header.
-        self.assertEqual(sent_request.headers['Host'], 'hooks.example.com')
+        self.assertEqual(sent_request.headers["Host"], "hooks.example.com")
 
-    @patch('requests.adapters.HTTPAdapter.send')
-    @patch('socket.getaddrinfo')
+    @patch("requests.adapters.HTTPAdapter.send")
+    @patch("socket.getaddrinfo")
     def test_pinned_ipv6_address_uses_bracketed_form(self, mock_getaddrinfo, mock_send):
         mock_getaddrinfo.return_value = [
-            (socket.AF_INET6, socket.SOCK_STREAM, socket.IPPROTO_TCP, '',
-             ('2606:2800:220:1:248:1893:25c8:1946', 443, 0, 0)),
+            (
+                socket.AF_INET6,
+                socket.SOCK_STREAM,
+                socket.IPPROTO_TCP,
+                "",
+                ("2606:2800:220:1:248:1893:25c8:1946", 443, 0, 0),
+            ),
         ]
         mock_send.return_value = self._make_pinned_response()
 
-        request_pinned('POST', 'https://hooks.example.com/x', json={})
+        request_pinned("POST", "https://hooks.example.com/x", json={})
 
         sent_request = mock_send.call_args[0][0]
         self.assertEqual(
-            urlsplit(sent_request.url).netloc, '[2606:2800:220:1:248:1893:25c8:1946]',
+            urlsplit(sent_request.url).netloc,
+            "[2606:2800:220:1:248:1893:25c8:1946]",
         )
-        self.assertEqual(sent_request.headers['Host'], 'hooks.example.com')
+        self.assertEqual(sent_request.headers["Host"], "hooks.example.com")
 
-    @patch('requests.Session.request')
+    @patch("requests.Session.request")
     def test_redirects_are_never_followed(self, mock_session_request):
         """A 3xx pointing at an internal address would bypass the pinning guard
         entirely, so redirects must be disabled at the requests layer. Asserted
@@ -124,19 +131,19 @@ class RequestPinnedTests(TestCase):
 
         # A public IP literal skips DNS entirely, keeping this test focused on the
         # redirect flag rather than resolution.
-        request_pinned('POST', 'https://93.184.216.34/x', json={})
+        request_pinned("POST", "https://93.184.216.34/x", json={})
 
         self.assertEqual(mock_session_request.call_count, 1)
         _, kwargs = mock_session_request.call_args
-        self.assertIs(kwargs['allow_redirects'], False)
+        self.assertIs(kwargs["allow_redirects"], False)
 
 
 class ChangelogTenantScopingTests(TestCase):
     """C3: ObjectChange must be scoped to the active tenant."""
 
     def setUp(self):
-        self.ta = Tenant.objects.create(name='Iso A', slug='iso-a')
-        self.tb = Tenant.objects.create(name='Iso B', slug='iso-b')
+        self.ta = Tenant.objects.create(name="Iso A", slug="iso-a")
+        self.tb = Tenant.objects.create(name="Iso B", slug="iso-b")
         self.ct = ContentType.objects.get_for_model(Tenant)
         self.change_a = self._make_change(self.ta)
         self.change_b = self._make_change(self.tb)
@@ -145,9 +152,9 @@ class ChangelogTenantScopingTests(TestCase):
         return ObjectChange._base_manager.create(
             tenant=tenant,
             user=None,
-            user_name='System',
+            user_name="System",
             request_id=uuid.uuid4(),
-            action='create',
+            action="create",
             changed_object_type=self.ct,
             changed_object_id=tenant.pk,
             object_repr=str(tenant),
@@ -158,7 +165,7 @@ class ChangelogTenantScopingTests(TestCase):
 
     def test_changelog_scoped_to_active_tenant(self):
         set_current_tenant(self.ta)
-        pks = set(ObjectChange.objects.values_list('pk', flat=True))
+        pks = set(ObjectChange.objects.values_list("pk", flat=True))
         self.assertIn(self.change_a.pk, pks)
         self.assertNotIn(self.change_b.pk, pks, "Tenant A must not see Tenant B's change history")
 
@@ -172,14 +179,15 @@ class AssignmentTenantScopingTests(TestCase):
     """C4: assignment rows must not leak/IDOR across tenants via the manager."""
 
     def setUp(self):
-        self.ta = Tenant.objects.create(name='Asg A', slug='asg-a')
-        self.tb = Tenant.objects.create(name='Asg B', slug='asg-b')
+        self.ta = Tenant.objects.create(name="Asg A", slug="asg-a")
+        self.tb = Tenant.objects.create(name="Asg B", slug="asg-b")
 
     def tearDown(self):
         set_current_tenant(None)
 
     def test_asset_assignment_scoped_by_parent_tenant(self):
         from assets.models import Asset, AssetAssignment
+
         set_current_tenant(None)
         asset_a = baker.make(Asset, tenant=self.ta)
         asset_b = baker.make(Asset, tenant=self.tb)
@@ -187,7 +195,7 @@ class AssignmentTenantScopingTests(TestCase):
         asgn_b = baker.make(AssetAssignment, asset=asset_b, is_active=False)
 
         set_current_tenant(self.ta)
-        pks = set(AssetAssignment.objects.values_list('pk', flat=True))
+        pks = set(AssetAssignment.objects.values_list("pk", flat=True))
         self.assertIn(asgn_a.pk, pks)
         self.assertNotIn(asgn_b.pk, pks, "Tenant A must not list Tenant B's assignments")
         with self.assertRaises(AssetAssignment.DoesNotExist):
@@ -195,6 +203,7 @@ class AssignmentTenantScopingTests(TestCase):
 
     def test_assignment_tenant_property_resolves_parent(self):
         from assets.models import Asset, AssetAssignment
+
         asset_a = baker.make(Asset, tenant=self.ta)
         asgn = baker.make(AssetAssignment, asset=asset_a, is_active=False)
         self.assertEqual(asgn.tenant, self.ta)

@@ -1,8 +1,9 @@
 import datetime
-import hmac
 import hashlib
+import hmac
 import json
 import logging
+
 import requests
 from django.utils import timezone
 from django_q.models import Schedule
@@ -11,11 +12,25 @@ from django_q.tasks import async_task
 logger = logging.getLogger(__name__)
 
 
-def send_webhook_task(url, method, headers, secret, event_action, event_model_app_label,
-                      event_model_name, event_object_id, event_timestamp_iso, event_data,
-                      attempt=0, retry_count=3, retry_backoff=60, webhook_endpoint_id=None):
+def send_webhook_task(
+    url,
+    method,
+    headers,
+    secret,
+    event_action,
+    event_model_app_label,
+    event_model_name,
+    event_object_id,
+    event_timestamp_iso,
+    event_data,
+    attempt=0,
+    retry_count=3,
+    retry_backoff=60,
+    webhook_endpoint_id=None,
+):
     """Dispatch a webhook event. Retries on 5xx and connection errors; 4xx are final."""
     from django.core.exceptions import ValidationError
+
     # inline import: core.http imports core.validators (django-loaded); keep the task
     # module import-light for django-q payload loading.
     from core.http import request_pinned, webhook_target_kind
@@ -24,6 +39,7 @@ def send_webhook_task(url, method, headers, secret, event_action, event_model_ap
     # to be persisted in the django_q payload / retry Schedule.kwargs (both stored plaintext).
     if webhook_endpoint_id and not secret:
         from extras.models import WebhookEndpoint
+
         endpoint = WebhookEndpoint.all_objects.filter(pk=webhook_endpoint_id).first()
         if endpoint:
             secret = endpoint.secret_decrypted
@@ -35,37 +51,37 @@ def send_webhook_task(url, method, headers, secret, event_action, event_model_ap
     # and redirects are never followed. A blocked URL is final — do not retry.
     target_kind = webhook_target_kind(url)
     try:
-        if target_kind == 'slack':
-            payload = {'text': f"Event: {event_action} on {event_model_name} (ID: {event_object_id})"}
-            response = request_pinned('POST', url, json=payload, timeout=10)
-        elif target_kind == 'teams':
+        if target_kind == "slack":
+            payload = {"text": f"Event: {event_action} on {event_model_name} (ID: {event_object_id})"}
+            response = request_pinned("POST", url, json=payload, timeout=10)
+        elif target_kind == "teams":
             payload = {
-                '@type': 'MessageCard',
-                '@context': 'https://schema.org/extensions',
-                'summary': f"Event: {event_action} on {event_model_name} (ID: {event_object_id})",
-                'themeColor': '0076D7',
-                'title': 'ITAMbox Notification',
-                'text': f"Event: {event_action} on {event_model_name} (ID: {event_object_id})",
+                "@type": "MessageCard",
+                "@context": "https://schema.org/extensions",
+                "summary": f"Event: {event_action} on {event_model_name} (ID: {event_object_id})",
+                "themeColor": "0076D7",
+                "title": "ITAMbox Notification",
+                "text": f"Event: {event_action} on {event_model_name} (ID: {event_object_id})",
             }
-            response = request_pinned('POST', url, json=payload, timeout=10)
+            response = request_pinned("POST", url, json=payload, timeout=10)
         else:
             payload = {
-                'event': event_action,
-                'model': f"{event_model_app_label}.{event_model_name}",
-                'object_id': event_object_id,
-                'timestamp': event_timestamp_iso,
-                'data': event_data,
+                "event": event_action,
+                "model": f"{event_model_app_label}.{event_model_name}",
+                "object_id": event_object_id,
+                "timestamp": event_timestamp_iso,
+                "data": event_data,
             }
             body = json.dumps(payload, default=str)
             req_headers = dict(headers)
             if secret:
                 sig = hmac.new(
-                    secret.encode('utf-8'),
-                    body.encode('utf-8'),
+                    secret.encode("utf-8"),
+                    body.encode("utf-8"),
                     hashlib.sha256,
                 ).hexdigest()
-                req_headers['X-Hub-Signature-256'] = f'sha256={sig}'
-            req_headers.setdefault('Content-Type', 'application/json')
+                req_headers["X-Hub-Signature-256"] = f"sha256={sig}"
+            req_headers.setdefault("Content-Type", "application/json")
             response = request_pinned(method, url, headers=req_headers, data=body, timeout=10)
 
         if 400 <= response.status_code < 500:
@@ -85,16 +101,23 @@ def send_webhook_task(url, method, headers, secret, event_action, event_model_ap
             return
 
         retry_kwargs = dict(
-            url=url, method=method, headers=headers,
+            url=url,
+            method=method,
+            headers=headers,
             # Endpoint-linked retries carry only the endpoint pk so the secret is never
             # written to Schedule.kwargs (re-derived on the next run); legacy webhooks keep
             # their plaintext config secret.
-            secret='' if webhook_endpoint_id else secret,
+            secret="" if webhook_endpoint_id else secret,
             webhook_endpoint_id=webhook_endpoint_id,
-            event_action=event_action, event_model_app_label=event_model_app_label,
-            event_model_name=event_model_name, event_object_id=event_object_id,
-            event_timestamp_iso=event_timestamp_iso, event_data=event_data,
-            attempt=attempt + 1, retry_count=retry_count, retry_backoff=retry_backoff,
+            event_action=event_action,
+            event_model_app_label=event_model_app_label,
+            event_model_name=event_model_name,
+            event_object_id=event_object_id,
+            event_timestamp_iso=event_timestamp_iso,
+            event_data=event_data,
+            attempt=attempt + 1,
+            retry_count=retry_count,
+            retry_backoff=retry_backoff,
         )
 
         if retry_backoff and retry_backoff > 0:
@@ -106,10 +129,14 @@ def send_webhook_task(url, method, headers, secret, event_action, event_model_ap
             # -1, which makes django-q delete the schedule after it fires once.
             logger.warning(
                 "Webhook %s failed (attempt %d/%d): %s — retrying in %ds",
-                url, attempt + 1, retry_count, exc, retry_backoff,
+                url,
+                attempt + 1,
+                retry_count,
+                exc,
+                retry_backoff,
             )
             Schedule.objects.create(
-                func='core.tasks.send_webhook_task',
+                func="core.tasks.send_webhook_task",
                 kwargs=repr(retry_kwargs),
                 schedule_type=Schedule.ONCE,
                 next_run=timezone.now() + datetime.timedelta(seconds=retry_backoff),
@@ -117,6 +144,9 @@ def send_webhook_task(url, method, headers, secret, event_action, event_model_ap
         else:
             logger.warning(
                 "Webhook %s failed (attempt %d/%d): %s — retrying immediately",
-                url, attempt + 1, retry_count, exc,
+                url,
+                attempt + 1,
+                retry_count,
+                exc,
             )
-            async_task('core.tasks.send_webhook_task', **retry_kwargs)
+            async_task("core.tasks.send_webhook_task", **retry_kwargs)

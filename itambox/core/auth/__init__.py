@@ -1,16 +1,18 @@
 import logging
+
 from django.contrib.auth import get_user_model
 from django.contrib.auth.backends import ModelBackend
 from django.utils import timezone
+
 from core.auth.cache import synchronize_authorization_cache
 from core.managers import (
+    get_current_all_accessible,
+    get_current_membership,
+    get_current_scope_conflict,
     get_current_tenant,
     get_current_tenant_group,
-    get_current_membership,
-    get_current_all_accessible,
-    get_current_scope_conflict,
-    set_current_tenant,
     set_current_membership,
+    set_current_tenant,
 )
 
 logger = logging.getLogger(__name__)
@@ -22,12 +24,13 @@ class PasswordLoginOnlyBackend(ModelBackend):
     permission checks so the only path that grants permissions is the unified
     :class:`MembershipBackend` below.
     """
+
     def user_can_authenticate(self, user):
         # Standard ModelBackend hook (also checks ``is_active``). A user with
         # ``can_login=False`` may never perform interactive password login — independent of
         # ``is_active`` (account status) and of API-token access. ``getattr`` keeps this safe
         # if the user model lacks the field (e.g. during a partial migration).
-        return super().user_can_authenticate(user) and getattr(user, 'can_login', True)
+        return super().user_can_authenticate(user) and getattr(user, "can_login", True)
 
     def has_perm(self, user_obj, perm, obj=None):
         return False
@@ -60,6 +63,7 @@ class MembershipBackend:
     stripped in the managed projection — role content alone decides what a grant
     conveys, and the escalation guard decides who may create it.
     """
+
     def authenticate(self, request, username=None, password=None, **kwargs):
         return None
 
@@ -71,7 +75,7 @@ class MembershipBackend:
         in a single request cost at most three queries.
         """
         synchronize_authorization_cache(user_obj)
-        cache_key = f'_perms_tenant_{tenant.pk}'
+        cache_key = f"_perms_tenant_{tenant.pk}"
         if hasattr(user_obj, cache_key):
             permissions, valid_until = getattr(user_obj, cache_key)
             if valid_until is None or valid_until > timezone.now():
@@ -93,7 +97,7 @@ class MembershipBackend:
         ``None`` for a tenant-less (global/shared) object."""
         from organization.models import Tenant
 
-        obj_tenant = getattr(obj, 'tenant', None)
+        obj_tenant = getattr(obj, "tenant", None)
         if obj_tenant is None and isinstance(obj, Tenant):
             obj_tenant = obj
         return obj_tenant
@@ -116,49 +120,56 @@ class MembershipBackend:
             # "All accessible tenants" scope: the gate passes when the permission
             # is held in ANY canonically accessible tenant, and fails closed when
             # it is held in none — mirroring the tenant-group union below.
-            cache_key = '_all_accessible_scope_tenants'
+            cache_key = "_all_accessible_scope_tenants"
             if hasattr(user_obj, cache_key):
                 tenants, valid_until = getattr(user_obj, cache_key)
                 if valid_until is None or valid_until > timezone.now():
                     return tenants
             # inline imports: avoid AppRegistryNotReady / a core<->organization cycle at load
-            from organization.models import Tenant
             from organization.access import accessible_tenant_ids_with_expiry
+            from organization.models import Tenant
+
             ids, valid_until = accessible_tenant_ids_with_expiry(user_obj)
-            tenants = list(Tenant._base_manager.filter(
-                pk__in=ids,
-                deleted_at__isnull=True,
-            ))
+            tenants = list(
+                Tenant._base_manager.filter(
+                    pk__in=ids,
+                    deleted_at__isnull=True,
+                )
+            )
             setattr(user_obj, cache_key, (tenants, valid_until))
             return tenants
         group = get_current_tenant_group()
         if group is None:
             return None
-        cache_key = f'_group_scope_tenants_{group.pk}'
+        cache_key = f"_group_scope_tenants_{group.pk}"
         if hasattr(user_obj, cache_key):
             tenants, valid_until = getattr(user_obj, cache_key)
             if valid_until is None or valid_until > timezone.now():
                 return tenants
         # inline imports: avoid AppRegistryNotReady / a core<->organization cycle at load
-        from organization.models import Tenant
         from organization.access import (
-            accessible_tenant_ids_with_expiry, get_descendant_tenant_group_ids,
+            accessible_tenant_ids_with_expiry,
+            get_descendant_tenant_group_ids,
         )
+        from organization.models import Tenant
+
         # live_only: prune soft-deleted subgroups exactly like filter_by_tenant's
         # walk, so the gate never counts a tenant the scoped querysets will hide.
         ids, valid_until = accessible_tenant_ids_with_expiry(user_obj)
-        tenants = list(Tenant._base_manager.filter(
-            pk__in=ids,
-            group_id__in=get_descendant_tenant_group_ids(group.pk, live_only=True),
-            deleted_at__isnull=True,
-        ))
+        tenants = list(
+            Tenant._base_manager.filter(
+                pk__in=ids,
+                group_id__in=get_descendant_tenant_group_ids(group.pk, live_only=True),
+                deleted_at__isnull=True,
+            )
+        )
         setattr(user_obj, cache_key, (tenants, valid_until))
         return tenants
 
     def _ambient_tenant(self, user_obj):
         """Single-tenant ambient context: bound membership → current tenant →
         first active membership's tenant → first scoped managed tenant."""
-        from organization.models import Tenant, Membership
+        from organization.models import Membership, Tenant
 
         membership = get_current_membership()
         if membership and membership.user_id == user_obj.pk and membership.tenant_id:
@@ -166,9 +177,14 @@ class MembershipBackend:
         current_tenant = get_current_tenant()
         if current_tenant is not None:
             return current_tenant
-        first = Membership.objects.filter(
-            user=user_obj, is_active=True,
-        ).select_related('tenant').first()
+        first = (
+            Membership.objects.filter(
+                user=user_obj,
+                is_active=True,
+            )
+            .select_related("tenant")
+            .first()
+        )
         if first is not None:
             set_current_tenant(first.tenant)
             set_current_membership(first)
@@ -176,9 +192,10 @@ class MembershipBackend:
         # Defensive fallback: a user whose only access is managed reach (should not
         # happen — reach rides on a membership — but fail towards a valid context).
         from organization.access import managed_accessible_tenant_ids
+
         reachable = managed_accessible_tenant_ids(user_obj)
         if reachable:
-            tenant = Tenant._base_manager.filter(pk__in=reachable).order_by('name').first()
+            tenant = Tenant._base_manager.filter(pk__in=reachable).order_by("name").first()
             if tenant is not None:
                 set_current_tenant(tenant)
                 return tenant
@@ -214,7 +231,7 @@ class MembershipBackend:
         and the per-tenant loop kept paying the full per-grant walk N times.
         """
         synchronize_authorization_cache(user_obj)
-        cached = user_obj.__dict__.get('_all_accessible_perms')
+        cached = user_obj.__dict__.get("_all_accessible_perms")
         if cached is not None:
             return cached
         group_tenants = self._group_scope_tenants(user_obj)
@@ -222,12 +239,13 @@ class MembershipBackend:
             return frozenset()
         # inline import: avoids AppRegistryNotReady at auth-backend import time.
         from organization.rbac import build_accessible_tenant_permissions_map
+
         build_accessible_tenant_permissions_map(user_obj)
         all_perms = set()
         for tenant in group_tenants:
             all_perms.update(self._effective_perms_for_tenant(user_obj, tenant))
         result = frozenset(all_perms)
-        user_obj.__dict__['_all_accessible_perms'] = result
+        user_obj.__dict__["_all_accessible_perms"] = result
         return result
 
     @staticmethod
@@ -240,8 +258,8 @@ class MembershipBackend:
         ``view_*`` permissions are safe to aggregate. Mutations remain available
         after selecting one tenant, or through an explicit object-bound check.
         """
-        codename = perm.rsplit('.', 1)[-1]
-        return codename.startswith('view_')
+        codename = perm.rsplit(".", 1)[-1]
+        return codename.startswith("view_")
 
     def has_perm(self, user_obj, perm, obj=None):
         if not user_obj.is_active:
@@ -252,10 +270,7 @@ class MembershipBackend:
             return False
         tenant = self._object_tenant(user_obj, obj) if obj is not None else None
         if tenant is None:
-            if (
-                get_current_all_accessible()
-                and not self._aggregate_scope_allows_ambient_permission(perm)
-            ):
+            if get_current_all_accessible() and not self._aggregate_scope_allows_ambient_permission(perm):
                 return False
             # Ambient check (list/add gates, nav). Under an active tenant-group
             # scope the page aggregates every accessible tenant in the subtree,
@@ -268,10 +283,7 @@ class MembershipBackend:
             if group_tenants is not None:
                 if get_current_all_accessible():
                     return perm in self._all_accessible_permissions(user_obj)
-                return any(
-                    perm in self._effective_perms_for_tenant(user_obj, tenant)
-                    for tenant in group_tenants
-                )
+                return any(perm in self._effective_perms_for_tenant(user_obj, tenant) for tenant in group_tenants)
             tenant = self._ambient_tenant(user_obj)
         if tenant is None:
             return False
@@ -284,23 +296,18 @@ class MembershipBackend:
             return True
         if get_current_scope_conflict(user_obj):
             return False
-        prefix = app_label + '.'
+        prefix = app_label + "."
         # Same group-union semantics as the ambient has_perm gate above.
         group_tenants = self._group_scope_tenants(user_obj)
         if group_tenants is not None:
             if get_current_all_accessible():
                 all_perms = self._all_accessible_permissions(user_obj)
                 return any(
-                    p.startswith(prefix)
-                    and self._aggregate_scope_allows_ambient_permission(p)
-                    for p in all_perms
+                    p.startswith(prefix) and self._aggregate_scope_allows_ambient_permission(p) for p in all_perms
                 )
             return any(
                 p.startswith(prefix)
-                and (
-                    not get_current_all_accessible()
-                    or self._aggregate_scope_allows_ambient_permission(p)
-                )
+                and (not get_current_all_accessible() or self._aggregate_scope_allows_ambient_permission(p))
                 for tenant in group_tenants
                 for p in self._effective_perms_for_tenant(user_obj, tenant)
             )

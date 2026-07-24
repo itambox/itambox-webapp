@@ -2,14 +2,16 @@
 Tests for Part 6: audit cadence (Category.audit_interval_months, Asset.audit_due_date,
 Asset.audit_overdue, AssetFilterSet audit_due filter, alert rule respects per-category cadence).
 """
+
 from datetime import timedelta
-from django.test import TestCase, RequestFactory
-from django.utils import timezone
+
 from django.contrib.auth import get_user_model
+from django.test import RequestFactory, TestCase
+from django.utils import timezone
 from model_bakery import baker
 
-from assets.models import Asset, AssetType, Category, StatusLabel, Manufacturer
 from assets.filters import AssetFilterSet
+from assets.models import Asset, AssetType, Category, Manufacturer, StatusLabel
 from core.tests.mixins import TenantTestMixin
 
 User = get_user_model()
@@ -37,9 +39,7 @@ class AuditDueDatePropertyTests(TestCase):
         at = _make_asset_type(cat)
         asset = baker.make(Asset, asset_type=at, status=self.status, last_audited=last_audited)
         if created_at_offset_days is not None:
-            Asset.objects.filter(pk=asset.pk).update(
-                created_at=self.now - timedelta(days=created_at_offset_days)
-            )
+            Asset.objects.filter(pk=asset.pk).update(created_at=self.now - timedelta(days=created_at_offset_days))
             asset.refresh_from_db()
         return asset
 
@@ -57,9 +57,7 @@ class AuditDueDatePropertyTests(TestCase):
         audited_at = self.now - timedelta(days=10)
         asset = self._make(interval_months=1, last_audited=audited_at)
         expected = audited_at + timedelta(days=30)
-        self.assertAlmostEqual(
-            asset.audit_due_date.timestamp(), expected.timestamp(), delta=1
-        )
+        self.assertAlmostEqual(asset.audit_due_date.timestamp(), expected.timestamp(), delta=1)
 
     def test_due_date_falls_back_to_created_at(self):
         asset = self._make(interval_months=1, last_audited=None, created_at_offset_days=5)
@@ -106,7 +104,7 @@ class AuditDueFilterTests(TenantTestMixin, TestCase):
 
     def _filter(self, value):
         qs = Asset.objects.filter(tenant=self.tenant)
-        fs = AssetFilterSet(data={'audit_due': value}, queryset=qs)
+        fs = AssetFilterSet(data={"audit_due": value}, queryset=qs)
         return list(fs.qs)
 
     def test_overdue_filter_returns_overdue_assets(self):
@@ -114,7 +112,7 @@ class AuditDueFilterTests(TenantTestMixin, TestCase):
         fresh = self._make_asset(self.at_interval, last_audited=self.now - timedelta(days=5))
         no_cadence = self._make_asset(self.at_no_interval)
 
-        results = self._filter('true')
+        results = self._filter("true")
         self.assertIn(overdue, results)
         self.assertNotIn(fresh, results)
         self.assertNotIn(no_cadence, results)
@@ -123,7 +121,7 @@ class AuditDueFilterTests(TenantTestMixin, TestCase):
         overdue = self._make_asset(self.at_interval, last_audited=self.now - timedelta(days=40))
         fresh = self._make_asset(self.at_interval, last_audited=self.now - timedelta(days=5))
 
-        results = self._filter('false')
+        results = self._filter("false")
         self.assertNotIn(overdue, results)
         self.assertIn(fresh, results)
 
@@ -132,19 +130,17 @@ class AuditDueFilterTests(TenantTestMixin, TestCase):
         # created_at is effectively now, so if interval=1mo it's not actually overdue yet
         # But we need to verify it's included in the overdue bucket when created_at is old.
         # Reset created_at to be older than the interval.
-        Asset.objects.filter(pk=never_audited.pk).update(
-            created_at=self.now - timedelta(days=45)
-        )
+        Asset.objects.filter(pk=never_audited.pk).update(created_at=self.now - timedelta(days=45))
         never_audited.refresh_from_db()
         # With no last_audited, audit_due_date uses created_at.
         # created_at is 45 days ago, interval is 30 days → overdue.
-        results = self._filter('true')
+        results = self._filter("true")
         self.assertIn(never_audited, results)
 
     def test_no_filter_value_returns_all(self):
         a1 = self._make_asset(self.at_interval, last_audited=self.now - timedelta(days=40))
         a2 = self._make_asset(self.at_no_interval)
-        results = self._filter('')
+        results = self._filter("")
         # Empty string → no filter applied
         self.assertIn(a1, results)
         self.assertIn(a2, results)
@@ -170,7 +166,9 @@ class AlertRuleCadenceTests(TestCase):
         from extras.models import AlertRule
 
         # Global rule: 180-day threshold
-        rule = baker.make(AlertRule, alert_type=AlertRule.ALERT_TYPE_AUDIT_OVERDUE, threshold_value=180, tenant=None, is_active=True)
+        rule = baker.make(
+            AlertRule, alert_type=AlertRule.ALERT_TYPE_AUDIT_OVERDUE, threshold_value=180, tenant=None, is_active=True
+        )
 
         # Asset: 45 days since last audit, category says every 30 days → overdue
         asset_overdue_by_cat = self._make_asset(interval_months=1, last_audited_days_ago=45)
@@ -178,7 +176,7 @@ class AlertRuleCadenceTests(TestCase):
         no_cat_asset = self._make_asset(interval_months=None, last_audited_days_ago=45)
 
         results = _match_audit_overdue(rule, self.today)
-        result_ids = {m['obj'].pk for m in results}
+        result_ids = {m["obj"].pk for m in results}
 
         self.assertIn(asset_overdue_by_cat.pk, result_ids)
         self.assertNotIn(no_cat_asset.pk, result_ids)
@@ -189,12 +187,14 @@ class AlertRuleCadenceTests(TestCase):
         from extras.models import AlertRule
 
         # Global rule: 30-day threshold
-        rule = baker.make(AlertRule, alert_type=AlertRule.ALERT_TYPE_AUDIT_OVERDUE, threshold_value=30, tenant=None, is_active=True)
+        rule = baker.make(
+            AlertRule, alert_type=AlertRule.ALERT_TYPE_AUDIT_OVERDUE, threshold_value=30, tenant=None, is_active=True
+        )
 
         # Asset: 45 days since last audit, but category says every 90 days → still fine
         asset_ok = self._make_asset(interval_months=3, last_audited_days_ago=45)
 
         results = _match_audit_overdue(rule, self.today)
-        result_ids = {m['obj'].pk for m in results}
+        result_ids = {m["obj"].pk for m in results}
 
         self.assertNotIn(asset_ok.pk, result_ids)

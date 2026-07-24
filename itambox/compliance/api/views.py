@@ -1,13 +1,23 @@
 from django_filters.rest_framework import DjangoFilterBackend
-from itambox.api.viewsets import ITAMBoxModelViewSet
-from core.managers import get_current_tenant
-from itambox.middleware import get_current_user
-from compliance.models import CustodyReceipt, CustodyTemplate, AuditSession, AssetAudit
+
 from assets.models import AssetMaintenance
-from compliance.filters import CustodyReceiptFilterSet, AssetMaintenanceFilterSet, AuditSessionFilterSet, AssetAuditFilterSet
+from compliance.filters import (
+    AssetAuditFilterSet,
+    AssetMaintenanceFilterSet,
+    AuditSessionFilterSet,
+    CustodyReceiptFilterSet,
+)
+from compliance.models import AssetAudit, AuditSession, CustodyReceipt, CustodyTemplate
+from core.managers import get_current_tenant
+from itambox.api.viewsets import ITAMBoxModelViewSet
+from itambox.middleware import get_current_user
+
 from .serializers import (
-    CustodyReceiptSerializer, CustodyTemplateSerializer, AssetMaintenanceSerializer,
-    AuditSessionSerializer, AssetAuditSerializer,
+    AssetAuditSerializer,
+    AssetMaintenanceSerializer,
+    AuditSessionSerializer,
+    CustodyReceiptSerializer,
+    CustodyTemplateSerializer,
 )
 
 
@@ -28,7 +38,7 @@ def _scope_by_asset_tenant(queryset):
     if tenant is not None:
         return queryset.filter(asset__tenant=tenant)
     user = get_current_user()
-    if user is not None and not getattr(user, 'is_superuser', False):
+    if user is not None and not getattr(user, "is_superuser", False):
         return queryset.none()
     return queryset
 
@@ -38,12 +48,14 @@ class CustodyTemplateViewSet(ITAMBoxModelViewSet):
     # with allow_global_tenant, so BaseViewSet.get_queryset() auto-applies
     # filter_by_tenant() — returning the active tenant's own templates plus the
     # shared global (tenant=None) templates. No custom get_queryset needed.
-    queryset = CustodyTemplate.objects.select_related('tenant', 'tenant_group', 'category').prefetch_related('tags').all()
+    queryset = (
+        CustodyTemplate.objects.select_related("tenant", "tenant_group", "category").prefetch_related("tags").all()
+    )
     serializer_class = CustodyTemplateSerializer
 
 
 class CustodyReceiptViewSet(ITAMBoxModelViewSet):
-    queryset = CustodyReceipt.objects.select_related('asset', 'holder').all()
+    queryset = CustodyReceipt.objects.select_related("asset", "holder").all()
     serializer_class = CustodyReceiptSerializer
     filter_backends = (DjangoFilterBackend,)
     filterset_class = CustodyReceiptFilterSet
@@ -53,7 +65,7 @@ class CustodyReceiptViewSet(ITAMBoxModelViewSet):
 
 
 class AssetMaintenanceViewSet(ITAMBoxModelViewSet):
-    queryset = AssetMaintenance.objects.select_related('asset').all()
+    queryset = AssetMaintenance.objects.select_related("asset").all()
     serializer_class = AssetMaintenanceSerializer
     filter_backends = (DjangoFilterBackend,)
     filterset_class = AssetMaintenanceFilterSet
@@ -63,7 +75,7 @@ class AssetMaintenanceViewSet(ITAMBoxModelViewSet):
 
 
 class AuditSessionViewSet(ITAMBoxModelViewSet):
-    queryset = AuditSession.objects.select_related('location', 'created_by').all()
+    queryset = AuditSession.objects.select_related("location", "created_by").all()
     serializer_class = AuditSessionSerializer
     filter_backends = (DjangoFilterBackend,)
     filterset_class = AuditSessionFilterSet
@@ -73,9 +85,7 @@ class AuditSessionViewSet(ITAMBoxModelViewSet):
 
 
 class AssetAuditViewSet(ITAMBoxModelViewSet):
-    queryset = AssetAudit.objects.select_related(
-        'asset', 'auditor', 'location', 'status', 'session'
-    ).all()
+    queryset = AssetAudit.objects.select_related("asset", "auditor", "location", "status", "session").all()
     serializer_class = AssetAuditSerializer
     filter_backends = (DjangoFilterBackend,)
     filterset_class = AssetAuditFilterSet
@@ -85,4 +95,3 @@ class AssetAuditViewSet(ITAMBoxModelViewSet):
 
     def perform_create(self, serializer):
         serializer.save(auditor=self.request.user)
-

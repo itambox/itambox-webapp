@@ -1,4 +1,6 @@
+from django.contrib.auth import get_user_model
 from model_bakery.recipe import Recipe, foreign_key
+
 from organization.models import (
     Membership,
     Role,
@@ -7,35 +9,16 @@ from organization.models import (
     Tenant,
     TenantGroup,
 )
-from django.contrib.auth import get_user_model
 
 User = get_user_model()
 
-tenant_group = Recipe(
-    TenantGroup,
-    name="Test Group",
-    slug="test-group"
-)
+tenant_group = Recipe(TenantGroup, name="Test Group", slug="test-group")
 
-tenant = Recipe(
-    Tenant,
-    name="Test Tenant",
-    slug="test-tenant",
-    group=foreign_key(tenant_group)
-)
+tenant = Recipe(Tenant, name="Test Tenant", slug="test-tenant", group=foreign_key(tenant_group))
 
-tenant_role = Recipe(
-    Role,
-    tenant=foreign_key(tenant),
-    name="Member",
-    permissions=[]
-)
+tenant_role = Recipe(Role, tenant=foreign_key(tenant), name="Member", permissions=[])
 
-user = Recipe(
-    User,
-    username="testuser",
-    email="testuser@example.com"
-)
+user = Recipe(User, username="testuser", email="testuser@example.com")
 
 # A Membership is just the (user, tenant) anchor. Callers needing effective
 # access should normally use ``core.tests.mixins.grant(...)`` so a scope is added.

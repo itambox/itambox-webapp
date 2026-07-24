@@ -11,12 +11,13 @@ automatic checkout, because assignment carries compliance side-effects.
 """
 
 import logging
+
 from django.conf import settings
 from django.utils import timezone
 
+from core.integrations.intune import IntuneClient
 from core.models import Job
 from core.tasks.context import TaskContext
-from core.integrations.intune import IntuneClient
 
 logger = logging.getLogger(__name__)
 
@@ -51,8 +52,9 @@ def sync_tenant_intune(
 
 def _run_sync(tenant, dry_run: bool, job: Job) -> dict:
     from django.conf import settings as _settings
-    from organization.models import Tenant, AssetHolder
-    from assets.models import Asset, Manufacturer, AssetType, StatusLabel
+
+    from assets.models import Asset, AssetType, Manufacturer, StatusLabel
+    from organization.models import AssetHolder, Tenant
 
     tenant_configs = getattr(_settings, "ITAMBOX_TENANT_INTUNE_CONFIGS", {})
     config = tenant_configs.get(tenant.slug)
@@ -147,7 +149,7 @@ def _stamp_discovery_facts(asset, device: dict, tenant, dry_run: bool) -> None:
 
 def _create_asset(device: dict, tenant, default_status_slug: str, dry_run: bool):
     """Create a Manufacturer, AssetType (get_or_create), and Asset for a new device."""
-    from assets.models import Asset, Manufacturer, AssetType, StatusLabel
+    from assets.models import Asset, AssetType, Manufacturer, StatusLabel
 
     serial = (device.get("serialNumber") or "").strip()
     device_name = (device.get("deviceName") or serial or "Unknown").strip()
@@ -191,7 +193,7 @@ def _create_asset(device: dict, tenant, default_status_slug: str, dry_run: bool)
 def _sync_device_software(client: IntuneClient, device: dict, asset, dry_run: bool) -> int:
     """Upsert InstalledSoftware records for all detected apps on a device."""
     from assets.models import Manufacturer
-    from software.models import Software, InstalledSoftware
+    from software.models import InstalledSoftware, Software
 
     device_id = device.get("id")
     if not device_id:
@@ -262,6 +264,7 @@ def _sync_device_software(client: IntuneClient, device: dict, asset, dry_run: bo
 def _slugify(value: str) -> str:
     """Minimal slug generation matching Django's default slugify output."""
     import re
+
     value = value.lower().strip()
     value = re.sub(r"[^\w\s-]", "", value)
     value = re.sub(r"[\s_-]+", "-", value)

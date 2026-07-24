@@ -5,8 +5,8 @@
 import csv
 import io
 import logging
-import yaml
 
+import yaml
 from django import forms
 from django.conf import settings
 from django.core.exceptions import ValidationError
@@ -17,41 +17,66 @@ logger = logging.getLogger(__name__)
 # Upper bound on rows accepted in a single bulk import. Beyond this, the request
 # is rejected so a single submission can't exhaust memory / hold a transaction
 # open indefinitely; large datasets should be split into batches.
-MAX_IMPORT_ROWS = getattr(settings, 'MAX_IMPORT_ROWS', 10000)
+MAX_IMPORT_ROWS = getattr(settings, "MAX_IMPORT_ROWS", 10000)
 
 # Fields that are never user-importable: set from request context, computed by
 # background tasks, or framework-managed. Excluded from both the dynamic field
 # enumeration and the "Field Options" help table.
-IMPORT_EXCLUDED_FIELDS = frozenset({
-    'tenant', 'deleted_at', 'created_at', 'updated_at', 'custom_field_data',
-    'current_book_value', 'depreciation_updated_at',
-    'disposed_at', 'disposal_value', 'last_audited', 'last_audited_by',
-})
+IMPORT_EXCLUDED_FIELDS = frozenset(
+    {
+        "tenant",
+        "deleted_at",
+        "created_at",
+        "updated_at",
+        "custom_field_data",
+        "current_book_value",
+        "depreciation_updated_at",
+        "disposed_at",
+        "disposal_value",
+        "last_audited",
+        "last_audited_by",
+    }
+)
 
 
 # Models that are NOT user-importable/exportable: generated logs, system records,
 # and complex config (JSON / secrets / relations) that is managed in the UI rather
 # than via bulk CSV. Drives the import-view gate AND the nav/list import+export
 # buttons from one source so they never drift. Everything else is importable.
-IMPORT_EXCLUDED_MODELS = frozenset({
-    # Generated / log / system data
-    'core.objectchange', 'core.notification', 'core.job',
-    'extras.alertlog', 'extras.event', 'extras.journalentry',
-    # Alerting / reporting configuration
-    'extras.alertrule', 'extras.notificationchannel',
-    'extras.scheduledreport', 'extras.reporttemplate',
-    # Other config (relations / JSON / secrets)
-    'extras.eventrule', 'extras.webhookendpoint', 'extras.dashboard',
-    # Authentication and canonical RBAC aggregates. The generic importer is an
-    # UPSERT surface built from raw model fields; using it here would bypass
-    # RoleForm/MembershipForm escalation checks, group provenance, scoped-grant
-    # validation, and User privilege controls. These objects are administered
-    # only through their security-aware UI/API/directory workflows.
-    'organization.membership', 'organization.role',
-    'organization.rolegrant', 'organization.rolegrantscope',
-    'organization.tenantresourcegrant',
-    'users.groupmembership', 'users.token', 'users.user', 'users.usergroup',
-})
+IMPORT_EXCLUDED_MODELS = frozenset(
+    {
+        # Generated / log / system data
+        "core.objectchange",
+        "core.notification",
+        "core.job",
+        "extras.alertlog",
+        "extras.event",
+        "extras.journalentry",
+        # Alerting / reporting configuration
+        "extras.alertrule",
+        "extras.notificationchannel",
+        "extras.scheduledreport",
+        "extras.reporttemplate",
+        # Other config (relations / JSON / secrets)
+        "extras.eventrule",
+        "extras.webhookendpoint",
+        "extras.dashboard",
+        # Authentication and canonical RBAC aggregates. The generic importer is an
+        # UPSERT surface built from raw model fields; using it here would bypass
+        # RoleForm/MembershipForm escalation checks, group provenance, scoped-grant
+        # validation, and User privilege controls. These objects are administered
+        # only through their security-aware UI/API/directory workflows.
+        "organization.membership",
+        "organization.role",
+        "organization.rolegrant",
+        "organization.rolegrantscope",
+        "organization.tenantresourcegrant",
+        "users.groupmembership",
+        "users.token",
+        "users.user",
+        "users.usergroup",
+    }
+)
 
 
 def is_model_importable(model):
@@ -60,7 +85,7 @@ def is_model_importable(model):
     import/export buttons in the nav and list header."""
     if model is None:
         return False
-    label = f'{model._meta.app_label}.{model._meta.model_name}'
+    label = f"{model._meta.app_label}.{model._meta.model_name}"
     return label not in IMPORT_EXCLUDED_MODELS
 
 
@@ -73,7 +98,7 @@ _IMPORT_FORMS_LOADED = False
 
 def register_import_form(form_cls):
     """Decorator: register a curated BulkImportForm for its model."""
-    if getattr(form_cls, 'model', None) is not None:
+    if getattr(form_cls, "model", None) is not None:
         _IMPORT_FORM_REGISTRY[form_cls.model] = form_cls
     return form_cls
 
@@ -88,7 +113,7 @@ def get_registered_import_form(model):
         try:
             import assets.forms.import_forms  # noqa: F401
         except Exception:
-            logger.exception('Failed to load curated import forms')
+            logger.exception("Failed to load curated import forms")
     return _IMPORT_FORM_REGISTRY.get(model)
 
 
@@ -109,7 +134,7 @@ def resolve_related(related_model, value):
     obj = None
     if value.isdigit():
         obj = related_model.objects.filter(pk=int(value)).first()
-    lookup_fields = ['slug', 'name', 'model', 'username', 'upn']
+    lookup_fields = ["slug", "name", "model", "username", "upn"]
     if not obj:
         for lookup in lookup_fields:
             if _model_has_concrete_field(related_model, lookup):
@@ -145,35 +170,31 @@ class BulkImportForm(forms.Form):
     required_fields = []
     optional_fields = []
 
-    active_tab = forms.CharField(
-        widget=forms.HiddenInput(),
-        initial='upload',
-        required=False
-    )
+    active_tab = forms.CharField(widget=forms.HiddenInput(), initial="upload", required=False)
     import_format = forms.ChoiceField(
-        choices=[('csv', 'CSV'), ('yaml', 'YAML')],
-        initial='csv',
-        widget=forms.RadioSelect(attrs={'class': 'form-selectgroup-input'}),
-        required=False
+        choices=[("csv", "CSV"), ("yaml", "YAML")],
+        initial="csv",
+        widget=forms.RadioSelect(attrs={"class": "form-selectgroup-input"}),
+        required=False,
     )
     csv_file = forms.FileField(
-        label=_('File'),
-        help_text=_('Upload a CSV or YAML file with headers matching the field names.'),
-        widget=forms.FileInput(attrs={'class': 'form-control'}),
-        required=False
+        label=_("File"),
+        help_text=_("Upload a CSV or YAML file with headers matching the field names."),
+        widget=forms.FileInput(attrs={"class": "form-control"}),
+        required=False,
     )
     import_text = forms.CharField(
-        label=_('Direct Data Input'),
-        help_text=_('Paste CSV or YAML data matching the field names.'),
-        widget=forms.Textarea(attrs={'class': 'form-control font-monospace', 'rows': 8}),
-        required=False
+        label=_("Direct Data Input"),
+        help_text=_("Paste CSV or YAML data matching the field names."),
+        widget=forms.Textarea(attrs={"class": "form-control font-monospace", "rows": 8}),
+        required=False,
     )
     delimiter = forms.ChoiceField(
-        label=_('CSV Delimiter'),
-        choices=[(',', _('Comma (,)')), ('\t', _('Tab')), (';', _('Semicolon (;)'))],
-        initial=',',
-        widget=forms.Select(attrs={'class': 'form-select'}),
-        required=False
+        label=_("CSV Delimiter"),
+        choices=[(",", _("Comma (,)")), ("\t", _("Tab")), (";", _("Semicolon (;)"))],
+        initial=",",
+        widget=forms.Select(attrs={"class": "form-select"}),
+        required=False,
     )
 
     def __init__(self, *args, **kwargs):
@@ -187,99 +208,103 @@ class BulkImportForm(forms.Form):
         return list(self.required_fields) + list(self.optional_fields)
 
     def clean_csv_file(self):
-        return self.cleaned_data.get('csv_file')
+        return self.cleaned_data.get("csv_file")
 
     def clean(self):
         cleaned_data = super().clean()
-        import_format = cleaned_data.get('import_format') or self.data.get('import_format', 'csv')
+        import_format = cleaned_data.get("import_format") or self.data.get("import_format", "csv")
 
-        csv_file = cleaned_data.get('csv_file')
-        import_text = cleaned_data.get('import_text') or ''
-        active_tab = cleaned_data.get('active_tab') or self.data.get('active_tab', 'upload')
+        csv_file = cleaned_data.get("csv_file")
+        import_text = cleaned_data.get("import_text") or ""
+        active_tab = cleaned_data.get("active_tab") or self.data.get("active_tab", "upload")
 
         # Auto-detect active tab based on which data is provided
         if csv_file:
-            active_tab = 'upload'
+            active_tab = "upload"
         elif import_text.strip():
-            active_tab = 'editor'
+            active_tab = "editor"
 
         self._rows_data = []
         raw_data = ""
 
-        if active_tab == 'upload':
+        if active_tab == "upload":
             if not csv_file:
-                raise ValidationError(_('Please select a file to upload.'))
+                raise ValidationError(_("Please select a file to upload."))
             try:
-                raw_data = csv_file.read().decode('utf-8-sig')
+                raw_data = csv_file.read().decode("utf-8-sig")
             except UnicodeDecodeError:
                 try:
                     csv_file.seek(0)
-                    raw_data = csv_file.read().decode('latin-1')
+                    raw_data = csv_file.read().decode("latin-1")
                 except Exception:
-                    raise ValidationError(_('Unable to decode file. Please upload a valid text-based CSV or YAML file.'))
+                    raise ValidationError(
+                        _("Unable to decode file. Please upload a valid text-based CSV or YAML file.")
+                    )
         else:
             if not import_text.strip():
-                raise ValidationError(_('Please paste data in the editor tab.'))
+                raise ValidationError(_("Please paste data in the editor tab."))
             raw_data = import_text
 
-        if import_format == 'csv':
-            delimiter = cleaned_data.get('delimiter') or ','
+        if import_format == "csv":
+            delimiter = cleaned_data.get("delimiter") or ","
             try:
                 reader = csv.DictReader(io.StringIO(raw_data), delimiter=delimiter)
                 rows = list(reader)
             except Exception as e:
-                raise ValidationError(_('Failed to parse CSV data: {error}').format(error=str(e)))
+                raise ValidationError(_("Failed to parse CSV data: {error}").format(error=str(e)))
 
             if not rows:
-                raise ValidationError(_('CSV data is empty.'))
+                raise ValidationError(_("CSV data is empty."))
 
             if len(rows) > MAX_IMPORT_ROWS:
                 raise ValidationError(
-                    _('Import exceeds the maximum of {max} rows; split into smaller batches.').format(max=MAX_IMPORT_ROWS)
+                    _("Import exceeds the maximum of {max} rows; split into smaller batches.").format(
+                        max=MAX_IMPORT_ROWS
+                    )
                 )
 
             headers = set(rows[0].keys())
-            headers = {h.strip() if h else '' for h in headers}
+            headers = {h.strip() if h else "" for h in headers}
             missing_required = [f for f in self.required_fields if f not in headers]
             if missing_required:
                 raise ValidationError(
-                    _('Missing required columns: {columns}').format(columns=", ".join(missing_required))
+                    _("Missing required columns: {columns}").format(columns=", ".join(missing_required))
                 )
 
             self._rows_data = []
             for row in rows:
-                cleaned_row = {k.strip() if k else '': (v.strip() if v else '') for k, v in row.items()}
+                cleaned_row = {k.strip() if k else "": (v.strip() if v else "") for k, v in row.items()}
                 self._rows_data.append(cleaned_row)
 
-        elif import_format == 'yaml':
+        elif import_format == "yaml":
             try:
                 parsed_yaml = yaml.safe_load(raw_data)
             except Exception as e:
-                raise ValidationError(_('Failed to parse YAML data: {error}').format(error=str(e)))
+                raise ValidationError(_("Failed to parse YAML data: {error}").format(error=str(e)))
 
             if not parsed_yaml:
-                raise ValidationError(_('YAML document is empty.'))
+                raise ValidationError(_("YAML document is empty."))
 
             if not isinstance(parsed_yaml, list):
                 if isinstance(parsed_yaml, dict):
                     parsed_yaml = [parsed_yaml]
                 else:
-                    raise ValidationError(_('YAML input must be a list of objects or a single object mapping.'))
+                    raise ValidationError(_("YAML input must be a list of objects or a single object mapping."))
 
             if not parsed_yaml or not isinstance(parsed_yaml[0], dict):
-                raise ValidationError(_('YAML data elements must be mappings (key-value pairs).'))
+                raise ValidationError(_("YAML data elements must be mappings (key-value pairs)."))
 
             if len(parsed_yaml) > MAX_IMPORT_ROWS:
                 raise ValidationError(
-                    _('Import exceeds the maximum of {max} rows; split into smaller batches.').format(max=MAX_IMPORT_ROWS)
+                    _("Import exceeds the maximum of {max} rows; split into smaller batches.").format(
+                        max=MAX_IMPORT_ROWS
+                    )
                 )
 
             headers = set(parsed_yaml[0].keys())
             missing_required = [f for f in self.required_fields if f not in headers]
             if missing_required:
-                raise ValidationError(
-                    _('Missing required fields: {fields}').format(fields=", ".join(missing_required))
-                )
+                raise ValidationError(_("Missing required fields: {fields}").format(fields=", ".join(missing_required)))
 
             self._rows_data = []
             for row in parsed_yaml:
@@ -289,7 +314,7 @@ class BulkImportForm(forms.Form):
                         continue
                     key_str = str(k).strip()
                     if v is None:
-                        cleaned_row[key_str] = ''
+                        cleaned_row[key_str] = ""
                     elif isinstance(v, bool):
                         cleaned_row[key_str] = str(v)
                     elif isinstance(v, (int, float)):
@@ -304,10 +329,10 @@ class BulkImportForm(forms.Form):
         from django.db import transaction
 
         if not self.model:
-            raise NotImplementedError('BulkImportForm subclass must define a `model` attribute.')
+            raise NotImplementedError("BulkImportForm subclass must define a `model` attribute.")
 
         if not self._rows_data:
-            return 0, [_('No data to import.')]
+            return 0, [_("No data to import.")]
 
         imported = 0
         errors = []
@@ -316,17 +341,17 @@ class BulkImportForm(forms.Form):
             try:
                 mapped = self.map_row(row)
                 self._validate_row(mapped, i)
-                
+
                 # Check for primary key to perform UPSERT (in-place update)
                 pk_name = self.model._meta.pk.name
                 pk_val = mapped.get(pk_name)
-                
+
                 if pk_val:
                     try:
                         instance = self.model.objects.get(pk=pk_val)
                         # Capture the pre-update state so ChangeLoggingMixin logs an
                         # accurate diff instead of re-fetching the row per import row.
-                        if hasattr(instance, 'snapshot'):
+                        if hasattr(instance, "snapshot"):
                             instance.snapshot()
                         # Perform in-place field updates
                         for key, val in mapped.items():
@@ -334,27 +359,22 @@ class BulkImportForm(forms.Form):
                                 setattr(instance, key, val)
                     except self.model.DoesNotExist:
                         # Raise ValidationError matching NetBox gold standard
-                        raise ValidationError(
-                            _("Object with ID {id} does not exist").format(id=pk_val)
-                        )
+                        raise ValidationError(_("Object with ID {id} does not exist").format(id=pk_val))
                 else:
                     instance = self._create_instance(mapped)
 
-                if hasattr(instance, 'full_clean'):
+                if hasattr(instance, "full_clean"):
                     instance.full_clean()
                 instance.save()
                 imported += 1
             except ValidationError as e:
-                errors.append(f'Row {i}: {"; ".join(e.messages if hasattr(e, "messages") else [str(e)])}')
+                errors.append(f"Row {i}: {'; '.join(e.messages if hasattr(e, 'messages') else [str(e)])}")
             except Exception:
                 # Keep the driver/exception detail (which can leak SQL fragments,
                 # column names, or other internals) in the server log only; show
                 # the user a generic, non-revealing per-row message.
-                logger.exception(f'Import error row {i}')
-                errors.append(
-                    str(_('Row %(row)s: could not be imported due to an unexpected error.')
-                        % {'row': i})
-                )
+                logger.exception(f"Import error row {i}")
+                errors.append(str(_("Row %(row)s: could not be imported due to an unexpected error.") % {"row": i}))
 
         self.imported_count = imported
         self.errors_list = errors
@@ -375,7 +395,7 @@ class BulkImportForm(forms.Form):
             return mapped
 
         pk_name = self.model._meta.pk.name
-        pk_val = row.get('id') or row.get(pk_name)
+        pk_val = row.get("id") or row.get(pk_name)
         if pk_val and str(pk_val).strip():
             mapped[pk_name] = str(pk_val).strip()
 
@@ -400,14 +420,11 @@ class BulkImportForm(forms.Form):
         """Validate a mapped row. Override for custom validation."""
         for field in self.required_fields:
             # When updating an existing object (PK is provided), required fields are not strictly required to be re-supplied
-            pk_name = self.model._meta.pk.name if self.model else 'id'
+            pk_name = self.model._meta.pk.name if self.model else "id"
             if pk_name in mapped_data:
                 continue
             if not mapped_data.get(field):
-                raise ValidationError(
-                    _('Row %(row)s: "%(field)s" is required.')
-                    % {'row': row_number, 'field': field}
-                )
+                raise ValidationError(_('Row %(row)s: "%(field)s" is required.') % {"row": row_number, "field": field})
 
     def _create_instance(self, mapped_data):
         """Create a model instance from mapped data. Override in subclass."""

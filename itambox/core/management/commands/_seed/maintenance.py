@@ -27,14 +27,17 @@ class SeedMaintenanceMixin:
 
     def _seed_maintenance(self):
         from assets.models import AssetMaintenance
-        self.stdout.write('--- Maintenance ---')
+
+        self.stdout.write("--- Maintenance ---")
         sample = random.sample(self._assets, k=min(40, len(self._assets)))
-        kinds = [('repair', 'Keyboard replacement under warranty', 0),
-                 ('repair', 'Display hinge repair', 220),
-                 ('upgrade', 'RAM upgrade to 64GB', 480),
-                 ('hardware_support', 'Redundant PSU replacement', 1200),
-                 ('software_support', 'Firmware / BIOS update', 0),
-                 ('calibration', 'Annual RAID battery replacement', 450)]
+        kinds = [
+            ("repair", "Keyboard replacement under warranty", 0),
+            ("repair", "Display hinge repair", 220),
+            ("upgrade", "RAM upgrade to 64GB", 480),
+            ("hardware_support", "Redundant PSU replacement", 1200),
+            ("software_support", "Firmware / BIOS update", 0),
+            ("calibration", "Annual RAID battery replacement", 450),
+        ]
         count = 0
         for asset in sample:
             mtype, note, cost = random.choice(kinds)
@@ -44,7 +47,12 @@ class SeedMaintenanceMixin:
             done = start + datetime.timedelta(days=random.randint(1, 5)) if random.random() < 0.7 else None
             AssetMaintenance.objects.create(
                 asset=asset,
-                maintenance_type=mtype, supplier=self._suppliers[random.choice(self.HW_SUPPLIERS)],
-                cost=cost, start_date=start, completion_date=done, notes=note)
+                maintenance_type=mtype,
+                supplier=self._suppliers[random.choice(self.HW_SUPPLIERS)],
+                cost=cost,
+                start_date=start,
+                completion_date=done,
+                notes=note,
+            )
             count += 1
-        self.stdout.write(f'  {count} maintenance records.')
+        self.stdout.write(f"  {count} maintenance records.")

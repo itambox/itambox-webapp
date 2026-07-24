@@ -23,5 +23,5 @@ def prune_changelog_task():
     invisible instead.
     """
     logger.info("Starting scheduled prune_changelog run.")
-    call_command('prune_changelog')
+    call_command("prune_changelog")
     logger.info("Scheduled prune_changelog run complete.")

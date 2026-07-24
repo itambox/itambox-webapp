@@ -1,12 +1,12 @@
-from django.test import TestCase
 from django.contrib.auth import get_user_model
+from django.test import TestCase
 from django.urls import reverse
 
-from core.tests.mixins import grant
-from organization.models import Tenant, Role, Membership, AssetHolder
 from assets.models import Manufacturer
-from software.models import Software
+from core.tests.mixins import grant
 from licenses.models import License, LicenseSeatAssignment, LicenseTypeChoices
+from organization.models import AssetHolder, Membership, Role, Tenant
+from software.models import Software
 
 User = get_user_model()
 
@@ -24,83 +24,75 @@ class LicenseSeatAssignmentCrossTenantTests(TestCase):
 
     def setUp(self):
         # Two isolated tenants
-        self.tenant_a = Tenant.objects.create(name='Tenant A', slug='tenant-a')
-        self.tenant_b = Tenant.objects.create(name='Tenant B', slug='tenant-b')
+        self.tenant_a = Tenant.objects.create(name="Tenant A", slug="tenant-a")
+        self.tenant_b = Tenant.objects.create(name="Tenant B", slug="tenant-b")
 
         # Users
-        self.user_a = User.objects.create_user(username='user_a', password='password123')
-        self.user_b = User.objects.create_user(username='user_b', password='password123')
+        self.user_a = User.objects.create_user(username="user_a", password="password123")
+        self.user_b = User.objects.create_user(username="user_b", password="password123")
 
         # Roles grant full CRUD on the seat assignment so the request reaches the
         # tenant-scoped queryset/object lookup (a 404 there, not a 403 from a
         # missing model permission, is what proves the boundary).
         seat_perms = [
-            'licenses.view_licenseseatassignment',
-            'licenses.change_licenseseatassignment',
-            'licenses.delete_licenseseatassignment',
+            "licenses.view_licenseseatassignment",
+            "licenses.change_licenseseatassignment",
+            "licenses.delete_licenseseatassignment",
         ]
-        self.role_a = Role.objects.create(
-            tenant=self.tenant_a, name='Admin', permissions=seat_perms
-        )
+        self.role_a = Role.objects.create(tenant=self.tenant_a, name="Admin", permissions=seat_perms)
         self.membership_a = grant(self.user_a, self.tenant_a, self.role_a).membership
-        self.role_b = Role.objects.create(
-            tenant=self.tenant_b, name='Admin', permissions=seat_perms
-        )
+        self.role_b = Role.objects.create(tenant=self.tenant_b, name="Admin", permissions=seat_perms)
         self.membership_b = grant(self.user_b, self.tenant_b, self.role_b).membership
 
         # Shared manufacturer for the software catalogue entries
-        self.mfr = Manufacturer.objects.create(name='Microsoft', slug='microsoft')
+        self.mfr = Manufacturer.objects.create(name="Microsoft", slug="microsoft")
 
         # Per-tenant software -> license -> seat assignment (to a holder)
-        self.software_a = Software.objects.create(
-            name='Office A', manufacturer=self.mfr, tenant=self.tenant_a
-        )
-        self.software_b = Software.objects.create(
-            name='Office B', manufacturer=self.mfr, tenant=self.tenant_b
-        )
+        self.software_a = Software.objects.create(name="Office A", manufacturer=self.mfr, tenant=self.tenant_a)
+        self.software_b = Software.objects.create(name="Office B", manufacturer=self.mfr, tenant=self.tenant_b)
 
         self.license_a = License.objects.create(
-            name='License A', software=self.software_a,
-            license_type=LicenseTypeChoices.PERPETUAL_SEAT, seats=10,
+            name="License A",
+            software=self.software_a,
+            license_type=LicenseTypeChoices.PERPETUAL_SEAT,
+            seats=10,
             tenant=self.tenant_a,
         )
         self.license_b = License.objects.create(
-            name='License B', software=self.software_b,
-            license_type=LicenseTypeChoices.PERPETUAL_SEAT, seats=10,
+            name="License B",
+            software=self.software_b,
+            license_type=LicenseTypeChoices.PERPETUAL_SEAT,
+            seats=10,
             tenant=self.tenant_b,
         )
 
         self.holder_a = AssetHolder.objects.create(
-            first_name='Alice', last_name='A', upn='alice@a.example.com', tenant=self.tenant_a
+            first_name="Alice", last_name="A", upn="alice@a.example.com", tenant=self.tenant_a
         )
         self.holder_b = AssetHolder.objects.create(
-            first_name='Bob', last_name='B', upn='bob@b.example.com', tenant=self.tenant_b
+            first_name="Bob", last_name="B", upn="bob@b.example.com", tenant=self.tenant_b
         )
 
-        self.seat_a = LicenseSeatAssignment.objects.create(
-            license=self.license_a, assigned_holder=self.holder_a
-        )
-        self.seat_b = LicenseSeatAssignment.objects.create(
-            license=self.license_b, assigned_holder=self.holder_b
-        )
+        self.seat_a = LicenseSeatAssignment.objects.create(license=self.license_a, assigned_holder=self.holder_a)
+        self.seat_b = LicenseSeatAssignment.objects.create(license=self.license_b, assigned_holder=self.holder_b)
 
     def _activate(self, user, tenant):
         self.client.force_login(user)
         session = self.client.session
-        session['active_tenant_id'] = tenant.pk
+        session["active_tenant_id"] = tenant.pk
         session.save()
 
     def test_list_excludes_other_tenant_seat(self):
         # Tenant B member lists seat assignments: only their own seat appears.
         self._activate(self.user_b, self.tenant_b)
 
-        list_url = reverse('api:licenses_api:licenseseatassignment-list')
+        list_url = reverse("api:licenses_api:licenseseatassignment-list")
         response = self.client.get(list_url)
         self.assertEqual(response.status_code, 200)
 
         data = response.json()
-        results = data['results'] if isinstance(data, dict) and 'results' in data else data
-        returned_ids = {row['id'] for row in results}
+        results = data["results"] if isinstance(data, dict) and "results" in data else data
+        returned_ids = {row["id"] for row in results}
 
         self.assertIn(self.seat_b.pk, returned_ids)
         self.assertNotIn(self.seat_a.pk, returned_ids)
@@ -109,52 +101,38 @@ class LicenseSeatAssignmentCrossTenantTests(TestCase):
         # Tenant B member tries to read Tenant A's seat directly.
         self._activate(self.user_b, self.tenant_b)
 
-        detail_url = reverse(
-            'api:licenses_api:licenseseatassignment-detail', kwargs={'pk': self.seat_a.pk}
-        )
+        detail_url = reverse("api:licenses_api:licenseseatassignment-detail", kwargs={"pk": self.seat_a.pk})
         response = self.client.get(detail_url)
         self.assertEqual(response.status_code, 404)
 
     def test_cross_tenant_patch_is_404_and_row_unchanged(self):
         self._activate(self.user_b, self.tenant_b)
 
-        detail_url = reverse(
-            'api:licenses_api:licenseseatassignment-detail', kwargs={'pk': self.seat_a.pk}
-        )
-        response = self.client.patch(
-            detail_url, data={'notes': 'hacked'}, content_type='application/json'
-        )
+        detail_url = reverse("api:licenses_api:licenseseatassignment-detail", kwargs={"pk": self.seat_a.pk})
+        response = self.client.patch(detail_url, data={"notes": "hacked"}, content_type="application/json")
         self.assertEqual(response.status_code, 404)
 
         self.seat_a.refresh_from_db()
-        self.assertNotEqual(self.seat_a.notes, 'hacked')
+        self.assertNotEqual(self.seat_a.notes, "hacked")
 
     def test_cross_tenant_delete_is_404_and_row_persists(self):
         self._activate(self.user_b, self.tenant_b)
 
-        detail_url = reverse(
-            'api:licenses_api:licenseseatassignment-detail', kwargs={'pk': self.seat_a.pk}
-        )
+        detail_url = reverse("api:licenses_api:licenseseatassignment-detail", kwargs={"pk": self.seat_a.pk})
         response = self.client.delete(detail_url)
         self.assertEqual(response.status_code, 404)
 
         # Row still exists (and is not soft-deleted).
-        self.assertTrue(
-            LicenseSeatAssignment.all_objects.filter(
-                pk=self.seat_a.pk, deleted_at__isnull=True
-            ).exists()
-        )
+        self.assertTrue(LicenseSeatAssignment.all_objects.filter(pk=self.seat_a.pk, deleted_at__isnull=True).exists())
 
     def test_own_tenant_detail_is_visible(self):
         # Sanity: the boundary does not over-block; own-tenant detail is 200.
         self._activate(self.user_b, self.tenant_b)
 
-        detail_url = reverse(
-            'api:licenses_api:licenseseatassignment-detail', kwargs={'pk': self.seat_b.pk}
-        )
+        detail_url = reverse("api:licenses_api:licenseseatassignment-detail", kwargs={"pk": self.seat_b.pk})
         response = self.client.get(detail_url)
         self.assertEqual(response.status_code, 200)
-        self.assertEqual(response.json()['id'], self.seat_b.pk)
+        self.assertEqual(response.json()["id"], self.seat_b.pk)
 
 
 class GlobalLicenseSeatResidualTests(TestCase):
@@ -169,32 +147,31 @@ class GlobalLicenseSeatResidualTests(TestCase):
     """
 
     def setUp(self):
-        self.tenant_b = Tenant.objects.create(name='Tenant B', slug='tenant-b')
+        self.tenant_b = Tenant.objects.create(name="Tenant B", slug="tenant-b")
 
-        self.user_b = User.objects.create_user(username='user_b', password='password123')
+        self.user_b = User.objects.create_user(username="user_b", password="password123")
         seat_perms = [
-            'licenses.view_licenseseatassignment',
-            'licenses.change_licenseseatassignment',
-            'licenses.delete_licenseseatassignment',
+            "licenses.view_licenseseatassignment",
+            "licenses.change_licenseseatassignment",
+            "licenses.delete_licenseseatassignment",
         ]
-        self.role_b = Role.objects.create(
-            tenant=self.tenant_b, name='Admin', permissions=seat_perms
-        )
+        self.role_b = Role.objects.create(tenant=self.tenant_b, name="Admin", permissions=seat_perms)
         self.membership_b = grant(self.user_b, self.tenant_b, self.role_b).membership
 
-        self.mfr = Manufacturer.objects.create(name='Microsoft', slug='microsoft')
+        self.mfr = Manufacturer.objects.create(name="Microsoft", slug="microsoft")
 
         # GLOBAL software + license (tenant=None) and a seat on it.
-        self.software_global = Software.objects.create(
-            name='Office (global)', manufacturer=self.mfr, tenant=None
-        )
+        self.software_global = Software.objects.create(name="Office (global)", manufacturer=self.mfr, tenant=None)
         self.license_global = License.objects.create(
-            name='Global License', software=self.software_global,
-            license_type=LicenseTypeChoices.PERPETUAL_SEAT, seats=10, tenant=None,
+            name="Global License",
+            software=self.software_global,
+            license_type=LicenseTypeChoices.PERPETUAL_SEAT,
+            seats=10,
+            tenant=None,
         )
         # Holder is global too so the seat row itself has no direct tenant FK.
         self.holder_global = AssetHolder.objects.create(
-            first_name='Gina', last_name='Global', upn='gina@global.example.com', tenant=None
+            first_name="Gina", last_name="Global", upn="gina@global.example.com", tenant=None
         )
         self.seat_global = LicenseSeatAssignment.objects.create(
             license=self.license_global, assigned_holder=self.holder_global
@@ -203,36 +180,30 @@ class GlobalLicenseSeatResidualTests(TestCase):
     def _activate(self, user, tenant):
         self.client.force_login(user)
         session = self.client.session
-        session['active_tenant_id'] = tenant.pk
+        session["active_tenant_id"] = tenant.pk
         session.save()
 
     def test_global_seat_excluded_from_list(self):
         self._activate(self.user_b, self.tenant_b)
-        list_url = reverse('api:licenses_api:licenseseatassignment-list')
+        list_url = reverse("api:licenses_api:licenseseatassignment-list")
         response = self.client.get(list_url)
         self.assertEqual(response.status_code, 200)
         data = response.json()
-        results = data['results'] if isinstance(data, dict) and 'results' in data else data
-        returned_ids = {row['id'] for row in results}
+        results = data["results"] if isinstance(data, dict) and "results" in data else data
+        returned_ids = {row["id"] for row in results}
         self.assertNotIn(self.seat_global.pk, returned_ids)
 
     def test_global_seat_detail_is_404(self):
         self._activate(self.user_b, self.tenant_b)
-        detail_url = reverse(
-            'api:licenses_api:licenseseatassignment-detail', kwargs={'pk': self.seat_global.pk}
-        )
+        detail_url = reverse("api:licenses_api:licenseseatassignment-detail", kwargs={"pk": self.seat_global.pk})
         response = self.client.get(detail_url)
         self.assertEqual(response.status_code, 404)
 
     def test_global_seat_delete_is_404_and_row_persists(self):
         self._activate(self.user_b, self.tenant_b)
-        detail_url = reverse(
-            'api:licenses_api:licenseseatassignment-detail', kwargs={'pk': self.seat_global.pk}
-        )
+        detail_url = reverse("api:licenses_api:licenseseatassignment-detail", kwargs={"pk": self.seat_global.pk})
         response = self.client.delete(detail_url)
         self.assertEqual(response.status_code, 404)
         self.assertTrue(
-            LicenseSeatAssignment.all_objects.filter(
-                pk=self.seat_global.pk, deleted_at__isnull=True
-            ).exists()
+            LicenseSeatAssignment.all_objects.filter(pk=self.seat_global.pk, deleted_at__isnull=True).exists()
         )

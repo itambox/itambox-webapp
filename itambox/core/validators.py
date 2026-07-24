@@ -19,14 +19,14 @@ def validate_external_url(url, allow_private=False):
     Returns the list of resolved ip_address objects on success.
     """
     if not url:
-        raise ValidationError(_('A URL is required.'))
+        raise ValidationError(_("A URL is required."))
 
     parts = urlsplit(url)
-    if parts.scheme not in ('http', 'https'):
-        raise ValidationError(_('URL scheme must be http or https.'))
+    if parts.scheme not in ("http", "https"):
+        raise ValidationError(_("URL scheme must be http or https."))
     host = parts.hostname
     if not host:
-        raise ValidationError(_('URL has no host.'))
+        raise ValidationError(_("URL has no host."))
 
     # A bare IP literal is checked directly even if DNS is unavailable.
     try:
@@ -38,17 +38,16 @@ def validate_external_url(url, allow_private=False):
     else:
         # Resolve every address the host maps to and reject if ANY is internal.
         try:
-            infos = socket.getaddrinfo(host, parts.port or (443 if parts.scheme == 'https' else 80),
-                                       proto=socket.IPPROTO_TCP)
+            infos = socket.getaddrinfo(
+                host, parts.port or (443 if parts.scheme == "https" else 80), proto=socket.IPPROTO_TCP
+            )
         except socket.gaierror:
             # FAIL CLOSED. An unresolvable host cannot be pinned to a validated
             # address, and "allow it through" would let an attacker-controlled
             # resolver answer differently at send time (DNS rebinding: benign at
             # validation, 169.254.169.254 at connect). A transient DNS outage
             # making a webhook save/send fail is the acceptable cost.
-            raise ValidationError(
-                _('URL host could not be resolved; refusing to accept it unverified.')
-            )
+            raise ValidationError(_("URL host could not be resolved; refusing to accept it unverified."))
 
     resolved = []
     for info in infos:
@@ -56,11 +55,15 @@ def validate_external_url(url, allow_private=False):
         resolved.append(ip)
         if allow_private:
             continue
-        if (ip.is_private or ip.is_loopback or ip.is_link_local or ip.is_reserved
-                or ip.is_multicast or ip.is_unspecified):
-            raise ValidationError(
-                _('URL host resolves to a disallowed internal address (%(ip)s).') % {'ip': str(ip)}
-            )
+        if (
+            ip.is_private
+            or ip.is_loopback
+            or ip.is_link_local
+            or ip.is_reserved
+            or ip.is_multicast
+            or ip.is_unspecified
+        ):
+            raise ValidationError(_("URL host resolves to a disallowed internal address (%(ip)s).") % {"ip": str(ip)})
     return resolved
 
 
@@ -71,8 +74,9 @@ class CustomValidator:
     @classmethod
     def validate_object(cls, instance):
         from django.conf import settings
+
         model_path = f"{instance._meta.app_label}.{instance._meta.model_name}"
-        rules = getattr(settings, 'CUSTOM_VALIDATORS', {}).get(model_path, {})
+        rules = getattr(settings, "CUSTOM_VALIDATORS", {}).get(model_path, {})
         if rules:
             parse_json_rules(instance, rules)
 
@@ -81,60 +85,60 @@ def parse_json_rules(instance, rules):
     errors = {}
 
     for field_name, field_rules in rules.items():
-        if field_name == '__all__':
+        if field_name == "__all__":
             continue
 
         value = getattr(instance, field_name, None)
 
-        if field_rules.get('required', False) and not value:
+        if field_rules.get("required", False) and not value:
             errors[field_name] = ValidationError(
-                _('%(field)s is required.'),
-                params={'field': field_name},
+                _("%(field)s is required."),
+                params={"field": field_name},
             )
             continue
 
-        if value is None or value == '':
+        if value is None or value == "":
             continue
 
-        if 'min_length' in field_rules and isinstance(value, str):
-            min_length = field_rules['min_length']
+        if "min_length" in field_rules and isinstance(value, str):
+            min_length = field_rules["min_length"]
             if len(value) < min_length:
                 errors[field_name] = ValidationError(
-                    _('%(field)s must be at least %(min)d characters.'),
-                    params={'field': field_name, 'min': min_length},
+                    _("%(field)s must be at least %(min)d characters."),
+                    params={"field": field_name, "min": min_length},
                 )
 
-        if 'max_length' in field_rules and isinstance(value, str):
-            max_length = field_rules['max_length']
+        if "max_length" in field_rules and isinstance(value, str):
+            max_length = field_rules["max_length"]
             if len(value) > max_length:
                 errors[field_name] = ValidationError(
-                    _('%(field)s must be at most %(max)d characters.'),
-                    params={'field': field_name, 'max': max_length},
+                    _("%(field)s must be at most %(max)d characters."),
+                    params={"field": field_name, "max": max_length},
                 )
 
-        if 'min' in field_rules and isinstance(value, (int, float)):
-            min_val = field_rules['min']
+        if "min" in field_rules and isinstance(value, (int, float)):
+            min_val = field_rules["min"]
             if value < min_val:
                 errors[field_name] = ValidationError(
-                    _('%(field)s must be at least %(min)s.'),
-                    params={'field': field_name, 'min': min_val},
+                    _("%(field)s must be at least %(min)s."),
+                    params={"field": field_name, "min": min_val},
                 )
 
-        if 'max' in field_rules and isinstance(value, (int, float)):
-            max_val = field_rules['max']
+        if "max" in field_rules and isinstance(value, (int, float)):
+            max_val = field_rules["max"]
             if value > max_val:
                 errors[field_name] = ValidationError(
-                    _('%(field)s must be at most %(max)s.'),
-                    params={'field': field_name, 'max': max_val},
+                    _("%(field)s must be at most %(max)s."),
+                    params={"field": field_name, "max": max_val},
                 )
 
-        if 'pattern' in field_rules and isinstance(value, str):
-            pattern = field_rules['pattern']
+        if "pattern" in field_rules and isinstance(value, str):
+            pattern = field_rules["pattern"]
             try:
                 if not re.match(pattern, value):
                     errors[field_name] = ValidationError(
-                        _('%(field)s does not match required pattern.'),
-                        params={'field': field_name},
+                        _("%(field)s does not match required pattern."),
+                        params={"field": field_name},
                     )
             except re.error:
                 pass
@@ -145,6 +149,7 @@ def parse_json_rules(instance, rules):
 
 def validate_file_attachment(file):
     import os
+
     # 1. Size Validation (10 MB limit)
     max_size = 10 * 1024 * 1024
     if file.size > max_size:
@@ -155,16 +160,50 @@ def validate_file_attachment(file):
     # libmagic is unavailable in the running image), so the extension gate must stand alone.
     ext = os.path.splitext(file.name)[1].lower()
     dangerous_extensions = {
-        '.exe', '.dll', '.bat', '.cmd', '.sh', '.bash', '.php', '.phtml', '.pl', '.py',
-        '.cgi', '.asp', '.aspx', '.jsp', '.vbs', '.vbe', '.scr', '.pif', '.app',
-        '.msi', '.com', '.htm', '.html', '.xhtml', '.shtml', '.xml', '.svg', '.svgz',
-        '.mhtml', '.mht', '.jar', '.iso', '.jnlp', '.hta', '.js', '.jse', '.wsf',
-        '.ps1', '.psm1', '.reg',
+        ".exe",
+        ".dll",
+        ".bat",
+        ".cmd",
+        ".sh",
+        ".bash",
+        ".php",
+        ".phtml",
+        ".pl",
+        ".py",
+        ".cgi",
+        ".asp",
+        ".aspx",
+        ".jsp",
+        ".vbs",
+        ".vbe",
+        ".scr",
+        ".pif",
+        ".app",
+        ".msi",
+        ".com",
+        ".htm",
+        ".html",
+        ".xhtml",
+        ".shtml",
+        ".xml",
+        ".svg",
+        ".svgz",
+        ".mhtml",
+        ".mht",
+        ".jar",
+        ".iso",
+        ".jnlp",
+        ".hta",
+        ".js",
+        ".jse",
+        ".wsf",
+        ".ps1",
+        ".psm1",
+        ".reg",
     }
     if ext in dangerous_extensions:
         raise ValidationError(
-            _("Files with extension '%(ext)s' are not allowed for security reasons."),
-            params={'ext': ext}
+            _("Files with extension '%(ext)s' are not allowed for security reasons."), params={"ext": ext}
         )
 
     # 3. Magic Mime Validation (blacklist dangerous mime types)
@@ -174,29 +213,30 @@ def validate_file_attachment(file):
         chunk = file.read(2048)
         file.seek(initial_pos)
         import magic
+
         mime_type = magic.from_buffer(chunk, mime=True).lower()
     except Exception:
         # libmagic unavailable: do NOT fall back to the client-supplied
         # Content-Type (attacker-controlled, defeats this check). The extension
         # blacklist above remains the gate; treat the signature as unknown.
-        mime_type = ''
+        mime_type = ""
 
     dangerous_mimes = {
-        'application/x-dosexec',
-        'application/x-msdownload',
-        'text/html',
-        'application/xml',
-        'text/xml',
-        'image/svg+xml',
-        'application/x-executable',
-        'application/x-sharedlib',
-        'application/x-shellscript',
-        'text/x-php',
-        'application/x-httpd-php',
-        'text/x-python',
-        'text/x-script.python',
-        'text/x-perl',
-        'text/x-script.perl',
+        "application/x-dosexec",
+        "application/x-msdownload",
+        "text/html",
+        "application/xml",
+        "text/xml",
+        "image/svg+xml",
+        "application/x-executable",
+        "application/x-sharedlib",
+        "application/x-shellscript",
+        "text/x-php",
+        "application/x-httpd-php",
+        "text/x-python",
+        "text/x-script.python",
+        "text/x-perl",
+        "text/x-script.perl",
     }
     if mime_type in dangerous_mimes:
         raise ValidationError(_("Uploaded file signature is not allowed for security reasons."))
@@ -204,6 +244,7 @@ def validate_file_attachment(file):
 
 def validate_image_attachment(file):
     import os
+
     # 1. Size Validation (5 MB limit)
     max_size = 5 * 1024 * 1024
     if file.size > max_size:
@@ -211,26 +252,28 @@ def validate_image_attachment(file):
 
     # 2. Extension Validation (whitelist safe image extensions)
     ext = os.path.splitext(file.name)[1].lower()
-    allowed_extensions = {'.png', '.jpg', '.jpeg', '.gif', '.bmp', '.webp'}
+    allowed_extensions = {".png", ".jpg", ".jpeg", ".gif", ".bmp", ".webp"}
     if ext not in allowed_extensions:
         raise ValidationError(
             _("Image format '%(ext)s' is not supported. Please upload a PNG, JPG, JPEG, GIF, BMP, or WebP image."),
-            params={'ext': ext}
+            params={"ext": ext},
         )
 
     # 3. Magic Mime Validation (verify actual file signature)
     import sys
+
     initial_pos = file.tell()
     file.seek(0)
     chunk = file.read(2048)
     file.seek(initial_pos)
 
-    is_testing = 'test' in sys.argv or any('test' in arg or 'pytest' in arg for arg in sys.argv)
+    is_testing = "test" in sys.argv or any("test" in arg or "pytest" in arg for arg in sys.argv)
     if is_testing and chunk in (b"image-data", b"x"):
-        mime_type = 'image/png'
+        mime_type = "image/png"
     else:
         try:
             import magic
+
             mime_type = magic.from_buffer(chunk, mime=True).lower()
         except Exception:
             # libmagic unavailable: verify the bytes are a real image with Pillow
@@ -238,19 +281,25 @@ def validate_image_attachment(file):
             # attacker controls). Anything Pillow can't decode fails closed.
             try:
                 from PIL import Image
+
                 file.seek(0)
                 with Image.open(file) as img:
                     img.verify()
-                    pil_format = (img.format or '').lower()
+                    pil_format = (img.format or "").lower()
                 file.seek(initial_pos)
                 mime_type = {
-                    'png': 'image/png', 'jpeg': 'image/jpeg', 'gif': 'image/gif',
-                    'bmp': 'image/bmp', 'webp': 'image/webp',
-                }.get(pil_format, '')
+                    "png": "image/png",
+                    "jpeg": "image/jpeg",
+                    "gif": "image/gif",
+                    "bmp": "image/bmp",
+                    "webp": "image/webp",
+                }.get(pil_format, "")
             except Exception:
                 file.seek(initial_pos)
-                mime_type = ''
+                mime_type = ""
 
-    allowed_mimes = {'image/png', 'image/jpeg', 'image/gif', 'image/bmp', 'image/x-ms-bmp', 'image/webp'}
+    allowed_mimes = {"image/png", "image/jpeg", "image/gif", "image/bmp", "image/x-ms-bmp", "image/webp"}
     if mime_type not in allowed_mimes:
-        raise ValidationError(_("Uploaded file signature does not match a valid image format (PNG, JPG, GIF, BMP, WebP)."))
+        raise ValidationError(
+            _("Uploaded file signature does not match a valid image format (PNG, JPG, GIF, BMP, WebP).")
+        )

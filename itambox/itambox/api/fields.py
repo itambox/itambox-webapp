@@ -14,6 +14,7 @@ class ChoiceField(serializers.Field):
     """
     Represent a ChoiceField as {'value': <DB value>, 'label': <string>}. Accepts a single value on write.
     """
+
     def __init__(self, choices, allow_blank=False, **kwargs):
         self.choiceset = choices
         self.allow_blank = allow_blank
@@ -25,19 +26,19 @@ class ChoiceField(serializers.Field):
         if data is None:
             if self.allow_null:
                 return True, None
-            data = ''
+            data = ""
         return super().validate_empty_values(data)
 
     def to_representation(self, obj):
-        if obj != '':
+        if obj != "":
             return {
-                'value': obj,
-                'label': self._choices.get(obj, ''),
+                "value": obj,
+                "label": self._choices.get(obj, ""),
             }
         return None
 
     def to_internal_value(self, data):
-        if data == '':
+        if data == "":
             if self.allow_blank:
                 return data
             raise ValidationError(_("This field may not be blank."))
@@ -47,10 +48,10 @@ class ChoiceField(serializers.Field):
                 _('Value must be passed directly (e.g. "foo": 123); do not use a dictionary or list.')
             )
 
-        if hasattr(data, 'lower'):
-            if data.lower() == 'true':
+        if hasattr(data, "lower"):
+            if data.lower() == "true":
                 data = True
-            elif data.lower() == 'false':
+            elif data.lower() == "false":
                 data = False
             else:
                 try:
@@ -95,7 +96,7 @@ def validate_gfk_target_tenant(content_type, object_id):
     if target is None:
         raise ValidationError(_("Referenced object was not found in the current tenant."))
     tenant = get_current_tenant()
-    obj_tenant = getattr(target, 'tenant', None)
+    obj_tenant = getattr(target, "tenant", None)
     if tenant is not None and obj_tenant is not None and obj_tenant != tenant:
         raise ValidationError(_("Referenced object belongs to another tenant."))
     return target
@@ -106,6 +107,7 @@ class ContentTypeField(RelatedField):
     """
     Represent a ContentType as '<app_label>.<model>'
     """
+
     default_error_messages = {
         "does_not_exist": _("Invalid content type: {content_type}"),
         "invalid": _("Invalid value. Specify a content type as '<app_label>.<model_name>'."),
@@ -113,12 +115,12 @@ class ContentTypeField(RelatedField):
 
     def to_internal_value(self, data):
         try:
-            app_label, model = data.split('.')
+            app_label, model = data.split(".")
             return ContentType.objects.get_by_natural_key(app_label=app_label, model=model)
         except ObjectDoesNotExist:
-            self.fail('does_not_exist', content_type=data)
+            self.fail("does_not_exist", content_type=data)
         except (AttributeError, TypeError, ValueError):
-            self.fail('invalid')
+            self.fail("invalid")
 
     def to_representation(self, obj):
         return f"{obj.app_label}.{obj.model}"
@@ -128,14 +130,15 @@ class SerializedPKRelatedField(PrimaryKeyRelatedField):
     """
     Extends PrimaryKeyRelatedField to return a serialized object on read.
     """
+
     def __init__(self, serializer, nested=False, **kwargs):
         self.serializer = serializer
         self.nested = nested
-        self.pk_field = kwargs.pop('pk_field', None)
+        self.pk_field = kwargs.pop("pk_field", None)
         super().__init__(**kwargs)
 
     def to_representation(self, value):
-        return self.serializer(value, nested=self.nested, context={'request': self.context['request']}).data
+        return self.serializer(value, nested=self.nested, context={"request": self.context["request"]}).data
 
 
 @extend_schema_field(OpenApiTypes.INT64)
@@ -143,6 +146,7 @@ class RelatedObjectCountField(serializers.ReadOnlyField):
     """
     Represents a read-only integer count of related objects.
     """
+
     def __init__(self, relation, **kwargs):
         self.relation = relation
         super().__init__(**kwargs)

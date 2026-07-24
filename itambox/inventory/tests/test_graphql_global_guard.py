@@ -6,42 +6,50 @@ In a tenant-GROUP context the active tenant is None, so ``get_object_or_denied``
 rows to a non-superuser group member. The per-mutation guard (mirroring the global-create
 guard) blocks the write; superusers are unaffected. Companion to the WS3-N1 create guards.
 """
-from django.test import TestCase, RequestFactory
-from django.contrib.auth import get_user_model
 
-from core.schema import schema
-from core.managers import set_current_tenant, set_current_tenant_group, set_current_membership
-from itambox.middleware import _current_user
-from organization.models import Tenant, TenantGroup, Role
-from inventory.models import Kit, Accessory
+from django.contrib.auth import get_user_model
+from django.test import RequestFactory, TestCase
+
 from assets.models import Manufacturer
+from core.managers import set_current_membership, set_current_tenant, set_current_tenant_group
+from core.schema import schema
 from core.tests.mixins import grant
+from inventory.models import Accessory, Kit
+from itambox.middleware import _current_user
+from organization.models import Role, Tenant, TenantGroup
 
 
 class GraphQLGlobalCatalogueGuardTests(TestCase):
     def setUp(self):
         User = get_user_model()
-        self.user = User.objects.create_user(username='member', email='member@x.com', password='pw')
-        self.superuser = User.objects.create_superuser(username='root', email='root@x.com', password='pw')
+        self.user = User.objects.create_user(username="member", email="member@x.com", password="pw")
+        self.superuser = User.objects.create_superuser(username="root", email="root@x.com", password="pw")
 
-        self.group = TenantGroup.objects.create(name='Grp', slug='grp')
-        self.tenant = Tenant.objects.create(name='T1', slug='t1', group=self.group)
+        self.group = TenantGroup.objects.create(name="Grp", slug="grp")
+        self.tenant = Tenant.objects.create(name="T1", slug="t1", group=self.group)
 
         role = Role.objects.create(
-            tenant=self.tenant, name='CatMgr',
+            tenant=self.tenant,
+            name="CatMgr",
             permissions=[
-                'inventory.view_kit', 'inventory.change_kit', 'inventory.delete_kit',
-                'inventory.view_accessory', 'inventory.change_accessory', 'inventory.delete_accessory',
+                "inventory.view_kit",
+                "inventory.change_kit",
+                "inventory.delete_kit",
+                "inventory.view_accessory",
+                "inventory.change_accessory",
+                "inventory.delete_accessory",
             ],
         )
         self.membership = grant(self.user, self.tenant, role).membership
 
         # Create the global (tenant=None) rows the attacker would target.
         set_current_tenant(self.tenant)
-        self.global_kit = Kit.objects.create(name='Global Kit', tenant=None)
-        self.global_mfr = Manufacturer.objects.create(name='GlobalMfr')  # Manufacturer has no tenant field
+        self.global_kit = Kit.objects.create(name="Global Kit", tenant=None)
+        self.global_mfr = Manufacturer.objects.create(name="GlobalMfr")  # Manufacturer has no tenant field
         self.global_accessory = Accessory.objects.create(
-            name='Global Accessory', manufacturer=self.global_mfr, tenant=None,
+            name="Global Accessory",
+            manufacturer=self.global_mfr,
+            tenant=None,
         )
         set_current_tenant(None)
 
@@ -62,7 +70,7 @@ class GraphQLGlobalCatalogueGuardTests(TestCase):
         set_current_tenant_group(self.group)
         set_current_membership(membership)
         _current_user.set(user)
-        request = self.factory.post('/graphql')
+        request = self.factory.post("/graphql")
         request.user = get_user_model().objects.get(pk=user.pk)
         request.active_tenant = None
         request.active_tenant_group = self.group
@@ -75,7 +83,7 @@ class GraphQLGlobalCatalogueGuardTests(TestCase):
         self.assertIsNotNone(result.errors)
         self.assertIn("Only superusers can modify global kits.", result.errors[0].message)
         self.global_kit.refresh_from_db()
-        self.assertEqual(self.global_kit.name, 'Global Kit')  # unchanged
+        self.assertEqual(self.global_kit.name, "Global Kit")  # unchanged
 
     def test_delete_global_kit_denied_for_standard_user(self):
         ctx = self._group_context(self.user, self.membership)
@@ -83,14 +91,14 @@ class GraphQLGlobalCatalogueGuardTests(TestCase):
         result = schema.execute(mutation, context_value=ctx)
         self.assertIsNotNone(result.errors)
         self.assertIn("Only superusers can delete global kits.", result.errors[0].message)
-        self.assertTrue(
-            Kit.all_objects.filter(pk=self.global_kit.pk, deleted_at__isnull=True).exists()
-        )
+        self.assertTrue(Kit.all_objects.filter(pk=self.global_kit.pk, deleted_at__isnull=True).exists())
 
     def test_update_global_accessory_denied_for_standard_user(self):
         # Same guard on an AbstractInventoryItem model (inherited allow_global_tenant).
         ctx = self._group_context(self.user, self.membership)
-        mutation = 'mutation { updateAccessory(id: "%s", name: "Hacked") { accessory { id } } }' % self.global_accessory.id
+        mutation = (
+            'mutation { updateAccessory(id: "%s", name: "Hacked") { accessory { id } } }' % self.global_accessory.id
+        )
         result = schema.execute(mutation, context_value=ctx)
         self.assertIsNotNone(result.errors)
         self.assertIn("Only superusers can modify global accessories.", result.errors[0].message)
@@ -102,4 +110,4 @@ class GraphQLGlobalCatalogueGuardTests(TestCase):
         result = schema.execute(mutation, context_value=ctx)
         self.assertIsNone(result.errors)
         self.global_kit.refresh_from_db()
-        self.assertEqual(self.global_kit.name, 'Renamed')
+        self.assertEqual(self.global_kit.name, "Renamed")

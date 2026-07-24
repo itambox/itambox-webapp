@@ -1,55 +1,55 @@
 from django.urls import reverse_lazy
 from django.utils.translation import gettext_lazy as _
 
+from assets.filters import AssetReservationFilterSet
+from assets.forms import AssetReservationFilterForm, AssetReservationForm
+from assets.models import AssetReservation
+from assets.tables import AssetReservationTable
 from itambox.panels import Panel
 from itambox.quick_add import QuickAddMixin
 from itambox.views.generic import (
-    ObjectListView, ObjectDetailView, ObjectEditView, ObjectDeleteView,
+    ObjectDeleteView,
+    ObjectDetailView,
+    ObjectEditView,
+    ObjectListView,
 )
-
-from assets.models import AssetReservation
-from assets.tables import AssetReservationTable
-from assets.forms import AssetReservationForm, AssetReservationFilterForm
-from assets.filters import AssetReservationFilterSet
 
 
 class AssetReservationListView(ObjectListView):
-    queryset = AssetReservation.objects.select_related('asset', 'reserved_for', 'created_by')
+    queryset = AssetReservation.objects.select_related("asset", "reserved_for", "created_by")
     filterset = AssetReservationFilterSet
     filterset_form = AssetReservationFilterForm
     table = AssetReservationTable
-    action_buttons = ('add',)
+    action_buttons = ("add",)
 
 
 class AssetReservationDetailView(ObjectDetailView):
-    queryset = AssetReservation.objects.select_related('asset', 'reserved_for', 'created_by')
-    template_name = 'generic/object_detail.html'
+    queryset = AssetReservation.objects.select_related("asset", "reserved_for", "created_by")
+    template_name = "generic/object_detail.html"
 
-    layout = (
-        ((Panel('info', _('Reservation Details')),),),
-    )
+    layout = (((Panel("info", _("Reservation Details")),),),)
 
 
 class AssetReservationEditView(QuickAddMixin, ObjectEditView):
     queryset = AssetReservation.objects.all()
     model = AssetReservation
     model_form = AssetReservationForm
-    template_name = 'generic/object_edit.html'
-    default_return_url = 'assets:assetreservation_list'
+    template_name = "generic/object_edit.html"
+    default_return_url = "assets:assetreservation_list"
     quick_add_reload = True
 
     def get_initial(self):
         initial = super().get_initial()
-        asset_id = self.request.GET.get('asset')
+        asset_id = self.request.GET.get("asset")
         if asset_id:
-            initial['asset'] = asset_id
+            initial["asset"] = asset_id
         if self.request.user and self.request.user.is_authenticated:
-            initial.setdefault('created_by', self.request.user.pk)
+            initial.setdefault("created_by", self.request.user.pk)
         return initial
 
 
 class AssetReservationDeleteView(ObjectDeleteView):
     queryset = AssetReservation.objects.all()
     model = AssetReservation
-    template_name = 'generic/object_confirm_delete.html'
-    success_url = reverse_lazy('assets:assetreservation_list')
+    template_name = "generic/object_confirm_delete.html"
+    success_url = reverse_lazy("assets:assetreservation_list")

@@ -9,14 +9,15 @@ Covers: token refresh, pagination (via IntuneClient mocks),
 """
 
 from unittest.mock import MagicMock, patch
-from django.test import TransactionTestCase, override_settings
+
 from django.contrib.auth import get_user_model
+from django.test import TransactionTestCase, override_settings
 from django.utils import timezone
 
+from assets.models import Asset, AssetType, Manufacturer, StatusLabel
 from core.models import Job
 from core.tests.mixins import TenantTestMixin
-from assets.models import Asset, Manufacturer, AssetType, StatusLabel
-from software.models import Software, InstalledSoftware
+from software.models import InstalledSoftware, Software
 
 User = get_user_model()
 
@@ -78,7 +79,8 @@ class IntuneTokenRefreshTest(TransactionTestCase):
             )
             mock_post.return_value.raise_for_status = MagicMock()
 
-            from core.integrations.intune import _get_token, _TOKEN_CACHE
+            from core.integrations.intune import _TOKEN_CACHE, _get_token
+
             _TOKEN_CACHE.clear()
 
             t1 = _get_token("tenant-x", "cid", "secret")
@@ -90,7 +92,9 @@ class IntuneTokenRefreshTest(TransactionTestCase):
     def test_expired_token_refreshed(self):
         """A token past its expiry triggers a fresh POST."""
         import time
-        from core.integrations.intune import _get_token, _TOKEN_CACHE
+
+        from core.integrations.intune import _TOKEN_CACHE, _get_token
+
         _TOKEN_CACHE["tenant-y"] = {"token": "old-tok", "expires_at": time.monotonic() - 1}
 
         with patch("core.integrations.intune.requests.post") as mock_post:
@@ -112,16 +116,14 @@ class IntunePaginationTest(TransactionTestCase):
         page1 = {"value": [{"id": "d1"}], "@odata.nextLink": "https://graph/page2"}
         page2 = {"value": [{"id": "d2"}], "@odata.nextLink": None}
 
-        responses = [
-            MagicMock(status_code=200, json=lambda p=p: p)
-            for p in [page1, page2]
-        ]
+        responses = [MagicMock(status_code=200, json=lambda p=p: p) for p in [page1, page2]]
         for r in responses:
             r.raise_for_status = MagicMock()
 
         with patch("core.integrations.intune.requests.get", side_effect=responses):
             with patch("core.integrations.intune._get_token", return_value="tok"):
                 from core.integrations.intune import IntuneClient
+
                 client = IntuneClient("tid", "cid", "sec")
                 # patch nextLink iteration: second response has no nextLink key
                 # simulate by returning None from @odata.nextLink
@@ -132,6 +134,7 @@ class IntunePaginationTest(TransactionTestCase):
         import core.integrations.intune as intune_mod
 
         call_count = 0
+
         def fake_get(url, headers, timeout):
             nonlocal call_count
             call_count += 1
@@ -186,6 +189,7 @@ class IntuneSyncMatchUpdateTest(TenantTestMixin, TransactionTestCase):
 
         job = _make_job("tenant-a")
         from core.tasks.intune_sync import sync_tenant_intune
+
         sync_tenant_intune(
             tenant_id=self.tenant.pk,
             user_id=self.tenant_admin.pk,
@@ -224,6 +228,7 @@ class IntuneSyncCreateMissingTest(TenantTestMixin, TransactionTestCase):
 
         job = _make_job("tenant-a")
         from core.tasks.intune_sync import sync_tenant_intune
+
         sync_tenant_intune(
             tenant_id=self.tenant.pk,
             user_id=self.tenant_admin.pk,
@@ -238,9 +243,7 @@ class IntuneSyncCreateMissingTest(TenantTestMixin, TransactionTestCase):
         self.assertTrue(Manufacturer.objects.filter(name="Dell").exists())
         self.assertTrue(AssetType.objects.filter(model="XPS 15").exists())
 
-    @override_settings(ITAMBOX_TENANT_INTUNE_CONFIGS={
-        "tenant-a": {**INTUNE_CONF_A, "create_missing": False}
-    })
+    @override_settings(ITAMBOX_TENANT_INTUNE_CONFIGS={"tenant-a": {**INTUNE_CONF_A, "create_missing": False}})
     @patch("core.tasks.intune_sync.IntuneClient")
     def test_create_missing_false_skips(self, MockClient):
         instance = MockClient.return_value
@@ -249,6 +252,7 @@ class IntuneSyncCreateMissingTest(TenantTestMixin, TransactionTestCase):
 
         job = _make_job("tenant-a")
         from core.tasks.intune_sync import sync_tenant_intune
+
         sync_tenant_intune(
             tenant_id=self.tenant.pk,
             user_id=self.tenant_admin.pk,
@@ -287,6 +291,7 @@ class IntuneSyncSoftwareTest(TenantTestMixin, TransactionTestCase):
 
         job = _make_job("tenant-a")
         from core.tasks.intune_sync import sync_tenant_intune
+
         sync_tenant_intune(
             tenant_id=self.tenant.pk,
             user_id=self.tenant_admin.pk,
@@ -296,12 +301,14 @@ class IntuneSyncSoftwareTest(TenantTestMixin, TransactionTestCase):
         job.refresh_from_db()
         self.assertEqual(job.result["apps_upserted"], 1)
         self.assertTrue(Software.objects.filter(name="Google Chrome").exists())
-        self.assertTrue(InstalledSoftware.objects.filter(
-            asset=asset,
-            software__name="Google Chrome",
-            version_detected="121.0.6167.85",
-            discovered_by_agent="Intune",
-        ).exists())
+        self.assertTrue(
+            InstalledSoftware.objects.filter(
+                asset=asset,
+                software__name="Google Chrome",
+                version_detected="121.0.6167.85",
+                discovered_by_agent="Intune",
+            ).exists()
+        )
 
     @override_settings(ITAMBOX_TENANT_INTUNE_CONFIGS=MOCK_SETTINGS)
     @patch("core.tasks.intune_sync.IntuneClient")
@@ -356,6 +363,7 @@ class IntuneSyncDryRunTest(TenantTestMixin, TransactionTestCase):
 
         job = _make_job("tenant-a")
         from core.tasks.intune_sync import sync_tenant_intune
+
         sync_tenant_intune(
             tenant_id=self.tenant.pk,
             user_id=self.tenant_admin.pk,
@@ -380,10 +388,9 @@ class IntuneSyncTenantIsolationTest(TenantTestMixin, TransactionTestCase):
 
         # Second tenant
         from organization.models import Tenant
+
         self.tenant_b = Tenant.objects.create(name="Tenant B", slug="tenant-b")
-        self.admin_b = User.objects.create_superuser(
-            username="admin_b", email="admin_b@example.com", password="pw"
-        )
+        self.admin_b = User.objects.create_superuser(username="admin_b", email="admin_b@example.com", password="pw")
 
     @override_settings(ITAMBOX_TENANT_INTUNE_CONFIGS=MOCK_SETTINGS)
     @patch("core.tasks.intune_sync.IntuneClient")

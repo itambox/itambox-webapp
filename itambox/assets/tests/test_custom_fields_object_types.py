@@ -1,11 +1,11 @@
+from django.contrib.auth import get_user_model
 from django.contrib.contenttypes.models import ContentType
 from django.test import TestCase
-from django.contrib.auth import get_user_model
 
-from assets.models import Asset, AssetType, Manufacturer, Category, AssetRole, StatusLabel
-from extras.models import CustomField, CustomFieldset
 from assets.forms.asset_form import AssetForm
 from assets.forms.assettype_form import AssetTypeForm
+from assets.models import Asset, AssetRole, AssetType, Category, Manufacturer, StatusLabel
+from extras.models import CustomField, CustomFieldset
 
 User = get_user_model()
 
@@ -20,7 +20,9 @@ class CustomFieldsObjectTypesTestCase(TestCase):
         self.manufacturer = Manufacturer.objects.create(name="Dell", slug="dell")
         self.category = Category.objects.create(name="Laptops", slug="laptops", applies_to={"asset": True})
         self.role = AssetRole.objects.create(name="Laptop", slug="laptop")
-        self.status = StatusLabel.objects.get_or_create(slug="available", defaults={"name": "Available", "type": "deployable"})[0]
+        self.status = StatusLabel.objects.get_or_create(
+            slug="available", defaults={"name": "Available", "type": "deployable"}
+        )[0]
 
         self.asset_ct = ContentType.objects.get_for_model(Asset)
         self.assettype_ct = ContentType.objects.get_for_model(AssetType)
@@ -62,8 +64,10 @@ class CustomFieldsObjectTypesTestCase(TestCase):
 
     def test_asset_form_renders_only_device_fields(self):
         asset = Asset.objects.create(
-            name="My Laptop", asset_tag="TAG-1",
-            asset_type=self.asset_type, status=self.status,
+            name="My Laptop",
+            asset_tag="TAG-1",
+            asset_type=self.asset_type,
+            status=self.status,
         )
         form = AssetForm(instance=asset)
         self.assertNotIn("cf_cpu", form.fields)
@@ -76,7 +80,9 @@ class CustomFieldsObjectTypesTestCase(TestCase):
         cf_global = CustomField.objects.create(name="cost_center", label="Cost Center", field_type="text")
         cf_global.object_types.add(self.asset_ct)
         asset = Asset.objects.create(
-            name="Plain Laptop", asset_tag="TAG-2", status=self.status,
+            name="Plain Laptop",
+            asset_tag="TAG-2",
+            status=self.status,
         )
         form = AssetForm(instance=asset)
         self.assertIn("cf_cost_center", form.fields)
@@ -88,18 +94,18 @@ class GenericCustomFieldFormMixinTestCase(TestCase):
     """The generic mixin renders/persists custom fields for any opted-in model."""
 
     def test_supplier_form_roundtrip(self):
-        from assets.models import Supplier
         from assets.forms.supplier_form import SupplierForm
+        from assets.models import Supplier
 
         supplier_ct = ContentType.objects.get_for_model(Supplier)
         cf = CustomField.objects.create(name="account_no", label="Account Number", field_type="text")
         cf.object_types.add(supplier_ct)
 
-        form = SupplierForm(data={'name': 'Bechtle AG', 'slug': 'bechtle-ag', 'cf_account_no': 'ACC-42'})
+        form = SupplierForm(data={"name": "Bechtle AG", "slug": "bechtle-ag", "cf_account_no": "ACC-42"})
         self.assertTrue(form.is_valid(), form.errors)
         supplier = form.save()
-        self.assertEqual(supplier.custom_field_data.get('account_no'), 'ACC-42')
+        self.assertEqual(supplier.custom_field_data.get("account_no"), "ACC-42")
 
         # Round-trip: the stored value comes back as the form initial.
         form2 = SupplierForm(instance=supplier)
-        self.assertEqual(form2.fields['cf_account_no'].initial, 'ACC-42')
+        self.assertEqual(form2.fields["cf_account_no"].initial, "ACC-42")

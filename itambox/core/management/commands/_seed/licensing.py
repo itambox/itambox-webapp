@@ -32,41 +32,49 @@ class SeedLicensingMixin:
 
     def _seed_licensing(self):
         from licenses.models import License, LicenseSeatAssignment
-        self.stdout.write('--- Licensing ---')
+
+        self.stdout.write("--- Licensing ---")
         self._licenses = []
         seat_assigns = 0
         for slug, tenant in self._tenants.items():
             meta = self._tenant_meta[slug]
             holders = self._tenant_holders[slug]
             hc = max(len(holders), 5)
-            code = meta['code']
+            code = meta["code"]
             plan = [
-                ('Microsoft 365 E5', 'subscription_seat', round(hc * 1.2) + 5, 57 * (round(hc * 1.2) + 5), True),
-                ('CrowdStrike Falcon', 'subscription_seat', round(hc * 1.2) + 5, 60 * (round(hc * 1.2) + 5), True),
-                ('1Password Business', 'subscription_seat', round(hc * 1.1) + 5, 8 * (round(hc * 1.1) + 5), True),
-                ('Windows 11 Enterprise', 'perpetual_seat', hc + 10, None, False),
+                ("Microsoft 365 E5", "subscription_seat", round(hc * 1.2) + 5, 57 * (round(hc * 1.2) + 5), True),
+                ("CrowdStrike Falcon", "subscription_seat", round(hc * 1.2) + 5, 60 * (round(hc * 1.2) + 5), True),
+                ("1Password Business", "subscription_seat", round(hc * 1.1) + 5, 8 * (round(hc * 1.1) + 5), True),
+                ("Windows 11 Enterprise", "perpetual_seat", hc + 10, None, False),
             ]
-            if meta['industry'] == 'Pharmaceuticals':
-                plan.append(('SAS Analytics Pro', 'subscription_seat', 15, 45000, True))
-            if meta['industry'] == 'Architecture & Design':
-                plan.append(('Autodesk AutoCAD', 'subscription_seat', 12, 24000, True))
-            if meta['industry'] in ('Banking', 'Asset Management'):
-                plan.append(('Bloomberg Terminal', 'subscription_seat', 8, 192000, True))
+            if meta["industry"] == "Pharmaceuticals":
+                plan.append(("SAS Analytics Pro", "subscription_seat", 15, 45000, True))
+            if meta["industry"] == "Architecture & Design":
+                plan.append(("Autodesk AutoCAD", "subscription_seat", 12, 24000, True))
+            if meta["industry"] in ("Banking", "Asset Management"):
+                plan.append(("Bloomberg Terminal", "subscription_seat", 8, 192000, True))
             for sw_name, ltype, seats, cost, has_expiry in plan:
                 expiry = days_ahead(random.choice([18, 25, 40, 90, 180, 365])) if has_expiry else None
                 lic = License.objects.create(
-                    name=sw_name, software=self._software[sw_name], license_type=ltype,
-                    product_key=('' if ltype != 'perpetual_seat' else f"{code}-XXXXX-YYYYY-ZZZZZ"),
-                    seats=seats, purchase_cost=cost, purchase_date=days_ago(random.randint(60, 600)),
-                    order_number=f"PO-SW-{random.randint(1000, 9999)}", tenant=tenant, expiration_date=expiry)
+                    name=sw_name,
+                    software=self._software[sw_name],
+                    license_type=ltype,
+                    product_key=("" if ltype != "perpetual_seat" else f"{code}-XXXXX-YYYYY-ZZZZZ"),
+                    seats=seats,
+                    purchase_cost=cost,
+                    purchase_date=days_ago(random.randint(60, 600)),
+                    order_number=f"PO-SW-{random.randint(1000, 9999)}",
+                    tenant=tenant,
+                    expiration_date=expiry,
+                )
                 self._licenses.append(lic)
                 # Assign seats to a sample of holders for the seat-based subscriptions.
                 # Per-user products (e.g. Microsoft 365 E5) are user-bound — the seat
                 # targets the holder. Per-device products (e.g. CrowdStrike Falcon, an
                 # endpoint agent) are device-bound — the seat targets the holder's
                 # primary laptop when known. The model enforces asset XOR holder.
-                DEVICE_BOUND_SOFTWARE = {'CrowdStrike Falcon'}
-                if ltype == 'subscription_seat' and holders and sw_name in ('Microsoft 365 E5', 'CrowdStrike Falcon'):
+                DEVICE_BOUND_SOFTWARE = {"CrowdStrike Falcon"}
+                if ltype == "subscription_seat" and holders and sw_name in ("Microsoft 365 E5", "CrowdStrike Falcon"):
                     device_bound = sw_name in DEVICE_BOUND_SOFTWARE
                     for h in random.sample(holders, k=min(len(holders), max(3, len(holders) // 2))):
                         try:
@@ -78,4 +86,4 @@ class SeedLicensingMixin:
                             seat_assigns += 1
                         except Exception:
                             pass
-        self.stdout.write(f'  {len(self._licenses)} licenses, {seat_assigns} seat assignments.')
+        self.stdout.write(f"  {len(self._licenses)} licenses, {seat_assigns} seat assignments.")

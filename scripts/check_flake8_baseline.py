@@ -1,9 +1,9 @@
 #!/usr/bin/env python
 """Fail-closed, identity-based Flake8 debt ratchet.
 
-ITAMbox has roughly 4k pre-existing Flake8 findings. The checked-in baseline
-records the identity of each reviewed finding as path, code, message, source,
-and stable AST context. Physical row/column numbers are deliberately excluded:
+ITAMbox has pre-existing Flake8 findings. The checked-in baseline records the
+identity of each reviewed finding as path, code, message, source, and stable AST
+context. Physical row/column numbers are deliberately excluded:
 inserting an unrelated line above existing debt must not create a false regression.
 
 A new identity is always a regression, even if it replaces an old finding with
@@ -16,16 +16,17 @@ behaviour differs across Python versions (which findings Flake8 reports and
 where), so results from a non-canonical interpreter are not comparable to the
 baseline. There are no interpreter- or OS-specific exceptions.
 """
+
 import argparse
 import ast
 import collections
 import configparser
-from importlib.metadata import PackageNotFoundError, version
 import hashlib
 import json
 import re
 import subprocess
 import sys
+from importlib.metadata import PackageNotFoundError, version
 from pathlib import Path
 
 VIOLATION_RE = re.compile(
@@ -117,8 +118,7 @@ def _source_anchor(code, source_text, source_lines, syntax_tree, row, path):
     candidates = [
         node
         for node in ast.walk(syntax_tree)
-        if isinstance(node, ast.stmt)
-        and node.lineno <= row <= getattr(node, "end_lineno", node.lineno)
+        if isinstance(node, ast.stmt) and node.lineno <= row <= getattr(node, "end_lineno", node.lineno)
     ]
     if not candidates:
         raise ValueError(f"cannot anchor B907 row {row} to a statement in {path}")
@@ -147,20 +147,12 @@ def _secondary_context_label(node):
     if isinstance(node, (ast.Try, getattr(ast, "TryStar", ast.Try))):
         return type(node).__name__
     if isinstance(node, ast.ExceptHandler):
-        exception_type = (
-            ast.dump(node.type, include_attributes=False)
-            if node.type is not None
-            else None
-        )
+        exception_type = ast.dump(node.type, include_attributes=False) if node.type is not None else None
         return f"ExceptHandler:{exception_type}:{node.name}"
     if isinstance(node, ast.Match):
         return f"Match:{ast.dump(node.subject, include_attributes=False)}"
     if isinstance(node, ast.match_case):
-        guard = (
-            ast.dump(node.guard, include_attributes=False)
-            if node.guard is not None
-            else None
-        )
+        guard = ast.dump(node.guard, include_attributes=False) if node.guard is not None else None
         return f"match_case:{ast.dump(node.pattern, include_attributes=False)}:{guard}"
     return None
 
@@ -184,9 +176,7 @@ def _context_label(node):
         items = [
             (
                 ast.dump(item.context_expr, include_attributes=False),
-                ast.dump(item.optional_vars, include_attributes=False)
-                if item.optional_vars is not None
-                else None,
+                ast.dump(item.optional_vars, include_attributes=False) if item.optional_vars is not None else None,
             )
             for item in node.items
         ]
@@ -241,11 +231,7 @@ def _context_label_with_sibling_ordinal(node, parents):
     siblings = getattr(parent, field, None)
     if not isinstance(siblings, list):
         return label
-    equivalent = [
-        sibling
-        for sibling in siblings
-        if isinstance(sibling, ast.AST) and _context_label(sibling) == label
-    ]
+    equivalent = [sibling for sibling in siblings if isinstance(sibling, ast.AST) and _context_label(sibling) == label]
     if len(equivalent) < 2:
         return label
     return f"{label}#{equivalent.index(node) + 1}"
@@ -303,9 +289,7 @@ def parse_findings(output, cwd):
         row = int(match.group("row"))
         source_text, source_lines, syntax_tree = source_cache[source_path]
         if row < 1 or row > len(source_lines):
-            raise ValueError(
-                f"finding row {row} is outside {path} ({len(source_lines)} lines)"
-            )
+            raise ValueError(f"finding row {row} is outside {path} ({len(source_lines)} lines)")
         code = match.group("code")
         message = match.group("message")
         source = _source_anchor(
@@ -334,15 +318,11 @@ def _validate_baseline_header(raw, expected_policy_fingerprint):
     if not isinstance(raw, dict) or set(raw) != required_top_level:
         raise ValueError("baseline has invalid top-level fields")
     if raw["schema_version"] != BASELINE_SCHEMA_VERSION:
-        raise ValueError(
-            f"expected Flake8 baseline schema {BASELINE_SCHEMA_VERSION}"
-        )
+        raise ValueError(f"expected Flake8 baseline schema {BASELINE_SCHEMA_VERSION}")
     if raw["canonical_python"] != "3.12":
         raise ValueError("baseline canonical_python must be '3.12'")
     if raw["policy_sha256"] != expected_policy_fingerprint:
-        raise ValueError(
-            "baseline policy_sha256 does not match the effective Flake8 policy"
-        )
+        raise ValueError("baseline policy_sha256 does not match the effective Flake8 policy")
 
 
 def load_baseline(baseline_path, expected_policy_fingerprint):
@@ -397,11 +377,12 @@ def write_baseline(findings, baseline_path, policy_fingerprint):
         "policy_sha256": policy_fingerprint,
         "findings": rows,
     }
-    baseline_path.write_text(json.dumps(data, indent=2) + "\n", encoding="utf-8")
-    print(
-        f"Wrote {len(rows)} baseline identities "
-        f"({sum(findings.values())} total violations) to {baseline_path}"
+    baseline_path.write_text(
+        json.dumps(data, indent=2) + "\n",
+        encoding="utf-8",
+        newline="\n",
     )
+    print(f"Wrote {len(rows)} baseline identities ({sum(findings.values())} total violations) to {baseline_path}")
 
 
 def validate_flake8_result(output, error_output, status, cwd):
@@ -480,11 +461,7 @@ def report_mismatches(
             example = examples.get(key)
             if example is None:
                 example = next(
-                    (
-                        line
-                        for candidate, line in examples.items()
-                        if candidate[:3] == key[:3]
-                    ),
+                    (line for candidate, line in examples.items() if candidate[:3] == key[:3]),
                     f"{path}: {code} {key[2]}",
                 )
             print(f"    e.g. {example}")
@@ -585,10 +562,7 @@ def main():
             findings,
             args.baseline,
         )
-    print(
-        f"flake8: {sum(findings.values())} violation(s) match the "
-        "identity baseline."
-    )
+    print(f"flake8: {sum(findings.values())} violation(s) match the identity baseline.")
     return 0
 
 

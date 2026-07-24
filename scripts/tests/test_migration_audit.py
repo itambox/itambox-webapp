@@ -103,18 +103,10 @@ class MigrationAuditTests(unittest.TestCase):
             len(inventory["special_users_bootstrap"]["swappable_dependents"]),
             1,
         )
-        users = next(
-            migration
-            for migration in inventory["migrations"]
-            if migration["id"] == "users.0001_initial"
-        )
+        users = next(migration for migration in inventory["migrations"] if migration["id"] == "users.0001_initial")
         self.assertEqual(users["operations"]["RunPython"]["with_reverse"], 1)
         self.assertEqual(users["operations"]["RunSQL"]["with_noop_reverse"], 1)
-        beta = next(
-            migration
-            for migration in inventory["migrations"]
-            if migration["id"] == "beta.0001_initial"
-        )
+        beta = next(migration for migration in inventory["migrations"] if migration["id"] == "beta.0001_initial")
         self.assertEqual(beta["operations"]["BtreeGistExtension"]["count"], 1)
         self.assertEqual(
             inventory["reviewed_semantics"]["required_fresh"],
@@ -134,12 +126,8 @@ class MigrationAuditTests(unittest.TestCase):
             path = self._write_migration(root, "alpha", "0001_initial", source)
             before = path.read_text(encoding="utf-8")
 
-            first = render_inventory(
-                build_inventory(root, semantic_dispositions={}, expected_blockers=[])
-            )
-            second = render_inventory(
-                build_inventory(root, semantic_dispositions={}, expected_blockers=[])
-            )
+            first = render_inventory(build_inventory(root, semantic_dispositions={}, expected_blockers=[]))
+            second = render_inventory(build_inventory(root, semantic_dispositions={}, expected_blockers=[]))
             after = path.read_text(encoding="utf-8")
 
         self.assertEqual(first, second)
@@ -185,9 +173,7 @@ class MigrationAuditTests(unittest.TestCase):
                 [("beta", "0001_initial")],
             )
 
-            inventory = build_inventory(
-                root, semantic_dispositions={}, expected_blockers=[]
-            )
+            inventory = build_inventory(root, semantic_dispositions={}, expected_blockers=[])
 
         self.assertEqual(
             inventory["historical_graph"],
@@ -258,9 +244,7 @@ class MigrationAuditTests(unittest.TestCase):
                 [("alpha", "0001_initial")],
             )
 
-            with self.assertRaisesRegex(
-                ValueError, r"replacement coverage incomplete.*alpha\.0002_second"
-            ):
+            with self.assertRaisesRegex(ValueError, r"replacement coverage incomplete.*alpha\.0002_second"):
                 build_inventory(root, semantic_dispositions={}, expected_blockers=[])
 
     def test_empty_replaces_declaration_triggers_coverage_validation(self):
@@ -269,9 +253,7 @@ class MigrationAuditTests(unittest.TestCase):
             self._write_plain_migration(root, "alpha", "0001_initial")
             self._write_replacement(root, "alpha", "0001_squashed", [])
 
-            with self.assertRaisesRegex(
-                ValueError, r"replacement coverage incomplete.*alpha\.0001_initial"
-            ):
+            with self.assertRaisesRegex(ValueError, r"replacement coverage incomplete.*alpha\.0001_initial"):
                 build_inventory(root, semantic_dispositions={}, expected_blockers=[])
 
     def test_replacement_targets_must_not_be_duplicated(self):
@@ -285,9 +267,7 @@ class MigrationAuditTests(unittest.TestCase):
                 [("alpha", "0001_initial"), ("alpha", "0001_initial")],
             )
 
-            with self.assertRaisesRegex(
-                ValueError, r"duplicate replacement targets.*alpha\.0001_initial"
-            ):
+            with self.assertRaisesRegex(ValueError, r"duplicate replacement targets.*alpha\.0001_initial"):
                 build_inventory(root, semantic_dispositions={}, expected_blockers=[])
 
     def test_effective_replacement_quotient_must_be_acyclic(self):
@@ -340,9 +320,7 @@ class MigrationAuditTests(unittest.TestCase):
                 [("beta", "0001_initial"), ("beta", "0002_second")],
             )
 
-            with self.assertRaisesRegex(
-                ValueError, "effective replacement graph contains a cycle"
-            ):
+            with self.assertRaisesRegex(ValueError, "effective replacement graph contains a cycle"):
                 build_inventory(root, semantic_dispositions={}, expected_blockers=[])
 
     def test_effective_graph_includes_explicit_replacement_dependencies(self):
@@ -364,9 +342,7 @@ class MigrationAuditTests(unittest.TestCase):
                 dependencies=[("alpha", "0001_squashed")],
             )
 
-            inventory = build_inventory(
-                root, semantic_dispositions={}, expected_blockers=[]
-            )
+            inventory = build_inventory(root, semantic_dispositions={}, expected_blockers=[])
 
         self.assertEqual(
             inventory["effective_graph"]["edges"],
@@ -392,9 +368,7 @@ class MigrationAuditTests(unittest.TestCase):
                 [("beta", "0001_initial")],
             )
 
-            inventory = build_inventory(
-                root, semantic_dispositions={}, expected_blockers=[]
-            )
+            inventory = build_inventory(root, semantic_dispositions={}, expected_blockers=[])
 
         self.assertEqual(
             inventory["effective_graph"]["edges"],
@@ -430,9 +404,7 @@ class MigrationAuditTests(unittest.TestCase):
                 [("beta", "0001_initial")],
             )
 
-            with self.assertRaisesRegex(
-                ValueError, "effective replacement graph contains a cycle"
-            ):
+            with self.assertRaisesRegex(ValueError, "effective replacement graph contains a cycle"):
                 build_inventory(root, semantic_dispositions={}, expected_blockers=[])
 
     def test_unknown_first_party_explicit_replacement_dependency_fails_clearly(self):
@@ -465,14 +437,10 @@ class MigrationAuditTests(unittest.TestCase):
                 dependencies=[("contenttypes", "0002_remove_content_type_name")],
             )
 
-            inventory = build_inventory(
-                root, semantic_dispositions={}, expected_blockers=[]
-            )
+            inventory = build_inventory(root, semantic_dispositions={}, expected_blockers=[])
 
         self.assertEqual(inventory["effective_graph"]["edges"], [])
-        self.assertEqual(
-            inventory["effective_graph"]["nodes"], ["alpha.0001_squashed"]
-        )
+        self.assertEqual(inventory["effective_graph"]["nodes"], ["alpha.0001_squashed"])
 
     def test_issue88_shard_requires_immediate_predecessor_dependency(self):
         with tempfile.TemporaryDirectory() as temporary_directory:
@@ -492,9 +460,7 @@ class MigrationAuditTests(unittest.TestCase):
                 [("beta", "0001_initial")],
             )
 
-            with self.assertRaisesRegex(
-                ValueError, "issue88 shard lacks immediate predecessor"
-            ):
+            with self.assertRaisesRegex(ValueError, "issue88 shard lacks immediate predecessor"):
                 build_inventory(root, semantic_dispositions={}, expected_blockers=[])
 
     def test_issue88_shard_requires_previous_same_app_dependency(self):
@@ -524,9 +490,7 @@ class MigrationAuditTests(unittest.TestCase):
                 dependencies=[("beta", "0100_issue88_shard_02_beta")],
             )
 
-            with self.assertRaisesRegex(
-                ValueError, "issue88 shard lacks previous same-app shard"
-            ):
+            with self.assertRaisesRegex(ValueError, "issue88 shard lacks previous same-app shard"):
                 build_inventory(root, semantic_dispositions={}, expected_blockers=[])
 
     def test_post_transition_migration_requires_effective_leaf_dependency(self):
@@ -562,9 +526,7 @@ class MigrationAuditTests(unittest.TestCase):
                 },
             }
 
-            with self.assertRaisesRegex(
-                ValueError, "post-transition migration lacks effective leaf dependency"
-            ):
+            with self.assertRaisesRegex(ValueError, "post-transition migration lacks effective leaf dependency"):
                 build_inventory(
                     root,
                     semantic_dispositions=dispositions,
@@ -588,9 +550,7 @@ class MigrationAuditTests(unittest.TestCase):
         )
         self.assertEqual(inventory["summary"]["missing_replacement_targets"], 0)
         self.assertEqual(inventory["summary"]["duplicate_replacement_targets"], 0)
-        self.assertTrue(
-            inventory["summary"]["effective_replacement_quotient_acyclic"]
-        )
+        self.assertTrue(inventory["summary"]["effective_replacement_quotient_acyclic"])
         self.assertEqual(
             inventory["summary"]["global_roots"],
             ["users.0010_user"],
@@ -685,11 +645,7 @@ class MigrationAuditTests(unittest.TestCase):
         self.assertEqual(set(SEMANTIC_DISPOSITIONS), custom_operation_ids)
         self.assertFalse(set(SEMANTIC_DISPOSITIONS) - custom_operation_ids)
         self.assertEqual(
-            {
-                migration["id"]
-                for migration in inventory["migrations"]
-                if migration["reviewed_disposition"] is not None
-            },
+            {migration["id"] for migration in inventory["migrations"] if migration["reviewed_disposition"] is not None},
             custom_operation_ids,
         )
 
@@ -715,9 +671,7 @@ class MigrationAuditTests(unittest.TestCase):
             """,
         )
 
-    def _write_replacement(
-        self, root, app, name, replaces, dependencies=None, run_before=None
-    ):
+    def _write_replacement(self, root, app, name, replaces, dependencies=None, run_before=None):
         dependencies = [] if dependencies is None else dependencies
         run_before = [] if run_before is None else run_before
         return self._write_migration(

@@ -17,13 +17,14 @@ test helper. The view's
 own permission check (``organization.change_membership`` on the membership's tenant) is
 unchanged — only the fixture setup below is migrated.
 """
+
 from django.contrib.auth import get_user_model
 from django.core import mail
 from django.test import TestCase
 from django.urls import reverse
 
 from core.tests.mixins import TenantTestMixin
-from organization.models import Tenant, Membership, Role
+from organization.models import Membership, Role, Tenant
 
 User = get_user_model()
 
@@ -33,7 +34,9 @@ class MembershipSendResetActionTests(TenantTestMixin, TestCase):
         self.clear_tenant_context()
         # A managing (MSP) tenant whose staff memberships we manage.
         self.provider = Tenant.objects.create(
-            name="Acme MSP", slug="acme-msp", is_provider=True,
+            name="Acme MSP",
+            slug="acme-msp",
+            is_provider=True,
         )
 
         # A role, owned by the managing tenant, that lets its holder change
@@ -47,36 +50,47 @@ class MembershipSendResetActionTests(TenantTestMixin, TestCase):
         # The acting manager: a non-superuser staff member holding manager_role via an
         # own RoleGrant scope at the managing tenant.
         self.manager = User.objects.create_user(
-            username="manager", email="manager@example.com",
-            password="pw", is_active=True,
+            username="manager",
+            email="manager@example.com",
+            password="pw",
+            is_active=True,
         )
         self.grant(self.manager, self.provider, self.manager_role)
         self.manager_membership = Membership.objects.get(
-            user=self.manager, tenant=self.provider,
+            user=self.manager,
+            tenant=self.provider,
         )
 
         # The onboarded technician whose credential we want to (re)issue. Mirrors the
         # onboarding flow: usable email, unusable password.
         self.tech = User.objects.create_user(
-            username="tech", email="tech@example.com", is_active=True,
+            username="tech",
+            email="tech@example.com",
+            is_active=True,
         )
         self.tech.set_unusable_password()
         self.tech.save(update_fields=["password"])
         self.tech_membership = Membership.objects.create(
-            user=self.tech, tenant=self.provider, is_active=True,
+            user=self.tech,
+            tenant=self.provider,
+            is_active=True,
         )
 
         # An outsider with no permission on the managing tenant.
         self.outsider = User.objects.create_user(
-            username="outsider", email="outsider@example.com",
-            password="pw", is_active=True,
+            username="outsider",
+            email="outsider@example.com",
+            password="pw",
+            is_active=True,
         )
 
         self.url = reverse(
-            'organization:membership_send_reset', kwargs={'pk': self.tech_membership.pk},
+            "organization:membership_send_reset",
+            kwargs={"pk": self.tech_membership.pk},
         )
         self.detail_url = reverse(
-            'organization:membership_detail', kwargs={'pk': self.tech_membership.pk},
+            "organization:membership_detail",
+            kwargs={"pk": self.tech_membership.pk},
         )
 
     def tearDown(self):
@@ -93,11 +107,13 @@ class MembershipSendResetActionTests(TenantTestMixin, TestCase):
 
         messages = list(resp.wsgi_request._messages)
         self.assertEqual(len(messages), 1)
-        self.assertEqual(messages[0].level_tag, 'success')
+        self.assertEqual(messages[0].level_tag, "success")
 
     def test_superuser_may_send(self):
         superuser = User.objects.create_superuser(
-            username="root", email="root@example.com", password="pw",
+            username="root",
+            email="root@example.com",
+            password="pw",
         )
         self.client.force_login(superuser)
         resp = self.client.post(self.url)
@@ -115,7 +131,7 @@ class MembershipSendResetActionTests(TenantTestMixin, TestCase):
 
         messages = list(resp.wsgi_request._messages)
         self.assertEqual(len(messages), 1)
-        self.assertEqual(messages[0].level_tag, 'error')
+        self.assertEqual(messages[0].level_tag, "error")
 
     def test_get_is_not_allowed(self):
         self.client.force_login(self.manager)

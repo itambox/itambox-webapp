@@ -1,16 +1,19 @@
 from datetime import date
+
 from django.test import TestCase
 from model_bakery import baker
-from assets.models import Asset, Supplier
+
+from assets.models import Asset, AssetMaintenance, Supplier
 from organization.models import AssetHolder
-from assets.models import AssetMaintenance
+
 from ..models import CustodyReceipt
+
 
 class AssetMaintenanceModelTests(TestCase):
     def setUp(self):
         # Baker automatically creates AssetRole and StatusLabel foreign keys
-        self.asset = baker.make(Asset, name='SRV-01', asset_tag='TAG-SRV-01', tenant=None)
-        self.supplier = baker.make(Supplier, name='Dell Support', slug='dell-support')
+        self.asset = baker.make(Asset, name="SRV-01", asset_tag="TAG-SRV-01", tenant=None)
+        self.supplier = baker.make(Supplier, name="Dell Support", slug="dell-support")
 
     def test_maintenance_creation(self):
         maint = baker.make(
@@ -21,9 +24,9 @@ class AssetMaintenanceModelTests(TestCase):
             cost=150.00,
             start_date=date(2026, 1, 15),
             completion_date=date(2026, 1, 18),
-            notes='Replaced power supply',
+            notes="Replaced power supply",
         )
-        self.assertEqual(str(maint), 'Repair on SRV-01')
+        self.assertEqual(str(maint), "Repair on SRV-01")
         self.assertEqual(maint.cost, 150.00)
         self.assertEqual(maint.supplier, self.supplier)
 
@@ -59,11 +62,11 @@ class AssetMaintenanceModelTests(TestCase):
 
     def test_maintenance_types(self):
         choices = dict(AssetMaintenance.MAINTENANCE_TYPE_CHOICES)
-        self.assertIn('repair', choices)
-        self.assertIn('upgrade', choices)
-        self.assertIn('calibration', choices)
-        self.assertIn('software_support', choices)
-        self.assertIn('hardware_support', choices)
+        self.assertIn("repair", choices)
+        self.assertIn("upgrade", choices)
+        self.assertIn("calibration", choices)
+        self.assertIn("software_support", choices)
+        self.assertIn("hardware_support", choices)
 
     def test_maintenance_default_type(self):
         maint = baker.make(
@@ -79,10 +82,16 @@ class AssetMaintenanceModelTests(TestCase):
 
     def test_maintenance_ordering(self):
         baker.make(
-            AssetMaintenance, asset=self.asset, start_date=date(2026, 1, 1), maintenance_type=AssetMaintenance.MAINTENANCE_TYPE_REPAIR
+            AssetMaintenance,
+            asset=self.asset,
+            start_date=date(2026, 1, 1),
+            maintenance_type=AssetMaintenance.MAINTENANCE_TYPE_REPAIR,
         )
         baker.make(
-            AssetMaintenance, asset=self.asset, start_date=date(2026, 6, 1), maintenance_type=AssetMaintenance.MAINTENANCE_TYPE_UPGRADE
+            AssetMaintenance,
+            asset=self.asset,
+            start_date=date(2026, 6, 1),
+            maintenance_type=AssetMaintenance.MAINTENANCE_TYPE_UPGRADE,
         )
         qs = AssetMaintenance.objects.all()
         self.assertGreater(qs[0].start_date, qs[1].start_date)
@@ -102,8 +111,8 @@ class AssetMaintenanceModelTests(TestCase):
 
 class CustodyReceiptModelTests(TestCase):
     def setUp(self):
-        self.asset = baker.make(Asset, name='LT-01', asset_tag='TAG-LT-01', tenant=None)
-        self.holder = baker.make(AssetHolder, first_name='Jane', last_name='Smith')
+        self.asset = baker.make(Asset, name="LT-01", asset_tag="TAG-LT-01", tenant=None)
+        self.holder = baker.make(AssetHolder, first_name="Jane", last_name="Smith")
 
     def test_custody_receipt_creation(self):
         receipt = baker.make(
@@ -125,5 +134,5 @@ class CustodyReceiptModelTests(TestCase):
 
     def test_custody_receipt_string(self):
         receipt = baker.make(CustodyReceipt, asset=self.asset, holder=self.holder)
-        self.assertIn('LT-01', str(receipt))
-        self.assertIn('Jane Smith', str(receipt))
+        self.assertIn("LT-01", str(receipt))
+        self.assertIn("Jane Smith", str(receipt))

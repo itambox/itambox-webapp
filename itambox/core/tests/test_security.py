@@ -1,9 +1,9 @@
-from django.test import TestCase, override_settings
+from django.contrib.auth import get_user_model
+from django.contrib.contenttypes.models import ContentType
+from django.core.cache import cache
 from django.core.exceptions import ValidationError
 from django.core.files.uploadedfile import SimpleUploadedFile
-from django.contrib.contenttypes.models import ContentType
-from django.contrib.auth import get_user_model
-from django.core.cache import cache
+from django.test import TestCase, override_settings
 from django.urls import reverse
 from model_bakery import baker
 
@@ -24,6 +24,7 @@ class MockUploadedFile(SimpleUploadedFile):
     @size.setter
     def size(self, value):
         self._size = value
+
 
 class SecurityHardeningTests(TestCase):
     def setUp(self):
@@ -86,20 +87,20 @@ class SecurityHardeningTests(TestCase):
 
     @override_settings(RATELIMIT_LIMIT=3, RATELIMIT_PERIOD=60)
     def test_rate_limiting_middleware(self):
-        login_url = reverse('login')
-        
+        login_url = reverse("login")
+
         # 1st request -> OK
         response1 = self.client.get(login_url)
         self.assertNotEqual(response1.status_code, 429)
-        
+
         # 2nd request -> OK
         response2 = self.client.get(login_url)
         self.assertNotEqual(response2.status_code, 429)
-        
+
         # 3rd request -> OK
         response3 = self.client.get(login_url)
         self.assertNotEqual(response3.status_code, 429)
-        
+
         # 4th request -> Blocked (429)
         response4 = self.client.get(login_url)
         self.assertEqual(response4.status_code, 429)
@@ -107,8 +108,8 @@ class SecurityHardeningTests(TestCase):
 
     @override_settings(RATELIMIT_LIMIT=3, RATELIMIT_PERIOD=60)
     def test_rate_limiting_ignores_unlisted_paths(self):
-        search_url = reverse('search')
-        
+        search_url = reverse("search")
+
         # Multiple requests should proceed normally
         for _ in range(5):
             response = self.client.get(search_url)

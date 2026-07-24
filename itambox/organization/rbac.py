@@ -1,4 +1,5 @@
 """Canonical RoleGrant-based authorization resolution."""
+
 from django.db.models import F, Q
 from django.utils import timezone
 
@@ -18,47 +19,45 @@ def applicable_grants(user):
     outage makes ``synchronize_authorization_cache`` fail open to a fresh local
     version, forcing a recompute rather than serving a stale set.
     """
-    can_cache = hasattr(user, '__dict__')
+    can_cache = hasattr(user, "__dict__")
     if can_cache:
         # inline import: avoids an organization.rbac -> core.auth import cycle at
         # load (core.auth resolves permissions through organization.rbac).
         from core.auth.cache import synchronize_authorization_cache
+
         synchronize_authorization_cache(user)
-        cached = user.__dict__.get('_applicable_grants')
+        cached = user.__dict__.get("_applicable_grants")
         if cached is not None:
             return cached
     now = timezone.now()
-    principal = (
-        Q(membership__user=user, membership__is_active=True)
-        | Q(
-            user_group__is_active=True,
-            user_group__deleted_at__isnull=True,
-            user_group__group_memberships__membership__user=user,
-            user_group__group_memberships__membership__is_active=True,
-            user_group__group_memberships__membership__tenant_id=F('user_group__tenant_id'),
-        )
+    principal = Q(membership__user=user, membership__is_active=True) | Q(
+        user_group__is_active=True,
+        user_group__deleted_at__isnull=True,
+        user_group__group_memberships__membership__user=user,
+        user_group__group_memberships__membership__is_active=True,
+        user_group__group_memberships__membership__tenant_id=F("user_group__tenant_id"),
     )
     grants = list(
         RoleGrant.objects.filter(principal, role__deleted_at__isnull=True)
         .filter(Q(valid_until__isnull=True) | Q(valid_until__gt=now))
         .select_related(
-            'membership__tenant',
-            'user_group__tenant',
-            'role__tenant',
+            "membership__tenant",
+            "user_group__tenant",
+            "role__tenant",
         )
-        .prefetch_related('scopes', 'scopes__tenant', 'scopes__tenant_group')
+        .prefetch_related("scopes", "scopes__tenant", "scopes__tenant_group")
         .distinct()
     )
     if can_cache:
-        user.__dict__['_applicable_grants'] = grants
+        user.__dict__["_applicable_grants"] = grants
     return grants
 
 
 def effective_permissions_with_expiry(user, tenant):
     """Return permissions plus the first expiry that can change that result."""
     # Check the precomputed per-tenant permissions map first (fix #3 for issue #56).
-    if hasattr(user, '__dict__'):
-        perm_map = user.__dict__.get('_tenant_permissions_map')
+    if hasattr(user, "__dict__"):
+        perm_map = user.__dict__.get("_tenant_permissions_map")
         if perm_map is not None and tenant.pk in perm_map:
             return perm_map[tenant.pk]
     permissions = set()
@@ -66,9 +65,7 @@ def effective_permissions_with_expiry(user, tenant):
     for grant in applicable_grants(user):
         if grant.covers_tenant(tenant):
             permissions.update(grant.role.permissions or [])
-            if grant.valid_until is not None and (
-                valid_until is None or grant.valid_until < valid_until
-            ):
+            if grant.valid_until is not None and (valid_until is None or grant.valid_until < valid_until):
                 valid_until = grant.valid_until
     return frozenset(permissions), valid_until
 
@@ -90,7 +87,12 @@ def _grant_candidate_tenant_ids(grant):
 
 
 def _accumulate_grant_coverage(
-    grant, perms, candidate_ids, tenants_by_id, tenant_perms, tenant_valid_until,
+    grant,
+    perms,
+    candidate_ids,
+    tenants_by_id,
+    tenant_perms,
+    tenant_valid_until,
 ):
     """Add ``perms`` to every candidate tenant ``grant`` actually covers, and
     track the earliest ``valid_until`` contributed to each of those tenants.
@@ -121,12 +123,13 @@ def build_accessible_tenant_permissions_map(user, grants=None):
     unconditionally, leaking a managed-only grant's permissions into the
     principal's own tenant).
     """
-    if not hasattr(user, '__dict__'):
+    if not hasattr(user, "__dict__"):
         return {}
     # inline import: avoids an organization.rbac -> core.auth import cycle at load.
     from core.auth.cache import synchronize_authorization_cache
+
     synchronize_authorization_cache(user)
-    cached = user.__dict__.get('_tenant_permissions_map')
+    cached = user.__dict__.get("_tenant_permissions_map")
     if cached is not None:
         return cached
     if grants is None:
@@ -147,7 +150,8 @@ def build_accessible_tenant_permissions_map(user, grants=None):
     tenants_by_id = {
         tenant.pk: tenant
         for tenant in Tenant._base_manager.filter(
-            pk__in=all_candidate_ids, deleted_at__isnull=True,
+            pk__in=all_candidate_ids,
+            deleted_at__isnull=True,
         )
     }
 
@@ -155,14 +159,16 @@ def build_accessible_tenant_permissions_map(user, grants=None):
     tenant_valid_until = {}
     for grant, perms, candidate_ids in grant_candidates:
         _accumulate_grant_coverage(
-            grant, perms, candidate_ids, tenants_by_id, tenant_perms, tenant_valid_until,
+            grant,
+            perms,
+            candidate_ids,
+            tenants_by_id,
+            tenant_perms,
+            tenant_valid_until,
         )
 
-    result = {
-        pk: (frozenset(perms), tenant_valid_until.get(pk))
-        for pk, perms in tenant_perms.items()
-    }
-    user.__dict__['_tenant_permissions_map'] = result
+    result = {pk: (frozenset(perms), tenant_valid_until.get(pk)) for pk, perms in tenant_perms.items()}
+    user.__dict__["_tenant_permissions_map"] = result
     return result
 
 
@@ -186,10 +192,7 @@ def _scope_contribution(scope, grant, owner_id, live_tenants):
     if scope.scope_type == RoleGrantScope.SCOPE_ALL_MANAGED:
         if owner_id != grant.role.tenant_id or not grant.role.tenant.is_provider:
             return set(), False
-        managed_ids = set(
-            live_tenants.filter(managed_by_id=grant.role.tenant_id)
-            .values_list('pk', flat=True)
-        )
+        managed_ids = set(live_tenants.filter(managed_by_id=grant.role.tenant_id).values_list("pk", flat=True))
         return managed_ids, bool(managed_ids)
 
     if scope.scope_type == RoleGrantScope.SCOPE_TENANT_GROUP:
@@ -202,7 +205,7 @@ def _scope_contribution(scope, grant, owner_id, live_tenants):
                     scope.tenant_group_id,
                     live_only=True,
                 ),
-            ).values_list('pk', flat=True)
+            ).values_list("pk", flat=True)
         )
         return managed_ids, bool(managed_ids)
 
@@ -224,15 +227,13 @@ def accessible_tenant_ids_with_expiry(user):
         live_tenants.filter(
             memberships__user=user,
             memberships__is_active=True,
-        ).values_list('pk', flat=True)
+        ).values_list("pk", flat=True)
     )
     valid_until = None
 
     def _note_expiry(grant):
         nonlocal valid_until
-        if grant.valid_until is not None and (
-            valid_until is None or grant.valid_until < valid_until
-        ):
+        if grant.valid_until is not None and (valid_until is None or grant.valid_until < valid_until):
             valid_until = grant.valid_until
 
     for grant in applicable_grants(user):

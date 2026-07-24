@@ -11,6 +11,7 @@ This fix adds bespoke templates for Membership and UserGroup:
 and ``UserGroupEditView`` (users/views.py) now set ``template_name`` to these bespoke
 templates, so the three RBAC create/edit flows render as one system.
 """
+
 from django.contrib.auth import get_user_model
 from django.template import Context, Template
 from django.template.loader import get_template
@@ -18,8 +19,8 @@ from django.test import TestCase
 from django.urls import reverse
 
 from core.tests.mixins import TenantTestMixin
-from organization.models import Tenant
 from organization.forms import MembershipForm
+from organization.models import Tenant
 from users.forms import UserGroupForm
 
 User = get_user_model()
@@ -32,8 +33,8 @@ class RBACFormTemplateTests(TenantTestMixin, TestCase):
     def setUp(self):
         super().setup_tenant_context()
         self.admin = User.objects.create_user(
-            username='rbac-form-admin',
-            password='password123',
+            username="rbac-form-admin",
+            password="password123",
             is_superuser=True,
             is_staff=True,
         )
@@ -41,17 +42,17 @@ class RBACFormTemplateTests(TenantTestMixin, TestCase):
 
     def test_membership_create_page_renders(self):
         """Membership create page renders with the bespoke RBAC form template."""
-        url = reverse('organization:membership_create')
+        url = reverse("organization:membership_create")
         response = self.client.get(url)
         self.assertEqual(response.status_code, 200)
-        self.assertTemplateUsed(response, 'organization/memberships/membership_form.html')
+        self.assertTemplateUsed(response, "organization/memberships/membership_form.html")
 
     def test_usergroup_create_page_renders(self):
         """UserGroup create page renders with the bespoke RBAC form template."""
-        url = reverse('users:usergroup_create')
+        url = reverse("users:usergroup_create")
         response = self.client.get(url)
         self.assertEqual(response.status_code, 200)
-        self.assertTemplateUsed(response, 'users/usergroups/usergroup_form.html')
+        self.assertTemplateUsed(response, "users/usergroups/usergroup_form.html")
 
     def test_bespoke_templates_exist_and_compile(self):
         """Both new bespoke templates load and compile (no template-syntax errors).
@@ -60,8 +61,8 @@ class RBACFormTemplateTests(TenantTestMixin, TestCase):
         lands, so guard the syntax now.
         """
         # get_template() raises TemplateSyntaxError / TemplateDoesNotExist on failure.
-        self.assertIsNotNone(get_template('organization/memberships/membership_form.html'))
-        self.assertIsNotNone(get_template('users/usergroups/usergroup_form.html'))
+        self.assertIsNotNone(get_template("organization/memberships/membership_form.html"))
+        self.assertIsNotNone(get_template("users/usergroups/usergroup_form.html"))
 
     def test_bespoke_templates_render_form(self):
         """The bespoke templates render the real forms' crispy output.
@@ -72,40 +73,42 @@ class RBACFormTemplateTests(TenantTestMixin, TestCase):
         its fields, and buttons — without the full page chrome that needs a live
         request. This proves the deferred one-line view switch is safe.
         """
-        minimal_base = Template('{% block content %}{% endblock %}')
+        minimal_base = Template("{% block content %}{% endblock %}")
 
         # A provider tenant so the managed-grants formset (and its row partial)
         # actually renders — this is what the real view supplies to the template.
         provider = Tenant.objects.create(
-            name="Render MSP", slug="render-msp-tmpl", is_provider=True,
+            name="Render MSP",
+            slug="render-msp-tmpl",
+            is_provider=True,
         )
         membership_form = MembershipForm(user=self.admin, tenant=provider)
-        membership_ctx = Context({
-            'base_template': minimal_base,
-            'form': membership_form,
-            'managed_formset': membership_form.managed_formset,
-            'title': 'Create membership',
-            'is_editing': False,
-            'cancel_url': reverse('organization:membership_list'),
-        })
-        membership_html = get_template(
-            'organization/memberships/membership_form.html'
-        ).template.render(membership_ctx)
-        self.assertIn('<form', membership_html)
+        membership_ctx = Context(
+            {
+                "base_template": minimal_base,
+                "form": membership_form,
+                "managed_formset": membership_form.managed_formset,
+                "title": "Create membership",
+                "is_editing": False,
+                "cancel_url": reverse("organization:membership_list"),
+            }
+        )
+        membership_html = get_template("organization/memberships/membership_form.html").template.render(membership_ctx)
+        self.assertIn("<form", membership_html)
         self.assertIn('name="user"', membership_html)
         # The managed-grants formset renders: management form + one row's role select.
         self.assertIn('name="managed-TOTAL_FORMS"', membership_html)
-        self.assertIn('managed-0-role', membership_html)
+        self.assertIn("managed-0-role", membership_html)
 
-        usergroup_ctx = Context({
-            'base_template': minimal_base,
-            'form': UserGroupForm(user=self.admin),
-            'title': 'Create user group',
-            'is_editing': False,
-            'cancel_url': reverse('users:usergroup_list'),
-        })
-        usergroup_html = get_template(
-            'users/usergroups/usergroup_form.html'
-        ).template.render(usergroup_ctx)
-        self.assertIn('<form', usergroup_html)
+        usergroup_ctx = Context(
+            {
+                "base_template": minimal_base,
+                "form": UserGroupForm(user=self.admin),
+                "title": "Create user group",
+                "is_editing": False,
+                "cancel_url": reverse("users:usergroup_list"),
+            }
+        )
+        usergroup_html = get_template("users/usergroups/usergroup_form.html").template.render(usergroup_ctx)
+        self.assertIn("<form", usergroup_html)
         self.assertIn('name="name"', usergroup_html)

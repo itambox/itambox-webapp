@@ -1,10 +1,10 @@
-from django.test import TestCase
 from django.contrib.auth import get_user_model
+from django.test import TestCase
 
-from organization.models import Tenant, Role
+from core.managers import set_current_membership, set_current_tenant
 from organization.forms import RoleForm as TenantRoleForm
+from organization.models import Role, Tenant
 from organization.views.role_views import RoleCloneView as TenantRoleCloneView
-from core.managers import set_current_tenant, set_current_membership
 
 User = get_user_model()
 
@@ -22,9 +22,7 @@ class TenantRoleCloneTests(TestCase):
         set_current_membership(None)
         self.tenant_a = Tenant.objects.create(name="Tenant A", slug="tenant-a")
         self.tenant_b = Tenant.objects.create(name="Tenant B", slug="tenant-b")
-        self.superuser = User.objects.create_superuser(
-            username='super', email='super@example.com', password='pw'
-        )
+        self.superuser = User.objects.create_superuser(username="super", email="super@example.com", password="pw")
         self.source = Role.objects.create(
             tenant=self.tenant_a,
             name="Inventory Manager",
@@ -42,7 +40,7 @@ class TenantRoleCloneTests(TestCase):
     def test_clone_view_builds_unsaved_tenantless_copy(self):
         set_current_tenant(self.tenant_a)
         view = TenantRoleCloneView()
-        view.kwargs = {'pk': self.source.pk}
+        view.kwargs = {"pk": self.source.pk}
 
         clone = view.get_object()
 
@@ -62,7 +60,7 @@ class TenantRoleCloneTests(TestCase):
         clone.tenant = None
 
         form = TenantRoleForm(
-            data={'name': "Inventory Manager (Copy)", 'description': ''},
+            data={"name": "Inventory Manager (Copy)", "description": ""},
             instance=clone,
             user=self.superuser,
         )
@@ -78,13 +76,13 @@ class TenantRoleCloneTests(TestCase):
         # No `tenant` kwarg → the form falls back to the active tenant context
         # rather than rendering a picker (there is none post-collapse).
         form = TenantRoleForm(instance=clone, user=self.superuser)
-        self.assertNotIn('tenant', form.fields)
+        self.assertNotIn("tenant", form.fields)
         self.assertEqual(form.owner_tenant, self.tenant_a)
 
         # Permission matrix pre-checked from the cloned permission set.
-        self.assertTrue(form.fields['perm_asset_read'].initial)
-        self.assertTrue(form.fields['perm_asset_create'].initial)
-        self.assertFalse(form.fields['perm_asset_edit'].initial)
+        self.assertTrue(form.fields["perm_asset_read"].initial)
+        self.assertTrue(form.fields["perm_asset_create"].initial)
+        self.assertFalse(form.fields["perm_asset_edit"].initial)
 
     def test_clone_saved_into_active_tenant_context(self):
         # "Chosen tenant" is now expressed by switching the active tenant context
@@ -96,10 +94,10 @@ class TenantRoleCloneTests(TestCase):
 
         form = TenantRoleForm(
             data={
-                'name': "Inventory Manager (Copy)",
-                'description': '',
-                'perm_asset_read': True,
-                'perm_asset_create': True,
+                "name": "Inventory Manager (Copy)",
+                "description": "",
+                "perm_asset_read": True,
+                "perm_asset_create": True,
             },
             instance=clone,
             user=self.superuser,
@@ -111,8 +109,8 @@ class TenantRoleCloneTests(TestCase):
         self.assertIsNotNone(new_role.pk)
         self.assertNotEqual(new_role.pk, self.source.pk)
         self.assertEqual(new_role.tenant, self.tenant_b)
-        self.assertIn('assets.view_asset', new_role.permissions)
-        self.assertIn('assets.add_asset', new_role.permissions)
+        self.assertIn("assets.view_asset", new_role.permissions)
+        self.assertIn("assets.add_asset", new_role.permissions)
         # Original is untouched.
         self.source.refresh_from_db()
         self.assertEqual(self.source.tenant, self.tenant_a)

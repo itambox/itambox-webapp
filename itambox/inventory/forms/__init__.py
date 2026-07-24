@@ -1,19 +1,35 @@
-from .base_forms import BaseCheckoutForm
 from .accessory_forms import (
-    AccessoryForm, AccessoryStockForm, AccessoryCheckoutForm,
-    AccessoryFilterForm, AccessoryStockFilterForm, AccessoryAssignmentFilterForm,
+    AccessoryAssignmentFilterForm,
+    AccessoryCheckoutForm,
+    AccessoryFilterForm,
+    AccessoryForm,
+    AccessoryStockFilterForm,
+    AccessoryStockForm,
     AccessoryStockModalForm,
 )
+from .base_forms import BaseCheckoutForm
+from .component_forms import (
+    ComponentAllocationFilterForm,
+    ComponentAllocationForm,
+    ComponentCheckoutForm,
+    ComponentFilterForm,
+    ComponentForm,
+    ComponentStockFilterForm,
+    ComponentStockForm,
+    ComponentStockModalForm,
+)
 from .consumable_forms import (
-    ConsumableForm, ConsumableStockForm, ConsumableCheckoutForm,
-    ConsumableFilterForm, ConsumableStockFilterForm, ConsumableAssignmentFilterForm,
+    ConsumableAssignmentFilterForm,
+    ConsumableCheckoutForm,
+    ConsumableFilterForm,
+    ConsumableForm,
+    ConsumableStockFilterForm,
+    ConsumableStockForm,
     ConsumableStockModalForm,
 )
 from .kit_forms import (
-    KitForm, KitItemForm, KitCheckoutForm, KitFilterForm,
-)
-from .component_forms import (
-    ComponentForm, ComponentStockForm, ComponentAllocationForm, ComponentCheckoutForm,
-    ComponentFilterForm, ComponentStockFilterForm, ComponentAllocationFilterForm,
-    ComponentStockModalForm,
+    KitCheckoutForm,
+    KitFilterForm,
+    KitForm,
+    KitItemForm,
 )

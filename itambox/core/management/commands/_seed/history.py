@@ -67,26 +67,25 @@ class SeedHistoryMixin:
 
         today = datetime.date.today()
 
-        actors = self._engineer_users or [getattr(self, '_provisioner', None)]
+        actors = self._engineer_users or [getattr(self, "_provisioner", None)]
         actors = [a for a in actors if a is not None]
         if not actors:
             actors = list(self._users.values())[:3]
 
-        helpdesk = [u for name, u in self._users.items()
-                    if name in ('ravi.anand', 'mia.koch')]
+        helpdesk = [u for name, u in self._users.items() if name in ("ravi.anand", "mia.koch")]
         if not helpdesk:
             helpdesk = actors[:2]
 
-        provisioner = getattr(self, '_provisioner', None) or actors[0]
+        provisioner = getattr(self, "_provisioner", None) or actors[0]
 
         # ── Status label shortcuts ────────────────────────────────────────────
-        sl_available = self._sl('available')
-        sl_in_use = self._sl('in-use')
-        sl_pending_repair = self._sl('pending-repair')
-        sl_retired = self._sl('retired')
+        sl_available = self._sl("available")
+        sl_in_use = self._sl("in-use")
+        sl_pending_repair = self._sl("pending-repair")
+        sl_retired = self._sl("retired")
 
         # ── 1. Aging pass: touch created_at/updated_at for all entities ───────
-        self.stdout.write('--- Change history (engine-driven) ---')
+        self.stdout.write("--- Change history (engine-driven) ---")
 
         for asset in self._assets:
             when = asset.purchase_date or today - datetime.timedelta(days=365)
@@ -102,19 +101,19 @@ class SeedHistoryMixin:
 
         # ── 2. Per-tenant asset lifecycle ─────────────────────────────────────
         mid_life_notes = [
-            'Re-imaged and re-enrolled in MDM.',
-            'BIOS/firmware updated to latest vendor release.',
-            'RAM upgraded to 32 GB for performance.',
-            'Relocated during office move to new floor.',
-            'Warranty extended by 12 months via support contract.',
-            'Enrolled in new endpoint protection policy.',
-            'SSD replaced under warranty; data migration complete.',
-            'Asset audited and label reprinted (old label damaged).',
-            'Intune profile reapplied after OS reinstall.',
-            'Network adapter replaced following intermittent faults.',
-            'Bitlocker key rotated per security policy.',
-            'Assigned to replacement pool after user departure.',
-            'Bluetooth/NFC disabled per hardening policy.',
+            "Re-imaged and re-enrolled in MDM.",
+            "BIOS/firmware updated to latest vendor release.",
+            "RAM upgraded to 32 GB for performance.",
+            "Relocated during office move to new floor.",
+            "Warranty extended by 12 months via support contract.",
+            "Enrolled in new endpoint protection policy.",
+            "SSD replaced under warranty; data migration complete.",
+            "Asset audited and label reprinted (old label damaged).",
+            "Intune profile reapplied after OS reinstall.",
+            "Network adapter replaced following intermittent faults.",
+            "Bitlocker key rotated per security policy.",
+            "Assigned to replacement pool after user departure.",
+            "Bluetooth/NFC disabled per hardening policy.",
         ]
 
         for slug in self._tenants:
@@ -135,12 +134,12 @@ class SeedHistoryMixin:
                 # so the create entry records them as 'available'); they are then
                 # checked out below via a real available(deployable)->in-use(deployed)
                 # transition. The rest keep their seeded state and just get a create.
-                active = asset.assignments.filter(
-                    is_active=True, assigned_user__isnull=False
-                ).first()
+                active = asset.assignments.filter(is_active=True, assigned_user__isnull=False).first()
                 checks_out = (
-                    active is not None and sl_available is not None
-                    and sl_in_use is not None and asset.status == sl_in_use
+                    active is not None
+                    and sl_available is not None
+                    and sl_in_use is not None
+                    and asset.status == sl_in_use
                     and random.random() < 0.6
                 )
                 if checks_out:
@@ -159,7 +158,7 @@ class SeedHistoryMixin:
                         asset,
                         when=checkout_date,
                         user=self._pick_actor(actors),
-                        action='checkout',
+                        action="checkout",
                         status=sl_in_use,
                     )
 
@@ -175,7 +174,7 @@ class SeedHistoryMixin:
                             asset,
                             when=edit_date,
                             user=self._pick_actor(actors, helpdesk),
-                            action='update',
+                            action="update",
                             notes=new_note,
                         )
 
@@ -184,9 +183,7 @@ class SeedHistoryMixin:
                     window_start = p_date + datetime.timedelta(days=60)
                     window_end = today - datetime.timedelta(days=60)
                     repair_start = self._rand_date(window_start, window_end)
-                    repair_end = repair_start + datetime.timedelta(
-                        days=random.randint(7, 30)
-                    )
+                    repair_end = repair_start + datetime.timedelta(days=random.randint(7, 30))
                     if repair_end > today:
                         repair_end = today - datetime.timedelta(days=1)
 
@@ -196,7 +193,7 @@ class SeedHistoryMixin:
                             asset,
                             when=repair_start,
                             user=self._pick_actor(actors, helpdesk),
-                            action='update',
+                            action="update",
                             status=sl_pending_repair,
                         )
                     # Returned to the deployable pool after repair. The
@@ -208,25 +205,26 @@ class SeedHistoryMixin:
                             asset,
                             when=repair_end,
                             user=self._pick_actor(actors),
-                            action='update',
+                            action="update",
                             status=sl_available,
                         )
 
                 # ── e) ~25 % physical audit ───────────────────────────────────
-                has_last_audited = any(
-                    f.name == 'last_audited'
-                    for f in asset._meta.fields
-                )
+                has_last_audited = any(f.name == "last_audited" for f in asset._meta.fields)
                 if has_last_audited and random.random() < 0.25:
                     audit_date = self._rand_date(
                         today - datetime.timedelta(days=90),
                         today - datetime.timedelta(days=1),
                     )
                     from django.utils import timezone as _tz
+
                     audit_dt = _tz.make_aware(
                         datetime.datetime(
-                            audit_date.year, audit_date.month, audit_date.day,
-                            random.randint(8, 17), random.randint(0, 59),
+                            audit_date.year,
+                            audit_date.month,
+                            audit_date.day,
+                            random.randint(8, 17),
+                            random.randint(0, 59),
                         ),
                         _tz.get_current_timezone(),
                     )
@@ -235,24 +233,25 @@ class SeedHistoryMixin:
                             asset,
                             when=audit_date,
                             user=self._pick_actor(actors, helpdesk),
-                            action='audit',
+                            action="audit",
                             last_audited=audit_dt,
                         )
 
         # ── 3. Retired assets: decommission entry ─────────────────────────────
         for asset in self._retired_assets:
             if sl_retired and asset.status != sl_retired:
-                window_start = (asset.purchase_date or today - datetime.timedelta(days=500)) \
-                               + datetime.timedelta(days=180)
+                window_start = (asset.purchase_date or today - datetime.timedelta(days=500)) + datetime.timedelta(
+                    days=180
+                )
                 window_end = today - datetime.timedelta(days=10)
                 decom_date = self._rand_date(window_start, window_end)
                 engine.change(
                     asset,
                     when=decom_date,
                     user=self._pick_actor(actors),
-                    action='update',
+                    action="update",
                     status=sl_retired,
-                    notes='Decommissioned — end of useful life. Disposed via certified e-waste vendor.',
+                    notes="Decommissioned — end of useful life. Disposed via certified e-waste vendor.",
                 )
 
         # ── 4. Licenses: create log + optional seat bump ──────────────────────
@@ -271,14 +270,12 @@ class SeedHistoryMixin:
                     lic,
                     when=bump_date,
                     user=self._pick_actor(actors),
-                    action='update',
+                    action="update",
                     seats=new_seats,
                 )
 
         # ── 5. Subscriptions: renewal (cost + date bump) ──────────────────────
-        for sub in random.sample(
-            self._subscriptions, k=min(15, len(self._subscriptions))
-        ):
+        for sub in random.sample(self._subscriptions, k=min(15, len(self._subscriptions))):
             if sub.renewal_cost is None or sub.renewal_date is None:
                 continue
 
@@ -290,9 +287,7 @@ class SeedHistoryMixin:
             new_cost = round(float(sub.renewal_cost) * random.uniform(1.03, 1.12), 2)
             # Advance the renewal date by one year
             try:
-                new_renewal_date = sub.renewal_date.replace(
-                    year=sub.renewal_date.year + 1
-                )
+                new_renewal_date = sub.renewal_date.replace(year=sub.renewal_date.year + 1)
             except ValueError:
                 # Feb 29 edge case
                 new_renewal_date = sub.renewal_date + datetime.timedelta(days=365)
@@ -303,13 +298,12 @@ class SeedHistoryMixin:
                     sub,
                     when=renewal_log_date,
                     user=self._pick_actor(actors, helpdesk),
-                    action='update',
+                    action="update",
                     renewal_cost=new_cost,
                     renewal_date=new_renewal_date,
                 )
 
         # ── Summary ───────────────────────────────────────────────────────────
         self.stdout.write(
-            f'  {engine.count} authentic change-history entries across '
-            f'assets, licenses and subscriptions.'
+            f"  {engine.count} authentic change-history entries across assets, licenses and subscriptions."
         )

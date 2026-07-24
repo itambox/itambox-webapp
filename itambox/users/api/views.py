@@ -1,21 +1,23 @@
 import logging
+
 from django.contrib.auth import get_user_model
 from django.contrib.auth.models import Group
 from django.db.models import Count
-from rest_framework.permissions import IsAuthenticated
 from rest_framework.generics import RetrieveUpdateAPIView
+from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 
-from itambox.api.viewsets import ITAMBoxReadOnlyModelViewSet, ITAMBoxModelViewSet
-from users.models import UserPreference, Token
-from .serializers import UserSerializer, GroupSerializer, UserConfigSerializer, TokenSerializer
+from itambox.api.viewsets import ITAMBoxModelViewSet, ITAMBoxReadOnlyModelViewSet
+from users.models import Token, UserPreference
+
+from .serializers import GroupSerializer, TokenSerializer, UserConfigSerializer, UserSerializer
 
 logger = logging.getLogger(__name__)
 User = get_user_model()
 
 
 class UserViewSet(ITAMBoxReadOnlyModelViewSet):
-    queryset = User.objects.all().prefetch_related('groups')
+    queryset = User.objects.all().prefetch_related("groups")
     serializer_class = UserSerializer
 
     def get_queryset(self):
@@ -48,34 +50,33 @@ class GroupViewSet(ITAMBoxReadOnlyModelViewSet):
         # the default reverse `user`, then User -> Membership is `memberships`.
         # Superusers remain unscoped; no active tenant fails closed to none().
         from django.db.models import Q
+
         from core.managers import get_current_tenant
 
         qs = super().get_queryset()
         if self.request.user.is_superuser:
             # Global admin: total membership count is acceptable.
-            return qs.annotate(user_count=Count('user', distinct=True))
+            return qs.annotate(user_count=Count("user", distinct=True))
         active_tenant = get_current_tenant()
         if active_tenant is None:
             return qs.none()
         # Count ONLY same-tenant members so the aggregate cannot leak the size of
         # a shared group's membership in other tenants.
         same_tenant = Q(user__memberships__tenant=active_tenant)
-        return qs.filter(same_tenant).distinct().annotate(
-            user_count=Count('user', filter=same_tenant, distinct=True)
-        )
+        return qs.filter(same_tenant).distinct().annotate(user_count=Count("user", filter=same_tenant, distinct=True))
 
 
 class TokenViewSet(ITAMBoxModelViewSet):
     serializer_class = TokenSerializer
 
     def get_queryset(self):
-        return Token.objects.select_related('user').filter(user=self.request.user)
+        return Token.objects.select_related("user").filter(user=self.request.user)
 
     def _pin_user(self, serializer):
         # A user must never be able to provision a token bound to another account
         # (privilege escalation). Only superusers may set an explicit `user`;
         # everyone else is pinned to themselves regardless of any supplied user_id.
-        if self.request.user.is_superuser and serializer.validated_data.get('user'):
+        if self.request.user.is_superuser and serializer.validated_data.get("user"):
             serializer.save()
         else:
             serializer.save(user=self.request.user)
@@ -102,14 +103,14 @@ class UserConfigView(RetrieveUpdateAPIView):
         logger.debug("Received PATCH data in UserConfigView: %s", incoming_data)
         logger.debug("Current data BEFORE merge: %s", current_data)
 
-        if 'tables' in incoming_data:
-            if 'tables' not in current_data:
-                current_data['tables'] = {}
-            for app_label, models in incoming_data['tables'].items():
-                if app_label not in current_data['tables']:
-                    current_data['tables'][app_label] = {}
+        if "tables" in incoming_data:
+            if "tables" not in current_data:
+                current_data["tables"] = {}
+            for app_label, models in incoming_data["tables"].items():
+                if app_label not in current_data["tables"]:
+                    current_data["tables"][app_label] = {}
                 for model_name, config in models.items():
-                    current_data['tables'][app_label][model_name] = config
+                    current_data["tables"][app_label][model_name] = config
 
         preference.data = current_data
         preference.save()

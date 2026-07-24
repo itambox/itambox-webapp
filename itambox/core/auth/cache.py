@@ -7,31 +7,30 @@ from uuid import uuid4
 from django.core.cache import cache
 from django.db import transaction
 
-
 logger = logging.getLogger(__name__)
 
-_CACHE_KEY_PREFIX = 'itambox:authz-version:'
-_TOPOLOGY_CACHE_KEY = 'itambox:authz-topology-version'
-_LOCAL_VERSION_ATTR = '_authorization_cache_version'
-_LOCAL_SYNC_TOKEN_ATTR = '_authorization_cache_sync_token'
+_CACHE_KEY_PREFIX = "itambox:authz-version:"
+_TOPOLOGY_CACHE_KEY = "itambox:authz-topology-version"
+_LOCAL_VERSION_ATTR = "_authorization_cache_version"
+_LOCAL_SYNC_TOKEN_ATTR = "_authorization_cache_sync_token"
 _request_invalidation_state = contextvars.ContextVar(
-    'authorization_request_invalidation_state',
+    "authorization_request_invalidation_state",
     default=None,
 )
 _LOCAL_CACHE_PREFIXES = (
-    '_perms_tenant_',
-    '_group_scope_tenants_',
-    '_all_accessible_scope_tenants',
-    '_all_accessible_group_ids',
-    '_accessible_tenant_ids',
-    '_applicable_grants',
-    '_all_accessible_perms',
-    '_tenant_permissions_map',
+    "_perms_tenant_",
+    "_group_scope_tenants_",
+    "_all_accessible_scope_tenants",
+    "_all_accessible_group_ids",
+    "_accessible_tenant_ids",
+    "_applicable_grants",
+    "_all_accessible_perms",
+    "_tenant_permissions_map",
 )
 
 
 def _cache_key(user_id):
-    return f'{_CACHE_KEY_PREFIX}{user_id}'
+    return f"{_CACHE_KEY_PREFIX}{user_id}"
 
 
 def begin_authorization_request(request_id):
@@ -90,9 +89,7 @@ def _mark_request_topology_invalidated():
 def clear_local_authorization_cache(user):
     """Discard every authorization value cached on one User instance."""
     for attr in list(user.__dict__):
-        if attr in (_LOCAL_VERSION_ATTR, _LOCAL_SYNC_TOKEN_ATTR) or attr.startswith(
-            _LOCAL_CACHE_PREFIXES
-        ):
+        if attr in (_LOCAL_VERSION_ATTR, _LOCAL_SYNC_TOKEN_ATTR) or attr.startswith(_LOCAL_CACHE_PREFIXES):
             delattr(user, attr)
 
 
@@ -103,7 +100,7 @@ def _publish_user_version(user_id):
         # A cache outage must not turn an authorization write into a 500. Reads
         # fail closed to uncached resolution in synchronize_authorization_cache.
         logger.warning(
-            'Could not publish authorization cache invalidation for user %s',
+            "Could not publish authorization cache invalidation for user %s",
             user_id,
             exc_info=True,
         )
@@ -114,7 +111,7 @@ def _publish_topology_version():
         cache.set(_TOPOLOGY_CACHE_KEY, uuid4().hex, timeout=None)
     except Exception:
         logger.warning(
-            'Could not publish authorization topology invalidation',
+            "Could not publish authorization topology invalidation",
             exc_info=True,
         )
 
@@ -141,11 +138,11 @@ def invalidate_user_authorization_cache(user, *, using=None):
     its next permission check. Production already requires a shared Valkey/
     Redis cache for security-sensitive state.
     """
-    user_id = getattr(user, 'pk', user)
+    user_id = getattr(user, "pk", user)
     if user_id is None:
         return
     _mark_request_user_invalidated(user_id)
-    if hasattr(user, '__dict__'):
+    if hasattr(user, "__dict__"):
         clear_local_authorization_cache(user)
     _publish_user_version(user_id)
     _repeat_after_commit(
@@ -179,9 +176,7 @@ def synchronize_authorization_cache(user):
     if sync_token is not None and previous_sync_token == sync_token:
         return
     crossed_request_boundary = (
-        sync_token is not None
-        and previous_sync_token is not None
-        and previous_sync_token[0] != sync_token[0]
+        sync_token is not None and previous_sync_token is not None and previous_sync_token[0] != sync_token[0]
     )
     request_local_invalidation = sync_token is not None and any(sync_token[1:])
 

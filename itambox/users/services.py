@@ -15,6 +15,7 @@ form only validates intent and delegates the write:
     free, otherwise a deterministic collision-resistant handle) while the full
     email is preserved in ``User.email``.
 """
+
 import hashlib
 
 from django.contrib.auth import get_user_model
@@ -37,7 +38,7 @@ class AmbiguousEmailError(Exception):
 
 def normalize_email(email):
     """Normalise ``email`` with the user manager's rules (lower-cases the domain)."""
-    return User.objects.normalize_email((email or '').strip())
+    return User.objects.normalize_email((email or "").strip())
 
 
 def resolve_existing_user(email):
@@ -47,7 +48,7 @@ def resolve_existing_user(email):
     normalized = normalize_email(email)
     if not normalized:
         return None
-    matches = list(User.objects.filter(email__iexact=normalized).order_by('pk')[:2])
+    matches = list(User.objects.filter(email__iexact=normalized).order_by("pk")[:2])
     if len(matches) > 1:
         raise AmbiguousEmailError(normalized)
     return matches[0] if matches else None
@@ -61,22 +62,22 @@ def _fitting_username(email):
     concurrent creates collide and one loses the race rather than duplicating),
     disambiguated with a numeric suffix in the vanishingly unlikely digest clash.
     """
-    max_len = User._meta.get_field('username').max_length
+    max_len = User._meta.get_field("username").max_length
     if len(email) <= max_len and not User.objects.filter(username=email).exists():
         return email
-    digest = hashlib.sha256(email.encode('utf-8')).hexdigest()[:12]
-    prefix = email[:max_len - len(digest) - 1].rstrip('-') or 'user'
+    digest = hashlib.sha256(email.encode("utf-8")).hexdigest()[:12]
+    prefix = email[: max_len - len(digest) - 1].rstrip("-") or "user"
     candidate = f"{prefix}-{digest}"[:max_len]
     unique = candidate
     n = 0
     while User.objects.filter(username=unique).exists():
         n += 1
         suffix = f"-{n}"
-        unique = f"{candidate[:max_len - len(suffix)]}{suffix}"
+        unique = f"{candidate[: max_len - len(suffix)]}{suffix}"
     return unique
 
 
-def resolve_or_create_user(*, email, first_name='', last_name=''):
+def resolve_or_create_user(*, email, first_name="", last_name=""):
     """Get-or-create an account for ``email`` (case-insensitive), transaction-safe.
 
     Returns ``(user, created)``. An existing account is reused WITHOUT overwriting
@@ -94,8 +95,8 @@ def resolve_or_create_user(*, email, first_name='', last_name=''):
             user = User(
                 username=_fitting_username(normalized),
                 email=normalized,
-                first_name=(first_name or '').strip(),
-                last_name=(last_name or '').strip(),
+                first_name=(first_name or "").strip(),
+                last_name=(last_name or "").strip(),
                 is_active=True,
             )
             user.set_unusable_password()

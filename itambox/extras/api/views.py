@@ -1,18 +1,38 @@
 from django_filters.rest_framework import DjangoFilterBackend
-from itambox.api.viewsets import ITAMBoxModelViewSet
-from extras.models import (
-    Tag, Dashboard, CustomField, CustomFieldset,
-    EventRule, WebhookEndpoint, NotificationChannel, AlertRule, JournalEntry,
-)
+
 from extras.filters import (
-    TagFilter, CustomFieldFilterSet, CustomFieldsetFilterSet,
-    EventRuleFilterSet, WebhookEndpointFilterSet, NotificationChannelFilterSet,
-    AlertRuleFilterSet, JournalEntryFilterSet,
+    AlertRuleFilterSet,
+    CustomFieldFilterSet,
+    CustomFieldsetFilterSet,
+    EventRuleFilterSet,
+    JournalEntryFilterSet,
+    NotificationChannelFilterSet,
+    TagFilter,
+    WebhookEndpointFilterSet,
 )
+from extras.models import (
+    AlertRule,
+    CustomField,
+    CustomFieldset,
+    Dashboard,
+    EventRule,
+    JournalEntry,
+    NotificationChannel,
+    Tag,
+    WebhookEndpoint,
+)
+from itambox.api.viewsets import ITAMBoxModelViewSet
+
 from .serializers import (
-    TagSerializer, DashboardSerializer, CustomFieldSerializer, CustomFieldsetSerializer,
-    EventRuleSerializer, WebhookEndpointSerializer, NotificationChannelSerializer,
-    AlertRuleSerializer, JournalEntrySerializer,
+    AlertRuleSerializer,
+    CustomFieldSerializer,
+    CustomFieldsetSerializer,
+    DashboardSerializer,
+    EventRuleSerializer,
+    JournalEntrySerializer,
+    NotificationChannelSerializer,
+    TagSerializer,
+    WebhookEndpointSerializer,
 )
 
 
@@ -31,7 +51,7 @@ class CustomFieldViewSet(ITAMBoxModelViewSet):
 
 
 class CustomFieldsetViewSet(ITAMBoxModelViewSet):
-    queryset = CustomFieldset.objects.prefetch_related('fields').all()
+    queryset = CustomFieldset.objects.prefetch_related("fields").all()
     serializer_class = CustomFieldsetSerializer
     filter_backends = (DjangoFilterBackend,)
     filterset_class = CustomFieldsetFilterSet
@@ -41,7 +61,7 @@ class DashboardViewSet(ITAMBoxModelViewSet):
     serializer_class = DashboardSerializer
 
     def get_queryset(self):
-        return Dashboard.objects.select_related('user').filter(user=self.request.user)
+        return Dashboard.objects.select_related("user").filter(user=self.request.user)
 
 
 class WebhookEndpointViewSet(ITAMBoxModelViewSet):
@@ -52,7 +72,7 @@ class WebhookEndpointViewSet(ITAMBoxModelViewSet):
 
 
 class EventRuleViewSet(ITAMBoxModelViewSet):
-    queryset = EventRule.objects.select_related('model', 'webhook').all()
+    queryset = EventRule.objects.select_related("model", "webhook").all()
     serializer_class = EventRuleSerializer
     filter_backends = (DjangoFilterBackend,)
     filterset_class = EventRuleFilterSet
@@ -66,15 +86,14 @@ class NotificationChannelViewSet(ITAMBoxModelViewSet):
 
 
 class AlertRuleViewSet(ITAMBoxModelViewSet):
-    queryset = AlertRule.objects.prefetch_related('channels').all()
+    queryset = AlertRule.objects.prefetch_related("channels").all()
     serializer_class = AlertRuleSerializer
     filter_backends = (DjangoFilterBackend,)
     filterset_class = AlertRuleFilterSet
 
 
 class JournalEntryViewSet(ITAMBoxModelViewSet):
-    queryset = JournalEntry.objects.select_related('model', 'user', 'tenant').all()
+    queryset = JournalEntry.objects.select_related("model", "user", "tenant").all()
     serializer_class = JournalEntrySerializer
     filter_backends = (DjangoFilterBackend,)
     filterset_class = JournalEntryFilterSet
-

@@ -1,16 +1,23 @@
 import logging
 import uuid
+
 from django.contrib.auth import get_user_model
 from django.core.exceptions import PermissionDenied
+
 from core.managers import (
-    set_current_tenant, set_current_membership,
-    get_current_tenant, get_current_membership,
-    set_current_tenant_group, get_current_tenant_group,
-    set_current_all_accessible, get_current_all_accessible,
+    get_current_all_accessible,
+    get_current_membership,
+    get_current_tenant,
+    get_current_tenant_group,
+    set_current_all_accessible,
+    set_current_membership,
+    set_current_tenant,
+    set_current_tenant_group,
 )
-from organization.models import Tenant, Membership
+from organization.models import Membership, Tenant
 
 logger = logging.getLogger(__name__)
+
 
 class TaskContext:
     """
@@ -28,6 +35,7 @@ class TaskContext:
     ``_request_id`` is ``None``) and disable tenant filtering for the rest of
     the request.
     """
+
     def __init__(self, tenant_id=None, user_id=None):
         self.tenant_id = tenant_id
         self.user_id = user_id
@@ -35,7 +43,7 @@ class TaskContext:
         self.user = None
 
     def __enter__(self):
-        from itambox.middleware import _request_id, _current_user
+        from itambox.middleware import _current_user, _request_id
 
         # Capture the context active on entry so __exit__ can restore it.
         self._prev_request_id = _request_id.get()
@@ -93,21 +101,19 @@ class TaskContext:
             User = get_user_model()
             self.user = User._base_manager.get(pk=self.user_id)
             if not self.user.is_active:
-                raise PermissionDenied('Inactive task principal')
+                raise PermissionDenied("Inactive task principal")
 
         # A user-bound tenant task must prove canonical access to the target.
         # System tasks (no user) and superusers retain their explicit paths.
-        if (
-            self.tenant is not None
-            and self.user is not None
-            and not self.user.is_superuser
-        ):
+        if self.tenant is not None and self.user is not None and not self.user.is_superuser:
             from organization.access import accessible_tenant_ids
+
             if self.tenant.pk not in accessible_tenant_ids(self.user):
-                raise PermissionDenied('Task principal cannot access target tenant')
+                raise PermissionDenied("Task principal cannot access target tenant")
 
     def _restore_context(self):
-        from itambox.middleware import _request_id, _current_user
+        from itambox.middleware import _current_user, _request_id
+
         _request_id.set(self._prev_request_id)
         _current_user.set(self._prev_user)
         set_current_tenant(self._prev_tenant)

@@ -1,21 +1,23 @@
-import logging
-import io
 import csv
+import io
+import logging
+
+from django.core.exceptions import ValidationError
 from django.core.files.base import ContentFile
 from django.core.mail import EmailMessage
-from django.template import Template, Context
+from django.template import Context, Template
 from django.utils import timezone
-from django.core.exceptions import ValidationError
 from django.utils.translation import gettext as _
 
-from core.models import EmailSettings
 from core.csv_utils import csv_safe, safe_csv_filename
 from core.events import send_notification_to_channel
-from core.tasks.context import TaskContext
-from extras.models import FileAttachment, ScheduledReport, ReportTemplate, ReportGenerationArchive
+from core.models import EmailSettings
 from core.reports import compile_report_context, get_polished_system_html_template
+from core.tasks.context import TaskContext
+from extras.models import FileAttachment, ReportGenerationArchive, ReportTemplate, ScheduledReport
 
 logger = logging.getLogger(__name__)
+
 
 def generate_scheduled_report_task(scheduled_report_id):
     """
@@ -52,7 +54,8 @@ def generate_scheduled_report_task(scheduled_report_id):
         if active_tenant is None and not filter_tenants:
             logger.error(
                 "Scheduled report '%s' has no tenant scope (no tenant, no filter_tenants) — "
-                "refusing to compile a cross-tenant report.", sched.name,
+                "refusing to compile a cross-tenant report.",
+                sched.name,
             )
             return
 
@@ -65,25 +68,25 @@ def generate_scheduled_report_task(scheduled_report_id):
 
             # 1. Compile report data using unified compiler helper
             headers, rows, summary_cards, grouped_data, chart_svg, context_data = compile_report_context(
-
                 template, active_tenant=active_tenant, filter_tenants=filter_tenants
             )
-            context_data['scheduled_report'] = sched
+            context_data["scheduled_report"] = sched
 
             # Per-currency display strings for the summary metrics, taken straight
             # from the already-currency-correct summary cards. NEVER re-parse the
             # formatted grid strings — they are localized per record currency, so a
             # '$'-strip + float() silently yields 0 for any non-USD report.
             def _card_value(cards, label):
-                for c in (cards or []):
-                    if c.get('label') == label:
-                        return c.get('value', '')
-                return ''
+                for c in cards or []:
+                    if c.get("label") == label:
+                        return c.get("value", "")
+                return ""
+
             total_rows = len(rows)
             total_assets = total_rows
             total_active = total_rows
-            acquisition_display = _card_value(summary_cards, _('Total Acquisition Sum'))
-            monthly_spend_display = _card_value(summary_cards, _('Est. Monthly Spend'))
+            acquisition_display = _card_value(summary_cards, _("Total Acquisition Sum"))
+            monthly_spend_display = _card_value(summary_cards, _("Est. Monthly Spend"))
 
             # 2. Render HTML Email Body
             email_body = ""
@@ -98,14 +101,19 @@ def generate_scheduled_report_task(scheduled_report_id):
                 if template.advanced_mode and template.template_content.strip():
                     # inline import: defer the optional/heavy jinja2 dependency.
                     from jinja2.sandbox import SandboxedEnvironment
+
                     env = SandboxedEnvironment()
                     jinja_template = env.from_string(template.template_content)
                     if template.report_type == ReportTemplate.REPORT_TYPE_ASSET_SUMMARY:
-                        context_data.update({
-                            'total_assets': total_assets,
-                            'acquisition_sum': acquisition_display,
-                            'location_distribution': [{'location': k, 'count': len(v)} for k, v in grouped_data.items()]
-                        })
+                        context_data.update(
+                            {
+                                "total_assets": total_assets,
+                                "acquisition_sum": acquisition_display,
+                                "location_distribution": [
+                                    {"location": k, "count": len(v)} for k, v in grouped_data.items()
+                                ],
+                            }
+                        )
                     return jinja_template.render(context_data)
                 return Template(get_polished_system_html_template()).render(Context(context_data))
 
@@ -117,23 +125,33 @@ def generate_scheduled_report_task(scheduled_report_id):
                     raise je
 
             elif sched.format == ScheduledReport.FORMAT_PDF:
-                from core.reports.exporters import report_pdf_bytes, PDF_MIME
+                from core.reports.exporters import PDF_MIME, report_pdf_bytes
+
                 attachment_content = report_pdf_bytes(_render_report_html())
-                attachment_filename = f"{safe_csv_filename(template.name).lower().replace(' ', '_')}_{timezone.now():%Y%m%d}.pdf"
+                attachment_filename = (
+                    f"{safe_csv_filename(template.name).lower().replace(' ', '_')}_{timezone.now():%Y%m%d}.pdf"
+                )
                 attachment_mime = PDF_MIME
-                email_body = _("Please find attached the scheduled PDF report for '%(name)s' generated on %(timestamp)s UTC.") % {
-                    'name': template.name,
-                    'timestamp': f"{timezone.now():%Y-%m-%d %H:%M:%S}",
+                email_body = _(
+                    "Please find attached the scheduled PDF report for '%(name)s' generated on %(timestamp)s UTC."
+                ) % {
+                    "name": template.name,
+                    "timestamp": f"{timezone.now():%Y-%m-%d %H:%M:%S}",
                 }
 
             elif sched.format == ScheduledReport.FORMAT_XLSX:
-                from core.reports.exporters import report_xlsx_bytes, XLSX_MIME
+                from core.reports.exporters import XLSX_MIME, report_xlsx_bytes
+
                 attachment_content = report_xlsx_bytes(headers, rows, sheet_title=template.name)
-                attachment_filename = f"{safe_csv_filename(template.name).lower().replace(' ', '_')}_{timezone.now():%Y%m%d}.xlsx"
+                attachment_filename = (
+                    f"{safe_csv_filename(template.name).lower().replace(' ', '_')}_{timezone.now():%Y%m%d}.xlsx"
+                )
                 attachment_mime = XLSX_MIME
-                email_body = _("Please find attached the scheduled XLSX report for '%(name)s' generated on %(timestamp)s UTC.") % {
-                    'name': template.name,
-                    'timestamp': f"{timezone.now():%Y-%m-%d %H:%M:%S}",
+                email_body = _(
+                    "Please find attached the scheduled XLSX report for '%(name)s' generated on %(timestamp)s UTC."
+                ) % {
+                    "name": template.name,
+                    "timestamp": f"{timezone.now():%Y-%m-%d %H:%M:%S}",
                 }
 
             elif sched.format == ScheduledReport.FORMAT_CSV:
@@ -143,68 +161,96 @@ def generate_scheduled_report_task(scheduled_report_id):
                 if template.advanced_mode:
                     # Original/Legacy CSV format
                     if template.report_type == ReportTemplate.REPORT_TYPE_ASSET_SUMMARY:
-                        writer.writerow(['Metric', 'Value'])
-                        writer.writerow(['Total Hardware Assets', total_assets])
-                        writer.writerow(['Total Acquisition Sum', acquisition_display])
+                        writer.writerow(["Metric", "Value"])
+                        writer.writerow(["Total Hardware Assets", total_assets])
+                        writer.writerow(["Total Acquisition Sum", acquisition_display])
                         writer.writerow([])
-                        writer.writerow(['Location', 'Allocated Count'])
+                        writer.writerow(["Location", "Allocated Count"])
                         for k, v in grouped_data.items():
                             writer.writerow([csv_safe(k), len(v)])
                     elif template.report_type == ReportTemplate.REPORT_TYPE_LICENSE_UTILIZATION:
-                        writer.writerow(['License', 'Software', 'Total Seats', 'Assigned Seats', 'Available Seats', 'Utilization Rate'])
+                        writer.writerow(
+                            [
+                                "License",
+                                "Software",
+                                "Total Seats",
+                                "Assigned Seats",
+                                "Available Seats",
+                                "Utilization Rate",
+                            ]
+                        )
                         for r in rows:
-                            writer.writerow([csv_safe(r.get(_('License Name'))), csv_safe(r.get(_('Software'))), r.get(_('Total Seats')), r.get(_('Assigned Seats')), r.get(_('Available Seats')), r.get(_('Utilization Rate'))])
+                            writer.writerow(
+                                [
+                                    csv_safe(r.get(_("License Name"))),
+                                    csv_safe(r.get(_("Software"))),
+                                    r.get(_("Total Seats")),
+                                    r.get(_("Assigned Seats")),
+                                    r.get(_("Available Seats")),
+                                    r.get(_("Utilization Rate")),
+                                ]
+                            )
                     elif template.report_type == ReportTemplate.REPORT_TYPE_SUBSCRIPTION_RENEWALS:
-                        writer.writerow(['Active Subscriptions', total_active])
-                        writer.writerow(['Est. Monthly Spend', monthly_spend_display])
+                        writer.writerow(["Active Subscriptions", total_active])
+                        writer.writerow(["Est. Monthly Spend", monthly_spend_display])
                         writer.writerow([])
-                        writer.writerow(['Subscription', 'Provider', 'Billing Cycle', 'Cost', 'End Date'])
+                        writer.writerow(["Subscription", "Provider", "Billing Cycle", "Cost", "End Date"])
                         for r in rows:
-                            writer.writerow([csv_safe(r.get(_('Subscription Name'))), csv_safe(r.get(_('Provider'))), csv_safe(r.get(_('Billing Cycle'))), r.get(_('Cost')), r.get(_('End Date'))])
+                            writer.writerow(
+                                [
+                                    csv_safe(r.get(_("Subscription Name"))),
+                                    csv_safe(r.get(_("Provider"))),
+                                    csv_safe(r.get(_("Billing Cycle"))),
+                                    r.get(_("Cost")),
+                                    r.get(_("End Date")),
+                                ]
+                            )
                 else:
                     # Dynamic visual-columns CSV format
                     writer.writerow(headers)
                     for r in rows:
-                        writer.writerow([csv_safe(r.get(head, '-')) for head in headers])
+                        writer.writerow([csv_safe(r.get(head, "-")) for head in headers])
 
                 attachment_content = csv_buffer.getvalue()
-                attachment_filename = f"{safe_csv_filename(template.name).lower().replace(' ', '_')}_{timezone.now():%Y%m%d}.csv"
+                attachment_filename = (
+                    f"{safe_csv_filename(template.name).lower().replace(' ', '_')}_{timezone.now():%Y%m%d}.csv"
+                )
                 attachment_mime = "text/csv"
-                email_body = _("Please find attached the scheduled CSV report for '%(name)s' generated on %(timestamp)s UTC.") % {
-                    'name': template.name,
-                    'timestamp': f"{timezone.now():%Y-%m-%d %H:%M:%S}",
+                email_body = _(
+                    "Please find attached the scheduled CSV report for '%(name)s' generated on %(timestamp)s UTC."
+                ) % {
+                    "name": template.name,
+                    "timestamp": f"{timezone.now():%Y-%m-%d %H:%M:%S}",
                 }
 
             # 3. Local In-App File Archive saving
             archive_entry = None
             file_attach = None
-            if getattr(sched, 'save_to_archive', True):
+            if getattr(sched, "save_to_archive", True):
                 archive_entry = ReportGenerationArchive.objects.create(
-                    scheduled_report=sched,
-                    format=sched.format,
-                    status='running',
-                    tenant=active_tenant
+                    scheduled_report=sched, format=sched.format, status="running", tenant=active_tenant
                 )
 
                 # Save the compiled report stream as a FileAttachment
                 if sched.format == ScheduledReport.FORMAT_HTML:
-                    content_bytes = email_body.encode('utf-8')
-                    mime = 'text/html'
+                    content_bytes = email_body.encode("utf-8")
+                    mime = "text/html"
                     filename = f"{template.name.lower().replace(' ', '_')}_{timezone.now():%Y%m%d}.html"
                 else:
-                    content_bytes = attachment_content.encode('utf-8') if isinstance(attachment_content, str) else attachment_content
-                    mime = attachment_mime or 'application/octet-stream'
+                    content_bytes = (
+                        attachment_content.encode("utf-8")
+                        if isinstance(attachment_content, str)
+                        else attachment_content
+                    )
+                    mime = attachment_mime or "application/octet-stream"
                     filename = attachment_filename
 
                 content_file = ContentFile(content_bytes, name=filename)
                 file_attach = FileAttachment.objects.create(
-                    content_object=archive_entry,
-                    file=content_file,
-                    name=filename,
-                    mime_type=mime
+                    content_object=archive_entry, file=content_file, name=filename, mime_type=mime
                 )
                 archive_entry.file = file_attach
-                archive_entry.status = 'success'
+                archive_entry.status = "success"
                 archive_entry.save()
 
             # 4. Deliver Email (optional, only if recipients is configured)
@@ -214,10 +260,10 @@ def generate_scheduled_report_task(scheduled_report_id):
                 if not email_config or not email_config.enabled:
                     raise ValidationError(_("SMTP Outbound Email is disabled in settings."))
 
-                recipient_list = [r.strip() for r in sched.recipients.split(',') if r.strip()]
+                recipient_list = [r.strip() for r in sched.recipients.split(",") if r.strip()]
                 if recipient_list:
                     email = EmailMessage(
-                        subject=_("[Scheduled Report] %(name)s") % {'name': sched.name},
+                        subject=_("[Scheduled Report] %(name)s") % {"name": sched.name},
                         body=email_body,
                         from_email=email_config.from_address,
                         to=recipient_list,
@@ -232,23 +278,23 @@ def generate_scheduled_report_task(scheduled_report_id):
                     email_sent = True
 
             # 5. Dispatch to configured Notification Channels (email, in_app, Slack, Teams)
-            report_subject = _("[Scheduled Report] %(name)s") % {'name': sched.name}
+            report_subject = _("[Scheduled Report] %(name)s") % {"name": sched.name}
             # Generic, currency-correct summary built from the compiled summary cards
             # (works for every report type; no asset-specific or '$'-hardcoded figures).
             # Falls back to a row count when summary cards are disabled.
-            card_lines = "\n".join(
-                "%s: %s" % (c.get('label'), c.get('value')) for c in (summary_cards or [])
-            ) or (_("Rows: %(n)s") % {'n': total_rows})
+            card_lines = "\n".join("%s: %s" % (c.get("label"), c.get("value")) for c in (summary_cards or [])) or (
+                _("Rows: %(n)s") % {"n": total_rows}
+            )
             report_body = _(
                 "Scheduled report '%(name)s' was successfully generated "
                 "on %(timestamp)s UTC.\n"
                 "Format: %(format)s\n"
                 "%(summary)s"
             ) % {
-                'name': sched.name,
-                'timestamp': f"{timezone.now():%Y-%m-%d %H:%M:%S}",
-                'format': sched.format.upper(),
-                'summary': card_lines,
+                "name": sched.name,
+                "timestamp": f"{timezone.now():%Y-%m-%d %H:%M:%S}",
+                "format": sched.format.upper(),
+                "summary": card_lines,
             }
             for channel in sched.channels.all():
                 if not channel.enabled:
@@ -265,7 +311,7 @@ def generate_scheduled_report_task(scheduled_report_id):
             sched.last_status = f"failed: {str(e)}"
             sched.save()
             if archive_entry:
-                archive_entry.status = 'failed'
+                archive_entry.status = "failed"
                 archive_entry.error_message = str(e)
                 archive_entry.save()
             return False

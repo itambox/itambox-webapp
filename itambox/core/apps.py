@@ -5,24 +5,25 @@ from django.utils.translation import gettext_lazy as _
 
 
 class SuperuserAdminConfig(AdminConfig):
-    default_site = 'core.admin.SuperuserAdminSite'
+    default_site = "core.admin.SuperuserAdminSite"
 
 
 class CoreConfig(AppConfig):
-    default_auto_field = 'django.db.models.BigAutoField'
-    name = 'core'
-    verbose_name = _('Core')
+    default_auto_field = "django.db.models.BigAutoField"
+    name = "core"
+    verbose_name = _("Core")
 
     def ready(self):
-        import core.signals  # noqa: F401
-
         # Monkey-patch ModelChoiceField.queryset to dynamically apply tenant scoping at request time
         from django.forms.models import ModelChoiceField
+
+        import core.signals  # noqa: F401
+
         original_queryset_getter = ModelChoiceField.queryset.fget
 
         def scoped_queryset_getter(self):
             qs = original_queryset_getter(self)
-            if qs is not None and hasattr(qs, 'filter_by_tenant'):
+            if qs is not None and hasattr(qs, "filter_by_tenant"):
                 qs = qs.filter_by_tenant()
             return qs
 
@@ -30,6 +31,7 @@ class CoreConfig(AppConfig):
 
         # Monkey-patch BaseForm.__init__ to make 'tenant' field required globally (excluding filters/bulk edit)
         from django.forms.forms import BaseForm
+
         original_baseform_init = BaseForm.__init__
 
         def scoped_baseform_init(self, *args, **kwargs):
@@ -38,32 +40,37 @@ class CoreConfig(AppConfig):
             # `tenant` means the object scopes to a tenant OR a group OR is global):
             # forcing `tenant` required would make their tenant-XOR-group clean()
             # unsatisfiable. Such forms manage `tenant.required` themselves.
-            if 'tenant' in self.fields and 'tenant_group' not in self.fields:
+            if "tenant" in self.fields and "tenant_group" not in self.fields:
                 class_name = self.__class__.__name__
-                if 'Filter' not in class_name and 'BulkEdit' not in class_name:
+                if "Filter" not in class_name and "BulkEdit" not in class_name:
                     from django.db import connection
+
                     # Safely check if the tenant table exists to avoid poisoning transaction during migrations
                     try:
-                        if 'organization_tenant' in connection.introspection.table_names():
+                        if "organization_tenant" in connection.introspection.table_names():
                             from organization.models import Tenant
+
                             if Tenant.objects.exists():
-                                self.fields['tenant'].required = True
+                                self.fields["tenant"].required = True
                     except Exception:
                         pass
 
             # Auto-apply TomSelect attribute to all select fields (excluding CheckboxSelectMultiple/RadioSelect/TableConfigForm/listboxes)
             from django import forms
+
             class_name = self.__class__.__name__
-            if 'TableConfig' not in class_name:
+            if "TableConfig" not in class_name:
                 for field in self.fields.values():
-                    if isinstance(field.widget, (forms.Select, forms.SelectMultiple)) and not isinstance(field.widget, (forms.RadioSelect, forms.CheckboxSelectMultiple)):
+                    if isinstance(field.widget, (forms.Select, forms.SelectMultiple)) and not isinstance(
+                        field.widget, (forms.RadioSelect, forms.CheckboxSelectMultiple)
+                    ):
                         # Do not apply to listboxes (select elements with a size attribute)
-                        if 'size' in field.widget.attrs:
+                        if "size" in field.widget.attrs:
                             continue
-                        widget_classes = field.widget.attrs.get('class', '')
-                        if 'available-columns' not in widget_classes and 'selected-columns' not in widget_classes:
-                            if 'data-tom-select' not in field.widget.attrs:
-                                field.widget.attrs['data-tom-select'] = ''
+                        widget_classes = field.widget.attrs.get("class", "")
+                        if "available-columns" not in widget_classes and "selected-columns" not in widget_classes:
+                            if "data-tom-select" not in field.widget.attrs:
+                                field.widget.attrs["data-tom-select"] = ""
 
         BaseForm.__init__ = scoped_baseform_init
 
@@ -74,14 +81,15 @@ class CoreConfig(AppConfig):
         """Ensure the daily alert evaluation schedule exists in django-q2."""
         # inline import: avoid AppRegistryNotReady at app-load time
         from django_q.models import Schedule
+
         from core.schedules import register_schedule
 
         register_schedule(
-            'core.tasks.evaluate_alert_rules_task',
+            "core.tasks.evaluate_alert_rules_task",
             defaults={
-                'name': 'Daily Alert Rule Evaluation',
-                'schedule_type': Schedule.DAILY,
-                'repeats': -1,
+                "name": "Daily Alert Rule Evaluation",
+                "schedule_type": Schedule.DAILY,
+                "repeats": -1,
             },
         )
 
@@ -89,13 +97,14 @@ class CoreConfig(AppConfig):
         """Ensure the daily changelog/operational-data retention prune schedule exists."""
         # inline import: avoid AppRegistryNotReady at app-load time
         from django_q.models import Schedule
+
         from core.schedules import register_schedule
 
         register_schedule(
-            'core.tasks.prune_changelog_task',
+            "core.tasks.prune_changelog_task",
             defaults={
-                'name': 'Daily Changelog & Operational-Data Retention Prune',
-                'schedule_type': Schedule.DAILY,
-                'repeats': -1,
+                "name": "Daily Changelog & Operational-Data Retention Prune",
+                "schedule_type": Schedule.DAILY,
+                "repeats": -1,
             },
         )

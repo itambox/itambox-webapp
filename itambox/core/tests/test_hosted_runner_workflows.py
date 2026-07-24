@@ -1,6 +1,5 @@
 from pathlib import Path
 
-
 REPOSITORY_ROOT = Path(__file__).resolve().parents[3]
 WORKFLOWS_ROOT = REPOSITORY_ROOT / ".github" / "workflows"
 E2E_WORKFLOW_PATH = WORKFLOWS_ROOT / "e2e.yml"

@@ -6,26 +6,33 @@ from typing import TYPE_CHECKING
 if TYPE_CHECKING:
     from django.contrib.auth.models import AbstractBaseUser
     from django.http import HttpRequest
+
     from organization.models import AssetHolder, Location
+
     from .models import AssetDisposal
 
+from django.contrib.contenttypes.models import ContentType
+from django.core.exceptions import ValidationError
+from django.core.mail import send_mail
 from django.db import transaction
 from django.db.models import Sum
-from django.core.exceptions import ValidationError
-from django.contrib.contenttypes.models import ContentType
-from django.urls import reverse
-from django.core.mail import send_mail
 from django.shortcuts import get_object_or_404
+from django.urls import reverse
 from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
-from .choices import StatusTypeChoices
-from .models import Asset, StatusLabel, AssetAssignment
+
 from compliance.models import CustodyReceipt
 from inventory.models import (
-    AccessoryAssignment, AccessoryStock, ConsumableAssignment, ConsumableStock,
+    AccessoryAssignment,
+    AccessoryStock,
+    ConsumableAssignment,
+    ConsumableStock,
 )
 from inventory.services import resolve_grant_for_checkout
 from licenses.models import LicenseSeatAssignment
+
+from .choices import StatusTypeChoices
+from .models import Asset, AssetAssignment, StatusLabel
 
 
 def checkout_asset(
@@ -36,7 +43,7 @@ def checkout_asset(
     user: AbstractBaseUser | None = None,
     request: HttpRequest | None = None,
     expected_checkin: datetime.date | None = None,
-    notes: str = '',
+    notes: str = "",
     checkout_date: datetime.datetime | None = None,
     status: StatusLabel | None = None,
     is_loan: bool = False,
@@ -60,32 +67,39 @@ def checkout_asset(
             StatusTypeChoices.ARCHIVED,
         ):
             raise ValidationError(
-                _("Cannot check out an asset that is %(status)s.")
-                % {"status": asset.status.get_type_display()}
+                _("Cannot check out an asset that is %(status)s.") % {"status": asset.status.get_type_display()}
             )
 
         # Reservation guard: if the asset is reserved for a *different* holder during
         # the checkout window, block the checkout to preserve the reservation.
         if holder:
             from assets.models import AssetReservation, ReservationStatusChoices
+
             today = datetime.date.today()
-            blocking = AssetReservation.all_objects.select_for_update().filter(
-                asset=asset,
-                status__in=[
-                    ReservationStatusChoices.ACTIVE,
-                    ReservationStatusChoices.PENDING,
-                ],
-                start_date__lte=today,
-                end_date__gte=today,
-            ).exclude(reserved_for=holder).first()
+            blocking = (
+                AssetReservation.all_objects.select_for_update()
+                .filter(
+                    asset=asset,
+                    status__in=[
+                        ReservationStatusChoices.ACTIVE,
+                        ReservationStatusChoices.PENDING,
+                    ],
+                    start_date__lte=today,
+                    end_date__gte=today,
+                )
+                .exclude(reserved_for=holder)
+                .first()
+            )
             if blocking:
                 raise ValidationError(
-                    _("Asset is reserved for %(holder)s until %(date)s and cannot be checked out to a different holder.")
+                    _(
+                        "Asset is reserved for %(holder)s until %(date)s and cannot be checked out to a different holder."
+                    )
                     % {"holder": blocking.reserved_for, "date": blocking.end_date}
                 )
 
         if asset.active_assignment:
-            checkin_asset(asset, user=user, notes='Auto-checkin for reassignment')
+            checkin_asset(asset, user=user, notes="Auto-checkin for reassignment")
 
         original_status = asset.status
 
@@ -102,74 +116,67 @@ def checkout_asset(
         elif asset_target:
             asset.location = asset_target.location
 
-        asset._changelog_action = 'checkout'
+        asset._changelog_action = "checkout"
         asset._changelog_message = f"Checked out to {target}"
-        asset.save(update_fields=['status', 'location'])
-
-
+        asset.save(update_fields=["status", "location"])
 
         assignment_kwargs = {
-            'asset': asset,
-            'checked_out_by': user,
-            'expected_checkin_date': expected_checkin,
-            'notes': notes,
-            'pre_checkout_status': original_status,
-            'is_loan': is_loan,
-            'due_date': due_date,
+            "asset": asset,
+            "checked_out_by": user,
+            "expected_checkin_date": expected_checkin,
+            "notes": notes,
+            "pre_checkout_status": original_status,
+            "is_loan": is_loan,
+            "due_date": due_date,
         }
         if holder:
-            assignment_kwargs['assigned_user'] = holder
+            assignment_kwargs["assigned_user"] = holder
         elif location:
-            assignment_kwargs['assigned_location'] = location
+            assignment_kwargs["assigned_location"] = location
         elif asset_target:
-            assignment_kwargs['assigned_asset'] = asset_target
+            assignment_kwargs["assigned_asset"] = asset_target
 
         if checkout_date:
-            assignment_kwargs['checked_out_at'] = checkout_date
+            assignment_kwargs["checked_out_at"] = checkout_date
 
         assignment = AssetAssignment.objects.create(**assignment_kwargs)
 
         category = asset.asset_type.category if asset.asset_type else None
         if holder and category:
             from compliance.models import CustodyTemplate
+
             resolved_template = None
 
             # Priority 1: Tenant-specific override for the category
             if holder.tenant:
                 resolved_template = CustodyTemplate.objects.filter(
-                    tenant=holder.tenant,
-                    category=category,
-                    is_active=True
+                    tenant=holder.tenant, category=category, is_active=True
                 ).first()
 
             # Priority 2: Tenant Group-specific override (if tenant belongs to a group)
             if not resolved_template and holder.tenant and holder.tenant.group:
                 resolved_template = CustodyTemplate.objects.filter(
-                    tenant_group=holder.tenant.group,
-                    category=category,
-                    is_active=True
+                    tenant_group=holder.tenant.group, category=category, is_active=True
                 ).first()
 
             # Priority 3: Global category template (only if allowed by settings)
             if not resolved_template:
                 from django.conf import settings
-                if getattr(settings, 'ALLOW_GLOBAL_CUSTODY_TEMPLATES', True):
+
+                if getattr(settings, "ALLOW_GLOBAL_CUSTODY_TEMPLATES", True):
                     resolved_template = CustodyTemplate.objects.filter(
-                        tenant__isnull=True,
-                        tenant_group__isnull=True,
-                        category=category,
-                        is_active=True
+                        tenant__isnull=True, tenant_group__isnull=True, category=category, is_active=True
                     ).first()
 
             if resolved_template and resolved_template.require_acceptance:
                 receipt_kwargs = {
-                    'asset': asset,
-                    'holder': holder,
-                    'custody_template': resolved_template,
-                    'signature_provider': resolved_template.signature_provider,
-                    'eula_text': resolved_template.eula_text,
-                    'disclaimer': resolved_template.disclaimer,
-                    'qms_reference': resolved_template.qms_reference,
+                    "asset": asset,
+                    "holder": holder,
+                    "custody_template": resolved_template,
+                    "signature_provider": resolved_template.signature_provider,
+                    "eula_text": resolved_template.eula_text,
+                    "disclaimer": resolved_template.disclaimer,
+                    "qms_reference": resolved_template.qms_reference,
                 }
                 receipt = CustodyReceipt.objects.create(**receipt_kwargs)
 
@@ -177,6 +184,7 @@ def checkout_asset(
                 if resolved_template.email_signature_request and request:
                     try:
                         from core.models import EmailSettings
+
                         email_config = EmailSettings.load()
                         if email_config and email_config.enabled and email_config.from_address:
                             recipient = holder.email
@@ -184,20 +192,24 @@ def checkout_asset(
                                 recipient = email_config.test_recipient or email_config.from_address
                             if recipient:
                                 from compliance.registry import signature_providers
-                                provider = signature_providers.get(receipt.signature_provider or 'local')
+
+                                provider = signature_providers.get(receipt.signature_provider or "local")
                                 sign_url = provider.initiate_signature(receipt, request)
                                 send_mail(
-                                    subject=_('Asset Acceptance Required: %(name)s (%(tag)s)') % {
-                                        "name": asset.name, "tag": asset.asset_tag,
+                                    subject=_("Asset Acceptance Required: %(name)s (%(tag)s)")
+                                    % {
+                                        "name": asset.name,
+                                        "tag": asset.asset_tag,
                                     },
                                     message=_(
-                                        'You have been assigned custody of:\n\n'
-                                        '  Asset: %(name)s\n'
-                                        '  Asset Tag: %(tag)s\n'
-                                        '  Serial: %(serial)s\n\n'
-                                        'Please accept custody at the following link:\n%(url)s\n\n'
-                                        'This link expires in 7 days.'
-                                    ) % {
+                                        "You have been assigned custody of:\n\n"
+                                        "  Asset: %(name)s\n"
+                                        "  Asset Tag: %(tag)s\n"
+                                        "  Serial: %(serial)s\n\n"
+                                        "Please accept custody at the following link:\n%(url)s\n\n"
+                                        "This link expires in 7 days."
+                                    )
+                                    % {
                                         "name": asset.name,
                                         "tag": asset.asset_tag,
                                         "serial": asset.serial_number or "N/A",
@@ -216,7 +228,7 @@ def checkout_asset(
 def checkin_asset(
     asset: Asset,
     user: AbstractBaseUser | None = None,
-    notes: str = '',
+    notes: str = "",
     status: StatusLabel | None = None,
     location: Location | None = None,
     checkin_date: datetime.date | None = None,
@@ -242,7 +254,7 @@ def checkin_asset(
 
             active.checked_in_by = user
             if notes:
-                active.notes = (active.notes + '\n' + notes).strip()
+                active.notes = (active.notes + "\n" + notes).strip()
             active.save()
 
             revert_status = status
@@ -250,16 +262,16 @@ def checkin_asset(
                 revert_status = active.pre_checkout_status
             if not revert_status:
                 revert_status = StatusLabel.objects.filter(type=StatusTypeChoices.DEPLOYABLE).first()
-            
+
             if revert_status:
                 asset.status = revert_status
             # Only overwrite location when a destination was provided; a blank
             # location preserves where the asset is rather than wiping it to NULL.
             if location is not None:
                 asset.location = location
-            asset._changelog_action = 'checkin'
+            asset._changelog_action = "checkin"
             asset._changelog_message = f"Checked in from {target}"
-            asset.save(update_fields=['status', 'location'])
+            asset.save(update_fields=["status", "location"])
 
             return f"Checked in from: {target}"
     elif asset.location:
@@ -272,9 +284,9 @@ def checkin_asset(
                 asset.status = revert_status
             if location is not None:
                 asset.location = location
-            asset._changelog_action = 'checkin'
+            asset._changelog_action = "checkin"
             asset._changelog_message = f"Checked in from Location: {checked_in_from}"
-            asset.save(update_fields=['status', 'location'])
+            asset.save(update_fields=["status", "location"])
             return f"Checked in from Location: {checked_in_from}"
     else:
         return None
@@ -284,16 +296,16 @@ def dispose_asset(
     asset: Asset,
     disposal_method: str,
     disposal_date,
-    data_sanitization_method: str = 'none',
-    sanitization_certificate: str = '',
-    sanitized_by: str = '',
-    recipient: str = '',
+    data_sanitization_method: str = "none",
+    sanitization_certificate: str = "",
+    sanitized_by: str = "",
+    recipient: str = "",
     proceeds=None,
-    currency: str = '',
+    currency: str = "",
     weee_compliant: bool = False,
-    notes: str = '',
+    notes: str = "",
     user=None,
-) -> 'AssetDisposal':
+) -> "AssetDisposal":
     """Record the end-of-life disposal of an asset.
 
     Creates (or replaces) an ``AssetDisposal`` record, stamps ``disposed_at``
@@ -304,9 +316,10 @@ def dispose_asset(
     The whole operation is wrapped in a database transaction; either
     everything succeeds or nothing is written.
     """
-    from assets.models import AssetDisposal  # local import avoids circular at module load
-    from assets.depreciation import compute_book_value
     from decimal import Decimal
+
+    from assets.depreciation import compute_book_value
+    from assets.models import AssetDisposal  # local import avoids circular at module load
 
     with transaction.atomic():
         # Lock the asset row to prevent concurrent mutations
@@ -314,13 +327,11 @@ def dispose_asset(
 
         # Auto-checkin any active assignment before disposal
         if asset.active_assignment:
-            checkin_asset(asset, user=user, notes='Auto-checkin for disposal')
+            checkin_asset(asset, user=user, notes="Auto-checkin for disposal")
             asset.refresh_from_db()
 
         # Transition to an archived status label (first one found)
-        archived_label = StatusLabel.objects.filter(
-            type=StatusTypeChoices.ARCHIVED
-        ).first()
+        archived_label = StatusLabel.objects.filter(type=StatusTypeChoices.ARCHIVED).first()
 
         # Remove any existing disposal record for this asset (idempotent re-run).
         # asset is a OneToOne, so the row must be HARD-deleted to free the unique
@@ -360,7 +371,7 @@ def dispose_asset(
         # book value / TCO it flows into.
         if proceeds is not None and proceeds < 0:
             raise ValidationError(_("Disposal proceeds cannot be negative."))
-        if proceeds is not None and currency and getattr(asset, 'currency', None) and currency != asset.currency:
+        if proceeds is not None and currency and getattr(asset, "currency", None) and currency != asset.currency:
             raise ValidationError(
                 _("Disposal proceeds currency must match the asset's currency (no conversion is applied).")
             )
@@ -371,18 +382,15 @@ def dispose_asset(
         else:
             # Freeze the depreciated residual at the disposal date BEFORE setting
             # disposed_at (compute_book_value short-circuits once disposed_at is set).
-            asset.disposal_value = compute_book_value(asset, on_date=disposal_date) or Decimal('0.00')
+            asset.disposal_value = compute_book_value(asset, on_date=disposal_date) or Decimal("0.00")
         asset.disposed_at = timezone.now()
 
         if archived_label:
             asset.status = archived_label
 
-        asset._changelog_action = 'dispose'
-        asset._changelog_message = (
-            f"Disposed via {disposal.get_disposal_method_display()} "
-            f"on {disposal_date}"
-        )
-        asset.save(update_fields=['disposed_at', 'disposal_value', 'status'])
+        asset._changelog_action = "dispose"
+        asset._changelog_message = f"Disposed via {disposal.get_disposal_method_display()} on {disposal_date}"
+        asset.save(update_fields=["disposed_at", "disposal_value", "status"])
 
     return disposal
 
@@ -400,15 +408,18 @@ def checkout_kit(kit, holder=None, location=None, user=None, notes="", source_lo
         item_assets_map = {}
 
         # 1. Lock all resources first to prevent race conditions (TOCTOU)
-        for item in kit.items.select_related('asset_type', 'accessory', 'license', 'consumable').all():
+        for item in kit.items.select_related("asset_type", "accessory", "license", "consumable").all():
             if item.asset_type:
                 # Lock a deployable asset immediately
-                asset = Asset.objects.filter(
-                    asset_type=item.asset_type,
-                    status__type=StatusTypeChoices.DEPLOYABLE
-                ).select_for_update().first()
+                asset = (
+                    Asset.objects.filter(asset_type=item.asset_type, status__type=StatusTypeChoices.DEPLOYABLE)
+                    .select_for_update()
+                    .first()
+                )
                 if not asset:
-                    raise ValidationError(_("No available assets of type '%(type)s' in stock.") % {"type": item.asset_type})
+                    raise ValidationError(
+                        _("No available assets of type '%(type)s' in stock.") % {"type": item.asset_type}
+                    )
                 allocated_assets.append(asset)
                 item_assets_map[item.pk] = asset
             elif item.accessory:
@@ -416,7 +427,10 @@ def checkout_kit(kit, holder=None, location=None, user=None, notes="", source_lo
                 acc = item.accessory.__class__.objects.select_for_update().get(pk=item.accessory.pk)
                 rem = acc.available
                 if not acc.allow_overallocate and rem < item.qty:
-                    raise ValidationError(_("Insufficient stock for accessory '%(acc)s'. Required: %(qty)s, Available: %(rem)s") % {"acc": acc, "qty": item.qty, "rem": rem})
+                    raise ValidationError(
+                        _("Insufficient stock for accessory '%(acc)s'. Required: %(qty)s, Available: %(rem)s")
+                        % {"acc": acc, "qty": item.qty, "rem": rem}
+                    )
             elif item.license:
                 # Lock license seat pool
                 lic = item.license.__class__.objects.select_for_update().get(pk=item.license.pk)
@@ -428,7 +442,10 @@ def checkout_kit(kit, holder=None, location=None, user=None, notes="", source_lo
                 con = item.consumable.__class__.objects.select_for_update().get(pk=item.consumable.pk)
                 rem = con.available
                 if not con.allow_overallocate and rem < item.qty:
-                    raise ValidationError(_("Insufficient stock for consumable '%(con)s'. Required: %(qty)s, Available: %(rem)s") % {"con": con, "qty": item.qty, "rem": rem})
+                    raise ValidationError(
+                        _("Insufficient stock for consumable '%(con)s'. Required: %(qty)s, Available: %(rem)s")
+                        % {"con": con, "qty": item.qty, "rem": rem}
+                    )
 
         # 2. Perform allocations safely under active locks
         for item in kit.items.all():
@@ -440,23 +457,22 @@ def checkout_kit(kit, holder=None, location=None, user=None, notes="", source_lo
                 else:
                     asset.location = location
 
-                asset._changelog_action = 'checkout'
+                asset._changelog_action = "checkout"
                 asset._changelog_message = f"Checked out via Kit '{kit.name}'. {notes}"
-                asset.save(update_fields=['status', 'location'])
+                asset.save(update_fields=["status", "location"])
 
                 target = holder or location
 
-
                 assignment_kwargs = {
-                    'asset': asset,
-                    'checked_out_by': user,
-                    'notes': f"Checked out via Kit '{kit.name}'. {notes}"
+                    "asset": asset,
+                    "checked_out_by": user,
+                    "notes": f"Checked out via Kit '{kit.name}'. {notes}",
                 }
                 if holder:
-                    assignment_kwargs['assigned_user'] = holder
+                    assignment_kwargs["assigned_user"] = holder
                 elif location:
-                    assignment_kwargs['assigned_location'] = location
-                    
+                    assignment_kwargs["assigned_location"] = location
+
                 AssetAssignment.objects.create(**assignment_kwargs)
 
             elif item.accessory:
@@ -469,8 +485,12 @@ def checkout_kit(kit, holder=None, location=None, user=None, notes="", source_lo
                     notes=f"Checked out via Kit '{kit.name}'. {notes}",
                     # ADR-0001: a cross-tenant source pool needs a covering grant.
                     resource_grant=resolve_grant_for_checkout(
-                        item.accessory, 'accessory', AccessoryStock,
-                        AccessoryAssignment, source_location, user=user,
+                        item.accessory,
+                        "accessory",
+                        AccessoryStock,
+                        AccessoryAssignment,
+                        source_location,
+                        user=user,
                     ),
                 )
             elif item.consumable:
@@ -482,22 +502,27 @@ def checkout_kit(kit, holder=None, location=None, user=None, notes="", source_lo
                     qty=item.qty,
                     notes=f"Checked out via Kit '{kit.name}'. {notes}",
                     resource_grant=resolve_grant_for_checkout(
-                        item.consumable, 'consumable', ConsumableStock,
-                        ConsumableAssignment, source_location, user=user,
+                        item.consumable,
+                        "consumable",
+                        ConsumableStock,
+                        ConsumableAssignment,
+                        source_location,
+                        user=user,
                     ),
                 )
             elif item.license:
                 if holder:
                     LicenseSeatAssignment.objects.create(
-                        license=item.license,
-                        assigned_holder=holder,
-                        notes=f"Checked out via Kit '{kit.name}'. {notes}"
+                        license=item.license, assigned_holder=holder, notes=f"Checked out via Kit '{kit.name}'. {notes}"
                     )
                 elif allocated_assets:
                     LicenseSeatAssignment.objects.create(
                         license=item.license,
                         asset=allocated_assets[0],
-                        notes=f"Checked out via Kit '{kit.name}'. {notes}"
+                        notes=f"Checked out via Kit '{kit.name}'. {notes}",
                     )
                 else:
-                    raise ValidationError(_("License seat for '%(name)s' must be assigned to either a Holder or an Asset.") % {"name": item.license.name})
+                    raise ValidationError(
+                        _("License seat for '%(name)s' must be assigned to either a Holder or an Asset.")
+                        % {"name": item.license.name}
+                    )

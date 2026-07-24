@@ -3,20 +3,26 @@
 Run with:
     pytest assets/tests/test_disposal.py
 """
+
 from decimal import Decimal
 
 import pytest
-from django.core.exceptions import ValidationError
-from django.test import TestCase, RequestFactory
-from django.urls import reverse
 from django.contrib.auth import get_user_model
-
+from django.core.exceptions import ValidationError
+from django.test import RequestFactory, TestCase
+from django.urls import reverse
 from model_bakery import baker
 
-from core.tests.mixins import TenantTestMixin
-from assets.models import Asset, AssetDisposal, StatusLabel, AssetAssignment
-from assets.models import DisposalMethodChoices, DataSanitizationMethodChoices
+from assets.models import (
+    Asset,
+    AssetAssignment,
+    AssetDisposal,
+    DataSanitizationMethodChoices,
+    DisposalMethodChoices,
+    StatusLabel,
+)
 from assets.services import dispose_asset
+from core.tests.mixins import TenantTestMixin
 
 User = get_user_model()
 
@@ -27,10 +33,10 @@ class AssetDisposalModelTest(TenantTestMixin, TestCase):
     def setUp(self):
         self.setup_tenant_context()
         self.user = baker.make(User, is_superuser=True, is_staff=True)
-        self.deployable_status = baker.make(StatusLabel, type='deployable', name='Deployable')
+        self.deployable_status = baker.make(StatusLabel, type="deployable", name="Deployable")
         self.asset = baker.make(
             Asset,
-            name='Test Laptop',
+            name="Test Laptop",
             status=self.deployable_status,
             tenant=self.tenant,
         )
@@ -39,7 +45,7 @@ class AssetDisposalModelTest(TenantTestMixin, TestCase):
         defaults = dict(
             asset=self.asset,
             disposal_method=DisposalMethodChoices.RECYCLE,
-            disposal_date='2025-06-01',
+            disposal_date="2025-06-01",
             data_sanitization_method=DataSanitizationMethodChoices.NIST_PURGE,
         )
         defaults.update(kwargs)
@@ -48,14 +54,14 @@ class AssetDisposalModelTest(TenantTestMixin, TestCase):
     def test_str_representation(self):
         d = self._make_disposal()
         d.save()
-        self.assertIn('Test Laptop', str(d))
-        self.assertIn('Recycle', str(d))
+        self.assertIn("Test Laptop", str(d))
+        self.assertIn("Recycle", str(d))
 
     def test_default_sanitization_method_is_none(self):
         d = AssetDisposal(
             asset=self.asset,
             disposal_method=DisposalMethodChoices.DESTRUCTION,
-            disposal_date='2025-06-01',
+            disposal_date="2025-06-01",
         )
         self.assertEqual(d.data_sanitization_method, DataSanitizationMethodChoices.NONE)
 
@@ -70,6 +76,7 @@ class AssetDisposalModelTest(TenantTestMixin, TestCase):
         d1.save()
         # A second disposal for the same asset should raise IntegrityError via OneToOne
         from django.db import IntegrityError
+
         with self.assertRaises(IntegrityError):
             d2 = self._make_disposal()
             d2.save()
@@ -78,30 +85,30 @@ class AssetDisposalModelTest(TenantTestMixin, TestCase):
         d = AssetDisposal(
             asset=self.asset,
             disposal_method=DisposalMethodChoices.DONATION,
-            disposal_date='2025-06-01',
-            sanitization_certificate='',
-            sanitized_by='',
-            recipient='',
+            disposal_date="2025-06-01",
+            sanitization_certificate="",
+            sanitized_by="",
+            recipient="",
             proceeds=None,
-            currency='',
-            notes='',
+            currency="",
+            notes="",
         )
         d.full_clean()  # must not raise
         d.save()
         self.assertIsNotNone(d.pk)
 
     def test_proceeds_and_currency_stored(self):
-        d = self._make_disposal(proceeds=Decimal('1234.56'), currency='USD')
+        d = self._make_disposal(proceeds=Decimal("1234.56"), currency="USD")
         d.save()
         d.refresh_from_db()
-        self.assertEqual(d.proceeds, Decimal('1234.56'))
-        self.assertEqual(d.currency, 'USD')
+        self.assertEqual(d.proceeds, Decimal("1234.56"))
+        self.assertEqual(d.currency, "USD")
 
     def test_get_absolute_url_resolves(self):
         d = self._make_disposal()
         d.save()
         url = d.get_absolute_url()
-        self.assertIn('/disposals/', url)
+        self.assertIn("/disposals/", url)
 
     def test_tenant_property_proxies_asset_tenant(self):
         d = self._make_disposal()
@@ -115,11 +122,11 @@ class DisposeAssetServiceTest(TenantTestMixin, TestCase):
     def setUp(self):
         self.setup_tenant_context()
         self.user = baker.make(User, is_superuser=True, is_staff=True)
-        self.deployable = baker.make(StatusLabel, type='deployable', name='Deployable')
-        self.archived = baker.make(StatusLabel, type='archived', name='Archived')
+        self.deployable = baker.make(StatusLabel, type="deployable", name="Deployable")
+        self.archived = baker.make(StatusLabel, type="archived", name="Archived")
         self.asset = baker.make(
             Asset,
-            name='Disposal Laptop',
+            name="Disposal Laptop",
             status=self.deployable,
             tenant=self.tenant,
         )
@@ -128,21 +135,21 @@ class DisposeAssetServiceTest(TenantTestMixin, TestCase):
         disposal = dispose_asset(
             asset=self.asset,
             disposal_method=DisposalMethodChoices.RECYCLE,
-            disposal_date='2025-06-10',
+            disposal_date="2025-06-10",
             data_sanitization_method=DataSanitizationMethodChoices.NIST_PURGE,
-            sanitization_certificate='CERT-001',
-            sanitized_by='IT Team',
+            sanitization_certificate="CERT-001",
+            sanitized_by="IT Team",
             user=self.user,
         )
         self.assertIsNotNone(disposal.pk)
         self.assertEqual(disposal.asset, self.asset)
-        self.assertEqual(disposal.sanitization_certificate, 'CERT-001')
+        self.assertEqual(disposal.sanitization_certificate, "CERT-001")
 
     def test_dispose_stamps_disposed_at_on_asset(self):
         dispose_asset(
             asset=self.asset,
             disposal_method=DisposalMethodChoices.DESTRUCTION,
-            disposal_date='2025-06-10',
+            disposal_date="2025-06-10",
             user=self.user,
         )
         self.asset.refresh_from_db()
@@ -153,29 +160,30 @@ class DisposeAssetServiceTest(TenantTestMixin, TestCase):
         dispose_asset(
             asset=self.asset,
             disposal_method=DisposalMethodChoices.RESALE,
-            disposal_date='2025-06-10',
+            disposal_date="2025-06-10",
             user=self.user,
         )
         self.asset.refresh_from_db()
         self.assertIsNotNone(self.asset.status)
-        self.assertEqual(self.asset.status.type, 'archived')
+        self.assertEqual(self.asset.status.type, "archived")
 
     def test_dispose_stamps_disposal_value_from_proceeds(self):
         dispose_asset(
             asset=self.asset,
             disposal_method=DisposalMethodChoices.RESALE,
-            disposal_date='2025-06-10',
-            proceeds=Decimal('500.00'),
+            disposal_date="2025-06-10",
+            proceeds=Decimal("500.00"),
             user=self.user,
         )
         self.asset.refresh_from_db()
-        self.assertEqual(self.asset.disposal_value, Decimal('500.00'))
+        self.assertEqual(self.asset.disposal_value, Decimal("500.00"))
 
     def test_dispose_auto_checks_in_active_assignment(self):
         """Active assignment must be closed before disposal."""
         from organization.models import AssetHolder
+
         holder = baker.make(AssetHolder, tenant=self.tenant)
-        deployed = baker.make(StatusLabel, type='deployed', name='Deployed')
+        deployed = baker.make(StatusLabel, type="deployed", name="Deployed")
         self.asset.status = deployed
         self.asset.save()
         AssetAssignment.objects.create(
@@ -188,7 +196,7 @@ class DisposeAssetServiceTest(TenantTestMixin, TestCase):
         dispose_asset(
             asset=self.asset,
             disposal_method=DisposalMethodChoices.RECYCLE,
-            disposal_date='2025-06-10',
+            disposal_date="2025-06-10",
             user=self.user,
         )
         self.asset.refresh_from_db()
@@ -199,13 +207,13 @@ class DisposeAssetServiceTest(TenantTestMixin, TestCase):
         dispose_asset(
             asset=self.asset,
             disposal_method=DisposalMethodChoices.RECYCLE,
-            disposal_date='2025-06-10',
+            disposal_date="2025-06-10",
             user=self.user,
         )
         dispose_asset(
             asset=self.asset,
             disposal_method=DisposalMethodChoices.DONATION,
-            disposal_date='2025-07-01',
+            disposal_date="2025-07-01",
             user=self.user,
         )
         self.asset.refresh_from_db()
@@ -219,12 +227,12 @@ class DisposeAssetServiceTest(TenantTestMixin, TestCase):
         disposal = dispose_asset(
             asset=self.asset,
             disposal_method=DisposalMethodChoices.RESALE,
-            disposal_date='2025-06-10',
-            proceeds=Decimal('999.99'),
-            currency='EUR',
+            disposal_date="2025-06-10",
+            proceeds=Decimal("999.99"),
+            currency="EUR",
             user=self.user,
         )
-        self.assertEqual(disposal.currency, 'EUR')
+        self.assertEqual(disposal.currency, "EUR")
 
 
 class AssetDisposalViewSmokeTest(TenantTestMixin, TestCase):
@@ -234,37 +242,37 @@ class AssetDisposalViewSmokeTest(TenantTestMixin, TestCase):
         self.setup_tenant_context()
         self.user = baker.make(User, is_superuser=True, is_staff=True)
         self.client.force_login(self.user)
-        self.deployable = baker.make(StatusLabel, type='deployable', name='Deployable')
+        self.deployable = baker.make(StatusLabel, type="deployable", name="Deployable")
         self.asset = baker.make(
             Asset,
-            name='View Laptop',
+            name="View Laptop",
             status=self.deployable,
             tenant=self.tenant,
         )
 
     def test_disposal_list_view_200(self):
-        url = reverse('assets:assetdisposal_list')
+        url = reverse("assets:assetdisposal_list")
         response = self.client.get(url)
         self.assertIn(response.status_code, [200, 302])
 
     def test_disposal_create_view_200(self):
-        url = reverse('assets:assetdisposal_create')
+        url = reverse("assets:assetdisposal_create")
         response = self.client.get(url)
         self.assertIn(response.status_code, [200, 302])
 
     def test_asset_dispose_action_view_200(self):
-        url = reverse('assets:asset_dispose', kwargs={'pk': self.asset.pk})
+        url = reverse("assets:asset_dispose", kwargs={"pk": self.asset.pk})
         response = self.client.get(url)
         self.assertIn(response.status_code, [200, 302])
 
     def test_disposal_detail_view_200(self):
-        archived = baker.make(StatusLabel, type='archived', name='Archived')
+        archived = baker.make(StatusLabel, type="archived", name="Archived")
         disposal = dispose_asset(
             asset=self.asset,
             disposal_method=DisposalMethodChoices.DESTRUCTION,
-            disposal_date='2025-06-01',
+            disposal_date="2025-06-01",
             user=self.user,
         )
-        url = reverse('assets:assetdisposal_detail', kwargs={'pk': disposal.pk})
+        url = reverse("assets:assetdisposal_detail", kwargs={"pk": disposal.pk})
         response = self.client.get(url)
         self.assertIn(response.status_code, [200, 302])

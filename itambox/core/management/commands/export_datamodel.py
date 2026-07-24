@@ -8,7 +8,6 @@ from pathlib import Path
 from django.apps import apps
 from django.core.management.base import BaseCommand
 
-
 DOMAIN_APPS = (
     "assets",
     "compliance",
@@ -102,8 +101,8 @@ class Command(BaseCommand):
             lines.append('    color="#98A2B3";')
             lines.append('    fontcolor="#344054";')
             lines.append('    fontname="Arial Bold";')
-            lines.append('    fontsize=13;')
-            lines.append('    penwidth=1.2;')
+            lines.append("    fontsize=13;")
+            lines.append("    penwidth=1.2;")
             lines.append('    style="rounded";')
             for model in app_models:
                 lines.append(

@@ -1,54 +1,58 @@
-from django.urls import reverse, reverse_lazy
 from django.contrib import messages
+from django.db.models import Count
 from django.shortcuts import redirect
+from django.urls import reverse, reverse_lazy
 from django.utils.translation import gettext_lazy as _
 from django_tables2 import RequestConfig
-from django.db.models import Count
 
-from ..models import AssetRole
-from .. import forms, tables, filters
-
-from itambox.utils import get_paginate_count
 from itambox.panels import Panel
-from itambox.views.generic import (
-    ObjectListView, ObjectDetailView, ObjectEditView, ObjectDeleteView, ObjectCloneView,
-)
 from itambox.quick_add import QuickAddMixin
+from itambox.utils import get_paginate_count
+from itambox.views.generic import (
+    ObjectCloneView,
+    ObjectDeleteView,
+    ObjectDetailView,
+    ObjectEditView,
+    ObjectListView,
+)
+
+from .. import filters, forms, tables
+from ..models import AssetRole
 
 
 class AssetRoleListView(ObjectListView):
-    queryset = AssetRole.objects.prefetch_related('tags').annotate(asset_count=Count('assets'))
+    queryset = AssetRole.objects.prefetch_related("tags").annotate(asset_count=Count("assets"))
     filterset = filters.AssetRoleFilterSet
     filterset_form = forms.AssetRoleFilterForm
     table = tables.AssetRoleTable
-    action_buttons = ('add',)
+    action_buttons = ("add",)
 
 
 class AssetRoleDetailView(ObjectDetailView):
-    queryset = AssetRole.objects.prefetch_related('tags', 'assets')
+    queryset = AssetRole.objects.prefetch_related("tags", "assets")
 
-    layout = (
-        ((Panel('info', _('Asset Role Details')),),),
-    )
+    layout = (((Panel("info", _("Asset Role Details")),),),)
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         assetrole = self.get_object()
 
         assets_table = tables.AssetTable(assetrole.assets.all(), request=self.request)
-        RequestConfig(self.request, paginate={'per_page': get_paginate_count(self.request)}).configure(assets_table)
+        RequestConfig(self.request, paginate={"per_page": get_paginate_count(self.request)}).configure(assets_table)
 
         related_objects_list = []
         asset_count = assetrole.assets.count()
         if asset_count:
-            related_objects_list.append({
-                'label': 'Assets',
-                'count': asset_count,
-                'url': f"{reverse('assets:asset_list')}?asset_role={assetrole.slug}"
-            })
+            related_objects_list.append(
+                {
+                    "label": "Assets",
+                    "count": asset_count,
+                    "url": f"{reverse('assets:asset_list')}?asset_role={assetrole.slug}",
+                }
+            )
 
-        context['assets_table'] = assets_table
-        context['related_objects_list'] = related_objects_list
+        context["assets_table"] = assets_table
+        context["related_objects_list"] = related_objects_list
         return context
 
 
@@ -56,22 +60,22 @@ class AssetRoleEditView(QuickAddMixin, ObjectEditView):
     queryset = AssetRole.objects.all()
     model = AssetRole
     model_form = forms.AssetRoleForm
-    template_name = 'generic/object_edit.html'
-    quick_add_target = 'id_asset_role'
+    template_name = "generic/object_edit.html"
+    quick_add_target = "id_asset_role"
 
 
 class AssetRoleCloneView(ObjectCloneView):
     model = AssetRole
     model_form = forms.AssetRoleForm
-    template_name = 'generic/object_edit.html'
-    default_return_url = 'assets:assetrole_list'
+    template_name = "generic/object_edit.html"
+    default_return_url = "assets:assetrole_list"
 
 
 class AssetRoleDeleteView(ObjectDeleteView):
     queryset = AssetRole.objects.all()
     model = AssetRole
-    template_name = 'generic/object_confirm_delete.html'
-    success_url = reverse_lazy('assets:assetrole_list')
+    template_name = "generic/object_confirm_delete.html"
+    success_url = reverse_lazy("assets:assetrole_list")
 
     def post(self, request, *args, **kwargs):
         assetrole = self.get_object()
@@ -80,11 +84,12 @@ class AssetRoleDeleteView(ObjectDeleteView):
         if asset_count > 0:
             messages.error(
                 request,
-                _("Cannot delete asset role '%(name)s': It is associated with %(count)s asset%(suffix)s.") % {
+                _("Cannot delete asset role '%(name)s': It is associated with %(count)s asset%(suffix)s.")
+                % {
                     "name": assetrole.name,
                     "count": asset_count,
-                    "suffix": 's' if asset_count != 1 else '',
-                }
+                    "suffix": "s" if asset_count != 1 else "",
+                },
             )
             return redirect(assetrole.get_absolute_url())
 

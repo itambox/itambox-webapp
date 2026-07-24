@@ -10,10 +10,10 @@ from rest_framework.response import Response
 from rest_framework.reverse import reverse
 from rest_framework.views import APIView
 
-from itambox.api.permissions import IsAuthenticatedOrLoginNotRequired
-from itambox.api.viewsets import ITAMBoxReadOnlyModelViewSet
-from itambox.api.serializers import ObjectChangeSerializer
 from core.models import ObjectChange
+from itambox.api.permissions import IsAuthenticatedOrLoginNotRequired
+from itambox.api.serializers import ObjectChangeSerializer
+from itambox.api.viewsets import ITAMBoxReadOnlyModelViewSet
 
 User = get_user_model()
 
@@ -26,17 +26,19 @@ class APIRootView(APIView):
 
     @extend_schema(exclude=True)
     def get(self, request, format=None):
-        return Response({
-            'assets': reverse('api:assets_api:api-root', request=request, format=format),
-            'core': reverse('api:core_api:api-root', request=request, format=format),
-            'extras': reverse('api:extras_api:api-root', request=request, format=format),
-            'licenses': reverse('api:licenses_api:api-root', request=request, format=format),
-            'organization': reverse('api:organization_api:api-root', request=request, format=format),
-            'software': reverse('api:software_api:api-root', request=request, format=format),
-            'status': reverse('api:api-status', request=request, format=format),
-            'subscriptions': reverse('api:subscriptions_api:api-root', request=request, format=format),
-            'users': reverse('api:users_api:api-root', request=request, format=format),
-        })
+        return Response(
+            {
+                "assets": reverse("api:assets_api:api-root", request=request, format=format),
+                "core": reverse("api:core_api:api-root", request=request, format=format),
+                "extras": reverse("api:extras_api:api-root", request=request, format=format),
+                "licenses": reverse("api:licenses_api:api-root", request=request, format=format),
+                "organization": reverse("api:organization_api:api-root", request=request, format=format),
+                "software": reverse("api:software_api:api-root", request=request, format=format),
+                "status": reverse("api:api-status", request=request, format=format),
+                "subscriptions": reverse("api:subscriptions_api:api-root", request=request, format=format),
+                "users": reverse("api:users_api:api-root", request=request, format=format),
+            }
+        )
 
 
 class StatusView(APIView):
@@ -44,11 +46,13 @@ class StatusView(APIView):
 
     @extend_schema(responses={200: OpenApiTypes.OBJECT})
     def get(self, request):
-        return Response({
-            'django-version': DJANGO_VERSION,
-            'itambox-version': getattr(settings, 'VERSION', 'unknown'),
-            'python-version': platform.python_version(),
-        })
+        return Response(
+            {
+                "django-version": DJANGO_VERSION,
+                "itambox-version": getattr(settings, "VERSION", "unknown"),
+                "python-version": platform.python_version(),
+            }
+        )
 
 
 class AuthenticationCheckView(APIView):
@@ -57,11 +61,12 @@ class AuthenticationCheckView(APIView):
     @extend_schema(responses={200: OpenApiTypes.OBJECT})
     def get(self, request):
         from users.api.serializers import UserSerializer
-        serializer = UserSerializer(request.user, context={'request': request})
+
+        serializer = UserSerializer(request.user, context={"request": request})
         return Response(serializer.data)
 
 
 class ObjectChangeViewSet(ITAMBoxReadOnlyModelViewSet):
-    queryset = ObjectChange.objects.select_related('user', 'changed_object_type').all()
+    queryset = ObjectChange.objects.select_related("user", "changed_object_type").all()
     serializer_class = ObjectChangeSerializer
-    filterset_fields = ['user_id', 'action', 'changed_object_type_id', 'changed_object_id']
+    filterset_fields = ["user_id", "action", "changed_object_type_id", "changed_object_id"]

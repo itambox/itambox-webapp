@@ -10,6 +10,10 @@ Django registers models by app_label (inferred from the package path
 Migrations reference ``'assets.ModelName'`` which is unaffected.
 """
 
+# This re-export order follows the documented model dependency chain above;
+# preserve it so future model imports cannot introduce an initialization cycle.
+# isort: off
+
 # ── 1. Lifecycle-local choice enums ─────────────────────────────────────────
 from assets.models.choices import (
     DisposalMethodChoices,
@@ -55,6 +59,8 @@ from assets.models.lifecycle import (
 
 # ── 8. Maintenance ───────────────────────────────────────────────────────────
 from assets.models.maintenance import AssetMaintenance
+
+# isort: on
 
 __all__ = [
     # choices

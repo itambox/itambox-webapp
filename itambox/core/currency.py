@@ -16,21 +16,22 @@ in the tenant currency while allowing explicit per-record currencies.
 The set mirrors the currencies the ``money`` filter knows how to format; keep
 the two in sync when adding entries.
 """
+
 from django.db import models
 from django.utils.translation import gettext_lazy as _
 
 # (ISO 4217 code, human label). Order = display order in form dropdowns.
 CURRENCY_CHOICES = [
-    ('EUR', _('Euro (€)')),
-    ('USD', _('US Dollar ($)')),
-    ('GBP', _('British Pound (£)')),
-    ('CHF', _('Swiss Franc (CHF)')),
-    ('SEK', _('Swedish Krona (kr)')),
-    ('NOK', _('Norwegian Krone (kr)')),
-    ('DKK', _('Danish Krone (kr)')),
-    ('CAD', _('Canadian Dollar (CA$)')),
-    ('AUD', _('Australian Dollar (A$)')),
-    ('JPY', _('Japanese Yen (¥)')),
+    ("EUR", _("Euro (€)")),
+    ("USD", _("US Dollar ($)")),
+    ("GBP", _("British Pound (£)")),
+    ("CHF", _("Swiss Franc (CHF)")),
+    ("SEK", _("Swedish Krona (kr)")),
+    ("NOK", _("Norwegian Krone (kr)")),
+    ("DKK", _("Danish Krone (kr)")),
+    ("CAD", _("Canadian Dollar (CA$)")),
+    ("AUD", _("Australian Dollar (A$)")),
+    ("JPY", _("Japanese Yen (¥)")),
 ]
 
 CURRENCY_CODES = frozenset(code for code, _label in CURRENCY_CHOICES)
@@ -42,13 +43,13 @@ def CurrencyField(**kwargs):
     Returns a plain ``CharField`` (so migrations serialise normally). Blank =
     fall back to the tenant currency at display time; non-blank overrides it.
     """
-    kwargs.setdefault('max_length', 3)
-    kwargs.setdefault('blank', True)
-    kwargs.setdefault('default', '')
-    kwargs.setdefault('choices', CURRENCY_CHOICES)
-    kwargs.setdefault('verbose_name', _('Currency'))
+    kwargs.setdefault("max_length", 3)
+    kwargs.setdefault("blank", True)
+    kwargs.setdefault("default", "")
+    kwargs.setdefault("choices", CURRENCY_CHOICES)
+    kwargs.setdefault("verbose_name", _("Currency"))
     kwargs.setdefault(
-        'help_text',
-        _('ISO 4217 code. Leave blank to use the tenant default currency.'),
+        "help_text",
+        _("ISO 4217 code. Leave blank to use the tenant default currency."),
     )
     return models.CharField(**kwargs)

@@ -14,35 +14,36 @@ The organization.CostCenter model is created by a concurrent agent; tests that
 require it are skipped gracefully when the model is not yet available.
 """
 
-from django.test import TestCase
 from django.core.exceptions import ValidationError
+from django.test import TestCase
 from model_bakery import baker
 
-from core.tests.mixins import TenantTestMixin
-from licenses.models import License, LicenseTypeChoices, LicenseSeatAssignment
-from software.models import Software, InstalledSoftware
 from assets.models import Asset
+from core.tests.mixins import TenantTestMixin
+from licenses.models import License, LicenseSeatAssignment, LicenseTypeChoices
 from organization.models import AssetHolder
-
+from software.models import InstalledSoftware, Software
 
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
 
+
 def _get_cost_center_model():
     """Return organization.CostCenter or None if not yet migrated."""
     try:
         from django.apps import apps
-        return apps.get_model('organization', 'CostCenter')
+
+        return apps.get_model("organization", "CostCenter")
     except LookupError:
         return None
 
 
-def _make_software(tenant=None, name='Test Software'):
+def _make_software(tenant=None, name="Test Software"):
     return baker.make(
         Software,
         name=name,
-        manufacturer__name=f'Mfr {name}',
+        manufacturer__name=f"Mfr {name}",
         tenant=tenant,
     )
 
@@ -61,13 +62,14 @@ def _make_license(software, tenant=None, seats=5):
 # Task 1 — License.cost_center
 # ---------------------------------------------------------------------------
 
+
 class LicenseCostCenterFieldTests(TenantTestMixin, TestCase):
     """Tests for the cost_center FK on License."""
 
     def setUp(self):
-        self.setup_tenant_context(name='CC Tenant', slug='cc-tenant')
+        self.setup_tenant_context(name="CC Tenant", slug="cc-tenant")
         with self.tenant_context(self.tenant):
-            self.software = _make_software(tenant=self.tenant, name='CC App')
+            self.software = _make_software(tenant=self.tenant, name="CC App")
 
     def test_cost_center_defaults_to_null(self):
         """A license created without specifying cost_center should have None."""
@@ -85,13 +87,13 @@ class LicenseCostCenterFieldTests(TenantTestMixin, TestCase):
         """License model must expose a cost_center_id attribute."""
         with self.tenant_context(self.tenant):
             lic = _make_license(self.software, self.tenant)
-        self.assertTrue(hasattr(lic, 'cost_center_id'))
+        self.assertTrue(hasattr(lic, "cost_center_id"))
 
     def test_cost_center_can_be_assigned(self):
         """When CostCenter model is available, a license can be linked to one."""
         CostCenter = _get_cost_center_model()
         if CostCenter is None:
-            self.skipTest('organization.CostCenter not yet migrated')
+            self.skipTest("organization.CostCenter not yet migrated")
 
         with self.tenant_context(self.tenant):
             cc = baker.make(CostCenter, tenant=self.tenant)
@@ -105,7 +107,7 @@ class LicenseCostCenterFieldTests(TenantTestMixin, TestCase):
         """CostCenter.licenses reverse relation exists when model is available."""
         CostCenter = _get_cost_center_model()
         if CostCenter is None:
-            self.skipTest('organization.CostCenter not yet migrated')
+            self.skipTest("organization.CostCenter not yet migrated")
 
         with self.tenant_context(self.tenant):
             cc = baker.make(CostCenter, tenant=self.tenant)
@@ -119,13 +121,14 @@ class LicenseCostCenterFieldTests(TenantTestMixin, TestCase):
 # Task 2 — LicenseSeatAssignment.installed_software link
 # ---------------------------------------------------------------------------
 
+
 class SeatInstallLinkTests(TenantTestMixin, TestCase):
     """Tests for the optional installed_software FK on LicenseSeatAssignment."""
 
     def setUp(self):
-        self.setup_tenant_context(name='SAM Tenant', slug='sam-tenant')
+        self.setup_tenant_context(name="SAM Tenant", slug="sam-tenant")
         with self.tenant_context(self.tenant):
-            self.software = _make_software(tenant=self.tenant, name='SAM App')
+            self.software = _make_software(tenant=self.tenant, name="SAM App")
             self.license = _make_license(self.software, self.tenant, seats=10)
             self.asset = baker.make(Asset, tenant=self.tenant)
             self.other_asset = baker.make(Asset, tenant=self.tenant)
@@ -195,7 +198,7 @@ class SeatInstallLinkTests(TenantTestMixin, TestCase):
             with self.assertRaises(ValidationError) as ctx:
                 seat.full_clean()
         errors = ctx.exception.message_dict
-        self.assertIn('installed_software', errors)
+        self.assertIn("installed_software", errors)
 
     # ── rejection: install on a different asset ───────────────────────────────
 
@@ -211,7 +214,7 @@ class SeatInstallLinkTests(TenantTestMixin, TestCase):
             with self.assertRaises(ValidationError) as ctx:
                 seat.full_clean()
         errors = ctx.exception.message_dict
-        self.assertIn('installed_software', errors)
+        self.assertIn("installed_software", errors)
 
     # ── reconciliation: linked_seats count ───────────────────────────────────
 
@@ -237,7 +240,7 @@ class SeatInstallLinkTests(TenantTestMixin, TestCase):
             )
             result = reconcile_software(self.software)
 
-        self.assertEqual(result['linked_seats'], 1)
+        self.assertEqual(result["linked_seats"], 1)
 
     def test_reconcile_linked_seats_zero_when_none(self):
         """linked_seats is 0 when no seats have an install link."""
@@ -253,4 +256,4 @@ class SeatInstallLinkTests(TenantTestMixin, TestCase):
             )
             result = reconcile_software(self.software)
 
-        self.assertEqual(result['linked_seats'], 0)
+        self.assertEqual(result["linked_seats"], 0)
