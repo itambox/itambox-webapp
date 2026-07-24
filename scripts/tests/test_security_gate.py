@@ -186,6 +186,26 @@ class SecurityAutomationContractTests(unittest.TestCase):
             workflow.index('security-tools/trivy" image', workflow.index("prepare-release:")),
             workflow.index("gh release create"),
         )
+        self.assertIn("security-events: write", workflow)
+        self.assertIn("id: image-gate", workflow)
+        self.assertIn("steps.image-gate.outputs.sarif == 'true'", workflow)
+        self.assertIn("github.event.pull_request.head.repo.full_name == github.repository", workflow)
+        self.assertIn("category: trivy-release-image", workflow)
+        upload = workflow.index("category: trivy-release-image")
+        self.assertLess(workflow.index("id: image-gate"), upload)
+        self.assertLess(upload, workflow.index("Enforce release-image gate"))
+
+    def test_manual_draft_retains_image_sarif_before_archiving(self):
+        workflow = (REPOSITORY_ROOT / ".github" / "workflows" / "release.yml").read_text(encoding="utf-8")
+        prepare_release = workflow[workflow.index("prepare-release:"):]
+        self.assertIn("security-events: write", prepare_release)
+        self.assertIn("id: draft-image-gate", prepare_release)
+        self.assertIn("steps.draft-image-gate.outputs.sarif == 'true'", prepare_release)
+        self.assertIn("category: trivy-draft-image", prepare_release)
+        self.assertLess(
+            prepare_release.index("category: trivy-draft-image"),
+            prepare_release.index("docker save"),
+        )
 
     def test_installer_pins_tool_versions_and_literal_checksums(self):
         installer = (REPOSITORY_ROOT / "scripts" / "install_security_tools.sh").read_text(encoding="utf-8")

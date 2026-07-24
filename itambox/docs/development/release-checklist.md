@@ -33,12 +33,12 @@ uv run --locked --only-group dev python scripts/release_policy.py notes \
 
 ## Pull-request rehearsal
 
-A pull request that changes release metadata, the Dockerfile, release documentation, policy code, or the release workflow runs the `rehearsal` job with read-only repository permissions. It:
+A pull request that changes release metadata, the Dockerfile, release documentation, policy code, or the release workflow runs the `rehearsal` job with read-only repository permissions plus narrowly scoped Code Scanning write access. It:
 
 1. validates version and changelog consistency;
 2. builds the complete production image without pushing it;
 3. verifies the image's OCI version, revision, and source labels;
-4. applies the [security scanning policy](security-scanning.md) to that exact local image.
+4. applies the [security scanning policy](security-scanning.md) to that exact local image and retains filtered SARIF for trusted pull requests.
 
 The rehearsal has no release token and cannot create tags, releases, packages, or repository changes. It is the safe, non-publishing dry run for every release change.
 
@@ -66,10 +66,10 @@ The workflow then:
 
 1. revalidates the requested version and reviewed commit;
 2. builds the production image from that exact commit;
-3. verifies immutable OCI labels and applies the blocking image scan;
+3. verifies immutable OCI labels, retains filtered image SARIF in Code Scanning, and applies the blocking image scan;
 4. retains a compressed Docker image and SHA-256 checksum as a workflow artifact;
 5. atomically creates the provisional tag, refusing a conflicting target;
-6. verifies the remote tag before and after draft creation;
+6. requires the tag to exist at draft creation, explicitly targets the reviewed commit, and verifies the remote tag before and after draft creation;
 7. creates a draft GitHub Release with changelog-derived notes and attaches the image archive.
 
 Prerelease versions receive GitHub's prerelease flag. The draft does not publish the release, create a public compatibility promise, or push the image to a registry. The workflow creates the requested lightweight tag with an atomic Git push and fails closed if origin cannot resolve it or it does not point to the reviewed commit. Treat that ref as provisional until publication.
