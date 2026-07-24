@@ -3,6 +3,7 @@
 Before the select_for_update fix, two concurrent saves could format the same
 tag from a stale read and collide on the asset_tag unique constraint.
 """
+
 import threading
 
 import pytest
@@ -13,7 +14,7 @@ from assets.models import AssetTagSequence
 
 @pytest.mark.django_db(transaction=True)
 def test_next_tag_is_unique_under_concurrent_claims():
-    seq = AssetTagSequence.all_objects.create(prefix='CONC-', next_value=1, zero_padding=4)
+    seq = AssetTagSequence.all_objects.create(prefix="CONC-", next_value=1, zero_padding=4)
 
     claimed = []
     claimed_lock = threading.Lock()

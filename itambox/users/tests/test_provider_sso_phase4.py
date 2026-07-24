@@ -17,7 +17,10 @@ class ProvisionProviderMembershipTests(TestCase):
 
     def test_provisions_identity_only_for_mapped_role(self):
         membership = provision_provider_membership(
-            self.user, self.provider_tenant, "Provider Admin", "OIDC",
+            self.user,
+            self.provider_tenant,
+            "Provider Admin",
+            "OIDC",
         )
 
         self.assertIsNotNone(membership)
@@ -31,7 +34,10 @@ class ProvisionProviderMembershipTests(TestCase):
 
     def test_missing_role_is_noop(self):
         membership = provision_provider_membership(
-            self.user, self.provider_tenant, "Nonexistent", "OIDC",
+            self.user,
+            self.provider_tenant,
+            "Nonexistent",
+            "OIDC",
         )
 
         self.assertIsNone(membership)
@@ -41,7 +47,10 @@ class ProvisionProviderMembershipTests(TestCase):
         Membership.objects.create(user=self.user, tenant=self.provider_tenant, is_active=False)
 
         membership = provision_provider_membership(
-            self.user, self.provider_tenant, "Provider Admin", "OIDC",
+            self.user,
+            self.provider_tenant,
+            "Provider Admin",
+            "OIDC",
         )
 
         self.assertIsNotNone(membership)
@@ -54,10 +63,16 @@ class ProvisionProviderMembershipTests(TestCase):
 
     def test_repeated_login_does_not_duplicate_membership_or_create_grant(self):
         provision_provider_membership(
-            self.user, self.provider_tenant, "Provider Admin", "OIDC",
+            self.user,
+            self.provider_tenant,
+            "Provider Admin",
+            "OIDC",
         )
         provision_provider_membership(
-            self.user, self.provider_tenant, "Provider Admin", "OIDC",
+            self.user,
+            self.provider_tenant,
+            "Provider Admin",
+            "OIDC",
         )
 
         membership = Membership.objects.get(user=self.user, tenant=self.provider_tenant)
@@ -72,7 +87,10 @@ class ProvisionProviderMembershipTests(TestCase):
         Role.objects.create(tenant=plain_tenant, name="Provider Admin")
 
         membership = provision_provider_membership(
-            self.user, plain_tenant, "Provider Admin", "OIDC",
+            self.user,
+            plain_tenant,
+            "Provider Admin",
+            "OIDC",
         )
 
         self.assertIsNone(membership)

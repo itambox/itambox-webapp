@@ -1,4 +1,5 @@
 from django import template
+
 from itambox import constants
 
 register = template.Library()

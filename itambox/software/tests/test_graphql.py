@@ -1,12 +1,12 @@
-from django.test import TestCase, RequestFactory
 from django.contrib.auth import get_user_model
+from django.test import RequestFactory, TestCase
 
-from core.schema import schema
-from software.models import Software
 from assets.models import Manufacturer
-from organization.models import Tenant, Role
+from core.schema import schema
 from core.tests.mixins import grant
 from itambox.middleware import set_current_tenant
+from organization.models import Role, Tenant
+from software.models import Software
 
 
 class SoftwareGraphQLTenantPinningTestCase(TestCase):
@@ -15,22 +15,22 @@ class SoftwareGraphQLTenantPinningTestCase(TestCase):
 
     def setUp(self):
         self.User = get_user_model()
-        self.user = self.User.objects.create_user(
-            username='swuser', email='sw@example.com', password='pw'
-        )
-        self.tenant = Tenant.objects.create(name='Tenant A', slug='tenant-a-sw')
-        self.other_tenant = Tenant.objects.create(name='Tenant B', slug='tenant-b-sw')
+        self.user = self.User.objects.create_user(username="swuser", email="sw@example.com", password="pw")
+        self.tenant = Tenant.objects.create(name="Tenant A", slug="tenant-a-sw")
+        self.other_tenant = Tenant.objects.create(name="Tenant B", slug="tenant-b-sw")
         role = Role.objects.create(
             tenant=self.tenant,
-            name='SW Role',
+            name="SW Role",
             permissions=[
-                'software.view_software', 'software.add_software',
-                'software.change_software', 'software.delete_software',
+                "software.view_software",
+                "software.add_software",
+                "software.change_software",
+                "software.delete_software",
             ],
         )
         grant(self.user, self.tenant, role)
         set_current_tenant(self.tenant)
-        self.manufacturer = Manufacturer.objects.create(name='Acme', slug='acme-sw')
+        self.manufacturer = Manufacturer.objects.create(name="Acme", slug="acme-sw")
         self.factory = RequestFactory()
 
     def tearDown(self):
@@ -38,7 +38,7 @@ class SoftwareGraphQLTenantPinningTestCase(TestCase):
         set_current_tenant(None)
 
     def _context(self, active_tenant):
-        request = self.factory.post('/graphql')
+        request = self.factory.post("/graphql")
         request.user = self.User.objects.get(pk=self.user.pk)
         request.active_tenant = active_tenant
         return request
@@ -54,11 +54,9 @@ class SoftwareGraphQLTenantPinningTestCase(TestCase):
         }
         """
         context = self._context(self.tenant)
-        result = schema.execute(
-            query, variable_values={'mid': str(self.manufacturer.id)}, context_value=context
-        )
+        result = schema.execute(query, variable_values={"mid": str(self.manufacturer.id)}, context_value=context)
         self.assertIsNone(result.errors, msg=str(result.errors))
-        sw = Software.objects.get(name='Acme Tool')
+        sw = Software.objects.get(name="Acme Tool")
         self.assertEqual(sw.tenant_id, self.tenant.id)
 
     def test_create_software_global_denied_for_non_superuser(self):
@@ -72,8 +70,6 @@ class SoftwareGraphQLTenantPinningTestCase(TestCase):
         """
         set_current_tenant(None)
         context = self._context(None)
-        result = schema.execute(
-            query, variable_values={'mid': str(self.manufacturer.id)}, context_value=context
-        )
+        result = schema.execute(query, variable_values={"mid": str(self.manufacturer.id)}, context_value=context)
         self.assertIsNotNone(result.errors)
-        self.assertFalse(Software.objects.filter(name='Global Tool').exists())
+        self.assertFalse(Software.objects.filter(name="Global Tool").exists())

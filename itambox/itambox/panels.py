@@ -30,13 +30,13 @@ class Panel:
     """A declarative panel in a detail view layout."""
 
     name: str
-    label: str = ''
-    description: str = ''
+    label: str = ""
+    description: str = ""
     fields: list = field(default_factory=list)
-    template_name: str = 'generic/includes/panel_wrapper.html'
-    position: str = 'left'
+    template_name: str = "generic/includes/panel_wrapper.html"
+    position: str = "left"
     extra_context: dict = field(default_factory=dict)
 
     @property
     def display_label(self):
-        return self.label or self.name.replace('_', ' ').title()
+        return self.label or self.name.replace("_", " ").title()

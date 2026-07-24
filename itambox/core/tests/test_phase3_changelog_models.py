@@ -3,16 +3,15 @@ import uuid
 from django.contrib.auth import get_user_model
 from django.test import TestCase
 
-from itambox.middleware import _current_user, _request_id
+from assets.models import Asset, AssetRole, StatusLabel
+from compliance.models import AssetAudit
 from core.choices import ObjectChangeActionChoices
 from core.managers import set_current_tenant
 from core.models import ObjectChange
-
-from organization.models import Tenant, Role, Membership, Site, Location
-from users.models import Token
-from assets.models import StatusLabel, AssetRole, Asset
-from compliance.models import AssetAudit
 from core.tests.mixins import grant
+from itambox.middleware import _current_user, _request_id
+from organization.models import Location, Membership, Role, Site, Tenant
+from users.models import Token
 
 User = get_user_model()
 
@@ -27,12 +26,12 @@ class Phase3ChangeLoggingModelsTestCase(TestCase):
 
     def setUp(self):
         self.user = User.objects.create_user(
-            username='changelog-c4',
-            password='password123',
+            username="changelog-c4",
+            password="password123",
             is_superuser=True,
         )
-        self.tenant = Tenant.objects.create(name='Changelog C4 Tenant', slug='changelog-c4')
-        self.role = Role.objects.create(tenant=self.tenant, name='Member C4')
+        self.tenant = Tenant.objects.create(name="Changelog C4 Tenant", slug="changelog-c4")
+        self.role = Role.objects.create(tenant=self.tenant, name="Member C4")
 
         # Establish an active request context so ChangeLoggingMixin logs.
         _current_user.set(self.user)
@@ -55,7 +54,7 @@ class Phase3ChangeLoggingModelsTestCase(TestCase):
             action=ObjectChangeActionChoices.ACTION_CREATE,
             changed_object_id=instance.pk,
             changed_object_type__model=instance.__class__._meta.model_name,
-        ).latest('time')
+        ).latest("time")
 
     def _assert_create_logged(self, instance, expected_tenant):
         change = self._latest_create(instance)
@@ -81,20 +80,18 @@ class Phase3ChangeLoggingModelsTestCase(TestCase):
         self._assert_create_logged(token, self.tenant)
 
     def _make_audit_fixtures(self, asset_tenant):
-        status = StatusLabel.objects.create(
-            name='Audited C4', slug='audited-c4', type='deployable', color='28a745'
-        )
-        role = AssetRole.objects.create(name='Audit Role C4', slug='audit-role-c4')
+        status = StatusLabel.objects.create(name="Audited C4", slug="audited-c4", type="deployable", color="28a745")
+        role = AssetRole.objects.create(name="Audit Role C4", slug="audit-role-c4")
         asset = Asset.objects.create(
-            name='Audit Laptop C4',
-            asset_tag='TAG-AUDIT-C4',
+            name="Audit Laptop C4",
+            asset_tag="TAG-AUDIT-C4",
             status=status,
             asset_role=role,
             tenant=asset_tenant,
         )
-        site = Site.objects.create(name='Audit Site C4', slug='audit-site-c4')
+        site = Site.objects.create(name="Audit Site C4", slug="audit-site-c4")
         location = Location.objects.create(
-            name='Audit Location C4', slug='audit-location-c4', site=site, tenant=asset_tenant
+            name="Audit Location C4", slug="audit-location-c4", site=site, tenant=asset_tenant
         )
         return asset, location, status
 
@@ -115,7 +112,7 @@ class Phase3ChangeLoggingModelsTestCase(TestCase):
     def test_asset_audit_attributed_to_asset_tenant_when_ambient_differs(self):
         """M2 — the change is attributed to the audited asset's tenant even when
         the ambient request tenant is a *different* tenant."""
-        owner_tenant = Tenant.objects.create(name='Owner Tenant', slug='owner-tenant')
+        owner_tenant = Tenant.objects.create(name="Owner Tenant", slug="owner-tenant")
         asset, location, status = self._make_audit_fixtures(owner_tenant)
 
         # Ambient tenant is the unrelated setUp tenant, not the asset's owner.
@@ -133,7 +130,7 @@ class Phase3ChangeLoggingModelsTestCase(TestCase):
         """M2 — with no ambient tenant (superuser global session / service flow)
         the change is still attributed to the asset's owning tenant rather than
         being written tenant=None and lost to the owner's changelog."""
-        owner_tenant = Tenant.objects.create(name='Owner Tenant', slug='owner-tenant')
+        owner_tenant = Tenant.objects.create(name="Owner Tenant", slug="owner-tenant")
         asset, location, status = self._make_audit_fixtures(owner_tenant)
 
         # No ambient tenant context.

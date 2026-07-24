@@ -19,27 +19,33 @@ User = get_user_model()
 
 class MembershipGrantEditorTests(TestCase):
     def setUp(self):
-        self.actor = User.objects.create_superuser(username='grant-editor')
-        self.user = User.objects.create_user(username='technician')
-        self.other_user = User.objects.create_user(username='other-technician')
+        self.actor = User.objects.create_superuser(username="grant-editor")
+        self.user = User.objects.create_user(username="technician")
+        self.other_user = User.objects.create_user(username="other-technician")
         self.provider = Tenant.objects.create(
-            name='Provider', slug='provider', is_provider=True,
+            name="Provider",
+            slug="provider",
+            is_provider=True,
         )
         self.customer_a = Tenant.objects.create(
-            name='Customer A', slug='customer-a', managed_by=self.provider,
+            name="Customer A",
+            slug="customer-a",
+            managed_by=self.provider,
         )
         self.customer_z = Tenant.objects.create(
-            name='Customer Z', slug='customer-z', managed_by=self.provider,
+            name="Customer Z",
+            slug="customer-z",
+            managed_by=self.provider,
         )
         self.read_role = Role.objects.create(
             tenant=self.provider,
-            name='Reader',
-            permissions=['assets.view_asset'],
+            name="Reader",
+            permissions=["assets.view_asset"],
         )
         self.admin_role = Role.objects.create(
             tenant=self.provider,
-            name='Admin',
-            permissions=['assets.view_asset', 'assets.change_asset'],
+            name="Admin",
+            permissions=["assets.view_asset", "assets.change_asset"],
         )
 
     def _create_form(self, **overrides):
@@ -75,22 +81,24 @@ class MembershipGrantEditorTests(TestCase):
             user=self.user.pk,
             who=MembershipForm.WHO_EXISTING,
             own_roles=[self.read_role.pk],
-            managed=[{
-                'role': self.read_role.pk,
-                'managed_scope': 'explicit',
-                'assigned_tenants': [self.customer_a.pk, self.customer_z.pk],
-            }],
+            managed=[
+                {
+                    "role": self.read_role.pk,
+                    "managed_scope": "explicit",
+                    "assigned_tenants": [self.customer_a.pk, self.customer_z.pk],
+                }
+            ],
         )
         form = MembershipForm(data=form.data, user=self.actor, tenant=self.provider)
 
         self.assertTrue(form.is_valid(), form.errors.as_json())
         membership = form.save()
 
-        grants = list(membership.role_grants.prefetch_related('scopes'))
+        grants = list(membership.role_grants.prefetch_related("scopes"))
         self.assertEqual(len(grants), 2)
         self.assertEqual(
             sorted(scope.scope_type for item in grants for scope in item.scopes.all()),
-            ['own', 'tenant', 'tenant'],
+            ["own", "tenant", "tenant"],
         )
 
     def test_noop_edit_preserves_grant_provenance(self):
@@ -98,19 +106,21 @@ class MembershipGrantEditorTests(TestCase):
             self.user,
             self.provider,
             self.read_role,
-            reach='managed',
+            reach="managed",
             assigned_tenants=[self.customer_a],
             granted_by=self.actor,
         )
         granted_at = existing.granted_at
         form = self._edit_form(
             existing.membership,
-            managed=[{
-                'id': existing.pk,
-                'role': self.read_role.pk,
-                'managed_scope': 'explicit',
-                'assigned_tenants': [self.customer_a.pk],
-            }],
+            managed=[
+                {
+                    "id": existing.pk,
+                    "role": self.read_role.pk,
+                    "managed_scope": "explicit",
+                    "assigned_tenants": [self.customer_a.pk],
+                }
+            ],
         )
 
         self.assertTrue(form.is_valid(), form.errors.as_json())
@@ -125,23 +135,25 @@ class MembershipGrantEditorTests(TestCase):
             self.user,
             self.provider,
             self.read_role,
-            reach='managed',
+            reach="managed",
             assigned_tenants=[self.customer_a],
         )
         form = self._edit_form(
             existing.membership,
-            managed=[{
-                'id': existing.pk,
-                'role': self.read_role.pk,
-                'managed_scope': RoleGrantScope.SCOPE_ALL_MANAGED,
-            }],
+            managed=[
+                {
+                    "id": existing.pk,
+                    "role": self.read_role.pk,
+                    "managed_scope": RoleGrantScope.SCOPE_ALL_MANAGED,
+                }
+            ],
         )
 
         self.assertTrue(form.is_valid(), form.errors.as_json())
         form.save()
         existing.refresh_from_db()
         self.assertEqual(
-            list(existing.scopes.values_list('scope_type', flat=True)),
+            list(existing.scopes.values_list("scope_type", flat=True)),
             [RoleGrantScope.SCOPE_ALL_MANAGED],
         )
 
@@ -155,39 +167,41 @@ class MembershipGrantEditorTests(TestCase):
         form = self._edit_form(
             existing.membership,
             own_roles=[self.read_role.pk],
-            managed=[{
-                'id': existing.pk,
-                'role': self.read_role.pk,
-                'managed_scope': 'explicit',
-                'assigned_tenants': [self.customer_a.pk],
-                'delete': True,
-            }],
+            managed=[
+                {
+                    "id": existing.pk,
+                    "role": self.read_role.pk,
+                    "managed_scope": "explicit",
+                    "assigned_tenants": [self.customer_a.pk],
+                    "delete": True,
+                }
+            ],
         )
 
         self.assertTrue(form.is_valid(), form.errors.as_json())
         form.save()
         self.assertTrue(RoleGrant.objects.filter(pk=existing.pk).exists())
         self.assertEqual(
-            list(existing.scopes.values_list('scope_type', flat=True)),
+            list(existing.scopes.values_list("scope_type", flat=True)),
             [RoleGrantScope.SCOPE_OWN],
         )
 
     def test_privileged_own_grant_requires_reason_and_future_expiry(self):
         invalid = self._create_form(own_roles=[self.admin_role.pk])
         self.assertFalse(invalid.is_valid())
-        self.assertIn('reason', invalid.errors)
-        self.assertIn('valid_until', invalid.errors)
+        self.assertIn("reason", invalid.errors)
+        self.assertIn("valid_until", invalid.errors)
 
         expiry = timezone.now() + timedelta(hours=2)
         valid = self._create_form(
             own_roles=[self.admin_role.pk],
-            reason='Temporary incident response',
+            reason="Temporary incident response",
             valid_until=expiry.isoformat(),
         )
         self.assertTrue(valid.is_valid(), valid.errors.as_json())
         membership = valid.save()
         role_grant = membership.role_grants.get(role=self.admin_role)
-        self.assertEqual(role_grant.reason, 'Temporary incident response')
+        self.assertEqual(role_grant.reason, "Temporary incident response")
         self.assertIsNotNone(role_grant.valid_until)
 
     def test_privileged_managed_row_has_per_row_metadata(self):
@@ -198,36 +212,40 @@ class MembershipGrantEditorTests(TestCase):
             user=self.user.pk,
             who=MembershipForm.WHO_EXISTING,
             own_roles=[],
-            managed=[{
-                'role': self.admin_role.pk,
-                'managed_scope': 'explicit',
-                'assigned_tenants': [self.customer_a.pk],
-                'reason': 'Customer incident escalation',
-                'valid_until': expiry.isoformat(),
-            }],
+            managed=[
+                {
+                    "role": self.admin_role.pk,
+                    "managed_scope": "explicit",
+                    "assigned_tenants": [self.customer_a.pk],
+                    "reason": "Customer incident escalation",
+                    "valid_until": expiry.isoformat(),
+                }
+            ],
         )
         form = MembershipForm(data=data, user=self.actor, tenant=self.provider)
         self.assertTrue(form.is_valid(), form.errors.as_json())
         role_grant = form.save().role_grants.get(role=self.admin_role)
-        self.assertEqual(role_grant.reason, 'Customer incident escalation')
+        self.assertEqual(role_grant.reason, "Customer incident escalation")
 
     def test_tampered_grant_id_cannot_modify_another_membership(self):
         foreign = grant(
             self.other_user,
             self.provider,
             self.read_role,
-            reach='managed',
+            reach="managed",
             assigned_tenants=[self.customer_z],
         )
         membership = Membership.objects.create(user=self.user, tenant=self.provider)
         form = self._edit_form(
             membership,
-            managed=[{
-                'id': foreign.pk,
-                'role': self.read_role.pk,
-                'managed_scope': 'explicit',
-                'assigned_tenants': [self.customer_a.pk],
-            }],
+            managed=[
+                {
+                    "id": foreign.pk,
+                    "role": self.read_role.pk,
+                    "managed_scope": "explicit",
+                    "assigned_tenants": [self.customer_a.pk],
+                }
+            ],
         )
 
         self.assertTrue(form.is_valid(), form.errors.as_json())
@@ -248,37 +266,39 @@ class MembershipGrantEditorTests(TestCase):
         )
 
         form = MembershipForm(instance=expired.membership, user=self.actor)
-        self.assertEqual(list(form.fields['own_roles'].initial), [])
+        self.assertEqual(list(form.fields["own_roles"].initial), [])
 
 
 class MembershipGroupReactivationTests(TestCase):
     def setUp(self):
         self.provider = Tenant.objects.create(
-            name='Reactivation Provider',
-            slug='reactivation-provider',
+            name="Reactivation Provider",
+            slug="reactivation-provider",
             is_provider=True,
         )
         self.customer = Tenant.objects.create(
-            name='Reactivation Customer',
-            slug='reactivation-customer',
+            name="Reactivation Customer",
+            slug="reactivation-customer",
             managed_by=self.provider,
         )
         self.actor = User.objects.create_user(
-            username='membership-reactivation-admin', password='pw',
+            username="membership-reactivation-admin",
+            password="pw",
         )
         actor_role = Role.objects.create(
             tenant=self.provider,
-            name='Membership reactivation manager',
+            name="Membership reactivation manager",
             permissions=[
-                'organization.change_membership',
-                'organization.add_rolegrant',
-                'assets.delete_asset',
+                "organization.change_membership",
+                "organization.add_rolegrant",
+                "assets.delete_asset",
             ],
         )
         self.actor_grant = grant(self.actor, self.provider, actor_role)
 
         self.target_user = User.objects.create_user(
-            username='inactive-provider-tech', password='pw',
+            username="inactive-provider-tech",
+            password="pw",
         )
         self.membership = Membership.objects.create(
             user=self.target_user,
@@ -287,7 +307,7 @@ class MembershipGroupReactivationTests(TestCase):
         )
         self.group = UserGroup.objects.create(
             tenant=self.provider,
-            name='Projected asset administrators',
+            name="Projected asset administrators",
         )
         GroupMembership.objects.create(
             user_group=self.group,
@@ -295,8 +315,8 @@ class MembershipGroupReactivationTests(TestCase):
         )
         projected_role = Role.objects.create(
             tenant=self.provider,
-            name='Projected asset deleter',
-            permissions=['assets.delete_asset'],
+            name="Projected asset deleter",
+            permissions=["assets.delete_asset"],
         )
         group_grant = RoleGrant.objects.create(
             user_group=self.group,
@@ -328,21 +348,21 @@ class MembershipGroupReactivationTests(TestCase):
     def login_at_provider(self, actor):
         self.client.force_login(actor)
         session = self.client.session
-        session['active_tenant_id'] = self.provider.pk
-        session.pop('active_tenant_group_id', None)
+        session["active_tenant_id"] = self.provider.pk
+        session.pop("active_tenant_group_id", None)
         session.save()
 
     def test_form_blocks_restoring_projected_group_outside_actor_reach(self):
         form = self.form_for(self.actor)
 
         self.assertFalse(form.is_valid())
-        self.assertIn('outside your own reach', ' '.join(form.non_field_errors()).lower())
+        self.assertIn("outside your own reach", " ".join(form.non_field_errors()).lower())
 
     def test_edit_view_leaves_membership_inactive_when_group_cannot_be_granted(self):
         self.login_at_provider(self.actor)
 
         response = self.client.post(
-            reverse('organization:membership_update', args=[self.membership.pk]),
+            reverse("organization:membership_update", args=[self.membership.pk]),
             self.reactivation_data(),
         )
 
@@ -350,8 +370,8 @@ class MembershipGroupReactivationTests(TestCase):
         self.membership.refresh_from_db()
         self.assertFalse(self.membership.is_active)
         self.assertIn(
-            'outside your own reach',
-            ' '.join(response.context['form'].non_field_errors()).lower(),
+            "outside your own reach",
+            " ".join(response.context["form"].non_field_errors()).lower(),
         )
 
     def test_form_allows_actor_with_matching_projected_authority(self):
@@ -365,19 +385,19 @@ class MembershipGroupReactivationTests(TestCase):
         self.assertTrue(form.is_valid(), form.errors.as_json())
         form.save()
         self.assertIn(
-            'assets.delete_asset',
+            "assets.delete_asset",
             effective_permissions(self.target_user, self.customer),
         )
 
     def test_inactive_group_does_not_block_membership_reactivation(self):
         self.group.is_active = False
-        self.group.save(update_fields=['is_active'])
+        self.group.save(update_fields=["is_active"])
         form = self.form_for(self.actor)
 
         self.assertTrue(form.is_valid(), form.errors.as_json())
         form.save()
         self.assertNotIn(
-            'assets.delete_asset',
+            "assets.delete_asset",
             effective_permissions(self.target_user, self.customer),
         )
 
@@ -388,18 +408,19 @@ class MembershipGroupReactivationTests(TestCase):
         self.assertTrue(form.is_valid(), form.errors.as_json())
         form.save()
         self.assertNotIn(
-            'assets.delete_asset',
+            "assets.delete_asset",
             effective_permissions(self.target_user, self.customer),
         )
 
     def test_edit_view_allows_superuser_reactivation(self):
         superuser = User.objects.create_superuser(
-            username='membership-reactivation-root', password='pw',
+            username="membership-reactivation-root",
+            password="pw",
         )
         self.login_at_provider(superuser)
 
         response = self.client.post(
-            reverse('organization:membership_update', args=[self.membership.pk]),
+            reverse("organization:membership_update", args=[self.membership.pk]),
             self.reactivation_data(),
         )
 

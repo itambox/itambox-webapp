@@ -24,59 +24,61 @@ class QuickAddMixin:
     quick_add_reload = False
 
     def is_quick_add(self):
-        return self.request.GET.get('_quickadd') == '1'
+        return self.request.GET.get("_quickadd") == "1"
 
     def get_quick_add_redirect_url(self):
         """Where to navigate after a reload-mode quick-add success.
         Default: the new object's parent asset detail, falling back to the object itself."""
         obj = self.object
-        asset = getattr(obj, 'asset', None)
+        asset = getattr(obj, "asset", None)
         if asset is not None:
             return asset.get_absolute_url()
         return obj.get_absolute_url()
 
     def get_template_names(self):
         if self.is_quick_add():
-            return ['generic/includes/quick_add_modal.html']
+            return ["generic/includes/quick_add_modal.html"]
         return super().get_template_names()
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         if self.is_quick_add():
-            context['model_label'] = (
-                self.model._meta.verbose_name.title()
-                if hasattr(self, 'model') and self.model
-                else ''
+            context["model_label"] = (
+                self.model._meta.verbose_name.title() if hasattr(self, "model") and self.model else ""
             )
-            form = context.get('form')
+            form = context.get("form")
             if form:
-                if not hasattr(form, 'helper') or form.helper is None:
+                if not hasattr(form, "helper") or form.helper is None:
                     from crispy_forms.helper import FormHelper
+
                     form.helper = FormHelper(form)
                 form.helper.form_tag = False
-            context['quick_add_form'] = form
+            context["quick_add_form"] = form
         return context
 
     def form_valid(self, form):
         if self.is_quick_add():
             self.object = form.save()
-            if getattr(self, 'quick_add_reload', False):
+            if getattr(self, "quick_add_reload", False):
                 response = HttpResponse(status=204)
-                response['HX-Redirect'] = self.get_quick_add_redirect_url()
+                response["HX-Redirect"] = self.get_quick_add_redirect_url()
                 return response
-            target = getattr(self, 'quick_add_target', None) or ''
+            target = getattr(self, "quick_add_target", None) or ""
             value = str(self.object)
             pk = self.object.pk
 
             import json
+
             response = HttpResponse("Object created successfully")
-            response['HX-Trigger'] = json.dumps({
-                'quickAddSuccess': {
-                    'target_id': target,
-                    'value': value,
-                    'pk': str(pk),
+            response["HX-Trigger"] = json.dumps(
+                {
+                    "quickAddSuccess": {
+                        "target_id": target,
+                        "value": value,
+                        "pk": str(pk),
+                    }
                 }
-            })
+            )
             return response
 
         return super().form_valid(form)

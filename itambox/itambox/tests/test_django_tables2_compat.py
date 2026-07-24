@@ -1,9 +1,8 @@
-from pathlib import Path
 import unittest
+from pathlib import Path
 
 from django.conf import settings
 from django.template import Engine
-
 
 if not settings.configured:
     settings.configure(
@@ -13,12 +12,7 @@ if not settings.configured:
 
 class DjangoTables2TemplateCompatibilityTests(unittest.TestCase):
     def test_htmx_sort_link_compiles_with_supported_django_tables2(self):
-        template_path = (
-            Path(__file__).resolve().parents[2]
-            / "templates"
-            / "global_includes"
-            / "htmx_table.html"
-        )
+        template_path = Path(__file__).resolve().parents[2] / "templates" / "global_includes" / "htmx_table.html"
         sort_link = next(
             line
             for line in template_path.read_text(encoding="utf-8").splitlines()

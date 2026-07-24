@@ -8,6 +8,7 @@ what remains meaningful is a grant's ``reach`` (this tenant vs managed
 tenants), whether a membership carries any managed reach ("staff"), and whether
 a role definition is shared with managed tenants.
 """
+
 from django import template
 from django.utils.html import format_html
 from django.utils.translation import gettext_lazy as _
@@ -17,27 +18,27 @@ from ..models import RoleGrant
 register = template.Library()
 
 _REACH_ICONS = {
-    RoleGrant.REACH_MANAGED: 'mdi-domain',
-    RoleGrant.REACH_OWN: 'mdi-office-building',
+    RoleGrant.REACH_MANAGED: "mdi-domain",
+    RoleGrant.REACH_OWN: "mdi-office-building",
 }
 
 
 @register.simple_tag
-def reach_badge(grant_or_reach, icon=False, extra_class=''):
+def reach_badge(grant_or_reach, icon=False, extra_class=""):
     """Badge for a grant's reach: purple for managed reach, blue for own tenant.
 
     Accepts a ``RoleGrant`` instance or a bare reach value string. Wording always
     comes from ``REACH_CHOICES`` labels, never a hand-copied string.
     """
-    reach = getattr(grant_or_reach, 'reach', grant_or_reach)
+    reach = getattr(grant_or_reach, "reach", grant_or_reach)
     if reach not in dict(RoleGrant.REACH_CHOICES):
         reach = RoleGrant.REACH_OWN
     label = dict(RoleGrant.REACH_CHOICES)[reach]
     is_managed = reach == RoleGrant.REACH_MANAGED
-    css_class = 'bg-purple-lt text-purple' if is_managed else 'bg-blue-lt text-blue'
+    css_class = "bg-purple-lt text-purple" if is_managed else "bg-blue-lt text-blue"
     if extra_class:
-        css_class = f'{css_class} {extra_class}'
-    icon_html = ''
+        css_class = f"{css_class} {extra_class}"
+    icon_html = ""
     if icon:
         icon_html = format_html('<i class="mdi {} me-1"></i>', _REACH_ICONS[reach])
     return format_html('<span class="badge {}">{}{}</span>', css_class, icon_html, label)
@@ -55,6 +56,6 @@ def membership_kind_badge(membership):
 @register.simple_tag
 def shared_role_badge(role):
     """Badge marking a role definition shared with managed tenants (empty otherwise)."""
-    if getattr(role, 'shared_with_managed', False):
+    if getattr(role, "shared_with_managed", False):
         return format_html('<span class="badge bg-teal-lt text-teal">{}</span>', _("Shared"))
-    return ''
+    return ""

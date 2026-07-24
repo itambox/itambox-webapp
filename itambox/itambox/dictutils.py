@@ -6,6 +6,7 @@ registry is ready (see ``core/settings/base.py``), while ``itambox.utils``
 imports ``users.models`` at module top — importing it that early would raise
 ``AppRegistryNotReady``.
 """
+
 import copy
 
 

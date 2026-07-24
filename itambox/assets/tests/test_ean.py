@@ -4,6 +4,7 @@ Scanning an asset-type EAN returns the asset list filtered by that EAN; scanning
 a component/accessory/consumable EAN goes to that item's detail. Resolution is
 tenant-scoped and permission-gated.
 """
+
 import json
 
 from django.contrib.auth import get_user_model
@@ -26,15 +27,28 @@ class EanScanTests(TenantTestMixin, TestCase):
         self.role = AssetRole.objects.create(name="EANRole", slug="eanrole")
         self.status = StatusLabel.objects.create(name="Avail", slug="ean-avail", type="deployable")
         self.atype = AssetType.objects.create(
-            manufacturer=self.mfr, model="EAN Model", slug="ean-model", ean="4012345678901",
+            manufacturer=self.mfr,
+            model="EAN Model",
+            slug="ean-model",
+            ean="4012345678901",
         )
         self.asset = Asset.objects.create(
-            name="EAN Asset", asset_tag="EAN-A1", asset_type=self.atype,
-            asset_role=self.role, status=self.status, tenant=self.tenant,
+            name="EAN Asset",
+            asset_tag="EAN-A1",
+            asset_type=self.atype,
+            asset_role=self.role,
+            status=self.status,
+            tenant=self.tenant,
         )
-        self.component = Component.objects.create(name="RAM", slug="ram-ean", manufacturer=self.mfr, ean="1111111111116", tenant=self.tenant)
-        self.accessory = Accessory.objects.create(name="Mouse", slug="mouse-ean", manufacturer=self.mfr, ean="2222222222226", tenant=self.tenant)
-        self.consumable = Consumable.objects.create(name="Toner", slug="toner-ean", manufacturer=self.mfr, ean="3333333333336", tenant=self.tenant)
+        self.component = Component.objects.create(
+            name="RAM", slug="ram-ean", manufacturer=self.mfr, ean="1111111111116", tenant=self.tenant
+        )
+        self.accessory = Accessory.objects.create(
+            name="Mouse", slug="mouse-ean", manufacturer=self.mfr, ean="2222222222226", tenant=self.tenant
+        )
+        self.consumable = Consumable.objects.create(
+            name="Toner", slug="toner-ean", manufacturer=self.mfr, ean="3333333333336", tenant=self.tenant
+        )
         self.url = reverse("scan_resolve")
 
     def _resolve(self, code):
@@ -86,9 +100,14 @@ class EanScanTests(TenantTestMixin, TestCase):
 
     def test_cross_tenant_component_not_resolved(self):
         from organization.models import Tenant
+
         other = Tenant.objects.create(name="OtherEan", slug="other-ean")
-        Component.objects.create(name="Other RAM", slug="other-ram-ean", manufacturer=self.mfr, ean="7777777777776", tenant=other)
-        self.client_login_to_tenant(self.tenant_admin, self.tenant)  # superuser resolves global; check scoped member instead
+        Component.objects.create(
+            name="Other RAM", slug="other-ram-ean", manufacturer=self.mfr, ean="7777777777776", tenant=other
+        )
+        self.client_login_to_tenant(
+            self.tenant_admin, self.tenant
+        )  # superuser resolves global; check scoped member instead
         self.tenant_role.permissions = ["assets.view_asset", "inventory.view_component"]
         self.tenant_role.save()
         self.client_login_to_tenant(self.tenant_user, self.tenant)

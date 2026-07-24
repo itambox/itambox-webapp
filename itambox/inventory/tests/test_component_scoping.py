@@ -1,15 +1,17 @@
 from django.test import TestCase
-from assets.models import Manufacturer, Category
-from organization.models import Tenant, TenantGroup
+
+from assets.models import Category, Manufacturer
 from inventory.models import Component
+from organization.models import Tenant, TenantGroup
+
 
 class ComponentTenantScopingTests(TestCase):
     def setUp(self):
         self.tenant_a = Tenant.objects.create(name="Tenant A", slug="tenant-a")
         self.tenant_b = Tenant.objects.create(name="Tenant B", slug="tenant-b")
-        
-        self.manufacturer = Manufacturer.objects.create(name='Samsung', slug='samsung')
-        self.category = Category.objects.create(name='Storage', slug='storage', applies_to={'component': True})
+
+        self.manufacturer = Manufacturer.objects.create(name="Samsung", slug="samsung")
+        self.category = Category.objects.create(name="Storage", slug="storage", applies_to={"component": True})
 
         # Components
         self.comp_a = Component.objects.create(
@@ -24,10 +26,12 @@ class ComponentTenantScopingTests(TestCase):
 
     def tearDown(self):
         from core.managers import set_current_tenant
+
         set_current_tenant(None)
 
     def test_tenant_a_scoping(self):
         from core.managers import set_current_tenant
+
         set_current_tenant(self.tenant_a)
 
         components = list(Component.objects.all())
@@ -37,6 +41,7 @@ class ComponentTenantScopingTests(TestCase):
 
     def test_tenant_b_scoping(self):
         from core.managers import set_current_tenant
+
         set_current_tenant(self.tenant_b)
 
         components = list(Component.objects.all())
@@ -46,6 +51,7 @@ class ComponentTenantScopingTests(TestCase):
 
     def test_no_tenant_scoping(self):
         from core.managers import set_current_tenant
+
         set_current_tenant(None)
 
         components = list(Component.objects.all())
@@ -56,24 +62,24 @@ class ComponentTenantScopingTests(TestCase):
     def test_tenant_group_sharing(self):
         # Create a TenantGroup
         group = TenantGroup.objects.create(name="Shared Group", slug="shared-group")
-        
+
         # Associate Tenant A and a new Tenant C with the TenantGroup
         self.tenant_a.group = group
         self.tenant_a.save()
-        
+
         tenant_c = Tenant.objects.create(name="Tenant C", slug="tenant-c", group=group)
-        
+
         # Create a component for Tenant C
         comp_c = Component.objects.create(
             name="Component C", manufacturer=self.manufacturer, category=self.category, tenant=tenant_c
         )
 
         from core.managers import set_current_tenant, set_current_tenant_group
-        
+
         # 1. Under Tenant A context (strict isolation):
         set_current_tenant(self.tenant_a)
         set_current_tenant_group(None)
-        
+
         components = list(Component.objects.all())
         self.assertIn(self.comp_a, components)
         self.assertIn(self.comp_global, components)

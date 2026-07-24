@@ -1,8 +1,9 @@
 import logging
+
 from django.utils import timezone
 
-from assets.models import Asset
 from assets.depreciation import compute_book_value
+from assets.models import Asset
 from core.tasks.context import TaskContext
 
 logger = logging.getLogger(__name__)
@@ -36,10 +37,10 @@ def calculate_depreciation():
         assets_to_update = []
 
         assets = Asset.objects.select_related(
-            'asset_type__depreciation',
-            'depreciation_override',
-            'tenant__default_depreciation',
-            'status',
+            "asset_type__depreciation",
+            "depreciation_override",
+            "tenant__default_depreciation",
+            "status",
         ).filter(purchase_cost__isnull=False)
 
         for asset in assets:
@@ -54,7 +55,7 @@ def calculate_depreciation():
         if assets_to_update:
             Asset.objects.bulk_update(
                 assets_to_update,
-                ['current_book_value', 'depreciation_updated_at'],
+                ["current_book_value", "depreciation_updated_at"],
                 batch_size=1000,
             )
         return len(assets_to_update)

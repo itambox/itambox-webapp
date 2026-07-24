@@ -6,12 +6,13 @@ Usage (via management command):
                                     [--tenant <slug>] [--map-companies-to-tenants]
                                     [--dry-run] [--skip assets,licenses,...] [--update]
 """
+
 from __future__ import annotations
 
-import re
-import time
 import datetime
 import logging
+import re
+import time
 from decimal import Decimal, InvalidOperation
 from typing import Iterator
 
@@ -28,6 +29,7 @@ logger = logging.getLogger(__name__)
 # Exceptions
 # ---------------------------------------------------------------------------
 
+
 class SnipeITError(Exception):
     pass
 
@@ -36,28 +38,31 @@ class SnipeITError(Exception):
 # HTTP client
 # ---------------------------------------------------------------------------
 
+
 class SnipeITClient:
     """Thin HTTP client that handles auth, pagination, and 429 back-off."""
 
     PAGE_SIZE = 500
 
     def __init__(self, base_url: str, token: str):
-        self.base_url = base_url.rstrip('/')
+        self.base_url = base_url.rstrip("/")
         self._session = requests.Session()
-        self._session.headers.update({
-            'Authorization': f'Bearer {token}',
-            'Accept': 'application/json',
-        })
+        self._session.headers.update(
+            {
+                "Authorization": f"Bearer {token}",
+                "Accept": "application/json",
+            }
+        )
 
     def get_all(self, endpoint: str, params: dict | None = None) -> Iterator[dict]:
         """Yield every row from a paginated list endpoint."""
         offset = 0
         while True:
-            data = self._get(endpoint, {**(params or {}), 'limit': self.PAGE_SIZE, 'offset': offset})
-            rows = data.get('rows') or []
+            data = self._get(endpoint, {**(params or {}), "limit": self.PAGE_SIZE, "offset": offset})
+            rows = data.get("rows") or []
             yield from rows
             offset += len(rows)
-            if offset >= (data.get('total') or 0) or not rows:
+            if offset >= (data.get("total") or 0) or not rows:
                 break
 
     def get_detail(self, endpoint: str) -> dict:
@@ -72,7 +77,7 @@ class SnipeITClient:
             raise SnipeITError(f"Network error fetching {url}: {exc}") from exc
 
         if resp.status_code == 429:
-            wait = int(resp.headers.get('Retry-After', 30))
+            wait = int(resp.headers.get("Retry-After", 30))
             if _retries < 5:
                 logger.warning("Snipe-IT rate-limited — sleeping %ds (retry %d)", wait, _retries + 1)
                 time.sleep(wait)
@@ -92,56 +97,56 @@ class SnipeITClient:
 # ---------------------------------------------------------------------------
 
 _FIELD_FORMAT_MAP = {
-    'TEXT': 'text',
-    'TEXTAREA': 'text',
-    'NUMERIC': 'number',
-    'DATE': 'date',
-    'BOOLEAN': 'boolean',
-    'CHECKBOX': 'boolean',
-    'LIST': 'select',
-    'LISTBOX': 'select',
-    'RADIO': 'select',
+    "TEXT": "text",
+    "TEXTAREA": "text",
+    "NUMERIC": "number",
+    "DATE": "date",
+    "BOOLEAN": "boolean",
+    "CHECKBOX": "boolean",
+    "LIST": "select",
+    "LISTBOX": "select",
+    "RADIO": "select",
 }
 
 _MAINTENANCE_TYPE_MAP = {
-    'maintenance': 'repair',
-    'repair': 'repair',
-    'upgrade': 'upgrade',
-    'hardware support': 'hardware_support',
-    'software support': 'software_support',
-    'pat test': 'calibration',
-    'asset review': 'calibration',
-    'firmware update': 'upgrade',
-    'other': 'repair',
+    "maintenance": "repair",
+    "repair": "repair",
+    "upgrade": "upgrade",
+    "hardware support": "hardware_support",
+    "software support": "software_support",
+    "pat test": "calibration",
+    "asset review": "calibration",
+    "firmware update": "upgrade",
+    "other": "repair",
 }
 
 _MAINTENANCE_STATUS_MAP = {
-    'pending': 'scheduled',
-    'complete': 'completed',
-    'in progress': 'in_progress',
+    "pending": "scheduled",
+    "complete": "completed",
+    "in progress": "in_progress",
 }
 
 _STATUS_TYPE_MAP = {
-    'deployable': 'deployable',
-    'pending': 'pending',
-    'undeployable': 'undeployable',
-    'archived': 'archived',
-    'out of deployable': 'deployed',
+    "deployable": "deployable",
+    "pending": "pending",
+    "undeployable": "undeployable",
+    "archived": "archived",
+    "out of deployable": "deployed",
 }
 
 _CATEGORY_APPLIES_MAP = {
-    'asset': {'asset': True},
-    'accessory': {'accessory': True},
-    'consumable': {'consumable': True},
-    'component': {'component': True},
-    'license': {'asset': True},
+    "asset": {"asset": True},
+    "accessory": {"accessory": True},
+    "consumable": {"consumable": True},
+    "component": {"component": True},
+    "license": {"asset": True},
 }
 
 
 def _parse_date(val: str | None) -> datetime.date | None:
     if not val:
         return None
-    for fmt in ('%Y-%m-%d', '%m/%d/%Y', '%d/%m/%Y'):
+    for fmt in ("%Y-%m-%d", "%m/%d/%Y", "%d/%m/%Y"):
         try:
             return datetime.datetime.strptime(val, fmt).date()
         except (ValueError, TypeError):
@@ -153,7 +158,7 @@ def _parse_decimal(val) -> Decimal | None:
     if val is None:
         return None
     try:
-        return Decimal(str(val)).quantize(Decimal('0.01'))
+        return Decimal(str(val)).quantize(Decimal("0.01"))
     except (InvalidOperation, TypeError):
         return None
 
@@ -161,19 +166,20 @@ def _parse_decimal(val) -> Decimal | None:
 def _clean_field_name(db_column: str) -> str:
     """Strip _snipeit_ prefix and trailing _<id> from a Snipe-IT db_column_name."""
     name = db_column
-    name = re.sub(r'^_snipeit_', '', name)
-    name = re.sub(r'_\d+$', '', name)
+    name = re.sub(r"^_snipeit_", "", name)
+    name = re.sub(r"_\d+$", "", name)
     return name[:100]
 
 
-def _unique_slug(model_class, name: str, extra: str = '') -> str:
+def _unique_slug(model_class, name: str, extra: str = "") -> str:
     """Generate a unique slug for model_class by slugifying name, appending counter on collision."""
     from django.core.exceptions import FieldError
-    base = (slugify(f"{name} {extra}") if extra else slugify(name)) or 'imported'
+
+    base = (slugify(f"{name} {extra}") if extra else slugify(name)) or "imported"
     base = base[:90]
     slug = base
     counter = 1
-    manager = getattr(model_class, '_base_manager', model_class.objects)
+    manager = getattr(model_class, "_base_manager", model_class.objects)
     while True:
         try:
             exists = manager.filter(slug=slug, deleted_at__isnull=True).exists()
@@ -188,19 +194,20 @@ def _unique_slug(model_class, name: str, extra: str = '') -> str:
 
 def _nested_id(obj) -> int | None:
     if isinstance(obj, dict):
-        return obj.get('id')
+        return obj.get("id")
     return None
 
 
-def _nested_str(obj, key='name') -> str:
+def _nested_str(obj, key="name") -> str:
     if isinstance(obj, dict):
-        return obj.get(key) or ''
-    return ''
+        return obj.get(key) or ""
+    return ""
 
 
 # ---------------------------------------------------------------------------
 # Main importer
 # ---------------------------------------------------------------------------
+
 
 class SnipeITImporter:
     """
@@ -240,11 +247,11 @@ class SnipeITImporter:
         self._category_map: dict[int, object] = {}
         self._location_map: dict[int, object] = {}
         self._holder_map: dict[int, object] = {}
-        self._field_map: dict[str, object] = {}    # db_column_name → CustomField
+        self._field_map: dict[str, object] = {}  # db_column_name → CustomField
         self._fieldset_map: dict[int, object] = {}
-        self._model_map: dict[int, object] = {}    # asset-model (AssetType)
+        self._model_map: dict[int, object] = {}  # asset-model (AssetType)
         self._asset_map: dict[int, object] = {}
-        self._tenant_map: dict[int, object] = {}   # company → Tenant
+        self._tenant_map: dict[int, object] = {}  # company → Tenant
         self._software_map: dict[int, object] = {}
 
         # Import counts: entity → {created, updated, skipped, failed}
@@ -267,17 +274,17 @@ class SnipeITImporter:
         self._import_fields()
         self._import_fieldsets()
         self._import_models()
-        if 'assets' not in self.skip:
+        if "assets" not in self.skip:
             self._import_hardware()
-        if 'accessories' not in self.skip:
+        if "accessories" not in self.skip:
             self._import_accessories()
-        if 'consumables' not in self.skip:
+        if "consumables" not in self.skip:
             self._import_consumables()
-        if 'components' not in self.skip:
+        if "components" not in self.skip:
             self._import_components()
-        if 'licenses' not in self.skip:
+        if "licenses" not in self.skip:
             self._import_licenses()
-        if 'maintenances' not in self.skip:
+        if "maintenances" not in self.skip:
             self._import_maintenances()
         return self.counts
 
@@ -294,14 +301,14 @@ class SnipeITImporter:
 
     def _counter(self, key: str) -> dict:
         if key not in self.counts:
-            self.counts[key] = {'created': 0, 'updated': 0, 'skipped': 0, 'failed': 0}
+            self.counts[key] = {"created": 0, "updated": 0, "skipped": 0, "failed": 0}
         return self.counts[key]
 
     def _finish(self, key: str) -> None:
         c = self.counts.get(key, {})
         self._log(
-            f"  {key}: {c.get('created',0)} created, {c.get('updated',0)} updated, "
-            f"{c.get('skipped',0)} skipped, {c.get('failed',0)} failed"
+            f"  {key}: {c.get('created', 0)} created, {c.get('updated', 0)} updated, "
+            f"{c.get('skipped', 0)} skipped, {c.get('failed', 0)} failed"
         )
 
     # ------------------------------------------------------------------
@@ -310,7 +317,7 @@ class SnipeITImporter:
 
     def _tenant_for(self, row: dict) -> object:
         if self.map_companies:
-            cid = _nested_id(row.get('company'))
+            cid = _nested_id(row.get("company"))
             if cid and cid in self._tenant_map:
                 return self._tenant_map[cid]
         return self.default_tenant
@@ -321,38 +328,39 @@ class SnipeITImporter:
 
     def _import_status_labels(self) -> None:
         from assets.models import StatusLabel
-        key = 'statuslabels'
+
+        key = "statuslabels"
         self._log(f"\n[{key}]")
         c = self._counter(key)
-        rows = list(self.client.get_all('/api/v1/statuslabels'))
+        rows = list(self.client.get_all("/api/v1/statuslabels"))
         for row in rows:
-            sid = row['id']
-            name = row.get('name', '').strip() or f'Imported Status {sid}'
-            snipe_type = (row.get('type') or '').lower()
-            itam_type = _STATUS_TYPE_MAP.get(snipe_type, 'deployable')
+            sid = row["id"]
+            name = row.get("name", "").strip() or f"Imported Status {sid}"
+            snipe_type = (row.get("type") or "").lower()
+            itam_type = _STATUS_TYPE_MAP.get(snipe_type, "deployable")
             try:
                 with transaction.atomic():
                     obj = StatusLabel.all_objects.filter(name=name).first()
                     if obj and not self.update:
-                        c['skipped'] += 1
+                        c["skipped"] += 1
                         self._status_map[sid] = obj
                         continue
                     if obj and self.update:
                         if not self.dry_run:
                             obj.type = itam_type
-                            obj.save(update_fields=['type'])
-                        c['updated'] += 1
+                            obj.save(update_fields=["type"])
+                        c["updated"] += 1
                         self._status_map[sid] = obj
                         continue
                     if not self.dry_run:
-                        obj = StatusLabel.objects.create(name=name, type=itam_type, color='6c757d')
+                        obj = StatusLabel.objects.create(name=name, type=itam_type, color="6c757d")
                     else:
                         obj = StatusLabel(id=-sid, name=name, type=itam_type)
-                    c['created'] += 1
+                    c["created"] += 1
                     self._status_map[sid] = obj
             except Exception as exc:
                 self._log(f"  ! statuslabel {sid} '{name}': {exc}")
-                c['failed'] += 1
+                c["failed"] += 1
         self._finish(key)
 
     # ------------------------------------------------------------------
@@ -361,21 +369,22 @@ class SnipeITImporter:
 
     def _import_manufacturers(self) -> None:
         from assets.models import Manufacturer
-        key = 'manufacturers'
+
+        key = "manufacturers"
         self._log(f"\n[{key}]")
         c = self._counter(key)
-        for row in self.client.get_all('/api/v1/manufacturers'):
-            sid = row['id']
-            name = (row.get('name') or '').strip() or f'Manufacturer {sid}'
+        for row in self.client.get_all("/api/v1/manufacturers"):
+            sid = row["id"]
+            name = (row.get("name") or "").strip() or f"Manufacturer {sid}"
             try:
                 with transaction.atomic():
                     obj = Manufacturer.all_objects.filter(name=name).first()
                     if obj and not self.update:
-                        c['skipped'] += 1
+                        c["skipped"] += 1
                         self._manufacturer_map[sid] = obj
                         continue
                     if obj and self.update:
-                        c['updated'] += 1
+                        c["updated"] += 1
                         self._manufacturer_map[sid] = obj
                         continue
                     if not self.dry_run:
@@ -383,11 +392,11 @@ class SnipeITImporter:
                     else:
                         obj = Manufacturer(id=-sid, name=name)
                         created = True
-                    c['created' if created else 'skipped'] += 1
+                    c["created" if created else "skipped"] += 1
                     self._manufacturer_map[sid] = obj
             except Exception as exc:
                 self._log(f"  ! manufacturer {sid} '{name}': {exc}")
-                c['failed'] += 1
+                c["failed"] += 1
         self._finish(key)
 
     # ------------------------------------------------------------------
@@ -396,37 +405,38 @@ class SnipeITImporter:
 
     def _import_categories(self) -> None:
         from assets.models import Category
-        key = 'categories'
+
+        key = "categories"
         self._log(f"\n[{key}]")
         c = self._counter(key)
-        for row in self.client.get_all('/api/v1/categories'):
-            sid = row['id']
-            name = (row.get('name') or '').strip() or f'Category {sid}'
-            cat_type = (row.get('category_type') or 'asset').lower()
-            applies_to = _CATEGORY_APPLIES_MAP.get(cat_type, {'asset': True})
+        for row in self.client.get_all("/api/v1/categories"):
+            sid = row["id"]
+            name = (row.get("name") or "").strip() or f"Category {sid}"
+            cat_type = (row.get("category_type") or "asset").lower()
+            applies_to = _CATEGORY_APPLIES_MAP.get(cat_type, {"asset": True})
             try:
                 with transaction.atomic():
                     obj = Category.all_objects.filter(name=name).first()
                     if obj and not self.update:
-                        c['skipped'] += 1
+                        c["skipped"] += 1
                         self._category_map[sid] = obj
                         continue
                     if obj and self.update:
                         if not self.dry_run:
                             obj.applies_to = applies_to
-                            obj.save(update_fields=['applies_to'])
-                        c['updated'] += 1
+                            obj.save(update_fields=["applies_to"])
+                        c["updated"] += 1
                         self._category_map[sid] = obj
                         continue
                     if not self.dry_run:
                         obj = Category.objects.create(name=name, applies_to=applies_to)
                     else:
                         obj = Category(id=-sid, name=name, applies_to=applies_to)
-                    c['created'] += 1
+                    c["created"] += 1
                     self._category_map[sid] = obj
             except Exception as exc:
                 self._log(f"  ! category {sid} '{name}': {exc}")
-                c['failed'] += 1
+                c["failed"] += 1
         self._finish(key)
 
     # ------------------------------------------------------------------
@@ -434,22 +444,24 @@ class SnipeITImporter:
     # ------------------------------------------------------------------
 
     def _import_suppliers(self) -> None:
+        from django.contrib.contenttypes.models import ContentType as CT
+
         from assets.models import Supplier
         from organization.models import Contact, ContactRole
-        from django.contrib.contenttypes.models import ContentType as CT
-        key = 'suppliers'
+
+        key = "suppliers"
         self._log(f"\n[{key}]")
         c = self._counter(key)
-        for row in self.client.get_all('/api/v1/suppliers'):
-            sid = row['id']
-            name = (row.get('name') or '').strip() or f'Supplier {sid}'
-            contact_email = (row.get('email') or '')[:254]
-            contact_phone = (row.get('phone') or '')[:50]
-            contact_name = (row.get('contact') or '')[:255]
+        for row in self.client.get_all("/api/v1/suppliers"):
+            sid = row["id"]
+            name = (row.get("name") or "").strip() or f"Supplier {sid}"
+            contact_email = (row.get("email") or "")[:254]
+            contact_phone = (row.get("phone") or "")[:50]
+            contact_name = (row.get("contact") or "")[:255]
             defaults = {
-                'website': (row.get('url') or '')[:200],
-                'notes': row.get('notes') or '',
-                'custom_field_data': {'snipeit_id': str(sid)},
+                "website": (row.get("url") or "")[:200],
+                "notes": row.get("notes") or "",
+                "custom_field_data": {"snipeit_id": str(sid)},
             }
             try:
                 with transaction.atomic():
@@ -458,24 +470,25 @@ class SnipeITImporter:
                         obj = Supplier.all_objects.filter(name=name).first()
                     if obj:
                         if not self.update:
-                            c['skipped'] += 1
+                            c["skipped"] += 1
                             self._supplier_map[sid] = obj
                             continue
                         if not self.dry_run:
                             for field, val in defaults.items():
                                 setattr(obj, field, val)
                             obj.save()
-                        c['updated'] += 1
+                        c["updated"] += 1
                         self._supplier_map[sid] = obj
                         continue
                     if not self.dry_run:
                         obj = Supplier.objects.create(name=name, **defaults)
                         if contact_name or contact_email or contact_phone:
                             from organization.models import ContactAssignment
+
                             supplier_ct = CT.objects.get_for_model(Supplier)
                             primary_role, _ = ContactRole.objects.get_or_create(
-                                slug='primary-contact',
-                                defaults={'name': 'Primary Contact', 'description': 'Primary Contact'},
+                                slug="primary-contact",
+                                defaults={"name": "Primary Contact", "description": "Primary Contact"},
                             )
                             contact = Contact.objects.create(
                                 name=contact_name or f"{name} Contact",
@@ -487,15 +500,15 @@ class SnipeITImporter:
                                 role=primary_role,
                                 content_type=supplier_ct,
                                 object_id=obj.pk,
-                                priority='primary',
+                                priority="primary",
                             )
                     else:
                         obj = Supplier(id=-sid, name=name)
-                    c['created'] += 1
+                    c["created"] += 1
                     self._supplier_map[sid] = obj
             except Exception as exc:
                 self._log(f"  ! supplier {sid} '{name}': {exc}")
-                c['failed'] += 1
+                c["failed"] += 1
         self._finish(key)
 
     # ------------------------------------------------------------------
@@ -504,17 +517,18 @@ class SnipeITImporter:
 
     def _import_companies(self) -> None:
         from organization.models import Tenant
-        key = 'companies'
+
+        key = "companies"
         self._log(f"\n[{key}] (--map-companies-to-tenants)")
         c = self._counter(key)
-        for row in self.client.get_all('/api/v1/companies'):
-            sid = row['id']
-            name = (row.get('name') or '').strip() or f'Company {sid}'
+        for row in self.client.get_all("/api/v1/companies"):
+            sid = row["id"]
+            name = (row.get("name") or "").strip() or f"Company {sid}"
             try:
                 with transaction.atomic():
                     obj = Tenant.all_objects.filter(name=name).first()
                     if obj:
-                        c['skipped'] += 1
+                        c["skipped"] += 1
                         self._tenant_map[sid] = obj
                         continue
                     if not self.dry_run:
@@ -524,11 +538,11 @@ class SnipeITImporter:
                         )
                     else:
                         obj = Tenant(id=-sid, name=name)
-                    c['created'] += 1
+                    c["created"] += 1
                     self._tenant_map[sid] = obj
             except Exception as exc:
                 self._log(f"  ! company {sid} '{name}': {exc}")
-                c['failed'] += 1
+                c["failed"] += 1
         self._finish(key)
 
     # ------------------------------------------------------------------
@@ -537,7 +551,8 @@ class SnipeITImporter:
 
     def _import_locations(self) -> None:
         from organization.models import Location, Site
-        key = 'locations'
+
+        key = "locations"
         self._log(f"\n[{key}]")
         c = self._counter(key)
 
@@ -546,36 +561,35 @@ class SnipeITImporter:
         # the tenant-scoped manager to find it on idempotent re-runs.
         if not self.dry_run:
             from core.managers import get_current_tenant, set_current_tenant
+
             _saved_tenant = get_current_tenant()
             set_current_tenant(None)
             try:
-                import_site = Site.all_objects.filter(
-                    name='Imported (Snipe-IT)', deleted_at__isnull=True
-                ).first()
+                import_site = Site.all_objects.filter(name="Imported (Snipe-IT)", deleted_at__isnull=True).first()
                 if not import_site:
                     import_site = Site.objects.create(
-                        name='Imported (Snipe-IT)',
-                        status='active',
-                        slug=_unique_slug(Site, 'Imported Snipe-IT'),
+                        name="Imported (Snipe-IT)",
+                        status="active",
+                        slug=_unique_slug(Site, "Imported Snipe-IT"),
                     )
             finally:
                 set_current_tenant(_saved_tenant)
         else:
-            import_site = Site(id=-1, name='Imported (Snipe-IT)')
+            import_site = Site(id=-1, name="Imported (Snipe-IT)")
 
-        rows = list(self.client.get_all('/api/v1/locations'))
+        rows = list(self.client.get_all("/api/v1/locations"))
 
         def _upsert_location(row):
-            sid = row['id']
-            name = (row.get('name') or '').strip() or f'Location {sid}'
-            parent_id = _nested_id(row.get('parent'))
+            sid = row["id"]
+            name = (row.get("name") or "").strip() or f"Location {sid}"
+            parent_id = _nested_id(row.get("parent"))
             parent_obj = self._location_map.get(parent_id) if parent_id else None
             tenant = self._tenant_for(row)
             defaults = {
-                'custom_field_data': {'snipeit_id': str(sid)},
-                'site': import_site,
-                'tenant': tenant,
-                'parent': parent_obj,
+                "custom_field_data": {"snipeit_id": str(sid)},
+                "site": import_site,
+                "tenant": tenant,
+                "parent": parent_obj,
             }
             with transaction.atomic():
                 obj = Location.all_objects.filter(custom_field_data__snipeit_id=str(sid)).first()
@@ -583,40 +597,40 @@ class SnipeITImporter:
                     obj = Location.all_objects.filter(name=name, tenant=tenant).first()
                 if obj:
                     if not self.update:
-                        c['skipped'] += 1
+                        c["skipped"] += 1
                         self._location_map[sid] = obj
                         return
                     if not self.dry_run:
                         obj.parent = parent_obj
-                        obj.custom_field_data['snipeit_id'] = str(sid)
-                        obj.save(update_fields=['parent', 'custom_field_data'])
-                    c['updated'] += 1
+                        obj.custom_field_data["snipeit_id"] = str(sid)
+                        obj.save(update_fields=["parent", "custom_field_data"])
+                    c["updated"] += 1
                     self._location_map[sid] = obj
                     return
                 if not self.dry_run:
-                    defaults['slug'] = _unique_slug(Location, name)
+                    defaults["slug"] = _unique_slug(Location, name)
                     obj = Location.objects.create(name=name, **defaults)
                 else:
                     obj = Location(id=-sid, name=name, site=import_site, tenant=tenant)
-                c['created'] += 1
+                c["created"] += 1
                 self._location_map[sid] = obj
 
         # Two passes: parents first, then children
         for row in rows:
-            if not _nested_id(row.get('parent')):
+            if not _nested_id(row.get("parent")):
                 try:
                     _upsert_location(row)
                 except Exception as exc:
                     self._log(f"  ! location {row['id']} (pass 1): {exc}")
-                    c['failed'] += 1
+                    c["failed"] += 1
 
         for row in rows:
-            if _nested_id(row.get('parent')):
+            if _nested_id(row.get("parent")):
                 try:
                     _upsert_location(row)
                 except Exception as exc:
                     self._log(f"  ! location {row['id']} (pass 2): {exc}")
-                    c['failed'] += 1
+                    c["failed"] += 1
 
         self._finish(key)
 
@@ -626,24 +640,25 @@ class SnipeITImporter:
 
     def _import_users(self) -> None:
         from organization.models import AssetHolder
-        key = 'users'
+
+        key = "users"
         self._log(f"\n[{key}]")
         c = self._counter(key)
-        for row in self.client.get_all('/api/v1/users'):
-            sid = row['id']
-            first = (row.get('first_name') or '').strip()
-            last = (row.get('last_name') or '').strip()
-            email = (row.get('email') or '').strip()
-            username = (row.get('username') or '').strip()
-            upn = username or email or f'imported-user-{sid}'
+        for row in self.client.get_all("/api/v1/users"):
+            sid = row["id"]
+            first = (row.get("first_name") or "").strip()
+            last = (row.get("last_name") or "").strip()
+            email = (row.get("email") or "").strip()
+            username = (row.get("username") or "").strip()
+            upn = username or email or f"imported-user-{sid}"
             tenant = self._tenant_for(row)
             defaults = {
-                'first_name': first,
-                'last_name': last,
-                'email': email,
-                'upn': upn,
-                'tenant': tenant,
-                'custom_field_data': {'snipeit_id': str(sid)},
+                "first_name": first,
+                "last_name": last,
+                "email": email,
+                "upn": upn,
+                "tenant": tenant,
+                "custom_field_data": {"snipeit_id": str(sid)},
             }
             try:
                 with transaction.atomic():
@@ -652,25 +667,25 @@ class SnipeITImporter:
                         obj = AssetHolder.all_objects.filter(upn=upn, tenant=tenant).first()
                     if obj:
                         if not self.update:
-                            c['skipped'] += 1
+                            c["skipped"] += 1
                             self._holder_map[sid] = obj
                             continue
                         if not self.dry_run:
                             for field, val in defaults.items():
                                 setattr(obj, field, val)
                             obj.save()
-                        c['updated'] += 1
+                        c["updated"] += 1
                         self._holder_map[sid] = obj
                         continue
                     if not self.dry_run:
                         obj = AssetHolder.objects.create(**defaults)
                     else:
                         obj = AssetHolder(id=-sid, upn=upn, tenant=tenant)
-                    c['created'] += 1
+                    c["created"] += 1
                     self._holder_map[sid] = obj
             except Exception as exc:
                 self._log(f"  ! user {sid} '{upn}': {exc}")
-                c['failed'] += 1
+                c["failed"] += 1
         self._finish(key)
 
     # ------------------------------------------------------------------
@@ -678,48 +693,50 @@ class SnipeITImporter:
     # ------------------------------------------------------------------
 
     def _import_fields(self) -> None:
-        from extras.models import CustomField
         from assets.models import Asset
-        key = 'fields'
+        from extras.models import CustomField
+
+        key = "fields"
         self._log(f"\n[{key}]")
         c = self._counter(key)
         asset_ct = ContentType.objects.get_for_model(Asset)
-        for row in self.client.get_all('/api/v1/fields'):
-            sid = row['id']
-            db_col = row.get('db_column_name') or ''
-            raw_name = _clean_field_name(db_col) if db_col else f'snipeit_field_{sid}'
-            label = (row.get('name') or raw_name).strip()[:100]
-            fmt = (row.get('format') or row.get('type') or 'TEXT').upper()
-            field_type = _FIELD_FORMAT_MAP.get(fmt, 'text')
-            raw_choices = row.get('field_values') or ''
-            choices = '\n'.join(v.strip() for v in raw_choices.split('\n') if v.strip()) if raw_choices else ''
+        for row in self.client.get_all("/api/v1/fields"):
+            sid = row["id"]
+            db_col = row.get("db_column_name") or ""
+            raw_name = _clean_field_name(db_col) if db_col else f"snipeit_field_{sid}"
+            label = (row.get("name") or raw_name).strip()[:100]
+            fmt = (row.get("format") or row.get("type") or "TEXT").upper()
+            field_type = _FIELD_FORMAT_MAP.get(fmt, "text")
+            raw_choices = row.get("field_values") or ""
+            choices = "\n".join(v.strip() for v in raw_choices.split("\n") if v.strip()) if raw_choices else ""
             try:
                 with transaction.atomic():
                     obj = CustomField.all_objects.filter(name=raw_name).first()
                     if obj:
                         if not self.update:
-                            c['skipped'] += 1
+                            c["skipped"] += 1
                         else:
                             if not self.dry_run:
                                 obj.label = label
                                 obj.field_type = field_type
                                 if choices:
                                     obj.choices = choices
-                                obj.save(update_fields=['label', 'field_type', 'choices'])
-                            c['updated'] += 1
+                                obj.save(update_fields=["label", "field_type", "choices"])
+                            c["updated"] += 1
                         self._field_map[db_col] = obj
                         continue
                     if not self.dry_run:
                         obj = CustomField.objects.create(
-                            name=raw_name, label=label, field_type=field_type, choices=choices)
+                            name=raw_name, label=label, field_type=field_type, choices=choices
+                        )
                         obj.object_types.add(asset_ct)
                     else:
                         obj = CustomField(id=-sid, name=raw_name, label=label, field_type=field_type)
-                    c['created'] += 1
+                    c["created"] += 1
                     self._field_map[db_col] = obj
             except Exception as exc:
                 self._log(f"  ! field {sid} '{raw_name}': {exc}")
-                c['failed'] += 1
+                c["failed"] += 1
         self._finish(key)
 
     # ------------------------------------------------------------------
@@ -728,40 +745,41 @@ class SnipeITImporter:
 
     def _import_fieldsets(self) -> None:
         from extras.models import CustomFieldset
-        key = 'fieldsets'
+
+        key = "fieldsets"
         self._log(f"\n[{key}]")
         c = self._counter(key)
-        for row in self.client.get_all('/api/v1/fieldsets'):
-            sid = row['id']
-            name = (row.get('name') or '').strip() or f'Fieldset {sid}'
-            field_ids = [f.get('id') for f in (row.get('fields', {}).get('rows') or []) if f.get('id')]
+        for row in self.client.get_all("/api/v1/fieldsets"):
+            sid = row["id"]
+            name = (row.get("name") or "").strip() or f"Fieldset {sid}"
+            field_ids = [f.get("id") for f in (row.get("fields", {}).get("rows") or []) if f.get("id")]
             try:
                 with transaction.atomic():
                     obj = CustomFieldset.all_objects.filter(name=name).first()
                     if obj:
                         if not self.update:
-                            c['skipped'] += 1
+                            c["skipped"] += 1
                             self._fieldset_map[sid] = obj
                             continue
-                        c['updated'] += 1
+                        c["updated"] += 1
                         self._fieldset_map[sid] = obj
                         continue
                     if not self.dry_run:
                         obj = CustomFieldset.objects.create(name=name)
                         cf_objs = [
                             self._field_map[db_col]
-                            for row2 in (row.get('fields', {}).get('rows') or [])
-                            if (db_col := row2.get('db_column_name')) and db_col in self._field_map
+                            for row2 in (row.get("fields", {}).get("rows") or [])
+                            if (db_col := row2.get("db_column_name")) and db_col in self._field_map
                         ]
                         if cf_objs:
                             obj.fields.set(cf_objs)
                     else:
                         obj = CustomFieldset(id=-sid, name=name)
-                    c['created'] += 1
+                    c["created"] += 1
                     self._fieldset_map[sid] = obj
             except Exception as exc:
                 self._log(f"  ! fieldset {sid} '{name}': {exc}")
-                c['failed'] += 1
+                c["failed"] += 1
         self._finish(key)
 
     # ------------------------------------------------------------------
@@ -770,25 +788,26 @@ class SnipeITImporter:
 
     def _import_models(self) -> None:
         from assets.models import AssetType
-        key = 'models'
+
+        key = "models"
         self._log(f"\n[{key}]")
         c = self._counter(key)
-        for row in self.client.get_all('/api/v1/models'):
-            sid = row['id']
-            model_name = (row.get('name') or '').strip() or f'Model {sid}'
-            mfr = self._manufacturer_map.get(_nested_id(row.get('manufacturer')))
-            cat = self._category_map.get(_nested_id(row.get('category')))
-            fieldset = self._fieldset_map.get(_nested_id(row.get('fieldset')))
-            eol_months = row.get('eol') or None
-            part_number = (row.get('model_number') or '')[:100]
+        for row in self.client.get_all("/api/v1/models"):
+            sid = row["id"]
+            model_name = (row.get("name") or "").strip() or f"Model {sid}"
+            mfr = self._manufacturer_map.get(_nested_id(row.get("manufacturer")))
+            cat = self._category_map.get(_nested_id(row.get("category")))
+            fieldset = self._fieldset_map.get(_nested_id(row.get("fieldset")))
+            eol_months = row.get("eol") or None
+            part_number = (row.get("model_number") or "")[:100]
             defaults = {
-                'model': model_name,
-                'manufacturer': mfr,
-                'category': cat,
-                'custom_fieldset': fieldset,
-                'eol_months': int(eol_months) if eol_months else None,
-                'part_number': part_number,
-                'custom_field_data': {'snipeit_id': str(sid)},
+                "model": model_name,
+                "manufacturer": mfr,
+                "category": cat,
+                "custom_fieldset": fieldset,
+                "eol_months": int(eol_months) if eol_months else None,
+                "part_number": part_number,
+                "custom_field_data": {"snipeit_id": str(sid)},
             }
             try:
                 with transaction.atomic():
@@ -797,25 +816,25 @@ class SnipeITImporter:
                         obj = AssetType.all_objects.filter(model=model_name, manufacturer=mfr).first()
                     if obj:
                         if not self.update:
-                            c['skipped'] += 1
+                            c["skipped"] += 1
                             self._model_map[sid] = obj
                             continue
                         if not self.dry_run:
                             for field, val in defaults.items():
                                 setattr(obj, field, val)
                             obj.save()
-                        c['updated'] += 1
+                        c["updated"] += 1
                         self._model_map[sid] = obj
                         continue
                     if not self.dry_run:
                         obj = AssetType.objects.create(**defaults)
                     else:
                         obj = AssetType(id=-sid, model=model_name, manufacturer=mfr)
-                    c['created'] += 1
+                    c["created"] += 1
                     self._model_map[sid] = obj
             except Exception as exc:
                 self._log(f"  ! model {sid} '{model_name}': {exc}")
-                c['failed'] += 1
+                c["failed"] += 1
         self._finish(key)
 
     # ------------------------------------------------------------------
@@ -823,58 +842,56 @@ class SnipeITImporter:
     # ------------------------------------------------------------------
 
     def _import_hardware(self) -> None:
-        from assets.models import Asset, StatusLabel, AssetAssignment
         from assets.choices import StatusTypeChoices
+        from assets.models import Asset, AssetAssignment, StatusLabel
         from assets.services import checkout_asset
-        key = 'assets'
+
+        key = "assets"
         self._log(f"\n[{key}]")
         c = self._counter(key)
 
         # Ensure a "Deployed (imported)" status label exists for checkout
         if not self.dry_run:
             deployed_status, _ = StatusLabel.objects.get_or_create(
-                name='Deployed (imported)',
-                defaults={'type': StatusTypeChoices.DEPLOYED, 'color': '007bff'},
+                name="Deployed (imported)",
+                defaults={"type": StatusTypeChoices.DEPLOYED, "color": "007bff"},
             )
         else:
-            deployed_status = StatusLabel(id=-9999, name='Deployed (imported)', type='deployed')
+            deployed_status = StatusLabel(id=-9999, name="Deployed (imported)", type="deployed")
 
-        for row in self.client.get_all('/api/v1/hardware'):
-            sid = row['id']
-            asset_tag = (row.get('asset_tag') or '').strip() or f'IMPORT-{sid}'
-            serial = (row.get('serial') or '').strip()
-            name = (row.get('name') or '').strip() or asset_tag
-            asset_type = self._model_map.get(_nested_id(row.get('model')))
-            status_obj = self._status_map.get(_nested_id(row.get('status_label')))
+        for row in self.client.get_all("/api/v1/hardware"):
+            sid = row["id"]
+            asset_tag = (row.get("asset_tag") or "").strip() or f"IMPORT-{sid}"
+            serial = (row.get("serial") or "").strip()
+            name = (row.get("name") or "").strip() or asset_tag
+            asset_type = self._model_map.get(_nested_id(row.get("model")))
+            status_obj = self._status_map.get(_nested_id(row.get("status_label")))
             tenant = self._tenant_for(row)
-            supplier = self._supplier_map.get(_nested_id(row.get('supplier')))
-            location = (
-                self._location_map.get(_nested_id(row.get('location')))
-                or self._location_map.get(_nested_id(row.get('rtd_location')))
+            supplier = self._supplier_map.get(_nested_id(row.get("supplier")))
+            location = self._location_map.get(_nested_id(row.get("location"))) or self._location_map.get(
+                _nested_id(row.get("rtd_location"))
             )
-            purchase_date = _parse_date(_nested_str(row.get('purchase_date'), 'date'))
-            purchase_cost = _parse_decimal(row.get('purchase_cost'))
-            order_number = (row.get('order_number') or '')[:100]
-            notes = row.get('notes') or ''
-            warranty_months = row.get('warranty_months') or None
+            purchase_date = _parse_date(_nested_str(row.get("purchase_date"), "date"))
+            purchase_cost = _parse_decimal(row.get("purchase_cost"))
+            order_number = (row.get("order_number") or "")[:100]
+            notes = row.get("notes") or ""
+            warranty_months = row.get("warranty_months") or None
 
             warranty_expiration = None
             if purchase_date and warranty_months:
                 try:
-                    warranty_expiration = (
-                        purchase_date + relativedelta(months=int(warranty_months))
-                    )
+                    warranty_expiration = purchase_date + relativedelta(months=int(warranty_months))
                 except (TypeError, ValueError):
                     pass
 
             # Build custom_field_data from snipe custom fields
-            cf_data: dict = {'snipeit_id': str(sid)}
-            for cf_label, cf_info in (row.get('custom_fields') or {}).items():
+            cf_data: dict = {"snipeit_id": str(sid)}
+            for cf_label, cf_info in (row.get("custom_fields") or {}).items():
                 if not isinstance(cf_info, dict):
                     continue
-                db_col = cf_info.get('field') or ''
-                value = cf_info.get('value')
-                if value is None or value == '':
+                db_col = cf_info.get("field") or ""
+                value = cf_info.get("value")
+                if value is None or value == "":
                     continue
                 local_field = self._field_map.get(db_col)
                 if local_field:
@@ -890,7 +907,7 @@ class SnipeITImporter:
 
                     if obj:
                         if not self.update:
-                            c['skipped'] += 1
+                            c["skipped"] += 1
                             self._asset_map[sid] = obj
                             continue
                         if not self.dry_run:
@@ -908,12 +925,17 @@ class SnipeITImporter:
                             obj.save()
                             if warranty_expiration and purchase_date:
                                 from assets.models import Warranty, WarrantyTypeChoices
+
                                 Warranty.objects.update_or_create(
-                                    asset=obj, warranty_type=WarrantyTypeChoices.HARDWARE,
-                                    defaults={'start_date': purchase_date, 'end_date': warranty_expiration,
-                                              'provider': supplier.name if supplier else ''},
+                                    asset=obj,
+                                    warranty_type=WarrantyTypeChoices.HARDWARE,
+                                    defaults={
+                                        "start_date": purchase_date,
+                                        "end_date": warranty_expiration,
+                                        "provider": supplier.name if supplier else "",
+                                    },
                                 )
-                        c['updated'] += 1
+                        c["updated"] += 1
                         self._asset_map[sid] = obj
                         continue
 
@@ -937,47 +959,61 @@ class SnipeITImporter:
                         obj = Asset(id=-sid, asset_tag=asset_tag, tenant=tenant)
                     if not self.dry_run and warranty_expiration and purchase_date:
                         from assets.models import Warranty, WarrantyTypeChoices
+
                         Warranty.objects.update_or_create(
-                            asset=obj, warranty_type=WarrantyTypeChoices.HARDWARE,
-                            defaults={'start_date': purchase_date, 'end_date': warranty_expiration,
-                                      'provider': supplier.name if supplier else ''},
+                            asset=obj,
+                            warranty_type=WarrantyTypeChoices.HARDWARE,
+                            defaults={
+                                "start_date": purchase_date,
+                                "end_date": warranty_expiration,
+                                "provider": supplier.name if supplier else "",
+                            },
                         )
-                    c['created'] += 1
+                    c["created"] += 1
                     self._asset_map[sid] = obj
 
             except Exception as exc:
                 self._log(f"  ! asset {sid} '{asset_tag}': {exc}")
-                c['failed'] += 1
+                c["failed"] += 1
                 continue
 
             # Handle checkout / assignment
-            assigned_to = row.get('assigned_to')
+            assigned_to = row.get("assigned_to")
             if not assigned_to or self.dry_run:
                 continue
-            target_type = (assigned_to.get('type') or '').lower()
-            target_id = assigned_to.get('id')
+            target_type = (assigned_to.get("type") or "").lower()
+            target_id = assigned_to.get("id")
             try:
                 with transaction.atomic():
-                    if target_type == 'user':
+                    if target_type == "user":
                         holder = self._holder_map.get(target_id)
                         if holder and obj.pk and obj.pk > 0:
                             checkout_asset(
-                                asset=obj, holder=holder, user=self.user,
-                                status=deployed_status, notes='Imported from Snipe-IT',
+                                asset=obj,
+                                holder=holder,
+                                user=self.user,
+                                status=deployed_status,
+                                notes="Imported from Snipe-IT",
                             )
-                    elif target_type == 'location':
+                    elif target_type == "location":
                         loc = self._location_map.get(target_id)
                         if loc and obj.pk and obj.pk > 0:
                             checkout_asset(
-                                asset=obj, location=loc, user=self.user,
-                                status=deployed_status, notes='Imported from Snipe-IT',
+                                asset=obj,
+                                location=loc,
+                                user=self.user,
+                                status=deployed_status,
+                                notes="Imported from Snipe-IT",
                             )
-                    elif target_type == 'asset':
+                    elif target_type == "asset":
                         target_asset = self._asset_map.get(target_id)
                         if target_asset and obj.pk and obj.pk > 0:
                             checkout_asset(
-                                asset=obj, asset_target=target_asset, user=self.user,
-                                status=deployed_status, notes='Imported from Snipe-IT',
+                                asset=obj,
+                                asset_target=target_asset,
+                                user=self.user,
+                                status=deployed_status,
+                                notes="Imported from Snipe-IT",
                             )
             except Exception as exc:
                 self._log(f"  ! checkout asset {sid}: {exc}")
@@ -991,26 +1027,27 @@ class SnipeITImporter:
     def _import_accessories(self) -> None:
         from inventory.models import Accessory, AccessoryAssignment
         from organization.models import AssetHolder
-        key = 'accessories'
+
+        key = "accessories"
         self._log(f"\n[{key}]")
         c = self._counter(key)
 
-        for row in self.client.get_all('/api/v1/accessories'):
-            sid = row['id']
-            name = (row.get('name') or '').strip() or f'Accessory {sid}'
-            mfr = self._manufacturer_map.get(_nested_id(row.get('manufacturer')))
-            cat = self._category_map.get(_nested_id(row.get('category')))
-            supplier = self._supplier_map.get(_nested_id(row.get('supplier')))
+        for row in self.client.get_all("/api/v1/accessories"):
+            sid = row["id"]
+            name = (row.get("name") or "").strip() or f"Accessory {sid}"
+            mfr = self._manufacturer_map.get(_nested_id(row.get("manufacturer")))
+            cat = self._category_map.get(_nested_id(row.get("category")))
+            supplier = self._supplier_map.get(_nested_id(row.get("supplier")))
             tenant = self._tenant_for(row)
-            qty = row.get('qty') or 1
+            qty = row.get("qty") or 1
 
             defaults = {
-                'manufacturer': mfr,
-                'category': cat,
-                'supplier': supplier,
-                'tenant': tenant,
-                'notes': row.get('notes') or '',
-                'custom_field_data': {'snipeit_id': str(sid)},
+                "manufacturer": mfr,
+                "category": cat,
+                "supplier": supplier,
+                "tenant": tenant,
+                "notes": row.get("notes") or "",
+                "custom_field_data": {"snipeit_id": str(sid)},
             }
             try:
                 with transaction.atomic():
@@ -1019,14 +1056,14 @@ class SnipeITImporter:
                         obj = Accessory.all_objects.filter(name=name, tenant=tenant).first()
                     if obj:
                         if not self.update:
-                            c['skipped'] += 1
+                            c["skipped"] += 1
                             # Still try to import checkouts for existing items
                         else:
                             if not self.dry_run:
                                 for field, val in defaults.items():
                                     setattr(obj, field, val)
                                 obj.save()
-                            c['updated'] += 1
+                            c["updated"] += 1
 
                         # Import checkouts from /accessories/{id}/checkedout
                         if not self.dry_run:
@@ -1038,41 +1075,40 @@ class SnipeITImporter:
                         # Create initial stock entry
                         from inventory.models import AccessoryStock
                         from organization.models import Location
+
                         # Use first available location for this tenant or no location
-                        loc = (
-                            Location.objects.filter(tenant=tenant).first()
-                            if tenant else None
-                        )
+                        loc = Location.objects.filter(tenant=tenant).first() if tenant else None
                         if loc:
                             AccessoryStock.objects.create(accessory=obj, location=loc, qty=qty)
                         self._import_accessory_checkouts(obj, sid)
                     else:
                         obj = Accessory(id=-sid, name=name, tenant=tenant)
-                    c['created'] += 1
+                    c["created"] += 1
 
             except Exception as exc:
                 self._log(f"  ! accessory {sid} '{name}': {exc}")
-                c['failed'] += 1
+                c["failed"] += 1
 
         self._finish(key)
 
     def _import_accessory_checkouts(self, accessory, snipe_id: int) -> None:
         """Import per-user checkouts for an accessory."""
         from inventory.models import AccessoryAssignment
+
         try:
-            data = self.client.get_all(f'/api/v1/accessories/{snipe_id}/checkedout')
+            data = self.client.get_all(f"/api/v1/accessories/{snipe_id}/checkedout")
             for co in data:
-                user_id = _nested_id(co.get('assigned_to'))
+                user_id = _nested_id(co.get("assigned_to"))
                 if not user_id:
                     continue
                 holder = self._holder_map.get(user_id)
                 if not holder or not holder.pk or holder.pk < 0:
                     continue
-                qty = co.get('qty') or 1
+                qty = co.get("qty") or 1
                 AccessoryAssignment.objects.get_or_create(
                     accessory=accessory,
                     assigned_holder=holder,
-                    defaults={'qty': qty, 'notes': 'Imported from Snipe-IT'},
+                    defaults={"qty": qty, "notes": "Imported from Snipe-IT"},
                 )
         except Exception as exc:
             logger.warning("Could not import checkouts for accessory %s: %s", snipe_id, exc)
@@ -1083,26 +1119,27 @@ class SnipeITImporter:
 
     def _import_consumables(self) -> None:
         from inventory.models import Consumable
-        key = 'consumables'
+
+        key = "consumables"
         self._log(f"\n[{key}]")
         c = self._counter(key)
 
-        for row in self.client.get_all('/api/v1/consumables'):
-            sid = row['id']
-            name = (row.get('name') or '').strip() or f'Consumable {sid}'
-            mfr = self._manufacturer_map.get(_nested_id(row.get('manufacturer')))
-            cat = self._category_map.get(_nested_id(row.get('category')))
-            supplier = self._supplier_map.get(_nested_id(row.get('supplier')))
+        for row in self.client.get_all("/api/v1/consumables"):
+            sid = row["id"]
+            name = (row.get("name") or "").strip() or f"Consumable {sid}"
+            mfr = self._manufacturer_map.get(_nested_id(row.get("manufacturer")))
+            cat = self._category_map.get(_nested_id(row.get("category")))
+            supplier = self._supplier_map.get(_nested_id(row.get("supplier")))
             tenant = self._tenant_for(row)
-            qty = row.get('qty') or 0
+            qty = row.get("qty") or 0
 
             defaults = {
-                'manufacturer': mfr,
-                'category': cat,
-                'supplier': supplier,
-                'tenant': tenant,
-                'notes': row.get('notes') or '',
-                'custom_field_data': {'snipeit_id': str(sid)},
+                "manufacturer": mfr,
+                "category": cat,
+                "supplier": supplier,
+                "tenant": tenant,
+                "notes": row.get("notes") or "",
+                "custom_field_data": {"snipeit_id": str(sid)},
             }
             try:
                 with transaction.atomic():
@@ -1111,28 +1148,29 @@ class SnipeITImporter:
                         obj = Consumable.all_objects.filter(name=name, tenant=tenant).first()
                     if obj:
                         if not self.update:
-                            c['skipped'] += 1
+                            c["skipped"] += 1
                         else:
                             if not self.dry_run:
                                 for field, val in defaults.items():
                                     setattr(obj, field, val)
                                 obj.save()
-                            c['updated'] += 1
+                            c["updated"] += 1
                         continue
                     if not self.dry_run:
                         obj = Consumable.objects.create(name=name, **defaults)
                         from inventory.models import ConsumableStock
                         from organization.models import Location
+
                         loc = Location.objects.filter(tenant=tenant).first() if tenant else None
                         if loc and qty:
                             ConsumableStock.objects.create(consumable=obj, location=loc, qty=qty)
                     else:
                         obj = Consumable(id=-sid, name=name, tenant=tenant)
-                    c['created'] += 1
+                    c["created"] += 1
 
             except Exception as exc:
                 self._log(f"  ! consumable {sid} '{name}': {exc}")
-                c['failed'] += 1
+                c["failed"] += 1
 
         self._finish(key)
 
@@ -1143,26 +1181,27 @@ class SnipeITImporter:
     def _import_components(self) -> None:
         from inventory.models import Component, ComponentAllocation, ComponentStock
         from organization.models import Location
-        key = 'components'
+
+        key = "components"
         self._log(f"\n[{key}]")
         c = self._counter(key)
 
-        for row in self.client.get_all('/api/v1/components'):
-            sid = row['id']
-            name = (row.get('name') or '').strip() or f'Component {sid}'
-            mfr = self._manufacturer_map.get(_nested_id(row.get('manufacturer')))
-            cat = self._category_map.get(_nested_id(row.get('category')))
-            supplier = self._supplier_map.get(_nested_id(row.get('supplier')))
+        for row in self.client.get_all("/api/v1/components"):
+            sid = row["id"]
+            name = (row.get("name") or "").strip() or f"Component {sid}"
+            mfr = self._manufacturer_map.get(_nested_id(row.get("manufacturer")))
+            cat = self._category_map.get(_nested_id(row.get("category")))
+            supplier = self._supplier_map.get(_nested_id(row.get("supplier")))
             tenant = self._tenant_for(row)
-            qty = row.get('qty') or 0
+            qty = row.get("qty") or 0
 
             defaults = {
-                'manufacturer': mfr,
-                'category': cat,
-                'supplier': supplier,
-                'tenant': tenant,
-                'notes': row.get('notes') or '',
-                'custom_field_data': {'snipeit_id': str(sid)},
+                "manufacturer": mfr,
+                "category": cat,
+                "supplier": supplier,
+                "tenant": tenant,
+                "notes": row.get("notes") or "",
+                "custom_field_data": {"snipeit_id": str(sid)},
             }
             try:
                 with transaction.atomic():
@@ -1171,13 +1210,13 @@ class SnipeITImporter:
                         obj = Component.all_objects.filter(name=name, manufacturer=mfr).first()
                     if obj:
                         if not self.update:
-                            c['skipped'] += 1
+                            c["skipped"] += 1
                         else:
                             if not self.dry_run:
                                 for field, val in defaults.items():
                                     setattr(obj, field, val)
                                 obj.save()
-                            c['updated'] += 1
+                            c["updated"] += 1
                         # Import allocations for existing component too
                         if not self.dry_run:
                             self._import_component_allocations(obj, sid)
@@ -1190,31 +1229,32 @@ class SnipeITImporter:
                         self._import_component_allocations(obj, sid)
                     else:
                         obj = Component(id=-sid, name=name, tenant=tenant)
-                    c['created'] += 1
+                    c["created"] += 1
 
             except Exception as exc:
                 self._log(f"  ! component {sid} '{name}': {exc}")
-                c['failed'] += 1
+                c["failed"] += 1
 
         self._finish(key)
 
     def _import_component_allocations(self, component, snipe_id: int) -> None:
         """Import per-asset allocations for a component."""
         from inventory.models import ComponentAllocation
+
         try:
-            data = self.client.get_all(f'/api/v1/components/{snipe_id}/assets')
+            data = self.client.get_all(f"/api/v1/components/{snipe_id}/assets")
             for al in data:
-                asset_id = al.get('id')
+                asset_id = al.get("id")
                 if not asset_id:
                     continue
                 asset = self._asset_map.get(asset_id)
                 if not asset or not asset.pk or asset.pk < 0:
                     continue
-                qty = al.get('qty') or 1
+                qty = al.get("qty") or 1
                 ComponentAllocation.objects.get_or_create(
                     component=component,
                     assigned_asset=asset,
-                    defaults={'qty': qty, 'notes': 'Imported from Snipe-IT'},
+                    defaults={"qty": qty, "notes": "Imported from Snipe-IT"},
                 )
         except Exception as exc:
             logger.warning("Could not import allocations for component %s: %s", snipe_id, exc)
@@ -1226,27 +1266,28 @@ class SnipeITImporter:
     def _import_licenses(self) -> None:
         from licenses.models import License, LicenseSeatAssignment
         from software.models import Software
-        key = 'licenses'
+
+        key = "licenses"
         self._log(f"\n[{key}]")
         c = self._counter(key)
 
-        for row in self.client.get_all('/api/v1/licenses'):
-            sid = row['id']
-            name = (row.get('name') or '').strip() or f'License {sid}'
-            mfr_id = _nested_id(row.get('manufacturer'))
+        for row in self.client.get_all("/api/v1/licenses"):
+            sid = row["id"]
+            name = (row.get("name") or "").strip() or f"License {sid}"
+            mfr_id = _nested_id(row.get("manufacturer"))
             mfr = self._manufacturer_map.get(mfr_id)
-            sw_name = (row.get('product_name') or name).strip()
+            sw_name = (row.get("product_name") or name).strip()
             tenant = self._tenant_for(row)
-            supplier = self._supplier_map.get(_nested_id(row.get('supplier')))
+            supplier = self._supplier_map.get(_nested_id(row.get("supplier")))
 
-            seats = row.get('seats') or 1
-            product_key = row.get('serial') or ''
-            purchase_date = _parse_date(_nested_str(row.get('purchase_date'), 'date'))
-            expiration_date = _parse_date(_nested_str(row.get('expiration_date'), 'date'))
-            purchase_cost = _parse_decimal(row.get('purchase_cost'))
-            order_number = (row.get('order_number') or '')[:100]
-            notes = row.get('notes') or ''
-            license_type = 'subscription_seat' if expiration_date else 'perpetual_seat'
+            seats = row.get("seats") or 1
+            product_key = row.get("serial") or ""
+            purchase_date = _parse_date(_nested_str(row.get("purchase_date"), "date"))
+            expiration_date = _parse_date(_nested_str(row.get("expiration_date"), "date"))
+            purchase_cost = _parse_decimal(row.get("purchase_cost"))
+            order_number = (row.get("order_number") or "")[:100]
+            notes = row.get("notes") or ""
+            license_type = "subscription_seat" if expiration_date else "perpetual_seat"
 
             try:
                 with transaction.atomic():
@@ -1267,7 +1308,7 @@ class SnipeITImporter:
                                 sw = Software.objects.create(
                                     name=sw_name,
                                     manufacturer=mfr,
-                                    custom_field_data={'snipeit_id': f'sw_{sid}'},
+                                    custom_field_data={"snipeit_id": f"sw_{sid}"},
                                 )
                         else:
                             sw = Software(id=-sid, name=sw_name)
@@ -1278,7 +1319,7 @@ class SnipeITImporter:
                         lic = License.all_objects.filter(name=name, software=sw, tenant=tenant).first()
                     if lic:
                         if not self.update:
-                            c['skipped'] += 1
+                            c["skipped"] += 1
                         else:
                             if not self.dry_run:
                                 lic.seats = seats
@@ -1289,9 +1330,9 @@ class SnipeITImporter:
                                 lic.order_number = order_number
                                 lic.notes = notes
                                 lic.license_type = license_type
-                                lic.custom_field_data['snipeit_id'] = str(sid)
+                                lic.custom_field_data["snipeit_id"] = str(sid)
                                 lic.save()
-                            c['updated'] += 1
+                            c["updated"] += 1
                         # Import seat assignments for existing licenses too
                         if not self.dry_run:
                             self._import_license_seats(lic, sid)
@@ -1311,42 +1352,45 @@ class SnipeITImporter:
                             notes=notes,
                             supplier=supplier,
                             tenant=tenant,
-                            custom_field_data={'snipeit_id': str(sid)},
+                            custom_field_data={"snipeit_id": str(sid)},
                         )
                         self._import_license_seats(lic, sid)
                     else:
                         lic = License(id=-sid, name=name, software=sw, tenant=tenant)
-                    c['created'] += 1
+                    c["created"] += 1
 
             except Exception as exc:
                 self._log(f"  ! license {sid} '{name}': {exc}")
-                c['failed'] += 1
+                c["failed"] += 1
 
         self._finish(key)
 
     def _import_license_seats(self, license, snipe_id: int) -> None:
         """Import seat assignments for a license."""
         from licenses.models import LicenseSeatAssignment
+
         try:
-            data = self.client.get_all(f'/api/v1/licenses/{snipe_id}/seats')
+            data = self.client.get_all(f"/api/v1/licenses/{snipe_id}/seats")
             for seat in data:
-                assigned_user = seat.get('assigned_user') or {}
-                assigned_asset = seat.get('assigned_asset') or {}
-                holder_id = assigned_user.get('id')
-                asset_id = assigned_asset.get('id')
+                assigned_user = seat.get("assigned_user") or {}
+                assigned_asset = seat.get("assigned_asset") or {}
+                holder_id = assigned_user.get("id")
+                asset_id = assigned_asset.get("id")
                 holder = self._holder_map.get(holder_id) if holder_id else None
                 asset = self._asset_map.get(asset_id) if asset_id else None
                 if not holder and not asset:
                     continue
                 if holder and holder.pk and holder.pk > 0:
                     LicenseSeatAssignment.objects.get_or_create(
-                        license=license, assigned_holder=holder,
-                        defaults={'notes': 'Imported from Snipe-IT'},
+                        license=license,
+                        assigned_holder=holder,
+                        defaults={"notes": "Imported from Snipe-IT"},
                     )
                 elif asset and asset.pk and asset.pk > 0:
                     LicenseSeatAssignment.objects.get_or_create(
-                        license=license, asset=asset,
-                        defaults={'notes': 'Imported from Snipe-IT'},
+                        license=license,
+                        asset=asset,
+                        defaults={"notes": "Imported from Snipe-IT"},
                     )
         except Exception as exc:
             logger.warning("Could not import seats for license %s: %s", snipe_id, exc)
@@ -1357,33 +1401,36 @@ class SnipeITImporter:
 
     def _import_maintenances(self) -> None:
         from assets.models import AssetMaintenance
-        key = 'maintenances'
+
+        key = "maintenances"
         self._log(f"\n[{key}]")
         c = self._counter(key)
 
-        for row in self.client.get_all('/api/v1/maintenances'):
-            sid = row['id']
-            asset_id = _nested_id(row.get('asset'))
+        for row in self.client.get_all("/api/v1/maintenances"):
+            sid = row["id"]
+            asset_id = _nested_id(row.get("asset"))
             asset = self._asset_map.get(asset_id)
             if not asset:
-                c['skipped'] += 1
+                c["skipped"] += 1
                 continue
 
-            raw_type = (row.get('asset_maintenance_type') or 'maintenance').lower()
-            mtype = _MAINTENANCE_TYPE_MAP.get(raw_type, 'repair')
-            raw_status = (row.get('completion_date') and 'complete') or (row.get('is_warranty') and 'complete') or 'pending'
-            completion_raw = _nested_str(row.get('completion_date'), 'date') or row.get('completion_date')
+            raw_type = (row.get("asset_maintenance_type") or "maintenance").lower()
+            mtype = _MAINTENANCE_TYPE_MAP.get(raw_type, "repair")
+            raw_status = (
+                (row.get("completion_date") and "complete") or (row.get("is_warranty") and "complete") or "pending"
+            )
+            completion_raw = _nested_str(row.get("completion_date"), "date") or row.get("completion_date")
             if isinstance(completion_raw, dict):
-                completion_raw = completion_raw.get('date')
-            start_raw = _nested_str(row.get('start_date'), 'date') or row.get('start_date')
+                completion_raw = completion_raw.get("date")
+            start_raw = _nested_str(row.get("start_date"), "date") or row.get("start_date")
             if isinstance(start_raw, dict):
-                start_raw = start_raw.get('date')
+                start_raw = start_raw.get("date")
             start_date = _parse_date(start_raw) or datetime.date.today()
             completion_date = _parse_date(completion_raw)
-            mstatus = 'completed' if completion_date else 'scheduled'
-            supplier = self._supplier_map.get(_nested_id(row.get('supplier')))
-            cost = _parse_decimal(row.get('cost'))
-            notes = row.get('notes') or ''
+            mstatus = "completed" if completion_date else "scheduled"
+            supplier = self._supplier_map.get(_nested_id(row.get("supplier")))
+            cost = _parse_decimal(row.get("cost"))
+            notes = row.get("notes") or ""
 
             try:
                 with transaction.atomic():
@@ -1394,7 +1441,7 @@ class SnipeITImporter:
                         ).first()
                         if obj:
                             if not self.update:
-                                c['skipped'] += 1
+                                c["skipped"] += 1
                                 continue
                             obj.maintenance_type = mtype
                             obj.status = mstatus
@@ -1403,7 +1450,7 @@ class SnipeITImporter:
                             obj.notes = notes
                             obj.supplier = supplier
                             obj.save()
-                            c['updated'] += 1
+                            c["updated"] += 1
                             continue
                         AssetMaintenance.objects.create(
                             asset=asset,
@@ -1415,10 +1462,10 @@ class SnipeITImporter:
                             notes=notes,
                             supplier=supplier,
                         )
-                    c['created'] += 1
+                    c["created"] += 1
 
             except Exception as exc:
                 self._log(f"  ! maintenance {sid} (asset {asset_id}): {exc}")
-                c['failed'] += 1
+                c["failed"] += 1
 
         self._finish(key)

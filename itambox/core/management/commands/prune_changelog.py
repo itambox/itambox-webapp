@@ -13,6 +13,7 @@ Scheduled to run daily via ``core.tasks.prune_changelog_task`` (registered as
 a django-q2 ``Schedule`` by ``CoreConfig._register_prune_schedule`` in
 core/apps.py); also safe to run ad hoc or from cron/CI.
 """
+
 import json
 import os
 from datetime import timedelta
@@ -27,7 +28,7 @@ from core.models import Notification, ObjectChange
 from extras.models import AlertLog
 from organization.models import Tenant
 
-CLASS_CHOICES = ('changelog', 'alertlog', 'notification', 'qtask')
+CLASS_CHOICES = ("changelog", "alertlog", "notification", "qtask")
 
 
 class _ArchiveWriter:
@@ -48,13 +49,13 @@ class _ArchiveWriter:
     """
 
     def __init__(self, directory, label, run_stamp):
-        self.path = os.path.join(directory, f'{label}_{run_stamp}.jsonl')
-        self._fh = open(self.path, 'a', encoding='utf-8')
+        self.path = os.path.join(directory, f"{label}_{run_stamp}.jsonl")
+        self._fh = open(self.path, "a", encoding="utf-8")
 
     def write_batch(self, values_iterable):
         for row in values_iterable:
             self._fh.write(json.dumps(row, cls=DjangoJSONEncoder))
-            self._fh.write('\n')
+            self._fh.write("\n")
         self._fh.flush()
 
     def close(self):
@@ -70,67 +71,81 @@ class Command(BaseCommand):
 
     def add_arguments(self, parser):
         parser.add_argument(
-            '--changelog-days', type=int, default=None,
-            help='Override ITAMBOX_CHANGELOG_RETENTION_DAYS for this run (0 = unlimited).',
+            "--changelog-days",
+            type=int,
+            default=None,
+            help="Override ITAMBOX_CHANGELOG_RETENTION_DAYS for this run (0 = unlimited).",
         )
         parser.add_argument(
-            '--alertlog-days', type=int, default=None,
-            help='Override ITAMBOX_ALERTLOG_RETENTION_DAYS for this run (0 = unlimited).',
+            "--alertlog-days",
+            type=int,
+            default=None,
+            help="Override ITAMBOX_ALERTLOG_RETENTION_DAYS for this run (0 = unlimited).",
         )
         parser.add_argument(
-            '--notification-days', type=int, default=None,
-            help='Override ITAMBOX_NOTIFICATION_RETENTION_DAYS for this run (0 = unlimited).',
+            "--notification-days",
+            type=int,
+            default=None,
+            help="Override ITAMBOX_NOTIFICATION_RETENTION_DAYS for this run (0 = unlimited).",
         )
         parser.add_argument(
-            '--qtask-days', type=int, default=None,
-            help='Override ITAMBOX_QTASK_FAILED_RETENTION_DAYS for this run (0 = unlimited).',
+            "--qtask-days",
+            type=int,
+            default=None,
+            help="Override ITAMBOX_QTASK_FAILED_RETENTION_DAYS for this run (0 = unlimited).",
         )
         parser.add_argument(
-            '--tenant', default=None,
+            "--tenant",
+            default=None,
             help=(
-                'Restrict CHANGELOG pruning to this tenant slug only -- its effective '
-                'retention is Tenant.changelog_retention_days if set, else the global '
-                'setting/--changelog-days. Global (tenant=None) changelog rows and every '
-                'other tenant are left untouched. Has no effect on alertlog/notification/'
-                'qtask, which carry no per-tenant scope in this command.'
+                "Restrict CHANGELOG pruning to this tenant slug only -- its effective "
+                "retention is Tenant.changelog_retention_days if set, else the global "
+                "setting/--changelog-days. Global (tenant=None) changelog rows and every "
+                "other tenant are left untouched. Has no effect on alertlog/notification/"
+                "qtask, which carry no per-tenant scope in this command."
             ),
         )
         parser.add_argument(
-            '--classes', default=','.join(CLASS_CHOICES),
-            help=f'Comma-separated subset of {{{",".join(CLASS_CHOICES)}}} to prune (default: all).',
+            "--classes",
+            default=",".join(CLASS_CHOICES),
+            help=f"Comma-separated subset of {{{','.join(CLASS_CHOICES)}}} to prune (default: all).",
         )
         parser.add_argument(
-            '--batch-size', type=int, default=10000,
-            help='Rows deleted per batch (default: 10000).',
+            "--batch-size",
+            type=int,
+            default=10000,
+            help="Rows deleted per batch (default: 10000).",
         )
         parser.add_argument(
-            '--dry-run', action='store_true', default=False,
-            help='Report counts only; delete and archive nothing.',
+            "--dry-run",
+            action="store_true",
+            default=False,
+            help="Report counts only; delete and archive nothing.",
         )
         parser.add_argument(
-            '--archive-dir', default=None,
+            "--archive-dir",
+            default=None,
             help=(
-                'Directory to stream pruned rows to as JSONL before deleting them (one '
-                'file per class per run). Ignored under --dry-run, since nothing is '
-                'deleted. Not transactional across batches -- see _ArchiveWriter.'
+                "Directory to stream pruned rows to as JSONL before deleting them (one "
+                "file per class per run). Ignored under --dry-run, since nothing is "
+                "deleted. Not transactional across batches -- see _ArchiveWriter."
             ),
         )
 
     def handle(self, *args, **options):
-        dry_run = options['dry_run']
-        batch_size = options['batch_size']
+        dry_run = options["dry_run"]
+        batch_size = options["batch_size"]
         if batch_size <= 0:
-            raise CommandError('--batch-size must be a positive integer.')
+            raise CommandError("--batch-size must be a positive integer.")
 
-        classes = {c.strip() for c in options['classes'].split(',') if c.strip()}
+        classes = {c.strip() for c in options["classes"].split(",") if c.strip()}
         unknown = classes - set(CLASS_CHOICES)
         if unknown:
             raise CommandError(
-                f"Unknown --classes value(s): {', '.join(sorted(unknown))}. "
-                f"Choose from: {', '.join(CLASS_CHOICES)}."
+                f"Unknown --classes value(s): {', '.join(sorted(unknown))}. Choose from: {', '.join(CLASS_CHOICES)}."
             )
 
-        tenant_slug = options['tenant']
+        tenant_slug = options["tenant"]
         tenant = None
         if tenant_slug:
             # _base_manager: this lookup must never be narrowed by an ambient
@@ -139,55 +154,91 @@ class Command(BaseCommand):
             tenant = Tenant._base_manager.filter(slug=tenant_slug).first()
             if tenant is None:
                 raise CommandError(f"No tenant found with slug '{tenant_slug}'.")
-            if classes - {'changelog'}:
-                self.stderr.write(self.style.WARNING(
-                    "--tenant only restricts changelog pruning; the other selected "
-                    "classes will still be pruned globally."
-                ))
+            if classes - {"changelog"}:
+                self.stderr.write(
+                    self.style.WARNING(
+                        "--tenant only restricts changelog pruning; the other selected "
+                        "classes will still be pruned globally."
+                    )
+                )
 
-        archive_dir = options['archive_dir']
+        archive_dir = options["archive_dir"]
         if archive_dir and not dry_run:
             os.makedirs(archive_dir, exist_ok=True)
 
-        changelog_days = self._resolve_days(options['changelog_days'], settings.ITAMBOX_CHANGELOG_RETENTION_DAYS, 'changelog')
-        alertlog_days = self._resolve_days(options['alertlog_days'], settings.ITAMBOX_ALERTLOG_RETENTION_DAYS, 'alertlog')
-        notification_days = self._resolve_days(options['notification_days'], settings.ITAMBOX_NOTIFICATION_RETENTION_DAYS, 'notification')
-        qtask_days = self._resolve_days(options['qtask_days'], settings.ITAMBOX_QTASK_FAILED_RETENTION_DAYS, 'qtask')
+        changelog_days = self._resolve_days(
+            options["changelog_days"], settings.ITAMBOX_CHANGELOG_RETENTION_DAYS, "changelog"
+        )
+        alertlog_days = self._resolve_days(
+            options["alertlog_days"], settings.ITAMBOX_ALERTLOG_RETENTION_DAYS, "alertlog"
+        )
+        notification_days = self._resolve_days(
+            options["notification_days"], settings.ITAMBOX_NOTIFICATION_RETENTION_DAYS, "notification"
+        )
+        qtask_days = self._resolve_days(options["qtask_days"], settings.ITAMBOX_QTASK_FAILED_RETENTION_DAYS, "qtask")
 
         now = timezone.now()
-        run_stamp = now.strftime('%Y%m%dT%H%M%SZ')
+        run_stamp = now.strftime("%Y%m%dT%H%M%SZ")
         grand_total = 0
 
-        if 'changelog' in classes:
+        if "changelog" in classes:
             grand_total += self._run_pruner(
-                'changelog', archive_dir, run_stamp, dry_run,
+                "changelog",
+                archive_dir,
+                run_stamp,
+                dry_run,
                 prune_fn=lambda writer: self._prune_changelog(
-                    now=now, global_days=changelog_days, tenant=tenant,
-                    batch_size=batch_size, dry_run=dry_run, archive_writer=writer,
+                    now=now,
+                    global_days=changelog_days,
+                    tenant=tenant,
+                    batch_size=batch_size,
+                    dry_run=dry_run,
+                    archive_writer=writer,
                 ),
             )
 
-        if 'alertlog' in classes:
+        if "alertlog" in classes:
             grand_total += self._run_pruner(
-                'alertlog', archive_dir, run_stamp, dry_run,
+                "alertlog",
+                archive_dir,
+                run_stamp,
+                dry_run,
                 prune_fn=lambda writer: self._prune_simple(
-                    AlertLog._base_manager, 'created_at', now, alertlog_days,
-                    batch_size=batch_size, dry_run=dry_run, archive_writer=writer, label='alertlog',
+                    AlertLog._base_manager,
+                    "created_at",
+                    now,
+                    alertlog_days,
+                    batch_size=batch_size,
+                    dry_run=dry_run,
+                    archive_writer=writer,
+                    label="alertlog",
                 ),
             )
 
-        if 'notification' in classes:
+        if "notification" in classes:
             grand_total += self._run_pruner(
-                'notification', archive_dir, run_stamp, dry_run,
+                "notification",
+                archive_dir,
+                run_stamp,
+                dry_run,
                 prune_fn=lambda writer: self._prune_simple(
-                    Notification._base_manager, 'created_at', now, notification_days,
-                    batch_size=batch_size, dry_run=dry_run, archive_writer=writer, label='notification',
+                    Notification._base_manager,
+                    "created_at",
+                    now,
+                    notification_days,
+                    batch_size=batch_size,
+                    dry_run=dry_run,
+                    archive_writer=writer,
+                    label="notification",
                 ),
             )
 
-        if 'qtask' in classes:
+        if "qtask" in classes:
             grand_total += self._run_pruner(
-                'qtask', archive_dir, run_stamp, dry_run,
+                "qtask",
+                archive_dir,
+                run_stamp,
+                dry_run,
                 prune_fn=lambda writer: self._prune_simple(
                     # Deliberately Failure.objects (FailureManager, success=False),
                     # NOT Failure._base_manager: for a proxy model, _base_manager
@@ -197,15 +248,21 @@ class Command(BaseCommand):
                     # would delete non-failed task history. Task/Failure carries
                     # no tenant field, so (unlike the models above) there is no
                     # ambient-tenant-context risk in using the class's own manager.
-                    Failure.objects, 'stopped', now, qtask_days,
-                    batch_size=batch_size, dry_run=dry_run, archive_writer=writer, label='qtask (failed)',
+                    Failure.objects,
+                    "stopped",
+                    now,
+                    qtask_days,
+                    batch_size=batch_size,
+                    dry_run=dry_run,
+                    archive_writer=writer,
+                    label="qtask (failed)",
                 ),
             )
 
         if dry_run:
-            self.stdout.write(self.style.WARNING(f'[DRY RUN] Total row(s) that would be pruned: {grand_total}'))
+            self.stdout.write(self.style.WARNING(f"[DRY RUN] Total row(s) that would be pruned: {grand_total}"))
         else:
-            self.stdout.write(self.style.SUCCESS(f'Total row(s) pruned: {grand_total}'))
+            self.stdout.write(self.style.SUCCESS(f"Total row(s) pruned: {grand_total}"))
 
     def _resolve_days(self, override, setting_value, label):
         days = override if override is not None else setting_value
@@ -214,7 +271,7 @@ class Command(BaseCommand):
         return days
 
     def _run_pruner(self, label, archive_dir, run_stamp, dry_run, *, prune_fn):
-        self.stdout.write(self.style.MIGRATE_HEADING(f'Pruning {label}...'))
+        self.stdout.write(self.style.MIGRATE_HEADING(f"Pruning {label}..."))
         writer = _ArchiveWriter(archive_dir, label, run_stamp) if (archive_dir and not dry_run) else None
         try:
             return prune_fn(writer)
@@ -242,14 +299,17 @@ class Command(BaseCommand):
                 return 0
             cutoff = now - timedelta(days=effective_days)
             qs = manager.filter(tenant_id=tenant.pk, time__lt=cutoff)
-            return self._prune_queryset(qs, batch_size=batch_size, dry_run=dry_run, archive_writer=archive_writer, label='changelog')
+            return self._prune_queryset(
+                qs, batch_size=batch_size, dry_run=dry_run, archive_writer=archive_writer, label="changelog"
+            )
 
         # No --tenant: prune every tenant carrying an explicit override at its
         # own cutoff first, then everything else (tenants with no override +
         # global tenant=None rows) at the global cutoff in one pass.
         overridden = list(
-            Tenant._base_manager.exclude(changelog_retention_days__isnull=True)
-            .only('id', 'slug', 'changelog_retention_days')
+            Tenant._base_manager.exclude(changelog_retention_days__isnull=True).only(
+                "id", "slug", "changelog_retention_days"
+            )
         )
         overridden_ids = [t.pk for t in overridden]
 
@@ -260,8 +320,11 @@ class Command(BaseCommand):
             cutoff = now - timedelta(days=t.changelog_retention_days)
             qs = manager.filter(tenant_id=t.pk, time__lt=cutoff)
             total += self._prune_queryset(
-                qs, batch_size=batch_size, dry_run=dry_run, archive_writer=archive_writer,
-                label=f'changelog (tenant={t.slug})',
+                qs,
+                batch_size=batch_size,
+                dry_run=dry_run,
+                archive_writer=archive_writer,
+                label=f"changelog (tenant={t.slug})",
             )
 
         if global_days == 0:
@@ -273,8 +336,11 @@ class Command(BaseCommand):
         if overridden_ids:
             qs = qs.exclude(tenant_id__in=overridden_ids)
         total += self._prune_queryset(
-            qs, batch_size=batch_size, dry_run=dry_run, archive_writer=archive_writer,
-            label='changelog (global cutoff)',
+            qs,
+            batch_size=batch_size,
+            dry_run=dry_run,
+            archive_writer=archive_writer,
+            label="changelog (global cutoff)",
         )
         return total
 
@@ -283,8 +349,10 @@ class Command(BaseCommand):
             self.stdout.write(f"  [{label}] retention=unlimited -- skipped.")
             return 0
         cutoff = now - timedelta(days=days)
-        qs = manager.filter(**{f'{time_field}__lt': cutoff})
-        return self._prune_queryset(qs, batch_size=batch_size, dry_run=dry_run, archive_writer=archive_writer, label=label)
+        qs = manager.filter(**{f"{time_field}__lt": cutoff})
+        return self._prune_queryset(
+            qs, batch_size=batch_size, dry_run=dry_run, archive_writer=archive_writer, label=label
+        )
 
     def _prune_queryset(self, queryset, *, batch_size, dry_run, archive_writer, label):
         if dry_run:
@@ -295,7 +363,7 @@ class Command(BaseCommand):
 
         total = 0
         while True:
-            pks = list(queryset.order_by('pk').values_list('pk', flat=True)[:batch_size])
+            pks = list(queryset.order_by("pk").values_list("pk", flat=True)[:batch_size])
             if not pks:
                 break
             # Re-filter by the already-selected pks rather than reusing `queryset`

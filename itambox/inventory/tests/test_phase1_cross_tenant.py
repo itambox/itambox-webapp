@@ -1,11 +1,11 @@
-from django.test import TestCase
 from django.contrib.auth import get_user_model
+from django.test import TestCase
 from django.urls import reverse
 
-from organization.models import Tenant, Role
-from assets.models import Manufacturer, AssetType
-from inventory.models import Kit, KitItem
+from assets.models import AssetType, Manufacturer
 from core.tests.mixins import grant
+from inventory.models import Kit, KitItem
+from organization.models import Role, Tenant
 
 User = get_user_model()
 
@@ -20,33 +20,29 @@ class KitItemCrossTenantTests(TestCase):
 
     def setUp(self):
         # Two isolated tenants
-        self.tenant_a = Tenant.objects.create(name='Tenant A', slug='tenant-a')
-        self.tenant_b = Tenant.objects.create(name='Tenant B', slug='tenant-b')
+        self.tenant_a = Tenant.objects.create(name="Tenant A", slug="tenant-a")
+        self.tenant_b = Tenant.objects.create(name="Tenant B", slug="tenant-b")
 
         # Users
-        self.user_a = User.objects.create_user(username='user_a', password='password123')
-        self.user_b = User.objects.create_user(username='user_b', password='password123')
+        self.user_a = User.objects.create_user(username="user_a", password="password123")
+        self.user_b = User.objects.create_user(username="user_b", password="password123")
 
         # Roles grant read on KitItem (TokenPermissions checks view_kititem on GET)
-        kititem_perms = ['inventory.view_kititem']
+        kititem_perms = ["inventory.view_kititem"]
 
-        self.role_a = Role.objects.create(
-            tenant=self.tenant_a, name='Admin', permissions=kititem_perms
-        )
+        self.role_a = Role.objects.create(tenant=self.tenant_a, name="Admin", permissions=kititem_perms)
         self.membership_a = grant(self.user_a, self.tenant_a, self.role_a).membership
 
-        self.role_b = Role.objects.create(
-            tenant=self.tenant_b, name='Admin', permissions=kititem_perms
-        )
+        self.role_b = Role.objects.create(tenant=self.tenant_b, name="Admin", permissions=kititem_perms)
         self.membership_b = grant(self.user_b, self.tenant_b, self.role_b).membership
 
         # Shared metadata for kit-item targets
-        self.mfr = Manufacturer.objects.create(name='Apple', slug='apple')
-        self.asset_type = AssetType.objects.create(manufacturer=self.mfr, model='MacBook Pro')
+        self.mfr = Manufacturer.objects.create(name="Apple", slug="apple")
+        self.asset_type = AssetType.objects.create(manufacturer=self.mfr, model="MacBook Pro")
 
         # A Kit + KitItem per tenant
-        self.kit_a = Kit.objects.create(name='Kit A', tenant=self.tenant_a)
-        self.kit_b = Kit.objects.create(name='Kit B', tenant=self.tenant_b)
+        self.kit_a = Kit.objects.create(name="Kit A", tenant=self.tenant_a)
+        self.kit_b = Kit.objects.create(name="Kit B", tenant=self.tenant_b)
 
         self.item_a = KitItem.objects.create(kit=self.kit_a, asset_type=self.asset_type, qty=1)
         self.item_b = KitItem.objects.create(kit=self.kit_b, asset_type=self.asset_type, qty=1)
@@ -54,19 +50,19 @@ class KitItemCrossTenantTests(TestCase):
     def _activate(self, user, tenant):
         self.client.force_login(user)
         session = self.client.session
-        session['active_tenant_id'] = tenant.pk
+        session["active_tenant_id"] = tenant.pk
         session.save()
 
     def test_list_returns_only_own_tenant_kit_items(self):
         self._activate(self.user_a, self.tenant_a)
 
-        list_url = reverse('api:inventory_api:kititem-list')
+        list_url = reverse("api:inventory_api:kititem-list")
         response = self.client.get(list_url)
         self.assertEqual(response.status_code, 200)
 
         data = response.json()
-        results = data['results'] if isinstance(data, dict) and 'results' in data else data
-        returned_ids = {row['id'] for row in results}
+        results = data["results"] if isinstance(data, dict) and "results" in data else data
+        returned_ids = {row["id"] for row in results}
 
         self.assertIn(self.item_a.pk, returned_ids)
         self.assertNotIn(self.item_b.pk, returned_ids)
@@ -75,7 +71,7 @@ class KitItemCrossTenantTests(TestCase):
         # Tenant A member tries to read Tenant B's kit item directly.
         self._activate(self.user_a, self.tenant_a)
 
-        detail_url = reverse('api:inventory_api:kititem-detail', kwargs={'pk': self.item_b.pk})
+        detail_url = reverse("api:inventory_api:kititem-detail", kwargs={"pk": self.item_b.pk})
         response = self.client.get(detail_url)
         self.assertEqual(response.status_code, 404)
 
@@ -83,7 +79,7 @@ class KitItemCrossTenantTests(TestCase):
         # Sanity: the boundary does not over-block; own-tenant detail is 200.
         self._activate(self.user_a, self.tenant_a)
 
-        detail_url = reverse('api:inventory_api:kititem-detail', kwargs={'pk': self.item_a.pk})
+        detail_url = reverse("api:inventory_api:kititem-detail", kwargs={"pk": self.item_a.pk})
         response = self.client.get(detail_url)
         self.assertEqual(response.status_code, 200)
-        self.assertEqual(response.json()['id'], self.item_a.pk)
+        self.assertEqual(response.json()["id"], self.item_a.pk)

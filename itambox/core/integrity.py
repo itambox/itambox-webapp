@@ -14,6 +14,7 @@ for operator review; it never creates them.
 
 Consumed by ``manage.py integrity_report`` and the phase-1 regression tests.
 """
+
 from dataclasses import dataclass, field
 
 from django.apps import apps
@@ -21,11 +22,11 @@ from django.apps import apps
 from core.mfa import role_is_privileged
 
 # Classification of a (resource-owner tenant, other-party tenant) pair.
-CLASS_SAME_TENANT = 'same-tenant'
-CLASS_PROVIDER_MANAGED = 'provider-to-managed'
-CLASS_TENANT_GROUP = 'within-tenant-group'
-CLASS_AMBIGUOUS = 'ambiguous'
-CLASS_INVALID = 'unrelated-invalid'
+CLASS_SAME_TENANT = "same-tenant"
+CLASS_PROVIDER_MANAGED = "provider-to-managed"
+CLASS_TENANT_GROUP = "within-tenant-group"
+CLASS_AMBIGUOUS = "ambiguous"
+CLASS_INVALID = "unrelated-invalid"
 
 # Classes for which a cross-tenant row is sharing-eligible under the target
 # design (ADR-0001) and therefore yields a proposed TenantResourceGrant.
@@ -37,48 +38,50 @@ MAX_SAMPLE_PKS = 10
 @dataclass(frozen=True)
 class Finding:
     """One integrity violation (or one aggregated per-model violation set)."""
-    check: str            # stable check identifier, e.g. 'stock_tenant_conflict'
-    model: str            # dotted label, e.g. 'inventory.ComponentStock'
-    pk: object            # offending row pk; None for aggregated findings
-    summary: str          # human-readable one-liner
-    classification: str = ''   # CLASS_* for cross-tenant findings
+
+    check: str  # stable check identifier, e.g. 'stock_tenant_conflict'
+    model: str  # dotted label, e.g. 'inventory.ComponentStock'
+    pk: object  # offending row pk; None for aggregated findings
+    summary: str  # human-readable one-liner
+    classification: str = ""  # CLASS_* for cross-tenant findings
     details: dict = field(default_factory=dict)
 
     def as_dict(self):
         return {
-            'check': self.check,
-            'model': self.model,
-            'pk': self.pk,
-            'summary': self.summary,
-            'classification': self.classification,
-            'details': self.details,
+            "check": self.check,
+            "model": self.model,
+            "pk": self.pk,
+            "summary": self.summary,
+            "classification": self.classification,
+            "details": self.details,
         }
 
 
 @dataclass(frozen=True)
 class GrantProposal:
     """A proposed TenantResourceGrant for operator review (phase 2 shape)."""
+
     owner_tenant_id: int
     grantee_tenant_id: int
-    resource_model: str        # dotted label of the stock model
-    item_id: int               # catalogue item pk
-    location_id: int           # stock location pk
-    stock_id: object           # concrete stock row pk when one exists, else None
-    access_level: str          # always 'use' — derived from observed consumption
-    classification: str        # why the pair is sharing-eligible
-    evidence: str              # which row surfaced the need
+    resource_model: str  # dotted label of the stock model
+    item_id: int  # catalogue item pk
+    location_id: int  # stock location pk
+    stock_id: object  # concrete stock row pk when one exists, else None
+    access_level: str  # always 'use' — derived from observed consumption
+    classification: str  # why the pair is sharing-eligible
+    evidence: str  # which row surfaced the need
 
     def as_dict(self):
         return {
-            'owner_tenant_id': self.owner_tenant_id,
-            'grantee_tenant_id': self.grantee_tenant_id,
-            'resource_model': self.resource_model,
-            'item_id': self.item_id,
-            'location_id': self.location_id,
-            'stock_id': self.stock_id,
-            'access_level': self.access_level,
-            'classification': self.classification,
-            'evidence': self.evidence,
+            "owner_tenant_id": self.owner_tenant_id,
+            "grantee_tenant_id": self.grantee_tenant_id,
+            "resource_model": self.resource_model,
+            "item_id": self.item_id,
+            "location_id": self.location_id,
+            "stock_id": self.stock_id,
+            "access_level": self.access_level,
+            "classification": self.classification,
+            "evidence": self.evidence,
         }
 
 
@@ -91,22 +94,24 @@ class TenantTopology:
     """
 
     def __init__(self):
-        Tenant = apps.get_model('organization', 'Tenant')
-        TenantGroup = apps.get_model('organization', 'TenantGroup')
+        Tenant = apps.get_model("organization", "Tenant")
+        TenantGroup = apps.get_model("organization", "TenantGroup")
         self.tenants = {
-            row['pk']: row
+            row["pk"]: row
             for row in Tenant._base_manager.values(
-                'pk', 'name', 'managed_by_id', 'group_id', 'is_provider',
+                "pk",
+                "name",
+                "managed_by_id",
+                "group_id",
+                "is_provider",
             )
         }
-        self.group_parents = dict(
-            TenantGroup._base_manager.values_list('pk', 'parent_id')
-        )
+        self.group_parents = dict(TenantGroup._base_manager.values_list("pk", "parent_id"))
         self._group_root_cache = {}
 
     def name(self, tenant_id):
         row = self.tenants.get(tenant_id)
-        return row['name'] if row else f'<missing tenant {tenant_id}>'
+        return row["name"] if row else f"<missing tenant {tenant_id}>"
 
     def group_root(self, group_id):
         """Root ancestor of ``group_id`` (cycle-safe; a cycle member returns the
@@ -142,10 +147,10 @@ class TenantTopology:
         other = self.tenants.get(other_tenant_id)
         if owner is None or other is None:
             return CLASS_AMBIGUOUS
-        if other['managed_by_id'] == owner_tenant_id or owner['managed_by_id'] == other_tenant_id:
+        if other["managed_by_id"] == owner_tenant_id or owner["managed_by_id"] == other_tenant_id:
             return CLASS_PROVIDER_MANAGED
-        owner_root = self.group_root(owner['group_id'])
-        other_root = self.group_root(other['group_id'])
+        owner_root = self.group_root(owner["group_id"])
+        other_root = self.group_root(other["group_id"])
         if owner_root is not None and owner_root == other_root:
             return CLASS_TENANT_GROUP
         return CLASS_INVALID
@@ -154,7 +159,7 @@ class TenantTopology:
 def _live(qs):
     """Restrict to non-soft-deleted rows when the model soft-deletes."""
     model = qs.model
-    if any(f.name == 'deleted_at' for f in model._meta.local_fields):
+    if any(f.name == "deleted_at" for f in model._meta.local_fields):
         return qs.filter(deleted_at__isnull=True)
     return qs
 
@@ -166,7 +171,7 @@ def _live(qs):
 #     superuser-triggered maintenance); see the field's own docstring.
 #   * extras.Dashboard — personal user object, deliberately unscoped; the
 #     tenant field only narrows widget data.
-NULL_TENANT_BY_DESIGN = frozenset({'core.Job', 'extras.Dashboard'})
+NULL_TENANT_BY_DESIGN = frozenset({"core.Job", "extras.Dashboard"})
 
 
 def check_null_tenants():
@@ -179,21 +184,21 @@ def check_null_tenants():
     documented by-design cases in :data:`NULL_TENANT_BY_DESIGN`: NULL is a
     supported state there, not an integrity violation.
     """
-    Tenant = apps.get_model('organization', 'Tenant')
+    Tenant = apps.get_model("organization", "Tenant")
     findings = []
     for model in apps.get_models():
         if model._meta.proxy:
             continue
         tenant_field = None
         for f in model._meta.local_fields:
-            if f.name == 'tenant' and f.is_relation and f.related_model is Tenant:
+            if f.name == "tenant" and f.is_relation and f.related_model is Tenant:
                 tenant_field = f
                 break
         if tenant_field is None or not tenant_field.null:
             continue
-        if getattr(model, 'allow_global_tenant', False):
+        if getattr(model, "allow_global_tenant", False):
             continue
-        if getattr(model, 'changelog_global', False):
+        if getattr(model, "changelog_global", False):
             continue
         if model._meta.label in NULL_TENANT_BY_DESIGN:
             continue
@@ -202,25 +207,27 @@ def check_null_tenants():
         if not count:
             continue
         label = model._meta.label
-        findings.append(Finding(
-            check='null_tenant',
-            model=label,
-            pk=None,
-            summary=f'{label}: {count} live row(s) with tenant=NULL',
-            details={
-                'count': count,
-                'sample_pks': list(qs.values_list('pk', flat=True)[:MAX_SAMPLE_PKS]),
-            },
-        ))
+        findings.append(
+            Finding(
+                check="null_tenant",
+                model=label,
+                pk=None,
+                summary=f"{label}: {count} live row(s) with tenant=NULL",
+                details={
+                    "count": count,
+                    "sample_pks": list(qs.values_list("pk", flat=True)[:MAX_SAMPLE_PKS]),
+                },
+            )
+        )
     return findings
 
 
 # --------------------------------------------------------------------------- 2
 STOCK_SPECS = (
     # (stock model label, catalogue-item FK name)
-    ('inventory.ComponentStock', 'component'),
-    ('inventory.AccessoryStock', 'accessory'),
-    ('inventory.ConsumableStock', 'consumable'),
+    ("inventory.ComponentStock", "component"),
+    ("inventory.AccessoryStock", "accessory"),
+    ("inventory.ConsumableStock", "consumable"),
 )
 
 
@@ -237,185 +244,241 @@ def check_stock_tenant_conflicts(topology=None):
     for label, item_attr in STOCK_SPECS:
         model = apps.get_model(label)
         rows = model._base_manager.values(
-            'pk', 'tenant_id', 'location_id', 'location__tenant_id',
-            f'{item_attr}_id', f'{item_attr}__tenant_id',
+            "pk",
+            "tenant_id",
+            "location_id",
+            "location__tenant_id",
+            f"{item_attr}_id",
+            f"{item_attr}__tenant_id",
         )
         for row in rows:
-            loc_tenant = row['location__tenant_id']
-            item_tenant = row[f'{item_attr}__tenant_id']
-            if loc_tenant is not None and row['tenant_id'] != loc_tenant:
+            loc_tenant = row["location__tenant_id"]
+            item_tenant = row[f"{item_attr}__tenant_id"]
+            if loc_tenant is not None and row["tenant_id"] != loc_tenant:
                 # Phase-4 invariant: stock.tenant is derived from and must
                 # match location.tenant — drift means someone bypassed save().
                 # (A tenant-less location is the AMBIGUOUS case below, not
                 # drift — one finding per row, not two.)
-                findings.append(Finding(
-                    check='stock_tenant_conflict',
-                    model=label, pk=row['pk'],
-                    summary=(f'{label} #{row["pk"]}: stored tenant '
-                             f'{topo.name(row["tenant_id"]) if row["tenant_id"] else "NULL"} '
-                             f'!= location tenant '
-                             f'{topo.name(loc_tenant)} (drift)'),
-                    classification=topo.classify(loc_tenant, row['tenant_id']),
-                    details={'stored_tenant_id': row['tenant_id'],
-                             'location_id': row['location_id'],
-                             'location_tenant_id': loc_tenant},
-                ))
+                findings.append(
+                    Finding(
+                        check="stock_tenant_conflict",
+                        model=label,
+                        pk=row["pk"],
+                        summary=(
+                            f"{label} #{row['pk']}: stored tenant "
+                            f"{topo.name(row['tenant_id']) if row['tenant_id'] else 'NULL'} "
+                            f"!= location tenant "
+                            f"{topo.name(loc_tenant)} (drift)"
+                        ),
+                        classification=topo.classify(loc_tenant, row["tenant_id"]),
+                        details={
+                            "stored_tenant_id": row["tenant_id"],
+                            "location_id": row["location_id"],
+                            "location_tenant_id": loc_tenant,
+                        },
+                    )
+                )
             if loc_tenant is None:
-                findings.append(Finding(
-                    check='stock_tenant_conflict',
-                    model=label, pk=row['pk'],
-                    summary=(f'{label} #{row["pk"]}: location #{row["location_id"]} has no '
-                             f'tenant — pool owner cannot be derived'),
-                    classification=CLASS_AMBIGUOUS,
-                    details={'location_id': row['location_id'],
-                             'item_id': row[f'{item_attr}_id'],
-                             'item_tenant_id': item_tenant},
-                ))
+                findings.append(
+                    Finding(
+                        check="stock_tenant_conflict",
+                        model=label,
+                        pk=row["pk"],
+                        summary=(
+                            f"{label} #{row['pk']}: location #{row['location_id']} has no "
+                            f"tenant — pool owner cannot be derived"
+                        ),
+                        classification=CLASS_AMBIGUOUS,
+                        details={
+                            "location_id": row["location_id"],
+                            "item_id": row[f"{item_attr}_id"],
+                            "item_tenant_id": item_tenant,
+                        },
+                    )
+                )
                 continue
             if item_tenant is None:
                 continue  # global catalogue item + owned location: supported
             cls = topo.classify(loc_tenant, item_tenant)
             if cls == CLASS_SAME_TENANT:
                 continue
-            findings.append(Finding(
-                check='stock_tenant_conflict',
-                model=label, pk=row['pk'],
-                summary=(f'{label} #{row["pk"]}: item tenant '
-                         f'"{topo.name(item_tenant)}" != location tenant '
-                         f'"{topo.name(loc_tenant)}"'),
-                classification=cls,
-                details={'location_id': row['location_id'],
-                         'location_tenant_id': loc_tenant,
-                         'item_id': row[f'{item_attr}_id'],
-                         'item_tenant_id': item_tenant},
-            ))
+            findings.append(
+                Finding(
+                    check="stock_tenant_conflict",
+                    model=label,
+                    pk=row["pk"],
+                    summary=(
+                        f"{label} #{row['pk']}: item tenant "
+                        f'"{topo.name(item_tenant)}" != location tenant '
+                        f'"{topo.name(loc_tenant)}"'
+                    ),
+                    classification=cls,
+                    details={
+                        "location_id": row["location_id"],
+                        "location_tenant_id": loc_tenant,
+                        "item_id": row[f"{item_attr}_id"],
+                        "item_tenant_id": item_tenant,
+                    },
+                )
+            )
     return findings
 
 
 # --------------------------------------------------------------------------- 3
 ASSIGNMENT_SPECS = (
     # (assignment model label, item FK name, matching stock model label)
-    ('inventory.ComponentAllocation', 'component', 'inventory.ComponentStock'),
-    ('inventory.AccessoryAssignment', 'accessory', 'inventory.AccessoryStock'),
-    ('inventory.ConsumableAssignment', 'consumable', 'inventory.ConsumableStock'),
+    ("inventory.ComponentAllocation", "component", "inventory.ComponentStock"),
+    ("inventory.AccessoryAssignment", "accessory", "inventory.AccessoryStock"),
+    ("inventory.ConsumableAssignment", "consumable", "inventory.ConsumableStock"),
 )
 
 
-def _target_tenant(row, prefix=''):
+def _target_tenant(row, prefix=""):
     """Tenant id of the single assignment target (holder / location / asset)."""
-    for key in (f'{prefix}assigned_holder__tenant_id',
-                f'{prefix}assigned_location__tenant_id',
-                f'{prefix}assigned_asset__tenant_id'):
+    for key in (
+        f"{prefix}assigned_holder__tenant_id",
+        f"{prefix}assigned_location__tenant_id",
+        f"{prefix}assigned_asset__tenant_id",
+    ):
         if row.get(key) is not None:
             return row[key]
     return None
 
 
-def _has_target(row, prefix=''):
-    return any(row.get(k) is not None for k in (
-        f'{prefix}assigned_holder_id', f'{prefix}assigned_location_id',
-        f'{prefix}assigned_asset_id'))
+def _has_target(row, prefix=""):
+    return any(
+        row.get(k) is not None
+        for k in (f"{prefix}assigned_holder_id", f"{prefix}assigned_location_id", f"{prefix}assigned_asset_id")
+    )
 
 
 def _inventory_assignment_finding(topo, label, item_attr, row):
     """Finding for one cross-tenant inventory assignment row, or None."""
-    if row['from_location_id'] is not None:
-        source_tenant = row['from_location__tenant_id']
-        source_kind = 'from_location'
+    if row["from_location_id"] is not None:
+        source_tenant = row["from_location__tenant_id"]
+        source_kind = "from_location"
     else:
-        source_tenant = row[f'{item_attr}__tenant_id']
-        source_kind = 'item'
+        source_tenant = row[f"{item_attr}__tenant_id"]
+        source_kind = "item"
     target_tenant = _target_tenant(row)
     cls = topo.classify(source_tenant, target_tenant)
     if cls == CLASS_SAME_TENANT:
         return None
-    if source_tenant is None and source_kind == 'item':
+    if source_tenant is None and source_kind == "item":
         # No from-location recorded and the catalogue item is global: the
         # source pool (and its owner) cannot be derived at all — these rows
         # block the phase-4 stock-ownership backfill.
-        summary = (f'{label} #{row["pk"]}: no source pool derivable '
-                   f'(from_location empty, item is global); target tenant '
-                   f'{topo.name(target_tenant) if target_tenant else "NULL"}')
+        summary = (
+            f"{label} #{row['pk']}: no source pool derivable "
+            f"(from_location empty, item is global); target tenant "
+            f"{topo.name(target_tenant) if target_tenant else 'NULL'}"
+        )
     else:
-        summary = (f'{label} #{row["pk"]}: source tenant '
-                   f'{topo.name(source_tenant) if source_tenant else "NULL"} '
-                   f'({source_kind}) != target tenant '
-                   f'{topo.name(target_tenant) if target_tenant else "NULL"}')
+        summary = (
+            f"{label} #{row['pk']}: source tenant "
+            f"{topo.name(source_tenant) if source_tenant else 'NULL'} "
+            f"({source_kind}) != target tenant "
+            f"{topo.name(target_tenant) if target_tenant else 'NULL'}"
+        )
     return Finding(
-        check='cross_tenant_assignment',
-        model=label, pk=row['pk'],
+        check="cross_tenant_assignment",
+        model=label,
+        pk=row["pk"],
         summary=summary,
         classification=cls,
-        details={'source_tenant_id': source_tenant,
-                 'source_kind': source_kind,
-                 'target_tenant_id': target_tenant,
-                 'item_id': row[f'{item_attr}_id'],
-                 'from_location_id': row['from_location_id']},
+        details={
+            "source_tenant_id": source_tenant,
+            "source_kind": source_kind,
+            "target_tenant_id": target_tenant,
+            "item_id": row[f"{item_attr}_id"],
+            "from_location_id": row["from_location_id"],
+        },
     )
 
 
 def _proposal_for_finding(finding, stock_model, stock_label, item_attr):
     """GrantProposal for a sharing-eligible finding with a concrete pool, or None."""
     d = finding.details
-    if (finding.classification not in PROPOSAL_ELIGIBLE_CLASSES
-            or d['from_location_id'] is None
-            or d['source_tenant_id'] is None or d['target_tenant_id'] is None):
+    if (
+        finding.classification not in PROPOSAL_ELIGIBLE_CLASSES
+        or d["from_location_id"] is None
+        or d["source_tenant_id"] is None
+        or d["target_tenant_id"] is None
+    ):
         return None
-    stock_pk = (stock_model._base_manager.filter(**{
-        f'{item_attr}_id': d['item_id'],
-        'location_id': d['from_location_id'],
-    }).values_list('pk', flat=True).first())
+    stock_pk = (
+        stock_model._base_manager.filter(
+            **{
+                f"{item_attr}_id": d["item_id"],
+                "location_id": d["from_location_id"],
+            }
+        )
+        .values_list("pk", flat=True)
+        .first()
+    )
     return GrantProposal(
-        owner_tenant_id=d['source_tenant_id'],
-        grantee_tenant_id=d['target_tenant_id'],
+        owner_tenant_id=d["source_tenant_id"],
+        grantee_tenant_id=d["target_tenant_id"],
         resource_model=stock_label,
-        item_id=d['item_id'],
-        location_id=d['from_location_id'],
+        item_id=d["item_id"],
+        location_id=d["from_location_id"],
         stock_id=stock_pk,
-        access_level='use',
+        access_level="use",
         classification=finding.classification,
-        evidence=f'{finding.model} #{finding.pk}',
+        evidence=f"{finding.model} #{finding.pk}",
     )
 
 
 def _check_asset_assignments(topo):
     """Cross-tenant findings for assets.AssetAssignment (current custody only)."""
-    AssetAssignment = apps.get_model('assets', 'AssetAssignment')
+    AssetAssignment = apps.get_model("assets", "AssetAssignment")
     findings = []
     # Only CURRENT custody (is_active=True): a checked-in asset assignment
     # stays as an is_active=False history row, mirroring the inventory family
     # where check-in soft-deletes the row (excluded by _live()).
     rows = _live(AssetAssignment._base_manager.filter(is_active=True)).values(
-        'pk', 'asset_id', 'asset__tenant_id',
-        'assigned_user_id', 'assigned_user__tenant_id',
-        'assigned_location_id', 'assigned_location__tenant_id',
-        'assigned_asset_id', 'assigned_asset__tenant_id',
+        "pk",
+        "asset_id",
+        "asset__tenant_id",
+        "assigned_user_id",
+        "assigned_user__tenant_id",
+        "assigned_location_id",
+        "assigned_location__tenant_id",
+        "assigned_asset_id",
+        "assigned_asset__tenant_id",
     )
     for row in rows:
-        if row['assigned_user_id'] is not None:
-            target_tenant = row['assigned_user__tenant_id']
-        elif row['assigned_location_id'] is not None:
-            target_tenant = row['assigned_location__tenant_id']
-        elif row['assigned_asset_id'] is not None:
-            target_tenant = row['assigned_asset__tenant_id']
+        if row["assigned_user_id"] is not None:
+            target_tenant = row["assigned_user__tenant_id"]
+        elif row["assigned_location_id"] is not None:
+            target_tenant = row["assigned_location__tenant_id"]
+        elif row["assigned_asset_id"] is not None:
+            target_tenant = row["assigned_asset__tenant_id"]
         else:
             continue
-        source_tenant = row['asset__tenant_id']
+        source_tenant = row["asset__tenant_id"]
         cls = topo.classify(source_tenant, target_tenant)
         if cls == CLASS_SAME_TENANT:
             continue
-        findings.append(Finding(
-            check='cross_tenant_assignment',
-            model='assets.AssetAssignment', pk=row['pk'],
-            summary=(f'assets.AssetAssignment #{row["pk"]}: asset tenant '
-                     f'{topo.name(source_tenant) if source_tenant else "NULL"} != '
-                     f'target tenant '
-                     f'{topo.name(target_tenant) if target_tenant else "NULL"}'),
-            classification=cls,
-            details={'source_tenant_id': source_tenant,
-                     'target_tenant_id': target_tenant,
-                     'asset_id': row['asset_id']},
-        ))
+        findings.append(
+            Finding(
+                check="cross_tenant_assignment",
+                model="assets.AssetAssignment",
+                pk=row["pk"],
+                summary=(
+                    f"assets.AssetAssignment #{row['pk']}: asset tenant "
+                    f"{topo.name(source_tenant) if source_tenant else 'NULL'} != "
+                    f"target tenant "
+                    f"{topo.name(target_tenant) if target_tenant else 'NULL'}"
+                ),
+                classification=cls,
+                details={
+                    "source_tenant_id": source_tenant,
+                    "target_tenant_id": target_tenant,
+                    "asset_id": row["asset_id"],
+                },
+            )
+        )
     return findings
 
 
@@ -435,11 +498,17 @@ def check_cross_tenant_assignments(topology=None):
         model = apps.get_model(label)
         stock_model = apps.get_model(stock_label)
         rows = _live(model._base_manager).values(
-            'pk', f'{item_attr}_id', f'{item_attr}__tenant_id',
-            'from_location_id', 'from_location__tenant_id',
-            'assigned_holder_id', 'assigned_holder__tenant_id',
-            'assigned_location_id', 'assigned_location__tenant_id',
-            'assigned_asset_id', 'assigned_asset__tenant_id',
+            "pk",
+            f"{item_attr}_id",
+            f"{item_attr}__tenant_id",
+            "from_location_id",
+            "from_location__tenant_id",
+            "assigned_holder_id",
+            "assigned_holder__tenant_id",
+            "assigned_location_id",
+            "assigned_location__tenant_id",
+            "assigned_asset_id",
+            "assigned_asset__tenant_id",
         )
         for row in rows:
             if not _has_target(row):
@@ -460,58 +529,72 @@ def check_cross_tenant_assignments(topology=None):
 def check_location_site_tenants(topology=None):
     """Locations whose tenant disagrees with their site's tenant."""
     topo = topology or TenantTopology()
-    Location = apps.get_model('organization', 'Location')
+    Location = apps.get_model("organization", "Location")
     findings = []
     rows = _live(Location._base_manager).values(
-        'pk', 'tenant_id', 'site_id', 'site__tenant_id',
+        "pk",
+        "tenant_id",
+        "site_id",
+        "site__tenant_id",
     )
     for row in rows:
-        loc_tenant, site_tenant = row['tenant_id'], row['site__tenant_id']
+        loc_tenant, site_tenant = row["tenant_id"], row["site__tenant_id"]
         if loc_tenant == site_tenant:
             continue
         cls = topo.classify(site_tenant, loc_tenant)
         if cls == CLASS_SAME_TENANT:
             continue
-        findings.append(Finding(
-            check='location_site_tenant_mismatch',
-            model='organization.Location', pk=row['pk'],
-            summary=(f'organization.Location #{row["pk"]}: location tenant '
-                     f'{topo.name(loc_tenant) if loc_tenant else "NULL"} != site tenant '
-                     f'{topo.name(site_tenant) if site_tenant else "NULL"}'),
-            classification=cls,
-            details={'tenant_id': loc_tenant, 'site_id': row['site_id'],
-                     'site_tenant_id': site_tenant},
-        ))
+        findings.append(
+            Finding(
+                check="location_site_tenant_mismatch",
+                model="organization.Location",
+                pk=row["pk"],
+                summary=(
+                    f"organization.Location #{row['pk']}: location tenant "
+                    f"{topo.name(loc_tenant) if loc_tenant else 'NULL'} != site tenant "
+                    f"{topo.name(site_tenant) if site_tenant else 'NULL'}"
+                ),
+                classification=cls,
+                details={"tenant_id": loc_tenant, "site_id": row["site_id"], "site_tenant_id": site_tenant},
+            )
+        )
     return findings
 
 
 # --------------------------------------------------------------------------- 5
-PO_LINE_ITEM_FKS = ('asset_type', 'component', 'accessory', 'consumable', 'license')
+PO_LINE_ITEM_FKS = ("asset_type", "component", "accessory", "consumable", "license")
 
 
 def _check_po_headers(topo):
     """PO tenant vs destination-location tenant."""
-    PurchaseOrder = apps.get_model('procurement', 'PurchaseOrder')
+    PurchaseOrder = apps.get_model("procurement", "PurchaseOrder")
     findings = []
     for row in _live(PurchaseOrder._base_manager).values(
-            'pk', 'tenant_id', 'destination_location_id',
-            'destination_location__tenant_id'):
-        po_tenant = row['tenant_id']
-        dest_tenant = row['destination_location__tenant_id']
+        "pk", "tenant_id", "destination_location_id", "destination_location__tenant_id"
+    ):
+        po_tenant = row["tenant_id"]
+        dest_tenant = row["destination_location__tenant_id"]
         cls = topo.classify(po_tenant, dest_tenant)
         if cls == CLASS_SAME_TENANT:
             continue
-        findings.append(Finding(
-            check='po_tenant_mismatch',
-            model='procurement.PurchaseOrder', pk=row['pk'],
-            summary=(f'procurement.PurchaseOrder #{row["pk"]}: PO tenant '
-                     f'{topo.name(po_tenant) if po_tenant else "NULL"} != destination-'
-                     f'location tenant {topo.name(dest_tenant) if dest_tenant else "NULL"}'),
-            classification=cls,
-            details={'tenant_id': po_tenant,
-                     'destination_location_id': row['destination_location_id'],
-                     'destination_tenant_id': dest_tenant},
-        ))
+        findings.append(
+            Finding(
+                check="po_tenant_mismatch",
+                model="procurement.PurchaseOrder",
+                pk=row["pk"],
+                summary=(
+                    f"procurement.PurchaseOrder #{row['pk']}: PO tenant "
+                    f"{topo.name(po_tenant) if po_tenant else 'NULL'} != destination-"
+                    f"location tenant {topo.name(dest_tenant) if dest_tenant else 'NULL'}"
+                ),
+                classification=cls,
+                details={
+                    "tenant_id": po_tenant,
+                    "destination_location_id": row["destination_location_id"],
+                    "destination_tenant_id": dest_tenant,
+                },
+            )
+        )
     return findings
 
 
@@ -519,27 +602,36 @@ def _po_line_item_findings(topo, row, line_tenant, tenant_bearing_fks):
     """Per-line findings for item FKs owned by a different tenant."""
     findings = []
     for fk in tenant_bearing_fks:
-        item_id, item_tenant = row[f'{fk}_id'], row[f'{fk}__tenant_id']
+        item_id, item_tenant = row[f"{fk}_id"], row[f"{fk}__tenant_id"]
         if item_id is None or item_tenant is None:
             continue  # no item on this fan arm, or global catalogue item
         if line_tenant is not None and item_tenant != line_tenant:
-            findings.append(Finding(
-                check='po_line_item_tenant_mismatch',
-                model='procurement.PurchaseOrderLine', pk=row['pk'],
-                summary=(f'procurement.PurchaseOrderLine #{row["pk"]}: {fk} '
-                         f'#{item_id} belongs to "{topo.name(item_tenant)}", '
-                         f'line belongs to "{topo.name(line_tenant)}"'),
-                classification=topo.classify(line_tenant, item_tenant),
-                details={'item_fk': fk, 'item_id': item_id,
-                         'item_tenant_id': item_tenant, 'tenant_id': line_tenant},
-            ))
+            findings.append(
+                Finding(
+                    check="po_line_item_tenant_mismatch",
+                    model="procurement.PurchaseOrderLine",
+                    pk=row["pk"],
+                    summary=(
+                        f"procurement.PurchaseOrderLine #{row['pk']}: {fk} "
+                        f'#{item_id} belongs to "{topo.name(item_tenant)}", '
+                        f'line belongs to "{topo.name(line_tenant)}"'
+                    ),
+                    classification=topo.classify(line_tenant, item_tenant),
+                    details={
+                        "item_fk": fk,
+                        "item_id": item_id,
+                        "item_tenant_id": item_tenant,
+                        "tenant_id": line_tenant,
+                    },
+                )
+            )
     return findings
 
 
 def check_purchase_orders(topology=None):
     """PO ↔ destination-location and PO ↔ line ↔ item tenant mismatches."""
     topo = topology or TenantTopology()
-    PurchaseOrderLine = apps.get_model('procurement', 'PurchaseOrderLine')
+    PurchaseOrderLine = apps.get_model("procurement", "PurchaseOrderLine")
     findings = _check_po_headers(topo)
 
     # Only follow <fk>__tenant for targets that actually carry a tenant field
@@ -547,28 +639,35 @@ def check_purchase_orders(topology=None):
     tenant_bearing_fks = []
     for fk in PO_LINE_ITEM_FKS:
         related = PurchaseOrderLine._meta.get_field(fk).related_model
-        if any(f.name == 'tenant' for f in related._meta.local_fields):
+        if any(f.name == "tenant" for f in related._meta.local_fields):
             tenant_bearing_fks.append(fk)
-    value_fields = ['pk', 'tenant_id', 'purchase_order_id', 'purchase_order__tenant_id']
+    value_fields = ["pk", "tenant_id", "purchase_order_id", "purchase_order__tenant_id"]
     for fk in tenant_bearing_fks:
-        value_fields += [f'{fk}_id', f'{fk}__tenant_id']
+        value_fields += [f"{fk}_id", f"{fk}__tenant_id"]
 
     for row in _live(PurchaseOrderLine._base_manager).values(*value_fields):
-        line_tenant = row['tenant_id']
-        po_tenant = row['purchase_order__tenant_id']
+        line_tenant = row["tenant_id"]
+        po_tenant = row["purchase_order__tenant_id"]
         cls = topo.classify(po_tenant, line_tenant)
         if cls != CLASS_SAME_TENANT:
-            findings.append(Finding(
-                check='po_line_tenant_mismatch',
-                model='procurement.PurchaseOrderLine', pk=row['pk'],
-                summary=(f'procurement.PurchaseOrderLine #{row["pk"]}: line tenant '
-                         f'{topo.name(line_tenant) if line_tenant else "NULL"} != PO tenant '
-                         f'{topo.name(po_tenant) if po_tenant else "NULL"}'),
-                classification=cls,
-                details={'tenant_id': line_tenant,
-                         'purchase_order_id': row['purchase_order_id'],
-                         'po_tenant_id': po_tenant},
-            ))
+            findings.append(
+                Finding(
+                    check="po_line_tenant_mismatch",
+                    model="procurement.PurchaseOrderLine",
+                    pk=row["pk"],
+                    summary=(
+                        f"procurement.PurchaseOrderLine #{row['pk']}: line tenant "
+                        f"{topo.name(line_tenant) if line_tenant else 'NULL'} != PO tenant "
+                        f"{topo.name(po_tenant) if po_tenant else 'NULL'}"
+                    ),
+                    classification=cls,
+                    details={
+                        "tenant_id": line_tenant,
+                        "purchase_order_id": row["purchase_order_id"],
+                        "po_tenant_id": po_tenant,
+                    },
+                )
+            )
         findings += _po_line_item_findings(topo, row, line_tenant, tenant_bearing_fks)
     return findings
 
@@ -577,35 +676,48 @@ def check_purchase_orders(topology=None):
 def check_license_seats(topology=None):
     """License-seat assignments whose target belongs to another tenant."""
     topo = topology or TenantTopology()
-    LicenseSeatAssignment = apps.get_model('licenses', 'LicenseSeatAssignment')
+    LicenseSeatAssignment = apps.get_model("licenses", "LicenseSeatAssignment")
     findings = []
     for row in _live(LicenseSeatAssignment._base_manager).values(
-            'pk', 'license_id', 'license__tenant_id',
-            'asset_id', 'asset__tenant_id',
-            'assigned_holder_id', 'assigned_holder__tenant_id'):
-        license_tenant = row['license__tenant_id']
-        if row['asset_id'] is not None:
-            target_tenant, target = row['asset__tenant_id'], f'asset #{row["asset_id"]}'
-        elif row['assigned_holder_id'] is not None:
-            target_tenant = row['assigned_holder__tenant_id']
-            target = f'holder #{row["assigned_holder_id"]}'
+        "pk",
+        "license_id",
+        "license__tenant_id",
+        "asset_id",
+        "asset__tenant_id",
+        "assigned_holder_id",
+        "assigned_holder__tenant_id",
+    ):
+        license_tenant = row["license__tenant_id"]
+        if row["asset_id"] is not None:
+            target_tenant, target = row["asset__tenant_id"], f"asset #{row['asset_id']}"
+        elif row["assigned_holder_id"] is not None:
+            target_tenant = row["assigned_holder__tenant_id"]
+            target = f"holder #{row['assigned_holder_id']}"
         else:
             continue
         cls = topo.classify(license_tenant, target_tenant)
         if cls == CLASS_SAME_TENANT:
             continue
-        findings.append(Finding(
-            check='license_seat_tenant_mismatch',
-            model='licenses.LicenseSeatAssignment', pk=row['pk'],
-            summary=(f'licenses.LicenseSeatAssignment #{row["pk"]}: license tenant '
-                     f'{topo.name(license_tenant) if license_tenant else "NULL"} != '
-                     f'{target} tenant '
-                     f'{topo.name(target_tenant) if target_tenant else "NULL"}'),
-            classification=cls,
-            details={'license_id': row['license_id'],
-                     'license_tenant_id': license_tenant,
-                     'target': target, 'target_tenant_id': target_tenant},
-        ))
+        findings.append(
+            Finding(
+                check="license_seat_tenant_mismatch",
+                model="licenses.LicenseSeatAssignment",
+                pk=row["pk"],
+                summary=(
+                    f"licenses.LicenseSeatAssignment #{row['pk']}: license tenant "
+                    f"{topo.name(license_tenant) if license_tenant else 'NULL'} != "
+                    f"{target} tenant "
+                    f"{topo.name(target_tenant) if target_tenant else 'NULL'}"
+                ),
+                classification=cls,
+                details={
+                    "license_id": row["license_id"],
+                    "license_tenant_id": license_tenant,
+                    "target": target,
+                    "target_tenant_id": target_tenant,
+                },
+            )
+        )
     return findings
 
 
@@ -613,27 +725,34 @@ def check_license_seats(topology=None):
 def check_custody_receipts(topology=None):
     """Custody receipts whose asset and holder belong to different tenants."""
     topo = topology or TenantTopology()
-    CustodyReceipt = apps.get_model('compliance', 'CustodyReceipt')
+    CustodyReceipt = apps.get_model("compliance", "CustodyReceipt")
     findings = []
     for row in CustodyReceipt._base_manager.values(
-            'pk', 'asset_id', 'asset__tenant_id',
-            'holder_id', 'holder__tenant_id'):
-        cls = topo.classify(row['asset__tenant_id'], row['holder__tenant_id'])
+        "pk", "asset_id", "asset__tenant_id", "holder_id", "holder__tenant_id"
+    ):
+        cls = topo.classify(row["asset__tenant_id"], row["holder__tenant_id"])
         if cls == CLASS_SAME_TENANT:
             continue
-        findings.append(Finding(
-            check='custody_tenant_mismatch',
-            model='compliance.CustodyReceipt', pk=row['pk'],
-            summary=(f'compliance.CustodyReceipt #{row["pk"]}: asset tenant '
-                     f'{topo.name(row["asset__tenant_id"]) if row["asset__tenant_id"] else "NULL"}'
-                     f' != holder tenant '
-                     f'{topo.name(row["holder__tenant_id"]) if row["holder__tenant_id"] else "NULL"}'),
-            classification=cls,
-            details={'asset_id': row['asset_id'],
-                     'asset_tenant_id': row['asset__tenant_id'],
-                     'holder_id': row['holder_id'],
-                     'holder_tenant_id': row['holder__tenant_id']},
-        ))
+        findings.append(
+            Finding(
+                check="custody_tenant_mismatch",
+                model="compliance.CustodyReceipt",
+                pk=row["pk"],
+                summary=(
+                    f"compliance.CustodyReceipt #{row['pk']}: asset tenant "
+                    f"{topo.name(row['asset__tenant_id']) if row['asset__tenant_id'] else 'NULL'}"
+                    f" != holder tenant "
+                    f"{topo.name(row['holder__tenant_id']) if row['holder__tenant_id'] else 'NULL'}"
+                ),
+                classification=cls,
+                details={
+                    "asset_id": row["asset_id"],
+                    "asset_tenant_id": row["asset__tenant_id"],
+                    "holder_id": row["holder_id"],
+                    "holder_tenant_id": row["holder__tenant_id"],
+                },
+            )
+        )
     return findings
 
 
@@ -653,24 +772,30 @@ def _own_scope_finding(topo, grant):
     shared_ok = (
         grant.membership_id
         and grant.role.shared_with_managed
-        and topo.tenants.get(role_tenant_id, {}).get('is_provider')
-        and topo.tenants.get(owner_id, {}).get('managed_by_id') == role_tenant_id
+        and topo.tenants.get(role_tenant_id, {}).get("is_provider")
+        and topo.tenants.get(owner_id, {}).get("managed_by_id") == role_tenant_id
     )
     if shared_ok:
         return None
     return Finding(
-        check='rbac_grant_inconsistent',
-        model='organization.RoleGrant', pk=grant.pk,
-        summary=(f'RoleGrant #{grant.pk} (own scope): role '
-                 f'"{grant.role.name}" owned by "{topo.name(role_tenant_id)}" granted '
-                 f'to a principal in "{topo.name(owner_id)}" without a valid '
-                 f'shared-role relationship'),
+        check="rbac_grant_inconsistent",
+        model="organization.RoleGrant",
+        pk=grant.pk,
+        summary=(
+            f"RoleGrant #{grant.pk} (own scope): role "
+            f'"{grant.role.name}" owned by "{topo.name(role_tenant_id)}" granted '
+            f'to a principal in "{topo.name(owner_id)}" without a valid '
+            f"shared-role relationship"
+        ),
         classification=topo.classify(role_tenant_id, owner_id),
-        details={'role_id': grant.role_id, 'role_tenant_id': role_tenant_id,
-                 'membership_id': grant.membership_id,
-                 'user_group_id': grant.user_group_id,
-                 'principal_tenant_id': owner_id,
-                 'shared_with_managed': grant.role.shared_with_managed},
+        details={
+            "role_id": grant.role_id,
+            "role_tenant_id": role_tenant_id,
+            "membership_id": grant.membership_id,
+            "user_group_id": grant.user_group_id,
+            "principal_tenant_id": owner_id,
+            "shared_with_managed": grant.role.shared_with_managed,
+        },
     )
 
 
@@ -679,92 +804,112 @@ def _managed_scope_finding(topo, grant, scope):
     owner_id = grant.principal_tenant_id
     role_tenant_id = grant.role.tenant_id
     problems = []
-    if not topo.tenants.get(owner_id, {}).get('is_provider'):
-        problems.append('principal tenant is not a provider')
+    if not topo.tenants.get(owner_id, {}).get("is_provider"):
+        problems.append("principal tenant is not a provider")
     if role_tenant_id != owner_id:
         problems.append(
-            f'managed-scope role must be owned by the granting provider, '
-            f'but is owned by "{topo.name(role_tenant_id)}"')
-    if scope.scope_type == 'tenant_group' and not scope.tenant_group_id:
-        problems.append('tenant_group scope without a scope group')
+            f'managed-scope role must be owned by the granting provider, but is owned by "{topo.name(role_tenant_id)}"'
+        )
+    if scope.scope_type == "tenant_group" and not scope.tenant_group_id:
+        problems.append("tenant_group scope without a scope group")
     stale = []
-    if scope.scope_type == 'tenant' and scope.tenant_id:
-        managed_by_id = topo.tenants.get(scope.tenant_id, {}).get('managed_by_id')
+    if scope.scope_type == "tenant" and scope.tenant_id:
+        managed_by_id = topo.tenants.get(scope.tenant_id, {}).get("managed_by_id")
         if managed_by_id != owner_id:
             stale.append(scope.tenant_id)
-            problems.append('target tenant is no longer managed by the provider')
+            problems.append("target tenant is no longer managed by the provider")
     if not problems:
         return None
     return Finding(
-        check='rbac_grant_inconsistent',
-        model='organization.RoleGrant', pk=grant.pk,
-        summary=f'RoleGrant #{grant.pk} (managed scope): ' + '; '.join(problems),
+        check="rbac_grant_inconsistent",
+        model="organization.RoleGrant",
+        pk=grant.pk,
+        summary=f"RoleGrant #{grant.pk} (managed scope): " + "; ".join(problems),
         classification=CLASS_INVALID,
-        details={'role_id': grant.role_id, 'role_tenant_id': role_tenant_id,
-                 'membership_id': grant.membership_id,
-                 'user_group_id': grant.user_group_id,
-                 'principal_tenant_id': owner_id,
-                 'scope_type': scope.scope_type,
-                 'stale_tenant_ids': sorted(stale)},
+        details={
+            "role_id": grant.role_id,
+            "role_tenant_id": role_tenant_id,
+            "membership_id": grant.membership_id,
+            "user_group_id": grant.user_group_id,
+            "principal_tenant_id": owner_id,
+            "scope_type": scope.scope_type,
+            "stale_tenant_ids": sorted(stale),
+        },
     )
 
 
 def _check_role_grants(topo):
-    RoleGrant = apps.get_model('organization', 'RoleGrant')
+    RoleGrant = apps.get_model("organization", "RoleGrant")
     findings = []
-    grants = RoleGrant._base_manager.select_related(
-        'membership', 'membership__tenant', 'user_group', 'user_group__tenant',
-        'role', 'role__tenant',
-    ).prefetch_related('scopes').filter(role__deleted_at__isnull=True)
+    grants = (
+        RoleGrant._base_manager.select_related(
+            "membership",
+            "membership__tenant",
+            "user_group",
+            "user_group__tenant",
+            "role",
+            "role__tenant",
+        )
+        .prefetch_related("scopes")
+        .filter(role__deleted_at__isnull=True)
+    )
     for grant in grants:
         has_membership = grant.membership_id is not None
         has_group = grant.user_group_id is not None
         if has_membership == has_group:
-            findings.append(Finding(
-                check='rbac_grant_inconsistent',
-                model='organization.RoleGrant', pk=grant.pk,
-                summary=f'RoleGrant #{grant.pk} does not have exactly one principal',
-                classification=CLASS_INVALID,
-                details={},
-            ))
+            findings.append(
+                Finding(
+                    check="rbac_grant_inconsistent",
+                    model="organization.RoleGrant",
+                    pk=grant.pk,
+                    summary=f"RoleGrant #{grant.pk} does not have exactly one principal",
+                    classification=CLASS_INVALID,
+                    details={},
+                )
+            )
             continue
         if has_group and grant.role.tenant_id != grant.user_group.tenant_id:
-            findings.append(Finding(
-                check='rbac_grant_inconsistent',
-                model='organization.RoleGrant', pk=grant.pk,
-                summary=(f'RoleGrant #{grant.pk}: group and role have different owners'),
-                classification=topo.classify(
-                    grant.user_group.tenant_id, grant.role.tenant_id,
-                ),
-                details={'user_group_id': grant.user_group_id,
-                         'role_id': grant.role_id},
-            ))
+            findings.append(
+                Finding(
+                    check="rbac_grant_inconsistent",
+                    model="organization.RoleGrant",
+                    pk=grant.pk,
+                    summary=(f"RoleGrant #{grant.pk}: group and role have different owners"),
+                    classification=topo.classify(
+                        grant.user_group.tenant_id,
+                        grant.role.tenant_id,
+                    ),
+                    details={"user_group_id": grant.user_group_id, "role_id": grant.role_id},
+                )
+            )
         scopes = list(grant.scopes.all())
         if not scopes:
-            findings.append(Finding(
-                check='rbac_grant_inconsistent',
-                model='organization.RoleGrant', pk=grant.pk,
-                summary=f'RoleGrant #{grant.pk} has no scope',
-                classification=CLASS_INVALID,
-                details={},
-            ))
-        if has_membership:
-            if role_is_privileged(grant.role) and (
-                not (grant.reason or '').strip() or grant.valid_until is None
-            ):
-                findings.append(Finding(
-                    check='rbac_grant_inconsistent',
-                    model='organization.RoleGrant', pk=grant.pk,
-                    summary=(f'RoleGrant #{grant.pk}: elevated direct grant lacks '
-                             f'a reason or expiration'),
+            findings.append(
+                Finding(
+                    check="rbac_grant_inconsistent",
+                    model="organization.RoleGrant",
+                    pk=grant.pk,
+                    summary=f"RoleGrant #{grant.pk} has no scope",
                     classification=CLASS_INVALID,
-                    details={'membership_id': grant.membership_id,
-                             'role_id': grant.role_id},
-                ))
+                    details={},
+                )
+            )
+        if has_membership:
+            if role_is_privileged(grant.role) and (not (grant.reason or "").strip() or grant.valid_until is None):
+                findings.append(
+                    Finding(
+                        check="rbac_grant_inconsistent",
+                        model="organization.RoleGrant",
+                        pk=grant.pk,
+                        summary=(f"RoleGrant #{grant.pk}: elevated direct grant lacks a reason or expiration"),
+                        classification=CLASS_INVALID,
+                        details={"membership_id": grant.membership_id, "role_id": grant.role_id},
+                    )
+                )
         for scope in scopes:
             finding = (
                 _own_scope_finding(topo, grant)
-                if scope.scope_type == 'own'
+                if scope.scope_type == "own"
                 else _managed_scope_finding(topo, grant, scope)
             )
             if finding is not None:
@@ -777,37 +922,47 @@ def _group_membership_findings(topo, group):
     findings = []
     for link in group.group_memberships.all():
         if link.membership.tenant_id != group.tenant_id:
-            findings.append(Finding(
-                check='rbac_group_inconsistent',
-                model='users.GroupMembership', pk=link.pk,
-                summary=(f'GroupMembership #{link.pk}: membership tenant '
-                         f'"{topo.name(link.membership.tenant_id)}" differs from '
-                         f'group owner "{topo.name(group.tenant_id)}"'),
-                classification=topo.classify(
-                    group.tenant_id, link.membership.tenant_id,
-                ),
-                details={'user_group_id': group.pk,
-                         'membership_id': link.membership_id},
-            ))
+            findings.append(
+                Finding(
+                    check="rbac_group_inconsistent",
+                    model="users.GroupMembership",
+                    pk=link.pk,
+                    summary=(
+                        f"GroupMembership #{link.pk}: membership tenant "
+                        f'"{topo.name(link.membership.tenant_id)}" differs from '
+                        f'group owner "{topo.name(group.tenant_id)}"'
+                    ),
+                    classification=topo.classify(
+                        group.tenant_id,
+                        link.membership.tenant_id,
+                    ),
+                    details={"user_group_id": group.pk, "membership_id": link.membership_id},
+                )
+            )
     return findings
 
 
 def _check_group_memberships(topo):
-    UserGroup = apps.get_model('users', 'UserGroup')
+    UserGroup = apps.get_model("users", "UserGroup")
     findings = []
     groups = _live(UserGroup._base_manager.filter(is_active=True)).prefetch_related(
-        'group_memberships__membership',
+        "group_memberships__membership",
     )
     for group in groups:
         if group.tenant_id is None:
-            findings.append(Finding(
-                check='rbac_group_inconsistent',
-                model='users.UserGroup', pk=group.pk,
-                summary=(f'UserGroup #{group.pk} "{group.name}" has no owning tenant '
-                         f'(global groups are disallowed by the target design)'),
-                classification=CLASS_AMBIGUOUS,
-                details={},
-            ))
+            findings.append(
+                Finding(
+                    check="rbac_group_inconsistent",
+                    model="users.UserGroup",
+                    pk=group.pk,
+                    summary=(
+                        f'UserGroup #{group.pk} "{group.name}" has no owning tenant '
+                        f"(global groups are disallowed by the target design)"
+                    ),
+                    classification=CLASS_AMBIGUOUS,
+                    details={},
+                )
+            )
         else:
             findings += _group_membership_findings(topo, group)
     return findings
@@ -835,11 +990,9 @@ def run_all_checks():
         unique.setdefault(key, p)
     proposals = list(unique.values())
 
-    stats = {'total_findings': len(findings), 'proposals': len(proposals),
-             'by_check': {}, 'by_classification': {}}
+    stats = {"total_findings": len(findings), "proposals": len(proposals), "by_check": {}, "by_classification": {}}
     for f in findings:
-        stats['by_check'][f.check] = stats['by_check'].get(f.check, 0) + 1
+        stats["by_check"][f.check] = stats["by_check"].get(f.check, 0) + 1
         if f.classification:
-            stats['by_classification'][f.classification] = (
-                stats['by_classification'].get(f.classification, 0) + 1)
+            stats["by_classification"][f.classification] = stats["by_classification"].get(f.classification, 0) + 1
     return findings, proposals, stats

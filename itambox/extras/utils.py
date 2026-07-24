@@ -24,28 +24,31 @@ def resolve_generic_items(rows, toggle_url_name=None):
         obj = resolved.get((row.model.id, row.object_id))
         if not obj:
             continue
-        url = '#'
-        if hasattr(obj, 'get_absolute_url'):
+        url = "#"
+        if hasattr(obj, "get_absolute_url"):
             try:
                 url = obj.get_absolute_url()
             except Exception:
                 pass
         item = {
-            'id': row.pk,
-            'type_name': obj._meta.verbose_name.title(),
-            'name': str(obj),
-            'url': url,
-            'created': row.created,
-            'content_type_id': row.model.pk,
-            'object_id': row.object_id,
+            "id": row.pk,
+            "type_name": obj._meta.verbose_name.title(),
+            "name": str(obj),
+            "url": url,
+            "created": row.created,
+            "content_type_id": row.model.pk,
+            "object_id": row.object_id,
         }
         if toggle_url_name:
             try:
-                item['toggle_url'] = reverse(toggle_url_name, kwargs={
-                    'content_type_id': row.model.pk,
-                    'object_id': row.object_id,
-                })
+                item["toggle_url"] = reverse(
+                    toggle_url_name,
+                    kwargs={
+                        "content_type_id": row.model.pk,
+                        "object_id": row.object_id,
+                    },
+                )
             except Exception:
-                item['toggle_url'] = '#'
+                item["toggle_url"] = "#"
         items.append(item)
     return items

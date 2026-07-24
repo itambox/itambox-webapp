@@ -7,41 +7,43 @@ Covers:
 
 Both endpoints must require compliance.add_assetaudit.
 """
+
+from django.contrib.auth import get_user_model
 from django.test import TestCase
 from django.urls import reverse
-from django.contrib.auth import get_user_model
 from model_bakery import baker
-from organization.models import Location
+
 from assets.models import Asset, StatusLabel
-from compliance.models import AuditSession, AssetAudit
+from compliance.models import AssetAudit, AuditSession
 from core.tests.mixins import TenantTestMixin
+from organization.models import Location
 
 User = get_user_model()
 
-AUDIT_PERM = 'compliance.add_assetaudit'
+AUDIT_PERM = "compliance.add_assetaudit"
 
 
 class AuditScanViewPermissionTests(TenantTestMixin, TestCase):
     """compliance:auditsession_scan — HTMX barcode-scan endpoint."""
 
     def setUp(self):
-        self.setup_tenant_context(name='Perm Tenant', slug='perm-tenant')
-        loc = baker.make(Location, name='Warehouse')
+        self.setup_tenant_context(name="Perm Tenant", slug="perm-tenant")
+        loc = baker.make(Location, name="Warehouse")
         self.session = AuditSession.objects.create(
-            name='Test Campaign',
-            status='active',
+            name="Test Campaign",
+            status="active",
             location=loc,
             created_by=self.tenant_admin,
         )
-        self.url = reverse('compliance:auditsession_scan', kwargs={'pk': self.session.pk})
-        self.htmx_headers = {'HTTP_HX_REQUEST': 'true'}
+        self.url = reverse("compliance:auditsession_scan", kwargs={"pk": self.session.pk})
+        self.htmx_headers = {"HTTP_HX_REQUEST": "true"}
 
     def _post(self, user=None, **extra):
         if user:
             self.client.force_login(user)
         else:
             self.client.logout()
-        return self.client.post(self.url, {'barcode': 'DUMMY'}, **extra)
+        return self.client.post(self.url, {"barcode": "DUMMY"}, **extra)
 
     def test_anonymous_redirects_to_login(self):
         response = self._post()
@@ -55,25 +57,23 @@ class AuditScanViewPermissionTests(TenantTestMixin, TestCase):
 
     def test_authed_no_perm_htmx_returns_204_danger(self):
         self.client_login_to_tenant(self.tenant_user, self.tenant)
-        response = self.client.post(self.url, {'barcode': 'DUMMY'}, **self.htmx_headers)
+        response = self.client.post(self.url, {"barcode": "DUMMY"}, **self.htmx_headers)
         self.assertEqual(response.status_code, 204)
-        self.assertIn('showMessage', response.get('HX-Trigger', ''))
-        self.assertIn('danger', response.get('HX-Trigger', ''))
+        self.assertIn("showMessage", response.get("HX-Trigger", ""))
+        self.assertIn("danger", response.get("HX-Trigger", ""))
         self.assertEqual(AssetAudit.objects.filter(session=self.session).count(), 0)
 
     def test_authed_with_perm_processes_scan(self):
-        self.tenant_role.permissions = [AUDIT_PERM, 'assets.view_asset']
+        self.tenant_role.permissions = [AUDIT_PERM, "assets.view_asset"]
         self.tenant_role.save()
         self.client_login_to_tenant(self.tenant_user, self.tenant)
         asset = baker.make(
             Asset,
-            asset_tag='SCAN-001',
+            asset_tag="SCAN-001",
             tenant=self.tenant,
             location=self.session.location,
         )
-        response = self.client.post(
-            self.url, {'barcode': asset.asset_tag}, **self.htmx_headers
-        )
+        response = self.client.post(self.url, {"barcode": asset.asset_tag}, **self.htmx_headers)
         # Should succeed (200 rendered partial) or at least not 302/403
         self.assertNotIn(response.status_code, (302, 403))
 
@@ -82,11 +82,11 @@ class AssetAuditViewPermissionTests(TenantTestMixin, TestCase):
     """assets:asset_audit — standalone per-asset audit POST."""
 
     def setUp(self):
-        self.setup_tenant_context(name='AssetAudit Perm Tenant', slug='asset-audit-perm-tenant')
-        loc = baker.make(Location, name='ServerRoom', tenant=self.tenant)
+        self.setup_tenant_context(name="AssetAudit Perm Tenant", slug="asset-audit-perm-tenant")
+        loc = baker.make(Location, name="ServerRoom", tenant=self.tenant)
         self.status = baker.make(StatusLabel, type=StatusLabel.TYPE_DEPLOYABLE)
-        self.asset = baker.make(Asset, asset_tag='ASSET-001', tenant=self.tenant, location=loc, status=self.status)
-        self.url = reverse('assets:asset_audit', kwargs={'pk': self.asset.pk})
+        self.asset = baker.make(Asset, asset_tag="ASSET-001", tenant=self.tenant, location=loc, status=self.status)
+        self.url = reverse("assets:asset_audit", kwargs={"pk": self.asset.pk})
 
     def _post(self, user=None, data=None):
         if user:
@@ -106,12 +106,12 @@ class AssetAuditViewPermissionTests(TenantTestMixin, TestCase):
 
     def test_authed_with_perm_creates_audit_row(self):
         # Grant permissions on the existing role (setup_tenant_context created it with empty perms)
-        self.tenant_role.permissions = [AUDIT_PERM, 'assets.view_asset']
+        self.tenant_role.permissions = [AUDIT_PERM, "assets.view_asset"]
         self.tenant_role.save()
         self.client_login_to_tenant(self.tenant_user, self.tenant)
         response = self._post(
             user=self.tenant_user,
-            data={'location': self.asset.location.pk, 'status': self.status.pk},
+            data={"location": self.asset.location.pk, "status": self.status.pk},
         )
         # GenericTransactionView redirects to detail page on non-HTMX success
         self.assertIn(response.status_code, (200, 204, 302))

@@ -22,12 +22,12 @@ Schedule example (nightly at 03:00) using django-q2:
 
 import logging
 
-from django.core.management.base import BaseCommand, CommandError
-from django.contrib.auth import get_user_model
 from django.conf import settings
+from django.contrib.auth import get_user_model
+from django.core.management.base import BaseCommand, CommandError
 
-from organization.models import Tenant
 from core.models import Job
+from organization.models import Tenant
 
 logger = logging.getLogger(__name__)
 User = get_user_model()
@@ -82,6 +82,7 @@ class Command(BaseCommand):
 
         if run_now:
             from core.tasks.intune_sync import sync_tenant_intune
+
             self.stdout.write("Running synchronously…")
             sync_tenant_intune(
                 tenant_id=tenant.pk,
@@ -94,8 +95,8 @@ class Command(BaseCommand):
             if job.result:
                 self.stdout.write(str(job.result))
         else:
-            from django_q.tasks import async_task
             from django.db import transaction
+            from django_q.tasks import async_task
 
             def _enqueue():
                 async_task(
@@ -107,8 +108,4 @@ class Command(BaseCommand):
                 )
 
             transaction.on_commit(_enqueue)
-            self.stdout.write(
-                self.style.SUCCESS(
-                    f"Intune sync for tenant '{tenant_slug}' enqueued (Job #{job.pk})."
-                )
-            )
+            self.stdout.write(self.style.SUCCESS(f"Intune sync for tenant '{tenant_slug}' enqueued (Job #{job.pk})."))

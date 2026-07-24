@@ -13,34 +13,34 @@ def encrypted_field_specs():
 
     Imported lazily to avoid touching the app registry at module import time.
     """
-    from licenses.models import License
     from core.models import EmailSettings
     from extras.models import WebhookEndpoint
+    from licenses.models import License
 
     return [
-        (License, 'product_key'),
-        (EmailSettings, 'smtp_password'),
-        (WebhookEndpoint, 'secret'),
+        (License, "product_key"),
+        (EmailSettings, "smtp_password"),
+        (WebhookEndpoint, "secret"),
     ]
 
 
 class Command(BaseCommand):
-    help = 'Re-encrypt every encrypted field with the current primary key (key rotation).'
+    help = "Re-encrypt every encrypted field with the current primary key (key rotation)."
 
     def add_arguments(self, parser):
         parser.add_argument(
-            '--dry-run',
-            action='store_true',
+            "--dry-run",
+            action="store_true",
             default=False,
-            help='Simulate key rotation without saving database changes',
+            help="Simulate key rotation without saving database changes",
         )
 
     def handle(self, *args, **options):
-        dry_run = options['dry_run']
+        dry_run = options["dry_run"]
 
         self.stdout.write("Scanning for encrypted fields in the database...")
 
-        totals = {'rotated': 0, 'skipped': 0, 'errors': 0}
+        totals = {"rotated": 0, "skipped": 0, "errors": 0}
         with transaction.atomic():
             for model, field_name in encrypted_field_specs():
                 result = self._rotate_field(model, field_name, dry_run)
@@ -48,10 +48,11 @@ class Command(BaseCommand):
                     totals[key] += result[key]
 
             prefix = "[DRY RUN] Simulation complete." if dry_run else "Rotation complete!"
-            self.stdout.write(self.style.SUCCESS(
-                f"{prefix} Rotated: {totals['rotated']}, "
-                f"Skipped: {totals['skipped']}, Errors: {totals['errors']}."
-            ))
+            self.stdout.write(
+                self.style.SUCCESS(
+                    f"{prefix} Rotated: {totals['rotated']}, Skipped: {totals['skipped']}, Errors: {totals['errors']}."
+                )
+            )
 
     def _rotate_field(self, model, field_name, dry_run):
         label = f"{model.__name__}.{field_name}"
@@ -75,19 +76,18 @@ class Command(BaseCommand):
                 try:
                     decrypted_val = decrypt_string(raw)
                 except Exception as e:
-                    self.stderr.write(self.style.ERROR(
-                        f"Failed to decrypt {label} pk={obj.pk}: {e}"
-                    ))
+                    self.stderr.write(self.style.ERROR(f"Failed to decrypt {label} pk={obj.pk}: {e}"))
                     errors += 1
                     continue
 
             # Defensive: decrypt_string raises on failure, but guard against a silent
             # cipher-passthrough to avoid re-encrypting an unrecoverable value.
             if decrypted_val == raw and raw.startswith("enc$"):
-                self.stderr.write(self.style.ERROR(
-                    f"Decryption returned the cipher for {label} pk={obj.pk}; "
-                    f"skipping to avoid data loss."
-                ))
+                self.stderr.write(
+                    self.style.ERROR(
+                        f"Decryption returned the cipher for {label} pk={obj.pk}; skipping to avoid data loss."
+                    )
+                )
                 errors += 1
                 continue
 
@@ -99,11 +99,9 @@ class Command(BaseCommand):
 
             rotated += 1
             if dry_run:
-                self.stdout.write(self.style.WARNING(
-                    f"[DRY RUN] Would rotate {label} pk={obj.pk}"
-                ))
+                self.stdout.write(self.style.WARNING(f"[DRY RUN] Would rotate {label} pk={obj.pk}"))
             else:
                 # .update() bypasses save()'s encrypt-on-save, storing the new ciphertext as-is.
                 model._base_manager.filter(pk=obj.pk).update(**{field_name: new_encrypted})
 
-        return {'rotated': rotated, 'skipped': skipped, 'errors': errors}
+        return {"rotated": rotated, "skipped": skipped, "errors": errors}

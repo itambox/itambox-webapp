@@ -1,97 +1,97 @@
+from crispy_forms.helper import FormHelper
+from crispy_forms.layout import HTML, Column, Layout, Row, Submit
 from django import forms
 from django.core.exceptions import ValidationError
 from django.urls import reverse
 from django.utils.translation import gettext_lazy as _
-from crispy_forms.helper import FormHelper
-from crispy_forms.layout import Layout, Submit, HTML, Row, Column
 
-from core.forms import SlugModelForm, FilterForm, scope_tenant_field
-from extras.models import Tag
+from assets.models import Category, Manufacturer, Supplier
+from core.forms import FilterForm, SlugModelForm, scope_tenant_field
 from extras.customfields import CustomFieldModelFormMixin
+from extras.models import Tag
 from organization.models import Location
-from assets.models import Manufacturer, Category, Supplier
+
+from ..filters import ConsumableAssignmentFilterSet, ConsumableFilterSet, ConsumableStockFilterSet
 from ..models import Consumable, ConsumableStock
-from ..filters import ConsumableFilterSet, ConsumableStockFilterSet, ConsumableAssignmentFilterSet
 from .base_forms import BaseCheckoutForm
 
 
 class ConsumableForm(CustomFieldModelFormMixin, SlugModelForm):
     manufacturer = forms.ModelChoiceField(
-        queryset=Manufacturer.objects.all(),
-        widget=forms.Select(attrs={'class': 'form-select'})
+        queryset=Manufacturer.objects.all(), widget=forms.Select(attrs={"class": "form-select"})
     )
     category = forms.ModelChoiceField(
         queryset=Category.objects.filter(applies_to__consumable=True),
         required=False,
-        widget=forms.Select(attrs={'class': 'form-select'}),
-        label=_("Category")
+        widget=forms.Select(attrs={"class": "form-select"}),
+        label=_("Category"),
     )
     supplier = forms.ModelChoiceField(
         queryset=Supplier.objects.all(),
         required=False,
-        widget=forms.Select(attrs={'class': 'form-select', 'data-tom-select': ''}),
-        label=_("Supplier")
+        widget=forms.Select(attrs={"class": "form-select", "data-tom-select": ""}),
+        label=_("Supplier"),
     )
     tags = forms.ModelMultipleChoiceField(
         queryset=Tag.objects.all(),
         required=False,
-        widget=forms.SelectMultiple(attrs={'class': 'form-select', 'data-tomselect-tags': 'true'}),
-        label=_("Tags")
+        widget=forms.SelectMultiple(attrs={"class": "form-select", "data-tomselect-tags": "true"}),
+        label=_("Tags"),
     )
 
     class Meta:
         model = Consumable
-        fields = ['manufacturer', 'name', 'slug', 'category', 'supplier', 'part_number', 'ean', 'min_qty', 'allow_overallocate', 'notes', 'tags', 'tenant']
+        fields = [
+            "manufacturer",
+            "name",
+            "slug",
+            "category",
+            "supplier",
+            "part_number",
+            "ean",
+            "min_qty",
+            "allow_overallocate",
+            "notes",
+            "tags",
+            "tenant",
+        ]
         widgets = {
-            'name': forms.TextInput(attrs={'class': 'form-control'}),
-            'slug': forms.TextInput(attrs={'class': 'form-control', 'slugify': 'name'}),
-            'part_number': forms.TextInput(attrs={'class': 'form-control'}),
-            'ean': forms.TextInput(attrs={'class': 'form-control', 'inputmode': 'numeric'}),
-            'min_qty': forms.NumberInput(attrs={'class': 'form-control', 'min': 0}),
-            'allow_overallocate': forms.CheckboxInput(attrs={'class': 'form-check-input'}),
-            'notes': forms.Textarea(attrs={'class': 'form-control', 'rows': 3}),
+            "name": forms.TextInput(attrs={"class": "form-control"}),
+            "slug": forms.TextInput(attrs={"class": "form-control", "slugify": "name"}),
+            "part_number": forms.TextInput(attrs={"class": "form-control"}),
+            "ean": forms.TextInput(attrs={"class": "form-control", "inputmode": "numeric"}),
+            "min_qty": forms.NumberInput(attrs={"class": "form-control", "min": 0}),
+            "allow_overallocate": forms.CheckboxInput(attrs={"class": "form-check-input"}),
+            "notes": forms.Textarea(attrs={"class": "form-control", "rows": 3}),
         }
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         scope_tenant_field(self)
         self.helper = FormHelper(self)
-        self.helper.form_method = 'post'
+        self.helper.form_method = "post"
         self.helper.form_tag = True
-        self.fields['slug'].widget.attrs['slugify'] = 'name'
+        self.fields["slug"].widget.attrs["slugify"] = "name"
 
-        button_text = 'Update' if self.instance.pk else 'Create'
-        cancel_url = self.instance.get_absolute_url() if self.instance.pk else reverse('inventory:consumable_list')
+        button_text = "Update" if self.instance.pk else "Create"
+        cancel_url = self.instance.get_absolute_url() if self.instance.pk else reverse("inventory:consumable_list")
 
         self.helper.layout = Layout(
+            Row(Column("manufacturer", css_class="col-md-6"), Column("name", css_class="col-md-6")),
             Row(
-                Column('manufacturer', css_class='col-md-6'),
-                Column('name', css_class='col-md-6')
+                Column("supplier", css_class="col-md-4"),
+                Column("part_number", css_class="col-md-4"),
+                Column("ean", css_class="col-md-4"),
             ),
-            Row(
-                Column('supplier', css_class='col-md-4'),
-                Column('part_number', css_class='col-md-4'),
-                Column('ean', css_class='col-md-4')
-            ),
-            Row(
-                Column('slug', css_class='col-md-6'),
-                Column('category', css_class='col-md-6')
-            ),
-            Row(
-                Column('min_qty', css_class='col-md-6'),
-                Column('tenant', css_class='col-md-6')
-            ),
-            Row(
-                Column('allow_overallocate', css_class='col-md-6')
-            ),
-            Row(
-                Column('tags', css_class='col-md-12')
-            ),
-            'notes',
+            Row(Column("slug", css_class="col-md-6"), Column("category", css_class="col-md-6")),
+            Row(Column("min_qty", css_class="col-md-6"), Column("tenant", css_class="col-md-6")),
+            Row(Column("allow_overallocate", css_class="col-md-6")),
+            Row(Column("tags", css_class="col-md-12")),
+            "notes",
             HTML('<div class="mt-3">'),
-            Submit('submit', button_text, css_class='btn btn-primary'),
+            Submit("submit", button_text, css_class="btn btn-primary"),
             HTML(f'<a href="{cancel_url}" class="btn btn-outline-secondary ms-2">Cancel</a>'),
-            HTML('</div>')
+            HTML("</div>"),
         )
         self.append_custom_fields_to_layout()
 
@@ -99,73 +99,73 @@ class ConsumableForm(CustomFieldModelFormMixin, SlugModelForm):
 class ConsumableStockForm(forms.ModelForm):
     class Meta:
         model = ConsumableStock
-        fields = ['consumable', 'location', 'qty']
+        fields = ["consumable", "location", "qty"]
         widgets = {
-            'consumable': forms.Select(attrs={'class': 'form-select'}),
-            'location': forms.Select(attrs={'class': 'form-select'}),
-            'qty': forms.NumberInput(attrs={'class': 'form-control', 'min': 0}),
+            "consumable": forms.Select(attrs={"class": "form-select"}),
+            "location": forms.Select(attrs={"class": "form-select"}),
+            "qty": forms.NumberInput(attrs={"class": "form-control", "min": 0}),
         }
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         # Rescope tenant-owned FK querysets per request (import-frozen unscoped).
-        self.fields['consumable'].queryset = Consumable.objects.all()
-        self.fields['location'].queryset = Location.objects.all().select_related('site')
+        self.fields["consumable"].queryset = Consumable.objects.all()
+        self.fields["location"].queryset = Location.objects.all().select_related("site")
         self.helper = FormHelper(self)
-        self.helper.form_method = 'post'
+        self.helper.form_method = "post"
         self.helper.form_tag = True
-        button_text = 'Update' if self.instance.pk else 'Create'
+        button_text = "Update" if self.instance.pk else "Create"
         self.helper.layout = Layout(
-            'consumable',
-            'location',
-            'qty',
+            "consumable",
+            "location",
+            "qty",
             HTML('<div class="mt-3">'),
-            Submit('submit', button_text, css_class='btn btn-primary'),
-            HTML('</div>')
+            Submit("submit", button_text, css_class="btn btn-primary"),
+            HTML("</div>"),
         )
 
 
 class ConsumableCheckoutForm(BaseCheckoutForm):
     qty = forms.IntegerField(
-        initial=1,
-        min_value=1,
-        widget=forms.NumberInput(attrs={'class': 'form-control'}),
-        label=_("Quantity")
+        initial=1, min_value=1, widget=forms.NumberInput(attrs={"class": "form-control"}), label=_("Quantity")
     )
     from_location = forms.ModelChoiceField(
-        queryset=Location.objects.all().order_by('name'),
+        queryset=Location.objects.all().order_by("name"),
         required=True,
-        widget=forms.Select(attrs={'class': 'form-select'}),
-        label=_("From Location")
+        widget=forms.Select(attrs={"class": "form-select"}),
+        label=_("From Location"),
     )
 
     def __init__(self, *args, **kwargs):
-        self.consumable = kwargs.pop('consumable', None)
+        self.consumable = kwargs.pop("consumable", None)
         tenant = self.consumable.tenant if self.consumable else None
         # inline import: sibling-module import at call time avoids a forms-package cycle
         from ..models import ConsumableStock
-        super().__init__(*args, tenant=tenant, item=self.consumable,
-                         stock_model=ConsumableStock, **kwargs)
+
+        super().__init__(*args, tenant=tenant, item=self.consumable, stock_model=ConsumableStock, **kwargs)
         self.helper = FormHelper()
         self.helper.form_tag = False
         self.helper.layout = Layout(
-            'from_location',
-            'assigned_holder',
+            "from_location",
+            "assigned_holder",
             HTML('<p class="text-muted text-center my-2">OR</p>'),
-            'assigned_location',
+            "assigned_location",
             HTML('<p class="text-muted text-center my-2">OR</p>'),
-            'assigned_asset',
-            'qty',
-            'notes'
+            "assigned_asset",
+            "qty",
+            "notes",
         )
 
     def clean(self):
         cleaned_data = super().clean()
-        qty = cleaned_data.get('qty')
+        qty = cleaned_data.get("qty")
         if self.consumable and qty:
             remaining = self.consumable.available
             if not self.consumable.allow_overallocate and qty > remaining:
-                raise ValidationError(_("Cannot checkout %(qty)s units. Only %(remaining)s units are currently in stock.") % {"qty": qty, "remaining": remaining})
+                raise ValidationError(
+                    _("Cannot checkout %(qty)s units. Only %(remaining)s units are currently in stock.")
+                    % {"qty": qty, "remaining": remaining}
+                )
         return cleaned_data
 
 
@@ -184,19 +184,19 @@ class ConsumableAssignmentFilterForm(FilterForm):
 class ConsumableStockModalForm(forms.ModelForm):
     qty = forms.IntegerField(
         min_value=1,
-        widget=forms.NumberInput(attrs={'class': 'form-control', 'min': 1}),
+        widget=forms.NumberInput(attrs={"class": "form-control", "min": 1}),
     )
 
     class Meta:
         model = ConsumableStock
-        fields = ['location', 'qty']
+        fields = ["location", "qty"]
         widgets = {
-            'location': forms.Select(attrs={'class': 'form-select'}),
+            "location": forms.Select(attrs={"class": "form-select"}),
         }
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         # Rescope the tenant-owned `location` FK per request (import-frozen unscoped).
-        self.fields['location'].queryset = Location.objects.all().select_related('site')
+        self.fields["location"].queryset = Location.objects.all().select_related("site")
         self.helper = FormHelper()
         self.helper.form_tag = False

@@ -56,22 +56,17 @@ def register_schedule(func, *, defaults=None):
 
             # Lock existing rows for this func so concurrent registrations of an
             # already-present schedule serialize rather than racing.
-            existing = list(
-                Schedule.objects.select_for_update()
-                .filter(func=func)
-                .order_by('id')
-            )
+            existing = list(Schedule.objects.select_for_update().filter(func=func).order_by("id"))
             if existing:
                 schedule = existing[0]
                 # Collapse any duplicates left by a previous racy registration.
                 duplicates = existing[1:]
                 if duplicates:
-                    Schedule.objects.filter(
-                        pk__in=[s.pk for s in duplicates]
-                    ).delete()
+                    Schedule.objects.filter(pk__in=[s.pk for s in duplicates]).delete()
                     logger.warning(
                         "Removed %d duplicate schedule row(s) for func=%s",
-                        len(duplicates), func,
+                        len(duplicates),
+                        func,
                     )
                 changed = []
                 for key, value in defaults.items():

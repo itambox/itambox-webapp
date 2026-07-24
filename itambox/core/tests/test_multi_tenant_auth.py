@@ -1,12 +1,14 @@
-from unittest.mock import patch, MagicMock
-from django.test import TestCase, override_settings
-from django.core.management import call_command, CommandError
-from django.contrib.auth import get_user_model
-from django.utils import timezone
-from core.managers import set_current_tenant, get_current_tenant
-from core.auth.ldap import MultiTenantLDAPBackend
+from unittest.mock import MagicMock, patch
+
 import ldap
+from django.contrib.auth import get_user_model
+from django.core.management import CommandError, call_command
+from django.test import TestCase, override_settings
+from django.utils import timezone
+
+from core.auth.ldap import MultiTenantLDAPBackend
 from core.auth.saml import load_saml_config
+from core.managers import get_current_tenant, set_current_tenant
 from organization.models import Membership, RoleGrantScope, Tenant
 
 User = get_user_model()
@@ -18,12 +20,8 @@ TEST_LDAP_CONFIGS = {
         "SERVER_URI": "ldap://ldap.alpha.com",
         "BIND_DN": "cn=admin,dc=alpha,dc=com",
         "BIND_PASSWORD": "alphapassword",
-        "USER_SEARCH": {
-            "base_dn": "ou=users,dc=alpha,dc=com",
-            "filter": "(uid=%(user)s)",
-            "scope": "SUBTREE"
-        },
-        "REQUIRE_GROUP": "cn=itambox-users,ou=groups,dc=alpha,dc=com"
+        "USER_SEARCH": {"base_dn": "ou=users,dc=alpha,dc=com", "filter": "(uid=%(user)s)", "scope": "SUBTREE"},
+        "REQUIRE_GROUP": "cn=itambox-users,ou=groups,dc=alpha,dc=com",
     },
     "tenant-beta": {
         "SERVER_URI": "ldaps://ldap.beta.org",
@@ -32,9 +30,9 @@ TEST_LDAP_CONFIGS = {
         "USER_SEARCH": {
             "base_dn": "ou=staff,dc=beta,dc=org",
             "filter": "(sAMAccountName=%(user)s)",
-            "scope": "ONELEVEL"
-        }
-    }
+            "scope": "ONELEVEL",
+        },
+    },
 }
 
 # Dummy tenant SAML settings
@@ -42,24 +40,17 @@ TEST_SAML_CONFIGS = {
     "tenant-alpha": {
         "entityid": "https://alpha.example.com/saml2/metadata/",
         "base_url": "https://alpha.example.com",
-        "metadata": {
-            "remote": [{"url": "https://idp.alpha.com/metadata"}]
-        }
+        "metadata": {"remote": [{"url": "https://idp.alpha.com/metadata"}]},
     },
     "tenant-beta": {
         "entityid": "https://beta.example.com/saml2/metadata/",
         "base_url": "https://beta.example.com",
-        "metadata": {
-            "local": ["/etc/saml/beta_metadata.xml"]
-        }
-    }
+        "metadata": {"local": ["/etc/saml/beta_metadata.xml"]},
+    },
 }
 
 
-@override_settings(
-    ITAMBOX_TENANT_LDAP_CONFIGS=TEST_LDAP_CONFIGS,
-    ITAMBOX_TENANT_SAML_CONFIGS=TEST_SAML_CONFIGS
-)
+@override_settings(ITAMBOX_TENANT_LDAP_CONFIGS=TEST_LDAP_CONFIGS, ITAMBOX_TENANT_SAML_CONFIGS=TEST_SAML_CONFIGS)
 class MultiTenantAuthTestCase(TestCase):
     def setUp(self):
         set_current_tenant(None)
@@ -68,11 +59,12 @@ class MultiTenantAuthTestCase(TestCase):
 
         # Patch xmlsec binary lookup to avoid SigverError on environments without xmlsec
         import sys
-        self.xmlsec_patcher = patch('saml2.sigver.get_xmlsec_binary', return_value=sys.executable)
+
+        self.xmlsec_patcher = patch("saml2.sigver.get_xmlsec_binary", return_value=sys.executable)
         self.xmlsec_patcher.start()
 
         # Patch requests.request to return dummy metadata XML
-        self.requests_patcher = patch('requests.request')
+        self.requests_patcher = patch("requests.request")
         self.mock_request = self.requests_patcher.start()
 
         mock_resp = MagicMock()
@@ -83,19 +75,20 @@ class MultiTenantAuthTestCase(TestCase):
         <SingleSignOnService Binding="urn:oasis:names:tc:SAML:2.0:bindings:HTTP-Redirect" Location="https://idp.alpha.com/sso"/>
     </IDPSSODescriptor>
 </EntityDescriptor>"""
-        mock_resp.content = mock_resp.text.encode('utf-8')
+        mock_resp.content = mock_resp.text.encode("utf-8")
         self.mock_request.return_value = mock_resp
 
         # Patch builtins.open to return dummy metadata XML for local file checks
         original_open = open
 
         def mock_open_file(file, *args, **kwargs):
-            if isinstance(file, str) and 'beta_metadata.xml' in file:
+            if isinstance(file, str) and "beta_metadata.xml" in file:
                 from io import BytesIO
+
                 return BytesIO(mock_resp.content)
             return original_open(file, *args, **kwargs)
 
-        self.open_patcher = patch('builtins.open', mock_open_file)
+        self.open_patcher = patch("builtins.open", mock_open_file)
         self.open_patcher.start()
 
     def tearDown(self):
@@ -162,7 +155,7 @@ class MultiTenantAuthTestCase(TestCase):
         backend = MultiTenantLDAPBackend()
 
         # Mock simple_bind_s and search results to prevent actual LDAP connection
-        with patch('django_auth_ldap.backend.LDAPBackend.authenticate') as mock_auth:
+        with patch("django_auth_ldap.backend.LDAPBackend.authenticate") as mock_auth:
             mock_auth.return_value = None
 
             # Auth query with UPN username matching tenant alpha slug
@@ -175,10 +168,10 @@ class MultiTenantAuthTestCase(TestCase):
             self.assertEqual(get_current_tenant(), self.tenant_beta)
 
     @patch(
-        'core.management.commands.sync_tenant_ldap.django_auth_ldap_installed',
+        "core.management.commands.sync_tenant_ldap.django_auth_ldap_installed",
         True,
     )
-    @patch('ldap.initialize')
+    @patch("ldap.initialize")
     def test_sync_tenant_ldap_command(self, mock_ldap_init):
         """Test that sync_tenant_ldap command fetches configurations and syncs users for the specified tenant."""
         # Setup LDAP connection mocks
@@ -190,38 +183,44 @@ class MultiTenantAuthTestCase(TestCase):
 
         # Mock connection results generator: first search result entry then None
         mock_conn.result.side_effect = [
-            (ldap.RES_SEARCH_ENTRY, [
-                ("uid=john.doe,ou=users,dc=alpha,dc=com", {
-                    "uid": [b"john.doe"],
-                    "mail": [b"john.doe@alpha.com"],
-                    "givenName": [b"John"],
-                    "sn": [b"Doe"],
-                    "memberOf": [b"cn=itambox-users,ou=groups,dc=alpha,dc=com"]
-                })
-            ]),
-            (None, None)
+            (
+                ldap.RES_SEARCH_ENTRY,
+                [
+                    (
+                        "uid=john.doe,ou=users,dc=alpha,dc=com",
+                        {
+                            "uid": [b"john.doe"],
+                            "mail": [b"john.doe@alpha.com"],
+                            "givenName": [b"John"],
+                            "sn": [b"Doe"],
+                            "memberOf": [b"cn=itambox-users,ou=groups,dc=alpha,dc=com"],
+                        },
+                    )
+                ],
+            ),
+            (None, None),
         ]
 
         # Call synchronization command for tenant-alpha
-        call_command('sync_tenant_ldap', tenant='tenant-alpha')
+        call_command("sync_tenant_ldap", tenant="tenant-alpha")
 
         # Check that user was created and sync was successful
-        user = User.objects.get(username='john.doe')
-        self.assertEqual(user.email, 'john.doe@alpha.com')
-        self.assertEqual(user.first_name, 'John')
-        self.assertEqual(user.last_name, 'Doe')
+        user = User.objects.get(username="john.doe")
+        self.assertEqual(user.email, "john.doe@alpha.com")
+        self.assertEqual(user.first_name, "John")
+        self.assertEqual(user.last_name, "Doe")
 
         # Check tenant membership was created
         membership = Membership.objects.get(user=user, tenant=self.tenant_alpha)
         role_grant = membership.role_grants.get(
             scopes__scope_type=RoleGrantScope.SCOPE_OWN,
         )
-        self.assertEqual(role_grant.role.name, 'Member')
-        self.assertEqual(role_grant.reason, 'LDAP directory synchronization')
+        self.assertEqual(role_grant.role.name, "Member")
+        self.assertEqual(role_grant.reason, "LDAP directory synchronization")
         self.assertGreater(role_grant.valid_until, timezone.now())
 
     def test_sync_tenant_ldap_command_invalid_tenant(self):
         """Test that sync_tenant_ldap raises CommandError for non-existent tenants."""
         with self.assertRaises(CommandError) as context:
-            call_command('sync_tenant_ldap', tenant='non-existent')
+            call_command("sync_tenant_ldap", tenant="non-existent")
         self.assertIn("does not exist", str(context.exception))

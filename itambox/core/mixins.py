@@ -1,10 +1,8 @@
-from django.db import models
 from django.contrib.contenttypes.fields import GenericRelation
+from django.db import models
 from django.utils.translation import gettext_lazy as _
 
 from itambox.registry import registry
-
-
 
 
 class BookmarkableMixin:
@@ -18,8 +16,8 @@ class BookmarkableMixin:
     @classmethod
     def __init_subclass__(cls, **kwargs):
         super().__init_subclass__(**kwargs)
-        registry.register_feature(cls, 'bookmarkable')
-        registry.register_feature(cls, 'watchable')
+        registry.register_feature(cls, "bookmarkable")
+        registry.register_feature(cls, "watchable")
 
 
 class CloneableMixin:
@@ -40,7 +38,7 @@ class CloneableMixin:
     @classmethod
     def __init_subclass__(cls, **kwargs):
         super().__init_subclass__(**kwargs)
-        registry.register_feature(cls, 'cloneable')
+        registry.register_feature(cls, "cloneable")
 
 
 class CustomFieldDataMixin(models.Model):
@@ -62,7 +60,7 @@ class CustomFieldDataMixin(models.Model):
     @classmethod
     def __init_subclass__(cls, **kwargs):
         super().__init_subclass__(**kwargs)
-        registry.register_feature(cls, 'custom_field_data')
+        registry.register_feature(cls, "custom_field_data")
 
 
 class ExportableMixin:
@@ -73,7 +71,7 @@ class ExportableMixin:
     @classmethod
     def __init_subclass__(cls, **kwargs):
         super().__init_subclass__(**kwargs)
-        registry.register_feature(cls, 'exportable')
+        registry.register_feature(cls, "exportable")
 
 
 class ImportableMixin:
@@ -84,7 +82,7 @@ class ImportableMixin:
     @classmethod
     def __init_subclass__(cls, **kwargs):
         super().__init_subclass__(**kwargs)
-        registry.register_feature(cls, 'importable')
+        registry.register_feature(cls, "importable")
 
 
 class JournalingMixin(models.Model):
@@ -94,11 +92,8 @@ class JournalingMixin(models.Model):
     Models using this mixin will have a reverse GenericRelation
     to JournalEntry for easy lookup.
     """
-    journal_entries = GenericRelation(
-        'extras.JournalEntry',
-        content_type_field='model',
-        object_id_field='object_id'
-    )
+
+    journal_entries = GenericRelation("extras.JournalEntry", content_type_field="model", object_id_field="object_id")
 
     class Meta:
         abstract = True
@@ -106,17 +101,16 @@ class JournalingMixin(models.Model):
     @classmethod
     def __init_subclass__(cls, **kwargs):
         super().__init_subclass__(**kwargs)
-        registry.register_feature(cls, 'journaling')
+        registry.register_feature(cls, "journaling")
 
 
 class ImageAttachmentMixin(models.Model):
     """
     Mixin for models that can have uploaded images.
     """
+
     image_attachments = GenericRelation(
-        'extras.ImageAttachment',
-        content_type_field='model',
-        object_id_field='object_id'
+        "extras.ImageAttachment", content_type_field="model", object_id_field="object_id"
     )
 
     class Meta:
@@ -125,18 +119,15 @@ class ImageAttachmentMixin(models.Model):
     @classmethod
     def __init_subclass__(cls, **kwargs):
         super().__init_subclass__(**kwargs)
-        registry.register_feature(cls, 'image_attachments')
+        registry.register_feature(cls, "image_attachments")
 
 
 class FileAttachmentMixin(models.Model):
     """
     Mixin for models that can have uploaded files.
     """
-    file_attachments = GenericRelation(
-        'extras.FileAttachment',
-        content_type_field='model',
-        object_id_field='object_id'
-    )
+
+    file_attachments = GenericRelation("extras.FileAttachment", content_type_field="model", object_id_field="object_id")
 
     class Meta:
         abstract = True
@@ -144,7 +135,7 @@ class FileAttachmentMixin(models.Model):
     @classmethod
     def __init_subclass__(cls, **kwargs):
         super().__init_subclass__(**kwargs)
-        registry.register_feature(cls, 'file_attachments')
+        registry.register_feature(cls, "file_attachments")
 
 
 class TaggableMixin:
@@ -158,7 +149,7 @@ class TaggableMixin:
     @classmethod
     def __init_subclass__(cls, **kwargs):
         super().__init_subclass__(**kwargs)
-        registry.register_feature(cls, 'taggable')
+        registry.register_feature(cls, "taggable")
 
 
 class SoftDeleteMixin(models.Model):
@@ -174,12 +165,13 @@ class SoftDeleteMixin(models.Model):
 
     def soft_delete(self):
         from django.utils import timezone
+
         self.deleted_at = timezone.now()
-        self.save(update_fields=['deleted_at'])
+        self.save(update_fields=["deleted_at"])
 
     def restore(self):
         self.deleted_at = None
-        self.save(update_fields=['deleted_at'])
+        self.save(update_fields=["deleted_at"])
 
     def delete(self, *args, force_hard_delete=False, **kwargs):
         """
@@ -191,7 +183,7 @@ class SoftDeleteMixin(models.Model):
         # ChangeLoggingMixin earlier in the MRO. Resolve from either source and
         # re-stash so the partner mixin sees it regardless of MRO order; never
         # forward the kwarg to super() (models.Model.delete() rejects it).
-        force_hard = force_hard_delete or getattr(self, '_force_hard_delete', False)
+        force_hard = force_hard_delete or getattr(self, "_force_hard_delete", False)
         self._force_hard_delete = force_hard
         if force_hard:
             super().delete(*args, **kwargs)
@@ -199,23 +191,25 @@ class SoftDeleteMixin(models.Model):
             from django.db import transaction
 
             with transaction.atomic():
-                if hasattr(self, '_changelog_action'):
+                if hasattr(self, "_changelog_action"):
                     from core.choices import ObjectChangeActionChoices
+
                     self._changelog_action = ObjectChangeActionChoices.ACTION_DELETE
-                
-                if hasattr(self, 'snapshot') and callable(self.snapshot):
+
+                if hasattr(self, "snapshot") and callable(self.snapshot):
                     self.snapshot()
-                
+
                 # Recurse and soft-delete/hard-delete cascading relations
                 from django.db.models.deletion import Collector
-                
-                collector = Collector(using=self._state.db or 'default')
+
+                collector = Collector(using=self._state.db or "default")
                 collector.collect([self])
                 collector.sort()
-                
+
                 from django.utils import timezone
+
                 now = timezone.now()
-                
+
                 for model, instances in list(collector.data.items()):
                     pks_to_soft_delete = []
                     for instance in instances:
@@ -225,11 +219,12 @@ class SoftDeleteMixin(models.Model):
                             if instance.deleted_at is None:
                                 pks_to_soft_delete.append(instance.pk)
                                 # Cascade changelog generation to prevent audit trail blind spots
-                                if hasattr(instance, '_log_change') and callable(instance._log_change):
+                                if hasattr(instance, "_log_change") and callable(instance._log_change):
                                     from itambox.utils import serialize_object
-                                    excluded = getattr(instance, '_change_logging_excluded_fields', ['updated_at'])
+
+                                    excluded = getattr(instance, "_change_logging_excluded_fields", ["updated_at"])
                                     prechange_data = serialize_object(instance, exclude_fields=excluded)
-                                    instance._log_change(action='delete', prechange_data=prechange_data)
+                                    instance._log_change(action="delete", prechange_data=prechange_data)
                         else:
                             # Non-soft-deletable cascade children are physically
                             # deleted with the (soft-deleted!) parent — EXCEPT
@@ -237,11 +232,11 @@ class SoftDeleteMixin(models.Model):
                             # (e.g. RoleGrant: grant rows are audit trail
                             # and must outlive a soft-deleted Role so a restore
                             # re-arms them). They still cascade on hard delete.
-                            if getattr(instance, 'survive_parent_soft_delete', False):
+                            if getattr(instance, "survive_parent_soft_delete", False):
                                 continue
                             if instance.pk is not None:
                                 instance.delete()
-                    
+
                     if pks_to_soft_delete:
                         # _base_manager (unscoped): these are cascade children of `self`
                         # collected by the ORM, so they MUST be soft-deleted regardless of
@@ -249,33 +244,34 @@ class SoftDeleteMixin(models.Model):
                         # zero rows for a child in a different/None tenant — leaving it active
                         # while a 'delete' audit entry was already written above (divergence).
                         model._base_manager.filter(pk__in=pks_to_soft_delete).update(deleted_at=now)
-                
+
                 self.soft_delete()
 
     @classmethod
     def __init_subclass__(cls, **kwargs):
         super().__init_subclass__(**kwargs)
-        registry.register_feature(cls, 'soft_delete')
+        registry.register_feature(cls, "soft_delete")
 
 
 class AutoSlugMixin:
     """
     Mixin to automatically generate a unique slug field on save.
-    
+
     By default, it will slugify the field specified by `slug_source` (default: 'name').
     It can also take a tuple/list of field names as `slug_source`, which will be
     concatenated together.
-    
+
     If there is a collision, it will append a counter to ensure uniqueness.
     """
-    slug_source = 'name'
+
+    slug_source = "name"
 
     def save(self, *args, **kwargs):
-        if not getattr(self, 'slug', None):
+        if not getattr(self, "slug", None):
             from itambox.utils import generate_unique_slug
+
             generate_unique_slug(self, self.slug_source)
         super().save(*args, **kwargs)
-
 
 
 class SubscribableMixin(models.Model):
@@ -284,11 +280,12 @@ class SubscribableMixin(models.Model):
     Models using this mixin will have a reverse GenericRelation
     to SubscriptionAssignment.
     """
+
     subscriptions = GenericRelation(
-        'subscriptions.SubscriptionAssignment',
-        content_type_field='content_type',
-        object_id_field='object_id',
-        related_query_name='%(app_label)s_%(class)s'
+        "subscriptions.SubscriptionAssignment",
+        content_type_field="content_type",
+        object_id_field="object_id",
+        related_query_name="%(app_label)s_%(class)s",
     )
 
     class Meta:
@@ -297,5 +294,4 @@ class SubscribableMixin(models.Model):
     @classmethod
     def __init_subclass__(cls, **kwargs):
         super().__init_subclass__(**kwargs)
-        registry.register_feature(cls, 'subscribable')
-
+        registry.register_feature(cls, "subscribable")

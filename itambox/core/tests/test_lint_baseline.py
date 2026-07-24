@@ -13,6 +13,8 @@ blocking violation causes nonzero exit" proof required by issue #15.
 The gate refuses non-canonical interpreters, so the subprocess-driven tests here
 require running the suite on Python 3.12 (the supported baseline, see issue #16).
 """
+
+import collections
 import importlib.util
 import json
 import subprocess
@@ -59,9 +61,9 @@ def _baseline(*findings):
 
 def _with_policy(root, baseline, targets=("pkg",)):
     baseline = dict(baseline)
-    baseline["policy_sha256"] = _load_script(
-        "check_flake8_baseline_fixture_policy"
-    ).compute_policy_fingerprint(root, list(targets))
+    baseline["policy_sha256"] = _load_script("check_flake8_baseline_fixture_policy").compute_policy_fingerprint(
+        root, list(targets)
+    )
     return baseline
 
 
@@ -70,6 +72,22 @@ def _write_fixture_policy(root):
         "[flake8]\nselect = B,C,E,F,W,B9\nignore = E203, E501, W503\n",
         encoding="utf-8",
     )
+
+
+def test_baseline_writer_forces_lf_line_endings():
+    gate = _load_script("check_flake8_baseline_lf_writer")
+
+    class RecordingPath:
+        def write_text(self, content, **kwargs):
+            self.content = content
+            self.kwargs = kwargs
+
+    baseline_path = RecordingPath()
+    gate.write_baseline(collections.Counter(), baseline_path, "policy-fingerprint")
+
+    assert baseline_path.content.endswith("\n")
+    assert baseline_path.kwargs["encoding"] == "utf-8"
+    assert baseline_path.kwargs["newline"] == "\n"
 
 
 @pytest.fixture
@@ -239,23 +257,18 @@ def test_b907_multiline_statement_anchor_is_stable_across_reported_rows(
 ):
     root, module = fixture_project
     module.write_text(
-        "def render(checkin_url):\n"
-        "    return (\n"
-        "        '<a '\n"
-        "        f'hx-get=\"{checkin_url}\"'\n"
-        "    )\n",
+        "def render(checkin_url):\n    return (\n        '<a '\n        f'hx-get=\"{checkin_url}\"'\n    )\n",
         encoding="utf-8",
     )
     gate = _load_script("check_flake8_baseline_b907_anchor")
-    message = (
-        "'checkin_url' is manually surrounded by quotes, "
-        "consider using the `!r` conversion flag."
-    )
+    message = "'checkin_url' is manually surrounded by quotes, consider using the `!r` conversion flag."
     row_two, _ = gate.parse_findings(
-        f"pkg/mod.py:2:5: B907 {message}", root,
+        f"pkg/mod.py:2:5: B907 {message}",
+        root,
     )
     row_four, _ = gate.parse_findings(
-        f"pkg/mod.py:4:9: B907 {message}", root,
+        f"pkg/mod.py:4:9: B907 {message}",
+        root,
     )
     assert row_two == row_four
     anchor = next(iter(row_two))[3]
@@ -266,16 +279,11 @@ def test_b907_multiline_statement_anchor_is_stable_across_reported_rows(
 def test_b907_url_anchor_is_stable_across_reported_rows(fixture_project):
     root, module = fixture_project
     module.write_text(
-        "html = (\n"
-        "    f'<a href=\"{url}\">link</a>'\n"
-        ")\n",
+        "html = (\n    f'<a href=\"{url}\">link</a>'\n)\n",
         encoding="utf-8",
     )
     gate = _load_script("check_flake8_baseline_b907_rows")
-    message = (
-        "'url' is manually surrounded by quotes, consider using the `!r` "
-        "conversion flag."
-    )
+    message = "'url' is manually surrounded by quotes, consider using the `!r` conversion flag."
     row_one, _ = gate.parse_findings(
         f"pkg/mod.py:1:1: B907 {message}\n",
         root,
@@ -351,7 +359,8 @@ def _baseline_for(root, *findings):
 
 
 def test_write_baseline_refuses_new_identity(
-    fixture_project, monkeypatch,
+    fixture_project,
+    monkeypatch,
 ):
     root, _module = fixture_project
     baseline_path = root / "flake8_baseline.json"
@@ -387,7 +396,8 @@ def test_write_baseline_refuses_new_identity(
 
 
 def test_write_baseline_updates_after_cleanup(
-    fixture_project, monkeypatch,
+    fixture_project,
+    monkeypatch,
 ):
     root, _module = fixture_project
     baseline_path = root / "flake8_baseline.json"
@@ -417,7 +427,9 @@ def test_write_baseline_updates_after_cleanup(
 
 
 def test_write_baseline_refuses_noncanonical_python(
-    fixture_project, monkeypatch, capsys,
+    fixture_project,
+    monkeypatch,
+    capsys,
 ):
     root, _module = fixture_project
     baseline_path = root / "flake8_baseline.json"
@@ -444,7 +456,9 @@ def test_write_baseline_refuses_noncanonical_python(
 
 
 def test_write_baseline_refuses_weakened_flake8_policy(
-    fixture_project, monkeypatch, capsys,
+    fixture_project,
+    monkeypatch,
+    capsys,
 ):
     root, _module = fixture_project
     baseline_path = root / "flake8_baseline.json"
@@ -491,15 +505,15 @@ def test_no_interpreter_specific_shortfall_remains(monkeypatch):
 
     for version_info in ((3, 10), (3, 11), (3, 12), (3, 13)):
         monkeypatch.setattr(gate.sys, "version_info", version_info)
-        regressions, stale = gate.compare_baseline(
-            gate.collections.Counter(), baseline
-        )
+        regressions, stale = gate.compare_baseline(gate.collections.Counter(), baseline)
         assert not regressions
         assert stale == baseline
 
 
 def test_check_mode_refuses_noncanonical_python(
-    fixture_project, monkeypatch, capsys,
+    fixture_project,
+    monkeypatch,
+    capsys,
 ):
     """The blocking gate itself (not just --write-baseline) refuses to run
     outside canonical Python 3.12."""
@@ -511,9 +525,7 @@ def test_check_mode_refuses_noncanonical_python(
     monkeypatch.setattr(
         gate,
         "run_flake8",
-        lambda targets, cwd: pytest.fail(
-            "Flake8 must not run on a non-canonical interpreter"
-        ),
+        lambda targets, cwd: pytest.fail("Flake8 must not run on a non-canonical interpreter"),
     )
     monkeypatch.setattr(
         sys,
@@ -612,8 +624,7 @@ def test_unknown_stdout_mixed_with_finding_fails_closed(tmp_path):
     module.write_text("import os\n", encoding="utf-8")
     gate = _load_script("check_flake8_baseline_unknown_mixed")
     _findings, _examples, failure = gate.validate_flake8_result(
-        "mod.py:1:1: F401 'os' imported but unused\n"
-        "INTERNAL PLUGIN FAILURE\n",
+        "mod.py:1:1: F401 'os' imported but unused\nINTERNAL PLUGIN FAILURE\n",
         "",
         1,
         tmp_path,
@@ -649,7 +660,9 @@ def test_operational_exit_one_without_findings_fails_closed(monkeypatch, tmp_pat
 
 
 def test_operational_stderr_with_baseline_covered_findings_fails_closed(
-    monkeypatch, tmp_path, capsys,
+    monkeypatch,
+    tmp_path,
+    capsys,
 ):
     """A plugin failure cannot hide beside otherwise grandfathered output."""
     spec = importlib.util.spec_from_file_location("check_flake8_baseline_mixed", SCRIPT)

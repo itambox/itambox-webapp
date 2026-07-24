@@ -1,32 +1,31 @@
 import json
+
 from django.conf import settings
-from django.test import TestCase, override_settings
-from django.urls import reverse
 from django.contrib.auth import get_user_model
 from django.contrib.auth.models import Permission
 from django.contrib.contenttypes.models import ContentType
-from organization.models import Tenant, Location, TenantGroup, Role, Site
+from django.test import TestCase, override_settings
+from django.urls import reverse
+
+from assets.models import Asset, AssetRole, AssetType, Category, Manufacturer, StatusLabel, Supplier
 from core.tests.mixins import grant
-from assets.models import Asset, AssetType, StatusLabel, AssetRole, Manufacturer, Category, Supplier
-from software.models import Software
+from inventory.models import Accessory, Component, Consumable, Kit
 from licenses.models import License
-from inventory.models import Accessory, Consumable, Kit, Component
+from organization.models import Location, Role, Site, Tenant, TenantGroup
+from software.models import Software
 from users.models import Token
 
 User = get_user_model()
+
 
 class GraphQLTestCase(TestCase):
     def setUp(self):
         # Create users
         self.admin_user = User.objects.create_superuser(
-            username='admin_user', email='admin@example.com', password='password123'
+            username="admin_user", email="admin@example.com", password="password123"
         )
-        self.staff_a = User.objects.create_user(
-            username='staff_a', email='staff_a@example.com', password='password123'
-        )
-        self.staff_b = User.objects.create_user(
-            username='staff_b', email='staff_b@example.com', password='password123'
-        )
+        self.staff_a = User.objects.create_user(username="staff_a", email="staff_a@example.com", password="password123")
+        self.staff_b = User.objects.create_user(username="staff_b", email="staff_b@example.com", password="password123")
 
         # Tenants
         self.tenant_group = TenantGroup.objects.create(name="HQ Group", slug="hq-group")
@@ -39,29 +38,71 @@ class GraphQLTestCase(TestCase):
         # Associate staff with Tenant membership/roles
         self.role_admin_a = Role.objects.create(
             tenant=self.tenant_a,
-            name='Admin Role A',
+            name="Admin Role A",
             permissions=[
-                'assets.view_asset', 'assets.add_asset', 'assets.change_asset', 'assets.delete_asset',
-                'software.view_software', 'software.add_software', 'software.change_software', 'software.delete_software',
-                'licenses.view_license', 'licenses.add_license', 'licenses.change_license', 'licenses.delete_license',
-                'inventory.view_component', 'inventory.add_component', 'inventory.change_component', 'inventory.delete_component',
-                'inventory.view_accessory', 'inventory.add_accessory', 'inventory.change_accessory', 'inventory.delete_accessory',
-                'inventory.view_consumable', 'inventory.add_consumable', 'inventory.change_consumable', 'inventory.delete_consumable',
-                'inventory.view_kit', 'inventory.add_kit', 'inventory.change_kit', 'inventory.delete_kit',
-            ]
+                "assets.view_asset",
+                "assets.add_asset",
+                "assets.change_asset",
+                "assets.delete_asset",
+                "software.view_software",
+                "software.add_software",
+                "software.change_software",
+                "software.delete_software",
+                "licenses.view_license",
+                "licenses.add_license",
+                "licenses.change_license",
+                "licenses.delete_license",
+                "inventory.view_component",
+                "inventory.add_component",
+                "inventory.change_component",
+                "inventory.delete_component",
+                "inventory.view_accessory",
+                "inventory.add_accessory",
+                "inventory.change_accessory",
+                "inventory.delete_accessory",
+                "inventory.view_consumable",
+                "inventory.add_consumable",
+                "inventory.change_consumable",
+                "inventory.delete_consumable",
+                "inventory.view_kit",
+                "inventory.add_kit",
+                "inventory.change_kit",
+                "inventory.delete_kit",
+            ],
         )
         self.role_admin_b = Role.objects.create(
             tenant=self.tenant_b,
-            name='Admin Role B',
+            name="Admin Role B",
             permissions=[
-                'assets.view_asset', 'assets.add_asset', 'assets.change_asset', 'assets.delete_asset',
-                'software.view_software', 'software.add_software', 'software.change_software', 'software.delete_software',
-                'licenses.view_license', 'licenses.add_license', 'licenses.change_license', 'licenses.delete_license',
-                'inventory.view_component', 'inventory.add_component', 'inventory.change_component', 'inventory.delete_component',
-                'inventory.view_accessory', 'inventory.add_accessory', 'inventory.change_accessory', 'inventory.delete_accessory',
-                'inventory.view_consumable', 'inventory.add_consumable', 'inventory.change_consumable', 'inventory.delete_consumable',
-                'inventory.view_kit', 'inventory.add_kit', 'inventory.change_kit', 'inventory.delete_kit',
-            ]
+                "assets.view_asset",
+                "assets.add_asset",
+                "assets.change_asset",
+                "assets.delete_asset",
+                "software.view_software",
+                "software.add_software",
+                "software.change_software",
+                "software.delete_software",
+                "licenses.view_license",
+                "licenses.add_license",
+                "licenses.change_license",
+                "licenses.delete_license",
+                "inventory.view_component",
+                "inventory.add_component",
+                "inventory.change_component",
+                "inventory.delete_component",
+                "inventory.view_accessory",
+                "inventory.add_accessory",
+                "inventory.change_accessory",
+                "inventory.delete_accessory",
+                "inventory.view_consumable",
+                "inventory.add_consumable",
+                "inventory.change_consumable",
+                "inventory.delete_consumable",
+                "inventory.view_kit",
+                "inventory.add_kit",
+                "inventory.change_kit",
+                "inventory.delete_kit",
+            ],
         )
         self.assignment_a = grant(self.staff_a, self.tenant_a, self.role_admin_a)
         self.membership_a = self.assignment_a.membership
@@ -71,12 +112,16 @@ class GraphQLTestCase(TestCase):
         # Grant general Django permissions to staff users
         for user in [self.staff_a, self.staff_b]:
             for app, model in [
-                ('assets', 'asset'), ('software', 'software'), ('licenses', 'license'),
-                ('inventory', 'component'), ('inventory', 'accessory'), ('inventory', 'consumable'),
-                ('inventory', 'kit')
+                ("assets", "asset"),
+                ("software", "software"),
+                ("licenses", "license"),
+                ("inventory", "component"),
+                ("inventory", "accessory"),
+                ("inventory", "consumable"),
+                ("inventory", "kit"),
             ]:
                 ct = ContentType.objects.get(app_label=app, model=model)
-                for action in ['view', 'add', 'change', 'delete']:
+                for action in ["view", "add", "change", "delete"]:
                     codename = f"{action}_{model}"
                     try:
                         perm = Permission.objects.get(codename=codename, content_type=ct)
@@ -97,21 +142,25 @@ class GraphQLTestCase(TestCase):
         self.asset_role = AssetRole.objects.create(name="Laptop", slug="laptop")
         self.status = StatusLabel.objects.create(name="Ready", slug="ready", type=StatusLabel.TYPE_DEPLOYABLE)
         self.asset_type = AssetType.objects.create(
-            manufacturer=self.manufacturer,
-            model="Latitude 5540",
-            slug="latitude-5540"
+            manufacturer=self.manufacturer, model="Latitude 5540", slug="latitude-5540"
         )
         self.category = Category.objects.create(
             name="Laptop Cat",
             slug="laptop-cat",
-            applies_to={"asset": True, "accessory": True, "component": True, "consumable": True}
+            applies_to={"asset": True, "accessory": True, "component": True, "consumable": True},
         )
 
         # Tenant A objects
-        self.location_a = Location.objects.create(name="Office A", slug="office-a", tenant=self.tenant_a, site=self.site)
+        self.location_a = Location.objects.create(
+            name="Office A", slug="office-a", tenant=self.tenant_a, site=self.site
+        )
         self.asset_a = Asset.objects.create(
-            name="Laptop A", asset_tag="TAG-A", asset_type=self.asset_type,
-            status=self.status, tenant=self.tenant_a, location=self.location_a
+            name="Laptop A",
+            asset_tag="TAG-A",
+            asset_type=self.asset_type,
+            status=self.status,
+            tenant=self.tenant_a,
+            location=self.location_a,
         )
         # Tenant-owned so that get_object_or_denied(Software, ..., tenant=tenant_a)
         # can find it (the function adds an extra .filter(tenant=tenant) on top of
@@ -130,92 +179,96 @@ class GraphQLTestCase(TestCase):
         self.consumable_a = Consumable.objects.create(
             name="MX-4 Paste A", manufacturer=self.manufacturer, tenant=self.tenant_a
         )
-        self.kit_a = Kit.objects.create(
-            name="New Hire Kit A", tenant=self.tenant_a
-        )
+        self.kit_a = Kit.objects.create(name="New Hire Kit A", tenant=self.tenant_a)
 
         # Tenant B objects
-        self.location_b = Location.objects.create(name="Office B", slug="office-b", tenant=self.tenant_b, site=self.site)
+        self.location_b = Location.objects.create(
+            name="Office B", slug="office-b", tenant=self.tenant_b, site=self.site
+        )
         self.asset_b = Asset.objects.create(
-            name="Laptop B", asset_tag="TAG-B", asset_type=self.asset_type,
-            status=self.status, tenant=self.tenant_b, location=self.location_b
+            name="Laptop B",
+            asset_tag="TAG-B",
+            asset_type=self.asset_type,
+            status=self.status,
+            tenant=self.tenant_b,
+            location=self.location_b,
         )
 
-        self.graphql_url = reverse('graphql')
+        self.graphql_url = reverse("graphql")
 
     @override_settings(
         DEBUG=True,
-        MIDDLEWARE=[m for m in settings.MIDDLEWARE if m != 'debug_toolbar.middleware.DebugToolbarMiddleware']
+        MIDDLEWARE=[m for m in settings.MIDDLEWARE if m != "debug_toolbar.middleware.DebugToolbarMiddleware"],
     )
     def test_graphiql_get_gated_by_session(self):
         # Unauthenticated GET request to GraphQL playground should redirect to login page
-        response = self.client.get(self.graphql_url, HTTP_ACCEPT='text/html')
+        response = self.client.get(self.graphql_url, HTTP_ACCEPT="text/html")
         self.assertEqual(response.status_code, 302)
-        self.assertIn('login', response.url)
+        self.assertIn("login", response.url)
 
         # Authenticated GET request should load successfully (status 200)
         self.client.force_login(self.admin_user)
-        response = self.client.get(self.graphql_url, HTTP_ACCEPT='text/html')
+        response = self.client.get(self.graphql_url, HTTP_ACCEPT="text/html")
         self.assertEqual(response.status_code, 200)
 
     def test_graphql_post_gated_by_auth(self):
-        query = '{ assets { name } }'
+        query = "{ assets { name } }"
         # Unauthenticated POST request should return 401
-        response = self.client.post(self.graphql_url, data={'query': query})
+        response = self.client.post(self.graphql_url, data={"query": query})
         self.assertEqual(response.status_code, 401)
 
         # Authenticated POST request with token should succeed
         response = self.client.post(
             self.graphql_url,
-            data=json.dumps({'query': query}),
-            content_type='application/json',
-            HTTP_AUTHORIZATION=f'Token {self.token_a.key}'
+            data=json.dumps({"query": query}),
+            content_type="application/json",
+            HTTP_AUTHORIZATION=f"Token {self.token_a.key}",
         )
         self.assertEqual(response.status_code, 200)
         res_data = response.json()
-        self.assertNotIn('errors', res_data)
+        self.assertNotIn("errors", res_data)
 
     def test_tenant_isolation_boundary_query(self):
         # When querying under Tenant A, only Asset A should be returned
-        query = '{ assets { name assetTag } }'
-        
+        query = "{ assets { name assetTag } }"
+
         response = self.client.post(
             self.graphql_url,
-            data=json.dumps({'query': query}),
-            content_type='application/json',
-            HTTP_AUTHORIZATION=f'Token {self.token_a.key}'
+            data=json.dumps({"query": query}),
+            content_type="application/json",
+            HTTP_AUTHORIZATION=f"Token {self.token_a.key}",
         )
         self.assertEqual(response.status_code, 200)
         res_data = response.json()
-        assets = res_data['data']['assets']
+        assets = res_data["data"]["assets"]
         self.assertEqual(len(assets), 1)
-        self.assertEqual(assets[0]['name'], 'Laptop A')
+        self.assertEqual(assets[0]["name"], "Laptop A")
 
         # When querying under Tenant B, only Asset B should be returned
         response = self.client.post(
             self.graphql_url,
-            data=json.dumps({'query': query}),
-            content_type='application/json',
-            HTTP_AUTHORIZATION=f'Token {self.token_b.key}'
+            data=json.dumps({"query": query}),
+            content_type="application/json",
+            HTTP_AUTHORIZATION=f"Token {self.token_b.key}",
         )
         self.assertEqual(response.status_code, 200)
         res_data = response.json()
-        assets = res_data['data']['assets']
+        assets = res_data["data"]["assets"]
         self.assertEqual(len(assets), 1)
-        self.assertEqual(assets[0]['name'], 'Laptop B')
+        self.assertEqual(assets[0]["name"], "Laptop B")
 
     def test_unauthorized_individual_lookup_returns_none(self):
         # Query asset of Tenant B as Staff A
         query = f'{{ asset(id: "{self.asset_b.id}") {{ name }} }}'
         response = self.client.post(
             self.graphql_url,
-            data=json.dumps({'query': query}),
-            content_type='application/json',
-            HTTP_AUTHORIZATION=f'Token {self.token_a.key}'
+            data=json.dumps({"query": query}),
+            content_type="application/json",
+            HTTP_AUTHORIZATION=f"Token {self.token_a.key}",
         )
         self.assertEqual(response.status_code, 200)
         res_data = response.json()
-        self.assertIsNone(res_data['data']['asset'])
+        self.assertIsNone(res_data["data"]["asset"])
 
     def test_mutations_create_and_validation(self):
         # Create asset in Tenant A
@@ -239,18 +292,18 @@ class GraphQLTestCase(TestCase):
         '''
         response = self.client.post(
             self.graphql_url,
-            data=json.dumps({'query': mutation}),
-            content_type='application/json',
-            HTTP_AUTHORIZATION=f'Token {self.token_a.key}'
+            data=json.dumps({"query": mutation}),
+            content_type="application/json",
+            HTTP_AUTHORIZATION=f"Token {self.token_a.key}",
         )
         if response.status_code != 200:
             print("ERROR RESPONSE:", response.status_code, response.content)
         self.assertEqual(response.status_code, 200)
         res_data = response.json()
-        self.assertNotIn('errors', res_data)
-        asset_name = res_data['data']['createAsset']['asset']['name']
+        self.assertNotIn("errors", res_data)
+        asset_name = res_data["data"]["createAsset"]["asset"]["name"]
         self.assertEqual(asset_name, "New Asset A")
-        tenant_slug = res_data['data']['createAsset']['asset']['tenant']['slug']
+        tenant_slug = res_data["data"]["createAsset"]["asset"]["tenant"]["slug"]
         self.assertEqual(tenant_slug, "tenant-a")
 
     def test_mutations_cross_tenant_foreign_key_fails(self):
@@ -272,28 +325,26 @@ class GraphQLTestCase(TestCase):
         '''
         response = self.client.post(
             self.graphql_url,
-            data=json.dumps({'query': mutation}),
-            content_type='application/json',
-            HTTP_AUTHORIZATION=f'Token {self.token_a.key}'
+            data=json.dumps({"query": mutation}),
+            content_type="application/json",
+            HTTP_AUTHORIZATION=f"Token {self.token_a.key}",
         )
         self.assertEqual(response.status_code, 200)
         res_data = response.json()
         # Should raise permission error or validation error because location_b belongs to Tenant B
-        self.assertIn('errors', res_data)
-        self.assertIn('denied', res_data['errors'][0]['message'].lower())
+        self.assertIn("errors", res_data)
+        self.assertIn("denied", res_data["errors"][0]["message"].lower())
 
     def test_post_request_using_session_auth(self):
-        query = '{ assets { name } }'
+        query = "{ assets { name } }"
         self.client.force_login(self.staff_a)
         response = self.client.post(
-            self.graphql_url,
-            data=json.dumps({'query': query}),
-            content_type='application/json'
+            self.graphql_url, data=json.dumps({"query": query}), content_type="application/json"
         )
         self.assertEqual(response.status_code, 200)
         res_data = response.json()
-        self.assertNotIn('errors', res_data)
-        self.assertEqual(len(res_data['data']['assets']), 1)
+        self.assertNotIn("errors", res_data)
+        self.assertEqual(len(res_data["data"]["assets"]), 1)
 
     def test_crud_asset_update_delete(self):
         # Update Asset A
@@ -311,14 +362,14 @@ class GraphQLTestCase(TestCase):
         '''
         response = self.client.post(
             self.graphql_url,
-            data=json.dumps({'query': mutation_update}),
-            content_type='application/json',
-            HTTP_AUTHORIZATION=f'Token {self.token_a.key}'
+            data=json.dumps({"query": mutation_update}),
+            content_type="application/json",
+            HTTP_AUTHORIZATION=f"Token {self.token_a.key}",
         )
         self.assertEqual(response.status_code, 200)
         res_data = response.json()
-        self.assertNotIn('errors', res_data)
-        self.assertEqual(res_data['data']['updateAsset']['asset']['name'], "Updated Asset A")
+        self.assertNotIn("errors", res_data)
+        self.assertEqual(res_data["data"]["updateAsset"]["asset"]["name"], "Updated Asset A")
 
         # Delete Asset A
         mutation_delete = f'''
@@ -330,14 +381,14 @@ class GraphQLTestCase(TestCase):
         '''
         response = self.client.post(
             self.graphql_url,
-            data=json.dumps({'query': mutation_delete}),
-            content_type='application/json',
-            HTTP_AUTHORIZATION=f'Token {self.token_a.key}'
+            data=json.dumps({"query": mutation_delete}),
+            content_type="application/json",
+            HTTP_AUTHORIZATION=f"Token {self.token_a.key}",
         )
         self.assertEqual(response.status_code, 200)
         res_data = response.json()
-        self.assertNotIn('errors', res_data)
-        self.assertTrue(res_data['data']['deleteAsset']['success'])
+        self.assertNotIn("errors", res_data)
+        self.assertTrue(res_data["data"]["deleteAsset"]["success"])
 
     def test_crud_software(self):
         # Use the admin (superuser) token so that active_tenant=None on the
@@ -364,14 +415,14 @@ class GraphQLTestCase(TestCase):
         '''
         response = self.client.post(
             self.graphql_url,
-            data=json.dumps({'query': mutation_create}),
-            content_type='application/json',
-            HTTP_AUTHORIZATION=f'Token {self.token_admin.key}'
+            data=json.dumps({"query": mutation_create}),
+            content_type="application/json",
+            HTTP_AUTHORIZATION=f"Token {self.token_admin.key}",
         )
         self.assertEqual(response.status_code, 200)
         res_data = response.json()
-        self.assertNotIn('errors', res_data)
-        sw_id = res_data['data']['createSoftware']['software']['id']
+        self.assertNotIn("errors", res_data)
+        sw_id = res_data["data"]["createSoftware"]["software"]["id"]
 
         # Update
         mutation_update = f'''
@@ -388,14 +439,14 @@ class GraphQLTestCase(TestCase):
         '''
         response = self.client.post(
             self.graphql_url,
-            data=json.dumps({'query': mutation_update}),
-            content_type='application/json',
-            HTTP_AUTHORIZATION=f'Token {self.token_admin.key}'
+            data=json.dumps({"query": mutation_update}),
+            content_type="application/json",
+            HTTP_AUTHORIZATION=f"Token {self.token_admin.key}",
         )
         self.assertEqual(response.status_code, 200)
         res_data = response.json()
-        self.assertNotIn('errors', res_data)
-        self.assertEqual(res_data['data']['updateSoftware']['software']['name'], "Updated Software")
+        self.assertNotIn("errors", res_data)
+        self.assertEqual(res_data["data"]["updateSoftware"]["software"]["name"], "Updated Software")
 
         # Delete
         mutation_delete = f'''
@@ -407,14 +458,14 @@ class GraphQLTestCase(TestCase):
         '''
         response = self.client.post(
             self.graphql_url,
-            data=json.dumps({'query': mutation_delete}),
-            content_type='application/json',
-            HTTP_AUTHORIZATION=f'Token {self.token_admin.key}'
+            data=json.dumps({"query": mutation_delete}),
+            content_type="application/json",
+            HTTP_AUTHORIZATION=f"Token {self.token_admin.key}",
         )
         self.assertEqual(response.status_code, 200)
         res_data = response.json()
-        self.assertNotIn('errors', res_data)
-        self.assertTrue(res_data['data']['deleteSoftware']['success'])
+        self.assertNotIn("errors", res_data)
+        self.assertTrue(res_data["data"]["deleteSoftware"]["success"])
 
     def test_crud_license(self):
         # Create
@@ -434,14 +485,14 @@ class GraphQLTestCase(TestCase):
         '''
         response = self.client.post(
             self.graphql_url,
-            data=json.dumps({'query': mutation_create}),
-            content_type='application/json',
-            HTTP_AUTHORIZATION=f'Token {self.token_a.key}'
+            data=json.dumps({"query": mutation_create}),
+            content_type="application/json",
+            HTTP_AUTHORIZATION=f"Token {self.token_a.key}",
         )
         self.assertEqual(response.status_code, 200)
         res_data = response.json()
-        self.assertNotIn('errors', res_data)
-        lic_id = res_data['data']['createLicense']['license']['id']
+        self.assertNotIn("errors", res_data)
+        lic_id = res_data["data"]["createLicense"]["license"]["id"]
 
         # Update
         mutation_update = f'''
@@ -458,14 +509,14 @@ class GraphQLTestCase(TestCase):
         '''
         response = self.client.post(
             self.graphql_url,
-            data=json.dumps({'query': mutation_update}),
-            content_type='application/json',
-            HTTP_AUTHORIZATION=f'Token {self.token_a.key}'
+            data=json.dumps({"query": mutation_update}),
+            content_type="application/json",
+            HTTP_AUTHORIZATION=f"Token {self.token_a.key}",
         )
         self.assertEqual(response.status_code, 200)
         res_data = response.json()
-        self.assertNotIn('errors', res_data)
-        self.assertEqual(res_data['data']['updateLicense']['license']['name'], "Updated License")
+        self.assertNotIn("errors", res_data)
+        self.assertEqual(res_data["data"]["updateLicense"]["license"]["name"], "Updated License")
 
         # Delete
         mutation_delete = f'''
@@ -477,14 +528,14 @@ class GraphQLTestCase(TestCase):
         '''
         response = self.client.post(
             self.graphql_url,
-            data=json.dumps({'query': mutation_delete}),
-            content_type='application/json',
-            HTTP_AUTHORIZATION=f'Token {self.token_a.key}'
+            data=json.dumps({"query": mutation_delete}),
+            content_type="application/json",
+            HTTP_AUTHORIZATION=f"Token {self.token_a.key}",
         )
         self.assertEqual(response.status_code, 200)
         res_data = response.json()
-        self.assertNotIn('errors', res_data)
-        self.assertTrue(res_data['data']['deleteLicense']['success'])
+        self.assertNotIn("errors", res_data)
+        self.assertTrue(res_data["data"]["deleteLicense"]["success"])
 
     def test_crud_component(self):
         # Create
@@ -504,14 +555,14 @@ class GraphQLTestCase(TestCase):
         '''
         response = self.client.post(
             self.graphql_url,
-            data=json.dumps({'query': mutation_create}),
-            content_type='application/json',
-            HTTP_AUTHORIZATION=f'Token {self.token_a.key}'
+            data=json.dumps({"query": mutation_create}),
+            content_type="application/json",
+            HTTP_AUTHORIZATION=f"Token {self.token_a.key}",
         )
         self.assertEqual(response.status_code, 200)
         res_data = response.json()
-        self.assertNotIn('errors', res_data)
-        comp_id = res_data['data']['createComponent']['component']['id']
+        self.assertNotIn("errors", res_data)
+        comp_id = res_data["data"]["createComponent"]["component"]["id"]
 
         # Update
         mutation_update = f'''
@@ -528,14 +579,14 @@ class GraphQLTestCase(TestCase):
         '''
         response = self.client.post(
             self.graphql_url,
-            data=json.dumps({'query': mutation_update}),
-            content_type='application/json',
-            HTTP_AUTHORIZATION=f'Token {self.token_a.key}'
+            data=json.dumps({"query": mutation_update}),
+            content_type="application/json",
+            HTTP_AUTHORIZATION=f"Token {self.token_a.key}",
         )
         self.assertEqual(response.status_code, 200)
         res_data = response.json()
-        self.assertNotIn('errors', res_data)
-        self.assertEqual(res_data['data']['updateComponent']['component']['name'], "Updated Component")
+        self.assertNotIn("errors", res_data)
+        self.assertEqual(res_data["data"]["updateComponent"]["component"]["name"], "Updated Component")
 
         # Delete
         mutation_delete = f'''
@@ -547,14 +598,14 @@ class GraphQLTestCase(TestCase):
         '''
         response = self.client.post(
             self.graphql_url,
-            data=json.dumps({'query': mutation_delete}),
-            content_type='application/json',
-            HTTP_AUTHORIZATION=f'Token {self.token_a.key}'
+            data=json.dumps({"query": mutation_delete}),
+            content_type="application/json",
+            HTTP_AUTHORIZATION=f"Token {self.token_a.key}",
         )
         self.assertEqual(response.status_code, 200)
         res_data = response.json()
-        self.assertNotIn('errors', res_data)
-        self.assertTrue(res_data['data']['deleteComponent']['success'])
+        self.assertNotIn("errors", res_data)
+        self.assertTrue(res_data["data"]["deleteComponent"]["success"])
 
     def test_crud_inventory_items(self):
         # 1. Accessory CRUD
@@ -573,14 +624,14 @@ class GraphQLTestCase(TestCase):
         '''
         response = self.client.post(
             self.graphql_url,
-            data=json.dumps({'query': acc_create}),
-            content_type='application/json',
-            HTTP_AUTHORIZATION=f'Token {self.token_a.key}'
+            data=json.dumps({"query": acc_create}),
+            content_type="application/json",
+            HTTP_AUTHORIZATION=f"Token {self.token_a.key}",
         )
         self.assertEqual(response.status_code, 200)
         res_data = response.json()
-        self.assertNotIn('errors', res_data)
-        acc_id = res_data['data']['createAccessory']['accessory']['id']
+        self.assertNotIn("errors", res_data)
+        acc_id = res_data["data"]["createAccessory"]["accessory"]["id"]
 
         acc_update = f'''
         mutation {{
@@ -596,14 +647,14 @@ class GraphQLTestCase(TestCase):
         '''
         response = self.client.post(
             self.graphql_url,
-            data=json.dumps({'query': acc_update}),
-            content_type='application/json',
-            HTTP_AUTHORIZATION=f'Token {self.token_a.key}'
+            data=json.dumps({"query": acc_update}),
+            content_type="application/json",
+            HTTP_AUTHORIZATION=f"Token {self.token_a.key}",
         )
         self.assertEqual(response.status_code, 200)
         res_data = response.json()
-        self.assertNotIn('errors', res_data)
-        self.assertEqual(res_data['data']['updateAccessory']['accessory']['name'], "Updated Acc")
+        self.assertNotIn("errors", res_data)
+        self.assertEqual(res_data["data"]["updateAccessory"]["accessory"]["name"], "Updated Acc")
 
         acc_delete = f'''
         mutation {{
@@ -614,14 +665,14 @@ class GraphQLTestCase(TestCase):
         '''
         response = self.client.post(
             self.graphql_url,
-            data=json.dumps({'query': acc_delete}),
-            content_type='application/json',
-            HTTP_AUTHORIZATION=f'Token {self.token_a.key}'
+            data=json.dumps({"query": acc_delete}),
+            content_type="application/json",
+            HTTP_AUTHORIZATION=f"Token {self.token_a.key}",
         )
         self.assertEqual(response.status_code, 200)
         res_data = response.json()
-        self.assertNotIn('errors', res_data)
-        self.assertTrue(res_data['data']['deleteAccessory']['success'])
+        self.assertNotIn("errors", res_data)
+        self.assertTrue(res_data["data"]["deleteAccessory"]["success"])
 
         # 2. Consumable CRUD
         cons_create = f'''
@@ -639,14 +690,14 @@ class GraphQLTestCase(TestCase):
         '''
         response = self.client.post(
             self.graphql_url,
-            data=json.dumps({'query': cons_create}),
-            content_type='application/json',
-            HTTP_AUTHORIZATION=f'Token {self.token_a.key}'
+            data=json.dumps({"query": cons_create}),
+            content_type="application/json",
+            HTTP_AUTHORIZATION=f"Token {self.token_a.key}",
         )
         self.assertEqual(response.status_code, 200)
         res_data = response.json()
-        self.assertNotIn('errors', res_data)
-        cons_id = res_data['data']['createConsumable']['consumable']['id']
+        self.assertNotIn("errors", res_data)
+        cons_id = res_data["data"]["createConsumable"]["consumable"]["id"]
 
         cons_update = f'''
         mutation {{
@@ -662,14 +713,14 @@ class GraphQLTestCase(TestCase):
         '''
         response = self.client.post(
             self.graphql_url,
-            data=json.dumps({'query': cons_update}),
-            content_type='application/json',
-            HTTP_AUTHORIZATION=f'Token {self.token_a.key}'
+            data=json.dumps({"query": cons_update}),
+            content_type="application/json",
+            HTTP_AUTHORIZATION=f"Token {self.token_a.key}",
         )
         self.assertEqual(response.status_code, 200)
         res_data = response.json()
-        self.assertNotIn('errors', res_data)
-        self.assertEqual(res_data['data']['updateConsumable']['consumable']['name'], "Updated Cons")
+        self.assertNotIn("errors", res_data)
+        self.assertEqual(res_data["data"]["updateConsumable"]["consumable"]["name"], "Updated Cons")
 
         cons_delete = f'''
         mutation {{
@@ -680,17 +731,17 @@ class GraphQLTestCase(TestCase):
         '''
         response = self.client.post(
             self.graphql_url,
-            data=json.dumps({'query': cons_delete}),
-            content_type='application/json',
-            HTTP_AUTHORIZATION=f'Token {self.token_a.key}'
+            data=json.dumps({"query": cons_delete}),
+            content_type="application/json",
+            HTTP_AUTHORIZATION=f"Token {self.token_a.key}",
         )
         self.assertEqual(response.status_code, 200)
         res_data = response.json()
-        self.assertNotIn('errors', res_data)
-        self.assertTrue(res_data['data']['deleteConsumable']['success'])
+        self.assertNotIn("errors", res_data)
+        self.assertTrue(res_data["data"]["deleteConsumable"]["success"])
 
         # 3. Kit CRUD
-        kit_create = f'''
+        kit_create = f"""
         mutation {{
             createKit(
                 name: "New Kit"
@@ -701,17 +752,17 @@ class GraphQLTestCase(TestCase):
                 }}
             }}
         }}
-        '''
+        """
         response = self.client.post(
             self.graphql_url,
-            data=json.dumps({'query': kit_create}),
-            content_type='application/json',
-            HTTP_AUTHORIZATION=f'Token {self.token_a.key}'
+            data=json.dumps({"query": kit_create}),
+            content_type="application/json",
+            HTTP_AUTHORIZATION=f"Token {self.token_a.key}",
         )
         self.assertEqual(response.status_code, 200)
         res_data = response.json()
-        self.assertNotIn('errors', res_data)
-        kit_id = res_data['data']['createKit']['kit']['id']
+        self.assertNotIn("errors", res_data)
+        kit_id = res_data["data"]["createKit"]["kit"]["id"]
 
         kit_update = f'''
         mutation {{
@@ -727,14 +778,14 @@ class GraphQLTestCase(TestCase):
         '''
         response = self.client.post(
             self.graphql_url,
-            data=json.dumps({'query': kit_update}),
-            content_type='application/json',
-            HTTP_AUTHORIZATION=f'Token {self.token_a.key}'
+            data=json.dumps({"query": kit_update}),
+            content_type="application/json",
+            HTTP_AUTHORIZATION=f"Token {self.token_a.key}",
         )
         self.assertEqual(response.status_code, 200)
         res_data = response.json()
-        self.assertNotIn('errors', res_data)
-        self.assertEqual(res_data['data']['updateKit']['kit']['name'], "Updated Kit")
+        self.assertNotIn("errors", res_data)
+        self.assertEqual(res_data["data"]["updateKit"]["kit"]["name"], "Updated Kit")
 
         kit_delete = f'''
         mutation {{
@@ -745,11 +796,11 @@ class GraphQLTestCase(TestCase):
         '''
         response = self.client.post(
             self.graphql_url,
-            data=json.dumps({'query': kit_delete}),
-            content_type='application/json',
-            HTTP_AUTHORIZATION=f'Token {self.token_a.key}'
+            data=json.dumps({"query": kit_delete}),
+            content_type="application/json",
+            HTTP_AUTHORIZATION=f"Token {self.token_a.key}",
         )
         self.assertEqual(response.status_code, 200)
         res_data = response.json()
-        self.assertNotIn('errors', res_data)
-        self.assertTrue(res_data['data']['deleteKit']['success'])
+        self.assertNotIn("errors", res_data)
+        self.assertTrue(res_data["data"]["deleteKit"]["success"])

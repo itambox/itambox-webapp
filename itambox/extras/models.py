@@ -1,18 +1,22 @@
 from django.conf import settings
 from django.contrib.contenttypes.fields import GenericForeignKey
 from django.contrib.contenttypes.models import ContentType
+from django.core.exceptions import ValidationError
 from django.db import models
 from django.urls import reverse
-from django.core.exceptions import ValidationError
 from django.utils.translation import gettext_lazy as _
-from core.models import BaseModel, ChangeLoggingMixin
-from core.managers import (
-    TenantScopingManager, SoftDeleteManager, AllObjectsManager,
-    TenantScopingSoftDeleteManager, TenantScopingAllObjectsManager,
-)
-from core.mixins import SoftDeleteMixin, BookmarkableMixin
-from core.validators import validate_image_attachment, validate_file_attachment, validate_external_url
+
 from core.csv_utils import csv_safe, safe_csv_filename
+from core.managers import (
+    AllObjectsManager,
+    SoftDeleteManager,
+    TenantScopingAllObjectsManager,
+    TenantScopingManager,
+    TenantScopingSoftDeleteManager,
+)
+from core.mixins import BookmarkableMixin, SoftDeleteMixin
+from core.models import BaseModel, ChangeLoggingMixin
+from core.validators import validate_external_url, validate_file_attachment, validate_image_attachment
 
 
 class Tag(ChangeLoggingMixin, BaseModel, SoftDeleteMixin, BookmarkableMixin):
@@ -21,23 +25,27 @@ class Tag(ChangeLoggingMixin, BaseModel, SoftDeleteMixin, BookmarkableMixin):
     all_objects = AllObjectsManager()
     name = models.CharField(max_length=100, verbose_name=_("Name"))
     slug = models.SlugField(max_length=100, verbose_name=_("Slug"))
-    color = models.CharField(max_length=6, blank=True, verbose_name=_("Color")) # Store hex color without #
+    color = models.CharField(max_length=6, blank=True, verbose_name=_("Color"))  # Store hex color without #
     description = models.CharField(max_length=200, blank=True, verbose_name=_("Description"))
 
     class Meta:
-        ordering = ['name']
+        ordering = ["name"]
         verbose_name = _("Tag")
         verbose_name_plural = _("Tags")
         constraints = [
-            models.UniqueConstraint(fields=['name'], condition=models.Q(deleted_at__isnull=True), name='unique_tag_name_active'),
-            models.UniqueConstraint(fields=['slug'], condition=models.Q(deleted_at__isnull=True), name='unique_tag_slug_active'),
+            models.UniqueConstraint(
+                fields=["name"], condition=models.Q(deleted_at__isnull=True), name="unique_tag_name_active"
+            ),
+            models.UniqueConstraint(
+                fields=["slug"], condition=models.Q(deleted_at__isnull=True), name="unique_tag_slug_active"
+            ),
         ]
 
     def __str__(self):
         return self.name
 
     def get_absolute_url(self):
-        return reverse('extras:tag_detail', kwargs={'pk': self.pk})
+        return reverse("extras:tag_detail", kwargs={"pk": self.pk})
 
 
 class Dashboard(models.Model):
@@ -48,40 +56,27 @@ class Dashboard(models.Model):
     # not prevent users from seeing their own dashboards.
     objects = models.Manager()
     user = models.ForeignKey(
-        settings.AUTH_USER_MODEL,
-        on_delete=models.CASCADE,
-        related_name='dashboards',
-        verbose_name=_("User")
+        settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="dashboards", verbose_name=_("User")
     )
-    name = models.CharField(
-        max_length=100,
-        default='Main Dashboard',
-        verbose_name=_("Name")
-    )
-    is_default = models.BooleanField(
-        default=False,
-        verbose_name=_("Is Default")
-    )
+    name = models.CharField(max_length=100, default="Main Dashboard", verbose_name=_("Name"))
+    is_default = models.BooleanField(default=False, verbose_name=_("Is Default"))
     tenant = models.ForeignKey(
-        'organization.Tenant',
+        "organization.Tenant",
         on_delete=models.CASCADE,
         null=True,
         blank=True,
-        related_name='dashboards',
+        related_name="dashboards",
         verbose_name=_("Tenant"),
-        help_text=_('Scope all widgets on this dashboard to this specific tenant context.')
+        help_text=_("Scope all widgets on this dashboard to this specific tenant context."),
     )
     layout = models.JSONField(
-        default=list,
-        blank=True,
-        verbose_name=_("Layout"),
-        help_text=_('Ordered list of widget config dicts')
+        default=list, blank=True, verbose_name=_("Layout"), help_text=_("Ordered list of widget config dicts")
     )
     created = models.DateTimeField(auto_now_add=True)
     last_updated = models.DateTimeField(auto_now=True)
 
     class Meta:
-        ordering = ['-is_default', 'name']
+        ordering = ["-is_default", "name"]
         verbose_name = _("Dashboard")
         verbose_name_plural = _("Dashboards")
 
@@ -93,29 +88,29 @@ class Dashboard(models.Model):
     def add_widget(self, widget_class, title=None, **config):
         """Add a new widget to the end of the layout."""
         entry = {
-            'widget': widget_class,
-            'title': title,
-            'visible': True,
-            'w': 4,
-            'h': 2,
-            'config': {},
+            "widget": widget_class,
+            "title": title,
+            "visible": True,
+            "w": 4,
+            "h": 2,
+            "config": {},
             **config,
         }
         self.layout.append(entry)
-        self.save(update_fields=['layout'])
+        self.save(update_fields=["layout"])
 
     def remove_widget(self, index):
         """Remove a widget by its index in the layout list."""
         if 0 <= index < len(self.layout):
             self.layout.pop(index)
-            self.save(update_fields=['layout'])
+            self.save(update_fields=["layout"])
 
     def update_widget(self, index, **kwargs):
         """Update widget config at the given index."""
         if 0 <= index < len(self.layout):
             self.layout[index].update(kwargs)
             self.layout = list(self.layout)
-            self.save(update_fields=['layout'])
+            self.save(update_fields=["layout"])
 
     def move_widget(self, from_index, to_index):
         """Reorder a widget within the layout."""
@@ -123,60 +118,72 @@ class Dashboard(models.Model):
         if 0 <= from_index < len(layout) and 0 <= to_index < len(layout):
             widget = layout.pop(from_index)
             layout.insert(to_index, widget)
-            self.save(update_fields=['layout'])
+            self.save(update_fields=["layout"])
 
 
 class CustomField(ChangeLoggingMixin, BaseModel, SoftDeleteMixin):
     changelog_global = True  # global config → changelog attributed to tenant=None
     objects = SoftDeleteManager()
     all_objects = AllObjectsManager()
-    FIELD_TYPE_TEXT = 'text'
-    FIELD_TYPE_NUMBER = 'number'
-    FIELD_TYPE_DATE = 'date'
-    FIELD_TYPE_BOOLEAN = 'boolean'
-    FIELD_TYPE_SELECT = 'select'
+    FIELD_TYPE_TEXT = "text"
+    FIELD_TYPE_NUMBER = "number"
+    FIELD_TYPE_DATE = "date"
+    FIELD_TYPE_BOOLEAN = "boolean"
+    FIELD_TYPE_SELECT = "select"
     FIELD_TYPE_CHOICES = [
-        (FIELD_TYPE_TEXT, _('Text')),
-        (FIELD_TYPE_NUMBER, _('Number')),
-        (FIELD_TYPE_DATE, _('Date')),
-        (FIELD_TYPE_BOOLEAN, _('Boolean')),
-        (FIELD_TYPE_SELECT, _('Select / Dropdown')),
+        (FIELD_TYPE_TEXT, _("Text")),
+        (FIELD_TYPE_NUMBER, _("Number")),
+        (FIELD_TYPE_DATE, _("Date")),
+        (FIELD_TYPE_BOOLEAN, _("Boolean")),
+        (FIELD_TYPE_SELECT, _("Select / Dropdown")),
     ]
 
-    name = models.SlugField(max_length=50, verbose_name=_("Field Name"), help_text=_("Slug-like name (e.g. sim_card_number)"))
+    name = models.SlugField(
+        max_length=50, verbose_name=_("Field Name"), help_text=_("Slug-like name (e.g. sim_card_number)")
+    )
     label = models.CharField(max_length=100, db_index=True, verbose_name=_("Display Label"))
-    field_type = models.CharField(max_length=50, choices=FIELD_TYPE_CHOICES, default=FIELD_TYPE_TEXT, db_index=True, verbose_name=_("Field Type"))
-    choices = models.TextField(blank=True, verbose_name=_("Choices"), help_text=_("New-line separated list of choices (only for 'select' type)"))
+    field_type = models.CharField(
+        max_length=50, choices=FIELD_TYPE_CHOICES, default=FIELD_TYPE_TEXT, db_index=True, verbose_name=_("Field Type")
+    )
+    choices = models.TextField(
+        blank=True,
+        verbose_name=_("Choices"),
+        help_text=_("New-line separated list of choices (only for 'select' type)"),
+    )
     required = models.BooleanField(default=False, db_index=True, verbose_name=_("Required"))
     object_types = models.ManyToManyField(
-        'contenttypes.ContentType',
-        related_name='custom_fields',
+        "contenttypes.ContentType",
+        related_name="custom_fields",
         blank=True,
         verbose_name=_("Object Types"),
-        help_text=_("The model(s) this field applies to. A field applying to Asset Type "
-                  "describes a hardware specification; one applying to Asset describes "
-                  "a per-device detail."),
+        help_text=_(
+            "The model(s) this field applies to. A field applying to Asset Type "
+            "describes a hardware specification; one applying to Asset describes "
+            "a per-device detail."
+        ),
     )
 
     class Meta:
-        ordering = ['label']
+        ordering = ["label"]
         verbose_name = _("Custom Field")
         verbose_name_plural = _("Custom Fields")
         constraints = [
-            models.UniqueConstraint(fields=['name'], condition=models.Q(deleted_at__isnull=True), name='unique_customfield_name_active'),
+            models.UniqueConstraint(
+                fields=["name"], condition=models.Q(deleted_at__isnull=True), name="unique_customfield_name_active"
+            ),
         ]
 
     def __str__(self):
         return f"{self.label} ({self.get_field_type_display()})"
 
     def get_absolute_url(self):
-        return reverse('extras:customfield_detail', kwargs={'pk': self.pk})
+        return reverse("extras:customfield_detail", kwargs={"pk": self.pk})
 
     @property
     def is_asset_type_spec(self):
         """True when this field applies to AssetType (a hardware specification).
         Template-friendly replacement for the retired model_level flag."""
-        return self.object_types.filter(app_label='assets', model='assettype').exists()
+        return self.object_types.filter(app_label="assets", model="assettype").exists()
 
 
 class CustomFieldset(ChangeLoggingMixin, BaseModel, SoftDeleteMixin):
@@ -184,56 +191,58 @@ class CustomFieldset(ChangeLoggingMixin, BaseModel, SoftDeleteMixin):
     objects = SoftDeleteManager()
     all_objects = AllObjectsManager()
     name = models.CharField(max_length=100, verbose_name=_("Fieldset Name"))
-    fields = models.ManyToManyField(CustomField, related_name='fieldsets', blank=True, verbose_name=_("Custom Fields"))
+    fields = models.ManyToManyField(CustomField, related_name="fieldsets", blank=True, verbose_name=_("Custom Fields"))
 
     class Meta:
-        ordering = ['name']
+        ordering = ["name"]
         verbose_name = _("Custom Fieldset")
         verbose_name_plural = _("Custom Fieldsets")
         constraints = [
-            models.UniqueConstraint(fields=['name'], condition=models.Q(deleted_at__isnull=True), name='unique_customfieldset_name_active'),
+            models.UniqueConstraint(
+                fields=["name"], condition=models.Q(deleted_at__isnull=True), name="unique_customfieldset_name_active"
+            ),
         ]
 
     def __str__(self):
         return self.name
 
     def get_absolute_url(self):
-        return reverse('extras:customfieldset_detail', kwargs={'pk': self.pk})
+        return reverse("extras:customfieldset_detail", kwargs={"pk": self.pk})
 
 
 # Machine-generated event-bus row. Intentionally NOT change-logged: it is
 # append-only, and logging it would write a second ObjectChange for every
 # tracked change (plus one more for the processed-flag flip), doubling volume.
 class Event(BaseModel):
-    ACTION_CREATE = 'create'
-    ACTION_UPDATE = 'update'
-    ACTION_DELETE = 'delete'
-    ACTION_RESTORE = 'restore'
+    ACTION_CREATE = "create"
+    ACTION_UPDATE = "update"
+    ACTION_DELETE = "delete"
+    ACTION_RESTORE = "restore"
 
     ACTION_CHOICES = [
-        (ACTION_CREATE, _('Create')),
-        (ACTION_UPDATE, _('Update')),
-        (ACTION_DELETE, _('Delete')),
+        (ACTION_CREATE, _("Create")),
+        (ACTION_UPDATE, _("Update")),
+        (ACTION_DELETE, _("Delete")),
         # Emitted on a soft-delete restore (set -> None). A distinct, subscribable
         # action so EventRules can target restores and the value is a declared choice.
-        (ACTION_RESTORE, _('Restore')),
+        (ACTION_RESTORE, _("Restore")),
     ]
 
-    model = models.ForeignKey(ContentType, on_delete=models.CASCADE, related_name='events')
+    model = models.ForeignKey(ContentType, on_delete=models.CASCADE, related_name="events")
     object_id = models.PositiveBigIntegerField(db_index=True)
-    content_object = GenericForeignKey('model', 'object_id')
+    content_object = GenericForeignKey("model", "object_id")
     action = models.CharField(max_length=20, choices=ACTION_CHOICES, db_index=True, verbose_name=_("Action"))
     timestamp = models.DateTimeField(auto_now_add=True, db_index=True)
     data = models.JSONField(default=dict, blank=True, verbose_name=_("Data"))
     processed = models.BooleanField(default=False, db_index=True, verbose_name=_("Processed"))
 
     class Meta:
-        ordering = ['-timestamp']
+        ordering = ["-timestamp"]
         verbose_name = _("Event")
         verbose_name_plural = _("Events")
         indexes = [
-            models.Index(fields=['model', 'object_id'], name='core_event_model_i_6d722d_idx'),
-            models.Index(fields=['processed', 'timestamp'], name='core_event_process_17ef77_idx'),
+            models.Index(fields=["model", "object_id"], name="core_event_model_i_6d722d_idx"),
+            models.Index(fields=["processed", "timestamp"], name="core_event_process_17ef77_idx"),
         ]
 
     def __str__(self):
@@ -245,58 +254,56 @@ class EventRule(ChangeLoggingMixin, SoftDeleteMixin, BaseModel):
     all_objects = TenantScopingAllObjectsManager()
     allow_global_tenant = True
 
-    ACTION_WEBHOOK = 'webhook'
-    ACTION_NOTIFICATION = 'notification'
+    ACTION_WEBHOOK = "webhook"
+    ACTION_NOTIFICATION = "notification"
 
     ACTION_TYPE_CHOICES = [
-        (ACTION_WEBHOOK, _('Webhook')),
-        (ACTION_NOTIFICATION, _('Notification')),
+        (ACTION_WEBHOOK, _("Webhook")),
+        (ACTION_NOTIFICATION, _("Notification")),
     ]
 
     name = models.CharField(max_length=255, verbose_name=_("Name"))
-    model = models.ForeignKey(ContentType, on_delete=models.CASCADE, related_name='event_rules', verbose_name=_("Model"))
+    model = models.ForeignKey(
+        ContentType, on_delete=models.CASCADE, related_name="event_rules", verbose_name=_("Model")
+    )
     events = models.JSONField(
-        default=list,
-        verbose_name=_("Events"),
-        help_text=_("List of event action types, e.g. ['create', 'update']")
+        default=list, verbose_name=_("Events"), help_text=_("List of event action types, e.g. ['create', 'update']")
     )
     conditions = models.JSONField(
-        default=dict,
-        blank=True,
-        verbose_name=_("Conditions"),
-        help_text=_("Optional conditions for rule matching")
+        default=dict, blank=True, verbose_name=_("Conditions"), help_text=_("Optional conditions for rule matching")
     )
     action_type = models.CharField(max_length=20, choices=ACTION_TYPE_CHOICES, verbose_name=_("Action Type"))
     webhook = models.ForeignKey(
-        'WebhookEndpoint',
+        "WebhookEndpoint",
         on_delete=models.SET_NULL,
         null=True,
         blank=True,
-        related_name='event_rules',
+        related_name="event_rules",
         verbose_name=_("Webhook"),
-        help_text=_("Endpoint to call when the action type is Webhook. "
-                  "Takes precedence over any 'url' in action_config."),
+        help_text=_(
+            "Endpoint to call when the action type is Webhook. Takes precedence over any 'url' in action_config."
+        ),
     )
     action_config = models.JSONField(
         default=dict,
         blank=True,
         verbose_name=_("Action Config"),
-        help_text=_("Advanced/optional JSON config (notification body, header overrides, etc.)")
+        help_text=_("Advanced/optional JSON config (notification body, header overrides, etc.)"),
     )
     enabled = models.BooleanField(default=True, verbose_name=_("Enabled"))
     tenant = models.ForeignKey(
-        'organization.Tenant',
+        "organization.Tenant",
         on_delete=models.CASCADE,
         blank=True,
         null=True,
-        related_name='event_rules',
+        related_name="event_rules",
         db_index=True,
         verbose_name=_("Tenant"),
         help_text=_("The tenant owning this rule. Null represents system-wide rules."),
     )
 
     class Meta:
-        ordering = ['name']
+        ordering = ["name"]
         verbose_name = _("Event Rule")
         verbose_name_plural = _("Event Rules")
 
@@ -304,19 +311,15 @@ class EventRule(ChangeLoggingMixin, SoftDeleteMixin, BaseModel):
         return self.name
 
     def get_absolute_url(self):
-        return reverse('extras:eventrule_detail', kwargs={'pk': self.pk})
+        return reverse("extras:eventrule_detail", kwargs={"pk": self.pk})
 
     def clean(self):
         super().clean()
-        if (
-            self.action_type == self.ACTION_WEBHOOK
-            and self.webhook_id
-            and self.tenant_id is not None
-        ):
+        if self.action_type == self.ACTION_WEBHOOK and self.webhook_id and self.tenant_id is not None:
             endpoint_tenant_id = self.webhook.tenant_id
             if endpoint_tenant_id is not None and endpoint_tenant_id != self.tenant_id:
                 raise ValidationError(
-                    {'webhook': _("Webhook endpoint must belong to the same tenant as the rule, or be system-wide.")}
+                    {"webhook": _("Webhook endpoint must belong to the same tenant as the rule, or be system-wide.")}
                 )
 
 
@@ -326,47 +329,55 @@ class WebhookEndpoint(ChangeLoggingMixin, SoftDeleteMixin, BaseModel):
     allow_global_tenant = True
     # Keep the (encrypted) HMAC secret and the headers — which may carry
     # Authorization tokens — out of the changelog JSON.
-    _change_logging_excluded_fields = ['updated_at', 'secret', 'headers']
+    _change_logging_excluded_fields = ["updated_at", "secret", "headers"]
 
-    HTTP_GET = 'GET'
-    HTTP_POST = 'POST'
-    HTTP_PUT = 'PUT'
-    HTTP_PATCH = 'PATCH'
+    HTTP_GET = "GET"
+    HTTP_POST = "POST"
+    HTTP_PUT = "PUT"
+    HTTP_PATCH = "PATCH"
     METHOD_CHOICES = [
-        (HTTP_GET, 'GET'),
-        (HTTP_POST, 'POST'),
-        (HTTP_PUT, 'PUT'),
-        (HTTP_PATCH, 'PATCH'),
+        (HTTP_GET, "GET"),
+        (HTTP_POST, "POST"),
+        (HTTP_PUT, "PUT"),
+        (HTTP_PATCH, "PATCH"),
     ]
 
     name = models.CharField(max_length=255, verbose_name=_("Name"))
     url = models.URLField(max_length=2000, verbose_name=_("URL"))
-    http_method = models.CharField(max_length=10, choices=METHOD_CHOICES, default=HTTP_POST, verbose_name=_("HTTP Method"))
+    http_method = models.CharField(
+        max_length=10, choices=METHOD_CHOICES, default=HTTP_POST, verbose_name=_("HTTP Method")
+    )
     headers = models.JSONField(default=dict, blank=True, verbose_name=_("Headers"))
-    secret = models.CharField(max_length=255, blank=True, verbose_name=_("Secret"), help_text=_("Shared secret for HMAC payload signing"))
+    secret = models.CharField(
+        max_length=255, blank=True, verbose_name=_("Secret"), help_text=_("Shared secret for HMAC payload signing")
+    )
     enabled = models.BooleanField(default=True, verbose_name=_("Enabled"))
-    retry_count = models.PositiveSmallIntegerField(default=3, verbose_name=_("Retry Count"), help_text=_("Max retry attempts on failure"))
-    retry_backoff = models.PositiveSmallIntegerField(default=60, verbose_name=_("Retry Backoff"), help_text=_("Backoff in seconds between retries"))
+    retry_count = models.PositiveSmallIntegerField(
+        default=3, verbose_name=_("Retry Count"), help_text=_("Max retry attempts on failure")
+    )
+    retry_backoff = models.PositiveSmallIntegerField(
+        default=60, verbose_name=_("Retry Backoff"), help_text=_("Backoff in seconds between retries")
+    )
     tenant = models.ForeignKey(
-        'organization.Tenant',
+        "organization.Tenant",
         on_delete=models.CASCADE,
         blank=True,
         null=True,
-        related_name='webhook_endpoints',
+        related_name="webhook_endpoints",
         db_index=True,
         verbose_name=_("Tenant"),
         help_text=_("The tenant owning this endpoint. Null represents system-wide endpoints."),
     )
 
     class Meta:
-        ordering = ['name']
+        ordering = ["name"]
         verbose_name = _("Webhook Endpoint")
         verbose_name_plural = _("Webhook Endpoints")
         constraints = [
             models.UniqueConstraint(
-                fields=['tenant', 'name'],
+                fields=["tenant", "name"],
                 condition=models.Q(deleted_at__isnull=True),
-                name='unique_webhookendpoint_tenant_name_active'
+                name="unique_webhookendpoint_tenant_name_active",
             )
         ]
 
@@ -374,7 +385,7 @@ class WebhookEndpoint(ChangeLoggingMixin, SoftDeleteMixin, BaseModel):
         return self.name
 
     def get_absolute_url(self):
-        return reverse('extras:webhookendpoint_detail', kwargs={'pk': self.pk})
+        return reverse("extras:webhookendpoint_detail", kwargs={"pk": self.pk})
 
     def clean(self):
         super().clean()
@@ -386,6 +397,7 @@ class WebhookEndpoint(ChangeLoggingMixin, SoftDeleteMixin, BaseModel):
     def save(self, *args, **kwargs):
         if self.secret and not self.secret.startswith("enc$"):
             from core.crypto import encrypt_string
+
             self.secret = encrypt_string(self.secret)
         super().save(*args, **kwargs)
 
@@ -395,10 +407,9 @@ class WebhookEndpoint(ChangeLoggingMixin, SoftDeleteMixin, BaseModel):
             return ""
         if self.secret.startswith("enc$"):
             from core.crypto import decrypt_string
+
             return decrypt_string(self.secret)
         return self.secret
-
-
 
 
 class JournalEntry(ChangeLoggingMixin, BaseModel):
@@ -409,35 +420,37 @@ class JournalEntry(ChangeLoggingMixin, BaseModel):
     # can see the object — mirrors the shared-catalogue pattern.
     allow_global_tenant = True
 
-    model = models.ForeignKey(ContentType, on_delete=models.CASCADE, related_name='journal_entries')
+    model = models.ForeignKey(ContentType, on_delete=models.CASCADE, related_name="journal_entries")
     object_id = models.PositiveBigIntegerField(db_index=True)
-    content_object = GenericForeignKey('model', 'object_id')
+    content_object = GenericForeignKey("model", "object_id")
     user = models.ForeignKey(
         to=settings.AUTH_USER_MODEL,
         on_delete=models.SET_NULL,
         null=True,
-        related_name='journal_entries',
-        verbose_name=_("User")
+        related_name="journal_entries",
+        verbose_name=_("User"),
     )
     created = models.DateTimeField(auto_now_add=True, db_index=True)
     comment = models.TextField(verbose_name=_("Comment"))
     tenant = models.ForeignKey(
-        'organization.Tenant',
+        "organization.Tenant",
         on_delete=models.CASCADE,
         blank=True,
         null=True,
-        related_name='journal_entries',
+        related_name="journal_entries",
         db_index=True,
         verbose_name=_("Tenant"),
-        help_text=_("Denormalised owning tenant, derived from the journaled object on save. Null = system/global object."),
+        help_text=_(
+            "Denormalised owning tenant, derived from the journaled object on save. Null = system/global object."
+        ),
     )
 
     class Meta:
-        ordering = ['-created']
+        ordering = ["-created"]
         verbose_name = _("Journal Entry")
         verbose_name_plural = _("Journal Entries")
         indexes = [
-            models.Index(fields=['model', 'object_id'], name='core_journa_model_i_3f2f97_idx'),
+            models.Index(fields=["model", "object_id"], name="core_journa_model_i_3f2f97_idx"),
         ]
 
     def __str__(self):
@@ -450,7 +463,7 @@ class JournalEntry(ChangeLoggingMixin, BaseModel):
         # REST and seed create paths all agree regardless of ambient context.
         parent = self.content_object
         if parent is not None:
-            self.tenant = getattr(parent, 'tenant', None)
+            self.tenant = getattr(parent, "tenant", None)
         super().save(*args, **kwargs)
 
 
@@ -458,27 +471,23 @@ class Bookmark(BaseModel):
     # Personal pin — intentionally NOT change-logged: no audit value, and with no
     # tenant of its own the changelog would mis-attribute to the ambient tenant.
     user = models.ForeignKey(
-        to=settings.AUTH_USER_MODEL,
-        on_delete=models.CASCADE,
-        related_name='bookmarks',
-        verbose_name=_("User")
+        to=settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="bookmarks", verbose_name=_("User")
     )
     model = models.ForeignKey(ContentType, on_delete=models.CASCADE)
     object_id = models.PositiveBigIntegerField()
-    content_object = GenericForeignKey('model', 'object_id')
+    content_object = GenericForeignKey("model", "object_id")
     created = models.DateTimeField(auto_now_add=True)
 
     class Meta:
-        ordering = ['-created']
+        ordering = ["-created"]
         verbose_name = _("Bookmark")
         verbose_name_plural = _("Bookmarks")
         indexes = [
-            models.Index(fields=['user', 'model', 'object_id'], name='core_bookma_user_id_69a2d6_idx'),
+            models.Index(fields=["user", "model", "object_id"], name="core_bookma_user_id_69a2d6_idx"),
         ]
         constraints = [
             models.UniqueConstraint(
-                fields=['user', 'model', 'object_id'],
-                name='core_bookmark_unique_user_model_object'
+                fields=["user", "model", "object_id"], name="core_bookmark_unique_user_model_object"
             )
         ]
 
@@ -488,30 +497,27 @@ class Bookmark(BaseModel):
 
 class ObjectWatch(BaseModel):
     """Notify the user on every change to the watched object (bell / Watch feature)."""
+
     # Personal subscription — intentionally NOT change-logged: no audit value, and
     # no tenant of its own to attribute the change to.
     user = models.ForeignKey(
-        to=settings.AUTH_USER_MODEL,
-        on_delete=models.CASCADE,
-        related_name='watches',
-        verbose_name=_("User")
+        to=settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="watches", verbose_name=_("User")
     )
     model = models.ForeignKey(ContentType, on_delete=models.CASCADE)
     object_id = models.PositiveBigIntegerField()
-    content_object = GenericForeignKey('model', 'object_id')
+    content_object = GenericForeignKey("model", "object_id")
     created = models.DateTimeField(auto_now_add=True)
 
     class Meta:
-        ordering = ['-created']
+        ordering = ["-created"]
         verbose_name = _("Object Watch")
         verbose_name_plural = _("Object Watches")
         indexes = [
-            models.Index(fields=['user', 'model', 'object_id'], name='extras_watch_user_id_idx'),
+            models.Index(fields=["user", "model", "object_id"], name="extras_watch_user_id_idx"),
         ]
         constraints = [
             models.UniqueConstraint(
-                fields=['user', 'model', 'object_id'],
-                name='extras_objectwatch_unique_user_model_object'
+                fields=["user", "model", "object_id"], name="extras_objectwatch_unique_user_model_object"
             )
         ]
 
@@ -522,21 +528,23 @@ class ObjectWatch(BaseModel):
 class ImageAttachment(ChangeLoggingMixin, BaseModel):
     # Attribute the changelog to the parent object's tenant (None for global
     # parents) via the generic FK, instead of the ambient request tenant.
-    changelog_tenant_lookup = 'content_object__tenant'
+    changelog_tenant_lookup = "content_object__tenant"
 
-    model = models.ForeignKey(ContentType, on_delete=models.CASCADE, related_name='image_attachments')
+    model = models.ForeignKey(ContentType, on_delete=models.CASCADE, related_name="image_attachments")
     object_id = models.PositiveBigIntegerField(db_index=True)
-    content_object = GenericForeignKey('model', 'object_id')
-    image = models.ImageField(upload_to='attachments/images/', validators=[validate_image_attachment], verbose_name=_("Image"))
+    content_object = GenericForeignKey("model", "object_id")
+    image = models.ImageField(
+        upload_to="attachments/images/", validators=[validate_image_attachment], verbose_name=_("Image")
+    )
     name = models.CharField(max_length=255, blank=True, verbose_name=_("Name"))
     created = models.DateTimeField(auto_now_add=True)
 
     class Meta:
-        ordering = ['-created']
+        ordering = ["-created"]
         verbose_name = _("Image Attachment")
         verbose_name_plural = _("Image Attachments")
         indexes = [
-            models.Index(fields=['model', 'object_id'], name='core_imagea_model_i_684849_idx'),
+            models.Index(fields=["model", "object_id"], name="core_imagea_model_i_684849_idx"),
         ]
 
     def __str__(self):
@@ -545,28 +553,30 @@ class ImageAttachment(ChangeLoggingMixin, BaseModel):
     def get_serve_url(self):
         # Serve through the authenticated, tenant-scoped proxy rather than the
         # raw MEDIA_URL (which the web server exposes with no access control).
-        return reverse('image_attachment_serve', kwargs={'pk': self.pk})
+        return reverse("image_attachment_serve", kwargs={"pk": self.pk})
 
 
 class FileAttachment(ChangeLoggingMixin, BaseModel):
     # Attribute the changelog to the parent object's tenant (None for global
     # parents) via the generic FK, instead of the ambient request tenant.
-    changelog_tenant_lookup = 'content_object__tenant'
+    changelog_tenant_lookup = "content_object__tenant"
 
-    model = models.ForeignKey(ContentType, on_delete=models.CASCADE, related_name='file_attachments')
+    model = models.ForeignKey(ContentType, on_delete=models.CASCADE, related_name="file_attachments")
     object_id = models.PositiveBigIntegerField(db_index=True)
-    content_object = GenericForeignKey('model', 'object_id')
-    file = models.FileField(upload_to='attachments/files/', validators=[validate_file_attachment], verbose_name=_("File"))
+    content_object = GenericForeignKey("model", "object_id")
+    file = models.FileField(
+        upload_to="attachments/files/", validators=[validate_file_attachment], verbose_name=_("File")
+    )
     name = models.CharField(max_length=255, blank=True, verbose_name=_("Name"))
     mime_type = models.CharField(max_length=100, blank=True, verbose_name=_("MIME Type"))
     created = models.DateTimeField(auto_now_add=True)
 
     class Meta:
-        ordering = ['-created']
+        ordering = ["-created"]
         verbose_name = _("File Attachment")
         verbose_name_plural = _("File Attachments")
         indexes = [
-            models.Index(fields=['model', 'object_id'], name='core_fileat_model_i_c8edb4_idx'),
+            models.Index(fields=["model", "object_id"], name="core_fileat_model_i_c8edb4_idx"),
         ]
 
     def __str__(self):
@@ -575,7 +585,7 @@ class FileAttachment(ChangeLoggingMixin, BaseModel):
     def get_download_url(self):
         # Download through the authenticated, tenant-scoped proxy (forces
         # attachment + nosniff) instead of the raw MEDIA_URL.
-        return reverse('file_attachment_download', kwargs={'pk': self.pk})
+        return reverse("file_attachment_download", kwargs={"pk": self.pk})
 
 
 class ExportTemplate(ChangeLoggingMixin, BaseModel):
@@ -583,17 +593,25 @@ class ExportTemplate(ChangeLoggingMixin, BaseModel):
     # Server-side Jinja2 template (an SSTI surface) — audit changes to it, to
     # match its siblings LabelTemplate / ReportTemplate which already log.
     # Fallback Content-Type when ``mime_type`` is left blank (NetBox parity).
-    DEFAULT_MIME_TYPE = 'text/plain; charset=utf-8'
+    DEFAULT_MIME_TYPE = "text/plain; charset=utf-8"
 
     name = models.CharField(max_length=255, verbose_name=_("Name"))
     description = models.TextField(blank=True, verbose_name=_("Description"))
-    content_type = models.ForeignKey(ContentType, on_delete=models.CASCADE, related_name='export_templates', verbose_name=_("Content Type"))
+    content_type = models.ForeignKey(
+        ContentType, on_delete=models.CASCADE, related_name="export_templates", verbose_name=_("Content Type")
+    )
     template_code = models.TextField(
         verbose_name=_("Template Code"),
         help_text=_("Jinja2 template rendered once over the whole result set, which is available as `queryset`."),
     )
-    mime_type = models.CharField(max_length=50, default='text/csv', blank=True, verbose_name=_("MIME Type"), help_text=_("MIME type for the exported file"))
-    file_extension = models.CharField(max_length=10, default='csv', blank=True, verbose_name=_("File Extension"))
+    mime_type = models.CharField(
+        max_length=50,
+        default="text/csv",
+        blank=True,
+        verbose_name=_("MIME Type"),
+        help_text=_("MIME type for the exported file"),
+    )
+    file_extension = models.CharField(max_length=10, default="csv", blank=True, verbose_name=_("File Extension"))
     as_attachment = models.BooleanField(
         default=True,
         verbose_name=_("Download as attachment"),
@@ -601,13 +619,12 @@ class ExportTemplate(ChangeLoggingMixin, BaseModel):
     )
 
     class Meta:
-        ordering = ['content_type', 'name']
+        ordering = ["content_type", "name"]
         verbose_name = _("Export Template")
         verbose_name_plural = _("Export Templates")
         constraints = [
             models.UniqueConstraint(
-                fields=['content_type', 'name'],
-                name='core_exporttemplate_unique_content_type_name'
+                fields=["content_type", "name"], name="core_exporttemplate_unique_content_type_name"
             )
         ]
 
@@ -615,7 +632,7 @@ class ExportTemplate(ChangeLoggingMixin, BaseModel):
         return f"{self.content_type.model} - {self.name}"
 
     def get_absolute_url(self):
-        return reverse('extras:exporttemplate_detail', kwargs={'pk': self.pk})
+        return reverse("extras:exporttemplate_detail", kwargs={"pk": self.pk})
 
     @staticmethod
     def get_jinja_environment(autoescape=False):
@@ -636,20 +653,20 @@ class ExportTemplate(ChangeLoggingMixin, BaseModel):
         from jinja2.sandbox import ImmutableSandboxedEnvironment
 
         env = ImmutableSandboxedEnvironment(autoescape=autoescape)
-        for unsafe_filter in ('attr', 'format', 'format_map', 'map', 'pprint', 'xmlattr'):
+        for unsafe_filter in ("attr", "format", "format_map", "map", "pprint", "xmlattr"):
             env.filters.pop(unsafe_filter, None)
-        for unsafe_global in ('cycler', 'joiner', 'namespace', 'lipsum'):
+        for unsafe_global in ("cycler", "joiner", "namespace", "lipsum"):
             env.globals.pop(unsafe_global, None)
         # Useful, safe export helper: neutralise spreadsheet formula injection.
-        env.filters['csv_safe'] = csv_safe
+        env.filters["csv_safe"] = csv_safe
         return env
 
     def _autoescape_for_output(self):
         # Escape interpolated {{ ... }} only for markup output (HTML/XHTML/SVG/XML),
         # where unescaped tenant data would be stored XSS or break the document. CSV/
         # JSON/plain text MUST stay un-escaped, or the rendered document is corrupted.
-        mime = (self.mime_type or '').lower()
-        return 'html' in mime or 'svg' in mime or 'xml' in mime
+        mime = (self.mime_type or "").lower()
+        return "html" in mime or "svg" in mime or "xml" in mime
 
     def render(self, queryset):
         """Render the entire queryset in a single pass (NetBox-style).
@@ -660,7 +677,7 @@ class ExportTemplate(ChangeLoggingMixin, BaseModel):
         env = self.get_jinja_environment(autoescape=self._autoescape_for_output())
         template = env.from_string(self.template_code)
         output = template.render(queryset=queryset)
-        return output.replace('\r\n', '\n')
+        return output.replace("\r\n", "\n")
 
     def get_export_filename(self, model):
         """ASCII-safe download filename for this template applied to ``model``."""
@@ -674,16 +691,23 @@ class LabelTemplate(ChangeLoggingMixin, BaseModel):
     description = models.TextField(blank=True, verbose_name=_("Description"))
     page_width = models.FloatField(default=2.25, verbose_name=_("Page Width"), help_text=_("Label width in inches"))
     page_height = models.FloatField(default=1.25, verbose_name=_("Page Height"), help_text=_("Label height in inches"))
-    barcode_format = models.CharField(max_length=20, default='code128', verbose_name=_("Barcode Format"), choices=[
-        ('code128', _('Code 128')),
-        ('code39', _('Code 39')),
-        ('qr', _('QR Code')),
-        ('datamatrix', _('Data Matrix')),
-    ])
-    template_code = models.TextField(blank=True, verbose_name=_("Template Code"), help_text=_("Jinja2/HTML template for label layout"))
+    barcode_format = models.CharField(
+        max_length=20,
+        default="code128",
+        verbose_name=_("Barcode Format"),
+        choices=[
+            ("code128", _("Code 128")),
+            ("code39", _("Code 39")),
+            ("qr", _("QR Code")),
+            ("datamatrix", _("Data Matrix")),
+        ],
+    )
+    template_code = models.TextField(
+        blank=True, verbose_name=_("Template Code"), help_text=_("Jinja2/HTML template for label layout")
+    )
 
     class Meta:
-        ordering = ['name']
+        ordering = ["name"]
         verbose_name = _("Label Template")
         verbose_name_plural = _("Label Templates")
 
@@ -691,7 +715,7 @@ class LabelTemplate(ChangeLoggingMixin, BaseModel):
         return self.name
 
     def get_absolute_url(self):
-        return reverse('extras:labeltemplate_detail', kwargs={'pk': self.pk})
+        return reverse("extras:labeltemplate_detail", kwargs={"pk": self.pk})
 
 
 class ReportTemplate(ChangeLoggingMixin, SoftDeleteMixin, BaseModel):
@@ -699,174 +723,226 @@ class ReportTemplate(ChangeLoggingMixin, SoftDeleteMixin, BaseModel):
     all_objects = TenantScopingAllObjectsManager()
     allow_global_tenant = True
 
-    REPORT_TYPE_ASSET_SUMMARY = 'asset_summary'
-    REPORT_TYPE_LICENSE_UTILIZATION = 'license_utilization'
-    REPORT_TYPE_SUBSCRIPTION_RENEWALS = 'subscription_renewals'
-    REPORT_TYPE_ASSET_MAINTENANCE = 'asset_maintenance'
-    REPORT_TYPE_ASSET_DEPRECIATION = 'asset_depreciation'
-    REPORT_TYPE_SOFTWARE_INVENTORY = 'software_inventory'
+    REPORT_TYPE_ASSET_SUMMARY = "asset_summary"
+    REPORT_TYPE_LICENSE_UTILIZATION = "license_utilization"
+    REPORT_TYPE_SUBSCRIPTION_RENEWALS = "subscription_renewals"
+    REPORT_TYPE_ASSET_MAINTENANCE = "asset_maintenance"
+    REPORT_TYPE_ASSET_DEPRECIATION = "asset_depreciation"
+    REPORT_TYPE_SOFTWARE_INVENTORY = "software_inventory"
 
-    REPORT_TYPE_CONTRACT_RENEWALS = 'contract_renewals'
-    REPORT_TYPE_WARRANTY_EXPIRATION = 'warranty_expiration'
-    REPORT_TYPE_ASSET_DISPOSAL_EOL = 'asset_disposal_eol'
-    REPORT_TYPE_HARDWARE_INVENTORY = 'hardware_inventory'
-    REPORT_TYPE_CUSTODY_COMPLIANCE = 'custody_compliance'
-
-    
+    REPORT_TYPE_CONTRACT_RENEWALS = "contract_renewals"
+    REPORT_TYPE_WARRANTY_EXPIRATION = "warranty_expiration"
+    REPORT_TYPE_ASSET_DISPOSAL_EOL = "asset_disposal_eol"
+    REPORT_TYPE_HARDWARE_INVENTORY = "hardware_inventory"
+    REPORT_TYPE_CUSTODY_COMPLIANCE = "custody_compliance"
 
     REPORT_TYPE_CHOICES = [
-        (REPORT_TYPE_ASSET_SUMMARY, _('Asset Inventory Summary')),
-        (REPORT_TYPE_LICENSE_UTILIZATION, _('License Utilization')),
-        (REPORT_TYPE_SUBSCRIPTION_RENEWALS, _('Subscription Renewals')),
-        (REPORT_TYPE_ASSET_MAINTENANCE, _('Asset Maintenance & Repairs')),
-        (REPORT_TYPE_ASSET_DEPRECIATION, _('Asset Depreciation Summary')),
-        (REPORT_TYPE_SOFTWARE_INVENTORY, _('Software Catalog & Installations')),
-        (REPORT_TYPE_CONTRACT_RENEWALS, _('Contract Renewals & Expirations')),
-        (REPORT_TYPE_WARRANTY_EXPIRATION, _('Warranty Expiration')),
-        (REPORT_TYPE_ASSET_DISPOSAL_EOL, _('Asset Disposal & End-of-Life')),
-        (REPORT_TYPE_HARDWARE_INVENTORY, _('Hardware Inventory (Accessories, Consumables, Components)')),
-        (REPORT_TYPE_CUSTODY_COMPLIANCE, _('Custody & EULA Sign-off Compliance')),
+        (REPORT_TYPE_ASSET_SUMMARY, _("Asset Inventory Summary")),
+        (REPORT_TYPE_LICENSE_UTILIZATION, _("License Utilization")),
+        (REPORT_TYPE_SUBSCRIPTION_RENEWALS, _("Subscription Renewals")),
+        (REPORT_TYPE_ASSET_MAINTENANCE, _("Asset Maintenance & Repairs")),
+        (REPORT_TYPE_ASSET_DEPRECIATION, _("Asset Depreciation Summary")),
+        (REPORT_TYPE_SOFTWARE_INVENTORY, _("Software Catalog & Installations")),
+        (REPORT_TYPE_CONTRACT_RENEWALS, _("Contract Renewals & Expirations")),
+        (REPORT_TYPE_WARRANTY_EXPIRATION, _("Warranty Expiration")),
+        (REPORT_TYPE_ASSET_DISPOSAL_EOL, _("Asset Disposal & End-of-Life")),
+        (REPORT_TYPE_HARDWARE_INVENTORY, _("Hardware Inventory (Accessories, Consumables, Components)")),
+        (REPORT_TYPE_CUSTODY_COMPLIANCE, _("Custody & EULA Sign-off Compliance")),
     ]
 
     name = models.CharField(max_length=255, verbose_name=_("Name"))
     description = models.TextField(blank=True, verbose_name=_("Description"))
     tenant = models.ForeignKey(
-        'organization.Tenant',
+        "organization.Tenant",
         on_delete=models.CASCADE,
         blank=True,
         null=True,
-        related_name='report_templates',
+        related_name="report_templates",
         db_index=True,
         verbose_name=_("Tenant"),
-        help_text=_("The tenant owning this report template. Null represents system-wide templates.")
+        help_text=_("The tenant owning this report template. Null represents system-wide templates."),
     )
     filter_tenants = models.ManyToManyField(
-        'organization.Tenant',
+        "organization.Tenant",
         blank=True,
-        related_name='filtered_templates',
+        related_name="filtered_templates",
         verbose_name=_("Filter Tenants"),
-        help_text=_("Filter compiled data to only include these selected tenants. If none are selected, aggregates data globally.")
+        help_text=_(
+            "Filter compiled data to only include these selected tenants. If none are selected, aggregates data globally."
+        ),
     )
     report_type = models.CharField(max_length=50, choices=REPORT_TYPE_CHOICES, verbose_name=_("Report Type"))
-    included_columns = models.JSONField(default=list, blank=True, verbose_name=_("Included Columns"), help_text=_("Checked columns to render in the report data grid."))
-    include_summary_cards = models.BooleanField(default=True, verbose_name=_("Include Summary Cards"), help_text=_("Toggle displaying top card widgets (totals, counts, financial sums)."))
-    include_distribution_chart = models.BooleanField(default=False, verbose_name=_("Include Distribution Chart"), help_text=_("Toggle embedding spend or status distribution charts in the HTML report."))
-    group_by_field = models.CharField(max_length=100, blank=True, verbose_name=_("Group By Field"), help_text=_("Optional column key to group grid records under (e.g. location, status)."))
-    style_preset = models.CharField(max_length=50, default='default', verbose_name=_("Style Preset"), choices=[
-        ('default', _('Executive (Branded)')),
-        ('compact', _('Compact (Dense)')),
-        ('financial', _('Financial (Ledger)')),
-        ('minimal', _('Minimal (Clean)')),
-    ])
-    advanced_mode = models.BooleanField(default=False, verbose_name=_("Advanced Mode"), help_text=_("Enable custom Jinja2/HTML template code override."))
-    template_content = models.TextField(
+    included_columns = models.JSONField(
+        default=list,
         blank=True,
-        verbose_name=_("Template Content"),
-        help_text=_("Optional Jinja2 custom HTML override template")
+        verbose_name=_("Included Columns"),
+        help_text=_("Checked columns to render in the report data grid."),
+    )
+    include_summary_cards = models.BooleanField(
+        default=True,
+        verbose_name=_("Include Summary Cards"),
+        help_text=_("Toggle displaying top card widgets (totals, counts, financial sums)."),
+    )
+    include_distribution_chart = models.BooleanField(
+        default=False,
+        verbose_name=_("Include Distribution Chart"),
+        help_text=_("Toggle embedding spend or status distribution charts in the HTML report."),
+    )
+    group_by_field = models.CharField(
+        max_length=100,
+        blank=True,
+        verbose_name=_("Group By Field"),
+        help_text=_("Optional column key to group grid records under (e.g. location, status)."),
+    )
+    style_preset = models.CharField(
+        max_length=50,
+        default="default",
+        verbose_name=_("Style Preset"),
+        choices=[
+            ("default", _("Executive (Branded)")),
+            ("compact", _("Compact (Dense)")),
+            ("financial", _("Financial (Ledger)")),
+            ("minimal", _("Minimal (Clean)")),
+        ],
+    )
+    advanced_mode = models.BooleanField(
+        default=False, verbose_name=_("Advanced Mode"), help_text=_("Enable custom Jinja2/HTML template code override.")
+    )
+    template_content = models.TextField(
+        blank=True, verbose_name=_("Template Content"), help_text=_("Optional Jinja2 custom HTML override template")
     )
 
     class Meta:
-        ordering = ['name']
+        ordering = ["name"]
         verbose_name = _("Report Template")
         verbose_name_plural = _("Report Templates")
         constraints = [
-            models.UniqueConstraint(fields=['name'], condition=models.Q(deleted_at__isnull=True), name='unique_reporttemplate_name_active'),
+            models.UniqueConstraint(
+                fields=["name"], condition=models.Q(deleted_at__isnull=True), name="unique_reporttemplate_name_active"
+            ),
         ]
 
     def __str__(self):
         return f"{self.name} ({self.get_report_type_display()})"
 
     def get_absolute_url(self):
-        return reverse('extras:reporttemplate_detail', kwargs={'pk': self.pk})
+        return reverse("extras:reporttemplate_detail", kwargs={"pk": self.pk})
 
     def clean(self):
         super().clean()
         if self.template_content and self.template_content.strip():
             try:
                 from jinja2 import Environment
+
                 Environment().parse(self.template_content)
             except Exception as e:
-                raise ValidationError({'template_content': _("Jinja2 template compilation failed: %(error)s") % {'error': str(e)}})
+                raise ValidationError(
+                    {"template_content": _("Jinja2 template compilation failed: %(error)s") % {"error": str(e)}}
+                )
 
 
 class ScheduledReport(ChangeLoggingMixin, BaseModel):
     objects = TenantScopingManager()
     allow_global_tenant = True
 
-    FORMAT_HTML = 'html'
-    FORMAT_CSV = 'csv'
-    FORMAT_PDF = 'pdf'
-    FORMAT_XLSX = 'xlsx'
+    FORMAT_HTML = "html"
+    FORMAT_CSV = "csv"
+    FORMAT_PDF = "pdf"
+    FORMAT_XLSX = "xlsx"
     FORMAT_CHOICES = [
-        (FORMAT_HTML, _('HTML Email')),
-        (FORMAT_CSV, _('CSV Attachment')),
-        (FORMAT_PDF, _('PDF Attachment')),
-        (FORMAT_XLSX, _('Excel (XLSX) Attachment')),
+        (FORMAT_HTML, _("HTML Email")),
+        (FORMAT_CSV, _("CSV Attachment")),
+        (FORMAT_PDF, _("PDF Attachment")),
+        (FORMAT_XLSX, _("Excel (XLSX) Attachment")),
     ]
 
-    FREQUENCY_ONCE = 'once'
-    FREQUENCY_HOURLY = 'hourly'
-    FREQUENCY_DAILY = 'daily'
-    FREQUENCY_WEEKLY = 'weekly'
-    FREQUENCY_BIWEEKLY = 'biweekly'
-    FREQUENCY_MONTHLY = 'monthly'
-    FREQUENCY_QUARTERLY = 'quarterly'
-    FREQUENCY_YEARLY = 'yearly'
-    FREQUENCY_CRON = 'cron'
+    FREQUENCY_ONCE = "once"
+    FREQUENCY_HOURLY = "hourly"
+    FREQUENCY_DAILY = "daily"
+    FREQUENCY_WEEKLY = "weekly"
+    FREQUENCY_BIWEEKLY = "biweekly"
+    FREQUENCY_MONTHLY = "monthly"
+    FREQUENCY_QUARTERLY = "quarterly"
+    FREQUENCY_YEARLY = "yearly"
+    FREQUENCY_CRON = "cron"
 
     FREQUENCY_CHOICES = [
-        (FREQUENCY_ONCE, _('Once')),
-        (FREQUENCY_HOURLY, _('Hourly')),
-        (FREQUENCY_DAILY, _('Daily')),
-        (FREQUENCY_WEEKLY, _('Weekly')),
-        (FREQUENCY_BIWEEKLY, _('Biweekly')),
-        (FREQUENCY_MONTHLY, _('Monthly')),
-        (FREQUENCY_QUARTERLY, _('Quarterly')),
-        (FREQUENCY_YEARLY, _('Yearly')),
-        (FREQUENCY_CRON, _('Custom Cron Expression')),
+        (FREQUENCY_ONCE, _("Once")),
+        (FREQUENCY_HOURLY, _("Hourly")),
+        (FREQUENCY_DAILY, _("Daily")),
+        (FREQUENCY_WEEKLY, _("Weekly")),
+        (FREQUENCY_BIWEEKLY, _("Biweekly")),
+        (FREQUENCY_MONTHLY, _("Monthly")),
+        (FREQUENCY_QUARTERLY, _("Quarterly")),
+        (FREQUENCY_YEARLY, _("Yearly")),
+        (FREQUENCY_CRON, _("Custom Cron Expression")),
     ]
 
     name = models.CharField(max_length=255, verbose_name=_("Name"))
     tenant = models.ForeignKey(
-        'organization.Tenant',
+        "organization.Tenant",
         on_delete=models.CASCADE,
         blank=True,
         null=True,
-        related_name='scheduled_reports',
+        related_name="scheduled_reports",
         db_index=True,
         verbose_name=_("Tenant"),
-        help_text=_("The tenant owning this scheduled report. Null represents system-wide schedules.")
+        help_text=_("The tenant owning this scheduled report. Null represents system-wide schedules."),
     )
     filter_tenants = models.ManyToManyField(
-        'organization.Tenant',
+        "organization.Tenant",
         blank=True,
-        related_name='filtered_schedules',
+        related_name="filtered_schedules",
         verbose_name=_("Filter Tenants"),
-        help_text=_("Filter compiled data to only include these selected tenants. If none are selected, aggregates data globally.")
+        help_text=_(
+            "Filter compiled data to only include these selected tenants. If none are selected, aggregates data globally."
+        ),
     )
-    report = models.ForeignKey(ReportTemplate, on_delete=models.CASCADE, related_name='schedules', verbose_name=_("Report"))
+    report = models.ForeignKey(
+        ReportTemplate, on_delete=models.CASCADE, related_name="schedules", verbose_name=_("Report")
+    )
     schedule = models.ForeignKey(
-        'django_q.Schedule',
+        "django_q.Schedule",
         on_delete=models.SET_NULL,
         null=True,
         blank=True,
-        related_name='scheduled_reports',
+        related_name="scheduled_reports",
         verbose_name=_("Schedule"),
-        help_text=_("Linked Django-Q Schedule")
+        help_text=_("Linked Django-Q Schedule"),
     )
-    recipients = models.TextField(blank=True, default='', verbose_name=_("Recipients"), help_text=_("Comma-separated email addresses"))
-    frequency = models.CharField(max_length=50, default='weekly', choices=FREQUENCY_CHOICES, verbose_name=_("Frequency"))
+    recipients = models.TextField(
+        blank=True, default="", verbose_name=_("Recipients"), help_text=_("Comma-separated email addresses")
+    )
+    frequency = models.CharField(
+        max_length=50, default="weekly", choices=FREQUENCY_CHOICES, verbose_name=_("Frequency")
+    )
     format = models.CharField(max_length=20, choices=FORMAT_CHOICES, default=FORMAT_HTML, verbose_name=_("Format"))
-    cron_expression = models.CharField(max_length=100, blank=True, verbose_name=_("Cron Expression"), help_text=_("Custom Cron Expression (e.g. '0 8 * * 1-5')"))
-    start_time = models.TimeField(null=True, blank=True, verbose_name=_("Start Time"), help_text=_("Time of day to run the schedule (e.g. 08:00:00)"))
-    channels = models.ManyToManyField('extras.NotificationChannel', blank=True, related_name='scheduled_reports', verbose_name=_("Channels"))
-    save_to_archive = models.BooleanField(default=True, verbose_name=_("Save To Archive"), help_text=_("Store a copy of generated reports in the local file archive"))
+    cron_expression = models.CharField(
+        max_length=100,
+        blank=True,
+        verbose_name=_("Cron Expression"),
+        help_text=_("Custom Cron Expression (e.g. '0 8 * * 1-5')"),
+    )
+    start_time = models.TimeField(
+        null=True,
+        blank=True,
+        verbose_name=_("Start Time"),
+        help_text=_("Time of day to run the schedule (e.g. 08:00:00)"),
+    )
+    channels = models.ManyToManyField(
+        "extras.NotificationChannel", blank=True, related_name="scheduled_reports", verbose_name=_("Channels")
+    )
+    save_to_archive = models.BooleanField(
+        default=True,
+        verbose_name=_("Save To Archive"),
+        help_text=_("Store a copy of generated reports in the local file archive"),
+    )
     is_active = models.BooleanField(default=True, verbose_name=_("Is Active"))
     last_run = models.DateTimeField(null=True, blank=True, verbose_name=_("Last Run"))
     last_status = models.CharField(max_length=50, blank=True, verbose_name=_("Last Status"))
 
     class Meta:
-        ordering = ['name']
+        ordering = ["name"]
         verbose_name = _("Scheduled Report")
         verbose_name_plural = _("Scheduled Reports")
 
@@ -883,48 +959,63 @@ class ScheduledReport(ChangeLoggingMixin, BaseModel):
 
     def clean(self):
         super().clean()
-        if self.frequency == 'cron':
+        if self.frequency == "cron":
             if not self.cron_expression:
-                raise ValidationError({'cron_expression': _("Cron expression is required when frequency is set to Custom Cron.")})
+                raise ValidationError(
+                    {"cron_expression": _("Cron expression is required when frequency is set to Custom Cron.")}
+                )
             try:
                 from croniter import croniter
                 from django.utils import timezone
+
                 croniter(self.cron_expression, timezone.now())
             except Exception as e:
-                raise ValidationError({'cron_expression': _("Invalid Cron expression: %(error)s") % {'error': str(e)}})
+                raise ValidationError({"cron_expression": _("Invalid Cron expression: %(error)s") % {"error": str(e)}})
         if self.recipients:
             from django.core.validators import validate_email
-            emails = [e.strip() for e in self.recipients.split(',') if e.strip()]
+
+            emails = [e.strip() for e in self.recipients.split(",") if e.strip()]
             if not emails:
-                raise ValidationError({'recipients': _("No recipient email addresses entered.")})
+                raise ValidationError({"recipients": _("No recipient email addresses entered.")})
             for email in emails:
                 try:
                     validate_email(email)
                 except ValidationError:
-                    raise ValidationError({'recipients': _("'%(email)s' is not a valid email address.") % {'email': email}})
+                    raise ValidationError(
+                        {"recipients": _("'%(email)s' is not a valid email address.") % {"email": email}}
+                    )
 
 
 class ReportGenerationArchive(ChangeLoggingMixin, BaseModel):
     objects = TenantScopingManager()
 
-    scheduled_report = models.ForeignKey(ScheduledReport, on_delete=models.CASCADE, related_name='archives', verbose_name=_("Scheduled Report"))
+    scheduled_report = models.ForeignKey(
+        ScheduledReport, on_delete=models.CASCADE, related_name="archives", verbose_name=_("Scheduled Report")
+    )
     generated_at = models.DateTimeField(auto_now_add=True)
     format = models.CharField(max_length=20, verbose_name=_("Format"))
     status = models.CharField(max_length=50, verbose_name=_("Status"))
     error_message = models.TextField(blank=True, verbose_name=_("Error Message"))
-    file = models.ForeignKey('extras.FileAttachment', on_delete=models.SET_NULL, null=True, blank=True, related_name='report_archives', verbose_name=_("File"))
+    file = models.ForeignKey(
+        "extras.FileAttachment",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="report_archives",
+        verbose_name=_("File"),
+    )
     tenant = models.ForeignKey(
-        'organization.Tenant',
+        "organization.Tenant",
         on_delete=models.CASCADE,
         blank=True,
         null=True,
-        related_name='report_archives',
+        related_name="report_archives",
         db_index=True,
-        verbose_name=_("Tenant")
+        verbose_name=_("Tenant"),
     )
 
     class Meta:
-        ordering = ['-generated_at']
+        ordering = ["-generated_at"]
         verbose_name = _("Report Generation Archive")
         verbose_name_plural = _("Report Generation Archives")
 
@@ -937,41 +1028,50 @@ class NotificationChannel(ChangeLoggingMixin, SoftDeleteMixin, BaseModel):
     all_objects = TenantScopingAllObjectsManager()
     # config holds channel secrets (SMTP password, Slack/Teams webhook URLs with
     # embedded tokens); keep it out of the changelog JSON.
-    _change_logging_excluded_fields = ['updated_at', 'config']
+    _change_logging_excluded_fields = ["updated_at", "config"]
 
-    TYPE_EMAIL = 'email'
-    TYPE_IN_APP = 'in_app'
-    TYPE_SLACK = 'slack'
-    TYPE_TEAMS = 'teams'
+    TYPE_EMAIL = "email"
+    TYPE_IN_APP = "in_app"
+    TYPE_SLACK = "slack"
+    TYPE_TEAMS = "teams"
 
     CHANNEL_TYPE_CHOICES = [
-        (TYPE_EMAIL, _('Email')),
-        (TYPE_IN_APP, _('In-App')),
-        (TYPE_SLACK, _('Slack')),
-        (TYPE_TEAMS, _('Microsoft Teams')),
+        (TYPE_EMAIL, _("Email")),
+        (TYPE_IN_APP, _("In-App")),
+        (TYPE_SLACK, _("Slack")),
+        (TYPE_TEAMS, _("Microsoft Teams")),
     ]
 
     name = models.CharField(max_length=255, verbose_name=_("Name"))
     channel_type = models.CharField(max_length=20, choices=CHANNEL_TYPE_CHOICES, verbose_name=_("Channel Type"))
     enabled = models.BooleanField(default=True, verbose_name=_("Enabled"))
-    config = models.JSONField(default=dict, blank=True, verbose_name=_("Config"), help_text=_("Channel-specific config (SMTP settings, webhook URL, etc.)"))
+    config = models.JSONField(
+        default=dict,
+        blank=True,
+        verbose_name=_("Config"),
+        help_text=_("Channel-specific config (SMTP settings, webhook URL, etc.)"),
+    )
     tenant = models.ForeignKey(
-        'organization.Tenant',
+        "organization.Tenant",
         on_delete=models.CASCADE,
         blank=True,
         null=True,
-        related_name='notification_channels',
+        related_name="notification_channels",
         db_index=True,
         verbose_name=_("Tenant"),
-        help_text=_("The tenant owning this channel. Null represents system-wide channels.")
+        help_text=_("The tenant owning this channel. Null represents system-wide channels."),
     )
 
     class Meta:
-        ordering = ['name']
+        ordering = ["name"]
         verbose_name = _("Notification Channel")
         verbose_name_plural = _("Notification Channels")
         constraints = [
-            models.UniqueConstraint(fields=['name'], condition=models.Q(deleted_at__isnull=True), name='unique_notificationchannel_name_active'),
+            models.UniqueConstraint(
+                fields=["name"],
+                condition=models.Q(deleted_at__isnull=True),
+                name="unique_notificationchannel_name_active",
+            ),
         ]
 
     def __str__(self):
@@ -983,38 +1083,44 @@ class AlertRule(ChangeLoggingMixin, SoftDeleteMixin, BaseModel):
     all_objects = TenantScopingAllObjectsManager()
     allow_global_tenant = True
 
-    ALERT_TYPE_LOW_STOCK = 'low_stock'
-    ALERT_TYPE_UPCOMING_EOL = 'upcoming_eol'
-    ALERT_TYPE_LICENSE_EXPIRY = 'license_expiry'
-    ALERT_TYPE_RENEWAL_DUE = 'renewal_due'
-    ALERT_TYPE_WARRANTY_EXPIRY = 'warranty_expiry'
-    ALERT_TYPE_AUDIT_OVERDUE = 'audit_overdue'
+    ALERT_TYPE_LOW_STOCK = "low_stock"
+    ALERT_TYPE_UPCOMING_EOL = "upcoming_eol"
+    ALERT_TYPE_LICENSE_EXPIRY = "license_expiry"
+    ALERT_TYPE_RENEWAL_DUE = "renewal_due"
+    ALERT_TYPE_WARRANTY_EXPIRY = "warranty_expiry"
+    ALERT_TYPE_AUDIT_OVERDUE = "audit_overdue"
 
     ALERT_TYPE_CHOICES = [
-        (ALERT_TYPE_LOW_STOCK, _('Low Stock Alert')),
-        (ALERT_TYPE_UPCOMING_EOL, _('Upcoming EOL Planning')),
-        (ALERT_TYPE_LICENSE_EXPIRY, _('License Expiry Alert')),
-        (ALERT_TYPE_RENEWAL_DUE, _('Renewal Due Alert')),
-        (ALERT_TYPE_WARRANTY_EXPIRY, _('Warranty Expiry Alert')),
-        (ALERT_TYPE_AUDIT_OVERDUE, _('Audit Overdue')),
+        (ALERT_TYPE_LOW_STOCK, _("Low Stock Alert")),
+        (ALERT_TYPE_UPCOMING_EOL, _("Upcoming EOL Planning")),
+        (ALERT_TYPE_LICENSE_EXPIRY, _("License Expiry Alert")),
+        (ALERT_TYPE_RENEWAL_DUE, _("Renewal Due Alert")),
+        (ALERT_TYPE_WARRANTY_EXPIRY, _("Warranty Expiry Alert")),
+        (ALERT_TYPE_AUDIT_OVERDUE, _("Audit Overdue")),
     ]
 
-    SEVERITY_INFO = 'info'
-    SEVERITY_WARNING = 'warning'
-    SEVERITY_CRITICAL = 'critical'
+    SEVERITY_INFO = "info"
+    SEVERITY_WARNING = "warning"
+    SEVERITY_CRITICAL = "critical"
 
     SEVERITY_CHOICES = [
-        (SEVERITY_INFO, _('Info')),
-        (SEVERITY_WARNING, _('Warning')),
-        (SEVERITY_CRITICAL, _('Critical')),
+        (SEVERITY_INFO, _("Info")),
+        (SEVERITY_WARNING, _("Warning")),
+        (SEVERITY_CRITICAL, _("Critical")),
     ]
 
     name = models.CharField(max_length=255, verbose_name=_("Name"))
     description = models.TextField(blank=True, verbose_name=_("Description"))
     alert_type = models.CharField(max_length=50, choices=ALERT_TYPE_CHOICES, verbose_name=_("Alert Type"))
-    threshold_value = models.PositiveIntegerField(verbose_name=_("Threshold Value"), help_text=_("Limit count or days horizon"))
-    severity = models.CharField(max_length=20, choices=SEVERITY_CHOICES, default=SEVERITY_WARNING, verbose_name=_("Severity"))
-    is_active = models.BooleanField(default=True, verbose_name=_("Is Active"), help_text=_("Inactive rules are not evaluated at all."))
+    threshold_value = models.PositiveIntegerField(
+        verbose_name=_("Threshold Value"), help_text=_("Limit count or days horizon")
+    )
+    severity = models.CharField(
+        max_length=20, choices=SEVERITY_CHOICES, default=SEVERITY_WARNING, verbose_name=_("Severity")
+    )
+    is_active = models.BooleanField(
+        default=True, verbose_name=_("Is Active"), help_text=_("Inactive rules are not evaluated at all.")
+    )
     is_muted = models.BooleanField(
         default=False,
         verbose_name=_("Is Muted"),
@@ -1026,27 +1132,33 @@ class AlertRule(ChangeLoggingMixin, SoftDeleteMixin, BaseModel):
         help_text=_("0 = notify once. N = re-send channel notifications every N days while an alert stays unresolved."),
     )
     last_fired_at = models.DateTimeField(
-        null=True, blank=True, editable=False,
+        null=True,
+        blank=True,
+        editable=False,
         help_text=_("When this rule was last evaluated by the engine."),
     )
-    channels = models.ManyToManyField(NotificationChannel, blank=True, related_name='alert_rules', verbose_name=_("Channels"))
+    channels = models.ManyToManyField(
+        NotificationChannel, blank=True, related_name="alert_rules", verbose_name=_("Channels")
+    )
     tenant = models.ForeignKey(
-        'organization.Tenant',
+        "organization.Tenant",
         on_delete=models.CASCADE,
         blank=True,
         null=True,
-        related_name='alert_rules',
+        related_name="alert_rules",
         db_index=True,
         verbose_name=_("Tenant"),
-        help_text=_("The tenant owning this rule. Null represents system-wide rules.")
+        help_text=_("The tenant owning this rule. Null represents system-wide rules."),
     )
 
     class Meta:
-        ordering = ['name']
+        ordering = ["name"]
         verbose_name = _("Alert Rule")
         verbose_name_plural = _("Alert Rules")
         constraints = [
-            models.UniqueConstraint(fields=['name'], condition=models.Q(deleted_at__isnull=True), name='unique_alertrule_name_active'),
+            models.UniqueConstraint(
+                fields=["name"], condition=models.Q(deleted_at__isnull=True), name="unique_alertrule_name_active"
+            ),
         ]
 
     def __str__(self):
@@ -1054,7 +1166,8 @@ class AlertRule(ChangeLoggingMixin, SoftDeleteMixin, BaseModel):
 
     def get_absolute_url(self):
         from django.urls import reverse
-        return reverse('extras:alertrule_detail', kwargs={'pk': self.pk})
+
+        return reverse("extras:alertrule_detail", kwargs={"pk": self.pk})
 
 
 class AlertLog(BaseModel):
@@ -1068,17 +1181,17 @@ class AlertLog(BaseModel):
     # all tenants and must never back a tenant-facing view/API.
     unscoped = AllObjectsManager()
 
-    STATUS_ACTIVE = 'active'
-    STATUS_ACKNOWLEDGED = 'acknowledged'
-    STATUS_RESOLVED = 'resolved'
+    STATUS_ACTIVE = "active"
+    STATUS_ACKNOWLEDGED = "acknowledged"
+    STATUS_RESOLVED = "resolved"
 
     STATUS_CHOICES = [
-        (STATUS_ACTIVE, _('Active')),
-        (STATUS_ACKNOWLEDGED, _('Acknowledged')),
-        (STATUS_RESOLVED, _('Resolved')),
+        (STATUS_ACTIVE, _("Active")),
+        (STATUS_ACKNOWLEDGED, _("Acknowledged")),
+        (STATUS_RESOLVED, _("Resolved")),
     ]
 
-    rule = models.ForeignKey(AlertRule, on_delete=models.CASCADE, related_name='logs', verbose_name=_("Rule"))
+    rule = models.ForeignKey(AlertRule, on_delete=models.CASCADE, related_name="logs", verbose_name=_("Rule"))
     subject = models.CharField(max_length=255, verbose_name=_("Subject"))
     message = models.TextField(verbose_name=_("Message"))
     severity = models.CharField(
@@ -1088,18 +1201,21 @@ class AlertLog(BaseModel):
         db_index=True,
         verbose_name=_("Severity"),
     )
-    content_type = models.ForeignKey('contenttypes.ContentType', on_delete=models.CASCADE, related_name='alert_logs')
+    content_type = models.ForeignKey("contenttypes.ContentType", on_delete=models.CASCADE, related_name="alert_logs")
     object_id = models.PositiveBigIntegerField()
-    content_object = GenericForeignKey('content_type', 'object_id')
-    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default=STATUS_ACTIVE, db_index=True, verbose_name=_("Status"))
+    content_object = GenericForeignKey("content_type", "object_id")
+    status = models.CharField(
+        max_length=20, choices=STATUS_CHOICES, default=STATUS_ACTIVE, db_index=True, verbose_name=_("Status")
+    )
     delivery_status = models.JSONField(
         default=dict,
         blank=True,
         verbose_name=_("Delivery Status"),
-        help_text=_("Per-channel delivery result: {channel_pk: 'ok'|'failed'|'error: ...'}")
+        help_text=_("Per-channel delivery result: {channel_pk: 'ok'|'failed'|'error: ...'}"),
     )
     last_notified_at = models.DateTimeField(
-        null=True, blank=True,
+        null=True,
+        blank=True,
         verbose_name=_("Last Notified At"),
         help_text=_("When channel notifications were last dispatched for this alert (drives re-notify)."),
     )
@@ -1108,28 +1224,28 @@ class AlertLog(BaseModel):
         on_delete=models.SET_NULL,
         null=True,
         blank=True,
-        related_name='acknowledged_alerts',
-        verbose_name=_("Acknowledged By")
+        related_name="acknowledged_alerts",
+        verbose_name=_("Acknowledged By"),
     )
     resolved_by = models.ForeignKey(
         to=settings.AUTH_USER_MODEL,
         on_delete=models.SET_NULL,
         null=True,
         blank=True,
-        related_name='resolved_alerts',
-        verbose_name=_("Resolved By")
+        related_name="resolved_alerts",
+        verbose_name=_("Resolved By"),
     )
     resolution_notes = models.TextField(blank=True, verbose_name=_("Resolution Notes"))
     resolved_at = models.DateTimeField(null=True, blank=True, verbose_name=_("Resolved At"))
     tenant = models.ForeignKey(
-        'organization.Tenant',
+        "organization.Tenant",
         on_delete=models.CASCADE,
         blank=True,
         null=True,
-        related_name='alert_logs',
+        related_name="alert_logs",
         db_index=True,
         verbose_name=_("Tenant"),
-        help_text=_("The tenant owning this log. Null represents system-wide logs.")
+        help_text=_("The tenant owning this log. Null represents system-wide logs."),
     )
 
     @property
@@ -1140,7 +1256,7 @@ class AlertLog(BaseModel):
                 return obj
             if self.content_type and self.object_id:
                 model_class = self.content_type.model_class()
-                if hasattr(model_class, 'all_objects'):
+                if hasattr(model_class, "all_objects"):
                     return model_class.all_objects.filter(pk=self.object_id).first()
                 return model_class.objects.filter(pk=self.object_id).first()
         except Exception:
@@ -1148,13 +1264,13 @@ class AlertLog(BaseModel):
         return None
 
     class Meta:
-        ordering = ['-created_at']
+        ordering = ["-created_at"]
         verbose_name = _("Alert Log")
         verbose_name_plural = _("Alert Logs")
         indexes = [
-            models.Index(fields=['content_type', 'object_id'], name='core_alertl_content_706751_idx'),
-            models.Index(fields=['severity'], name='core_alertl_severit_f0ec11_idx'),
-            models.Index(fields=['status'], name='core_alertl_status_b2f47a_idx'),
+            models.Index(fields=["content_type", "object_id"], name="core_alertl_content_706751_idx"),
+            models.Index(fields=["severity"], name="core_alertl_severit_f0ec11_idx"),
+            models.Index(fields=["status"], name="core_alertl_status_b2f47a_idx"),
         ]
         constraints = [
             # At most one OPEN (active/acknowledged) alert per rule+object.
@@ -1162,9 +1278,9 @@ class AlertLog(BaseModel):
             # re-fire later. Literal status strings: the class constants are not
             # in scope inside Meta.
             models.UniqueConstraint(
-                fields=['rule', 'content_type', 'object_id'],
-                condition=models.Q(status__in=['active', 'acknowledged']),
-                name='uniq_open_alert_per_object',
+                fields=["rule", "content_type", "object_id"],
+                condition=models.Q(status__in=["active", "acknowledged"]),
+                name="uniq_open_alert_per_object",
             ),
         ]
 
@@ -1181,6 +1297,7 @@ class SavedFilter(ChangeLoggingMixin, SoftDeleteMixin, BaseModel):
     tenant a filter is visible to every member when ``shared`` (the default), or
     only to its ``created_by`` owner otherwise.
     """
+
     objects = TenantScopingSoftDeleteManager()
     all_objects = TenantScopingAllObjectsManager()
     allow_global_tenant = True
@@ -1190,7 +1307,7 @@ class SavedFilter(ChangeLoggingMixin, SoftDeleteMixin, BaseModel):
     content_type = models.ForeignKey(
         ContentType,
         on_delete=models.CASCADE,
-        related_name='saved_filters',
+        related_name="saved_filters",
         verbose_name=_("Content Type"),
         help_text=_("The model whose list view this filter applies to."),
     )
@@ -1211,29 +1328,29 @@ class SavedFilter(ChangeLoggingMixin, SoftDeleteMixin, BaseModel):
         on_delete=models.SET_NULL,
         null=True,
         blank=True,
-        related_name='saved_filters',
+        related_name="saved_filters",
         verbose_name=_("Created By"),
     )
     tenant = models.ForeignKey(
-        'organization.Tenant',
+        "organization.Tenant",
         on_delete=models.CASCADE,
         blank=True,
         null=True,
-        related_name='saved_filters',
+        related_name="saved_filters",
         db_index=True,
         verbose_name=_("Tenant"),
         help_text=_("The tenant owning this filter. Null represents system-wide filters."),
     )
 
     class Meta:
-        ordering = ['content_type', 'name']
+        ordering = ["content_type", "name"]
         verbose_name = _("Saved Filter")
         verbose_name_plural = _("Saved Filters")
         constraints = [
             models.UniqueConstraint(
-                fields=['tenant', 'content_type', 'name'],
+                fields=["tenant", "content_type", "name"],
                 condition=models.Q(deleted_at__isnull=True),
-                name='unique_savedfilter_name_active',
+                name="unique_savedfilter_name_active",
             ),
         ]
 
@@ -1241,5 +1358,4 @@ class SavedFilter(ChangeLoggingMixin, SoftDeleteMixin, BaseModel):
         return self.name
 
     def get_absolute_url(self):
-        return reverse('extras:savedfilter_detail', kwargs={'pk': self.pk})
-
+        return reverse("extras:savedfilter_detail", kwargs={"pk": self.pk})

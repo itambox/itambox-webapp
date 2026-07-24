@@ -1,15 +1,18 @@
-from django.utils import timezone
 from django.urls import reverse, reverse_lazy
+from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
 
-from ..models import AssetRequest
 from assets.choices import RequestStatusChoices
-from .. import forms, tables, filters
-
 from itambox.panels import Panel
 from itambox.views.generic import (
-    ObjectListView, ObjectDetailView, ObjectEditView, ObjectDeleteView,
+    ObjectDeleteView,
+    ObjectDetailView,
+    ObjectEditView,
+    ObjectListView,
 )
+
+from .. import filters, forms, tables
+from ..models import AssetRequest
 
 
 class AssetRequestListView(ObjectListView):
@@ -18,7 +21,7 @@ class AssetRequestListView(ObjectListView):
     filterset_form = forms.AssetRequestFilterForm
     table = tables.AssetRequestTable
     action_buttons = ("add",)
-    
+
     def get_queryset(self):
         qs = super().get_queryset().filter(parent__isnull=True)
         return qs
@@ -29,8 +32,8 @@ class AssetRequestDetailView(ObjectDetailView):
 
     layout = (
         (
-            (Panel('info', _('Asset Request Details')),),
-            (Panel('response', _('Decision & Response Details')),),
+            (Panel("info", _("Asset Request Details")),),
+            (Panel("response", _("Decision & Response Details")),),
         ),
     )
 
@@ -43,19 +46,19 @@ class AssetRequestCreateView(ObjectEditView):
 
     def get_form_kwargs(self):
         kwargs = super().get_form_kwargs()
-        kwargs['request'] = self.request
+        kwargs["request"] = self.request
         return kwargs
 
     def form_valid(self, form):
         form.instance.requester = self.request.user
-        qty = form.cleaned_data.get('qty') or 1
+        qty = form.cleaned_data.get("qty") or 1
         asset_type = form.instance.asset_type
         if asset_type and qty > 1:
             # Create the parent group request
             form.instance.qty = qty
             form.instance.is_group = True
             response = super().form_valid(form)
-            
+
             # Create the individual child requests
             for _i in range(qty):
                 req = AssetRequest(
@@ -87,7 +90,7 @@ class AssetRequestEditView(ObjectEditView):
             form.instance.response_date = timezone.now()
             form.instance.responded_by = self.request.user
         response = super().form_valid(form)
-        
+
         # Cascade status changes to sub_requests
         if form.instance.is_group and form.instance.status in ("approved", "denied", "cancelled"):
             for child in form.instance.sub_requests.exclude(status=form.instance.status):
@@ -97,15 +100,17 @@ class AssetRequestEditView(ObjectEditView):
                     child.responded_by = form.instance.responded_by
                     child.response_notes = form.instance.response_notes
                     child.save()
-                    
+
         try:
             from core.events import dispatch_event
             from core.models import Notification
-            dispatch_event(AssetRequest, self.object, action='update')
+
+            dispatch_event(AssetRequest, self.object, action="update")
             Notification.objects.create(
                 user=self.object.requester,
                 subject=_("Asset Request %(status)s") % {"status": self.object.get_status_display()},
-                message=_("Your request for %(item)s has been %(status)s.") % {"item": self.object, "status": self.object.get_status_display().lower()},
+                message=_("Your request for %(item)s has been %(status)s.")
+                % {"item": self.object, "status": self.object.get_status_display().lower()},
                 level=Notification.LEVEL_INFO,
                 target_url=self.object.get_absolute_url(),
             )
@@ -120,12 +125,14 @@ class AssetRequestEditView(ObjectEditView):
 
 
 class AssetRequestQueueView(ObjectListView):
-    queryset = AssetRequest.objects.filter(status=RequestStatusChoices.PENDING).select_related("requester", "asset", "asset_type")
+    queryset = AssetRequest.objects.filter(status=RequestStatusChoices.PENDING).select_related(
+        "requester", "asset", "asset_type"
+    )
     filterset = filters.AssetRequestFilterSet
     filterset_form = forms.AssetRequestFilterForm
     table = tables.AssetRequestTable
     action_buttons = ()
-    template_name = 'generic/object_list.html'
+    template_name = "generic/object_list.html"
 
 
 class AssetRequestDeleteView(ObjectDeleteView):
@@ -135,11 +142,9 @@ class AssetRequestDeleteView(ObjectDeleteView):
     success_url = reverse_lazy("assets:assetrequest_list")
 
 
-from django.views import View
 from django.contrib.auth.mixins import LoginRequiredMixin, PermissionRequiredMixin
-from django.views.generic.base import TemplateResponseMixin
+from django.db import transaction
 from django.http import HttpResponseRedirect
 from django.shortcuts import redirect
-from django.db import transaction
-
-
+from django.views import View
+from django.views.generic.base import TemplateResponseMixin

@@ -6,10 +6,11 @@ member who can open the form (a low-severity cross-tenant disclosure) and is
 needless UX clutter. ``scope_tenant_field`` fixes both, accounting for tenant
 groups.
 """
+
 from django import forms
 
 
-def scope_tenant_field(form, field_name='tenant', autoset_when_single=True):
+def scope_tenant_field(form, field_name="tenant", autoset_when_single=True):
     """Scope a form's owning-tenant picker to the tenants the user may use.
 
     - **Superusers / system context** — left untouched (full picker, for
@@ -36,28 +37,30 @@ def scope_tenant_field(form, field_name='tenant', autoset_when_single=True):
 
     # inline imports: avoid a core.forms -> middleware/models import cycle at load
     from itambox.middleware import get_current_user
+
     user = get_current_user()
-    if user is None or getattr(user, 'is_superuser', False):
+    if user is None or getattr(user, "is_superuser", False):
         return  # operator / system context keeps the full picker
 
     from organization.models import Tenant
+
     accessible = Tenant.objects.all()  # tenant-scoping manager → accessible set
     field.queryset = accessible
 
     if not autoset_when_single:
         return
 
-    accessible_pks = list(accessible.values_list('pk', flat=True))
+    accessible_pks = list(accessible.values_list("pk", flat=True))
     if len(accessible_pks) == 1:
         field.disabled = True
         field.required = False
         field.widget = forms.HiddenInput()
-        instance = getattr(form, 'instance', None)
-        if not (instance and getattr(instance, f'{field_name}_id', None)):
+        instance = getattr(form, "instance", None)
+        if not (instance and getattr(instance, f"{field_name}_id", None)):
             form.initial[field_name] = accessible_pks[0]
 
 
-def scope_tenant_group_field(form, field_name='tenant_group'):
+def scope_tenant_group_field(form, field_name="tenant_group"):
     """Scope a tenant-group picker to the groups the current user may use.
 
     Re-evaluates the field's queryset per request through the (now tenant-scoped)
@@ -68,6 +71,6 @@ def scope_tenant_group_field(form, field_name='tenant_group'):
     groups' ancestors.
     """
     field = form.fields.get(field_name)
-    if field is None or getattr(field, 'queryset', None) is None:
+    if field is None or getattr(field, "queryset", None) is None:
         return
     field.queryset = field.queryset.model._default_manager.all()

@@ -1,6 +1,7 @@
-import logging
 import io
+import logging
 import zipfile
+
 from django.contrib.contenttypes.models import ContentType
 from django.core.files.base import ContentFile
 from django.utils.html import escape
@@ -8,28 +9,33 @@ from django.utils.translation import gettext_lazy as _
 
 from core.models import Job, Notification
 from extras.models import FileAttachment
+
 from .context import TaskContext
 from .utils import reverse_job_detail
 
 logger = logging.getLogger(__name__)
+
 
 def generate_single_label_graphic(asset, label_format):
     """
     Renders QR code or Barcode PNG bytes for the given asset.
     """
     import io
+
     buffer = io.BytesIO()
 
-    if label_format == 'qr':
+    if label_format == "qr":
         import segno
+
         # Generate clean QR code
         qr = segno.make_qr(f"itambox://asset/{asset.pk}")
-        qr.save(buffer, kind='png', scale=10)
+        qr.save(buffer, kind="png", scale=10)
     else:
         import barcode
         from barcode.writer import ImageWriter
+
         # Generate barcode
-        CODING = barcode.get_barcode_class('code128')
+        CODING = barcode.get_barcode_class("code128")
         # Clean text
         code = CODING(asset.asset_tag or str(asset.pk), writer=ImageWriter())
         code.write(buffer)
@@ -58,10 +64,11 @@ def generate_label_batch_task(job_id, asset_pks, label_format, user_id, tenant_i
 
             try:
                 from assets.models import Asset
+
                 assets = Asset.objects.filter(pk__in=asset_pks)
 
                 zip_buffer = io.BytesIO()
-                with zipfile.ZipFile(zip_buffer, 'w', zipfile.ZIP_DEFLATED) as zip_file:
+                with zipfile.ZipFile(zip_buffer, "w", zipfile.ZIP_DEFLATED) as zip_file:
                     for asset in assets:
                         try:
                             img_data = generate_single_label_graphic(asset, label_format)
@@ -75,27 +82,21 @@ def generate_label_batch_task(job_id, asset_pks, label_format, user_id, tenant_i
 
                 ct = ContentType.objects.get_for_model(Job)
                 attachment = FileAttachment.objects.create(
-                    model=ct,
-                    object_id=job.pk,
-                    name=f"labels_batch_{job.pk}.zip",
-                    mime_type="application/zip"
+                    model=ct, object_id=job.pk, name=f"labels_batch_{job.pk}.zip", mime_type="application/zip"
                 )
                 attachment.file.save(f"labels_batch_{job.pk}.zip", ContentFile(zip_buffer.getvalue()))
                 attachment.save()
 
                 job.append_log(f"ZIP package generated and saved successfully: {attachment.file.name}")
-                job.mark_completed(result={
-                    'file_name': attachment.name,
-                    'download_url': attachment.get_download_url()
-                })
+                job.mark_completed(result={"file_name": attachment.name, "download_url": attachment.get_download_url()})
 
                 Notification.objects.create(
                     user=ctx.user,
                     subject=_("Label Generation Complete"),
                     message=_("Successfully generated label batch zip for %(count)s asset(s). Click to download.")
-                    % {'count': assets.count()},
+                    % {"count": assets.count()},
                     level=Notification.LEVEL_SUCCESS,
-                    target_url=attachment.get_download_url()
+                    target_url=attachment.get_download_url(),
                 )
 
             except Exception as e:
@@ -104,44 +105,47 @@ def generate_label_batch_task(job_id, asset_pks, label_format, user_id, tenant_i
                 Notification.objects.create(
                     user=ctx.user,
                     subject=_("Label Generation Failed"),
-                    message=_("An error occurred during barcode rendering: %(error)s") % {'error': str(e)},
+                    message=_("An error occurred during barcode rendering: %(error)s") % {"error": str(e)},
                     level=Notification.LEVEL_DANGER,
-                    target_url=reverse_job_detail(job.pk)
+                    target_url=reverse_job_detail(job.pk),
                 )
         except Exception as e:
             logger.exception("Outer exception during label batch generation task")
 
 
 def generate_base64_barcode(asset, barcode_format):
-    import io
     import base64
+    import io
+
     buffer = io.BytesIO()
 
-    fmt = barcode_format.lower() if barcode_format else 'code128'
-    if fmt == 'qr':
+    fmt = barcode_format.lower() if barcode_format else "code128"
+    if fmt == "qr":
         import segno
+
         # Encode the bare asset tag with the itambox: scheme so QR codes
         # scan correctly off any device / host (no localhost hardcoding).
         # resolve_scanned_code() understands this format on both the audit
         # and global scan-to-find paths.
-        asset_tag = getattr(asset, 'asset_tag', None) or str(getattr(asset, 'pk', ''))
+        asset_tag = getattr(asset, "asset_tag", None) or str(getattr(asset, "pk", ""))
         qr_data = f"itambox:{asset_tag}"
         qr = segno.make_qr(qr_data)
         # border=4 is the mandatory QR "quiet zone" — without it the code won't
         # scan and its edge modules visually merge with neighbouring content.
-        qr.save(buffer, kind='png', scale=6, border=4)
+        qr.save(buffer, kind="png", scale=6, border=4)
     else:
         import barcode
         from barcode.writer import ImageWriter
+
         if fmt not in barcode.PROVIDED_BARCODES:
-            fmt = 'code128'
+            fmt = "code128"
         CODING = barcode.get_barcode_class(fmt)
-        text = getattr(asset, 'asset_tag', None) or str(getattr(asset, 'pk', ''))
+        text = getattr(asset, "asset_tag", None) or str(getattr(asset, "pk", ""))
         code = CODING(text, writer=ImageWriter())
         code.write(buffer)
 
     img_bytes = buffer.getvalue()
-    base64_str = base64.b64encode(img_bytes).decode('utf-8')
+    base64_str = base64.b64encode(img_bytes).decode("utf-8")
     return f"data:image/png;base64,{base64_str}"
 
 
@@ -155,12 +159,13 @@ def _default_label_card(asset, barcode_data_uri):
     renders label_card cannot be abused for stored-XSS. barcode_data_uri is
     a base64 data: URI produced entirely by this module and is safe as-is.
     """
-    name = escape(getattr(asset, 'name', None) or str(asset))
-    asset_tag = escape(getattr(asset, 'asset_tag', '') or '')
-    serial_number = escape(getattr(asset, 'serial_number', '') or '')
+    name = escape(getattr(asset, "name", None) or str(asset))
+    asset_tag = escape(getattr(asset, "asset_tag", "") or "")
+    serial_number = escape(getattr(asset, "serial_number", "") or "")
     serial_html = (
         f'<div style="font-size: 7pt; font-weight: normal; color: #555;">S/N: {serial_number}</div>'
-        if serial_number else ''
+        if serial_number
+        else ""
     )
     return f"""
     <table style="width: 100%; border-collapse: collapse; margin: 0; padding: 0;">
@@ -194,14 +199,15 @@ def render_label_html(asset, label_template, barcode_data_uri):
 
     try:
         from jinja2.sandbox import SandboxedEnvironment
+
         env = SandboxedEnvironment()
         template = env.from_string(label_template.template_code)
         context = {
-            'obj': asset,
-            'asset': asset,
-            'barcode_data_uri': barcode_data_uri,
-            'barcode_img': f'<img src="{barcode_data_uri}" style="width: 0.9in; height: 0.9in; background: #fff;" />',
-            'barcode_format': label_template.barcode_format,
+            "obj": asset,
+            "asset": asset,
+            "barcode_data_uri": barcode_data_uri,
+            "barcode_img": f'<img src="{barcode_data_uri}" style="width: 0.9in; height: 0.9in; background: #fff;" />',
+            "barcode_format": label_template.barcode_format,
         }
         return template.render(**context)
     except Exception as e:
@@ -212,16 +218,16 @@ def render_label_html(asset, label_template, barcode_data_uri):
 def chunk_list(lst, n):
     """Yield successive n-sized chunks from lst."""
     for i in range(0, len(lst), n):
-        yield lst[i:i + n]
+        yield lst[i : i + n]
 
 
 def _build_labels_document(rendered_cards, label_template, layout_mode):
     """Wrap rendered label cards into a complete, printable HTML document sized
     for the chosen layout. Unknown layouts fall back to continuous-roll sizing."""
-    if layout_mode in ('a4_grid', 'letter_grid'):
-        paper_size = "a4" if layout_mode == 'a4_grid' else "letter"
-        margin = "10mm" if layout_mode == 'a4_grid' else "0.5in"
-        cell_height = "34mm" if layout_mode == 'a4_grid' else "1.22in"
+    if layout_mode in ("a4_grid", "letter_grid"):
+        paper_size = "a4" if layout_mode == "a4_grid" else "letter"
+        margin = "10mm" if layout_mode == "a4_grid" else "0.5in"
+        cell_height = "34mm" if layout_mode == "a4_grid" else "1.22in"
 
         # Chunk cards into pages of 24
         pages = []
@@ -245,7 +251,7 @@ def _build_labels_document(rendered_cards, label_template, layout_mode):
                         cells_block += f'<td class="grid-cell">{card}</td>\n'
                     else:
                         cells_block += '<td class="grid-cell">&nbsp;</td>\n'
-                rows_block += f'<tr>\n{cells_block}</tr>\n'
+                rows_block += f"<tr>\n{cells_block}</tr>\n"
 
             pages_block += f'<table class="grid-table" style="{page_break}">\n{rows_block}</table>\n'
 
@@ -335,29 +341,31 @@ def _pdf_safe_link_callback(uri, rel):
     else (remote URLs, ``file://``, traversal) resolves to nothing.
     """
     import os
+
     from django.conf import settings
 
-    if uri.startswith('data:'):
+    if uri.startswith("data:"):
         return uri
 
     for url_prefix, root in (
-        (getattr(settings, 'STATIC_URL', None), getattr(settings, 'STATIC_ROOT', None)),
-        (getattr(settings, 'MEDIA_URL', None), getattr(settings, 'MEDIA_ROOT', None)),
+        (getattr(settings, "STATIC_URL", None), getattr(settings, "STATIC_ROOT", None)),
+        (getattr(settings, "MEDIA_URL", None), getattr(settings, "MEDIA_ROOT", None)),
     ):
         if url_prefix and root and uri.startswith(url_prefix):
             root_abs = os.path.abspath(root)
-            candidate = os.path.abspath(os.path.join(root_abs, uri[len(url_prefix):].lstrip('/')))
+            candidate = os.path.abspath(os.path.join(root_abs, uri[len(url_prefix) :].lstrip("/")))
             # Reject path traversal outside the served root.
             if os.path.commonpath([root_abs, candidate]) == root_abs and os.path.isfile(candidate):
                 return candidate
-            return ''
+            return ""
     # Remote URLs (http/https), file://, protocol-relative, etc. are refused.
-    return ''
+    return ""
 
 
 def _html_to_pdf_bytes(html_content):
     """Render an HTML document to PDF bytes via xhtml2pdf."""
     from xhtml2pdf import pisa
+
     pdf_buffer = io.BytesIO()
     pisa_status = pisa.CreatePDF(html_content, dest=pdf_buffer, link_callback=_pdf_safe_link_callback)
     if pisa_status.err:
@@ -365,7 +373,7 @@ def _html_to_pdf_bytes(html_content):
     return pdf_buffer.getvalue()
 
 
-def render_labels_pdf(assets, label_template, layout_mode='roll'):
+def render_labels_pdf(assets, label_template, layout_mode="roll"):
     """Synchronously render one or more asset labels into a single PDF (bytes).
 
     Shares the exact card engine (``render_label_html``) and document builder
@@ -407,7 +415,9 @@ def generate_label_pdf_batch_task(job_id, asset_pks, template_id, layout_mode, u
 
             try:
                 label_template = LabelTemplate.objects.get(pk=template_id)
-                job.append_log(f"Selected template: {label_template.name} ({label_template.page_width}x{label_template.page_height} in)")
+                job.append_log(
+                    f"Selected template: {label_template.name} ({label_template.page_width}x{label_template.page_height} in)"
+                )
             except LabelTemplate.DoesNotExist:
                 error_msg = f"LabelTemplate {template_id} not found."
                 logger.error(error_msg)
@@ -419,7 +429,7 @@ def generate_label_pdf_batch_task(job_id, asset_pks, template_id, layout_mode, u
             assets = list(Asset.objects.filter(pk__in=asset_pks))
             if not assets:
                 job.append_log("No matching assets found to print.")
-                job.mark_completed(result={'status': 'no_assets'})
+                job.mark_completed(result={"status": "no_assets"})
                 return
 
             # Render individual cards (with per-asset logging for the job trail)
@@ -443,37 +453,31 @@ def generate_label_pdf_batch_task(job_id, asset_pks, template_id, layout_mode, u
             # Save FileAttachment
             ct = ContentType.objects.get_for_model(Job)
             attachment = FileAttachment.objects.create(
-                model=ct,
-                object_id=job.pk,
-                name=f"labels_batch_{job.pk}.pdf",
-                mime_type="application/pdf"
+                model=ct, object_id=job.pk, name=f"labels_batch_{job.pk}.pdf", mime_type="application/pdf"
             )
             attachment.file.save(f"labels_batch_{job.pk}.pdf", ContentFile(pdf_bytes))
             attachment.save()
 
             job.append_log(f"PDF document generated and saved successfully: {attachment.file.name}")
-            job.mark_completed(result={
-                'file_name': attachment.name,
-                'download_url': attachment.get_download_url()
-            })
+            job.mark_completed(result={"file_name": attachment.name, "download_url": attachment.get_download_url()})
 
             Notification.objects.create(
                 user=ctx.user,
                 subject=_("Label Generation Complete"),
                 message=_("Successfully generated label PDF for %(count)s asset(s). Click to download.")
-                % {'count': len(assets)},
+                % {"count": len(assets)},
                 level=Notification.LEVEL_SUCCESS,
-                target_url=attachment.get_download_url()
+                target_url=attachment.get_download_url(),
             )
 
         except Exception as e:
             logger.exception("Exception during label batch generation task")
-            if 'job' in locals():
+            if "job" in locals():
                 job.mark_failed(str(e))
             Notification.objects.create(
                 user=ctx.user,
                 subject=_("Label Generation Failed"),
-                message=_("An error occurred during PDF rendering: %(error)s") % {'error': str(e)},
+                message=_("An error occurred during PDF rendering: %(error)s") % {"error": str(e)},
                 level=Notification.LEVEL_DANGER,
-                target_url=reverse_job_detail(job.pk) if 'job' in locals() else None
+                target_url=reverse_job_detail(job.pk) if "job" in locals() else None,
             )

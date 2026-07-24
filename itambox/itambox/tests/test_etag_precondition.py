@@ -26,48 +26,47 @@ class ETagPreconditionTests(APITestCase):
     def setUp(self):
         self.staff = baker.make(
             User,
-            username='staff',
-            email='staff@example.com',
+            username="staff",
+            email="staff@example.com",
             is_staff=True,
             is_superuser=False,
         )
-        self.staff.set_password('password123')
+        self.staff.set_password("password123")
         self.staff.save()
 
         from organization.models import Role, Tenant
-        self.tenant = baker.make(Tenant, name='Test Tenant', slug='test-tenant')
+
+        self.tenant = baker.make(Tenant, name="Test Tenant", slug="test-tenant")
         self.role = baker.make(
             Role,
             tenant=self.tenant,
-            name='Staff Role',
+            name="Staff Role",
             permissions=[
-                'software.view_software',
-                'software.add_software',
-                'software.change_software',
-                'software.delete_software',
+                "software.view_software",
+                "software.add_software",
+                "software.change_software",
+                "software.delete_software",
             ],
         )
         self.membership = grant(self.staff, self.tenant, self.role).membership
 
-        self.manufacturer = baker.make(Manufacturer, name='Microsoft', slug='microsoft')
+        self.manufacturer = baker.make(Manufacturer, name="Microsoft", slug="microsoft")
         self.software = baker.make(
             Software,
-            name='Office 2021 Professional',
+            name="Office 2021 Professional",
             manufacturer=self.manufacturer,
-            version='16.0',
-            category='productivity',
-            license_type='proprietary',
+            version="16.0",
+            category="productivity",
+            license_type="proprietary",
             tenant=self.tenant,
         )
 
-        self.detail_url = reverse(
-            'api:software_api:software-detail', kwargs={'pk': self.software.pk}
-        )
+        self.detail_url = reverse("api:software_api:software-detail", kwargs={"pk": self.software.pk})
 
     def _login(self):
         self.client.force_login(self.staff)
         session = self.client.session
-        session['active_tenant_id'] = self.tenant.pk
+        session["active_tenant_id"] = self.tenant.pk
         session.save()
 
     def _current_etag(self):
@@ -78,21 +77,15 @@ class ETagPreconditionTests(APITestCase):
 
     def test_patch_without_if_match_returns_428_and_does_not_write(self):
         self._login()
-        response = self.client.patch(
-            self.detail_url, data={'name': 'Renamed'}, format='json'
-        )
-        self.assertEqual(
-            response.status_code, status.HTTP_428_PRECONDITION_REQUIRED
-        )
+        response = self.client.patch(self.detail_url, data={"name": "Renamed"}, format="json")
+        self.assertEqual(response.status_code, status.HTTP_428_PRECONDITION_REQUIRED)
         self.software.refresh_from_db()
-        self.assertEqual(self.software.name, 'Office 2021 Professional')
+        self.assertEqual(self.software.name, "Office 2021 Professional")
 
     def test_delete_without_if_match_returns_428_and_does_not_delete(self):
         self._login()
         response = self.client.delete(self.detail_url)
-        self.assertEqual(
-            response.status_code, status.HTTP_428_PRECONDITION_REQUIRED
-        )
+        self.assertEqual(response.status_code, status.HTTP_428_PRECONDITION_REQUIRED)
         self.assertTrue(Software.objects.filter(pk=self.software.pk).exists())
 
     # --- stale If-Match -> 412, no write ---------------------------------
@@ -101,24 +94,18 @@ class ETagPreconditionTests(APITestCase):
         self._login()
         response = self.client.patch(
             self.detail_url,
-            data={'name': 'Renamed'},
-            format='json',
+            data={"name": "Renamed"},
+            format="json",
             HTTP_IF_MATCH='W/"1999-01-01T00:00:00+00:00"',
         )
-        self.assertEqual(
-            response.status_code, status.HTTP_412_PRECONDITION_FAILED
-        )
+        self.assertEqual(response.status_code, status.HTTP_412_PRECONDITION_FAILED)
         self.software.refresh_from_db()
-        self.assertEqual(self.software.name, 'Office 2021 Professional')
+        self.assertEqual(self.software.name, "Office 2021 Professional")
 
     def test_delete_with_stale_if_match_returns_412_and_does_not_delete(self):
         self._login()
-        response = self.client.delete(
-            self.detail_url, HTTP_IF_MATCH='W/"1999-01-01T00:00:00+00:00"'
-        )
-        self.assertEqual(
-            response.status_code, status.HTTP_412_PRECONDITION_FAILED
-        )
+        response = self.client.delete(self.detail_url, HTTP_IF_MATCH='W/"1999-01-01T00:00:00+00:00"')
+        self.assertEqual(response.status_code, status.HTTP_412_PRECONDITION_FAILED)
         self.assertTrue(Software.objects.filter(pk=self.software.pk).exists())
 
     # --- sanity: correct If-Match still works ----------------------------
@@ -127,10 +114,10 @@ class ETagPreconditionTests(APITestCase):
         self._login()
         response = self.client.patch(
             self.detail_url,
-            data={'name': 'Renamed'},
-            format='json',
+            data={"name": "Renamed"},
+            format="json",
             HTTP_IF_MATCH=self._current_etag(),
         )
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.software.refresh_from_db()
-        self.assertEqual(self.software.name, 'Renamed')
+        self.assertEqual(self.software.name, "Renamed")

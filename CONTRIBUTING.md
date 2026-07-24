@@ -137,8 +137,15 @@ From the repository root:
 
 ```bash
 uv run --locked --group dev pre-commit run --all-files
+make format-check
 uv run --locked --only-group dev python scripts/check_flake8_baseline.py
 ```
+
+Ruff is the canonical formatter and import sorter (`make format` applies it
+idempotently; `make format-check` above is the non-mutating check CI runs).
+Ruff owns formatting and import order only -- Flake8 above remains the
+separate blocking semantic gate, and this split is deliberate: see
+[AGENTS.md](AGENTS.md#format-and-import-order-ruff) for the full policy.
 
 From `itambox/`:
 

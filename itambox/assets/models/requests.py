@@ -1,13 +1,14 @@
 """AssetRequest — user-facing request workflow for assets and consumables."""
-from django.db import models
-from django.utils.translation import gettext_lazy as _
-from django.urls import reverse
-from django.contrib.auth import get_user_model
 
-from core.models import BaseModel, ChangeLoggingMixin
-from core.mixins import SoftDeleteMixin, JournalingMixin, TaggableMixin
-from core.managers import TenantScopingSoftDeleteManager, TenantScopingAllObjectsManager
+from django.contrib.auth import get_user_model
+from django.db import models
+from django.urls import reverse
+from django.utils.translation import gettext_lazy as _
+
 from assets.choices import RequestStatusChoices
+from core.managers import TenantScopingAllObjectsManager, TenantScopingSoftDeleteManager
+from core.mixins import JournalingMixin, SoftDeleteMixin, TaggableMixin
+from core.models import BaseModel, ChangeLoggingMixin
 
 User = get_user_model()
 
@@ -16,75 +17,132 @@ class AssetRequest(JournalingMixin, TaggableMixin, ChangeLoggingMixin, BaseModel
     objects = TenantScopingSoftDeleteManager()
     all_objects = TenantScopingAllObjectsManager()
     tenant = models.ForeignKey(
-        'organization.Tenant',
+        "organization.Tenant",
         on_delete=models.PROTECT,
         blank=True,
         null=True,
-        related_name='asset_requests',
+        related_name="asset_requests",
         db_index=True,
-        verbose_name=_("Tenant")
+        verbose_name=_("Tenant"),
     )
-    requester = models.ForeignKey(User, on_delete=models.PROTECT, related_name='asset_requests', db_index=True, verbose_name=_("Requester"))
-    asset = models.ForeignKey('assets.Asset', on_delete=models.SET_NULL, null=True, blank=True, related_name='requests', db_index=True, verbose_name=_("Asset"))
-    asset_type = models.ForeignKey('assets.AssetType', on_delete=models.SET_NULL, null=True, blank=True, related_name='requests', db_index=True, verbose_name=_("Asset Type"))
-    component = models.ForeignKey('inventory.Component', on_delete=models.SET_NULL, null=True, blank=True, related_name='requests', db_index=True, verbose_name=_("Component"))
-    accessory = models.ForeignKey('inventory.Accessory', on_delete=models.SET_NULL, null=True, blank=True, related_name='requests', db_index=True, verbose_name=_("Accessory"))
-    consumable = models.ForeignKey('inventory.Consumable', on_delete=models.SET_NULL, null=True, blank=True, related_name='requests', db_index=True, verbose_name=_("Consumable"))
-    qty = models.PositiveIntegerField(default=1, verbose_name=_("Quantity"))
-    source_location = models.ForeignKey(
-        'organization.Location',
+    requester = models.ForeignKey(
+        User, on_delete=models.PROTECT, related_name="asset_requests", db_index=True, verbose_name=_("Requester")
+    )
+    asset = models.ForeignKey(
+        "assets.Asset",
         on_delete=models.SET_NULL,
         null=True,
         blank=True,
-        related_name='source_requests',
+        related_name="requests",
         db_index=True,
-        verbose_name=_("Source Location")
+        verbose_name=_("Asset"),
     )
-    status = models.CharField(max_length=20, choices=RequestStatusChoices.choices, default=RequestStatusChoices.PENDING, db_index=True, verbose_name=_("Status"))
+    asset_type = models.ForeignKey(
+        "assets.AssetType",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="requests",
+        db_index=True,
+        verbose_name=_("Asset Type"),
+    )
+    component = models.ForeignKey(
+        "inventory.Component",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="requests",
+        db_index=True,
+        verbose_name=_("Component"),
+    )
+    accessory = models.ForeignKey(
+        "inventory.Accessory",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="requests",
+        db_index=True,
+        verbose_name=_("Accessory"),
+    )
+    consumable = models.ForeignKey(
+        "inventory.Consumable",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="requests",
+        db_index=True,
+        verbose_name=_("Consumable"),
+    )
+    qty = models.PositiveIntegerField(default=1, verbose_name=_("Quantity"))
+    source_location = models.ForeignKey(
+        "organization.Location",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="source_requests",
+        db_index=True,
+        verbose_name=_("Source Location"),
+    )
+    status = models.CharField(
+        max_length=20,
+        choices=RequestStatusChoices.choices,
+        default=RequestStatusChoices.PENDING,
+        db_index=True,
+        verbose_name=_("Status"),
+    )
     request_date = models.DateTimeField(auto_now_add=True, db_index=True)
     response_date = models.DateTimeField(null=True, blank=True, verbose_name=_("Response Date"))
-    responded_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name='asset_request_responses', verbose_name=_("Responded By"))
+    responded_by = models.ForeignKey(
+        User,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="asset_request_responses",
+        verbose_name=_("Responded By"),
+    )
 
     # Intended assignee target fields (delegated targets)
     assigned_user = models.ForeignKey(
-        'organization.AssetHolder',
+        "organization.AssetHolder",
         on_delete=models.SET_NULL,
         null=True,
         blank=True,
-        related_name='asset_requests',
-        verbose_name=_("Assigned User")
+        related_name="asset_requests",
+        verbose_name=_("Assigned User"),
     )
     assigned_location = models.ForeignKey(
-        'organization.Location',
+        "organization.Location",
         on_delete=models.SET_NULL,
         null=True,
         blank=True,
-        related_name='asset_requests',
-        verbose_name=_("Assigned Location")
+        related_name="asset_requests",
+        verbose_name=_("Assigned Location"),
     )
     assigned_asset = models.ForeignKey(
-        'assets.Asset',
+        "assets.Asset",
         on_delete=models.SET_NULL,
         null=True,
         blank=True,
-        related_name='child_requests_for',
-        verbose_name=_("Assigned Asset")
+        related_name="child_requests_for",
+        verbose_name=_("Assigned Asset"),
     )
 
     parent = models.ForeignKey(
-        'self',
+        "self",
         on_delete=models.CASCADE,
         null=True,
         blank=True,
-        related_name='sub_requests',
+        related_name="sub_requests",
         db_index=True,
-        verbose_name=_("Parent")
+        verbose_name=_("Parent"),
     )
     is_group = models.BooleanField(default=False, db_index=True, verbose_name=_("Is Group"))
 
     notes = models.TextField(blank=True, verbose_name=_("Notes"))
     response_notes = models.TextField(blank=True, verbose_name=_("Response Notes"))
-    tags = models.ManyToManyField('extras.Tag', related_name='asset_requests_tagged', blank=True, verbose_name=_("Tags"))
+    tags = models.ManyToManyField(
+        "extras.Tag", related_name="asset_requests_tagged", blank=True, verbose_name=_("Tags")
+    )
 
     @property
     def assigned_target(self):
@@ -96,13 +154,17 @@ class AssetRequest(JournalingMixin, TaggableMixin, ChangeLoggingMixin, BaseModel
 
     @property
     def assigned_to_type(self):
-        if self.assigned_user: return 'assetholder'
-        if self.assigned_location: return 'location'
-        if self.assigned_asset: return 'asset'
+        if self.assigned_user:
+            return "assetholder"
+        if self.assigned_location:
+            return "location"
+        if self.assigned_asset:
+            return "asset"
         return None
 
     def clean(self):
         from django.core.exceptions import ValidationError
+
         super().clean()
 
         if self.pk:
@@ -112,15 +174,31 @@ class AssetRequest(JournalingMixin, TaggableMixin, ChangeLoggingMixin, BaseModel
                 old_status = AssetRequest._base_manager.get(pk=self.pk).status
                 if old_status != self.status:
                     VALID_TRANSITIONS = {
-                        RequestStatusChoices.PENDING: {RequestStatusChoices.APPROVED, RequestStatusChoices.DENIED, RequestStatusChoices.CANCELLED, RequestStatusChoices.FULFILLED},
-                        RequestStatusChoices.APPROVED: {RequestStatusChoices.FULFILLED, RequestStatusChoices.CANCELLED, RequestStatusChoices.PROCUREMENT},
-                        RequestStatusChoices.PROCUREMENT: {RequestStatusChoices.FULFILLED, RequestStatusChoices.CANCELLED, RequestStatusChoices.APPROVED},
+                        RequestStatusChoices.PENDING: {
+                            RequestStatusChoices.APPROVED,
+                            RequestStatusChoices.DENIED,
+                            RequestStatusChoices.CANCELLED,
+                            RequestStatusChoices.FULFILLED,
+                        },
+                        RequestStatusChoices.APPROVED: {
+                            RequestStatusChoices.FULFILLED,
+                            RequestStatusChoices.CANCELLED,
+                            RequestStatusChoices.PROCUREMENT,
+                        },
+                        RequestStatusChoices.PROCUREMENT: {
+                            RequestStatusChoices.FULFILLED,
+                            RequestStatusChoices.CANCELLED,
+                            RequestStatusChoices.APPROVED,
+                        },
                         RequestStatusChoices.DENIED: set(),
                         RequestStatusChoices.FULFILLED: set(),
                         RequestStatusChoices.CANCELLED: set(),
                     }
                     if self.status not in VALID_TRANSITIONS.get(old_status, set()):
-                        raise ValidationError(_("Invalid state transition from %(old)s to %(new)s.") % {"old": old_status, "new": self.status})
+                        raise ValidationError(
+                            _("Invalid state transition from %(old)s to %(new)s.")
+                            % {"old": old_status, "new": self.status}
+                        )
             except AssetRequest.DoesNotExist:
                 pass
 
@@ -135,7 +213,11 @@ class AssetRequest(JournalingMixin, TaggableMixin, ChangeLoggingMixin, BaseModel
             categories_filled.append("consumable")
 
         if len(categories_filled) == 0:
-            raise ValidationError(_("You must specify what item you are requesting (Asset, Asset Type, Component, Accessory, or Consumable)."))
+            raise ValidationError(
+                _(
+                    "You must specify what item you are requesting (Asset, Asset Type, Component, Accessory, or Consumable)."
+                )
+            )
         if len(categories_filled) > 1:
             raise ValidationError(_("You cannot request more than one type of item in a single request."))
 
@@ -147,33 +229,51 @@ class AssetRequest(JournalingMixin, TaggableMixin, ChangeLoggingMixin, BaseModel
                 raise ValidationError(_("The asset '%(asset)s' is not requestable.") % {"asset": self.asset})
             if self.asset_type and not self.asset_type.requestable:
                 raise ValidationError(_("The asset type '%(type)s' is not requestable.") % {"type": self.asset_type})
-            if self.asset and self.asset.status and self.asset.status.type != 'deployable':
-                raise ValidationError(_("The asset '%(asset)s' is currently not available (Status: %(status)s).") % {"asset": self.asset, "status": self.asset.status.name})
+            if self.asset and self.asset.status and self.asset.status.type != "deployable":
+                raise ValidationError(
+                    _("The asset '%(asset)s' is currently not available (Status: %(status)s).")
+                    % {"asset": self.asset, "status": self.asset.status.name}
+                )
 
             # Check for duplicate pending or approved requests by the same requester
-            if self.requester_id and not getattr(self, '_skip_duplicate_check', False):
+            if self.requester_id and not getattr(self, "_skip_duplicate_check", False):
                 duplicate_qs = AssetRequest.objects.filter(
                     requester_id=self.requester_id,
                     status__in=[RequestStatusChoices.PENDING, RequestStatusChoices.APPROVED],
                     assigned_user_id=self.assigned_user_id,
                     assigned_location_id=self.assigned_location_id,
-                    assigned_asset_id=self.assigned_asset_id
+                    assigned_asset_id=self.assigned_asset_id,
                 )
                 if self.asset:
                     if duplicate_qs.filter(asset=self.asset).exists():
-                        raise ValidationError(_("You already have a pending or approved request for the asset '%(asset)s'.") % {"asset": self.asset})
+                        raise ValidationError(
+                            _("You already have a pending or approved request for the asset '%(asset)s'.")
+                            % {"asset": self.asset}
+                        )
                 elif self.asset_type:
                     if duplicate_qs.filter(asset_type=self.asset_type, asset__isnull=True).exists():
-                        raise ValidationError(_("You already have a pending or approved request for the asset type '%(type)s'.") % {"type": self.asset_type})
+                        raise ValidationError(
+                            _("You already have a pending or approved request for the asset type '%(type)s'.")
+                            % {"type": self.asset_type}
+                        )
                 elif self.component:
                     if duplicate_qs.filter(component=self.component).exists():
-                        raise ValidationError(_("You already have a pending or approved request for the component '%(component)s'.") % {"component": self.component})
+                        raise ValidationError(
+                            _("You already have a pending or approved request for the component '%(component)s'.")
+                            % {"component": self.component}
+                        )
                 elif self.accessory:
                     if duplicate_qs.filter(accessory=self.accessory).exists():
-                        raise ValidationError(_("You already have a pending or approved request for the accessory '%(accessory)s'.") % {"accessory": self.accessory})
+                        raise ValidationError(
+                            _("You already have a pending or approved request for the accessory '%(accessory)s'.")
+                            % {"accessory": self.accessory}
+                        )
                 elif self.consumable:
                     if duplicate_qs.filter(consumable=self.consumable).exists():
-                        raise ValidationError(_("You already have a pending or approved request for the consumable '%(consumable)s'.") % {"consumable": self.consumable})
+                        raise ValidationError(
+                            _("You already have a pending or approved request for the consumable '%(consumable)s'.")
+                            % {"consumable": self.consumable}
+                        )
 
         if self.asset and self.asset_type and self.asset.asset_type != self.asset_type:
             raise ValidationError(_("The selected asset does not match the requested asset type."))
@@ -181,6 +281,7 @@ class AssetRequest(JournalingMixin, TaggableMixin, ChangeLoggingMixin, BaseModel
     def save(self, *args, **kwargs):
         if not self.tenant:
             from core.managers import get_current_tenant
+
             self.tenant = get_current_tenant()
 
         # Auto-approval check for Accessories and Consumables.
@@ -192,19 +293,23 @@ class AssetRequest(JournalingMixin, TaggableMixin, ChangeLoggingMixin, BaseModel
             from django.utils import timezone
 
             # Auto-approval thresholds come from settings (sane defaults below).
-            thresholds = getattr(settings, 'REQUISITION_AUTO_APPROVAL_THRESHOLDS', {
-                'accessory': 3,
-                'consumable': 5,
-            })
+            thresholds = getattr(
+                settings,
+                "REQUISITION_AUTO_APPROVAL_THRESHOLDS",
+                {
+                    "accessory": 3,
+                    "consumable": 5,
+                },
+            )
 
             if self.accessory:
-                max_qty = thresholds.get('accessory', 0)
+                max_qty = thresholds.get("accessory", 0)
                 if self.qty <= max_qty and self.accessory.available >= self.qty:
                     self.status = RequestStatusChoices.APPROVED
                     self.response_date = timezone.now()
                     self.response_notes = "Automatically approved based on available stock."
             elif self.consumable:
-                max_qty = thresholds.get('consumable', 0)
+                max_qty = thresholds.get("consumable", 0)
                 if self.qty <= max_qty and self.consumable.available >= self.qty:
                     self.status = RequestStatusChoices.APPROVED
                     self.response_date = timezone.now()
@@ -214,7 +319,7 @@ class AssetRequest(JournalingMixin, TaggableMixin, ChangeLoggingMixin, BaseModel
         super().save(*args, **kwargs)
 
     class Meta:
-        ordering = ['-request_date']
+        ordering = ["-request_date"]
         verbose_name = _("Asset Request")
         verbose_name_plural = _("Asset Requests")
         permissions = [
@@ -225,22 +330,61 @@ class AssetRequest(JournalingMixin, TaggableMixin, ChangeLoggingMixin, BaseModel
         constraints = [
             models.CheckConstraint(
                 check=(
-                    (models.Q(assigned_user__isnull=True) & models.Q(assigned_location__isnull=True) & models.Q(assigned_asset__isnull=True)) |
-                    (models.Q(assigned_user__isnull=False) & models.Q(assigned_location__isnull=True) & models.Q(assigned_asset__isnull=True)) |
-                    (models.Q(assigned_user__isnull=True) & models.Q(assigned_location__isnull=False) & models.Q(assigned_asset__isnull=True)) |
-                    (models.Q(assigned_user__isnull=True) & models.Q(assigned_location__isnull=True) & models.Q(assigned_asset__isnull=False))
+                    (
+                        models.Q(assigned_user__isnull=True)
+                        & models.Q(assigned_location__isnull=True)
+                        & models.Q(assigned_asset__isnull=True)
+                    )
+                    | (
+                        models.Q(assigned_user__isnull=False)
+                        & models.Q(assigned_location__isnull=True)
+                        & models.Q(assigned_asset__isnull=True)
+                    )
+                    | (
+                        models.Q(assigned_user__isnull=True)
+                        & models.Q(assigned_location__isnull=False)
+                        & models.Q(assigned_asset__isnull=True)
+                    )
+                    | (
+                        models.Q(assigned_user__isnull=True)
+                        & models.Q(assigned_location__isnull=True)
+                        & models.Q(assigned_asset__isnull=False)
+                    )
                 ),
-                name='at_most_one_request_target'
+                name="at_most_one_request_target",
             ),
             models.CheckConstraint(
                 check=(
-                    (models.Q(component__isnull=True) & models.Q(accessory__isnull=True) & models.Q(consumable__isnull=True) & (models.Q(asset__isnull=False) | models.Q(asset_type__isnull=False))) |
-                    (models.Q(asset__isnull=True) & models.Q(asset_type__isnull=True) & models.Q(component__isnull=False) & models.Q(accessory__isnull=True) & models.Q(consumable__isnull=True)) |
-                    (models.Q(asset__isnull=True) & models.Q(asset_type__isnull=True) & models.Q(component__isnull=True) & models.Q(accessory__isnull=False) & models.Q(consumable__isnull=True)) |
-                    (models.Q(asset__isnull=True) & models.Q(asset_type__isnull=True) & models.Q(component__isnull=True) & models.Q(accessory__isnull=True) & models.Q(consumable__isnull=False))
+                    (
+                        models.Q(component__isnull=True)
+                        & models.Q(accessory__isnull=True)
+                        & models.Q(consumable__isnull=True)
+                        & (models.Q(asset__isnull=False) | models.Q(asset_type__isnull=False))
+                    )
+                    | (
+                        models.Q(asset__isnull=True)
+                        & models.Q(asset_type__isnull=True)
+                        & models.Q(component__isnull=False)
+                        & models.Q(accessory__isnull=True)
+                        & models.Q(consumable__isnull=True)
+                    )
+                    | (
+                        models.Q(asset__isnull=True)
+                        & models.Q(asset_type__isnull=True)
+                        & models.Q(component__isnull=True)
+                        & models.Q(accessory__isnull=False)
+                        & models.Q(consumable__isnull=True)
+                    )
+                    | (
+                        models.Q(asset__isnull=True)
+                        & models.Q(asset_type__isnull=True)
+                        & models.Q(component__isnull=True)
+                        & models.Q(accessory__isnull=True)
+                        & models.Q(consumable__isnull=False)
+                    )
                 ),
-                name='exactly_one_requested_category'
-            )
+                name="exactly_one_requested_category",
+            ),
         ]
 
     def __str__(self):
@@ -259,15 +403,12 @@ class AssetRequest(JournalingMixin, TaggableMixin, ChangeLoggingMixin, BaseModel
         return f"Request for {target} by {self.requester} ({self.get_status_display()})"
 
     def get_absolute_url(self):
-        return reverse('assets:assetrequest_detail', kwargs={'pk': self.pk})
+        return reverse("assets:assetrequest_detail", kwargs={"pk": self.pk})
 
     @property
     def unallocated_count(self):
         if self.is_group:
             return self.sub_requests.filter(
-                asset__isnull=True,
-                component__isnull=True,
-                accessory__isnull=True,
-                consumable__isnull=True
+                asset__isnull=True, component__isnull=True, accessory__isnull=True, consumable__isnull=True
             ).count()
         return 1 if not (self.asset or self.component or self.accessory or self.consumable) else 0

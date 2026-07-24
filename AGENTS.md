@@ -137,8 +137,8 @@ uv run --locked --only-group dev python scripts/check_flake8_baseline.py
 uv run --locked --only-group dev python scripts/check_flake8_baseline.py --write-baseline
 ```
 Policy (`select`/`ignore`, each ignore documented with a reason) lives in `setup.cfg`
-at the repo root. The pinned Flake8/Bugbear toolchain is blocking; the ~4k
-pre-existing violations are grandfathered via `scripts/flake8_baseline.json`, a
+at the repo root. The pinned Flake8/Bugbear toolchain is blocking; pre-existing
+violations are grandfathered via `scripts/flake8_baseline.json`, a
 schema-v3 identity baseline keyed by path, code, message, source statement, and
 stable AST context. Its policy SHA-256 binds it to the effective Flake8 config,
 targets, and exact tool versions. Canonical Python 3.12 requires exact identity
@@ -147,6 +147,27 @@ baseline in the same reviewed cleanup so old headroom cannot hide reintroduced
 debt. The gate refuses to run on any interpreter other than canonical Python
 3.12; there are no interpreter- or OS-specific exceptions. `make lint` /
 `pre-commit run --all-files` use the same managed policy.
+
+### Format and import order (Ruff)
+```bash
+# From the repository root -- idempotent; import sort runs before formatting:
+make format
+
+# Non-mutating check -- the same rule set enforced by CI and pre-commit:
+make format-check
+```
+Ruff is the canonical formatter and import sorter, pinned to an exact version
+in `pyproject.toml`/`uv.lock` so contributors, pre-commit, and CI produce
+identical output. Configuration lives in `pyproject.toml` `[tool.ruff]`: line
+length 120 and `target-version = "py312"` to match the Flake8 policy above,
+plus repository-appropriate excludes (migrations, `itambox/static/dist`,
+and `itambox/static/docs`). `[tool.ruff.lint] select = ["I"]` enables
+import-order enforcement only -- this phase deliberately does not enable any
+of Ruff's own pycodestyle/pyflakes/bugbear-equivalent rules, so Flake8 above
+remains the sole semantic lint gate; nothing here weakens or replaces it.
+Local-import classification (cycle break / optional dependency / expensive
+import / unjustified, per the inline-import policy above) is a separate,
+later phase -- this formatting pass does not move any import between scopes.
 
 ### Docs (MkDocs)
 ```bash

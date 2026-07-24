@@ -13,6 +13,7 @@ just ``Tenant(is_provider=True)``, with customer tenants pointing back via
       ``?all_providers=true`` parameter never widens them. Provider admins use the
       Managed Tenants detail tab instead; superusers retain their normal global list.
 """
+
 from django.contrib.auth import get_user_model
 from django.test import RequestFactory, TestCase
 from django.urls import NoReverseMatch, reverse
@@ -33,10 +34,14 @@ class CustomerTenantConsolidationTests(TenantTestMixin, TestCase):
         self.msp_a = Tenant.objects.create(name="Alpha MSP", slug="alpha-msp", is_provider=True)
         self.msp_b = Tenant.objects.create(name="Bravo MSP", slug="bravo-msp", is_provider=True)
         self.customer_a = Tenant.objects.create(
-            name="Customer A", slug="customer-a", managed_by=self.msp_a,
+            name="Customer A",
+            slug="customer-a",
+            managed_by=self.msp_a,
         )
         self.customer_b = Tenant.objects.create(
-            name="Customer B", slug="customer-b", managed_by=self.msp_b,
+            name="Customer B",
+            slug="customer-b",
+            managed_by=self.msp_b,
         )
         # The tenant the ordinary user is a member of (standalone, not managed).
         self.own_tenant = Tenant.objects.create(name="Own Co", slug="own-co")
@@ -50,7 +55,9 @@ class CustomerTenantConsolidationTests(TenantTestMixin, TestCase):
             permissions=["organization.view_tenant"],
         )
         self.ordinary_user = User.objects.create_user(
-            username="ordinary", email="ordinary@example.com", password="pw",
+            username="ordinary",
+            email="ordinary@example.com",
+            password="pw",
             is_active=True,
         )
         self.grant(self.ordinary_user, self.own_tenant, self.ordinary_role)
@@ -64,7 +71,9 @@ class CustomerTenantConsolidationTests(TenantTestMixin, TestCase):
             permissions=["organization.change_tenant", "organization.view_tenant"],
         )
         self.msp_a_admin = User.objects.create_user(
-            username="msp_a_admin", email="msp_a_admin@example.com", password="pw",
+            username="msp_a_admin",
+            email="msp_a_admin@example.com",
+            password="pw",
             is_active=True,
         )
         self.grant(self.msp_a_admin, self.msp_a, self.msp_a_admin_role)
@@ -163,11 +172,14 @@ class CustomerTenantConsolidationTests(TenantTestMixin, TestCase):
 
     def test_second_msp_admin_also_stays_scoped_with_retired_parameter(self):
         msp_b_admin_role = Role.objects.create(
-            tenant=self.msp_b, name="MSP B Admin",
+            tenant=self.msp_b,
+            name="MSP B Admin",
             permissions=["organization.change_tenant", "organization.view_tenant"],
         )
         msp_b_admin = User.objects.create_user(
-            username="msp_b_admin", email="msp_b_admin@example.com", password="pw",
+            username="msp_b_admin",
+            email="msp_b_admin@example.com",
+            password="pw",
             is_active=True,
         )
         self.grant(msp_b_admin, self.msp_b, msp_b_admin_role)
@@ -186,8 +198,12 @@ class CustomerTenantConsolidationTests(TenantTestMixin, TestCase):
 
     def test_superuser_retains_normal_global_list(self):
         su = User.objects.create_user(
-            username="root", email="root@example.com", password="pw",
-            is_active=True, is_superuser=True, is_staff=True,
+            username="root",
+            email="root@example.com",
+            password="pw",
+            is_active=True,
+            is_superuser=True,
+            is_staff=True,
         )
         self.client.force_login(su)
         response = self.client.get(self.list_url, {"all_providers": "true"})
@@ -219,11 +235,14 @@ class CustomerTenantConsolidationTests(TenantTestMixin, TestCase):
 
     def test_customer_admin_cannot_widen_list_with_retired_parameter(self):
         customer_admin_role = Role.objects.create(
-            tenant=self.customer_a, name="Customer A Admin",
+            tenant=self.customer_a,
+            name="Customer A Admin",
             permissions=["organization.change_tenant", "organization.view_tenant"],
         )
         customer_admin = User.objects.create_user(
-            username="customer_a_admin", email="customer_a_admin@example.com", password="pw",
+            username="customer_a_admin",
+            email="customer_a_admin@example.com",
+            password="pw",
             is_active=True,
         )
         self.grant(customer_admin, self.customer_a, customer_admin_role)

@@ -8,7 +8,6 @@ import re
 import sys
 from pathlib import Path
 
-
 SCHEMA_VERSION = 3
 OPERATION_TYPES = (
     "RunPython",
@@ -37,10 +36,7 @@ EXPECTED_BLOCKERS = {
 
 
 def _dispositions(disposition, rationale, migration_ids):
-    return {
-        migration_id: {"disposition": disposition, "rationale": rationale}
-        for migration_id in migration_ids
-    }
+    return {migration_id: {"disposition": disposition, "rationale": rationale} for migration_id in migration_ids}
 
 
 # This is a checked, human-reviewed policy. It is intentionally independent of
@@ -264,10 +260,7 @@ def _validate_issue88_shard_chain(replacement_migrations):
     ordinals = [ordinal for ordinal, _ in issue88_shards]
     expected_ordinals = list(range(1, len(issue88_shards) + 1))
     if ordinals != expected_ordinals:
-        raise ValueError(
-            "issue88 shard ordinals must be contiguous: "
-            f"expected={expected_ordinals}, actual={ordinals}"
-        )
+        raise ValueError(f"issue88 shard ordinals must be contiguous: expected={expected_ordinals}, actual={ordinals}")
 
     previous_by_app = {}
     for index, (_, migration) in enumerate(issue88_shards):
@@ -275,17 +268,11 @@ def _validate_issue88_shard_chain(replacement_migrations):
         if index:
             predecessor = issue88_shards[index - 1][1]["id"]
             if predecessor not in dependencies:
-                raise ValueError(
-                    "issue88 shard lacks immediate predecessor: "
-                    f"{migration['id']} -> {predecessor}"
-                )
+                raise ValueError(f"issue88 shard lacks immediate predecessor: {migration['id']} -> {predecessor}")
         app = migration["id"].split(".", 1)[0]
         previous_same_app = previous_by_app.get(app)
         if previous_same_app and previous_same_app not in dependencies:
-            raise ValueError(
-                "issue88 shard lacks previous same-app shard: "
-                f"{migration['id']} -> {previous_same_app}"
-            )
+            raise ValueError(f"issue88 shard lacks previous same-app shard: {migration['id']} -> {previous_same_app}")
         previous_by_app[app] = migration["id"]
     return max(0, len(issue88_shards) - 1)
 
@@ -299,28 +286,21 @@ def _validate_post_transition_dependencies(
         return
     effective_nodes = set(effective_graph["nodes"])
     effective_leaves = set(effective_graph["leaves"])
-    post_transition_ids = {
-        migration["id"] for migration in post_transition_migrations
-    }
+    post_transition_ids = {migration["id"] for migration in post_transition_migrations}
     known_predecessors = effective_nodes | post_transition_ids
     for migration in post_transition_migrations:
         dependencies = set(migration["dependencies"])
         unknown_dependencies = sorted(
             dependency
             for dependency in dependencies
-            if dependency.split(".", 1)[0] in first_party_apps
-            and dependency not in known_predecessors
+            if dependency.split(".", 1)[0] in first_party_apps and dependency not in known_predecessors
         )
         if unknown_dependencies:
-            raise ValueError(
-                "unknown first-party post-transition dependency targets: "
-                f"{unknown_dependencies}"
-            )
+            raise ValueError(f"unknown first-party post-transition dependency targets: {unknown_dependencies}")
         missing_leaves = sorted(effective_leaves - dependencies)
         if missing_leaves:
             raise ValueError(
-                "post-transition migration lacks effective leaf dependency: "
-                f"{migration['id']} -> {missing_leaves}"
+                f"post-transition migration lacks effective leaf dependency: {migration['id']} -> {missing_leaves}"
             )
 
 
@@ -373,11 +353,7 @@ def build_inventory(  # noqa: C901 - graph validation is intentionally one coord
     expected_blockers=None,
 ):
     source_root = Path(source_root)
-    semantic_dispositions = (
-        SEMANTIC_DISPOSITIONS
-        if semantic_dispositions is None
-        else semantic_dispositions
-    )
+    semantic_dispositions = SEMANTIC_DISPOSITIONS if semantic_dispositions is None else semantic_dispositions
     expected_blockers = EXPECTED_BLOCKERS if expected_blockers is None else set(expected_blockers)
     migrations = []
     for path in sorted(source_root.glob("*/migrations/[0-9]*.py")):
@@ -388,22 +364,15 @@ def build_inventory(  # noqa: C901 - graph validation is intentionally one coord
             migration_class = _migration_class(tree)
         except (SyntaxError, ValueError) as error:
             raise ValueError(f"{path}: {error}") from error
-        dependencies, has_swappable_dependency = _dependencies(
-            _assignment(migration_class, "dependencies")
-        )
+        dependencies, has_swappable_dependency = _dependencies(_assignment(migration_class, "dependencies"))
         run_before, _ = _dependencies(_assignment(migration_class, "run_before"))
         replaces_node = _assignment(migration_class, "replaces")
         try:
             replaces = _replaces(replaces_node)
         except ValueError as error:
             raise ValueError(f"{path}: {error}") from error
-        special_bootstrap = (
-            app == "users"
-            and "users.0001_initial" in run_before
-        )
-        operations = _operation_summary(
-            _assignment(migration_class, "operations")
-        )
+        special_bootstrap = app == "users" and "users.0001_initial" in run_before
+        operations = _operation_summary(_assignment(migration_class, "operations"))
         custom_operation_presence = {
             "RunPython": sum(operations["RunPython"].values()) > 0,
             "RunSQL": sum(operations["RunSQL"].values()) > 0,
@@ -429,25 +398,18 @@ def build_inventory(  # noqa: C901 - graph validation is intentionally one coord
             }
         )
 
-    replacement_migrations = [
-        migration for migration in migrations if migration["is_replacement"]
-    ]
+    replacement_migrations = [migration for migration in migrations if migration["is_replacement"]]
     post_transition_migrations = [
-        migration
-        for migration in migrations
-        if migration["id"] in POST_TRANSITION_MIGRATIONS
+        migration for migration in migrations if migration["id"] in POST_TRANSITION_MIGRATIONS
     ]
     historical_migrations = [
         migration
         for migration in migrations
-        if not migration["is_replacement"]
-        and migration["id"] not in POST_TRANSITION_MIGRATIONS
+        if not migration["is_replacement"] and migration["id"] not in POST_TRANSITION_MIGRATIONS
     ]
     node_ids = {migration["id"] for migration in historical_migrations}
     user_bootstraps = sorted(
-        migration["id"]
-        for migration in historical_migrations
-        if migration["special_users_bootstrap"]
+        migration["id"] for migration in historical_migrations if migration["special_users_bootstrap"]
     )
     user_bootstrap = user_bootstraps[0] if len(user_bootstraps) == 1 else None
     edges = {
@@ -470,27 +432,17 @@ def build_inventory(  # noqa: C901 - graph validation is intentionally one coord
         )
     edges = sorted(edges)
     historical_graph = _graph_summary(node_ids, edges)
-    first_party_apps = {
-        migration["id"].split(".", 1)[0] for migration in migrations
-    }
+    first_party_apps = {migration["id"].split(".", 1)[0] for migration in migrations}
     explicit_replacement_chain_edges = 0
 
     if replacement_migrations:
-        explicit_replacement_chain_edges = _validate_issue88_shard_chain(
-            replacement_migrations
-        )
-        replacement_targets = [
-            target
-            for migration in replacement_migrations
-            for target in migration["replaces"]
-        ]
+        explicit_replacement_chain_edges = _validate_issue88_shard_chain(replacement_migrations)
+        replacement_targets = [target for migration in replacement_migrations for target in migration["replaces"]]
         unknown_targets = sorted(set(replacement_targets) - node_ids)
         if unknown_targets:
             raise ValueError(f"unknown replacement targets: {unknown_targets}")
         duplicate_targets = sorted(
-            target
-            for target in set(replacement_targets)
-            if replacement_targets.count(target) > 1
+            target for target in set(replacement_targets) if replacement_targets.count(target) > 1
         )
         if duplicate_targets:
             raise ValueError(f"duplicate replacement targets: {duplicate_targets}")
@@ -499,27 +451,19 @@ def build_inventory(  # noqa: C901 - graph validation is intentionally one coord
             raise ValueError(f"replacement coverage incomplete: {uncovered}")
 
         replacement_by_target = {
-            target: migration["id"]
-            for migration in replacement_migrations
-            for target in migration["replaces"]
+            target: migration["id"] for migration in replacement_migrations for target in migration["replaces"]
         }
-        effective_node_ids = {
-            migration["id"] for migration in replacement_migrations
-        }
+        effective_node_ids = {migration["id"] for migration in replacement_migrations}
         unknown_dependency_targets = sorted(
             {
                 dependency
                 for migration in replacement_migrations
                 for dependency in migration["dependencies"]
-                if dependency.split(".", 1)[0] in first_party_apps
-                and dependency not in effective_node_ids
+                if dependency.split(".", 1)[0] in first_party_apps and dependency not in effective_node_ids
             }
         )
         if unknown_dependency_targets:
-            raise ValueError(
-                "unknown first-party replacement dependency targets: "
-                f"{unknown_dependency_targets}"
-            )
+            raise ValueError(f"unknown first-party replacement dependency targets: {unknown_dependency_targets}")
         unknown_run_before_targets = sorted(
             {
                 target
@@ -531,10 +475,7 @@ def build_inventory(  # noqa: C901 - graph validation is intentionally one coord
             }
         )
         if unknown_run_before_targets:
-            raise ValueError(
-                "unknown first-party replacement run_before targets: "
-                f"{unknown_run_before_targets}"
-            )
+            raise ValueError(f"unknown first-party replacement run_before targets: {unknown_run_before_targets}")
         effective_edges = {
             (replacement_by_target[source], replacement_by_target[target])
             for source, target in edges
@@ -606,16 +547,8 @@ def build_inventory(  # noqa: C901 - graph validation is intentionally one coord
     per_app = {}
     for migration in historical_migrations:
         app = migration["id"].split(".", 1)[0]
-        app_ids = {
-            item["id"]
-            for item in historical_migrations
-            if item["id"].startswith(f"{app}.")
-        }
-        app_edges = {
-            (source, target)
-            for source, target in edges
-            if source in app_ids and target in app_ids
-        }
+        app_ids = {item["id"] for item in historical_migrations if item["id"].startswith(f"{app}.")}
+        app_edges = {(source, target) for source, target in edges if source in app_ids and target in app_ids}
         app_sources = {source for source, _ in app_edges}
         app_targets = {target for _, target in app_edges}
         per_app[app] = {
@@ -626,16 +559,12 @@ def build_inventory(  # noqa: C901 - graph validation is intentionally one coord
         "schema_version": SCHEMA_VERSION,
         "historical_graph": historical_graph,
         "effective_graph": effective_graph,
-        "post_transition_migrations": [
-            migration["id"] for migration in post_transition_migrations
-        ],
+        "post_transition_migrations": [migration["id"] for migration in post_transition_migrations],
         "summary": {
             "first_party_edges": len(edges),
             "first_party_nodes": len(historical_migrations),
             "replacement_shards": len(replacement_migrations),
-            "replacement_targets": sum(
-                len(migration["replaces"]) for migration in replacement_migrations
-            ),
+            "replacement_targets": sum(len(migration["replaces"]) for migration in replacement_migrations),
             "post_transition_migrations": len(post_transition_migrations),
             "explicit_replacement_chain_edges": explicit_replacement_chain_edges,
             "missing_replacement_targets": 0,
@@ -665,14 +594,11 @@ def build_inventory(  # noqa: C901 - graph validation is intentionally one coord
         },
         "special_users_bootstrap": {
             "migration": user_bootstrap,
-            "run_before": (
-                by_id[user_bootstrap]["run_before"] if user_bootstrap else []
-            ),
+            "run_before": (by_id[user_bootstrap]["run_before"] if user_bootstrap else []),
             "swappable_dependents": sorted(
                 migration_id
                 for migration_id, migration in by_id.items()
-                if not migration["is_replacement"]
-                and migration["swappable_user_dependency"]
+                if not migration["is_replacement"] and migration["swappable_user_dependency"]
             ),
         },
         "migrations": migrations,

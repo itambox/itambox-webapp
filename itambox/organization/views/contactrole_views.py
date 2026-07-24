@@ -1,24 +1,30 @@
-from django.shortcuts import render, redirect, get_object_or_404
-from django.http import HttpResponseBadRequest
-from django.contrib.auth.mixins import LoginRequiredMixin
-from django.views.generic import View
-from django.urls import reverse, reverse_lazy
 from django.contrib import messages
+from django.contrib.auth.mixins import LoginRequiredMixin
 from django.contrib.contenttypes.models import ContentType
+from django.http import HttpResponseBadRequest
+from django.shortcuts import get_object_or_404, redirect, render
+from django.urls import reverse, reverse_lazy
 from django.utils.translation import gettext_lazy as _
-
-from itambox.views.generic import (
-    ObjectListView, ObjectDetailView, ObjectEditView, ObjectDeleteView, ObjectBulkEditView, ObjectBulkDeleteView, ObjectCloneView,
-)
-from itambox.utils import get_paginate_count
-from itambox.views.generic.utils import safe_return_url
-from itambox.panels import Panel
-
-from ..models import ContactRole, ContactAssignment
-from ..forms import ContactRoleForm, ContactRoleFilterForm, ContactAssignmentForm
-from ..tables import ContactRoleTable, ContactAssignmentTable
-from ..filters import ContactRoleFilterSet
+from django.views.generic import View
 from django_tables2 import RequestConfig
+
+from itambox.panels import Panel
+from itambox.utils import get_paginate_count
+from itambox.views.generic import (
+    ObjectBulkDeleteView,
+    ObjectBulkEditView,
+    ObjectCloneView,
+    ObjectDeleteView,
+    ObjectDetailView,
+    ObjectEditView,
+    ObjectListView,
+)
+from itambox.views.generic.utils import safe_return_url
+
+from ..filters import ContactRoleFilterSet
+from ..forms import ContactAssignmentForm, ContactRoleFilterForm, ContactRoleForm
+from ..models import ContactAssignment, ContactRole
+from ..tables import ContactAssignmentTable, ContactRoleTable
 
 
 class ContactRoleListView(ObjectListView):
@@ -26,15 +32,13 @@ class ContactRoleListView(ObjectListView):
     filterset = ContactRoleFilterSet
     filterset_form = ContactRoleFilterForm
     table = ContactRoleTable
-    action_buttons = ('add',)
+    action_buttons = ("add",)
 
 
 class ContactRoleDetailView(ObjectDetailView):
-    queryset = ContactRole.objects.prefetch_related('assignments')
+    queryset = ContactRole.objects.prefetch_related("assignments")
 
-    layout = (
-        ((Panel('info', _('Contact Role Details')),),),
-    )
+    layout = (((Panel("info", _("Contact Role Details")),),),)
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
@@ -43,7 +47,7 @@ class ContactRoleDetailView(ObjectDetailView):
         assignments_table = ContactAssignmentTable(role.assignments.all(), request=self.request)
         assignments_table.configure(self.request)
 
-        context['assignments_table'] = assignments_table
+        context["assignments_table"] = assignments_table
         return context
 
 
@@ -51,21 +55,21 @@ class ContactRoleEditView(ObjectEditView):
     queryset = ContactRole.objects.all()
     model = ContactRole
     model_form = ContactRoleForm
-    template_name = 'generic/object_edit.html'
+    template_name = "generic/object_edit.html"
 
 
 class ContactRoleCloneView(ObjectCloneView):
     model = ContactRole
     model_form = ContactRoleForm
-    template_name = 'generic/object_edit.html'
-    default_return_url = 'organization:contactrole_list'
+    template_name = "generic/object_edit.html"
+    default_return_url = "organization:contactrole_list"
 
 
 class ContactRoleDeleteView(ObjectDeleteView):
     queryset = ContactRole.objects.all()
     model = ContactRole
-    template_name = 'generic/object_confirm_delete.html'
-    success_url = reverse_lazy('organization:contactrole_list')
+    template_name = "generic/object_confirm_delete.html"
+    success_url = reverse_lazy("organization:contactrole_list")
 
     def post(self, request, *args, **kwargs):
         role = self.get_object()
@@ -74,11 +78,12 @@ class ContactRoleDeleteView(ObjectDeleteView):
         if assignment_count > 0:
             messages.error(
                 request,
-                _("Cannot delete role '%(role)s': It is associated with %(count)d contact assignment%(plural)s.") % {
-                    'role': role,
-                    'count': assignment_count,
-                    'plural': 's' if assignment_count != 1 else '',
-                }
+                _("Cannot delete role '%(role)s': It is associated with %(count)d contact assignment%(plural)s.")
+                % {
+                    "role": role,
+                    "count": assignment_count,
+                    "plural": "s" if assignment_count != 1 else "",
+                },
             )
             return redirect(role.get_absolute_url())
 
@@ -86,11 +91,11 @@ class ContactRoleDeleteView(ObjectDeleteView):
 
 
 class ContactAssignmentCreateView(LoginRequiredMixin, View):
-    template_name = 'organization/contactassignments/contactassignment_form.html'
+    template_name = "organization/contactassignments/contactassignment_form.html"
 
     def get(self, request, *args, **kwargs):
-        content_type_id = request.GET.get('content_type')
-        object_id = request.GET.get('object_id')
+        content_type_id = request.GET.get("content_type")
+        object_id = request.GET.get("object_id")
 
         if not content_type_id or not object_id:
             return HttpResponseBadRequest(_("Missing content_type or object_id"))
@@ -100,16 +105,16 @@ class ContactAssignmentCreateView(LoginRequiredMixin, View):
 
         form = ContactAssignmentForm(content_type=content_type, object_id=object_id)
         context = {
-            'form': form,
-            'target_obj': target_obj,
-            'content_type': content_type,
-            'object_id': object_id,
+            "form": form,
+            "target_obj": target_obj,
+            "content_type": content_type,
+            "object_id": object_id,
         }
         return render(request, self.template_name, context)
 
     def post(self, request, *args, **kwargs):
-        content_type_id = request.POST.get('content_type') or request.GET.get('content_type')
-        object_id = request.POST.get('object_id') or request.GET.get('object_id')
+        content_type_id = request.POST.get("content_type") or request.GET.get("content_type")
+        object_id = request.POST.get("object_id") or request.GET.get("object_id")
 
         if not content_type_id or not object_id:
             return HttpResponseBadRequest(_("Missing content_type or object_id"))
@@ -120,14 +125,14 @@ class ContactAssignmentCreateView(LoginRequiredMixin, View):
         form = ContactAssignmentForm(request.POST, content_type=content_type, object_id=object_id)
         if form.is_valid():
             form.save()
-            messages.success(request, _("Assigned contact successfully to %(target)s.") % {'target': target_obj})
+            messages.success(request, _("Assigned contact successfully to %(target)s.") % {"target": target_obj})
             return redirect(target_obj.get_absolute_url())
 
         context = {
-            'form': form,
-            'target_obj': target_obj,
-            'content_type': content_type,
-            'object_id': object_id,
+            "form": form,
+            "target_obj": target_obj,
+            "content_type": content_type,
+            "object_id": object_id,
         }
         return render(request, self.template_name, context)
 
@@ -135,18 +140,18 @@ class ContactAssignmentCreateView(LoginRequiredMixin, View):
 class ContactAssignmentDeleteView(ObjectDeleteView):
     queryset = ContactAssignment.objects.all()
     model = ContactAssignment
-    template_name = 'generic/object_confirm_delete.html'
+    template_name = "generic/object_confirm_delete.html"
 
     def get_success_url(self):
         obj = self.object
-        if obj and obj.assigned_object and hasattr(obj.assigned_object, 'get_absolute_url'):
+        if obj and obj.assigned_object and hasattr(obj.assigned_object, "get_absolute_url"):
             fallback = obj.assigned_object.get_absolute_url()
         else:
-            fallback = reverse('dashboard')
+            fallback = reverse("dashboard")
         # Only honor a caller-supplied return_url when it is same-host (open-redirect guard).
         return safe_return_url(
             self.request,
-            self.request.GET.get('return_url') or self.request.POST.get('return_url'),
+            self.request.GET.get("return_url") or self.request.POST.get("return_url"),
             fallback,
         )
 

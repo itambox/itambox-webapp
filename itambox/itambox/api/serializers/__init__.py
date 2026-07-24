@@ -2,11 +2,11 @@ from django.contrib.auth import get_user_model
 from django.contrib.contenttypes.models import ContentType
 from rest_framework import serializers
 
+from core.choices import ObjectChangeActionChoices
+from core.models import ObjectChange
 from itambox.api.base import BaseModelSerializer
 from itambox.api.fields import ChoiceField, ContentTypeField
 from itambox.api.gfk_fields import GFKSerializerField
-from core.models import ObjectChange
-from core.choices import ObjectChangeActionChoices
 from itambox.api.serializers.bulk import BulkOperationSerializer
 from itambox.api.serializers.features import ChangeLogMessageSerializer
 
@@ -14,60 +14,57 @@ User = get_user_model()
 
 from drf_spectacular.utils import extend_schema_field
 
-
 __all__ = (
-    'BulkOperationSerializer',
-    'ChangeLogMessageSerializer',
-    'ContentTypeSerializer',
-    'GenericObjectSerializer',
-    'GFKSerializerField',
-    'NestedUserSerializer',
-    'ObjectChangeSerializer',
+    "BulkOperationSerializer",
+    "ChangeLogMessageSerializer",
+    "ContentTypeSerializer",
+    "GenericObjectSerializer",
+    "GFKSerializerField",
+    "NestedUserSerializer",
+    "ObjectChangeSerializer",
 )
 
 
 class GenericObjectSerializer(serializers.Serializer):
-    object_type = ContentTypeField(
-        queryset=ContentType.objects.all()
-    )
+    object_type = ContentTypeField(queryset=ContentType.objects.all())
     object_id = serializers.IntegerField()
     object = GFKSerializerField(read_only=True)
 
     def to_internal_value(self, data):
         data = super().to_internal_value(data)
-        model = data['object_type'].model_class()
-        return model.objects.get(pk=data['object_id'])
+        model = data["object_type"].model_class()
+        return model.objects.get(pk=data["object_id"])
 
     def to_representation(self, instance):
         ct = ContentType.objects.get_for_model(instance)
         return {
-            'object_type': f"{ct.app_label}.{ct.model}",
-            'object_id': instance.pk,
+            "object_type": f"{ct.app_label}.{ct.model}",
+            "object_id": instance.pk,
             # Reuse the BOUND field (self.fields['object']) rather than a fresh
             # GFKSerializerField(): the bound field inherits this serializer's
             # context, so GFKSerializerField.to_representation can read
             # context['request']. A fresh instance has empty context -> KeyError.
-            'object': self.fields['object'].to_representation(instance) if 'request' in self.context else None,
+            "object": self.fields["object"].to_representation(instance) if "request" in self.context else None,
         }
 
 
 class ContentTypeSerializer(serializers.ModelSerializer):
-    url = serializers.HyperlinkedIdentityField(view_name='api:core_api:contenttype-detail')
+    url = serializers.HyperlinkedIdentityField(view_name="api:core_api:contenttype-detail")
 
     class Meta:
         model = ContentType
-        fields = ['id', 'url', 'app_label', 'model']
+        fields = ["id", "url", "app_label", "model"]
 
 
 class NestedUserSerializer(BaseModelSerializer):
     class Meta:
         model = User
-        fields = ['id', 'username']
-        brief_fields = ['id', 'username']
+        fields = ["id", "username"]
+        brief_fields = ["id", "username"]
 
 
 class ObjectChangeSerializer(BaseModelSerializer):
-    url = serializers.HyperlinkedIdentityField(view_name='api:core_api:objectchange-detail')
+    url = serializers.HyperlinkedIdentityField(view_name="api:core_api:objectchange-detail")
     user = NestedUserSerializer(read_only=True)
     action = ChoiceField(choices=ObjectChangeActionChoices(), read_only=True)
     changed_object_type = ContentTypeField(read_only=True)
@@ -77,11 +74,23 @@ class ObjectChangeSerializer(BaseModelSerializer):
     class Meta:
         model = ObjectChange
         fields = [
-            'id', 'url', 'display', 'time', 'user', 'user_name', 'request_id', 'action',
-            'changed_object_type', 'changed_object_id', 'changed_object',
-            'prechange_data', 'postchange_data', 'object_repr', 'object_type_repr',
+            "id",
+            "url",
+            "display",
+            "time",
+            "user",
+            "user_name",
+            "request_id",
+            "action",
+            "changed_object_type",
+            "changed_object_id",
+            "changed_object",
+            "prechange_data",
+            "postchange_data",
+            "object_repr",
+            "object_type_repr",
         ]
-        brief_fields = ['id', 'url', 'display', 'time', 'user', 'action', 'object_repr']
+        brief_fields = ["id", "url", "display", "time", "user", "action", "object_repr"]
 
     def get_display(self, obj):
         action_label = obj.get_action_display()
@@ -92,7 +101,7 @@ class ObjectChangeSerializer(BaseModelSerializer):
         if obj.changed_object is None:
             return None
         return {
-            'id': obj.changed_object_id,
-            'object_type': str(obj.changed_object_type),
-            'display': obj.object_repr,
+            "id": obj.changed_object_id,
+            "object_type": str(obj.changed_object_type),
+            "display": obj.object_repr,
         }

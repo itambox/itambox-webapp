@@ -1,5 +1,6 @@
 from .providers import LocalSignatureProvider
 
+
 class SignatureProviderRegistry:
     def __init__(self):
         self._registry = {}

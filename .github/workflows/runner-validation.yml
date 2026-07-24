@@ -58,7 +58,13 @@ jobs:
           uv lock --check
           uv sync --locked --only-group dev
 
-      - name: Lint with flake8
+      - name: Check import order (Ruff)
+        run: uv run --locked --no-sync ruff check --select I itambox scripts
+
+      - name: Check formatting (Ruff)
+        run: uv run --locked --no-sync ruff format --check itambox scripts
+
+      - name: Lint with flake8 (blocking baseline gate)
         run: uv run --locked --no-sync python scripts/check_flake8_baseline.py
 
   docs:

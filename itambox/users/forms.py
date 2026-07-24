@@ -3,98 +3,103 @@
 # Licensed under the Apache License, Version 2.0.
 
 import logging
+
 from django import forms
+from django.conf import settings  # Import settings
 from django.contrib.auth import get_user_model
 from django.db.models import Q
-# Import UserPreference from this app's models
-from .models import UserPreference 
 from django.utils.translation import gettext_lazy as _
-from django.conf import settings # Import settings
+
+# Import UserPreference from this app's models
+from .models import UserPreference
 
 logger = logging.getLogger(__name__)
 User = get_user_model()
 from crispy_forms.helper import FormHelper
-from crispy_forms.layout import Layout, Row, Column, Fieldset, Submit, HTML
+from crispy_forms.layout import HTML, Column, Fieldset, Layout, Row, Submit
+
 from organization.forms.helpers import add_standard_buttons
+
 
 class UserProfileForm(forms.ModelForm):
     class Meta:
         model = User
-        fields = ['first_name', 'last_name', 'email']
+        fields = ["first_name", "last_name", "email"]
+
 
 class UserForm(forms.ModelForm):
     password = forms.CharField(
-        widget=forms.PasswordInput(attrs={'class': 'form-control'}),
+        widget=forms.PasswordInput(attrs={"class": "form-control"}),
         required=False,
-        help_text=_("Raw passwords are not stored. If editing a user, leave this blank to keep the current password.")
+        help_text=_("Raw passwords are not stored. If editing a user, leave this blank to keep the current password."),
     )
 
     class Meta:
         model = User
-        fields = ['username', 'first_name', 'last_name', 'email', 'is_active', 'can_login', 'is_staff', 'is_superuser']
+        fields = ["username", "first_name", "last_name", "email", "is_active", "can_login", "is_staff", "is_superuser"]
         widgets = {
-            'username': forms.TextInput(attrs={'class': 'form-control'}),
-            'first_name': forms.TextInput(attrs={'class': 'form-control'}),
-            'last_name': forms.TextInput(attrs={'class': 'form-control'}),
-            'email': forms.EmailInput(attrs={'class': 'form-control'}),
-            'is_active': forms.CheckboxInput(attrs={'class': 'form-check-input'}),
-            'can_login': forms.CheckboxInput(attrs={'class': 'form-check-input'}),
-            'is_staff': forms.CheckboxInput(attrs={'class': 'form-check-input'}),
-            'is_superuser': forms.CheckboxInput(attrs={'class': 'form-check-input'}),
+            "username": forms.TextInput(attrs={"class": "form-control"}),
+            "first_name": forms.TextInput(attrs={"class": "form-control"}),
+            "last_name": forms.TextInput(attrs={"class": "form-control"}),
+            "email": forms.EmailInput(attrs={"class": "form-control"}),
+            "is_active": forms.CheckboxInput(attrs={"class": "form-check-input"}),
+            "can_login": forms.CheckboxInput(attrs={"class": "form-check-input"}),
+            "is_staff": forms.CheckboxInput(attrs={"class": "form-check-input"}),
+            "is_superuser": forms.CheckboxInput(attrs={"class": "form-check-input"}),
         }
 
     def __init__(self, *args, user=None, **kwargs):
         self.request_user = user
         super().__init__(*args, **kwargs)
         if self.instance and self.instance.pk:
-            self.fields['password'].required = False
-            self.fields['password'].help_text = _("Leave blank to keep the current password.")
+            self.fields["password"].required = False
+            self.fields["password"].help_text = _("Leave blank to keep the current password.")
         else:
-            self.fields['password'].required = True
+            self.fields["password"].required = True
 
         # Security check: only superusers can modify is_superuser, is_staff, and can_login
         # (login capability is a global account flag, not a per-tenant setting).
         if not self.request_user or not self.request_user.is_superuser:
-            if 'is_superuser' in self.fields:
-                self.fields['is_superuser'].disabled = True
-            if 'is_staff' in self.fields:
-                self.fields['is_staff'].disabled = True
-            if 'can_login' in self.fields:
-                self.fields['can_login'].disabled = True
+            if "is_superuser" in self.fields:
+                self.fields["is_superuser"].disabled = True
+            if "is_staff" in self.fields:
+                self.fields["is_staff"].disabled = True
+            if "can_login" in self.fields:
+                self.fields["can_login"].disabled = True
 
         self.helper = FormHelper(self)
-        self.helper.form_method = 'post'
+        self.helper.form_method = "post"
         self.helper.form_tag = True
         self.helper.layout = Layout(
             Row(
-                Column('username', css_class='col-md-8'),
-                Column('is_active', css_class='col-md-4'),
-                css_class='row g-3',
+                Column("username", css_class="col-md-8"),
+                Column("is_active", css_class="col-md-4"),
+                css_class="row g-3",
             ),
-            'password',
+            "password",
             Row(
-                Column('first_name', css_class='col-md-6'),
-                Column('last_name', css_class='col-md-6'),
-                css_class='row g-3',
+                Column("first_name", css_class="col-md-6"),
+                Column("last_name", css_class="col-md-6"),
+                css_class="row g-3",
             ),
-            'email',
+            "email",
             Fieldset(
-                _('Permissions'),
+                _("Permissions"),
                 Row(
-                    Column('can_login', css_class='col-md-12'),
-                    css_class='row g-3',
+                    Column("can_login", css_class="col-md-12"),
+                    css_class="row g-3",
                 ),
                 Row(
-                    Column('is_staff', css_class='col-md-6'),
-                    Column('is_superuser', css_class='col-md-6'),
-                    css_class='row g-3',
+                    Column("is_staff", css_class="col-md-6"),
+                    Column("is_superuser", css_class="col-md-6"),
+                    css_class="row g-3",
                 ),
             ),
         )
-        add_standard_buttons(self.helper, self.instance, 'users:user_list')
+        add_standard_buttons(self.helper, self.instance, "users:user_list")
 
     def clean_is_superuser(self):
-        is_superuser = self.cleaned_data.get('is_superuser')
+        is_superuser = self.cleaned_data.get("is_superuser")
         if is_superuser and (not self.request_user or not self.request_user.is_superuser):
             if self.instance and self.instance.is_superuser:
                 return is_superuser
@@ -102,7 +107,7 @@ class UserForm(forms.ModelForm):
         return is_superuser
 
     def clean_is_staff(self):
-        is_staff = self.cleaned_data.get('is_staff')
+        is_staff = self.cleaned_data.get("is_staff")
         if is_staff and (not self.request_user or not self.request_user.is_superuser):
             if self.instance and self.instance.is_staff:
                 return is_staff
@@ -111,7 +116,7 @@ class UserForm(forms.ModelForm):
 
     def save(self, commit=True):
         user = super().save(commit=False)
-        password = self.cleaned_data.get('password')
+        password = self.cleaned_data.get("password")
         if password:
             user.set_password(password)
         if commit:
@@ -119,24 +124,25 @@ class UserForm(forms.ModelForm):
             self.save_m2m()
         return user
 
+
 class UserPreferencesForm(forms.Form):
     # Define fields explicitly
     pagination_per_page = forms.ChoiceField(
         choices=settings.PAGINATE_COUNT_CHOICES,
-        label=_('Items Per Page'),
-        widget=forms.Select(attrs={'class': 'form-select'})
+        label=_("Items Per Page"),
+        widget=forms.Select(attrs={"class": "form-select"}),
     )
     theme = forms.ChoiceField(
-        choices=UserPreference.THEME_CHOICES, # Reference choices from model
+        choices=UserPreference.THEME_CHOICES,  # Reference choices from model
         required=False,
-        widget=forms.Select(attrs={'class': 'form-select'})
+        widget=forms.Select(attrs={"class": "form-select"}),
     )
     language = forms.ChoiceField(
         choices=settings.LANGUAGES,
         required=False,
-        label=_('Language'),
-        help_text=_('Interface language. Applies across the whole application.'),
-        widget=forms.Select(attrs={'class': 'form-select'})
+        label=_("Language"),
+        help_text=_("Interface language. Applies across the whole application."),
+        widget=forms.Select(attrs={"class": "form-select"}),
     )
 
     def __init__(self, user, *args, **kwargs):
@@ -147,130 +153,130 @@ class UserPreferencesForm(forms.Form):
             # Use filter().first() to avoid DoesNotExist exception
             prefs = UserPreference.objects.filter(user=self.user).first()
             if prefs and prefs.data:
-                pagination_prefs = prefs.data.get('pagination', {})
-                theme_prefs = prefs.data.get('theme', {})
-                
-                initial_per_page = pagination_prefs.get('per_page', settings.DEFAULT_PAGINATE_COUNT)
+                pagination_prefs = prefs.data.get("pagination", {})
+                theme_prefs = prefs.data.get("theme", {})
+
+                initial_per_page = pagination_prefs.get("per_page", settings.DEFAULT_PAGINATE_COUNT)
                 # Use THEME_LIGHT as the default
-                initial_theme = theme_prefs.get('theme', UserPreference.THEME_LIGHT)
-                
+                initial_theme = theme_prefs.get("theme", UserPreference.THEME_LIGHT)
+
                 # Ensure initial value is valid before setting
                 if initial_per_page in dict(settings.PAGINATE_COUNT_CHOICES):
-                    self.fields['pagination_per_page'].initial = initial_per_page
+                    self.fields["pagination_per_page"].initial = initial_per_page
                 else:
                     # Fallback if stored pref is invalid
-                    self.fields['pagination_per_page'].initial = settings.DEFAULT_PAGINATE_COUNT
-                
+                    self.fields["pagination_per_page"].initial = settings.DEFAULT_PAGINATE_COUNT
+
                 if initial_theme in dict(UserPreference.THEME_CHOICES):
-                     self.fields['theme'].initial = initial_theme
+                    self.fields["theme"].initial = initial_theme
                 else:
-                     # Fallback if stored pref is invalid
-                    self.fields['theme'].initial = UserPreference.THEME_LIGHT
-                    
+                    # Fallback if stored pref is invalid
+                    self.fields["theme"].initial = UserPreference.THEME_LIGHT
+
             else:
                 # Set defaults if no preferences exist
-                self.fields['pagination_per_page'].initial = settings.DEFAULT_PAGINATE_COUNT
+                self.fields["pagination_per_page"].initial = settings.DEFAULT_PAGINATE_COUNT
                 # Use THEME_LIGHT as the default
-                self.fields['theme'].initial = UserPreference.THEME_LIGHT
-                
+                self.fields["theme"].initial = UserPreference.THEME_LIGHT
+
         except Exception:
             # Fallback to defaults on any error loading preferences
-            self.fields['pagination_per_page'].initial = settings.DEFAULT_PAGINATE_COUNT
-             # Use THEME_LIGHT as the default
-            self.fields['theme'].initial = UserPreference.THEME_LIGHT
+            self.fields["pagination_per_page"].initial = settings.DEFAULT_PAGINATE_COUNT
+            # Use THEME_LIGHT as the default
+            self.fields["theme"].initial = UserPreference.THEME_LIGHT
 
         # Language initial: stored preference first, else the active language
         from django.utils import translation
+
         valid_languages = dict(settings.LANGUAGES)
         stored_language = None
         try:
             prefs = UserPreference.objects.filter(user=self.user).first()
             if prefs and prefs.data:
-                stored_language = prefs.data.get('language')
+                stored_language = prefs.data.get("language")
         except Exception:
             stored_language = None
         if stored_language not in valid_languages:
             stored_language = translation.get_language()
         if stored_language not in valid_languages:
             stored_language = settings.LANGUAGE_CODE
-        self.fields['language'].initial = stored_language
+        self.fields["language"].initial = stored_language
 
     def save(self):
         """Save form data to UserPreference."""
         prefs, created_at = UserPreference.objects.get_or_create(user=self.user)
-        
+
         # Ensure prefs.data is initialized as a dict if it's None or not set
         if prefs.data is None:
             prefs.data = {}
-        
+
         # Update pagination preferences
-        if 'pagination' not in prefs.data:
-            prefs.data['pagination'] = {}
-        prefs.data['pagination']['per_page'] = self.cleaned_data['pagination_per_page']
+        if "pagination" not in prefs.data:
+            prefs.data["pagination"] = {}
+        prefs.data["pagination"]["per_page"] = self.cleaned_data["pagination_per_page"]
 
         # Update theme preferences
-        if 'theme' not in prefs.data:
-            prefs.data['theme'] = {}
-        prefs.data['theme']['theme'] = self.cleaned_data['theme']
+        if "theme" not in prefs.data:
+            prefs.data["theme"] = {}
+        prefs.data["theme"]["theme"] = self.cleaned_data["theme"]
 
         # Update language preference (the active cookie is set by the view)
-        language = self.cleaned_data.get('language')
+        language = self.cleaned_data.get("language")
         if language and language in dict(settings.LANGUAGES):
-            prefs.data['language'] = language
+            prefs.data["language"] = language
 
         prefs.save()
+
 
 class TableConfigForm(forms.Form):
     """
     Form for configuring table columns.
     Adapted from NetBox pattern.
     """
+
     available_columns = forms.MultipleChoiceField(
         choices=[],
         required=False,
-        widget=forms.SelectMultiple(
-            attrs={'size': 10, 'class': 'form-select available-columns'}
-        ),
-        label=_('Available Columns')
+        widget=forms.SelectMultiple(attrs={"size": 10, "class": "form-select available-columns"}),
+        label=_("Available Columns"),
     )
     columns = forms.MultipleChoiceField(
         choices=[],
         required=False,
-        widget=forms.SelectMultiple(
-            attrs={'size': 10, 'class': 'form-select selected-columns'}
-        ),
-        label=_('Selected Columns')
+        widget=forms.SelectMultiple(attrs={"size": 10, "class": "form-select selected-columns"}),
+        label=_("Selected Columns"),
     )
 
     def __init__(self, table, *args, **kwargs):
         self.table = table
-        user_config = kwargs.pop('user_config', {}) # e.g., {'columns': [...], 'ordering': [...]} or {}
+        user_config = kwargs.pop("user_config", {})  # e.g., {'columns': [...], 'ordering': [...]} or {}
         super().__init__(*args, **kwargs)
 
         logger.debug("TableConfigForm received user_config: %s", user_config)
 
         # Determine initial selected columns (priority: user > table default > all)
-        default_cols = getattr(table.Meta, 'default_columns', None)
-        initial_selected_names = user_config.get('columns', default_cols)
+        default_cols = getattr(table.Meta, "default_columns", None)
+        initial_selected_names = user_config.get("columns", default_cols)
         # Treat empty list (from Reset) the same as None — fall back to defaults
         if not initial_selected_names:
-             # Fallback if no user pref and no Meta.default_columns
-             # Use Meta.fields or all non-excluded fields
-             if hasattr(table.Meta, 'fields'):
-                 initial_selected_names = list(table.Meta.fields)
-             else:
-                 exclude = getattr(table.Meta, 'exclude', ('pk', 'actions'))
-                 initial_selected_names = [name for name in table.base_columns.keys() if name not in exclude]
-        
+            # Fallback if no user pref and no Meta.default_columns
+            # Use Meta.fields or all non-excluded fields
+            if hasattr(table.Meta, "fields"):
+                initial_selected_names = list(table.Meta.fields)
+            else:
+                exclude = getattr(table.Meta, "exclude", ("pk", "actions"))
+                initial_selected_names = [name for name in table.base_columns.keys() if name not in exclude]
+
         logger.debug("TableConfigForm initial selected names: %s", initial_selected_names)
 
         # Populate choices based on the table definition
         all_column_choices = {
-            name: str(column.verbose_name) 
+            name: str(column.verbose_name)
             for name, column in table.columns.items()
-            if name not in getattr(table.Meta, 'exclude_from_config', ('pk', 'actions')) # Allow explicit exclusion from config
+            if name
+            not in getattr(table.Meta, "exclude_from_config", ("pk", "actions"))  # Allow explicit exclusion from config
         }
-        
+
         available_choices = []
         selected_choices = []
 
@@ -278,22 +284,18 @@ class TableConfigForm(forms.Form):
         for name in initial_selected_names:
             if name in all_column_choices:
                 selected_choices.append((name, all_column_choices[name]))
-        
+
         # Populate available_choices with remaining columns, sorted by verbose name
         selected_names_set = set(initial_selected_names)
         available_choices = sorted(
-            [
-                (name, verbose)
-                for name, verbose in all_column_choices.items()
-                if name not in selected_names_set
-            ],
-            key=lambda item: item[1] # Sort by verbose name
+            [(name, verbose) for name, verbose in all_column_choices.items() if name not in selected_names_set],
+            key=lambda item: item[1],  # Sort by verbose name
         )
 
         # Assign choices to the form fields
-        self.fields['available_columns'].choices = available_choices
-        self.fields['columns'].choices = selected_choices
-        
+        self.fields["available_columns"].choices = available_choices
+        self.fields["columns"].choices = selected_choices
+
         logger.debug("TableConfigForm final available choices: %s", available_choices)
         logger.debug("TableConfigForm final selected choices: %s", selected_choices)
 
@@ -303,28 +305,33 @@ class TableConfigForm(forms.Form):
             return None
         app_label = self.table.Meta.model._meta.app_label
         model_name = self.table.Meta.model._meta.model_name
-        return f'{app_label}.{model_name}'
+        return f"{app_label}.{model_name}"
 
 
 class TokenForm(forms.ModelForm):
     expires = forms.DateField(
         required=False,
-        widget=forms.DateInput(attrs={'type': 'date', 'class': 'form-control'}),
-        help_text=_("Optional expiration date. Leave blank for a token that never expires.")
+        widget=forms.DateInput(attrs={"type": "date", "class": "form-control"}),
+        help_text=_("Optional expiration date. Leave blank for a token that never expires."),
     )
     allowed_ips = forms.CharField(
         required=False,
-        widget=forms.TextInput(attrs={'class': 'form-control', 'placeholder': _('e.g., 192.168.1.0/24, 10.0.0.5')}),
-        help_text=_("Comma-separated IPs or CIDR prefixes allowed to use this token. Leave blank to allow any address."),
+        widget=forms.TextInput(attrs={"class": "form-control", "placeholder": _("e.g., 192.168.1.0/24, 10.0.0.5")}),
+        help_text=_(
+            "Comma-separated IPs or CIDR prefixes allowed to use this token. Leave blank to allow any address."
+        ),
     )
 
     class Meta:
         from .models import Token
+
         model = Token
-        fields = ['description', 'write_enabled', 'allowed_ips', 'expires']
+        fields = ["description", "write_enabled", "allowed_ips", "expires"]
         widgets = {
-            'description': forms.TextInput(attrs={'class': 'form-control', 'placeholder': _('e.g., Personal Laptop API Access')}),
-            'write_enabled': forms.CheckboxInput(attrs={'class': 'form-check-input'}),
+            "description": forms.TextInput(
+                attrs={"class": "form-control", "placeholder": _("e.g., Personal Laptop API Access")}
+            ),
+            "write_enabled": forms.CheckboxInput(attrs={"class": "form-check-input"}),
         }
 
     def __init__(self, *args, **kwargs):
@@ -332,33 +339,35 @@ class TokenForm(forms.ModelForm):
         # form_tag=False because the surrounding template already provides <form> and the
         # CSRF token; setting it here prevents a nested <form> element being rendered.
         self.helper = FormHelper(self)
-        self.helper.form_method = 'post'
+        self.helper.form_method = "post"
         self.helper.form_tag = False
         self.helper.layout = Layout(
             Row(
-                Column('write_enabled', css_class='col-md-6'),
-                Column('expires', css_class='col-md-6'),
-                css_class='row g-3',
+                Column("write_enabled", css_class="col-md-6"),
+                Column("expires", css_class="col-md-6"),
+                css_class="row g-3",
             ),
-            'description',
-            'allowed_ips',
+            "description",
+            "allowed_ips",
         )
 
     def clean_allowed_ips(self):
         import ipaddress
-        raw = self.cleaned_data.get('allowed_ips', '')
-        prefixes = [p.strip() for p in raw.replace('\n', ',').split(',') if p.strip()]
+
+        raw = self.cleaned_data.get("allowed_ips", "")
+        prefixes = [p.strip() for p in raw.replace("\n", ",").split(",") if p.strip()]
         for prefix in prefixes:
             try:
                 ipaddress.ip_network(prefix, strict=False)
             except ValueError:
                 raise forms.ValidationError(
-                    _('"%(prefix)s" is not a valid IP address or CIDR prefix.') % {'prefix': prefix}
+                    _('"%(prefix)s" is not a valid IP address or CIDR prefix.') % {"prefix": prefix}
                 )
         return prefixes
 
 
-from core.forms import FilterForm, BulkEditForm
+from core.forms import BulkEditForm, FilterForm
+
 from .filters import UserFilterSet
 
 
@@ -369,82 +378,92 @@ class UserFilterForm(FilterForm):
 class UserBulkEditForm(BulkEditForm):
     def __init__(self, *args, request_user=None, **kwargs):
         self.request_user = request_user
-        if 'model' not in kwargs:
-            kwargs['model'] = get_user_model()
+        if "model" not in kwargs:
+            kwargs["model"] = get_user_model()
         super().__init__(*args, **kwargs)
 
         # Remove fields that should not be bulk editable
-        forbidden_fields = {'password', 'last_login', 'username', 'first_name', 'last_name', 'email', 'date_joined'}
+        forbidden_fields = {"password", "last_login", "username", "first_name", "last_name", "email", "date_joined"}
         for f in forbidden_fields:
             if f in self.fields:
                 del self.fields[f]
-        if '_selected_fields' in self.fields:
-            self.fields['_selected_fields'].choices = [
-                c for c in self.fields['_selected_fields'].choices if c[0] not in forbidden_fields
+        if "_selected_fields" in self.fields:
+            self.fields["_selected_fields"].choices = [
+                c for c in self.fields["_selected_fields"].choices if c[0] not in forbidden_fields
             ]
 
-        self.fields['is_active'] = forms.NullBooleanField(
+        self.fields["is_active"] = forms.NullBooleanField(
             required=False,
-            label=_('Active'),
-            widget=forms.Select(choices=(
-                (None, _('— No Change —')),
-                (True, _('Yes')),
-                (False, _('No')),
-            ), attrs={'class': 'form-select'})
+            label=_("Active"),
+            widget=forms.Select(
+                choices=(
+                    (None, _("— No Change —")),
+                    (True, _("Yes")),
+                    (False, _("No")),
+                ),
+                attrs={"class": "form-select"},
+            ),
         )
-        self.fields['is_staff'] = forms.NullBooleanField(
+        self.fields["is_staff"] = forms.NullBooleanField(
             required=False,
-            label=_('Staff'),
-            widget=forms.Select(choices=(
-                (None, _('— No Change —')),
-                (True, _('Yes')),
-                (False, _('No')),
-            ), attrs={'class': 'form-select'})
+            label=_("Staff"),
+            widget=forms.Select(
+                choices=(
+                    (None, _("— No Change —")),
+                    (True, _("Yes")),
+                    (False, _("No")),
+                ),
+                attrs={"class": "form-select"},
+            ),
         )
-        self.fields['is_superuser'] = forms.NullBooleanField(
+        self.fields["is_superuser"] = forms.NullBooleanField(
             required=False,
-            label=_('Superuser'),
-            widget=forms.Select(choices=(
-                (None, _('— No Change —')),
-                (True, _('Yes')),
-                (False, _('No')),
-            ), attrs={'class': 'form-select'})
+            label=_("Superuser"),
+            widget=forms.Select(
+                choices=(
+                    (None, _("— No Change —")),
+                    (True, _("Yes")),
+                    (False, _("No")),
+                ),
+                attrs={"class": "form-select"},
+            ),
         )
-        self.fields['can_login'] = forms.NullBooleanField(
+        self.fields["can_login"] = forms.NullBooleanField(
             required=False,
-            label=_('Can log in'),
-            widget=forms.Select(choices=(
-                (None, _('— No Change —')),
-                (True, _('Yes')),
-                (False, _('No')),
-            ), attrs={'class': 'form-select'})
+            label=_("Can log in"),
+            widget=forms.Select(
+                choices=(
+                    (None, _("— No Change —")),
+                    (True, _("Yes")),
+                    (False, _("No")),
+                ),
+                attrs={"class": "form-select"},
+            ),
         )
 
         # Security check: only superusers can modify is_superuser, is_staff, and can_login
         if not self.request_user or not self.request_user.is_superuser:
-            for f in ('is_superuser', 'is_staff', 'can_login'):
+            for f in ("is_superuser", "is_staff", "can_login"):
                 if f in self.fields:
                     self.fields[f].disabled = True
-                    self.fields[f].widget.attrs['disabled'] = 'disabled'
+                    self.fields[f].widget.attrs["disabled"] = "disabled"
 
     def clean(self):
         cleaned_data = super().clean()
-        selected_fields = self.data.getlist('_selected_fields') if self.data else []
+        selected_fields = self.data.getlist("_selected_fields") if self.data else []
 
         # Only superusers can change is_superuser / is_staff / can_login
-        has_privilege_field_selected = any(
-            f in selected_fields for f in ('is_superuser', 'is_staff', 'can_login')
-        )
+        has_privilege_field_selected = any(f in selected_fields for f in ("is_superuser", "is_staff", "can_login"))
         if has_privilege_field_selected and (not self.request_user or not self.request_user.is_superuser):
             raise forms.ValidationError(_("Only superusers can grant or modify staff, superuser, or login status."))
 
         # Prevent non-nullable fields from being set to None if they are selected
-        for field_name in ['is_active', 'is_staff', 'is_superuser', 'can_login']:
+        for field_name in ["is_active", "is_staff", "is_superuser", "can_login"]:
             if field_name in selected_fields:
                 val = cleaned_data.get(field_name)
                 # If they are superuser, these fields aren't disabled and we validate they aren't None.
                 # If they aren't superuser, they were already validated/gated above, so we only need to validate fields that aren't disabled (i.e. is_active).
-                if val is None and (self.request_user and self.request_user.is_superuser or field_name == 'is_active'):
+                if val is None and (self.request_user and self.request_user.is_superuser or field_name == "is_active"):
                     self.add_error(field_name, _("Please select Yes or No for this field."))
 
         return cleaned_data
@@ -455,25 +474,31 @@ class UserBulkEditForm(BulkEditForm):
 # provider-owned groups may be projected into managed tenants through RoleGrant scopes.
 from django.db import transaction
 
-from organization.models import (
-    Membership, Role, RoleGrant, RoleGrantScope, Tenant, TenantGroup,
-)
-from organization.access import accessible_tenant_ids, get_descendant_tenant_group_ids
 from core.auth.guards import validate_role_grant
-from .models import GroupMembership, UserGroup
+from organization.access import accessible_tenant_ids, get_descendant_tenant_group_ids
+from organization.models import (
+    Membership,
+    Role,
+    RoleGrant,
+    RoleGrantScope,
+    Tenant,
+    TenantGroup,
+)
+
 from .filters import UserGroupFilterSet
+from .models import GroupMembership, UserGroup
 
 
 class GroupManagedRoleGrantForm(forms.Form):
     """One additive managed-scope segment of a group RoleGrant."""
 
-    SCOPE_EXPLICIT = 'explicit'
+    SCOPE_EXPLICIT = "explicit"
     id = forms.IntegerField(required=False, widget=forms.HiddenInput)
     role = forms.ModelChoiceField(
         queryset=Role._base_manager.none(),
         required=False,
         label=_("Role"),
-        widget=forms.Select(attrs={'class': 'form-select managed-role'}),
+        widget=forms.Select(attrs={"class": "form-select managed-role"}),
     )
     managed_scope = forms.ChoiceField(
         choices=(
@@ -484,19 +509,19 @@ class GroupManagedRoleGrantForm(forms.Form):
         initial=SCOPE_EXPLICIT,
         required=False,
         label=_("Coverage"),
-        widget=forms.Select(attrs={'class': 'form-select managed-scope'}),
+        widget=forms.Select(attrs={"class": "form-select managed-scope"}),
     )
     scope_group = forms.ModelChoiceField(
         queryset=TenantGroup._base_manager.none(),
         required=False,
         label=_("Tenant group"),
-        widget=forms.Select(attrs={'class': 'form-select managed-scope-group'}),
+        widget=forms.Select(attrs={"class": "form-select managed-scope-group"}),
     )
     assigned_tenants = forms.ModelMultipleChoiceField(
         queryset=Tenant._base_manager.none(),
         required=False,
         label=_("Specific tenants"),
-        widget=forms.SelectMultiple(attrs={'class': 'form-select managed-assigned-tenants'}),
+        widget=forms.SelectMultiple(attrs={"class": "form-select managed-assigned-tenants"}),
     )
 
     def __init__(self, *args, owner=None, requesting_user=None, **kwargs):
@@ -505,65 +530,63 @@ class GroupManagedRoleGrantForm(forms.Form):
         self._requesting_user = requesting_user
         if owner is None:
             return
-        self.fields['role'].queryset = Role._base_manager.filter(
+        self.fields["role"].queryset = Role._base_manager.filter(
             tenant=owner,
             deleted_at__isnull=True,
-        ).order_by('name')
-        self.fields['scope_group'].queryset = TenantGroup._base_manager.filter(
+        ).order_by("name")
+        self.fields["scope_group"].queryset = TenantGroup._base_manager.filter(
             deleted_at__isnull=True,
-        ).order_by('name')
-        self.fields['assigned_tenants'].queryset = Tenant._base_manager.filter(
+        ).order_by("name")
+        self.fields["assigned_tenants"].queryset = Tenant._base_manager.filter(
             managed_by=owner,
             deleted_at__isnull=True,
-        ).order_by('name')
+        ).order_by("name")
 
     def clean(self):
         cleaned = super().clean()
-        if cleaned.get('DELETE') or not cleaned.get('role'):
+        if cleaned.get("DELETE") or not cleaned.get("role"):
             return cleaned
 
         owner = self._owner
-        role = cleaned['role']
+        role = cleaned["role"]
         if owner is None or not owner.is_provider:
-            raise forms.ValidationError(_(
-                "Managed group grants require a managing provider tenant."
-            ))
+            raise forms.ValidationError(_("Managed group grants require a managing provider tenant."))
         if role.tenant_id != owner.pk:
-            self.add_error('role', _('The role must be owned by the group tenant.'))
+            self.add_error("role", _("The role must be owned by the group tenant."))
             return cleaned
 
-        scope = cleaned.get('managed_scope') or self.SCOPE_EXPLICIT
-        cleaned['managed_scope'] = scope
+        scope = cleaned.get("managed_scope") or self.SCOPE_EXPLICIT
+        cleaned["managed_scope"] = scope
         requested_tenant_ids = None
         if scope == RoleGrantScope.SCOPE_TENANT_GROUP:
-            cleaned['assigned_tenants'] = []
-            scope_group = cleaned.get('scope_group')
+            cleaned["assigned_tenants"] = []
+            scope_group = cleaned.get("scope_group")
             if scope_group is None:
-                self.add_error('scope_group', _('Pick a tenant group.'))
+                self.add_error("scope_group", _("Pick a tenant group."))
                 return cleaned
             requested_tenant_ids = set(
                 Tenant._base_manager.filter(
                     managed_by=owner,
                     group_id__in=get_descendant_tenant_group_ids(scope_group.pk),
                     deleted_at__isnull=True,
-                ).values_list('pk', flat=True)
+                ).values_list("pk", flat=True)
             )
         elif scope == self.SCOPE_EXPLICIT:
-            cleaned['scope_group'] = None
-            assigned = list(cleaned.get('assigned_tenants') or [])
+            cleaned["scope_group"] = None
+            assigned = list(cleaned.get("assigned_tenants") or [])
             if not assigned:
-                self.add_error('assigned_tenants', _('Pick at least one managed tenant.'))
+                self.add_error("assigned_tenants", _("Pick at least one managed tenant."))
                 return cleaned
             if any(tenant.managed_by_id != owner.pk for tenant in assigned):
                 self.add_error(
-                    'assigned_tenants',
-                    _('Every selected tenant must be managed by the group owner.'),
+                    "assigned_tenants",
+                    _("Every selected tenant must be managed by the group owner."),
                 )
                 return cleaned
             requested_tenant_ids = {tenant.pk for tenant in assigned}
         else:
-            cleaned['scope_group'] = None
-            cleaned['assigned_tenants'] = []
+            cleaned["scope_group"] = None
+            cleaned["assigned_tenants"] = []
 
         try:
             validate_role_grant(
@@ -590,36 +613,32 @@ class BaseGroupManagedRoleGrantFormSet(forms.BaseFormSet):
         row_count_by_role = {}
         all_managed_roles = set()
         for form in self.forms:
-            if not hasattr(form, 'cleaned_data'):
+            if not hasattr(form, "cleaned_data"):
                 continue
             cleaned = form.cleaned_data
-            if cleaned.get('DELETE') or not cleaned.get('role'):
+            if cleaned.get("DELETE") or not cleaned.get("role"):
                 continue
-            role_id = cleaned['role'].pk
-            scope = cleaned.get('managed_scope') or GroupManagedRoleGrantForm.SCOPE_EXPLICIT
+            role_id = cleaned["role"].pk
+            scope = cleaned.get("managed_scope") or GroupManagedRoleGrantForm.SCOPE_EXPLICIT
             row_count_by_role[role_id] = row_count_by_role.get(role_id, 0) + 1
             if scope == RoleGrantScope.SCOPE_TENANT_GROUP:
-                signature = (role_id, scope, cleaned['scope_group'].pk)
+                signature = (role_id, scope, cleaned["scope_group"].pk)
             elif scope == RoleGrantScope.SCOPE_ALL_MANAGED:
                 all_managed_roles.add(role_id)
                 signature = (role_id, scope, None)
             else:
-                tenant_ids = {tenant.pk for tenant in cleaned.get('assigned_tenants') or []}
+                tenant_ids = {tenant.pk for tenant in cleaned.get("assigned_tenants") or []}
                 overlap = explicit_tenants_by_role.setdefault(role_id, set()) & tenant_ids
                 if overlap:
-                    raise forms.ValidationError(_(
-                        "The same role targets a managed tenant more than once."
-                    ))
+                    raise forms.ValidationError(_("The same role targets a managed tenant more than once."))
                 explicit_tenants_by_role[role_id].update(tenant_ids)
                 signature = None
             if signature is not None and signature in signatures:
-                raise forms.ValidationError(_('A managed grant scope is duplicated.'))
+                raise forms.ValidationError(_("A managed grant scope is duplicated."))
             if signature is not None:
                 signatures.add(signature)
         if any(row_count_by_role[role_id] > 1 for role_id in all_managed_roles):
-            raise forms.ValidationError(_(
-                "All managed tenants already covers every narrower scope for that role."
-            ))
+            raise forms.ValidationError(_("All managed tenants already covers every narrower scope for that role."))
 
 
 GroupManagedRoleGrantFormSet = forms.formset_factory(
@@ -629,7 +648,7 @@ GroupManagedRoleGrantFormSet = forms.formset_factory(
     can_delete=True,
 )
 
-GROUP_MANAGED_FORMSET_PREFIX = 'managed'
+GROUP_MANAGED_FORMSET_PREFIX = "managed"
 
 
 class UserGroupForm(forms.ModelForm):
@@ -640,37 +659,40 @@ class UserGroupForm(forms.ModelForm):
     tenant Membership rows, never global users. Manual group memberships are
     reconciled here while directory-managed rows remain owned by their source.
     """
+
     name = forms.CharField(
         max_length=100,
         label=_("Name"),
-        widget=forms.TextInput(attrs={'class': 'form-control'}),
+        widget=forms.TextInput(attrs={"class": "form-control"}),
     )
     description = forms.CharField(
         required=False,
         label=_("Description"),
-        widget=forms.Textarea(attrs={'class': 'form-control', 'rows': 3}),
+        widget=forms.Textarea(attrs={"class": "form-control", "rows": 3}),
     )
     roles = forms.ModelMultipleChoiceField(
         queryset=Role._base_manager.none(),
         required=False,
         label=_("Roles in owning tenant"),
-        widget=forms.SelectMultiple(attrs={'class': 'form-select'}),
+        widget=forms.SelectMultiple(attrs={"class": "form-select"}),
         help_text=_("Owner-owned roles that apply inside the group's own tenant."),
     )
     members = forms.ModelMultipleChoiceField(
         queryset=Membership.objects.none(),
         required=False,
         label=_("Members"),
-        widget=forms.SelectMultiple(attrs={'class': 'form-select'}),
-        help_text=_("Active memberships in the owning tenant can be added. Existing "
-                    "inactive rows remain visible; directory-managed rows must be "
-                    "removed through their identity source."),
+        widget=forms.SelectMultiple(attrs={"class": "form-select"}),
+        help_text=_(
+            "Active memberships in the owning tenant can be added. Existing "
+            "inactive rows remain visible; directory-managed rows must be "
+            "removed through their identity source."
+        ),
     )
     tenant = forms.ModelChoiceField(
         queryset=Tenant._base_manager.none(),
         required=True,
         label=_("Owning tenant"),
-        widget=forms.Select(attrs={'class': 'form-select'}),
+        widget=forms.Select(attrs={"class": "form-select"}),
         help_text=_("The tenant/provider that owns this group and its member identities."),
     )
     is_active = forms.BooleanField(
@@ -681,7 +703,7 @@ class UserGroupForm(forms.ModelForm):
 
     class Meta:
         model = UserGroup
-        fields = ['name', 'description', 'roles', 'members', 'tenant', 'is_active']
+        fields = ["name", "description", "roles", "members", "tenant", "is_active"]
 
     @staticmethod
     def _role_label(role):
@@ -694,7 +716,7 @@ class UserGroupForm(forms.ModelForm):
         if user.email:
             label = f"{label} ({user.email})"
         if not membership.is_active:
-            label = _("%(member)s [inactive]") % {'member': label}
+            label = _("%(member)s [inactive]") % {"member": label}
         return label
 
     def __init__(self, *args, user=None, tenant=None, **kwargs):
@@ -703,18 +725,16 @@ class UserGroupForm(forms.ModelForm):
         # ModelForm applies cleaned values to ``instance`` after ``clean()``.
         # Keep the persisted activation state explicitly so reactivation can be
         # treated as restoring every retained grant, not as a metadata-only edit.
-        self._initial_is_active = (
-            self.instance.is_active if self.instance.pk else None
-        )
+        self._initial_is_active = self.instance.is_active if self.instance.pk else None
         is_superuser = bool(user is None or user.is_superuser)
         self._submitted_owner_changed = False
 
-        tenant_qs = Tenant._base_manager.filter(deleted_at__isnull=True).order_by('name')
+        tenant_qs = Tenant._base_manager.filter(deleted_at__isnull=True).order_by("name")
         if not is_superuser:
             manageable_ids = [
                 candidate.pk
                 for candidate in tenant_qs.filter(pk__in=accessible_tenant_ids(user))
-                if user.has_perm('users.add_usergroup', obj=candidate)
+                if user.has_perm("users.add_usergroup", obj=candidate)
             ]
             tenant_qs = tenant_qs.filter(pk__in=manageable_ids)
 
@@ -722,29 +742,31 @@ class UserGroupForm(forms.ModelForm):
         if self.instance.pk:
             owner = self.instance.tenant
             if self.is_bound:
-                raw_owner = self.data.get('tenant')
-                self._submitted_owner_changed = (
-                    raw_owner not in (None, '') and str(raw_owner) != str(owner.pk)
-                )
-            self.fields['tenant'].queryset = Tenant._base_manager.filter(pk=owner.pk)
-            self.fields['tenant'].initial = owner.pk
-            self.fields['tenant'].disabled = True
+                raw_owner = self.data.get("tenant")
+                self._submitted_owner_changed = raw_owner not in (None, "") and str(raw_owner) != str(owner.pk)
+            self.fields["tenant"].queryset = Tenant._base_manager.filter(pk=owner.pk)
+            self.fields["tenant"].initial = owner.pk
+            self.fields["tenant"].disabled = True
         else:
-            self.fields['tenant'].queryset = tenant_qs
+            self.fields["tenant"].queryset = tenant_qs
             if self.is_bound:
                 try:
-                    owner = tenant_qs.filter(pk=self.data.get('tenant')).first()
+                    owner = tenant_qs.filter(pk=self.data.get("tenant")).first()
                 except (TypeError, ValueError):
                     owner = None
             elif tenant is not None and tenant_qs.filter(pk=tenant.pk).exists():
                 owner = tenant
-                self.fields['tenant'].initial = tenant.pk
+                self.fields["tenant"].initial = tenant.pk
 
         if owner is not None:
-            self.fields['roles'].queryset = Role._base_manager.filter(
-                tenant=owner,
-                deleted_at__isnull=True,
-            ).select_related('tenant').order_by('name')
+            self.fields["roles"].queryset = (
+                Role._base_manager.filter(
+                    tenant=owner,
+                    deleted_at__isnull=True,
+                )
+                .select_related("tenant")
+                .order_by("name")
+            )
             membership_qs = Membership.objects.filter(tenant=owner)
             if self.instance.pk:
                 membership_qs = membership_qs.filter(
@@ -752,83 +774,92 @@ class UserGroupForm(forms.ModelForm):
                 ).distinct()
             else:
                 membership_qs = membership_qs.filter(is_active=True)
-            self.fields['members'].queryset = membership_qs.select_related(
-                'user', 'tenant',
+            self.fields["members"].queryset = membership_qs.select_related(
+                "user",
+                "tenant",
             ).order_by(
-                'user__last_name', 'user__first_name', 'user__username',
+                "user__last_name",
+                "user__first_name",
+                "user__username",
             )
-        self.fields['roles'].label_from_instance = self._role_label
-        self.fields['members'].label_from_instance = self._membership_label
+        self.fields["roles"].label_from_instance = self._role_label
+        self.fields["members"].label_from_instance = self._membership_label
 
         managed_initial = []
         if self.instance.pk:
-            self.fields['roles'].initial = list(
+            self.fields["roles"].initial = list(
                 self.instance.role_grants.filter(
                     scopes__scope_type=RoleGrantScope.SCOPE_OWN,
-                ).values_list('role_id', flat=True)
+                ).values_list("role_id", flat=True)
             )
-            self.fields['members'].initial = list(
-                self.instance.group_memberships.values_list('membership_id', flat=True)
+            self.fields["members"].initial = list(
+                self.instance.group_memberships.values_list("membership_id", flat=True)
             )
             managed_initial = self._managed_initial()
 
         self.managed_formset = self._build_managed_formset(owner, managed_initial)
 
         self.helper = FormHelper(self)
-        self.helper.form_method = 'post'
+        self.helper.form_method = "post"
         self.helper.form_tag = False
         self.helper.disable_csrf = True
         self.helper.layout = Layout(
             Fieldset(
                 str(_("Group details")),
-                'tenant', 'name', 'description', 'is_active',
+                "tenant",
+                "name",
+                "description",
+                "is_active",
             ),
-            Fieldset(str(_("Owning tenant roles")), 'roles'),
-            Fieldset(str(_("Members")), 'members'),
+            Fieldset(str(_("Owning tenant roles")), "roles"),
+            Fieldset(str(_("Members")), "members"),
         )
 
     def _managed_initial(self):
         rows = []
-        grants = self.instance.role_grants.select_related('role').prefetch_related('scopes')
+        grants = self.instance.role_grants.select_related("role").prefetch_related("scopes")
         for grant in grants:
-            scopes = [
-                scope for scope in grant.scopes.all()
-                if scope.scope_type != RoleGrantScope.SCOPE_OWN
-            ]
+            scopes = [scope for scope in grant.scopes.all() if scope.scope_type != RoleGrantScope.SCOPE_OWN]
             explicit_tenant_ids = [
                 scope.tenant_id
                 for scope in scopes
                 if scope.scope_type == RoleGrantScope.SCOPE_TENANT and scope.tenant_id
             ]
             if explicit_tenant_ids:
-                rows.append({
-                    'id': grant.pk,
-                    'role': grant.role_id,
-                    'managed_scope': GroupManagedRoleGrantForm.SCOPE_EXPLICIT,
-                    'assigned_tenants': explicit_tenant_ids,
-                })
+                rows.append(
+                    {
+                        "id": grant.pk,
+                        "role": grant.role_id,
+                        "managed_scope": GroupManagedRoleGrantForm.SCOPE_EXPLICIT,
+                        "assigned_tenants": explicit_tenant_ids,
+                    }
+                )
             for scope in scopes:
                 if scope.scope_type == RoleGrantScope.SCOPE_TENANT_GROUP:
-                    rows.append({
-                        'id': grant.pk,
-                        'role': grant.role_id,
-                        'managed_scope': RoleGrantScope.SCOPE_TENANT_GROUP,
-                        'scope_group': scope.tenant_group_id,
-                    })
+                    rows.append(
+                        {
+                            "id": grant.pk,
+                            "role": grant.role_id,
+                            "managed_scope": RoleGrantScope.SCOPE_TENANT_GROUP,
+                            "scope_group": scope.tenant_group_id,
+                        }
+                    )
                 elif scope.scope_type == RoleGrantScope.SCOPE_ALL_MANAGED:
-                    rows.append({
-                        'id': grant.pk,
-                        'role': grant.role_id,
-                        'managed_scope': RoleGrantScope.SCOPE_ALL_MANAGED,
-                    })
+                    rows.append(
+                        {
+                            "id": grant.pk,
+                            "role": grant.role_id,
+                            "managed_scope": RoleGrantScope.SCOPE_ALL_MANAGED,
+                        }
+                    )
         return rows
 
     def _build_managed_formset(self, owner, initial):
         if owner is None or not owner.is_provider:
             return None
         form_kwargs = {
-            'owner': owner,
-            'requesting_user': self._requesting_user,
+            "owner": owner,
+            "requesting_user": self._requesting_user,
         }
         if self.is_bound:
             return GroupManagedRoleGrantFormSet(
@@ -852,44 +883,41 @@ class UserGroupForm(forms.ModelForm):
 
     def clean(self):
         cleaned_data = super().clean()
-        owner = cleaned_data.get('tenant')
+        owner = cleaned_data.get("tenant")
 
         if owner is None:
-            self.add_error('tenant', _('Every user group must have an owning tenant.'))
+            self.add_error("tenant", _("Every user group must have an owning tenant."))
             return cleaned_data
 
-        if self.instance.pk and (
-            owner.pk != self.instance.tenant_id or self._submitted_owner_changed
-        ):
-            self.add_error('tenant', _('A user group owner cannot be changed.'))
+        if self.instance.pk and (owner.pk != self.instance.tenant_id or self._submitted_owner_changed):
+            self.add_error("tenant", _("A user group owner cannot be changed."))
 
-        roles = list(cleaned_data.get('roles') or [])
+        roles = list(cleaned_data.get("roles") or [])
         if any(role.tenant_id != owner.pk for role in roles):
             self.add_error(
-                'roles',
-                _('A group may carry only roles owned by its owning tenant.'),
+                "roles",
+                _("A group may carry only roles owned by its owning tenant."),
             )
 
-        memberships = list(cleaned_data.get('members') or [])
+        memberships = list(cleaned_data.get("members") or [])
         existing_member_ids = set(
-            self.instance.group_memberships.values_list('membership_id', flat=True)
-            if self.instance.pk else []
+            self.instance.group_memberships.values_list("membership_id", flat=True) if self.instance.pk else []
         )
         if any(
-            membership.tenant_id != owner.pk
-            or (not membership.is_active and membership.pk not in existing_member_ids)
+            membership.tenant_id != owner.pk or (not membership.is_active and membership.pk not in existing_member_ids)
             for membership in memberships
         ):
             self.add_error(
-                'members',
-                _('Every group member must be an active Membership in the owning tenant.'),
+                "members",
+                _("Every group member must be an active Membership in the owning tenant."),
             )
 
         existing_own_role_ids = set(
             self.instance.role_grants.filter(
                 scopes__scope_type=RoleGrantScope.SCOPE_OWN,
-            ).values_list('role_id', flat=True)
-            if self.instance.pk else []
+            ).values_list("role_id", flat=True)
+            if self.instance.pk
+            else []
         )
         selected_role_ids = {role.pk for role in roles}
         selected_member_ids = {membership.pk for membership in memberships}
@@ -899,11 +927,7 @@ class UserGroupForm(forms.ModelForm):
         # every existing member, so all selected own-scope roles must pass the
         # same escalation guard even though their grant rows already existed.
         role_ids_to_validate = selected_role_ids - existing_own_role_ids
-        reactivating = bool(
-            self.instance.pk
-            and self._initial_is_active is False
-            and cleaned_data.get('is_active')
-        )
+        reactivating = bool(self.instance.pk and self._initial_is_active is False and cleaned_data.get("is_active"))
         if reactivating or selected_member_ids - existing_member_ids:
             role_ids_to_validate = selected_role_ids
 
@@ -945,44 +969,39 @@ class UserGroupForm(forms.ModelForm):
             self._sync_manual_memberships(group)
 
     def _sync_role_grants(self, group):
-        own_roles = list(self.cleaned_data.get('roles') or [])
+        own_roles = list(self.cleaned_data.get("roles") or [])
         roles_by_id = {role.pk: role for role in own_roles}
-        desired_scopes = {
-            role.pk: {(RoleGrantScope.SCOPE_OWN, None, None)}
-            for role in own_roles
-        }
+        desired_scopes = {role.pk: {(RoleGrantScope.SCOPE_OWN, None, None)} for role in own_roles}
 
         if self.managed_formset is not None:
             for form in self.managed_formset.forms:
-                if not hasattr(form, 'cleaned_data'):
+                if not hasattr(form, "cleaned_data"):
                     continue
                 cleaned = form.cleaned_data
-                if cleaned.get('DELETE') or not cleaned.get('role'):
+                if cleaned.get("DELETE") or not cleaned.get("role"):
                     continue
-                role = cleaned['role']
+                role = cleaned["role"]
                 roles_by_id[role.pk] = role
                 role_scopes = desired_scopes.setdefault(role.pk, set())
-                scope = (
-                    cleaned.get('managed_scope')
-                    or GroupManagedRoleGrantForm.SCOPE_EXPLICIT
-                )
+                scope = cleaned.get("managed_scope") or GroupManagedRoleGrantForm.SCOPE_EXPLICIT
                 if scope == RoleGrantScope.SCOPE_ALL_MANAGED:
                     role_scopes.add((RoleGrantScope.SCOPE_ALL_MANAGED, None, None))
                 elif scope == RoleGrantScope.SCOPE_TENANT_GROUP:
-                    role_scopes.add((
-                        RoleGrantScope.SCOPE_TENANT_GROUP,
-                        None,
-                        cleaned['scope_group'].pk,
-                    ))
+                    role_scopes.add(
+                        (
+                            RoleGrantScope.SCOPE_TENANT_GROUP,
+                            None,
+                            cleaned["scope_group"].pk,
+                        )
+                    )
                 else:
                     role_scopes.update(
                         (RoleGrantScope.SCOPE_TENANT, tenant.pk, None)
-                        for tenant in cleaned.get('assigned_tenants') or []
+                        for tenant in cleaned.get("assigned_tenants") or []
                     )
 
         existing = {
-            grant.role_id: grant
-            for grant in group.role_grants.select_related('role').prefetch_related('scopes')
+            grant.role_id: grant for grant in group.role_grants.select_related("role").prefetch_related("scopes")
         }
         for role_id, grant in existing.items():
             if role_id not in desired_scopes:
@@ -999,8 +1018,7 @@ class UserGroupForm(forms.ModelForm):
                 grant.save()
 
             existing_scopes = {
-                (scope.scope_type, scope.tenant_id, scope.tenant_group_id): scope
-                for scope in grant.scopes.all()
+                (scope.scope_type, scope.tenant_id, scope.tenant_group_id): scope for scope in grant.scopes.all()
             }
             for key, scope in existing_scopes.items():
                 if key not in scope_keys:
@@ -1016,17 +1034,11 @@ class UserGroupForm(forms.ModelForm):
                 )
 
     def _sync_manual_memberships(self, group):
-        memberships = list(self.cleaned_data.get('members') or [])
+        memberships = list(self.cleaned_data.get("members") or [])
         selected_ids = {membership.pk for membership in memberships}
-        existing = {
-            row.membership_id: row
-            for row in group.group_memberships.select_related('membership')
-        }
+        existing = {row.membership_id: row for row in group.group_memberships.select_related("membership")}
         for membership_id, row in existing.items():
-            if (
-                membership_id not in selected_ids
-                and row.source == GroupMembership.SOURCE_MANUAL
-            ):
+            if membership_id not in selected_ids and row.source == GroupMembership.SOURCE_MANUAL:
                 row.delete()
         for membership in memberships:
             if membership.pk in existing:
@@ -1045,19 +1057,26 @@ class UserGroupFilterForm(FilterForm):
 
 class UserGroupAssignUsersForm(forms.Form):
     """Pick active members of the group's owning tenant."""
+
     memberships = forms.ModelMultipleChoiceField(
         queryset=Membership.objects.none(),
         required=True,
         label=_("Tenant memberships"),
-        widget=forms.SelectMultiple(attrs={'class': 'form-select'}),
+        widget=forms.SelectMultiple(attrs={"class": "form-select"}),
     )
 
     def __init__(self, *args, group, **kwargs):
         super().__init__(*args, **kwargs)
-        self.fields['memberships'].queryset = Membership.objects.filter(
-            tenant_id=group.tenant_id,
-            is_active=True,
-        ).select_related('user', 'tenant').order_by(
-            'user__last_name', 'user__first_name', 'user__username',
+        self.fields["memberships"].queryset = (
+            Membership.objects.filter(
+                tenant_id=group.tenant_id,
+                is_active=True,
+            )
+            .select_related("user", "tenant")
+            .order_by(
+                "user__last_name",
+                "user__first_name",
+                "user__username",
+            )
         )
-        self.fields['memberships'].label_from_instance = UserGroupForm._membership_label
+        self.fields["memberships"].label_from_instance = UserGroupForm._membership_label

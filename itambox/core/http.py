@@ -14,9 +14,11 @@ header — the server sees a normal request; only the socket target is fixed.
 ``request_pinned`` is the single seam through which all tenant-configured
 outbound traffic must flow (and the single patch target for tests of callers).
 """
+
+from urllib.parse import urlsplit, urlunsplit
+
 import requests
 from requests.adapters import HTTPAdapter
-from urllib.parse import urlsplit, urlunsplit
 
 from core.validators import validate_external_url
 
@@ -30,15 +32,15 @@ def webhook_target_kind(url):
     ``https://hooks.slack.com.evil.example`` from being misclassified.
     """
     parts = urlsplit(url)
-    host = (parts.hostname or '').lower()
-    if host == 'hooks.slack.com':
-        return 'slack'
+    host = (parts.hostname or "").lower()
+    if host == "hooks.slack.com":
+        return "slack"
     # Teams incoming webhooks live on a per-tenant <tenant>.webhook.office.com
     # host; legacy connectors use outlook.office.com/webhook.
-    if host == 'webhook.office.com' or host.endswith('.webhook.office.com'):
-        return 'teams'
-    if host == 'outlook.office.com' and parts.path.startswith('/webhook'):
-        return 'teams'
+    if host == "webhook.office.com" or host.endswith(".webhook.office.com"):
+        return "teams"
+    if host == "outlook.office.com" and parts.path.startswith("/webhook"):
+        return "teams"
     return None
 
 
@@ -53,7 +55,7 @@ class _PinnedSNIAdapter(HTTPAdapter):
         # urllib3 uses server_hostname both for SNI and as the certificate
         # verification target, so cert checks still run against the real
         # hostname even though the URL now carries the pinned IP.
-        pool_kwargs['server_hostname'] = self._server_hostname
+        pool_kwargs["server_hostname"] = self._server_hostname
         super().init_poolmanager(connections, maxsize, block, **pool_kwargs)
 
 
@@ -70,19 +72,25 @@ def request_pinned(method, url, *, headers=None, json=None, data=None, timeout=1
     host = parts.hostname
 
     pinned = resolved[0]
-    ip_text = f'[{pinned}]' if pinned.version == 6 else str(pinned)
-    port_suffix = f':{parts.port}' if parts.port else ''
-    pinned_url = urlunsplit((
-        parts.scheme, ip_text + port_suffix, parts.path, parts.query, parts.fragment,
-    ))
+    ip_text = f"[{pinned}]" if pinned.version == 6 else str(pinned)
+    port_suffix = f":{parts.port}" if parts.port else ""
+    pinned_url = urlunsplit(
+        (
+            parts.scheme,
+            ip_text + port_suffix,
+            parts.path,
+            parts.query,
+            parts.fragment,
+        )
+    )
 
     req_headers = dict(headers or {})
-    req_headers['Host'] = host + port_suffix
+    req_headers["Host"] = host + port_suffix
 
     session = requests.Session()
     try:
-        if parts.scheme == 'https':
-            session.mount('https://', _PinnedSNIAdapter(server_hostname=host))
+        if parts.scheme == "https":
+            session.mount("https://", _PinnedSNIAdapter(server_hostname=host))
         return session.request(
             method=method,
             url=pinned_url,

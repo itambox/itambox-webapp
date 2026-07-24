@@ -1,10 +1,12 @@
 from django.apps import AppConfig
 
+
 class PluginConfig(AppConfig):
     """
     Base configuration class for ITAMbox plugins.
     Plugins should subclass this in their __init__.py and set config = MyPluginConfig.
     """
+
     # Default settings for the plugin
     default_settings = {}
 
@@ -18,9 +20,9 @@ class PluginConfig(AppConfig):
     django_apps = []
 
     # Plugin metadata
-    version = ''
-    author = ''
-    author_email = ''
+    version = ""
+    author = ""
+    author_email = ""
     base_url = None
     min_version = None
     max_version = None

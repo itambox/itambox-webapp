@@ -42,9 +42,9 @@ from django.contrib.contenttypes.models import ContentType
 from django.test import TestCase, override_settings
 from django.urls import reverse
 
-from assets.models import Asset, Manufacturer, AssetRole, StatusLabel
+from assets.models import Asset, AssetRole, Manufacturer, StatusLabel
 from core.tests.mixins import TenantTestMixin
-from organization.models import Tenant, Membership, Role
+from organization.models import Membership, Role, Tenant
 
 User = get_user_model()
 
@@ -53,19 +53,20 @@ User = get_user_model()
 # Helpers
 # ---------------------------------------------------------------------------
 
+
 def _make_superuser(username):
     return User.objects.create_superuser(
         username=username,
-        email=f'{username}@example.com',
-        password='testpassword',
+        email=f"{username}@example.com",
+        password="testpassword",
     )
 
 
 def _make_regular_user(username):
     return User.objects.create_user(
         username=username,
-        email=f'{username}@example.com',
-        password='testpassword',
+        email=f"{username}@example.com",
+        password="testpassword",
     )
 
 
@@ -73,40 +74,35 @@ def _make_regular_user(username):
 # 1. ObjectListView
 # ---------------------------------------------------------------------------
 
+
 class ObjectListViewTests(TestCase):
     """Tests for ObjectListView via ManufacturerListView."""
 
     def setUp(self):
-        self.user = _make_superuser('listview-gcbv')
+        self.user = _make_superuser("listview-gcbv")
         self.client.force_login(self.user)
 
         # Create two manufacturers; '-gcbv' suffix prevents slug collisions
-        self.mfr1 = Manufacturer.objects.create(
-            name='Alpha Corp GCBV', slug='alpha-corp-gcbv'
-        )
-        self.mfr2 = Manufacturer.objects.create(
-            name='Beta Corp GCBV', slug='beta-corp-gcbv'
-        )
+        self.mfr1 = Manufacturer.objects.create(name="Alpha Corp GCBV", slug="alpha-corp-gcbv")
+        self.mfr2 = Manufacturer.objects.create(name="Beta Corp GCBV", slug="beta-corp-gcbv")
 
     def test_list_get_200(self):
         """GET /manufacturers/ returns 200."""
-        response = self.client.get(reverse('assets:manufacturer_list'))
+        response = self.client.get(reverse("assets:manufacturer_list"))
         self.assertEqual(response.status_code, 200)
 
     def test_list_shows_created_rows(self):
         """Both manufacturers appear in the response body."""
-        response = self.client.get(reverse('assets:manufacturer_list'))
-        self.assertContains(response, 'Alpha Corp GCBV')
-        self.assertContains(response, 'Beta Corp GCBV')
+        response = self.client.get(reverse("assets:manufacturer_list"))
+        self.assertContains(response, "Alpha Corp GCBV")
+        self.assertContains(response, "Beta Corp GCBV")
 
     def test_filterset_narrows_results(self):
         """Passing ?q=Alpha returns only Alpha; Beta is absent."""
-        response = self.client.get(
-            reverse('assets:manufacturer_list'), {'q': 'Alpha'}
-        )
+        response = self.client.get(reverse("assets:manufacturer_list"), {"q": "Alpha"})
         self.assertEqual(response.status_code, 200)
-        self.assertContains(response, 'Alpha Corp GCBV')
-        self.assertNotContains(response, 'Beta Corp GCBV')
+        self.assertContains(response, "Alpha Corp GCBV")
+        self.assertNotContains(response, "Beta Corp GCBV")
 
     def test_htmx_partial_returns_partial_template(self):
         """An HTMX non-boosted request receives the content partial, not the
@@ -114,8 +110,8 @@ class ObjectListViewTests(TestCase):
         # Send HX-Request without HX-Boosted so BaseHTMXView.is_htmx_partial()
         # returns True and renders content_partial_name instead of the full page.
         response = self.client.get(
-            reverse('assets:manufacturer_list'),
-            HTTP_HX_REQUEST='true',
+            reverse("assets:manufacturer_list"),
+            HTTP_HX_REQUEST="true",
         )
         self.assertEqual(response.status_code, 200)
         # The partial wraps table content without the full shell; the full page
@@ -123,70 +119,59 @@ class ObjectListViewTests(TestCase):
         # the templates_used list will contain the partial name but NOT the
         # full-page shell name.
         template_names = [t.name for t in response.templates]
-        self.assertIn('htmx/list_page_wrapper.html', template_names)
-        self.assertNotIn('base.html', template_names)
+        self.assertIn("htmx/list_page_wrapper.html", template_names)
+        self.assertNotIn("base.html", template_names)
 
     def test_normal_request_uses_full_template(self):
         """A non-HTMX request uses the full page template (has 'base.html' or
         the object_list template)."""
-        response = self.client.get(reverse('assets:manufacturer_list'))
+        response = self.client.get(reverse("assets:manufacturer_list"))
         template_names = [t.name for t in response.templates]
         # Full-page render: the list template is used (not just the partial)
-        any_list_template = any(
-            'list' in name or 'base' in name for name in template_names
-        )
+        any_list_template = any("list" in name or "base" in name for name in template_names)
         self.assertTrue(any_list_template)
-        self.assertNotIn('htmx/list_page_wrapper.html', template_names)
+        self.assertNotIn("htmx/list_page_wrapper.html", template_names)
 
     def test_table_in_context(self):
         """The context always contains a 'table' key."""
-        response = self.client.get(reverse('assets:manufacturer_list'))
-        self.assertIn('table', response.context)
+        response = self.client.get(reverse("assets:manufacturer_list"))
+        self.assertIn("table", response.context)
 
 
 # ---------------------------------------------------------------------------
 # 2. ObjectDetailView
 # ---------------------------------------------------------------------------
 
+
 class ObjectDetailViewTests(TestCase):
     """Tests for ObjectDetailView via ManufacturerDetailView."""
 
     def setUp(self):
-        self.user = _make_superuser('detailview-gcbv')
+        self.user = _make_superuser("detailview-gcbv")
         self.client.force_login(self.user)
 
-        self.mfr = Manufacturer.objects.create(
-            name='Detail Mfr GCBV', slug='detail-mfr-gcbv'
-        )
+        self.mfr = Manufacturer.objects.create(name="Detail Mfr GCBV", slug="detail-mfr-gcbv")
 
     def test_detail_get_200(self):
         """GET /manufacturers/<pk>/ returns 200."""
-        response = self.client.get(
-            reverse('assets:manufacturer_detail', kwargs={'pk': self.mfr.pk})
-        )
+        response = self.client.get(reverse("assets:manufacturer_detail", kwargs={"pk": self.mfr.pk}))
         self.assertEqual(response.status_code, 200)
 
     def test_detail_renders_object_name(self):
         """The manufacturer name appears in the rendered output."""
-        response = self.client.get(
-            reverse('assets:manufacturer_detail', kwargs={'pk': self.mfr.pk})
-        )
-        self.assertContains(response, 'Detail Mfr GCBV')
+        response = self.client.get(reverse("assets:manufacturer_detail", kwargs={"pk": self.mfr.pk}))
+        self.assertContains(response, "Detail Mfr GCBV")
 
     def test_related_objects_list_present_in_context(self):
         """The 'related_objects_list' key is always present in context after the
         view builds it (may be an empty list when there are no reverse-related
         objects with counts > 0)."""
-        response = self.client.get(
-            reverse('assets:manufacturer_detail', kwargs={'pk': self.mfr.pk})
-        )
-        self.assertIn('related_objects_list', response.context)
+        response = self.client.get(reverse("assets:manufacturer_detail", kwargs={"pk": self.mfr.pk}))
+        self.assertIn("related_objects_list", response.context)
 
     def test_detail_unknown_pk_returns_404(self):
         """An unknown pk yields 404."""
-        response = self.client.get(
-            reverse('assets:manufacturer_detail', kwargs={'pk': 999999})
-        )
+        response = self.client.get(reverse("assets:manufacturer_detail", kwargs={"pk": 999999}))
         self.assertEqual(response.status_code, 404)
 
 
@@ -194,30 +179,27 @@ class ObjectDetailViewTests(TestCase):
 # 3. ObjectEditView
 # ---------------------------------------------------------------------------
 
+
 class ObjectEditViewTests(TestCase):
     """Tests for ObjectEditView via ManufacturerEditView."""
 
     def setUp(self):
-        self.user = _make_superuser('editview-gcbv')
+        self.user = _make_superuser("editview-gcbv")
         self.client.force_login(self.user)
 
-        self.mfr = Manufacturer.objects.create(
-            name='Edit Mfr GCBV', slug='edit-mfr-gcbv'
-        )
+        self.mfr = Manufacturer.objects.create(name="Edit Mfr GCBV", slug="edit-mfr-gcbv")
 
     # --- GET ---
 
     def test_create_form_get_200(self):
         """GET /manufacturers/add/ returns 200 with a form."""
-        response = self.client.get(reverse('assets:manufacturer_create'))
+        response = self.client.get(reverse("assets:manufacturer_create"))
         self.assertEqual(response.status_code, 200)
-        self.assertIn('form', response.context)
+        self.assertIn("form", response.context)
 
     def test_edit_form_get_200(self):
         """GET /manufacturers/<pk>/edit/ returns 200."""
-        response = self.client.get(
-            reverse('assets:manufacturer_update', kwargs={'pk': self.mfr.pk})
-        )
+        response = self.client.get(reverse("assets:manufacturer_update", kwargs={"pk": self.mfr.pk}))
         self.assertEqual(response.status_code, 200)
 
     # --- POST create ---
@@ -226,33 +208,33 @@ class ObjectEditViewTests(TestCase):
         """POSTing the create form with valid data creates a new Manufacturer."""
         count_before = Manufacturer.objects.count()
         response = self.client.post(
-            reverse('assets:manufacturer_create'),
+            reverse("assets:manufacturer_create"),
             data={
-                'name': 'New Mfr GCBV',
-                'slug': 'new-mfr-gcbv',
-                'description': '',
+                "name": "New Mfr GCBV",
+                "slug": "new-mfr-gcbv",
+                "description": "",
             },
         )
         # non-HTMX success → redirect (302)
         self.assertEqual(response.status_code, 302)
         self.assertEqual(Manufacturer.objects.count(), count_before + 1)
-        self.assertTrue(Manufacturer.objects.filter(slug='new-mfr-gcbv').exists())
+        self.assertTrue(Manufacturer.objects.filter(slug="new-mfr-gcbv").exists())
 
     # --- POST update ---
 
     def test_post_update_modifies_object(self):
         """POSTing the edit form updates an existing Manufacturer."""
         response = self.client.post(
-            reverse('assets:manufacturer_update', kwargs={'pk': self.mfr.pk}),
+            reverse("assets:manufacturer_update", kwargs={"pk": self.mfr.pk}),
             data={
-                'name': 'Edit Mfr GCBV Updated',
-                'slug': 'edit-mfr-gcbv',
-                'description': 'Updated description',
+                "name": "Edit Mfr GCBV Updated",
+                "slug": "edit-mfr-gcbv",
+                "description": "Updated description",
             },
         )
         self.assertEqual(response.status_code, 302)
         self.mfr.refresh_from_db()
-        self.assertEqual(self.mfr.name, 'Edit Mfr GCBV Updated')
+        self.assertEqual(self.mfr.name, "Edit Mfr GCBV Updated")
 
     # --- HTMX POST → 204 with HX-Trigger ---
 
@@ -260,13 +242,13 @@ class ObjectEditViewTests(TestCase):
         """ObjectEditView form_valid always returns an HttpResponseRedirect (302
         regardless of HTMX) — it is NOT an HtmxActionMixin service view."""
         response = self.client.post(
-            reverse('assets:manufacturer_update', kwargs={'pk': self.mfr.pk}),
+            reverse("assets:manufacturer_update", kwargs={"pk": self.mfr.pk}),
             data={
-                'name': 'HTMX Edit GCBV',
-                'slug': 'edit-mfr-gcbv',
-                'description': '',
+                "name": "HTMX Edit GCBV",
+                "slug": "edit-mfr-gcbv",
+                "description": "",
             },
-            HTTP_HX_REQUEST='true',
+            HTTP_HX_REQUEST="true",
         )
         # ObjectEditView is a standard UpdateView; HTMX callers still get a
         # redirect (the client follows it or HTMX intercepts).
@@ -277,11 +259,11 @@ class ObjectEditViewTests(TestCase):
     def test_non_htmx_post_redirects(self):
         """A non-HTMX create POST redirects (302) on success."""
         response = self.client.post(
-            reverse('assets:manufacturer_create'),
+            reverse("assets:manufacturer_create"),
             data={
-                'name': 'Redirect Test GCBV',
-                'slug': 'redirect-test-gcbv',
-                'description': '',
+                "name": "Redirect Test GCBV",
+                "slug": "redirect-test-gcbv",
+                "description": "",
             },
         )
         self.assertEqual(response.status_code, 302)
@@ -291,6 +273,7 @@ class ObjectEditViewTests(TestCase):
 # 4. ObjectDeleteView
 # ---------------------------------------------------------------------------
 
+
 class ObjectDeleteViewTests(TestCase):
     """Tests for ObjectDeleteView via ManufacturerDeleteView.
 
@@ -299,26 +282,20 @@ class ObjectDeleteViewTests(TestCase):
     """
 
     def setUp(self):
-        self.user = _make_superuser('deleteview-gcbv')
+        self.user = _make_superuser("deleteview-gcbv")
         self.client.force_login(self.user)
 
-        self.mfr = Manufacturer.objects.create(
-            name='Delete Mfr GCBV', slug='delete-mfr-gcbv'
-        )
+        self.mfr = Manufacturer.objects.create(name="Delete Mfr GCBV", slug="delete-mfr-gcbv")
 
     def test_delete_get_200(self):
         """GET the delete confirmation page returns 200."""
-        response = self.client.get(
-            reverse('assets:manufacturer_delete', kwargs={'pk': self.mfr.pk})
-        )
+        response = self.client.get(reverse("assets:manufacturer_delete", kwargs={"pk": self.mfr.pk}))
         self.assertEqual(response.status_code, 200)
 
     def test_post_delete_soft_deletes(self):
         """POSTing the delete view sets deleted_at (soft delete) so the object
         disappears from the default manager but exists in all_objects."""
-        self.client.post(
-            reverse('assets:manufacturer_delete', kwargs={'pk': self.mfr.pk})
-        )
+        self.client.post(reverse("assets:manufacturer_delete", kwargs={"pk": self.mfr.pk}))
         # Hidden from default manager
         self.assertFalse(Manufacturer.objects.filter(pk=self.mfr.pk).exists())
         # Still in all_objects
@@ -327,9 +304,7 @@ class ObjectDeleteViewTests(TestCase):
 
     def test_post_delete_redirects(self):
         """A non-HTMX delete POST redirects on success."""
-        response = self.client.post(
-            reverse('assets:manufacturer_delete', kwargs={'pk': self.mfr.pk})
-        )
+        response = self.client.post(reverse("assets:manufacturer_delete", kwargs={"pk": self.mfr.pk}))
         self.assertEqual(response.status_code, 302)
 
 
@@ -337,17 +312,16 @@ class ObjectDeleteViewTests(TestCase):
 # 5. ObjectRestoreView and ObjectPurgeView
 # ---------------------------------------------------------------------------
 
+
 class RestoreAndPurgeTests(TestCase):
     """Tests for ObjectRestoreView / ObjectPurgeView (core URL names)."""
 
     def setUp(self):
-        self.user = _make_superuser('restorepurge-gcbv')
+        self.user = _make_superuser("restorepurge-gcbv")
         self.client.force_login(self.user)
 
         # Create and soft-delete a manufacturer directly
-        self.mfr = Manufacturer.objects.create(
-            name='Restore Mfr GCBV', slug='restore-mfr-gcbv'
-        )
+        self.mfr = Manufacturer.objects.create(name="Restore Mfr GCBV", slug="restore-mfr-gcbv")
         self.mfr.delete()  # soft-delete
         self.mfr.refresh_from_db()
         self.assertIsNotNone(self.mfr.deleted_at)
@@ -357,8 +331,8 @@ class RestoreAndPurgeTests(TestCase):
     def test_restore_makes_object_visible_again(self):
         """POST to object_restore brings the soft-deleted object back."""
         url = reverse(
-            'object_restore',
-            kwargs={'content_type_id': self.ct.pk, 'object_id': self.mfr.pk},
+            "object_restore",
+            kwargs={"content_type_id": self.ct.pk, "object_id": self.mfr.pk},
         )
         response = self.client.post(url)
         # Non-HTMX → redirect to list?deleted=true
@@ -372,15 +346,13 @@ class RestoreAndPurgeTests(TestCase):
     def test_purge_hard_deletes_object(self):
         """POST to object_purge permanently removes the object from all managers."""
         # Create a fresh soft-deleted manufacturer to avoid interference
-        mfr2 = Manufacturer.objects.create(
-            name='Purge Mfr GCBV', slug='purge-mfr-gcbv'
-        )
+        mfr2 = Manufacturer.objects.create(name="Purge Mfr GCBV", slug="purge-mfr-gcbv")
         mfr2.delete()
         pk = mfr2.pk
 
         url = reverse(
-            'object_purge',
-            kwargs={'content_type_id': self.ct.pk, 'object_id': pk},
+            "object_purge",
+            kwargs={"content_type_id": self.ct.pk, "object_id": pk},
         )
         response = self.client.post(url)
         self.assertIn(response.status_code, [302, 204])
@@ -393,6 +365,7 @@ class RestoreAndPurgeTests(TestCase):
 # 6. ObjectBulkEditView / ObjectBulkDeleteView
 # ---------------------------------------------------------------------------
 
+
 class BulkViewTests(TenantTestMixin, TestCase):
     """Tests for ObjectBulkEditView and ObjectBulkDeleteView via the Asset bulk
     views.  Asset is tenant-scoped so we use TenantTestMixin to wire up the
@@ -401,8 +374,8 @@ class BulkViewTests(TenantTestMixin, TestCase):
     def setUp(self):
         # Set up a full tenant + superuser context
         self.setup_tenant_context(
-            name='BulkTest Tenant GCBV',
-            slug='bulktest-tenant-gcbv',
+            name="BulkTest Tenant GCBV",
+            slug="bulktest-tenant-gcbv",
         )
 
         # Log in as tenant_admin (superuser) and set active tenant in session
@@ -410,36 +383,36 @@ class BulkViewTests(TenantTestMixin, TestCase):
 
         # Status label needed for Asset creation
         self.status, _ = StatusLabel.objects.get_or_create(
-            slug='available',
+            slug="available",
             defaults={
-                'name': 'Available',
-                'type': 'deployable',
-                'color': '28a745',
+                "name": "Available",
+                "type": "deployable",
+                "color": "28a745",
             },
         )
 
         # Create two assets in the tenant
         self.asset1 = Asset.objects.create(
-            name='Bulk Asset 1 GCBV',
-            asset_tag='BULK-001-GCBV',
+            name="Bulk Asset 1 GCBV",
+            asset_tag="BULK-001-GCBV",
             tenant=self.tenant,
             status=self.status,
         )
         self.asset2 = Asset.objects.create(
-            name='Bulk Asset 2 GCBV',
-            asset_tag='BULK-002-GCBV',
+            name="Bulk Asset 2 GCBV",
+            asset_tag="BULK-002-GCBV",
             tenant=self.tenant,
             status=self.status,
         )
 
     def test_bulk_edit_get_shows_confirmation_form(self):
         """GET to bulk edit with pk params renders the edit form (200)."""
-        url = reverse('assets:asset_bulk_edit')
+        url = reverse("assets:asset_bulk_edit")
         response = self.client.post(
             url,
             data={
-                'pk': [str(self.asset1.pk), str(self.asset2.pk)],
-                'model_name': 'assets.asset',
+                "pk": [str(self.asset1.pk), str(self.asset2.pk)],
+                "model_name": "assets.asset",
             },
         )
         # First POST without _apply shows the form
@@ -449,19 +422,19 @@ class BulkViewTests(TenantTestMixin, TestCase):
         """POSTing with _apply and a selected field updates all selected pks."""
         # Create a new role to bulk-assign
         role, _ = AssetRole.objects.get_or_create(
-            slug='bulk-role-gcbv',
-            defaults={'name': 'Bulk Role GCBV'},
+            slug="bulk-role-gcbv",
+            defaults={"name": "Bulk Role GCBV"},
         )
 
-        url = reverse('assets:asset_bulk_edit')
+        url = reverse("assets:asset_bulk_edit")
         response = self.client.post(
             url,
             data={
-                'pk': [str(self.asset1.pk), str(self.asset2.pk)],
-                '_apply': '1',
-                '_selected_fields': ['asset_role'],
-                'asset_role': str(role.pk),
-                'model_name': 'assets.asset',
+                "pk": [str(self.asset1.pk), str(self.asset2.pk)],
+                "_apply": "1",
+                "_selected_fields": ["asset_role"],
+                "asset_role": str(role.pk),
+                "model_name": "assets.asset",
             },
         )
         # Should redirect after successful bulk edit
@@ -474,25 +447,25 @@ class BulkViewTests(TenantTestMixin, TestCase):
 
     def test_bulk_delete_shows_confirmation(self):
         """POSTing without _confirm renders the confirmation page (200)."""
-        url = reverse('assets:asset_bulk_delete')
+        url = reverse("assets:asset_bulk_delete")
         response = self.client.post(
             url,
             data={
-                'pk': [str(self.asset1.pk)],
-                'model_name': 'assets.asset',
+                "pk": [str(self.asset1.pk)],
+                "model_name": "assets.asset",
             },
         )
         self.assertEqual(response.status_code, 200)
 
     def test_bulk_delete_confirm_soft_deletes(self):
         """POSTing with _confirm soft-deletes all selected assets."""
-        url = reverse('assets:asset_bulk_delete')
+        url = reverse("assets:asset_bulk_delete")
         response = self.client.post(
             url,
             data={
-                'pk': [str(self.asset1.pk), str(self.asset2.pk)],
-                '_confirm': '1',
-                'model_name': 'assets.asset',
+                "pk": [str(self.asset1.pk), str(self.asset2.pk)],
+                "_confirm": "1",
+                "model_name": "assets.asset",
             },
         )
         self.assertEqual(response.status_code, 302)
@@ -502,17 +475,14 @@ class BulkViewTests(TenantTestMixin, TestCase):
         self.assertFalse(Asset.objects.filter(pk=self.asset2.pk).exists())
 
         # Still in all_objects with deleted_at set
-        self.assertTrue(
-            Asset.all_objects.filter(pk=self.asset1.pk, deleted_at__isnull=False).exists()
-        )
-        self.assertTrue(
-            Asset.all_objects.filter(pk=self.asset2.pk, deleted_at__isnull=False).exists()
-        )
+        self.assertTrue(Asset.all_objects.filter(pk=self.asset1.pk, deleted_at__isnull=False).exists())
+        self.assertTrue(Asset.all_objects.filter(pk=self.asset2.pk, deleted_at__isnull=False).exists())
 
 
 # ---------------------------------------------------------------------------
 # 7. Permission enforcement
 # ---------------------------------------------------------------------------
+
 
 class PermissionEnforcementTests(TenantTestMixin, TestCase):
     """A logged-in user WITHOUT the required permission gets 403 (or a redirect
@@ -521,48 +491,42 @@ class PermissionEnforcementTests(TenantTestMixin, TestCase):
     def setUp(self):
         # Regular tenant with no permissions
         self.setup_tenant_context(
-            name='Perm Test Tenant GCBV',
-            slug='perm-test-tenant-gcbv',
+            name="Perm Test Tenant GCBV",
+            slug="perm-test-tenant-gcbv",
             permissions=[],  # empty: no perms granted
         )
         self.client_login_to_tenant(self.tenant_user, self.tenant)
 
-        self.mfr = Manufacturer.objects.create(
-            name='Perm Mfr GCBV', slug='perm-mfr-gcbv'
-        )
+        self.mfr = Manufacturer.objects.create(name="Perm Mfr GCBV", slug="perm-mfr-gcbv")
 
     def test_no_view_perm_blocks_list(self):
         """A user without assets.view_manufacturer cannot list manufacturers."""
-        response = self.client.get(reverse('assets:manufacturer_list'))
+        response = self.client.get(reverse("assets:manufacturer_list"))
         # PermissionRequiredMixin redirects anonymous users and 403-s authenticated
         # users who lack the perm (Django raises PermissionDenied -> 403).
         self.assertIn(response.status_code, [302, 403])
 
     def test_no_view_perm_blocks_detail(self):
         """Without view perm, the detail page is also blocked."""
-        response = self.client.get(
-            reverse('assets:manufacturer_detail', kwargs={'pk': self.mfr.pk})
-        )
+        response = self.client.get(reverse("assets:manufacturer_detail", kwargs={"pk": self.mfr.pk}))
         self.assertIn(response.status_code, [302, 403])
 
     def test_no_add_perm_blocks_create_post(self):
         """Without assets.add_manufacturer, POSTing the create form is blocked."""
         response = self.client.post(
-            reverse('assets:manufacturer_create'),
+            reverse("assets:manufacturer_create"),
             data={
-                'name': 'Unauthorized GCBV',
-                'slug': 'unauthorized-gcbv',
-                'description': '',
+                "name": "Unauthorized GCBV",
+                "slug": "unauthorized-gcbv",
+                "description": "",
             },
         )
         self.assertIn(response.status_code, [302, 403])
-        self.assertFalse(Manufacturer.objects.filter(slug='unauthorized-gcbv').exists())
+        self.assertFalse(Manufacturer.objects.filter(slug="unauthorized-gcbv").exists())
 
     def test_no_delete_perm_blocks_delete(self):
         """Without assets.delete_manufacturer, delete is blocked."""
-        response = self.client.post(
-            reverse('assets:manufacturer_delete', kwargs={'pk': self.mfr.pk})
-        )
+        response = self.client.post(reverse("assets:manufacturer_delete", kwargs={"pk": self.mfr.pk}))
         self.assertIn(response.status_code, [302, 403])
         # Object must still exist (not deleted)
         self.assertTrue(Manufacturer.objects.filter(pk=self.mfr.pk).exists())
@@ -571,6 +535,7 @@ class PermissionEnforcementTests(TenantTestMixin, TestCase):
 # ---------------------------------------------------------------------------
 # 8. Tenant scoping — cross-tenant 404 on Asset detail
 # ---------------------------------------------------------------------------
+
 
 class TenantScopingTests(TenantTestMixin, TestCase):
     """A tenant-A user gets 404 on an Asset that belongs to tenant-B because
@@ -581,30 +546,28 @@ class TenantScopingTests(TenantTestMixin, TestCase):
     def setUp(self):
         # Tenant A — user we log in as
         self.setup_tenant_context(
-            name='TenantA GCBV',
-            slug='tenanta-gcbv',
-            permissions=['assets.view_asset'],
+            name="TenantA GCBV",
+            slug="tenanta-gcbv",
+            permissions=["assets.view_asset"],
         )
 
         # Tenant B — a different tenant whose assets must not be visible to A
-        self.tenant_b = Tenant.objects.create(
-            name='TenantB GCBV', slug='tenantb-gcbv'
-        )
+        self.tenant_b = Tenant.objects.create(name="TenantB GCBV", slug="tenantb-gcbv")
 
         # Status label for Asset
         self.status, _ = StatusLabel.objects.get_or_create(
-            slug='available',
+            slug="available",
             defaults={
-                'name': 'Available',
-                'type': 'deployable',
-                'color': '28a745',
+                "name": "Available",
+                "type": "deployable",
+                "color": "28a745",
             },
         )
 
         # Asset belonging to tenant B
         self.asset_b = Asset.objects.create(
-            name='Tenant B Asset GCBV',
-            asset_tag='TB-ASSET-001-GCBV',
+            name="Tenant B Asset GCBV",
+            asset_tag="TB-ASSET-001-GCBV",
             tenant=self.tenant_b,
             status=self.status,
         )
@@ -614,20 +577,16 @@ class TenantScopingTests(TenantTestMixin, TestCase):
 
     def test_cross_tenant_asset_detail_returns_404(self):
         """Tenant-A user cannot access tenant-B's Asset detail — gets 404."""
-        response = self.client.get(
-            reverse('assets:asset_detail', kwargs={'pk': self.asset_b.pk})
-        )
+        response = self.client.get(reverse("assets:asset_detail", kwargs={"pk": self.asset_b.pk}))
         self.assertEqual(response.status_code, 404)
 
     def test_own_tenant_asset_detail_accessible(self):
         """A tenant-A user CAN access an asset that belongs to tenant A."""
         asset_a = Asset.objects.create(
-            name='Tenant A Asset GCBV',
-            asset_tag='TA-ASSET-001-GCBV',
+            name="Tenant A Asset GCBV",
+            asset_tag="TA-ASSET-001-GCBV",
             tenant=self.tenant,
             status=self.status,
         )
-        response = self.client.get(
-            reverse('assets:asset_detail', kwargs={'pk': asset_a.pk})
-        )
+        response = self.client.get(reverse("assets:asset_detail", kwargs={"pk": asset_a.pk}))
         self.assertEqual(response.status_code, 200)

@@ -72,6 +72,9 @@ dev = [
     "pyflakes==3.2.0",
     "pre-commit>=4.0,<5.0",
     "PyYAML>=6.0,<7.0",
+    # Exact version: formatting/import-sort output must be reproducible across
+    # contributors, pre-commit, and CI (see pyproject.toml [tool.ruff]).
+    "ruff==0.15.20",
 ]
 docs = [
     "mkdocs>=1.6.1,<2.0",
@@ -119,3 +122,32 @@ omit = [
 # 80 was unattainable so every run "failed" the gate and it enforced nothing.
 fail_under = 45
 show_missing = true
+
+[tool.ruff]
+# Canonical formatter and import sorter (see issue #87). Ruff owns formatting
+# and import order only; Flake8 (setup.cfg) remains the semantic lint gate --
+# this section deliberately does not enable Ruff's own semantic rule sets.
+line-length = 120
+target-version = "py312"
+# Two independent import roots: itambox/ (Django project root -- apps import
+# each other by bare name, e.g. `from organization.models import Tenant`) and
+# the repo root (scripts/ is imported as a top-level package, e.g.
+# `from scripts.release_policy import ...`).
+src = ["itambox", "."]
+# Generated/dependency/vendor paths only -- never hand-written app code.
+# .git, __pycache__, .venv, venv, node_modules, and dist are already covered
+# by Ruff's built-in default excludes.
+extend-exclude = [
+    "*/migrations/*",
+    "itambox/static/dist",
+    "itambox/static/docs",
+]
+
+[tool.ruff.format]
+line-ending = "lf"
+
+[tool.ruff.lint]
+# Import-order enforcement only. No pycodestyle/pyflakes/bugbear rules here --
+# those stay on the Flake8 identity baseline (scripts/flake8_baseline.json) so
+# this phase introduces no new semantic gate or rule weakening.
+select = ["I"]

@@ -5,25 +5,24 @@ from django.urls import reverse
 
 from core.forms.import_forms import is_model_importable
 
-
 SENSITIVE_MODEL_LABELS = (
-    'organization.membership',
-    'organization.role',
-    'organization.rolegrant',
-    'organization.rolegrantscope',
-    'organization.tenantresourcegrant',
-    'users.groupmembership',
-    'users.token',
-    'users.user',
-    'users.usergroup',
+    "organization.membership",
+    "organization.role",
+    "organization.rolegrant",
+    "organization.rolegrantscope",
+    "organization.tenantresourcegrant",
+    "users.groupmembership",
+    "users.token",
+    "users.user",
+    "users.usergroup",
 )
 
 
 class SecuritySensitiveImportBoundaryTests(TestCase):
     def setUp(self):
         self.superuser = get_user_model().objects.create_superuser(
-            username='sensitive-import-superuser',
-            password='password',
+            username="sensitive-import-superuser",
+            password="password",
         )
         self.client.force_login(self.superuser)
 
@@ -34,10 +33,15 @@ class SecuritySensitiveImportBoundaryTests(TestCase):
 
     def test_direct_generic_import_urls_are_404_even_for_superuser(self):
         for label in SENSITIVE_MODEL_LABELS:
-            app_label, model_name = label.split('.')
+            app_label, model_name = label.split(".")
             with self.subTest(label=label):
-                response = self.client.get(reverse('generic_import', kwargs={
-                    'app_label': app_label,
-                    'model_name': model_name,
-                }))
+                response = self.client.get(
+                    reverse(
+                        "generic_import",
+                        kwargs={
+                            "app_label": app_label,
+                            "model_name": model_name,
+                        },
+                    )
+                )
                 self.assertEqual(response.status_code, 404)

@@ -7,19 +7,24 @@ OTHER relation's row count. The fix replaces them with independent correlated
 Subquery annotations via Accessory/Consumable.objects.with_counts(), used by
 both the API viewsets and the HTML list views.
 """
-from django.test import TestCase, RequestFactory
+
 from django.contrib.auth import get_user_model
+from django.test import RequestFactory, TestCase
 
 from assets.models import Manufacturer
-from organization.models import Site, Location, AssetHolder, Tenant
-from inventory.models import (
-    Accessory, AccessoryStock, AccessoryAssignment,
-    Consumable, ConsumableStock, ConsumableAssignment,
-)
 from inventory.api.serializers import AccessorySerializer, ConsumableSerializer
 from inventory.api.views import AccessoryViewSet, ConsumableViewSet
+from inventory.models import (
+    Accessory,
+    AccessoryAssignment,
+    AccessoryStock,
+    Consumable,
+    ConsumableAssignment,
+    ConsumableStock,
+)
 from inventory.views.accessory_views import AccessoryListView
 from inventory.views.consumable_views import ConsumableListView
+from organization.models import AssetHolder, Location, Site, Tenant
 
 User = get_user_model()
 
@@ -30,14 +35,14 @@ class AccessoryStockFanoutTests(TestCase):
 
     def setUp(self):
         self.tenant = Tenant.objects.create(name="Tenant Fanout Acc", slug="tenant-fanout-acc")
-        self.manufacturer = Manufacturer.objects.create(name='Logitech', slug='logitech')
-        self.site = Site.objects.create(name='Warehouse', slug='warehouse', tenant=self.tenant)
-        self.loc_a = Location.objects.create(name='Shelf A', slug='shelf-a', site=self.site, tenant=self.tenant)
-        self.loc_b = Location.objects.create(name='Shelf B', slug='shelf-b', site=self.site, tenant=self.tenant)
-        self.holder1 = AssetHolder.objects.create(first_name='Jane', last_name='Doe', upn='jane.doe')
-        self.holder2 = AssetHolder.objects.create(first_name='John', last_name='Roe', upn='john.roe')
+        self.manufacturer = Manufacturer.objects.create(name="Logitech", slug="logitech")
+        self.site = Site.objects.create(name="Warehouse", slug="warehouse", tenant=self.tenant)
+        self.loc_a = Location.objects.create(name="Shelf A", slug="shelf-a", site=self.site, tenant=self.tenant)
+        self.loc_b = Location.objects.create(name="Shelf B", slug="shelf-b", site=self.site, tenant=self.tenant)
+        self.holder1 = AssetHolder.objects.create(first_name="Jane", last_name="Doe", upn="jane.doe")
+        self.holder2 = AssetHolder.objects.create(first_name="John", last_name="Roe", upn="john.roe")
 
-        self.accessory = Accessory.objects.create(name='MX Keys', manufacturer=self.manufacturer)
+        self.accessory = Accessory.objects.create(name="MX Keys", manufacturer=self.manufacturer)
 
         # 2 stock rows at two locations: 10 + 20 = 30 total stock.
         AccessoryStock.objects.create(accessory=self.accessory, location=self.loc_a, qty=10)
@@ -61,15 +66,13 @@ class AccessoryStockFanoutTests(TestCase):
         qs = AccessoryViewSet.queryset
         acc = qs.get(pk=self.accessory.pk)
         data = AccessorySerializer(acc).data
-        self.assertEqual(data['total_stock'], 30)
-        self.assertEqual(data['checked_out_qty'], 7)
-        self.assertEqual(data['available'], 23)
+        self.assertEqual(data["total_stock"], 30)
+        self.assertEqual(data["checked_out_qty"], 7)
+        self.assertEqual(data["available"], 23)
 
     def test_list_view_context_counts_correct(self):
-        request = RequestFactory().get('/inventory/accessories/')
-        request.user = User.objects.create_user(
-            username='admin', password='pw', is_staff=True, is_superuser=True
-        )
+        request = RequestFactory().get("/inventory/accessories/")
+        request.user = User.objects.create_user(username="admin", password="pw", is_staff=True, is_superuser=True)
         view = AccessoryListView()
         view.setup(request)
         obj = view.get_queryset().get(pk=self.accessory.pk)
@@ -83,14 +86,14 @@ class ConsumableStockFanoutTests(TestCase):
 
     def setUp(self):
         self.tenant = Tenant.objects.create(name="Tenant Fanout Con", slug="tenant-fanout-con")
-        self.manufacturer = Manufacturer.objects.create(name='HP', slug='hp')
-        self.site = Site.objects.create(name='Depot', slug='depot', tenant=self.tenant)
-        self.loc_a = Location.objects.create(name='Bin A', slug='bin-a', site=self.site, tenant=self.tenant)
-        self.loc_b = Location.objects.create(name='Bin B', slug='bin-b', site=self.site, tenant=self.tenant)
-        self.holder1 = AssetHolder.objects.create(first_name='Amy', last_name='Lee', upn='amy.lee')
-        self.holder2 = AssetHolder.objects.create(first_name='Bob', last_name='Kim', upn='bob.kim')
+        self.manufacturer = Manufacturer.objects.create(name="HP", slug="hp")
+        self.site = Site.objects.create(name="Depot", slug="depot", tenant=self.tenant)
+        self.loc_a = Location.objects.create(name="Bin A", slug="bin-a", site=self.site, tenant=self.tenant)
+        self.loc_b = Location.objects.create(name="Bin B", slug="bin-b", site=self.site, tenant=self.tenant)
+        self.holder1 = AssetHolder.objects.create(first_name="Amy", last_name="Lee", upn="amy.lee")
+        self.holder2 = AssetHolder.objects.create(first_name="Bob", last_name="Kim", upn="bob.kim")
 
-        self.consumable = Consumable.objects.create(name='Toner 26A', manufacturer=self.manufacturer)
+        self.consumable = Consumable.objects.create(name="Toner 26A", manufacturer=self.manufacturer)
 
         ConsumableStock.objects.create(consumable=self.consumable, location=self.loc_a, qty=10)
         ConsumableStock.objects.create(consumable=self.consumable, location=self.loc_b, qty=20)
@@ -110,15 +113,13 @@ class ConsumableStockFanoutTests(TestCase):
         qs = ConsumableViewSet.queryset
         con = qs.get(pk=self.consumable.pk)
         data = ConsumableSerializer(con).data
-        self.assertEqual(data['total_stock'], 30)
-        self.assertEqual(data['consumed_qty'], 7)
-        self.assertEqual(data['available'], 23)
+        self.assertEqual(data["total_stock"], 30)
+        self.assertEqual(data["consumed_qty"], 7)
+        self.assertEqual(data["available"], 23)
 
     def test_list_view_context_counts_correct(self):
-        request = RequestFactory().get('/inventory/consumables/')
-        request.user = User.objects.create_user(
-            username='admin', password='pw', is_staff=True, is_superuser=True
-        )
+        request = RequestFactory().get("/inventory/consumables/")
+        request.user = User.objects.create_user(username="admin", password="pw", is_staff=True, is_superuser=True)
         view = ConsumableListView()
         view.setup(request)
         obj = view.get_queryset().get(pk=self.consumable.pk)

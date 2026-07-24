@@ -11,6 +11,7 @@ so they run fast and catch regressions of the tab-load race / boost fixes:
 * The shared tab list keeps its ``id="detail-tabs"`` so lazy tabs can target it as
   their ``hx-sync`` abort group.
 """
+
 import re
 from pathlib import Path
 
@@ -35,12 +36,9 @@ def test_detail_templates_discovered():
 @pytest.mark.parametrize("tpl", DETAIL_TEMPLATES, ids=lambda p: p.name)
 def test_no_plain_boosted_tab_anchors(tpl: Path):
     src = tpl.read_text(encoding="utf-8")
-    offenders = [
-        a for a in _tab_anchors(src)
-        if 'hx-boost="false"' not in a and "hx-get=" not in a
-    ]
+    offenders = [a for a in _tab_anchors(src) if 'hx-boost="false"' not in a and "hx-get=" not in a]
     assert not offenders, (
-        f'{tpl.relative_to(PROJECT_ROOT)} has plain-boosted tab anchor(s); add '
+        f"{tpl.relative_to(PROJECT_ROOT)} has plain-boosted tab anchor(s); add "
         f'hx-boost="false" (or use a lazy hx-get tab):\n  ' + "\n  ".join(offenders)
     )
 
@@ -50,4 +48,4 @@ def test_generic_detail_has_sync_group_id():
     hx-sync abort group (#detail-tabs:replace)."""
     base = PROJECT_ROOT / "templates" / "generic" / "object_detail.html"
     src = base.read_text(encoding="utf-8")
-    assert 'id="detail-tabs"' in src, "generic object_detail.html lost id=\"detail-tabs\""
+    assert 'id="detail-tabs"' in src, 'generic object_detail.html lost id="detail-tabs"'

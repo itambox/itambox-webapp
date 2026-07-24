@@ -5,6 +5,7 @@ FIX-03 security tests:
   Family 10 — global search respects tenant scoping
   Family B6 — REST list+detail cross-tenant probes (inventory, licenses, subscriptions)
 """
+
 import io
 import json
 
@@ -14,12 +15,12 @@ from django.test import TestCase
 from django.urls import reverse
 
 from assets.models import Asset, AssetType, Manufacturer, StatusLabel
+from core.tests.mixins import grant
 from inventory.models import Accessory
 from licenses.models import License
-from core.tests.mixins import grant
-from organization.models import Tenant, Membership, Role, Site
+from organization.models import Membership, Role, Site, Tenant
 from software.models import Software
-from subscriptions.models import Subscription, Provider
+from subscriptions.models import Provider, Subscription
 from users.models import Token
 
 User = get_user_model()
@@ -39,6 +40,7 @@ def _login(client, user, tenant):
 # ---------------------------------------------------------------------------
 # Part A — upload / journal views require change permission on the target
 # ---------------------------------------------------------------------------
+
 
 class UploadJournalPermTests(TestCase):
     def setUp(self):
@@ -93,9 +95,8 @@ class UploadJournalPermTests(TestCase):
         )
         self.assertNotEqual(resp.status_code, 404)
         from extras.models import JournalEntry
-        self.assertTrue(
-            JournalEntry.objects.filter(object_id=self.asset_a.pk, comment="legit").exists()
-        )
+
+        self.assertTrue(JournalEntry.objects.filter(object_id=self.asset_a.pk, comment="legit").exists())
 
     # --- ImageAttachmentUploadView ---
 
@@ -146,6 +147,7 @@ class UploadJournalPermTests(TestCase):
 # Part B / Family 2b — _get_model allowlist (non-tenant model rejected)
 # ---------------------------------------------------------------------------
 
+
 class BulkModelNameAllowlistTests(TestCase):
     """POST model_name=auth.User to the generic bulk views must return 404.
 
@@ -180,6 +182,7 @@ class BulkModelNameAllowlistTests(TestCase):
 # Family 10 — global search respects tenant scoping
 # ---------------------------------------------------------------------------
 
+
 class SearchTenantScopingTests(TestCase):
     def setUp(self):
         self.tenant_a = Tenant.objects.create(name="SearchA", slug="search-a")
@@ -196,12 +199,10 @@ class SearchTenantScopingTests(TestCase):
         # Unique token that only appears in tenant_b's asset
         self.secret_tag = "XZQHIDDENB999"
         Asset.objects.create(
-            name="Hidden B Asset", asset_tag=self.secret_tag,
-            asset_type=at, status=sl, tenant=self.tenant_b
+            name="Hidden B Asset", asset_tag=self.secret_tag, asset_type=at, status=sl, tenant=self.tenant_b
         )
         Asset.objects.create(
-            name="Visible A Asset", asset_tag="XZQVISIBLEA111",
-            asset_type=at, status=sl, tenant=self.tenant_a
+            name="Visible A Asset", asset_tag="XZQVISIBLEA111", asset_type=at, status=sl, tenant=self.tenant_a
         )
 
     def test_search_does_not_leak_cross_tenant_data(self):
@@ -230,6 +231,7 @@ class SearchTenantScopingTests(TestCase):
 # Family B6 — REST list + detail cross-tenant (inventory, licenses, subscriptions)
 # ---------------------------------------------------------------------------
 
+
 class RESTCrossTenantTests(TestCase):
     def setUp(self):
         self.site = Site.objects.create(name="HQ", slug="hq")
@@ -239,7 +241,8 @@ class RESTCrossTenantTests(TestCase):
         # User A (member of tenant_a only)
         self.user_a = User.objects.create_user("rest_a", password="pw")
         role_a = _make_role(
-            self.tenant_a, "AllPerms",
+            self.tenant_a,
+            "AllPerms",
             [
                 "inventory.view_accessory",
                 "licenses.view_license",
@@ -256,27 +259,15 @@ class RESTCrossTenantTests(TestCase):
         sw = Software.objects.create(name="Office", manufacturer=self.mfr)
 
         # Tenant A objects
-        self.acc_a = Accessory.objects.create(
-            name="Acc A", slug="acc-a", manufacturer=self.mfr, tenant=self.tenant_a
-        )
-        self.lic_a = License.objects.create(
-            name="Lic A", software=sw, tenant=self.tenant_a, seats=5
-        )
+        self.acc_a = Accessory.objects.create(name="Acc A", slug="acc-a", manufacturer=self.mfr, tenant=self.tenant_a)
+        self.lic_a = License.objects.create(name="Lic A", software=sw, tenant=self.tenant_a, seats=5)
         provider = Provider.objects.create(name="AWS", slug="aws")
-        self.sub_a = Subscription.objects.create(
-            name="Sub A", provider=provider, tenant=self.tenant_a
-        )
+        self.sub_a = Subscription.objects.create(name="Sub A", provider=provider, tenant=self.tenant_a)
 
         # Tenant B objects
-        self.acc_b = Accessory.objects.create(
-            name="Acc B", slug="acc-b", manufacturer=self.mfr, tenant=self.tenant_b
-        )
-        self.lic_b = License.objects.create(
-            name="Lic B", software=sw, tenant=self.tenant_b, seats=10
-        )
-        self.sub_b = Subscription.objects.create(
-            name="Sub B", provider=provider, tenant=self.tenant_b
-        )
+        self.acc_b = Accessory.objects.create(name="Acc B", slug="acc-b", manufacturer=self.mfr, tenant=self.tenant_b)
+        self.lic_b = License.objects.create(name="Lic B", software=sw, tenant=self.tenant_b, seats=10)
+        self.sub_b = Subscription.objects.create(name="Sub B", provider=provider, tenant=self.tenant_b)
 
     def _headers(self):
         return {"HTTP_AUTHORIZATION": f"Token {self.token_a.key}"}

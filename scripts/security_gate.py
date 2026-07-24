@@ -13,7 +13,6 @@ from datetime import date
 from pathlib import Path
 from typing import Any
 
-
 BLOCKING_SEVERITIES = {"HIGH", "CRITICAL"}
 TRIVY_SEVERITIES = {"UNKNOWN", "LOW", "MEDIUM", "HIGH", "CRITICAL"}
 MAX_SUPPRESSION_DAYS = 90
@@ -118,11 +117,7 @@ def _validate_governance_dates(entry_id: str, entry: dict[str, Any], today: date
 def _validate_scope(entry_id: str, tool: str, scope: Any) -> None:
     if not isinstance(scope, dict):
         raise SecurityGateError(f"{entry_id}: scope must be an object")
-    required = (
-        {"target", "package", "version"}
-        if tool == "trivy"
-        else {"fingerprint", "path", "rule"}
-    )
+    required = {"target", "package", "version"} if tool == "trivy" else {"fingerprint", "path", "rule"}
     if set(scope) != required:
         raise SecurityGateError(f"{entry_id}: scope must contain exactly {sorted(required)}")
     if any(not isinstance(scope[field], str) or not scope[field] for field in required):
@@ -135,7 +130,8 @@ def _trivy_suppressed(finding: dict[str, Any], entries: list[dict[str, Any]]) ->
     return any(
         entry["tool"] == "trivy"
         and entry["finding"] == finding["id"]
-        and entry["scope"] == {
+        and entry["scope"]
+        == {
             "target": finding["target"],
             "package": finding["package"],
             "version": finding["version"],
@@ -151,18 +147,15 @@ def _gitleaks_suppressed(finding: dict[str, Any], entries: list[dict[str, Any]])
         "rule": finding.get("RuleID", ""),
     }
     return any(
-        entry["tool"] == "gitleaks"
-        and entry["finding"] == scope["rule"]
-        and entry["scope"] == scope
+        entry["tool"] == "gitleaks" and entry["finding"] == scope["rule"] and entry["scope"] == scope
         for entry in entries
     )
 
 
 def _parse_trivy_vulnerability(vulnerability: Any, target: str) -> dict[str, str]:
     required = ("VulnerabilityID", "PkgName", "InstalledVersion", "Severity")
-    if (
-        not isinstance(vulnerability, dict)
-        or any(not isinstance(vulnerability.get(field), str) or not vulnerability[field] for field in required)
+    if not isinstance(vulnerability, dict) or any(
+        not isinstance(vulnerability.get(field), str) or not vulnerability[field] for field in required
     ):
         raise SecurityGateError("invalid Trivy report")
     severity = vulnerability["Severity"].upper()
@@ -242,23 +235,30 @@ def _write_sarif(path: Path, findings: list[dict[str, str]]) -> None:
     results = []
     level = {"CRITICAL": "error", "HIGH": "error", "MEDIUM": "warning"}
     for finding in findings:
-        rules.setdefault(finding["id"], {
-            "id": finding["id"],
-            "shortDescription": {"text": "Dependency vulnerability"},
-        })
-        results.append({
-            "ruleId": finding["id"],
-            "level": level.get(finding["severity"], "note"),
-            "message": {"text": f"{finding['package']} {finding['version']} ({finding['severity']})"},
-            "locations": [{"physicalLocation": {"artifactLocation": {"uri": finding["target"]}}}],
-        })
+        rules.setdefault(
+            finding["id"],
+            {
+                "id": finding["id"],
+                "shortDescription": {"text": "Dependency vulnerability"},
+            },
+        )
+        results.append(
+            {
+                "ruleId": finding["id"],
+                "level": level.get(finding["severity"], "note"),
+                "message": {"text": f"{finding['package']} {finding['version']} ({finding['severity']})"},
+                "locations": [{"physicalLocation": {"artifactLocation": {"uri": finding["target"]}}}],
+            }
+        )
     payload = {
         "$schema": "https://json.schemastore.org/sarif-2.1.0.json",
         "version": "2.1.0",
-        "runs": [{
-            "tool": {"driver": {"name": "ITAMbox security gate", "rules": list(rules.values())}},
-            "results": results,
-        }],
+        "runs": [
+            {
+                "tool": {"driver": {"name": "ITAMbox security gate", "rules": list(rules.values())}},
+                "results": results,
+            }
+        ],
     }
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(json.dumps(payload), encoding="utf-8")

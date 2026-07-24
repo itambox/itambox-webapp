@@ -26,30 +26,32 @@ def get_worker_status():
     from django.conf import settings
 
     result = {
-        'detectable': True,
-        'online': False,
-        'cluster_count': 0,
-        'queued_tasks': None,
-        'cache_alias': 'default',
+        "detectable": True,
+        "online": False,
+        "cluster_count": 0,
+        "queued_tasks": None,
+        "cache_alias": "default",
     }
 
     try:
         from django_q.conf import Conf
+
         cache_alias = Conf.CACHE
     except Exception:
-        cache_alias = 'default'
-    result['cache_alias'] = cache_alias
+        cache_alias = "default"
+    result["cache_alias"] = cache_alias
 
-    backend = (settings.CACHES.get(cache_alias, {}) or {}).get('BACKEND', '')
-    if not backend or 'locmem' in backend.lower() or 'dummy' in backend.lower():
+    backend = (settings.CACHES.get(cache_alias, {}) or {}).get("BACKEND", "")
+    if not backend or "locmem" in backend.lower() or "dummy" in backend.lower():
         # Heartbeats can't be shared across processes — don't claim "offline".
-        result['detectable'] = False
+        result["detectable"] = False
 
     try:
         from django_q.status import Stat
+
         clusters = Stat.get_all()
-        result['cluster_count'] = len(clusters)
-        result['online'] = len(clusters) > 0
+        result["cluster_count"] = len(clusters)
+        result["online"] = len(clusters) > 0
     except Exception:
         pass
 
@@ -57,7 +59,8 @@ def get_worker_status():
     # reliable across processes regardless of the cache backend.
     try:
         from django_q.models import OrmQ
-        result['queued_tasks'] = OrmQ.objects.count()
+
+        result["queued_tasks"] = OrmQ.objects.count()
     except Exception:
         pass
 

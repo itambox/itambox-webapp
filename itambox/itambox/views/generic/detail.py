@@ -5,37 +5,44 @@ from django.contrib.contenttypes.models import ContentType
 from django.db.models import Count, OuterRef, Subquery
 from django.db.models.functions import Coalesce
 from django.http import Http404
-from django.template.loader import get_template
 from django.template import TemplateDoesNotExist
-from django.urls import reverse, NoReverseMatch
+from django.template.loader import get_template
+from django.urls import NoReverseMatch, reverse
 from django.utils.http import urlencode
-from django.utils.translation import gettext as _, override
+from django.utils.translation import gettext as _
+from django.utils.translation import override
 from django.views.generic import DetailView
 from django_tables2 import RequestConfig
 
-from core.models import ObjectChange
-from core.tables import ObjectChangeTable, BaseTable
 from core.forms import JournalEntryForm
+from core.models import ObjectChange
+from core.tables import BaseTable, ObjectChangeTable
 from extras.customfields import get_custom_fields_display
 from extras.models import (
-    JournalEntry, ImageAttachment, FileAttachment, Bookmark, ObjectWatch,
+    Bookmark,
+    FileAttachment,
+    ImageAttachment,
+    JournalEntry,
+    ObjectWatch,
 )
 from itambox.registry import registry
-from itambox.utils import get_model_viewname, get_help_url
-from itambox.views.htmx import BaseHTMXView
+from itambox.utils import get_help_url, get_model_viewname
 from itambox.views.generic.mixins import (
     CachedObjectMixin,
     TenantScopingViewMixin,
     user_can_mutate_model,
 )
+from itambox.views.htmx import BaseHTMXView
 from subscriptions.models import SubscriptionAssignment
 from subscriptions.tables import SubscriptionAssignmentTable
 
 logger = logging.getLogger(__name__)
 
 
-class ObjectDetailView(TenantScopingViewMixin, PermissionRequiredMixin, LoginRequiredMixin, BaseHTMXView, CachedObjectMixin, DetailView):
-    template_name = 'generic/object_detail.html'
+class ObjectDetailView(
+    TenantScopingViewMixin, PermissionRequiredMixin, LoginRequiredMixin, BaseHTMXView, CachedObjectMixin, DetailView
+):
+    template_name = "generic/object_detail.html"
     layout = None
     # Opt-in escape hatch: when True, skip the per-reverse-relation .count()
     # loop entirely (10-15 COUNTs/page) and supply an empty list. Default False
@@ -53,14 +60,14 @@ class ObjectDetailView(TenantScopingViewMixin, PermissionRequiredMixin, LoginReq
         return super().render_to_response(context, **response_kwargs)
 
     def get_permission_required(self):
-        model = getattr(self, 'model', None)
-        if model is None and hasattr(self, 'queryset') and self.queryset is not None:
+        model = getattr(self, "model", None)
+        if model is None and hasattr(self, "queryset") and self.queryset is not None:
             model = self.queryset.model
         if model:
             app_label = model._meta.app_label
             model_name = model._meta.model_name
-            return (f'{app_label}.view_{model_name}',)
-        return ('',)
+            return (f"{app_label}.view_{model_name}",)
+        return ("",)
 
     def has_permission(self):
         perms = self.get_permission_required()
@@ -78,16 +85,16 @@ class ObjectDetailView(TenantScopingViewMixin, PermissionRequiredMixin, LoginReq
     def get(self, request, *args, **kwargs):
         self.object = self.get_object()
 
-        tab = request.GET.get('tab')
-        if tab and request.headers.get('HX-Request'):
+        tab = request.GET.get("tab")
+        if tab and request.headers.get("HX-Request"):
             # Try replacing hyphens with underscores
-            tab_clean = tab.replace('-', '_')
+            tab_clean = tab.replace("-", "_")
             tab_method_name = f"get_tab_{tab_clean}"
             if hasattr(self, tab_method_name):
                 return getattr(self, tab_method_name)(request)
 
             # Try removing hyphens entirely (e.g., asset-holders -> assetholders)
-            tab_flat = tab.replace('-', '')
+            tab_flat = tab.replace("-", "")
             tab_method_name_flat = f"get_tab_{tab_flat}"
             if hasattr(self, tab_method_name_flat):
                 return getattr(self, tab_method_name_flat)(request)
@@ -95,20 +102,20 @@ class ObjectDetailView(TenantScopingViewMixin, PermissionRequiredMixin, LoginReq
         return super().get(request, *args, **kwargs)
 
     def get_template_names(self):
-        if self.template_name and self.template_name != 'generic/object_detail.html':
+        if self.template_name and self.template_name != "generic/object_detail.html":
             return [self.template_name]
 
         obj = self.get_object()
         if obj:
             app_label = obj._meta.app_label
             model_name = obj._meta.model_name
-            with override('en'):
+            with override("en"):
                 plural_name = str(obj._meta.verbose_name_plural).lower().replace(" ", "")
 
             templates_to_try = [
                 f"{app_label}/{plural_name}/{model_name}_detail.html",
                 f"{app_label}/{model_name}_detail.html",
-                'generic/object_detail.html',
+                "generic/object_detail.html",
             ]
 
             for template_name in templates_to_try:
@@ -118,7 +125,7 @@ class ObjectDetailView(TenantScopingViewMixin, PermissionRequiredMixin, LoginReq
                 except TemplateDoesNotExist:
                     continue
 
-        return ['generic/object_detail.html']
+        return ["generic/object_detail.html"]
 
     @staticmethod
     def _related_count_uses_distinct(related_model):
@@ -131,8 +138,9 @@ class ObjectDetailView(TenantScopingViewMixin, PermissionRequiredMixin, LoginReq
         ``.count()`` (which counts distinct rows) for these relations.
         """
         from django.core.exceptions import FieldDoesNotExist
+
         try:
-            related_model._meta.get_field('filter_tenants')
+            related_model._meta.get_field("filter_tenants")
             return True
         except FieldDoesNotExist:
             return False
@@ -192,16 +200,15 @@ class ObjectDetailView(TenantScopingViewMixin, PermissionRequiredMixin, LoginReq
                     # tenant + soft-delete filtering of the old .count() is kept.
                     try:
                         fk_name = relation.field.name
-                        target = getattr(relation, 'field_name', None) or 'pk'
+                        target = getattr(relation, "field_name", None) or "pk"
                         subquery = Subquery(
-                            related_model._default_manager
-                            .filter(**{fk_name: OuterRef(target)})
+                            related_model._default_manager.filter(**{fk_name: OuterRef(target)})
                             .order_by()
                             .values(fk_name)
-                            .annotate(c=Count('pk'))
-                            .values('c')[:1]
+                            .annotate(c=Count("pk"))
+                            .values("c")[:1]
                         )
-                        count_key = f'_relcount_{len(annotations)}'
+                        count_key = f"_relcount_{len(annotations)}"
                         annotations[count_key] = Coalesce(subquery, 0)
                     except Exception:
                         # Couldn't stage the subquery — fall back to .count().
@@ -239,24 +246,26 @@ class ObjectDetailView(TenantScopingViewMixin, PermissionRequiredMixin, LoginReq
                 # reverse-relation targets (root-mounted, UN-namespaced) resolve
                 # too — a hardcoded '{app}:{model}_list' silently dropped them.
                 # App-namespaced targets still map to '{app}:{model}_list'.
-                view_name = get_model_viewname(related_model, 'list')
+                view_name = get_model_viewname(related_model, "list")
 
                 try:
                     base_url = reverse(view_name)
                     filter_field_name = relation.remote_field.name if relation.remote_field else obj._meta.model_name
-                    filter_val = getattr(obj, 'slug', obj.pk)
+                    filter_val = getattr(obj, "slug", obj.pk)
                     url = f"{base_url}?{filter_field_name}={filter_val}"
                     label = str(related_model._meta.verbose_name_plural).title()
 
-                    related_objects_list.append({
-                        'label': label,
-                        'count': count,
-                        'url': url,
-                    })
+                    related_objects_list.append(
+                        {
+                            "label": label,
+                            "count": count,
+                            "url": url,
+                        }
+                    )
                 except NoReverseMatch:
                     continue
 
-        related_objects_list.sort(key=lambda x: x['label'])
+        related_objects_list.sort(key=lambda x: x["label"])
         return related_objects_list
 
     def get_context_data(self, **kwargs):
@@ -267,169 +276,180 @@ class ObjectDetailView(TenantScopingViewMixin, PermissionRequiredMixin, LoginReq
         verbose_name = obj._meta.verbose_name
         verbose_name_plural = obj._meta.verbose_name_plural
 
-        context['model'] = obj.__class__
-        context['layout'] = self.layout
+        context["model"] = obj.__class__
+        context["layout"] = self.layout
 
         mutation_allowed = user_can_mutate_model(self.request.user, obj.__class__)
         can_change = mutation_allowed and self.request.user.has_perm(
-            f'{app_label}.change_{model_name}', obj=obj,
+            f"{app_label}.change_{model_name}",
+            obj=obj,
         )
         can_delete = mutation_allowed and self.request.user.has_perm(
-            f'{app_label}.delete_{model_name}', obj=obj,
+            f"{app_label}.delete_{model_name}",
+            obj=obj,
         )
-        context['can_change'] = can_change
-        context['can_delete'] = can_delete
-        context['edit_url'] = None
+        context["can_change"] = can_change
+        context["can_delete"] = can_delete
+        context["edit_url"] = None
         if can_change:
             try:
-                context['edit_url'] = reverse(get_model_viewname(obj, 'update'), kwargs={'pk': obj.pk})
+                context["edit_url"] = reverse(get_model_viewname(obj, "update"), kwargs={"pk": obj.pk})
             except NoReverseMatch:
                 logger.debug("Edit URL not resolvable for %s obj=%s", model_name, obj.pk)
 
-        context['delete_url'] = None
+        context["delete_url"] = None
         if can_delete:
             try:
-                context['delete_url'] = reverse(get_model_viewname(obj, 'delete'), kwargs={'pk': obj.pk})
+                context["delete_url"] = reverse(get_model_viewname(obj, "delete"), kwargs={"pk": obj.pk})
             except NoReverseMatch:
                 logger.debug("Delete URL not resolvable for %s obj=%s", model_name, obj.pk)
 
         # Clone is offered generically for any model flagged cloneable (via
         # CloneableMixin) that has a clone view wired and that the user may add.
-        context['clone_url'] = None
-        if mutation_allowed and registry.model_has_feature(obj.__class__, 'cloneable') and \
-                self.request.user.has_perm(f'{app_label}.add_{model_name}', obj=obj):
+        context["clone_url"] = None
+        if (
+            mutation_allowed
+            and registry.model_has_feature(obj.__class__, "cloneable")
+            and self.request.user.has_perm(f"{app_label}.add_{model_name}", obj=obj)
+        ):
             try:
-                context['clone_url'] = reverse(get_model_viewname(obj, 'clone'), kwargs={'pk': obj.pk})
+                context["clone_url"] = reverse(get_model_viewname(obj, "clone"), kwargs={"pk": obj.pk})
             except NoReverseMatch:
                 logger.debug("Clone URL not resolvable for %s obj=%s", model_name, obj.pk)
 
-        context['title'] = str(obj)
+        context["title"] = str(obj)
         base_breadcrumbs = [
-            (reverse('dashboard'), _('Dashboard')),
-            (reverse(get_model_viewname(obj, 'list')), verbose_name_plural),
-            (None, context['title']),
+            (reverse("dashboard"), _("Dashboard")),
+            (reverse(get_model_viewname(obj, "list")), verbose_name_plural),
+            (None, context["title"]),
         ]
-        context['breadcrumbs'] = getattr(self, 'get_breadcrumbs', lambda: base_breadcrumbs)()
+        context["breadcrumbs"] = getattr(self, "get_breadcrumbs", lambda: base_breadcrumbs)()
 
         # A4: resolve ContentType once for this object — it is used by changelog,
         # journaling, image/file attachments, bookmarks, and watches below.
-        _obj_ct_exists = ContentType.objects.filter(app_label='core', model='objectchange').exists()
+        _obj_ct_exists = ContentType.objects.filter(app_label="core", model="objectchange").exists()
         if _obj_ct_exists:
             obj_type = ContentType.objects.get_for_model(obj)
         else:
             obj_type = None
 
-        if hasattr(obj, 'get_changelog_url'):
-            context['changelog_url'] = obj.get_changelog_url()
+        if hasattr(obj, "get_changelog_url"):
+            context["changelog_url"] = obj.get_changelog_url()
         elif _obj_ct_exists:
-            changelog_url = reverse('objectchange_list') + '?' + urlencode({'changed_object_type': obj_type.pk, 'changed_object_id': obj.pk})
-            context['changelog_url'] = changelog_url
+            changelog_url = (
+                reverse("objectchange_list")
+                + "?"
+                + urlencode({"changed_object_type": obj_type.pk, "changed_object_id": obj.pk})
+            )
+            context["changelog_url"] = changelog_url
 
         if _obj_ct_exists:
             changelog_qs = ObjectChange.objects.filter(
                 changed_object_type=obj_type,
                 changed_object_id=obj.pk,
-            ).order_by('-time')[:50]
+            ).order_by("-time")[:50]
             changelog_table = ObjectChangeTable(list(changelog_qs))
-            RequestConfig(self.request, paginate={'per_page': 10}).configure(changelog_table)
-            context['changelog_table'] = changelog_table
+            RequestConfig(self.request, paginate={"per_page": 10}).configure(changelog_table)
+            context["changelog_table"] = changelog_table
 
-        context['page_actions'] = {
-            'edit_url': context.get('edit_url'),
-            'delete_url': context.get('delete_url'),
+        context["page_actions"] = {
+            "edit_url": context.get("edit_url"),
+            "delete_url": context.get("delete_url"),
         }
-        context['action_urls'] = {
-            'edit': context.get('edit_url'),
-            'delete': context.get('delete_url'),
-            'clone': context.get('clone_url'),
+        context["action_urls"] = {
+            "edit": context.get("edit_url"),
+            "delete": context.get("delete_url"),
+            "clone": context.get("clone_url"),
         }
-        context['content_template_name'] = self.get_template_names()[0]
+        context["content_template_name"] = self.get_template_names()[0]
 
-        if registry.model_has_feature(obj.__class__, 'journaling'):
+        if registry.model_has_feature(obj.__class__, "journaling"):
             if obj_type is None:
                 obj_type = ContentType.objects.get_for_model(obj)
             journal_qs = JournalEntry.objects.filter(
                 model=obj_type,
                 object_id=obj.pk,
             )
-            context['has_journaling'] = True
-            context['journal_app_label'] = app_label
-            context['journal_model_name'] = model_name
-            context['journal_entries'] = journal_qs.select_related('user').order_by('-created')[:50]
-            context['journal_entries_count'] = journal_qs.count()
-            context['journal_form'] = JournalEntryForm()
+            context["has_journaling"] = True
+            context["journal_app_label"] = app_label
+            context["journal_model_name"] = model_name
+            context["journal_entries"] = journal_qs.select_related("user").order_by("-created")[:50]
+            context["journal_entries_count"] = journal_qs.count()
+            context["journal_form"] = JournalEntryForm()
 
-        context['attachment_app_label'] = app_label
-        context['attachment_model_name'] = model_name
+        context["attachment_app_label"] = app_label
+        context["attachment_model_name"] = model_name
 
-        if registry.model_has_feature(obj.__class__, 'custom_field_data'):
-            context['custom_fields_display'] = get_custom_fields_display(obj)
+        if registry.model_has_feature(obj.__class__, "custom_field_data"):
+            context["custom_fields_display"] = get_custom_fields_display(obj)
 
-        if registry.model_has_feature(obj.__class__, 'image_attachments'):
+        if registry.model_has_feature(obj.__class__, "image_attachments"):
             if obj_type is None:
                 obj_type = ContentType.objects.get_for_model(obj)
-            context['image_attachments'] = ImageAttachment.objects.filter(
-                model=obj_type, object_id=obj.pk,
-            ).order_by('-created')[:20]
-            context['has_image_attachments'] = True
+            context["image_attachments"] = ImageAttachment.objects.filter(
+                model=obj_type,
+                object_id=obj.pk,
+            ).order_by("-created")[:20]
+            context["has_image_attachments"] = True
 
-        if registry.model_has_feature(obj.__class__, 'file_attachments'):
+        if registry.model_has_feature(obj.__class__, "file_attachments"):
             if obj_type is None:
                 obj_type = ContentType.objects.get_for_model(obj)
-            context['file_attachments'] = FileAttachment.objects.filter(
-                model=obj_type, object_id=obj.pk,
-            ).order_by('-created')[:20]
-            context['has_file_attachments'] = True
+            context["file_attachments"] = FileAttachment.objects.filter(
+                model=obj_type,
+                object_id=obj.pk,
+            ).order_by("-created")[:20]
+            context["has_file_attachments"] = True
 
-        if registry.model_has_feature(obj.__class__, 'subscribable'):
+        if registry.model_has_feature(obj.__class__, "subscribable"):
             if obj_type is None:
                 obj_type = ContentType.objects.get_for_model(obj)
-            context['has_subscriptions'] = True
-            context['subscribable_content_type_id'] = obj_type.pk
+            context["has_subscriptions"] = True
+            context["subscribable_content_type_id"] = obj_type.pk
 
             assignments_qs = SubscriptionAssignment.objects.filter(
                 content_type=obj_type,
                 object_id=obj.pk,
-            ).select_related('subscription', 'subscription__provider', 'assigned_by')
+            ).select_related("subscription", "subscription__provider", "assigned_by")
 
             subs_table = SubscriptionAssignmentTable(assignments_qs, request=self.request)
-            subs_table.exclude = ('content_type', 'object_id', 'assigned_object')
+            subs_table.exclude = ("content_type", "object_id", "assigned_object")
             RequestConfig(self.request, paginate=False).configure(subs_table)
-            context['subscription_assignments_table'] = subs_table
-            context['subscription_assignments_count'] = assignments_qs.count()
+            context["subscription_assignments_table"] = subs_table
+            context["subscription_assignments_count"] = assignments_qs.count()
 
-        if registry.model_has_feature(obj.__class__, 'bookmarkable'):
+        if registry.model_has_feature(obj.__class__, "bookmarkable"):
             if obj_type is None:
                 obj_type = ContentType.objects.get_for_model(obj)
-            context['is_bookmarkable'] = True
-            context['bookmark_content_type_id'] = obj_type.pk
+            context["is_bookmarkable"] = True
+            context["bookmark_content_type_id"] = obj_type.pk
             if self.request.user.is_authenticated:
-                context['is_bookmarked'] = Bookmark.objects.filter(
+                context["is_bookmarked"] = Bookmark.objects.filter(
                     user=self.request.user,
                     model=obj_type,
                     object_id=obj.pk,
                 ).exists()
             else:
-                context['is_bookmarked'] = False
+                context["is_bookmarked"] = False
 
-        if registry.model_has_feature(obj.__class__, 'watchable'):
+        if registry.model_has_feature(obj.__class__, "watchable"):
             if obj_type is None:
                 obj_type = ContentType.objects.get_for_model(obj)
-            context['is_watchable'] = True
-            context['watch_content_type_id'] = obj_type.pk
+            context["is_watchable"] = True
+            context["watch_content_type_id"] = obj_type.pk
             if self.request.user.is_authenticated:
-                context['is_watched'] = ObjectWatch.objects.filter(
+                context["is_watched"] = ObjectWatch.objects.filter(
                     user=self.request.user,
                     model=obj_type,
                     object_id=obj.pk,
                 ).exists()
             else:
-                context['is_watched'] = False
+                context["is_watched"] = False
 
-        if 'related_objects_list' not in context and self.disable_related_objects_list:
-            context['related_objects_list'] = []
-        elif 'related_objects_list' not in context:
-            context['related_objects_list'] = self._build_related_objects_list(obj)
+        if "related_objects_list" not in context and self.disable_related_objects_list:
+            context["related_objects_list"] = []
+        elif "related_objects_list" not in context:
+            context["related_objects_list"] = self._build_related_objects_list(obj)
 
-        context['help_url'] = get_help_url(self, app_label, model_name)
+        context["help_url"] = get_help_url(self, app_label, model_name)
         return context

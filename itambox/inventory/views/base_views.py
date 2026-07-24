@@ -1,37 +1,38 @@
-from django.shortcuts import get_object_or_404, redirect
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.contrib.auth.mixins import LoginRequiredMixin
-from django.urls import reverse
-from django.http import HttpResponseRedirect
-from django.views.generic import View
 from django.db import transaction
+from django.http import HttpResponseRedirect
+from django.shortcuts import get_object_or_404, redirect
+from django.urls import reverse
 from django.utils.translation import gettext_lazy as _
+from django.views.generic import View
 
-from ..models import Accessory, Consumable, AccessoryStock, ConsumableStock, Component, ComponentStock
 from inventory.services import checkout_inventory_item
 from itambox.views.generic.utils import safe_return_url
+
+from ..models import Accessory, AccessoryStock, Component, ComponentStock, Consumable, ConsumableStock
 
 
 class InventoryListView(LoginRequiredMixin, View):
     def get(self, request, *args, **kwargs):
         from django.core.exceptions import PermissionDenied
 
-        target_type = request.GET.get('type')
-        if target_type == 'accessories' and request.user.has_perm('inventory.view_accessory'):
-            return redirect('inventory:accessory_list')
-        elif target_type == 'consumables' and request.user.has_perm('inventory.view_consumable'):
-            return redirect('inventory:consumable_list')
-        elif target_type == 'components' and request.user.has_perm('inventory.view_component'):
-            return redirect('inventory:component_list')
+        target_type = request.GET.get("type")
+        if target_type == "accessories" and request.user.has_perm("inventory.view_accessory"):
+            return redirect("inventory:accessory_list")
+        elif target_type == "consumables" and request.user.has_perm("inventory.view_consumable"):
+            return redirect("inventory:consumable_list")
+        elif target_type == "components" and request.user.has_perm("inventory.view_component"):
+            return redirect("inventory:component_list")
 
         accessible_url = None
-        if request.user.has_perm('inventory.view_component'):
-            accessible_url = reverse('inventory:component_list')
-        elif request.user.has_perm('inventory.view_accessory'):
-            accessible_url = reverse('inventory:accessory_list')
-        elif request.user.has_perm('inventory.view_consumable'):
-            accessible_url = reverse('inventory:consumable_list')
+        if request.user.has_perm("inventory.view_component"):
+            accessible_url = reverse("inventory:component_list")
+        elif request.user.has_perm("inventory.view_accessory"):
+            accessible_url = reverse("inventory:accessory_list")
+        elif request.user.has_perm("inventory.view_consumable"):
+            accessible_url = reverse("inventory:consumable_list")
 
         if not accessible_url:
             raise PermissionDenied(_("You do not have permission to view inventory."))
@@ -42,30 +43,34 @@ class InventoryListView(LoginRequiredMixin, View):
 @login_required
 def bulk_checkout_inventory(request):
     import logging
+
     logger = logging.getLogger(__name__)
 
-    model_name_str = request.POST.get('model_name')
+    model_name_str = request.POST.get("model_name")
     # Resolve correct permission code
-    if model_name_str in ('inventory.accessory', 'inventory.accessorystock'):
-        perm = 'inventory.change_accessory'
-    elif model_name_str in ('inventory.consumable', 'inventory.consumablestock'):
-        perm = 'inventory.change_consumable'
-    elif model_name_str in ('inventory.component', 'inventory.componentstock'):
-        perm = 'inventory.change_component'
+    if model_name_str in ("inventory.accessory", "inventory.accessorystock"):
+        perm = "inventory.change_accessory"
+    elif model_name_str in ("inventory.consumable", "inventory.consumablestock"):
+        perm = "inventory.change_consumable"
+    elif model_name_str in ("inventory.component", "inventory.componentstock"):
+        perm = "inventory.change_component"
     else:
         from django.http import HttpResponseBadRequest
+
         return HttpResponseBadRequest(_("Invalid model specified."))
 
     if not request.user.has_perm(perm):
         from django.http import HttpResponseForbidden
-        return HttpResponseForbidden(_("Permission denied."))
-    if request.method != 'POST':
-        from django.http import HttpResponseNotAllowed
-        return HttpResponseNotAllowed(['POST'])
 
-    object_pks = request.POST.getlist('pk')
-    qty_str = request.POST.get('qty', '1')
-    notes = request.POST.get('notes', '')
+        return HttpResponseForbidden(_("Permission denied."))
+    if request.method != "POST":
+        from django.http import HttpResponseNotAllowed
+
+        return HttpResponseNotAllowed(["POST"])
+
+    object_pks = request.POST.getlist("pk")
+    qty_str = request.POST.get("qty", "1")
+    notes = request.POST.get("notes", "")
 
     try:
         qty = int(qty_str)
@@ -73,26 +78,26 @@ def bulk_checkout_inventory(request):
             raise ValueError()
     except ValueError:
         messages.error(request, _("Invalid checkout quantity specified."))
-        return HttpResponseRedirect(safe_return_url(request, request.META.get('HTTP_REFERER'), '/'))
+        return HttpResponseRedirect(safe_return_url(request, request.META.get("HTTP_REFERER"), "/"))
 
     if not object_pks:
         messages.error(request, _("No items selected."))
-        return HttpResponseRedirect(safe_return_url(request, request.META.get('HTTP_REFERER'), '/'))
+        return HttpResponseRedirect(safe_return_url(request, request.META.get("HTTP_REFERER"), "/"))
 
-    from organization.models import AssetHolder, Location
     from assets.models import Asset
+    from organization.models import AssetHolder, Location
 
-    holder_id = request.POST.get('assigned_holder')
-    location_id = request.POST.get('assigned_location')
-    asset_id = request.POST.get('assigned_asset')
+    holder_id = request.POST.get("assigned_holder")
+    location_id = request.POST.get("assigned_location")
+    asset_id = request.POST.get("assigned_asset")
 
     filled = [t for t in [holder_id, location_id, asset_id] if t]
     if len(filled) == 0:
         messages.error(request, _("You must select either an Asset Holder, a Location, or an Asset."))
-        return HttpResponseRedirect(safe_return_url(request, request.META.get('HTTP_REFERER'), '/'))
+        return HttpResponseRedirect(safe_return_url(request, request.META.get("HTTP_REFERER"), "/"))
     if len(filled) > 1:
         messages.error(request, _("Please select only one target (Asset Holder, Location, or Asset)."))
-        return HttpResponseRedirect(safe_return_url(request, request.META.get('HTTP_REFERER'), '/'))
+        return HttpResponseRedirect(safe_return_url(request, request.META.get("HTTP_REFERER"), "/"))
 
     holder = None
     location = None
@@ -108,10 +113,10 @@ def bulk_checkout_inventory(request):
     success_count = 0
     failure_count = 0
 
-    if model_name_str in ('inventory.accessory', 'inventory.accessorystock'):
+    if model_name_str in ("inventory.accessory", "inventory.accessorystock"):
         item_model = Accessory
         stock_model = AccessoryStock
-    elif model_name_str in ('inventory.consumable', 'inventory.consumablestock'):
+    elif model_name_str in ("inventory.consumable", "inventory.consumablestock"):
         item_model = Consumable
         stock_model = ConsumableStock
     else:
@@ -119,12 +124,12 @@ def bulk_checkout_inventory(request):
         stock_model = ComponentStock
 
     with transaction.atomic():
-        if model_name_str in ('inventory.accessory', 'inventory.consumable', 'inventory.component'):
+        if model_name_str in ("inventory.accessory", "inventory.consumable", "inventory.component"):
             # Catalog page checkouts: requires from_location
-            from_location_id = request.POST.get('from_location')
+            from_location_id = request.POST.get("from_location")
             if not from_location_id:
                 messages.error(request, _("No source location specified."))
-                return HttpResponseRedirect(safe_return_url(request, request.META.get('HTTP_REFERER'), '/'))
+                return HttpResponseRedirect(safe_return_url(request, request.META.get("HTTP_REFERER"), "/"))
             from_location = get_object_or_404(Location, pk=from_location_id)
 
             for pk in object_pks:
@@ -138,15 +143,17 @@ def bulk_checkout_inventory(request):
                         asset=asset,
                         user=request.user,
                         notes=notes,
-                        source_location=from_location
+                        source_location=from_location,
                     )
                     success_count += 1
                 except Exception as ex:
                     failure_count += 1
                     logger.exception(f"Failed to bulk checkout {item_model.__name__} PK {pk}")
-                    messages.error(request, _("Failed to check out %(item)s: %(error)s") % {"item": item, "error": str(ex)})
+                    messages.error(
+                        request, _("Failed to check out %(item)s: %(error)s") % {"item": item, "error": str(ex)}
+                    )
 
-        elif model_name_str in ('inventory.accessorystock', 'inventory.consumablestock', 'inventory.componentstock'):
+        elif model_name_str in ("inventory.accessorystock", "inventory.consumablestock", "inventory.componentstock"):
             # Stocks page checkouts: from_location determined per stock record
             for pk in object_pks:
                 try:
@@ -160,7 +167,7 @@ def bulk_checkout_inventory(request):
                         asset=asset,
                         user=request.user,
                         notes=notes,
-                        source_location=stock.location
+                        source_location=stock.location,
                     )
                     success_count += 1
                 except Exception as ex:
@@ -171,12 +178,12 @@ def bulk_checkout_inventory(request):
     if success_count > 0:
         messages.success(request, _("Successfully checked out %(count)s item(s).") % {"count": success_count})
 
-    redirect_url = reverse('inventory:inventory_list')
-    if model_name_str in ('inventory.accessory', 'inventory.accessorystock'):
-        redirect_url = reverse('inventory:accessory_list')
-    elif model_name_str in ('inventory.consumable', 'inventory.consumablestock'):
-        redirect_url = reverse('inventory:consumable_list')
-    elif model_name_str in ('inventory.component', 'inventory.componentstock'):
-        redirect_url = reverse('inventory:component_list')
+    redirect_url = reverse("inventory:inventory_list")
+    if model_name_str in ("inventory.accessory", "inventory.accessorystock"):
+        redirect_url = reverse("inventory:accessory_list")
+    elif model_name_str in ("inventory.consumable", "inventory.consumablestock"):
+        redirect_url = reverse("inventory:consumable_list")
+    elif model_name_str in ("inventory.component", "inventory.componentstock"):
+        redirect_url = reverse("inventory:component_list")
 
-    return HttpResponseRedirect(safe_return_url(request, request.META.get('HTTP_REFERER'), redirect_url))
+    return HttpResponseRedirect(safe_return_url(request, request.META.get("HTTP_REFERER"), redirect_url))

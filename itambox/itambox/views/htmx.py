@@ -8,52 +8,54 @@ class BaseHTMXView:
     content_partial_name = None
 
     def get_template_names(self):
-        if not hasattr(self, 'template_name') or not self.template_name:
-            if hasattr(super(), 'get_template_names'):
+        if not hasattr(self, "template_name") or not self.template_name:
+            if hasattr(super(), "get_template_names"):
                 return super().get_template_names()
-            raise ImproperlyConfigured(
-                f"{self.__class__.__name__} needs a template_name attribute defined."
-            )
+            raise ImproperlyConfigured(f"{self.__class__.__name__} needs a template_name attribute defined.")
         return [self.template_name]
 
     def _is_boosted_main_swap(self):
         request = self.request
-        if not getattr(request, 'htmx', False):
+        if not getattr(request, "htmx", False):
             return False
-        target = getattr(request.htmx, 'target', '') or ''
-        return getattr(request.htmx, 'boosted', False) or \
-               getattr(request.htmx, 'history_restore_request', False) or \
-               target in ('page-content-wrapper', '#page-content-wrapper', 'page-body-main', '#page-body-main')
+        target = getattr(request.htmx, "target", "") or ""
+        return (
+            getattr(request.htmx, "boosted", False)
+            or getattr(request.htmx, "history_restore_request", False)
+            or target in ("page-content-wrapper", "#page-content-wrapper", "page-body-main", "#page-body-main")
+        )
 
     def is_htmx_partial(self):
         """True when this request will be answered with the content partial
         (not the full page and not a boosted main swap)."""
-        return bool(getattr(self.request, 'htmx', False)) and not self._is_boosted_main_swap()
+        return bool(getattr(self.request, "htmx", False)) and not self._is_boosted_main_swap()
 
     def render_to_response(self, context, **response_kwargs):
         request = self.request
 
-        if getattr(request, 'htmx', False):
-            context['request'] = request
+        if getattr(request, "htmx", False):
+            context["request"] = request
 
             if self._is_boosted_main_swap():
-                context['base_template'] = 'base_htmx.html'
-                context.setdefault('title', 'ITAMbox')
-                context.setdefault('breadcrumbs', [(reverse('dashboard'), _('Dashboard')), (None, context['title'])])
-                context.setdefault('page_actions', None)
+                context["base_template"] = "base_htmx.html"
+                context.setdefault("title", "ITAMbox")
+                context.setdefault("breadcrumbs", [(reverse("dashboard"), _("Dashboard")), (None, context["title"])])
+                context.setdefault("page_actions", None)
             elif self.content_partial_name:
                 return render(request, self.content_partial_name, context)
 
-        if hasattr(super(), 'render_to_response'):
+        if hasattr(super(), "render_to_response"):
             return super().render_to_response(context, **response_kwargs)
         else:
-            if hasattr(self, 'response_class') and hasattr(self, 'get_template_names'):
-                 return self.response_class(
+            if hasattr(self, "response_class") and hasattr(self, "get_template_names"):
+                return self.response_class(
                     request=request,
                     template=self.get_template_names(),
                     context=context,
                     using=self.template_engine,
-                    **response_kwargs
+                    **response_kwargs,
                 )
             else:
-                raise ImproperlyConfigured(f"{self.__class__.__name__} or its superclasses must provide a render_to_response method or be mixed with TemplateResponseMixin.")
+                raise ImproperlyConfigured(
+                    f"{self.__class__.__name__} or its superclasses must provide a render_to_response method or be mixed with TemplateResponseMixin."
+                )

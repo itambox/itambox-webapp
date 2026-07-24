@@ -1,14 +1,15 @@
 """Tests for assets/scanning.py and the /scan/resolve/ endpoint."""
+
 import json
 
-from django.test import TestCase, RequestFactory
-from django.urls import reverse
 from django.contrib.auth import get_user_model
+from django.test import RequestFactory, TestCase
+from django.urls import reverse
 
-from assets.models import Asset, AssetType, StatusLabel, AssetRole, Manufacturer
+from assets.models import Asset, AssetRole, AssetType, Manufacturer, StatusLabel
 from assets.scanning import resolve_scanned_code
 from core.tests.mixins import TenantTestMixin
-from organization.models import Tenant, Membership, Role
+from organization.models import Membership, Role, Tenant
 
 User = get_user_model()
 
@@ -17,21 +18,19 @@ User = get_user_model()
 # Helpers
 # ─────────────────────────────────────────────────────────────────────────────
 
+
 def _make_asset_fixtures():
     mfr = Manufacturer.objects.create(name="TestMfr", slug="testmfr")
     role = AssetRole.objects.create(name="TestRole", slug="testrole")
-    status = StatusLabel.objects.create(
-        name="Active", slug="active-scan-test", type=StatusLabel.TYPE_DEPLOYABLE
-    )
-    atype = AssetType.objects.create(
-        manufacturer=mfr, model="TestModel", slug="test-model", requestable=False
-    )
+    status = StatusLabel.objects.create(name="Active", slug="active-scan-test", type=StatusLabel.TYPE_DEPLOYABLE)
+    atype = AssetType.objects.create(manufacturer=mfr, model="TestModel", slug="test-model", requestable=False)
     return role, status, atype
 
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Unit tests for resolve_scanned_code
 # ─────────────────────────────────────────────────────────────────────────────
+
 
 class ResolveScannedCodeTests(TenantTestMixin, TestCase):
     def setUp(self):
@@ -125,12 +124,10 @@ class ResolveScannedCodeTests(TenantTestMixin, TestCase):
         self.assertEqual(result, self.asset)
 
 
-
-
-
 # ─────────────────────────────────────────────────────────────────────────────
 # ScanResolveView endpoint tests
 # ─────────────────────────────────────────────────────────────────────────────
+
 
 class ScanResolveViewTests(TenantTestMixin, TestCase):
     def setUp(self):
@@ -229,7 +226,6 @@ class ScanResolveViewTests(TenantTestMixin, TestCase):
         data = json.loads(resp.content)
         self.assertTrue(data["found"])
 
-
     def test_member_without_view_asset_gets_403(self):
         """Member with no assets.view_asset permission is denied."""
         # tenant_user has empty permissions (setup_tenant_context default).
@@ -241,7 +237,7 @@ class ScanResolveViewTests(TenantTestMixin, TestCase):
 
     def test_member_with_view_asset_sees_own_tenant_not_other(self):
         """Member with view_asset resolves own-tenant asset and gets 404 for other tenant's tag."""
-        from assets.models import Manufacturer, AssetRole, StatusLabel, AssetType
+        from assets.models import AssetRole, AssetType, Manufacturer, StatusLabel
 
         # Give tenant_user the view_asset permission.
         self.tenant_role.permissions = ["assets.view_asset"]

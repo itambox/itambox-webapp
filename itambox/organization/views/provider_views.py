@@ -5,6 +5,7 @@ into the unified "Add member" flow: ``TechnicianQuickAddView`` is now a thin
 redirect to ``memberships/add/?tenant=<msp pk>&preset=technician``. The nav item
 "Add Technician" keeps pointing at this route, so bookmarks and menus survive.
 """
+
 from urllib.parse import urlencode
 
 from django.contrib.auth.mixins import LoginRequiredMixin
@@ -25,12 +26,16 @@ def _provider_tenants_with_perm(user, perm):
     """
     if not (user and user.is_authenticated):
         return []
-    candidates = Tenant._base_manager.filter(
-        is_provider=True,
-        deleted_at__isnull=True,
-        memberships__user=user,
-        memberships__is_active=True,
-    ).distinct().order_by('name')
+    candidates = (
+        Tenant._base_manager.filter(
+            is_provider=True,
+            deleted_at__isnull=True,
+            memberships__user=user,
+            memberships__is_active=True,
+        )
+        .distinct()
+        .order_by("name")
+    )
     return [t for t in candidates if user.has_perm(perm, obj=t)]
 
 
@@ -43,18 +48,23 @@ class TechnicianQuickAddView(LoginRequiredMixin, View):
     No form logic lives here anymore — the target ``MembershipCreateView``
     enforces the actual ``add_membership`` permission and the escalation guards.
     """
-    http_method_names = ['get']
+
+    http_method_names = ["get"]
 
     def get(self, request):
         candidates = _provider_tenants_with_perm(
-            request.user, 'organization.add_membership',
+            request.user,
+            "organization.add_membership",
         )
-        if getattr(request.user, 'is_superuser', False) and not candidates:
-            candidates = list(Tenant._base_manager.filter(
-                is_provider=True, deleted_at__isnull=True,
-            ).order_by('name'))
+        if getattr(request.user, "is_superuser", False) and not candidates:
+            candidates = list(
+                Tenant._base_manager.filter(
+                    is_provider=True,
+                    deleted_at__isnull=True,
+                ).order_by("name")
+            )
 
-        active = getattr(request, 'active_tenant', None)
+        active = getattr(request, "active_tenant", None)
         msp = None
         if active is not None and any(t.pk == active.pk for t in candidates):
             msp = active
@@ -62,11 +72,7 @@ class TechnicianQuickAddView(LoginRequiredMixin, View):
             msp = candidates[0]
 
         if msp is None:
-            raise PermissionDenied(
-                _("No managing organization is available for technician onboarding.")
-            )
+            raise PermissionDenied(_("No managing organization is available for technician onboarding."))
 
-        params = {'preset': 'technician', 'tenant': msp.pk}
-        return redirect(
-            f"{reverse('organization:membership_create')}?{urlencode(params)}"
-        )
+        params = {"preset": "technician", "tenant": msp.pk}
+        return redirect(f"{reverse('organization:membership_create')}?{urlencode(params)}")

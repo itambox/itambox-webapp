@@ -5,6 +5,7 @@ Covers:
   - ``TokenPermissions.has_object_permission`` now resolves against the object's tenant
   - the ``validate_role_permissions`` management command
 """
+
 from io import StringIO
 from types import SimpleNamespace
 
@@ -14,10 +15,10 @@ from django.core.management import call_command
 from django.test import RequestFactory, TestCase
 
 from core.auth.guards import validate_permission_grant
-from core.managers import set_current_tenant, set_current_membership
+from core.managers import set_current_membership, set_current_tenant
 from core.tests.mixins import grant
 from itambox.api.permissions import TokenPermissions
-from organization.models import Tenant, Membership, Role
+from organization.models import Membership, Role, Tenant
 
 User = get_user_model()
 
@@ -39,7 +40,7 @@ def _superuser(username):
 
 
 def _membership(user, tenant, roles=None):
-    m, _ = Membership.objects.get_or_create(user=user, tenant=tenant, defaults={'is_active': True})
+    m, _ = Membership.objects.get_or_create(user=user, tenant=tenant, defaults={"is_active": True})
     for role in roles or []:
         grant(user, tenant, role)
     return m
@@ -56,8 +57,11 @@ class _Ctx:
 
     def _flush(self, user):
         for attr in list(user.__dict__):
-            if (attr.startswith('_perms_tenant_') or attr.startswith('_tenant_membership_')
-                    or attr == '_global_caps_cache'):
+            if (
+                attr.startswith("_perms_tenant_")
+                or attr.startswith("_tenant_membership_")
+                or attr == "_global_caps_cache"
+            ):
                 delattr(user, attr)
 
 
@@ -117,7 +121,7 @@ class TokenObjectPermissionTests(_Ctx, TestCase):
 
     def _check(self, obj):
         perm = TokenPermissions()
-        request = self.factory.get('/')
+        request = self.factory.get("/")
         request.user = self.user
         view = SimpleNamespace(queryset=Role._base_manager.all())
         return perm.has_object_permission(request, view, obj)
@@ -141,7 +145,7 @@ class ValidateRolePermissionsCommandTests(_Ctx, TestCase):
         _role(self.t, "Bad", ["assets.view_asset", "assets.bogus_codename"])
         out = StringIO()
         with self.assertRaises(SystemExit):
-            call_command('validate_role_permissions', stdout=out, stderr=StringIO())
+            call_command("validate_role_permissions", stdout=out, stderr=StringIO())
         output = out.getvalue()
         self.assertIn("assets.bogus_codename", output)
         self.assertIn("stale", output.lower())
@@ -149,5 +153,5 @@ class ValidateRolePermissionsCommandTests(_Ctx, TestCase):
     def test_all_valid_reports_success(self):
         _role(self.t, "Good", ["assets.view_asset", "assets.add_asset"])
         out = StringIO()
-        call_command('validate_role_permissions', stdout=out, stderr=StringIO())
+        call_command("validate_role_permissions", stdout=out, stderr=StringIO())
         self.assertIn("valid", out.getvalue().lower())

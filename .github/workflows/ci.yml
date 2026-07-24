@@ -5,16 +5,17 @@ on:
     branches: [master, main]
   pull_request:
     paths:
-      - ".github/workflows/ci.yml"
-      - "itambox/**/migrations/**"
-      - "itambox/**/models.py"
-      - "itambox/**/models/**"
+      - ".github/workflows/**"
+      - ".pre-commit-config.yaml"
+      - "Makefile"
+      - "pyproject.toml"
+      - "setup.cfg"
+      - "uv.lock"
+      - "itambox/**/*.py"
       - "itambox/docs/development/migration-verification.md"
       - "itambox/mkdocs.yml"
-      - "scripts/migration_audit.py"
+      - "scripts/**/*.py"
       - "scripts/migration_audit.json"
-      - "scripts/tests/test_migration_audit.py"
-      - "uv.lock"
   workflow_dispatch:
 
 permissions:
@@ -150,6 +151,14 @@ jobs:
         run: |
           uv lock --check
           uv sync --locked --only-group dev
+
+      - name: Check import order (Ruff)
+        run: |
+          uv run --locked --no-sync ruff check --select I itambox scripts
+
+      - name: Check formatting (Ruff)
+        run: |
+          uv run --locked --no-sync ruff format --check itambox scripts
 
       - name: Lint with flake8 (blocking baseline gate)
         run: |

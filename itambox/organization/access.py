@@ -1,14 +1,14 @@
 """Canonical tenant, RBAC, and explicitly shared-resource access helpers."""
+
 import contextvars
 
 from django.utils import timezone
-
 
 # Request-local memo for the recursive descendant walk below. Each request runs
 # in its own context, so the cache lives for the request lifetime and is
 # discarded when the context ends. Keyed by (group_id, live_only).
 _descendant_group_ids_cache = contextvars.ContextVar(
-    'descendant_tenant_group_ids_cache',
+    "descendant_tenant_group_ids_cache",
     default=None,
 )
 
@@ -26,10 +26,13 @@ def get_descendant_tenant_group_ids(group_id, live_only=False):
     # inline import: avoids organization model import during app initialization.
     from organization.models import TenantGroup
 
-    if live_only and not TenantGroup._base_manager.filter(
-        pk=group_id,
-        deleted_at__isnull=True,
-    ).exists():
+    if (
+        live_only
+        and not TenantGroup._base_manager.filter(
+            pk=group_id,
+            deleted_at__isnull=True,
+        ).exists()
+    ):
         cache[cache_key] = set()
         return cache[cache_key]
 
@@ -41,7 +44,7 @@ def get_descendant_tenant_group_ids(group_id, live_only=False):
         ).exclude(pk__in=ids)
         if live_only:
             children_qs = children_qs.filter(deleted_at__isnull=True)
-        children = list(children_qs.values_list('pk', flat=True))
+        children = list(children_qs.values_list("pk", flat=True))
         if not children:
             break
         ids.update(children)
@@ -59,15 +62,11 @@ def get_ancestor_tenant_group_ids(group_id, live_only=False):
     seen = set()
     node = group_id
     while node is not None and node not in seen:
-        row = (
-            TenantGroup._base_manager.filter(pk=node)
-            .values('parent_id', 'deleted_at')
-            .first()
-        )
-        if row is None or (live_only and row['deleted_at'] is not None):
+        row = TenantGroup._base_manager.filter(pk=node).values("parent_id", "deleted_at").first()
+        if row is None or (live_only and row["deleted_at"] is not None):
             break
         seen.add(node)
-        node = row['parent_id']
+        node = row["parent_id"]
     return seen
 
 
@@ -76,10 +75,11 @@ def shared_resource_ids(model, tenant):
     # inline imports: avoid AppRegistryNotReady during app initialization.
     from django.contrib.contenttypes.models import ContentType
     from django.db.models import Q
+
     from organization.models import TenantResourceGrant
 
     if tenant is None:
-        return TenantResourceGrant.objects.none().values_list('resource_id', flat=True)
+        return TenantResourceGrant.objects.none().values_list("resource_id", flat=True)
     content_type = ContentType.objects.get_for_model(model)
     grantee = Q(grantee_tenant_id=tenant.pk)
     ancestor_group_ids = get_ancestor_tenant_group_ids(
@@ -91,7 +91,7 @@ def shared_resource_ids(model, tenant):
     return (
         TenantResourceGrant.objects.filter(resource_type=content_type)
         .filter(grantee)
-        .values_list('resource_id', flat=True)
+        .values_list("resource_id", flat=True)
     )
 
 
@@ -103,10 +103,10 @@ def accessible_tenant_ids_with_expiry(user):
     generation would keep serving an expired grant's tenant forever. ``None``
     means nothing cached here carries a clock-based expiry.
     """
-    if user is None or not getattr(user, 'is_authenticated', False):
+    if user is None or not getattr(user, "is_authenticated", False):
         return frozenset(), None
-    cache_key = '_accessible_tenant_ids'
-    expiry_key = '_accessible_tenant_ids_valid_until'
+    cache_key = "_accessible_tenant_ids"
+    expiry_key = "_accessible_tenant_ids_valid_until"
     # Request-local memoization keyed to the user instance. filter_by_tenant()
     # calls this for EVERY tenant-scoped model rendered on a page; under a
     # tenant-group scope that recomputed the full grant walk dozens of times per
@@ -120,11 +120,12 @@ def accessible_tenant_ids_with_expiry(user):
     # outage makes synchronize_authorization_cache() fail open to a fresh local
     # version on every call, which forces a recompute below rather than ever
     # serving a stale set while the shared cache is unreachable.
-    can_cache = hasattr(user, '__dict__')
+    can_cache = hasattr(user, "__dict__")
     if can_cache:
         # inline import: avoids an organization.access -> core.auth import cycle
         # at load (core.auth resolves permissions through organization.rbac).
         from core.auth.cache import synchronize_authorization_cache
+
         synchronize_authorization_cache(user)
         cached = user.__dict__.get(cache_key)
         if cached is not None:
@@ -133,6 +134,7 @@ def accessible_tenant_ids_with_expiry(user):
                 return cached, cached_valid_until
     # inline import: avoids organization.access <-> organization.rbac at load time.
     from organization.rbac import resolve_accessible_tenant_ids_with_expiry
+
     result, valid_until = resolve_accessible_tenant_ids_with_expiry(user)
     result = frozenset(result)
     if can_cache:
@@ -147,7 +149,7 @@ def accessible_tenant_ids(user):
 
 
 def managed_accessible_tenant_ids(user):
-    if user is None or not getattr(user, 'is_authenticated', False):
+    if user is None or not getattr(user, "is_authenticated", False):
         return set()
     # inline import: avoids organization.access <-> organization.rbac at load time.
     from organization.rbac import applicable_grants
@@ -163,6 +165,7 @@ def tenant_access_report(tenant, external_only=False):
     # inline imports: keep this model-heavy module safe during app setup.
     from django.db.models import Q
     from django.utils import timezone
+
     from organization.models import Membership, RoleGrant
 
     user_data = {}
@@ -170,10 +173,10 @@ def tenant_access_report(tenant, external_only=False):
     def entry_for(user):
         if user.pk not in user_data:
             user_data[user.pk] = {
-                'user': user,
-                'sources': set(),
-                'groups': set(),
-                'permissions': set(),
+                "user": user,
+                "sources": set(),
+                "groups": set(),
+                "permissions": set(),
             }
         return user_data[user.pk]
 
@@ -181,24 +184,24 @@ def tenant_access_report(tenant, external_only=False):
         memberships = Membership.objects.filter(
             tenant=tenant,
             is_active=True,
-        ).select_related('user')
+        ).select_related("user")
         for membership in memberships:
-            entry_for(membership.user)['sources'].add('membership')
+            entry_for(membership.user)["sources"].add("membership")
 
     grants = (
         RoleGrant.objects.filter(role__deleted_at__isnull=True)
         .filter(Q(valid_until__isnull=True) | Q(valid_until__gt=timezone.now()))
         .select_related(
-            'membership__user',
-            'membership__tenant',
-            'user_group__tenant',
-            'role__tenant',
+            "membership__user",
+            "membership__tenant",
+            "user_group__tenant",
+            "role__tenant",
         )
         .prefetch_related(
-            'scopes',
-            'scopes__tenant',
-            'scopes__tenant_group',
-            'user_group__group_memberships__membership__user',
+            "scopes",
+            "scopes__tenant",
+            "scopes__tenant_group",
+            "user_group__group_memberships__membership__user",
         )
     )
     for grant in grants:
@@ -208,9 +211,9 @@ def tenant_access_report(tenant, external_only=False):
             if not grant.membership.is_active:
                 continue
             entry = entry_for(grant.membership.user)
-            source = 'membership' if grant.membership.tenant_id == tenant.pk else 'managed'
-            entry['sources'].add(source)
-            entry['permissions'].update(grant.role.permissions or [])
+            source = "membership" if grant.membership.tenant_id == tenant.pk else "managed"
+            entry["sources"].add(source)
+            entry["permissions"].update(grant.role.permissions or [])
             continue
 
         group = grant.user_group
@@ -221,29 +224,27 @@ def tenant_access_report(tenant, external_only=False):
             if not membership.is_active or membership.tenant_id != group.tenant_id:
                 continue
             entry = entry_for(membership.user)
-            entry['sources'].add('group')
+            entry["sources"].add("group")
             if group.tenant_id != tenant.pk:
-                entry['sources'].add('managed')
-            entry['groups'].add(group.name)
-            entry['permissions'].update(grant.role.permissions or [])
+                entry["sources"].add("managed")
+            entry["groups"].add(group.name)
+            entry["permissions"].update(grant.role.permissions or [])
 
     if external_only:
-        local_user_ids = set(
-            Membership.objects.filter(tenant=tenant).values_list('user_id', flat=True)
-        )
-        user_data = {
-            pk: data for pk, data in user_data.items() if pk not in local_user_ids
-        }
+        local_user_ids = set(Membership.objects.filter(tenant=tenant).values_list("user_id", flat=True))
+        user_data = {pk: data for pk, data in user_data.items() if pk not in local_user_ids}
 
     report = []
     for data in user_data.values():
-        user = data['user']
-        report.append({
-            'user': user,
-            'sources': sorted(data['sources']),
-            'groups': sorted(data['groups']),
-            'permissions': sorted(data['permissions']),
-            'inactive': not (user.is_active and getattr(user, 'can_login', True)),
-        })
-    report.sort(key=lambda row: (row['user'].username or '').lower())
+        user = data["user"]
+        report.append(
+            {
+                "user": user,
+                "sources": sorted(data["sources"]),
+                "groups": sorted(data["groups"]),
+                "permissions": sorted(data["permissions"]),
+                "inactive": not (user.is_active and getattr(user, "can_login", True)),
+            }
+        )
+    report.sort(key=lambda row: (row["user"].username or "").lower())
     return report

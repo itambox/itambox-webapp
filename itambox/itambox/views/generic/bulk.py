@@ -11,40 +11,44 @@ from django.views.generic import View
 from django.views.generic.base import TemplateResponseMixin
 
 from core.forms import BulkEditForm
-from itambox.views.htmx import BaseHTMXView
 from itambox.views.generic.mixins import (
     BulkViewMixin,
     filter_permitted_rows,
     user_can_mutate_model,
 )
 from itambox.views.generic.utils import safe_return_url
+from itambox.views.htmx import BaseHTMXView
 
 logger = logging.getLogger(__name__)
 
 
-class ObjectBulkEditView(BulkViewMixin, PermissionRequiredMixin, LoginRequiredMixin, BaseHTMXView, TemplateResponseMixin, View):
+class ObjectBulkEditView(
+    BulkViewMixin, PermissionRequiredMixin, LoginRequiredMixin, BaseHTMXView, TemplateResponseMixin, View
+):
     queryset = None
     form_class = None
-    template_name = 'generic/object_bulk_edit.html'
+    template_name = "generic/object_bulk_edit.html"
     # The request-selected fallback form intentionally supports ordinary
     # tenant-scoped business models. These two models have security-specific
     # forms whose invariants cannot be reproduced by the scalar-field generator:
     # Tenant topology/provider edges are superuser-only, and Role ownership plus
     # projected permissions require escalation checks. Their dedicated views
     # remain available; the global ``/bulk-edit/`` escape hatch does not.
-    dynamic_model_denylist = frozenset({
-        'organization.role',
-        'organization.tenant',
-    })
+    dynamic_model_denylist = frozenset(
+        {
+            "organization.role",
+            "organization.tenant",
+        }
+    )
 
     def _uses_request_selected_model(self):
         return (
             self.queryset is None
-            and getattr(self, 'model', None) is None
+            and getattr(self, "model", None) is None
             and not (
                 self.form_class is not None
-                and getattr(self.form_class, '_meta', None) is not None
-                and getattr(self.form_class._meta, 'model', None) is not None
+                and getattr(self.form_class, "_meta", None) is not None
+                and getattr(self.form_class._meta, "model", None) is not None
             )
         )
 
@@ -56,19 +60,16 @@ class ObjectBulkEditView(BulkViewMixin, PermissionRequiredMixin, LoginRequiredMi
             and model._meta.label_lower in self.dynamic_model_denylist
         ):
             return False
-        return (
-            user_can_mutate_model(self.request.user, model)
-            and super().has_permission()
-        )
+        return user_can_mutate_model(self.request.user, model) and super().has_permission()
 
     def get_permission_required(self):
         model = self._get_model()
         if model:
-            return (f'{model._meta.app_label}.change_{model._meta.model_name}',)
-        return ('',)
+            return (f"{model._meta.app_label}.change_{model._meta.model_name}",)
+        return ("",)
 
     def _get_bulk_edit_form(self, data=None, model=None):
-        form_class = getattr(self, 'form_class', None) or BulkEditForm
+        form_class = getattr(self, "form_class", None) or BulkEditForm
         # Every bulk-edit form derives from BulkEditForm, whose __init__ builds the
         # per-field edit widgets from `model`. Detect the subclass directly rather than
         # introspecting __init__: a subclass with a `*args, **kwargs` signature (e.g.
@@ -79,60 +80,74 @@ class ObjectBulkEditView(BulkViewMixin, PermissionRequiredMixin, LoginRequiredMi
         return form_class(data)
 
     def post(self, request, *args, **kwargs):
-        pks = request.POST.getlist('pk')
+        pks = request.POST.getlist("pk")
         model = self._get_model()
         return_url = safe_return_url(
             request,
-            request.POST.get('return_url') or request.META.get('HTTP_REFERER'),
-            reverse('dashboard'),
+            request.POST.get("return_url") or request.META.get("HTTP_REFERER"),
+            reverse("dashboard"),
         )
-        raw_selected_fields = request.POST.getlist('_selected_fields')
-        selected_fields = [f for f in raw_selected_fields if f not in ('add_tags', 'remove_tags')]
+        raw_selected_fields = request.POST.getlist("_selected_fields")
+        selected_fields = [f for f in raw_selected_fields if f not in ("add_tags", "remove_tags")]
 
         if not pks:
-            messages.warning(request, _("No %(objects)s were selected.") % {'objects': model._meta.verbose_name_plural})
+            messages.warning(request, _("No %(objects)s were selected.") % {"objects": model._meta.verbose_name_plural})
             return HttpResponseRedirect(return_url)
 
         # Per-row change-perm enforcement (see filter_permitted_rows): the
         # dispatch gate alone is too coarse inside a multi-tenant group scope.
-        queryset, skipped = filter_permitted_rows(request.user, self._get_queryset(pks), model, 'change')
+        queryset, skipped = filter_permitted_rows(request.user, self._get_queryset(pks), model, "change")
         if skipped:
-            messages.warning(request, _(
-                "Skipped %(count)s %(objects)s you do not have permission to change."
-            ) % {'count': skipped, 'objects': model._meta.verbose_name_plural})
+            messages.warning(
+                request,
+                _("Skipped %(count)s %(objects)s you do not have permission to change.")
+                % {"count": skipped, "objects": model._meta.verbose_name_plural},
+            )
         if not queryset:
             return HttpResponseRedirect(return_url)
 
-        if '_apply' in request.POST:
+        if "_apply" in request.POST:
             form = self._get_bulk_edit_form(request.POST, model)
 
-            if form.is_valid() and (selected_fields or ('add_tags' in raw_selected_fields and form.cleaned_data.get('add_tags')) or ('remove_tags' in raw_selected_fields and form.cleaned_data.get('remove_tags'))):
-
+            if form.is_valid() and (
+                selected_fields
+                or ("add_tags" in raw_selected_fields and form.cleaned_data.get("add_tags"))
+                or ("remove_tags" in raw_selected_fields and form.cleaned_data.get("remove_tags"))
+            ):
                 # Validate tenant assignment permissions for bulk edits
-                if 'tenant' in selected_fields and 'tenant' in form.cleaned_data:
-                    selected_tenant = form.cleaned_data['tenant']
+                if "tenant" in selected_fields and "tenant" in form.cleaned_data:
+                    selected_tenant = form.cleaned_data["tenant"]
                     if selected_tenant:
                         app_label = model._meta.app_label
                         model_name = model._meta.model_name
-                        perm_codename = f'{app_label}.change_{model_name}'
+                        perm_codename = f"{app_label}.change_{model_name}"
                         if not request.user.has_perm(perm_codename, obj=selected_tenant):
-                            messages.error(request, _("You do not have permission to assign objects to tenant '%(tenant)s'.") % {'tenant': selected_tenant})
-                            form.add_error('tenant', _("You do not have permission to assign objects to tenant '%(tenant)s'.") % {'tenant': selected_tenant})
+                            messages.error(
+                                request,
+                                _("You do not have permission to assign objects to tenant '%(tenant)s'.")
+                                % {"tenant": selected_tenant},
+                            )
+                            form.add_error(
+                                "tenant",
+                                _("You do not have permission to assign objects to tenant '%(tenant)s'.")
+                                % {"tenant": selected_tenant},
+                            )
                             context = {
-                                'form': form,
-                                'model': model,
-                                'model_name': f'{model._meta.app_label}.{model._meta.model_name}',
-                                'objects': queryset,
-                                'object_pks': pks,
-                                'return_url': return_url,
-                                'selected_fields': selected_fields,
-                                'verbose_name': model._meta.verbose_name,
-                                'verbose_name_plural': model._meta.verbose_name_plural,
-                                'title': _('Bulk Edit %(objects)s') % {'objects': str(model._meta.verbose_name_plural).title()},
-                                'breadcrumbs': [
-                                    (reverse('dashboard'), _('Dashboard')),
+                                "form": form,
+                                "model": model,
+                                "model_name": f"{model._meta.app_label}.{model._meta.model_name}",
+                                "objects": queryset,
+                                "object_pks": pks,
+                                "return_url": return_url,
+                                "selected_fields": selected_fields,
+                                "verbose_name": model._meta.verbose_name,
+                                "verbose_name_plural": model._meta.verbose_name_plural,
+                                "title": _("Bulk Edit %(objects)s")
+                                % {"objects": str(model._meta.verbose_name_plural).title()},
+                                "breadcrumbs": [
+                                    (reverse("dashboard"), _("Dashboard")),
                                     (return_url, str(model._meta.verbose_name_plural).title()),
-                                    (None, _('Bulk Edit (%(count)s)') % {'count': len(pks)}),
+                                    (None, _("Bulk Edit (%(count)s)") % {"count": len(pks)}),
                                 ],
                             }
                             return self.render_to_response(context)
@@ -141,142 +156,154 @@ class ObjectBulkEditView(BulkViewMixin, PermissionRequiredMixin, LoginRequiredMi
 
                 with transaction.atomic():
                     for obj in queryset:
-                        if hasattr(obj, 'snapshot') and callable(obj.snapshot):
+                        if hasattr(obj, "snapshot") and callable(obj.snapshot):
                             obj.snapshot()
 
                         for field_name in selected_fields:
                             if field_name in form.cleaned_data:
                                 val = form.cleaned_data[field_name]
                                 field = model._meta.get_field(field_name)
-                                if field.is_relation and val == '':
+                                if field.is_relation and val == "":
                                     val = None
                                 setattr(obj, field.attname, val)
 
                         obj.full_clean()
                         obj.save()
 
-                        if hasattr(obj, 'tags'):
-                            if 'add_tags' in raw_selected_fields and form.cleaned_data.get('add_tags'):
-                                obj.tags.add(*form.cleaned_data['add_tags'])
-                            if 'remove_tags' in raw_selected_fields and form.cleaned_data.get('remove_tags'):
-                                obj.tags.remove(*form.cleaned_data['remove_tags'])
+                        if hasattr(obj, "tags"):
+                            if "add_tags" in raw_selected_fields and form.cleaned_data.get("add_tags"):
+                                obj.tags.add(*form.cleaned_data["add_tags"])
+                            if "remove_tags" in raw_selected_fields and form.cleaned_data.get("remove_tags"):
+                                obj.tags.remove(*form.cleaned_data["remove_tags"])
 
                         updated_count += 1
 
                 messages.success(
                     request,
-                    _("Updated %(count)s %(objects)s.") % {'count': updated_count, 'objects': model._meta.verbose_name_plural},
+                    _("Updated %(count)s %(objects)s.")
+                    % {"count": updated_count, "objects": model._meta.verbose_name_plural},
                 )
                 return HttpResponseRedirect(return_url)
             else:
-                if not (selected_fields or form.cleaned_data.get('add_tags') or form.cleaned_data.get('remove_tags')):
+                if not (selected_fields or form.cleaned_data.get("add_tags") or form.cleaned_data.get("remove_tags")):
                     messages.warning(request, _("No fields or tags were selected for editing."))
                 else:
                     for field_name, errors in form.errors.items():
                         field_label = form[field_name].label if field_name in form else field_name
-                        messages.error(request, _("Error in field '%(field)s': %(errors)s") % {'field': field_label, 'errors': ', '.join(errors)})
-                form = self._get_bulk_edit_form(request.POST if '_apply' in request.POST else None, model)
+                        messages.error(
+                            request,
+                            _("Error in field '%(field)s': %(errors)s")
+                            % {"field": field_label, "errors": ", ".join(errors)},
+                        )
+                form = self._get_bulk_edit_form(request.POST if "_apply" in request.POST else None, model)
         else:
             form = self._get_bulk_edit_form(model=model)
 
         context = {
-            'form': form,
-            'model': model,
-            'model_name': f'{model._meta.app_label}.{model._meta.model_name}',
-            'objects': queryset,
-            'object_pks': pks,
-            'return_url': return_url,
-            'selected_fields': selected_fields,
-            'verbose_name': model._meta.verbose_name,
-            'verbose_name_plural': model._meta.verbose_name_plural,
-            'title': _('Bulk Edit %(objects)s') % {'objects': str(model._meta.verbose_name_plural).title()},
-            'breadcrumbs': [
-                (reverse('dashboard'), _('Dashboard')),
+            "form": form,
+            "model": model,
+            "model_name": f"{model._meta.app_label}.{model._meta.model_name}",
+            "objects": queryset,
+            "object_pks": pks,
+            "return_url": return_url,
+            "selected_fields": selected_fields,
+            "verbose_name": model._meta.verbose_name,
+            "verbose_name_plural": model._meta.verbose_name_plural,
+            "title": _("Bulk Edit %(objects)s") % {"objects": str(model._meta.verbose_name_plural).title()},
+            "breadcrumbs": [
+                (reverse("dashboard"), _("Dashboard")),
                 (return_url, str(model._meta.verbose_name_plural).title()),
-                (None, _('Bulk Edit (%(count)s)') % {'count': len(pks)}),
+                (None, _("Bulk Edit (%(count)s)") % {"count": len(pks)}),
             ],
         }
         return self.render_to_response(context)
 
 
-class ObjectBulkDeleteView(BulkViewMixin, PermissionRequiredMixin, LoginRequiredMixin, BaseHTMXView, TemplateResponseMixin, View):
+class ObjectBulkDeleteView(
+    BulkViewMixin, PermissionRequiredMixin, LoginRequiredMixin, BaseHTMXView, TemplateResponseMixin, View
+):
     queryset = None
-    template_name = 'generic/object_confirm_bulk_delete.html'
+    template_name = "generic/object_confirm_bulk_delete.html"
 
     def has_permission(self):
-        return (
-            user_can_mutate_model(self.request.user, self._get_model())
-            and super().has_permission()
-        )
+        return user_can_mutate_model(self.request.user, self._get_model()) and super().has_permission()
 
     def get_permission_required(self):
         model = self._get_model()
         if model:
-            return (f'{model._meta.app_label}.delete_{model._meta.model_name}',)
-        return ('',)
+            return (f"{model._meta.app_label}.delete_{model._meta.model_name}",)
+        return ("",)
 
     def post(self, request, *args, **kwargs):
-        pks = request.POST.getlist('pk')
+        pks = request.POST.getlist("pk")
         model = self._get_model()
         return_url = safe_return_url(
             request,
-            request.POST.get('return_url') or request.META.get('HTTP_REFERER'),
-            reverse('dashboard'),
+            request.POST.get("return_url") or request.META.get("HTTP_REFERER"),
+            reverse("dashboard"),
         )
 
         if not pks:
-            messages.warning(request, _("No %(objects)s were selected.") % {'objects': model._meta.verbose_name_plural})
+            messages.warning(request, _("No %(objects)s were selected.") % {"objects": model._meta.verbose_name_plural})
             return HttpResponseRedirect(return_url)
 
         # Per-row delete-perm enforcement (see filter_permitted_rows): the
         # dispatch gate alone is too coarse inside a multi-tenant group scope.
         objects_to_delete, skipped = filter_permitted_rows(
-            request.user, self._get_queryset(pks), model, 'delete',
+            request.user,
+            self._get_queryset(pks),
+            model,
+            "delete",
         )
         if skipped:
-            messages.warning(request, _(
-                "Skipped %(count)s %(objects)s you do not have permission to delete."
-            ) % {'count': skipped, 'objects': model._meta.verbose_name_plural})
+            messages.warning(
+                request,
+                _("Skipped %(count)s %(objects)s you do not have permission to delete.")
+                % {"count": skipped, "objects": model._meta.verbose_name_plural},
+            )
 
         if not objects_to_delete:
-            messages.warning(request, _("No valid %(objects)s selected for deletion.") % {'objects': model._meta.verbose_name_plural})
+            messages.warning(
+                request, _("No valid %(objects)s selected for deletion.") % {"objects": model._meta.verbose_name_plural}
+            )
             return HttpResponseRedirect(return_url)
 
-        if '_confirm' in request.POST:
+        if "_confirm" in request.POST:
             try:
                 deleted_count = 0
                 with transaction.atomic():
                     for obj in objects_to_delete:
-                        if hasattr(obj, 'snapshot') and callable(obj.snapshot):
+                        if hasattr(obj, "snapshot") and callable(obj.snapshot):
                             obj.snapshot()
                         obj.delete()
                         deleted_count += 1
 
                 messages.success(
                     request,
-                    _("Successfully deleted %(count)s %(objects)s.") % {'count': deleted_count, 'objects': model._meta.verbose_name_plural},
+                    _("Successfully deleted %(count)s %(objects)s.")
+                    % {"count": deleted_count, "objects": model._meta.verbose_name_plural},
                 )
                 return HttpResponseRedirect(return_url)
             except ProtectedError as e:
                 messages.error(
                     request,
-                    _("Could not delete objects due to protected relationships: %(error)s") % {'error': e},
+                    _("Could not delete objects due to protected relationships: %(error)s") % {"error": e},
                 )
                 return HttpResponseRedirect(return_url)
         else:
             context = {
-                'model': model,
-                'model_name': f'{model._meta.app_label}.{model._meta.model_name}',
-                'model_verbose_name': model._meta.verbose_name,
-                'model_verbose_name_plural': model._meta.verbose_name_plural,
-                'objects': objects_to_delete,
-                'object_pks': pks,
-                'return_url': return_url,
-                'title': _('Confirm Bulk Deletion'),
-                'breadcrumbs': [
-                    (reverse('dashboard'), _('Dashboard')),
+                "model": model,
+                "model_name": f"{model._meta.app_label}.{model._meta.model_name}",
+                "model_verbose_name": model._meta.verbose_name,
+                "model_verbose_name_plural": model._meta.verbose_name_plural,
+                "objects": objects_to_delete,
+                "object_pks": pks,
+                "return_url": return_url,
+                "title": _("Confirm Bulk Deletion"),
+                "breadcrumbs": [
+                    (reverse("dashboard"), _("Dashboard")),
                     (return_url, str(model._meta.verbose_name_plural).title()),
-                    (None, _('Delete (%(count)s)') % {'count': len(objects_to_delete)}),
+                    (None, _("Delete (%(count)s)") % {"count": len(objects_to_delete)}),
                 ],
             }
             return self.render_to_response(context)

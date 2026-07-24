@@ -1,56 +1,115 @@
-from .site_views import (
-    SiteListView, SiteDetailView, SiteEditView, SiteDeleteView, SiteBulkEditView, SiteBulkDeleteView,
-    SiteCloneView,
-)
-from .region_views import (
-    RegionListView, RegionDetailView, RegionEditView, RegionDeleteView, RegionBulkEditView, RegionBulkDeleteView,
-    RegionCloneView,
-)
-from .sitegroup_views import (
-    SiteGroupListView, SiteGroupDetailView, SiteGroupEditView, SiteGroupDeleteView,
-    SiteGroupCloneView,
-)
-from .location_views import (
-    LocationListView, LocationDetailView, LocationEditView, LocationDeleteView,
-    LocationBulkEditView, LocationBulkDeleteView, LocationCloneView,
-)
-from .tenantgroup_views import (
-    TenantGroupListView, TenantGroupDetailView, TenantGroupEditView, TenantGroupDeleteView,
-)
-from .tenant_views import (
-    TenantListView, TenantDetailView, TenantEditView, TenantDeleteView, TenantBulkEditView, TenantBulkDeleteView,
-    TenantAccessView, TenantManagedTenantsTabView, tenant_ldap_sync,
-)
 from .assetholder_views import (
-    AssetHolderListView, AssetHolderDetailView, AssetHolderEditView, AssetHolderDeleteView,
-    AssetHolderBulkEditView, AssetHolderBulkDeleteView,
+    AssetHolderBulkDeleteView,
+    AssetHolderBulkEditView,
+    AssetHolderDeleteView,
+    AssetHolderDetailView,
+    AssetHolderEditView,
+    AssetHolderListView,
 )
 from .contact_views import (
-    ContactListView, ContactDetailView, ContactEditView, ContactDeleteView, ContactBulkEditView, ContactBulkDeleteView,
+    ContactBulkDeleteView,
+    ContactBulkEditView,
     ContactCloneView,
+    ContactDeleteView,
+    ContactDetailView,
+    ContactEditView,
+    ContactListView,
 )
 from .contactrole_views import (
-    ContactRoleListView, ContactRoleDetailView, ContactRoleEditView, ContactRoleDeleteView,
-    ContactAssignmentCreateView, ContactAssignmentDeleteView,
-    ContactRoleBulkEditView, ContactRoleBulkDeleteView, ContactRoleCloneView,
-)
-from .role_views import (
-    RoleListView, RoleDetailView, RoleEditView, RoleDeleteView,
-    RoleCloneView, RoleBulkDeleteView, RoleAssignUsersView,
-)
-from .membership_views import (
-    MembershipListView, MembershipDetailView, MembershipCreateView, MembershipEditView,
-    MembershipDeleteView, MembershipBulkEditView, MembershipBulkDeleteView,
-    MembershipSendResetView,
-)
-from .resource_grant_views import (
-    TenantResourceGrantListView, TenantResourceGrantCreateView,
-    TenantResourceGrantRevokeView,
+    ContactAssignmentCreateView,
+    ContactAssignmentDeleteView,
+    ContactRoleBulkDeleteView,
+    ContactRoleBulkEditView,
+    ContactRoleCloneView,
+    ContactRoleDeleteView,
+    ContactRoleDetailView,
+    ContactRoleEditView,
+    ContactRoleListView,
 )
 from .costcenter_views import (
-    CostCenterListView, CostCenterDetailView, CostCenterEditView, CostCenterDeleteView,
-    CostCenterCloneView, CostCenterBulkEditView, CostCenterBulkDeleteView,
+    CostCenterBulkDeleteView,
+    CostCenterBulkEditView,
+    CostCenterCloneView,
+    CostCenterDeleteView,
+    CostCenterDetailView,
+    CostCenterEditView,
+    CostCenterListView,
+)
+from .location_views import (
+    LocationBulkDeleteView,
+    LocationBulkEditView,
+    LocationCloneView,
+    LocationDeleteView,
+    LocationDetailView,
+    LocationEditView,
+    LocationListView,
+)
+from .membership_views import (
+    MembershipBulkDeleteView,
+    MembershipBulkEditView,
+    MembershipCreateView,
+    MembershipDeleteView,
+    MembershipDetailView,
+    MembershipEditView,
+    MembershipListView,
+    MembershipSendResetView,
 )
 from .provider_views import (
     TechnicianQuickAddView,
+)
+from .region_views import (
+    RegionBulkDeleteView,
+    RegionBulkEditView,
+    RegionCloneView,
+    RegionDeleteView,
+    RegionDetailView,
+    RegionEditView,
+    RegionListView,
+)
+from .resource_grant_views import (
+    TenantResourceGrantCreateView,
+    TenantResourceGrantListView,
+    TenantResourceGrantRevokeView,
+)
+from .role_views import (
+    RoleAssignUsersView,
+    RoleBulkDeleteView,
+    RoleCloneView,
+    RoleDeleteView,
+    RoleDetailView,
+    RoleEditView,
+    RoleListView,
+)
+from .site_views import (
+    SiteBulkDeleteView,
+    SiteBulkEditView,
+    SiteCloneView,
+    SiteDeleteView,
+    SiteDetailView,
+    SiteEditView,
+    SiteListView,
+)
+from .sitegroup_views import (
+    SiteGroupCloneView,
+    SiteGroupDeleteView,
+    SiteGroupDetailView,
+    SiteGroupEditView,
+    SiteGroupListView,
+)
+from .tenant_views import (
+    TenantAccessView,
+    TenantBulkDeleteView,
+    TenantBulkEditView,
+    TenantDeleteView,
+    TenantDetailView,
+    TenantEditView,
+    TenantListView,
+    TenantManagedTenantsTabView,
+    tenant_ldap_sync,
+)
+from .tenantgroup_views import (
+    TenantGroupDeleteView,
+    TenantGroupDetailView,
+    TenantGroupEditView,
+    TenantGroupListView,
 )

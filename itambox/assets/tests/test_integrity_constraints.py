@@ -5,7 +5,7 @@ from django.core.exceptions import ValidationError
 from django.test import TestCase
 from model_bakery import baker
 
-from assets.models import Asset, StatusLabel, AssetAssignment
+from assets.models import Asset, AssetAssignment, StatusLabel
 from assets.services import checkout_asset, dispose_asset
 from licenses.models import License, LicenseSeatAssignment
 from organization.models import AssetHolder
@@ -51,13 +51,17 @@ class DisposalProceedsGuardTests(TestCase):
         self.deployable = baker.make(StatusLabel, type=StatusLabel.TYPE_DEPLOYABLE)
 
     def test_negative_proceeds_rejected(self):
-        asset = baker.make(Asset, status=self.deployable, currency='EUR', tenant=None)
+        asset = baker.make(Asset, status=self.deployable, currency="EUR", tenant=None)
         with self.assertRaises(ValidationError):
-            dispose_asset(asset, disposal_method='recycle', disposal_date=datetime.date.today(),
-                          proceeds=Decimal('-5'))
+            dispose_asset(asset, disposal_method="recycle", disposal_date=datetime.date.today(), proceeds=Decimal("-5"))
 
     def test_foreign_currency_proceeds_rejected(self):
-        asset = baker.make(Asset, status=self.deployable, currency='EUR', tenant=None)
+        asset = baker.make(Asset, status=self.deployable, currency="EUR", tenant=None)
         with self.assertRaises(ValidationError):
-            dispose_asset(asset, disposal_method='recycle', disposal_date=datetime.date.today(),
-                          proceeds=Decimal('100'), currency='USD')
+            dispose_asset(
+                asset,
+                disposal_method="recycle",
+                disposal_date=datetime.date.today(),
+                proceeds=Decimal("100"),
+                currency="USD",
+            )

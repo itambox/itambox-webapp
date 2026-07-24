@@ -1,41 +1,43 @@
-from itambox.constants import DEFAULT_PAGINATE_COUNT, PAGINATE_COUNT_CHOICES
 import datetime
-from decimal import Decimal
 import logging
+from decimal import Decimal
+
 from django.conf import settings
-from django.core.paginator import Paginator
 from django.contrib.contenttypes.models import ContentType
-from django.utils.module_loading import import_string
-from django.shortcuts import reverse
+from django.core.paginator import Paginator
 from django.db.models import Model
 from django.forms.models import model_to_dict
+from django.shortcuts import reverse
+from django.utils.module_loading import import_string
+
+from itambox.constants import DEFAULT_PAGINATE_COUNT, PAGINATE_COUNT_CHOICES
 
 logger = logging.getLogger(__name__)
 
 
 def get_model_viewname(model, action):
     app_label = model._meta.app_label
-    if app_label == 'components':
-        app_label = 'assets'
-    elif app_label == 'auth':
-        app_label = 'users'
+    if app_label == "components":
+        app_label = "assets"
+    elif app_label == "auth":
+        app_label = "users"
     model_name = model._meta.model_name
-    if app_label == 'core':
+    if app_label == "core":
         # core-app models (e.g. ObjectChange/changelog) are root-mounted, unnamespaced.
-        act = 'add' if action == 'create' else action
+        act = "add" if action == "create" else action
         return f"{model_name}_{act}"
     return f"{app_label}:{model_name}_{action}"
 
 
 def get_paginate_count(request):
     try:
-        per_page_param = request.GET.get('per_page')
+        per_page_param = request.GET.get("per_page")
         if per_page_param:
             per_page = int(per_page_param)
             if per_page in dict(PAGINATE_COUNT_CHOICES):
                 return per_page
     except (ValueError, TypeError):
-        logger.debug("Invalid per_page query parameter: '%s'", request.GET.get('per_page'))
+        logger.debug("Invalid per_page query parameter: '%s'", request.GET.get("per_page"))
 
     if request.user.is_authenticated:
         try:
@@ -43,11 +45,12 @@ def get_paginate_count(request):
             # which imports this module (itambox.utils) — a top-level import here
             # would close that cycle at app-load time.
             from users.models import UserPreference
-            if not hasattr(request, '_user_preferences_cache'):
+
+            if not hasattr(request, "_user_preferences_cache"):
                 request._user_preferences_cache = UserPreference.objects.filter(user=request.user).first()
             prefs = request._user_preferences_cache
             if prefs and prefs.data:
-                user_pref_val = prefs.data.get('pagination', {}).get('per_page')
+                user_pref_val = prefs.data.get("pagination", {}).get("per_page")
                 if user_pref_val:
                     try:
                         user_pref = int(user_pref_val)
@@ -96,9 +99,9 @@ def serialize_object(obj: Model, extra_fields=None, exclude_fields=None) -> dict
             continue
 
         if field_name in m2m_fields:
-            if hasattr(field_value, 'all'):
+            if hasattr(field_value, "all"):
                 try:
-                    data[field_name] = sorted(list(field_value.values_list('pk', flat=True)))
+                    data[field_name] = sorted(list(field_value.values_list("pk", flat=True)))
                 except Exception:
                     data[field_name] = []
             else:
@@ -115,6 +118,7 @@ def serialize_object(obj: Model, extra_fields=None, exclude_fields=None) -> dict
                 data[field_name] = str(field_value)
             else:
                 from django.db.models.fields.files import FieldFile
+
                 if isinstance(field_value, FieldFile):
                     data[field_name] = field_value.name if field_value else None
                 else:
@@ -125,7 +129,7 @@ def serialize_object(obj: Model, extra_fields=None, exclude_fields=None) -> dict
 
 def get_content_type_by_natural_key(natural_key):
     try:
-        app_label, model = natural_key.lower().split('.')
+        app_label, model = natural_key.lower().split(".")
         return ContentType.objects.get(app_label=app_label, model=model)
     except (ContentType.DoesNotExist, ValueError, AttributeError):
         return None
@@ -136,7 +140,7 @@ def get_table_for_model(model):
     model_name = model.__name__
     table_class_name = f"{model_name}Table"
     try:
-        tables_module = import_string(f'{app_label}.tables')
+        tables_module = import_string(f"{app_label}.tables")
         return getattr(tables_module, table_class_name)
     except (ImportError, AttributeError):
         logger.warning("Could not find %s in %s.tables", table_class_name, app_label)
@@ -148,21 +152,22 @@ def get_help_url(view_instance, app_label=None, model_name=None):
     Resolves the local static documentation help link for a given view context.
     Checks if the compiled HTML file or its directory index exists in static/docs.
     """
-    doc_path = getattr(view_instance, 'document_path', None)
+    doc_path = getattr(view_instance, "document_path", None)
     if not doc_path and app_label and model_name:
         # Resolve path mismatch for components which belong to the inventory app
-        resolved_app = 'components' if app_label == 'inventory' and model_name.startswith('component') else app_label
+        resolved_app = "components" if app_label == "inventory" and model_name.startswith("component") else app_label
         # Resolve path mismatch for assetmaintenance (its app_label in model is assets, but docs are in compliance)
-        if app_label == 'assets' and model_name == 'assetmaintenance':
-            resolved_app = 'compliance'
+        if app_label == "assets" and model_name == "assetmaintenance":
+            resolved_app = "compliance"
         doc_path = f"models/{resolved_app}/{model_name}"
 
     if not doc_path:
         return f"{settings.STATIC_URL}docs/index.html"
 
     import os
-    static_docs_dir = os.path.join(settings.BASE_DIR, 'static', 'docs')
-    
+
+    static_docs_dir = os.path.join(settings.BASE_DIR, "static", "docs")
+
     file_target = os.path.join(static_docs_dir, f"{doc_path}.html")
     dir_target = os.path.join(static_docs_dir, doc_path, "index.html")
 
@@ -173,7 +178,7 @@ def get_help_url(view_instance, app_label=None, model_name=None):
     return f"{settings.STATIC_URL}docs/index.html"
 
 
-def generate_unique_slug(instance, slug_source=None, slug_field='slug'):
+def generate_unique_slug(instance, slug_source=None, slug_field="slug"):
     """
     Helper to automatically generate a unique slug field on an instance.
     By default, it will slugify the field specified by instance.slug_source (default: 'name').
@@ -182,17 +187,17 @@ def generate_unique_slug(instance, slug_source=None, slug_field='slug'):
     """
     if getattr(instance, slug_field, None):
         return
-        
+
     from django.utils.text import slugify
-    
+
     if slug_source is None:
-        slug_source = getattr(instance, 'slug_source', 'name')
-        
+        slug_source = getattr(instance, "slug_source", "name")
+
     if isinstance(slug_source, (list, tuple)):
         source_values = []
         for field_name in slug_source:
-            if '__' in field_name:
-                parts = field_name.split('__')
+            if "__" in field_name:
+                parts = field_name.split("__")
                 obj = instance
                 for part in parts:
                     obj = getattr(obj, part, None) if obj else None
@@ -204,41 +209,39 @@ def generate_unique_slug(instance, slug_source=None, slug_field='slug'):
         slug_src = "-".join(source_values)
     else:
         slug_src = getattr(instance, slug_source, "")
-        
+
     slug_val = slugify(slug_src) or "auto-slug"
     base_slug = slug_val
     counter = 1
     model_class = instance.__class__
-    manager = getattr(model_class, '_base_manager', model_class.objects)
-    
+    manager = getattr(model_class, "_base_manager", model_class.objects)
+
     current_slug = base_slug
     while manager.filter(**{slug_field: current_slug}).exclude(pk=instance.pk).exists():
         current_slug = f"{base_slug}-{counter}"
         counter += 1
-        
+
     setattr(instance, slug_field, current_slug)
 
 
 def get_status_color(status):
     """Map Site, Location, and Subscription status names/slugs to suiting hex colors."""
     if not status:
-        return '6c757d'
+        return "6c757d"
     status_lower = str(status).lower()
     status_colors = {
         # Site / Location
-        'planned': '0d6efd',
-        'staging': 'fd7e14',
-        'active': '20c997',
-        'decommissioning': 'e83e8c',
-        'retired': '6c757d',
+        "planned": "0d6efd",
+        "staging": "fd7e14",
+        "active": "20c997",
+        "decommissioning": "e83e8c",
+        "retired": "6c757d",
         # Subscription
-        'expired': 'dc3545',
-        'cancelled': '6f42c1',
-        'pending': 'ffc107',
-        'suspended': 'fd7e14',
-        'renewing': '0d6efd',
-        'trial': '17a2b8',
+        "expired": "dc3545",
+        "cancelled": "6f42c1",
+        "pending": "ffc107",
+        "suspended": "fd7e14",
+        "renewing": "0d6efd",
+        "trial": "17a2b8",
     }
-    return status_colors.get(status_lower, '6c757d')
-
-
+    return status_colors.get(status_lower, "6c757d")

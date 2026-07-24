@@ -8,20 +8,23 @@ None). Both tasks under test now wrap their per-object work in TaskContext, whic
 wires up tenant + request_id + current_user, so saves are recorded as
 ObjectChange rows. Q_CLUSTER['sync'] is True under tests, so tasks run inline.
 """
+
 import datetime
 
-from django.test import TransactionTestCase
 from django.contrib.auth import get_user_model
 from django.contrib.contenttypes.models import ContentType
+from django.test import TransactionTestCase
 from django.utils import timezone
 
 from core.models import ObjectChange
+from core.tasks.reports import generate_scheduled_report_task
 from extras.models import ReportTemplate, ScheduledReport
 from subscriptions.models import (
-    Provider, Subscription, SubscriptionStatusChoices,
+    Provider,
+    Subscription,
+    SubscriptionStatusChoices,
 )
 from subscriptions.tasks import check_subscription_expiries_and_reminders
-from core.tasks.reports import generate_scheduled_report_task
 
 User = get_user_model()
 
@@ -32,6 +35,7 @@ class ScheduledReportTaskAuditTests(TransactionTestCase):
 
     def test_scheduled_report_run_logs_object_change(self):
         from organization.models import Tenant
+
         tenant = Tenant.objects.create(name="Phase3 Tenant", slug="phase3-report-tenant")
         template = ReportTemplate.objects.create(
             name="Phase3 Audit Asset Report",
@@ -44,16 +48,14 @@ class ScheduledReportTaskAuditTests(TransactionTestCase):
             tenant=tenant,
             format=ScheduledReport.FORMAT_HTML,
             save_to_archive=False,
-            recipients='',
+            recipients="",
             is_active=True,
         )
 
         sched_ct = ContentType.objects.get_for_model(ScheduledReport)
         # Fixture creation above happened outside any task/request context, so it
         # was NOT logged. Baseline should therefore be zero for this object.
-        baseline = ObjectChange.objects.filter(
-            changed_object_type=sched_ct, changed_object_id=sched.pk
-        ).count()
+        baseline = ObjectChange.objects.filter(changed_object_type=sched_ct, changed_object_id=sched.pk).count()
 
         result = generate_scheduled_report_task(sched.pk)
         self.assertTrue(result)
@@ -62,13 +64,12 @@ class ScheduledReportTaskAuditTests(TransactionTestCase):
         self.assertIsNotNone(sched.last_run)
         self.assertEqual(sched.last_status, "success")
 
-        after = ObjectChange.objects.filter(
-            changed_object_type=sched_ct, changed_object_id=sched.pk
-        ).count()
+        after = ObjectChange.objects.filter(changed_object_type=sched_ct, changed_object_id=sched.pk).count()
         self.assertGreater(
-            after, baseline,
+            after,
+            baseline,
             "generate_scheduled_report_task should record an ObjectChange for "
-            "the ScheduledReport save (now running inside TaskContext)."
+            "the ScheduledReport save (now running inside TaskContext).",
         )
 
 
@@ -98,20 +99,17 @@ class SubscriptionExpiryTaskAuditTests(TransactionTestCase):
         self.assertEqual(sub.status, SubscriptionStatusChoices.ACTIVE)
 
         sub_ct = ContentType.objects.get_for_model(Subscription)
-        baseline = ObjectChange.objects.filter(
-            changed_object_type=sub_ct, changed_object_id=sub.pk
-        ).count()
+        baseline = ObjectChange.objects.filter(changed_object_type=sub_ct, changed_object_id=sub.pk).count()
 
         check_subscription_expiries_and_reminders()
 
         sub.refresh_from_db()
         self.assertEqual(sub.status, SubscriptionStatusChoices.EXPIRED)
 
-        changes = ObjectChange.objects.filter(
-            changed_object_type=sub_ct, changed_object_id=sub.pk
-        )
+        changes = ObjectChange.objects.filter(changed_object_type=sub_ct, changed_object_id=sub.pk)
         self.assertGreater(
-            changes.count(), baseline,
+            changes.count(),
+            baseline,
             "Auto-expiry must record an ObjectChange for the Subscription "
-            "status change (now running inside TaskContext)."
+            "status change (now running inside TaskContext).",
         )

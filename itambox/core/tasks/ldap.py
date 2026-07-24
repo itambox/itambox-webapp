@@ -1,11 +1,15 @@
 import logging
+
 from django.core.management import call_command
 from django.utils.translation import gettext_lazy as _
+
 from core.models import Job, Notification
+
 from .context import TaskContext
 from .utils import reverse_job_detail
 
 logger = logging.getLogger(__name__)
+
 
 class JobLogStream:
     def __init__(self, job):
@@ -26,6 +30,7 @@ class JobLogStream:
         if self.buffer.strip():
             self.job.append_log(self.buffer.strip())
             self.buffer = ""
+
 
 def sync_tenant_ldap_task(job_id, tenant_slug, user_id, tenant_id=None):
     """
@@ -49,19 +54,19 @@ def sync_tenant_ldap_task(job_id, tenant_slug, user_id, tenant_id=None):
 
             try:
                 # Call command and pipe output to log_stream
-                call_command('sync_tenant_ldap', tenant=tenant_slug, stdout=log_stream, stderr=log_stream)
+                call_command("sync_tenant_ldap", tenant=tenant_slug, stdout=log_stream, stderr=log_stream)
                 log_stream.flush()
 
                 job.append_log("LDAP directory sync execution finished.")
-                job.mark_completed(result={'status': 'success'})
+                job.mark_completed(result={"status": "success"})
 
                 Notification.objects.create(
                     user=ctx.user,
                     subject=_("LDAP Sync Complete"),
                     message=_("LDAP directory sync for tenant '%(tenant)s' completed successfully.")
-                    % {'tenant': tenant_slug},
+                    % {"tenant": tenant_slug},
                     level=Notification.LEVEL_SUCCESS,
-                    target_url=reverse_job_detail(job.pk)
+                    target_url=reverse_job_detail(job.pk),
                 )
 
             except Exception as e:
@@ -72,9 +77,9 @@ def sync_tenant_ldap_task(job_id, tenant_slug, user_id, tenant_id=None):
                     user=ctx.user,
                     subject=_("LDAP Sync Failed"),
                     message=_("LDAP directory sync for tenant '%(tenant)s' failed: %(error)s")
-                    % {'tenant': tenant_slug, 'error': str(e)},
+                    % {"tenant": tenant_slug, "error": str(e)},
                     level=Notification.LEVEL_DANGER,
-                    target_url=reverse_job_detail(job.pk)
+                    target_url=reverse_job_detail(job.pk),
                 )
 
         except Exception as e:

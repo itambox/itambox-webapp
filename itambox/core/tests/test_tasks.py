@@ -1,18 +1,20 @@
 import json
-from unittest.mock import patch, MagicMock
-from django.test import TransactionTestCase
+from unittest.mock import MagicMock, patch
+
 from django.contrib.auth import get_user_model
-from django.utils import timezone
 from django.contrib.contenttypes.models import ContentType
 from django.core.exceptions import ValidationError
+from django.test import TransactionTestCase
+from django.utils import timezone
 
+from assets.models import Asset, AssetRole, AssetType, Manufacturer, StatusLabel
 from core.models import Job, Notification
-from extras.models import AlertRule, AlertLog, NotificationChannel
-from core.tasks import import_csv_task, evaluate_alert_rules_task, run_alert_rule_now
-from assets.models import Asset, StatusLabel, AssetRole, Manufacturer, AssetType
+from core.tasks import evaluate_alert_rules_task, import_csv_task, run_alert_rule_now
+from extras.models import AlertLog, AlertRule, NotificationChannel
 from subscriptions.models import Subscription
 
 User = get_user_model()
+
 
 class TasksTestCase(TransactionTestCase):
     def setUp(self):
@@ -24,9 +26,10 @@ class TasksTestCase(TransactionTestCase):
         # rejects a tenant-less location). The alert rule itself stays
         # tenant=None (global) — only the stock's location needs an owner.
         from organization.models import Tenant
+
         self.stock_tenant = Tenant.objects.create(name="Task Stock Tenant", slug="task-stock-tenant")
 
-    @patch('itambox.views.generic.ObjectImportView.get_form_class')
+    @patch("itambox.views.generic.ObjectImportView.get_form_class")
     def test_import_csv_task_success(self, mock_get_form_class):
         # Mocking ObjectImportView and the Form
         mock_form = MagicMock()
@@ -40,19 +43,19 @@ class TasksTestCase(TransactionTestCase):
             rows_data=[{"name": "Mfr1"}, {"name": "Mfr2"}],
             app_label="assets",
             model_name="manufacturer",
-            user_id=self.user.pk
+            user_id=self.user.pk,
         )
 
         job.refresh_from_db()
         self.assertEqual(job.status, Job.STATUS_COMPLETED)
-        self.assertEqual(job.result['imported'], 5)
-        
+        self.assertEqual(job.result["imported"], 5)
+
         # Verify notification was created
         notification = Notification.objects.filter(user=self.user, level=Notification.LEVEL_SUCCESS).first()
         self.assertIsNotNone(notification)
         self.assertIn("Successfully imported 5 record(s)", notification.message)
 
-    @patch('itambox.views.generic.ObjectImportView.get_form_class')
+    @patch("itambox.views.generic.ObjectImportView.get_form_class")
     def test_import_csv_task_failed(self, mock_get_form_class):
         mock_form = MagicMock()
         mock_form.import_data.return_value = (0, ["Row 1: invalid name", "Row 2: missing field"])
@@ -61,16 +64,12 @@ class TasksTestCase(TransactionTestCase):
         job = Job.objects.create(name="Import Job Failed", status=Job.STATUS_PENDING)
 
         import_csv_task(
-            job_id=job.pk,
-            rows_data=[{"name": ""}],
-            app_label="assets",
-            model_name="manufacturer",
-            user_id=self.user.pk
+            job_id=job.pk, rows_data=[{"name": ""}], app_label="assets", model_name="manufacturer", user_id=self.user.pk
         )
 
         job.refresh_from_db()
         self.assertEqual(job.status, Job.STATUS_FAILED)
-        
+
         # Verify failure notification
         notification = Notification.objects.filter(user=self.user, level=Notification.LEVEL_DANGER).first()
         self.assertIsNotNone(notification)
@@ -79,24 +78,21 @@ class TasksTestCase(TransactionTestCase):
     def test_evaluate_alert_rules_task_low_stock(self):
         # Create an AlertRule for low stock
         rule = AlertRule.objects.create(
-            name="Low Stock Alert Rule",
-            alert_type=AlertRule.ALERT_TYPE_LOW_STOCK,
-            threshold_value=5,
-            is_active=True
+            name="Low Stock Alert Rule", alert_type=AlertRule.ALERT_TYPE_LOW_STOCK, threshold_value=5, is_active=True
         )
 
         # Create accessory under threshold
         mfr = Manufacturer.objects.create(name="HP", slug="hp")
         from inventory.models import Accessory, AccessoryStock
         from organization.models import Location, Site
-        
+
         accessory = Accessory.objects.create(
             name="HP Mouse",
             slug="hp-mouse",
             manufacturer=mfr,
-            min_qty=3  # specific threshold
+            min_qty=3,  # specific threshold
         )
-        
+
         site = Site.objects.create(name="Stock Site", slug="stock-site", tenant=self.stock_tenant)
         location = Location.objects.create(name="Stock Room", slug="stock-room", site=site, tenant=self.stock_tenant)
 
@@ -134,8 +130,10 @@ class TasksTestCase(TransactionTestCase):
         )
         # A channel exists, but muting must prevent any dispatch.
         channel = NotificationChannel.objects.create(
-            name="Muted Slack", channel_type=NotificationChannel.TYPE_SLACK,
-            config={'webhook_url': 'https://hooks.slack.com/x'}, enabled=True,
+            name="Muted Slack",
+            channel_type=NotificationChannel.TYPE_SLACK,
+            config={"webhook_url": "https://hooks.slack.com/x"},
+            enabled=True,
         )
         rule.channels.add(channel)
         self._make_low_stock_accessory(name="MutedAcc", slug="muted-acc", min_qty=3, qty=1)
@@ -145,7 +143,7 @@ class TasksTestCase(TransactionTestCase):
         log = AlertLog.objects.filter(rule=rule).first()
         self.assertIsNotNone(log)  # still tracked in the Alert Center
         self.assertEqual(log.status, AlertLog.STATUS_ACTIVE)
-        self.assertEqual(log.delivery_status, {})       # no dispatch happened
+        self.assertEqual(log.delivery_status, {})  # no dispatch happened
         self.assertIsNone(log.last_notified_at)
 
     def test_run_alert_rule_now_evaluates_single_rule(self):
@@ -164,6 +162,7 @@ class TasksTestCase(TransactionTestCase):
 
     def test_renotify_re_dispatches_after_interval(self):
         from django.utils import timezone
+
         rule = AlertRule.objects.create(
             name="Renotify Rule",
             alert_type=AlertRule.ALERT_TYPE_LOW_STOCK,
@@ -205,18 +204,22 @@ class AlertDedupRegressionTests(TransactionTestCase):
         self.ct = ContentType.objects.get_for_model(AlertRule)
         # ADR-0001 phase 4: stock requires a location owned by a tenant.
         from organization.models import Tenant
+
         self.stock_tenant = Tenant.objects.create(name="Dedup Stock Tenant", slug="dedup-stock-tenant")
 
     def _low_stock_rule(self, name="Dedup Rule"):
         return AlertRule.objects.create(
-            name=name, alert_type=AlertRule.ALERT_TYPE_LOW_STOCK,
-            threshold_value=5, is_active=True,
+            name=name,
+            alert_type=AlertRule.ALERT_TYPE_LOW_STOCK,
+            threshold_value=5,
+            is_active=True,
         )
 
     def _make_low_stock_accessory(self, slug="dedup-acc", min_qty=3, qty=1):
         from assets.models import Manufacturer
         from inventory.models import Accessory, AccessoryStock
         from organization.models import Location, Site
+
         mfr = Manufacturer.objects.create(name=f"M-{slug}", slug=f"m-{slug}")
         acc = Accessory.objects.create(name=f"A-{slug}", slug=slug, manufacturer=mfr, min_qty=min_qty)
         site = Site.objects.create(name=f"S-{slug}", slug=f"s-{slug}", tenant=self.stock_tenant)
@@ -233,10 +236,14 @@ class AlertDedupRegressionTests(TransactionTestCase):
 
         rule = self._low_stock_rule()
         log = AlertLog.objects.create(
-            rule=rule, subject='s', message='m', content_type=self.ct,
-            object_id=12345, status=AlertLog.STATUS_ACTIVE,
+            rule=rule,
+            subject="s",
+            message="m",
+            content_type=self.ct,
+            object_id=12345,
+            status=AlertLog.STATUS_ACTIVE,
         )
-        member = User.objects.create_user(username='member_prefetch', password='x')
+        member = User.objects.create_user(username="member_prefetch", password="x")
         token = _current_user.set(member)
         try:
             # Sanity: the scoping manager really does fail closed here.
@@ -259,7 +266,7 @@ class AlertDedupRegressionTests(TransactionTestCase):
 
         rule = self._low_stock_rule()
         self._make_low_stock_accessory()
-        member = User.objects.create_user(username='member_eval', password='x')
+        member = User.objects.create_user(username="member_eval", password="x")
         token = _current_user.set(member)
         try:
             first = evaluate_alert_rules_task()
@@ -279,14 +286,22 @@ class AlertDedupRegressionTests(TransactionTestCase):
 
         rule = self._low_stock_rule()
         AlertLog.objects.create(
-            rule=rule, subject='s', message='m', content_type=self.ct,
-            object_id=999, status=AlertLog.STATUS_ACTIVE,
+            rule=rule,
+            subject="s",
+            message="m",
+            content_type=self.ct,
+            object_id=999,
+            status=AlertLog.STATUS_ACTIVE,
         )
         with self.assertRaises(IntegrityError):
             with transaction.atomic():
                 AlertLog.objects.create(
-                    rule=rule, subject='s2', message='m2', content_type=self.ct,
-                    object_id=999, status=AlertLog.STATUS_ACKNOWLEDGED,
+                    rule=rule,
+                    subject="s2",
+                    message="m2",
+                    content_type=self.ct,
+                    object_id=999,
+                    status=AlertLog.STATUS_ACKNOWLEDGED,
                 )
 
     def test_resolved_alert_does_not_block_new_open_alert(self):
@@ -294,13 +309,21 @@ class AlertDedupRegressionTests(TransactionTestCase):
         # so a cleared condition can re-fire) — not the original duplicate bug.
         rule = self._low_stock_rule()
         AlertLog.objects.create(
-            rule=rule, subject='s', message='m', content_type=self.ct,
-            object_id=999, status=AlertLog.STATUS_RESOLVED,
+            rule=rule,
+            subject="s",
+            message="m",
+            content_type=self.ct,
+            object_id=999,
+            status=AlertLog.STATUS_RESOLVED,
         )
         # Partial constraint: a resolved row must not block a fresh open one.
         AlertLog.objects.create(
-            rule=rule, subject='s2', message='m2', content_type=self.ct,
-            object_id=999, status=AlertLog.STATUS_ACTIVE,
+            rule=rule,
+            subject="s2",
+            message="m2",
+            content_type=self.ct,
+            object_id=999,
+            status=AlertLog.STATUS_ACTIVE,
         )
         self.assertEqual(AlertLog.unscoped.filter(rule=rule).count(), 2)
         # ...but still at most one OPEN row for the key.
@@ -342,10 +365,14 @@ class AlertDedupRegressionTests(TransactionTestCase):
 
         rule = self._low_stock_rule()
         stale = AlertLog.objects.create(
-            rule=rule, subject='s', message='m', content_type=self.ct,
-            object_id=4242, status=AlertLog.STATUS_ACTIVE,
+            rule=rule,
+            subject="s",
+            message="m",
+            content_type=self.ct,
+            object_id=4242,
+            status=AlertLog.STATUS_ACTIVE,
         )
-        member = User.objects.create_user(username='member_resolve', password='x')
+        member = User.objects.create_user(username="member_resolve", password="x")
         token = _current_user.set(member)
         try:
             self.assertEqual(AlertLog.objects.count(), 0)  # fail-closed sanity
@@ -367,7 +394,7 @@ class AlertDedupRegressionTests(TransactionTestCase):
         evaluate_alert_rules_task()
         log = AlertLog.unscoped.get(rule=rule)
         log.status = AlertLog.STATUS_ACKNOWLEDGED
-        log.save(update_fields=['status'])
+        log.save(update_fields=["status"])
 
         evaluate_alert_rules_task()
         self.assertEqual(AlertLog.unscoped.filter(rule=rule).count(), 1)
@@ -376,8 +403,11 @@ class AlertDedupRegressionTests(TransactionTestCase):
 
     def test_muted_rule_dedups_across_passes_without_dispatch(self):
         rule = AlertRule.objects.create(
-            name='Muted Dedup', alert_type=AlertRule.ALERT_TYPE_LOW_STOCK,
-            threshold_value=5, is_active=True, is_muted=True,
+            name="Muted Dedup",
+            alert_type=AlertRule.ALERT_TYPE_LOW_STOCK,
+            threshold_value=5,
+            is_active=True,
+            is_muted=True,
         )
         self._make_low_stock_accessory()
         evaluate_alert_rules_task()

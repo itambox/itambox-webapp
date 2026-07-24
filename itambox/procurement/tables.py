@@ -1,10 +1,13 @@
 import django_tables2 as tables
 from django.utils.translation import gettext_lazy as _
-from core.tables import BaseTable, ActionsColumn, ToggleColumn
-from .models import PurchaseOrder, Contract
+
+from core.tables import ActionsColumn, BaseTable, ToggleColumn
+
+from .models import Contract, PurchaseOrder
+
 
 class PurchaseOrderTable(BaseTable):
-    pk = ToggleColumn(accessor='pk')
+    pk = ToggleColumn(accessor="pk")
     order_number = tables.Column(linkify=True)
     supplier = tables.Column(linkify=True)
     status = tables.Column()
@@ -14,14 +17,22 @@ class PurchaseOrderTable(BaseTable):
 
     class Meta(BaseTable.Meta):
         model = PurchaseOrder
-        fields = ('pk', 'order_number', 'supplier', 'status', 'expected_delivery_date', 'destination_location', 'actions')
+        fields = (
+            "pk",
+            "order_number",
+            "supplier",
+            "status",
+            "expected_delivery_date",
+            "destination_location",
+            "actions",
+        )
 
 
 class ContractTable(BaseTable):
-    pk = ToggleColumn(accessor='pk')
+    pk = ToggleColumn(accessor="pk")
     name = tables.Column(linkify=True)
     contract_number = tables.Column(linkify=True)
-    contract_type = tables.Column(verbose_name=_('Type'))
+    contract_type = tables.Column(verbose_name=_("Type"))
     status = tables.Column()
     supplier = tables.Column(linkify=True)
     start_date = tables.Column()
@@ -30,4 +41,14 @@ class ContractTable(BaseTable):
 
     class Meta(BaseTable.Meta):
         model = Contract
-        fields = ('pk', 'name', 'contract_number', 'contract_type', 'status', 'supplier', 'start_date', 'end_date', 'actions')
+        fields = (
+            "pk",
+            "name",
+            "contract_number",
+            "contract_type",
+            "status",
+            "supplier",
+            "start_date",
+            "end_date",
+            "actions",
+        )

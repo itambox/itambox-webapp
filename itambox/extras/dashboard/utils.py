@@ -11,41 +11,168 @@ def get_default_dashboard():
     """
     return [
         # Row 1 (y=0, h3) — personal + alerts strip: bookmarks, stock, renewals, notes
-        {'widget': 'my-bookmarks', 'title': 'My Bookmarks', 'visible': True, 'x': 0, 'y': 0, 'w': 3, 'h': 3, 'style': 'default', 'config': {}},
-        {'widget': 'low-stock', 'title': 'Low Stock Alerts', 'visible': True, 'x': 3, 'y': 0, 'w': 3, 'h': 3, 'style': 'danger', 'config': {}},
-        {'widget': 'upcoming-renewals', 'title': 'Upcoming Renewals', 'visible': True, 'x': 6, 'y': 0, 'w': 3, 'h': 3, 'style': 'warning', 'config': {}},
-        {'widget': 'note', 'title': 'Quick Notes', 'visible': True, 'x': 9, 'y': 0, 'w': 3, 'h': 3, 'style': 'default', 'config': {
-            'content': '# Welcome to ITAMbox!\n\nThis is your premium ITAM dashboard. Click the gear icon on any widget to adjust parameters, or click **Unlock** at the top right to drag, resize, or reorder elements.\n\n- Star any object to see it under **My Bookmarks**\n- Press **Ctrl+K** to jump to search from anywhere'
-        }},
-
+        {
+            "widget": "my-bookmarks",
+            "title": "My Bookmarks",
+            "visible": True,
+            "x": 0,
+            "y": 0,
+            "w": 3,
+            "h": 3,
+            "style": "default",
+            "config": {},
+        },
+        {
+            "widget": "low-stock",
+            "title": "Low Stock Alerts",
+            "visible": True,
+            "x": 3,
+            "y": 0,
+            "w": 3,
+            "h": 3,
+            "style": "danger",
+            "config": {},
+        },
+        {
+            "widget": "upcoming-renewals",
+            "title": "Upcoming Renewals",
+            "visible": True,
+            "x": 6,
+            "y": 0,
+            "w": 3,
+            "h": 3,
+            "style": "warning",
+            "config": {},
+        },
+        {
+            "widget": "note",
+            "title": "Quick Notes",
+            "visible": True,
+            "x": 9,
+            "y": 0,
+            "w": 3,
+            "h": 3,
+            "style": "default",
+            "config": {
+                "content": "# Welcome to ITAMbox!\n\nThis is your premium ITAM dashboard. Click the gear icon on any widget to adjust parameters, or click **Unlock** at the top right to drag, resize, or reorder elements.\n\n- Star any object to see it under **My Bookmarks**\n- Press **Ctrl+K** to jump to search from anywhere"
+            },
+        },
         # Row 2 (y=3, h4) — status donut, financial centerpiece, tenant spend, counts
-        {'widget': 'status-labels', 'title': 'Asset Status Labels', 'visible': True, 'x': 0, 'y': 3, 'w': 3, 'h': 4, 'style': 'info', 'config': {'chart_type': 'doughnut'}},
-        {'widget': 'financial-overview', 'title': 'Financial Overview', 'visible': True, 'x': 3, 'y': 3, 'w': 4, 'h': 4, 'style': 'success', 'config': {
-            'metrics': ['purchase', 'maintenance', 'salvage', 'asset_count'],
-        }},
-        {'widget': 'tenant-spend', 'title': 'Tenant Spend', 'visible': True, 'x': 7, 'y': 3, 'w': 3, 'h': 4, 'style': 'info', 'config': {'limit': 6}},
-        {'widget': 'object-counts', 'title': 'Object Counts', 'visible': True, 'x': 10, 'y': 3, 'w': 2, 'h': 4, 'style': 'info', 'config': {
-            'models': [
-                'assets.asset',
-                'inventory.component',
-                'inventory.accessory',
-                'inventory.consumable',
-                'organization.tenant',
-                'organization.location',
-                'licenses.license',
-                'subscriptions.subscription',
-                'software.software'
-            ],
-        }},
-
+        {
+            "widget": "status-labels",
+            "title": "Asset Status Labels",
+            "visible": True,
+            "x": 0,
+            "y": 3,
+            "w": 3,
+            "h": 4,
+            "style": "info",
+            "config": {"chart_type": "doughnut"},
+        },
+        {
+            "widget": "financial-overview",
+            "title": "Financial Overview",
+            "visible": True,
+            "x": 3,
+            "y": 3,
+            "w": 4,
+            "h": 4,
+            "style": "success",
+            "config": {
+                "metrics": ["purchase", "maintenance", "salvage", "asset_count"],
+            },
+        },
+        {
+            "widget": "tenant-spend",
+            "title": "Tenant Spend",
+            "visible": True,
+            "x": 7,
+            "y": 3,
+            "w": 3,
+            "h": 4,
+            "style": "info",
+            "config": {"limit": 6},
+        },
+        {
+            "widget": "object-counts",
+            "title": "Object Counts",
+            "visible": True,
+            "x": 10,
+            "y": 3,
+            "w": 2,
+            "h": 4,
+            "style": "info",
+            "config": {
+                "models": [
+                    "assets.asset",
+                    "inventory.component",
+                    "inventory.accessory",
+                    "inventory.consumable",
+                    "organization.tenant",
+                    "organization.location",
+                    "licenses.license",
+                    "subscriptions.subscription",
+                    "software.software",
+                ],
+            },
+        },
         # Row 3 (y=7, h4) — age chart, EOL planning, repairs, license seats
-        {'widget': 'asset-age', 'title': 'Asset Age Distribution', 'visible': True, 'x': 0, 'y': 7, 'w': 3, 'h': 4, 'style': 'info', 'config': {'chart_format': 'bar'}},
-        {'widget': 'eol-alerts', 'title': 'EOL Planning Alerts', 'visible': True, 'x': 3, 'y': 7, 'w': 4, 'h': 4, 'style': 'warning', 'config': {}},
-        {'widget': 'active-maintenances', 'title': 'Active Repairs & Maintenances', 'visible': True, 'x': 7, 'y': 7, 'w': 3, 'h': 4, 'style': 'warning', 'config': {}},
-        {'widget': 'license-utilization', 'title': 'Software License Seats', 'visible': True, 'x': 10, 'y': 7, 'w': 2, 'h': 4, 'style': 'info', 'config': {}},
-
+        {
+            "widget": "asset-age",
+            "title": "Asset Age Distribution",
+            "visible": True,
+            "x": 0,
+            "y": 7,
+            "w": 3,
+            "h": 4,
+            "style": "info",
+            "config": {"chart_format": "bar"},
+        },
+        {
+            "widget": "eol-alerts",
+            "title": "EOL Planning Alerts",
+            "visible": True,
+            "x": 3,
+            "y": 7,
+            "w": 4,
+            "h": 4,
+            "style": "warning",
+            "config": {},
+        },
+        {
+            "widget": "active-maintenances",
+            "title": "Active Repairs & Maintenances",
+            "visible": True,
+            "x": 7,
+            "y": 7,
+            "w": 3,
+            "h": 4,
+            "style": "warning",
+            "config": {},
+        },
+        {
+            "widget": "license-utilization",
+            "title": "Software License Seats",
+            "visible": True,
+            "x": 10,
+            "y": 7,
+            "w": 2,
+            "h": 4,
+            "style": "info",
+            "config": {},
+        },
         # Row 4 (y=11, h5) — full-width audit trail
-        {'widget': 'recent-activity', 'title': 'Change Log', 'visible': True, 'x': 0, 'y': 11, 'w': 12, 'h': 5, 'style': 'default', 'config': {'limit': 8}},
+        {
+            "widget": "recent-activity",
+            "title": "Change Log",
+            "visible": True,
+            "x": 0,
+            "y": 11,
+            "w": 12,
+            "h": 5,
+            "style": "default",
+            "config": {"limit": 8},
+        },
     ]
 
 
@@ -74,13 +201,10 @@ def get_dashboard(user, dashboard_id=None, for_update=False):
 
     if not dashboard:
         dashboard = Dashboard.objects.create(
-            user=user,
-            name='Main Dashboard',
-            is_default=True,
-            layout=get_default_dashboard()
+            user=user, name="Main Dashboard", is_default=True, layout=get_default_dashboard()
         )
     elif not dashboard.layout:
         dashboard.layout = get_default_dashboard()
-        dashboard.save(update_fields=['layout'])
+        dashboard.save(update_fields=["layout"])
 
     return dashboard

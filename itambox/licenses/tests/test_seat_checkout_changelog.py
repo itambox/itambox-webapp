@@ -17,23 +17,21 @@ import uuid
 from django.test import TestCase
 from model_bakery import baker
 
-from core.models import ObjectChange
 from core.choices import ObjectChangeActionChoices
+from core.models import ObjectChange
 from core.tests.mixins import TenantTestMixin
-from itambox.middleware import _request_id, _current_user
+from itambox.middleware import _current_user, _request_id
 from licenses.models import License, LicenseTypeChoices
-from licenses.services import checkout_license, checkin_license_seat
-from software.models import Software
+from licenses.services import checkin_license_seat, checkout_license
 from organization.models import AssetHolder
+from software.models import Software
 
 
 class LicenseSeatCheckoutChangelogTests(TenantTestMixin, TestCase):
     def setUp(self):
-        self.setup_tenant_context(name='Seat Tenant', slug='seat-tenant')
+        self.setup_tenant_context(name="Seat Tenant", slug="seat-tenant")
         with self.tenant_context(self.tenant):
-            self.software = baker.make(
-                Software, name='Seat App', manufacturer__name='Seat Mfr', tenant=self.tenant
-            )
+            self.software = baker.make(Software, name="Seat App", manufacturer__name="Seat Mfr", tenant=self.tenant)
             self.license = baker.make(
                 License,
                 software=self.software,
@@ -42,7 +40,7 @@ class LicenseSeatCheckoutChangelogTests(TenantTestMixin, TestCase):
                 license_type=LicenseTypeChoices.PERPETUAL_SEAT,
             )
             self.holder = AssetHolder.objects.create(
-                first_name='Seat', last_name='Holder', upn='seat.holder', tenant=self.tenant
+                first_name="Seat", last_name="Holder", upn="seat.holder", tenant=self.tenant
             )
 
         # Change logging only fires when both contextvars are populated (mirrors a
@@ -59,7 +57,7 @@ class LicenseSeatCheckoutChangelogTests(TenantTestMixin, TestCase):
         # _base_manager: assert independently of the active tenant scope/soft-delete.
         return ObjectChange._base_manager.filter(
             changed_object_id=self.license.pk,
-            object_type_repr='licenses | license',
+            object_type_repr="licenses | license",
             action=ObjectChangeActionChoices.ACTION_UPDATE,
         )
 
@@ -75,7 +73,7 @@ class LicenseSeatCheckoutChangelogTests(TenantTestMixin, TestCase):
             before + 1,
             "checkout_license must emit exactly one 'update' ObjectChange for the license",
         )
-        change = changes.latest('time')
+        change = changes.latest("time")
         # It is the message-only entry the short-circuit used to drop: nothing on the
         # license row changed, so prechange == postchange.
         self.assertEqual(change.prechange_data, change.postchange_data)

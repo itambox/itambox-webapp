@@ -15,6 +15,7 @@ Pulls data from a Snipe-IT instance via its REST API and imports it into ITAMbox
 Out of scope (v1): images/file uploads, activity history, depreciation schedules,
 kits, Snipe "requestable" requests.
 """
+
 import os
 import sys
 
@@ -34,123 +35,118 @@ class Command(BaseCommand):
 
     def add_arguments(self, parser):
         parser.add_argument(
-            '--url',
+            "--url",
             required=True,
-            metavar='URL',
-            help='Snipe-IT base URL, e.g. https://snipe.example (no trailing slash).',
+            metavar="URL",
+            help="Snipe-IT base URL, e.g. https://snipe.example (no trailing slash).",
         )
         parser.add_argument(
-            '--token-env',
+            "--token-env",
             required=True,
-            metavar='ENV_VAR',
-            help='Name of the environment variable that holds the Snipe-IT API token.',
+            metavar="ENV_VAR",
+            help="Name of the environment variable that holds the Snipe-IT API token.",
         )
         parser.add_argument(
-            '--tenant',
-            metavar='SLUG',
+            "--tenant",
+            metavar="SLUG",
             default=None,
-            help='Target ITAMbox tenant slug. Required unless --map-companies-to-tenants is set.',
+            help="Target ITAMbox tenant slug. Required unless --map-companies-to-tenants is set.",
         )
         parser.add_argument(
-            '--map-companies-to-tenants',
-            action='store_true',
+            "--map-companies-to-tenants",
+            action="store_true",
             default=False,
-            help='Create/use one ITAMbox tenant per Snipe-IT company (MSP mode).',
+            help="Create/use one ITAMbox tenant per Snipe-IT company (MSP mode).",
         )
         parser.add_argument(
-            '--dry-run',
-            action='store_true',
+            "--dry-run",
+            action="store_true",
             default=False,
-            help='Fetch and report the mapping without writing anything to the database.',
+            help="Fetch and report the mapping without writing anything to the database.",
         )
         parser.add_argument(
-            '--skip',
-            metavar='ENTITIES',
-            default='',
-            help='Comma-separated list of entity types to skip: assets,accessories,consumables,components,licenses,maintenances',
+            "--skip",
+            metavar="ENTITIES",
+            default="",
+            help="Comma-separated list of entity types to skip: assets,accessories,consumables,components,licenses,maintenances",
         )
         parser.add_argument(
-            '--update',
-            action='store_true',
+            "--update",
+            action="store_true",
             default=False,
-            help='Re-sync fields on existing records (default: skip existing).',
+            help="Re-sync fields on existing records (default: skip existing).",
         )
         parser.add_argument(
-            '--admin-user',
-            metavar='USERNAME',
+            "--admin-user",
+            metavar="USERNAME",
             default=None,
-            help='Username of the ITAMbox admin who owns the import job/changes (default: first superuser).',
+            help="Username of the ITAMbox admin who owns the import job/changes (default: first superuser).",
         )
 
     def handle(self, *args, **options):
-        from core.importers.snipeit import SnipeITClient, SnipeITImporter, SnipeITError
+        from core.importers.snipeit import SnipeITClient, SnipeITError, SnipeITImporter
         from core.models import Job
         from organization.models import Tenant
 
         # Resolve API token from environment
-        token_env = options['token_env']
-        token = os.environ.get(token_env, '').strip()
+        token_env = options["token_env"]
+        token = os.environ.get(token_env, "").strip()
         if not token:
             raise CommandError(
                 f"Environment variable '{token_env}' is empty or not set. "
                 "Export it before running: export SNIPEIT_TOKEN=<your-token>"
             )
 
-        base_url = options['url'].rstrip('/')
-        map_companies = options['map_companies_to_tenants']
-        dry_run = options['dry_run']
-        update = options['update']
-        skip = {s.strip() for s in options['skip'].split(',') if s.strip()}
+        base_url = options["url"].rstrip("/")
+        map_companies = options["map_companies_to_tenants"]
+        dry_run = options["dry_run"]
+        update = options["update"]
+        skip = {s.strip() for s in options["skip"].split(",") if s.strip()}
 
         # Resolve tenant
         tenant = None
-        if options['tenant']:
+        if options["tenant"]:
             try:
-                tenant = Tenant.objects.get(slug=options['tenant'])
+                tenant = Tenant.objects.get(slug=options["tenant"])
             except Tenant.DoesNotExist:
                 raise CommandError(f"Tenant with slug '{options['tenant']}' not found.")
         elif not map_companies:
-            raise CommandError(
-                "Either --tenant <slug> or --map-companies-to-tenants is required."
-            )
+            raise CommandError("Either --tenant <slug> or --map-companies-to-tenants is required.")
 
         # Resolve admin user
-        admin_username = options.get('admin_user')
+        admin_username = options.get("admin_user")
         if admin_username:
             try:
                 user = User.objects.get(username=admin_username)
             except User.DoesNotExist:
                 raise CommandError(f"User '{admin_username}' not found.")
         else:
-            user = User.objects.filter(is_superuser=True).order_by('pk').first()
+            user = User.objects.filter(is_superuser=True).order_by("pk").first()
             if not user:
-                raise CommandError(
-                    "No superuser found. Create one first or pass --admin-user."
-                )
+                raise CommandError("No superuser found. Create one first or pass --admin-user.")
 
         if dry_run:
-            self.stdout.write(self.style.WARNING(
-                "\n[DRY RUN] No data will be written to the database.\n"
-            ))
+            self.stdout.write(self.style.WARNING("\n[DRY RUN] No data will be written to the database.\n"))
 
         # Create Job record for visibility in the Jobs UI
         job_name = f"Snipe-IT Import from {base_url}"
         if dry_run:
-            job_name += ' (dry-run)'
+            job_name += " (dry-run)"
         if not dry_run:
             from django.contrib.contenttypes.models import ContentType
+
             job = Job.objects.create(
                 name=job_name,
                 tenant=tenant,
                 status=Job.STATUS_PENDING,
                 data={
-                    'source': 'snipeit',
-                    'url': base_url,
-                    'tenant': tenant.slug if tenant else None,
-                    'map_companies': map_companies,
-                    'skip': list(skip),
-                    'update': update,
-                    'started_by': user.username,
+                    "source": "snipeit",
+                    "url": base_url,
+                    "tenant": tenant.slug if tenant else None,
+                    "map_companies": map_companies,
+                    "skip": list(skip),
+                    "update": update,
+                    "started_by": user.username,
                 },
             )
             job.mark_running()
@@ -170,7 +166,7 @@ class Command(BaseCommand):
 
         # Verify connectivity
         try:
-            client.get_detail('/api/v1/statuslabels?limit=1&offset=0')
+            client.get_detail("/api/v1/statuslabels?limit=1&offset=0")
         except SnipeITError as exc:
             msg = f"Cannot connect to Snipe-IT at {base_url}: {exc}"
             if job:
@@ -206,10 +202,8 @@ class Command(BaseCommand):
         elapsed = (timezone.now() - started).total_seconds()
 
         # Summary
-        self.stdout.write('\n' + self.style.SUCCESS('=' * 60))
-        self.stdout.write(self.style.SUCCESS(
-            'DRY RUN complete' if dry_run else 'Import complete'
-        ))
+        self.stdout.write("\n" + self.style.SUCCESS("=" * 60))
+        self.stdout.write(self.style.SUCCESS("DRY RUN complete" if dry_run else "Import complete"))
         self.stdout.write(f"Elapsed: {elapsed:.1f}s\n")
 
         total_created = total_updated = total_failed = 0
@@ -221,19 +215,21 @@ class Command(BaseCommand):
                 f"skipped={stats['skipped']:4d}  "
                 f"failed={stats['failed']:4d}"
             )
-            total_created += stats['created']
-            total_updated += stats['updated']
-            total_failed += stats['failed']
+            total_created += stats["created"]
+            total_updated += stats["updated"]
+            total_failed += stats["failed"]
 
-        self.stdout.write(self.style.SUCCESS(
-            f"\nTotal: {total_created} created, {total_updated} updated, {total_failed} failed"
-        ))
+        self.stdout.write(
+            self.style.SUCCESS(f"\nTotal: {total_created} created, {total_updated} updated, {total_failed} failed")
+        )
 
         if job:
-            job.mark_completed(result={
-                'total_created': total_created,
-                'total_updated': total_updated,
-                'total_failed': total_failed,
-                'elapsed_seconds': elapsed,
-                'counts': counts,
-            })
+            job.mark_completed(
+                result={
+                    "total_created": total_created,
+                    "total_updated": total_updated,
+                    "total_failed": total_failed,
+                    "elapsed_seconds": elapsed,
+                    "counts": counts,
+                }
+            )

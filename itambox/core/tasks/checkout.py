@@ -1,10 +1,12 @@
 import datetime
 import logging
+
 from django.contrib.contenttypes.models import ContentType
 from django.db import transaction
 from django.utils.translation import gettext_lazy as _
 
 from core.models import Job, Notification
+
 from .context import TaskContext
 from .utils import reverse_job_detail
 
@@ -22,8 +24,18 @@ def _parse_date(value):
         return None
 
 
-def bulk_checkout_task(job_id, asset_pks, target_type_str, target_pk, user_id, notes,
-                       expected_checkin_date=None, tenant_id=None, status_id=None, checkout_date=None):
+def bulk_checkout_task(
+    job_id,
+    asset_pks,
+    target_type_str,
+    target_pk,
+    user_id,
+    notes,
+    expected_checkin_date=None,
+    tenant_id=None,
+    status_id=None,
+    checkout_date=None,
+):
     """
     Asynchronously executes bulk checkout operations on selected hardware Assets
     utilizing select_for_update row-level locking to prevent race anomalies.
@@ -44,11 +56,11 @@ def bulk_checkout_task(job_id, asset_pks, target_type_str, target_pk, user_id, n
 
             try:
                 _CT_MAP = {
-                    'assetholder': ('organization', 'assetholder'),
-                    'asset':       ('assets', 'asset'),
-                    'location':    ('organization', 'location'),
+                    "assetholder": ("organization", "assetholder"),
+                    "asset": ("assets", "asset"),
+                    "location": ("organization", "location"),
                 }
-                app_label, model_name = _CT_MAP.get(target_type_str, ('organization', target_type_str))
+                app_label, model_name = _CT_MAP.get(target_type_str, ("organization", target_type_str))
                 target_model = ContentType.objects.get(
                     app_label=app_label,
                     model=model_name,
@@ -62,11 +74,11 @@ def bulk_checkout_task(job_id, asset_pks, target_type_str, target_pk, user_id, n
 
                 # Map target_type_str to the correct checkout_asset keyword argument
                 _TARGET_KWARG = {
-                    'assetholder': 'holder',
-                    'asset':       'asset_target',
-                    'location':    'location',
+                    "assetholder": "holder",
+                    "asset": "asset_target",
+                    "location": "location",
                 }
-                target_kwarg = _TARGET_KWARG.get(target_type_str, 'location')
+                target_kwarg = _TARGET_KWARG.get(target_type_str, "location")
 
                 status = StatusLabel.objects.filter(pk=status_id).first() if status_id else None
                 resolved_checkin = _parse_date(expected_checkin_date)
@@ -94,7 +106,9 @@ def bulk_checkout_task(job_id, asset_pks, target_type_str, target_pk, user_id, n
                         failure_count += 1
                         job.append_log(f" - Failed to checkout Asset PK {pk}: {str(ex)}")
 
-                job.append_log(f"Bulk checkout execution finished. Successes: {success_count} | Failures: {failure_count}")
+                job.append_log(
+                    f"Bulk checkout execution finished. Successes: {success_count} | Failures: {failure_count}"
+                )
 
                 if success_count == 0:
                     job.mark_failed("All asset checkouts failed.")
@@ -103,22 +117,20 @@ def bulk_checkout_task(job_id, asset_pks, target_type_str, target_pk, user_id, n
                         subject=_("Bulk Checkout Failed"),
                         message=_("All hardware checkouts failed. View logs for error tracebacks."),
                         level=Notification.LEVEL_DANGER,
-                        target_url=reverse_job_detail(job.pk)
+                        target_url=reverse_job_detail(job.pk),
                     )
                     return
 
-                job.mark_completed(result={
-                    'checked_out': success_count,
-                    'failed': failure_count,
-                    'total': len(asset_pks)
-                })
+                job.mark_completed(
+                    result={"checked_out": success_count, "failed": failure_count, "total": len(asset_pks)}
+                )
 
                 Notification.objects.create(
                     user=ctx.user,
                     subject=_("Bulk Checkout Complete"),
-                    message=_("Successfully checked out %(count)s asset(s).") % {'count': success_count},
+                    message=_("Successfully checked out %(count)s asset(s).") % {"count": success_count},
                     level=Notification.LEVEL_SUCCESS,
-                    target_url=reverse_job_detail(job.pk)
+                    target_url=reverse_job_detail(job.pk),
                 )
 
             except Exception as e:
@@ -127,9 +139,9 @@ def bulk_checkout_task(job_id, asset_pks, target_type_str, target_pk, user_id, n
                 Notification.objects.create(
                     user=ctx.user,
                     subject=_("Bulk Checkout Error"),
-                    message=_("A system exception occurred during the checkout: %(error)s") % {'error': str(e)},
+                    message=_("A system exception occurred during the checkout: %(error)s") % {"error": str(e)},
                     level=Notification.LEVEL_DANGER,
-                    target_url=reverse_job_detail(job.pk)
+                    target_url=reverse_job_detail(job.pk),
                 )
         except Exception as e:
             logger.exception("Outer exception during bulk checkout task")

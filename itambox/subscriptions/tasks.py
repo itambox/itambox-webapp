@@ -1,9 +1,12 @@
 import logging
+
+from django.contrib.auth import get_user_model
 from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
-from django.contrib.auth import get_user_model
+
 from core.models import Notification
 from core.tasks.context import TaskContext
+
 from .models import Subscription, SubscriptionStatusChoices
 
 logger = logging.getLogger(__name__)
@@ -25,23 +28,20 @@ def check_subscription_expiries_and_reminders():
 
     # 1. Handle auto-expiries
     expired_count = 0
-    expired_subs = Subscription.objects.filter(
-        status=SubscriptionStatusChoices.ACTIVE,
-        renewal_date__lt=today
-    )
+    expired_subs = Subscription.objects.filter(status=SubscriptionStatusChoices.ACTIVE, renewal_date__lt=today)
     for sub in expired_subs:
         with TaskContext(tenant_id=sub.tenant_id, user_id=None):
             sub.status = SubscriptionStatusChoices.EXPIRED
-            sub.save(update_fields=['status'])
+            sub.save(update_fields=["status"])
             expired_count += 1
 
             # Notify owner and admins about auto-expiry
             # Scope recipients to staff who belong to this subscription's tenant.
             # The bare is_staff=True query notified every platform operator with
             # another tenant's per-tenant financials (a cross-tenant data flow).
-            recipients = set(User.objects.filter(
-                is_staff=True, is_active=True, memberships__tenant_id=sub.tenant_id
-            ).distinct())
+            recipients = set(
+                User.objects.filter(is_staff=True, is_active=True, memberships__tenant_id=sub.tenant_id).distinct()
+            )
             if sub.owner and sub.owner.is_active:
                 recipients.add(sub.owner)
 
@@ -49,16 +49,14 @@ def check_subscription_expiries_and_reminders():
                 Notification.objects.create(
                     user=user,
                     subject=_("Subscription Expired: %(name)s") % {"name": sub.name},
-                    message=_(
-                        "The subscription '%(name)s' from provider '%(provider)s' "
-                        "has expired as of %(date)s."
-                    ) % {
+                    message=_("The subscription '%(name)s' from provider '%(provider)s' has expired as of %(date)s.")
+                    % {
                         "name": sub.name,
                         "provider": sub.provider,
                         "date": sub.renewal_date,
                     },
                     level=Notification.LEVEL_WARNING,
-                    target_url=sub.get_absolute_url()
+                    target_url=sub.get_absolute_url(),
                 )
 
     if expired_count:
@@ -68,32 +66,29 @@ def check_subscription_expiries_and_reminders():
     reminder_days = [30, 14, 7]
     for days in reminder_days:
         target_date = today + timezone.timedelta(days=days)
-        subs_to_remind = Subscription.objects.filter(
-            status=SubscriptionStatusChoices.ACTIVE,
-            renewal_date=target_date
-        )
+        subs_to_remind = Subscription.objects.filter(status=SubscriptionStatusChoices.ACTIVE, renewal_date=target_date)
         for sub in subs_to_remind:
             with TaskContext(tenant_id=sub.tenant_id, user_id=None):
                 # Scope recipients to staff who belong to this subscription's tenant.
                 # The bare is_staff=True query notified every platform operator with
                 # another tenant's per-tenant financials (a cross-tenant data flow).
-                recipients = set(User.objects.filter(
-                    is_staff=True, is_active=True, memberships__tenant_id=sub.tenant_id
-                ).distinct())
+                recipients = set(
+                    User.objects.filter(is_staff=True, is_active=True, memberships__tenant_id=sub.tenant_id).distinct()
+                )
                 if sub.owner and sub.owner.is_active:
                     recipients.add(sub.owner)
 
                 for user in recipients:
                     Notification.objects.create(
                         user=user,
-                        subject=_(
-                            "Subscription Renewal Warning: %(name)s in %(days)s Days"
-                        ) % {"name": sub.name, "days": days},
+                        subject=_("Subscription Renewal Warning: %(name)s in %(days)s Days")
+                        % {"name": sub.name, "days": days},
                         message=_(
                             "The subscription '%(name)s' from provider '%(provider)s' "
                             "is due for renewal on %(date)s (%(days)s days remaining). "
                             "Cost: %(cost)s %(currency)s."
-                        ) % {
+                        )
+                        % {
                             "name": sub.name,
                             "provider": sub.provider,
                             "date": sub.renewal_date,
@@ -102,5 +97,5 @@ def check_subscription_expiries_and_reminders():
                             "currency": sub.currency,
                         },
                         level=Notification.LEVEL_WARNING,
-                        target_url=sub.get_absolute_url()
+                        target_url=sub.get_absolute_url(),
                     )

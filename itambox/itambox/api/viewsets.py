@@ -10,18 +10,18 @@ from rest_framework.response import Response
 from rest_framework.viewsets import GenericViewSet
 
 from core.managers import get_current_tenant
+from itambox.api.mixins import BulkDestroyModelMixin, BulkUpdateModelMixin, ETagMixin, ObjectValidationMixin
 from itambox.api.serializers.features import ChangeLogMessageSerializer
 from itambox.api.utils import get_annotations_for_serializer, get_prefetches_for_serializer
-from itambox.api.mixins import BulkUpdateModelMixin, BulkDestroyModelMixin, ObjectValidationMixin, ETagMixin
 
-logger = logging.getLogger('itambox.api.views')
+logger = logging.getLogger("itambox.api.views")
 
 
 class BaseViewSet(GenericViewSet):
     brief = False
 
     def initialize_request(self, request, *args, **kwargs):
-        self.brief = request.method == 'GET' and 'brief' in request.GET
+        self.brief = request.method == "GET" and "brief" in request.GET
         return super().initialize_request(request, *args, **kwargs)
 
     def get_queryset(self):
@@ -30,12 +30,12 @@ class BaseViewSet(GenericViewSet):
         # The viewset's `queryset` class attribute is evaluated at import time when no
         # tenant context is active, so filter_by_tenant() is a no-op then.  Re-apply it
         # here at request time so the correct tenant scope is enforced on every call.
-        if hasattr(qs, 'filter_by_tenant'):
+        if hasattr(qs, "filter_by_tenant"):
             qs = qs.filter_by_tenant()
 
         serializer_class = self.get_serializer_class()
 
-        if not hasattr(serializer_class, 'Meta') or not hasattr(serializer_class.Meta, 'model'):
+        if not hasattr(serializer_class, "Meta") or not hasattr(serializer_class.Meta, "model"):
             return qs
 
         if prefetch := get_prefetches_for_serializer(serializer_class, **self.field_kwargs):
@@ -52,26 +52,21 @@ class BaseViewSet(GenericViewSet):
 
     @cached_property
     def field_kwargs(self):
-        if requested_fields := self.request.query_params.get('fields'):
-            return {'fields': requested_fields.split(',')}
+        if requested_fields := self.request.query_params.get("fields"):
+            return {"fields": requested_fields.split(",")}
 
-        if omit_fields := self.request.query_params.get('omit'):
-            return {'omit': omit_fields.split(',')}
+        if omit_fields := self.request.query_params.get("omit"):
+            return {"omit": omit_fields.split(",")}
 
         if self.brief:
             serializer_class = self.get_serializer_class()
-            if brief_fields := getattr(serializer_class.Meta, 'brief_fields', None):
-                return {'fields': brief_fields}
+            if brief_fields := getattr(serializer_class.Meta, "brief_fields", None):
+                return {"fields": brief_fields}
 
         return {}
 
 
-class ITAMBoxReadOnlyModelViewSet(
-    ETagMixin,
-    drf_mixins.RetrieveModelMixin,
-    drf_mixins.ListModelMixin,
-    BaseViewSet
-):
+class ITAMBoxReadOnlyModelViewSet(ETagMixin, drf_mixins.RetrieveModelMixin, drf_mixins.ListModelMixin, BaseViewSet):
     pass
 
 
@@ -85,17 +80,17 @@ class ITAMBoxModelViewSet(
     drf_mixins.UpdateModelMixin,
     drf_mixins.DestroyModelMixin,
     drf_mixins.ListModelMixin,
-    BaseViewSet
+    BaseViewSet,
 ):
     def get_object_with_snapshot(self):
         obj = super().get_object()
-        if hasattr(obj, 'snapshot'):
+        if hasattr(obj, "snapshot"):
             obj.snapshot()
         return obj
 
     def get_serializer(self, *args, **kwargs):
-        if isinstance(kwargs.get('data', {}), list):
-            kwargs['many'] = True
+        if isinstance(kwargs.get("data", {}), list):
+            kwargs["many"] = True
         return super().get_serializer(*args, **kwargs)
 
     def dispatch(self, request, *args, **kwargs):
@@ -112,27 +107,22 @@ class ITAMBoxModelViewSet(
             count = len(protected_objects)
             # Keep the enumerated detail server-side for diagnostics only.
             logger.warning(
-                'Unable to delete object: %d dependent object(s): %s',
+                "Unable to delete object: %d dependent object(s): %s",
                 count,
-                ', '.join(f'{obj} ({obj.pk})' for obj in protected_objects),
+                ", ".join(f"{obj} ({obj.pk})" for obj in protected_objects),
             )
-            msg = f'Unable to delete object. {count} dependent object(s) reference it.'
-            return self.finalize_response(
-                request,
-                Response({'detail': msg}, status=409),
-                *args,
-                **kwargs
-            )
+            msg = f"Unable to delete object. {count} dependent object(s) reference it."
+            return self.finalize_response(request, Response({"detail": msg}, status=409), *args, **kwargs)
 
     def create(self, request, *args, **kwargs):
         serializer = self.get_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)
-        bulk_create = getattr(serializer, 'many', False)
+        bulk_create = getattr(serializer, "many", False)
         self.perform_create(serializer)
 
         if bulk_create:
             instance_pks = [obj.pk for obj in serializer.instance]
-            qs = self.get_queryset().filter(pk__in=instance_pks).order_by('pk')
+            qs = self.get_queryset().filter(pk__in=instance_pks).order_by("pk")
         else:
             try:
                 qs = self.get_queryset().get(pk=serializer.instance.pk)
@@ -152,19 +142,16 @@ class ITAMBoxModelViewSet(
 
         if not bulk_create:
             if etag := self._get_etag(qs):
-                response['ETag'] = etag
+                response["ETag"] = etag
 
         return response
 
     @staticmethod
     def _missing_create_tenant_rows(serializer):
         validated = serializer.validated_data
-        if getattr(serializer, 'many', False):
-            return [
-                row for row in validated
-                if isinstance(row, dict) and row.get('tenant') is None
-            ]
-        if isinstance(validated, dict) and validated.get('tenant') is None:
+        if getattr(serializer, "many", False):
+            return [row for row in validated if isinstance(row, dict) and row.get("tenant") is None]
+        if isinstance(validated, dict) and validated.get("tenant") is None:
             return [validated]
         return []
 
@@ -184,13 +171,13 @@ class ITAMBoxModelViewSet(
             return {}
 
         try:
-            tenant_field = model._meta.get_field('tenant')
+            tenant_field = model._meta.get_field("tenant")
         except FieldDoesNotExist:
             return {}
-        if not getattr(tenant_field, 'null', False):
+        if not getattr(tenant_field, "null", False):
             return {}
 
-        bulk_create = getattr(serializer, 'many', False)
+        bulk_create = getattr(serializer, "many", False)
         missing_tenant_rows = self._missing_create_tenant_rows(serializer)
         if not missing_tenant_rows:
             return {}
@@ -203,13 +190,13 @@ class ITAMBoxModelViewSet(
             raise PermissionDenied()
 
         if not bulk_create:
-            return {'tenant': active_tenant}
+            return {"tenant": active_tenant}
 
         # ListSerializer.save() consumes these per-row mappings; mutate only
         # missing/null values so explicit tenant choices remain subject to
         # _validate_objects().
         for row in missing_tenant_rows:
-            row['tenant'] = active_tenant
+            row["tenant"] = active_tenant
         return {}
 
     def perform_create(self, serializer):
@@ -226,7 +213,7 @@ class ITAMBoxModelViewSet(
             raise PermissionDenied()
 
     def update(self, request, *args, **kwargs):
-        partial = kwargs.pop('partial', False)
+        partial = kwargs.pop("partial", False)
         instance = self.get_object_with_snapshot()
 
         self._validate_etag(self.request, instance)
@@ -240,7 +227,7 @@ class ITAMBoxModelViewSet(
         response = Response(serializer.data)
 
         if etag := self._get_etag(qs):
-            response['ETag'] = etag
+            response["ETag"] = etag
 
         return response
 
@@ -258,18 +245,19 @@ class ITAMBoxModelViewSet(
         # pinning and the GraphQL mutations, which never let a client set tenant.
         validated = serializer.validated_data
         if (
-            not getattr(serializer, 'many', False)
+            not getattr(serializer, "many", False)
             and isinstance(validated, dict)
             and not self.request.user.is_superuser
-            and 'tenant' in validated
+            and "tenant" in validated
         ):
             from django.core.exceptions import FieldDoesNotExist
+
             try:
-                model._meta.get_field('tenant')
+                model._meta.get_field("tenant")
             except FieldDoesNotExist:
                 pass
             else:
-                save_kwargs['tenant'] = getattr(serializer.instance, 'tenant', None)
+                save_kwargs["tenant"] = getattr(serializer.instance, "tenant", None)
 
         try:
             with transaction.atomic(using=router.db_for_write(model)):
@@ -287,7 +275,7 @@ class ITAMBoxModelViewSet(
 
         serializer = ChangeLogMessageSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
-        instance._changelog_message = serializer.validated_data.get('changelog_message')
+        instance._changelog_message = serializer.validated_data.get("changelog_message")
 
         self.perform_destroy(instance)
 
@@ -305,6 +293,7 @@ class ITAMBoxModelViewSet(
         except ObjectDoesNotExist:
             logger.warning(
                 "perform_destroy: %s pk=%s not visible in tenant scope; denying.",
-                model._meta.verbose_name, instance.pk,
+                model._meta.verbose_name,
+                instance.pk,
             )
             raise PermissionDenied()

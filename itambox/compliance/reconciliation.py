@@ -1,10 +1,10 @@
-from django.db import transaction, IntegrityError
 from django.core.exceptions import ValidationError
+from django.db import IntegrityError, transaction
 from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
 
 from assets.models import Asset, StatusLabel
-from compliance.models import AuditSession, AssetAudit
+from compliance.models import AssetAudit, AuditSession
 
 
 def classify_session_audits(session: AuditSession) -> dict:
@@ -19,10 +19,8 @@ def classify_session_audits(session: AuditSession) -> dict:
       surprise    — list of AssetAudit (scanned but not in expected_ids)
       missing     — Asset queryset (expected but not scanned)
     """
-    expected_ids = set(session.expected_assets_queryset.values_list('id', flat=True))
-    audits = list(
-        session.audits.select_related('asset', 'location', 'status', 'auditor')
-    )
+    expected_ids = set(session.expected_assets_queryset.values_list("id", flat=True))
+    audits = list(session.audits.select_related("asset", "location", "status", "auditor"))
     scanned_ids = {a.asset_id for a in audits}
 
     matching = []
@@ -44,22 +42,33 @@ def classify_session_audits(session: AuditSession) -> dict:
     # expected_assets_queryset, then filter by session.tenant when set so that
     # a viewer from a different tenant sees the same missing list.
     from django.db.models import QuerySet as _RawQS
+
     missing_ids = expected_ids - scanned_ids
     _missing_qs = _RawQS(model=Asset).filter(deleted_at__isnull=True, id__in=missing_ids)
     if session.tenant_id is not None:
         _missing_qs = _missing_qs.filter(tenant_id=session.tenant_id)
-    missing = _missing_qs.select_related('location', 'status')
+    missing = _missing_qs.select_related("location", "status")
 
     return {
-        'matching': matching,
-        'mismatched': mismatched,
-        'surprise': surprise,
-        'missing': missing,
+        "matching": matching,
+        "mismatched": mismatched,
+        "surprise": surprise,
+        "missing": missing,
     }
 
 
 @transaction.atomic
-def audit_asset(asset: Asset, user=None, session=None, location=None, status=None, notes='', verification_method='manual', request=None, **kwargs) -> AssetAudit:
+def audit_asset(
+    asset: Asset,
+    user=None,
+    session=None,
+    location=None,
+    status=None,
+    notes="",
+    verification_method="manual",
+    request=None,
+    **kwargs,
+) -> AssetAudit:
     # Lock the asset row so concurrent scans of the same asset serialize: the second one
     # then sees the first's committed audit (friendly ValidationError) instead of racing
     # the (session, asset) unique constraint into a 500.
@@ -86,7 +95,7 @@ def audit_asset(asset: Asset, user=None, session=None, location=None, status=Non
             location=location,
             status=status,
             notes=notes,
-            verification_method=verification_method
+            verification_method=verification_method,
         )
     except IntegrityError:
         # Lost the race on the (session, asset) unique constraint — return the friendly
@@ -100,12 +109,12 @@ def audit_asset(asset: Asset, user=None, session=None, location=None, status=Non
         asset.location = location
         asset.status = status
 
-    asset.save(update_fields=['last_audited', 'last_audited_by', 'location', 'status'])
+    asset.save(update_fields=["last_audited", "last_audited_by", "location", "status"])
 
     return audit_record
 
 
-def audit_asset_from_form(asset: Asset, user, location, status, notes: str = '', **kwargs) -> dict:
+def audit_asset_from_form(asset: Asset, user, location, status, notes: str = "", **kwargs) -> dict:
     """Service callable for the standalone detail-page verify modal.
 
     Resolves the correct active session (observed-location match first, then
@@ -113,8 +122,8 @@ def audit_asset_from_form(asset: Asset, user, location, status, notes: str = '',
     audit_asset().
     """
     session = (
-        AuditSession.objects.filter(status='active', location=location).first()
-        or AuditSession.objects.filter(status='active', location__isnull=True).first()
+        AuditSession.objects.filter(status="active", location=location).first()
+        or AuditSession.objects.filter(status="active", location__isnull=True).first()
     )
 
     audit_asset(
@@ -124,34 +133,35 @@ def audit_asset_from_form(asset: Asset, user, location, status, notes: str = '',
         location=location,
         status=status,
         notes=notes,
-        verification_method='manual',
+        verification_method="manual",
     )
 
     if session:
-        return {'message': _("Verified inside campaign '%(name)s'.") % {'name': session.name}, 'session': session}
-    return {'message': _("Standalone verification recorded."), 'session': None}
+        return {"message": _("Verified inside campaign '%(name)s'.") % {"name": session.name}, "session": session}
+    return {"message": _("Standalone verification recorded."), "session": None}
 
 
 def _audit_to_dict(audit, category: str, expected_location_name: str = None) -> dict:
     """Serialize one AssetAudit to a JSON-safe dict for the stored report."""
     from django.urls import reverse
+
     try:
         asset_url = audit.asset.get_absolute_url()
     except Exception:
         asset_url = None
     return {
-        'category': category,
-        'asset_id': audit.asset_id,
-        'asset_tag': audit.asset.asset_tag,
-        'name': audit.asset.name,
-        'asset_url': asset_url,
-        'observed_location_id': audit.location_id,
-        'observed_location': audit.location.name if audit.location else None,
-        'expected_location': expected_location_name,
-        'auditor': audit.auditor.username if audit.auditor else None,
-        'timestamp': audit.timestamp.isoformat(),
-        'timestamp_display': audit.timestamp.strftime("%Y-%m-%d %H:%M"),
-        'verification_method_display': audit.get_verification_method_display(),
+        "category": category,
+        "asset_id": audit.asset_id,
+        "asset_tag": audit.asset.asset_tag,
+        "name": audit.asset.name,
+        "asset_url": asset_url,
+        "observed_location_id": audit.location_id,
+        "observed_location": audit.location.name if audit.location else None,
+        "expected_location": expected_location_name,
+        "auditor": audit.auditor.username if audit.auditor else None,
+        "timestamp": audit.timestamp.isoformat(),
+        "timestamp_display": audit.timestamp.strftime("%Y-%m-%d %H:%M"),
+        "verification_method_display": audit.get_verification_method_display(),
     }
 
 
@@ -161,65 +171,65 @@ def _missing_asset_to_dict(asset, session_location) -> dict:
     except Exception:
         asset_url = None
     return {
-        'category': 'missing',
-        'asset_id': asset.pk,
-        'asset_tag': asset.asset_tag,
-        'name': asset.name,
-        'asset_url': asset_url,
-        'observed_location_id': None,
-        'observed_location': None,
-        'expected_location': session_location.name if session_location else 'Global',
-        'serial_number': asset.serial_number if hasattr(asset, 'serial_number') else None,
-        'status_id': asset.status_id,
-        'status_name': asset.status.name if asset.status else None,
-        'status_color': asset.status.color if asset.status else None,
-        'auditor': None,
-        'timestamp': None,
-        'verification_method_display': None,
+        "category": "missing",
+        "asset_id": asset.pk,
+        "asset_tag": asset.asset_tag,
+        "name": asset.name,
+        "asset_url": asset_url,
+        "observed_location_id": None,
+        "observed_location": None,
+        "expected_location": session_location.name if session_location else "Global",
+        "serial_number": asset.serial_number if hasattr(asset, "serial_number") else None,
+        "status_id": asset.status_id,
+        "status_name": asset.status.name if asset.status else None,
+        "status_color": asset.status.color if asset.status else None,
+        "auditor": None,
+        "timestamp": None,
+        "verification_method_display": None,
     }
 
 
 @transaction.atomic
-def close_audit_session(session: AuditSession, user=None, request=None, notes='', **kwargs) -> dict:
-    if session.status == 'completed':
+def close_audit_session(session: AuditSession, user=None, request=None, notes="", **kwargs) -> dict:
+    if session.status == "completed":
         raise ValidationError(_("This audit campaign is already closed."))
 
-    session.status = 'completed'
+    session.status = "completed"
     session.completed_at = timezone.now()
     session.save()
 
     result = classify_session_audits(session)
 
     # Build the frozen report — denormalized so it stays readable after asset deletions.
-    expected_location_name = session.location.name if session.location else 'Global'
+    expected_location_name = session.location.name if session.location else "Global"
     rows = []
-    for audit in result['matching']:
-        rows.append(_audit_to_dict(audit, 'matching'))
-    for audit in result['mismatched']:
-        rows.append(_audit_to_dict(audit, 'mismatched', expected_location_name))
-    for audit in result['surprise']:
-        rows.append(_audit_to_dict(audit, 'surprise'))
-    for asset in result['missing']:
+    for audit in result["matching"]:
+        rows.append(_audit_to_dict(audit, "matching"))
+    for audit in result["mismatched"]:
+        rows.append(_audit_to_dict(audit, "mismatched", expected_location_name))
+    for audit in result["surprise"]:
+        rows.append(_audit_to_dict(audit, "surprise"))
+    for asset in result["missing"]:
         rows.append(_missing_asset_to_dict(asset, session.location))
 
-    total_scanned = len(result['matching']) + len(result['mismatched']) + len(result['surprise'])
-    total_expected = len(result['matching']) + len(result['mismatched']) + len(list(result['missing']))
+    total_scanned = len(result["matching"]) + len(result["mismatched"]) + len(result["surprise"])
+    total_expected = len(result["matching"]) + len(result["mismatched"]) + len(list(result["missing"]))
 
     report = {
-        'total_expected': total_expected,
-        'total_scanned': total_scanned,
-        'rows': rows,
+        "total_expected": total_expected,
+        "total_scanned": total_scanned,
+        "rows": rows,
     }
     session.reconciliation_report = report
-    session.save(update_fields=['reconciliation_report'])
+    session.save(update_fields=["reconciliation_report"])
 
     return {
-        'total_expected': total_expected,
-        'total_scanned': total_scanned,
-        'matching_count': len(result['matching']),
-        'mismatch_list': [a.asset for a in result['mismatched']],
-        'surprise_list': [a.asset for a in result['surprise']],
-        'missing_list': list(result['missing']),
+        "total_expected": total_expected,
+        "total_scanned": total_scanned,
+        "matching_count": len(result["matching"]),
+        "mismatch_list": [a.asset for a in result["mismatched"]],
+        "surprise_list": [a.asset for a in result["surprise"]],
+        "missing_list": list(result["missing"]),
     }
 
 
@@ -231,28 +241,30 @@ def rehome_audit_session_mismatches(session: AuditSession, user=None, request=No
     assets moved matches exactly what was recorded at close time — not a
     re-evaluation of current asset state.
     """
-    if session.status != 'completed':
+    if session.status != "completed":
         raise ValidationError(_("Audit sessions must be closed before bulk re-homing reconciliation."))
 
     if session.reconciliation_report:
         mismatch_ids = [
-            row['asset_id']
-            for row in session.reconciliation_report.get('rows', [])
-            if row.get('category') == 'mismatched'
+            row["asset_id"]
+            for row in session.reconciliation_report.get("rows", [])
+            if row.get("category") == "mismatched"
         ]
         from django.db.models import QuerySet as _RawQS
+
         assets = _RawQS(model=Asset).filter(
-            deleted_at__isnull=True, pk__in=mismatch_ids,
-            **({'tenant_id': session.tenant_id} if session.tenant_id else {}),
+            deleted_at__isnull=True,
+            pk__in=mismatch_ids,
+            **({"tenant_id": session.tenant_id} if session.tenant_id else {}),
         )
     else:
         result = classify_session_audits(session)
-        assets = [audit.asset for audit in result['mismatched']]
+        assets = [audit.asset for audit in result["mismatched"]]
 
     for asset in assets:
         asset.snapshot()
         asset.location = session.location
-        asset.save(update_fields=['location'])
+        asset.save(update_fields=["location"])
 
 
 @transaction.atomic
@@ -262,36 +274,38 @@ def flag_missing_assets(session: AuditSession, user=None, request=None, **kwargs
 
     Returns counts: flagged, skipped.
     """
-    if session.status != 'completed':
+    if session.status != "completed":
         raise ValidationError(_("Audit session must be closed before flagging missing assets."))
 
     if not session.reconciliation_report:
         raise ValidationError(_("No reconciliation report found. Close the session first."))
 
-    missing_rows = [
-        row for row in session.reconciliation_report.get('rows', [])
-        if row.get('category') == 'missing'
-    ]
+    missing_rows = [row for row in session.reconciliation_report.get("rows", []) if row.get("category") == "missing"]
     if not missing_rows:
-        return {'flagged': 0, 'skipped': 0}
+        return {"flagged": 0, "skipped": 0}
 
     missing_status, _created = StatusLabel.objects.get_or_create(
-        name='Missing',
-        defaults={'type': StatusLabel.TYPE_UNDEPLOYABLE, 'color': 'dc3545'},
+        name="Missing",
+        defaults={"type": StatusLabel.TYPE_UNDEPLOYABLE, "color": "dc3545"},
     )
     if missing_status.type != StatusLabel.TYPE_UNDEPLOYABLE:
         missing_status.type = StatusLabel.TYPE_UNDEPLOYABLE
-        missing_status.save(update_fields=['type'])
+        missing_status.save(update_fields=["type"])
 
-    asset_ids = [row['asset_id'] for row in missing_rows]
-    stored_status_by_id = {row['asset_id']: row.get('status_id') for row in missing_rows}
+    asset_ids = [row["asset_id"] for row in missing_rows]
+    stored_status_by_id = {row["asset_id"]: row.get("status_id") for row in missing_rows}
 
     from django.db.models import QuerySet as _RawQS
+
     assets = {
-        a.pk: a for a in _RawQS(model=Asset).filter(
-            deleted_at__isnull=True, pk__in=asset_ids,
-            **({'tenant_id': session.tenant_id} if session.tenant_id else {}),
-        ).select_related('status')
+        a.pk: a
+        for a in _RawQS(model=Asset)
+        .filter(
+            deleted_at__isnull=True,
+            pk__in=asset_ids,
+            **({"tenant_id": session.tenant_id} if session.tenant_id else {}),
+        )
+        .select_related("status")
     }
 
     flagged = 0
@@ -306,7 +320,7 @@ def flag_missing_assets(session: AuditSession, user=None, request=None, **kwargs
             continue
         asset.snapshot()
         asset.status = missing_status
-        asset.save(update_fields=['status'])
+        asset.save(update_fields=["status"])
         flagged += 1
 
-    return {'flagged': flagged, 'skipped': skipped}
+    return {"flagged": flagged, "skipped": skipped}

@@ -8,22 +8,25 @@ class ITAMBoxRouter(DefaultRouter):
     2. Alphabetically order endpoints under the root view
     3. Provide contextual view names for breadcrumb trails
     """
+
     class APIRootView(DefaultRouter.APIRootView):
         _module_name = None
 
         def get_view_name(self):
             if self._module_name:
                 return self._module_name
-            return 'API Root'
+            return "API Root"
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
 
-        self.routes[0].mapping.update({
-            'put': 'bulk_update',
-            'patch': 'bulk_partial_update',
-            'delete': 'bulk_destroy',
-        })
+        self.routes[0].mapping.update(
+            {
+                "put": "bulk_update",
+                "patch": "bulk_partial_update",
+                "delete": "bulk_destroy",
+            }
+        )
 
     def get_api_root_view(self, api_urls=None):
         api_root_dict = {}
@@ -38,9 +41,9 @@ class ITAMBoxRouter(DefaultRouter):
             meta = model._meta
             module_name = meta.app_config.verbose_name if meta.app_config else meta.app_label
             root_view_cls = type(
-                'AppRootView',
+                "AppRootView",
                 (self.APIRootView,),
-                {'_module_name': module_name},
+                {"_module_name": module_name},
             )
 
         return root_view_cls.as_view(api_root_dict=api_root_dict)

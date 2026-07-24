@@ -1,10 +1,11 @@
+from urllib.parse import quote
+
 from django.conf import settings
 from django.http import HttpResponse, JsonResponse
 from django.shortcuts import redirect
 from django.utils.decorators import method_decorator
 from django.utils.translation import gettext_lazy as _
 from django.views.decorators.csrf import csrf_exempt
-from urllib.parse import quote
 from graphene_django.views import GraphQLView
 from rest_framework import exceptions
 
@@ -20,8 +21,8 @@ def field_count_limit_validator(max_fields=500, max_aliases=50):
     (`a1: assets(...) a2: assets(...) ...`) to amplify DB load. This rule rejects
     operations whose field/alias counts exceed sane limits.
     """
-    from graphql.validation import ValidationRule
     from graphql.error import GraphQLError
+    from graphql.validation import ValidationRule
 
     class FieldCountLimitRule(ValidationRule):
         def __init__(self, context):
@@ -34,11 +35,9 @@ def field_count_limit_validator(max_fields=500, max_aliases=50):
             if node.alias:
                 self._aliases += 1
             if self._fields > max_fields:
-                self.report_error(GraphQLError(
-                    f'Query exceeds the maximum of {max_fields} field selections.', node))
+                self.report_error(GraphQLError(f"Query exceeds the maximum of {max_fields} field selections.", node))
             elif self._aliases > max_aliases:
-                self.report_error(GraphQLError(
-                    f'Query exceeds the maximum of {max_aliases} aliases.', node))
+                self.report_error(GraphQLError(f"Query exceeds the maximum of {max_aliases} aliases.", node))
 
     return FieldCountLimitRule
 
@@ -76,11 +75,11 @@ def query_complexity_validator(max_complexity=1000, fan_out=10):
     ``self.context.get_type()`` yields the live output type used to detect lists.
     """
     from graphql import visit
+    from graphql.error import GraphQLError
     from graphql.language.visitor import Visitor
+    from graphql.type import GraphQLList, GraphQLNonNull
     from graphql.utilities import TypeInfo, TypeInfoVisitor, type_from_ast
     from graphql.validation import ValidationRule
-    from graphql.error import GraphQLError
-    from graphql.type import GraphQLList, GraphQLNonNull
 
     def _returns_list(output_type):
         """True if the field's output type is (a non-null wrapper around) a list."""
@@ -104,9 +103,7 @@ def query_complexity_validator(max_complexity=1000, fan_out=10):
         def _report_if_over(self, node):
             if self._cost > max_complexity and not self._reported:
                 self._reported = True
-                self.report_error(GraphQLError(
-                    f'Query exceeds the maximum complexity of {max_complexity}.',
-                    node))
+                self.report_error(GraphQLError(f"Query exceeds the maximum complexity of {max_complexity}.", node))
 
         def enter_field(self, node, *_args):
             multiplier = self._multipliers[-1]
@@ -189,12 +186,11 @@ def query_complexity_validator(max_complexity=1000, fan_out=10):
     return QueryComplexityValidator
 
 
-@method_decorator(csrf_exempt, name='dispatch')
+@method_decorator(csrf_exempt, name="dispatch")
 class PrivateGraphQLView(GraphQLView):
     def __init__(self, *args, **kwargs):
-        from graphql.validation import specified_rules
-        from graphql.validation import NoSchemaIntrospectionCustomRule
         from graphene.validation import depth_limit_validator
+        from graphql.validation import NoSchemaIntrospectionCustomRule, specified_rules
 
         rules = list(specified_rules)
         rules.append(depth_limit_validator(max_depth=10))
@@ -208,7 +204,7 @@ class PrivateGraphQLView(GraphQLView):
         if not settings.DEBUG:
             rules.append(NoSchemaIntrospectionCustomRule)
 
-        kwargs['validation_rules'] = rules
+        kwargs["validation_rules"] = rules
         super().__init__(*args, **kwargs)
 
     @property
@@ -220,14 +216,16 @@ class PrivateGraphQLView(GraphQLView):
         pass
 
     def dispatch(self, request, *args, **kwargs):
-        if request.method == 'GET':
+        if request.method == "GET":
             if not request.user.is_authenticated:
                 from django.shortcuts import resolve_url
+
                 return redirect(f"{resolve_url(settings.LOGIN_URL)}?next={quote(request.get_full_path())}")
 
-        elif request.method == 'POST':
+        elif request.method == "POST":
             if request.user.is_authenticated:
                 from django.middleware.csrf import CsrfViewMiddleware
+
                 csrf_reject = CsrfViewMiddleware(lambda r: None).process_view(request, None, (), {})
                 if csrf_reject:
                     return csrf_reject
@@ -245,23 +243,33 @@ class PrivateGraphQLView(GraphQLView):
                         # Re-run tenant middleware to set tenant context
                         TenantMiddleware().process_request(request)
                     else:
-                        return HttpResponse(_('Unauthorized'), status=401)
+                        return HttpResponse(_("Unauthorized"), status=401)
                 except exceptions.AuthenticationFailed:
                     # Return a generic message; the specific failure reason must not
                     # leak to the client (aligns with the broad-except branch below).
-                    return JsonResponse({'errors': [{'message': str(_('Authentication failed'))}]}, status=401)
+                    return JsonResponse({"errors": [{"message": str(_("Authentication failed"))}]}, status=401)
                 except Exception as e:
-                    return JsonResponse({'errors': [{'message': str(_('Authentication failed'))}]}, status=401)
+                    return JsonResponse({"errors": [{"message": str(_("Authentication failed"))}]}, status=401)
 
             # Perform rate limiting / throttling checks
             from rest_framework.throttling import AnonRateThrottle, UserRateThrottle
+
             throttles = [AnonRateThrottle(), UserRateThrottle()]
             for throttle in throttles:
                 if not throttle.allow_request(request, self):
                     wait = throttle.wait()
                     return JsonResponse(
-                        {'errors': [{'message': str(_('Request was throttled. Expected available in %(wait)s seconds.') % {'wait': wait})}]},
-                        status=429
+                        {
+                            "errors": [
+                                {
+                                    "message": str(
+                                        _("Request was throttled. Expected available in %(wait)s seconds.")
+                                        % {"wait": wait}
+                                    )
+                                }
+                            ]
+                        },
+                        status=429,
                     )
 
         return super().dispatch(request, *args, **kwargs)

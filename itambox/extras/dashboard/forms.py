@@ -1,55 +1,48 @@
 from django import forms
 from django.utils.translation import gettext_lazy as _
-from extras.dashboard.widgets import get_registered_widgets, get_widget, WidgetConfigForm
+
+from extras.dashboard.widgets import WidgetConfigForm, get_registered_widgets, get_widget
 
 
 class DashboardWidgetAddForm(forms.Form):
-    widget = forms.ChoiceField(
-        label=_('Widget'),
-        choices=[],
-        widget=forms.Select(attrs={'class': 'form-select'})
-    )
+    widget = forms.ChoiceField(label=_("Widget"), choices=[], widget=forms.Select(attrs={"class": "form-select"}))
     title = forms.CharField(
-        label=_('Title'),
+        label=_("Title"),
         max_length=100,
         required=False,
-        widget=forms.TextInput(attrs={'class': 'form-control', 'placeholder': _('Default title will be used')})
+        widget=forms.TextInput(attrs={"class": "form-control", "placeholder": _("Default title will be used")}),
     )
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         widgets = get_registered_widgets()
-        self.fields['widget'].choices = [
-            (w.widget_id, f"{w.title} — {w.description}")
-            for w in sorted(widgets, key=lambda w: w.title)
+        self.fields["widget"].choices = [
+            (w.widget_id, f"{w.title} — {w.description}") for w in sorted(widgets, key=lambda w: w.title)
         ]
 
 
 class DashboardWidgetConfigForm(forms.Form):
     title = forms.CharField(
-        label=_('Title'),
-        max_length=100,
-        required=False,
-        widget=forms.TextInput(attrs={'class': 'form-control'})
+        label=_("Title"), max_length=100, required=False, widget=forms.TextInput(attrs={"class": "form-control"})
     )
     visible = forms.BooleanField(
-        label=_('Visible'),
+        label=_("Visible"),
         required=False,
         initial=True,
-        widget=forms.CheckboxInput(attrs={'class': 'form-check-input'})
+        widget=forms.CheckboxInput(attrs={"class": "form-check-input"}),
     )
     style = forms.ChoiceField(
-        label=_('Header Color Style'),
+        label=_("Header Color Style"),
         choices=[
-            ('default', _('Default')),
-            ('info', _('Info (Blue)')),
-            ('warning', _('Warning (Yellow)')),
-            ('success', _('Success (Green)')),
-            ('danger', _('Danger (Red)')),
+            ("default", _("Default")),
+            ("info", _("Info (Blue)")),
+            ("warning", _("Warning (Yellow)")),
+            ("success", _("Success (Green)")),
+            ("danger", _("Danger (Red)")),
         ],
-        initial='default',
-        widget=forms.Select(attrs={'class': 'form-select'}),
-        required=False
+        initial="default",
+        widget=forms.Select(attrs={"class": "form-select"}),
+        required=False,
     )
 
     def __init__(self, *args, widget_id=None, initial_config=None, request=None, **kwargs):
@@ -60,8 +53,7 @@ class DashboardWidgetConfigForm(forms.Form):
             if widget_cls:
                 widget_instance = widget_cls(config=initial_config or {})
                 self.widget_config_form = widget_instance.get_config_form(
-                    data=self.data if self.is_bound else None,
-                    request=request
+                    data=self.data if self.is_bound else None, request=request
                 )
 
     def is_valid(self):

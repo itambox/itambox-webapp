@@ -10,21 +10,28 @@ Covers two audit findings:
   dependents, never the str()/pk of related rows the caller may not be entitled
   to see.
 """
+
 from django.contrib.auth import get_user_model
 from django.contrib.contenttypes.models import ContentType
 from django.urls import reverse
 from rest_framework import status
 from rest_framework.test import APITestCase
 
-from core.models import ObjectChange
 from core.choices import ObjectChangeActionChoices
+from core.models import ObjectChange
 from core.tests.mixins import grant
 from organization.models import (
-    TenantGroup, Tenant, AssetHolder, Role,
+    AssetHolder,
+    Role,
+    Tenant,
+    TenantGroup,
 )
 from subscriptions.models import (
-    Provider, Subscription,
-    SubscriptionTypeChoices, SubscriptionStatusChoices, BillingCycleChoices,
+    BillingCycleChoices,
+    Provider,
+    Subscription,
+    SubscriptionStatusChoices,
+    SubscriptionTypeChoices,
 )
 
 User = get_user_model()
@@ -33,8 +40,11 @@ User = get_user_model()
 class A5ApiHygieneTests(APITestCase):
     def setUp(self):
         self.staff = User.objects.create_user(
-            username='a5_staff', email='a5_staff@example.com',
-            password='password123', is_staff=True, is_superuser=False,
+            username="a5_staff",
+            email="a5_staff@example.com",
+            password="password123",
+            is_staff=True,
+            is_superuser=False,
         )
 
         self.tg = TenantGroup.objects.create(name="A5 TG", slug="a5-tg")
@@ -43,14 +53,20 @@ class A5ApiHygieneTests(APITestCase):
         # scope; TokenPermissions' request-level check still needs the active
         # tenant bound on the session (see _login_as_staff below).
         AssetHolder.objects.create(
-            user=self.staff, first_name="A5", last_name="Staff",
-            upn="a5.staff", email="a5_staff@example.com", tenant=self.tenant,
+            user=self.staff,
+            first_name="A5",
+            last_name="Staff",
+            upn="a5.staff",
+            email="a5_staff@example.com",
+            tenant=self.tenant,
         )
 
         # Tenant-scoped provider + subscription (PROTECT relation lets us exercise
         # the 409 ProtectedError handler).
         self.provider = Provider.objects.create(
-            name="A5 Provider", slug="a5-provider", tenant=self.tenant,
+            name="A5 Provider",
+            slug="a5-provider",
+            tenant=self.tenant,
         )
         self.subscription = Subscription.objects.create(
             name="A5 Subscription",
@@ -66,11 +82,13 @@ class A5ApiHygieneTests(APITestCase):
 
         role = Role.objects.create(
             tenant=self.tenant,
-            name='A5 Role',
+            name="A5 Role",
             permissions=[
-                'subscriptions.view_provider', 'subscriptions.delete_provider',
-                'subscriptions.view_subscription', 'subscriptions.change_subscription',
-                'subscriptions.delete_subscription',
+                "subscriptions.view_provider",
+                "subscriptions.delete_provider",
+                "subscriptions.view_subscription",
+                "subscriptions.change_subscription",
+                "subscriptions.delete_subscription",
             ],
         )
         grant(self.staff, self.tenant, role)
@@ -83,7 +101,7 @@ class A5ApiHygieneTests(APITestCase):
         # login would.
         self.client.force_login(self.staff)
         session = self.client.session
-        session['active_tenant_id'] = self.tenant.pk
+        session["active_tenant_id"] = self.tenant.pk
         session.save()
 
     # ----- WS3-3 -----------------------------------------------------------
@@ -100,10 +118,10 @@ class A5ApiHygieneTests(APITestCase):
         """A status write with no If-Match is refused (428), not last-writer-wins."""
         self._login_as_staff()
         url = reverse(
-            'api:subscriptions_api:subscription-update-status',
-            kwargs={'pk': self.subscription.pk},
+            "api:subscriptions_api:subscription-update-status",
+            kwargs={"pk": self.subscription.pk},
         )
-        response = self.client.patch(url, data={'status': 'suspended'}, format='json')
+        response = self.client.patch(url, data={"status": "suspended"}, format="json")
         self.assertEqual(response.status_code, status.HTTP_428_PRECONDITION_REQUIRED)
         self.subscription.refresh_from_db()
         self.assertEqual(self.subscription.status, SubscriptionStatusChoices.ACTIVE)
@@ -112,11 +130,13 @@ class A5ApiHygieneTests(APITestCase):
         """A stale (no-longer-current) If-Match loses the concurrency race."""
         self._login_as_staff()
         url = reverse(
-            'api:subscriptions_api:subscription-update-status',
-            kwargs={'pk': self.subscription.pk},
+            "api:subscriptions_api:subscription-update-status",
+            kwargs={"pk": self.subscription.pk},
         )
         response = self.client.patch(
-            url, data={'status': 'suspended'}, format='json',
+            url,
+            data={"status": "suspended"},
+            format="json",
             HTTP_IF_MATCH='W/"1999-01-01T00:00:00+00:00"',
         )
         self.assertEqual(response.status_code, status.HTTP_412_PRECONDITION_FAILED)
@@ -130,36 +150,46 @@ class A5ApiHygieneTests(APITestCase):
 
         ct = ContentType.objects.get_for_model(Subscription)
         before = ObjectChange.objects.filter(
-            changed_object_type=ct, changed_object_id=self.subscription.pk,
+            changed_object_type=ct,
+            changed_object_id=self.subscription.pk,
         ).count()
 
         url = reverse(
-            'api:subscriptions_api:subscription-update-status',
-            kwargs={'pk': self.subscription.pk},
+            "api:subscriptions_api:subscription-update-status",
+            kwargs={"pk": self.subscription.pk},
         )
         response = self.client.patch(
-            url, data={'status': 'suspended'}, format='json', HTTP_IF_MATCH=etag,
+            url,
+            data={"status": "suspended"},
+            format="json",
+            HTTP_IF_MATCH=etag,
         )
         self.assertEqual(response.status_code, status.HTTP_200_OK)
-        self.assertEqual(response.data['status'], 'suspended')
+        self.assertEqual(response.data["status"], "suspended")
         # The ETag advanced with the write, so the response carries a fresh token.
-        self.assertIn('ETag', response)
-        self.assertNotEqual(response['ETag'], etag)
+        self.assertIn("ETag", response)
+        self.assertNotEqual(response["ETag"], etag)
 
         self.subscription.refresh_from_db()
         self.assertEqual(self.subscription.status, SubscriptionStatusChoices.SUSPENDED)
 
-        change = ObjectChange.objects.filter(
-            changed_object_type=ct, changed_object_id=self.subscription.pk,
-            action=ObjectChangeActionChoices.ACTION_UPDATE,
-        ).order_by('-time').first()
+        change = (
+            ObjectChange.objects.filter(
+                changed_object_type=ct,
+                changed_object_id=self.subscription.pk,
+                action=ObjectChangeActionChoices.ACTION_UPDATE,
+            )
+            .order_by("-time")
+            .first()
+        )
         self.assertIsNotNone(change, "update_status must record an ObjectChange")
         # The snapshot()/save() path produced an accurate old->new status diff.
-        self.assertEqual(change.prechange_data.get('status'), SubscriptionStatusChoices.ACTIVE)
-        self.assertEqual(change.postchange_data.get('status'), SubscriptionStatusChoices.SUSPENDED)
+        self.assertEqual(change.prechange_data.get("status"), SubscriptionStatusChoices.ACTIVE)
+        self.assertEqual(change.postchange_data.get("status"), SubscriptionStatusChoices.SUSPENDED)
         # Exactly one new change row for this write.
         after = ObjectChange.objects.filter(
-            changed_object_type=ct, changed_object_id=self.subscription.pk,
+            changed_object_type=ct,
+            changed_object_id=self.subscription.pk,
         ).count()
         self.assertEqual(after, before + 1)
 
@@ -170,15 +200,16 @@ class A5ApiHygieneTests(APITestCase):
         body carries a COUNT of dependents, not the enumerated str()/pk."""
         self._login_as_staff()
         provider_detail = reverse(
-            'api:subscriptions_api:provider-detail', kwargs={'pk': self.provider.pk},
+            "api:subscriptions_api:provider-detail",
+            kwargs={"pk": self.provider.pk},
         )
         etag = self._etag_for(self.provider)
 
         response = self.client.delete(provider_detail, HTTP_IF_MATCH=etag)
         self.assertEqual(response.status_code, 409)
-        detail = response.data['detail']
+        detail = response.data["detail"]
         # A count is present.
-        self.assertIn('1 dependent', detail)
+        self.assertIn("1 dependent", detail)
         # The blocking subscription's repr / pk is NOT leaked in the body.
         self.assertNotIn(str(self.subscription), detail)
-        self.assertNotIn(f'({self.subscription.pk})', detail)
+        self.assertNotIn(f"({self.subscription.pk})", detail)

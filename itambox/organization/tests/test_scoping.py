@@ -1,62 +1,81 @@
-from django.test import TestCase
 from django.contrib.auth import get_user_model
-from organization.models import Region, Site, Location, SiteGroup, TenantGroup, Tenant, AssetHolder
+from django.test import TestCase
+
+from organization.models import AssetHolder, Location, Region, Site, SiteGroup, Tenant, TenantGroup
 
 User = get_user_model()
 
+
 class HierarchyValidationTests(TestCase):
     def setUp(self):
-        self.region = Region.objects.create(name='Global', slug='global')
-        self.site = Site.objects.create(name='Global HQ', slug='global-hq', status='active')
-        self.location = Location.objects.create(name='Server Room', slug='server-room', site=self.site)
-        self.site_group = SiteGroup.objects.create(name='Main HQ Sites', slug='main-hq-sites')
-        self.tenant_group = TenantGroup.objects.create(name='Internal Entities', slug='internal-entities')
+        self.region = Region.objects.create(name="Global", slug="global")
+        self.site = Site.objects.create(name="Global HQ", slug="global-hq", status="active")
+        self.location = Location.objects.create(name="Server Room", slug="server-room", site=self.site)
+        self.site_group = SiteGroup.objects.create(name="Main HQ Sites", slug="main-hq-sites")
+        self.tenant_group = TenantGroup.objects.create(name="Internal Entities", slug="internal-entities")
 
     def test_region_cannot_be_own_parent(self):
         from organization.forms.region_form import RegionForm
-        form = RegionForm(instance=self.region, data={
-            'name': 'Global',
-            'slug': 'global',
-            'parent': self.region.pk,
-        })
+
+        form = RegionForm(
+            instance=self.region,
+            data={
+                "name": "Global",
+                "slug": "global",
+                "parent": self.region.pk,
+            },
+        )
         self.assertFalse(form.is_valid())
-        self.assertIn('parent', form.errors)
-        self.assertEqual(form.errors['parent'][0], "A region cannot be its own parent.")
+        self.assertIn("parent", form.errors)
+        self.assertEqual(form.errors["parent"][0], "A region cannot be its own parent.")
 
     def test_location_cannot_be_own_parent(self):
         from organization.forms.location_form import LocationForm
-        form = LocationForm(instance=self.location, data={
-            'name': 'Server Room',
-            'slug': 'server-room',
-            'site': self.site.pk,
-            'status': 'active',
-            'parent': self.location.pk,
-        })
+
+        form = LocationForm(
+            instance=self.location,
+            data={
+                "name": "Server Room",
+                "slug": "server-room",
+                "site": self.site.pk,
+                "status": "active",
+                "parent": self.location.pk,
+            },
+        )
         self.assertFalse(form.is_valid())
-        self.assertIn('parent', form.errors)
-        self.assertEqual(form.errors['parent'][0], "A location cannot be its own parent.")
+        self.assertIn("parent", form.errors)
+        self.assertEqual(form.errors["parent"][0], "A location cannot be its own parent.")
 
     def test_site_group_cannot_be_own_parent(self):
         from organization.forms.sitegroup_form import SiteGroupForm
-        form = SiteGroupForm(instance=self.site_group, data={
-            'name': 'Main HQ Sites',
-            'slug': 'main-hq-sites',
-            'parent': self.site_group.pk,
-        })
+
+        form = SiteGroupForm(
+            instance=self.site_group,
+            data={
+                "name": "Main HQ Sites",
+                "slug": "main-hq-sites",
+                "parent": self.site_group.pk,
+            },
+        )
         self.assertFalse(form.is_valid())
-        self.assertIn('parent', form.errors)
-        self.assertEqual(form.errors['parent'][0], "A site group cannot be its own parent.")
+        self.assertIn("parent", form.errors)
+        self.assertEqual(form.errors["parent"][0], "A site group cannot be its own parent.")
 
     def test_tenant_group_cannot_be_own_parent(self):
         from organization.forms.tenantgroup_form import TenantGroupForm
-        form = TenantGroupForm(instance=self.tenant_group, data={
-            'name': 'Internal Entities',
-            'slug': 'internal-entities',
-            'parent': self.tenant_group.pk,
-        })
+
+        form = TenantGroupForm(
+            instance=self.tenant_group,
+            data={
+                "name": "Internal Entities",
+                "slug": "internal-entities",
+                "parent": self.tenant_group.pk,
+            },
+        )
         self.assertFalse(form.is_valid())
-        self.assertIn('parent', form.errors)
-        self.assertEqual(form.errors['parent'][0], "A tenant group cannot be its own parent.")
+        self.assertIn("parent", form.errors)
+        self.assertEqual(form.errors["parent"][0], "A tenant group cannot be its own parent.")
+
 
 class OrganizationTenantScopingTests(TestCase):
     def setUp(self):
@@ -69,7 +88,9 @@ class OrganizationTenantScopingTests(TestCase):
 
         self.loc_a = Location.objects.create(name="Location A", slug="loc-a", site=self.site_a, tenant=self.tenant_a)
         self.loc_b = Location.objects.create(name="Location B", slug="loc-b", site=self.site_b, tenant=self.tenant_b)
-        self.loc_global = Location.objects.create(name="Location Global", slug="loc-global", site=self.site_global, tenant=None)
+        self.loc_global = Location.objects.create(
+            name="Location Global", slug="loc-global", site=self.site_global, tenant=None
+        )
 
         self.holder_a = AssetHolder.objects.create(
             first_name="Holder", last_name="A", upn="holder.a", tenant=self.tenant_a
@@ -83,10 +104,12 @@ class OrganizationTenantScopingTests(TestCase):
 
     def tearDown(self):
         from core.managers import set_current_tenant
+
         set_current_tenant(None)
 
     def test_tenant_a_scoping(self):
         from core.managers import set_current_tenant
+
         set_current_tenant(self.tenant_a)
 
         tenants = list(Tenant.objects.all())
@@ -110,6 +133,7 @@ class OrganizationTenantScopingTests(TestCase):
 
     def test_tenant_b_scoping(self):
         from core.managers import set_current_tenant
+
         set_current_tenant(self.tenant_b)
 
         tenants = list(Tenant.objects.all())
@@ -133,6 +157,7 @@ class OrganizationTenantScopingTests(TestCase):
 
     def test_no_tenant_scoping(self):
         from core.managers import set_current_tenant
+
         set_current_tenant(None)
 
         tenants = list(Tenant.objects.all())
@@ -156,23 +181,23 @@ class OrganizationTenantScopingTests(TestCase):
 
     def test_tenant_group_sharing(self):
         group = TenantGroup.objects.create(name="Shared Group", slug="shared-group")
-        
+
         self.tenant_a.group = group
         self.tenant_a.save()
-        
+
         tenant_c = Tenant.objects.create(name="Tenant C", slug="tenant-c", group=group)
         site_c = Site.objects.create(name="Site C", slug="site-c", tenant=tenant_c)
 
         from core.managers import set_current_tenant, set_current_tenant_group
-        
+
         set_current_tenant(self.tenant_a)
         set_current_tenant_group(None)
-        
+
         tenants = list(Tenant.objects.all())
         self.assertIn(self.tenant_a, tenants)
         self.assertNotIn(tenant_c, tenants)
         self.assertNotIn(self.tenant_b, tenants)
-        
+
         sites = list(Site.objects.all())
         self.assertIn(self.site_a, sites)
         self.assertNotIn(self.site_global, sites)

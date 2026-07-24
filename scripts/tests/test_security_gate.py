@@ -11,7 +11,6 @@ from scripts.security_gate import (
     load_suppressions,
 )
 
-
 REPOSITORY_ROOT = Path(__file__).resolve().parents[2]
 
 
@@ -57,10 +56,15 @@ class SuppressionPolicyTests(unittest.TestCase):
     def test_expired_overlong_and_duplicate_suppressions_are_rejected(self):
         today = date.today()
         cases = [
-            ([suppression(
-                review_on=(today - timedelta(days=2)).isoformat(),
-                expires_on=(today - timedelta(days=1)).isoformat(),
-            )], "expired"),
+            (
+                [
+                    suppression(
+                        review_on=(today - timedelta(days=2)).isoformat(),
+                        expires_on=(today - timedelta(days=1)).isoformat(),
+                    )
+                ],
+                "expired",
+            ),
             ([suppression(expires_on=(today + timedelta(days=91)).isoformat())], "90 days"),
             ([suppression(review_on=(today - timedelta(days=1)).isoformat())], "review is overdue"),
             ([suppression(), suppression()], "duplicate"),
@@ -75,15 +79,19 @@ class FindingPolicyTests(unittest.TestCase):
     def test_trivy_blocks_unsuppressed_high_and_emits_sarif(self):
         report = {
             "SchemaVersion": 2,
-            "Results": [{
-                "Target": "uv.lock",
-                "Vulnerabilities": [{
-                    "VulnerabilityID": "CVE-2026-0001",
-                    "PkgName": "example",
-                    "InstalledVersion": "1.0.0",
-                    "Severity": "HIGH",
-                }],
-            }],
+            "Results": [
+                {
+                    "Target": "uv.lock",
+                    "Vulnerabilities": [
+                        {
+                            "VulnerabilityID": "CVE-2026-0001",
+                            "PkgName": "example",
+                            "InstalledVersion": "1.0.0",
+                            "Severity": "HIGH",
+                        }
+                    ],
+                }
+            ],
         }
         with tempfile.TemporaryDirectory() as root:
             sarif = Path(root) / "results.sarif"
@@ -95,13 +103,25 @@ class FindingPolicyTests(unittest.TestCase):
     def test_exact_trivy_suppression_and_low_findings_do_not_block(self):
         report = {
             "SchemaVersion": 2,
-            "Results": [{
-                "Target": "uv.lock",
-                "Vulnerabilities": [
-                    {"VulnerabilityID": "CVE-2026-0001", "PkgName": "example", "InstalledVersion": "1.0.0", "Severity": "HIGH"},
-                    {"VulnerabilityID": "CVE-2026-0002", "PkgName": "other", "InstalledVersion": "2.0.0", "Severity": "LOW"},
-                ],
-            }],
+            "Results": [
+                {
+                    "Target": "uv.lock",
+                    "Vulnerabilities": [
+                        {
+                            "VulnerabilityID": "CVE-2026-0001",
+                            "PkgName": "example",
+                            "InstalledVersion": "1.0.0",
+                            "Severity": "HIGH",
+                        },
+                        {
+                            "VulnerabilityID": "CVE-2026-0002",
+                            "PkgName": "other",
+                            "InstalledVersion": "2.0.0",
+                            "Severity": "LOW",
+                        },
+                    ],
+                }
+            ],
         }
         with tempfile.TemporaryDirectory() as root:
             manifest = Path(root) / "suppressions.json"
@@ -126,12 +146,14 @@ class FindingPolicyTests(unittest.TestCase):
                     sarif,
                     expected_targets={"uv.lock", "itambox/package-lock.json"},
                 )
-            report["Results"][0]["Vulnerabilities"] = [{
-                "VulnerabilityID": "CVE-2026-0001",
-                "PkgName": "example",
-                "InstalledVersion": "1.0.0",
-                "Severity": "UNRECOGNIZED",
-            }]
+            report["Results"][0]["Vulnerabilities"] = [
+                {
+                    "VulnerabilityID": "CVE-2026-0001",
+                    "PkgName": "example",
+                    "InstalledVersion": "1.0.0",
+                    "Severity": "UNRECOGNIZED",
+                }
+            ]
             with self.assertRaisesRegex(SecurityGateError, "invalid Trivy severity"):
                 evaluate_trivy([report], [], sarif)
             report["Results"] = [
@@ -178,7 +200,7 @@ class SecurityAutomationContractTests(unittest.TestCase):
     def test_release_rehearsal_scans_the_same_image_before_draft_creation(self):
         workflow = (REPOSITORY_ROOT / ".github" / "workflows" / "release.yml").read_text(encoding="utf-8")
         self.assertGreaterEqual(workflow.count("--ignore-unfixed"), 2)
-        for image in ("itambox:release-rehearsal", 'itambox:${RELEASE_VERSION}'):
+        for image in ("itambox:release-rehearsal", "itambox:${RELEASE_VERSION}"):
             build = workflow.index(image)
             scan = workflow.index('security-tools/trivy" image', build)
             self.assertGreater(workflow.index(image, scan), scan)
@@ -197,7 +219,7 @@ class SecurityAutomationContractTests(unittest.TestCase):
 
     def test_manual_draft_retains_image_sarif_before_archiving(self):
         workflow = (REPOSITORY_ROOT / ".github" / "workflows" / "release.yml").read_text(encoding="utf-8")
-        prepare_release = workflow[workflow.index("prepare-release:"):]
+        prepare_release = workflow[workflow.index("prepare-release:") :]
         self.assertIn("security-events: write", prepare_release)
         self.assertIn("id: draft-image-gate", prepare_release)
         self.assertIn("steps.draft-image-gate.outputs.sarif == 'true'", prepare_release)

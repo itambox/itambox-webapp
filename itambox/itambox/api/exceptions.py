@@ -1,7 +1,8 @@
 from django.core.exceptions import ValidationError as DjangoValidationError
 from django.utils.translation import gettext_lazy as _
 from rest_framework import status
-from rest_framework.exceptions import APIException, ValidationError as DRFValidationError
+from rest_framework.exceptions import APIException
+from rest_framework.exceptions import ValidationError as DRFValidationError
 from rest_framework.views import exception_handler as drf_exception_handler
 
 
@@ -20,9 +21,9 @@ def itambox_exception_handler(exc, context):
     errors instead of a server error.
     """
     if isinstance(exc, DjangoValidationError):
-        if hasattr(exc, 'message_dict'):
+        if hasattr(exc, "message_dict"):
             detail = exc.message_dict
-        elif hasattr(exc, 'messages'):
+        elif hasattr(exc, "messages"):
             detail = exc.messages
         else:
             detail = str(exc)
@@ -39,8 +40,8 @@ class PreconditionRequired(APIException):
     """
 
     status_code = status.HTTP_428_PRECONDITION_REQUIRED
-    default_detail = _('If-Match header is required for mutating requests.')
-    default_code = 'precondition_required'
+    default_detail = _("If-Match header is required for mutating requests.")
+    default_code = "precondition_required"
 
     def __init__(self, detail=None, etag=None):
         self.etag = etag
@@ -56,8 +57,8 @@ class PreconditionFailed(APIException):
     """
 
     status_code = status.HTTP_412_PRECONDITION_FAILED
-    default_detail = _('The resource has changed since it was last fetched (stale ETag).')
-    default_code = 'precondition_failed'
+    default_detail = _("The resource has changed since it was last fetched (stale ETag).")
+    default_code = "precondition_failed"
 
     def __init__(self, detail=None, etag=None):
         self.etag = etag

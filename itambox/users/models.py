@@ -9,12 +9,12 @@ from django.contrib.postgres.fields import ArrayField
 from django.core.exceptions import ValidationError
 from django.db import models
 from django.urls import reverse
-from django.utils.translation import gettext_lazy as _
 from django.utils import timezone
+from django.utils.translation import gettext_lazy as _
 
-from core.models import ChangeLoggingMixin, StandardModel
-from core.managers import SoftDeleteManager, AllObjectsManager, TenantScopingAllObjectsManager
+from core.managers import AllObjectsManager, SoftDeleteManager, TenantScopingAllObjectsManager
 from core.mixins import AutoSlugMixin, SoftDeleteMixin
+from core.models import ChangeLoggingMixin, StandardModel
 
 
 def token_peppers():
@@ -27,7 +27,7 @@ def token_peppers():
     SECRET_KEY so the app/tests work out of the box — production deployments
     should set an explicit, rotatable pepper.
     """
-    configured = getattr(settings, 'API_TOKEN_PEPPERS', None)
+    configured = getattr(settings, "API_TOKEN_PEPPERS", None)
     if configured:
         return {int(k): v for k, v in configured.items()}
     return {1: settings.SECRET_KEY}
@@ -41,9 +41,7 @@ def current_pepper_id():
 def hash_token(plaintext, pepper_id):
     """HMAC-SHA256 digest of a plaintext token under the given pepper id."""
     pepper = token_peppers()[pepper_id]
-    return hmac.new(
-        pepper.encode('utf-8'), plaintext.encode('utf-8'), hashlib.sha256
-    ).hexdigest()
+    return hmac.new(pepper.encode("utf-8"), plaintext.encode("utf-8"), hashlib.sha256).hexdigest()
 
 
 def validate_cidr_list(value):
@@ -54,7 +52,7 @@ def validate_cidr_list(value):
         except ValueError:
             raise ValidationError(
                 _('"%(prefix)s" is not a valid IP address or CIDR prefix.'),
-                params={'prefix': prefix},
+                params={"prefix": prefix},
             )
 
 
@@ -67,6 +65,7 @@ class User(AbstractUser):
     but must never sign in simply has ``can_login=False`` — there is no separate "contact"
     person type.
     """
+
     can_login = models.BooleanField(
         default=True,
         db_index=True,
@@ -88,17 +87,18 @@ class UserPreference(models.Model):
     """
     Stores user-specific preferences, including table configurations.
     """
-    THEME_DARK = 'dark'
-    THEME_LIGHT = 'light'
+
+    THEME_DARK = "dark"
+    THEME_LIGHT = "light"
     THEME_CHOICES = (
-        (THEME_LIGHT, _('Light')),
-        (THEME_DARK, _('Dark')),
+        (THEME_LIGHT, _("Light")),
+        (THEME_DARK, _("Dark")),
     )
 
     user = models.OneToOneField(
         settings.AUTH_USER_MODEL,
         on_delete=models.CASCADE,
-        related_name='preferences', # Keep related_name for now, or change if needed
+        related_name="preferences",  # Keep related_name for now, or change if needed
         verbose_name=_("User"),
     )
     # Store various preferences as key-value pairs
@@ -109,7 +109,7 @@ class UserPreference(models.Model):
         return f"Preferences for {self.user.username}"
 
     class Meta:
-        ordering = ('user',)
+        ordering = ("user",)
         verbose_name = _("User Preference")
         verbose_name_plural = _("User Preferences")
 
@@ -124,9 +124,10 @@ class Token(ChangeLoggingMixin, models.Model):
     and available on the in-memory instance via the ``key`` property until the
     object is reloaded from the database.
     """
+
     # Never serialize the at-rest credential (digest), its pepper id, or the
     # high-frequency last_used heartbeat into the changelog JSON.
-    _change_logging_excluded_fields = ['updated_at', 'digest', 'pepper', 'last_used']
+    _change_logging_excluded_fields = ["updated_at", "digest", "pepper", "last_used"]
 
     # HMAC-SHA256(pepper, plaintext) — the only at-rest representation of the
     # secret. `pepper` records which configured pepper produced this digest so
@@ -137,13 +138,13 @@ class Token(ChangeLoggingMixin, models.Model):
     user = models.ForeignKey(
         to=settings.AUTH_USER_MODEL,
         on_delete=models.CASCADE,
-        related_name='tokens',
+        related_name="tokens",
         verbose_name=_("User"),
     )
     tenant = models.ForeignKey(
-        to='organization.Tenant',
+        to="organization.Tenant",
         on_delete=models.CASCADE,
-        related_name='tokens',
+        related_name="tokens",
         db_index=True,
         verbose_name=_("Tenant"),
     )
@@ -157,9 +158,9 @@ class Token(ChangeLoggingMixin, models.Model):
         blank=True,
         default=list,
         validators=[validate_cidr_list],
-        verbose_name=_('Allowed IPs'),
+        verbose_name=_("Allowed IPs"),
         help_text=_(
-            'Permitted IPv4/IPv6 networks from which this token may be used, in CIDR notation '
+            "Permitted IPv4/IPv6 networks from which this token may be used, in CIDR notation "
             '(e.g. "192.168.1.0/24, 10.0.0.5"). Leave blank to allow any source address.'
         ),
     )
@@ -169,7 +170,7 @@ class Token(ChangeLoggingMixin, models.Model):
     _plaintext = None
 
     class Meta:
-        ordering = ['-created']
+        ordering = ["-created"]
         verbose_name = _("Token")
         verbose_name_plural = _("Tokens")
 
@@ -193,17 +194,16 @@ class Token(ChangeLoggingMixin, models.Model):
             self.pepper = current_pepper_id()
             self.digest = hash_token(self._plaintext, self.pepper)
             self.key_preview = self._plaintext[:8]
-        if not getattr(self, 'tenant_id', None):
+        if not getattr(self, "tenant_id", None):
             from core.managers import get_current_tenant
+
             tenant = get_current_tenant()
             if not tenant:
                 from organization.models import Tenant
+
                 tenant = Tenant._base_manager.first()
                 if not tenant:
-                    tenant = Tenant._base_manager.create(
-                        name="Default Tenant",
-                        slug="default-tenant"
-                    )
+                    tenant = Tenant._base_manager.create(name="Default Tenant", slug="default-tenant")
             self.tenant = tenant
         super().save(*args, **kwargs)
 
@@ -218,7 +218,7 @@ class Token(ChangeLoggingMixin, models.Model):
         if not plaintext:
             return None
         digests = [hash_token(plaintext, pid) for pid in token_peppers()]
-        return cls.objects.select_related('user', 'tenant').filter(digest__in=digests).first()
+        return cls.objects.select_related("user", "tenant").filter(digest__in=digests).first()
 
     @property
     def is_expired(self):
@@ -254,6 +254,7 @@ class UserGroup(AutoSlugMixin, StandardModel, SoftDeleteMixin):
     Members are Membership-backed :class:`GroupMembership` rows; permissions are
     additive organization.RoleGrant rows with explicit RoleGrantScope children.
     """
+
     # The default manager stays deliberately unscoped because groups participate
     # in cross-tenant projections. Every UI/API surface scopes them explicitly.
     # ``all_objects`` keeps recycle-bin/export access tenant-aware.
@@ -264,27 +265,27 @@ class UserGroup(AutoSlugMixin, StandardModel, SoftDeleteMixin):
     slug = models.SlugField(max_length=100, verbose_name=_("Slug"))
     description = models.TextField(blank=True, verbose_name=_("Description"))
     tenant = models.ForeignKey(
-        'organization.Tenant',
+        "organization.Tenant",
         on_delete=models.CASCADE,
-        related_name='user_groups',
+        related_name="user_groups",
         verbose_name=_("Tenant"),
     )
     is_active = models.BooleanField(default=True, db_index=True, verbose_name=_("Active"))
 
     class Meta:
-        ordering = ['name']
+        ordering = ["name"]
         verbose_name = _("User Group")
         verbose_name_plural = _("User Groups")
         constraints = [
             models.UniqueConstraint(
-                fields=['tenant', 'name'],
+                fields=["tenant", "name"],
                 condition=models.Q(deleted_at__isnull=True),
-                name='users_usergroup_unique_tenant_name_active',
+                name="users_usergroup_unique_tenant_name_active",
             ),
             models.UniqueConstraint(
-                fields=['tenant', 'slug'],
+                fields=["tenant", "slug"],
                 condition=models.Q(deleted_at__isnull=True),
-                name='users_usergroup_unique_tenant_slug_active',
+                name="users_usergroup_unique_tenant_slug_active",
             ),
         ]
 
@@ -292,18 +293,14 @@ class UserGroup(AutoSlugMixin, StandardModel, SoftDeleteMixin):
         return self.name
 
     def get_absolute_url(self):
-        return reverse('users:usergroup_detail', kwargs={'pk': self.pk})
+        return reverse("users:usergroup_detail", kwargs={"pk": self.pk})
 
     def clean(self):
         super().clean()
         if self.pk:
-            original_tenant_id = (
-                type(self)._base_manager.filter(pk=self.pk)
-                .values_list('tenant_id', flat=True)
-                .first()
-            )
+            original_tenant_id = type(self)._base_manager.filter(pk=self.pk).values_list("tenant_id", flat=True).first()
             if original_tenant_id is not None and self.tenant_id != original_tenant_id:
-                raise ValidationError({'tenant': _('A user group owner cannot be changed.')})
+                raise ValidationError({"tenant": _("A user group owner cannot be changed.")})
 
 
 class GroupMembership(ChangeLoggingMixin, models.Model):
@@ -315,73 +312,73 @@ class GroupMembership(ChangeLoggingMixin, models.Model):
 
     survive_parent_soft_delete = True
 
-    SOURCE_MANUAL = 'manual'
-    SOURCE_SCIM = 'scim'
-    SOURCE_LDAP = 'ldap'
-    SOURCE_OIDC = 'oidc'
-    SOURCE_SAML = 'saml'
+    SOURCE_MANUAL = "manual"
+    SOURCE_SCIM = "scim"
+    SOURCE_LDAP = "ldap"
+    SOURCE_OIDC = "oidc"
+    SOURCE_SAML = "saml"
     SOURCE_CHOICES = [
-        (SOURCE_MANUAL, _('Manual')),
-        (SOURCE_SCIM, _('SCIM')),
-        (SOURCE_LDAP, _('LDAP / Entra ID')),
-        (SOURCE_OIDC, _('OIDC')),
-        (SOURCE_SAML, _('SAML')),
+        (SOURCE_MANUAL, _("Manual")),
+        (SOURCE_SCIM, _("SCIM")),
+        (SOURCE_LDAP, _("LDAP / Entra ID")),
+        (SOURCE_OIDC, _("OIDC")),
+        (SOURCE_SAML, _("SAML")),
     ]
 
     user_group = models.ForeignKey(
-        'users.UserGroup',
+        "users.UserGroup",
         on_delete=models.CASCADE,
-        related_name='group_memberships',
-        verbose_name=_('User group'),
+        related_name="group_memberships",
+        verbose_name=_("User group"),
     )
     membership = models.ForeignKey(
-        'organization.Membership',
+        "organization.Membership",
         on_delete=models.CASCADE,
-        related_name='group_memberships',
-        verbose_name=_('Membership'),
+        related_name="group_memberships",
+        verbose_name=_("Membership"),
     )
     added_by = models.ForeignKey(
         settings.AUTH_USER_MODEL,
         on_delete=models.SET_NULL,
-        related_name='added_group_memberships',
+        related_name="added_group_memberships",
         blank=True,
         null=True,
-        verbose_name=_('Added by'),
+        verbose_name=_("Added by"),
     )
     source = models.CharField(
         max_length=20,
         choices=SOURCE_CHOICES,
         default=SOURCE_MANUAL,
         db_index=True,
-        verbose_name=_('Source'),
+        verbose_name=_("Source"),
     )
     external_id = models.CharField(
         max_length=255,
         blank=True,
-        verbose_name=_('External ID'),
-        help_text=_('Stable membership identifier supplied by SCIM/LDAP when available.'),
+        verbose_name=_("External ID"),
+        help_text=_("Stable membership identifier supplied by SCIM/LDAP when available."),
     )
     added_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
-        ordering = ['user_group', 'membership']
-        verbose_name = _('Group membership')
-        verbose_name_plural = _('Group memberships')
+        ordering = ["user_group", "membership"]
+        verbose_name = _("Group membership")
+        verbose_name_plural = _("Group memberships")
         constraints = [
             models.UniqueConstraint(
-                fields=['user_group', 'membership'],
-                name='users_groupmembership_unique_member',
+                fields=["user_group", "membership"],
+                name="users_groupmembership_unique_member",
             ),
             models.UniqueConstraint(
-                fields=['user_group', 'source', 'external_id'],
-                condition=~models.Q(external_id=''),
-                name='users_groupmembership_unique_external_id',
+                fields=["user_group", "source", "external_id"],
+                condition=~models.Q(external_id=""),
+                name="users_groupmembership_unique_external_id",
             ),
         ]
         indexes = [
             models.Index(
-                fields=['user_group', 'source', 'external_id'],
-                name='users_groupmember_external_idx',
+                fields=["user_group", "source", "external_id"],
+                name="users_groupmember_external_idx",
             ),
         ]
 
@@ -390,15 +387,13 @@ class GroupMembership(ChangeLoggingMixin, models.Model):
         return self.user_group.tenant
 
     def __str__(self):
-        return f'{self.membership} in {self.user_group}'
+        return f"{self.membership} in {self.user_group}"
 
     def clean(self):
         super().clean()
         if not self.user_group_id or not self.membership_id:
             return
         if self.user_group.tenant_id is None:
-            raise ValidationError({'user_group': _('A group membership requires a tenant-owned group.')})
+            raise ValidationError({"user_group": _("A group membership requires a tenant-owned group.")})
         if self.membership.tenant_id != self.user_group.tenant_id:
-            raise ValidationError({
-                'membership': _('The membership must belong to the group\'s owning tenant.')
-            })
+            raise ValidationError({"membership": _("The membership must belong to the group's owning tenant.")})

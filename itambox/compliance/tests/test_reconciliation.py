@@ -8,14 +8,15 @@ Covers:
 - Surprise finds: assets scanned that are not in expected_ids.
 - Missing: expected assets not scanned.
 """
+
+from django.contrib.auth import get_user_model
 from django.core.exceptions import ValidationError
 from django.test import TestCase
-from django.contrib.auth import get_user_model
 from model_bakery import baker
 
 from assets.models import Asset, StatusLabel
-from compliance.models import AuditSession, AssetAudit
-from compliance.reconciliation import classify_session_audits, audit_asset
+from compliance.models import AssetAudit, AuditSession
+from compliance.reconciliation import audit_asset, classify_session_audits
 from organization.models import Location
 
 User = get_user_model()
@@ -26,11 +27,14 @@ class AuditDuplicateGuardTests(TestCase):
     surface the unique-constraint IntegrityError as a 500."""
 
     def setUp(self):
-        self.user = User.objects.create_superuser(username='dup_auditor', email='d@t.com', password='pw')
+        self.user = User.objects.create_superuser(username="dup_auditor", email="d@t.com", password="pw")
         self.status = baker.make(StatusLabel, type=StatusLabel.TYPE_DEPLOYABLE)
-        self.loc = baker.make(Location, name='Berlin')
+        self.loc = baker.make(Location, name="Berlin")
         self.session = AuditSession.objects.create(
-            name='Stocktake', status='active', location=self.loc, created_by=self.user,
+            name="Stocktake",
+            status="active",
+            location=self.loc,
+            created_by=self.user,
         )
         self.asset = baker.make(Asset, status=self.status, location=self.loc)
 
@@ -38,13 +42,11 @@ class AuditDuplicateGuardTests(TestCase):
         audit_asset(self.asset, user=self.user, session=self.session)
         with self.assertRaises(ValidationError):
             audit_asset(self.asset, user=self.user, session=self.session)
-        self.assertEqual(
-            AssetAudit.objects.filter(session=self.session, asset=self.asset).count(), 1
-        )
+        self.assertEqual(AssetAudit.objects.filter(session=self.session, asset=self.asset).count(), 1)
 
 
 def _superuser():
-    u = User.objects.create_superuser(username='auditor_su', email='a@test.com', password='pw')
+    u = User.objects.create_superuser(username="auditor_su", email="a@test.com", password="pw")
     return u
 
 
@@ -54,16 +56,20 @@ class ClassifyGlobalSessionTests(TestCase):
     def setUp(self):
         self.user = _superuser()
         self.session = AuditSession.objects.create(
-            name='Global Stocktake', status='active', location=None, created_by=self.user
+            name="Global Stocktake", status="active", location=None, created_by=self.user
         )
         self.status = baker.make(StatusLabel, type=StatusLabel.TYPE_DEPLOYABLE)
-        self.loc_a = baker.make(Location, name='Berlin')
-        self.loc_b = baker.make(Location, name='Munich')
+        self.loc_a = baker.make(Location, name="Berlin")
+        self.loc_b = baker.make(Location, name="Munich")
 
     def _audit(self, asset, location):
         return AssetAudit.objects.create(
-            session=self.session, asset=asset, auditor=self.user,
-            location=location, status=self.status, verification_method='manual'
+            session=self.session,
+            asset=asset,
+            auditor=self.user,
+            location=location,
+            status=self.status,
+            verification_method="manual",
         )
 
     def test_located_assets_are_matching_in_global_session(self):
@@ -74,17 +80,19 @@ class ClassifyGlobalSessionTests(TestCase):
 
         result = classify_session_audits(self.session)
 
-        self.assertEqual(len(result['matching']), 2)
-        self.assertEqual(len(result['mismatched']), 0)
-        self.assertEqual(len(result['surprise']), 0)
+        self.assertEqual(len(result["matching"]), 2)
+        self.assertEqual(len(result["mismatched"]), 0)
+        self.assertEqual(len(result["surprise"]), 0)
 
     def test_missing_not_scanned(self):
         expected_asset = baker.make(
-            Asset, status=self.status, location=self.loc_a,
+            Asset,
+            status=self.status,
+            location=self.loc_a,
         )
         # Don't scan it — it should appear in missing
         result = classify_session_audits(self.session)
-        missing_ids = set(result['missing'].values_list('id', flat=True))
+        missing_ids = set(result["missing"].values_list("id", flat=True))
         self.assertIn(expected_asset.id, missing_ids)
 
 
@@ -93,18 +101,21 @@ class ClassifyLocatedSessionTests(TestCase):
 
     def setUp(self):
         self.user = _superuser()
-        self.loc_berlin = baker.make(Location, name='Berlin')
-        self.loc_munich = baker.make(Location, name='Munich')
+        self.loc_berlin = baker.make(Location, name="Berlin")
+        self.loc_munich = baker.make(Location, name="Munich")
         self.session = AuditSession.objects.create(
-            name='Berlin Campaign', status='active',
-            location=self.loc_berlin, created_by=self.user
+            name="Berlin Campaign", status="active", location=self.loc_berlin, created_by=self.user
         )
         self.status = baker.make(StatusLabel, type=StatusLabel.TYPE_DEPLOYABLE)
 
     def _audit(self, asset, observed_location):
         return AssetAudit.objects.create(
-            session=self.session, asset=asset, auditor=self.user,
-            location=observed_location, status=self.status, verification_method='barcode'
+            session=self.session,
+            asset=asset,
+            auditor=self.user,
+            location=observed_location,
+            status=self.status,
+            verification_method="barcode",
         )
 
     def test_matching_when_audit_location_equals_session_location(self):
@@ -114,9 +125,9 @@ class ClassifyLocatedSessionTests(TestCase):
         self._audit(asset, self.loc_berlin)
 
         result = classify_session_audits(self.session)
-        self.assertEqual(len(result['matching']), 1)
-        self.assertEqual(len(result['mismatched']), 0)
-        self.assertEqual(len(result['surprise']), 0)
+        self.assertEqual(len(result["matching"]), 1)
+        self.assertEqual(len(result["mismatched"]), 0)
+        self.assertEqual(len(result["surprise"]), 0)
 
     def test_mismatch_uses_audit_location_not_live_asset_location(self):
         """Asset was scanned in Munich (wrong location for Berlin campaign). Even if
@@ -126,11 +137,11 @@ class ClassifyLocatedSessionTests(TestCase):
 
         # Move the live asset back to Berlin AFTER the scan
         asset.location = self.loc_berlin
-        asset.save(update_fields=['location'])
+        asset.save(update_fields=["location"])
 
         result = classify_session_audits(self.session)
-        self.assertEqual(len(result['mismatched']), 1)
-        self.assertEqual(len(result['matching']), 0)
+        self.assertEqual(len(result["mismatched"]), 1)
+        self.assertEqual(len(result["matching"]), 0)
 
     def test_surprise_find_not_in_expected(self):
         """An archived asset (excluded from expected) gets scanned — surprise."""
@@ -139,14 +150,14 @@ class ClassifyLocatedSessionTests(TestCase):
         self._audit(surprise_asset, self.loc_berlin)
 
         result = classify_session_audits(self.session)
-        surprise_ids = {a.asset_id for a in result['surprise']}
+        surprise_ids = {a.asset_id for a in result["surprise"]}
         self.assertIn(surprise_asset.id, surprise_ids)
-        self.assertEqual(len(result['matching']), 0)
-        self.assertEqual(len(result['mismatched']), 0)
+        self.assertEqual(len(result["matching"]), 0)
+        self.assertEqual(len(result["mismatched"]), 0)
 
     def test_missing_expected_not_scanned(self):
         expected = baker.make(Asset, status=self.status, location=self.loc_berlin)
         # No audit created for expected
         result = classify_session_audits(self.session)
-        missing_ids = set(result['missing'].values_list('id', flat=True))
+        missing_ids = set(result["missing"].values_list("id", flat=True))
         self.assertIn(expected.id, missing_ids)

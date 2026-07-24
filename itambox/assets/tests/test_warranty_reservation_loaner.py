@@ -5,6 +5,7 @@ Tests for:
   - AssetAssignment loaner fields + is_overdue + service wiring (Task 3)
   - Asset.cost_center FK (Task 4)
 """
+
 import datetime
 
 from django.core.exceptions import ValidationError
@@ -12,19 +13,23 @@ from django.test import TestCase
 from model_bakery import baker
 
 from assets.models import (
-    Asset, AssetAssignment, StatusLabel,
-    Warranty, WarrantyTypeChoices,
-    AssetReservation, ReservationStatusChoices,
+    Asset,
+    AssetAssignment,
+    AssetReservation,
+    ReservationStatusChoices,
+    StatusLabel,
+    Warranty,
+    WarrantyTypeChoices,
 )
-from assets.services import checkout_asset, checkin_asset
-
+from assets.services import checkin_asset, checkout_asset
 
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
 
+
 def _deployable_asset(**kwargs):
-    status = baker.make(StatusLabel, type='deployable')
+    status = baker.make(StatusLabel, type="deployable")
     return baker.make(Asset, status=status, tenant=None, **kwargs)
 
 
@@ -32,10 +37,10 @@ def _deployable_asset(**kwargs):
 # Task 1 — Warranty model
 # ---------------------------------------------------------------------------
 
-class WarrantyModelTest(TestCase):
 
+class WarrantyModelTest(TestCase):
     def setUp(self):
-        self.asset = _deployable_asset(name='Test Asset')
+        self.asset = _deployable_asset(name="Test Asset")
 
     def test_is_active_within_range(self):
         today = datetime.date.today()
@@ -101,6 +106,7 @@ class WarrantyModelTest(TestCase):
         """DB-level check constraint: end_date >= start_date."""
         today = datetime.date.today()
         from django.db import IntegrityError, transaction
+
         with self.assertRaises((IntegrityError, ValidationError)):
             with transaction.atomic():
                 Warranty.objects.create(
@@ -119,7 +125,7 @@ class WarrantyModelTest(TestCase):
             start_date=today,
             end_date=today + datetime.timedelta(days=365),
         )
-        self.assertIn('Hardware', str(w))
+        self.assertIn("Hardware", str(w))
         self.assertIn(self.asset.name, str(w))
 
     def test_get_absolute_url(self):
@@ -132,18 +138,19 @@ class WarrantyModelTest(TestCase):
         )
         url = w.get_absolute_url()
         self.assertIn(str(w.pk), url)
-        self.assertIn('warranties', url)
+        self.assertIn("warranties", url)
 
 
 # ---------------------------------------------------------------------------
 # Task 2 — AssetReservation
 # ---------------------------------------------------------------------------
 
-class AssetReservationModelTest(TestCase):
 
+class AssetReservationModelTest(TestCase):
     def setUp(self):
-        self.asset = _deployable_asset(name='Reserved Asset')
+        self.asset = _deployable_asset(name="Reserved Asset")
         from organization.models import AssetHolder
+
         self.holder_a = baker.make(AssetHolder)
         self.holder_b = baker.make(AssetHolder)
 
@@ -190,7 +197,7 @@ class AssetReservationModelTest(TestCase):
         try:
             res2.clean()
         except ValidationError:
-            self.fail('clean() raised ValidationError for non-overlapping reservation')
+            self.fail("clean() raised ValidationError for non-overlapping reservation")
 
     def test_clean_rejects_end_before_start(self):
         today = datetime.date.today()
@@ -207,6 +214,7 @@ class AssetReservationModelTest(TestCase):
         """checkout_asset() must raise when a current window reservation exists for a different holder."""
         today = datetime.date.today()
         from django.contrib.auth import get_user_model
+
         user = baker.make(get_user_model(), is_superuser=True)
 
         baker.make(
@@ -229,6 +237,7 @@ class AssetReservationModelTest(TestCase):
         """checkout_asset() should succeed when the holder matches the reservation."""
         today = datetime.date.today()
         from django.contrib.auth import get_user_model
+
         user = baker.make(get_user_model(), is_superuser=True)
 
         baker.make(
@@ -252,13 +261,15 @@ class AssetReservationModelTest(TestCase):
 # Task 3 — Loaner fields on AssetAssignment
 # ---------------------------------------------------------------------------
 
-class LoanerAssignmentTest(TestCase):
 
+class LoanerAssignmentTest(TestCase):
     def setUp(self):
         from django.contrib.auth import get_user_model
+
         self.user = baker.make(get_user_model(), is_superuser=True)
-        self.asset = _deployable_asset(name='Loaner Laptop')
+        self.asset = _deployable_asset(name="Loaner Laptop")
         from organization.models import AssetHolder
+
         self.holder = baker.make(AssetHolder)
 
     def test_checkout_with_loan_flag(self):
@@ -353,27 +364,29 @@ class LoanerAssignmentTest(TestCase):
 # Task 4 — Asset.cost_center FK
 # ---------------------------------------------------------------------------
 
-class AssetCostCenterTest(TestCase):
 
+class AssetCostCenterTest(TestCase):
     def test_cost_center_nullable(self):
-        asset = _deployable_asset(name='CC Asset')
+        asset = _deployable_asset(name="CC Asset")
         self.assertIsNone(asset.cost_center)
 
     def test_cost_center_assignment(self):
         from organization.models import CostCenter
+
         cc = baker.make(CostCenter)
-        asset = _deployable_asset(name='CC Asset 2')
+        asset = _deployable_asset(name="CC Asset 2")
         asset.cost_center = cc
-        asset.save(update_fields=['cost_center'])
+        asset.save(update_fields=["cost_center"])
         asset.refresh_from_db()
         self.assertEqual(asset.cost_center, cc)
 
     def test_cost_center_set_null_on_delete(self):
         from organization.models import CostCenter
+
         cc = baker.make(CostCenter)
-        asset = _deployable_asset(name='CC Asset 3')
+        asset = _deployable_asset(name="CC Asset 3")
         asset.cost_center = cc
-        asset.save(update_fields=['cost_center'])
+        asset.save(update_fields=["cost_center"])
         # SET_NULL fires on an actual row deletion. CostCenter is soft-delete,
         # so a plain delete() keeps the row (and the FK still resolves) — hard
         # delete to exercise the on_delete=SET_NULL behaviour.

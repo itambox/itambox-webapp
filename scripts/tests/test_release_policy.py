@@ -12,7 +12,6 @@ from scripts.release_policy import (
     validate_repository,
 )
 
-
 REPOSITORY_ROOT = Path(__file__).resolve().parents[2]
 
 
@@ -62,9 +61,7 @@ class VersionPolicyTests(unittest.TestCase):
 
 class RepositoryPolicyTests(unittest.TestCase):
     def test_checked_in_release_metadata_is_consistent(self):
-        version = validate_repository(
-            REPOSITORY_ROOT, expected_version="1.0.0-alpha.1"
-        )
+        version = validate_repository(REPOSITORY_ROOT, expected_version="1.0.0-alpha.1")
 
         self.assertEqual(version.semver, "1.0.0-alpha.1")
         self.assertEqual(version.pep440, "1.0.0a1")
@@ -84,14 +81,9 @@ class RepositoryPolicyTests(unittest.TestCase):
             f'[project]\nname = "itambox"\nversion = {project_version!r}\n',
             encoding="utf-8",
         )
-        (root / "itambox" / "itambox" / "release.py").write_text(
-            f"VERSION = {source_version!r}\n", encoding="utf-8"
-        )
+        (root / "itambox" / "itambox" / "release.py").write_text(f"VERSION = {source_version!r}\n", encoding="utf-8")
         (root / "uv.lock").write_text(
-            "[[package]]\n"
-            'name = "itambox"\n'
-            f"version = {locked_version!r}\n"
-            'source = { virtual = "." }\n',
+            f'[[package]]\nname = "itambox"\nversion = {locked_version!r}\nsource = {{ virtual = "." }}\n',
             encoding="utf-8",
         )
         (root / "CHANGELOG.md").write_text(
@@ -197,18 +189,14 @@ class ReleaseAutomationContractTests(unittest.TestCase):
 
     def test_public_guidance_uses_dotted_prerelease_examples(self):
         security_policy = (REPOSITORY_ROOT / "SECURITY.md").read_text(encoding="utf-8")
-        bug_template = (
-            REPOSITORY_ROOT / ".github" / "ISSUE_TEMPLATE" / "bug_report.md"
-        ).read_text(encoding="utf-8")
+        bug_template = (REPOSITORY_ROOT / ".github" / "ISSUE_TEMPLATE" / "bug_report.md").read_text(encoding="utf-8")
 
         self.assertNotIn("1.0.0-alpha1", security_policy)
         self.assertNotIn("1.0.0-alpha1", bug_template)
         self.assertIn("1.0.0-alpha.1", bug_template)
 
     def test_release_workflow_separates_pr_rehearsal_from_draft_preparation(self):
-        workflow = (
-            REPOSITORY_ROOT / ".github" / "workflows" / "release.yml"
-        ).read_text(encoding="utf-8")
+        workflow = (REPOSITORY_ROOT / ".github" / "workflows" / "release.yml").read_text(encoding="utf-8")
 
         self.assertIn("pull_request:", workflow)
         self.assertIn("workflow_dispatch:", workflow)
@@ -227,7 +215,7 @@ class ReleaseAutomationContractTests(unittest.TestCase):
         self.assertGreaterEqual(workflow.count("verify_release_tag"), 3)
         self.assertIn("Release tag does not resolve to the reviewed commit", workflow)
         self.assertIn("gh release create", workflow)
-        self.assertIn('--verify-tag', workflow)
+        self.assertIn("--verify-tag", workflow)
         self.assertIn('--target "$GITHUB_SHA"', workflow)
         self.assertIn("--draft", workflow)
         self.assertIn("--prerelease", workflow)

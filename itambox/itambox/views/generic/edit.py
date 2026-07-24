@@ -1,31 +1,33 @@
 import logging
 
 from crispy_forms.helper import FormHelper
-from crispy_forms.layout import Layout, Submit, HTML
+from crispy_forms.layout import HTML, Layout, Submit
 from django.contrib import messages
 from django.contrib.auth.mixins import LoginRequiredMixin, PermissionRequiredMixin
 from django.core.exceptions import ImproperlyConfigured
 from django.http import Http404, HttpResponseRedirect
 from django.shortcuts import get_object_or_404, redirect
-from django.urls import reverse, NoReverseMatch
+from django.urls import NoReverseMatch, reverse
 from django.utils.translation import gettext as _
 from django.views.generic import UpdateView
 
-from itambox.utils import get_model_viewname, get_help_url
-from itambox.views.htmx import BaseHTMXView
+from itambox.utils import get_help_url, get_model_viewname
 from itambox.views.generic.mixins import (
     CachedObjectMixin,
     TenantScopingViewMixin,
     user_can_mutate_model,
 )
 from itambox.views.generic.utils import safe_return_url
+from itambox.views.htmx import BaseHTMXView
 
 logger = logging.getLogger(__name__)
 
 
-class ObjectEditView(TenantScopingViewMixin, PermissionRequiredMixin, LoginRequiredMixin, BaseHTMXView, CachedObjectMixin, UpdateView):
+class ObjectEditView(
+    TenantScopingViewMixin, PermissionRequiredMixin, LoginRequiredMixin, BaseHTMXView, CachedObjectMixin, UpdateView
+):
     model_form = None
-    template_name = 'generic/object_edit.html'
+    template_name = "generic/object_edit.html"
 
     def has_permission(self):
         if not user_can_mutate_model(self.request.user, self._get_model()):
@@ -52,18 +54,18 @@ class ObjectEditView(TenantScopingViewMixin, PermissionRequiredMixin, LoginRequi
             except Http404:
                 obj = None
             if obj:
-                return (f'{app_label}.change_{model_name}',)
-            return (f'{app_label}.add_{model_name}',)
-        return ('',)
+                return (f"{app_label}.change_{model_name}",)
+            return (f"{app_label}.add_{model_name}",)
+        return ("",)
 
     def _get_model(self):
-        if hasattr(self, 'model') and self.model:
+        if hasattr(self, "model") and self.model:
             return self.model
-        if hasattr(self, 'queryset') and self.queryset is not None:
+        if hasattr(self, "queryset") and self.queryset is not None:
             return self.queryset.model
-        if hasattr(self, 'model_form') and self.model_form:
+        if hasattr(self, "model_form") and self.model_form:
             return self.model_form._meta.model
-        if hasattr(self, 'form_class') and self.form_class and hasattr(self.form_class, '_meta'):
+        if hasattr(self, "form_class") and self.form_class and hasattr(self.form_class, "_meta"):
             return self.form_class._meta.model
         return None
 
@@ -73,46 +75,48 @@ class ObjectEditView(TenantScopingViewMixin, PermissionRequiredMixin, LoginRequi
         return super().get_form_class()
 
     def get_object(self, queryset=None):
-        if 'pk' not in self.kwargs and 'slug' not in self.kwargs:
+        if "pk" not in self.kwargs and "slug" not in self.kwargs:
             return None
         return super().get_object(queryset)
 
     def get_form(self, form_class=None):
         kwargs = self.get_form_kwargs()
-        kwargs['instance'] = self.object
+        kwargs["instance"] = self.object
         if form_class is None:
             form_class = self.get_form_class()
         form = form_class(**kwargs)
 
-        if not hasattr(form, 'helper') or form.helper is None:
+        if not hasattr(form, "helper") or form.helper is None:
             helper = FormHelper(form)
-            helper.form_method = 'post'
+            helper.form_method = "post"
             helper.form_tag = True
 
             is_editing = self.object is not None and self.object.pk is not None
-            button_text = _('Update') if is_editing else _('Create')
+            button_text = _("Update") if is_editing else _("Create")
 
-            cancel_url = '#'
-            if self.object and hasattr(self.object, 'get_absolute_url'):
+            cancel_url = "#"
+            if self.object and hasattr(self.object, "get_absolute_url"):
                 try:
                     cancel_url = self.object.get_absolute_url()
                 except Exception:
                     pass
-            if cancel_url == '#':
+            if cancel_url == "#":
                 _model = self._get_model()
                 if _model:
                     try:
-                        list_view_name = get_model_viewname(_model, 'list')
+                        list_view_name = get_model_viewname(_model, "list")
                         cancel_url = reverse(list_view_name)
                     except Exception:
-                        cancel_url = reverse('dashboard')
+                        cancel_url = reverse("dashboard")
 
             layout_elements = list(form.fields.keys())
-            layout_elements.extend([
-                HTML('<div class="mt-4"></div>'),
-                Submit('submit', button_text, css_class='btn btn-primary'),
-                HTML(f'<a href="{cancel_url}" class="btn btn-outline-secondary ms-2">{_("Cancel")}</a>'),
-            ])
+            layout_elements.extend(
+                [
+                    HTML('<div class="mt-4"></div>'),
+                    Submit("submit", button_text, css_class="btn btn-primary"),
+                    HTML(f'<a href="{cancel_url}" class="btn btn-outline-secondary ms-2">{_("Cancel")}</a>'),
+                ]
+            )
             helper.layout = Layout(*layout_elements)
             form.helper = helper
 
@@ -120,21 +124,21 @@ class ObjectEditView(TenantScopingViewMixin, PermissionRequiredMixin, LoginRequi
 
     def get_success_url(self):
         fallback = None
-        if hasattr(self, 'default_return_url') and self.default_return_url:
+        if hasattr(self, "default_return_url") and self.default_return_url:
             fallback = reverse(self.default_return_url)
-        elif self.object and hasattr(self.object, 'get_absolute_url'):
+        elif self.object and hasattr(self.object, "get_absolute_url"):
             fallback = self.object.get_absolute_url()
         if fallback is None:
             _model = self._get_model()
             if _model:
                 try:
-                    list_view_name = get_model_viewname(_model, 'list')
+                    list_view_name = get_model_viewname(_model, "list")
                     fallback = reverse(list_view_name)
                 except NoReverseMatch:
                     logger.debug("List view URL fallback failed for model %s", _model)
         if fallback is None:
-            fallback = reverse('dashboard')
-        return safe_return_url(self.request, self.request.POST.get('return_url'), fallback)
+            fallback = reverse("dashboard")
+        return safe_return_url(self.request, self.request.POST.get("return_url"), fallback)
 
     def form_valid(self, form):
         # Unsaved instances (new objects and clones) are creations.
@@ -145,32 +149,45 @@ class ObjectEditView(TenantScopingViewMixin, PermissionRequiredMixin, LoginRequi
         if _model:
             app_label = _model._meta.app_label
             model_name = _model._meta.model_name
-            selected_tenant = form.cleaned_data.get('tenant')
-            if not selected_tenant and hasattr(form.instance, 'tenant'):
-                selected_tenant = getattr(form.instance, 'tenant', None)
+            selected_tenant = form.cleaned_data.get("tenant")
+            if not selected_tenant and hasattr(form.instance, "tenant"):
+                selected_tenant = getattr(form.instance, "tenant", None)
 
             if selected_tenant:
                 is_creating_instance = self.object is None or self.object.pk is None
-                perm_codename = f'{app_label}.add_{model_name}' if is_creating_instance else f'{app_label}.change_{model_name}'
+                perm_codename = (
+                    f"{app_label}.add_{model_name}" if is_creating_instance else f"{app_label}.change_{model_name}"
+                )
                 if not self.request.user.has_perm(perm_codename, obj=selected_tenant):
-                    form.add_error('tenant', _("You do not have permission to assign objects to tenant '%(tenant)s'.") % {'tenant': selected_tenant})
+                    form.add_error(
+                        "tenant",
+                        _("You do not have permission to assign objects to tenant '%(tenant)s'.")
+                        % {"tenant": selected_tenant},
+                    )
                     return self.form_invalid(form)
 
         self.object = form.save()
-        msg_verb = _('Created') if is_creating else _('Modified')
-        msg_link = f"<a href='{self.object.get_absolute_url()}'>{self.object}</a>" if hasattr(self.object, 'get_absolute_url') else str(self.object)
-        messages.success(self.request, _("%(verb)s %(model)s %(link)s") % {'verb': msg_verb, 'model': _model._meta.verbose_name, 'link': msg_link})
+        msg_verb = _("Created") if is_creating else _("Modified")
+        msg_link = (
+            f"<a href='{self.object.get_absolute_url()}'>{self.object}</a>"
+            if hasattr(self.object, "get_absolute_url")
+            else str(self.object)
+        )
+        messages.success(
+            self.request,
+            _("%(verb)s %(model)s %(link)s") % {"verb": msg_verb, "model": _model._meta.verbose_name, "link": msg_link},
+        )
 
-        if self.request.POST.get('_addanother') and _model:
+        if self.request.POST.get("_addanother") and _model:
             try:
-                add_view_name = get_model_viewname(_model, 'add')
+                add_view_name = get_model_viewname(_model, "add")
                 return redirect(reverse(add_view_name))
             except NoReverseMatch:
                 pass
-        elif self.request.POST.get('_continue') and _model:
+        elif self.request.POST.get("_continue") and _model:
             try:
-                edit_view_name = get_model_viewname(_model, 'edit')
-                return redirect(reverse(edit_view_name, kwargs={'pk': self.object.pk}))
+                edit_view_name = get_model_viewname(_model, "edit")
+                return redirect(reverse(edit_view_name, kwargs={"pk": self.object.pk}))
             except NoReverseMatch:
                 pass
 
@@ -185,28 +202,28 @@ class ObjectEditView(TenantScopingViewMixin, PermissionRequiredMixin, LoginRequi
         # A clone is an unsaved instance (pk is None): treat it as creation, not
         # an edit, so we don't reverse get_absolute_url() with a null pk.
         is_editing = self.object is not None and self.object.pk is not None
-        context['model'] = _model
-        context['verbose_name'] = _model._meta.verbose_name
-        context['is_editing'] = is_editing
-        action_verb = _('Edit') if is_editing else _('Create')
-        context['title'] = f"{action_verb} {context['verbose_name']}"
+        context["model"] = _model
+        context["verbose_name"] = _model._meta.verbose_name
+        context["is_editing"] = is_editing
+        action_verb = _("Edit") if is_editing else _("Create")
+        context["title"] = f"{action_verb} {context['verbose_name']}"
 
-        if is_editing and hasattr(self.object, 'get_absolute_url'):
-            context['cancel_url'] = self.object.get_absolute_url()
+        if is_editing and hasattr(self.object, "get_absolute_url"):
+            context["cancel_url"] = self.object.get_absolute_url()
         else:
             try:
-                list_view_name = get_model_viewname(_model, 'list')
-                context['cancel_url'] = reverse(list_view_name)
+                list_view_name = get_model_viewname(_model, "list")
+                context["cancel_url"] = reverse(list_view_name)
             except NoReverseMatch:
-                context['cancel_url'] = reverse('dashboard')
+                context["cancel_url"] = reverse("dashboard")
 
         base_breadcrumbs = [
-            (reverse('dashboard'), _('Dashboard')),
-            (context['cancel_url'], _model._meta.verbose_name_plural),
-            (None, context['title']),
+            (reverse("dashboard"), _("Dashboard")),
+            (context["cancel_url"], _model._meta.verbose_name_plural),
+            (None, context["title"]),
         ]
-        context['breadcrumbs'] = getattr(self, 'get_breadcrumbs', lambda: base_breadcrumbs)()
-        context['help_url'] = get_help_url(self, _model._meta.app_label, _model._meta.model_name)
+        context["breadcrumbs"] = getattr(self, "get_breadcrumbs", lambda: base_breadcrumbs)()
+        context["help_url"] = get_help_url(self, _model._meta.app_label, _model._meta.model_name)
         return context
 
 
@@ -220,16 +237,16 @@ class ObjectCloneView(ObjectEditView):
     """
 
     def get_object(self, queryset=None):
-        self.original_object = get_object_or_404(self.model, pk=self.kwargs['pk'])
+        self.original_object = get_object_or_404(self.model, pk=self.kwargs["pk"])
         cloned = self.original_object.clone()
 
-        if hasattr(cloned, 'name'):
+        if hasattr(cloned, "name"):
             cloned.name = f"{self.original_object.name} (Copy)"
-        elif hasattr(cloned, 'model'):
+        elif hasattr(cloned, "model"):
             cloned.model = f"{self.original_object.model} (Copy)"
 
-        if hasattr(cloned, 'slug'):
-            cloned.slug = ''
+        if hasattr(cloned, "slug"):
+            cloned.slug = ""
 
         self.pre_save_clone(self.original_object, cloned)
         # Intentionally NOT saved here — the form's POST creates the record.
@@ -240,19 +257,19 @@ class ObjectCloneView(ObjectEditView):
         # so seed them (e.g. tags) from the source object as form initial. Only
         # fields actually present on the form are rendered/saved.
         initial = super().get_initial()
-        original = getattr(self, 'original_object', None)
+        original = getattr(self, "original_object", None)
         if original is not None and original.pk:
             for field in original._meta.many_to_many:
                 initial.setdefault(
                     field.name,
-                    list(getattr(original, field.name).values_list('pk', flat=True)),
+                    list(getattr(original, field.name).values_list("pk", flat=True)),
                 )
         return initial
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
-        context['is_clone'] = True
-        context['title'] = _('Clone %(name)s') % {'name': context['verbose_name']}
+        context["is_clone"] = True
+        context["title"] = _("Clone %(name)s") % {"name": context["verbose_name"]}
         return context
 
     def pre_save_clone(self, original, cloned):

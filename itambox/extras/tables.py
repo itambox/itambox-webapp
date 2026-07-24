@@ -1,29 +1,41 @@
 # itambox/extras/tables.py
 import django_tables2 as tables
-from django_tables2.utils import A
-from django.utils.safestring import mark_safe
 from django.urls import reverse
 from django.utils.html import escape, format_html
+from django.utils.safestring import mark_safe
 from django.utils.text import Truncator
 from django.utils.translation import gettext_lazy as _
+from django_tables2.utils import A
+
+from core.tables import ActionsColumn, BaseTable, BooleanColumn, ToggleColumn
+
 from .models import (
-    Tag, CustomField, CustomFieldset, SavedFilter, JournalEntry,
-    AlertRule, AlertLog, NotificationChannel, ReportTemplate, ScheduledReport,
+    AlertLog,
+    AlertRule,
+    CustomField,
+    CustomFieldset,
+    JournalEntry,
+    NotificationChannel,
+    ReportTemplate,
+    SavedFilter,
+    ScheduledReport,
+    Tag,
 )
-from core.tables import ActionsColumn, BaseTable, ToggleColumn, BooleanColumn
 
 # =============================================================================
 # Custom Columns
 # =============================================================================
 
+
 class TagColumn(tables.ManyToManyColumn):
     """
     A table column which renders linked tags for an object.
     """
+
     def __init__(self, url_name=None, *args, **kwargs):
         self.url_name = url_name
         # Prevent default linking of ManyToManyColumn
-        kwargs.setdefault('linkify_item', False) 
+        kwargs.setdefault("linkify_item", False)
         super().__init__(*args, **kwargs)
 
     def render(self, value):
@@ -40,7 +52,7 @@ class TagColumn(tables.ManyToManyColumn):
         rendered_tags = []
         for tag in visible_tags:
             color_hex = tag.color or "6c757d"  # fallback default color if empty
-            
+
             # calculate contrast color using YIQ formula
             try:
                 r = int(color_hex[0:2], 16)
@@ -51,38 +63,46 @@ class TagColumn(tables.ManyToManyColumn):
             except Exception:
                 text_color = "#ffffff"
 
-            url = reverse(self.url_name or 'extras:tag_list') + '?tag=' + escape(tag.slug)
-            rendered_tags.append(format_html(
-                '<a href="{}" class="badge me-1" style="background-color: #{}; color: {};">{}</a>',
-                url, color_hex, text_color, tag.name
-            ))
+            url = reverse(self.url_name or "extras:tag_list") + "?tag=" + escape(tag.slug)
+            rendered_tags.append(
+                format_html(
+                    '<a href="{}" class="badge me-1" style="background-color: #{}; color: {};">{}</a>',
+                    url,
+                    color_hex,
+                    text_color,
+                    tag.name,
+                )
+            )
 
         if remaining_count > 0:
-            rendered_tags.append(format_html(
-                '<span class="badge bg-secondary" title="{} tags total">+{}</span>',
-                len(tags), remaining_count
-            ))
+            rendered_tags.append(
+                format_html(
+                    '<span class="badge bg-secondary" title="{} tags total">+{}</span>', len(tags), remaining_count
+                )
+            )
 
         return mark_safe("".join(rendered_tags))
+
 
 # =============================================================================
 # Model Tables
 # =============================================================================
 
+
 class TagTable(BaseTable):
-    pk = ToggleColumn(accessor='pk')
-    name = tables.LinkColumn('extras:tag_detail', args=[A('pk')], verbose_name=_('Name'))
+    pk = ToggleColumn(accessor="pk")
+    name = tables.LinkColumn("extras:tag_detail", args=[A("pk")], verbose_name=_("Name"))
     # You might want a column to show count of items tagged with this tag.
     # This can be complex depending on how Tags are related (GenericForeignKey?).
     # For now, let's omit the count.
     # item_count = tables.Column(verbose_name='Tagged Items', orderable=False, empty_values=())
-    color = tables.Column(verbose_name=_('Color'), orderable=True)
+    color = tables.Column(verbose_name=_("Color"), orderable=True)
     actions = ActionsColumn()
 
     class Meta(BaseTable.Meta):
         model = Tag
-        fields = ('pk', 'name', 'slug', 'color', 'description', 'actions')
-        default_columns = ('pk', 'name', 'color', 'description', 'actions')
+        fields = ("pk", "name", "slug", "color", "description", "actions")
+        default_columns = ("pk", "name", "color", "description", "actions")
 
     def render_color(self, value):
         if value:
@@ -91,13 +111,13 @@ class TagTable(BaseTable):
 
 
 class CustomFieldTable(BaseTable):
-    pk = ToggleColumn(accessor='pk')
-    name = tables.LinkColumn('extras:customfield_detail', args=[A('pk')], verbose_name=_('Name'))
-    label = tables.Column(verbose_name=_('Label'))
-    field_type = tables.Column(verbose_name=_('Field Type'))
-    required = tables.BooleanColumn(verbose_name=_('Required'))
+    pk = ToggleColumn(accessor="pk")
+    name = tables.LinkColumn("extras:customfield_detail", args=[A("pk")], verbose_name=_("Name"))
+    label = tables.Column(verbose_name=_("Label"))
+    field_type = tables.Column(verbose_name=_("Field Type"))
+    required = tables.BooleanColumn(verbose_name=_("Required"))
     object_types = tables.ManyToManyColumn(
-        verbose_name=_('Applies To'),
+        verbose_name=_("Applies To"),
         transform=lambda ct: ct.model_class()._meta.verbose_name.title() if ct.model_class() else ct.model,
         orderable=False,
     )
@@ -105,39 +125,39 @@ class CustomFieldTable(BaseTable):
 
     class Meta(BaseTable.Meta):
         model = CustomField
-        fields = ('pk', 'name', 'label', 'field_type', 'required', 'object_types', 'actions')
-        default_columns = ('pk', 'name', 'label', 'field_type', 'required', 'object_types', 'actions')
+        fields = ("pk", "name", "label", "field_type", "required", "object_types", "actions")
+        default_columns = ("pk", "name", "label", "field_type", "required", "object_types", "actions")
 
 
 class CustomFieldsetTable(BaseTable):
-    pk = ToggleColumn(accessor='pk')
-    name = tables.LinkColumn('extras:customfieldset_detail', args=[A('pk')], verbose_name=_('Name'))
-    fields_count = tables.Column(verbose_name=_('Fields Count'), orderable=False)
+    pk = ToggleColumn(accessor="pk")
+    name = tables.LinkColumn("extras:customfieldset_detail", args=[A("pk")], verbose_name=_("Name"))
+    fields_count = tables.Column(verbose_name=_("Fields Count"), orderable=False)
     actions = ActionsColumn()
 
     class Meta(BaseTable.Meta):
         model = CustomFieldset
-        fields = ('pk', 'name', 'fields_count', 'actions')
-        default_columns = ('pk', 'name', 'fields_count', 'actions')
+        fields = ("pk", "name", "fields_count", "actions")
+        default_columns = ("pk", "name", "fields_count", "actions")
 
     def render_fields_count(self, value, record=None):
         return value or 0
 
 
 class SavedFilterTable(BaseTable):
-    pk = ToggleColumn(accessor='pk')
-    name = tables.LinkColumn('extras:savedfilter_detail', args=[A('pk')], verbose_name=_('Name'))
-    content_type = tables.Column(verbose_name=_('Object Type'), accessor='content_type')
-    shared = BooleanColumn(verbose_name=_('Shared'))
-    enabled = BooleanColumn(verbose_name=_('Enabled'))
-    tenant = tables.Column(verbose_name=_('Tenant'), accessor='tenant.name', linkify=False)
-    created_by = tables.Column(verbose_name=_('Created By'), accessor='created_by')
+    pk = ToggleColumn(accessor="pk")
+    name = tables.LinkColumn("extras:savedfilter_detail", args=[A("pk")], verbose_name=_("Name"))
+    content_type = tables.Column(verbose_name=_("Object Type"), accessor="content_type")
+    shared = BooleanColumn(verbose_name=_("Shared"))
+    enabled = BooleanColumn(verbose_name=_("Enabled"))
+    tenant = tables.Column(verbose_name=_("Tenant"), accessor="tenant.name", linkify=False)
+    created_by = tables.Column(verbose_name=_("Created By"), accessor="created_by")
     actions = ActionsColumn()
 
     class Meta(BaseTable.Meta):
         model = SavedFilter
-        fields = ('pk', 'name', 'content_type', 'shared', 'enabled', 'tenant', 'created_by', 'actions')
-        default_columns = ('pk', 'name', 'content_type', 'shared', 'enabled', 'tenant', 'created_by', 'actions')
+        fields = ("pk", "name", "content_type", "shared", "enabled", "tenant", "created_by", "actions")
+        default_columns = ("pk", "name", "content_type", "shared", "enabled", "tenant", "created_by", "actions")
 
     def render_content_type(self, value):
         model = value.model_class()
@@ -153,27 +173,28 @@ class JournalEntryTable(BaseTable):
     There is no per-entry detail page (journaling is an inline-add feature), so
     the Object column links straight to the journaled object's detail view.
     """
-    created = tables.DateTimeColumn(verbose_name=_('Created'), format='Y-m-d H:i:s', linkify=False)
+
+    created = tables.DateTimeColumn(verbose_name=_("Created"), format="Y-m-d H:i:s", linkify=False)
     content_object = tables.Column(
-        verbose_name=_('Object'),
-        accessor='content_object',
+        verbose_name=_("Object"),
+        accessor="content_object",
         orderable=False,
         empty_values=(),
     )
-    model = tables.Column(verbose_name=_('Object Type'), linkify=False)
-    user = tables.Column(verbose_name=_('User'), linkify=False)
-    comment = tables.Column(verbose_name=_('Comment'), orderable=False)
+    model = tables.Column(verbose_name=_("Object Type"), linkify=False)
+    user = tables.Column(verbose_name=_("User"), linkify=False)
+    comment = tables.Column(verbose_name=_("Comment"), orderable=False)
 
     class Meta(BaseTable.Meta):
         model = JournalEntry
-        fields = ('created', 'content_object', 'model', 'user', 'comment')
-        default_columns = ('created', 'content_object', 'model', 'user', 'comment')
-        order_by = ('-created',)
+        fields = ("created", "content_object", "model", "user", "comment")
+        default_columns = ("created", "content_object", "model", "user", "comment")
+        order_by = ("-created",)
 
     def render_content_object(self, value):
         if value is None:
             return mark_safe('<span class="text-muted">&mdash;</span>')
-        get_url = getattr(value, 'get_absolute_url', None)
+        get_url = getattr(value, "get_absolute_url", None)
         url = None
         if get_url is not None:
             try:
@@ -196,15 +217,16 @@ class JournalEntryTable(BaseTable):
 # Alerting Tables
 # =============================================================================
 
+
 class AlertRuleTable(BaseTable):
-    pk = ToggleColumn(accessor='pk')
+    pk = ToggleColumn(accessor="pk")
     name = tables.Column(linkify=True)
-    alert_type = tables.Column(verbose_name=_('Alert Type'))
-    threshold_value = tables.Column(verbose_name=_('Threshold'))
+    alert_type = tables.Column(verbose_name=_("Alert Type"))
+    threshold_value = tables.Column(verbose_name=_("Threshold"))
     severity = tables.Column()
     is_active = BooleanColumn()
-    is_muted = BooleanColumn(verbose_name=_('Muted'))
-    tenant = tables.Column(verbose_name=_('Tenant'), accessor='tenant.name', linkify=False)
+    is_muted = BooleanColumn(verbose_name=_("Muted"))
+    tenant = tables.Column(verbose_name=_("Tenant"), accessor="tenant.name", linkify=False)
     actions = tables.TemplateColumn(
         template_code="""
         <div class="d-flex gap-1 justify-content-end">
@@ -223,33 +245,53 @@ class AlertRuleTable(BaseTable):
         verbose_name=_("Actions"),
         orderable=False,
         attrs={
-            'th': {'class': 'col-actions text-nowrap'},
-            'td': {'class': 'text-end text-nowrap noprint p-1 col-actions'},
-        }
+            "th": {"class": "col-actions text-nowrap"},
+            "td": {"class": "text-end text-nowrap noprint p-1 col-actions"},
+        },
     )
 
     class Meta(BaseTable.Meta):
         model = AlertRule
-        fields = ('pk', 'name', 'alert_type', 'threshold_value', 'severity', 'is_active', 'is_muted', 'tenant', 'actions')
-        sequence = ('pk', 'name', 'alert_type', 'threshold_value', 'severity', 'is_active', 'is_muted', 'tenant', 'actions')
+        fields = (
+            "pk",
+            "name",
+            "alert_type",
+            "threshold_value",
+            "severity",
+            "is_active",
+            "is_muted",
+            "tenant",
+            "actions",
+        )
+        sequence = (
+            "pk",
+            "name",
+            "alert_type",
+            "threshold_value",
+            "severity",
+            "is_active",
+            "is_muted",
+            "tenant",
+            "actions",
+        )
 
     def render_severity(self, value):
-        color = 'secondary'
+        color = "secondary"
         if value == AlertRule.SEVERITY_INFO:
-            color = 'info'
+            color = "info"
         elif value == AlertRule.SEVERITY_WARNING:
-            color = 'warning'
+            color = "warning"
         elif value == AlertRule.SEVERITY_CRITICAL:
-            color = 'danger'
+            color = "danger"
         return format_html('<span class="badge bg-{}">{}</span>', color, value.capitalize())
 
 
 class NotificationChannelTable(BaseTable):
-    pk = ToggleColumn(accessor='pk')
+    pk = ToggleColumn(accessor="pk")
     name = tables.Column(linkify=False)
-    channel_type = tables.Column(verbose_name=_('Channel Type'))
+    channel_type = tables.Column(verbose_name=_("Channel Type"))
     enabled = BooleanColumn()
-    tenant = tables.Column(verbose_name=_('Tenant'), accessor='tenant.name', linkify=False)
+    tenant = tables.Column(verbose_name=_("Tenant"), accessor="tenant.name", linkify=False)
     actions = tables.TemplateColumn(
         template_code="""
         <div class="d-flex gap-1 justify-content-end">
@@ -270,31 +312,27 @@ class NotificationChannelTable(BaseTable):
         verbose_name=_("Actions"),
         orderable=False,
         attrs={
-            'th': {
-                'class': 'col-actions text-nowrap',
+            "th": {
+                "class": "col-actions text-nowrap",
             },
-            'td': {
-                'class': 'text-end text-nowrap noprint p-1 col-actions'
-            }
-        }
+            "td": {"class": "text-end text-nowrap noprint p-1 col-actions"},
+        },
     )
 
     class Meta(BaseTable.Meta):
         model = NotificationChannel
-        fields = ('pk', 'name', 'channel_type', 'enabled', 'tenant', 'actions')
-        sequence = ('pk', 'name', 'channel_type', 'enabled', 'tenant', 'actions')
+        fields = ("pk", "name", "channel_type", "enabled", "tenant", "actions")
+        sequence = ("pk", "name", "channel_type", "enabled", "tenant", "actions")
 
 
 class AlertLogTable(BaseTable):
-    pk = ToggleColumn(accessor='pk')
-    created_at = tables.DateTimeColumn(verbose_name=_('Date'), format='Y-m-d H:i:s')
+    pk = ToggleColumn(accessor="pk")
+    created_at = tables.DateTimeColumn(verbose_name=_("Date"), format="Y-m-d H:i:s")
     rule = tables.Column(linkify=True)
     subject = tables.Column(linkify=False)
     severity = tables.Column()
     status = tables.Column()
-    delivery = tables.Column(
-        verbose_name=_('Delivery'), orderable=False, empty_values=(), accessor='delivery_status'
-    )
+    delivery = tables.Column(verbose_name=_("Delivery"), orderable=False, empty_values=(), accessor="delivery_status")
     actions = tables.TemplateColumn(
         template_code="""
         <div class="d-flex gap-1 justify-content-end">
@@ -323,39 +361,37 @@ class AlertLogTable(BaseTable):
         verbose_name=_("Actions"),
         orderable=False,
         attrs={
-            'th': {
-                'class': 'col-actions-wide text-nowrap',
+            "th": {
+                "class": "col-actions-wide text-nowrap",
             },
-            'td': {
-                'class': 'text-end text-nowrap noprint p-1 col-actions-wide'
-            }
-        }
+            "td": {"class": "text-end text-nowrap noprint p-1 col-actions-wide"},
+        },
     )
 
     class Meta(BaseTable.Meta):
         model = AlertLog
-        fields = ('pk', 'created_at', 'rule', 'subject', 'severity', 'status', 'delivery', 'actions')
-        sequence = ('pk', 'created_at', 'rule', 'subject', 'severity', 'status', 'delivery', 'actions')
-        empty_text = _('All clear. No alerts match the current filters.')
+        fields = ("pk", "created_at", "rule", "subject", "severity", "status", "delivery", "actions")
+        sequence = ("pk", "created_at", "rule", "subject", "severity", "status", "delivery", "actions")
+        empty_text = _("All clear. No alerts match the current filters.")
 
     def render_severity(self, value):
-        color = 'secondary'
+        color = "secondary"
         if value == AlertRule.SEVERITY_INFO:
-            color = 'info'
+            color = "info"
         elif value == AlertRule.SEVERITY_WARNING:
-            color = 'warning'
+            color = "warning"
         elif value == AlertRule.SEVERITY_CRITICAL:
-            color = 'danger'
+            color = "danger"
         return format_html('<span class="badge bg-{}">{}</span>', color, value.capitalize())
 
     def render_status(self, value):
-        color = 'secondary'
+        color = "secondary"
         if value == AlertLog.STATUS_ACTIVE:
-            color = 'danger'
+            color = "danger"
         elif value == AlertLog.STATUS_ACKNOWLEDGED:
-            color = 'warning'
+            color = "warning"
         elif value == AlertLog.STATUS_RESOLVED:
-            color = 'success'
+            color = "success"
         return format_html('<span class="badge bg-{}">{}</span>', color, value.capitalize())
 
     def render_delivery(self, record):
@@ -363,16 +399,20 @@ class AlertLogTable(BaseTable):
         if not statuses:
             return format_html('<span class="text-muted" title="No channels / not yet dispatched">&mdash;</span>')
         total = len(statuses)
-        failed = [k for k, v in statuses.items() if v != 'ok']
+        failed = [k for k, v in statuses.items() if v != "ok"]
         if not failed:
             return format_html(
                 '<span class="badge bg-success" title="All {} channel(s) delivered">{}/{}</span>',
-                total, total, total,
+                total,
+                total,
+                total,
             )
-        failed_detail = '; '.join(f"{k}: {statuses[k]}" for k in failed)
+        failed_detail = "; ".join(f"{k}: {statuses[k]}" for k in failed)
         return format_html(
             '<span class="badge bg-danger" title="{}">{}/{} failed</span>',
-            failed_detail, len(failed), total,
+            failed_detail,
+            len(failed),
+            total,
         )
 
 
@@ -380,25 +420,26 @@ class AlertLogTable(BaseTable):
 # Reporting Tables
 # =============================================================================
 
+
 class ReportTemplateTable(BaseTable):
-    pk = ToggleColumn(accessor='pk')
+    pk = ToggleColumn(accessor="pk")
     name = tables.Column(linkify=True)
-    report_type = tables.Column(verbose_name=_('Type'))
+    report_type = tables.Column(verbose_name=_("Type"))
 
     class Meta(BaseTable.Meta):
         model = ReportTemplate
-        fields = ('pk', 'name', 'description', 'report_type')
-        sequence = ('pk', 'name', 'description', 'report_type')
+        fields = ("pk", "name", "description", "report_type")
+        sequence = ("pk", "name", "description", "report_type")
 
 
 class ScheduledReportTable(BaseTable):
-    pk = ToggleColumn(accessor='pk')
+    pk = ToggleColumn(accessor="pk")
     name = tables.Column(linkify=False)
     report = tables.Column(linkify=True)
     recipients = tables.Column()
     format = tables.Column()
     is_active = BooleanColumn()
-    last_run = tables.DateTimeColumn(format='Y-m-d H:i:s')
+    last_run = tables.DateTimeColumn(format="Y-m-d H:i:s")
     last_status = tables.Column()
     actions = tables.TemplateColumn(
         template_code="""
@@ -422,18 +463,14 @@ class ScheduledReportTable(BaseTable):
         verbose_name=_("Actions"),
         orderable=False,
         attrs={
-            'th': {
-                'class': 'col-actions-wide text-nowrap',
+            "th": {
+                "class": "col-actions-wide text-nowrap",
             },
-            'td': {
-                'class': 'text-end text-nowrap noprint p-1 col-actions-wide'
-            }
-        }
+            "td": {"class": "text-end text-nowrap noprint p-1 col-actions-wide"},
+        },
     )
 
     class Meta(BaseTable.Meta):
         model = ScheduledReport
-        fields = ('pk', 'name', 'report', 'recipients', 'format', 'is_active', 'last_run', 'last_status', 'actions')
-        sequence = ('pk', 'name', 'report', 'recipients', 'format', 'is_active', 'last_run', 'last_status', 'actions')
-
-
+        fields = ("pk", "name", "report", "recipients", "format", "is_active", "last_run", "last_status", "actions")
+        sequence = ("pk", "name", "report", "recipients", "format", "is_active", "last_run", "last_status", "actions")

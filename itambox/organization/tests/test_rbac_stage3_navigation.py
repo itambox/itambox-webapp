@@ -13,38 +13,47 @@ from organization.models import (
     TenantGroup,
 )
 
-
 User = get_user_model()
 
 
 class CanonicalNavigationTests(TestCase):
     def setUp(self):
         self.provider = Tenant.objects.create(
-            name='Navigation Provider', slug='navigation-provider', is_provider=True,
+            name="Navigation Provider",
+            slug="navigation-provider",
+            is_provider=True,
         )
         self.group = TenantGroup.objects.create(
-            name='Navigation group', slug='navigation-group',
+            name="Navigation group",
+            slug="navigation-group",
         )
         self.child_group = TenantGroup.objects.create(
-            name='Navigation child', slug='navigation-child', parent=self.group,
+            name="Navigation child",
+            slug="navigation-child",
+            parent=self.group,
         )
         self.customer_a = Tenant.objects.create(
-            name='Navigation A', slug='navigation-a', managed_by=self.provider,
+            name="Navigation A",
+            slug="navigation-a",
+            managed_by=self.provider,
             group=self.group,
         )
         self.customer_b = Tenant.objects.create(
-            name='Navigation B', slug='navigation-b', managed_by=self.provider,
+            name="Navigation B",
+            slug="navigation-b",
+            managed_by=self.provider,
             group=self.child_group,
         )
         self.unrelated = Tenant.objects.create(
-            name='Navigation unrelated', slug='navigation-unrelated',
+            name="Navigation unrelated",
+            slug="navigation-unrelated",
         )
-        self.user = User.objects.create_user(username='navigation-tech')
+        self.user = User.objects.create_user(username="navigation-tech")
         self.membership = Membership.objects.create(user=self.user, tenant=self.provider)
         self.role = Role.objects.create(
             tenant=self.provider,
-            name='Navigation reader',
-            permissions=['assets.view_asset'],
+            name="Navigation reader",
+            permissions=["assets.view_asset"],
         )
 
     def add_scope(self, scope_type, **kwargs):
@@ -87,6 +96,6 @@ class CanonicalNavigationTests(TestCase):
     def test_deactivated_membership_removes_home_and_projected_workspaces(self):
         self.add_scope(RoleGrantScope.SCOPE_ALL_MANAGED)
         self.membership.is_active = False
-        self.membership.save(update_fields=['is_active'])
+        self.membership.save(update_fields=["is_active"])
 
         self.assertEqual(accessible_tenant_ids(self.user), set())

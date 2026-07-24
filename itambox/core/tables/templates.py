@@ -1,43 +1,38 @@
 import django_tables2 as tables
 from django.contrib.contenttypes.models import ContentType
 from django.utils.translation import gettext_lazy as _
-from extras.models import WebhookEndpoint, EventRule, ExportTemplate, LabelTemplate
+
+from extras.models import EventRule, ExportTemplate, LabelTemplate, WebhookEndpoint
+
 from .base import BaseTable
 from .columns import BooleanColumn
 
+
 class ExportTemplateTable(BaseTable):
     name = tables.Column(linkify=True)
-    content_type = tables.Column(verbose_name=_('Model'))
-    file_extension = tables.Column(verbose_name=_('File Type'))
+    content_type = tables.Column(verbose_name=_("Model"))
+    file_extension = tables.Column(verbose_name=_("File Type"))
     mime_type = tables.Column()
 
     class Meta(BaseTable.Meta):
         model = ExportTemplate
-        fields = ('name', 'content_type', 'file_extension', 'mime_type')
-        sequence = ('name', 'content_type', 'file_extension', 'mime_type')
+        fields = ("name", "content_type", "file_extension", "mime_type")
+        sequence = ("name", "content_type", "file_extension", "mime_type")
 
     def render_content_type(self, value):
         return f"{value.app_label}.{value.model}"
 
 
 class SearchResultTable(tables.Table):
-    object_type = tables.Column(
-        accessor='_object_type_id',
-        verbose_name=_('Type'),
-        orderable=False
-    )
-    object = tables.Column(
-        accessor='object',
-        linkify=True,
-        verbose_name=_('Result'),
-        orderable=False
-    )
+    object_type = tables.Column(accessor="_object_type_id", verbose_name=_("Type"), orderable=False)
+    object = tables.Column(accessor="object", linkify=True, verbose_name=_("Result"), orderable=False)
 
     class Meta:
-        attrs = {
-            'class': 'table table-hover table-vcenter card-table'
-        }
-        fields = ('object_type', 'object',)
+        attrs = {"class": "table table-hover table-vcenter card-table"}
+        fields = (
+            "object_type",
+            "object",
+        )
 
     def render_object_type(self, value):
         try:
@@ -50,26 +45,26 @@ class SearchResultTable(tables.Table):
 class WebhookEndpointTable(BaseTable):
     name = tables.Column(linkify=True)
     url = tables.Column()
-    http_method = tables.Column(verbose_name=_('Method'))
+    http_method = tables.Column(verbose_name=_("Method"))
     enabled = BooleanColumn()
-    retry_count = tables.Column(verbose_name=_('Retries'))
+    retry_count = tables.Column(verbose_name=_("Retries"))
 
     class Meta(BaseTable.Meta):
         model = WebhookEndpoint
-        fields = ('name', 'url', 'http_method', 'enabled', 'retry_count')
-        sequence = ('name', 'url', 'http_method', 'enabled', 'retry_count')
+        fields = ("name", "url", "http_method", "enabled", "retry_count")
+        sequence = ("name", "url", "http_method", "enabled", "retry_count")
 
 
 class EventRuleTable(BaseTable):
     name = tables.Column(linkify=True)
-    model = tables.Column(verbose_name=_('Model'))
-    action_type = tables.Column(verbose_name=_('Action'))
+    model = tables.Column(verbose_name=_("Model"))
+    action_type = tables.Column(verbose_name=_("Action"))
     enabled = BooleanColumn()
 
     class Meta(BaseTable.Meta):
         model = EventRule
-        fields = ('name', 'model', 'action_type', 'enabled')
-        sequence = ('name', 'model', 'action_type', 'enabled')
+        fields = ("name", "model", "action_type", "enabled")
+        sequence = ("name", "model", "action_type", "enabled")
 
     def render_model(self, value):
         return f"{value.app_label}.{value.model}"
@@ -82,15 +77,15 @@ class EventRuleTable(BaseTable):
 class LabelTemplateTable(BaseTable):
     name = tables.Column(linkify=True)
     description = tables.Column()
-    page_width = tables.Column(verbose_name=_('Width (in)'))
-    page_height = tables.Column(verbose_name=_('Height (in)'))
-    barcode_format = tables.Column(verbose_name=_('Barcode'))
+    page_width = tables.Column(verbose_name=_("Width (in)"))
+    page_height = tables.Column(verbose_name=_("Height (in)"))
+    barcode_format = tables.Column(verbose_name=_("Barcode"))
 
     class Meta(BaseTable.Meta):
         model = LabelTemplate
-        fields = ('name', 'description', 'page_width', 'page_height', 'barcode_format')
-        sequence = ('name', 'description', 'page_width', 'page_height', 'barcode_format')
+        fields = ("name", "description", "page_width", "page_height", "barcode_format")
+        sequence = ("name", "description", "page_width", "page_height", "barcode_format")
 
     def render_barcode_format(self, value):
-        fmt_map = dict(LabelTemplate._meta.get_field('barcode_format').choices)
+        fmt_map = dict(LabelTemplate._meta.get_field("barcode_format").choices)
         return fmt_map.get(value, value)

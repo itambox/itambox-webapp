@@ -5,7 +5,7 @@ from core.models import Job
 
 
 class Command(BaseCommand):
-    help = 'Process pending background jobs from the database job queue.'
+    help = "Process pending background jobs from the database job queue."
 
     def handle(self, *args, **options):
         now = timezone.now()
@@ -17,7 +17,7 @@ class Command(BaseCommand):
         )
 
         if not pending_jobs.exists():
-            self.stdout.write(self.style.SUCCESS('No pending jobs to process.'))
+            self.stdout.write(self.style.SUCCESS("No pending jobs to process."))
             return
 
         processed = 0
@@ -28,7 +28,7 @@ class Command(BaseCommand):
                 if not job.mark_running():
                     continue
                 self._execute_job(job)
-                job.mark_completed({'status': 'success'})
+                job.mark_completed({"status": "success"})
                 processed += 1
                 self.stdout.write(self.style.SUCCESS(f'Job "{job.name}" completed.'))
             except Exception as e:
@@ -36,13 +36,9 @@ class Command(BaseCommand):
                 failed += 1
                 self.stderr.write(self.style.ERROR(f'Job "{job.name}" failed: {e}'))
 
-        self.stdout.write(
-            self.style.SUCCESS(
-                f'Job processing complete: {processed} succeeded, {failed} failed.'
-            )
-        )
+        self.stdout.write(self.style.SUCCESS(f"Job processing complete: {processed} succeeded, {failed} failed."))
 
     def _execute_job(self, job):
-        if hasattr(self, f'_run_{job.name.replace(":", "_").replace(" ", "_").lower()}'):
-            handler = getattr(self, f'_run_{job.name.replace(":", "_").replace(" ", "_").lower()}')
+        if hasattr(self, f"_run_{job.name.replace(':', '_').replace(' ', '_').lower()}"):
+            handler = getattr(self, f"_run_{job.name.replace(':', '_').replace(' ', '_').lower()}")
             handler(job)

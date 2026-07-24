@@ -1,60 +1,73 @@
 import json
-from django.db import transaction
-from django.http import Http404, HttpResponse, HttpResponseForbidden
-from django.shortcuts import render, get_object_or_404, redirect
+
 from django.contrib import messages
 from django.contrib.auth.mixins import LoginRequiredMixin, PermissionRequiredMixin
+from django.db import transaction
+from django.http import Http404, HttpResponse, HttpResponseForbidden
+from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse, reverse_lazy
 from django.utils.html import format_html
-from django.views.generic import View
 from django.utils.translation import gettext_lazy as _
+from django.views.generic import View
 
+from inventory.services import (
+    checkin_accessory,
+    checkout_inventory_item,
+    recipient_assignment_union,
+    shared_stock_union,
+)
+from itambox.panels import Panel
 from itambox.views.generic import (
-    ObjectListView, ObjectDetailView, ObjectEditView, ObjectDeleteView,
-    ObjectCloneView, ObjectBulkEditView, ObjectBulkDeleteView,
+    ObjectBulkDeleteView,
+    ObjectBulkEditView,
+    ObjectCloneView,
+    ObjectDeleteView,
+    ObjectDetailView,
+    ObjectEditView,
+    ObjectListView,
 )
 from itambox.views.generic.service_views import GenericTransactionView, SimplePostView
-from itambox.panels import Panel
 
-from ..models import Accessory, Kit, AccessoryStock, AccessoryAssignment
-from .. import forms, tables, filters
-from inventory.services import (
-    checkout_inventory_item, checkin_accessory,
-    recipient_assignment_union, shared_stock_union,
-)
+from .. import filters, forms, tables
+from ..models import Accessory, AccessoryAssignment, AccessoryStock, Kit
 
 
 class AccessoryListView(ObjectListView):
-    queryset = Accessory.objects.with_counts().select_related('tenant', 'manufacturer', 'category').prefetch_related('tags')
+    queryset = (
+        Accessory.objects.with_counts().select_related("tenant", "manufacturer", "category").prefetch_related("tags")
+    )
     filterset = filters.AccessoryFilterSet
     filterset_form = forms.AccessoryFilterForm
     table = tables.AccessoryTable
-    action_buttons = ('add',)
+    action_buttons = ("add",)
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
-        context['title'] = _('Accessories')
-        context['breadcrumbs'] = [
-            (reverse('dashboard'), _('Dashboard')),
-            (None, _('Inventory & Stock')),
-            (None, _('Accessories'))
+        context["title"] = _("Accessories")
+        context["breadcrumbs"] = [
+            (reverse("dashboard"), _("Dashboard")),
+            (None, _("Inventory & Stock")),
+            (None, _("Accessories")),
         ]
         if not (self.is_htmx_partial() and self.content_partial_name):
-            from organization.models import AssetHolder, Location
             from assets.models import Asset
-            context['asset_holders'] = AssetHolder.objects.all().order_by('last_name', 'first_name')
-            context['locations'] = Location.objects.all().order_by('name')
-            context['assets'] = Asset.objects.all().order_by('asset_tag')
+            from organization.models import AssetHolder, Location
+
+            context["asset_holders"] = AssetHolder.objects.all().order_by("last_name", "first_name")
+            context["locations"] = Location.objects.all().order_by("name")
+            context["assets"] = Asset.objects.all().order_by("asset_tag")
         return context
 
 
 class AccessoryDetailView(ObjectDetailView):
-    queryset = Accessory.objects.select_related('manufacturer').prefetch_related('tags', 'assignments__assigned_holder', 'assignments__assigned_location', 'stocks__location')
-    template_name = 'assets/accessories/accessory_detail.html'
+    queryset = Accessory.objects.select_related("manufacturer").prefetch_related(
+        "tags", "assignments__assigned_holder", "assignments__assigned_location", "stocks__location"
+    )
+    template_name = "assets/accessories/accessory_detail.html"
 
     layout = (
-        ((Panel('metrics', _('Metrics Overview')),),),
-        ((Panel('info', _('Accessory Details')),),),
+        ((Panel("metrics", _("Metrics Overview")),),),
+        ((Panel("info", _("Accessory Details")),),),
     )
 
     def get_context_data(self, **kwargs):
@@ -63,35 +76,34 @@ class AccessoryDetailView(ObjectDetailView):
 
         assignments_table = tables.AccessoryAssignmentTable(accessory.assignments.all(), request=self.request)
         assignments_table.configure(self.request)
-        context['assignments_table'] = assignments_table
+        context["assignments_table"] = assignments_table
 
         stocks_table = tables.AccessoryStockTable(accessory.stocks.all(), request=self.request)
         stocks_table.configure(self.request)
-        context['stocks_table'] = stocks_table
+        context["stocks_table"] = stocks_table
 
         # Kits
         kits_qs = Kit.objects.filter(items__accessory=accessory).distinct()
         kits_table = tables.KitTable(kits_qs, request=self.request)
         kits_table.configure(self.request)
-        context['kits_table'] = kits_table
+        context["kits_table"] = kits_table
 
         return context
-
 
 
 class AccessoryEditView(ObjectEditView):
     queryset = Accessory.objects.all()
     model = Accessory
     model_form = forms.AccessoryForm
-    template_name = 'generic/object_edit.html'
-    default_return_url = 'inventory:accessory_list'
+    template_name = "generic/object_edit.html"
+    default_return_url = "inventory:accessory_list"
 
 
 class AccessoryDeleteView(ObjectDeleteView):
     queryset = Accessory.objects.all()
     model = Accessory
-    template_name = 'generic/object_confirm_delete.html'
-    success_url = reverse_lazy('inventory:accessory_list')
+    template_name = "generic/object_confirm_delete.html"
+    success_url = reverse_lazy("inventory:accessory_list")
 
     def post(self, request, *args, **kwargs):
         accessory = self.get_object()
@@ -99,7 +111,8 @@ class AccessoryDeleteView(ObjectDeleteView):
         if assignment_count > 0:
             messages.error(
                 request,
-                _("Cannot delete accessory '%(accessory)s': It has %(count)s active assignments.") % {"accessory": accessory, "count": assignment_count}
+                _("Cannot delete accessory '%(accessory)s': It has %(count)s active assignments.")
+                % {"accessory": accessory, "count": assignment_count},
             )
             return redirect(accessory.get_absolute_url())
         return super().post(request, *args, **kwargs)
@@ -108,39 +121,39 @@ class AccessoryDeleteView(ObjectDeleteView):
 class AccessoryCloneView(ObjectCloneView):
     model = Accessory
     model_form = forms.AccessoryForm
-    template_name = 'generic/object_edit.html'
-    default_return_url = 'inventory:accessory_list'
+    template_name = "generic/object_edit.html"
+    default_return_url = "inventory:accessory_list"
 
 
 class AccessoryCheckoutView(GenericTransactionView):
-    permission_required = ('inventory.change_accessory',)
+    permission_required = ("inventory.change_accessory",)
     queryset = Accessory.objects.all()
     model_form = forms.AccessoryCheckoutForm
     service_callable = checkout_inventory_item
-    context_object_name = 'accessory'
-    template_name = 'inventory/includes/accessory_checkout_modal.html'
-    error_partial = 'inventory/includes/accessory_checkout_modal.html#checkout-modal-form'
+    context_object_name = "accessory"
+    template_name = "inventory/includes/accessory_checkout_modal.html"
+    error_partial = "inventory/includes/accessory_checkout_modal.html#checkout-modal-form"
     success_message = _("Accessory checked out successfully.")
     form_field_map = {
-        'assigned_holder': 'holder',
-        'assigned_location': 'location',
-        'assigned_asset': 'asset',
-        'from_location': 'source_location',
+        "assigned_holder": "holder",
+        "assigned_location": "location",
+        "assigned_asset": "asset",
+        "from_location": "source_location",
     }
 
     def get_form_kwargs(self):
         kwargs = super().get_form_kwargs()
-        del kwargs['instance']
-        kwargs['accessory'] = self.get_object()
-        if 'initial' not in kwargs:
-            kwargs['initial'] = {}
+        del kwargs["instance"]
+        kwargs["accessory"] = self.get_object()
+        if "initial" not in kwargs:
+            kwargs["initial"] = {}
         for key in self.request.GET:
-            kwargs['initial'][key] = self.request.GET.get(key)
+            kwargs["initial"][key] = self.request.GET.get(key)
         return kwargs
 
 
 class AccessoryCheckinView(SimplePostView):
-    permission_required = ('inventory.change_accessory',)
+    permission_required = ("inventory.change_accessory",)
     queryset = AccessoryAssignment.objects.all()
 
     def get_queryset(self):
@@ -160,12 +173,15 @@ class AccessoryCheckinView(SimplePostView):
     def perform_action(self, assignment, request):
         accessory, qty, recipient = checkin_accessory(assignment.pk, user=request.user)
         return {
-            'message': str(_("Checked in %(qty)sx '%(accessory)s' from %(recipient)s.") % {"qty": qty, "accessory": accessory, "recipient": recipient}),
-            'redirect': accessory.get_absolute_url(),
+            "message": str(
+                _("Checked in %(qty)sx '%(accessory)s' from %(recipient)s.")
+                % {"qty": qty, "accessory": accessory, "recipient": recipient}
+            ),
+            "redirect": accessory.get_absolute_url(),
         }
 
     def get_success_redirect(self, obj, result):
-        return redirect(result.get('redirect') or '/')
+        return redirect(result.get("redirect") or "/")
 
 
 class AccessoryBulkEditView(ObjectBulkEditView):
@@ -177,31 +193,32 @@ class AccessoryBulkDeleteView(ObjectBulkDeleteView):
 
 
 class AccessoryStockListView(ObjectListView):
-    queryset = AccessoryStock.objects.select_related('accessory', 'location').all()
+    queryset = AccessoryStock.objects.select_related("accessory", "location").all()
 
     def get_queryset(self):
         # ADR-0001 4b: include pools shared TO the active tenant (read-only).
-        return shared_stock_union(super().get_queryset(), AccessoryStock).select_related(
-            'accessory', 'location')
+        return shared_stock_union(super().get_queryset(), AccessoryStock).select_related("accessory", "location")
+
     table = tables.AccessoryStockTable
-    action_buttons = ('add',)
+    action_buttons = ("add",)
     filterset = filters.AccessoryStockFilterSet
     filterset_form = forms.AccessoryStockFilterForm
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
-        context['title'] = _('Accessory Stocks')
-        context['breadcrumbs'] = [
-            (reverse('dashboard'), _('Dashboard')),
-            (reverse('inventory:accessory_list'), _('Accessories')),
-            (None, _('Stocks'))
+        context["title"] = _("Accessory Stocks")
+        context["breadcrumbs"] = [
+            (reverse("dashboard"), _("Dashboard")),
+            (reverse("inventory:accessory_list"), _("Accessories")),
+            (None, _("Stocks")),
         ]
         if not (self.is_htmx_partial() and self.content_partial_name):
-            from organization.models import AssetHolder, Location
             from assets.models import Asset
-            context['asset_holders'] = AssetHolder.objects.all().order_by('last_name', 'first_name')
-            context['locations'] = Location.objects.all().order_by('name')
-            context['assets'] = Asset.objects.all().order_by('asset_tag')
+            from organization.models import AssetHolder, Location
+
+            context["asset_holders"] = AssetHolder.objects.all().order_by("last_name", "first_name")
+            context["locations"] = Location.objects.all().order_by("name")
+            context["assets"] = Asset.objects.all().order_by("asset_tag")
         return context
 
 
@@ -209,27 +226,29 @@ class AccessoryStockEditView(ObjectEditView):
     queryset = AccessoryStock.objects.all()
     model = AccessoryStock
     model_form = forms.AccessoryStockForm
-    template_name = 'generic/object_edit.html'
-    default_return_url = 'inventory:accessory_list'
+    template_name = "generic/object_edit.html"
+    default_return_url = "inventory:accessory_list"
 
 
 class AccessoryStockDeleteView(ObjectDeleteView):
     queryset = AccessoryStock.objects.all()
     model = AccessoryStock
-    template_name = 'generic/object_confirm_delete.html'
-    success_url = reverse_lazy('inventory:accessory_list')
+    template_name = "generic/object_confirm_delete.html"
+    success_url = reverse_lazy("inventory:accessory_list")
 
 
 class AccessoryAssignmentListView(ObjectListView):
     queryset = AccessoryAssignment.objects.select_related(
-        'accessory', 'assigned_holder', 'assigned_location', 'assigned_asset'
+        "accessory", "assigned_holder", "assigned_location", "assigned_asset"
     ).all()
 
     def get_queryset(self):
         # ADR-0001 4b: recipients see assignments targeting their tenant.
         return recipient_assignment_union(
-            super().get_queryset(), AccessoryAssignment,
-        ).select_related('accessory', 'assigned_holder', 'assigned_location', 'assigned_asset')
+            super().get_queryset(),
+            AccessoryAssignment,
+        ).select_related("accessory", "assigned_holder", "assigned_location", "assigned_asset")
+
     table = tables.AccessoryAssignmentTable
     action_buttons = ()
     filterset = filters.AccessoryAssignmentFilterSet
@@ -237,17 +256,17 @@ class AccessoryAssignmentListView(ObjectListView):
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
-        context['title'] = _('Accessory Assignments')
-        context['breadcrumbs'] = [
-            (reverse('dashboard'), _('Dashboard')),
-            (reverse('inventory:accessory_list'), _('Accessories')),
-            (None, _('Assignments'))
+        context["title"] = _("Accessory Assignments")
+        context["breadcrumbs"] = [
+            (reverse("dashboard"), _("Dashboard")),
+            (reverse("inventory:accessory_list"), _("Accessories")),
+            (None, _("Assignments")),
         ]
         return context
 
 
 class AccessoryStockAdjustView(LoginRequiredMixin, PermissionRequiredMixin, View):
-    permission_required = 'inventory.change_accessorystock'
+    permission_required = "inventory.change_accessorystock"
 
     def post(self, request, pk):
         with transaction.atomic():
@@ -258,76 +277,90 @@ class AccessoryStockAdjustView(LoginRequiredMixin, PermissionRequiredMixin, View
             # Anchor at the POOL (its tenant is the owner) — never the catalogue
             # item: grantees and other tenants must not adjust foreign stock
             # (ADR-0001), and the owner must not be blocked by a foreign item.
-            if not request.user.has_perm('inventory.change_accessorystock', obj=stock):
+            if not request.user.has_perm("inventory.change_accessorystock", obj=stock):
                 return HttpResponseForbidden(_("Permission denied."))
-            action = request.GET.get('action')
+            action = request.GET.get("action")
 
-            if action == 'increment':
+            if action == "increment":
                 stock.qty += 1
                 stock.save()
-            elif action == 'decrement':
+            elif action == "decrement":
                 if stock.qty > 0:
                     stock.qty -= 1
                     stock.save()
 
-        return HttpResponse(format_html(
-            '<div class="d-flex align-items-center justify-content-start">'
-            '  <button class="btn btn-sm btn-icon btn-outline-secondary me-2 px-1 py-0 lh-1" '
-            '          hx-post="{}" hx-swap="outerHTML" hx-target="closest div" style="height: 1.5rem; width: 1.5rem;">'
-            '    <i class="mdi mdi-minus" style="font-size: 0.75rem;"></i>'
-            '  </button>'
-            '  <span class="badge bg-blue-lt text-blue font-weight-bold px-2 py-1" style="font-size: 0.85rem;">{}</span>'
-            '  <button class="btn btn-sm btn-icon btn-outline-secondary ms-2 px-1 py-0 lh-1" '
-            '          hx-post="{}" hx-swap="outerHTML" hx-target="closest div" style="height: 1.5rem; width: 1.5rem;">'
-            '    <i class="mdi mdi-plus" style="font-size: 0.75rem;"></i>'
-            '  </button>'
-            '</div>',
-            reverse('inventory:accessorystock_adjust', kwargs={'pk': stock.pk}) + '?action=decrement',
-            stock.qty,
-            reverse('inventory:accessorystock_adjust', kwargs={'pk': stock.pk}) + '?action=increment'
-        ))
+        return HttpResponse(
+            format_html(
+                '<div class="d-flex align-items-center justify-content-start">'
+                '  <button class="btn btn-sm btn-icon btn-outline-secondary me-2 px-1 py-0 lh-1" '
+                '          hx-post="{}" hx-swap="outerHTML" hx-target="closest div" style="height: 1.5rem; width: 1.5rem;">'
+                '    <i class="mdi mdi-minus" style="font-size: 0.75rem;"></i>'
+                "  </button>"
+                '  <span class="badge bg-blue-lt text-blue font-weight-bold px-2 py-1" style="font-size: 0.85rem;">{}</span>'
+                '  <button class="btn btn-sm btn-icon btn-outline-secondary ms-2 px-1 py-0 lh-1" '
+                '          hx-post="{}" hx-swap="outerHTML" hx-target="closest div" style="height: 1.5rem; width: 1.5rem;">'
+                '    <i class="mdi mdi-plus" style="font-size: 0.75rem;"></i>'
+                "  </button>"
+                "</div>",
+                reverse("inventory:accessorystock_adjust", kwargs={"pk": stock.pk}) + "?action=decrement",
+                stock.qty,
+                reverse("inventory:accessorystock_adjust", kwargs={"pk": stock.pk}) + "?action=increment",
+            )
+        )
 
 
 class AccessoryStockCreateModalView(LoginRequiredMixin, PermissionRequiredMixin, View):
-    permission_required = 'inventory.add_accessorystock'
+    permission_required = "inventory.add_accessorystock"
 
     def get(self, request, pk):
         accessory = get_object_or_404(Accessory, pk=pk)
         from ..forms import AccessoryStockModalForm
+
         initial = {}
-        location_id = request.GET.get('location')
+        location_id = request.GET.get("location")
         if location_id:
-            initial['location'] = location_id
+            initial["location"] = location_id
         form = AccessoryStockModalForm(initial=initial)
-        return render(request, 'generic/includes/add_stock_modal.html', {
-            'object': accessory,
-            'form': form,
-            'post_url': reverse('inventory:accessory_add_stock', kwargs={'pk': accessory.pk}),
-        })
+        return render(
+            request,
+            "generic/includes/add_stock_modal.html",
+            {
+                "object": accessory,
+                "form": form,
+                "post_url": reverse("inventory:accessory_add_stock", kwargs={"pk": accessory.pk}),
+            },
+        )
 
     def post(self, request, pk):
         accessory = get_object_or_404(Accessory, pk=pk)
         from ..forms import AccessoryStockModalForm
+
         form = AccessoryStockModalForm(request.POST)
         if form.is_valid():
             stock = form.save(commit=False)
             stock.accessory = accessory
             stock.save()
-            if request.headers.get('HX-Request'):
+            if request.headers.get("HX-Request"):
                 response = HttpResponse(status=204)
-                response['HX-Trigger'] = json.dumps({
-                    "closeModalEvent": None,
-                    "tableRefreshRequired": None,
-                    "showMessage": {
-                        "message": str(_("Added stock pool for %(location)s.") % {"location": stock.location}),
-                        "level": "success"
+                response["HX-Trigger"] = json.dumps(
+                    {
+                        "closeModalEvent": None,
+                        "tableRefreshRequired": None,
+                        "showMessage": {
+                            "message": str(_("Added stock pool for %(location)s.") % {"location": stock.location}),
+                            "level": "success",
+                        },
                     }
-                })
+                )
                 return response
             return redirect(accessory.get_absolute_url())
 
-        return render(request, 'generic/includes/add_stock_modal.html', {
-            'object': accessory,
-            'form': form,
-            'post_url': reverse('inventory:accessory_add_stock', kwargs={'pk': accessory.pk}),
-        })
+        return render(
+            request,
+            "generic/includes/add_stock_modal.html",
+            {
+                "object": accessory,
+                "form": form,
+                "post_url": reverse("inventory:accessory_add_stock", kwargs={"pk": accessory.pk}),
+            },
+        )

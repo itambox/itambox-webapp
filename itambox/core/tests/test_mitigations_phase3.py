@@ -1,16 +1,17 @@
 import json
+
+from django.contrib.auth import get_user_model
 from django.test import TestCase
 from django.urls import reverse
-from django.contrib.auth import get_user_model
 from model_bakery import baker
 
-from organization.models import Tenant, TenantGroup, Role, Location, Site
-from assets.models import Asset, AssetType, StatusLabel, AssetRole, Manufacturer, Category, Supplier, Depreciation
-from software.models import Software
-from licenses.models import License
-from users.models import Token
-from core.managers import set_current_tenant_group, _descendant_group_ids_cache
+from assets.models import Asset, AssetRole, AssetType, Category, Depreciation, Manufacturer, StatusLabel, Supplier
+from core.managers import _descendant_group_ids_cache, set_current_tenant_group
 from core.tests.mixins import grant
+from licenses.models import License
+from organization.models import Location, Role, Site, Tenant, TenantGroup
+from software.models import Software
+from users.models import Token
 
 User = get_user_model()
 
@@ -18,21 +19,19 @@ User = get_user_model()
 class MitigationsPhase3Tests(TestCase):
     def setUp(self):
         # Setup users, tenants, and membership
-        self.staff = User.objects.create_user(
-            username='staff_user', email='staff@example.com', password='password123'
-        )
+        self.staff = User.objects.create_user(username="staff_user", email="staff@example.com", password="password123")
         self.tenant_group = TenantGroup.objects.create(name="HQ Group", slug="hq-group")
         self.tenant = Tenant.objects.create(name="Tenant", slug="tenant", group=self.tenant_group)
         self.site = Site.objects.create(name="Site", slug="site")
 
         self.role = Role.objects.create(
             tenant=self.tenant,
-            name='Staff Role',
+            name="Staff Role",
             permissions=[
-                'assets.view_asset',
-                'software.view_software',
-                'licenses.view_license',
-            ]
+                "assets.view_asset",
+                "software.view_software",
+                "licenses.view_license",
+            ],
         )
         self.membership = grant(self.staff, self.tenant, self.role).membership
         self.token = Token.objects.create(user=self.staff)
@@ -46,7 +45,7 @@ class MitigationsPhase3Tests(TestCase):
         self.category = Category.objects.create(
             name="Laptop Cat",
             slug="laptop-cat",
-            applies_to={"asset": True, "accessory": True, "component": True, "consumable": True}
+            applies_to={"asset": True, "accessory": True, "component": True, "consumable": True},
         )
         self.asset_type = AssetType.objects.create(
             manufacturer=self.manufacturer,
@@ -54,29 +53,33 @@ class MitigationsPhase3Tests(TestCase):
             slug="latitude-5540",
             category=self.category,
             asset_role=self.asset_role,
-            depreciation=self.depreciation
+            depreciation=self.depreciation,
         )
         self.location = Location.objects.create(name="Office", slug="office", tenant=self.tenant, site=self.site)
         self.supplier = Supplier.objects.create(name="Dell Supplier", slug="dell-supplier")
 
         # Create Assets
         self.asset = Asset.objects.create(
-            name="Laptop", asset_tag="TAG-1", asset_type=self.asset_type,
-            status=self.status, tenant=self.tenant, location=self.location,
-            supplier=self.supplier
+            name="Laptop",
+            asset_tag="TAG-1",
+            asset_type=self.asset_type,
+            status=self.status,
+            tenant=self.tenant,
+            location=self.location,
+            supplier=self.supplier,
         )
 
         # Create Software & License
         self.software = Software.objects.create(name="Slack", manufacturer=self.manufacturer)
         self.license = License.objects.create(
-            name="Slack License", software=self.software, tenant=self.tenant, seats=5,
-            supplier=self.supplier
+            name="Slack License", software=self.software, tenant=self.tenant, seats=5, supplier=self.supplier
         )
 
-        self.graphql_url = reverse('graphql')
+        self.graphql_url = reverse("graphql")
 
     def tearDown(self):
-        from core.managers import set_current_tenant, set_current_tenant_group, set_current_membership
+        from core.managers import set_current_membership, set_current_tenant, set_current_tenant_group
+
         set_current_tenant(None)
         set_current_tenant_group(None)
         set_current_membership(None)
@@ -99,10 +102,7 @@ class MitigationsPhase3Tests(TestCase):
         cache = _descendant_group_ids_cache.get()
         self.assertIsNotNone(cache)
         self.assertIn(root_group.pk, cache)
-        self.assertEqual(
-            set(cache[root_group.pk]),
-            {root_group.pk, child_group.pk, grandchild_group.pk}
-        )
+        self.assertEqual(set(cache[root_group.pk]), {root_group.pk, child_group.pk, grandchild_group.pk})
 
         # Subsequent evaluations should execute 0 tenantgroup queries
         with self.assertNumQueries(2):  # exactly 2 queries: 1 to assets, 1 to assets (again)
@@ -111,7 +111,7 @@ class MitigationsPhase3Tests(TestCase):
 
     def test_graphql_assets_select_related(self):
         # Request all relation fields: asset_type, asset_role, status, location, tenant, supplier
-        query = '''
+        query = """
         {
           assets {
             name
@@ -141,13 +141,17 @@ class MitigationsPhase3Tests(TestCase):
             }
           }
         }
-        '''
+        """
 
         # Create a second asset to ensure N+1 is not present
         Asset.objects.create(
-            name="Laptop 2", asset_tag="TAG-2", asset_type=self.asset_type,
-            status=self.status, tenant=self.tenant, location=self.location,
-            supplier=self.supplier
+            name="Laptop 2",
+            asset_tag="TAG-2",
+            asset_type=self.asset_type,
+            status=self.status,
+            tenant=self.tenant,
+            location=self.location,
+            supplier=self.supplier,
         )
 
         # The key assertion is the single JOIN'd Asset query (select_related works — no
@@ -164,11 +168,11 @@ class MitigationsPhase3Tests(TestCase):
         with self.assertNumQueries(16):
             response = self.client.post(
                 self.graphql_url,
-                data=json.dumps({'query': query}),
-                content_type='application/json',
-                HTTP_AUTHORIZATION=f'Token {self.token.key}'
+                data=json.dumps({"query": query}),
+                content_type="application/json",
+                HTTP_AUTHORIZATION=f"Token {self.token.key}",
             )
             self.assertEqual(response.status_code, 200)
             res_data = response.json()
-            self.assertNotIn('errors', res_data)
-            self.assertEqual(len(res_data['data']['assets']), 2)
+            self.assertNotIn("errors", res_data)
+            self.assertEqual(len(res_data["data"]["assets"]), 2)

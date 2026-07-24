@@ -6,6 +6,7 @@ Covers:
 - bulk_checkin_task / bulk_dispose_task (state changes, skips, partial results)
 - the basket page views (render + list-view seeding)
 """
+
 import json
 from decimal import Decimal
 from unittest.mock import patch
@@ -15,7 +16,12 @@ from django.test import TestCase
 from django.urls import reverse
 
 from assets.models import (
-    Asset, AssetType, AssetRole, Manufacturer, StatusLabel, AssetDisposal,
+    Asset,
+    AssetDisposal,
+    AssetRole,
+    AssetType,
+    Manufacturer,
+    StatusLabel,
 )
 from assets.services import checkout_asset, dispose_asset
 from core.models import Job
@@ -42,14 +48,20 @@ def _fixtures(suffix=""):
 # Resolve-for-action endpoint
 # ─────────────────────────────────────────────────────────────────────────────
 
+
 class ScanActionResolveTests(TenantTestMixin, TestCase):
     def setUp(self):
         self.setup_tenant_context(slug="resolve")
         self.set_active_tenant(self.tenant, self.tenant_membership)
         self.role, self.atype, self.deployable, self.deployed, self.archived = _fixtures("-r")
         self.asset = Asset.objects.create(
-            name="Resolve Asset", asset_tag="RES-001", serial_number="SN-RES-001",
-            asset_type=self.atype, asset_role=self.role, status=self.deployable, tenant=self.tenant,
+            name="Resolve Asset",
+            asset_tag="RES-001",
+            serial_number="SN-RES-001",
+            asset_type=self.atype,
+            asset_role=self.role,
+            status=self.deployable,
+            tenant=self.tenant,
         )
         self.url = reverse("assets:asset_scan_resolve_action")
 
@@ -66,7 +78,9 @@ class ScanActionResolveTests(TenantTestMixin, TestCase):
         self.assertTrue(data["warning"])
 
     def test_checkin_eligible_when_checked_out(self):
-        holder = AssetHolder.objects.create(first_name="A", last_name="B", upn="ab@x.io", email="ab@x.io", tenant=self.tenant)
+        holder = AssetHolder.objects.create(
+            first_name="A", last_name="B", upn="ab@x.io", email="ab@x.io", tenant=self.tenant
+        )
         checkout_asset(self.asset, holder=holder, user=self.tenant_admin)
         self.client_login_to_tenant(self.tenant_admin, self.tenant)
         resp = self.client.get(self.url, {"code": "RES-001", "mode": "checkin"})
@@ -121,8 +135,12 @@ class ScanActionResolveTests(TenantTestMixin, TestCase):
     def test_cross_tenant_isolation(self):
         other = Tenant.objects.create(name="Other", slug="other-resolve")
         other_asset = Asset.objects.create(
-            name="Other", asset_tag="OTH-001", asset_type=self.atype, asset_role=self.role,
-            status=self.deployable, tenant=other,
+            name="Other",
+            asset_tag="OTH-001",
+            asset_type=self.atype,
+            asset_role=self.role,
+            status=self.deployable,
+            tenant=other,
         )
         self.client_login_to_tenant(self.tenant_admin, self.tenant)
         resp = self.client.get(self.url, {"code": "OTH-001", "mode": "checkin"})
@@ -139,21 +157,39 @@ class ScanActionResolveTests(TenantTestMixin, TestCase):
 # Submit views — Job creation + enqueue arguments
 # ─────────────────────────────────────────────────────────────────────────────
 
+
 class BulkScanSubmitViewTests(TenantTestMixin, TestCase):
     def setUp(self):
         self.setup_tenant_context(slug="submit")
         self.set_active_tenant(self.tenant, self.tenant_membership)
         self.role, self.atype, self.deployable, self.deployed, self.archived = _fixtures("-s")
-        self.a1 = Asset.objects.create(name="A1", asset_tag="S-001", asset_type=self.atype, asset_role=self.role, status=self.deployable, tenant=self.tenant)
-        self.a2 = Asset.objects.create(name="A2", asset_tag="S-002", asset_type=self.atype, asset_role=self.role, status=self.deployable, tenant=self.tenant)
+        self.a1 = Asset.objects.create(
+            name="A1",
+            asset_tag="S-001",
+            asset_type=self.atype,
+            asset_role=self.role,
+            status=self.deployable,
+            tenant=self.tenant,
+        )
+        self.a2 = Asset.objects.create(
+            name="A2",
+            asset_tag="S-002",
+            asset_type=self.atype,
+            asset_role=self.role,
+            status=self.deployable,
+            tenant=self.tenant,
+        )
 
     @patch("django_q.tasks.async_task")
     def test_bulk_checkin_enqueues(self, mock_async):
         self.client_login_to_tenant(self.tenant_admin, self.tenant)
-        resp = self.client.post(reverse("assets:asset_bulk_checkin"), {
-            "pk": [self.a1.pk, self.a2.pk],
-            "notes": "returned to stock",
-        })
+        resp = self.client.post(
+            reverse("assets:asset_bulk_checkin"),
+            {
+                "pk": [self.a1.pk, self.a2.pk],
+                "notes": "returned to stock",
+            },
+        )
         self.assertEqual(resp.status_code, 302)
         job = Job.objects.filter(name__contains="Bulk Check-in").first()
         self.assertIsNotNone(job)
@@ -169,15 +205,18 @@ class BulkScanSubmitViewTests(TenantTestMixin, TestCase):
     @patch("django_q.tasks.async_task")
     def test_bulk_dispose_enqueues_with_proceeds_map(self, mock_async):
         self.client_login_to_tenant(self.tenant_admin, self.tenant)
-        resp = self.client.post(reverse("assets:asset_bulk_dispose"), {
-            "pk": [self.a1.pk, self.a2.pk],
-            "disposal_method": "recycle",
-            "disposal_date": "2026-06-19",
-            "data_sanitization_method": "nist_purge",
-            "currency": "EUR",
-            "weee_compliant": "on",
-            f"proceeds_{self.a1.pk}": "50.00",
-        })
+        resp = self.client.post(
+            reverse("assets:asset_bulk_dispose"),
+            {
+                "pk": [self.a1.pk, self.a2.pk],
+                "disposal_method": "recycle",
+                "disposal_date": "2026-06-19",
+                "data_sanitization_method": "nist_purge",
+                "currency": "EUR",
+                "weee_compliant": "on",
+                f"proceeds_{self.a1.pk}": "50.00",
+            },
+        )
         self.assertEqual(resp.status_code, 302)
         job = Job.objects.filter(name__contains="Bulk Disposal").first()
         self.assertIsNotNone(job)
@@ -194,10 +233,13 @@ class BulkScanSubmitViewTests(TenantTestMixin, TestCase):
     @patch("django_q.tasks.async_task")
     def test_dispose_requires_date(self, mock_async):
         self.client_login_to_tenant(self.tenant_admin, self.tenant)
-        resp = self.client.post(reverse("assets:asset_bulk_dispose"), {
-            "pk": [self.a1.pk],
-            "disposal_method": "recycle",
-        })
+        resp = self.client.post(
+            reverse("assets:asset_bulk_dispose"),
+            {
+                "pk": [self.a1.pk],
+                "disposal_method": "recycle",
+            },
+        )
         self.assertEqual(resp.status_code, 302)
         mock_async.assert_not_called()
         self.assertFalse(Job.objects.exists())
@@ -221,19 +263,39 @@ class BulkScanSubmitViewTests(TenantTestMixin, TestCase):
 # Background tasks
 # ─────────────────────────────────────────────────────────────────────────────
 
+
 class BulkCheckinTaskTests(TenantTestMixin, TestCase):
     def setUp(self):
         self.setup_tenant_context(slug="ci-task")
         self.set_active_tenant(self.tenant, self.tenant_membership)
         self.role, self.atype, self.deployable, self.deployed, self.archived = _fixtures("-ci")
-        self.holder = AssetHolder.objects.create(first_name="H", last_name="X", upn="hx@x.io", email="hx@x.io", tenant=self.tenant)
-        self.checked_out = Asset.objects.create(name="CO", asset_tag="CI-001", asset_type=self.atype, asset_role=self.role, status=self.deployable, tenant=self.tenant)
+        self.holder = AssetHolder.objects.create(
+            first_name="H", last_name="X", upn="hx@x.io", email="hx@x.io", tenant=self.tenant
+        )
+        self.checked_out = Asset.objects.create(
+            name="CO",
+            asset_tag="CI-001",
+            asset_type=self.atype,
+            asset_role=self.role,
+            status=self.deployable,
+            tenant=self.tenant,
+        )
         checkout_asset(self.checked_out, holder=self.holder, user=self.tenant_admin)
-        self.idle = Asset.objects.create(name="Idle", asset_tag="CI-002", asset_type=self.atype, asset_role=self.role, status=self.deployable, tenant=self.tenant)
+        self.idle = Asset.objects.create(
+            name="Idle",
+            asset_tag="CI-002",
+            asset_type=self.atype,
+            asset_role=self.role,
+            status=self.deployable,
+            tenant=self.tenant,
+        )
 
     def _job(self):
         from django.contrib.contenttypes.models import ContentType
-        return Job.objects.create(name="t", tenant=self.tenant, model=ContentType.objects.get_for_model(Asset), status=Job.STATUS_PENDING)
+
+        return Job.objects.create(
+            name="t", tenant=self.tenant, model=ContentType.objects.get_for_model(Asset), status=Job.STATUS_PENDING
+        )
 
     def test_checks_in_and_skips(self):
         job = self._job()
@@ -247,14 +309,23 @@ class BulkCheckinTaskTests(TenantTestMixin, TestCase):
 
     def test_status_override(self):
         job = self._job()
-        bulk_checkin_task(job.pk, [str(self.checked_out.pk)], self.tenant_admin.pk, self.tenant.pk, status_id=self.archived.pk)
+        bulk_checkin_task(
+            job.pk, [str(self.checked_out.pk)], self.tenant_admin.pk, self.tenant.pk, status_id=self.archived.pk
+        )
         self.checked_out.refresh_from_db()
         self.assertEqual(self.checked_out.status, self.archived)
 
     def test_blank_location_preserves_current_location(self):
         site = Site.objects.create(name="HQ", slug="hq-ci")
         loc = Location.objects.create(name="Shelf 1", slug="shelf-1-ci", site=site, tenant=self.tenant)
-        asset = Asset.objects.create(name="Loc", asset_tag="CI-LOC", asset_type=self.atype, asset_role=self.role, status=self.deployable, tenant=self.tenant)
+        asset = Asset.objects.create(
+            name="Loc",
+            asset_tag="CI-LOC",
+            asset_type=self.atype,
+            asset_role=self.role,
+            status=self.deployable,
+            tenant=self.tenant,
+        )
         checkout_asset(asset, location=loc, user=self.tenant_admin)
         asset.refresh_from_db()
         self.assertEqual(asset.location, loc)
@@ -267,7 +338,14 @@ class BulkCheckinTaskTests(TenantTestMixin, TestCase):
         site = Site.objects.create(name="HQ2", slug="hq2-ci")
         loc = Location.objects.create(name="Shelf A", slug="shelf-a-ci", site=site, tenant=self.tenant)
         dest = Location.objects.create(name="Shelf B", slug="shelf-b-ci", site=site, tenant=self.tenant)
-        asset = Asset.objects.create(name="Loc2", asset_tag="CI-LOC2", asset_type=self.atype, asset_role=self.role, status=self.deployable, tenant=self.tenant)
+        asset = Asset.objects.create(
+            name="Loc2",
+            asset_tag="CI-LOC2",
+            asset_type=self.atype,
+            asset_role=self.role,
+            status=self.deployable,
+            tenant=self.tenant,
+        )
         checkout_asset(asset, location=loc, user=self.tenant_admin)
         job = self._job()
         bulk_checkin_task(job.pk, [str(asset.pk)], self.tenant_admin.pk, self.tenant.pk, location_id=dest.pk)
@@ -280,12 +358,29 @@ class BulkDisposeTaskTests(TenantTestMixin, TestCase):
         self.setup_tenant_context(slug="dz-task")
         self.set_active_tenant(self.tenant, self.tenant_membership)
         self.role, self.atype, self.deployable, self.deployed, self.archived = _fixtures("-dz")
-        self.a1 = Asset.objects.create(name="D1", asset_tag="DZ-001", asset_type=self.atype, asset_role=self.role, status=self.deployable, tenant=self.tenant)
-        self.a2 = Asset.objects.create(name="D2", asset_tag="DZ-002", asset_type=self.atype, asset_role=self.role, status=self.deployable, tenant=self.tenant)
+        self.a1 = Asset.objects.create(
+            name="D1",
+            asset_tag="DZ-001",
+            asset_type=self.atype,
+            asset_role=self.role,
+            status=self.deployable,
+            tenant=self.tenant,
+        )
+        self.a2 = Asset.objects.create(
+            name="D2",
+            asset_tag="DZ-002",
+            asset_type=self.atype,
+            asset_role=self.role,
+            status=self.deployable,
+            tenant=self.tenant,
+        )
 
     def _job(self):
         from django.contrib.contenttypes.models import ContentType
-        return Job.objects.create(name="t", tenant=self.tenant, model=ContentType.objects.get_for_model(Asset), status=Job.STATUS_PENDING)
+
+        return Job.objects.create(
+            name="t", tenant=self.tenant, model=ContentType.objects.get_for_model(Asset), status=Job.STATUS_PENDING
+        )
 
     def _kwargs(self):
         return {
@@ -303,7 +398,10 @@ class BulkDisposeTaskTests(TenantTestMixin, TestCase):
     def test_disposes_with_per_asset_proceeds(self):
         job = self._job()
         bulk_dispose_task(
-            job.pk, [str(self.a1.pk), str(self.a2.pk)], self.tenant_admin.pk, self.tenant.pk,
+            job.pk,
+            [str(self.a1.pk), str(self.a2.pk)],
+            self.tenant_admin.pk,
+            self.tenant.pk,
             disposal_kwargs=self._kwargs(),
             proceeds_map={str(self.a1.pk): "50.00"},
         )
@@ -323,8 +421,12 @@ class BulkDisposeTaskTests(TenantTestMixin, TestCase):
         original = AssetDisposal.objects.get(asset=self.a1)
         job = self._job()
         bulk_dispose_task(
-            job.pk, [str(self.a1.pk), str(self.a2.pk)], self.tenant_admin.pk, self.tenant.pk,
-            disposal_kwargs=self._kwargs(), proceeds_map={},
+            job.pk,
+            [str(self.a1.pk), str(self.a2.pk)],
+            self.tenant_admin.pk,
+            self.tenant.pk,
+            disposal_kwargs=self._kwargs(),
+            proceeds_map={},
         )
         job.refresh_from_db()
         self.assertEqual(job.result["disposed"], 1)
@@ -339,12 +441,20 @@ class BulkDisposeTaskTests(TenantTestMixin, TestCase):
 # Basket pages
 # ─────────────────────────────────────────────────────────────────────────────
 
+
 class BulkScanPageTests(TenantTestMixin, TestCase):
     def setUp(self):
         self.setup_tenant_context(slug="page")
         self.set_active_tenant(self.tenant, self.tenant_membership)
         self.role, self.atype, self.deployable, self.deployed, self.archived = _fixtures("-pg")
-        self.asset = Asset.objects.create(name="Seed", asset_tag="PG-001", asset_type=self.atype, asset_role=self.role, status=self.deployable, tenant=self.tenant)
+        self.asset = Asset.objects.create(
+            name="Seed",
+            asset_tag="PG-001",
+            asset_type=self.atype,
+            asset_role=self.role,
+            status=self.deployable,
+            tenant=self.tenant,
+        )
 
     def test_checkin_page_renders(self):
         self.client_login_to_tenant(self.tenant_admin, self.tenant)
@@ -376,21 +486,32 @@ class BulkScanPageTests(TenantTestMixin, TestCase):
 # Bulk check-out
 # ─────────────────────────────────────────────────────────────────────────────
 
+
 class BulkCheckoutTests(TenantTestMixin, TestCase):
     def setUp(self):
         self.setup_tenant_context(slug="co")
         self.set_active_tenant(self.tenant, self.tenant_membership)
         self.role, self.atype, self.deployable, self.deployed, self.archived = _fixtures("-co")
-        self.holder = AssetHolder.objects.create(first_name="C", last_name="O", upn="co@x.io", email="co@x.io", tenant=self.tenant)
+        self.holder = AssetHolder.objects.create(
+            first_name="C", last_name="O", upn="co@x.io", email="co@x.io", tenant=self.tenant
+        )
         self.asset = Asset.objects.create(
-            name="CO Asset", asset_tag="CO-001", serial_number="SN-CO-001",
-            asset_type=self.atype, asset_role=self.role, status=self.deployable, tenant=self.tenant,
+            name="CO Asset",
+            asset_tag="CO-001",
+            serial_number="SN-CO-001",
+            asset_type=self.atype,
+            asset_role=self.role,
+            status=self.deployable,
+            tenant=self.tenant,
         )
         self.resolve_url = reverse("assets:asset_scan_resolve_action")
 
     def _job(self):
         from django.contrib.contenttypes.models import ContentType
-        return Job.objects.create(name="t", tenant=self.tenant, model=ContentType.objects.get_for_model(Asset), status=Job.STATUS_PENDING)
+
+        return Job.objects.create(
+            name="t", tenant=self.tenant, model=ContentType.objects.get_for_model(Asset), status=Job.STATUS_PENDING
+        )
 
     # ── resolve ──
     def test_resolve_checkout_eligible(self):
@@ -421,11 +542,14 @@ class BulkCheckoutTests(TenantTestMixin, TestCase):
     @patch("django_q.tasks.async_task")
     def test_bulk_checkout_enqueues(self, mock_async):
         self.client_login_to_tenant(self.tenant_admin, self.tenant)
-        resp = self.client.post(reverse("assets:asset_bulk_checkout"), {
-            "pk": [self.asset.pk],
-            "asset_holder": self.holder.pk,
-            "notes": "deploy",
-        })
+        resp = self.client.post(
+            reverse("assets:asset_bulk_checkout"),
+            {
+                "pk": [self.asset.pk],
+                "asset_holder": self.holder.pk,
+                "notes": "deploy",
+            },
+        )
         self.assertEqual(resp.status_code, 302)
         job = Job.objects.filter(name__contains="Bulk Check-out").first()
         self.assertIsNotNone(job)
@@ -450,11 +574,14 @@ class BulkCheckoutTests(TenantTestMixin, TestCase):
         site = Site.objects.create(name="S", slug="s-co")
         loc = Location.objects.create(name="L", slug="l-co", site=site, tenant=self.tenant)
         self.client_login_to_tenant(self.tenant_admin, self.tenant)
-        resp = self.client.post(reverse("assets:asset_bulk_checkout"), {
-            "pk": [self.asset.pk],
-            "asset_holder": self.holder.pk,
-            "location": loc.pk,
-        })
+        resp = self.client.post(
+            reverse("assets:asset_bulk_checkout"),
+            {
+                "pk": [self.asset.pk],
+                "asset_holder": self.holder.pk,
+                "location": loc.pk,
+            },
+        )
         self.assertEqual(resp.status_code, 302)
         mock_async.assert_not_called()
 
@@ -462,13 +589,24 @@ class BulkCheckoutTests(TenantTestMixin, TestCase):
         self.tenant_role.permissions = ["assets.view_asset"]
         self.tenant_role.save()
         self.client_login_to_tenant(self.tenant_user, self.tenant)
-        resp = self.client.post(reverse("assets:asset_bulk_checkout"), {"pk": [self.asset.pk], "asset_holder": self.holder.pk})
+        resp = self.client.post(
+            reverse("assets:asset_bulk_checkout"), {"pk": [self.asset.pk], "asset_holder": self.holder.pk}
+        )
         self.assertEqual(resp.status_code, 403)
 
     # ── task ──
     def test_task_checks_out_to_holder(self):
         job = self._job()
-        bulk_checkout_task(job.pk, [str(self.asset.pk)], "assetholder", self.holder.pk, self.tenant_admin.pk, "deploy", None, self.tenant.pk)
+        bulk_checkout_task(
+            job.pk,
+            [str(self.asset.pk)],
+            "assetholder",
+            self.holder.pk,
+            self.tenant_admin.pk,
+            "deploy",
+            None,
+            self.tenant.pk,
+        )
         job.refresh_from_db()
         self.assertEqual(job.status, Job.STATUS_COMPLETED)
         self.assertEqual(job.result["checked_out"], 1)
@@ -480,7 +618,17 @@ class BulkCheckoutTests(TenantTestMixin, TestCase):
     def test_task_applies_status_override(self):
         custom = StatusLabel.objects.create(name="CO Custom", slug="co-custom", type="deployed")
         job = self._job()
-        bulk_checkout_task(job.pk, [str(self.asset.pk)], "assetholder", self.holder.pk, self.tenant_admin.pk, "", None, self.tenant.pk, custom.pk)
+        bulk_checkout_task(
+            job.pk,
+            [str(self.asset.pk)],
+            "assetholder",
+            self.holder.pk,
+            self.tenant_admin.pk,
+            "",
+            None,
+            self.tenant.pk,
+            custom.pk,
+        )
         self.asset.refresh_from_db()
         self.assertEqual(self.asset.status, custom)
 

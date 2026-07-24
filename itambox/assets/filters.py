@@ -1,119 +1,128 @@
 import django_filters
-from core.filters import BaseFilterSet
-from .models import Asset, AssetRole, Manufacturer, AssetType, StatusLabel, Depreciation, Supplier, Category, AssetRequest, AssetTagSequence
-from .models import AssetDisposal, Warranty, AssetReservation
-from .models.choices import (
-    DisposalMethodChoices,
-    DataSanitizationMethodChoices,
-    WarrantyTypeChoices,
-    ReservationStatusChoices,
-)
-from assets.choices import RequestStatusChoices
-from organization.models import Location, Tenant, AssetHolder, Site
-from extras.models import Tag
 from django import forms
-from django.db.models import Q
 from django.contrib.auth import get_user_model
+from django.db.models import Q
 from django.utils.translation import gettext_lazy as _
+
+from assets.choices import RequestStatusChoices
+from core.filters import BaseFilterSet
+from extras.models import Tag
+from organization.models import AssetHolder, Location, Site, Tenant
+
+from .models import (
+    Asset,
+    AssetDisposal,
+    AssetRequest,
+    AssetReservation,
+    AssetRole,
+    AssetTagSequence,
+    AssetType,
+    Category,
+    Depreciation,
+    Manufacturer,
+    StatusLabel,
+    Supplier,
+    Warranty,
+)
+from .models.choices import (
+    DataSanitizationMethodChoices,
+    DisposalMethodChoices,
+    ReservationStatusChoices,
+    WarrantyTypeChoices,
+)
 
 User = get_user_model()
 
+
 class AssetFilterSet(BaseFilterSet):
     q = django_filters.CharFilter(
-        method='search',
-        label=_('Search'),
-        widget=forms.TextInput(attrs={'placeholder': 'Name, Tag, Serial...'})
+        method="search", label=_("Search"), widget=forms.TextInput(attrs={"placeholder": "Name, Tag, Serial..."})
     )
 
     status = django_filters.ModelChoiceFilter(
-        queryset=StatusLabel.objects.all(),
-        label=_('Status'),
-        widget=forms.Select(attrs={'class': 'form-select'})
+        queryset=StatusLabel.objects.all(), label=_("Status"), widget=forms.Select(attrs={"class": "form-select"})
     )
     asset_role = django_filters.ModelChoiceFilter(
-        queryset=AssetRole.objects.all(),
-        label=_('Asset Role'),
-        widget=forms.Select(attrs={'class': 'form-select'})
+        queryset=AssetRole.objects.all(), label=_("Asset Role"), widget=forms.Select(attrs={"class": "form-select"})
     )
     asset_type = django_filters.ModelChoiceFilter(
-        queryset=AssetType.objects.all().select_related('manufacturer'),
-        label=_('Asset Type'),
-        widget=forms.Select(attrs={'class': 'form-select'})
+        queryset=AssetType.objects.all().select_related("manufacturer"),
+        label=_("Asset Type"),
+        widget=forms.Select(attrs={"class": "form-select"}),
     )
     ean = django_filters.CharFilter(
-        field_name='asset_type__ean',
-        lookup_expr='iexact',
-        label=_('EAN'),
-        widget=forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'EAN / barcode'})
+        field_name="asset_type__ean",
+        lookup_expr="iexact",
+        label=_("EAN"),
+        widget=forms.TextInput(attrs={"class": "form-control", "placeholder": "EAN / barcode"}),
     )
     manufacturer = django_filters.ModelChoiceFilter(
-        field_name='asset_type__manufacturer',
+        field_name="asset_type__manufacturer",
         queryset=Manufacturer.objects.all(),
-        label=_('Manufacturer'),
-        widget=forms.Select(attrs={'class': 'form-select'})
+        label=_("Manufacturer"),
+        widget=forms.Select(attrs={"class": "form-select"}),
     )
     category = django_filters.ModelChoiceFilter(
-        field_name='asset_type__category',
+        field_name="asset_type__category",
         queryset=Category.objects.all(),
-        label=_('Category'),
-        widget=forms.Select(attrs={'class': 'form-select'})
+        label=_("Category"),
+        widget=forms.Select(attrs={"class": "form-select"}),
     )
     location = django_filters.ModelChoiceFilter(
-        queryset=Location.objects.all().select_related('site'),
-        widget=forms.Select(attrs={'class': 'form-select'})
+        queryset=Location.objects.all().select_related("site"), widget=forms.Select(attrs={"class": "form-select"})
     )
     site = django_filters.ModelChoiceFilter(
-        field_name='location__site',
+        field_name="location__site",
         queryset=Site.objects.all(),
-        label=_('Site'),
-        widget=forms.Select(attrs={'class': 'form-select'})
+        label=_("Site"),
+        widget=forms.Select(attrs={"class": "form-select"}),
     )
     tenant = django_filters.ModelChoiceFilter(
-        queryset=Tenant.objects.all(),
-        widget=forms.Select(attrs={'class': 'form-select'}),
-        label=_('Tenant')
+        queryset=Tenant.objects.all(), widget=forms.Select(attrs={"class": "form-select"}), label=_("Tenant")
     )
     assigned_to = django_filters.ModelChoiceFilter(
-        field_name='assignments__assigned_user',
+        field_name="assignments__assigned_user",
         queryset=AssetHolder.objects.all(),
-        label=_('Assigned To'),
-        widget=forms.Select(attrs={'class': 'form-select'}),
-        method='filter_assigned_to'
+        label=_("Assigned To"),
+        widget=forms.Select(attrs={"class": "form-select"}),
+        method="filter_assigned_to",
     )
     supplier = django_filters.ModelChoiceFilter(
-        queryset=Supplier.objects.all(),
-        label=_('Supplier'),
-        widget=forms.Select(attrs={'class': 'form-select'})
+        queryset=Supplier.objects.all(), label=_("Supplier"), widget=forms.Select(attrs={"class": "form-select"})
     )
     tags = django_filters.ModelMultipleChoiceFilter(
-        field_name='tags__slug',
+        field_name="tags__slug",
         queryset=Tag.objects.all(),
-        to_field_name='slug',
-        label=_('Tags'),
+        to_field_name="slug",
+        label=_("Tags"),
         conjoined=True,
-        widget=forms.SelectMultiple(attrs={'class': 'form-select'})
+        widget=forms.SelectMultiple(attrs={"class": "form-select"}),
     )
     purchase_date_after = django_filters.DateFilter(
-        field_name='purchase_date',
-        lookup_expr='gte',
-        label=_('Purchased After'),
-        widget=forms.DateInput(attrs={'class': 'form-control', 'type': 'date'})
+        field_name="purchase_date",
+        lookup_expr="gte",
+        label=_("Purchased After"),
+        widget=forms.DateInput(attrs={"class": "form-control", "type": "date"}),
     )
     purchase_date_before = django_filters.DateFilter(
-        field_name='purchase_date',
-        lookup_expr='lte',
-        label=_('Purchased Before'),
-        widget=forms.DateInput(attrs={'class': 'form-control', 'type': 'date'})
+        field_name="purchase_date",
+        lookup_expr="lte",
+        label=_("Purchased Before"),
+        widget=forms.DateInput(attrs={"class": "form-control", "type": "date"}),
     )
     requestable = django_filters.BooleanFilter(
-        method='filter_requestable',
-        label=_('Requestable'),
-        widget=forms.Select(choices=[('', _('Any')), ('true', _('Yes')), ('false', _('No'))], attrs={'class': 'form-select'})
+        method="filter_requestable",
+        label=_("Requestable"),
+        widget=forms.Select(
+            choices=[("", _("Any")), ("true", _("Yes")), ("false", _("No"))], attrs={"class": "form-select"}
+        ),
     )
     audit_due = django_filters.BooleanFilter(
-        method='filter_audit_due',
-        label=_('Audit Due'),
-        widget=forms.Select(choices=[('', _('Any')), ('true', _('Overdue')), ('false', _('Up to date'))], attrs={'class': 'form-select'})
+        method="filter_audit_due",
+        label=_("Audit Due"),
+        widget=forms.Select(
+            choices=[("", _("Any")), ("true", _("Overdue")), ("false", _("Up to date"))], attrs={"class": "form-select"}
+        ),
     )
 
     class Meta:
@@ -125,12 +134,12 @@ class AssetFilterSet(BaseFilterSet):
         if value is None:
             return queryset
         if value:
-            return queryset.filter(
-                Q(requestable=True) | Q(requestable__isnull=True, asset_type__requestable=True)
-            )
+            return queryset.filter(Q(requestable=True) | Q(requestable__isnull=True, asset_type__requestable=True))
         else:
             return queryset.filter(
-                Q(requestable=False) | Q(requestable__isnull=True, asset_type__isnull=True) | Q(requestable__isnull=True, asset_type__requestable=False)
+                Q(requestable=False)
+                | Q(requestable__isnull=True, asset_type__isnull=True)
+                | Q(requestable__isnull=True, asset_type__requestable=False)
             )
 
     def search(self, queryset, name, value):
@@ -138,15 +147,13 @@ class AssetFilterSet(BaseFilterSet):
         if not value.strip():
             return queryset
         from assets.scanning import strip_itambox_prefix
+
         value = strip_itambox_prefix(value)
         # Basic search across name, asset_tag, serial_number (can be expanded)
         # Consider adding asset_holder.name if performance allows
         return queryset.filter(
-            Q(name__icontains=value) |
-            Q(asset_tag__icontains=value) |
-            Q(serial_number__icontains=value)
+            Q(name__icontains=value) | Q(asset_tag__icontains=value) | Q(serial_number__icontains=value)
         ).distinct()
-
 
     def filter_assigned_to(self, queryset, name, value):
         if not value:
@@ -156,9 +163,11 @@ class AssetFilterSet(BaseFilterSet):
     def filter_audit_due(self, queryset, name, value):
         if value is None:
             return queryset
-        from django.utils import timezone
         from datetime import timedelta
-        from django.db.models import ExpressionWrapper, DurationField, F, Case, When
+
+        from django.db.models import Case, DurationField, ExpressionWrapper, F, When
+        from django.utils import timezone
+
         today = timezone.now()
         # Policy (matches Asset.audit_due_date and core/tasks/alerts._match_audit_overdue):
         # never-audited assets are overdue at created_at + interval, not immediately.
@@ -168,8 +177,7 @@ class AssetFilterSet(BaseFilterSet):
             cutoff = today - interval
             # audited and past cutoff, OR never audited and created before cutoff
             overdue_q |= Q(asset_type__category=cat) & (
-                Q(last_audited__lt=cutoff) |
-                (Q(last_audited__isnull=True) & Q(created_at__lt=cutoff))
+                Q(last_audited__lt=cutoff) | (Q(last_audited__isnull=True) & Q(created_at__lt=cutoff))
             )
         if value:
             return queryset.filter(overdue_q)
@@ -178,200 +186,183 @@ class AssetFilterSet(BaseFilterSet):
             has_cadence_q = Q(asset_type__category__audit_interval_months__isnull=False)
             return queryset.exclude(overdue_q & has_cadence_q)
 
-# --- AssetRole Filter --- 
+
+# --- AssetRole Filter ---
 class AssetRoleFilterSet(BaseFilterSet):
     q = django_filters.CharFilter(
-        method='search',
-        label=_('Search'),
-        widget=forms.TextInput(attrs={'placeholder': 'Name, Description...'})
+        method="search", label=_("Search"), widget=forms.TextInput(attrs={"placeholder": "Name, Description..."})
     )
 
     class Meta:
         model = AssetRole
-        fields = ['name'] # Add other specific fields if needed later
+        fields = ["name"]  # Add other specific fields if needed later
 
     def search(self, queryset, name, value):
         if not value.strip():
             return queryset
-        return queryset.filter(
-            Q(name__icontains=value) |
-            Q(description__icontains=value)
-        ).distinct()
+        return queryset.filter(Q(name__icontains=value) | Q(description__icontains=value)).distinct()
 
-# --- Manufacturer Filter --- 
+
+# --- Manufacturer Filter ---
 class ManufacturerFilterSet(BaseFilterSet):
     q = django_filters.CharFilter(
-        method='search',
-        label=_('Search'),
-        widget=forms.TextInput(attrs={'placeholder': 'Name, Description...'})
+        method="search", label=_("Search"), widget=forms.TextInput(attrs={"placeholder": "Name, Description..."})
     )
 
     class Meta:
         model = Manufacturer
-        fields = ['name'] # Add other specific fields if needed later
+        fields = ["name"]  # Add other specific fields if needed later
 
     def search(self, queryset, name, value):
         if not value.strip():
             return queryset
-        return queryset.filter(
-            Q(name__icontains=value) |
-            Q(description__icontains=value)
-        ).distinct()
+        return queryset.filter(Q(name__icontains=value) | Q(description__icontains=value)).distinct()
+
 
 class AssetTypeFilterSet(BaseFilterSet):
     q = django_filters.CharFilter(
-        method='search',
-        label=_('Search'),
+        method="search",
+        label=_("Search"),
     )
     manufacturer = django_filters.ModelChoiceFilter(
-        queryset=Manufacturer.objects.all(),
-        field_name='manufacturer',
-        label=_('Manufacturer')
+        queryset=Manufacturer.objects.all(), field_name="manufacturer", label=_("Manufacturer")
     )
     category = django_filters.ModelChoiceFilter(
-        queryset=Category.objects.all(),
-        label=_('Category'),
-        widget=forms.Select(attrs={'class': 'form-select'})
+        queryset=Category.objects.all(), label=_("Category"), widget=forms.Select(attrs={"class": "form-select"})
     )
     requestable = django_filters.BooleanFilter(
-        label=_('Requestable'),
-        widget=forms.Select(choices=[('', _('Any')), ('true', _('Yes')), ('false', _('No'))], attrs={'class': 'form-select'})
+        label=_("Requestable"),
+        widget=forms.Select(
+            choices=[("", _("Any")), ("true", _("Yes")), ("false", _("No"))], attrs={"class": "form-select"}
+        ),
     )
 
     class Meta:
         model = AssetType
-        fields = ['manufacturer', 'model', 'part_number', 'category', 'requestable']
+        fields = ["manufacturer", "model", "part_number", "category", "requestable"]
 
     def search(self, queryset, name, value):
         if not value.strip():
             return queryset
         return queryset.filter(
-            Q(model__icontains=value) |
-            Q(part_number__icontains=value) |
-            Q(description__icontains=value) |
-            Q(manufacturer__name__icontains=value)
+            Q(model__icontains=value)
+            | Q(part_number__icontains=value)
+            | Q(description__icontains=value)
+            | Q(manufacturer__name__icontains=value)
         ).distinct()
 
 
 class StatusLabelFilterSet(BaseFilterSet):
     q = django_filters.CharFilter(
-        method='search',
-        label=_('Search'),
-        widget=forms.TextInput(attrs={'placeholder': 'Name, Description...'})
+        method="search", label=_("Search"), widget=forms.TextInput(attrs={"placeholder": "Name, Description..."})
     )
     type = django_filters.MultipleChoiceFilter(
-        choices=StatusLabel.TYPE_CHOICES,
-        widget=forms.SelectMultiple(attrs={'class': 'form-select'})
+        choices=StatusLabel.TYPE_CHOICES, widget=forms.SelectMultiple(attrs={"class": "form-select"})
     )
 
     class Meta:
         model = StatusLabel
-        fields = ['name', 'type']
+        fields = ["name", "type"]
 
     def search(self, queryset, name, value):
         if not value.strip():
             return queryset
-        return queryset.filter(
-            Q(name__icontains=value) |
-            Q(description__icontains=value)
-        ).distinct()
+        return queryset.filter(Q(name__icontains=value) | Q(description__icontains=value)).distinct()
 
 
 class DepreciationFilterSet(BaseFilterSet):
-    q = django_filters.CharFilter(method='search', label=_('Search'))
+    q = django_filters.CharFilter(method="search", label=_("Search"))
     method = django_filters.ChoiceFilter(choices=Depreciation.Method.choices)
     convention = django_filters.ChoiceFilter(choices=Depreciation.Convention.choices)
 
     class Meta:
         model = Depreciation
-        fields = ['name', 'months', 'method', 'convention']
+        fields = ["name", "months", "method", "convention"]
 
     def search(self, queryset, name, value):
         if not value.strip():
             return queryset
-        return queryset.filter(
-            Q(name__icontains=value) | Q(description__icontains=value)
-        ).distinct()
+        return queryset.filter(Q(name__icontains=value) | Q(description__icontains=value)).distinct()
+
+
 class SupplierFilterSet(BaseFilterSet):
-    q = django_filters.CharFilter(method='search', label=_('Search'), widget=forms.TextInput(attrs={'placeholder': 'Name...'}))
+    q = django_filters.CharFilter(
+        method="search", label=_("Search"), widget=forms.TextInput(attrs={"placeholder": "Name..."})
+    )
 
     class Meta:
         model = Supplier
-        fields = ['name']
+        fields = ["name"]
 
     def search(self, queryset, name, value):
         if not value.strip():
             return queryset
-        return queryset.filter(
-            Q(name__icontains=value) | Q(website__icontains=value)
-        ).distinct()
+        return queryset.filter(Q(name__icontains=value) | Q(website__icontains=value)).distinct()
 
 
 class CategoryFilterSet(BaseFilterSet):
-    q = django_filters.CharFilter(method='search', label=_('Search'), widget=forms.TextInput(attrs={'placeholder': 'Name...'}))
+    q = django_filters.CharFilter(
+        method="search", label=_("Search"), widget=forms.TextInput(attrs={"placeholder": "Name..."})
+    )
 
     class Meta:
         model = Category
-        fields = ['name']
+        fields = ["name"]
 
     def search(self, queryset, name, value):
         if not value.strip():
             return queryset
-        return queryset.filter(
-            Q(name__icontains=value) | Q(description__icontains=value)
-        ).distinct()
+        return queryset.filter(Q(name__icontains=value) | Q(description__icontains=value)).distinct()
 
 
 class AssetRequestFilterSet(BaseFilterSet):
-    q = django_filters.CharFilter(method='search', label=_('Search'), widget=forms.TextInput(attrs={'placeholder': 'Search...'}))
-    status = django_filters.ChoiceFilter(choices=RequestStatusChoices.choices, widget=forms.Select(attrs={'class': 'form-select'}))
+    q = django_filters.CharFilter(
+        method="search", label=_("Search"), widget=forms.TextInput(attrs={"placeholder": "Search..."})
+    )
+    status = django_filters.ChoiceFilter(
+        choices=RequestStatusChoices.choices, widget=forms.Select(attrs={"class": "form-select"})
+    )
 
     class Meta:
         model = AssetRequest
-        fields = ['status']
+        fields = ["status"]
 
     def search(self, queryset, name, value):
         if not value.strip():
             return queryset
         return queryset.filter(
-            Q(asset__name__icontains=value) |
-            Q(asset_type__model__icontains=value) |
-            Q(requester__username__icontains=value) |
-            Q(notes__icontains=value)
+            Q(asset__name__icontains=value)
+            | Q(asset_type__model__icontains=value)
+            | Q(requester__username__icontains=value)
+            | Q(notes__icontains=value)
         ).distinct()
 
 
 class AssetTagSequenceFilterSet(BaseFilterSet):
     q = django_filters.CharFilter(
-        method='search',
-        label=_('Search'),
-        widget=forms.TextInput(attrs={'placeholder': 'Prefix...'})
+        method="search", label=_("Search"), widget=forms.TextInput(attrs={"placeholder": "Prefix..."})
     )
     tenant = django_filters.ModelChoiceFilter(
-        queryset=Tenant.objects.all(),
-        widget=forms.Select(attrs={'class': 'form-select'}),
-        label=_('Tenant')
+        queryset=Tenant.objects.all(), widget=forms.Select(attrs={"class": "form-select"}), label=_("Tenant")
     )
     category = django_filters.ModelChoiceFilter(
-        queryset=Category.objects.all(),
-        widget=forms.Select(attrs={'class': 'form-select'}),
-        label=_('Category')
+        queryset=Category.objects.all(), widget=forms.Select(attrs={"class": "form-select"}), label=_("Category")
     )
     is_active = django_filters.BooleanFilter(
-        widget=forms.Select(choices=[('', _('All')), ('True', _('Active')), ('False', _('Inactive'))], attrs={'class': 'form-select'}),
-        label=_('Active')
+        widget=forms.Select(
+            choices=[("", _("All")), ("True", _("Active")), ("False", _("Inactive"))], attrs={"class": "form-select"}
+        ),
+        label=_("Active"),
     )
 
     class Meta:
         model = AssetTagSequence
-        fields = ['prefix', 'tenant', 'category', 'is_active']
+        fields = ["prefix", "tenant", "category", "is_active"]
 
     def search(self, queryset, name, value):
         if not value.strip():
             return queryset
-        return queryset.filter(
-            Q(prefix__icontains=value)
-        ).distinct()
+        return queryset.filter(Q(prefix__icontains=value)).distinct()
 
 
 # AuditSessionFilterSet / AssetAuditFilterSet moved to compliance.filters
@@ -379,143 +370,133 @@ class AssetTagSequenceFilterSet(BaseFilterSet):
 
 class AssetDisposalFilterSet(BaseFilterSet):
     q = django_filters.CharFilter(
-        method='search',
-        label=_('Search'),
-        widget=forms.TextInput(attrs={'placeholder': 'Recipient, Sanitized By, Certificate, Notes, Asset Name...'})
+        method="search",
+        label=_("Search"),
+        widget=forms.TextInput(attrs={"placeholder": "Recipient, Sanitized By, Certificate, Notes, Asset Name..."}),
     )
     asset = django_filters.ModelChoiceFilter(
-        queryset=Asset.objects.all(),
-        label=_('Asset'),
-        widget=forms.Select(attrs={'class': 'form-select'})
+        queryset=Asset.objects.all(), label=_("Asset"), widget=forms.Select(attrs={"class": "form-select"})
     )
     disposal_method = django_filters.ChoiceFilter(
         choices=DisposalMethodChoices.choices,
-        label=_('Disposal Method'),
-        widget=forms.Select(attrs={'class': 'form-select'})
+        label=_("Disposal Method"),
+        widget=forms.Select(attrs={"class": "form-select"}),
     )
     data_sanitization_method = django_filters.ChoiceFilter(
         choices=DataSanitizationMethodChoices.choices,
-        label=_('Data Sanitization Method'),
-        widget=forms.Select(attrs={'class': 'form-select'})
+        label=_("Data Sanitization Method"),
+        widget=forms.Select(attrs={"class": "form-select"}),
     )
     disposal_date = django_filters.DateFromToRangeFilter(
-        label=_('Disposal Date'),
-        widget=django_filters.widgets.RangeWidget(attrs={'class': 'form-control', 'type': 'date'})
+        label=_("Disposal Date"),
+        widget=django_filters.widgets.RangeWidget(attrs={"class": "form-control", "type": "date"}),
     )
     weee_compliant = django_filters.BooleanFilter(
-        label=_('WEEE Compliant'),
-        widget=forms.Select(choices=[('', _('Any')), ('true', _('Yes')), ('false', _('No'))], attrs={'class': 'form-select'})
+        label=_("WEEE Compliant"),
+        widget=forms.Select(
+            choices=[("", _("Any")), ("true", _("Yes")), ("false", _("No"))], attrs={"class": "form-select"}
+        ),
     )
 
     class Meta:
         model = AssetDisposal
-        fields = ['asset', 'disposal_method', 'data_sanitization_method', 'disposal_date', 'weee_compliant']
+        fields = ["asset", "disposal_method", "data_sanitization_method", "disposal_date", "weee_compliant"]
 
     def search(self, queryset, name, value):
         if not value.strip():
             return queryset
         return queryset.filter(
-            Q(recipient__icontains=value) |
-            Q(sanitized_by__icontains=value) |
-            Q(sanitization_certificate__icontains=value) |
-            Q(notes__icontains=value) |
-            Q(asset__name__icontains=value)
+            Q(recipient__icontains=value)
+            | Q(sanitized_by__icontains=value)
+            | Q(sanitization_certificate__icontains=value)
+            | Q(notes__icontains=value)
+            | Q(asset__name__icontains=value)
         ).distinct()
 
 
 class WarrantyFilterSet(BaseFilterSet):
     q = django_filters.CharFilter(
-        method='search',
-        label=_('Search'),
-        widget=forms.TextInput(attrs={'placeholder': 'Provider, Reference, Terms, Notes, Asset Name...'})
+        method="search",
+        label=_("Search"),
+        widget=forms.TextInput(attrs={"placeholder": "Provider, Reference, Terms, Notes, Asset Name..."}),
     )
     asset = django_filters.ModelChoiceFilter(
-        queryset=Asset.objects.all(),
-        label=_('Asset'),
-        widget=forms.Select(attrs={'class': 'form-select'})
+        queryset=Asset.objects.all(), label=_("Asset"), widget=forms.Select(attrs={"class": "form-select"})
     )
     warranty_type = django_filters.ChoiceFilter(
         choices=WarrantyTypeChoices.choices,
-        label=_('Warranty Type'),
-        widget=forms.Select(attrs={'class': 'form-select'})
+        label=_("Warranty Type"),
+        widget=forms.Select(attrs={"class": "form-select"}),
     )
     provider = django_filters.CharFilter(
-        lookup_expr='icontains',
-        label=_('Provider'),
-        widget=forms.TextInput(attrs={'class': 'form-control'})
+        lookup_expr="icontains", label=_("Provider"), widget=forms.TextInput(attrs={"class": "form-control"})
     )
     start_date = django_filters.DateFromToRangeFilter(
-        label=_('Start Date'),
-        widget=django_filters.widgets.RangeWidget(attrs={'class': 'form-control', 'type': 'date'})
+        label=_("Start Date"),
+        widget=django_filters.widgets.RangeWidget(attrs={"class": "form-control", "type": "date"}),
     )
     end_date = django_filters.DateFromToRangeFilter(
-        label=_('End Date'),
-        widget=django_filters.widgets.RangeWidget(attrs={'class': 'form-control', 'type': 'date'})
+        label=_("End Date"), widget=django_filters.widgets.RangeWidget(attrs={"class": "form-control", "type": "date"})
     )
 
     class Meta:
         model = Warranty
-        fields = ['asset', 'warranty_type', 'provider', 'start_date', 'end_date']
+        fields = ["asset", "warranty_type", "provider", "start_date", "end_date"]
 
     def search(self, queryset, name, value):
         if not value.strip():
             return queryset
         return queryset.filter(
-            Q(provider__icontains=value) |
-            Q(reference__icontains=value) |
-            Q(terms__icontains=value) |
-            Q(notes__icontains=value) |
-            Q(asset__name__icontains=value)
+            Q(provider__icontains=value)
+            | Q(reference__icontains=value)
+            | Q(terms__icontains=value)
+            | Q(notes__icontains=value)
+            | Q(asset__name__icontains=value)
         ).distinct()
 
 
 class AssetReservationFilterSet(BaseFilterSet):
     q = django_filters.CharFilter(
-        method='search',
-        label=_('Search'),
-        widget=forms.TextInput(attrs={'placeholder': 'Purpose, Notes, Asset Name, Reserved For...'})
+        method="search",
+        label=_("Search"),
+        widget=forms.TextInput(attrs={"placeholder": "Purpose, Notes, Asset Name, Reserved For..."}),
     )
     asset = django_filters.ModelChoiceFilter(
-        queryset=Asset.objects.all(),
-        label=_('Asset'),
-        widget=forms.Select(attrs={'class': 'form-select'})
+        queryset=Asset.objects.all(), label=_("Asset"), widget=forms.Select(attrs={"class": "form-select"})
     )
     reserved_for = django_filters.ModelChoiceFilter(
         queryset=AssetHolder.objects.all(),
-        label=_('Reserved For'),
-        null_label=_('(no holder)'),
-        widget=forms.Select(attrs={'class': 'form-select'})
+        label=_("Reserved For"),
+        null_label=_("(no holder)"),
+        widget=forms.Select(attrs={"class": "form-select"}),
     )
     status = django_filters.ChoiceFilter(
-        choices=ReservationStatusChoices.choices,
-        label=_('Status'),
-        widget=forms.Select(attrs={'class': 'form-select'})
+        choices=ReservationStatusChoices.choices, label=_("Status"), widget=forms.Select(attrs={"class": "form-select"})
     )
     start_date = django_filters.DateFromToRangeFilter(
-        label=_('Start Date'),
-        widget=django_filters.widgets.RangeWidget(attrs={'class': 'form-control', 'type': 'date'})
+        label=_("Start Date"),
+        widget=django_filters.widgets.RangeWidget(attrs={"class": "form-control", "type": "date"}),
     )
     end_date = django_filters.DateFromToRangeFilter(
-        label=_('End Date'),
-        widget=django_filters.widgets.RangeWidget(attrs={'class': 'form-control', 'type': 'date'})
+        label=_("End Date"), widget=django_filters.widgets.RangeWidget(attrs={"class": "form-control", "type": "date"})
     )
     created_by = django_filters.ModelChoiceFilter(
-        queryset=User.objects.order_by('username'),
-        label=_('Created By'),
-        widget=forms.Select(attrs={'class': 'form-select'})
+        queryset=User.objects.order_by("username"),
+        label=_("Created By"),
+        widget=forms.Select(attrs={"class": "form-select"}),
     )
 
     class Meta:
         model = AssetReservation
-        fields = ['asset', 'reserved_for', 'status', 'start_date', 'end_date', 'created_by']
+        fields = ["asset", "reserved_for", "status", "start_date", "end_date", "created_by"]
 
     def search(self, queryset, name, value):
         if not value.strip():
             return queryset
         return queryset.filter(
-            Q(purpose__icontains=value) |
-            Q(notes__icontains=value) |
-            Q(asset__name__icontains=value) |
-            Q(reserved_for__first_name__icontains=value) |
-            Q(reserved_for__last_name__icontains=value)
+            Q(purpose__icontains=value)
+            | Q(notes__icontains=value)
+            | Q(asset__name__icontains=value)
+            | Q(reserved_for__first_name__icontains=value)
+            | Q(reserved_for__last_name__icontains=value)
         ).distinct()

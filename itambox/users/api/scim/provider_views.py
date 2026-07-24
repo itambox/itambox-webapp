@@ -1,24 +1,23 @@
 import logging
 import re
+
 from django.contrib.auth import get_user_model
 from django.db import transaction
 from django.shortcuts import get_object_or_404
 from rest_framework import exceptions, status
+from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
-from rest_framework.permissions import IsAuthenticated
 
 from core.auth.guards import validate_group_membership_grant
 from core.managers import set_current_tenant
 from itambox.middleware import set_current_user
-from organization.models import Tenant, Membership
-from users.models import GroupMembership, UserGroup
-from users.api.scim.serializers import (
-    SCIMUserSerializer, SCIMGroupSerializer, SCIMServiceProviderConfigSerializer
-)
+from organization.models import Membership, Tenant
 from users.api.scim.provider_authentication import SCIMProviderBearerTokenAuthentication
+from users.api.scim.serializers import SCIMGroupSerializer, SCIMServiceProviderConfigSerializer, SCIMUserSerializer
+from users.models import GroupMembership, UserGroup
 
-logger = logging.getLogger('itambox.scim.provider_views')
+logger = logging.getLogger("itambox.scim.provider_views")
 User = get_user_model()
 
 # Sentinel for "attribute not supplied by this SCIM request" (distinct from an explicit
@@ -43,26 +42,23 @@ def sync_provider_group_members(tenant, group, member_ids, *, actor):
     """
     memberships_by_user_id = {}
     for uid in member_ids:
-        membership = Membership.objects.filter(
-            user_id=uid, tenant=tenant, is_active=True
-        ).first()
+        membership = Membership.objects.filter(user_id=uid, tenant=tenant, is_active=True).first()
         if membership:
             memberships_by_user_id[uid] = membership
         else:
             logger.warning(
                 "SCIM provider group sync skipped user id %s: not active staff of provider %s "
-                "(provision via SCIM /Users first).", uid, tenant.slug
+                "(provision via SCIM /Users first).",
+                uid,
+                tenant.slug,
             )
 
     # Apply only the delta (add/remove) so ChangeLoggingMixin does not fire on unchanged
     # members.
     if group.tenant_id != tenant.pk:
-        raise ValueError('Provider SCIM may modify only groups owned by its provider tenant.')
+        raise ValueError("Provider SCIM may modify only groups owned by its provider tenant.")
 
-    current_rows = {
-        row.membership.user_id: row
-        for row in group.group_memberships.select_related('membership__user')
-    }
+    current_rows = {row.membership.user_id: row for row in group.group_memberships.select_related("membership__user")}
     additions = set(memberships_by_user_id) - set(current_rows)
     if additions:
         validate_group_membership_grant(actor, group)
@@ -80,7 +76,7 @@ def sync_provider_group_members(tenant, group, member_ids, *, actor):
             continue
         if row.source == GroupMembership.SOURCE_SCIM and row.external_id != str(user_id):
             row.external_id = str(user_id)
-            row.save(update_fields=['external_id'])
+            row.save(update_fields=["external_id"])
 
     desired_user_ids = set(memberships_by_user_id)
     for user_id, row in current_rows.items():
@@ -95,32 +91,30 @@ class SCIMProviderMixin:
     def require_group_permission(self, request, permission):
         """Enforce the method-specific UserGroup permission in the provider tenant."""
         if not request.user.has_perm(permission, obj=self.tenant):
-            raise exceptions.PermissionDenied(
-                f'{permission} is required for this provider SCIM group operation.'
-            )
+            raise exceptions.PermissionDenied(f"{permission} is required for this provider SCIM group operation.")
 
     def handle_exception(self, exc):
-        from django.core.exceptions import ValidationError as DjangoValidationError
         from django.core.exceptions import FieldError as DjangoFieldError
+        from django.core.exceptions import ValidationError as DjangoValidationError
 
         if isinstance(exc, DjangoValidationError):
-            exc = exceptions.ValidationError(detail=exc.message_dict if hasattr(exc, 'message_dict') else exc.messages)
+            exc = exceptions.ValidationError(detail=exc.message_dict if hasattr(exc, "message_dict") else exc.messages)
         elif isinstance(exc, DjangoFieldError):
             exc = exceptions.ValidationError(detail=str(exc))
 
         response = super().handle_exception(exc)
         if response is not None:
-            detail = response.data.get('detail') if isinstance(response.data, dict) else str(response.data)
+            detail = response.data.get("detail") if isinstance(response.data, dict) else str(response.data)
             response.data = {
                 "schemas": ["urn:ietf:params:scim:api:messages:2.0:Error"],
                 "status": str(response.status_code),
-                "detail": detail
+                "detail": detail,
             }
         return response
 
     def initial(self, request, *args, **kwargs):
         super().initial(request, *args, **kwargs)
-        provider_slug = self.kwargs.get('provider_slug')
+        provider_slug = self.kwargs.get("provider_slug")
         if not provider_slug:
             raise exceptions.ValidationError("provider_slug is required")
 
@@ -128,7 +122,9 @@ class SCIMProviderMixin:
         # mount is kept but resolves against the tenant tree. _base_manager: no tenant
         # context exists yet, so the tenant-scoped default manager would return nothing.
         self.tenant = Tenant._base_manager.filter(
-            is_provider=True, deleted_at__isnull=True, slug=provider_slug,
+            is_provider=True,
+            deleted_at__isnull=True,
+            slug=provider_slug,
         ).first()
         if self.tenant is None:
             raise exceptions.NotFound("Provider not found.")
@@ -138,7 +134,7 @@ class SCIMProviderMixin:
         # to the acting service account rather than 'System' (CurrentUserMiddleware
         # captured AnonymousUser before DRF auth ran).
         set_current_tenant(self.tenant)
-        if getattr(request, 'user', None) and request.user.is_authenticated:
+        if getattr(request, "user", None) and request.user.is_authenticated:
             set_current_user(request.user)
 
 
@@ -146,42 +142,27 @@ class ProviderServiceProviderConfigView(SCIMProviderMixin, APIView):
     def get(self, request, *args, **kwargs):
         config_data = {
             "schemas": ["urn:ietf:params:scim:schemas:core:2.0:ServiceProviderConfig"],
-            "patch": {
-                "supported": True
-            },
-            "bulk": {
-                "supported": False,
-                "maxOperations": 1000,
-                "maxPayloadSize": 1048576
-            },
-            "filter": {
-                "supported": True,
-                "maxResults": 200
-            },
-            "changePassword": {
-                "supported": False
-            },
-            "sort": {
-                "supported": False
-            },
-            "etag": {
-                "supported": False
-            },
+            "patch": {"supported": True},
+            "bulk": {"supported": False, "maxOperations": 1000, "maxPayloadSize": 1048576},
+            "filter": {"supported": True, "maxResults": 200},
+            "changePassword": {"supported": False},
+            "sort": {"supported": False},
+            "etag": {"supported": False},
             "authenticationSchemes": [
                 {
                     "name": "OAuth Bearer Token",
                     "description": "External identity provisioning via Bearer Token",
                     "specUri": "http://tools.ietf.org/html/rfc6750",
                     "type": "oauthbearertoken",
-                    "primary": True
+                    "primary": True,
                 },
                 {
                     "name": "HTTP Basic",
                     "description": "Standard basic authentication",
                     "specUri": "http://tools.ietf.org/html/rfc2617",
-                    "type": "httpbasic"
-                }
-            ]
+                    "type": "httpbasic",
+                },
+            ],
         }
         serializer = SCIMServiceProviderConfigSerializer(data=config_data)
         serializer.is_valid(raise_exception=True)
@@ -191,15 +172,16 @@ class ProviderServiceProviderConfigView(SCIMProviderMixin, APIView):
 class SCIMProviderUserListView(SCIMProviderMixin, APIView):
     def get(self, request, *args, **kwargs):
         queryset = User.objects.filter(
-            memberships__tenant=self.tenant, memberships__is_active=True,
+            memberships__tenant=self.tenant,
+            memberships__is_active=True,
         ).distinct()
 
         try:
-            start_index = int(request.query_params.get('startIndex', 1))
+            start_index = int(request.query_params.get("startIndex", 1))
         except ValueError:
             start_index = 1
         try:
-            count = int(request.query_params.get('count', 50))
+            count = int(request.query_params.get("count", 50))
         except ValueError:
             count = 50
         count = min(count, 200)  # Enforce maxResults upper bound
@@ -213,69 +195,87 @@ class SCIMProviderUserListView(SCIMProviderMixin, APIView):
         serializer = SCIMUserSerializer(
             sliced_queryset,
             many=True,
-            context={'request': request, 'tenant_slug': self.tenant.slug, 'tenant': self.tenant}
+            context={"request": request, "tenant_slug": self.tenant.slug, "tenant": self.tenant},
         )
 
-        return Response({
-            "schemas": ["urn:ietf:params:scim:api:messages:2.0:ListResponse"],
-            "totalResults": total_results,
-            "itemsPerPage": len(serializer.data),
-            "startIndex": start_index,
-            "Resources": serializer.data
-        }, status=status.HTTP_200_OK)
+        return Response(
+            {
+                "schemas": ["urn:ietf:params:scim:api:messages:2.0:ListResponse"],
+                "totalResults": total_results,
+                "itemsPerPage": len(serializer.data),
+                "startIndex": start_index,
+                "Resources": serializer.data,
+            },
+            status=status.HTTP_200_OK,
+        )
 
     def post(self, request, *args, **kwargs):
-        username = request.data.get('userName')
+        username = request.data.get("userName")
         if not username:
-            return Response({
-                "schemas": ["urn:ietf:params:scim:api:messages:2.0:Error"],
-                "status": "400",
-                "detail": "userName is required"
-            }, status=status.HTTP_400_BAD_REQUEST)
+            return Response(
+                {
+                    "schemas": ["urn:ietf:params:scim:api:messages:2.0:Error"],
+                    "status": "400",
+                    "detail": "userName is required",
+                },
+                status=status.HTTP_400_BAD_REQUEST,
+            )
 
         if username and len(username) > 150:
-            return Response({
-                "schemas": ["urn:ietf:params:scim:api:messages:2.0:Error"],
-                "status": "400",
-                "detail": "userName exceeds maximum length of 150 characters."
-            }, status=status.HTTP_400_BAD_REQUEST)
+            return Response(
+                {
+                    "schemas": ["urn:ietf:params:scim:api:messages:2.0:Error"],
+                    "status": "400",
+                    "detail": "userName exceeds maximum length of 150 characters.",
+                },
+                status=status.HTTP_400_BAD_REQUEST,
+            )
 
         email = ""
-        emails = request.data.get('emails', [])
+        emails = request.data.get("emails", [])
         if emails and isinstance(emails, list):
-            email = emails[0].get('value', '')
+            email = emails[0].get("value", "")
 
         if email and len(email) > 254:
-            return Response({
-                "schemas": ["urn:ietf:params:scim:api:messages:2.0:Error"],
-                "status": "400",
-                "detail": "email exceeds maximum length of 254 characters."
-            }, status=status.HTTP_400_BAD_REQUEST)
+            return Response(
+                {
+                    "schemas": ["urn:ietf:params:scim:api:messages:2.0:Error"],
+                    "status": "400",
+                    "detail": "email exceeds maximum length of 254 characters.",
+                },
+                status=status.HTTP_400_BAD_REQUEST,
+            )
 
         first_name = ""
         last_name = ""
-        name_data = request.data.get('name')
+        name_data = request.data.get("name")
         if name_data and isinstance(name_data, dict):
-            first_name = name_data.get('givenName', '')
-            last_name = name_data.get('familyName', '')
+            first_name = name_data.get("givenName", "")
+            last_name = name_data.get("familyName", "")
 
         if first_name and len(first_name) > 150:
-            return Response({
-                "schemas": ["urn:ietf:params:scim:api:messages:2.0:Error"],
-                "status": "400",
-                "detail": "givenName exceeds maximum length of 150 characters."
-            }, status=status.HTTP_400_BAD_REQUEST)
+            return Response(
+                {
+                    "schemas": ["urn:ietf:params:scim:api:messages:2.0:Error"],
+                    "status": "400",
+                    "detail": "givenName exceeds maximum length of 150 characters.",
+                },
+                status=status.HTTP_400_BAD_REQUEST,
+            )
 
         if last_name and len(last_name) > 150:
-            return Response({
-                "schemas": ["urn:ietf:params:scim:api:messages:2.0:Error"],
-                "status": "400",
-                "detail": "familyName exceeds maximum length of 150 characters."
-            }, status=status.HTTP_400_BAD_REQUEST)
+            return Response(
+                {
+                    "schemas": ["urn:ietf:params:scim:api:messages:2.0:Error"],
+                    "status": "400",
+                    "detail": "familyName exceeds maximum length of 150 characters.",
+                },
+                status=status.HTTP_400_BAD_REQUEST,
+            )
 
-        active = request.data.get('active', True)
+        active = request.data.get("active", True)
         if isinstance(active, str):
-            active = (active.lower() == 'true')
+            active = active.lower() == "true"
         else:
             active = bool(active)
 
@@ -283,11 +283,14 @@ class SCIMProviderUserListView(SCIMProviderMixin, APIView):
         if user:
             existing = Membership.objects.filter(user=user, tenant=self.tenant).first()
             if existing:
-                return Response({
-                    "schemas": ["urn:ietf:params:scim:api:messages:2.0:Error"],
-                    "status": "409",
-                    "detail": "User already exists in this provider"
-                }, status=status.HTTP_409_CONFLICT)
+                return Response(
+                    {
+                        "schemas": ["urn:ietf:params:scim:api:messages:2.0:Error"],
+                        "status": "409",
+                        "detail": "User already exists in this provider",
+                    },
+                    status=status.HTTP_409_CONFLICT,
+                )
 
             with transaction.atomic():
                 # SCIM provisions identity only: a bare membership at the managing
@@ -300,11 +303,7 @@ class SCIMProviderUserListView(SCIMProviderMixin, APIView):
         else:
             with transaction.atomic():
                 user = User.objects.create_user(
-                    username=username,
-                    email=email,
-                    first_name=first_name,
-                    last_name=last_name,
-                    is_active=active
+                    username=username, email=email, first_name=first_name, last_name=last_name, is_active=active
                 )
                 user.set_unusable_password()
                 user.save()
@@ -313,8 +312,7 @@ class SCIMProviderUserListView(SCIMProviderMixin, APIView):
                 Membership.objects.create(user=user, tenant=self.tenant, is_active=active)
 
         serializer = SCIMUserSerializer(
-            user,
-            context={'request': request, 'tenant_slug': self.tenant.slug, 'tenant': self.tenant}
+            user, context={"request": request, "tenant_slug": self.tenant.slug, "tenant": self.tenant}
         )
         return Response(serializer.data, status=status.HTTP_201_CREATED)
 
@@ -322,19 +320,20 @@ class SCIMProviderUserListView(SCIMProviderMixin, APIView):
 class SCIMProviderUserDetailView(SCIMProviderMixin, APIView):
     def _staff_queryset(self):
         return User.objects.filter(
-            memberships__tenant=self.tenant, memberships__is_active=True,
+            memberships__tenant=self.tenant,
+            memberships__is_active=True,
         ).distinct()
 
     def get(self, request, pk, *args, **kwargs):
         user = get_object_or_404(self._staff_queryset(), id=pk)
         serializer = SCIMUserSerializer(
-            user,
-            context={'request': request, 'tenant_slug': self.tenant.slug, 'tenant': self.tenant}
+            user, context={"request": request, "tenant_slug": self.tenant.slug, "tenant": self.tenant}
         )
         return Response(serializer.data, status=status.HTTP_200_OK)
 
-    def _apply_scim_identity(self, user, *, username=_UNSET, email=_UNSET,
-                             first_name=_UNSET, last_name=_UNSET, active=_UNSET):
+    def _apply_scim_identity(
+        self, user, *, username=_UNSET, email=_UNSET, first_name=_UNSET, last_name=_UNSET, active=_UNSET
+    ):
         """Apply SCIM-provisioned identity/active changes for this managing tenant.
 
         A provider SCIM token is bound to exactly one managing tenant.
@@ -348,24 +347,20 @@ class SCIMProviderUserDetailView(SCIMProviderMixin, APIView):
           principal. Those changes apply only to a user whose sole membership is this
           managing tenant.
         """
-        has_other = (
-            Membership.objects.filter(user=user)
-            .exclude(tenant=self.tenant)
-            .exists()
-        )
+        has_other = Membership.objects.filter(user=user).exclude(tenant=self.tenant).exists()
 
         if active is not _UNSET:
             membership = Membership.objects.filter(user=user, tenant=self.tenant).first()
             if membership is not None and membership.is_active != active:
                 membership.is_active = active
-                membership.save(update_fields=['is_active'])
+                membership.save(update_fields=["is_active"])
             # Mirror the global flag to "has any active membership anywhere": clears
             # login only when the user is fully de-provisioned, never from a single
             # tenant's token while another tenant still has them active.
             any_active = Membership.objects.filter(user=user, is_active=True).exists()
             if user.is_active != any_active:
                 user.is_active = any_active
-                user.save(update_fields=['is_active'])
+                user.save(update_fields=["is_active"])
 
         if has_other:
             # Leave the shared global identity alone.
@@ -375,16 +370,16 @@ class SCIMProviderUserDetailView(SCIMProviderMixin, APIView):
         identity_fields = []
         if username is not _UNSET:
             user.username = username
-            identity_fields.append('username')
+            identity_fields.append("username")
         if email is not _UNSET:
             user.email = email
-            identity_fields.append('email')
+            identity_fields.append("email")
         if first_name is not _UNSET:
             user.first_name = first_name
-            identity_fields.append('first_name')
+            identity_fields.append("first_name")
         if last_name is not _UNSET:
             user.last_name = last_name
-            identity_fields.append('last_name')
+            identity_fields.append("last_name")
         if identity_fields:
             user.save(update_fields=identity_fields)
         return user
@@ -392,69 +387,87 @@ class SCIMProviderUserDetailView(SCIMProviderMixin, APIView):
     def put(self, request, pk, *args, **kwargs):
         user = get_object_or_404(self._staff_queryset(), id=pk)
 
-        username = request.data.get('userName')
+        username = request.data.get("userName")
         if not username:
-            return Response({
-                "schemas": ["urn:ietf:params:scim:api:messages:2.0:Error"],
-                "status": "400",
-                "detail": "userName is required"
-            }, status=status.HTTP_400_BAD_REQUEST)
+            return Response(
+                {
+                    "schemas": ["urn:ietf:params:scim:api:messages:2.0:Error"],
+                    "status": "400",
+                    "detail": "userName is required",
+                },
+                status=status.HTTP_400_BAD_REQUEST,
+            )
 
         if username and len(username) > 150:
-            return Response({
-                "schemas": ["urn:ietf:params:scim:api:messages:2.0:Error"],
-                "status": "400",
-                "detail": "userName exceeds maximum length of 150 characters."
-            }, status=status.HTTP_400_BAD_REQUEST)
+            return Response(
+                {
+                    "schemas": ["urn:ietf:params:scim:api:messages:2.0:Error"],
+                    "status": "400",
+                    "detail": "userName exceeds maximum length of 150 characters.",
+                },
+                status=status.HTTP_400_BAD_REQUEST,
+            )
 
         email = ""
-        emails = request.data.get('emails', [])
+        emails = request.data.get("emails", [])
         if emails and isinstance(emails, list):
-            email = emails[0].get('value', '')
+            email = emails[0].get("value", "")
 
         if email and len(email) > 254:
-            return Response({
-                "schemas": ["urn:ietf:params:scim:api:messages:2.0:Error"],
-                "status": "400",
-                "detail": "email exceeds maximum length of 254 characters."
-            }, status=status.HTTP_400_BAD_REQUEST)
+            return Response(
+                {
+                    "schemas": ["urn:ietf:params:scim:api:messages:2.0:Error"],
+                    "status": "400",
+                    "detail": "email exceeds maximum length of 254 characters.",
+                },
+                status=status.HTTP_400_BAD_REQUEST,
+            )
 
         first_name = ""
         last_name = ""
-        name_data = request.data.get('name')
+        name_data = request.data.get("name")
         if name_data and isinstance(name_data, dict):
-            first_name = name_data.get('givenName', '')
-            last_name = name_data.get('familyName', '')
+            first_name = name_data.get("givenName", "")
+            last_name = name_data.get("familyName", "")
 
         if first_name and len(first_name) > 150:
-            return Response({
-                "schemas": ["urn:ietf:params:scim:api:messages:2.0:Error"],
-                "status": "400",
-                "detail": "givenName exceeds maximum length of 150 characters."
-            }, status=status.HTTP_400_BAD_REQUEST)
+            return Response(
+                {
+                    "schemas": ["urn:ietf:params:scim:api:messages:2.0:Error"],
+                    "status": "400",
+                    "detail": "givenName exceeds maximum length of 150 characters.",
+                },
+                status=status.HTTP_400_BAD_REQUEST,
+            )
 
         if last_name and len(last_name) > 150:
-            return Response({
-                "schemas": ["urn:ietf:params:scim:api:messages:2.0:Error"],
-                "status": "400",
-                "detail": "familyName exceeds maximum length of 150 characters."
-            }, status=status.HTTP_400_BAD_REQUEST)
+            return Response(
+                {
+                    "schemas": ["urn:ietf:params:scim:api:messages:2.0:Error"],
+                    "status": "400",
+                    "detail": "familyName exceeds maximum length of 150 characters.",
+                },
+                status=status.HTTP_400_BAD_REQUEST,
+            )
 
-        active = request.data.get('active', True)
+        active = request.data.get("active", True)
         if isinstance(active, str):
-            active = (active.lower() == 'true')
+            active = active.lower() == "true"
         else:
             active = bool(active)
 
         with transaction.atomic():
             user = self._apply_scim_identity(
-                user, username=username, email=email,
-                first_name=first_name, last_name=last_name, active=active,
+                user,
+                username=username,
+                email=email,
+                first_name=first_name,
+                last_name=last_name,
+                active=active,
             )
 
         serializer = SCIMUserSerializer(
-            user,
-            context={'request': request, 'tenant_slug': self.tenant.slug, 'tenant': self.tenant}
+            user, context={"request": request, "tenant_slug": self.tenant.slug, "tenant": self.tenant}
         )
         return Response(serializer.data, status=status.HTTP_200_OK)
 
@@ -467,61 +480,64 @@ class SCIMProviderUserDetailView(SCIMProviderMixin, APIView):
         new_last = _UNSET
         new_active = _UNSET
 
-        for op in request.data.get('Operations', []):
-            op_type = op.get('op', '').lower()
-            path = op.get('path', '')
-            value = op.get('value')
+        for op in request.data.get("Operations", []):
+            op_type = op.get("op", "").lower()
+            path = op.get("path", "")
+            value = op.get("value")
 
-            if op_type in ('add', 'replace'):
+            if op_type in ("add", "replace"):
                 if isinstance(value, dict) and not path:
                     for k, v in value.items():
-                        if k == 'active':
+                        if k == "active":
                             new_active = bool(v)
-                        elif k == 'userName':
+                        elif k == "userName":
                             new_username = v
-                        elif k == 'emails':
+                        elif k == "emails":
                             if isinstance(v, list) and v:
-                                new_email = v[0].get('value', '')
+                                new_email = v[0].get("value", "")
                             elif isinstance(v, str):
                                 new_email = v
-                        elif k == 'name':
+                        elif k == "name":
                             if isinstance(v, dict):
-                                new_first = v.get('givenName', user.first_name)
-                                new_last = v.get('familyName', user.last_name)
+                                new_first = v.get("givenName", user.first_name)
+                                new_last = v.get("familyName", user.last_name)
                 else:
                     path_lower = path.lower() if path else ""
-                    if path_lower == 'active':
+                    if path_lower == "active":
                         if isinstance(value, str):
-                            new_active = (value.lower() == 'true')
+                            new_active = value.lower() == "true"
                         else:
                             new_active = bool(value)
-                    elif path_lower == 'username':
+                    elif path_lower == "username":
                         new_username = str(value)
-                    elif path_lower in ('email', 'emails', 'emails.value'):
+                    elif path_lower in ("email", "emails", "emails.value"):
                         if isinstance(value, list) and value:
-                            new_email = value[0].get('value', '')
+                            new_email = value[0].get("value", "")
                         else:
                             new_email = str(value)
-                    elif path_lower.startswith('name.'):
-                        sub = path_lower.split('.')[1]
-                        if sub == 'givenname':
+                    elif path_lower.startswith("name."):
+                        sub = path_lower.split(".")[1]
+                        if sub == "givenname":
                             new_first = str(value)
-                        elif sub == 'familyname':
+                        elif sub == "familyname":
                             new_last = str(value)
-                    elif path_lower == 'name':
+                    elif path_lower == "name":
                         if isinstance(value, dict):
-                            new_first = value.get('givenName', user.first_name)
-                            new_last = value.get('familyName', user.last_name)
+                            new_first = value.get("givenName", user.first_name)
+                            new_last = value.get("familyName", user.last_name)
 
         with transaction.atomic():
             user = self._apply_scim_identity(
-                user, username=new_username, email=new_email,
-                first_name=new_first, last_name=new_last, active=new_active,
+                user,
+                username=new_username,
+                email=new_email,
+                first_name=new_first,
+                last_name=new_last,
+                active=new_active,
             )
 
         serializer = SCIMUserSerializer(
-            user,
-            context={'request': request, 'tenant_slug': self.tenant.slug, 'tenant': self.tenant}
+            user, context={"request": request, "tenant_slug": self.tenant.slug, "tenant": self.tenant}
         )
         return Response(serializer.data, status=status.HTTP_200_OK)
 
@@ -538,21 +554,21 @@ class SCIMProviderUserDetailView(SCIMProviderMixin, APIView):
             # account instead of hard-deleting (same rule as the tenant SCIM path).
             if not Membership.objects.filter(user=user).exists():
                 user.is_active = False
-                user.save(update_fields=['is_active'])
+                user.save(update_fields=["is_active"])
         return Response(status=status.HTTP_204_NO_CONTENT)
 
 
 class SCIMProviderGroupListView(SCIMProviderMixin, APIView):
     def get(self, request, *args, **kwargs):
-        self.require_group_permission(request, 'users.view_usergroup')
+        self.require_group_permission(request, "users.view_usergroup")
         queryset = UserGroup.objects.filter(tenant=self.tenant)
 
         try:
-            start_index = int(request.query_params.get('startIndex', 1))
+            start_index = int(request.query_params.get("startIndex", 1))
         except ValueError:
             start_index = 1
         try:
-            count = int(request.query_params.get('count', 50))
+            count = int(request.query_params.get("count", 50))
         except ValueError:
             count = 50
         count = min(count, 200)  # Enforce maxResults upper bound
@@ -564,58 +580,73 @@ class SCIMProviderGroupListView(SCIMProviderMixin, APIView):
         sliced_queryset = queryset[start_index - 1 : start_index - 1 + count]
 
         serializer = SCIMGroupSerializer(
-            sliced_queryset, many=True, context={'request': request, 'tenant_slug': self.tenant.slug}
+            sliced_queryset, many=True, context={"request": request, "tenant_slug": self.tenant.slug}
         )
 
-        return Response({
-            "schemas": ["urn:ietf:params:scim:api:messages:2.0:ListResponse"],
-            "totalResults": total_results,
-            "itemsPerPage": len(serializer.data),
-            "startIndex": start_index,
-            "Resources": serializer.data
-        }, status=status.HTTP_200_OK)
+        return Response(
+            {
+                "schemas": ["urn:ietf:params:scim:api:messages:2.0:ListResponse"],
+                "totalResults": total_results,
+                "itemsPerPage": len(serializer.data),
+                "startIndex": start_index,
+                "Resources": serializer.data,
+            },
+            status=status.HTTP_200_OK,
+        )
 
     def post(self, request, *args, **kwargs):
-        self.require_group_permission(request, 'users.add_usergroup')
-        name = request.data.get('displayName')
+        self.require_group_permission(request, "users.add_usergroup")
+        name = request.data.get("displayName")
         if not name:
-            return Response({
-                "schemas": ["urn:ietf:params:scim:api:messages:2.0:Error"],
-                "status": "400",
-                "detail": "displayName is required"
-            }, status=status.HTTP_400_BAD_REQUEST)
+            return Response(
+                {
+                    "schemas": ["urn:ietf:params:scim:api:messages:2.0:Error"],
+                    "status": "400",
+                    "detail": "displayName is required",
+                },
+                status=status.HTTP_400_BAD_REQUEST,
+            )
 
         if name and len(name) > 100:
-            return Response({
-                "schemas": ["urn:ietf:params:scim:api:messages:2.0:Error"],
-                "status": "400",
-                "detail": "displayName exceeds maximum length of 100 characters."
-            }, status=status.HTTP_400_BAD_REQUEST)
+            return Response(
+                {
+                    "schemas": ["urn:ietf:params:scim:api:messages:2.0:Error"],
+                    "status": "400",
+                    "detail": "displayName exceeds maximum length of 100 characters.",
+                },
+                status=status.HTTP_400_BAD_REQUEST,
+            )
 
         # Group names are unique PER OWNING TENANT (active rows): reject only a
         # duplicate within THIS managing tenant, surfacing a clean 409 rather than a DB
         # IntegrityError. A different tenant may legitimately reuse the same displayName.
         if UserGroup.objects.filter(tenant=self.tenant, name=name).exists():
-            return Response({
-                "schemas": ["urn:ietf:params:scim:api:messages:2.0:Error"],
-                "status": "409",
-                "detail": "Group already exists"
-            }, status=status.HTTP_409_CONFLICT)
+            return Response(
+                {
+                    "schemas": ["urn:ietf:params:scim:api:messages:2.0:Error"],
+                    "status": "409",
+                    "detail": "Group already exists",
+                },
+                status=status.HTTP_409_CONFLICT,
+            )
 
-        members = request.data.get('members', [])
+        members = request.data.get("members", [])
         member_ids = set()
         if members and isinstance(members, list):
             for item in members:
-                uid = item.get('value')
+                uid = item.get("value")
                 if uid:
                     try:
                         member_ids.add(int(uid))
                     except (ValueError, TypeError):
-                        return Response({
-                            "schemas": ["urn:ietf:params:scim:api:messages:2.0:Error"],
-                            "status": "400",
-                            "detail": f"Invalid member ID: {uid}"
-                        }, status=status.HTTP_400_BAD_REQUEST)
+                        return Response(
+                            {
+                                "schemas": ["urn:ietf:params:scim:api:messages:2.0:Error"],
+                                "status": "400",
+                                "detail": f"Invalid member ID: {uid}",
+                            },
+                            status=status.HTTP_400_BAD_REQUEST,
+                        )
 
         with transaction.atomic():
             group = UserGroup.objects.create(
@@ -623,78 +654,91 @@ class SCIMProviderGroupListView(SCIMProviderMixin, APIView):
                 name=name,
             )
             sync_provider_group_members(
-                self.tenant, group, member_ids, actor=request.user,
+                self.tenant,
+                group,
+                member_ids,
+                actor=request.user,
             )
 
-        serializer = SCIMGroupSerializer(group, context={'request': request, 'tenant_slug': self.tenant.slug})
+        serializer = SCIMGroupSerializer(group, context={"request": request, "tenant_slug": self.tenant.slug})
         return Response(serializer.data, status=status.HTTP_201_CREATED)
 
 
 class SCIMProviderGroupDetailView(SCIMProviderMixin, APIView):
     def get(self, request, pk, *args, **kwargs):
-        self.require_group_permission(request, 'users.view_usergroup')
+        self.require_group_permission(request, "users.view_usergroup")
         group = get_object_or_404(UserGroup.objects.filter(tenant=self.tenant), id=pk)
-        serializer = SCIMGroupSerializer(group, context={'request': request, 'tenant_slug': self.tenant.slug})
+        serializer = SCIMGroupSerializer(group, context={"request": request, "tenant_slug": self.tenant.slug})
         return Response(serializer.data, status=status.HTTP_200_OK)
 
     def put(self, request, pk, *args, **kwargs):
-        self.require_group_permission(request, 'users.change_usergroup')
+        self.require_group_permission(request, "users.change_usergroup")
         group = get_object_or_404(UserGroup.objects.filter(tenant=self.tenant), id=pk)
 
-        name = request.data.get('displayName')
+        name = request.data.get("displayName")
         if not name:
-            return Response({
-                "schemas": ["urn:ietf:params:scim:api:messages:2.0:Error"],
-                "status": "400",
-                "detail": "displayName is required"
-            }, status=status.HTTP_400_BAD_REQUEST)
+            return Response(
+                {
+                    "schemas": ["urn:ietf:params:scim:api:messages:2.0:Error"],
+                    "status": "400",
+                    "detail": "displayName is required",
+                },
+                status=status.HTTP_400_BAD_REQUEST,
+            )
 
         if name and len(name) > 100:
-            return Response({
-                "schemas": ["urn:ietf:params:scim:api:messages:2.0:Error"],
-                "status": "400",
-                "detail": "displayName exceeds maximum length of 100 characters."
-            }, status=status.HTTP_400_BAD_REQUEST)
+            return Response(
+                {
+                    "schemas": ["urn:ietf:params:scim:api:messages:2.0:Error"],
+                    "status": "400",
+                    "detail": "displayName exceeds maximum length of 100 characters.",
+                },
+                status=status.HTTP_400_BAD_REQUEST,
+            )
 
-        members = request.data.get('members', [])
+        members = request.data.get("members", [])
         member_ids = set()
         if members and isinstance(members, list):
             for item in members:
-                uid = item.get('value')
+                uid = item.get("value")
                 if uid:
                     try:
                         member_ids.add(int(uid))
                     except (ValueError, TypeError):
-                        return Response({
-                            "schemas": ["urn:ietf:params:scim:api:messages:2.0:Error"],
-                            "status": "400",
-                            "detail": f"Invalid member ID: {uid}"
-                        }, status=status.HTTP_400_BAD_REQUEST)
+                        return Response(
+                            {
+                                "schemas": ["urn:ietf:params:scim:api:messages:2.0:Error"],
+                                "status": "400",
+                                "detail": f"Invalid member ID: {uid}",
+                            },
+                            status=status.HTTP_400_BAD_REQUEST,
+                        )
 
         with transaction.atomic():
             group.name = name
             group.save()
             sync_provider_group_members(
-                self.tenant, group, member_ids, actor=request.user,
+                self.tenant,
+                group,
+                member_ids,
+                actor=request.user,
             )
 
-        serializer = SCIMGroupSerializer(group, context={'request': request, 'tenant_slug': self.tenant.slug})
+        serializer = SCIMGroupSerializer(group, context={"request": request, "tenant_slug": self.tenant.slug})
         return Response(serializer.data, status=status.HTTP_200_OK)
 
     def patch(self, request, pk, *args, **kwargs):
-        self.require_group_permission(request, 'users.change_usergroup')
+        self.require_group_permission(request, "users.change_usergroup")
         group = get_object_or_404(UserGroup.objects.filter(tenant=self.tenant), id=pk)
 
         # Build the desired member id set from the current group state, then apply PATCH ops.
-        current_member_ids = set(
-            group.group_memberships.values_list('membership__user_id', flat=True)
-        )
+        current_member_ids = set(group.group_memberships.values_list("membership__user_id", flat=True))
 
         with transaction.atomic():
-            for op in request.data.get('Operations', []):
-                op_type = op.get('op', '').lower()
-                path = op.get('path', '')
-                value = op.get('value')
+            for op in request.data.get("Operations", []):
+                op_type = op.get("op", "").lower()
+                path = op.get("path", "")
+                value = op.get("value")
 
                 val_list = []
                 if isinstance(value, list):
@@ -702,87 +746,108 @@ class SCIMProviderGroupDetailView(SCIMProviderMixin, APIView):
                 elif isinstance(value, dict):
                     val_list = [value]
 
-                if op_type == 'add':
+                if op_type == "add":
                     for item in val_list:
-                        uid = item.get('value')
+                        uid = item.get("value")
                         if uid:
                             try:
                                 current_member_ids.add(int(uid))
                             except (ValueError, TypeError):
-                                return Response({
-                                    "schemas": ["urn:ietf:params:scim:api:messages:2.0:Error"],
-                                    "status": "400",
-                                    "detail": f"Invalid member ID: {uid}"
-                                }, status=status.HTTP_400_BAD_REQUEST)
-                elif op_type == 'remove':
-                    if path and 'value eq' in path:
+                                return Response(
+                                    {
+                                        "schemas": ["urn:ietf:params:scim:api:messages:2.0:Error"],
+                                        "status": "400",
+                                        "detail": f"Invalid member ID: {uid}",
+                                    },
+                                    status=status.HTTP_400_BAD_REQUEST,
+                                )
+                elif op_type == "remove":
+                    if path and "value eq" in path:
                         match = re.search(r'value\s+eq\s+["\']?([^"\']+)["\']?', path, re.IGNORECASE)
                         if match:
                             uid = match.group(1)
                             try:
                                 current_member_ids.discard(int(uid))
                             except (ValueError, TypeError):
-                                return Response({
-                                    "schemas": ["urn:ietf:params:scim:api:messages:2.0:Error"],
-                                    "status": "400",
-                                    "detail": f"Invalid member ID: {uid}"
-                                }, status=status.HTTP_400_BAD_REQUEST)
+                                return Response(
+                                    {
+                                        "schemas": ["urn:ietf:params:scim:api:messages:2.0:Error"],
+                                        "status": "400",
+                                        "detail": f"Invalid member ID: {uid}",
+                                    },
+                                    status=status.HTTP_400_BAD_REQUEST,
+                                )
                     elif val_list:
                         for item in val_list:
-                            uid = item.get('value')
+                            uid = item.get("value")
                             if uid:
                                 try:
                                     current_member_ids.discard(int(uid))
                                 except (ValueError, TypeError):
-                                    return Response({
-                                        "schemas": ["urn:ietf:params:scim:api:messages:2.0:Error"],
-                                        "status": "400",
-                                        "detail": f"Invalid member ID: {uid}"
-                                    }, status=status.HTTP_400_BAD_REQUEST)
+                                    return Response(
+                                        {
+                                            "schemas": ["urn:ietf:params:scim:api:messages:2.0:Error"],
+                                            "status": "400",
+                                            "detail": f"Invalid member ID: {uid}",
+                                        },
+                                        status=status.HTTP_400_BAD_REQUEST,
+                                    )
                     elif not path and not val_list:
                         current_member_ids = set()
-                elif op_type == 'replace':
-                    if path == 'displayName' and isinstance(value, str):
+                elif op_type == "replace":
+                    if path == "displayName" and isinstance(value, str):
                         if len(value) > 100:
-                            return Response({
-                                "schemas": ["urn:ietf:params:scim:api:messages:2.0:Error"],
-                                "status": "400",
-                                "detail": "displayName exceeds maximum length of 100 characters."
-                            }, status=status.HTTP_400_BAD_REQUEST)
+                            return Response(
+                                {
+                                    "schemas": ["urn:ietf:params:scim:api:messages:2.0:Error"],
+                                    "status": "400",
+                                    "detail": "displayName exceeds maximum length of 100 characters.",
+                                },
+                                status=status.HTTP_400_BAD_REQUEST,
+                            )
                         group.name = value
-                    elif isinstance(value, dict) and 'displayName' in value:
-                        display_name = value['displayName']
+                    elif isinstance(value, dict) and "displayName" in value:
+                        display_name = value["displayName"]
                         if display_name and len(display_name) > 100:
-                            return Response({
-                                "schemas": ["urn:ietf:params:scim:api:messages:2.0:Error"],
-                                "status": "400",
-                                "detail": "displayName exceeds maximum length of 100 characters."
-                            }, status=status.HTTP_400_BAD_REQUEST)
+                            return Response(
+                                {
+                                    "schemas": ["urn:ietf:params:scim:api:messages:2.0:Error"],
+                                    "status": "400",
+                                    "detail": "displayName exceeds maximum length of 100 characters.",
+                                },
+                                status=status.HTTP_400_BAD_REQUEST,
+                            )
                         group.name = display_name
-                    elif path == 'members' or not path:
+                    elif path == "members" or not path:
                         current_member_ids = set()
                         for item in val_list:
-                            uid = item.get('value')
+                            uid = item.get("value")
                             if uid:
                                 try:
                                     current_member_ids.add(int(uid))
                                 except (ValueError, TypeError):
-                                    return Response({
-                                        "schemas": ["urn:ietf:params:scim:api:messages:2.0:Error"],
-                                        "status": "400",
-                                        "detail": f"Invalid member ID: {uid}"
-                                    }, status=status.HTTP_400_BAD_REQUEST)
+                                    return Response(
+                                        {
+                                            "schemas": ["urn:ietf:params:scim:api:messages:2.0:Error"],
+                                            "status": "400",
+                                            "detail": f"Invalid member ID: {uid}",
+                                        },
+                                        status=status.HTTP_400_BAD_REQUEST,
+                                    )
 
             group.save()
             sync_provider_group_members(
-                self.tenant, group, current_member_ids, actor=request.user,
+                self.tenant,
+                group,
+                current_member_ids,
+                actor=request.user,
             )
 
-        serializer = SCIMGroupSerializer(group, context={'request': request, 'tenant_slug': self.tenant.slug})
+        serializer = SCIMGroupSerializer(group, context={"request": request, "tenant_slug": self.tenant.slug})
         return Response(serializer.data, status=status.HTTP_200_OK)
 
     def delete(self, request, pk, *args, **kwargs):
-        self.require_group_permission(request, 'users.delete_usergroup')
+        self.require_group_permission(request, "users.delete_usergroup")
         group = get_object_or_404(UserGroup.objects.filter(tenant=self.tenant), id=pk)
         with transaction.atomic():
             # Soft-delete via the model's delete() for change-logging.

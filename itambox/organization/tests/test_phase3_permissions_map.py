@@ -8,6 +8,7 @@ cover the grant's own principal tenant — ``covers_tenant()`` already encodes
 that — so the map must not add the principal tenant just because it is the
 grant's owner.
 """
+
 from datetime import timedelta
 
 from django.contrib.auth import get_user_model
@@ -15,7 +16,12 @@ from django.test import TestCase
 from django.utils import timezone
 
 from organization.models import (
-    Membership, Role, RoleGrant, RoleGrantScope, Tenant, TenantGroup,
+    Membership,
+    Role,
+    RoleGrant,
+    RoleGrantScope,
+    Tenant,
+    TenantGroup,
 )
 from organization.rbac import (
     build_accessible_tenant_permissions_map,
@@ -28,28 +34,36 @@ User = get_user_model()
 class TenantPermissionsMapOwnScopeTests(TestCase):
     def setUp(self):
         self.provider = Tenant.objects.create(
-            name='Phase3 Provider', slug='phase3-provider', is_provider=True,
+            name="Phase3 Provider",
+            slug="phase3-provider",
+            is_provider=True,
         )
         self.customer = Tenant.objects.create(
-            name='Phase3 Customer', slug='phase3-customer', managed_by=self.provider,
+            name="Phase3 Customer",
+            slug="phase3-customer",
+            managed_by=self.provider,
         )
-        self.group = TenantGroup.objects.create(name='Phase3 Group', slug='phase3-group')
+        self.group = TenantGroup.objects.create(name="Phase3 Group", slug="phase3-group")
         self.grouped_customer = Tenant.objects.create(
-            name='Phase3 Grouped Customer', slug='phase3-grouped-customer',
-            managed_by=self.provider, group=self.group,
+            name="Phase3 Grouped Customer",
+            slug="phase3-grouped-customer",
+            managed_by=self.provider,
+            group=self.group,
         )
-        self.user = User.objects.create_user(username='phase3-tech')
+        self.user = User.objects.create_user(username="phase3-tech")
         self.membership = Membership.objects.create(user=self.user, tenant=self.provider)
         self.role = Role.objects.create(
             tenant=self.provider,
-            name='Phase3 reader',
-            permissions=['assets.view_asset'],
+            name="Phase3 reader",
+            permissions=["assets.view_asset"],
         )
 
     def _grant(self, scope_type, tenant_group=None):
         role_grant = RoleGrant.objects.create(membership=self.membership, role=self.role)
         RoleGrantScope.objects.create(
-            role_grant=role_grant, scope_type=scope_type, tenant_group=tenant_group,
+            role_grant=role_grant,
+            scope_type=scope_type,
+            tenant_group=tenant_group,
         )
         return role_grant
 
@@ -60,7 +74,7 @@ class TenantPermissionsMapOwnScopeTests(TestCase):
 
         self.assertNotIn(self.provider.pk, perm_map)
         self.assertIn(self.customer.pk, perm_map)
-        self.assertIn('assets.view_asset', perm_map[self.customer.pk][0])
+        self.assertIn("assets.view_asset", perm_map[self.customer.pk][0])
 
         # The fast-path map must agree with the canonical covers_tenant() walk.
         self.assertEqual(
@@ -75,7 +89,7 @@ class TenantPermissionsMapOwnScopeTests(TestCase):
 
         self.assertNotIn(self.provider.pk, perm_map)
         self.assertIn(self.grouped_customer.pk, perm_map)
-        self.assertIn('assets.view_asset', perm_map[self.grouped_customer.pk][0])
+        self.assertIn("assets.view_asset", perm_map[self.grouped_customer.pk][0])
 
     def test_warm_map_agrees_with_canonical_lookup_for_principal_tenant(self):
         self._grant(RoleGrantScope.SCOPE_ALL_MANAGED)
@@ -94,16 +108,21 @@ class TenantPermissionsMapOwnScopeTests(TestCase):
 
         first = self._grant(RoleGrantScope.SCOPE_ALL_MANAGED)
         first.valid_until = far
-        first.save(update_fields=['valid_until'])
+        first.save(update_fields=["valid_until"])
 
         second_role = Role.objects.create(
-            tenant=self.provider, name='Phase3 reader 2', permissions=['assets.view_asset'],
+            tenant=self.provider,
+            name="Phase3 reader 2",
+            permissions=["assets.view_asset"],
         )
         second = RoleGrant.objects.create(
-            membership=self.membership, role=second_role, valid_until=near,
+            membership=self.membership,
+            role=second_role,
+            valid_until=near,
         )
         RoleGrantScope.objects.create(
-            role_grant=second, scope_type=RoleGrantScope.SCOPE_ALL_MANAGED,
+            role_grant=second,
+            scope_type=RoleGrantScope.SCOPE_ALL_MANAGED,
         )
 
         perm_map = build_accessible_tenant_permissions_map(self.user)

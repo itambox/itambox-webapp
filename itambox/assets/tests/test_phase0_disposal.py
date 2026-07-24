@@ -8,16 +8,15 @@ compute_book_value short-circuits on disposed_at and the residual is lost
 Run with:
     pytest assets/tests/test_phase0_disposal.py
 """
+
 import datetime
 from decimal import Decimal
 
 import pytest
 from django.contrib.auth import get_user_model
 from django.test import TestCase
-
 from model_bakery import baker
 
-from core.tests.mixins import TenantTestMixin
 from assets.depreciation import compute_book_value
 from assets.models import (
     Asset,
@@ -28,6 +27,7 @@ from assets.models import (
     StatusLabel,
 )
 from assets.services import dispose_asset
+from core.tests.mixins import TenantTestMixin
 
 User = get_user_model()
 
@@ -42,26 +42,30 @@ class DisposeAssetFreezesResidualTest(TenantTestMixin, TestCase):
         self.set_active_tenant(self.tenant)
 
         self.user = baker.make(User, is_superuser=True, is_staff=True)
-        self.mfg = Manufacturer.objects.create(name='Acme', slug='acme-p0')
+        self.mfg = Manufacturer.objects.create(name="Acme", slug="acme-p0")
         # 36-month straight-line policy, exclude purchase month.
         self.policy = Depreciation.objects.create(
-            name='P0 36M', months=36, method='straight_line',
-            convention='exclude_purchase_month',
+            name="P0 36M",
+            months=36,
+            method="straight_line",
+            convention="exclude_purchase_month",
         )
         self.asset_type = AssetType.objects.create(
-            manufacturer=self.mfg, model='WidgetPro', slug='acme-p0-widgetpro',
+            manufacturer=self.mfg,
+            model="WidgetPro",
+            slug="acme-p0-widgetpro",
             depreciation=self.policy,
         )
         # Use names unique to this test — default seed data already ships an
         # "Available"/"Retired" label and StatusLabel.name is uniquely constrained
         # among active rows.
         self.status_deployable, _ = StatusLabel.objects.get_or_create(
-            slug='available-p0',
-            defaults={'name': 'P0 Deployable', 'type': 'deployable', 'color': '28a745'},
+            slug="available-p0",
+            defaults={"name": "P0 Deployable", "type": "deployable", "color": "28a745"},
         )
         self.status_archived, _ = StatusLabel.objects.get_or_create(
-            slug='retired-p0',
-            defaults={'name': 'P0 Archived', 'type': 'archived', 'color': 'dc3545'},
+            slug="retired-p0",
+            defaults={"name": "P0 Archived", "type": "archived", "color": "dc3545"},
         )
 
     def test_dispose_with_no_proceeds_freezes_depreciated_residual(self):
@@ -71,19 +75,19 @@ class DisposeAssetFreezesResidualTest(TenantTestMixin, TestCase):
         purchase_date = datetime.date(2024, 1, 1)
         disposal_date = datetime.date(2024, 7, 1)
         asset = Asset.objects.create(
-            name='Widget P0',
-            asset_tag='TAG-P0-1',
+            name="Widget P0",
+            asset_tag="TAG-P0-1",
             asset_type=self.asset_type,
             status=self.status_deployable,
-            purchase_cost=Decimal('1200.00'),
-            salvage_value=Decimal('0.00'),
+            purchase_cost=Decimal("1200.00"),
+            salvage_value=Decimal("0.00"),
             purchase_date=purchase_date,
             tenant=self.tenant,
         )
 
         # Expected residual computed BEFORE disposed_at is set.
         expected_residual = compute_book_value(asset, on_date=disposal_date)
-        self.assertEqual(expected_residual, Decimal('1000.00'))
+        self.assertEqual(expected_residual, Decimal("1000.00"))
         self.assertTrue(expected_residual > 0)
 
         dispose_asset(

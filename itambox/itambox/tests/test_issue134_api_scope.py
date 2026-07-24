@@ -17,6 +17,7 @@ a multi-tenant-scope create fails closed, token requests stay single-tenant, and
 superuser behaviour is unchanged. The exercised users hold NO AssetHolder profile
 so the obsolete fallback cannot mask a regression.
 """
+
 from django.contrib.auth import get_user_model
 from django.urls import reverse
 from django.utils import timezone
@@ -46,12 +47,16 @@ from users.models import GroupMembership, Token, UserGroup
 User = get_user_model()
 
 CHANNEL_PERMS = [
-    'extras.view_notificationchannel', 'extras.add_notificationchannel',
-    'extras.change_notificationchannel', 'extras.delete_notificationchannel',
+    "extras.view_notificationchannel",
+    "extras.add_notificationchannel",
+    "extras.change_notificationchannel",
+    "extras.delete_notificationchannel",
 ]
 ALERT_PERMS = [
-    'extras.view_alertrule', 'extras.add_alertrule',
-    'extras.change_alertrule', 'extras.delete_alertrule',
+    "extras.view_alertrule",
+    "extras.add_alertrule",
+    "extras.change_alertrule",
+    "extras.delete_alertrule",
 ]
 
 
@@ -65,7 +70,9 @@ def _reset_scope():
 
 def _channel(name, tenant):
     return NotificationChannel.objects.create(
-        name=name, channel_type=NotificationChannel.TYPE_IN_APP, tenant=tenant,
+        name=name,
+        channel_type=NotificationChannel.TYPE_IN_APP,
+        tenant=tenant,
     )
 
 
@@ -77,76 +84,109 @@ class AllAccessibleRestReadTests(APITestCase):
 
     def setUp(self):
         _reset_scope()
-        self.region = TenantGroup.objects.create(name='Region', slug='i134r')
+        self.region = TenantGroup.objects.create(name="Region", slug="i134r")
         self.region_west = TenantGroup.objects.create(
-            name='Region West', slug='i134rw', parent=self.region,
+            name="Region West",
+            slug="i134rw",
+            parent=self.region,
         )
         self.provider = Tenant.objects.create(
-            name='Provider', slug='i134-prov', is_provider=True,
+            name="Provider",
+            slug="i134-prov",
+            is_provider=True,
         )
         self.cust_a = Tenant.objects.create(  # direct membership
-            name='Cust A', slug='i134-a', managed_by=self.provider, group=self.region,
+            name="Cust A",
+            slug="i134-a",
+            managed_by=self.provider,
+            group=self.region,
         )
         self.cust_b = Tenant.objects.create(  # managed reach
-            name='Cust B', slug='i134-b', managed_by=self.provider, group=self.region,
+            name="Cust B",
+            slug="i134-b",
+            managed_by=self.provider,
+            group=self.region,
         )
         self.cust_c = Tenant.objects.create(  # UserGroup-derived
-            name='Cust C', slug='i134-c', managed_by=self.provider, group=self.region_west,
+            name="Cust C",
+            slug="i134-c",
+            managed_by=self.provider,
+            group=self.region_west,
         )
         self.cust_d = Tenant.objects.create(  # NOT accessible
-            name='Cust D', slug='i134-d', managed_by=self.provider, group=self.region,
+            name="Cust D",
+            slug="i134-d",
+            managed_by=self.provider,
+            group=self.region,
         )
         self.cust_e = Tenant.objects.create(  # accessible, then soft-deleted
-            name='Cust E', slug='i134-e', managed_by=self.provider, group=self.region,
+            name="Cust E",
+            slug="i134-e",
+            managed_by=self.provider,
+            group=self.region,
         )
 
         self.tech_role = Role.objects.create(
-            tenant=self.provider, name='Tech', permissions=CHANNEL_PERMS,
+            tenant=self.provider,
+            name="Tech",
+            permissions=CHANNEL_PERMS,
         )
         self.role_a = Role.objects.create(
-            tenant=self.cust_a, name='A Direct', permissions=CHANNEL_PERMS,
+            tenant=self.cust_a,
+            name="A Direct",
+            permissions=CHANNEL_PERMS,
         )
         self.role_e = Role.objects.create(
-            tenant=self.cust_e, name='E Direct', permissions=CHANNEL_PERMS,
+            tenant=self.cust_e,
+            name="E Direct",
+            permissions=CHANNEL_PERMS,
         )
 
-        self.member = User.objects.create_user(username='i134-reader', password='pw')
+        self.member = User.objects.create_user(username="i134-reader", password="pw")
         # 1) direct membership in cust_a
         grant(self.member, self.cust_a, self.role_a)
         # 2) managed reach to cust_b (rides on a provider membership)
         grant(
-            self.member, self.provider, self.tech_role,
+            self.member,
+            self.provider,
+            self.tech_role,
             reach=RoleGrant.REACH_MANAGED,
             managed_scope=RoleGrantScope.SCOPE_TENANT,
             assigned_tenants=[self.cust_b],
         )
         # 3) UserGroup-derived access to cust_c
         user_group = UserGroup.objects.create(
-            name='Team', slug='i134-team', tenant=self.provider,
+            name="Team",
+            slug="i134-team",
+            tenant=self.provider,
         )
         provider_membership = Membership.objects.get(user=self.member, tenant=self.provider)
         GroupMembership.objects.create(user_group=user_group, membership=provider_membership)
         group_grant = RoleGrant.objects.create(user_group=user_group, role=self.tech_role)
         RoleGrantScope.objects.create(
-            role_grant=group_grant, scope_type=RoleGrantScope.SCOPE_TENANT, tenant=self.cust_c,
+            role_grant=group_grant,
+            scope_type=RoleGrantScope.SCOPE_TENANT,
+            tenant=self.cust_c,
         )
         # 4) accessible-then-soft-deleted membership in cust_e
         grant(self.member, self.cust_e, self.role_e)
 
-        self.ch_a = _channel('CH A', self.cust_a)
-        self.ch_b = _channel('CH B', self.cust_b)
-        self.ch_c = _channel('CH C', self.cust_c)
-        self.ch_d = _channel('CH D', self.cust_d)
-        self.ch_e = _channel('CH E', self.cust_e)
-        self.ch_global = _channel('CH Global', None)
+        self.ch_a = _channel("CH A", self.cust_a)
+        self.ch_b = _channel("CH B", self.cust_b)
+        self.ch_c = _channel("CH C", self.cust_c)
+        self.ch_d = _channel("CH D", self.cust_d)
+        self.ch_e = _channel("CH E", self.cust_e)
+        self.ch_global = _channel("CH Global", None)
 
         # Soft-delete cust_e AFTER its channel exists: the tenant leaves the
         # accessible set, so its (still-present) channel must drop out of scope.
         self.cust_e.deleted_at = timezone.now()
-        self.cust_e.save(update_fields=['deleted_at'])
+        self.cust_e.save(update_fields=["deleted_at"])
 
         self.superuser = User.objects.create_superuser(
-            username='i134-su', email='i134-su@x.com', password='pw',
+            username="i134-su",
+            email="i134-su@x.com",
+            password="pw",
         )
 
         self.assertFalse(AssetHolder._base_manager.filter(user=self.member).exists())
@@ -157,20 +197,20 @@ class AllAccessibleRestReadTests(APITestCase):
     def _login_all_accessible(self, user):
         self.client.force_login(user)
         session = self.client.session
-        session['active_all_accessible'] = True
+        session["active_all_accessible"] = True
         session.save()
 
     def _list_ids(self, resp):
         data = resp.data
-        rows = data['results'] if isinstance(data, dict) and 'results' in data else data
-        return {row['id'] for row in rows}
+        rows = data["results"] if isinstance(data, dict) and "results" in data else data
+        return {row["id"] for row in rows}
 
     def _detail(self, pk):
-        return reverse('api:extras_api:notificationchannel-detail', kwargs={'pk': pk})
+        return reverse("api:extras_api:notificationchannel-detail", kwargs={"pk": pk})
 
     def test_list_returns_exactly_authorized_set(self):
         self._login_all_accessible(self.member)
-        resp = self.client.get(reverse('api:extras_api:notificationchannel-list'))
+        resp = self.client.get(reverse("api:extras_api:notificationchannel-list"))
         self.assertEqual(resp.status_code, status.HTTP_200_OK, resp.data)
         self.assertEqual(
             self._list_ids(resp),
@@ -204,7 +244,7 @@ class AllAccessibleRestReadTests(APITestCase):
 
     def test_superuser_global_scope_unchanged(self):
         self.client.force_authenticate(self.superuser)
-        resp = self.client.get(reverse('api:extras_api:notificationchannel-list'))
+        resp = self.client.get(reverse("api:extras_api:notificationchannel-list"))
         self.assertEqual(resp.status_code, status.HTTP_200_OK)
         ids = self._list_ids(resp)
         for pk in (self.ch_a.pk, self.ch_b.pk, self.ch_c.pk, self.ch_d.pk, self.ch_global.pk):
@@ -220,22 +260,28 @@ class GroupScopeRestWriteTests(APITestCase):
 
     def setUp(self):
         _reset_scope()
-        self.region = TenantGroup.objects.create(name='WRegion', slug='i134w')
-        self.cust_a = Tenant.objects.create(name='WA', slug='i134w-a', group=self.region)
-        self.cust_b = Tenant.objects.create(name='WB', slug='i134w-b', group=self.region)
-        self.cust_d = Tenant.objects.create(name='WD', slug='i134w-d', group=self.region)
-        self.role_a = Role.objects.create(tenant=self.cust_a, name='WA role', permissions=ALERT_PERMS)
-        self.role_b = Role.objects.create(tenant=self.cust_b, name='WB role', permissions=ALERT_PERMS)
-        self.member = User.objects.create_user(username='i134-writer', password='pw')
+        self.region = TenantGroup.objects.create(name="WRegion", slug="i134w")
+        self.cust_a = Tenant.objects.create(name="WA", slug="i134w-a", group=self.region)
+        self.cust_b = Tenant.objects.create(name="WB", slug="i134w-b", group=self.region)
+        self.cust_d = Tenant.objects.create(name="WD", slug="i134w-d", group=self.region)
+        self.role_a = Role.objects.create(tenant=self.cust_a, name="WA role", permissions=ALERT_PERMS)
+        self.role_b = Role.objects.create(tenant=self.cust_b, name="WB role", permissions=ALERT_PERMS)
+        self.member = User.objects.create_user(username="i134-writer", password="pw")
         grant(self.member, self.cust_a, self.role_a)
         grant(self.member, self.cust_b, self.role_b)
         self.rule_a = AlertRule.objects.create(
-            name='Rule A', alert_type=AlertRule.ALERT_TYPE_LOW_STOCK,
-            threshold_value=5, severity=AlertRule.SEVERITY_WARNING, tenant=self.cust_a,
+            name="Rule A",
+            alert_type=AlertRule.ALERT_TYPE_LOW_STOCK,
+            threshold_value=5,
+            severity=AlertRule.SEVERITY_WARNING,
+            tenant=self.cust_a,
         )
         self.rule_d = AlertRule.objects.create(
-            name='Rule D', alert_type=AlertRule.ALERT_TYPE_LOW_STOCK,
-            threshold_value=5, severity=AlertRule.SEVERITY_WARNING, tenant=self.cust_d,
+            name="Rule D",
+            alert_type=AlertRule.ALERT_TYPE_LOW_STOCK,
+            threshold_value=5,
+            severity=AlertRule.SEVERITY_WARNING,
+            tenant=self.cust_d,
         )
         self.assertFalse(AssetHolder._base_manager.filter(user=self.member).exists())
 
@@ -245,11 +291,11 @@ class GroupScopeRestWriteTests(APITestCase):
     def _login_group_scope(self):
         self.client.force_login(self.member)
         session = self.client.session
-        session['active_tenant_group_id'] = self.region.pk
+        session["active_tenant_group_id"] = self.region.pk
         session.save()
 
     def _detail(self, pk):
-        return reverse('api:extras_api:alertrule-detail', kwargs={'pk': pk})
+        return reverse("api:extras_api:alertrule-detail", kwargs={"pk": pk})
 
     @staticmethod
     def _etag(rule):
@@ -260,12 +306,14 @@ class GroupScopeRestWriteTests(APITestCase):
         self._login_group_scope()
         before = AlertRule._base_manager.count()
         resp = self.client.post(
-            reverse('api:extras_api:alertrule-list'),
+            reverse("api:extras_api:alertrule-list"),
             data={
-                'name': 'Sneaky Global', 'alert_type': AlertRule.ALERT_TYPE_LOW_STOCK,
-                'threshold_value': 3, 'severity': AlertRule.SEVERITY_INFO,
+                "name": "Sneaky Global",
+                "alert_type": AlertRule.ALERT_TYPE_LOW_STOCK,
+                "threshold_value": 3,
+                "severity": AlertRule.SEVERITY_INFO,
             },
-            format='json',
+            format="json",
         )
         # No single active tenant + omitted tenant => fail closed, never a 201.
         self.assertIn(
@@ -274,26 +322,24 @@ class GroupScopeRestWriteTests(APITestCase):
             resp.data,
         )
         self.assertEqual(AlertRule._base_manager.count(), before)
-        self.assertFalse(
-            AlertRule._base_manager.filter(name='Sneaky Global', tenant__isnull=True).exists()
-        )
+        self.assertFalse(AlertRule._base_manager.filter(name="Sneaky Global", tenant__isnull=True).exists())
 
     def test_bulk_create_without_tenant_fails_closed_no_global_rows(self):
         self._login_group_scope()
         before = AlertRule._base_manager.count()
-        names = ['Sneaky Bulk Global A', 'Sneaky Bulk Global B']
+        names = ["Sneaky Bulk Global A", "Sneaky Bulk Global B"]
         resp = self.client.post(
-            reverse('api:extras_api:alertrule-list'),
+            reverse("api:extras_api:alertrule-list"),
             data=[
                 {
-                    'name': name,
-                    'alert_type': AlertRule.ALERT_TYPE_LOW_STOCK,
-                    'threshold_value': 3,
-                    'severity': AlertRule.SEVERITY_INFO,
+                    "name": name,
+                    "alert_type": AlertRule.ALERT_TYPE_LOW_STOCK,
+                    "threshold_value": 3,
+                    "severity": AlertRule.SEVERITY_INFO,
                 }
                 for name in names
             ],
-            format='json',
+            format="json",
         )
         self.assertIn(
             resp.status_code,
@@ -301,15 +347,15 @@ class GroupScopeRestWriteTests(APITestCase):
             resp.data,
         )
         self.assertEqual(AlertRule._base_manager.count(), before)
-        self.assertFalse(
-            AlertRule._base_manager.filter(name__in=names, tenant__isnull=True).exists()
-        )
+        self.assertFalse(AlertRule._base_manager.filter(name__in=names, tenant__isnull=True).exists())
 
     def test_update_accessible_object_succeeds_via_object_tenant(self):
         self._login_group_scope()
         resp = self.client.patch(
-            self._detail(self.rule_a.pk), {'severity': AlertRule.SEVERITY_CRITICAL},
-            format='json', HTTP_IF_MATCH=self._etag(self.rule_a),
+            self._detail(self.rule_a.pk),
+            {"severity": AlertRule.SEVERITY_CRITICAL},
+            format="json",
+            HTTP_IF_MATCH=self._etag(self.rule_a),
         )
         self.assertEqual(resp.status_code, status.HTTP_200_OK, resp.data)
         self.rule_a.refresh_from_db()
@@ -319,8 +365,10 @@ class GroupScopeRestWriteTests(APITestCase):
     def test_update_inaccessible_object_returns_404(self):
         self._login_group_scope()
         resp = self.client.patch(
-            self._detail(self.rule_d.pk), {'severity': AlertRule.SEVERITY_CRITICAL},
-            format='json', HTTP_IF_MATCH=self._etag(self.rule_d),
+            self._detail(self.rule_d.pk),
+            {"severity": AlertRule.SEVERITY_CRITICAL},
+            format="json",
+            HTTP_IF_MATCH=self._etag(self.rule_d),
         )
         self.assertEqual(resp.status_code, status.HTTP_404_NOT_FOUND)
         self.rule_d.refresh_from_db()
@@ -333,58 +381,62 @@ class TokenSingleTenantTests(APITestCase):
 
     def setUp(self):
         _reset_scope()
-        self.tenant_a = Tenant.objects.create(name='TA', slug='i134t-a')
-        self.tenant_b = Tenant.objects.create(name='TB', slug='i134t-b')
+        self.tenant_a = Tenant.objects.create(name="TA", slug="i134t-a")
+        self.tenant_b = Tenant.objects.create(name="TB", slug="i134t-b")
         self.role_a = Role.objects.create(
-            tenant=self.tenant_a, name='TA role', permissions=CHANNEL_PERMS,
+            tenant=self.tenant_a,
+            name="TA role",
+            permissions=CHANNEL_PERMS,
         )
         self.role_b = Role.objects.create(
-            tenant=self.tenant_b, name='TB role', permissions=CHANNEL_PERMS,
+            tenant=self.tenant_b,
+            name="TB role",
+            permissions=CHANNEL_PERMS,
         )
-        self.member = User.objects.create_user(username='i134-token', password='pw')
+        self.member = User.objects.create_user(username="i134-token", password="pw")
         grant(self.member, self.tenant_a, self.role_a)
         grant(self.member, self.tenant_b, self.role_b)
-        self.ch_a = _channel('T CH A', self.tenant_a)
-        self.ch_b = _channel('T CH B', self.tenant_b)
+        self.ch_a = _channel("T CH A", self.tenant_a)
+        self.ch_b = _channel("T CH B", self.tenant_b)
         self.token = Token.objects.create(user=self.member, tenant=self.tenant_a)
 
     def tearDown(self):
         _reset_scope()
 
     def _detail(self, pk):
-        return reverse('api:extras_api:notificationchannel-detail', kwargs={'pk': pk})
+        return reverse("api:extras_api:notificationchannel-detail", kwargs={"pk": pk})
 
     def test_token_list_pinned_to_token_tenant(self):
-        self.client.credentials(HTTP_AUTHORIZATION=f'Token {self.token.key}')
-        resp = self.client.get(reverse('api:extras_api:notificationchannel-list'))
+        self.client.credentials(HTTP_AUTHORIZATION=f"Token {self.token.key}")
+        resp = self.client.get(reverse("api:extras_api:notificationchannel-list"))
         self.assertEqual(resp.status_code, status.HTTP_200_OK, resp.data)
         data = resp.data
-        rows = data['results'] if isinstance(data, dict) and 'results' in data else data
-        ids = {row['id'] for row in rows}
+        rows = data["results"] if isinstance(data, dict) and "results" in data else data
+        ids = {row["id"] for row in rows}
         self.assertIn(self.ch_a.pk, ids)
         self.assertNotIn(self.ch_b.pk, ids)
 
     def test_token_cannot_reach_other_tenant_detail(self):
-        self.client.credentials(HTTP_AUTHORIZATION=f'Token {self.token.key}')
+        self.client.credentials(HTTP_AUTHORIZATION=f"Token {self.token.key}")
         resp = self.client.get(self._detail(self.ch_b.pk))
         self.assertEqual(resp.status_code, status.HTTP_404_NOT_FOUND)
 
     def test_token_bulk_create_without_tenant_pins_every_row(self):
-        self.client.credentials(HTTP_AUTHORIZATION=f'Token {self.token.key}')
-        names = ['Token Bulk A', 'Token Bulk B']
+        self.client.credentials(HTTP_AUTHORIZATION=f"Token {self.token.key}")
+        names = ["Token Bulk A", "Token Bulk B"]
         resp = self.client.post(
-            reverse('api:extras_api:notificationchannel-list'),
+            reverse("api:extras_api:notificationchannel-list"),
             data=[
                 {
-                    'name': name,
-                    'channel_type': NotificationChannel.TYPE_IN_APP,
-                    'config': {},
+                    "name": name,
+                    "channel_type": NotificationChannel.TYPE_IN_APP,
+                    "config": {},
                 }
                 for name in names
             ],
-            format='json',
+            format="json",
         )
         self.assertEqual(resp.status_code, status.HTTP_201_CREATED, resp.data)
         created = NotificationChannel._base_manager.filter(name__in=names)
         self.assertEqual(created.count(), 2)
-        self.assertEqual(set(created.values_list('tenant_id', flat=True)), {self.tenant_a.pk})
+        self.assertEqual(set(created.values_list("tenant_id", flat=True)), {self.tenant_a.pk})

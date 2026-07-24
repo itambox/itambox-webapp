@@ -25,10 +25,10 @@ class ITAMBoxPagination(LimitOffsetPagination):
        collections, where offset pagination degrades.
     """
 
-    start_query_param = 'start'
+    start_query_param = "start"
 
     def __init__(self):
-        self.default_limit = getattr(settings, 'PAGINATE_COUNT', 50)
+        self.default_limit = getattr(settings, "PAGINATE_COUNT", 50)
         self.start = None
         self._page_length = 0
         self._last_pk = None
@@ -36,7 +36,7 @@ class ITAMBoxPagination(LimitOffsetPagination):
 
     def paginate_queryset(self, queryset, request, view=None):
         if isinstance(queryset, QuerySet) and not queryset.ordered:
-            queryset = queryset.order_by('pk')
+            queryset = queryset.order_by("pk")
 
         self.start = self.get_start(request)
         self.limit = self.get_limit(request)
@@ -54,12 +54,12 @@ class ITAMBoxPagination(LimitOffsetPagination):
             self.count = None
             self.offset = 0
 
-            queryset = queryset.filter(pk__gte=self.start).order_by('pk')
-            results = list(queryset[:self.limit]) if self.limit is not None else list(queryset)
+            queryset = queryset.filter(pk__gte=self.start).order_by("pk")
+            results = list(queryset[: self.limit]) if self.limit is not None else list(queryset)
 
             self._page_length = len(results)
             if results:
-                self._last_pk = results[-1].pk if hasattr(results[-1], 'pk') else results[-1]['pk']
+                self._last_pk = results[-1].pk if hasattr(results[-1], "pk") else results[-1]["pk"]
 
             return results
 
@@ -77,8 +77,8 @@ class ITAMBoxPagination(LimitOffsetPagination):
             return list()
 
         if self.limit is not None:
-            return list(queryset[self.offset:self.offset + self.limit])
-        return list(queryset[self.offset:])
+            return list(queryset[self.offset : self.offset + self.limit])
+        return list(queryset[self.offset :])
 
     def get_start(self, request):
         try:
@@ -101,7 +101,7 @@ class ITAMBoxPagination(LimitOffsetPagination):
 
     def get_limit(self, request):
         max_limit = self.default_limit
-        MAX_PAGE_SIZE = getattr(settings, 'MAX_PAGE_SIZE', None)
+        MAX_PAGE_SIZE = getattr(settings, "MAX_PAGE_SIZE", None)
 
         if MAX_PAGE_SIZE:
             max_limit = min(max_limit, MAX_PAGE_SIZE)
@@ -125,7 +125,7 @@ class ITAMBoxPagination(LimitOffsetPagination):
         return max_limit
 
     def get_queryset_count(self, queryset):
-        cap = getattr(settings, 'ITAMBOX_PAGINATOR_COUNT_CAP', 0)
+        cap = getattr(settings, "ITAMBOX_PAGINATOR_COUNT_CAP", 0)
         try:
             cap = int(cap)
         except (TypeError, ValueError):
@@ -136,34 +136,38 @@ class ITAMBoxPagination(LimitOffsetPagination):
         # Count over a bounded slice so the DB stops scanning at cap + 1 rows
         # instead of a full COUNT(*) on every list page (qs[:n].count() emits
         # COUNT(*) over a LIMIT-ed subquery). Mirrors EnhancedPaginator.
-        raw = queryset[:cap + 1].count()
+        raw = queryset[: cap + 1].count()
         if raw > cap:
             self.count_capped = True
             return cap
         return raw
 
     def get_paginated_response(self, data):
-        return Response(OrderedDict([
-            ('count', self.count),
-            # True when `count` was capped (the real total is larger). Clients
-            # that must enumerate everything should switch to ?start= cursoring.
-            ('count_capped', self.count_capped),
-            ('next', self.get_next_link()),
-            ('previous', self.get_previous_link()),
-            ('results', data),
-        ]))
+        return Response(
+            OrderedDict(
+                [
+                    ("count", self.count),
+                    # True when `count` was capped (the real total is larger). Clients
+                    # that must enumerate everything should switch to ?start= cursoring.
+                    ("count_capped", self.count_capped),
+                    ("next", self.get_next_link()),
+                    ("previous", self.get_previous_link()),
+                    ("results", data),
+                ]
+            )
+        )
 
     def get_paginated_response_schema(self, schema):
         response_schema = super().get_paginated_response_schema(schema)
         # `count` is null in keyset/cursor mode (?start=), where no COUNT is run.
-        if 'count' in response_schema.get('properties', {}):
-            response_schema['properties']['count']['nullable'] = True
-        response_schema['properties']['count_capped'] = {
-            'type': 'boolean',
-            'description': (
-                'True when `count` was capped at ITAMBOX_PAGINATOR_COUNT_CAP and '
-                'the real total is larger. Use `start` (keyset cursor) pagination '
-                'to iterate the full result set.'
+        if "count" in response_schema.get("properties", {}):
+            response_schema["properties"]["count"]["nullable"] = True
+        response_schema["properties"]["count_capped"] = {
+            "type": "boolean",
+            "description": (
+                "True when `count` was capped at ITAMBOX_PAGINATOR_COUNT_CAP and "
+                "the real total is larger. Use `start` (keyset cursor) pagination "
+                "to iterate the full result set."
             ),
         }
         return response_schema
@@ -194,18 +198,20 @@ class ITAMBoxPagination(LimitOffsetPagination):
 
     def get_schema_operation_parameters(self, view):
         parameters = super().get_schema_operation_parameters(view)
-        parameters.append({
-            'name': self.start_query_param,
-            'required': False,
-            'in': 'query',
-            'description': (
-                'Keyset/cursor pagination: return results with pk >= start, ordered by pk. '
-                'Skips the (capped) row count and stays O(page) regardless of table size — '
-                'use this instead of offset/limit for bulk export or iterating large '
-                'collections. Follow the `next` link to walk subsequent pages.'
-            ),
-            'schema': {
-                'type': 'integer',
-            },
-        })
+        parameters.append(
+            {
+                "name": self.start_query_param,
+                "required": False,
+                "in": "query",
+                "description": (
+                    "Keyset/cursor pagination: return results with pk >= start, ordered by pk. "
+                    "Skips the (capped) row count and stays O(page) regardless of table size — "
+                    "use this instead of offset/limit for bulk export or iterating large "
+                    "collections. Follow the `next` link to walk subsequent pages."
+                ),
+                "schema": {
+                    "type": "integer",
+                },
+            }
+        )
         return parameters

@@ -16,6 +16,7 @@ Every entry is back-dated (``ObjectChange.time`` + the object's
 ``created_at``/``updated_at``) to a simulated moment so the history reads as
 naturally grown over the MSP's lifetime rather than all-at-once.
 """
+
 import datetime
 import uuid
 
@@ -58,7 +59,7 @@ class ChangeLogEngine:
     @staticmethod
     def _tenant_of(obj):
         try:
-            return getattr(obj, 'tenant', None)
+            return getattr(obj, "tenant", None)
         except Exception:
             return None
 
@@ -71,23 +72,24 @@ class ChangeLogEngine:
         auto_now_add (and tenant scoping) don't override them."""
         fields = {}
         names = self._field_names(obj)
-        if set_created and 'created_at' in names:
-            fields['created_at'] = when
-        if 'updated_at' in names:
-            fields['updated_at'] = when
+        if set_created and "created_at" in names:
+            fields["created_at"] = when
+        if "updated_at" in names:
+            fields["updated_at"] = when
         if fields:
             type(obj)._base_manager.filter(pk=obj.pk).update(**fields)
 
     @staticmethod
     def _latest_change_pk(ct, obj):
-        return (ObjectChange._base_manager
-                .filter(changed_object_type=ct, changed_object_id=obj.pk)
-                .order_by('-pk')
-                .values_list('pk', flat=True)
-                .first()) or 0
+        return (
+            ObjectChange._base_manager.filter(changed_object_type=ct, changed_object_id=obj.pk)
+            .order_by("-pk")
+            .values_list("pk", flat=True)
+            .first()
+        ) or 0
 
     # ── public API ───────────────────────────────────────────────────
-    def change(self, obj, *, when, user, action='update', **field_updates):
+    def change(self, obj, *, when, user, action="update", **field_updates):
         """Apply ``field_updates`` through a real save so the resulting ObjectChange
         has a genuine diff, then back-date it. No-op updates (no field actually
         changed) produce no entry and are skipped. ``action`` may be a custom
@@ -107,8 +109,8 @@ class ChangeLogEngine:
         tenant = self._tenant_of(obj)
         tenant_id = tenant.id if tenant is not None else None
 
-        with TaskContext(tenant_id=tenant_id, user_id=getattr(user, 'id', None)):
-            if hasattr(obj, 'snapshot'):
+        with TaskContext(tenant_id=tenant_id, user_id=getattr(user, "id", None)):
+            if hasattr(obj, "snapshot"):
                 obj.snapshot()
             for key, value in field_updates.items():
                 setattr(obj, key, value)
@@ -137,10 +139,11 @@ class ChangeLogEngine:
                 pass
             return obj
 
-        oc = (ObjectChange._base_manager
-              .filter(changed_object_type=ct, changed_object_id=obj.pk, pk__gt=before_pk)
-              .order_by('-pk')
-              .first())
+        oc = (
+            ObjectChange._base_manager.filter(changed_object_type=ct, changed_object_id=obj.pk, pk__gt=before_pk)
+            .order_by("-pk")
+            .first()
+        )
         if oc is not None:
             ObjectChange._base_manager.filter(pk=oc.pk).update(time=when)
             self._backdate_timestamps(obj, when)
@@ -160,12 +163,12 @@ class ChangeLogEngine:
         except Exception:
             pass
         ct = ContentType.objects.get_for_model(type(obj))
-        excluded = getattr(obj, '_change_logging_excluded_fields', ['updated_at'])
+        excluded = getattr(obj, "_change_logging_excluded_fields", ["updated_at"])
         tenant = self._tenant_of(obj)
         ObjectChange._base_manager.create(
             tenant=tenant,
             user=user,
-            user_name=(user.get_username() if user else 'System'),
+            user_name=(user.get_username() if user else "System"),
             request_id=uuid.uuid4(),
             action=ObjectChangeActionChoices.ACTION_CREATE,
             changed_object_type=ct,

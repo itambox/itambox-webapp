@@ -8,5 +8,5 @@ class GFKSerializerField(serializers.Field):
         if instance is None:
             return None
         serializer = get_serializer_for_model(instance)
-        context = {'request': self.context['request']}
+        context = {"request": self.context["request"]}
         return serializer(instance, nested=True, context=context).data
