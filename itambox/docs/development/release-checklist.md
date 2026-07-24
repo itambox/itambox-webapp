@@ -37,7 +37,8 @@ A pull request that changes release metadata, the Dockerfile, release documentat
 
 1. validates version and changelog consistency;
 2. builds the complete production image without pushing it;
-3. verifies the image's OCI version, revision, and source labels.
+3. verifies the image's OCI version, revision, and source labels;
+4. applies the [security scanning policy](security-scanning.md) to that exact local image.
 
 The rehearsal has no release token and cannot create tags, releases, packages, or repository changes. It is the safe, non-publishing dry run for every release change.
 
@@ -64,13 +65,14 @@ gh run watch --exit-status
 The workflow then:
 
 1. revalidates the requested version and reviewed commit;
-2. refuses an existing release or tag;
-3. builds the production image from that exact commit;
-4. verifies immutable OCI labels;
-5. retains a compressed Docker image and SHA-256 checksum as a workflow artifact;
-6. creates a draft GitHub Release with changelog-derived notes and attaches the image archive.
+2. builds the production image from that exact commit;
+3. verifies immutable OCI labels and applies the blocking image scan;
+4. retains a compressed Docker image and SHA-256 checksum as a workflow artifact;
+5. atomically creates the provisional tag, refusing a conflicting target;
+6. verifies the remote tag before and after draft creation;
+7. creates a draft GitHub Release with changelog-derived notes and attaches the image archive.
 
-Prerelease versions receive GitHub's prerelease flag. The draft does not publish the release, create a public compatibility promise, or push the image to a registry. GitHub may create or associate the requested tag while preparing the draft; treat that ref as provisional and verify that it points to the reviewed commit.
+Prerelease versions receive GitHub's prerelease flag. The draft does not publish the release, create a public compatibility promise, or push the image to a registry. The workflow creates the requested lightweight tag with an atomic Git push and fails closed if origin cannot resolve it or it does not point to the reviewed commit. Treat that ref as provisional until publication.
 
 ## Review and promote
 
@@ -98,7 +100,7 @@ Promotion is always a new reviewed release change. Never rename or rewrite an ex
 Before publication, rollback is non-disruptive:
 
 1. delete the draft GitHub Release;
-2. remove the associated provisional tag if GitHub created it, after confirming that no release was published;
+2. remove the associated provisional tag created by the workflow, after confirming that no release was published;
 3. delete the workflow artifact if it should no longer be retained;
 4. fix the release change in a new pull request;
 5. rerun the rehearsal and draft preparation.

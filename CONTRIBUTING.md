@@ -8,6 +8,7 @@ ITAMbox accepts focused changes through pull requests. This guide describes the 
 - Discuss large features, schema changes, and compatibility breaks in an issue before implementation.
 - Keep each pull request to one concern. Separate cleanup from behavioral changes unless the cleanup is required for the fix.
 - Report vulnerabilities privately through [SECURITY.md](SECURITY.md), never in a public issue.
+- Follow the [security scanning and suppression policy](itambox/docs/development/security-scanning.md) for dependency, secret, or scanner-policy changes.
 
 ## Prerequisites
 
