@@ -100,6 +100,32 @@ class MultiDashboardViewsTests(TestCase):
         self.assertEqual(response.context['active_dashboard'].id, self.db_secondary.id)
         self.assertEqual(self.client.session['active_dashboard_id'], self.db_secondary.id)
 
+    def test_dashboard_view_places_switcher_in_header_without_title_block(self):
+        response = self.client.get(reverse('dashboard'))
+
+        self.assertEqual(response.status_code, 200)
+        content = response.content.decode()
+        page_header = content.split('<div class="page-header d-print-none">', 1)[1].split(
+            '<div id="tabs-block"', 1
+        )[0]
+        self.assertNotIn('page-header-block', page_header)
+        self.assertNotIn('page-pretitle', page_header)
+        self.assertNotIn('page-title', page_header)
+        self.assertIn('id="dashboard-switcher"', page_header)
+        self.assertIn(
+            f'hx-get="?dashboard={self.db_secondary.id}"',
+            page_header,
+        )
+        self.assertIn(
+            reverse("extras:dashboard_manage_modal"),
+            page_header,
+        )
+        self.assertIn('hx-target="#dashboard-modal-content"', page_header)
+        self.assertLess(
+            page_header.index('id="dashboard-switcher"'),
+            page_header.index('id="dashboard-controls"'),
+        )
+
     def test_dashboard_view_session_persistence(self):
         # Set active dashboard in session first
         session = self.client.session
