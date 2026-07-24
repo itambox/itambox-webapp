@@ -5,8 +5,15 @@ from django.urls import reverse
 from django.contrib.sessions.middleware import SessionMiddleware
 from django.core.exceptions import PermissionDenied
 
-from organization.models import Tenant, AssetHolder, Role
+from organization.models import Tenant, AssetHolder, Membership, Role
 from core.tests.mixins import grant
+from core.managers import (
+    set_current_all_accessible,
+    set_current_membership,
+    set_current_tenant,
+    set_current_tenant_group,
+)
+from itambox.middleware import set_current_user
 from assets.models import Asset, StatusLabel, AssetType, Manufacturer
 from extras.models import Dashboard
 from extras.dashboard.widgets import (
@@ -193,6 +200,10 @@ class MultiDashboardTenantScopingTests(TestCase):
         self.holder_a = AssetHolder.objects.create(
             user=self.user_a, first_name="User", last_name="A", upn="user.a", tenant=self.tenant_a
         )
+        # Canonical (Membership-backed) access to Tenant A. The dashboard scope is
+        # driven by the tenant-scoping managers, not the AssetHolder profile.
+        self.role_a = Role.objects.create(tenant=self.tenant_a, name="Member A", permissions=[])
+        grant(self.user_a, self.tenant_a, self.role_a)
 
         # Basic Asset catalogs
         self.mfr = Manufacturer.objects.create(name="Manufacturer X", slug="mfr-x")
@@ -230,6 +241,28 @@ class MultiDashboardTenantScopingTests(TestCase):
         middleware = SessionMiddleware(lambda req: None)
         middleware.process_request(request)
         request.session.save()
+        # Bind the canonical tenant context the middleware would set: a member is
+        # scoped to their (single) accessible tenant, a superuser stays global.
+        # Widgets read this via the tenant-scoping managers/contextvars. The
+        # autouse conftest fixture clears these after each test.
+        set_current_user(user)
+        set_current_tenant_group(None)
+        set_current_all_accessible(False)
+        if user.is_superuser:
+            membership = None
+            tenant = None
+        else:
+            membership = (
+                Membership.objects.filter(user=user, is_active=True)
+                .select_related("tenant").first()
+            )
+            tenant = membership.tenant if membership else None
+        set_current_tenant(tenant)
+        set_current_membership(membership)
+        request.active_tenant = tenant
+        request.active_tenant_group = None
+        request.active_membership = membership
+        request.active_all_accessible = False
         return request
 
     def test_global_admin_all_tenants_by_default(self):

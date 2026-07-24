@@ -9,6 +9,15 @@ from assets.models import AssetMaintenance
 from licenses.models import License
 from subscriptions.models import Subscription, Provider
 from core.models import ObjectChange
+from core.managers import (
+    set_current_all_accessible,
+    set_current_membership,
+    set_current_tenant,
+    set_current_tenant_group,
+)
+from core.tests.mixins import grant
+from itambox.middleware import set_current_user
+from organization.models import Membership, Role
 from extras.dashboard.widgets import (
     get_widget, NoteWidget, ObjectCountsWidget, FinancialWidget,
     StatusLabelsWidget, LicenseWidget, MaintenanceWidget, EOLAlertsWidget,
@@ -38,6 +47,14 @@ class DashboardWidgetsMultiTenancyTests(TestCase):
         self.holder_b = AssetHolder.objects.create(
             user=self.user_b, first_name="User", last_name="B", upn="user.b", tenant=self.tenant_b
         )
+
+        # Canonical tenant access is Membership-backed: the dashboard scope is
+        # driven by the tenant-scoping managers (via the request/contextvars),
+        # not by AssetHolder profiles.
+        role_a = Role.objects.create(tenant=self.tenant_a, name="Member A", permissions=[])
+        role_b = Role.objects.create(tenant=self.tenant_b, name="Member B", permissions=[])
+        grant(self.user_a, self.tenant_a, role_a)
+        grant(self.user_b, self.tenant_b, role_b)
 
         # Basic catalog setups
         self.mfr = Manufacturer.objects.create(name="Acme Mfr", slug="acme-mfr")
@@ -102,8 +119,30 @@ class DashboardWidgetsMultiTenancyTests(TestCase):
         )
 
     def make_request(self, user):
+        """Build a request with the canonical tenant context the middleware would
+        bind: a member is scoped to their (single) accessible tenant, a superuser
+        keeps the global view. The autouse conftest fixture clears the tenant/user
+        contextvars after each test."""
         request = self.factory.get("/")
         request.user = user
+        set_current_user(user)
+        set_current_tenant_group(None)
+        set_current_all_accessible(False)
+        if user.is_superuser:
+            membership = None
+            tenant = None
+        else:
+            membership = (
+                Membership.objects.filter(user=user, is_active=True)
+                .select_related("tenant").first()
+            )
+            tenant = membership.tenant if membership else None
+        set_current_tenant(tenant)
+        set_current_membership(membership)
+        request.active_tenant = tenant
+        request.active_tenant_group = None
+        request.active_membership = membership
+        request.active_all_accessible = False
         return request
 
     def test_financial_widget_scoping(self):
@@ -298,12 +337,15 @@ class DashboardWidgetsMultiTenancyTests(TestCase):
         # Tenant B (2000) ranks above Tenant A (1000).
         self.assertEqual(ctx_admin['tenant_spend'][0]['name'], "Tenant B")
 
-        # Standard Tenant User: blocked
-        self.assertFalse(widget.has_permission(self.make_request(self.user_a)))
-        
-        # Test widget render returns restricted block
-        render_out = widget.render(self.make_request(self.user_a))
-        self.assertIn("Restricted to Global Administrators", render_out)
+        # Standard Tenant User: now permitted (issue #133), but scoped to exactly
+        # the tenant(s) they may access — here their single tenant, never global.
+        request_a = self.make_request(self.user_a)
+        self.assertTrue(widget.has_permission(request_a))
+        render_out = widget.render(request_a)
+        self.assertNotIn("Restricted to Global Administrators", render_out)
+        ctx_a = widget.get_context(self.make_request(self.user_a))
+        names_a = {t['name'] for t in ctx_a['tenant_spend']}
+        self.assertEqual(names_a, {"Tenant A"})
 
     def test_tenant_spend_widget_mixed_currencies(self):
         # A USD asset for Tenant A creates a second currency bucket within the

@@ -14661,22 +14661,6 @@
     },
     {
       "path": "itambox/extras/dashboard/widgets.py",
-      "code": "C901",
-      "message": "'LowStockWidget.get_context' is too complex (19)",
-      "source": "    def get_context(self, request):",
-      "context": "Module:body/ClassDef:LowStockWidget:body/FunctionDef:get_context:self",
-      "count": 1
-    },
-    {
-      "path": "itambox/extras/dashboard/widgets.py",
-      "code": "C901",
-      "message": "'get_scoped_queryset' is too complex (12)",
-      "source": "def get_scoped_queryset(model_class, request, config=None):",
-      "context": "Module:body/FunctionDef:get_scoped_queryset:self",
-      "count": 1
-    },
-    {
-      "path": "itambox/extras/dashboard/widgets.py",
       "code": "E201",
       "message": "whitespace after '{'",
       "source": "            { 'name': \"1 - 3 Years\", 'count': buckets['1_3y'], 'color': \"#206bc4\" },",
@@ -14906,30 +14890,6 @@
       "source": "            ",
       "context": "Module:body/ClassDef:EOLAlertsWidget:body/FunctionDef:get_context:self",
       "count": 2
-    },
-    {
-      "path": "itambox/extras/dashboard/widgets.py",
-      "code": "W293",
-      "message": "blank line contains whitespace",
-      "source": "            ",
-      "context": "Module:body/ClassDef:LowStockWidget:body/FunctionDef:get_context:body/If:Name(id='include_acc', ctx=Load()):self",
-      "count": 4
-    },
-    {
-      "path": "itambox/extras/dashboard/widgets.py",
-      "code": "W293",
-      "message": "blank line contains whitespace",
-      "source": "            ",
-      "context": "Module:body/ClassDef:LowStockWidget:body/FunctionDef:get_context:body/If:Name(id='include_comp', ctx=Load()):self",
-      "count": 4
-    },
-    {
-      "path": "itambox/extras/dashboard/widgets.py",
-      "code": "W293",
-      "message": "blank line contains whitespace",
-      "source": "            ",
-      "context": "Module:body/ClassDef:LowStockWidget:body/FunctionDef:get_context:body/If:Name(id='include_con', ctx=Load()):self",
-      "count": 4
     },
     {
       "path": "itambox/extras/filters.py",
@@ -15882,14 +15842,6 @@
       "source": "        ",
       "context": "Module:body/ClassDef:DashboardWidgetsMultiTenancyTests:body/FunctionDef:test_low_stock_widget_scoping:self",
       "count": 10
-    },
-    {
-      "path": "itambox/extras/tests/test_dashboard_widgets.py",
-      "code": "W293",
-      "message": "blank line contains whitespace",
-      "source": "        ",
-      "context": "Module:body/ClassDef:DashboardWidgetsMultiTenancyTests:body/FunctionDef:test_tenant_spend_widget_permissions:self",
-      "count": 1
     },
     {
       "path": "itambox/extras/tests/test_existing.py",
