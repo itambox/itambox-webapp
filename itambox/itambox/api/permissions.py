@@ -67,7 +67,9 @@ class TokenPermissions(BasePermission):
         # Permission evaluation must never silently choose the user's first
         # membership: that makes an unbound request's authorization depend on
         # database ordering and can stomp an intentional tenant-group scope.
-        from core.managers import get_current_tenant, get_current_tenant_group
+        from core.managers import (
+            get_current_all_accessible, get_current_tenant, get_current_tenant_group,
+        )
         tenant = get_current_tenant()
         token_tenant_id = getattr(getattr(request, 'auth', None), 'tenant_id', None)
         if token_tenant_id is not None:
@@ -79,7 +81,19 @@ class TokenPermissions(BasePermission):
                 or getattr(request.auth, 'user_id', None) != request.user.pk
             ):
                 return False
-        elif not request.user.is_superuser and tenant is None and get_current_tenant_group() is None:
+        elif (
+            not request.user.is_superuser
+            and tenant is None
+            and get_current_tenant_group() is None
+            and not get_current_all_accessible()
+        ):
+            # A session request carries exactly one canonical scope: a single
+            # tenant, a tenant group, or the "All accessible tenants" aggregate.
+            # None of them active for a non-superuser means the request is
+            # unbound — fail closed. All-accessible is a bound scope (not the
+            # superuser global view): objectless mutation permissions stay
+            # read-only under it in the membership backend, so recognising it
+            # here restores its reads without widening write access (issue #134).
             return False
 
         return request.user.has_perms(perms)
@@ -127,13 +141,21 @@ class StrictTenantPermission(BasePermission):
         if request.user.is_superuser:
             return True
 
-        from core.managers import get_current_tenant
+        from core.managers import (
+            get_current_all_accessible, get_current_tenant, get_current_tenant_group,
+        )
         user_tenant = getattr(request, 'active_tenant', None) or get_current_tenant()
-        if not user_tenant:
-            profile = request.user.asset_holder_profiles.first()
-            user_tenant = profile.tenant if profile else None
 
-        if not user_tenant:
+        if user_tenant is None:
+            # No single active tenant. Under the canonical multi-tenant read
+            # scopes (tenant group / All accessible tenants) the boundary is the
+            # actor's authorized tenant SET, resolved by the same canonical model
+            # the scoped managers use — never an AssetHolder profile, which is a
+            # domain profile, not an authorization source (issue #134). With no
+            # authorized scope active, fail closed (hidden as 404 to avoid pk
+            # enumeration).
+            if get_current_tenant_group() is not None or get_current_all_accessible():
+                return self._has_multi_tenant_object_permission(request, obj)
             from django.http import Http404
             raise Http404()
 
@@ -159,6 +181,35 @@ class StrictTenantPermission(BasePermission):
                 raise Http404()
 
         return True
+
+    def _has_multi_tenant_object_permission(self, request, obj):
+        """Object tenant boundary under a multi-tenant scope (tenant group /
+        All accessible tenants), where no single tenant anchors the request.
+
+        ``get_object()`` already constrained the object to the actor's authorized
+        tenants through the tenant-scoping queryset; this re-checks the same
+        boundary as defense in depth by intersecting the object's OWN tenant with
+        the canonical accessible set (``has_perms(obj=...)`` in TokenPermissions
+        independently enforces the permission against that same object tenant, so
+        object-tenant authorization stays authoritative). Global (tenant=None)
+        rows remain readable but not mutable by non-superusers. The aggregate
+        scopes never surface cross-tenant shared pools, so a foreign-tenant
+        object fails closed here.
+        """
+        from django.http import Http404
+
+        if not hasattr(obj, 'tenant'):
+            return True
+        obj_tenant = obj.tenant
+        if obj_tenant is None:
+            if request.method not in SAFE_METHODS:
+                raise Http404()
+            return True
+        # inline import: keep the API layer decoupled from organization at load.
+        from organization.access import accessible_tenant_ids
+        if obj_tenant.pk in accessible_tenant_ids(request.user):
+            return True
+        raise Http404()
 
     @staticmethod
     def _shared_read_allowed(obj, user_tenant):

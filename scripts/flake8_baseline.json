@@ -15062,46 +15062,6 @@
     {
       "path": "itambox/extras/forms.py",
       "code": "B950",
-      "message": "line too long (156 > 120 characters)",
-      "source": "            profile = user.asset_holder_profiles.filter(tenant=get_current_tenant()).first() if get_current_tenant() else user.asset_holder_profiles.first()",
-      "context": "Module:body/ClassDef:AlertRuleForm:body/FunctionDef:save:body/If:BoolOp(op=And(), values=[Name(id='user', ctx=Load()), UnaryOp(op=Not(), operand=BoolOp(op=Or(), values=[Attribute(value=Name(id='user', ctx=Load()), attr='is_superuser', ctx=Load()), BoolOp(op=And(), values=[Call(func=Name(id='hasattr', ctx=Load()), args=[Name(id='user', ctx=Load()), Constant(value='is_staff')], keywords=[]), Attribute(value=Name(id='user', ctx=Load()), attr='is_staff', ctx=Load())])]))]):body",
-      "count": 1
-    },
-    {
-      "path": "itambox/extras/forms.py",
-      "code": "B950",
-      "message": "line too long (156 > 120 characters)",
-      "source": "            profile = user.asset_holder_profiles.filter(tenant=get_current_tenant()).first() if get_current_tenant() else user.asset_holder_profiles.first()",
-      "context": "Module:body/ClassDef:NotificationChannelForm:body/FunctionDef:save:body/If:BoolOp(op=And(), values=[Name(id='user', ctx=Load()), UnaryOp(op=Not(), operand=BoolOp(op=Or(), values=[Attribute(value=Name(id='user', ctx=Load()), attr='is_superuser', ctx=Load()), BoolOp(op=And(), values=[Call(func=Name(id='hasattr', ctx=Load()), args=[Name(id='user', ctx=Load()), Constant(value='is_staff')], keywords=[]), Attribute(value=Name(id='user', ctx=Load()), attr='is_staff', ctx=Load())])]))]):body",
-      "count": 1
-    },
-    {
-      "path": "itambox/extras/forms.py",
-      "code": "B950",
-      "message": "line too long (156 > 120 characters)",
-      "source": "            profile = user.asset_holder_profiles.filter(tenant=get_current_tenant()).first() if get_current_tenant() else user.asset_holder_profiles.first()",
-      "context": "Module:body/ClassDef:ReportTemplateForm:body/FunctionDef:save:body/If:BoolOp(op=And(), values=[Name(id='user', ctx=Load()), UnaryOp(op=Not(), operand=BoolOp(op=Or(), values=[Attribute(value=Name(id='user', ctx=Load()), attr='is_superuser', ctx=Load()), BoolOp(op=And(), values=[Call(func=Name(id='hasattr', ctx=Load()), args=[Name(id='user', ctx=Load()), Constant(value='is_staff')], keywords=[]), Attribute(value=Name(id='user', ctx=Load()), attr='is_staff', ctx=Load())])]))]):body",
-      "count": 1
-    },
-    {
-      "path": "itambox/extras/forms.py",
-      "code": "B950",
-      "message": "line too long (156 > 120 characters)",
-      "source": "            profile = user.asset_holder_profiles.filter(tenant=get_current_tenant()).first() if get_current_tenant() else user.asset_holder_profiles.first()",
-      "context": "Module:body/ClassDef:ScheduledReportForm:body/FunctionDef:__init__:body/If:BoolOp(op=And(), values=[Name(id='user', ctx=Load()), UnaryOp(op=Not(), operand=BoolOp(op=Or(), values=[Attribute(value=Name(id='user', ctx=Load()), attr='is_superuser', ctx=Load()), BoolOp(op=And(), values=[Call(func=Name(id='hasattr', ctx=Load()), args=[Name(id='user', ctx=Load()), Constant(value='is_staff')], keywords=[]), Attribute(value=Name(id='user', ctx=Load()), attr='is_staff', ctx=Load())])]))]):body",
-      "count": 1
-    },
-    {
-      "path": "itambox/extras/forms.py",
-      "code": "B950",
-      "message": "line too long (156 > 120 characters)",
-      "source": "            profile = user.asset_holder_profiles.filter(tenant=get_current_tenant()).first() if get_current_tenant() else user.asset_holder_profiles.first()",
-      "context": "Module:body/ClassDef:ScheduledReportForm:body/FunctionDef:save:body/If:BoolOp(op=And(), values=[Name(id='user', ctx=Load()), UnaryOp(op=Not(), operand=BoolOp(op=Or(), values=[Attribute(value=Name(id='user', ctx=Load()), attr='is_superuser', ctx=Load()), BoolOp(op=And(), values=[Call(func=Name(id='hasattr', ctx=Load()), args=[Name(id='user', ctx=Load()), Constant(value='is_staff')], keywords=[]), Attribute(value=Name(id='user', ctx=Load()), attr='is_staff', ctx=Load())])]))]):body",
-      "count": 1
-    },
-    {
-      "path": "itambox/extras/forms.py",
-      "code": "B950",
       "message": "line too long (204 > 120 characters)",
       "source": "                self.fields['filter_tenants'].help_text = _(\"Select one or more specific tenants to filter this report's compiled data. If none are selected, aggregates data globally across all tenants.\")",
       "context": "Module:body/ClassDef:ReportTemplateForm:body/FunctionDef:__init__:body/If:BoolOp(op=And(), values=[Name(id='user', ctx=Load()), UnaryOp(op=Not(), operand=BoolOp(op=Or(), values=[Attribute(value=Name(id='user', ctx=Load()), attr='is_superuser', ctx=Load()), BoolOp(op=And(), values=[Call(func=Name(id='hasattr', ctx=Load()), args=[Name(id='user', ctx=Load()), Constant(value='is_staff')], keywords=[]), Attribute(value=Name(id='user', ctx=Load()), attr='is_staff', ctx=Load())])]))]):orelse/If:Compare(left=Constant(value='filter_tenants'), ops=[In()], comparators=[Attribute(value=Name(id='self', ctx=Load()), attr='fields', ctx=Load())]):body",
@@ -15289,14 +15249,6 @@
       "message": "redefinition of unused 'Layout' from line 7",
       "source": "from crispy_forms.layout import Layout, Field, HTML, Div, Submit, Row, Column, Fieldset",
       "context": "Module:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/extras/forms.py",
-      "code": "F811",
-      "message": "redefinition of unused 'Q' from line 4",
-      "source": "                from django.db.models import Q",
-      "context": "Module:body/ClassDef:ScheduledReportForm:body/FunctionDef:__init__:body/If:BoolOp(op=And(), values=[Name(id='user', ctx=Load()), UnaryOp(op=Not(), operand=BoolOp(op=Or(), values=[Attribute(value=Name(id='user', ctx=Load()), attr='is_superuser', ctx=Load()), BoolOp(op=And(), values=[Call(func=Name(id='hasattr', ctx=Load()), args=[Name(id='user', ctx=Load()), Constant(value='is_staff')], keywords=[]), Attribute(value=Name(id='user', ctx=Load()), attr='is_staff', ctx=Load())])]))]):body/If:BoolOp(op=And(), values=[Name(id='profile', ctx=Load()), Attribute(value=Name(id='profile', ctx=Load()), attr='tenant', ctx=Load())]):body",
       "count": 1
     },
     {

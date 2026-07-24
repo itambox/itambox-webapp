@@ -7,6 +7,7 @@ from crispy_forms.helper import FormHelper
 from crispy_forms.layout import Layout, Submit, HTML, Div, Field, Fieldset, Row, Column
 from django.urls import reverse
 from core.forms import FilterForm, ColorFieldFormMixin
+from core.managers import get_current_tenant
 from .filters import TagFilter
 
 class TagForm(ColorFieldFormMixin, forms.ModelForm):
@@ -640,6 +641,41 @@ class ExportTemplateForm(forms.ModelForm):
         return code
 
 
+def _resolve_nonadmin_write_tenant(form, user):
+    """Tenant to bind for a non-admin write to a tenant-scoped Extras record.
+
+    Canonical write scopes are single tenant, tenant group, and All accessible
+    tenants; AssetHolder is a domain profile, never an authorization source, so
+    it is never consulted here (issue #134). Behaviour:
+
+    * Admins (superuser / staff) choose the tenant explicitly through the
+      exposed field — including a deliberate global ``tenant=None`` — so this
+      never overrides them (returns ``None``).
+    * Editing an existing record retains its current tenant: a non-admin has no
+      tenant field to retarget it with (returns ``None``).
+    * Creating requires one explicit live tenant — the active single-tenant
+      scope. A multi-tenant scope (tenant group / All accessible) has no
+      unambiguous tenant, so it fails validation instead of silently picking the
+      first (or any) AssetHolder/membership tenant.
+
+    Returns the tenant to assign on a non-admin create, or ``None`` to leave the
+    instance's tenant untouched. Raises ``ValidationError`` when a non-admin
+    create has no single active tenant.
+    """
+    if user is None or user.is_superuser or getattr(user, 'is_staff', False):
+        return None
+    if form.instance.pk:
+        return None
+    tenant = get_current_tenant()
+    if tenant is None:
+        raise forms.ValidationError(
+            _('This record must belong to a single tenant. Switch to one '
+              'specific tenant before saving — the active scope spans multiple '
+              'tenants.')
+        )
+    return tenant
+
+
 class ReportTemplateForm(forms.ModelForm):
     COLUMN_CHOICES = [
         # Asset Inventory Summary Columns
@@ -785,14 +821,16 @@ class ReportTemplateForm(forms.ModelForm):
                 self.fields['filter_tenants'].label = _("Filter Tenants (Scoping Constellation)")
                 self.fields['filter_tenants'].help_text = _("Select one or more specific tenants to filter this report's compiled data. If none are selected, aggregates data globally across all tenants.")
 
+    def clean(self):
+        cleaned_data = super().clean()
+        _resolve_nonadmin_write_tenant(self, get_current_user())
+        return cleaned_data
+
     def save(self, commit=True):
         instance = super().save(commit=False)
-        user = get_current_user()
-        if user and not (user.is_superuser or (hasattr(user, 'is_staff') and user.is_staff)):
-            from core.managers import get_current_tenant
-            profile = user.asset_holder_profiles.filter(tenant=get_current_tenant()).first() if get_current_tenant() else user.asset_holder_profiles.first()
-            if profile and profile.tenant:
-                instance.tenant = profile.tenant
+        tenant = _resolve_nonadmin_write_tenant(self, get_current_user())
+        if tenant is not None:
+            instance.tenant = tenant
         if commit:
             instance.save()
             self.save_m2m()
@@ -824,19 +862,13 @@ class ScheduledReportForm(forms.ModelForm):
                 self.fields.pop('tenant')
             if 'filter_tenants' in self.fields:
                 self.fields.pop('filter_tenants')
-            # Filter reports and channels choices dynamically
-            from core.managers import get_current_tenant
-            profile = user.asset_holder_profiles.filter(tenant=get_current_tenant()).first() if get_current_tenant() else user.asset_holder_profiles.first()
-            if profile and profile.tenant:
-                from extras.models import ReportTemplate
-                from extras.models import NotificationChannel
-                from django.db.models import Q
-                self.fields['report'].queryset = ReportTemplate.objects.filter(
-                    Q(tenant=profile.tenant) | Q(tenant__isnull=True)
-                )
-                self.fields['channels'].queryset = NotificationChannel.objects.filter(
-                    Q(tenant=profile.tenant) | Q(tenant__isnull=True)
-                )
+            # Report/channel choices follow the active canonical read scope
+            # (single tenant, tenant group, or All accessible) resolved by the
+            # tenant-scoping managers — never an arbitrary AssetHolder profile
+            # tenant, which under a multi-tenant scope would hide records the
+            # actor can legitimately reach (issue #134).
+            self.fields['report'].queryset = ReportTemplate.objects.all()
+            self.fields['channels'].queryset = NotificationChannel.objects.all()
         else:
             if 'tenant' in self.fields:
                 self.fields['tenant'].required = False
@@ -900,14 +932,16 @@ class ScheduledReportForm(forms.ModelForm):
         ]
         self.helper.layout = Layout(*layout_fields)
 
+    def clean(self):
+        cleaned_data = super().clean()
+        _resolve_nonadmin_write_tenant(self, get_current_user())
+        return cleaned_data
+
     def save(self, commit=True):
         instance = super().save(commit=False)
-        user = get_current_user()
-        if user and not (user.is_superuser or (hasattr(user, 'is_staff') and user.is_staff)):
-            from core.managers import get_current_tenant
-            profile = user.asset_holder_profiles.filter(tenant=get_current_tenant()).first() if get_current_tenant() else user.asset_holder_profiles.first()
-            if profile and profile.tenant:
-                instance.tenant = profile.tenant
+        tenant = _resolve_nonadmin_write_tenant(self, get_current_user())
+        if tenant is not None:
+            instance.tenant = tenant
         if commit:
             instance.save()
             self.save_m2m()
@@ -1007,14 +1041,16 @@ class AlertRuleForm(forms.ModelForm):
         ]
         self.helper.layout = Layout(*layout_fields)
 
+    def clean(self):
+        cleaned_data = super().clean()
+        _resolve_nonadmin_write_tenant(self, get_current_user())
+        return cleaned_data
+
     def save(self, commit=True):
         instance = super().save(commit=False)
-        user = get_current_user()
-        if user and not (user.is_superuser or (hasattr(user, 'is_staff') and user.is_staff)):
-            from core.managers import get_current_tenant
-            profile = user.asset_holder_profiles.filter(tenant=get_current_tenant()).first() if get_current_tenant() else user.asset_holder_profiles.first()
-            if profile and profile.tenant:
-                instance.tenant = profile.tenant
+        tenant = _resolve_nonadmin_write_tenant(self, get_current_user())
+        if tenant is not None:
+            instance.tenant = tenant
         if commit:
             instance.save()
             self.save_m2m()
@@ -1151,17 +1187,15 @@ class NotificationChannelForm(forms.ModelForm):
             # Empty is valid — delivery falls back to all tenant members.
 
         self._assembled_config = config
+        _resolve_nonadmin_write_tenant(self, get_current_user())
         return cleaned
 
     def save(self, commit=True):
         instance = super().save(commit=False)
         instance.config = getattr(self, '_assembled_config', {}) or {}
-        user = get_current_user()
-        if user and not (user.is_superuser or (hasattr(user, 'is_staff') and user.is_staff)):
-            from core.managers import get_current_tenant
-            profile = user.asset_holder_profiles.filter(tenant=get_current_tenant()).first() if get_current_tenant() else user.asset_holder_profiles.first()
-            if profile and profile.tenant:
-                instance.tenant = profile.tenant
+        tenant = _resolve_nonadmin_write_tenant(self, get_current_user())
+        if tenant is not None:
+            instance.tenant = tenant
         if commit:
             instance.save()
             self.save_m2m()
