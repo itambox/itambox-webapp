@@ -1,7 +1,7 @@
 # ==============================================================================
 # ITAMbox Automated Dependabot Configuration
 # ==============================================================================
-# Automates weekly dependency scans for both Python packages and GitHub Actions.
+# Automates weekly dependency scans for Python, npm, and GitHub Actions.
 # ==============================================================================
 
 version: 2
@@ -9,6 +9,24 @@ updates:
   # Check the root pyproject.toml and uv.lock dependency graph.
   - package-ecosystem: "pip"
     directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "08:00"
+      timezone: "Europe/Berlin"
+    open-pull-requests-limit: 5
+
+  - package-ecosystem: "npm"
+    directory: "/itambox"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "08:00"
+      timezone: "Europe/Berlin"
+    open-pull-requests-limit: 5
+
+  - package-ecosystem: "npm"
+    directory: "/itambox/tests/e2e"
     schedule:
       interval: "weekly"
       day: "monday"

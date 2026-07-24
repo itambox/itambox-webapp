@@ -161,5 +161,6 @@ nav:
       - Management Commands: 'operations/management-commands.md'
   - Development:
       - Release Checklist: 'development/release-checklist.md'
+      - Security Scanning: 'development/security-scanning.md'
       - Module Maturity: 'development/module-maturity.md'
       - Migration Verification: 'development/migration-verification.md'
