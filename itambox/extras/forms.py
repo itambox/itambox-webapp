@@ -206,9 +206,6 @@ class SavedFilterFilterForm(FilterForm):
 
 import json as _json
 
-from crispy_forms.layout import HTML, Column, Div, Field, Fieldset, Layout, Row, Submit
-from django.contrib.contenttypes.models import ContentType
-
 from core.forms.import_forms import is_model_importable
 from core.validators import validate_external_url
 from itambox.middleware import get_current_user

@@ -173,7 +173,6 @@ class AssetDetailView(ObjectDetailView):
         context["audits_table"] = audits_table
 
         # Custody Receipts
-        from compliance.models import CustodyReceipt
         from compliance.tables import CustodyReceiptTable
 
         receipt_qs = CustodyReceipt.objects.filter(asset=asset).select_related("asset", "holder", "custody_template")
@@ -205,8 +204,6 @@ class AssetDetailView(ObjectDetailView):
         custody_receipt = None
         eula_token = None
         if active_assignment and active_assignment.assigned_target:
-            from organization.models import AssetHolder
-
             if isinstance(active_assignment.assigned_target, AssetHolder):
                 custody_receipt = (
                     CustodyReceipt.objects.filter(asset=asset, holder=active_assignment.assigned_target)
@@ -514,8 +511,6 @@ def bulk_print_labels(request):
         )
 
     from django.conf import settings
-    from django.contrib.contenttypes.models import ContentType
-    from django.db import transaction
     from django_q.tasks import async_task
 
     from core.managers import get_current_tenant

@@ -294,9 +294,6 @@ class ContractForm(forms.ModelForm):
         )
 
 
-from django.core.exceptions import ValidationError
-
-
 class ReceiveLineForm(forms.Form):
     line_id = forms.IntegerField(widget=forms.HiddenInput)
     qty_to_receive = forms.IntegerField(

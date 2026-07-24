@@ -371,8 +371,6 @@ class TenantOIDCAuthorizeView(TenantOIDCSettingsMixin, OIDCAuthenticationRequest
                     pass
 
         if tenant:
-            from core.managers import set_current_tenant
-
             set_current_tenant(tenant)
 
         return super().dispatch(request, *args, **kwargs)
@@ -386,8 +384,6 @@ class TenantOIDCCallbackView(TenantOIDCSettingsMixin, OIDCAuthenticationCallback
 
             try:
                 tenant = Tenant.objects.get(slug=tenant_slug)
-                from core.managers import set_current_tenant
-
                 set_current_tenant(tenant)
             except Tenant.DoesNotExist:
                 pass

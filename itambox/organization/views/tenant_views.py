@@ -404,7 +404,7 @@ def tenant_ldap_sync(request, pk):
     from django.conf import settings
     from django.contrib.contenttypes.models import ContentType
     from django.db import transaction
-    from django.urls import NoReverseMatch, reverse
+    from django.urls import NoReverseMatch
     from django_q.tasks import async_task
 
     from core.models import Job

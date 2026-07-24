@@ -12,8 +12,6 @@ class HardwareInventoryReportTests(TenantTestMixin, TestCase):
 
     def test_hardware_inventory_report(self):
         from assets.models import Manufacturer
-        from core.reports import compile_report_context
-        from extras.models import ReportTemplate
         from inventory.models import Accessory
 
         mfr = Manufacturer.objects.create(name="Dell HW", slug="dell-hw")
