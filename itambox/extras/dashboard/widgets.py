@@ -12,6 +12,7 @@ from django.urls import reverse
 from django.utils.html import escape
 from django.utils.safestring import mark_safe
 from django.template.loader import render_to_string
+from django.core.exceptions import FieldDoesNotExist
 from django.core.exceptions import PermissionDenied
 from django.utils.translation import gettext as _
 from django.utils.translation import gettext_lazy as _lazy
@@ -45,54 +46,76 @@ def get_registered_widgets():
 
 
 # -----------------------------------------------------------------------------
-# Secure Scoping Scoping & Multitenancy Helper
+# Tenant scoping & multitenancy helper
 # -----------------------------------------------------------------------------
 
 def get_scoped_queryset(model_class, request, config=None):
-    """
-    Safely resolves and returns a model queryset constrained by active tenant boundaries
-    and optional regional/site preferences defined in the widget config.
-    """
-    qs = model_class.objects.all()
-    config = config or {}
-    user = request.user
+    """Return ``model_class`` rows visible under the request's canonical tenant
+    scope, optionally narrowed to a single explicitly targeted tenant.
 
+    ``model_class.objects`` is the canonical tenant-scoping manager: it already
+    resolves the active scope from the request/contextvars bound by
+    ``TenantMiddleware`` — a single tenant, a tenant group, the member
+    "all accessible tenants" aggregate, the superuser global view, or a
+    fail-closed empty set. This helper deliberately does NOT re-derive tenant
+    membership; the previous second scoping layer honoured only
+    ``request.active_tenant`` and, on the all-accessible scope, collapsed the
+    aggregate to the member's first ``AssetHolder`` profile (or ``qs.none()``
+    when they had none) — the root cause of issue #133.
+
+    A ``config['tenant_id']`` — per-widget targeting by an authorized global
+    administrator, or a tenant-bound dashboard injected by the ``render_widget``
+    template tag — is applied as a pure NARROWING overlay on top of that scope,
+    so it can only ever restrict, never widen, what the viewer may already see.
+    """
+    user = getattr(request, 'user', None)
     if not user or not user.is_authenticated:
-        return qs.none()
+        return model_class.objects.none()
 
-    # 1. Resolve Active Tenant boundary
-    is_global_admin = user.is_superuser or (hasattr(user, 'is_staff') and user.is_staff)
-    active_tenant = None
+    qs = model_class.objects.all()
 
-    if not is_global_admin:
-        # Standard tenant-bound users are strictly sandboxed to their tenant
-        active_tenant = getattr(request, 'active_tenant', None)
-        if not active_tenant:
-            profile = user.asset_holder_profiles.first()
-            active_tenant = profile.tenant if profile else None
-    else:
-        # Global Admin or Superuser: Can view system-wide or select a target tenant in config
-        tenant_id = config.get('tenant_id')
-        if tenant_id:
-            from organization.models import Tenant
-            active_tenant = Tenant.objects.filter(id=tenant_id).first()
+    target = _resolve_target_tenant(config)
+    if target is not None:
+        qs = _narrow_queryset_to_tenant(qs, model_class, target.pk)
+    return qs
 
-    if active_tenant:
-        if hasattr(model_class, 'tenant'):
-            qs = qs.filter(tenant=active_tenant)
-        elif model_class.__name__ == 'AssetMaintenance':
-            qs = qs.filter(asset__tenant=active_tenant)
-        elif model_class.__name__ == 'SubscriptionAssignment':
-            qs = qs.filter(subscription__tenant=active_tenant)
-        elif model_class.__name__ == 'LicenseSeatAssignment':
-            qs = qs.filter(license__tenant=active_tenant)
-        elif model_class.__name__ == 'ObjectChange':
-            # Partition audit logs to changes made by members of this tenant
-            qs = qs.filter(user__asset_holder_profiles__tenant=active_tenant)
-    elif not is_global_admin:
-        # Standard users without an active tenant profile are restricted by default
-        return qs.none()
 
+def _resolve_target_tenant(config):
+    """Resolve the explicit per-widget target tenant from ``config['tenant_id']``.
+
+    Resolution goes through the tenant-scoped ``Tenant.objects`` manager, so the
+    id is honoured only when the viewer may actually reach that tenant under the
+    active scope (a superuser resolves any tenant; a member resolves only an
+    accessible one). An unresolved id yields ``None`` — i.e. no narrowing — so a
+    tenant-bound dashboard pointing at a tenant the member cannot access falls
+    back to their canonical scope instead of leaking or blanking arbitrarily.
+    """
+    tenant_id = (config or {}).get('tenant_id')
+    if not tenant_id:
+        return None
+    # inline import: avoid an extras.dashboard.widgets -> organization.models
+    # import cycle at app load.
+    from organization.models import Tenant
+    return Tenant.objects.filter(pk=tenant_id).first()
+
+
+def _narrow_queryset_to_tenant(qs, model_class, tenant_id):
+    """Intersect ``qs`` with a single tenant, applied on top of the canonical
+    manager scope so a tenant the viewer cannot access simply yields no rows.
+
+    Resolves the tenant column the way the tenant-scoping manager does: a direct
+    ``tenant`` field, else the model's declared ``tenant_lookup`` relation (e.g.
+    ``asset__tenant`` for ``AssetMaintenance``). Global catalogue tables with
+    neither (e.g. ``StatusLabel``) are returned unchanged.
+    """
+    try:
+        model_class._meta.get_field('tenant')
+        return qs.filter(tenant_id=tenant_id)
+    except FieldDoesNotExist:
+        pass
+    tenant_lookup = getattr(model_class, 'tenant_lookup', None)
+    if tenant_lookup:
+        return qs.filter(**{f'{tenant_lookup}_id': tenant_id})
     return qs
 
 
@@ -538,31 +561,16 @@ class StatusLabelsWidget(DashboardWidget):
         )
 
     def get_context(self, request):
-        user = request.user
-        is_global_admin = user.is_superuser or (hasattr(user, 'is_staff') and user.is_staff)
-        active_tenant = None
-
-        if not is_global_admin:
-            active_tenant = getattr(request, 'active_tenant', None)
-            if not active_tenant:
-                profile = user.asset_holder_profiles.first()
-                active_tenant = profile.tenant if profile else None
-        else:
-            tenant_id = self.get_config_value('tenant_id')
-            if tenant_id:
-                from organization.models import Tenant
-                active_tenant = Tenant.objects.filter(id=tenant_id).first()
-
-        if active_tenant:
-            statuses = StatusLabel.objects.annotate(
-                asset_count=Count('assets', filter=Q(assets__tenant=active_tenant))
-            ).order_by('-asset_count')
-            total_assets = Asset.objects.filter(tenant=active_tenant).count()
-        else:
-            statuses = StatusLabel.objects.annotate(
-                asset_count=Count('assets')
-            ).order_by('-asset_count')
-            total_assets = Asset.objects.count()
+        # Count exactly the assets visible under the canonical scope (single
+        # tenant / group / all-accessible / superuser-global), narrowed by any
+        # per-widget or tenant-bound-dashboard target. StatusLabel is a global
+        # catalogue table, so the scoping rides entirely on the Asset subquery
+        # rather than a second, divergent active-tenant/AssetHolder resolution.
+        scoped_assets = get_scoped_queryset(Asset, request, config=self.config.get("config", {}))
+        statuses = StatusLabel.objects.annotate(
+            asset_count=Count('assets', filter=Q(assets__in=scoped_assets))
+        ).order_by('-asset_count')
+        total_assets = scoped_assets.count()
 
         chart_data = []
         for status in statuses:
@@ -956,118 +964,29 @@ class LowStockWidget(DashboardWidget):
         )
 
     def get_context(self, request):
-        user = request.user
-        is_global_admin = user.is_superuser or (hasattr(user, 'is_staff') and user.is_staff)
-        active_tenant = None
+        # Item querysets are scoped by the canonical manager (get_scoped_queryset
+        # for accessories/consumables; Component.objects for components). The
+        # correlated stock/assignment/allocation subqueries each carry their OWN
+        # tenant column, so they are scoped the same way via each model's
+        # tenant-scoping manager (`.objects`). An explicit per-widget /
+        # tenant-bound-dashboard target additionally narrows both sides to that
+        # one tenant (issue #133: no more active-tenant/AssetHolder fallback).
+        # The per-item-type work lives in helpers so this stays simple.
+        target = _resolve_target_tenant(self.config.get("config", {}))
+        target_id = target.pk if target is not None else None
 
-        if not is_global_admin:
-            active_tenant = getattr(request, 'active_tenant', None)
-            if not active_tenant:
-                profile = user.asset_holder_profiles.first()
-                active_tenant = profile.tenant if profile else None
-        else:
-            tenant_id = self.get_config_value('tenant_id')
-            if tenant_id:
-                from organization.models import Tenant
-                active_tenant = Tenant.objects.filter(id=tenant_id).first()
-
-        include_acc = self.get_config_value('include_accessories', True)
-        include_con = self.get_config_value('include_consumables', True)
-        include_comp = self.get_config_value('include_components', True)
-
-        # Scoped Accessory calculation (Annotated in single query)
-        low_accessories = []
-        if include_acc:
-            from inventory.models import AccessoryStock, AccessoryAssignment
-            acc_qs = get_scoped_queryset(Accessory, request, config=self.config.get("config", {})).filter(min_qty__gt=0)
-            
-            # Scoped total stock subquery
-            stock_sub = AccessoryStock.objects.filter(accessory=OuterRef('pk'))
-            if active_tenant:
-                stock_sub = stock_sub.filter(location__tenant=active_tenant)
-            stock_sub = stock_sub.values('accessory').annotate(sum_qty=Sum('qty')).values('sum_qty')
-            
-            # Scoped checked out subquery
-            assignment_sub = AccessoryAssignment.objects.filter(accessory=OuterRef('pk'))
-            if active_tenant:
-                assignment_sub = assignment_sub.filter(
-                    Q(assigned_location__tenant=active_tenant) | Q(assigned_holder__tenant=active_tenant)
-                )
-            assignment_sub = assignment_sub.values('accessory').annotate(sum_qty=Sum('qty')).values('sum_qty')
-            
-            acc_qs = acc_qs.annotate(
-                _total_stock_annotated=Coalesce(Subquery(stock_sub), 0),
-                _checked_out_annotated=Coalesce(Subquery(assignment_sub), 0)
-            )
-            
-            for acc in acc_qs:
-                available = max(0, acc._total_stock_annotated - acc._checked_out_annotated)
-                if available < acc.min_qty:
-                    low_accessories.append(ScopedAccessoryWrapper(acc, available))
-
-        # Scoped Consumable calculation (Annotated in single query)
-        low_consumables = []
-        if include_con:
-            from inventory.models import ConsumableStock, ConsumableAssignment
-            con_qs = get_scoped_queryset(Consumable, request, config=self.config.get("config", {})).filter(min_qty__gt=0)
-            
-            # Scoped total stock subquery
-            stock_sub = ConsumableStock.objects.filter(consumable=OuterRef('pk'))
-            if active_tenant:
-                stock_sub = stock_sub.filter(location__tenant=active_tenant)
-            stock_sub = stock_sub.values('consumable').annotate(sum_qty=Sum('qty')).values('sum_qty')
-            
-            # Scoped consumed subquery
-            consumption_sub = ConsumableAssignment.objects.filter(consumable=OuterRef('pk'))
-            if active_tenant:
-                consumption_sub = consumption_sub.filter(
-                    Q(assigned_location__tenant=active_tenant) | Q(assigned_holder__tenant=active_tenant)
-                )
-            consumption_sub = consumption_sub.values('consumable').annotate(sum_qty=Sum('qty')).values('sum_qty')
-            
-            con_qs = con_qs.annotate(
-                _total_stock_annotated=Coalesce(Subquery(stock_sub), 0),
-                _consumed_annotated=Coalesce(Subquery(consumption_sub), 0)
-            )
-            
-            for con in con_qs:
-                available = max(0, con._total_stock_annotated - con._consumed_annotated)
-                if available < con.min_qty:
-                    low_consumables.append(ScopedConsumableWrapper(con, available))
-
-        # Scoped Component calculation (Annotated in single query)
-        low_components = []
-        if include_comp:
-            from inventory.models import Component, ComponentStock, ComponentAllocation
-            comp_qs = Component.objects.filter(min_qty__gt=0).order_by('name')
-            
-            # Scoped total stock subquery
-            stock_sub = ComponentStock.objects.filter(component=OuterRef('pk'))
-            if active_tenant:
-                stock_sub = stock_sub.filter(location__tenant=active_tenant)
-            stock_sub = stock_sub.values('component').annotate(sum_qty=Sum('qty')).values('sum_qty')
-            
-            # Scoped allocated subquery
-            allocation_sub = ComponentAllocation.objects.filter(component=OuterRef('pk'), deleted_at__isnull=True)
-            if active_tenant:
-                allocation_sub = allocation_sub.filter(assigned_asset__tenant=active_tenant)
-            allocation_sub = allocation_sub.values('component').annotate(sum_qty=Sum('qty')).values('sum_qty')
-            
-            comp_qs = comp_qs.annotate(
-                _total_stock_annotated=Coalesce(Subquery(stock_sub), 0),
-                _total_allocated_annotated=Coalesce(Subquery(allocation_sub), 0)
-            )
-            
-            for comp in comp_qs:
-                available = comp._total_stock_annotated - comp._total_allocated_annotated
-                if available < comp.min_qty:
-                    low_components.append({
-                        'component': comp,
-                        'available_stock': available,
-                        'total_stock': comp._total_stock_annotated,
-                        'total_allocated': comp._total_allocated_annotated,
-                        'min_qty': comp.min_qty,
-                    })
+        low_accessories = (
+            self._low_stock_accessories(request, target_id)
+            if self.get_config_value('include_accessories', True) else []
+        )
+        low_consumables = (
+            self._low_stock_consumables(request, target_id)
+            if self.get_config_value('include_consumables', True) else []
+        )
+        low_components = (
+            self._low_stock_components(request, target_id)
+            if self.get_config_value('include_components', True) else []
+        )
 
         return {
             'low_stock_accessories': low_accessories,
@@ -1077,6 +996,104 @@ class LowStockWidget(DashboardWidget):
             'low_stock_consumable_count': len(low_consumables),
             'low_stock_component_count': len(low_components),
         }
+
+    def _low_stock_accessories(self, request, target_id):
+        # inline import: defer the inventory sub-models (avoids widening this
+        # module's import surface for a widget that may not render).
+        from inventory.models import AccessoryStock, AccessoryAssignment
+        acc_qs = get_scoped_queryset(Accessory, request, config=self.config.get("config", {})).filter(min_qty__gt=0)
+
+        # Scoped total stock subquery
+        stock_sub = AccessoryStock.objects.filter(accessory=OuterRef('pk'))
+        if target_id:
+            stock_sub = stock_sub.filter(location__tenant_id=target_id)
+        stock_sub = stock_sub.values('accessory').annotate(sum_qty=Sum('qty')).values('sum_qty')
+
+        # Scoped checked out subquery
+        assignment_sub = AccessoryAssignment.objects.filter(accessory=OuterRef('pk'))
+        if target_id:
+            assignment_sub = assignment_sub.filter(
+                Q(assigned_location__tenant_id=target_id) | Q(assigned_holder__tenant_id=target_id)
+            )
+        assignment_sub = assignment_sub.values('accessory').annotate(sum_qty=Sum('qty')).values('sum_qty')
+
+        acc_qs = acc_qs.annotate(
+            _total_stock_annotated=Coalesce(Subquery(stock_sub), 0),
+            _checked_out_annotated=Coalesce(Subquery(assignment_sub), 0)
+        )
+
+        low_accessories = []
+        for acc in acc_qs:
+            available = max(0, acc._total_stock_annotated - acc._checked_out_annotated)
+            if available < acc.min_qty:
+                low_accessories.append(ScopedAccessoryWrapper(acc, available))
+        return low_accessories
+
+    def _low_stock_consumables(self, request, target_id):
+        # inline import: defer the inventory sub-models (see _low_stock_accessories).
+        from inventory.models import ConsumableStock, ConsumableAssignment
+        con_qs = get_scoped_queryset(Consumable, request, config=self.config.get("config", {})).filter(min_qty__gt=0)
+
+        # Scoped total stock subquery
+        stock_sub = ConsumableStock.objects.filter(consumable=OuterRef('pk'))
+        if target_id:
+            stock_sub = stock_sub.filter(location__tenant_id=target_id)
+        stock_sub = stock_sub.values('consumable').annotate(sum_qty=Sum('qty')).values('sum_qty')
+
+        # Scoped consumed subquery
+        consumption_sub = ConsumableAssignment.objects.filter(consumable=OuterRef('pk'))
+        if target_id:
+            consumption_sub = consumption_sub.filter(
+                Q(assigned_location__tenant_id=target_id) | Q(assigned_holder__tenant_id=target_id)
+            )
+        consumption_sub = consumption_sub.values('consumable').annotate(sum_qty=Sum('qty')).values('sum_qty')
+
+        con_qs = con_qs.annotate(
+            _total_stock_annotated=Coalesce(Subquery(stock_sub), 0),
+            _consumed_annotated=Coalesce(Subquery(consumption_sub), 0)
+        )
+
+        low_consumables = []
+        for con in con_qs:
+            available = max(0, con._total_stock_annotated - con._consumed_annotated)
+            if available < con.min_qty:
+                low_consumables.append(ScopedConsumableWrapper(con, available))
+        return low_consumables
+
+    def _low_stock_components(self, request, target_id):
+        # inline import: defer the inventory sub-models (see _low_stock_accessories).
+        from inventory.models import Component, ComponentStock, ComponentAllocation
+        comp_qs = Component.objects.filter(min_qty__gt=0).order_by('name')
+
+        # Scoped total stock subquery
+        stock_sub = ComponentStock.objects.filter(component=OuterRef('pk'))
+        if target_id:
+            stock_sub = stock_sub.filter(location__tenant_id=target_id)
+        stock_sub = stock_sub.values('component').annotate(sum_qty=Sum('qty')).values('sum_qty')
+
+        # Scoped allocated subquery
+        allocation_sub = ComponentAllocation.objects.filter(component=OuterRef('pk'), deleted_at__isnull=True)
+        if target_id:
+            allocation_sub = allocation_sub.filter(assigned_asset__tenant_id=target_id)
+        allocation_sub = allocation_sub.values('component').annotate(sum_qty=Sum('qty')).values('sum_qty')
+
+        comp_qs = comp_qs.annotate(
+            _total_stock_annotated=Coalesce(Subquery(stock_sub), 0),
+            _total_allocated_annotated=Coalesce(Subquery(allocation_sub), 0)
+        )
+
+        low_components = []
+        for comp in comp_qs:
+            available = comp._total_stock_annotated - comp._total_allocated_annotated
+            if available < comp.min_qty:
+                low_components.append({
+                    'component': comp,
+                    'available_stock': available,
+                    'total_stock': comp._total_stock_annotated,
+                    'total_allocated': comp._total_allocated_annotated,
+                    'min_qty': comp.min_qty,
+                })
+        return low_components
 
     def get_footer_links(self, request):
         return [
@@ -1189,7 +1206,9 @@ class TenantSpendWidget(DashboardWidget):
     title = _lazy('Tenant Spend')
     description = _lazy('Purchase cost grouped by tenant (top 8)')
     template_name = 'extras/dashboard/widgets/tenant_spend.html'
-    admin_only = True          # Restrict in UI list
+    # Not admin-only: a standard user sees spend grouped across exactly the
+    # tenants they are authorized to access (issue #133). The scope is enforced
+    # by the canonical manager in get_context, never a permission gate here.
 
     # NOTE: the former 'chart_type' and 'currency' symbol options were dropped.
     # Assets carry a per-record currency, so each tenant bucket can mix
@@ -1220,14 +1239,18 @@ class TenantSpendWidget(DashboardWidget):
 
         default_code = (getattr(settings, 'ITAMBOX_DEFAULT_CURRENCY', 'EUR') or 'EUR').upper()
 
-        # Build query. This is an admin-only cross-tenant comparison (the widget
-        # is gated to superusers/staff via admin_only/has_permission), so it must
-        # see every tenant regardless of the viewer's active tenant. Asset.objects
-        # is tenant-scoped: when a superuser has an active tenant set it would
-        # silently collapse the comparison to that one tenant. Use the unscoped
-        # base manager and re-apply the soft-delete filter ourselves so the
-        # grouping is independent of the active-tenant contextvar.
-        qs = Asset._base_manager.filter(deleted_at__isnull=True)
+        # Group spend across EXACTLY the active authorized scope. The canonical
+        # manager resolves it from the request/contextvars: a superuser with no
+        # narrower scope gets the global cross-tenant comparison; an explicit
+        # tenant / group / tenant-bound-dashboard scope, or a member's
+        # "all accessible tenants" aggregate, narrows it to exactly those
+        # tenants. This replaces the former Asset._base_manager global read,
+        # which bypassed the scope and disclosed every tenant to any viewer.
+        qs = get_scoped_queryset(Asset, request, config=self.config.get("config", {}))
+        # Never surface a soft-deleted tenant in the comparison. A member's
+        # accessible set already excludes them; this guard also covers the
+        # superuser global view, whose unscoped rows can still reference one.
+        qs = qs.filter(Q(tenant__isnull=True) | Q(tenant__deleted_at__isnull=True))
         if exclude_unassigned:
             qs = qs.filter(tenant__isnull=False)
 
