@@ -267,6 +267,7 @@ class AccessoryViewTests(TestCase):
         )
         url = reverse("inventory:accessory_delete", kwargs={"pk": self.accessory.pk})
         response = self.client.post(url)
+        self.assertRedirects(response, self.accessory.get_absolute_url())
         self.assertTrue(Accessory.objects.filter(pk=self.accessory.pk).exists())
 
 

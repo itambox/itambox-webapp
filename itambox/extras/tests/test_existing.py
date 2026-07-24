@@ -142,8 +142,8 @@ class DashboardModelTests(TestCase):
         self.assertEqual(dash.layout[2]["widget"], "first")
 
     def test_dashboard_multiple_allowed(self):
-        dash1 = Dashboard.objects.create(user=self.user, name="Dashboard 1")
-        dash2 = Dashboard.objects.create(user=self.user, name="Dashboard 2")
+        Dashboard.objects.create(user=self.user, name="Dashboard 1")
+        Dashboard.objects.create(user=self.user, name="Dashboard 2")
         self.assertEqual(Dashboard.objects.filter(user=self.user).count(), 2)
 
 
@@ -305,10 +305,10 @@ class TagColumnTests(TestCase):
     def test_tag_column_rendering(self):
         from extras.tables import TagColumn
 
-        t1 = Tag.objects.create(name="Tag1", slug="tag1", color="ffffff")  # white bg -> dark text
-        t2 = Tag.objects.create(name="Tag2", slug="tag2", color="000000")  # black bg -> white text
-        t3 = Tag.objects.create(name="Tag3", slug="tag3", color="20c997")
-        t4 = Tag.objects.create(name="Tag4", slug="tag4", color="111111")
+        Tag.objects.create(name="Tag1", slug="tag1", color="ffffff")  # white bg -> dark text
+        Tag.objects.create(name="Tag2", slug="tag2", color="000000")  # black bg -> white text
+        Tag.objects.create(name="Tag3", slug="tag3", color="20c997")
+        Tag.objects.create(name="Tag4", slug="tag4", color="111111")
 
         column = TagColumn(url_name="extras:tag_list")
 

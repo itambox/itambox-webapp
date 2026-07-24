@@ -22,6 +22,6 @@ class CurrentUserMiddlewareTestCase(TestCase):
         self.assertEqual(get_current_user(), self.user)
         self.assertIsNotNone(get_current_request_id())
 
-        response = middleware.process_response(request, None)
+        middleware.process_response(request, None)
         self.assertIsNone(get_current_user())
         self.assertIsNone(get_current_request_id())

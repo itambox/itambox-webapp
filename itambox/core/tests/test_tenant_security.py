@@ -103,8 +103,8 @@ class CoreTenantSecurityTestCase(TestCase):
             permissions=["assets.view_asset", "assets.add_asset", "assets.change_asset", "assets.delete_asset"],
         )
         reader_role = Role.objects.create(tenant=tenant_readonly, name="Reader", permissions=["assets.view_asset"])
-        mem_admin = grant(test_user, tenant_admin, admin_role).membership
-        mem_readonly = grant(test_user, tenant_readonly, reader_role).membership
+        grant(test_user, tenant_admin, admin_role)
+        grant(test_user, tenant_readonly, reader_role)
 
         # Set active context in test client session
         self.client.force_login(test_user)
@@ -325,7 +325,7 @@ class CrossTenantAttackTestCase(TestCase):
     def test_bulk_delete_cross_tenant_pks_are_dropped(self):
         """POSTing Tenant A pks to the generic bulk-delete endpoint must not delete them."""
         url = reverse("bulk_delete")
-        response = self.client.post(
+        self.client.post(
             url,
             {
                 "pk": [str(self.asset_a.pk)],

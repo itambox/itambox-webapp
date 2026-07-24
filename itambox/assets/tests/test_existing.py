@@ -1200,7 +1200,7 @@ class CategoryTestCase(_SeededStatusLabelsMixin, TestCase):
 
     def test_category_list_view_and_color_rendering(self):
         # Create a category with color code
-        category = Category.objects.create(name="Laptop Category", slug="laptop-category", color="ff0000")
+        Category.objects.create(name="Laptop Category", slug="laptop-category", color="ff0000")
 
         response = self.client.get(reverse("assets:category_list"))
         self.assertEqual(response.status_code, 200)

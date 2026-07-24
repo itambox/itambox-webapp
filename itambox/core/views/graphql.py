@@ -248,7 +248,7 @@ class PrivateGraphQLView(GraphQLView):
                     # Return a generic message; the specific failure reason must not
                     # leak to the client (aligns with the broad-except branch below).
                     return JsonResponse({"errors": [{"message": str(_("Authentication failed"))}]}, status=401)
-                except Exception as e:
+                except Exception:
                     return JsonResponse({"errors": [{"message": str(_("Authentication failed"))}]}, status=401)
 
             # Perform rate limiting / throttling checks

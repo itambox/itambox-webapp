@@ -319,7 +319,6 @@ class AssetRequestActionForm(forms.Form):
         cleaned_data = super().clean()
         qty = cleaned_data.get("qty")
         allocated_location = cleaned_data.get("allocated_location")
-        allocated_asset = cleaned_data.get("allocated_asset")
 
         if self.request_instance:
             is_inventory = (

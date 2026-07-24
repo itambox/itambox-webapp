@@ -245,6 +245,7 @@ class ConsumableViewTests(TestCase):
         )
         url = reverse("inventory:consumable_delete", kwargs={"pk": self.consumable.pk})
         response = self.client.post(url)
+        self.assertRedirects(response, self.consumable.get_absolute_url())
         self.assertTrue(Consumable.objects.filter(pk=self.consumable.pk).exists())
 
 

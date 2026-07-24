@@ -98,5 +98,5 @@ def import_csv_task(job_id, rows_data, app_label, model_name, user_id, tenant_id
                     level=Notification.LEVEL_DANGER,
                     target_url=reverse_job_detail(job.pk),
                 )
-        except Exception as e:
+        except Exception:
             logger.exception("Outer exception during async import task")

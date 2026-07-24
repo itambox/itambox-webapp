@@ -139,7 +139,7 @@ def checkout_asset(
         if checkout_date:
             assignment_kwargs["checked_out_at"] = checkout_date
 
-        assignment = AssetAssignment.objects.create(**assignment_kwargs)
+        AssetAssignment.objects.create(**assignment_kwargs)
 
         category = asset.asset_type.category if asset.asset_type else None
         if holder and category:
@@ -460,8 +460,6 @@ def checkout_kit(kit, holder=None, location=None, user=None, notes="", source_lo
                 asset._changelog_action = "checkout"
                 asset._changelog_message = f"Checked out via Kit '{kit.name}'. {notes}"
                 asset.save(update_fields=["status", "location"])
-
-                target = holder or location
 
                 assignment_kwargs = {
                     "asset": asset,

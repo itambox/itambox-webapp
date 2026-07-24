@@ -182,10 +182,11 @@ class CoreTablesTestCase(TestCase):
 
         # ObjectChangeTable render coverage
         _request_id.set(uuid.uuid4())
-        channel2 = NotificationChannel.objects.create(name="Another Channel", channel_type="webhook")
+        NotificationChannel.objects.create(name="Another Channel", channel_type="webhook")
         _request_id.set(None)
 
         oc_table = ObjectChangeTable(ObjectChange.objects.all())
+        self.assertGreater(len(oc_table.rows), 0)
         for row in oc_table.rows:
             html = oc_table.render_action(row.record.action, row.record)
             self.assertIn("badge bg-", html)

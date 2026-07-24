@@ -106,8 +106,10 @@ class MitigationsPhase4Tests(TestCase):
         with self.assertRaises(ProtectedError):
             self.asset_holder.delete()
 
+        receipt.delete(force_hard_delete=True)
+
         # AssetMaintenance protects asset
-        maintenance = AssetMaintenance.objects.create(asset=self.asset, start_date="2026-01-01")
+        AssetMaintenance.objects.create(asset=self.asset, start_date="2026-01-01")
 
         with self.assertRaises(ProtectedError):
             self.asset.delete()
@@ -148,7 +150,7 @@ class MitigationsPhase4Tests(TestCase):
         # Create a staff user who has permission to change assets on self.tenant, but NOT on self.other_tenant
         staff_user = User.objects.create_user(username="staff", email="staff@example.com", password="password123")
         role = Role.objects.create(tenant=self.tenant, name="Tenant Staff", permissions=["assets.change_asset"])
-        membership_staff = grant(staff_user, self.tenant, role).membership
+        grant(staff_user, self.tenant, role)
 
         factory = RequestFactory()
 

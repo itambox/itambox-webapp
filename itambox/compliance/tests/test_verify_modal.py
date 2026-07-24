@@ -74,7 +74,7 @@ class AuditAssetFromFormTests(TestCase):
 
     def test_location_from_form_stored_on_audit(self):
         """Observed location (user-supplied) is frozen on the audit record."""
-        result = audit_asset_from_form(self.asset, self.user, location=self.loc_munich, status=self.status)
+        audit_asset_from_form(self.asset, self.user, location=self.loc_munich, status=self.status)
         audit = AssetAudit.objects.get(asset=self.asset)
         self.assertEqual(audit.location, self.loc_munich)
 

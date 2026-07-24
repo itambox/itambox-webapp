@@ -260,9 +260,6 @@ def compile_report_context(template, active_tenant=None, filter_tenants=None):
         )
 
         total_assets = assets_qs.count()
-        # Aggregate in the DB rather than pulling every filtered asset (and its
-        # prefetched assignments) into Python just to sum one column.
-        acquisition_sum = assets_qs.aggregate(total=Sum("purchase_cost"))["total"] or 0
         # Bucket acquisition cost per currency (each Asset carries its own currency and there
         # is no FX source, so a single combined sum would be meaningless).
         acq_by_currency = {}
@@ -964,7 +961,6 @@ def compile_report_context(template, active_tenant=None, filter_tenants=None):
         elif active_tenant:
             contracts_qs = contracts_qs.filter(tenant=active_tenant)
 
-        total_contracts = contracts_qs.count()
         active_contracts_qs = contracts_qs.filter(status="active")
         total_active = active_contracts_qs.count()
 

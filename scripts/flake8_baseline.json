@@ -596,14 +596,6 @@
       "count": 1
     },
     {
-      "path": "itambox/assets/forms/request_forms.py",
-      "code": "F841",
-      "message": "local variable 'allocated_asset' is assigned to but never used",
-      "source": "        allocated_asset = cleaned_data.get(\"allocated_asset\")",
-      "context": "Module:body/ClassDef:AssetRequestActionForm:body/FunctionDef:clean:body",
-      "count": 1
-    },
-    {
       "path": "itambox/assets/forms/reservation_form.py",
       "code": "B907",
       "message": "'cancel_url' is manually surrounded by quotes, consider using the `!r` conversion flag.",
@@ -809,22 +801,6 @@
       "message": "'django.urls.reverse' imported but unused",
       "source": "from django.urls import reverse",
       "context": "Module:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/assets/services.py",
-      "code": "F841",
-      "message": "local variable 'assignment' is assigned to but never used",
-      "source": "        assignment = AssetAssignment.objects.create(**assignment_kwargs)",
-      "context": "Module:body/FunctionDef:checkout_asset:body/With:[(\"Call(func=Attribute(value=Name(id='transaction', ctx=Load()), attr='atomic', ctx=Load()), args=[], keywords=[])\", None)]:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/assets/services.py",
-      "code": "F841",
-      "message": "local variable 'target' is assigned to but never used",
-      "source": "                target = holder or location",
-      "context": "Module:body/FunctionDef:checkout_kit:body/With:[(\"Call(func=Attribute(value=Name(id='transaction', ctx=Load()), attr='atomic', ctx=Load()), args=[], keywords=[])\", None)]:body/For:Name(id='item', ctx=Store()):Call(func=Attribute(value=Attribute(value=Name(id='kit', ctx=Load()), attr='items', ctx=Load()), attr='all', ctx=Load()), args=[], keywords=[]):body/If:Attribute(value=Name(id='item', ctx=Load()), attr='asset_type', ctx=Load()):body",
       "count": 1
     },
     {
@@ -1084,14 +1060,6 @@
       "count": 1
     },
     {
-      "path": "itambox/assets/tests/test_assignments.py",
-      "code": "F841",
-      "message": "local variable 'target' is assigned to but never used",
-      "source": "        target = checkout_asset(",
-      "context": "Module:body/ClassDef:AssetAssignmentTestCase:body/FunctionDef:test_checkout_asset_with_custom_status:body",
-      "count": 1
-    },
-    {
       "path": "itambox/assets/tests/test_audit_cadence.py",
       "code": "F401",
       "message": "'django.test.RequestFactory' imported but unused",
@@ -1105,30 +1073,6 @@
       "message": "'django.utils.timezone' imported but unused",
       "source": "from django.utils import timezone",
       "context": "Module:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/assets/tests/test_audits.py",
-      "code": "F841",
-      "message": "local variable 'audit_1' is assigned to but never used",
-      "source": "        audit_1 = audit_asset(",
-      "context": "Module:body/ClassDef:AuditReconciliationTestCase:body/FunctionDef:test_audit_outside_session:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/assets/tests/test_bulk_scan.py",
-      "code": "F841",
-      "message": "local variable 'other_asset' is assigned to but never used",
-      "source": "        other_asset = Asset.objects.create(",
-      "context": "Module:body/ClassDef:ScanActionResolveTests:body/FunctionDef:test_cross_tenant_isolation:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/assets/tests/test_bulk_scan.py",
-      "code": "F841",
-      "message": "local variable 'resp' is assigned to but never used",
-      "source": "        resp = self.client.get(self.url, {\"code\": \"OTH-001\", \"mode\": \"checkin\"})",
-      "context": "Module:body/ClassDef:ScanActionResolveTests:body/FunctionDef:test_cross_tenant_isolation:body",
       "count": 1
     },
     {
@@ -1172,27 +1116,11 @@
       "count": 1
     },
     {
-      "path": "itambox/assets/tests/test_disposal.py",
-      "code": "F841",
-      "message": "local variable 'archived' is assigned to but never used",
-      "source": "        archived = baker.make(StatusLabel, type=\"archived\", name=\"Archived\")",
-      "context": "Module:body/ClassDef:AssetDisposalViewSmokeTest:body/FunctionDef:test_disposal_detail_view_200:body",
-      "count": 1
-    },
-    {
       "path": "itambox/assets/tests/test_existing.py",
       "code": "F401",
       "message": "'inventory.models.ConsumableAssignment' imported but unused",
       "source": "from inventory.models import (",
       "context": "Module:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/assets/tests/test_existing.py",
-      "code": "F841",
-      "message": "local variable 'category' is assigned to but never used",
-      "source": "        category = Category.objects.create(name=\"Laptop Category\", slug=\"laptop-category\", color=\"ff0000\")",
-      "context": "Module:body/ClassDef:CategoryTestCase:body/FunctionDef:test_category_list_view_and_color_rendering:body",
       "count": 1
     },
     {
@@ -1641,14 +1569,6 @@
       "message": "f-string is missing placeholders",
       "source": "        url = f\"http://localhost:8000/assets/ITM-00001/\"",
       "context": "Module:body/ClassDef:ResolveScannedCodeTests:body/FunctionDef:test_url_with_tag_segment:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/assets/tests/test_scanning.py",
-      "code": "F841",
-      "message": "local variable 'other_asset' is assigned to but never used",
-      "source": "        other_asset = Asset.objects.create(",
-      "context": "Module:body/ClassDef:ScanResolveViewTests:body/FunctionDef:test_member_with_view_asset_sees_own_tenant_not_other:body",
       "count": 1
     },
     {
@@ -2740,14 +2660,6 @@
       "count": 1
     },
     {
-      "path": "itambox/assets/views/disposal_views.py",
-      "code": "F841",
-      "message": "local variable 'disposal' is assigned to but never used",
-      "source": "            disposal = dispose_asset(",
-      "context": "Module:body/ClassDef:AssetDisposeActionView:body/FunctionDef:form_valid:body/Try:body",
-      "count": 1
-    },
-    {
       "path": "itambox/assets/views/manufacturer_views.py",
       "code": "F401",
       "message": "'itambox.views.generic.ObjectImportView' imported but unused",
@@ -2969,54 +2881,6 @@
       "message": "'organization.models.Tenant' imported but unused",
       "source": "from organization.models import Location, Tenant",
       "context": "Module:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/compliance/tests/test_flag_missing.py",
-      "code": "F841",
-      "message": "local variable 'assets' is assigned to but never used",
-      "source": "        assets = self._close_with_missing(1)",
-      "context": "Module:body/ClassDef:FlagMissingServiceTests:body/FunctionDef:test_idempotent_second_run:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/compliance/tests/test_flag_missing.py",
-      "code": "F841",
-      "message": "local variable 'existing' is assigned to but never used",
-      "source": "        existing = StatusLabel.objects.create(name=\"Missing\", type=StatusLabel.TYPE_UNDEPLOYABLE, color=\"#000\")",
-      "context": "Module:body/ClassDef:FlagMissingServiceTests:body/FunctionDef:test_missing_status_is_get_or_create:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/compliance/tests/test_report_persistence.py",
-      "code": "F841",
-      "message": "local variable 'missing_asset' is assigned to but never used",
-      "source": "        missing_asset = baker.make(Asset, status=self.status, location=self.loc)",
-      "context": "Module:body/ClassDef:ReportPersistenceTests:body/FunctionDef:test_report_contains_all_categories:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/compliance/tests/test_tenant_session.py",
-      "code": "F841",
-      "message": "local variable '_asset_missing' is assigned to but never used",
-      "source": "        _asset_missing = baker.make(Asset, status=scanned_status, tenant=self.tenant, location=loc)",
-      "context": "Module:body/ClassDef:ExpectedAssetsCountStabilityTests:body/FunctionDef:test_classification_stable_across_tenant_contexts:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/compliance/tests/test_tenant_session.py",
-      "code": "F841",
-      "message": "local variable 'at' is assigned to but never used",
-      "source": "        at = baker.make(AssetType, manufacturer=mfr)",
-      "context": "Module:body/ClassDef:ExpectedAssetsCountStabilityTests:body/FunctionDef:setUp:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/compliance/tests/test_verify_modal.py",
-      "code": "F841",
-      "message": "local variable 'result' is assigned to but never used",
-      "source": "        result = audit_asset_from_form(self.asset, self.user, location=self.loc_munich, status=self.status)",
-      "context": "Module:body/ClassDef:AuditAssetFromFormTests:body/FunctionDef:test_location_from_form_stored_on_audit:body",
       "count": 1
     },
     {
@@ -3716,22 +3580,6 @@
       "count": 1
     },
     {
-      "path": "itambox/core/importers/snipeit.py",
-      "code": "F841",
-      "message": "local variable 'field_ids' is assigned to but never used",
-      "source": "            field_ids = [f.get(\"id\") for f in (row.get(\"fields\", {}).get(\"rows\") or []) if f.get(\"id\")]",
-      "context": "Module:body/ClassDef:SnipeITImporter:body/FunctionDef:_import_fieldsets:body/For:Name(id='row', ctx=Store()):Call(func=Attribute(value=Attribute(value=Name(id='self', ctx=Load()), attr='client', ctx=Load()), attr='get_all', ctx=Load()), args=[Constant(value='/api/v1/fieldsets')], keywords=[]):body",
-      "count": 1
-    },
-    {
-      "path": "itambox/core/importers/snipeit.py",
-      "code": "F841",
-      "message": "local variable 'raw_status' is assigned to but never used",
-      "source": "            raw_status = (",
-      "context": "Module:body/ClassDef:SnipeITImporter:body/FunctionDef:_import_maintenances:body/For:Name(id='row', ctx=Store()):Call(func=Attribute(value=Attribute(value=Name(id='self', ctx=Load()), attr='client', ctx=Load()), attr='get_all', ctx=Load()), args=[Constant(value='/api/v1/maintenances')], keywords=[]):body",
-      "count": 1
-    },
-    {
       "path": "itambox/core/integrity.py",
       "code": "B907",
       "message": "'grant.role.name' is manually surrounded by quotes, consider using the `!r` conversion flag.",
@@ -3924,14 +3772,6 @@
       "count": 1
     },
     {
-      "path": "itambox/core/management/commands/_seed/finance.py",
-      "code": "F841",
-      "message": "local variable 'currency' is assigned to but never used",
-      "source": "            currency = meta.get(\"currency\", \"EUR\")",
-      "context": "Module:body/ClassDef:SeedFinanceMixin:body/FunctionDef:_seed_cost_centers:body/For:Tuple(elts=[Name(id='slug', ctx=Store()), Name(id='tenant', ctx=Store())], ctx=Store()):Call(func=Attribute(value=Attribute(value=Name(id='self', ctx=Load()), attr='_tenants', ctx=Load()), attr='items', ctx=Load()), args=[], keywords=[]):body",
-      "count": 1
-    },
-    {
       "path": "itambox/core/management/commands/_seed/inventory.py",
       "code": "B007",
       "message": "Loop control variable 'comp_slug' not used within the loop body. If this is intended, start the name with an underscore.",
@@ -4000,22 +3840,6 @@
       "code": "F401",
       "message": "'assets.models.AssetType' imported but unused",
       "source": "        from assets.models import Asset, AssetRequest, AssetType",
-      "context": "Module:body/ClassDef:SeedOperationsMixin:body/FunctionDef:_seed_operations:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/core/management/commands/_seed/operations.py",
-      "code": "F841",
-      "message": "local variable 'rt_dep' is assigned to but never used",
-      "source": "        rt_dep = ReportTemplate.objects.create(",
-      "context": "Module:body/ClassDef:SeedOperationsMixin:body/FunctionDef:_seed_operations:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/core/management/commands/_seed/operations.py",
-      "code": "F841",
-      "message": "local variable 'rt_renew' is assigned to but never used",
-      "source": "        rt_renew = ReportTemplate.objects.create(",
       "context": "Module:body/ClassDef:SeedOperationsMixin:body/FunctionDef:_seed_operations:body",
       "count": 1
     },
@@ -4729,22 +4553,6 @@
       "message": "'django.contrib.contenttypes.models.ContentType' imported but unused",
       "source": "from django.contrib.contenttypes.models import ContentType",
       "context": "Module:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/core/reports/compiler.py",
-      "code": "F841",
-      "message": "local variable 'acquisition_sum' is assigned to but never used",
-      "source": "        acquisition_sum = assets_qs.aggregate(total=Sum(\"purchase_cost\"))[\"total\"] or 0",
-      "context": "Module:body/FunctionDef:compile_report_context:body/If:Compare(left=Attribute(value=Name(id='template', ctx=Load()), attr='report_type', ctx=Load()), ops=[Eq()], comparators=[Attribute(value=Name(id='ReportTemplate', ctx=Load()), attr='REPORT_TYPE_ASSET_SUMMARY', ctx=Load())]):body",
-      "count": 1
-    },
-    {
-      "path": "itambox/core/reports/compiler.py",
-      "code": "F841",
-      "message": "local variable 'total_contracts' is assigned to but never used",
-      "source": "        total_contracts = contracts_qs.count()",
-      "context": "Module:body/FunctionDef:compile_report_context:body/If:Compare(left=Attribute(value=Name(id='template', ctx=Load()), attr='report_type', ctx=Load()), ops=[Eq()], comparators=[Attribute(value=Name(id='ReportTemplate', ctx=Load()), attr='REPORT_TYPE_ASSET_SUMMARY', ctx=Load())]):orelse/If:Compare(left=Attribute(value=Name(id='template', ctx=Load()), attr='report_type', ctx=Load()), ops=[Eq()], comparators=[Attribute(value=Name(id='ReportTemplate', ctx=Load()), attr='REPORT_TYPE_LICENSE_UTILIZATION', ctx=Load())]):orelse/If:Compare(left=Attribute(value=Name(id='template', ctx=Load()), attr='report_type', ctx=Load()), ops=[Eq()], comparators=[Attribute(value=Name(id='ReportTemplate', ctx=Load()), attr='REPORT_TYPE_SUBSCRIPTION_RENEWALS', ctx=Load())]):orelse/If:Compare(left=Attribute(value=Name(id='template', ctx=Load()), attr='report_type', ctx=Load()), ops=[Eq()], comparators=[Attribute(value=Name(id='ReportTemplate', ctx=Load()), attr='REPORT_TYPE_ASSET_MAINTENANCE', ctx=Load())]):orelse/If:Compare(left=Attribute(value=Name(id='template', ctx=Load()), attr='report_type', ctx=Load()), ops=[Eq()], comparators=[Attribute(value=Name(id='ReportTemplate', ctx=Load()), attr='REPORT_TYPE_ASSET_DEPRECIATION', ctx=Load())]):orelse/If:Compare(left=Attribute(value=Name(id='template', ctx=Load()), attr='report_type', ctx=Load()), ops=[Eq()], comparators=[Attribute(value=Name(id='ReportTemplate', ctx=Load()), attr='REPORT_TYPE_SOFTWARE_INVENTORY', ctx=Load())]):orelse/If:Compare(left=Attribute(value=Name(id='template', ctx=Load()), attr='report_type', ctx=Load()), ops=[Eq()], comparators=[Attribute(value=Name(id='ReportTemplate', ctx=Load()), attr='REPORT_TYPE_CONTRACT_RENEWALS', ctx=Load())]):body",
       "count": 1
     },
     {
@@ -5508,27 +5316,11 @@
       "count": 1
     },
     {
-      "path": "itambox/core/tasks/checkout.py",
-      "code": "F841",
-      "message": "local variable 'e' is assigned to but never used",
-      "source": "        except Exception as e:",
-      "context": "Module:body/FunctionDef:bulk_checkout_task:body/With:[(\"Call(func=Name(id='TaskContext', ctx=Load()), args=[], keywords=[keyword(arg='tenant_id', value=Name(id='tenant_id', ctx=Load())), keyword(arg='user_id', value=Name(id='user_id', ctx=Load()))])\", \"Name(id='ctx', ctx=Store())\")]:body/Try:self",
-      "count": 1
-    },
-    {
       "path": "itambox/core/tasks/csv_import.py",
       "code": "C901",
       "message": "'import_csv_task' is too complex (12)",
       "source": "def import_csv_task(job_id, rows_data, app_label, model_name, user_id, tenant_id=None):",
       "context": "Module:body/FunctionDef:import_csv_task:self",
-      "count": 1
-    },
-    {
-      "path": "itambox/core/tasks/csv_import.py",
-      "code": "F841",
-      "message": "local variable 'e' is assigned to but never used",
-      "source": "        except Exception as e:",
-      "context": "Module:body/FunctionDef:import_csv_task:body/With:[(\"Call(func=Name(id='TaskContext', ctx=Load()), args=[], keywords=[keyword(arg='tenant_id', value=Name(id='tenant_id', ctx=Load())), keyword(arg='user_id', value=Name(id='user_id', ctx=Load()))])\", \"Name(id='ctx', ctx=Store())\")]:body/Try:self",
       "count": 1
     },
     {
@@ -5612,14 +5404,6 @@
       "count": 1
     },
     {
-      "path": "itambox/core/tasks/intune_sync.py",
-      "code": "F841",
-      "message": "local variable 'device_name' is assigned to but never used",
-      "source": "        device_name = (device.get(\"deviceName\") or \"\").strip()",
-      "context": "Module:body/FunctionDef:_run_sync:body/For:Name(id='device', ctx=Store()):Name(id='devices', ctx=Load()):body",
-      "count": 1
-    },
-    {
       "path": "itambox/core/tasks/labels.py",
       "code": "B907",
       "message": "'barcode_data_uri' is manually surrounded by quotes, consider using the `!r` conversion flag.",
@@ -5684,22 +5468,6 @@
       "count": 1
     },
     {
-      "path": "itambox/core/tasks/labels.py",
-      "code": "F841",
-      "message": "local variable 'e' is assigned to but never used",
-      "source": "        except Exception as e:",
-      "context": "Module:body/FunctionDef:generate_label_batch_task:body/With:[(\"Call(func=Name(id='TaskContext', ctx=Load()), args=[], keywords=[keyword(arg='tenant_id', value=Name(id='tenant_id', ctx=Load())), keyword(arg='user_id', value=Name(id='user_id', ctx=Load()))])\", \"Name(id='ctx', ctx=Store())\")]:body/Try:self",
-      "count": 1
-    },
-    {
-      "path": "itambox/core/tasks/ldap.py",
-      "code": "F841",
-      "message": "local variable 'e' is assigned to but never used",
-      "source": "        except Exception as e:",
-      "context": "Module:body/FunctionDef:sync_tenant_ldap_task:body/With:[(\"Call(func=Name(id='TaskContext', ctx=Load()), args=[], keywords=[keyword(arg='tenant_id', value=Name(id='tenant_id', ctx=Load())), keyword(arg='user_id', value=Name(id='user_id', ctx=Load()))])\", \"Name(id='ctx', ctx=Store())\")]:body/Try:self",
-      "count": 1
-    },
-    {
       "path": "itambox/core/tasks/reports.py",
       "code": "B907",
       "message": "'sched.name' is manually surrounded by quotes, consider using the `!r` conversion flag.",
@@ -5721,14 +5489,6 @@
       "message": "'generate_scheduled_report_task' is too complex (38)",
       "source": "def generate_scheduled_report_task(scheduled_report_id):",
       "context": "Module:body/FunctionDef:generate_scheduled_report_task:self",
-      "count": 1
-    },
-    {
-      "path": "itambox/core/tasks/reports.py",
-      "code": "F841",
-      "message": "local variable 'email_sent' is assigned to but never used",
-      "source": "                    email_sent = True",
-      "context": "Module:body/FunctionDef:generate_scheduled_report_task:body/With:[(\"Call(func=Name(id='TaskContext', ctx=Load()), args=[], keywords=[keyword(arg='tenant_id', value=IfExp(test=Name(id='active_tenant', ctx=Load()), body=Attribute(value=Name(id='active_tenant', ctx=Load()), attr='id', ctx=Load()), orelse=Constant(value=None))), keyword(arg='user_id', value=Constant(value=None))])\", None)]:body/Try:body/If:Attribute(value=Name(id='sched', ctx=Load()), attr='recipients', ctx=Load()):body/If:Name(id='recipient_list', ctx=Load()):body",
       "count": 1
     },
     {
@@ -5860,22 +5620,6 @@
       "count": 1
     },
     {
-      "path": "itambox/core/tests/test_events.py",
-      "code": "F841",
-      "message": "local variable 'rule' is assigned to but never used",
-      "source": "        rule = EventRule.objects.create(",
-      "context": "Module:body/ClassDef:EventsSystemTestCase:body/FunctionDef:test_event_rule_conditions_evaluation:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/core/tests/test_events.py",
-      "code": "F841",
-      "message": "local variable 'rule' is assigned to but never used",
-      "source": "        rule = EventRule.objects.create(",
-      "context": "Module:body/ClassDef:EventsSystemTestCase:body/FunctionDef:test_webhook_delivery_with_hmac_signature:body",
-      "count": 1
-    },
-    {
       "path": "itambox/core/tests/test_htmx.py",
       "code": "F401",
       "message": "'organization.models.Membership' imported but unused",
@@ -5924,27 +5668,11 @@
       "count": 1
     },
     {
-      "path": "itambox/core/tests/test_intune_sync.py",
-      "code": "F841",
-      "message": "local variable 'client' is assigned to but never used",
-      "source": "                client = IntuneClient(\"tid\", \"cid\", \"sec\")",
-      "context": "Module:body/ClassDef:IntunePaginationTest:body/FunctionDef:test_pagination_followed:body/With:[(\"Call(func=Name(id='patch', ctx=Load()), args=[Constant(value='core.integrations.intune.requests.get')], keywords=[keyword(arg='side_effect', value=Name(id='responses', ctx=Load()))])\", None)]:body/With:[(\"Call(func=Name(id='patch', ctx=Load()), args=[Constant(value='core.integrations.intune._get_token')], keywords=[keyword(arg='return_value', value=Constant(value='tok'))])\", None)]:body",
-      "count": 1
-    },
-    {
       "path": "itambox/core/tests/test_label_print_perms.py",
       "code": "F401",
       "message": "'organization.models.Membership' imported but unused",
       "source": "from organization.models import Membership, Role, Tenant",
       "context": "Module:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/core/tests/test_label_print_perms.py",
-      "code": "F841",
-      "message": "local variable 'membership' is assigned to but never used",
-      "source": "        membership = grant(user, self.tenant, role).membership",
-      "context": "Module:body/ClassDef:LabelPrintPermissionTests:body/FunctionDef:_login:body",
       "count": 1
     },
     {
@@ -5972,14 +5700,6 @@
       "count": 1
     },
     {
-      "path": "itambox/core/tests/test_middleware.py",
-      "code": "F841",
-      "message": "local variable 'response' is assigned to but never used",
-      "source": "        response = middleware.process_response(request, None)",
-      "context": "Module:body/ClassDef:CurrentUserMiddlewareTestCase:body/FunctionDef:test_current_user_middleware_contextvars:body",
-      "count": 1
-    },
-    {
       "path": "itambox/core/tests/test_mitigations_phase2.py",
       "code": "F401",
       "message": "'sys' imported but unused",
@@ -6001,30 +5721,6 @@
       "message": "'organization.models.Location' imported but unused",
       "source": "from organization.models import AssetHolder, Location, Membership, Role, Tenant",
       "context": "Module:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/core/tests/test_mitigations_phase4.py",
-      "code": "F841",
-      "message": "local variable 'maintenance' is assigned to but never used",
-      "source": "        maintenance = AssetMaintenance.objects.create(asset=self.asset, start_date=\"2026-01-01\")",
-      "context": "Module:body/ClassDef:MitigationsPhase4Tests:body/FunctionDef:test_deletion_cascades_protected_compliance_data:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/core/tests/test_mitigations_phase4.py",
-      "code": "F841",
-      "message": "local variable 'membership_staff' is assigned to but never used",
-      "source": "        membership_staff = grant(staff_user, self.tenant, role).membership",
-      "context": "Module:body/ClassDef:MitigationsPhase4Tests:body/FunctionDef:test_bulk_edit_tenant_validation:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/core/tests/test_mitigations_phase4.py",
-      "code": "F841",
-      "message": "local variable 'receipt' is assigned to but never used",
-      "source": "        receipt = CustodyReceipt.objects.create(asset=self.asset, holder=self.asset_holder, accepted=True)",
-      "context": "Module:body/ClassDef:MitigationsPhase4Tests:body/FunctionDef:test_deletion_cascades_protected_compliance_data:body",
       "count": 1
     },
     {
@@ -6081,14 +5777,6 @@
       "message": "'unittest.mock.MagicMock' imported but unused",
       "source": "from unittest.mock import MagicMock, patch",
       "context": "Module:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/core/tests/test_oidc.py",
-      "code": "F841",
-      "message": "local variable 'holder_a' is assigned to but never used",
-      "source": "        holder_a = AssetHolder.objects.create(",
-      "context": "Module:body/ClassDef:TenantOIDCTestCase:body/FunctionDef:test_upn_collision_during_provisioning:body",
       "count": 1
     },
     {
@@ -6332,86 +6020,6 @@
       "count": 1
     },
     {
-      "path": "itambox/core/tests/test_reporting.py",
-      "code": "F841",
-      "message": "local variable 'asset' is assigned to but never used",
-      "source": "        asset = Asset.objects.create(",
-      "context": "Module:body/ClassDef:ScheduledReportingAndAlertsTests:body/FunctionDef:test_report_preview_compilation_and_view:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/core/tests/test_reporting.py",
-      "code": "F841",
-      "message": "local variable 'loc' is assigned to but never used",
-      "source": "        loc = Location.objects.create(name=\"Office HQ\", slug=\"office-hq\", site=site)",
-      "context": "Module:body/ClassDef:ScheduledReportingAndAlertsTests:body/FunctionDef:test_report_preview_compilation_and_view:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/core/tests/test_sec_mfa.py",
-      "code": "F841",
-      "message": "local variable 'm_admin' is assigned to but never used",
-      "source": "        m_admin = grant(self.admin_user, self.tenant, admin_role).membership",
-      "context": "Module:body/ClassDef:MFAEnforcementMiddlewareTests:body/FunctionDef:setUp:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/core/tests/test_sec_mfa.py",
-      "code": "F841",
-      "message": "local variable 'm_admin' is assigned to but never used",
-      "source": "        m_admin = grant(self.admin_user, self.tenant, admin_role).membership",
-      "context": "Module:body/ClassDef:MFAGateViewTests:body/FunctionDef:setUp:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/core/tests/test_sec_mfa.py",
-      "code": "F841",
-      "message": "local variable 'm_admin' is assigned to but never used",
-      "source": "        m_admin = grant(self.admin_user, self.tenant, admin_role).membership",
-      "context": "Module:body/ClassDef:MFAPolicyHelperTests:body/FunctionDef:setUp:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/core/tests/test_sec_mfa.py",
-      "code": "F841",
-      "message": "local variable 'm_custom' is assigned to but never used",
-      "source": "        m_custom = grant(self.custom_user, self.tenant, custom_role).membership",
-      "context": "Module:body/ClassDef:MFAPolicyHelperTests:body/FunctionDef:setUp:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/core/tests/test_sec_mfa.py",
-      "code": "F841",
-      "message": "local variable 'm_manager' is assigned to but never used",
-      "source": "        m_manager = grant(self.manager_user, self.tenant, manager_role).membership",
-      "context": "Module:body/ClassDef:MFAEnforcementMiddlewareTests:body/FunctionDef:setUp:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/core/tests/test_sec_mfa.py",
-      "code": "F841",
-      "message": "local variable 'm_manager' is assigned to but never used",
-      "source": "        m_manager = grant(self.manager_user, self.tenant, manager_role).membership",
-      "context": "Module:body/ClassDef:MFAPolicyHelperTests:body/FunctionDef:setUp:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/core/tests/test_sec_mfa.py",
-      "code": "F841",
-      "message": "local variable 'm_member' is assigned to but never used",
-      "source": "        m_member = grant(self.member_user, self.tenant, member_role).membership",
-      "context": "Module:body/ClassDef:MFAEnforcementMiddlewareTests:body/FunctionDef:setUp:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/core/tests/test_sec_mfa.py",
-      "code": "F841",
-      "message": "local variable 'm_viewer' is assigned to but never used",
-      "source": "        m_viewer = grant(self.viewer_user, self.tenant, viewer_role).membership",
-      "context": "Module:body/ClassDef:MFAPolicyHelperTests:body/FunctionDef:setUp:body",
-      "count": 1
-    },
-    {
       "path": "itambox/core/tests/test_security_boundaries.py",
       "code": "B907",
       "message": "'self.asset_b.pk' is manually surrounded by quotes, consider using the `!r` conversion flag.",
@@ -6460,54 +6068,6 @@
       "count": 1
     },
     {
-      "path": "itambox/core/tests/test_security_finish.py",
-      "code": "F841",
-      "message": "local variable 'at' is assigned to but never used",
-      "source": "        at = AssetType.objects.create(manufacturer=self.mfr, model=\"Switch\")",
-      "context": "Module:body/ClassDef:RESTCrossTenantTests:body/FunctionDef:setUp:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/core/tests/test_security_finish.py",
-      "code": "F841",
-      "message": "local variable 'm_a' is assigned to but never used",
-      "source": "        m_a = grant(self.user_a, self.tenant_a, role_a).membership",
-      "context": "Module:body/ClassDef:RESTCrossTenantTests:body/FunctionDef:setUp:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/core/tests/test_security_finish.py",
-      "code": "F841",
-      "message": "local variable 'm_a' is assigned to but never used",
-      "source": "        m_a = grant(self.user_a, self.tenant_a, role_a).membership",
-      "context": "Module:body/ClassDef:SearchTenantScopingTests:body/FunctionDef:setUp:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/core/tests/test_security_finish.py",
-      "code": "F841",
-      "message": "local variable 'm_chg' is assigned to but never used",
-      "source": "        m_chg = grant(self.user_chg, self.tenant_a, role_chg).membership",
-      "context": "Module:body/ClassDef:UploadJournalPermTests:body/FunctionDef:setUp:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/core/tests/test_security_finish.py",
-      "code": "F841",
-      "message": "local variable 'm_view' is assigned to but never used",
-      "source": "        m_view = grant(self.user_view, self.tenant_a, role_view).membership",
-      "context": "Module:body/ClassDef:UploadJournalPermTests:body/FunctionDef:setUp:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/core/tests/test_security_finish.py",
-      "code": "F841",
-      "message": "local variable 'sl' is assigned to but never used",
-      "source": "        sl = StatusLabel.objects.create(name=\"In-Use\", slug=\"in-use-rest\", type=StatusLabel.TYPE_DEPLOYED)",
-      "context": "Module:body/ClassDef:RESTCrossTenantTests:body/FunctionDef:setUp:body",
-      "count": 1
-    },
-    {
       "path": "itambox/core/tests/test_tables.py",
       "code": "B007",
       "message": "Loop control variable 'row' not used within the loop body. If this is intended, start the name with an underscore.",
@@ -6521,14 +6081,6 @@
       "message": "'location.get_absolute_url()' is manually surrounded by quotes, consider using the `!r` conversion flag.",
       "source": "self.assertIn(f'Location: <a href=\"{location.get_absolute_url()}\">{location.name}</a>', rendered_1)",
       "context": "Module:body/ClassDef:CoreTablesTestCase:body/FunctionDef:test_assignee_column_render:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/core/tests/test_tables.py",
-      "code": "F841",
-      "message": "local variable 'channel2' is assigned to but never used",
-      "source": "        channel2 = NotificationChannel.objects.create(name=\"Another Channel\", channel_type=\"webhook\")",
-      "context": "Module:body/ClassDef:CoreTablesTestCase:body/FunctionDef:test_table_optimizations:body",
       "count": 1
     },
     {
@@ -6604,22 +6156,6 @@
       "count": 1
     },
     {
-      "path": "itambox/core/tests/test_tenant_group_scoping.py",
-      "code": "F841",
-      "message": "local variable 'm' is assigned to but never used",
-      "source": "        m = grant(self.member, self.tenant, role).membership",
-      "context": "Module:body/ClassDef:TenantGroupScopingTests:body/FunctionDef:setUp:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/core/tests/test_tenant_group_scoping.py",
-      "code": "F841",
-      "message": "local variable 'mu' is assigned to but never used",
-      "source": "        mu = grant(self.member, unrelated_tenant, role).membership",
-      "context": "Module:body/ClassDef:TenantGroupScopingTests:body/FunctionDef:test_member_group_scope_excludes_other_member_groups:body",
-      "count": 1
-    },
-    {
       "path": "itambox/core/tests/test_tenant_security.py",
       "code": "F401",
       "message": "'io.BytesIO' imported but unused",
@@ -6628,51 +6164,11 @@
       "count": 1
     },
     {
-      "path": "itambox/core/tests/test_tenant_security.py",
-      "code": "F841",
-      "message": "local variable 'mem_admin' is assigned to but never used",
-      "source": "        mem_admin = grant(test_user, tenant_admin, admin_role).membership",
-      "context": "Module:body/ClassDef:CoreTenantSecurityTestCase:body/FunctionDef:test_tenant_group_membership_isolation:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/core/tests/test_tenant_security.py",
-      "code": "F841",
-      "message": "local variable 'mem_readonly' is assigned to but never used",
-      "source": "        mem_readonly = grant(test_user, tenant_readonly, reader_role).membership",
-      "context": "Module:body/ClassDef:CoreTenantSecurityTestCase:body/FunctionDef:test_tenant_group_membership_isolation:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/core/tests/test_tenant_security.py",
-      "code": "F841",
-      "message": "local variable 'response' is assigned to but never used",
-      "source": "        response = self.client.post(",
-      "context": "Module:body/ClassDef:CrossTenantAttackTestCase:body/FunctionDef:test_bulk_delete_cross_tenant_pks_are_dropped:body",
-      "count": 1
-    },
-    {
       "path": "itambox/core/tests/test_views.py",
       "code": "F401",
       "message": "'organization.models.Membership' imported but unused",
       "source": "        from organization.models import Membership, Role, Tenant",
       "context": "Module:body/ClassDef:CoreViewsTestCase:body/FunctionDef:test_recycle_bin_permissions:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/core/tests/test_views.py",
-      "code": "F841",
-      "message": "local variable 'mfr1' is assigned to but never used",
-      "source": "        mfr1 = Manufacturer.objects.create(name=\"Intel unique-filter-1\", slug=\"intel-unique-filter-1\")",
-      "context": "Module:body/ClassDef:CoreViewsTestCase:body/FunctionDef:test_objectchange_filtering:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/core/tests/test_views.py",
-      "code": "F841",
-      "message": "local variable 'mfr2' is assigned to but never used",
-      "source": "        mfr2 = Manufacturer.objects.create(name=\"AMD unique-filter-2\", slug=\"amd-unique-filter-2\")",
-      "context": "Module:body/ClassDef:CoreViewsTestCase:body/FunctionDef:test_objectchange_filtering:body",
       "count": 1
     },
     {
@@ -6753,14 +6249,6 @@
       "message": "'query_complexity_validator' is too complex (20)",
       "source": "def query_complexity_validator(max_complexity=1000, fan_out=10):",
       "context": "Module:body/FunctionDef:query_complexity_validator:self",
-      "count": 1
-    },
-    {
-      "path": "itambox/core/views/graphql.py",
-      "code": "F841",
-      "message": "local variable 'e' is assigned to but never used",
-      "source": "                except Exception as e:",
-      "context": "Module:body/ClassDef:PrivateGraphQLView:body/FunctionDef:dispatch:body/If:Compare(left=Attribute(value=Name(id='request', ctx=Load()), attr='method', ctx=Load()), ops=[Eq()], comparators=[Constant(value='GET')]):orelse/If:Compare(left=Attribute(value=Name(id='request', ctx=Load()), attr='method', ctx=Load()), ops=[Eq()], comparators=[Constant(value='POST')]):body/If:UnaryOp(op=Not(), operand=Attribute(value=Attribute(value=Name(id='request', ctx=Load()), attr='user', ctx=Load()), attr='is_authenticated', ctx=Load())):body/Try:self",
       "count": 1
     },
     {
@@ -7188,54 +6676,6 @@
       "count": 1
     },
     {
-      "path": "itambox/extras/tests/test_existing.py",
-      "code": "F841",
-      "message": "local variable 'dash1' is assigned to but never used",
-      "source": "        dash1 = Dashboard.objects.create(user=self.user, name=\"Dashboard 1\")",
-      "context": "Module:body/ClassDef:DashboardModelTests:body/FunctionDef:test_dashboard_multiple_allowed:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/extras/tests/test_existing.py",
-      "code": "F841",
-      "message": "local variable 'dash2' is assigned to but never used",
-      "source": "        dash2 = Dashboard.objects.create(user=self.user, name=\"Dashboard 2\")",
-      "context": "Module:body/ClassDef:DashboardModelTests:body/FunctionDef:test_dashboard_multiple_allowed:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/extras/tests/test_existing.py",
-      "code": "F841",
-      "message": "local variable 't1' is assigned to but never used",
-      "source": "        t1 = Tag.objects.create(name=\"Tag1\", slug=\"tag1\", color=\"ffffff\")  # white bg -> dark text",
-      "context": "Module:body/ClassDef:TagColumnTests:body/FunctionDef:test_tag_column_rendering:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/extras/tests/test_existing.py",
-      "code": "F841",
-      "message": "local variable 't2' is assigned to but never used",
-      "source": "        t2 = Tag.objects.create(name=\"Tag2\", slug=\"tag2\", color=\"000000\")  # black bg -> white text",
-      "context": "Module:body/ClassDef:TagColumnTests:body/FunctionDef:test_tag_column_rendering:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/extras/tests/test_existing.py",
-      "code": "F841",
-      "message": "local variable 't3' is assigned to but never used",
-      "source": "        t3 = Tag.objects.create(name=\"Tag3\", slug=\"tag3\", color=\"20c997\")",
-      "context": "Module:body/ClassDef:TagColumnTests:body/FunctionDef:test_tag_column_rendering:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/extras/tests/test_existing.py",
-      "code": "F841",
-      "message": "local variable 't4' is assigned to but never used",
-      "source": "        t4 = Tag.objects.create(name=\"Tag4\", slug=\"tag4\", color=\"111111\")",
-      "context": "Module:body/ClassDef:TagColumnTests:body/FunctionDef:test_tag_column_rendering:body",
-      "count": 1
-    },
-    {
       "path": "itambox/extras/tests/test_multi_dashboard.py",
       "code": "F401",
       "message": "'datetime.date' imported but unused",
@@ -7289,22 +6729,6 @@
       "message": "'extras.templatetags.dashboard.get_widget_footer_links' imported but unused",
       "source": "from extras.templatetags.dashboard import get_widget_footer_links, render_widget",
       "context": "Module:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/extras/tests/test_multi_dashboard.py",
-      "code": "F841",
-      "message": "local variable 'db1' is assigned to but never used",
-      "source": "        db1 = Dashboard.objects.create(user=self.user, name=\"Board B\", is_default=False)",
-      "context": "Module:body/ClassDef:MultiDashboardModelAndUtilsTests:body/FunctionDef:test_get_dashboard_default_fallback:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/extras/tests/test_multi_dashboard.py",
-      "code": "F841",
-      "message": "local variable 'db2' is assigned to but never used",
-      "source": "        db2 = Dashboard.objects.create(user=self.user, name=\"Board A\", is_default=False)",
-      "context": "Module:body/ClassDef:MultiDashboardModelAndUtilsTests:body/FunctionDef:test_get_dashboard_default_fallback:body",
       "count": 1
     },
     {
@@ -7977,22 +7401,6 @@
       "message": "'adjust_inventory_stock' is too complex (18)",
       "source": "def adjust_inventory_stock(",
       "context": "Module:body/FunctionDef:adjust_inventory_stock:self",
-      "count": 1
-    },
-    {
-      "path": "itambox/inventory/tests/test_accessories.py",
-      "code": "F841",
-      "message": "local variable 'response' is assigned to but never used",
-      "source": "        response = self.client.post(url)",
-      "context": "Module:body/ClassDef:AccessoryViewTests:body/FunctionDef:test_delete_view_blocked_with_assignments:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/inventory/tests/test_consumables.py",
-      "code": "F841",
-      "message": "local variable 'response' is assigned to but never used",
-      "source": "        response = self.client.post(url)",
-      "context": "Module:body/ClassDef:ConsumableViewTests:body/FunctionDef:test_delete_view_blocked_with_consumptions:body",
       "count": 1
     },
     {
@@ -9308,14 +8716,6 @@
       "count": 1
     },
     {
-      "path": "itambox/itambox/views/generic/detail.py",
-      "code": "F841",
-      "message": "local variable 'verbose_name' is assigned to but never used",
-      "source": "        verbose_name = obj._meta.verbose_name",
-      "context": "Module:body/ClassDef:ObjectDetailView:body/FunctionDef:get_context_data:body",
-      "count": 1
-    },
-    {
       "path": "itambox/itambox/views/generic/edit.py",
       "code": "B907",
       "message": "'cancel_url' is manually surrounded by quotes, consider using the `!r` conversion flag.",
@@ -9401,14 +8801,6 @@
       "message": "'django.views.generic.View' imported but unused",
       "source": "from django.views.generic import View",
       "context": "Module:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/itambox/views/generic/service_views.py",
-      "code": "F841",
-      "message": "local variable 'e' is assigned to but never used",
-      "source": "        except Exception as e:",
-      "context": "Module:body/ClassDef:GenericTransactionView:body/FunctionDef:form_valid:body/Try:self",
       "count": 1
     },
     {
@@ -10217,14 +9609,6 @@
       "message": "'organization.models.Role' imported but unused",
       "source": "from organization.models import Role",
       "context": "Module:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/organization/tests/test_tenants.py",
-      "code": "F841",
-      "message": "local variable 'mem' is assigned to but never used",
-      "source": "        mem = grant(self.user, self.tenant_a, self.role_member).membership",
-      "context": "Module:body/ClassDef:MultiTenantMembershipTests:body/FunctionDef:test_tenant_switching_middleware:body",
       "count": 1
     },
     {
@@ -11660,22 +11044,6 @@
       "count": 1
     },
     {
-      "path": "itambox/subscriptions/schema.py",
-      "code": "F841",
-      "message": "local variable 'user' is assigned to but never used",
-      "source": "        user = check_permission(info, \"subscriptions.change_subscriptionassignment\")",
-      "context": "Module:body/ClassDef:UpdateSubscriptionAssignment:body/FunctionDef:mutate:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/subscriptions/schema.py",
-      "code": "F841",
-      "message": "local variable 'user' is assigned to but never used",
-      "source": "        user = check_permission(info, \"subscriptions.delete_subscriptionassignment\")",
-      "context": "Module:body/ClassDef:DeleteSubscriptionAssignment:body/FunctionDef:mutate:body",
-      "count": 1
-    },
-    {
       "path": "itambox/subscriptions/tables.py",
       "code": "F401",
       "message": "'.models.SubscriptionStatusChoices' imported but unused",
@@ -11705,30 +11073,6 @@
       "message": "'subscriptions.models.SubscriptionTypeChoices' imported but unused",
       "source": "from subscriptions.models import (",
       "context": "Module:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/subscriptions/tests/test_fixes.py",
-      "code": "F841",
-      "message": "local variable 'sub_14' is assigned to but never used",
-      "source": "        sub_14 = Subscription.objects.create(",
-      "context": "Module:body/ClassDef:SubscriptionFixesTests:body/FunctionDef:test_background_task_expiry_and_reminders:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/subscriptions/tests/test_fixes.py",
-      "code": "F841",
-      "message": "local variable 'sub_30' is assigned to but never used",
-      "source": "        sub_30 = Subscription.objects.create(",
-      "context": "Module:body/ClassDef:SubscriptionFixesTests:body/FunctionDef:test_background_task_expiry_and_reminders:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/subscriptions/tests/test_fixes.py",
-      "code": "F841",
-      "message": "local variable 'sub_7' is assigned to but never used",
-      "source": "        sub_7 = Subscription.objects.create(",
-      "context": "Module:body/ClassDef:SubscriptionFixesTests:body/FunctionDef:test_background_task_expiry_and_reminders:body",
       "count": 1
     },
     {
@@ -11793,14 +11137,6 @@
       "message": "'itambox.utils.get_paginate_count' imported but unused",
       "source": "from itambox.utils import get_paginate_count",
       "context": "Module:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/subscriptions/views.py",
-      "code": "F841",
-      "message": "local variable 'assignment' is assigned to but never used",
-      "source": "            assignment = SubscriptionAssignment.objects.create(",
-      "context": "Module:body/ClassDef:SubscriptionCheckoutView:body/FunctionDef:post:body/If:Call(func=Attribute(value=Name(id='form', ctx=Load()), attr='is_valid', ctx=Load()), args=[], keywords=[]):body",
       "count": 1
     },
     {
@@ -12161,14 +11497,6 @@
       "message": "'organization.models.Membership' imported but unused",
       "source": "from organization.models import AssetHolder, Membership, Role, Tenant",
       "context": "Module:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/users/tests/test_scim_stress.py",
-      "code": "F841",
-      "message": "local variable 'admin_membership' is assigned to but never used",
-      "source": "        admin_membership = grant(self.admin_user, self.tenant, self.role_admin).membership",
-      "context": "Module:body/ClassDef:SCIMStressTests:body/FunctionDef:setUp:body",
       "count": 1
     },
     {

@@ -135,7 +135,7 @@ class GenericTransactionView(PermissionRequiredMixin, LoginRequiredMixin, BaseHT
             for msg in e.messages:
                 form.add_error(None, msg)
             return self.form_invalid(form)
-        except Exception as e:
+        except Exception:
             logger.exception("Unexpected error in %s.form_valid", self.__class__.__name__)
             form.add_error(None, _("An unexpected error occurred. Please try again or contact support."))
             return self.form_invalid(form)

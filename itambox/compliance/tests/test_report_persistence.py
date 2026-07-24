@@ -82,6 +82,8 @@ class ReportPersistenceTests(TestCase):
         self.assertIn("mismatched", cats)
         self.assertIn("surprise", cats)
         self.assertIn("missing", cats)
+        missing_row = next(row for row in rows if row["category"] == "missing")
+        self.assertEqual(missing_row["asset_id"], missing_asset.pk)
 
     def test_report_row_is_denormalized(self):
         """Rows contain name/tag/location strings, not just IDs."""

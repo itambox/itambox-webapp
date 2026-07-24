@@ -85,7 +85,6 @@ def _run_sync(tenant, dry_run: bool, job: Job) -> dict:
 
     for device in devices:
         serial = (device.get("serialNumber") or "").strip()
-        device_name = (device.get("deviceName") or "").strip()
 
         if not serial:
             counts["skipped"] += 1

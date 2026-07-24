@@ -134,7 +134,7 @@ class ScanActionResolveTests(TenantTestMixin, TestCase):
 
     def test_cross_tenant_isolation(self):
         other = Tenant.objects.create(name="Other", slug="other-resolve")
-        other_asset = Asset.objects.create(
+        Asset.objects.create(
             name="Other",
             asset_tag="OTH-001",
             asset_type=self.atype,
@@ -144,8 +144,9 @@ class ScanActionResolveTests(TenantTestMixin, TestCase):
         )
         self.client_login_to_tenant(self.tenant_admin, self.tenant)
         resp = self.client.get(self.url, {"code": "OTH-001", "mode": "checkin"})
-        # tenant_admin is a superuser → resolves globally; for a scoped member it 404s.
-        # Assert a scoped member cannot see it:
+        self.assertEqual(resp.status_code, 404)
+
+        # A regular scoped member cannot see it either.
         self.tenant_role.permissions = ["assets.view_asset", "assets.change_asset"]
         self.tenant_role.save()
         self.client_login_to_tenant(self.tenant_user, self.tenant)
