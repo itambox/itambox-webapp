@@ -1,7 +1,7 @@
 import logging
 from functools import cached_property
 
-from django.core.exceptions import ObjectDoesNotExist, PermissionDenied
+from django.core.exceptions import FieldDoesNotExist, ObjectDoesNotExist, PermissionDenied
 from django.db import router, transaction
 from django.db.models import ProtectedError, RestrictedError
 from rest_framework import mixins as drf_mixins
@@ -9,6 +9,7 @@ from rest_framework import status
 from rest_framework.response import Response
 from rest_framework.viewsets import GenericViewSet
 
+from core.managers import get_current_tenant
 from itambox.api.serializers.features import ChangeLogMessageSerializer
 from itambox.api.utils import get_annotations_for_serializer, get_prefetches_for_serializer
 from itambox.api.mixins import BulkUpdateModelMixin, BulkDestroyModelMixin, ObjectValidationMixin, ETagMixin
@@ -155,11 +156,19 @@ class ITAMBoxModelViewSet(
 
         return response
 
-    def perform_create(self, serializer):
-        model = self.queryset.model
-        logger.info(f"Creating new {model._meta.verbose_name}")
+    @staticmethod
+    def _missing_create_tenant_rows(serializer):
+        validated = serializer.validated_data
+        if getattr(serializer, 'many', False):
+            return [
+                row for row in validated
+                if isinstance(row, dict) and row.get('tenant') is None
+            ]
+        if isinstance(validated, dict) and validated.get('tenant') is None:
+            return [validated]
+        return []
 
-        save_kwargs = {}
+    def _tenant_create_kwargs(self, serializer, model):
         # Default a tenant-scoped create to the active tenant when the client
         # omitted it OR explicitly passed a null tenant.  Without this a
         # tenant-bound (non-superuser) request could mint a global (tenant=None)
@@ -168,25 +177,46 @@ class ITAMBoxModelViewSet(
         # {"tenant": null} that lands as `tenant: None` in validated_data and
         # would otherwise slip past an `'tenant' not in validated` check.
         # Superusers retain the ability to create global rows explicitly
-        # (including via an explicit null).  Only applies to single-object
-        # creates; bulk (ListSerializer) payloads carry a list of validated
-        # dicts and are left to the per-row tenant scoping enforced elsewhere.
-        validated = serializer.validated_data
-        if (
-            not getattr(serializer, 'many', False)
-            and isinstance(validated, dict)
-            and not self.request.user.is_superuser
-            and validated.get('tenant') is None
-        ):
-            from django.core.exceptions import FieldDoesNotExist
-            from core.managers import get_current_tenant
-            try:
-                tenant_field = model._meta.get_field('tenant')
-            except FieldDoesNotExist:
-                tenant_field = None
-            if tenant_field is not None and getattr(tenant_field, 'null', False):
-                if active_tenant := get_current_tenant():
-                    save_kwargs['tenant'] = active_tenant
+        # (including via an explicit null). For a bulk ListSerializer, fill only
+        # rows that omitted/nullified tenant; preserve explicit tenants so the
+        # request-scoped object validation below can accept or reject each one.
+        if self.request.user.is_superuser:
+            return {}
+
+        try:
+            tenant_field = model._meta.get_field('tenant')
+        except FieldDoesNotExist:
+            return {}
+        if not getattr(tenant_field, 'null', False):
+            return {}
+
+        bulk_create = getattr(serializer, 'many', False)
+        missing_tenant_rows = self._missing_create_tenant_rows(serializer)
+        if not missing_tenant_rows:
+            return {}
+
+        active_tenant = get_current_tenant()
+        if active_tenant is None:
+            # No single active tenant (tenant-group / All-accessible / unbound
+            # context): deriving one from a membership/AssetHolder would cross
+            # the authorization boundary — fail closed (issue #134).
+            raise PermissionDenied()
+
+        if not bulk_create:
+            return {'tenant': active_tenant}
+
+        # ListSerializer.save() consumes these per-row mappings; mutate only
+        # missing/null values so explicit tenant choices remain subject to
+        # _validate_objects().
+        for row in missing_tenant_rows:
+            row['tenant'] = active_tenant
+        return {}
+
+    def perform_create(self, serializer):
+        model = self.queryset.model
+        logger.info(f"Creating new {model._meta.verbose_name}")
+
+        save_kwargs = self._tenant_create_kwargs(serializer, model)
 
         try:
             with transaction.atomic(using=router.db_for_write(model)):
