@@ -204,8 +204,6 @@ class ObjectChangeView(BaseHTMXView, DetailView):
 
 
 def get_filterset_for_model(model):
-    from itambox.registry import registry
-
     fs = registry.get_filter_set(model)
     if fs:
         return fs

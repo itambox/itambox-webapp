@@ -1173,8 +1173,6 @@ class EnterpriseITAMTestCase(_SeededStatusLabelsMixin, TestCase):
         self.assertNotIn(holder_a, holders_qs_acc)
 
         # 3. Test Consumable checkout form filtering
-        from inventory.models import Consumable
-
         con = Consumable.objects.create(
             manufacturer=self.manufacturer, name="Consumable A", slug="con-a", tenant=tenant_a
         )

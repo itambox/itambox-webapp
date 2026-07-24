@@ -1182,25 +1182,9 @@
     {
       "path": "itambox/assets/tests/test_existing.py",
       "code": "F401",
-      "message": "'inventory.models.Consumable' imported but unused",
-      "source": "from inventory.models import (",
-      "context": "Module:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/assets/tests/test_existing.py",
-      "code": "F401",
       "message": "'inventory.models.ConsumableAssignment' imported but unused",
       "source": "from inventory.models import (",
       "context": "Module:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/assets/tests/test_existing.py",
-      "code": "F811",
-      "message": "redefinition of unused 'Consumable' from line 22",
-      "source": "        from inventory.models import Consumable",
-      "context": "Module:body/ClassDef:EnterpriseITAMTestCase:body/FunctionDef:test_tenant_scoped_checkout_holders:body",
       "count": 1
     },
     {
@@ -2686,22 +2670,6 @@
     {
       "path": "itambox/assets/views/asset_views.py",
       "code": "F401",
-      "message": "'compliance.models.CustodyReceipt' imported but unused",
-      "source": "from compliance.models import CustodyReceipt",
-      "context": "Module:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/assets/views/asset_views.py",
-      "code": "F401",
-      "message": "'django.contrib.contenttypes.models.ContentType' imported but unused",
-      "source": "from django.contrib.contenttypes.models import ContentType",
-      "context": "Module:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/assets/views/asset_views.py",
-      "code": "F401",
       "message": "'django.core.exceptions.ValidationError' imported but unused",
       "source": "from django.core.exceptions import PermissionDenied, ValidationError",
       "context": "Module:body",
@@ -2712,14 +2680,6 @@
       "code": "F401",
       "message": "'django.db.models.Count' imported but unused",
       "source": "from django.db.models import Count, Prefetch",
-      "context": "Module:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/assets/views/asset_views.py",
-      "code": "F401",
-      "message": "'django.db.transaction' imported but unused",
-      "source": "from django.db import transaction",
       "context": "Module:body",
       "count": 1
     },
@@ -2769,46 +2729,6 @@
       "message": "'itambox.views.generic.service_views.SimplePostView' imported but unused",
       "source": "from itambox.views.generic.service_views import GenericTransactionView, SimplePostView",
       "context": "Module:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/assets/views/asset_views.py",
-      "code": "F401",
-      "message": "'organization.models.AssetHolder' imported but unused",
-      "source": "from organization.models import AssetHolder",
-      "context": "Module:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/assets/views/asset_views.py",
-      "code": "F811",
-      "message": "redefinition of unused 'AssetHolder' from line 41",
-      "source": "            from organization.models import AssetHolder",
-      "context": "Module:body/ClassDef:AssetDetailView:body/FunctionDef:get_context_data:body/If:BoolOp(op=And(), values=[Name(id='active_assignment', ctx=Load()), Attribute(value=Name(id='active_assignment', ctx=Load()), attr='assigned_target', ctx=Load())]):body",
-      "count": 1
-    },
-    {
-      "path": "itambox/assets/views/asset_views.py",
-      "code": "F811",
-      "message": "redefinition of unused 'ContentType' from line 7",
-      "source": "    from django.contrib.contenttypes.models import ContentType",
-      "context": "Module:body/FunctionDef:bulk_print_labels:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/assets/views/asset_views.py",
-      "code": "F811",
-      "message": "redefinition of unused 'CustodyReceipt' from line 22",
-      "source": "        from compliance.models import CustodyReceipt",
-      "context": "Module:body/ClassDef:AssetDetailView:body/FunctionDef:get_context_data:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/assets/views/asset_views.py",
-      "code": "F811",
-      "message": "redefinition of unused 'transaction' from line 9",
-      "source": "    from django.db import transaction",
-      "context": "Module:body/FunctionDef:bulk_print_labels:body",
       "count": 1
     },
     {
@@ -3254,33 +3174,9 @@
     {
       "path": "itambox/core/auth/oidc.py",
       "code": "F401",
-      "message": "'core.managers.set_current_tenant' imported but unused",
-      "source": "from core.managers import get_current_tenant, set_current_tenant",
-      "context": "Module:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/core/auth/oidc.py",
-      "code": "F401",
       "message": "'django.db.models' imported but unused",
       "source": "from django.db import IntegrityError, models, transaction",
       "context": "Module:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/core/auth/oidc.py",
-      "code": "F811",
-      "message": "redefinition of unused 'set_current_tenant' from line 13",
-      "source": "                from core.managers import set_current_tenant",
-      "context": "Module:body/ClassDef:TenantOIDCCallbackView:body/FunctionDef:dispatch:body/If:Name(id='tenant_slug', ctx=Load()):body/Try:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/core/auth/oidc.py",
-      "code": "F811",
-      "message": "redefinition of unused 'set_current_tenant' from line 13",
-      "source": "            from core.managers import set_current_tenant",
-      "context": "Module:body/ClassDef:TenantOIDCAuthorizeView:body/FunctionDef:dispatch:body/If:Name(id='tenant', ctx=Load()):body",
       "count": 1
     },
     {
@@ -3534,14 +3430,6 @@
     {
       "path": "itambox/core/forms/mixins.py",
       "code": "F401",
-      "message": "'crispy_forms.layout.HTML' imported but unused",
-      "source": "from crispy_forms.layout import HTML, Column, Div, Field, Fieldset, Layout, Row, Submit",
-      "context": "Module:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/core/forms/mixins.py",
-      "code": "F401",
       "message": "'crispy_forms.layout.Layout' imported but unused",
       "source": "from crispy_forms.layout import HTML, Column, Div, Field, Fieldset, Layout, Row, Submit",
       "context": "Module:body",
@@ -3551,14 +3439,6 @@
       "path": "itambox/core/forms/mixins.py",
       "code": "F401",
       "message": "'crispy_forms.layout.Row' imported but unused",
-      "source": "from crispy_forms.layout import HTML, Column, Div, Field, Fieldset, Layout, Row, Submit",
-      "context": "Module:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/core/forms/mixins.py",
-      "code": "F401",
-      "message": "'crispy_forms.layout.Submit' imported but unused",
       "source": "from crispy_forms.layout import HTML, Column, Div, Field, Fieldset, Layout, Row, Submit",
       "context": "Module:body",
       "count": 1
@@ -3585,22 +3465,6 @@
       "message": "'json' imported but unused",
       "source": "import json",
       "context": "Module:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/core/forms/mixins.py",
-      "code": "F811",
-      "message": "redefinition of unused 'HTML' from line 10",
-      "source": "        from crispy_forms.layout import HTML, Submit",
-      "context": "Module:body/ClassDef:CrispyFormMixin:body/FunctionDef:action_buttons:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/core/forms/mixins.py",
-      "code": "F811",
-      "message": "redefinition of unused 'Submit' from line 10",
-      "source": "        from crispy_forms.layout import HTML, Submit",
-      "context": "Module:body/ClassDef:CrispyFormMixin:body/FunctionDef:action_buttons:body",
       "count": 1
     },
     {
@@ -6324,22 +6188,6 @@
       "count": 1
     },
     {
-      "path": "itambox/core/tests/test_report_export_formats.py",
-      "code": "F401",
-      "message": "'django.utils.translation.gettext as _' imported but unused",
-      "source": "from django.utils.translation import gettext as _",
-      "context": "Module:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/core/tests/test_report_export_formats.py",
-      "code": "F811",
-      "message": "redefinition of unused '_' from line 6",
-      "source": "        headers, rows, *_ = compile_report_context(tpl, active_tenant=self.tenant)",
-      "context": "Module:body/ClassDef:ReportExportIntegrationTests:body/FunctionDef:test_compile_then_xlsx_contains_real_asset:body",
-      "count": 1
-    },
-    {
       "path": "itambox/core/tests/test_report_hardware_inventory.py",
       "code": "E402",
       "message": "module level import not at top of file",
@@ -6438,22 +6286,6 @@
     {
       "path": "itambox/core/tests/test_report_hardware_inventory.py",
       "code": "F401",
-      "message": "'core.reports.compile_report_context' imported but unused",
-      "source": "from core.reports import compile_report_context",
-      "context": "Module:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/core/tests/test_report_hardware_inventory.py",
-      "code": "F401",
-      "message": "'extras.models.ReportTemplate' imported but unused",
-      "source": "from extras.models import ReportTemplate",
-      "context": "Module:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/core/tests/test_report_hardware_inventory.py",
-      "code": "F401",
       "message": "'model_bakery.baker' imported but unused",
       "source": "from model_bakery import baker",
       "context": "Module:body",
@@ -6481,22 +6313,6 @@
       "message": "'pytest' imported but unused",
       "source": "import pytest",
       "context": "Module:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/core/tests/test_report_hardware_inventory.py",
-      "code": "F811",
-      "message": "redefinition of unused 'ReportTemplate' from line 45",
-      "source": "        from extras.models import ReportTemplate",
-      "context": "Module:body/ClassDef:HardwareInventoryReportTests:body/FunctionDef:test_hardware_inventory_report:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/core/tests/test_report_hardware_inventory.py",
-      "code": "F811",
-      "message": "redefinition of unused 'compile_report_context' from line 43",
-      "source": "        from core.reports import compile_report_context",
-      "context": "Module:body/ClassDef:HardwareInventoryReportTests:body/FunctionDef:test_hardware_inventory_report:body",
       "count": 1
     },
     {
@@ -7012,22 +6828,6 @@
       "count": 1
     },
     {
-      "path": "itambox/extras/dashboard/views.py",
-      "code": "F401",
-      "message": "'json' imported but unused",
-      "source": "import json",
-      "context": "Module:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/extras/dashboard/views.py",
-      "code": "F811",
-      "message": "redefinition of unused 'json' from line 1",
-      "source": "        import json",
-      "context": "Module:body/ClassDef:DashboardSaveLayoutView:body/FunctionDef:post:body",
-      "count": 1
-    },
-    {
       "path": "itambox/extras/dashboard/widgets.py",
       "code": "B007",
       "message": "Loop control variable 't_id' not used within the loop body. If this is intended, start the name with an underscore.",
@@ -7239,22 +7039,6 @@
       "path": "itambox/extras/forms.py",
       "code": "E402",
       "message": "module level import not at top of file",
-      "source": "from crispy_forms.layout import HTML, Column, Div, Field, Fieldset, Layout, Row, Submit",
-      "context": "Module:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/extras/forms.py",
-      "code": "E402",
-      "message": "module level import not at top of file",
-      "source": "from django.contrib.contenttypes.models import ContentType",
-      "context": "Module:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/extras/forms.py",
-      "code": "E402",
-      "message": "module level import not at top of file",
       "source": "from itambox.middleware import get_current_user",
       "context": "Module:body",
       "count": 1
@@ -7280,78 +7064,6 @@
       "code": "F401",
       "message": "'django.db.models.Q' imported but unused",
       "source": "from django.db.models import Q",
-      "context": "Module:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/extras/forms.py",
-      "code": "F811",
-      "message": "redefinition of unused 'Column' from line 2",
-      "source": "from crispy_forms.layout import HTML, Column, Div, Field, Fieldset, Layout, Row, Submit",
-      "context": "Module:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/extras/forms.py",
-      "code": "F811",
-      "message": "redefinition of unused 'ContentType' from line 4",
-      "source": "from django.contrib.contenttypes.models import ContentType",
-      "context": "Module:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/extras/forms.py",
-      "code": "F811",
-      "message": "redefinition of unused 'Div' from line 2",
-      "source": "from crispy_forms.layout import HTML, Column, Div, Field, Fieldset, Layout, Row, Submit",
-      "context": "Module:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/extras/forms.py",
-      "code": "F811",
-      "message": "redefinition of unused 'Field' from line 2",
-      "source": "from crispy_forms.layout import HTML, Column, Div, Field, Fieldset, Layout, Row, Submit",
-      "context": "Module:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/extras/forms.py",
-      "code": "F811",
-      "message": "redefinition of unused 'Fieldset' from line 2",
-      "source": "from crispy_forms.layout import HTML, Column, Div, Field, Fieldset, Layout, Row, Submit",
-      "context": "Module:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/extras/forms.py",
-      "code": "F811",
-      "message": "redefinition of unused 'HTML' from line 2",
-      "source": "from crispy_forms.layout import HTML, Column, Div, Field, Fieldset, Layout, Row, Submit",
-      "context": "Module:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/extras/forms.py",
-      "code": "F811",
-      "message": "redefinition of unused 'Layout' from line 2",
-      "source": "from crispy_forms.layout import HTML, Column, Div, Field, Fieldset, Layout, Row, Submit",
-      "context": "Module:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/extras/forms.py",
-      "code": "F811",
-      "message": "redefinition of unused 'Row' from line 2",
-      "source": "from crispy_forms.layout import HTML, Column, Div, Field, Fieldset, Layout, Row, Submit",
-      "context": "Module:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/extras/forms.py",
-      "code": "F811",
-      "message": "redefinition of unused 'Submit' from line 2",
-      "source": "from crispy_forms.layout import HTML, Column, Div, Field, Fieldset, Layout, Row, Submit",
       "context": "Module:body",
       "count": 1
     },
@@ -9572,22 +9284,6 @@
       "count": 1
     },
     {
-      "path": "itambox/itambox/views/features.py",
-      "code": "F401",
-      "message": "'itambox.registry.registry' imported but unused",
-      "source": "from itambox.registry import registry",
-      "context": "Module:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/itambox/views/features.py",
-      "code": "F811",
-      "message": "redefinition of unused 'registry' from line 47",
-      "source": "    from itambox.registry import registry",
-      "context": "Module:body/FunctionDef:get_filterset_for_model:body",
-      "count": 1
-    },
-    {
       "path": "itambox/itambox/views/generic/bulk.py",
       "code": "C901",
       "message": "'ObjectBulkEditView.post' is too complex (19)",
@@ -11494,14 +11190,6 @@
     {
       "path": "itambox/organization/views/tenant_views.py",
       "code": "F401",
-      "message": "'django.urls.reverse' imported but unused",
-      "source": "from django.urls import reverse, reverse_lazy",
-      "context": "Module:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/organization/views/tenant_views.py",
-      "code": "F401",
       "message": "'django_tables2.RequestConfig' imported but unused",
       "source": "from django_tables2 import RequestConfig",
       "context": "Module:body",
@@ -11513,14 +11201,6 @@
       "message": "'itambox.utils.get_paginate_count' imported but unused",
       "source": "from itambox.utils import get_paginate_count",
       "context": "Module:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/organization/views/tenant_views.py",
-      "code": "F811",
-      "message": "redefinition of unused 'reverse' from line 8",
-      "source": "    from django.urls import NoReverseMatch, reverse",
-      "context": "Module:body/FunctionDef:tenant_ldap_sync:body",
       "count": 1
     },
     {
@@ -11580,22 +11260,6 @@
       "count": 1
     },
     {
-      "path": "itambox/procurement/forms.py",
-      "code": "E402",
-      "message": "module level import not at top of file",
-      "source": "from django.core.exceptions import ValidationError",
-      "context": "Module:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/procurement/forms.py",
-      "code": "F811",
-      "message": "redefinition of unused 'ValidationError' from line 4",
-      "source": "from django.core.exceptions import ValidationError",
-      "context": "Module:body",
-      "count": 1
-    },
-    {
       "path": "itambox/procurement/services.py",
       "code": "C901",
       "message": "'receive_purchase_order' is too complex (24)",
@@ -11608,22 +11272,6 @@
       "code": "E402",
       "message": "module level import not at top of file",
       "source": "from core.currency import CURRENCY_CHOICES",
-      "context": "Module:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/procurement/tests.py",
-      "code": "E402",
-      "message": "module level import not at top of file",
-      "source": "from django.utils import timezone",
-      "context": "Module:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/procurement/tests.py",
-      "code": "E402",
-      "message": "module level import not at top of file",
-      "source": "from organization.models import Tenant",
       "context": "Module:body",
       "count": 1
     },
@@ -11648,22 +11296,6 @@
       "code": "E402",
       "message": "module level import not at top of file",
       "source": "import datetime",
-      "context": "Module:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/procurement/tests.py",
-      "code": "F811",
-      "message": "redefinition of unused 'Tenant' from line 9",
-      "source": "from organization.models import Tenant",
-      "context": "Module:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/procurement/tests.py",
-      "code": "F811",
-      "message": "redefinition of unused 'timezone' from line 4",
-      "source": "from django.utils import timezone",
       "context": "Module:body",
       "count": 1
     },

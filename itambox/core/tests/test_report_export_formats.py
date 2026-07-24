@@ -3,7 +3,6 @@
 import io
 
 from django.test import TestCase
-from django.utils.translation import gettext as _
 
 from core.reports.exporters import report_pdf_bytes, report_xlsx_bytes
 from core.tests.mixins import TenantTestMixin

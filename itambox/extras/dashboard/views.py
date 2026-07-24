@@ -191,8 +191,6 @@ class DashboardSaveLayoutView(LoginRequiredMixin, View):
 
     @transaction.atomic
     def post(self, request, dashboard_id):
-        import json
-
         logger = logging.getLogger(__name__)
         dashboard = get_dashboard(request.user, dashboard_id=dashboard_id, for_update=True)
         try:

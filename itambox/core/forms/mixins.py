@@ -235,7 +235,6 @@ class CrispyFormMixin:
         ``cancel_url`` is a resolved URL string. The submit label reflects
         create vs. update based on the bound instance.
         """
-        from crispy_forms.layout import HTML, Submit
         from django.utils.translation import gettext as _
 
         label = _("Update") if getattr(self, "instance", None) and self.instance.pk else _("Create")

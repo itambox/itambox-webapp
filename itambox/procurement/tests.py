@@ -379,7 +379,6 @@ class ProcurementStatusTransitionTests(TestCase):
 
 
 from core.currency import CURRENCY_CHOICES
-from organization.models import Tenant
 from procurement.forms import ContractForm, PurchaseOrderForm, PurchaseOrderLineForm
 from procurement.models import Contract
 
@@ -584,8 +583,6 @@ class PurchaseOrderCurrencyTests(TestCase):
 # ---------------------------------------------------------------------------
 
 import datetime
-
-from django.utils import timezone
 
 
 class ContractModelTests(TestCase):
