@@ -6,8 +6,49 @@
 {% block title %}{% translate "Dashboard - ITAMbox" %}{% endblock %}
 
 {% block page_header %}
-<div class="page-pretitle">{% translate "Overview" %}</div>
-<h2 class="page-title">{% translate "Dashboard" %}</h2>
+<div class="dropdown d-inline-block">
+    <button class="btn btn-outline-primary dropdown-toggle d-flex align-items-center" type="button" id="dashboard-switcher" data-bs-toggle="dropdown" aria-expanded="false">
+        <i class="mdi mdi-view-dashboard-variant-outline me-1"></i>
+        {{ active_dashboard.name }}
+        {% if active_dashboard.tenant %}
+            <span class="badge bg-blue-lt ms-2">{{ active_dashboard.tenant.name }}</span>
+        {% endif %}
+    </button>
+    <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="dashboard-switcher">
+        <li class="dropdown-header">{% translate "Switch Dashboard" %}</li>
+        {% for db in dashboards_list %}
+            <li>
+                <a class="dropdown-item d-flex align-items-center justify-content-between {% if db.id == active_dashboard.id %}active{% endif %}"
+                   href="?dashboard={{ db.id }}"
+                   hx-get="?dashboard={{ db.id }}"
+                   hx-target="#page-content-wrapper"
+                   hx-push-url="true">
+                    <span>
+                        {{ db.name }}
+                        {% if db.is_default %}
+                            <small class="text-muted ms-1">({% translate "Default" %})</small>
+                        {% endif %}
+                    </span>
+                    {% if db.tenant %}
+                        <span class="badge bg-blue-lt ms-2">{{ db.tenant.name }}</span>
+                    {% endif %}
+                </a>
+            </li>
+        {% endfor %}
+        <div class="dropdown-divider"></div>
+        <li>
+            <a class="dropdown-item d-flex align-items-center text-primary"
+               hx-get="{% url 'extras:dashboard_manage_modal' %}"
+               hx-target="#dashboard-modal-content"
+               data-bs-toggle="modal"
+               data-bs-target="#dashboard-modal"
+               href="#">
+                <i class="mdi mdi-cog-outline me-1"></i>
+                {% translate "Manage Dashboards" %}
+            </a>
+        </li>
+    </ul>
+</div>
 {% endblock %}
 
 {% block page_actions %}
@@ -19,51 +60,6 @@
     }
 </style>
 <div class="btn-list" id="dashboard-controls">
-    <!-- Dashboard Dropdown Switcher -->
-    <div class="dropdown d-inline-block">
-        <button class="btn btn-outline-primary dropdown-toggle d-flex align-items-center" type="button" id="dashboard-switcher" data-bs-toggle="dropdown" aria-expanded="false">
-            <i class="mdi mdi-view-dashboard-variant-outline me-1"></i>
-            {{ active_dashboard.name }}
-            {% if active_dashboard.tenant %}
-                <span class="badge bg-blue-lt ms-2">{{ active_dashboard.tenant.name }}</span>
-            {% endif %}
-        </button>
-        <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="dashboard-switcher">
-            <li class="dropdown-header">{% translate "Switch Dashboard" %}</li>
-            {% for db in dashboards_list %}
-                <li>
-                    <a class="dropdown-item d-flex align-items-center justify-content-between {% if db.id == active_dashboard.id %}active{% endif %}"
-                       href="?dashboard={{ db.id }}"
-                       hx-get="?dashboard={{ db.id }}"
-                       hx-target="#page-content-wrapper"
-                       hx-push-url="true">
-                        <span>
-                            {{ db.name }}
-                            {% if db.is_default %}
-                                <small class="text-muted ms-1">({% translate "Default" %})</small>
-                            {% endif %}
-                        </span>
-                        {% if db.tenant %}
-                            <span class="badge bg-blue-lt ms-2">{{ db.tenant.name }}</span>
-                        {% endif %}
-                    </a>
-                </li>
-            {% endfor %}
-            <div class="dropdown-divider"></div>
-            <li>
-                <a class="dropdown-item d-flex align-items-center text-primary"
-                   hx-get="{% url 'extras:dashboard_manage_modal' %}"
-                   hx-target="#dashboard-modal-content"
-                   data-bs-toggle="modal"
-                   data-bs-target="#dashboard-modal"
-                   href="#">
-                    <i class="mdi mdi-cog-outline me-1"></i>
-                    {% translate "Manage Dashboards" %}
-                </a>
-            </li>
-        </ul>
-    </div>
-
     {# On phones these controls collapse to icon-only to save space; labels return at ≥sm. #}
     <span id="dashboard-locked-controls">
         <button id="unlock-dashboard" class="btn btn-outline-secondary d-flex align-items-center"
