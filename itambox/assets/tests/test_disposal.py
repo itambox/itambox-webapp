@@ -266,7 +266,7 @@ class AssetDisposalViewSmokeTest(TenantTestMixin, TestCase):
         self.assertIn(response.status_code, [200, 302])
 
     def test_disposal_detail_view_200(self):
-        archived = baker.make(StatusLabel, type="archived", name="Archived")
+        baker.make(StatusLabel, type="archived", name="Archived")
         disposal = dispose_asset(
             asset=self.asset,
             disposal_method=DisposalMethodChoices.DESTRUCTION,

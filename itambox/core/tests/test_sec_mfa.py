@@ -86,7 +86,7 @@ class MFAPolicyHelperTests(TestCase):
             name="Manager",
             permissions=self.WRITE_PERMS,
         )
-        m_manager = grant(self.manager_user, self.tenant, manager_role).membership
+        grant(self.manager_user, self.tenant, manager_role)
 
         # Admin: privileged by canonical name.
         self.admin_user = User.objects.create_user(
@@ -99,7 +99,7 @@ class MFAPolicyHelperTests(TestCase):
             name="Admin",
             permissions=self.WRITE_PERMS + ["assets.delete_asset"],
         )
-        m_admin = grant(self.admin_user, self.tenant, admin_role).membership
+        grant(self.admin_user, self.tenant, admin_role)
 
         # H4: a custom-named role that is NOT a canonical name but grants a
         # non-view permission is privileged by its permissions.
@@ -113,7 +113,7 @@ class MFAPolicyHelperTests(TestCase):
             name="Fleet Steward",
             permissions=self.WRITE_PERMS,
         )
-        m_custom = grant(self.custom_user, self.tenant, custom_role).membership
+        grant(self.custom_user, self.tenant, custom_role)
 
         # A read-only Viewer: neither a privileged name nor any mutating perm.
         self.viewer_user = User.objects.create_user(
@@ -126,7 +126,7 @@ class MFAPolicyHelperTests(TestCase):
             name="Viewer",
             permissions=self.READ_ONLY_PERMS,
         )
-        m_viewer = grant(self.viewer_user, self.tenant, viewer_role).membership
+        grant(self.viewer_user, self.tenant, viewer_role)
 
     def test_superuser_requires_mfa(self):
         self.assertTrue(user_requires_mfa(self.super_user))
@@ -211,7 +211,7 @@ class MFAEnforcementMiddlewareTests(TestCase):
             password="pw-mfa",
         )
         admin_role = Role.objects.create(tenant=self.tenant, name="Admin", permissions=[])
-        m_admin = grant(self.admin_user, self.tenant, admin_role).membership
+        grant(self.admin_user, self.tenant, admin_role)
 
         # H4: a Manager (the SSO-provisioned privileged role) must be gated too.
         self.manager_user = User.objects.create_user(
@@ -224,7 +224,7 @@ class MFAEnforcementMiddlewareTests(TestCase):
             name="Manager",
             permissions=["assets.view_asset", "assets.add_asset", "assets.change_asset"],
         )
-        m_manager = grant(self.manager_user, self.tenant, manager_role).membership
+        grant(self.manager_user, self.tenant, manager_role)
 
         self.member_user = User.objects.create_user(
             username="enforce-member-mfa",
@@ -237,7 +237,7 @@ class MFAEnforcementMiddlewareTests(TestCase):
             name="Member",
             permissions=["assets.view_asset"],
         )
-        m_member = grant(self.member_user, self.tenant, member_role).membership
+        grant(self.member_user, self.tenant, member_role)
 
     def _login_with_backend(self, user, backend):
         """force_login then pin the session auth backend (password vs SSO)."""
@@ -354,7 +354,7 @@ class MFAGateViewTests(TestCase):
             password="pw-mfa",
         )
         admin_role = Role.objects.create(tenant=self.tenant, name="Admin", permissions=[])
-        m_admin = grant(self.admin_user, self.tenant, admin_role).membership
+        grant(self.admin_user, self.tenant, admin_role)
 
     def _login_password(self, user):
         self.client.force_login(user)

@@ -28,7 +28,7 @@ class LabelPrintPermissionTests(TestCase):
     def _login(self, username, perms):
         user = User.objects.create_user(username=username, password="pw")
         role = Role.objects.create(tenant=self.tenant, name=f"role-{username}", permissions=perms)
-        membership = grant(user, self.tenant, role).membership
+        grant(user, self.tenant, role)
         self.client.force_login(user)
         session = self.client.session
         session["active_tenant_id"] = self.tenant.pk

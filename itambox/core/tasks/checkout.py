@@ -143,5 +143,5 @@ def bulk_checkout_task(
                     level=Notification.LEVEL_DANGER,
                     target_url=reverse_job_detail(job.pk),
                 )
-        except Exception as e:
+        except Exception:
             logger.exception("Outer exception during bulk checkout task")

@@ -187,7 +187,7 @@ class SubscriptionFixesTests(TestCase):
         # Bypass pre_save signal using .update() to set renewal_date to the past
         Subscription.objects.filter(pk=sub_expired.pk).update(renewal_date=date.today() - timedelta(days=1))
         # Create subscriptions approaching renewal (30, 14, 7 days)
-        sub_30 = Subscription.objects.create(
+        Subscription.objects.create(
             name="Sub 30",
             provider=self.provider_a,
             tenant=self.tenant_a,
@@ -195,7 +195,7 @@ class SubscriptionFixesTests(TestCase):
             renewal_date=date.today() + timedelta(days=30),
             renewal_cost=100.00,
         )
-        sub_14 = Subscription.objects.create(
+        Subscription.objects.create(
             name="Sub 14",
             provider=self.provider_a,
             tenant=self.tenant_a,
@@ -203,7 +203,7 @@ class SubscriptionFixesTests(TestCase):
             renewal_date=date.today() + timedelta(days=14),
             renewal_cost=100.00,
         )
-        sub_7 = Subscription.objects.create(
+        Subscription.objects.create(
             name="Sub 7",
             provider=self.provider_a,
             tenant=self.tenant_a,

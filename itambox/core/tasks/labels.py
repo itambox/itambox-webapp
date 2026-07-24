@@ -109,7 +109,7 @@ def generate_label_batch_task(job_id, asset_pks, label_format, user_id, tenant_i
                     level=Notification.LEVEL_DANGER,
                     target_url=reverse_job_detail(job.pk),
                 )
-        except Exception as e:
+        except Exception:
             logger.exception("Outer exception during label batch generation task")
 
 

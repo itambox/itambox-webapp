@@ -139,13 +139,10 @@ class ScheduledReportingAndAlertsTests(TestCase):
         """Test report template context compilation and preview endpoint rendering without ValueError."""
         # Create some sample assets to exercise the asset summary report compilation path
         from assets.models import Asset, StatusLabel
-        from organization.models import Location, Site
 
         status, _ = StatusLabel.objects.get_or_create(name="Available", defaults={"type": StatusLabel.TYPE_DEPLOYABLE})
-        site = Site.objects.create(name="Office HQ Site", slug="office-hq-site")
-        loc = Location.objects.create(name="Office HQ", slug="office-hq", site=site)
 
-        asset = Asset.objects.create(
+        Asset.objects.create(
             asset_tag="AST-1001",
             name="Developer Laptop",
             status=status,

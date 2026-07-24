@@ -495,7 +495,7 @@ class MultiTenantMembershipTests(TestCase):
 
         from itambox.middleware import TenantMiddleware
 
-        mem = grant(self.user, self.tenant_a, self.role_member).membership
+        grant(self.user, self.tenant_a, self.role_member)
 
         factory = RequestFactory()
 

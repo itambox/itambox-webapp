@@ -273,7 +273,6 @@ class ObjectDetailView(
         obj = self.get_object()
         app_label = obj._meta.app_label
         model_name = obj._meta.model_name
-        verbose_name = obj._meta.verbose_name
         verbose_name_plural = obj._meta.verbose_name_plural
 
         context["model"] = obj.__class__

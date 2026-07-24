@@ -7,7 +7,7 @@ from django.test import TestCase
 from django.urls import reverse
 from model_bakery import baker
 
-from assets.models import Asset, AssetType, Manufacturer, StatusLabel
+from assets.models import Asset, StatusLabel
 from compliance.models import AssetAudit, AuditSession
 from compliance.reconciliation import classify_session_audits
 from core.tests.mixins import TenantTestMixin
@@ -76,8 +76,6 @@ class ExpectedAssetsCountStabilityTests(TenantTestMixin, TestCase):
         self.tenant_b = baker.make(Tenant, name="OtherTenant", slug="other-tenant")
 
         self.status = baker.make(StatusLabel, type=StatusLabel.TYPE_DEPLOYABLE)
-        mfr = baker.make(Manufacturer)
-        at = baker.make(AssetType, manufacturer=mfr)
 
         # 3 assets belonging to our tenant
         for _ in range(3):
@@ -128,7 +126,7 @@ class ExpectedAssetsCountStabilityTests(TenantTestMixin, TestCase):
         )
         # 2 assets at the location — one will be scanned, one missing
         asset_scanned = baker.make(Asset, status=scanned_status, tenant=self.tenant, location=loc)
-        _asset_missing = baker.make(Asset, status=scanned_status, tenant=self.tenant, location=loc)
+        asset_missing = baker.make(Asset, status=scanned_status, tenant=self.tenant, location=loc)
 
         auditor = baker.make(User)
         AssetAudit.objects.create(
@@ -142,6 +140,7 @@ class ExpectedAssetsCountStabilityTests(TenantTestMixin, TestCase):
         self.set_active_tenant(self.tenant)
         result_a = classify_session_audits(session)
         missing_ids_a = set(result_a["missing"].values_list("pk", flat=True))
+        self.assertEqual(missing_ids_a, {asset_missing.pk})
 
         self.set_active_tenant(self.tenant_b)
         result_b = classify_session_audits(session)

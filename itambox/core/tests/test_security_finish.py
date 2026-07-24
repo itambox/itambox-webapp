@@ -51,12 +51,12 @@ class UploadJournalPermTests(TestCase):
         # User with change_asset on tenant_a
         self.user_chg = User.objects.create_user("chg", password="pw")
         role_chg = _make_role(self.tenant_a, "changer", ["assets.change_asset"])
-        m_chg = grant(self.user_chg, self.tenant_a, role_chg).membership
+        grant(self.user_chg, self.tenant_a, role_chg)
 
         # User with view-only on tenant_a (no change)
         self.user_view = User.objects.create_user("view", password="pw")
         role_view = _make_role(self.tenant_a, "viewer", ["assets.view_asset"])
-        m_view = grant(self.user_view, self.tenant_a, role_view).membership
+        grant(self.user_view, self.tenant_a, role_view)
 
         mfr = Manufacturer.objects.create(name="Dell", slug="dell")
         at = AssetType.objects.create(manufacturer=mfr, model="XPS 13")
@@ -190,7 +190,7 @@ class SearchTenantScopingTests(TestCase):
 
         self.user_a = User.objects.create_user("srch_a", password="pw")
         role_a = _make_role(self.tenant_a, "viewer", ["assets.view_asset"])
-        m_a = grant(self.user_a, self.tenant_a, role_a).membership
+        grant(self.user_a, self.tenant_a, role_a)
 
         mfr = Manufacturer.objects.create(name="HP", slug="hp")
         at = AssetType.objects.create(manufacturer=mfr, model="EliteBook")
@@ -249,13 +249,11 @@ class RESTCrossTenantTests(TestCase):
                 "subscriptions.view_subscription",
             ],
         )
-        m_a = grant(self.user_a, self.tenant_a, role_a).membership
+        grant(self.user_a, self.tenant_a, role_a)
         self.token_a = Token.objects.create(user=self.user_a)
 
         # Shared metadata
         self.mfr = Manufacturer.objects.create(name="Cisco", slug="cisco")
-        sl = StatusLabel.objects.create(name="In-Use", slug="in-use-rest", type=StatusLabel.TYPE_DEPLOYED)
-        at = AssetType.objects.create(manufacturer=self.mfr, model="Switch")
         sw = Software.objects.create(name="Office", manufacturer=self.mfr)
 
         # Tenant A objects

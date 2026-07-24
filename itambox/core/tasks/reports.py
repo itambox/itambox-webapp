@@ -254,7 +254,6 @@ def generate_scheduled_report_task(scheduled_report_id):
                 archive_entry.save()
 
             # 4. Deliver Email (optional, only if recipients is configured)
-            email_sent = False
             if sched.recipients:
                 email_config = EmailSettings.load()
                 if not email_config or not email_config.enabled:
@@ -275,7 +274,6 @@ def generate_scheduled_report_task(scheduled_report_id):
                         email.attach(attachment_filename, attachment_content, attachment_mime)
 
                     email.send(fail_silently=False)
-                    email_sent = True
 
             # 5. Dispatch to configured Notification Channels (email, in_app, Slack, Teams)
             report_subject = _("[Scheduled Report] %(name)s") % {"name": sched.name}

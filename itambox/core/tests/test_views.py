@@ -94,8 +94,8 @@ class CoreViewsTestCase(TestCase):
         middleware = CurrentUserMiddleware(get_response=lambda r: None)
         middleware.process_request(request)
 
-        mfr1 = Manufacturer.objects.create(name="Intel unique-filter-1", slug="intel-unique-filter-1")
-        mfr2 = Manufacturer.objects.create(name="AMD unique-filter-2", slug="amd-unique-filter-2")
+        Manufacturer.objects.create(name="Intel unique-filter-1", slug="intel-unique-filter-1")
+        Manufacturer.objects.create(name="AMD unique-filter-2", slug="amd-unique-filter-2")
 
         middleware.process_response(request, None)
 

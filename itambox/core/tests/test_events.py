@@ -44,7 +44,7 @@ class EventsSystemTestCase(TransactionTestCase):
 
     def test_event_rule_conditions_evaluation(self):
         # Create a rule with an "and" condition
-        rule = EventRule.objects.create(
+        EventRule.objects.create(
             name="Test Rule with Conditions",
             model=self.manufacturer_ct,
             events=["create"],
@@ -149,7 +149,7 @@ class EventsSystemTestCase(TransactionTestCase):
         mock_request_pinned.return_value = mock_response
 
         # Create webhook rule
-        rule = EventRule.objects.create(
+        EventRule.objects.create(
             name="Test Webhook Rule",
             model=self.manufacturer_ct,
             events=["create"],

@@ -59,8 +59,8 @@ class MultiDashboardModelAndUtilsTests(TestCase):
 
     def test_get_dashboard_default_fallback(self):
         # When no dashboard is explicitly default, fall back to the first available
-        db1 = Dashboard.objects.create(user=self.user, name="Board B", is_default=False)
-        db2 = Dashboard.objects.create(user=self.user, name="Board A", is_default=False)
+        Dashboard.objects.create(user=self.user, name="Board B", is_default=False)
+        Dashboard.objects.create(user=self.user, name="Board A", is_default=False)
 
         fetched = get_dashboard(self.user)
         # Ordering is ordering = ['-is_default', 'name'], so Board A should be first among non-defaults

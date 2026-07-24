@@ -133,13 +133,13 @@ class SeedOperationsMixin:
             description="Seat utilization and renewal exposure across customers.",
             include_summary_cards=True,
         )
-        rt_renew = ReportTemplate.objects.create(
+        ReportTemplate.objects.create(
             name="Upcoming Subscription Renewals",
             report_type="subscription_renewals",
             description="Cloud and SaaS renewals due in the next quarter.",
             include_summary_cards=True,
         )
-        rt_dep = ReportTemplate.objects.create(
+        ReportTemplate.objects.create(
             name="Asset Depreciation Summary",
             report_type="asset_depreciation",
             description="Written-down value of the managed fleet.",

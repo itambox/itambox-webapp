@@ -752,7 +752,6 @@ class SnipeITImporter:
         for row in self.client.get_all("/api/v1/fieldsets"):
             sid = row["id"]
             name = (row.get("name") or "").strip() or f"Fieldset {sid}"
-            field_ids = [f.get("id") for f in (row.get("fields", {}).get("rows") or []) if f.get("id")]
             try:
                 with transaction.atomic():
                     obj = CustomFieldset.all_objects.filter(name=name).first()
@@ -1416,9 +1415,6 @@ class SnipeITImporter:
 
             raw_type = (row.get("asset_maintenance_type") or "maintenance").lower()
             mtype = _MAINTENANCE_TYPE_MAP.get(raw_type, "repair")
-            raw_status = (
-                (row.get("completion_date") and "complete") or (row.get("is_warranty") and "complete") or "pending"
-            )
             completion_raw = _nested_str(row.get("completion_date"), "date") or row.get("completion_date")
             if isinstance(completion_raw, dict):
                 completion_raw = completion_raw.get("date")

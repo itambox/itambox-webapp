@@ -34,7 +34,7 @@ class SCIMStressTests(TestCase):
                 "organization.change_membership",
             ],
         )
-        admin_membership = grant(self.admin_user, self.tenant, self.role_admin).membership
+        grant(self.admin_user, self.tenant, self.role_admin)
 
         # Setup tokens — tenant explicit so it unambiguously matches self.tenant's URLs.
         self.valid_token = Token.objects.create(

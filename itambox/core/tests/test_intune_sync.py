@@ -113,23 +113,6 @@ class IntunePaginationTest(TransactionTestCase):
     """IntuneClient follows @odata.nextLink correctly."""
 
     def test_pagination_followed(self):
-        page1 = {"value": [{"id": "d1"}], "@odata.nextLink": "https://graph/page2"}
-        page2 = {"value": [{"id": "d2"}], "@odata.nextLink": None}
-
-        responses = [MagicMock(status_code=200, json=lambda p=p: p) for p in [page1, page2]]
-        for r in responses:
-            r.raise_for_status = MagicMock()
-
-        with patch("core.integrations.intune.requests.get", side_effect=responses):
-            with patch("core.integrations.intune._get_token", return_value="tok"):
-                from core.integrations.intune import IntuneClient
-
-                client = IntuneClient("tid", "cid", "sec")
-                # patch nextLink iteration: second response has no nextLink key
-                # simulate by returning None from @odata.nextLink
-                # We'll patch _graph_get_paginated directly instead:
-                pass
-
         # Direct test of _graph_get_paginated
         import core.integrations.intune as intune_mod
 

@@ -198,7 +198,7 @@ class AuditReconciliationTestCase(TestCase):
 
     def test_audit_outside_session(self):
         # Auditing outside session must change location & status immediately
-        audit_1 = audit_asset(
+        audit_asset(
             asset=self.asset_mismatched,
             user=self.auditor,
             session=None,

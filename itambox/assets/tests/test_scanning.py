@@ -250,7 +250,7 @@ class ScanResolveViewTests(TenantTestMixin, TestCase):
 
         # Create an asset in a second tenant.
         other_tenant = Tenant.objects.create(name="OtherTenant", slug="other-tenant-scan")
-        other_asset = Asset.objects.create(
+        Asset.objects.create(
             name="Other Tenant Asset",
             asset_tag="OTHER-999",
             serial_number="SN-OTHER-999",

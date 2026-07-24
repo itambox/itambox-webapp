@@ -344,7 +344,7 @@ class SubscriptionCheckoutView(LoginRequiredMixin, PermissionRequiredMixin, View
             content_type = ContentType.objects.get_for_model(target_obj)
 
             # Create SubscriptionAssignment
-            assignment = SubscriptionAssignment.objects.create(
+            SubscriptionAssignment.objects.create(
                 subscription=subscription,
                 content_type=content_type,
                 object_id=target_obj.pk,

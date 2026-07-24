@@ -217,7 +217,6 @@ class SeedFinanceMixin:
         for slug, tenant in self._tenants.items():
             meta = self._tenant_meta.get(slug, {})
             profile = meta.get("profile", "_default")
-            currency = meta.get("currency", "EUR")
 
             templates = _CC_TEMPLATES.get(profile, _CC_TEMPLATES["_default"])
 

@@ -59,7 +59,7 @@ class AssetAssignmentTestCase(TestCase):
         updates the asset status accordingly.
         """
         deployed_status = baker.make(StatusLabel, type="deployed", name="Custom Deployed")
-        target = checkout_asset(
+        checkout_asset(
             asset=self.peripheral_monitor, asset_target=self.host_laptop, user=self.user, status=deployed_status
         )
         self.peripheral_monitor.refresh_from_db()

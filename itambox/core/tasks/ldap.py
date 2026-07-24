@@ -82,5 +82,5 @@ def sync_tenant_ldap_task(job_id, tenant_slug, user_id, tenant_id=None):
                     target_url=reverse_job_detail(job.pk),
                 )
 
-        except Exception as e:
+        except Exception:
             logger.exception("Outer exception during LDAP sync task")

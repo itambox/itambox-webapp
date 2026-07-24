@@ -696,7 +696,7 @@ class TenantOIDCTestCase(TestCase):
 
         # Create user A and link to an AssetHolder with specific upn
         user_a = User.objects.create_user(username="user_a", email="usera@alpha.com")
-        holder_a = AssetHolder.objects.create(
+        AssetHolder.objects.create(
             user=user_a,
             first_name="User",
             last_name="A",

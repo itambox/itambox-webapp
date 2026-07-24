@@ -102,7 +102,7 @@ class AssetDisposeActionView(ObjectEditView):
         # pk. Asset.objects is tenant-scoped, so a cross-tenant pk 404s here.
         asset = get_object_or_404(Asset.objects, pk=data["asset"].pk)
         try:
-            disposal = dispose_asset(
+            dispose_asset(
                 asset=asset,
                 disposal_method=data["disposal_method"],
                 disposal_date=data["disposal_date"],

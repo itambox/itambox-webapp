@@ -76,6 +76,8 @@ class FlagMissingServiceTests(TestCase):
         result = flag_missing_assets(self.session, user=self.user)
         self.assertEqual(result["skipped"], 1)
         self.assertEqual(result["flagged"], 0)
+        assets[0].refresh_from_db()
+        self.assertEqual(assets[0].status.name, "Missing")
 
     def test_raises_if_session_not_closed(self):
         from django.core.exceptions import ValidationError
@@ -109,6 +111,7 @@ class FlagMissingServiceTests(TestCase):
         flag_missing_assets(self.session, user=self.user)
         # Should not create a second 'Missing' label
         self.assertEqual(StatusLabel.objects.filter(name="Missing").count(), 1)
+        self.assertEqual(StatusLabel.objects.get(name="Missing").pk, existing.pk)
 
 
 class FlagMissingViewTests(TenantTestMixin, TestCase):

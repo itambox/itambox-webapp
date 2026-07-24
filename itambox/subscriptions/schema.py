@@ -645,7 +645,7 @@ class UpdateSubscriptionAssignment(graphene.Mutation):
     subscription_assignment = graphene.Field(SubscriptionAssignmentNode)
 
     def mutate(self, info, id, **kwargs):
-        user = check_permission(info, "subscriptions.change_subscriptionassignment")
+        check_permission(info, "subscriptions.change_subscriptionassignment")
         active_tenant = getattr(info.context, "active_tenant", None)
 
         try:
@@ -680,7 +680,7 @@ class DeleteSubscriptionAssignment(graphene.Mutation):
     success = graphene.Boolean()
 
     def mutate(self, info, id):
-        user = check_permission(info, "subscriptions.delete_subscriptionassignment")
+        check_permission(info, "subscriptions.delete_subscriptionassignment")
         active_tenant = getattr(info.context, "active_tenant", None)
 
         try:
