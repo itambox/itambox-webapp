@@ -126,6 +126,14 @@ class FindingPolicyTests(unittest.TestCase):
                     sarif,
                     expected_targets={"uv.lock", "itambox/package-lock.json"},
                 )
+            report["Results"][0]["Vulnerabilities"] = [{
+                "VulnerabilityID": "CVE-2026-0001",
+                "PkgName": "example",
+                "InstalledVersion": "1.0.0",
+                "Severity": "UNRECOGNIZED",
+            }]
+            with self.assertRaisesRegex(SecurityGateError, "invalid Trivy severity"):
+                evaluate_trivy([report], [], sarif)
 
     def test_gitleaks_requires_exact_fingerprint_path_and_rule_suppression(self):
         finding = {"Fingerprint": "abc:src/app.py:rule", "File": "src/app.py", "RuleID": "rule"}

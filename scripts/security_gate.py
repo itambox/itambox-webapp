@@ -15,6 +15,7 @@ from typing import Any
 
 
 BLOCKING_SEVERITIES = {"HIGH", "CRITICAL"}
+TRIVY_SEVERITIES = {"UNKNOWN", "LOW", "MEDIUM", "HIGH", "CRITICAL"}
 MAX_SUPPRESSION_DAYS = 90
 _OWNER_RE = re.compile(r"^@[A-Za-z0-9](?:[A-Za-z0-9-]*/)?[A-Za-z0-9-]+$")
 _REQUIRED_FIELDS = {
@@ -164,12 +165,15 @@ def _parse_trivy_vulnerability(vulnerability: Any, target: str) -> dict[str, str
         or any(not isinstance(vulnerability.get(field), str) or not vulnerability[field] for field in required)
     ):
         raise SecurityGateError("invalid Trivy report")
+    severity = vulnerability["Severity"].upper()
+    if severity not in TRIVY_SEVERITIES:
+        raise SecurityGateError("invalid Trivy severity")
     return {
         "id": vulnerability["VulnerabilityID"],
         "target": target,
         "package": vulnerability["PkgName"],
         "version": vulnerability["InstalledVersion"],
-        "severity": vulnerability["Severity"].upper(),
+        "severity": severity,
     }
 
 
