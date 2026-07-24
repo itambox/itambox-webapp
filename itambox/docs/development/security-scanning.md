@@ -27,7 +27,7 @@ This repository is public, so normal Actions logs and artifacts are treated as p
 - Scanner shell tracing is disabled.
 - Logs contain only aggregate severity counts and generic pass/fail messages.
 - Redacted Gitleaks reports are never uploaded as artifacts or SARIF.
-- Unsuppressed dependency findings are converted after policy evaluation to SARIF and retained in GitHub Code Scanning, whose security-alert permissions govern access. Fork and Dependabot pull requests skip this write-only upload; their merge gate still runs, and `main` retains the result after merge.
+- Unsuppressed dependency and release-image findings are converted after policy evaluation to SARIF and retained in GitHub Code Scanning, whose security-alert permissions govern access. Fork and Dependabot pull requests skip write-only rehearsal uploads; their merge gates still run, and trusted runs retain the results.
 - Raw dependency and image reports are not uploaded as normal workflow artifacts.
 - Fork pull requests receive no additional secrets; the workflow never uses `pull_request_target`.
 
@@ -76,9 +76,9 @@ uv run --locked --only-group dev python -m unittest scripts.tests.test_security_
 
 ## Release integration
 
-The release workflow builds each candidate once, verifies its OCI identity, and runs Trivy against that same local image before creating a draft release or tag-associated release object. A failed image gate prevents archive creation and `gh release create`.
+The release workflow builds each candidate once, verifies its OCI identity, and runs Trivy against that same local image before creating a draft release or tag-associated release object. Filtered image SARIF is retained in Code Scanning before the gate is enforced. A failed image gate prevents archive creation and `gh release create`.
 
-The pull-request rehearsal has read-only repository permission and publishes nothing. Manual draft preparation remains restricted to a reviewed `main` commit as documented in the [release runbook](release-checklist.md).
+The pull-request rehearsal has read-only repository permission plus narrowly scoped `security-events: write` permission for internal Code Scanning uploads, and publishes no release artifact. Fork and Dependabot rehearsals skip the upload. Manual draft preparation remains restricted to a reviewed `main` commit as documented in the [release runbook](release-checklist.md).
 
 ## Repository enforcement
 

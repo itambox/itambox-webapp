@@ -227,6 +227,8 @@ class ReleaseAutomationContractTests(unittest.TestCase):
         self.assertGreaterEqual(workflow.count("verify_release_tag"), 3)
         self.assertIn("Release tag does not resolve to the reviewed commit", workflow)
         self.assertIn("gh release create", workflow)
+        self.assertIn('--verify-tag', workflow)
+        self.assertIn('--target "$GITHUB_SHA"', workflow)
         self.assertIn("--draft", workflow)
         self.assertIn("--prerelease", workflow)
         self.assertIn("docker image inspect", workflow)
