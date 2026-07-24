@@ -112,6 +112,8 @@ class MultiDashboardViewsTests(TestCase):
         self.assertNotIn('page-pretitle', page_header)
         self.assertNotIn('page-title', page_header)
         self.assertIn('id="dashboard-switcher"', page_header)
+        self.assertIn('dropdown-menu-start', page_header)
+        self.assertNotIn('dropdown-menu-end', page_header)
         self.assertIn(
             f'hx-get="?dashboard={self.db_secondary.id}"',
             page_header,

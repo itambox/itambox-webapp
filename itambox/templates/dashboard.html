@@ -14,7 +14,7 @@
             <span class="badge bg-blue-lt ms-2">{{ active_dashboard.tenant.name }}</span>
         {% endif %}
     </button>
-    <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="dashboard-switcher">
+    <ul class="dropdown-menu dropdown-menu-start" aria-labelledby="dashboard-switcher">
         <li class="dropdown-header">{% translate "Switch Dashboard" %}</li>
         {% for db in dashboards_list %}
             <li>
