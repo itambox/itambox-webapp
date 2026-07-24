@@ -81,6 +81,9 @@ jobs:
           set +e
           python scripts/security_gate.py trivy \
             --report "$RUNNER_TEMP/trivy-dependencies.json" \
+            --expect-target "uv.lock" \
+            --expect-target "itambox/package-lock.json" \
+            --expect-target "itambox/tests/e2e/package-lock.json" \
             --sarif "$RUNNER_TEMP/trivy-dependencies.sarif"
           status=$?
           set -e

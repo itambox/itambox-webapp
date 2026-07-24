@@ -74,6 +74,7 @@ class SuppressionPolicyTests(unittest.TestCase):
 class FindingPolicyTests(unittest.TestCase):
     def test_trivy_blocks_unsuppressed_high_and_emits_sarif(self):
         report = {
+            "SchemaVersion": 2,
             "Results": [{
                 "Target": "uv.lock",
                 "Vulnerabilities": [{
@@ -93,6 +94,7 @@ class FindingPolicyTests(unittest.TestCase):
 
     def test_exact_trivy_suppression_and_low_findings_do_not_block(self):
         report = {
+            "SchemaVersion": 2,
             "Results": [{
                 "Target": "uv.lock",
                 "Vulnerabilities": [
@@ -107,6 +109,23 @@ class FindingPolicyTests(unittest.TestCase):
             result = evaluate_trivy([report], load_suppressions(manifest), Path(root) / "results.sarif")
             self.assertTrue(result.passed)
             self.assertEqual(result.suppressed, 1)
+
+    def test_trivy_rejects_malformed_reports_and_missing_expected_targets(self):
+        with tempfile.TemporaryDirectory() as root:
+            sarif = Path(root) / "results.sarif"
+            with self.assertRaisesRegex(SecurityGateError, "invalid Trivy report"):
+                evaluate_trivy([{}], [], sarif)
+            report = {
+                "SchemaVersion": 2,
+                "Results": [{"Target": "uv.lock", "Vulnerabilities": None}],
+            }
+            with self.assertRaisesRegex(SecurityGateError, "missing expected Trivy targets"):
+                evaluate_trivy(
+                    [report],
+                    [],
+                    sarif,
+                    expected_targets={"uv.lock", "itambox/package-lock.json"},
+                )
 
     def test_gitleaks_requires_exact_fingerprint_path_and_rule_suppression(self):
         finding = {"Fingerprint": "abc:src/app.py:rule", "File": "src/app.py", "RuleID": "rule"}
@@ -140,6 +159,7 @@ class SecurityAutomationContractTests(unittest.TestCase):
         self.assertIn("github.actor != 'dependabot[bot]'", workflow)
         self.assertIn("uv lock --check", workflow)
         self.assertIn("--include-dev-deps", workflow)
+        self.assertEqual(workflow.count("--expect-target"), 3)
 
     def test_release_rehearsal_scans_the_same_image_before_draft_creation(self):
         workflow = (REPOSITORY_ROOT / ".github" / "workflows" / "release.yml").read_text(encoding="utf-8")

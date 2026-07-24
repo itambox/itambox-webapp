@@ -157,26 +157,63 @@ def _gitleaks_suppressed(finding: dict[str, Any], entries: list[dict[str, Any]])
     )
 
 
+def _parse_trivy_vulnerability(vulnerability: Any, target: str) -> dict[str, str]:
+    required = ("VulnerabilityID", "PkgName", "InstalledVersion", "Severity")
+    if (
+        not isinstance(vulnerability, dict)
+        or any(not isinstance(vulnerability.get(field), str) or not vulnerability[field] for field in required)
+    ):
+        raise SecurityGateError("invalid Trivy report")
+    return {
+        "id": vulnerability["VulnerabilityID"],
+        "target": target,
+        "package": vulnerability["PkgName"],
+        "version": vulnerability["InstalledVersion"],
+        "severity": vulnerability["Severity"].upper(),
+    }
+
+
+def _parse_trivy_report(report: Any) -> tuple[list[dict[str, str]], set[str]]:
+    if (
+        not isinstance(report, dict)
+        or report.get("SchemaVersion") != 2
+        or not isinstance(report.get("Results"), list)
+        or not report["Results"]
+    ):
+        raise SecurityGateError("invalid Trivy report")
+    findings: list[dict[str, str]] = []
+    targets: set[str] = set()
+    for result in report["Results"]:
+        if not isinstance(result, dict) or not isinstance(result.get("Target"), str) or not result["Target"]:
+            raise SecurityGateError("invalid Trivy report")
+        target = result["Target"]
+        targets.add(target)
+        vulnerabilities = result.get("Vulnerabilities")
+        if vulnerabilities is None:
+            vulnerabilities = []
+        if not isinstance(vulnerabilities, list):
+            raise SecurityGateError("invalid Trivy report")
+        findings.extend(_parse_trivy_vulnerability(item, target) for item in vulnerabilities)
+    return findings, targets
+
+
 def evaluate_trivy(
     reports: list[dict[str, Any]],
     suppressions: list[dict[str, Any]],
     sarif_path: Path,
+    expected_targets: set[str] | None = None,
 ) -> GateResult:
     findings: list[dict[str, str]] = []
+    seen_targets: set[str] = set()
     for report in reports:
-        if not isinstance(report, dict) or not isinstance(report.get("Results", []), list):
-            raise SecurityGateError("invalid Trivy report")
-        for result in report.get("Results", []):
-            target = str(result.get("Target", ""))
-            for vulnerability in result.get("Vulnerabilities") or []:
-                severity = str(vulnerability.get("Severity", "UNKNOWN")).upper()
-                findings.append({
-                    "id": str(vulnerability.get("VulnerabilityID", "UNKNOWN")),
-                    "target": target,
-                    "package": str(vulnerability.get("PkgName", "")),
-                    "version": str(vulnerability.get("InstalledVersion", "")),
-                    "severity": severity,
-                })
+        report_findings, report_targets = _parse_trivy_report(report)
+        findings.extend(report_findings)
+        seen_targets.update(report_targets)
+
+    missing_targets = (expected_targets or set()) - seen_targets
+    if missing_targets:
+        missing = ", ".join(sorted(missing_targets))
+        raise SecurityGateError(f"missing expected Trivy targets: {missing}")
 
     visible: list[dict[str, str]] = []
     suppressed = 0
@@ -246,6 +283,7 @@ def build_parser() -> argparse.ArgumentParser:
     trivy = subparsers.add_parser("trivy")
     trivy.add_argument("--report", action="append", required=True, type=Path)
     trivy.add_argument("--sarif", required=True, type=Path)
+    trivy.add_argument("--expect-target", action="append", default=[])
     gitleaks = subparsers.add_parser("gitleaks")
     gitleaks.add_argument("--report", required=True, type=Path)
     return parser
@@ -259,7 +297,12 @@ def main(argv: list[str] | None = None) -> int:
             print(f"security suppressions valid: {len(suppressions)}")
             return 0
         if args.command == "trivy":
-            result = evaluate_trivy([_load_json(path) for path in args.report], suppressions, args.sarif)
+            result = evaluate_trivy(
+                [_load_json(path) for path in args.report],
+                suppressions,
+                args.sarif,
+                expected_targets=set(args.expect_target),
+            )
             _print_result("dependency vulnerabilities", result)
         else:
             result = evaluate_gitleaks(_load_json(args.report), suppressions)
