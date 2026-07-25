@@ -33,4 +33,4 @@ class LicenseSeatAssignmentViewSet(ITAMBoxModelViewSet):
         try:
             checkin_license_seat(assignment=instance)
         except DjangoValidationError as exc:
-            raise DRFValidationError(exc.messages)
+            raise DRFValidationError(exc.messages) from exc

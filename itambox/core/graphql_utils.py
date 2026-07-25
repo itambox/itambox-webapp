@@ -41,7 +41,7 @@ def get_object_or_denied(model, pk, user, tenant=None):
         obj = qs.get(pk=pk)
         return obj
     except model.DoesNotExist:
-        raise PermissionDenied(_("Permission denied."))
+        raise PermissionDenied(_("Permission denied.")) from None
 
 
 def generate_slug(instance):

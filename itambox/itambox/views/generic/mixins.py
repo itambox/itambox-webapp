@@ -165,7 +165,7 @@ class BulkViewMixin:
                     app_label, mn = model_name.split(".")
                     model = apps.get_model(app_label, mn)
                 except (ValueError, LookupError):
-                    raise Http404
+                    raise Http404 from None
                 # A swapped-out model (e.g. the default ``auth.User`` once AUTH_USER_MODEL is
                 # overridden) has no usable manager — reject it like any non-tenant model.
                 # ``_meta.swapped`` is checked first so the short-circuit never touches the

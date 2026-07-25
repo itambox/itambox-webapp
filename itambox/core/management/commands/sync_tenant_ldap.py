@@ -90,7 +90,7 @@ class Command(BaseCommand):
         try:
             tenant = Tenant.objects.get(slug=tenant_slug)
         except Tenant.DoesNotExist:
-            raise CommandError(f"Tenant with slug '{tenant_slug}' does not exist.")
+            raise CommandError(f"Tenant with slug {tenant_slug!r} does not exist.") from None
 
         # TaskContext sets the tenant scope AND wires _request_id + _current_user
         # so that ChangeLoggingMixin records ObjectChange entries for all User/
@@ -157,7 +157,7 @@ class Command(BaseCommand):
             conn.simple_bind_s(bind_dn, bind_password)
             self.stdout.write(self.style.SUCCESS("LDAP bind successful."))
         except ldap.LDAPError as e:
-            raise CommandError(f"LDAP bind failed: {e}")
+            raise CommandError(f"LDAP bind failed: {e}") from e
 
         # Resolve wildcards for bulk synchronization search
         search_filter = user_search_filter
@@ -282,7 +282,7 @@ class Command(BaseCommand):
             )
 
         except ldap.LDAPError as e:
-            raise CommandError(f"LDAP search failed: {e}")
+            raise CommandError(f"LDAP search failed: {e}") from e
         finally:
             # Tenant context cleanup is handled by TaskContext.__exit__; do NOT
             # call set_current_tenant(None) here as it would fire before TaskContext

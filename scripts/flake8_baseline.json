@@ -5,30 +5,6 @@
   "findings": [
     {
       "path": "itambox/assets/api/serializers.py",
-      "code": "B904",
-      "message": "Within an `except` clause, raise exceptions with `raise ... from err` or `raise ... from None` to distinguish them from errors in exception handling.  See https://docs.python.org/3/tutorial/errors.html#exception-chaining for details.",
-      "source": "                raise serializers.ValidationError({\"asset_target_id\": _(\"Specified target asset does not exist.\")})",
-      "context": "Module:body/ClassDef:AssetCheckOutAPISerializer:body/FunctionDef:validate:body/If:Name(id='holder_id', ctx=Load()):orelse/If:Name(id='location_id', ctx=Load()):orelse/If:Name(id='asset_target_id', ctx=Load()):body/Try:handlers/ExceptHandler:Attribute(value=Name(id='Asset', ctx=Load()), attr='DoesNotExist', ctx=Load()):None:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/assets/api/serializers.py",
-      "code": "B904",
-      "message": "Within an `except` clause, raise exceptions with `raise ... from err` or `raise ... from None` to distinguish them from errors in exception handling.  See https://docs.python.org/3/tutorial/errors.html#exception-chaining for details.",
-      "source": "                raise serializers.ValidationError({\"holder_id\": _(\"Specified holder does not exist.\")})",
-      "context": "Module:body/ClassDef:AssetCheckOutAPISerializer:body/FunctionDef:validate:body/If:Name(id='holder_id', ctx=Load()):body/Try:handlers/ExceptHandler:Attribute(value=Name(id='AssetHolder', ctx=Load()), attr='DoesNotExist', ctx=Load()):None:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/assets/api/serializers.py",
-      "code": "B904",
-      "message": "Within an `except` clause, raise exceptions with `raise ... from err` or `raise ... from None` to distinguish them from errors in exception handling.  See https://docs.python.org/3/tutorial/errors.html#exception-chaining for details.",
-      "source": "                raise serializers.ValidationError({\"location_id\": _(\"Specified location does not exist.\")})",
-      "context": "Module:body/ClassDef:AssetCheckOutAPISerializer:body/FunctionDef:validate:body/If:Name(id='holder_id', ctx=Load()):orelse/If:Name(id='location_id', ctx=Load()):body/Try:handlers/ExceptHandler:Attribute(value=Name(id='Location', ctx=Load()), attr='DoesNotExist', ctx=Load()):None:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/assets/api/serializers.py",
       "code": "C901",
       "message": "'AssetCheckOutAPISerializer.validate' is too complex (12)",
       "source": "    def validate(self, data):",
@@ -556,14 +532,6 @@
       "count": 1
     },
     {
-      "path": "itambox/assets/forms/fields.py",
-      "code": "B904",
-      "message": "Within an `except` clause, raise exceptions with `raise ... from err` or `raise ... from None` to distinguish them from errors in exception handling.  See https://docs.python.org/3/tutorial/errors.html#exception-chaining for details.",
-      "source": "                raise ValidationError(self.error_messages[\"invalid_choice\"], code=\"invalid_choice\")",
-      "context": "Module:body/ClassDef:StatusModelChoiceField:body/FunctionDef:to_python:body/If:BoolOp(op=And(), values=[Call(func=Name(id='isinstance', ctx=Load()), args=[Name(id='value', ctx=Load()), Name(id='str', ctx=Load())], keywords=[]), UnaryOp(op=Not(), operand=Call(func=Attribute(value=Name(id='value', ctx=Load()), attr='isdigit', ctx=Load()), args=[], keywords=[]))]):body/Try:handlers/ExceptHandler:Attribute(value=Attribute(value=Attribute(value=Name(id='self', ctx=Load()), attr='queryset', ctx=Load()), attr='model', ctx=Load()), attr='DoesNotExist', ctx=Load()):None:body",
-      "count": 1
-    },
-    {
       "path": "itambox/assets/forms/request_forms.py",
       "code": "B907",
       "message": "'cancel_url' is manually surrounded by quotes, consider using the `!r` conversion flag.",
@@ -681,22 +649,6 @@
       "message": "'AssetRequest.clean' is too complex (29)",
       "source": "    def clean(self):",
       "context": "Module:body/ClassDef:AssetRequest:body/FunctionDef:clean:self",
-      "count": 1
-    },
-    {
-      "path": "itambox/assets/schema.py",
-      "code": "B904",
-      "message": "Within an `except` clause, raise exceptions with `raise ... from err` or `raise ... from None` to distinguish them from errors in exception handling.  See https://docs.python.org/3/tutorial/errors.html#exception-chaining for details.",
-      "source": "            raise GraphQLError(",
-      "context": "Module:body/ClassDef:CreateAsset:body/FunctionDef:mutate:body/Try:handlers/ExceptHandler:Name(id='ValidationError', ctx=Load()):e:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/assets/schema.py",
-      "code": "B904",
-      "message": "Within an `except` clause, raise exceptions with `raise ... from err` or `raise ... from None` to distinguish them from errors in exception handling.  See https://docs.python.org/3/tutorial/errors.html#exception-chaining for details.",
-      "source": "            raise GraphQLError(",
-      "context": "Module:body/ClassDef:UpdateAsset:body/FunctionDef:mutate:body/Try:handlers/ExceptHandler:Name(id='ValidationError', ctx=Load()):e:body",
       "count": 1
     },
     {
@@ -2853,14 +2805,6 @@
     },
     {
       "path": "itambox/compliance/reconciliation.py",
-      "code": "B904",
-      "message": "Within an `except` clause, raise exceptions with `raise ... from err` or `raise ... from None` to distinguish them from errors in exception handling.  See https://docs.python.org/3/tutorial/errors.html#exception-chaining for details.",
-      "source": "        raise ValidationError(_(\"This asset has already been verified in this session.\"))",
-      "context": "Module:body/FunctionDef:audit_asset:body/Try:handlers/ExceptHandler:Name(id='IntegrityError', ctx=Load()):None:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/compliance/reconciliation.py",
       "code": "F401",
       "message": "'django.urls.reverse' imported but unused",
       "source": "    from django.urls import reverse",
@@ -2933,14 +2877,6 @@
     },
     {
       "path": "itambox/compliance/views_audit.py",
-      "code": "B904",
-      "message": "Within an `except` clause, raise exceptions with `raise ... from err` or `raise ... from None` to distinguish them from errors in exception handling.  See https://docs.python.org/3/tutorial/errors.html#exception-chaining for details.",
-      "source": "                        raise ValidationError(_(\"Asset with ID %(pk)s does not exist.\") % {\"pk\": asset_pk})",
-      "context": "Module:body/ClassDef:AuditSessionCommitView:body/FunctionDef:post:body/Try:body/With:[(\"Call(func=Attribute(value=Name(id='transaction', ctx=Load()), attr='atomic', ctx=Load()), args=[], keywords=[])\", None)]:body/For:Name(id='asset_pk', ctx=Store()):Name(id='asset_pks', ctx=Load()):body/Try:handlers/ExceptHandler:Attribute(value=Name(id='Asset', ctx=Load()), attr='DoesNotExist', ctx=Load()):None:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/compliance/views_audit.py",
       "code": "F401",
       "message": "'compliance.forms_audit.AssetAuditForm' imported but unused",
       "source": "from compliance.forms_audit import AssetAuditForm, AuditBarcodeScanForm, AuditSessionForm",
@@ -2989,22 +2925,6 @@
     },
     {
       "path": "itambox/core/auth/oidc.py",
-      "code": "B904",
-      "message": "Within an `except` clause, raise exceptions with `raise ... from err` or `raise ... from None` to distinguish them from errors in exception handling.  See https://docs.python.org/3/tutorial/errors.html#exception-chaining for details.",
-      "source": "                raise Http404(f\"Tenant '{tenant_slug}' does not exist.\")",
-      "context": "Module:body/ClassDef:TenantOIDCAuthorizeView:body/FunctionDef:dispatch:body/If:Name(id='tenant_slug', ctx=Load()):body/Try:handlers/ExceptHandler:Attribute(value=Name(id='Tenant', ctx=Load()), attr='DoesNotExist', ctx=Load()):None:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/core/auth/oidc.py",
-      "code": "B904",
-      "message": "Within an `except` clause, raise exceptions with `raise ... from err` or `raise ... from None` to distinguish them from errors in exception handling.  See https://docs.python.org/3/tutorial/errors.html#exception-chaining for details.",
-      "source": "            raise ImproperlyConfigured(f\"OIDC not configured for tenant: {tenant_slug} (missing setting: {attr})\")",
-      "context": "Module:body/ClassDef:TenantOIDCSettingsMixin:body/FunctionDef:get_settings:body/Try:handlers/ExceptHandler:Name(id='ImproperlyConfigured', ctx=Load()):None:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/core/auth/oidc.py",
       "code": "B907",
       "message": "'name' is manually surrounded by quotes, consider using the `!r` conversion flag.",
       "source": "raise AttributeError(f\"'{self.__class__.__name__}' object has no attribute '{name}'\")",
@@ -3017,14 +2937,6 @@
       "message": "'self.__class__.__name__' is manually surrounded by quotes, consider using the `!r` conversion flag.",
       "source": "raise AttributeError(f\"'{self.__class__.__name__}' object has no attribute '{name}'\")",
       "context": "Module:body/ClassDef:TenantOIDCSettingsMixin:body/FunctionDef:__getattr__:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/core/auth/oidc.py",
-      "code": "B907",
-      "message": "'tenant_slug' is manually surrounded by quotes, consider using the `!r` conversion flag.",
-      "source": "raise Http404(f\"Tenant '{tenant_slug}' does not exist.\")",
-      "context": "Module:body/ClassDef:TenantOIDCAuthorizeView:body/FunctionDef:dispatch:body/If:Name(id='tenant_slug', ctx=Load()):body/Try:handlers/ExceptHandler:Attribute(value=Name(id='Tenant', ctx=Load()), attr='DoesNotExist', ctx=Load()):None:body",
       "count": 1
     },
     {
@@ -3153,38 +3065,6 @@
       "message": "'BaseFilterSet.__init__' is too complex (13)",
       "source": "    def __init__(self, *args, **kwargs):",
       "context": "Module:body/ClassDef:BaseFilterSet:body/FunctionDef:__init__:self",
-      "count": 1
-    },
-    {
-      "path": "itambox/core/forms/import_forms.py",
-      "code": "B904",
-      "message": "Within an `except` clause, raise exceptions with `raise ... from err` or `raise ... from None` to distinguish them from errors in exception handling.  See https://docs.python.org/3/tutorial/errors.html#exception-chaining for details.",
-      "source": "                        raise ValidationError(_(\"Object with ID {id} does not exist\").format(id=pk_val))",
-      "context": "Module:body/ClassDef:BulkImportForm:body/FunctionDef:import_data:body/For:Tuple(elts=[Name(id='i', ctx=Store()), Name(id='row', ctx=Store())], ctx=Store()):Call(func=Name(id='enumerate', ctx=Load()), args=[Attribute(value=Name(id='self', ctx=Load()), attr='_rows_data', ctx=Load())], keywords=[keyword(arg='start', value=Constant(value=2))]):body/Try:body/If:Name(id='pk_val', ctx=Load()):body/Try:handlers/ExceptHandler:Attribute(value=Attribute(value=Name(id='self', ctx=Load()), attr='model', ctx=Load()), attr='DoesNotExist', ctx=Load()):None:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/core/forms/import_forms.py",
-      "code": "B904",
-      "message": "Within an `except` clause, raise exceptions with `raise ... from err` or `raise ... from None` to distinguish them from errors in exception handling.  See https://docs.python.org/3/tutorial/errors.html#exception-chaining for details.",
-      "source": "                    raise ValidationError(",
-      "context": "Module:body/ClassDef:BulkImportForm:body/FunctionDef:clean:body/If:Compare(left=Name(id='active_tab', ctx=Load()), ops=[Eq()], comparators=[Constant(value='upload')]):body/Try:handlers/ExceptHandler:Name(id='UnicodeDecodeError', ctx=Load()):None:body/Try:handlers/ExceptHandler:Name(id='Exception', ctx=Load()):None:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/core/forms/import_forms.py",
-      "code": "B904",
-      "message": "Within an `except` clause, raise exceptions with `raise ... from err` or `raise ... from None` to distinguish them from errors in exception handling.  See https://docs.python.org/3/tutorial/errors.html#exception-chaining for details.",
-      "source": "                raise ValidationError(_(\"Failed to parse CSV data: {error}\").format(error=str(e)))",
-      "context": "Module:body/ClassDef:BulkImportForm:body/FunctionDef:clean:body/If:Compare(left=Name(id='import_format', ctx=Load()), ops=[Eq()], comparators=[Constant(value='csv')]):body/Try:handlers/ExceptHandler:Name(id='Exception', ctx=Load()):e:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/core/forms/import_forms.py",
-      "code": "B904",
-      "message": "Within an `except` clause, raise exceptions with `raise ... from err` or `raise ... from None` to distinguish them from errors in exception handling.  See https://docs.python.org/3/tutorial/errors.html#exception-chaining for details.",
-      "source": "                raise ValidationError(_(\"Failed to parse YAML data: {error}\").format(error=str(e)))",
-      "context": "Module:body/ClassDef:BulkImportForm:body/FunctionDef:clean:body/If:Compare(left=Name(id='import_format', ctx=Load()), ops=[Eq()], comparators=[Constant(value='csv')]):orelse/If:Compare(left=Name(id='import_format', ctx=Load()), ops=[Eq()], comparators=[Constant(value='yaml')]):body/Try:handlers/ExceptHandler:Name(id='Exception', ctx=Load()):e:body",
       "count": 1
     },
     {
@@ -3329,14 +3209,6 @@
       "message": "'json' imported but unused",
       "source": "import json",
       "context": "Module:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/core/graphql_utils.py",
-      "code": "B904",
-      "message": "Within an `except` clause, raise exceptions with `raise ... from err` or `raise ... from None` to distinguish them from errors in exception handling.  See https://docs.python.org/3/tutorial/errors.html#exception-chaining for details.",
-      "source": "        raise PermissionDenied(_(\"Permission denied.\"))",
-      "context": "Module:body/FunctionDef:get_object_or_denied:body/Try:handlers/ExceptHandler:Attribute(value=Name(id='model', ctx=Load()), attr='DoesNotExist', ctx=Load()):None:body",
       "count": 1
     },
     {
@@ -3965,46 +3837,6 @@
     },
     {
       "path": "itambox/core/management/commands/import_snipeit.py",
-      "code": "B904",
-      "message": "Within an `except` clause, raise exceptions with `raise ... from err` or `raise ... from None` to distinguish them from errors in exception handling.  See https://docs.python.org/3/tutorial/errors.html#exception-chaining for details.",
-      "source": "                raise CommandError(f\"Tenant with slug '{options['tenant']}' not found.\")",
-      "context": "Module:body/ClassDef:Command:body/FunctionDef:handle:body/If:Subscript(value=Name(id='options', ctx=Load()), slice=Constant(value='tenant'), ctx=Load()):body/Try:handlers/ExceptHandler:Attribute(value=Name(id='Tenant', ctx=Load()), attr='DoesNotExist', ctx=Load()):None:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/core/management/commands/import_snipeit.py",
-      "code": "B904",
-      "message": "Within an `except` clause, raise exceptions with `raise ... from err` or `raise ... from None` to distinguish them from errors in exception handling.  See https://docs.python.org/3/tutorial/errors.html#exception-chaining for details.",
-      "source": "                raise CommandError(f\"User '{admin_username}' not found.\")",
-      "context": "Module:body/ClassDef:Command:body/FunctionDef:handle:body/If:Name(id='admin_username', ctx=Load()):body/Try:handlers/ExceptHandler:Attribute(value=Name(id='User', ctx=Load()), attr='DoesNotExist', ctx=Load()):None:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/core/management/commands/import_snipeit.py",
-      "code": "B904",
-      "message": "Within an `except` clause, raise exceptions with `raise ... from err` or `raise ... from None` to distinguish them from errors in exception handling.  See https://docs.python.org/3/tutorial/errors.html#exception-chaining for details.",
-      "source": "            raise CommandError(msg)",
-      "context": "Module:body/ClassDef:Command:body/FunctionDef:handle:body/Try:handlers/ExceptHandler:Name(id='SnipeITError', ctx=Load()):exc:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/core/management/commands/import_snipeit.py",
-      "code": "B907",
-      "message": "\"options['tenant']\" is manually surrounded by quotes, consider using the `!r` conversion flag.",
-      "source": "raise CommandError(f\"Tenant with slug '{options['tenant']}' not found.\")",
-      "context": "Module:body/ClassDef:Command:body/FunctionDef:handle:body/If:Subscript(value=Name(id='options', ctx=Load()), slice=Constant(value='tenant'), ctx=Load()):body/Try:handlers/ExceptHandler:Attribute(value=Name(id='Tenant', ctx=Load()), attr='DoesNotExist', ctx=Load()):None:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/core/management/commands/import_snipeit.py",
-      "code": "B907",
-      "message": "'admin_username' is manually surrounded by quotes, consider using the `!r` conversion flag.",
-      "source": "raise CommandError(f\"User '{admin_username}' not found.\")",
-      "context": "Module:body/ClassDef:Command:body/FunctionDef:handle:body/If:Name(id='admin_username', ctx=Load()):body/Try:handlers/ExceptHandler:Attribute(value=Name(id='User', ctx=Load()), attr='DoesNotExist', ctx=Load()):None:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/core/management/commands/import_snipeit.py",
       "code": "B907",
       "message": "'token_env' is manually surrounded by quotes, consider using the `!r` conversion flag.",
       "source": "raise CommandError(\n                f\"Environment variable '{token_env}' is empty or not set. \"\n                \"Export it before running: export SNIPEIT_TOKEN=<your-token>\"\n            )",
@@ -4085,26 +3917,10 @@
     },
     {
       "path": "itambox/core/management/commands/sync_intune.py",
-      "code": "B904",
-      "message": "Within an `except` clause, raise exceptions with `raise ... from err` or `raise ... from None` to distinguish them from errors in exception handling.  See https://docs.python.org/3/tutorial/errors.html#exception-chaining for details.",
-      "source": "            raise CommandError(f\"No tenant with slug '{tenant_slug}'.\")",
-      "context": "Module:body/ClassDef:Command:body/FunctionDef:handle:body/Try:handlers/ExceptHandler:Attribute(value=Name(id='Tenant', ctx=Load()), attr='DoesNotExist', ctx=Load()):None:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/core/management/commands/sync_intune.py",
       "code": "B907",
       "message": "'tenant_slug' is manually surrounded by quotes, consider using the `!r` conversion flag.",
       "source": "raise CommandError(\n                f\"No ITAMBOX_TENANT_INTUNE_CONFIGS entry for tenant '{tenant_slug}'. \"\n                \"Set the environment variable and restart.\"\n            )",
       "context": "Module:body/ClassDef:Command:body/FunctionDef:handle:body/If:Compare(left=Name(id='tenant_slug', ctx=Load()), ops=[NotIn()], comparators=[Name(id='intune_configs', ctx=Load())]):body",
-      "count": 1
-    },
-    {
-      "path": "itambox/core/management/commands/sync_intune.py",
-      "code": "B907",
-      "message": "'tenant_slug' is manually surrounded by quotes, consider using the `!r` conversion flag.",
-      "source": "raise CommandError(f\"No tenant with slug '{tenant_slug}'.\")",
-      "context": "Module:body/ClassDef:Command:body/FunctionDef:handle:body/Try:handlers/ExceptHandler:Attribute(value=Name(id='Tenant', ctx=Load()), attr='DoesNotExist', ctx=Load()):None:body",
       "count": 1
     },
     {
@@ -4125,30 +3941,6 @@
     },
     {
       "path": "itambox/core/management/commands/sync_tenant_ldap.py",
-      "code": "B904",
-      "message": "Within an `except` clause, raise exceptions with `raise ... from err` or `raise ... from None` to distinguish them from errors in exception handling.  See https://docs.python.org/3/tutorial/errors.html#exception-chaining for details.",
-      "source": "            raise CommandError(f\"LDAP bind failed: {e}\")",
-      "context": "Module:body/ClassDef:Command:body/FunctionDef:_run_sync:body/Try#2:handlers/ExceptHandler:Attribute(value=Name(id='ldap', ctx=Load()), attr='LDAPError', ctx=Load()):e:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/core/management/commands/sync_tenant_ldap.py",
-      "code": "B904",
-      "message": "Within an `except` clause, raise exceptions with `raise ... from err` or `raise ... from None` to distinguish them from errors in exception handling.  See https://docs.python.org/3/tutorial/errors.html#exception-chaining for details.",
-      "source": "            raise CommandError(f\"LDAP search failed: {e}\")",
-      "context": "Module:body/ClassDef:Command:body/FunctionDef:_run_sync:body/Try#3:handlers/ExceptHandler:Attribute(value=Name(id='ldap', ctx=Load()), attr='LDAPError', ctx=Load()):e:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/core/management/commands/sync_tenant_ldap.py",
-      "code": "B904",
-      "message": "Within an `except` clause, raise exceptions with `raise ... from err` or `raise ... from None` to distinguish them from errors in exception handling.  See https://docs.python.org/3/tutorial/errors.html#exception-chaining for details.",
-      "source": "            raise CommandError(f\"Tenant with slug '{tenant_slug}' does not exist.\")",
-      "context": "Module:body/ClassDef:Command:body/FunctionDef:handle:body/Try:handlers/ExceptHandler:Attribute(value=Name(id='Tenant', ctx=Load()), attr='DoesNotExist', ctx=Load()):None:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/core/management/commands/sync_tenant_ldap.py",
       "code": "B907",
       "message": "'tenant.slug' is manually surrounded by quotes, consider using the `!r` conversion flag.",
       "source": "raise CommandError(f\"No LDAP configuration found for tenant slug '{tenant.slug}' in settings.\")",
@@ -4161,14 +3953,6 @@
       "message": "'tenant.slug' is manually surrounded by quotes, consider using the `!r` conversion flag.",
       "source": "self.stdout.write(\n                self.style.SUCCESS(\n                    f\"LDAP sync complete for tenant '{tenant.slug}'. Created: {created_count}, Updated: {updated_count}\"\n                )\n            )",
       "context": "Module:body/ClassDef:Command:body/FunctionDef:_run_sync:body/Try#3:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/core/management/commands/sync_tenant_ldap.py",
-      "code": "B907",
-      "message": "'tenant_slug' is manually surrounded by quotes, consider using the `!r` conversion flag.",
-      "source": "raise CommandError(f\"Tenant with slug '{tenant_slug}' does not exist.\")",
-      "context": "Module:body/ClassDef:Command:body/FunctionDef:handle:body/Try:handlers/ExceptHandler:Attribute(value=Name(id='Tenant', ctx=Load()), attr='DoesNotExist', ctx=Load()):None:body",
       "count": 1
     },
     {
@@ -6213,14 +5997,6 @@
     },
     {
       "path": "itambox/core/validators.py",
-      "code": "B904",
-      "message": "Within an `except` clause, raise exceptions with `raise ... from err` or `raise ... from None` to distinguish them from errors in exception handling.  See https://docs.python.org/3/tutorial/errors.html#exception-chaining for details.",
-      "source": "            raise ValidationError(_(\"URL host could not be resolved; refusing to accept it unverified.\"))",
-      "context": "Module:body/FunctionDef:validate_external_url:body/If:Compare(left=Name(id='literal_ip', ctx=Load()), ops=[IsNot()], comparators=[Constant(value=None)]):orelse/Try:handlers/ExceptHandler:Attribute(value=Name(id='socket', ctx=Load()), attr='gaierror', ctx=Load()):None:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/core/validators.py",
       "code": "C901",
       "message": "'parse_json_rules' is too complex (18)",
       "source": "def parse_json_rules(instance, rules):",
@@ -6257,22 +6033,6 @@
       "message": "'user_id' is manually surrounded by quotes, consider using the `!r` conversion flag.",
       "source": "print(f\"Error: user_id must be a numeric value, got '{user_id}'\", file=sys.stderr)",
       "context": "Module:body/FunctionDef:main:body/If:UnaryOp(op=Not(), operand=Call(func=Attribute(value=Name(id='user_id', ctx=Load()), attr='isdigit', ctx=Load()), args=[], keywords=[])):body",
-      "count": 1
-    },
-    {
-      "path": "itambox/extras/api/serializers.py",
-      "code": "B904",
-      "message": "Within an `except` clause, raise exceptions with `raise ... from err` or `raise ... from None` to distinguish them from errors in exception handling.  See https://docs.python.org/3/tutorial/errors.html#exception-chaining for details.",
-      "source": "                    raise serializers.ValidationError({\"webhook_url\": exc.messages})",
-      "context": "Module:body/ClassDef:NotificationChannelSerializer:body/FunctionDef:validate_config:body/If:Call(func=Name(id='isinstance', ctx=Load()), args=[Name(id='value', ctx=Load()), Name(id='dict', ctx=Load())], keywords=[]):body/If:BoolOp(op=And(), values=[Name(id='url_val', ctx=Load()), Compare(left=Name(id='url_val', ctx=Load()), ops=[NotEq()], comparators=[Name(id='_REDACTED_PLACEHOLDER', ctx=Load())])]):body/Try:handlers/ExceptHandler:Name(id='DjangoValidationError', ctx=Load()):exc:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/extras/api/serializers.py",
-      "code": "B904",
-      "message": "Within an `except` clause, raise exceptions with `raise ... from err` or `raise ... from None` to distinguish them from errors in exception handling.  See https://docs.python.org/3/tutorial/errors.html#exception-chaining for details.",
-      "source": "            raise serializers.ValidationError(exc.messages)",
-      "context": "Module:body/ClassDef:WebhookEndpointSerializer:body/FunctionDef:validate_target_url:body/Try:handlers/ExceptHandler:Name(id='DjangoValidationError', ctx=Load()):exc:body",
       "count": 1
     },
     {
@@ -6393,38 +6153,6 @@
       "message": "'django.db.models.functions.Extract' imported but unused",
       "source": "from django.db.models.functions import Coalesce, Extract",
       "context": "Module:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/extras/forms.py",
-      "code": "B904",
-      "message": "Within an `except` clause, raise exceptions with `raise ... from err` or `raise ... from None` to distinguish them from errors in exception handling.  See https://docs.python.org/3/tutorial/errors.html#exception-chaining for details.",
-      "source": "                raise forms.ValidationError(_(\"Action config must be valid JSON.\"))",
-      "context": "Module:body/ClassDef:EventRuleForm:body/FunctionDef:clean_action_config:body/If:Call(func=Name(id='isinstance', ctx=Load()), args=[Name(id='data', ctx=Load()), Name(id='str', ctx=Load())], keywords=[]):body/Try:handlers/ExceptHandler:Attribute(value=Name(id='_json', ctx=Load()), attr='JSONDecodeError', ctx=Load()):None:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/extras/forms.py",
-      "code": "B904",
-      "message": "Within an `except` clause, raise exceptions with `raise ... from err` or `raise ... from None` to distinguish them from errors in exception handling.  See https://docs.python.org/3/tutorial/errors.html#exception-chaining for details.",
-      "source": "                raise forms.ValidationError(_(\"Conditions must be valid JSON.\"))",
-      "context": "Module:body/ClassDef:EventRuleForm:body/FunctionDef:clean_conditions:body/If:Call(func=Name(id='isinstance', ctx=Load()), args=[Name(id='data', ctx=Load()), Name(id='str', ctx=Load())], keywords=[]):body/Try:handlers/ExceptHandler:Attribute(value=Name(id='_json', ctx=Load()), attr='JSONDecodeError', ctx=Load()):None:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/extras/forms.py",
-      "code": "B904",
-      "message": "Within an `except` clause, raise exceptions with `raise ... from err` or `raise ... from None` to distinguish them from errors in exception handling.  See https://docs.python.org/3/tutorial/errors.html#exception-chaining for details.",
-      "source": "                raise forms.ValidationError(_(\"Headers must be valid JSON.\"))",
-      "context": "Module:body/ClassDef:WebhookEndpointForm:body/FunctionDef:clean_headers:body/If:Call(func=Name(id='isinstance', ctx=Load()), args=[Name(id='data', ctx=Load()), Name(id='str', ctx=Load())], keywords=[]):body/Try:handlers/ExceptHandler:Attribute(value=Name(id='_json', ctx=Load()), attr='JSONDecodeError', ctx=Load()):None:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/extras/forms.py",
-      "code": "B904",
-      "message": "Within an `except` clause, raise exceptions with `raise ... from err` or `raise ... from None` to distinguish them from errors in exception handling.  See https://docs.python.org/3/tutorial/errors.html#exception-chaining for details.",
-      "source": "            raise forms.ValidationError(",
-      "context": "Module:body/ClassDef:ExportTemplateForm:body/FunctionDef:clean_template_code:body/Try:handlers/ExceptHandler:Name(id='TemplateSyntaxError', ctx=Load()):exc:body",
       "count": 1
     },
     {
@@ -6553,30 +6281,6 @@
       "message": "'django.db.models.Q' imported but unused",
       "source": "from django.db.models import Q",
       "context": "Module:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/extras/models.py",
-      "code": "B904",
-      "message": "Within an `except` clause, raise exceptions with `raise ... from err` or `raise ... from None` to distinguish them from errors in exception handling.  See https://docs.python.org/3/tutorial/errors.html#exception-chaining for details.",
-      "source": "                    raise ValidationError(",
-      "context": "Module:body/ClassDef:ScheduledReport:body/FunctionDef:clean:body/If:Attribute(value=Name(id='self', ctx=Load()), attr='recipients', ctx=Load()):body/For:Name(id='email', ctx=Store()):Name(id='emails', ctx=Load()):body/Try:handlers/ExceptHandler:Name(id='ValidationError', ctx=Load()):None:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/extras/models.py",
-      "code": "B904",
-      "message": "Within an `except` clause, raise exceptions with `raise ... from err` or `raise ... from None` to distinguish them from errors in exception handling.  See https://docs.python.org/3/tutorial/errors.html#exception-chaining for details.",
-      "source": "                raise ValidationError(",
-      "context": "Module:body/ClassDef:ReportTemplate:body/FunctionDef:clean:body/If:BoolOp(op=And(), values=[Attribute(value=Name(id='self', ctx=Load()), attr='template_content', ctx=Load()), Call(func=Attribute(value=Attribute(value=Name(id='self', ctx=Load()), attr='template_content', ctx=Load()), attr='strip', ctx=Load()), args=[], keywords=[])]):body/Try:handlers/ExceptHandler:Name(id='Exception', ctx=Load()):e:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/extras/models.py",
-      "code": "B904",
-      "message": "Within an `except` clause, raise exceptions with `raise ... from err` or `raise ... from None` to distinguish them from errors in exception handling.  See https://docs.python.org/3/tutorial/errors.html#exception-chaining for details.",
-      "source": "                raise ValidationError({\"cron_expression\": _(\"Invalid Cron expression: %(error)s\") % {\"error\": str(e)}})",
-      "context": "Module:body/ClassDef:ScheduledReport:body/FunctionDef:clean:body/If:Compare(left=Attribute(value=Name(id='self', ctx=Load()), attr='frequency', ctx=Load()), ops=[Eq()], comparators=[Constant(value='cron')]):body/Try:handlers/ExceptHandler:Name(id='Exception', ctx=Load()):e:body",
       "count": 1
     },
     {
@@ -7332,70 +7036,6 @@
       "count": 1
     },
     {
-      "path": "itambox/inventory/schema.py",
-      "code": "B904",
-      "message": "Within an `except` clause, raise exceptions with `raise ... from err` or `raise ... from None` to distinguish them from errors in exception handling.  See https://docs.python.org/3/tutorial/errors.html#exception-chaining for details.",
-      "source": "            raise GraphQLError(",
-      "context": "Module:body/ClassDef:CreateAccessory:body/FunctionDef:mutate:body/Try:handlers/ExceptHandler:Name(id='ValidationError', ctx=Load()):e:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/inventory/schema.py",
-      "code": "B904",
-      "message": "Within an `except` clause, raise exceptions with `raise ... from err` or `raise ... from None` to distinguish them from errors in exception handling.  See https://docs.python.org/3/tutorial/errors.html#exception-chaining for details.",
-      "source": "            raise GraphQLError(",
-      "context": "Module:body/ClassDef:CreateComponent:body/FunctionDef:mutate:body/Try:handlers/ExceptHandler:Name(id='ValidationError', ctx=Load()):e:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/inventory/schema.py",
-      "code": "B904",
-      "message": "Within an `except` clause, raise exceptions with `raise ... from err` or `raise ... from None` to distinguish them from errors in exception handling.  See https://docs.python.org/3/tutorial/errors.html#exception-chaining for details.",
-      "source": "            raise GraphQLError(",
-      "context": "Module:body/ClassDef:CreateConsumable:body/FunctionDef:mutate:body/Try:handlers/ExceptHandler:Name(id='ValidationError', ctx=Load()):e:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/inventory/schema.py",
-      "code": "B904",
-      "message": "Within an `except` clause, raise exceptions with `raise ... from err` or `raise ... from None` to distinguish them from errors in exception handling.  See https://docs.python.org/3/tutorial/errors.html#exception-chaining for details.",
-      "source": "            raise GraphQLError(",
-      "context": "Module:body/ClassDef:CreateKit:body/FunctionDef:mutate:body/Try:handlers/ExceptHandler:Name(id='ValidationError', ctx=Load()):e:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/inventory/schema.py",
-      "code": "B904",
-      "message": "Within an `except` clause, raise exceptions with `raise ... from err` or `raise ... from None` to distinguish them from errors in exception handling.  See https://docs.python.org/3/tutorial/errors.html#exception-chaining for details.",
-      "source": "            raise GraphQLError(",
-      "context": "Module:body/ClassDef:UpdateAccessory:body/FunctionDef:mutate:body/Try:handlers/ExceptHandler:Name(id='ValidationError', ctx=Load()):e:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/inventory/schema.py",
-      "code": "B904",
-      "message": "Within an `except` clause, raise exceptions with `raise ... from err` or `raise ... from None` to distinguish them from errors in exception handling.  See https://docs.python.org/3/tutorial/errors.html#exception-chaining for details.",
-      "source": "            raise GraphQLError(",
-      "context": "Module:body/ClassDef:UpdateComponent:body/FunctionDef:mutate:body/Try:handlers/ExceptHandler:Name(id='ValidationError', ctx=Load()):e:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/inventory/schema.py",
-      "code": "B904",
-      "message": "Within an `except` clause, raise exceptions with `raise ... from err` or `raise ... from None` to distinguish them from errors in exception handling.  See https://docs.python.org/3/tutorial/errors.html#exception-chaining for details.",
-      "source": "            raise GraphQLError(",
-      "context": "Module:body/ClassDef:UpdateConsumable:body/FunctionDef:mutate:body/Try:handlers/ExceptHandler:Name(id='ValidationError', ctx=Load()):e:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/inventory/schema.py",
-      "code": "B904",
-      "message": "Within an `except` clause, raise exceptions with `raise ... from err` or `raise ... from None` to distinguish them from errors in exception handling.  See https://docs.python.org/3/tutorial/errors.html#exception-chaining for details.",
-      "source": "            raise GraphQLError(",
-      "context": "Module:body/ClassDef:UpdateKit:body/FunctionDef:mutate:body/Try:handlers/ExceptHandler:Name(id='ValidationError', ctx=Load()):e:body",
-      "count": 1
-    },
-    {
       "path": "itambox/inventory/services.py",
       "code": "C901",
       "message": "'adjust_inventory_stock' is too complex (18)",
@@ -7844,35 +7484,11 @@
       "count": 1
     },
     {
-      "path": "itambox/inventory/views/accessory_views.py",
-      "code": "B904",
-      "message": "Within an `except` clause, raise exceptions with `raise ... from err` or `raise ... from None` to distinguish them from errors in exception handling.  See https://docs.python.org/3/tutorial/errors.html#exception-chaining for details.",
-      "source": "                raise Http404",
-      "context": "Module:body/ClassDef:AccessoryStockAdjustView:body/FunctionDef:post:body/With:[(\"Call(func=Attribute(value=Name(id='transaction', ctx=Load()), attr='atomic', ctx=Load()), args=[], keywords=[])\", None)]:body/Try:handlers/ExceptHandler:Attribute(value=Name(id='AccessoryStock', ctx=Load()), attr='DoesNotExist', ctx=Load()):None:body",
-      "count": 1
-    },
-    {
       "path": "itambox/inventory/views/base_views.py",
       "code": "C901",
       "message": "'bulk_checkout_inventory' is too complex (30)",
       "source": "def bulk_checkout_inventory(request):",
       "context": "Module:body/FunctionDef:bulk_checkout_inventory:self",
-      "count": 1
-    },
-    {
-      "path": "itambox/inventory/views/component_views.py",
-      "code": "B904",
-      "message": "Within an `except` clause, raise exceptions with `raise ... from err` or `raise ... from None` to distinguish them from errors in exception handling.  See https://docs.python.org/3/tutorial/errors.html#exception-chaining for details.",
-      "source": "                raise Http404",
-      "context": "Module:body/ClassDef:ComponentStockAdjustView:body/FunctionDef:post:body/With:[(\"Call(func=Attribute(value=Name(id='transaction', ctx=Load()), attr='atomic', ctx=Load()), args=[], keywords=[])\", None)]:body/Try:handlers/ExceptHandler:Attribute(value=Name(id='ComponentStock', ctx=Load()), attr='DoesNotExist', ctx=Load()):None:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/inventory/views/consumable_views.py",
-      "code": "B904",
-      "message": "Within an `except` clause, raise exceptions with `raise ... from err` or `raise ... from None` to distinguish them from errors in exception handling.  See https://docs.python.org/3/tutorial/errors.html#exception-chaining for details.",
-      "source": "                raise Http404",
-      "context": "Module:body/ClassDef:ConsumableStockAdjustView:body/FunctionDef:post:body/With:[(\"Call(func=Attribute(value=Name(id='transaction', ctx=Load()), attr='atomic', ctx=Load()), args=[], keywords=[])\", None)]:body/Try:handlers/ExceptHandler:Attribute(value=Name(id='ConsumableStock', ctx=Load()), attr='DoesNotExist', ctx=Load()):None:body",
       "count": 1
     },
     {
@@ -7889,14 +7505,6 @@
       "message": "ambiguous variable name 'l'",
       "source": "            for l in licenses:",
       "context": "Module:body/ClassDef:KitDetailView:body/FunctionDef:get_context_data:body/If:Name(id='license_ids', ctx=Load()):body/For:Name(id='l', ctx=Store()):Name(id='licenses', ctx=Load()):self",
-      "count": 1
-    },
-    {
-      "path": "itambox/itambox/api/authentication.py",
-      "code": "B904",
-      "message": "Within an `except` clause, raise exceptions with `raise ... from err` or `raise ... from None` to distinguish them from errors in exception handling.  See https://docs.python.org/3/tutorial/errors.html#exception-chaining for details.",
-      "source": "            raise exceptions.AuthenticationFailed(msg)",
-      "context": "Module:body/ClassDef:TokenAuthentication:body/FunctionDef:authenticate:body/Try:handlers/ExceptHandler:Name(id='UnicodeError', ctx=Load()):None:body",
       "count": 1
     },
     {
@@ -7956,14 +7564,6 @@
       "count": 1
     },
     {
-      "path": "itambox/itambox/api/pagination.py",
-      "code": "B904",
-      "message": "Within an `except` clause, raise exceptions with `raise ... from err` or `raise ... from None` to distinguish them from errors in exception handling.  See https://docs.python.org/3/tutorial/errors.html#exception-chaining for details.",
-      "source": "            raise ValidationError(",
-      "context": "Module:body/ClassDef:ITAMBoxPagination:body/FunctionDef:get_start:body/Try:handlers/ExceptHandler:Tuple(elts=[Name(id='ValueError', ctx=Load()), Name(id='TypeError', ctx=Load())], ctx=Load()):None:body",
-      "count": 1
-    },
-    {
       "path": "itambox/itambox/api/permissions.py",
       "code": "F401",
       "message": "'rest_framework.permissions.DjangoObjectPermissions' imported but unused",
@@ -7993,78 +7593,6 @@
       "message": "'drf_spectacular.utils.extend_schema_field' imported but unused",
       "source": "from drf_spectacular.utils import extend_schema_field",
       "context": "Module:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/itambox/api/utils.py",
-      "code": "B904",
-      "message": "Within an `except` clause, raise exceptions with `raise ... from err` or `raise ... from None` to distinguish them from errors in exception handling.  See https://docs.python.org/3/tutorial/errors.html#exception-chaining for details.",
-      "source": "            raise ValidationError(",
-      "context": "Module:body/FunctionDef:get_related_object_by_attrs:body/If:Call(func=Name(id='isinstance', ctx=Load()), args=[Name(id='attrs', ctx=Load()), Name(id='dict', ctx=Load())], keywords=[]):body/Try:handlers/ExceptHandler:Name(id='ObjectDoesNotExist', ctx=Load()):None:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/itambox/api/utils.py",
-      "code": "B904",
-      "message": "Within an `except` clause, raise exceptions with `raise ... from err` or `raise ... from None` to distinguish them from errors in exception handling.  See https://docs.python.org/3/tutorial/errors.html#exception-chaining for details.",
-      "source": "            raise ValidationError(_(\"Multiple objects match the provided attributes: {params}\").format(params=params))",
-      "context": "Module:body/FunctionDef:get_related_object_by_attrs:body/If:Call(func=Name(id='isinstance', ctx=Load()), args=[Name(id='attrs', ctx=Load()), Name(id='dict', ctx=Load())], keywords=[]):body/Try:handlers/ExceptHandler:Name(id='MultipleObjectsReturned', ctx=Load()):None:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/itambox/api/utils.py",
-      "code": "B904",
-      "message": "Within an `except` clause, raise exceptions with `raise ... from err` or `raise ... from None` to distinguish them from errors in exception handling.  See https://docs.python.org/3/tutorial/errors.html#exception-chaining for details.",
-      "source": "        raise SerializerNotFound(f\"Could not determine serializer for {app_label}.{model_name} with prefix '{prefix}'\")",
-      "context": "Module:body/FunctionDef:get_serializer_for_model:body/Try:handlers/ExceptHandler:Name(id='ImportError', ctx=Load()):None:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/itambox/api/utils.py",
-      "code": "B904",
-      "message": "Within an `except` clause, raise exceptions with `raise ... from err` or `raise ... from None` to distinguish them from errors in exception handling.  See https://docs.python.org/3/tutorial/errors.html#exception-chaining for details.",
-      "source": "        raise ValidationError(",
-      "context": "Module:body/FunctionDef:get_related_object_by_attrs:body/Try#1:handlers/ExceptHandler:Tuple(elts=[Name(id='TypeError', ctx=Load()), Name(id='ValueError', ctx=Load())], ctx=Load()):None:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/itambox/api/utils.py",
-      "code": "B904",
-      "message": "Within an `except` clause, raise exceptions with `raise ... from err` or `raise ... from None` to distinguish them from errors in exception handling.  See https://docs.python.org/3/tutorial/errors.html#exception-chaining for details.",
-      "source": "        raise ValidationError(_(\"Related object not found using the provided numeric ID: {id}\").format(id=pk))",
-      "context": "Module:body/FunctionDef:get_related_object_by_attrs:body/Try#2:handlers/ExceptHandler:Name(id='ObjectDoesNotExist', ctx=Load()):None:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/itambox/api/utils.py",
-      "code": "B907",
-      "message": "'prefix' is manually surrounded by quotes, consider using the `!r` conversion flag.",
-      "source": "raise SerializerNotFound(f\"Could not determine serializer for {app_label}.{model_name} with prefix '{prefix}'\")",
-      "context": "Module:body/FunctionDef:get_serializer_for_model:body/Try:handlers/ExceptHandler:Name(id='ImportError', ctx=Load()):None:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/itambox/api/viewsets.py",
-      "code": "B904",
-      "message": "Within an `except` clause, raise exceptions with `raise ... from err` or `raise ... from None` to distinguish them from errors in exception handling.  See https://docs.python.org/3/tutorial/errors.html#exception-chaining for details.",
-      "source": "            raise PermissionDenied()",
-      "context": "Module:body/ClassDef:ITAMBoxModelViewSet:body/FunctionDef:perform_create:body/Try:handlers/ExceptHandler:Name(id='ObjectDoesNotExist', ctx=Load()):None:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/itambox/api/viewsets.py",
-      "code": "B904",
-      "message": "Within an `except` clause, raise exceptions with `raise ... from err` or `raise ... from None` to distinguish them from errors in exception handling.  See https://docs.python.org/3/tutorial/errors.html#exception-chaining for details.",
-      "source": "            raise PermissionDenied()",
-      "context": "Module:body/ClassDef:ITAMBoxModelViewSet:body/FunctionDef:perform_destroy:body/Try:handlers/ExceptHandler:Name(id='ObjectDoesNotExist', ctx=Load()):None:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/itambox/api/viewsets.py",
-      "code": "B904",
-      "message": "Within an `except` clause, raise exceptions with `raise ... from err` or `raise ... from None` to distinguish them from errors in exception handling.  See https://docs.python.org/3/tutorial/errors.html#exception-chaining for details.",
-      "source": "            raise PermissionDenied()",
-      "context": "Module:body/ClassDef:ITAMBoxModelViewSet:body/FunctionDef:perform_update:body/Try:handlers/ExceptHandler:Name(id='ObjectDoesNotExist', ctx=Load()):None:body",
       "count": 1
     },
     {
@@ -8117,14 +7645,6 @@
     },
     {
       "path": "itambox/itambox/plugins/utils.py",
-      "code": "B904",
-      "message": "Within an `except` clause, raise exceptions with `raise ... from err` or `raise ... from None` to distinguish them from errors in exception handling.  See https://docs.python.org/3/tutorial/errors.html#exception-chaining for details.",
-      "source": "            raise ImproperlyConfigured(f\"Failed to import plugin '{plugin_name}': {e}\")",
-      "context": "Module:body/FunctionDef:load_plugins:body/For:Name(id='plugin_name', ctx=Store()):Name(id='plugins', ctx=Load()):body/Try:handlers/ExceptHandler:Name(id='ImportError', ctx=Load()):e:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/itambox/plugins/utils.py",
       "code": "B907",
       "message": "'key' is manually surrounded by quotes, consider using the `!r` conversion flag.",
       "source": "raise ImproperlyConfigured(\n                    f\"Plugin '{plugin_name}' requires setting '{key}' to be defined in PLUGINS_CONFIG.\"\n                )",
@@ -8161,14 +7681,6 @@
       "message": "'plugin_name' is manually surrounded by quotes, consider using the `!r` conversion flag.",
       "source": "raise ImproperlyConfigured(\n                f\"Plugin '{plugin_name}' does not declare a 'config' attribute in its __init__.py.\"\n            )",
       "context": "Module:body/FunctionDef:load_plugins:body/For:Name(id='plugin_name', ctx=Store()):Name(id='plugins', ctx=Load()):body/If:Compare(left=Name(id='config_cls', ctx=Load()), ops=[Is()], comparators=[Constant(value=None)]):body",
-      "count": 1
-    },
-    {
-      "path": "itambox/itambox/plugins/utils.py",
-      "code": "B907",
-      "message": "'plugin_name' is manually surrounded by quotes, consider using the `!r` conversion flag.",
-      "source": "raise ImproperlyConfigured(f\"Failed to import plugin '{plugin_name}': {e}\")",
-      "context": "Module:body/FunctionDef:load_plugins:body/For:Name(id='plugin_name', ctx=Store()):Name(id='plugins', ctx=Load()):body/Try:handlers/ExceptHandler:Name(id='ImportError', ctx=Load()):e:body",
       "count": 1
     },
     {
@@ -8613,30 +8125,6 @@
     },
     {
       "path": "itambox/itambox/views/features.py",
-      "code": "B904",
-      "message": "Within an `except` clause, raise exceptions with `raise ... from err` or `raise ... from None` to distinguish them from errors in exception handling.  See https://docs.python.org/3/tutorial/errors.html#exception-chaining for details.",
-      "source": "            raise Http404",
-      "context": "Module:body/ClassDef:FileAttachmentUploadView:body/FunctionDef:post:body/Try:handlers/ExceptHandler:Name(id='LookupError', ctx=Load()):None:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/itambox/views/features.py",
-      "code": "B904",
-      "message": "Within an `except` clause, raise exceptions with `raise ... from err` or `raise ... from None` to distinguish them from errors in exception handling.  See https://docs.python.org/3/tutorial/errors.html#exception-chaining for details.",
-      "source": "            raise Http404",
-      "context": "Module:body/ClassDef:ImageAttachmentUploadView:body/FunctionDef:post:body/Try:handlers/ExceptHandler:Name(id='LookupError', ctx=Load()):None:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/itambox/views/features.py",
-      "code": "B904",
-      "message": "Within an `except` clause, raise exceptions with `raise ... from err` or `raise ... from None` to distinguish them from errors in exception handling.  See https://docs.python.org/3/tutorial/errors.html#exception-chaining for details.",
-      "source": "            raise Http404",
-      "context": "Module:body/ClassDef:JournalEntryCreateView:body/FunctionDef:post:body/Try:handlers/ExceptHandler:Name(id='LookupError', ctx=Load()):None:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/itambox/views/features.py",
       "code": "B907",
       "message": "'template.get_export_filename(model)' is manually surrounded by quotes, consider using the `!r` conversion flag.",
       "source": "response[\"Content-Disposition\"] = f'attachment; filename=\"{template.get_export_filename(model)}\"'",
@@ -8741,14 +8229,6 @@
     },
     {
       "path": "itambox/itambox/views/generic/import_.py",
-      "code": "B904",
-      "message": "Within an `except` clause, raise exceptions with `raise ... from err` or `raise ... from None` to distinguish them from errors in exception handling.  See https://docs.python.org/3/tutorial/errors.html#exception-chaining for details.",
-      "source": "            raise Http404",
-      "context": "Module:body/ClassDef:GenericObjectImportView:body/FunctionDef:_get_model:body/Try:handlers/ExceptHandler:Name(id='LookupError', ctx=Load()):None:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/itambox/views/generic/import_.py",
       "code": "B950",
       "message": "line too long (149 > 120 characters)",
       "source": "                        lambda job_pk=job.pk, r=rows, app=model._meta.app_label, name=model._meta.model_name, u_pk=request.user.pk, t_id=tenant_id: (",
@@ -8769,14 +8249,6 @@
       "message": "'ObjectListView.get_queryset' is too complex (17)",
       "source": "    def get_queryset(self):",
       "context": "Module:body/ClassDef:ObjectListView:body/FunctionDef:get_queryset:self",
-      "count": 1
-    },
-    {
-      "path": "itambox/itambox/views/generic/mixins.py",
-      "code": "B904",
-      "message": "Within an `except` clause, raise exceptions with `raise ... from err` or `raise ... from None` to distinguish them from errors in exception handling.  See https://docs.python.org/3/tutorial/errors.html#exception-chaining for details.",
-      "source": "                    raise Http404",
-      "context": "Module:body/ClassDef:BulkViewMixin:body/FunctionDef:_get_model:body/If:BoolOp(op=And(), values=[Call(func=Name(id='hasattr', ctx=Load()), args=[Name(id='self', ctx=Load()), Constant(value='request')], keywords=[]), Attribute(value=Name(id='self', ctx=Load()), attr='request', ctx=Load())]):body/If:Name(id='model_name', ctx=Load()):body/Try:handlers/ExceptHandler:Tuple(elts=[Name(id='ValueError', ctx=Load()), Name(id='LookupError', ctx=Load())], ctx=Load()):None:body",
       "count": 1
     },
     {
@@ -8813,30 +8285,6 @@
     },
     {
       "path": "itambox/licenses/api/serializers.py",
-      "code": "B904",
-      "message": "Within an `except` clause, raise exceptions with `raise ... from err` or `raise ... from None` to distinguish them from errors in exception handling.  See https://docs.python.org/3/tutorial/errors.html#exception-chaining for details.",
-      "source": "                raise serializers.ValidationError(exc.message_dict)",
-      "context": "Module:body/ClassDef:LicenseSerializer:body/FunctionDef:validate:body/If:BoolOp(op=And(), values=[Compare(left=Name(id='instance', ctx=Load()), ops=[IsNot()], comparators=[Constant(value=None)]), Compare(left=Constant(value='seats'), ops=[In()], comparators=[Name(id='data', ctx=Load())])]):body/Try:handlers/ExceptHandler:Name(id='DjangoValidationError', ctx=Load()):exc:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/licenses/api/serializers.py",
-      "code": "B904",
-      "message": "Within an `except` clause, raise exceptions with `raise ... from err` or `raise ... from None` to distinguish them from errors in exception handling.  See https://docs.python.org/3/tutorial/errors.html#exception-chaining for details.",
-      "source": "                raise serializers.ValidationError(exc.messages)",
-      "context": "Module:body/ClassDef:LicenseSeatAssignmentSerializer:body/FunctionDef:update:body/If:BoolOp(op=And(), values=[Compare(left=Name(id='new_license', ctx=Load()), ops=[IsNot()], comparators=[Constant(value=None)]), Compare(left=Attribute(value=Name(id='new_license', ctx=Load()), attr='pk', ctx=Load()), ops=[NotEq()], comparators=[Attribute(value=Name(id='instance', ctx=Load()), attr='license_id', ctx=Load())])]):body/Try:handlers/ExceptHandler:Name(id='DjangoValidationError', ctx=Load()):exc:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/licenses/api/serializers.py",
-      "code": "B904",
-      "message": "Within an `except` clause, raise exceptions with `raise ... from err` or `raise ... from None` to distinguish them from errors in exception handling.  See https://docs.python.org/3/tutorial/errors.html#exception-chaining for details.",
-      "source": "            raise serializers.ValidationError(exc.messages)",
-      "context": "Module:body/ClassDef:LicenseSeatAssignmentSerializer:body/FunctionDef:create:body/Try:handlers/ExceptHandler:Name(id='DjangoValidationError', ctx=Load()):exc:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/licenses/api/serializers.py",
       "code": "F401",
       "message": "'django.utils.translation.gettext_lazy as _' imported but unused",
       "source": "from django.utils.translation import gettext_lazy as _",
@@ -8849,14 +8297,6 @@
       "message": "'itambox.api.nested_serializers.NestedManufacturerSerializer' imported but unused",
       "source": "from itambox.api.nested_serializers import NestedAssetSerializer, NestedManufacturerSerializer",
       "context": "Module:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/licenses/api/views.py",
-      "code": "B904",
-      "message": "Within an `except` clause, raise exceptions with `raise ... from err` or `raise ... from None` to distinguish them from errors in exception handling.  See https://docs.python.org/3/tutorial/errors.html#exception-chaining for details.",
-      "source": "            raise DRFValidationError(exc.messages)",
-      "context": "Module:body/ClassDef:LicenseSeatAssignmentViewSet:body/FunctionDef:perform_destroy:body/Try:handlers/ExceptHandler:Name(id='DjangoValidationError', ctx=Load()):exc:body",
       "count": 1
     },
     {
@@ -8897,22 +8337,6 @@
       "message": "'django.db.models.Q' imported but unused",
       "source": "from django.db.models import Count, Q, Sum",
       "context": "Module:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/licenses/schema.py",
-      "code": "B904",
-      "message": "Within an `except` clause, raise exceptions with `raise ... from err` or `raise ... from None` to distinguish them from errors in exception handling.  See https://docs.python.org/3/tutorial/errors.html#exception-chaining for details.",
-      "source": "            raise GraphQLError(",
-      "context": "Module:body/ClassDef:CreateLicense:body/FunctionDef:mutate:body/Try:handlers/ExceptHandler:Name(id='ValidationError', ctx=Load()):e:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/licenses/schema.py",
-      "code": "B904",
-      "message": "Within an `except` clause, raise exceptions with `raise ... from err` or `raise ... from None` to distinguish them from errors in exception handling.  See https://docs.python.org/3/tutorial/errors.html#exception-chaining for details.",
-      "source": "            raise GraphQLError(",
-      "context": "Module:body/ClassDef:UpdateLicense:body/FunctionDef:mutate:body/Try:handlers/ExceptHandler:Name(id='ValidationError', ctx=Load()):e:body",
       "count": 1
     },
     {
@@ -9305,14 +8729,6 @@
       "message": "'crispy_forms.helper.FormHelper' imported but unused",
       "source": "from crispy_forms.helper import FormHelper",
       "context": "Module:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/organization/forms/membership_form.py",
-      "code": "B904",
-      "message": "Within an `except` clause, raise exceptions with `raise ... from err` or `raise ... from None` to distinguish them from errors in exception handling.  See https://docs.python.org/3/tutorial/errors.html#exception-chaining for details.",
-      "source": "            raise forms.ValidationError(exc.messages)",
-      "context": "Module:body/ClassDef:ManagedRoleGrantForm:body/FunctionDef:clean:body/Try:handlers/ExceptHandler:Attribute(value=Name(id='forms', ctx=Load()), attr='ValidationError', ctx=Load()):exc:body",
       "count": 1
     },
     {
@@ -10516,14 +9932,6 @@
       "count": 1
     },
     {
-      "path": "itambox/organization/views/role_views.py",
-      "code": "B904",
-      "message": "Within an `except` clause, raise exceptions with `raise ... from err` or `raise ... from None` to distinguish them from errors in exception handling.  See https://docs.python.org/3/tutorial/errors.html#exception-chaining for details.",
-      "source": "            raise PermissionDenied(\", \".join(e.messages))",
-      "context": "Module:body/ClassDef:RoleAssignUsersView:body/FunctionDef:_guard_grant:body/Try:handlers/ExceptHandler:Name(id='ValidationError', ctx=Load()):e:body",
-      "count": 1
-    },
-    {
       "path": "itambox/organization/views/site_views.py",
       "code": "F401",
       "message": "'django.shortcuts.get_object_or_404' imported but unused",
@@ -10780,22 +10188,6 @@
       "count": 1
     },
     {
-      "path": "itambox/software/schema.py",
-      "code": "B904",
-      "message": "Within an `except` clause, raise exceptions with `raise ... from err` or `raise ... from None` to distinguish them from errors in exception handling.  See https://docs.python.org/3/tutorial/errors.html#exception-chaining for details.",
-      "source": "            raise GraphQLError(",
-      "context": "Module:body/ClassDef:CreateSoftware:body/FunctionDef:mutate:body/Try:handlers/ExceptHandler:Name(id='ValidationError', ctx=Load()):e:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/software/schema.py",
-      "code": "B904",
-      "message": "Within an `except` clause, raise exceptions with `raise ... from err` or `raise ... from None` to distinguish them from errors in exception handling.  See https://docs.python.org/3/tutorial/errors.html#exception-chaining for details.",
-      "source": "            raise GraphQLError(",
-      "context": "Module:body/ClassDef:UpdateSoftware:body/FunctionDef:mutate:body/Try:handlers/ExceptHandler:Name(id='ValidationError', ctx=Load()):e:body",
-      "count": 1
-    },
-    {
       "path": "itambox/software/tables.py",
       "code": "F401",
       "message": "'assets.models.Manufacturer' imported but unused",
@@ -10957,78 +10349,6 @@
     },
     {
       "path": "itambox/subscriptions/schema.py",
-      "code": "B904",
-      "message": "Within an `except` clause, raise exceptions with `raise ... from err` or `raise ... from None` to distinguish them from errors in exception handling.  See https://docs.python.org/3/tutorial/errors.html#exception-chaining for details.",
-      "source": "            raise GraphQLError(",
-      "context": "Module:body/ClassDef:CreateProvider:body/FunctionDef:mutate:body/Try:handlers/ExceptHandler:Name(id='ValidationError', ctx=Load()):e:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/subscriptions/schema.py",
-      "code": "B904",
-      "message": "Within an `except` clause, raise exceptions with `raise ... from err` or `raise ... from None` to distinguish them from errors in exception handling.  See https://docs.python.org/3/tutorial/errors.html#exception-chaining for details.",
-      "source": "            raise GraphQLError(",
-      "context": "Module:body/ClassDef:CreateSubscription:body/FunctionDef:mutate:body/Try:handlers/ExceptHandler:Name(id='ValidationError', ctx=Load()):e:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/subscriptions/schema.py",
-      "code": "B904",
-      "message": "Within an `except` clause, raise exceptions with `raise ... from err` or `raise ... from None` to distinguish them from errors in exception handling.  See https://docs.python.org/3/tutorial/errors.html#exception-chaining for details.",
-      "source": "            raise GraphQLError(",
-      "context": "Module:body/ClassDef:CreateSubscriptionAssignment:body/FunctionDef:mutate:body/Try:handlers/ExceptHandler:Name(id='ValidationError', ctx=Load()):e:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/subscriptions/schema.py",
-      "code": "B904",
-      "message": "Within an `except` clause, raise exceptions with `raise ... from err` or `raise ... from None` to distinguish them from errors in exception handling.  See https://docs.python.org/3/tutorial/errors.html#exception-chaining for details.",
-      "source": "            raise GraphQLError(",
-      "context": "Module:body/ClassDef:UpdateProvider:body/FunctionDef:mutate:body/Try:handlers/ExceptHandler:Name(id='ValidationError', ctx=Load()):e:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/subscriptions/schema.py",
-      "code": "B904",
-      "message": "Within an `except` clause, raise exceptions with `raise ... from err` or `raise ... from None` to distinguish them from errors in exception handling.  See https://docs.python.org/3/tutorial/errors.html#exception-chaining for details.",
-      "source": "            raise GraphQLError(",
-      "context": "Module:body/ClassDef:UpdateSubscription:body/FunctionDef:mutate:body/Try:handlers/ExceptHandler:Name(id='ValidationError', ctx=Load()):e:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/subscriptions/schema.py",
-      "code": "B904",
-      "message": "Within an `except` clause, raise exceptions with `raise ... from err` or `raise ... from None` to distinguish them from errors in exception handling.  See https://docs.python.org/3/tutorial/errors.html#exception-chaining for details.",
-      "source": "            raise GraphQLError(",
-      "context": "Module:body/ClassDef:UpdateSubscriptionAssignment:body/FunctionDef:mutate:body/Try#2:handlers/ExceptHandler:Name(id='ValidationError', ctx=Load()):e:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/subscriptions/schema.py",
-      "code": "B904",
-      "message": "Within an `except` clause, raise exceptions with `raise ... from err` or `raise ... from None` to distinguish them from errors in exception handling.  See https://docs.python.org/3/tutorial/errors.html#exception-chaining for details.",
-      "source": "            raise PermissionDenied(_(\"Permission denied.\"))",
-      "context": "Module:body/ClassDef:DeleteSubscriptionAssignment:body/FunctionDef:mutate:body/Try:handlers/ExceptHandler:Attribute(value=Name(id='SubscriptionAssignment', ctx=Load()), attr='DoesNotExist', ctx=Load()):None:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/subscriptions/schema.py",
-      "code": "B904",
-      "message": "Within an `except` clause, raise exceptions with `raise ... from err` or `raise ... from None` to distinguish them from errors in exception handling.  See https://docs.python.org/3/tutorial/errors.html#exception-chaining for details.",
-      "source": "            raise PermissionDenied(_(\"Permission denied.\"))",
-      "context": "Module:body/ClassDef:UpdateSubscriptionAssignment:body/FunctionDef:mutate:body/Try#1:handlers/ExceptHandler:Attribute(value=Name(id='SubscriptionAssignment', ctx=Load()), attr='DoesNotExist', ctx=Load()):None:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/subscriptions/schema.py",
-      "code": "B904",
-      "message": "Within an `except` clause, raise exceptions with `raise ... from err` or `raise ... from None` to distinguish them from errors in exception handling.  See https://docs.python.org/3/tutorial/errors.html#exception-chaining for details.",
-      "source": "        raise GraphQLError(str(_(\"CostCenter model is not yet available.\")))",
-      "context": "Module:body/FunctionDef:_resolve_cost_center:body/Try:handlers/ExceptHandler:Name(id='LookupError', ctx=Load()):None:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/subscriptions/schema.py",
       "code": "C901",
       "message": "'CreateProvider.mutate' is too complex (11)",
       "source": "    def mutate(self, info, **kwargs):",
@@ -11141,22 +10461,6 @@
     },
     {
       "path": "itambox/users/api/scim/authentication.py",
-      "code": "B904",
-      "message": "Within an `except` clause, raise exceptions with `raise ... from err` or `raise ... from None` to distinguish them from errors in exception handling.  See https://docs.python.org/3/tutorial/errors.html#exception-chaining for details.",
-      "source": "                raise exceptions.AuthenticationFailed(",
-      "context": "Module:body/ClassDef:SCIMBearerTokenAuthentication:body/FunctionDef:authenticate:body/If:BoolOp(op=And(), values=[Name(id='auth', ctx=Load()), Compare(left=Call(func=Attribute(value=Subscript(value=Name(id='auth', ctx=Load()), slice=Constant(value=0), ctx=Load()), attr='lower', ctx=Load()), args=[], keywords=[]), ops=[Eq()], comparators=[Constant(value=b'bearer')])]):body/Try:handlers/ExceptHandler:Name(id='UnicodeError', ctx=Load()):None:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/users/api/scim/authentication.py",
-      "code": "B904",
-      "message": "Within an `except` clause, raise exceptions with `raise ... from err` or `raise ... from None` to distinguish them from errors in exception handling.  See https://docs.python.org/3/tutorial/errors.html#exception-chaining for details.",
-      "source": "            raise exceptions.AuthenticationFailed(\"Tenant not found.\")",
-      "context": "Module:body/ClassDef:SCIMBearerTokenAuthentication:body/FunctionDef:authenticate:body/Try:handlers/ExceptHandler:Attribute(value=Name(id='Tenant', ctx=Load()), attr='DoesNotExist', ctx=Load()):None:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/users/api/scim/authentication.py",
       "code": "C901",
       "message": "'SCIMBearerTokenAuthentication.authenticate' is too complex (22)",
       "source": "    def authenticate(self, request):",
@@ -11177,14 +10481,6 @@
       "message": "'parse_scim_filter' is too complex (32)",
       "source": "def parse_scim_filter(filter_str, model_type=\"user\"):",
       "context": "Module:body/FunctionDef:parse_scim_filter:self",
-      "count": 1
-    },
-    {
-      "path": "itambox/users/api/scim/provider_authentication.py",
-      "code": "B904",
-      "message": "Within an `except` clause, raise exceptions with `raise ... from err` or `raise ... from None` to distinguish them from errors in exception handling.  See https://docs.python.org/3/tutorial/errors.html#exception-chaining for details.",
-      "source": "                raise exceptions.AuthenticationFailed(",
-      "context": "Module:body/ClassDef:SCIMProviderBearerTokenAuthentication:body/FunctionDef:authenticate:body/If:BoolOp(op=And(), values=[Name(id='auth', ctx=Load()), Compare(left=Call(func=Attribute(value=Subscript(value=Name(id='auth', ctx=Load()), slice=Constant(value=0), ctx=Load()), attr='lower', ctx=Load()), args=[], keywords=[]), ops=[Eq()], comparators=[Constant(value=b'bearer')])]):body/Try:handlers/ExceptHandler:Name(id='UnicodeError', ctx=Load()):None:body",
       "count": 1
     },
     {
@@ -11221,14 +10517,6 @@
     },
     {
       "path": "itambox/users/api/scim/views.py",
-      "code": "B904",
-      "message": "Within an `except` clause, raise exceptions with `raise ... from err` or `raise ... from None` to distinguish them from errors in exception handling.  See https://docs.python.org/3/tutorial/errors.html#exception-chaining for details.",
-      "source": "            raise exceptions.NotFound(\"Tenant not found.\")",
-      "context": "Module:body/ClassDef:SCIMTenantMixin:body/FunctionDef:initial:body/Try:handlers/ExceptHandler:Attribute(value=Name(id='Tenant', ctx=Load()), attr='DoesNotExist', ctx=Load()):None:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/users/api/scim/views.py",
       "code": "C901",
       "message": "'SCIMUserDetailView.patch' is too complex (22)",
       "source": "    def patch(self, request, pk, *args, **kwargs):",
@@ -11249,22 +10537,6 @@
       "message": "'link_or_create_assetholder' is too complex (11)",
       "source": "def link_or_create_assetholder(user, tenant):",
       "context": "Module:body/FunctionDef:link_or_create_assetholder:self",
-      "count": 1
-    },
-    {
-      "path": "itambox/users/forms.py",
-      "code": "B904",
-      "message": "Within an `except` clause, raise exceptions with `raise ... from err` or `raise ... from None` to distinguish them from errors in exception handling.  See https://docs.python.org/3/tutorial/errors.html#exception-chaining for details.",
-      "source": "                raise forms.ValidationError(",
-      "context": "Module:body/ClassDef:TokenForm:body/FunctionDef:clean_allowed_ips:body/For:Name(id='prefix', ctx=Store()):Name(id='prefixes', ctx=Load()):body/Try:handlers/ExceptHandler:Name(id='ValueError', ctx=Load()):None:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/users/forms.py",
-      "code": "B904",
-      "message": "Within an `except` clause, raise exceptions with `raise ... from err` or `raise ... from None` to distinguish them from errors in exception handling.  See https://docs.python.org/3/tutorial/errors.html#exception-chaining for details.",
-      "source": "            raise forms.ValidationError(exc.messages)",
-      "context": "Module:body/ClassDef:GroupManagedRoleGrantForm:body/FunctionDef:clean:body/Try:handlers/ExceptHandler:Attribute(value=Name(id='forms', ctx=Load()), attr='ValidationError', ctx=Load()):exc:body",
       "count": 1
     },
     {
@@ -11417,14 +10689,6 @@
       "message": "'crispy_forms.layout.Submit' imported but unused",
       "source": "from crispy_forms.layout import HTML, Column, Fieldset, Layout, Row, Submit",
       "context": "Module:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/users/models.py",
-      "code": "B904",
-      "message": "Within an `except` clause, raise exceptions with `raise ... from err` or `raise ... from None` to distinguish them from errors in exception handling.  See https://docs.python.org/3/tutorial/errors.html#exception-chaining for details.",
-      "source": "            raise ValidationError(",
-      "context": "Module:body/FunctionDef:validate_cidr_list:body/For:Name(id='prefix', ctx=Store()):Name(id='value', ctx=Load()):body/Try:handlers/ExceptHandler:Name(id='ValueError', ctx=Load()):None:body",
       "count": 1
     },
     {

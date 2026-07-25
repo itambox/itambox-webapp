@@ -371,7 +371,7 @@ class RoleAssignUsersView(LoginRequiredMixin, View):
                 scope_type=RoleGrantScope.SCOPE_OWN,
             )
         except ValidationError as e:
-            raise PermissionDenied(", ".join(e.messages))
+            raise PermissionDenied(", ".join(e.messages)) from None
 
     def get(self, request, pk, *args, **kwargs):
         role = self._get_role(pk)

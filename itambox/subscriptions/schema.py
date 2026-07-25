@@ -319,7 +319,7 @@ class CreateProvider(graphene.Mutation):
             raise GraphQLError(
                 "Validation failed",
                 extensions={"validation_errors": e.message_dict if hasattr(e, "message_dict") else e.messages},
-            )
+            ) from e
         provider.save()
         return CreateProvider(provider=provider)
 
@@ -380,7 +380,7 @@ class UpdateProvider(graphene.Mutation):
             raise GraphQLError(
                 "Validation failed",
                 extensions={"validation_errors": e.message_dict if hasattr(e, "message_dict") else e.messages},
-            )
+            ) from e
         provider.save()
         return UpdateProvider(provider=provider)
 
@@ -419,8 +419,8 @@ def _resolve_cost_center(cost_center_id, user):
         from django.apps import apps
 
         CostCenter = apps.get_model("organization", "CostCenter")
-    except LookupError:
-        raise GraphQLError(str(_("CostCenter model is not yet available.")))
+    except LookupError as exc:
+        raise GraphQLError(str(_("CostCenter model is not yet available."))) from exc
     return get_object_or_denied(CostCenter, cost_center_id, user)
 
 
@@ -496,7 +496,7 @@ class CreateSubscription(graphene.Mutation):
             raise GraphQLError(
                 "Validation failed",
                 extensions={"validation_errors": e.message_dict if hasattr(e, "message_dict") else e.messages},
-            )
+            ) from e
         subscription.save()
         return CreateSubscription(subscription=subscription)
 
@@ -572,7 +572,7 @@ class UpdateSubscription(graphene.Mutation):
             raise GraphQLError(
                 "Validation failed",
                 extensions={"validation_errors": e.message_dict if hasattr(e, "message_dict") else e.messages},
-            )
+            ) from e
         subscription.save()
         return UpdateSubscription(subscription=subscription)
 
@@ -632,7 +632,7 @@ class CreateSubscriptionAssignment(graphene.Mutation):
             raise GraphQLError(
                 "Validation failed",
                 extensions={"validation_errors": e.message_dict if hasattr(e, "message_dict") else e.messages},
-            )
+            ) from e
         assignment.save()
         return CreateSubscriptionAssignment(subscription_assignment=assignment)
 
@@ -655,7 +655,7 @@ class UpdateSubscriptionAssignment(graphene.Mutation):
                 .get(pk=id)
             )
         except SubscriptionAssignment.DoesNotExist:
-            raise PermissionDenied(_("Permission denied."))
+            raise PermissionDenied(_("Permission denied.")) from None
 
         check_permission(info, "subscriptions.change_subscriptionassignment", obj=assignment)
 
@@ -668,7 +668,7 @@ class UpdateSubscriptionAssignment(graphene.Mutation):
             raise GraphQLError(
                 "Validation failed",
                 extensions={"validation_errors": e.message_dict if hasattr(e, "message_dict") else e.messages},
-            )
+            ) from e
         assignment.save()
         return UpdateSubscriptionAssignment(subscription_assignment=assignment)
 
@@ -690,7 +690,7 @@ class DeleteSubscriptionAssignment(graphene.Mutation):
                 .get(pk=id)
             )
         except SubscriptionAssignment.DoesNotExist:
-            raise PermissionDenied(_("Permission denied."))
+            raise PermissionDenied(_("Permission denied.")) from None
 
         check_permission(info, "subscriptions.delete_subscriptionassignment", obj=assignment)
 

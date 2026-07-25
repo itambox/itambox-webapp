@@ -47,7 +47,7 @@ def validate_external_url(url, allow_private=False):
             # resolver answer differently at send time (DNS rebinding: benign at
             # validation, 169.254.169.254 at connect). A transient DNS outage
             # making a webhook save/send fail is the acceptable cost.
-            raise ValidationError(_("URL host could not be resolved; refusing to accept it unverified."))
+            raise ValidationError(_("URL host could not be resolved; refusing to accept it unverified.")) from None
 
     resolved = []
     for info in infos:

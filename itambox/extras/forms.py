@@ -420,8 +420,8 @@ class WebhookEndpointForm(forms.ModelForm):
         if isinstance(data, str):
             try:
                 return _json.loads(data)
-            except _json.JSONDecodeError:
-                raise forms.ValidationError(_("Headers must be valid JSON."))
+            except _json.JSONDecodeError as exc:
+                raise forms.ValidationError(_("Headers must be valid JSON.")) from exc
         return data
 
 
@@ -530,8 +530,8 @@ class EventRuleForm(forms.ModelForm):
                 return {}
             try:
                 return _json.loads(data)
-            except _json.JSONDecodeError:
-                raise forms.ValidationError(_("Conditions must be valid JSON."))
+            except _json.JSONDecodeError as exc:
+                raise forms.ValidationError(_("Conditions must be valid JSON.")) from exc
         return data or {}
 
     def clean_action_config(self):
@@ -541,8 +541,8 @@ class EventRuleForm(forms.ModelForm):
                 return {}
             try:
                 return _json.loads(data)
-            except _json.JSONDecodeError:
-                raise forms.ValidationError(_("Action config must be valid JSON."))
+            except _json.JSONDecodeError as exc:
+                raise forms.ValidationError(_("Action config must be valid JSON.")) from exc
         return data or {}
 
     def clean(self):
@@ -703,7 +703,7 @@ class ExportTemplateForm(forms.ModelForm):
                     "line": exc.lineno,
                     "message": exc.message,
                 }
-            )
+            ) from exc
         return code
 
 

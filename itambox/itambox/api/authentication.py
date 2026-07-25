@@ -30,7 +30,7 @@ class TokenAuthentication(BaseAuthentication):
             token = auth[1].decode()
         except UnicodeError:
             msg = _("Invalid token header. Token string should not contain invalid characters.")
-            raise exceptions.AuthenticationFailed(msg)
+            raise exceptions.AuthenticationFailed(msg) from None
 
         return self.authenticate_credentials(token, request)
 

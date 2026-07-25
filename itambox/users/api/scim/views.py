@@ -92,7 +92,7 @@ class SCIMTenantMixin:
         try:
             self.tenant = Tenant._base_manager.get(slug=tenant_slug)
         except Tenant.DoesNotExist:
-            raise exceptions.NotFound("Tenant not found.")
+            raise exceptions.NotFound("Tenant not found.") from None
 
         set_current_tenant(self.tenant)
         # DRF authenticated the bearer token in super().initial(); bind the token's

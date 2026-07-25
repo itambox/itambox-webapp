@@ -242,7 +242,7 @@ class ManagedRoleGrantForm(forms.Form):
                 requested_tenant_ids=requested_tenant_ids,
             )
         except forms.ValidationError as exc:
-            raise forms.ValidationError(exc.messages)
+            raise forms.ValidationError(exc.messages) from None
         return cleaned
 
 

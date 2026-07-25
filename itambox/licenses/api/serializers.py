@@ -81,7 +81,7 @@ class LicenseSerializer(BaseModelSerializer):
                 instance.assert_seat_capacity(seats=data["seats"])
             except DjangoValidationError as exc:
                 # Re-raise as DRF ValidationError so the response uses the expected format.
-                raise serializers.ValidationError(exc.message_dict)
+                raise serializers.ValidationError(exc.message_dict) from exc
         return super().validate(data)
 
 
@@ -144,7 +144,7 @@ class LicenseSeatAssignmentSerializer(BaseModelSerializer):
             )
         except DjangoValidationError as exc:
             # Surface service-layer errors as DRF validation errors (friendly 400 response).
-            raise serializers.ValidationError(exc.messages)
+            raise serializers.ValidationError(exc.messages) from exc
         # If the caller supplied installed_software, persist it now — checkout_license
         # only wires the core assignment; the optional SAM link is layered on top.
         installed_software = validated_data.get("installed_software")
@@ -165,5 +165,5 @@ class LicenseSeatAssignmentSerializer(BaseModelSerializer):
             try:
                 instance = transfer_license_seat(instance, new_license)
             except DjangoValidationError as exc:
-                raise serializers.ValidationError(exc.messages)
+                raise serializers.ValidationError(exc.messages) from exc
         return super().update(instance, validated_data)

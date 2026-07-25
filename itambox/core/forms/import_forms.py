@@ -236,10 +236,10 @@ class BulkImportForm(forms.Form):
                 try:
                     csv_file.seek(0)
                     raw_data = csv_file.read().decode("latin-1")
-                except Exception:
+                except Exception as exc:
                     raise ValidationError(
                         _("Unable to decode file. Please upload a valid text-based CSV or YAML file.")
-                    )
+                    ) from exc
         else:
             if not import_text.strip():
                 raise ValidationError(_("Please paste data in the editor tab."))
@@ -251,7 +251,7 @@ class BulkImportForm(forms.Form):
                 reader = csv.DictReader(io.StringIO(raw_data), delimiter=delimiter)
                 rows = list(reader)
             except Exception as e:
-                raise ValidationError(_("Failed to parse CSV data: {error}").format(error=str(e)))
+                raise ValidationError(_("Failed to parse CSV data: {error}").format(error=str(e))) from None
 
             if not rows:
                 raise ValidationError(_("CSV data is empty."))
@@ -280,7 +280,7 @@ class BulkImportForm(forms.Form):
             try:
                 parsed_yaml = yaml.safe_load(raw_data)
             except Exception as e:
-                raise ValidationError(_("Failed to parse YAML data: {error}").format(error=str(e)))
+                raise ValidationError(_("Failed to parse YAML data: {error}").format(error=str(e))) from None
 
             if not parsed_yaml:
                 raise ValidationError(_("YAML document is empty."))
@@ -359,7 +359,7 @@ class BulkImportForm(forms.Form):
                                 setattr(instance, key, val)
                     except self.model.DoesNotExist:
                         # Raise ValidationError matching NetBox gold standard
-                        raise ValidationError(_("Object with ID {id} does not exist").format(id=pk_val))
+                        raise ValidationError(_("Object with ID {id} does not exist").format(id=pk_val)) from None
                 else:
                     instance = self._create_instance(mapped)
 

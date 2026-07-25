@@ -28,7 +28,7 @@ class SCIMBearerTokenAuthentication(BaseAuthentication):
         try:
             tenant = Tenant._base_manager.get(slug=tenant_slug)
         except Tenant.DoesNotExist:
-            raise exceptions.AuthenticationFailed("Tenant not found.")
+            raise exceptions.AuthenticationFailed("Tenant not found.") from None
 
         auth = get_authorization_header(request).split()
 
@@ -44,7 +44,7 @@ class SCIMBearerTokenAuthentication(BaseAuthentication):
             except UnicodeError:
                 raise exceptions.AuthenticationFailed(
                     "Invalid token header. Token string should not contain invalid characters."
-                )
+                ) from None
 
             token = Token.find_by_key(token_key)
             if token is None:

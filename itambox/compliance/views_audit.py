@@ -301,7 +301,7 @@ class AuditSessionCommitView(LoginRequiredMixin, PermissionRequiredMixin, View):
                     try:
                         asset = Asset.objects.select_for_update().get(pk=asset_pk)
                     except Asset.DoesNotExist:
-                        raise ValidationError(_("Asset with ID %(pk)s does not exist.") % {"pk": asset_pk})
+                        raise ValidationError(_("Asset with ID %(pk)s does not exist.") % {"pk": asset_pk}) from None
 
                     # Skip an asset already verified in this session so re-committing
                     # a basket is idempotent (audit_asset would otherwise raise on the

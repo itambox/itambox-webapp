@@ -97,7 +97,7 @@ class ITAMBoxPagination(LimitOffsetPagination):
                 _("Invalid '{param}' parameter: must be a non-negative integer.").format(
                     param=self.start_query_param,
                 )
-            )
+            ) from None
 
     def get_limit(self, request):
         max_limit = self.default_limit

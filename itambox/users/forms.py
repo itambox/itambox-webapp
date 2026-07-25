@@ -362,7 +362,7 @@ class TokenForm(forms.ModelForm):
             except ValueError:
                 raise forms.ValidationError(
                     _('"%(prefix)s" is not a valid IP address or CIDR prefix.') % {"prefix": prefix}
-                )
+                ) from None
         return prefixes
 
 
@@ -597,7 +597,7 @@ class GroupManagedRoleGrantForm(forms.Form):
                 requested_tenant_ids=requested_tenant_ids,
             )
         except forms.ValidationError as exc:
-            raise forms.ValidationError(exc.messages)
+            raise forms.ValidationError(exc.messages) from None
         return cleaned
 
 

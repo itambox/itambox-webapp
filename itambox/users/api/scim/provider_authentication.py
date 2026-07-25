@@ -61,7 +61,7 @@ class SCIMProviderBearerTokenAuthentication(BaseAuthentication):
             except UnicodeError:
                 raise exceptions.AuthenticationFailed(
                     "Invalid token header. Token string should not contain invalid characters."
-                )
+                ) from None
 
             token = Token.find_by_key(token_key)
             if token is None:

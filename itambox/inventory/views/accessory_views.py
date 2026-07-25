@@ -273,7 +273,7 @@ class AccessoryStockAdjustView(LoginRequiredMixin, PermissionRequiredMixin, View
             try:
                 stock = AccessoryStock.objects.select_for_update().get(pk=pk)
             except AccessoryStock.DoesNotExist:
-                raise Http404
+                raise Http404 from None
             # Anchor at the POOL (its tenant is the owner) — never the catalogue
             # item: grantees and other tenants must not adjust foreign stock
             # (ADR-0001), and the owner must not be blocked by a foreign item.
