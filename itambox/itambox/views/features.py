@@ -1,7 +1,9 @@
+import csv
 import difflib
 import json
 import logging
 
+import yaml
 from django.apps import apps
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
@@ -222,128 +224,123 @@ def get_filterset_for_model(model):
     return None
 
 
+_REDACTED_EXPORT_FIELD_SUBSTRINGS = ("secret", "password", "token")
+
+
+def _is_export_value_redacted(field_name, value):
+    name = field_name.lower()
+    if any(substring in name for substring in _REDACTED_EXPORT_FIELD_SUBSTRINGS):
+        return True
+    return isinstance(value, str) and value.startswith("enc$")
+
+
+def _get_export_queryset(request, model, app_label, model_name, export_scope):
+    pks = request.GET.get("pk", "")
+    if pks:
+        valid_pks = [int(pk) for pk in pks.split(",") if pk.strip().isdigit()]
+        if not valid_pks:
+            return None
+        queryset = model.objects.filter(pk__in=valid_pks)
+    elif export_scope == "filtered":
+        queryset = model.objects.all()
+        filterset_class = get_filterset_for_model(model)
+        if filterset_class:
+            filterset = filterset_class(request.GET, queryset=queryset)
+            if filterset.is_valid():
+                queryset = filterset.qs
+    else:
+        queryset = model.objects.all()
+
+    if is_container_scoped_unfiltered(model):
+        # Membership/Token-shaped models use an unscoped default manager.
+        queryset = visible_to_containers(request.user, queryset, f"{app_label}.view_{model_name}")
+    return queryset
+
+
+def _render_yaml_export(model, model_name, queryset):
+    fields = [field for field in model._meta.fields if not field.many_to_many]
+    export_data = []
+    for obj in queryset:
+        row_dict = {}
+        for field in fields:
+            value = getattr(obj, field.name)
+            if _is_export_value_redacted(field.name, value):
+                row_dict[field.name] = "***"
+                continue
+            if value is None:
+                value = ""
+            elif isinstance(value, (int, float, bool)):
+                row_dict[field.name] = value
+            else:
+                row_dict[field.name] = str(value)
+        export_data.append(row_dict)
+
+    yaml_content = yaml.safe_dump(export_data, default_flow_style=False, sort_keys=False)
+    response = HttpResponse(yaml_content, content_type="text/yaml")
+    response["Content-Disposition"] = f'attachment; filename="{model_name}_export.yaml"'
+    return response
+
+
+def _render_csv_export(model, model_name, queryset):
+    response = HttpResponse(content_type="text/csv")
+    response["Content-Disposition"] = f'attachment; filename="{model_name}_export.csv"'
+    writer = csv.writer(response)
+    fields = [field for field in model._meta.fields if not field.many_to_many]
+    writer.writerow([field.name for field in fields])
+    for obj in queryset:
+        row = []
+        for field in fields:
+            value = getattr(obj, field.name)
+            if _is_export_value_redacted(field.name, value):
+                row.append("***")
+                continue
+            row.append(csv_safe(value))
+        writer.writerow(row)
+    return response
+
+
+def _render_template_export(request, model, queryset, template_id):
+    content_type = ContentType.objects.get_for_model(model)
+    template = get_object_or_404(ExportTemplate, pk=template_id, content_type=content_type)
+    try:
+        content = template.render(queryset)
+    except Exception as exc:
+        # Template code is author-controlled. Never surface a render-time 500.
+        logger.warning("Export template %s render failed: %s", template.pk, exc)
+        messages.error(
+            request,
+            _('There was an error rendering the export template "%(name)s": %(error)s')
+            % {"name": template.name, "error": exc},
+        )
+        return HttpResponseRedirect(
+            safe_return_url(request, request.META.get("HTTP_REFERER"), template.get_absolute_url())
+        )
+
+    response = HttpResponse(content, content_type=template.mime_type or ExportTemplate.DEFAULT_MIME_TYPE)
+    # Author-controlled MIME and body must never be content-sniffed into executable content.
+    response["X-Content-Type-Options"] = "nosniff"
+    if template.as_attachment:
+        response["Content-Disposition"] = 'attachment; filename="{}"'.format(template.get_export_filename(model))
+    return response
+
+
 class ObjectExportView(LoginRequiredMixin, View):
     def get(self, request, app_label, model_name, template_id):
         model = apps.get_model(app_label, model_name)
-
         if not request.user.has_perm(f"{app_label}.view_{model_name}"):
             raise Http404
 
         export_format = request.GET.get("format", "csv").lower()
         export_scope = request.GET.get("export_scope", "all").lower()
-
-        pks = request.GET.get("pk", "")
-        if pks:
-            valid_pks = [int(p) for p in pks.split(",") if p.strip().isdigit()]
-            if not valid_pks:
-                return HttpResponseBadRequest(_("Invalid pk value(s)."))
-            queryset = model.objects.filter(pk__in=valid_pks)
-        elif export_scope == "filtered":
-            queryset = model.objects.all()
-            filterset_class = get_filterset_for_model(model)
-            if filterset_class:
-                filterset = filterset_class(request.GET, queryset=queryset)
-                if filterset.is_valid():
-                    queryset = filterset.qs
-        else:
-            queryset = model.objects.all()
-
-        if is_container_scoped_unfiltered(model):
-            # Membership/Token-shaped models: the default manager has no
-            # filter_by_tenant, so the queryset built above is not tenant-scoped
-            # at all — an ambient view_<model> permission (granted by every
-            # seeded role, including Read-Only) would otherwise dump every
-            # tenant's rows. Mirrors the restriction
-            # MembershipListView/MembershipDetailView apply on top of the same
-            # unscoped manager.
-            queryset = visible_to_containers(request.user, queryset, f"{app_label}.view_{model_name}")
+        queryset = _get_export_queryset(request, model, app_label, model_name, export_scope)
+        if queryset is None:
+            return HttpResponseBadRequest(_("Invalid pk value(s)."))
 
         if template_id == 0:
-            _REDACTED_FIELD_SUBSTRINGS = ("secret", "password", "token")
-
-            def _is_redacted(field_name, val):
-                # Redact by name, AND auto-redact any encrypted-field ciphertext regardless
-                # of the field's name (enc$ is the Fernet sentinel — covers product_key,
-                # smtp_password, webhook secret, and any future encrypted field).
-                name = field_name.lower()
-                if any(sub in name for sub in _REDACTED_FIELD_SUBSTRINGS):
-                    return True
-                return isinstance(val, str) and val.startswith("enc$")
-
             if export_format == "yaml":
-                import yaml
-
-                fields = [f for f in model._meta.fields if not f.many_to_many]
-                export_data = []
-                for obj in queryset:
-                    row_dict = {}
-                    for field in fields:
-                        val = getattr(obj, field.name)
-                        if _is_redacted(field.name, val):
-                            row_dict[field.name] = "***"
-                            continue
-                        if val is None:
-                            val = ""
-                        elif isinstance(val, (int, float, bool)):
-                            row_dict[field.name] = val
-                        else:
-                            row_dict[field.name] = str(val)
-                    export_data.append(row_dict)
-
-                yaml_content = yaml.safe_dump(export_data, default_flow_style=False, sort_keys=False)
-                response = HttpResponse(yaml_content, content_type="text/yaml")
-                response["Content-Disposition"] = f'attachment; filename="{model_name}_export.yaml"'
-                return response
-            else:
-                import csv
-
-                response = HttpResponse(content_type="text/csv")
-                response["Content-Disposition"] = f'attachment; filename="{model_name}_export.csv"'
-
-                writer = csv.writer(response)
-                fields = [f for f in model._meta.fields if not f.many_to_many]
-                writer.writerow([f.name for f in fields])
-
-                for obj in queryset:
-                    row = []
-                    for field in fields:
-                        val = getattr(obj, field.name)
-                        if _is_redacted(field.name, val):
-                            row.append("***")
-                            continue
-                        row.append(csv_safe(val))
-                    writer.writerow(row)
-                return response
-
-        content_type = ContentType.objects.get_for_model(model)
-        template = get_object_or_404(ExportTemplate, pk=template_id, content_type=content_type)
-        try:
-            content = template.render(queryset)
-        except Exception as exc:
-            # Template code is author-controlled and can fail at render time (undefined
-            # variable, type error, sandbox violation). Never surface a 500 — flash the
-            # error and send the user back where they came from, NetBox-style.
-            logger.warning("Export template %s render failed: %s", template.pk, exc)
-            messages.error(
-                request,
-                _('There was an error rendering the export template "%(name)s": %(error)s')
-                % {"name": template.name, "error": exc},
-            )
-            return HttpResponseRedirect(
-                safe_return_url(
-                    request,
-                    request.META.get("HTTP_REFERER"),
-                    template.get_absolute_url(),
-                )
-            )
-
-        response = HttpResponse(content, content_type=template.mime_type or ExportTemplate.DEFAULT_MIME_TYPE)
-        # mime_type AND the rendered body are author-controlled (could be HTML/SVG);
-        # stop the browser content-sniffing its way into executing them.
-        response["X-Content-Type-Options"] = "nosniff"
-        if template.as_attachment:
-            response["Content-Disposition"] = f'attachment; filename="{template.get_export_filename(model)}"'
-        return response
+                return _render_yaml_export(model, model_name, queryset)
+            return _render_csv_export(model, model_name, queryset)
+        return _render_template_export(request, model, queryset, template_id)
 
 
 @method_decorator(login_required, name="dispatch")

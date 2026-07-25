@@ -5998,14 +5998,6 @@
     {
       "path": "itambox/core/validators.py",
       "code": "C901",
-      "message": "'parse_json_rules' is too complex (18)",
-      "source": "def parse_json_rules(instance, rules):",
-      "context": "Module:body/FunctionDef:parse_json_rules:self",
-      "count": 1
-    },
-    {
-      "path": "itambox/core/validators.py",
-      "code": "C901",
       "message": "'validate_external_url' is too complex (12)",
       "source": "def validate_external_url(url, allow_private=False):",
       "context": "Module:body/FunctionDef:validate_external_url:self",
@@ -7645,78 +7637,6 @@
     },
     {
       "path": "itambox/itambox/plugins/utils.py",
-      "code": "B907",
-      "message": "'key' is manually surrounded by quotes, consider using the `!r` conversion flag.",
-      "source": "raise ImproperlyConfigured(\n                    f\"Plugin '{plugin_name}' requires setting '{key}' to be defined in PLUGINS_CONFIG.\"\n                )",
-      "context": "Module:body/FunctionDef:load_plugins:body/For:Name(id='plugin_name', ctx=Store()):Name(id='plugins', ctx=Load()):body/For:Name(id='key', ctx=Store()):Name(id='required_settings', ctx=Load()):body/If:BoolOp(op=Or(), values=[Compare(left=Name(id='key', ctx=Load()), ops=[NotIn()], comparators=[Name(id='merged_config', ctx=Load())]), Compare(left=Subscript(value=Name(id='merged_config', ctx=Load()), slice=Name(id='key', ctx=Load()), ctx=Load()), ops=[Is()], comparators=[Constant(value=None)])]):body",
-      "count": 1
-    },
-    {
-      "path": "itambox/itambox/plugins/utils.py",
-      "code": "B907",
-      "message": "'plugin_name' is manually surrounded by quotes, consider using the `!r` conversion flag.",
-      "source": "raise ImproperlyConfigured(\n                    f\"Plugin '{plugin_name}' requires minimum ITAMbox version {min_version} (current version is {current_version_str})\"\n                )",
-      "context": "Module:body/FunctionDef:load_plugins:body/For:Name(id='plugin_name', ctx=Store()):Name(id='plugins', ctx=Load()):body/If:Name(id='min_version', ctx=Load()):body/If:Compare(left=Name(id='current_version', ctx=Load()), ops=[Lt()], comparators=[Call(func=Name(id='parse_version', ctx=Load()), args=[Name(id='min_version', ctx=Load())], keywords=[])]):body",
-      "count": 1
-    },
-    {
-      "path": "itambox/itambox/plugins/utils.py",
-      "code": "B907",
-      "message": "'plugin_name' is manually surrounded by quotes, consider using the `!r` conversion flag.",
-      "source": "raise ImproperlyConfigured(\n                    f\"Plugin '{plugin_name}' requires setting '{key}' to be defined in PLUGINS_CONFIG.\"\n                )",
-      "context": "Module:body/FunctionDef:load_plugins:body/For:Name(id='plugin_name', ctx=Store()):Name(id='plugins', ctx=Load()):body/For:Name(id='key', ctx=Store()):Name(id='required_settings', ctx=Load()):body/If:BoolOp(op=Or(), values=[Compare(left=Name(id='key', ctx=Load()), ops=[NotIn()], comparators=[Name(id='merged_config', ctx=Load())]), Compare(left=Subscript(value=Name(id='merged_config', ctx=Load()), slice=Name(id='key', ctx=Load()), ctx=Load()), ops=[Is()], comparators=[Constant(value=None)])]):body",
-      "count": 1
-    },
-    {
-      "path": "itambox/itambox/plugins/utils.py",
-      "code": "B907",
-      "message": "'plugin_name' is manually surrounded by quotes, consider using the `!r` conversion flag.",
-      "source": "raise ImproperlyConfigured(\n                    f\"Plugin '{plugin_name}' supports maximum ITAMbox version {max_version} (current version is {current_version_str})\"\n                )",
-      "context": "Module:body/FunctionDef:load_plugins:body/For:Name(id='plugin_name', ctx=Store()):Name(id='plugins', ctx=Load()):body/If:Name(id='max_version', ctx=Load()):body/If:Compare(left=Name(id='current_version', ctx=Load()), ops=[Gt()], comparators=[Call(func=Name(id='parse_version', ctx=Load()), args=[Name(id='max_version', ctx=Load())], keywords=[])]):body",
-      "count": 1
-    },
-    {
-      "path": "itambox/itambox/plugins/utils.py",
-      "code": "B907",
-      "message": "'plugin_name' is manually surrounded by quotes, consider using the `!r` conversion flag.",
-      "source": "raise ImproperlyConfigured(\n                f\"Plugin '{plugin_name}' does not declare a 'config' attribute in its __init__.py.\"\n            )",
-      "context": "Module:body/FunctionDef:load_plugins:body/For:Name(id='plugin_name', ctx=Store()):Name(id='plugins', ctx=Load()):body/If:Compare(left=Name(id='config_cls', ctx=Load()), ops=[Is()], comparators=[Constant(value=None)]):body",
-      "count": 1
-    },
-    {
-      "path": "itambox/itambox/plugins/utils.py",
-      "code": "B907",
-      "message": "'plugin_name' is manually surrounded by quotes, consider using the `!r` conversion flag.",
-      "source": "raise ImproperlyConfigured(f\"Plugin '{plugin_name}' config class is not a subclass of PluginConfig.\")",
-      "context": "Module:body/FunctionDef:load_plugins:body/For:Name(id='plugin_name', ctx=Store()):Name(id='plugins', ctx=Load()):body/If:UnaryOp(op=Not(), operand=Call(func=Name(id='issubclass', ctx=Load()), args=[Name(id='config_cls', ctx=Load()), Name(id='PluginConfig', ctx=Load())], keywords=[])):body",
-      "count": 1
-    },
-    {
-      "path": "itambox/itambox/plugins/utils.py",
-      "code": "B950",
-      "message": "line too long (135 > 120 characters)",
-      "source": "                    f\"Plugin '{plugin_name}' requires minimum ITAMbox version {min_version} (current version is {current_version_str})\"",
-      "context": "Module:body/FunctionDef:load_plugins:body/For:Name(id='plugin_name', ctx=Store()):Name(id='plugins', ctx=Load()):body/If:Name(id='min_version', ctx=Load()):body/If:Compare(left=Name(id='current_version', ctx=Load()), ops=[Lt()], comparators=[Call(func=Name(id='parse_version', ctx=Load()), args=[Name(id='min_version', ctx=Load())], keywords=[])]):body",
-      "count": 1
-    },
-    {
-      "path": "itambox/itambox/plugins/utils.py",
-      "code": "B950",
-      "message": "line too long (135 > 120 characters)",
-      "source": "                    f\"Plugin '{plugin_name}' supports maximum ITAMbox version {max_version} (current version is {current_version_str})\"",
-      "context": "Module:body/FunctionDef:load_plugins:body/For:Name(id='plugin_name', ctx=Store()):Name(id='plugins', ctx=Load()):body/If:Name(id='max_version', ctx=Load()):body/If:Compare(left=Name(id='current_version', ctx=Load()), ops=[Gt()], comparators=[Call(func=Name(id='parse_version', ctx=Load()), args=[Name(id='max_version', ctx=Load())], keywords=[])]):body",
-      "count": 1
-    },
-    {
-      "path": "itambox/itambox/plugins/utils.py",
-      "code": "C901",
-      "message": "'load_plugins' is too complex (18)",
-      "source": "def load_plugins(settings_module):",
-      "context": "Module:body/FunctionDef:load_plugins:self",
-      "count": 1
-    },
-    {
-      "path": "itambox/itambox/plugins/utils.py",
       "code": "F401",
       "message": "'sys' imported but unused",
       "source": "import sys",
@@ -8121,22 +8041,6 @@
       "message": "'.utility.health' imported but unused",
       "source": "from .utility import SearchView, health",
       "context": "Module:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/itambox/views/features.py",
-      "code": "B907",
-      "message": "'template.get_export_filename(model)' is manually surrounded by quotes, consider using the `!r` conversion flag.",
-      "source": "response[\"Content-Disposition\"] = f'attachment; filename=\"{template.get_export_filename(model)}\"'",
-      "context": "Module:body/ClassDef:ObjectExportView:body/FunctionDef:get:body/If:Attribute(value=Name(id='template', ctx=Load()), attr='as_attachment', ctx=Load()):body",
-      "count": 1
-    },
-    {
-      "path": "itambox/itambox/views/features.py",
-      "code": "C901",
-      "message": "'ObjectExportView.get' is too complex (23)",
-      "source": "    def get(self, request, app_label, model_name, template_id):",
-      "context": "Module:body/ClassDef:ObjectExportView:body/FunctionDef:get:self",
       "count": 1
     },
     {
