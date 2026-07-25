@@ -160,13 +160,32 @@ From `itambox/`:
 ```bash
 uv run --locked --group dev python manage.py makemigrations --check --dry-run
 uv run --locked --group dev python manage.py check
-uv run --locked --group dev pytest --cov=. --cov-report=term --cov-fail-under=45
 
 npm ci
 npm run build:all
 npm run typecheck
 npx eslint static/src
 ```
+
+Coverage is gated, so run it the way CI does — from the repository root, which
+measures the complete serial suite against a database migrated from scratch and
+then checks the three quality gates:
+
+```bash
+make coverage        # suite + branch coverage + run certification + global ratchet
+make coverage-diff   # differential coverage of your branch against origin/main
+```
+
+`make coverage-diff` requires 85% of the executable lines your change touched to
+be covered, counting a line as covered only when it was executed and is not the
+origin of an untaken branch. A changed production file the run never measured is
+a failure, not a pass. Read the
+[test coverage policy](itambox/docs/development/test-coverage-policy.md) before
+changing a baseline or adding an exemption, and the
+[security test expectations](itambox/docs/development/security-test-expectations.md)
+before writing tests for tenancy, RBAC, tokens, encryption, imports, SCIM, task
+context, or destructive operations — coverage proves a line ran, not that the
+test asserted anything about the boundary it crosses.
 
 Documentation dependencies are isolated in their own locked group:
 

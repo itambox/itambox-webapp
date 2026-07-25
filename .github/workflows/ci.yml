@@ -15,9 +15,12 @@ on:
       - "itambox/docs/development/migration-verification.md"
       - "itambox/docs/development/python-import-policy.md"
       - "itambox/mkdocs.yml"
+      - "itambox/docs/development/security-test-expectations.md"
+      - "itambox/docs/development/test-coverage-policy.md"
       - "scripts/**/*.py"
       - "scripts/migration_audit.json"
       - "scripts/local_import_baseline.json"
+      - "scripts/coverage_baseline.json"
   workflow_dispatch:
 
 permissions:
@@ -56,7 +59,12 @@ jobs:
       ITAMBOX_DB_SSLMODE: disable
 
     steps:
+      # Full history: the differential coverage gate diffs the change against the
+      # merge base with the pull request's base commit, which a shallow clone
+      # cannot resolve.
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          fetch-depth: 0
 
       - name: Set up Python ${{ matrix.python-version }}
         uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
@@ -74,6 +82,17 @@ jobs:
         run: |
           python -m unittest scripts.tests.test_migration_audit
           python scripts/migration_audit.py --check
+
+      # Fail fast: a broken quality gate must be caught before the ~40 minute
+      # suite runs, not after it. These suites are stdlib-only and need no
+      # database or application environment.
+      - name: Check the coverage and test-reporting gates
+        run: |
+          python -m unittest \
+            scripts.tests.test_coverage_policy \
+            scripts.tests.test_check_coverage_baseline \
+            scripts.tests.test_check_diff_coverage \
+            scripts.tests.test_check_test_report
 
       # python-ldap (pulled by django-auth-ldap) needs libldap2/sasl headers for
       # source builds. ubuntu-latest images can miss these under transient updates.
@@ -126,10 +145,80 @@ jobs:
         run: |
           uv run --locked --no-sync python manage.py check
 
-      - name: Run tests
+      # The complete serial suite against the database migrated from scratch
+      # above. It stays the correctness source of truth: pytest-xdist is
+      # installed but deliberately not used here, because the suite is not yet
+      # parallel-safe (see issue #21) and a flaky parallel run would be a weaker
+      # signal than a slow serial one, not a stronger one.
+      #
+      # `addopts` is overridden rather than extended: the repository defaults
+      # (`--reuse-db`, `--no-cov-on-fail`) are the wrong policy for the gate run.
+      # A reused database is not a clean measurement, and suppressing the report
+      # on failure would delete exactly the artifacts needed to diagnose it.
+      #
+      # `--cov-config` is mandatory, not decorative. coverage.py looks for its
+      # configuration in the *current* directory, and pytest runs from itambox/,
+      # so without this the root pyproject.toml is silently ignored: no branch
+      # measurement, and migrations and test files counted as covered source.
+      - name: Run tests (complete serial suite, branch coverage)
+        id: suite
         working-directory: ./itambox
         run: |
-          uv run --locked --no-sync pytest --create-db --cov=. --cov-report=term --cov-fail-under=45
+          uv run --locked --no-sync pytest \
+            -o addopts="--tb=short -p no:warnings" \
+            --create-db \
+            --cov=. \
+            --cov-config=../pyproject.toml \
+            --cov-report=term-missing:skip-covered \
+            --cov-report=xml:coverage.xml \
+            --cov-report=json:coverage.json \
+            --cov-report=html:htmlcov \
+            --junitxml=junit.xml \
+            --durations=25
+
+      # Published even when the suite failed: the durations and partial coverage
+      # of a failing run are the data you need to act on it.
+      - name: Upload coverage and duration artifacts
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: coverage-and-durations-py${{ matrix.python-version }}
+          path: |
+            itambox/coverage.xml
+            itambox/coverage.json
+            itambox/junit.xml
+            itambox/htmlcov/
+          if-no-files-found: error
+          retention-days: 30
+
+      # The three gates below are conditioned on the suite having produced a
+      # report, not on each other. They answer independent questions, so one
+      # failing must not skip the next and hide its finding: a run that both
+      # regressed globally and left new code untested has to report both.
+      - name: Certify the run and publish durations
+        if: steps.suite.conclusion == 'success'
+        run: |
+          python scripts/check_test_report.py \
+            --report itambox/junit.xml \
+            --summary-file "$GITHUB_STEP_SUMMARY"
+
+      - name: Check the global coverage ratchet
+        if: steps.suite.conclusion == 'success'
+        run: |
+          python scripts/check_coverage_baseline.py \
+            --coverage-json itambox/coverage.json \
+            --summary-file "$GITHUB_STEP_SUMMARY"
+
+      # Pull requests only: on a push to a protected branch there is no
+      # meaningful "changed code" range to hold to the differential target.
+      - name: Check differential coverage for changed production code
+        if: steps.suite.conclusion == 'success' && github.event_name == 'pull_request'
+        run: |
+          python scripts/check_diff_coverage.py \
+            --base-ref "${{ github.event.pull_request.base.sha }}" \
+            --head-ref HEAD \
+            --coverage-json itambox/coverage.json \
+            --summary-file "$GITHUB_STEP_SUMMARY"
 
   lint:
     runs-on: ubuntu-latest

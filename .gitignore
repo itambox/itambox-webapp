@@ -48,10 +48,15 @@ test_holders.csv
 # Local-only docker compose overrides
 docker-compose.override.yml
 
-# Coverage reports
+# Coverage and test-run reports. These are measurement output, published as CI
+# artifacts; the reviewed record is scripts/coverage_baseline.json, which IS
+# tracked.
 .coverage
 htmlcov/
 coverage_report*.txt
+coverage.json
+coverage.xml
+junit.xml
 
 # Scratch files
 scratch_page.html

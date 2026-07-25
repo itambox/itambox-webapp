@@ -1,0 +1,16 @@
+{
+  "schema_version": 1,
+  "canonical_python": "3.12",
+  "coverage_series": "7.15",
+  "policy_sha256": "7c16f6cab39e95dc0377da5487c5daf069158a628529235d65e5b39f3a07f6df",
+  "totals": {
+    "num_statements": 38733,
+    "covered_lines": 30386,
+    "line_rate": 78.45,
+    "num_branches": 10540,
+    "covered_branches": 6009,
+    "branch_rate": 57.01,
+    "excluded_lines": 29,
+    "measured_files": 453
+  }
+}
