@@ -5,11 +5,10 @@ from datetime import timedelta
 
 from django.utils import timezone
 
-from core.mfa import role_is_privileged
+from core.mfa import PRIVILEGED_ROLE_NAMES, role_is_privileged
 
 logger = logging.getLogger("itambox.auth.sso")
 
-PRIVILEGED_ROLE_NAMES = {"Admin", "Manager"}
 PRIVILEGED_JIT_TTL = timedelta(days=1)
 
 

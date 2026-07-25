@@ -15,6 +15,7 @@ from django.utils.http import urlencode
 from django.utils.translation import gettext_lazy as _
 
 from core.choices import JobStatusChoices, ObjectChangeActionChoices
+from core.context import get_current_request_id, get_current_user
 from core.managers import (
     AllObjectsManager,
     SoftDeleteManager,
@@ -34,7 +35,6 @@ from core.mixins import (
 from core.validators import validate_file_attachment, validate_image_attachment
 
 # Local application
-from itambox.middleware import get_current_request_id, get_current_user
 from itambox.registry import registry
 from itambox.utils import serialize_object
 

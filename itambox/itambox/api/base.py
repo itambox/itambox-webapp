@@ -5,6 +5,7 @@ from drf_spectacular.utils import extend_schema_field
 from rest_framework import serializers
 
 from itambox.api.exceptions import SerializerNotFound
+from itambox.api.related import get_related_object_by_attrs
 
 
 class BaseModelSerializer(serializers.ModelSerializer):
@@ -27,10 +28,6 @@ class BaseModelSerializer(serializers.ModelSerializer):
     def to_internal_value(self, data):
         if self.nested:
             queryset = self.Meta.model.objects.all()
-            # inline import: cycle: itambox.api.base <-> itambox.api.utils are
-            # mutually dependent; one of the two must stay deferred.
-            from itambox.api.utils import get_related_object_by_attrs
-
             return get_related_object_by_attrs(queryset, data)
         return super().to_internal_value(data)
 

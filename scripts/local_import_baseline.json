@@ -994,12 +994,6 @@
       "count": 1
     },
     {
-      "path": "itambox/core/auth/cache.py",
-      "context": "FunctionDef:_request_state",
-      "statement": "from itambox.middleware import get_current_request_id",
-      "count": 1
-    },
-    {
       "path": "itambox/core/auth/ldap.py",
       "context": "ClassDef:MultiTenantLDAPBackend/FunctionDef:authenticate",
       "statement": "from django.core.exceptions import ImproperlyConfigured",
@@ -2170,30 +2164,6 @@
       "count": 1
     },
     {
-      "path": "itambox/core/tasks/alerts.py",
-      "context": "FunctionDef:evaluate_alert_rules_task",
-      "statement": "from core.managers import set_current_membership, set_current_tenant",
-      "count": 1
-    },
-    {
-      "path": "itambox/core/tasks/alerts.py",
-      "context": "FunctionDef:evaluate_alert_rules_task",
-      "statement": "from itambox.middleware import _current_user",
-      "count": 1
-    },
-    {
-      "path": "itambox/core/tasks/alerts.py",
-      "context": "FunctionDef:run_alert_rule_now",
-      "statement": "from core.managers import set_current_membership, set_current_tenant",
-      "count": 1
-    },
-    {
-      "path": "itambox/core/tasks/alerts.py",
-      "context": "FunctionDef:run_alert_rule_now",
-      "statement": "from itambox.middleware import _current_user",
-      "count": 1
-    },
-    {
       "path": "itambox/core/tasks/checkin.py",
       "context": "FunctionDef:bulk_checkin_task",
       "statement": "from assets.models import Asset, StatusLabel",
@@ -2225,20 +2195,8 @@
     },
     {
       "path": "itambox/core/tasks/context.py",
-      "context": "ClassDef:TaskContext/FunctionDef:__enter__",
-      "statement": "from itambox.middleware import _current_user, _request_id",
-      "count": 1
-    },
-    {
-      "path": "itambox/core/tasks/context.py",
       "context": "ClassDef:TaskContext/FunctionDef:_resolve_principal_and_tenant",
       "statement": "from organization.access import accessible_tenant_ids",
-      "count": 1
-    },
-    {
-      "path": "itambox/core/tasks/context.py",
-      "context": "ClassDef:TaskContext/FunctionDef:_restore_context",
-      "statement": "from itambox.middleware import _current_user, _request_id",
       "count": 1
     },
     {
@@ -2959,36 +2917,6 @@
       "path": "itambox/inventory/models.py",
       "context": "ClassDef:ConsumableQuerySet/FunctionDef:with_counts",
       "statement": "from django.db.models.functions import Coalesce",
-      "count": 1
-    },
-    {
-      "path": "itambox/inventory/services.py",
-      "context": "FunctionDef:adjust_inventory_stock",
-      "statement": "from .models import AccessoryStock as StockModel",
-      "count": 1
-    },
-    {
-      "path": "itambox/inventory/services.py",
-      "context": "FunctionDef:adjust_inventory_stock",
-      "statement": "from .models import ComponentStock as StockModel",
-      "count": 1
-    },
-    {
-      "path": "itambox/inventory/services.py",
-      "context": "FunctionDef:adjust_inventory_stock",
-      "statement": "from .models import ConsumableStock as StockModel",
-      "count": 1
-    },
-    {
-      "path": "itambox/inventory/services.py",
-      "context": "FunctionDef:adjust_inventory_stock",
-      "statement": "from django.core.exceptions import ValidationError",
-      "count": 1
-    },
-    {
-      "path": "itambox/inventory/services.py",
-      "context": "FunctionDef:adjust_inventory_stock",
-      "statement": "from django.db import transaction",
       "count": 1
     },
     {

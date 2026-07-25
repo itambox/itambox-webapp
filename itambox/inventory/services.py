@@ -15,6 +15,11 @@ from .models import (
     ConsumableStock,
 )
 
+# Compatibility re-export: adjust_inventory_stock moved to the leaf module
+# inventory.stock so inventory.models can call it without importing this
+# module (issue #87, phase D). The published import path stays valid.
+from .stock import adjust_inventory_stock  # noqa: F401  isort:skip
+
 
 def checkout_inventory_item(
     item: Any,
@@ -210,88 +215,3 @@ def checkin_component(assignment_pk: Any, user: Optional[Any] = None) -> Tuple[A
 
     assignment.delete()
     return component, qty, recipient
-
-
-def adjust_inventory_stock(
-    assignment_instance: Any, is_delete: bool = False, old_instance: Optional[Any] = None
-) -> None:
-    """
-    Unified stock adjustment logic for ComponentAllocation, AccessoryAssignment, and ConsumableAssignment.
-    """
-    from django.core.exceptions import ValidationError
-    from django.db import transaction
-
-    if hasattr(assignment_instance, "accessory"):
-        item_field = "accessory"
-        from .models import AccessoryStock as StockModel
-    elif hasattr(assignment_instance, "consumable"):
-        item_field = "consumable"
-        from .models import ConsumableStock as StockModel
-    elif hasattr(assignment_instance, "component"):
-        item_field = "component"
-        from .models import ComponentStock as StockModel
-    else:
-        raise ValueError("Unknown assignment type for stock adjustment.")
-
-    item = getattr(assignment_instance, item_field)
-
-    def update_stock(item_val, location, qty_diff, allow_overallocate):
-        # _base_manager: with pool ownership on stock.tenant (phase 4), a
-        # granted cross-tenant checkout must adjust the OWNER's pool, which
-        # the grantee's scoped manager cannot see (a scoped get_or_create
-        # would try to create a duplicate and hit the unique constraint).
-        # Authorization happened upstream (resolve_grant_for_checkout +
-        # AbstractAssignment.clean); this is pure bookkeeping.
-        stock, _created = StockModel._base_manager.select_for_update().get_or_create(
-            location=location, **{item_field: item_val}, defaults={"qty": 0}
-        )
-        if qty_diff < 0:  # Deducting stock
-            if not allow_overallocate and stock.qty < abs(qty_diff):
-                raise ValidationError(
-                    _("Insufficient stock at %(location)s. Available: %(available)s, Requested: %(requested)s")
-                    % {"location": location, "available": stock.qty, "requested": abs(qty_diff)}
-                )
-        # No max(0, ...) clamp: clamping the deduction while restoring the full qty
-        # on check-in materialises stock out of nothing. The signed `qty` field lets
-        # over-allocation go negative so deduction and restoration stay symmetric.
-        stock.qty = stock.qty + qty_diff
-        stock.save(update_fields=["qty"])
-
-    with transaction.atomic():
-        if is_delete:
-            if assignment_instance.from_location:
-                update_stock(item, assignment_instance.from_location, assignment_instance.qty, item.allow_overallocate)
-        else:
-            is_new = assignment_instance.pk is None
-            if is_new:
-                if assignment_instance.from_location:
-                    update_stock(
-                        item, assignment_instance.from_location, -assignment_instance.qty, item.allow_overallocate
-                    )
-            else:
-                if old_instance is None:
-                    old_instance = assignment_instance.__class__._base_manager.get(pk=assignment_instance.pk)
-
-                old_deleted = getattr(old_instance, "deleted_at", None) is not None
-                new_deleted = getattr(assignment_instance, "deleted_at", None) is not None
-
-                if old_deleted and not new_deleted:
-                    # Restoring a soft-deleted assignment: only apply new stock allocation
-                    if assignment_instance.from_location:
-                        update_stock(
-                            item, assignment_instance.from_location, -assignment_instance.qty, item.allow_overallocate
-                        )
-                elif not old_deleted and new_deleted:
-                    # Soft-deleting: delete() already reverted the stock, do nothing here
-                    pass
-                elif not old_deleted and not new_deleted:
-                    # Normal update: revert old allocation, apply new allocation
-                    if old_instance.from_location:
-                        old_item = getattr(old_instance, item_field)
-                        update_stock(
-                            old_item, old_instance.from_location, old_instance.qty, old_item.allow_overallocate
-                        )
-                    if assignment_instance.from_location:
-                        update_stock(
-                            item, assignment_instance.from_location, -assignment_instance.qty, item.allow_overallocate
-                        )
