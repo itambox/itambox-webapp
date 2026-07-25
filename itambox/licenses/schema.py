@@ -134,7 +134,7 @@ class CreateLicense(graphene.Mutation):
             raise GraphQLError(
                 "Validation failed",
                 extensions={"validation_errors": e.message_dict if hasattr(e, "message_dict") else e.messages},
-            )
+            ) from e
         lic.save()
         return CreateLicense(license=lic)
 
@@ -188,7 +188,7 @@ class UpdateLicense(graphene.Mutation):
             raise GraphQLError(
                 "Validation failed",
                 extensions={"validation_errors": e.message_dict if hasattr(e, "message_dict") else e.messages},
-            )
+            ) from e
         lic.save()
         return UpdateLicense(license=lic)
 

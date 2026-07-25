@@ -53,7 +53,7 @@ def validate_cidr_list(value):
             raise ValidationError(
                 _('"%(prefix)s" is not a valid IP address or CIDR prefix.'),
                 params={"prefix": prefix},
-            )
+            ) from None
 
 
 class User(AbstractUser):

@@ -106,7 +106,7 @@ class CreateSoftware(graphene.Mutation):
             raise GraphQLError(
                 "Validation failed",
                 extensions={"validation_errors": e.message_dict if hasattr(e, "message_dict") else e.messages},
-            )
+            ) from e
         software.save()
         return CreateSoftware(software=software)
 
@@ -152,7 +152,7 @@ class UpdateSoftware(graphene.Mutation):
             raise GraphQLError(
                 "Validation failed",
                 extensions={"validation_errors": e.message_dict if hasattr(e, "message_dict") else e.messages},
-            )
+            ) from e
         software.save()
         return UpdateSoftware(software=software)
 

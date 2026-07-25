@@ -12,5 +12,5 @@ class StatusModelChoiceField(forms.ModelChoiceField):
             try:
                 return self.queryset.get(Q(slug=value) | Q(name__iexact=value))
             except self.queryset.model.DoesNotExist:
-                raise ValidationError(self.error_messages["invalid_choice"], code="invalid_choice")
+                raise ValidationError(self.error_messages["invalid_choice"], code="invalid_choice") from None
         return super().to_python(value)

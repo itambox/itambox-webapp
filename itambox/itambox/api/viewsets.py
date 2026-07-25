@@ -210,7 +210,7 @@ class ITAMBoxModelViewSet(
                 instance = serializer.save(**save_kwargs)
                 self._validate_objects(instance)
         except ObjectDoesNotExist:
-            raise PermissionDenied()
+            raise PermissionDenied() from None
 
     def update(self, request, *args, **kwargs):
         partial = kwargs.pop("partial", False)
@@ -266,7 +266,7 @@ class ITAMBoxModelViewSet(
                 instance = serializer.save(**save_kwargs)
                 self._validate_objects(instance)
         except ObjectDoesNotExist:
-            raise PermissionDenied()
+            raise PermissionDenied() from None
 
     def destroy(self, request, *args, **kwargs):
         instance = self.get_object_with_snapshot()
@@ -296,4 +296,4 @@ class ITAMBoxModelViewSet(
                 model._meta.verbose_name,
                 instance.pk,
             )
-            raise PermissionDenied()
+            raise PermissionDenied() from None

@@ -417,7 +417,7 @@ class JournalEntryCreateView(LoginRequiredMixin, View):
         try:
             model_class = apps.get_model(app_label, model_name)
         except LookupError:
-            raise Http404
+            raise Http404 from None
         obj_type = ContentType.objects.get_for_model(model_class)
         obj = _check_attachment_parent_access(request, obj_type, object_id)
         form = JournalEntryForm(request.POST)
@@ -445,7 +445,7 @@ class ImageAttachmentUploadView(LoginRequiredMixin, View):
         try:
             model_class = apps.get_model(app_label, model_name)
         except LookupError:
-            raise Http404
+            raise Http404 from None
         obj_type = ContentType.objects.get_for_model(model_class)
         obj = _check_attachment_parent_access(request, obj_type, object_id)
         uploaded_file = request.FILES.get("image")
@@ -465,7 +465,7 @@ class FileAttachmentUploadView(LoginRequiredMixin, View):
         try:
             model_class = apps.get_model(app_label, model_name)
         except LookupError:
-            raise Http404
+            raise Http404 from None
         obj_type = ContentType.objects.get_for_model(model_class)
         obj = _check_attachment_parent_access(request, obj_type, object_id)
         uploaded_file = request.FILES.get("file")

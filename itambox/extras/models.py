@@ -838,7 +838,7 @@ class ReportTemplate(ChangeLoggingMixin, SoftDeleteMixin, BaseModel):
             except Exception as e:
                 raise ValidationError(
                     {"template_content": _("Jinja2 template compilation failed: %(error)s") % {"error": str(e)}}
-                )
+                ) from None
 
 
 class ScheduledReport(ChangeLoggingMixin, BaseModel):
@@ -970,7 +970,9 @@ class ScheduledReport(ChangeLoggingMixin, BaseModel):
 
                 croniter(self.cron_expression, timezone.now())
             except Exception as e:
-                raise ValidationError({"cron_expression": _("Invalid Cron expression: %(error)s") % {"error": str(e)}})
+                raise ValidationError(
+                    {"cron_expression": _("Invalid Cron expression: %(error)s") % {"error": str(e)}}
+                ) from None
         if self.recipients:
             from django.core.validators import validate_email
 
@@ -983,7 +985,7 @@ class ScheduledReport(ChangeLoggingMixin, BaseModel):
                 except ValidationError:
                     raise ValidationError(
                         {"recipients": _("'%(email)s' is not a valid email address.") % {"email": email}}
-                    )
+                    ) from None
 
 
 class ReportGenerationArchive(ChangeLoggingMixin, BaseModel):

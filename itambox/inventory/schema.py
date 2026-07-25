@@ -290,7 +290,7 @@ class CreateAccessory(graphene.Mutation):
             raise GraphQLError(
                 "Validation failed",
                 extensions={"validation_errors": e.message_dict if hasattr(e, "message_dict") else e.messages},
-            )
+            ) from e
         acc.save()
         return CreateAccessory(accessory=acc)
 
@@ -341,7 +341,7 @@ class UpdateAccessory(graphene.Mutation):
             raise GraphQLError(
                 "Validation failed",
                 extensions={"validation_errors": e.message_dict if hasattr(e, "message_dict") else e.messages},
-            )
+            ) from e
         acc.save()
         return UpdateAccessory(accessory=acc)
 
@@ -404,7 +404,7 @@ class CreateConsumable(graphene.Mutation):
             raise GraphQLError(
                 "Validation failed",
                 extensions={"validation_errors": e.message_dict if hasattr(e, "message_dict") else e.messages},
-            )
+            ) from e
         cons.save()
         return CreateConsumable(consumable=cons)
 
@@ -448,7 +448,7 @@ class UpdateConsumable(graphene.Mutation):
             raise GraphQLError(
                 "Validation failed",
                 extensions={"validation_errors": e.message_dict if hasattr(e, "message_dict") else e.messages},
-            )
+            ) from e
         cons.save()
         return UpdateConsumable(consumable=cons)
 
@@ -501,7 +501,7 @@ class CreateKit(graphene.Mutation):
             raise GraphQLError(
                 "Validation failed",
                 extensions={"validation_errors": e.message_dict if hasattr(e, "message_dict") else e.messages},
-            )
+            ) from e
         kt.save()
         return CreateKit(kit=kt)
 
@@ -533,7 +533,7 @@ class UpdateKit(graphene.Mutation):
             raise GraphQLError(
                 "Validation failed",
                 extensions={"validation_errors": e.message_dict if hasattr(e, "message_dict") else e.messages},
-            )
+            ) from e
         kt.save()
         return UpdateKit(kit=kt)
 
@@ -599,7 +599,7 @@ class CreateComponent(graphene.Mutation):
             raise GraphQLError(
                 "Validation failed",
                 extensions={"validation_errors": e.message_dict if hasattr(e, "message_dict") else e.messages},
-            )
+            ) from e
         comp.save()
         return CreateComponent(component=comp)
 
@@ -647,7 +647,7 @@ class UpdateComponent(graphene.Mutation):
             raise GraphQLError(
                 "Validation failed",
                 extensions={"validation_errors": e.message_dict if hasattr(e, "message_dict") else e.messages},
-            )
+            ) from e
         comp.save()
         return UpdateComponent(component=comp)
 

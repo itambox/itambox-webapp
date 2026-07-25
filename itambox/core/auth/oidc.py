@@ -42,9 +42,11 @@ class TenantOIDCSettingsMixin:
         # Fallback to global django settings
         try:
             return import_from_settings(attr, *args)
-        except ImproperlyConfigured:
+        except ImproperlyConfigured as exc:
             tenant_slug = tenant.slug if tenant else "<unknown>"
-            raise ImproperlyConfigured(f"OIDC not configured for tenant: {tenant_slug} (missing setting: {attr})")
+            raise ImproperlyConfigured(
+                f"OIDC not configured for tenant: {tenant_slug} (missing setting: {attr})"
+            ) from exc
 
     def __getattr__(self, name):
         if name.startswith("OIDC_"):
@@ -360,7 +362,7 @@ class TenantOIDCAuthorizeView(TenantOIDCSettingsMixin, OIDCAuthenticationRequest
             except Tenant.DoesNotExist:
                 from django.http import Http404
 
-                raise Http404(f"Tenant '{tenant_slug}' does not exist.")
+                raise Http404(f"Tenant {tenant_slug!r} does not exist.") from None
 
         if not tenant:
             sess_tenant_slug = request.session.get("oidc_tenant_slug")

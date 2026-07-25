@@ -118,7 +118,7 @@ class WebhookEndpointSerializer(BaseModelSerializer):
         try:
             validate_external_url(value)
         except DjangoValidationError as exc:
-            raise serializers.ValidationError(exc.messages)
+            raise serializers.ValidationError(exc.messages) from exc
         return value
 
 
@@ -216,7 +216,7 @@ class NotificationChannelSerializer(BaseModelSerializer):
                 try:
                     validate_external_url(url_val)
                 except DjangoValidationError as exc:
-                    raise serializers.ValidationError({"webhook_url": exc.messages})
+                    raise serializers.ValidationError({"webhook_url": exc.messages}) from exc
             return cleaned
         return value
 

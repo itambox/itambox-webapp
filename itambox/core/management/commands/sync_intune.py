@@ -59,7 +59,7 @@ class Command(BaseCommand):
         try:
             tenant = Tenant.objects.get(slug=tenant_slug)
         except Tenant.DoesNotExist:
-            raise CommandError(f"No tenant with slug '{tenant_slug}'.")
+            raise CommandError(f"No tenant with slug {tenant_slug!r}.") from None
 
         intune_configs = getattr(settings, "ITAMBOX_TENANT_INTUNE_CONFIGS", {})
         if tenant_slug not in intune_configs:

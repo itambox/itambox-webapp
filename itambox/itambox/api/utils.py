@@ -25,8 +25,10 @@ def get_serializer_for_model(model, prefix=""):
     serializer_name = f"{app_label}.api.serializers.{prefix}{model_name}Serializer"
     try:
         return import_string(serializer_name)
-    except ImportError:
-        raise SerializerNotFound(f"Could not determine serializer for {app_label}.{model_name} with prefix '{prefix}'")
+    except ImportError as exc:
+        raise SerializerNotFound(
+            f"Could not determine serializer for {app_label}.{model_name} with prefix {prefix!r}"
+        ) from exc
 
 
 def get_view_name(view):
@@ -120,12 +122,14 @@ def get_related_object_by_attrs(queryset, attrs):
         params = _dict_to_filter_params(attrs)
         try:
             return queryset.get(**params)
-        except ObjectDoesNotExist:
+        except ObjectDoesNotExist as exc:
             raise ValidationError(
                 _("Related object not found using the provided attributes: {params}").format(params=params)
-            )
-        except MultipleObjectsReturned:
-            raise ValidationError(_("Multiple objects match the provided attributes: {params}").format(params=params))
+            ) from exc
+        except MultipleObjectsReturned as exc:
+            raise ValidationError(
+                _("Multiple objects match the provided attributes: {params}").format(params=params)
+            ) from exc
 
     try:
         pk = int(attrs)
@@ -135,12 +139,12 @@ def get_related_object_by_attrs(queryset, attrs):
                 "Related objects must be referenced by numeric ID or by dictionary of attributes. Received an "
                 "unrecognized value: {value}"
             ).format(value=attrs)
-        )
+        ) from None
 
     try:
         return queryset.get(pk=pk)
-    except ObjectDoesNotExist:
-        raise ValidationError(_("Related object not found using the provided numeric ID: {id}").format(id=pk))
+    except ObjectDoesNotExist as exc:
+        raise ValidationError(_("Related object not found using the provided numeric ID: {id}").format(id=pk)) from exc
 
 
 def _dict_to_filter_params(d):

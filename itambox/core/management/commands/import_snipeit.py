@@ -109,7 +109,7 @@ class Command(BaseCommand):
             try:
                 tenant = Tenant.objects.get(slug=options["tenant"])
             except Tenant.DoesNotExist:
-                raise CommandError(f"Tenant with slug '{options['tenant']}' not found.")
+                raise CommandError(f"Tenant with slug {options['tenant']!r} not found.") from None
         elif not map_companies:
             raise CommandError("Either --tenant <slug> or --map-companies-to-tenants is required.")
 
@@ -119,7 +119,7 @@ class Command(BaseCommand):
             try:
                 user = User.objects.get(username=admin_username)
             except User.DoesNotExist:
-                raise CommandError(f"User '{admin_username}' not found.")
+                raise CommandError(f"User {admin_username!r} not found.") from None
         else:
             user = User.objects.filter(is_superuser=True).order_by("pk").first()
             if not user:
@@ -171,7 +171,7 @@ class Command(BaseCommand):
             msg = f"Cannot connect to Snipe-IT at {base_url}: {exc}"
             if job:
                 job.mark_failed(msg)
-            raise CommandError(msg)
+            raise CommandError(msg) from exc
 
         from core.tasks.context import TaskContext
 

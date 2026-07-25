@@ -287,7 +287,7 @@ class GenericObjectImportView(ObjectImportView):
         try:
             model = apps.get_model(app_label, model_name)
         except LookupError:
-            raise Http404
+            raise Http404 from None
         # Generated logs and UI-only config are not importable, even by direct URL.
         if not is_model_importable(model):
             raise Http404

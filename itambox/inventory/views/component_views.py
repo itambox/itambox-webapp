@@ -217,7 +217,7 @@ class ComponentStockAdjustView(LoginRequiredMixin, PermissionRequiredMixin, View
             try:
                 stock = ComponentStock.objects.select_for_update().get(pk=pk)
             except ComponentStock.DoesNotExist:
-                raise Http404
+                raise Http404 from None
             # Anchor at the POOL — see AccessoryStockAdjustView.
             if not request.user.has_perm("inventory.change_componentstock", obj=stock):
                 return HttpResponseForbidden(_("Permission denied."))

@@ -100,7 +100,7 @@ def audit_asset(
     except IntegrityError:
         # Lost the race on the (session, asset) unique constraint — return the friendly
         # error rather than a 500.
-        raise ValidationError(_("This asset has already been verified in this session."))
+        raise ValidationError(_("This asset has already been verified in this session.")) from None
 
     asset.last_audited = timezone.now()
     asset.last_audited_by = user

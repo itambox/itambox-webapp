@@ -29,7 +29,7 @@ def load_plugins(settings_module):
         try:
             plugin_module = importlib.import_module(plugin_name)
         except ImportError as e:
-            raise ImproperlyConfigured(f"Failed to import plugin '{plugin_name}': {e}")
+            raise ImproperlyConfigured(f"Failed to import plugin {plugin_name!r}: {e}") from e
 
         config_cls = getattr(plugin_module, "config", None)
         if config_cls is None:

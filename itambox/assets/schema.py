@@ -237,7 +237,7 @@ class CreateAsset(graphene.Mutation):
             raise GraphQLError(
                 "Validation failed",
                 extensions={"validation_errors": e.message_dict if hasattr(e, "message_dict") else e.messages},
-            )
+            ) from e
         asset.save()
         return CreateAsset(asset=asset)
 
@@ -298,7 +298,7 @@ class UpdateAsset(graphene.Mutation):
             raise GraphQLError(
                 "Validation failed",
                 extensions={"validation_errors": e.message_dict if hasattr(e, "message_dict") else e.messages},
-            )
+            ) from e
         asset.save()
         return UpdateAsset(asset=asset)
 
