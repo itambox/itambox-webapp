@@ -10,6 +10,7 @@ from itambox.middleware import get_current_user
 
 from ..filters import TenantFilterSet
 from ..models import Tenant, TenantGroup
+from .helpers import add_standard_buttons
 
 # Codes the `money` template filter renders with a proper symbol/placement;
 # anything else falls back to an ISO-code suffix.
@@ -191,7 +192,6 @@ class TenantForm(forms.ModelForm):
                 )
         layout_rows.extend(["description", "comments", "tags"])
         self.helper.layout = Layout(*layout_rows)
-        from .helpers import add_standard_buttons
 
         add_standard_buttons(self.helper, self.instance, "organization:tenant_list")
 

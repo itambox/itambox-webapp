@@ -2,6 +2,7 @@ import hashlib
 import hmac
 import json
 import logging
+from types import SimpleNamespace
 
 import requests
 from django.contrib.auth import get_user_model
@@ -257,8 +258,6 @@ def _render_template(template, event):
     an information-disclosure vector for anyone who can edit a rule's
     ``action_config``. A nested SimpleNamespace of strings has no such gadget.
     """
-    from types import SimpleNamespace
-
     if not template:
         return template
 
@@ -339,7 +338,7 @@ def _post_pinned(webhook_url, payload):
     """
     from django.core.exceptions import ValidationError
 
-    # inline import: keep event-dispatch import-light; core.http pulls requests.
+    # inline import: heavy-import: keep event-dispatch import-light; core.http pulls requests.
     from core.http import request_pinned
 
     try:

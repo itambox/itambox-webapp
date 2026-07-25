@@ -1,3 +1,6 @@
+import csv
+import datetime
+import io
 import json
 
 from django.contrib import messages
@@ -772,8 +775,6 @@ class ScheduledReportListView(ObjectListView):
 
 
 def handle_report_scheduling(sched_report):
-    import datetime
-
     from django.utils import timezone
     from django_q.models import Schedule
 
@@ -1060,9 +1061,6 @@ class ReportTemplateDownloadView(PermissionRequiredMixin, LoginRequiredMixin, Vi
             stamp = f"{timezone.now():%Y%m%d}"
 
             if format_type == "csv":
-                import csv
-                import io
-
                 from core.csv_utils import csv_safe
 
                 csv_buffer = io.StringIO()

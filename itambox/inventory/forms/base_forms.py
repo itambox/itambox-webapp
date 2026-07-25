@@ -73,7 +73,7 @@ class BaseCheckoutForm(forms.Form):
         active = get_current_tenant()
         if active is None:
             return []
-        # inline import: breaks an inventory <-> organization form-import cycle
+        # inline import: cycle: breaks an inventory <-> organization form-import cycle
         from organization.access import shared_resource_ids
 
         item_field = stock_model._meta.model_name.replace("stock", "")

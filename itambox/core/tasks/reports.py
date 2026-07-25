@@ -99,7 +99,7 @@ def generate_scheduled_report_task(scheduled_report_id):
                 # in advanced mode, else the polished system template. Shared by the
                 # HTML and PDF formats (PDF is this HTML run through xhtml2pdf).
                 if template.advanced_mode and template.template_content.strip():
-                    # inline import: defer the optional/heavy jinja2 dependency.
+                    # inline import: heavy-import: defer the optional/heavy jinja2 dependency.
                     from jinja2.sandbox import SandboxedEnvironment
 
                     env = SandboxedEnvironment()

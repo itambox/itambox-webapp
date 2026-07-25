@@ -1,3 +1,7 @@
+import datetime
+from datetime import timedelta
+from types import SimpleNamespace
+
 from django.contrib.contenttypes.models import ContentType
 from django.db.models import Count, Q, Sum
 from django.utils import timezone
@@ -23,8 +27,6 @@ def _format_per_currency(amount_by_currency):
     """Render a {currency: amount} mapping as ONE money figure per currency joined with
     ' · '. There is no FX source, so amounts in different currencies are NEVER summed into a
     single (meaningless) total. Mirrors the subscription-renewals spend card."""
-    from types import SimpleNamespace
-
     from extras.templatetags.money import money as _money_fmt
 
     items = sorted(amount_by_currency.items(), key=lambda kv: kv[1], reverse=True)
@@ -38,7 +40,6 @@ def _money(amount, currency_value, active_tenant):
     Mirrors the per-currency summary-card path (_record_currency/_format_per_currency)."""
     if amount is None:
         return "-"
-    from types import SimpleNamespace
 
     from extras.templatetags.money import money as _money_fmt
 
@@ -310,9 +311,7 @@ def compile_report_context(template, active_tenant=None, filter_tenants=None):
                 # Warranty is its own model now (Asset has no warranty_months field).
                 # Compute the active warranty's term from the prefetched relation —
                 # no N+1, no dead getattr. (A dedicated warranty report covers the rest.)
-                import datetime as _dt
-
-                _today = _dt.date.today()
+                _today = datetime.date.today()
                 _active_warranty = next(
                     (
                         w
@@ -546,8 +545,6 @@ def compile_report_context(template, active_tenant=None, filter_tenants=None):
 
         if template.include_summary_cards:
             # One figure per currency; no cross-currency combined total.
-            from types import SimpleNamespace
-
             spend_value = " · ".join(
                 _money_fmt(amount, SimpleNamespace(currency=cur))
                 for cur, amount in sorted(monthly_by_currency.items(), key=lambda kv: kv[1], reverse=True)
@@ -945,8 +942,6 @@ def compile_report_context(template, active_tenant=None, filter_tenants=None):
             chart_svg = generate_doughnut_chart(chart_data, title=_("Software Category Distribution"))
 
     elif template.report_type == ReportTemplate.REPORT_TYPE_CONTRACT_RENEWALS:
-        from datetime import timedelta  # inline import: timedelta not yet at module level in compiler.py
-
         from procurement.models import Contract
 
         # select_related 'tenant' avoids N+1 in _record_currency when the
@@ -1140,8 +1135,6 @@ def compile_report_context(template, active_tenant=None, filter_tenants=None):
         if template.include_distribution_chart:
             chart_svg = generate_bar_chart(chart_data, title=_("Annual Spend by Supplier"))
     elif template.report_type == ReportTemplate.REPORT_TYPE_WARRANTY_EXPIRATION:
-        import datetime
-
         from assets.models.lifecycle import Warranty
 
         today = datetime.date.today()

@@ -8,6 +8,8 @@ Usage on a CreateView:
         quick_add_target = 'id_manufacturer'  # ID of the parent select to refresh
 """
 
+import json
+
 from django.http import HttpResponse
 from django.template.loader import render_to_string
 
@@ -66,8 +68,6 @@ class QuickAddMixin:
             target = getattr(self, "quick_add_target", None) or ""
             value = str(self.object)
             pk = self.object.pk
-
-            import json
 
             response = HttpResponse("Object created successfully")
             response["HX-Trigger"] = json.dumps(

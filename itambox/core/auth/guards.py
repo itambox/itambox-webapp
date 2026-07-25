@@ -48,7 +48,7 @@ def validate_role_grant(
     ):
         raise ValidationError(_("You are not allowed to grant reach into managed tenants."))
 
-    # inline imports: avoid core.auth <-> organization import cycles at load time.
+    # inline imports: cycle: avoid core.auth <-> organization import cycles at load time.
     from organization.models import RoleGrantScope, Tenant
     from organization.rbac import applicable_grants
 
@@ -167,7 +167,7 @@ def _live_role_grant_scope_request(
             target_group = scope.tenant_group
             if target_group is None or target_group.deleted_at is not None:
                 continue
-            # inline imports: avoid core.auth <-> organization import cycles at load time.
+            # inline imports: cycle: avoid core.auth <-> organization import cycles at load time.
             from organization.access import get_descendant_tenant_group_ids
             from organization.models import Tenant
 

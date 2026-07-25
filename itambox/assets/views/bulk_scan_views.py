@@ -32,7 +32,7 @@ from itambox.views.generic.utils import safe_return_url
 
 from .. import forms
 from ..depreciation import compute_book_value
-from ..models import Asset
+from ..models import Asset, AssetDisposal
 from ..scanning import resolve_scanned_code
 
 logger = logging.getLogger(__name__)
@@ -56,9 +56,6 @@ def asset_action_payload(asset, mode):
     book_value = None
 
     if mode == "dispose":
-        # inline import: avoids a models-package import cycle at module load
-        from ..models import AssetDisposal
-
         if asset.disposed_at is not None or AssetDisposal.all_objects.filter(asset=asset).exists():
             eligible = False
             warning = str(_("Already disposed — will be skipped."))

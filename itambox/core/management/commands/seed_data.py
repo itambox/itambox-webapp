@@ -20,7 +20,9 @@ Usage:
 """
 
 import datetime
+import os
 import random
+import secrets as _secrets
 
 from django.apps import apps
 from django.conf import settings
@@ -238,9 +240,6 @@ class Command(
     # ─────────────────────────────────────────────────────────────────
 
     def _seed_minimal(self):
-        import os
-        import secrets as _secrets
-
         from assets.models import StatusLabel
 
         if not User.objects.filter(is_superuser=True).exists():

@@ -1,4 +1,5 @@
 import hashlib
+from urllib.parse import parse_qsl, urlencode, urlparse, urlunparse
 
 from django.contrib.auth.decorators import login_required, permission_required
 from django.shortcuts import get_object_or_404, render
@@ -47,8 +48,6 @@ def custody_eula_sign(request, token):
         if provider:
             url = provider.initiate_signature(receipt, request)
             if request.GET.get("onsite") == "true":
-                from urllib.parse import parse_qsl, urlencode, urlparse, urlunparse
-
                 u = urlparse(url)
                 q = dict(parse_qsl(u.query))
                 q["onsite"] = "true"

@@ -27,6 +27,8 @@ class BaseModelSerializer(serializers.ModelSerializer):
     def to_internal_value(self, data):
         if self.nested:
             queryset = self.Meta.model.objects.all()
+            # inline import: cycle: itambox.api.base <-> itambox.api.utils are
+            # mutually dependent; one of the two must stay deferred.
             from itambox.api.utils import get_related_object_by_attrs
 
             return get_related_object_by_attrs(queryset, data)

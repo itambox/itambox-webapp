@@ -1,6 +1,8 @@
 import ipaddress
+import os
 import re
 import socket
+import sys
 from urllib.parse import urlsplit
 
 from django.core.exceptions import ValidationError
@@ -166,8 +168,6 @@ def parse_json_rules(instance, rules):
 
 
 def validate_file_attachment(file):
-    import os
-
     # 1. Size Validation (10 MB limit)
     max_size = 10 * 1024 * 1024
     if file.size > max_size:
@@ -230,6 +230,8 @@ def validate_file_attachment(file):
         file.seek(0)
         chunk = file.read(2048)
         file.seek(initial_pos)
+        # inline import: optional-dependency: python-magic is excluded on native
+        # Windows; the except branch is the documented fallback.
         import magic
 
         mime_type = magic.from_buffer(chunk, mime=True).lower()
@@ -261,8 +263,6 @@ def validate_file_attachment(file):
 
 
 def validate_image_attachment(file):
-    import os
-
     # 1. Size Validation (5 MB limit)
     max_size = 5 * 1024 * 1024
     if file.size > max_size:
@@ -278,8 +278,6 @@ def validate_image_attachment(file):
         )
 
     # 3. Magic Mime Validation (verify actual file signature)
-    import sys
-
     initial_pos = file.tell()
     file.seek(0)
     chunk = file.read(2048)
@@ -290,6 +288,8 @@ def validate_image_attachment(file):
         mime_type = "image/png"
     else:
         try:
+            # inline import: optional-dependency: python-magic is excluded on native
+            # Windows; the except branch is the documented Pillow fallback.
             import magic
 
             mime_type = magic.from_buffer(chunk, mime=True).lower()

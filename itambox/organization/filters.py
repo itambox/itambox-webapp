@@ -180,7 +180,7 @@ def _tenant_filter_managed_by_queryset(request):
     managers = Tenant._base_manager.filter(is_provider=True, deleted_at__isnull=True)
     if user.is_superuser:
         return managers
-    # inline import: organization.access imports organization.models; a module-top import here
+    # inline import: app-registry: organization.access imports organization.models; a module-top import here
     # risks an import cycle during app loading.
     from organization.access import accessible_tenant_ids
 

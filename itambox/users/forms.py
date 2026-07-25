@@ -2,6 +2,7 @@
 # Copyright (c) DigitalOcean, LLC.
 # Licensed under the Apache License, Version 2.0.
 
+import ipaddress
 import logging
 
 from django import forms
@@ -352,8 +353,6 @@ class TokenForm(forms.ModelForm):
         )
 
     def clean_allowed_ips(self):
-        import ipaddress
-
         raw = self.cleaned_data.get("allowed_ips", "")
         prefixes = [p.strip() for p in raw.replace("\n", ",").split(",") if p.strip()]
         for prefix in prefixes:

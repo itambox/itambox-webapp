@@ -1,3 +1,5 @@
+import re
+
 from crispy_forms.helper import FormHelper
 from crispy_forms.layout import HTML, Column, Div, Field, Fieldset, Layout, Row, Submit
 from django import forms
@@ -690,7 +692,7 @@ class ExportTemplateForm(forms.ModelForm):
 
     def clean_template_code(self):
         code = self.cleaned_data.get("template_code") or ""
-        # inline import: jinja2 is only needed when validating template authoring,
+        # inline import: heavy-import: jinja2 is only needed when validating template authoring,
         # not on every forms.py import.
         from jinja2 import TemplateSyntaxError
 
@@ -1248,8 +1250,6 @@ class NotificationChannelForm(forms.ModelForm):
                 self.initial.setdefault("in_app_recipient_users", recipient_users)
 
     def clean(self):
-        import re
-
         from django.core.exceptions import ValidationError as DjangoValidationError
         from django.core.validators import validate_email
 

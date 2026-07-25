@@ -139,6 +139,7 @@ From the repository root:
 uv run --locked --group dev pre-commit run --all-files
 make format-check
 uv run --locked --only-group dev python scripts/check_flake8_baseline.py
+uv run --locked --only-group dev python scripts/check_local_imports.py
 ```
 
 Ruff is the canonical formatter and import sorter (`make format` applies it
@@ -146,6 +147,13 @@ idempotently; `make format-check` above is the non-mutating check CI runs).
 Ruff owns formatting and import order only -- Flake8 above remains the
 separate blocking semantic gate, and this split is deliberate: see
 [AGENTS.md](AGENTS.md#format-and-import-order-ruff) for the full policy.
+
+The last command is the import-placement gate. Imports belong at module top; a
+function-body import needs an explicit `# inline import: <category>: <reason>`
+annotation, and everything not yet triaged is frozen in
+`scripts/local_import_baseline.json` so new untriaged imports fail review. Read
+the [Python import policy](itambox/docs/development/python-import-policy.md)
+before adding one or paying down baselined debt.
 
 From `itambox/`:
 

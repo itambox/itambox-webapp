@@ -17,7 +17,7 @@ def _role_is_privileged(role_name, permissions, privileged_names_lower) -> bool:
 
 def role_is_privileged(role) -> bool:
     """Classify privilege by canonical names or any non-view permission."""
-    # inline import: avoids core.auth initialization during model import.
+    # inline import: cycle: core.mfa <-> core.auth.provisioning at module load.
     from core.auth.provisioning import PRIVILEGED_ROLE_NAMES
 
     privileged_names_lower = {name.lower() for name in PRIVILEGED_ROLE_NAMES}
@@ -29,7 +29,7 @@ def user_requires_mfa(user) -> bool:
         return False
     if getattr(user, "is_superuser", False):
         return True
-    # inline import: avoids core.mfa <-> organization model imports at module load.
+    # inline import: cycle: avoids core.mfa <-> organization model imports at module load.
     from organization.rbac import applicable_grants
 
     return any(bool(grant.scopes.all()) and role_is_privileged(grant.role) for grant in applicable_grants(user))

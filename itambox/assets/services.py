@@ -11,6 +11,8 @@ if TYPE_CHECKING:
 
     from .models import AssetDisposal
 
+from decimal import Decimal
+
 from django.contrib.contenttypes.models import ContentType
 from django.core.exceptions import ValidationError
 from django.core.mail import send_mail
@@ -316,8 +318,6 @@ def dispose_asset(
     The whole operation is wrapped in a database transaction; either
     everything succeeds or nothing is written.
     """
-    from decimal import Decimal
-
     from assets.depreciation import compute_book_value
     from assets.models import AssetDisposal  # local import avoids circular at module load
 

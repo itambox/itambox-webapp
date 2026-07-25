@@ -3,6 +3,7 @@
 # Licensed under the Apache License, Version 2.0.
 
 # itambox/templatetags/utility_tags.py
+import json
 from urllib.parse import urlencode
 
 from django import template
@@ -198,8 +199,6 @@ def has_object_perm(user, perm, obj):
 @register.filter
 def pretty_json(value):
     """Render value as a pretty-printed JSON string."""
-    import json
-
     if value is None:
         return ""
     try:

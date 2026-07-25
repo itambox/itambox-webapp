@@ -1,7 +1,9 @@
 import csv
 import difflib
+import importlib
 import json
 import logging
+import mimetypes
 
 import yaml
 from django.apps import apps
@@ -212,7 +214,6 @@ def get_filterset_for_model(model):
 
     app_label = model._meta.app_label
     model_name = model._meta.model_name
-    import importlib
 
     try:
         filters_module = importlib.import_module(f"{app_label}.filters")
@@ -467,8 +468,6 @@ class FileAttachmentUploadView(LoginRequiredMixin, View):
         obj = _check_attachment_parent_access(request, obj_type, object_id)
         uploaded_file = request.FILES.get("file")
         if uploaded_file:
-            import mimetypes
-
             mime_type, _encoding = mimetypes.guess_type(uploaded_file.name)
             FileAttachment.objects.create(
                 model=obj_type,
@@ -574,8 +573,6 @@ class ImageAttachmentServeView(LoginRequiredMixin, View):
         # Force an image/* content-type (defence-in-depth alongside nosniff) so a mislabeled
         # upload can't be served as HTML/SVG inline. The validator restricts uploads to image
         # extensions, so a valid image always resolves to image/*; anything else -> download.
-        import mimetypes
-
         guessed, _enc = mimetypes.guess_type(attachment.image.name)
         response["Content-Type"] = guessed if (guessed or "").startswith("image/") else "application/octet-stream"
         response["X-Content-Type-Options"] = "nosniff"
@@ -669,8 +666,6 @@ class WebhookEndpointDetailView(WorkerStatusContextMixin, ObjectDetailView):
         return self.get(request, *args, **kwargs)
 
     def _send_test_webhook(self, request):
-        import json
-
         import requests as http_requests
         from django.http import JsonResponse
 

@@ -11,6 +11,7 @@ automatic checkout, because assignment carries compliance side-effects.
 """
 
 import logging
+import re
 
 from django.conf import settings
 from django.utils import timezone
@@ -262,8 +263,6 @@ def _sync_device_software(client: IntuneClient, device: dict, asset, dry_run: bo
 
 def _slugify(value: str) -> str:
     """Minimal slug generation matching Django's default slugify output."""
-    import re
-
     value = value.lower().strip()
     value = re.sub(r"[^\w\s-]", "", value)
     value = re.sub(r"[\s_-]+", "-", value)

@@ -45,6 +45,8 @@ def get_view_name(view):
 
 
 def _get_nested_serializer(serializer_field):
+    # inline import: cycle: itambox.api.utils <-> itambox.api.base are mutually
+    # dependent; one of the two must stay deferred.
     from itambox.api.base import BaseModelSerializer
 
     if isinstance(serializer_field, ListSerializer):

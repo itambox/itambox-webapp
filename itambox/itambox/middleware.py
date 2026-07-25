@@ -1,4 +1,6 @@
+import base64
 import contextvars
+import os
 import uuid
 
 from .ratelimit import RateLimitMiddleware
@@ -95,9 +97,6 @@ class CSPMiddleware:
         self.get_response = get_response
 
     def __call__(self, request):
-        import base64
-        import os
-
         # Generate a cryptographically secure random base64 nonce for this request
         request.csp_nonce = base64.b64encode(os.urandom(16)).decode("utf-8")
         response = self.get_response(request)
@@ -269,6 +268,7 @@ class TenantMiddleware:
         # no single tenant/group is selected, yet the request is NOT global.
         session_all_accessible = bool(request.session.get("active_all_accessible"))
 
+        # inline import: cycle: itambox.middleware <-> organization.models at module load.
         from organization.models import Membership, Tenant, TenantGroup
 
         # If query parameters are provided to switch, update them. Selecting a
@@ -350,7 +350,7 @@ class TenantMiddleware:
                 # managed reach). The descendant walk (pruned at soft-deleted nodes)
                 # matches filter_by_tenant and the auth backend's group gate — a member
                 # whose tenants all sit in a child group may still activate the parent.
-                # inline import: avoid a middleware <-> organization cycle at load
+                # inline import: cycle: avoid a middleware <-> organization cycle at load
                 from organization.access import get_descendant_tenant_group_ids
 
                 group_tenant_ids = set(

@@ -1,5 +1,7 @@
 """AssetAssignment — checkout/checkin records linking assets to holders/locations."""
 
+import datetime
+
 from django.conf import settings
 from django.core.exceptions import ValidationError
 from django.db import models
@@ -173,7 +175,6 @@ class AssetAssignment(SoftDeleteMixin, JournalingMixin, TaggableMixin, ChangeLog
             return False
         if not self.due_date:
             return False
-        import datetime
 
         return datetime.date.today() > self.due_date
 

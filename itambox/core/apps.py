@@ -79,7 +79,7 @@ class CoreConfig(AppConfig):
 
     def _register_alert_schedule(self, sender, **kwargs):
         """Ensure the daily alert evaluation schedule exists in django-q2."""
-        # inline import: avoid AppRegistryNotReady at app-load time
+        # inline import: app-registry: avoid AppRegistryNotReady at app-load time
         from django_q.models import Schedule
 
         from core.schedules import register_schedule
@@ -95,7 +95,7 @@ class CoreConfig(AppConfig):
 
     def _register_prune_schedule(self, sender, **kwargs):
         """Ensure the daily changelog/operational-data retention prune schedule exists."""
-        # inline import: avoid AppRegistryNotReady at app-load time
+        # inline import: app-registry: avoid AppRegistryNotReady at app-load time
         from django_q.models import Schedule
 
         from core.schedules import register_schedule

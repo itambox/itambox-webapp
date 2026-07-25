@@ -1,3 +1,5 @@
+import logging
+
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.contrib.auth.mixins import LoginRequiredMixin
@@ -42,8 +44,6 @@ class InventoryListView(LoginRequiredMixin, View):
 
 @login_required
 def bulk_checkout_inventory(request):
-    import logging
-
     logger = logging.getLogger(__name__)
 
     model_name_str = request.POST.get("model_name")

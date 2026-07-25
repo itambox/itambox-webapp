@@ -35,7 +35,7 @@ def register_schedule(func, *, defaults=None):
     """
     defaults = defaults or {}
     try:
-        # inline import: avoid AppRegistryNotReady at app-load time
+        # inline import: app-registry: avoid AppRegistryNotReady at app-load time
         from django_q.models import Schedule
 
         with transaction.atomic():

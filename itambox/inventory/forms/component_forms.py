@@ -254,9 +254,6 @@ class ComponentCheckoutForm(BaseCheckoutForm):
     def __init__(self, *args, **kwargs):
         self.component = kwargs.pop("component", None)
         tenant = self.component.tenant if self.component else None
-        # inline import: sibling-module import at call time avoids a forms-package cycle
-        from ..models import ComponentStock
-
         super().__init__(*args, tenant=tenant, item=self.component, stock_model=ComponentStock, **kwargs)
         self.helper = FormHelper()
         self.helper.form_tag = False

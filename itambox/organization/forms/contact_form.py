@@ -8,6 +8,7 @@ from extras.models import Tag
 
 from ..filters import ContactFilterSet
 from ..models import Contact
+from .helpers import add_standard_buttons
 
 
 class ContactForm(CustomFieldModelFormMixin, forms.ModelForm):
@@ -62,7 +63,6 @@ class ContactForm(CustomFieldModelFormMixin, forms.ModelForm):
             "tags",
         )
         self.append_custom_fields_to_layout()
-        from .helpers import add_standard_buttons
 
         add_standard_buttons(self.helper, self.instance, "organization:contact_list")
 

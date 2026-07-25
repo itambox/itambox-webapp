@@ -13,9 +13,11 @@ on:
       - "uv.lock"
       - "itambox/**/*.py"
       - "itambox/docs/development/migration-verification.md"
+      - "itambox/docs/development/python-import-policy.md"
       - "itambox/mkdocs.yml"
       - "scripts/**/*.py"
       - "scripts/migration_audit.json"
+      - "scripts/local_import_baseline.json"
   workflow_dispatch:
 
 permissions:
@@ -163,6 +165,11 @@ jobs:
       - name: Lint with flake8 (blocking baseline gate)
         run: |
           uv run --locked --no-sync python scripts/check_flake8_baseline.py
+
+      - name: Check the local-import policy gate
+        run: |
+          python -m unittest scripts.tests.test_local_imports
+          uv run --locked --no-sync python scripts/check_local_imports.py
 
   docs:
     runs-on: ubuntu-latest

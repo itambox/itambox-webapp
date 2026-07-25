@@ -240,7 +240,9 @@ class AssetDetailView(ObjectDetailView):
         RequestConfig(self.request, paginate={"per_page": 10}).configure(reservations_table)
         context["reservations_table"] = reservations_table
 
-        from assets.models import AssetDisposal  # inline import: avoid touching the module-level import block
+        # Local-import debt: hoisting this lands in the second import block below
+        # `logger = ...`, which is pre-existing E402 debt. Hoist it with that cleanup.
+        from assets.models import AssetDisposal
 
         context["disposal_obj"] = AssetDisposal.objects.filter(asset=asset).first()
 

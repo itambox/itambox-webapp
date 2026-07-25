@@ -209,7 +209,8 @@ class StrictTenantPermission(BasePermission):
             if request.method not in SAFE_METHODS:
                 raise Http404()
             return True
-        # inline import: keep the API layer decoupled from organization at load.
+        # Deferred to keep the API layer decoupled from organization at load. Not a
+        # module-level cycle -- tracked as local-import debt, not a policy justification.
         from organization.access import accessible_tenant_ids
 
         if obj_tenant.pk in accessible_tenant_ids(request.user):
@@ -218,7 +219,8 @@ class StrictTenantPermission(BasePermission):
 
     @staticmethod
     def _shared_read_allowed(obj, user_tenant):
-        # inline imports: keep the API layer decoupled from organization at load
+        # Deferred to keep the API layer decoupled from organization at load. Not a
+        # module-level cycle -- tracked as local-import debt, not a policy justification.
         from organization.access import shared_resource_ids
         from organization.models import TenantResourceGrant
 

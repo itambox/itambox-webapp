@@ -9,6 +9,7 @@ from extras.models import Tag
 
 from ..filters import LocationFilterSet
 from ..models import Location, Site, Tenant
+from .helpers import add_standard_buttons
 
 
 class LocationForm(CustomFieldModelFormMixin, forms.ModelForm):
@@ -62,7 +63,6 @@ class LocationForm(CustomFieldModelFormMixin, forms.ModelForm):
             "tags",
         )
         self.append_custom_fields_to_layout()
-        from .helpers import add_standard_buttons
 
         add_standard_buttons(self.helper, self.instance, "organization:location_list")
 

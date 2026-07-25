@@ -31,7 +31,7 @@ def send_webhook_task(
     """Dispatch a webhook event. Retries on 5xx and connection errors; 4xx are final."""
     from django.core.exceptions import ValidationError
 
-    # inline import: core.http imports core.validators (django-loaded); keep the task
+    # inline import: heavy-import: core.http imports core.validators (django-loaded); keep the task
     # module import-light for django-q payload loading.
     from core.http import request_pinned, webhook_target_kind
 

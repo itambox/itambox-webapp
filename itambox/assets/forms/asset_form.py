@@ -10,7 +10,7 @@ from extras.models import CustomField, Tag
 from organization.models import CostCenter, Location
 from procurement.models import PurchaseOrderLine
 
-from ..models import Asset, AssetRole, AssetType, StatusLabel
+from ..models import Asset, AssetRole, AssetType, StatusLabel, Warranty
 from ..models.choices import WarrantyTypeChoices
 from .fields import StatusModelChoiceField
 
@@ -191,7 +191,6 @@ class AssetForm(CrispyFormMixin, forms.ModelForm):
         end = cd.get("warranty_end_date")
         if not (start and end):
             return None
-        from ..models import Warranty  # inline import: avoid import cycle at module load
 
         kwargs = dict(
             asset=asset,

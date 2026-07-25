@@ -21,7 +21,7 @@ def applicable_grants(user):
     """
     can_cache = hasattr(user, "__dict__")
     if can_cache:
-        # inline import: avoids an organization.rbac -> core.auth import cycle at
+        # inline import: cycle: avoids an organization.rbac -> core.auth import cycle at
         # load (core.auth resolves permissions through organization.rbac).
         from core.auth.cache import synchronize_authorization_cache
 
@@ -125,7 +125,7 @@ def build_accessible_tenant_permissions_map(user, grants=None):
     """
     if not hasattr(user, "__dict__"):
         return {}
-    # inline import: avoids an organization.rbac -> core.auth import cycle at load.
+    # inline import: cycle: avoids an organization.rbac -> core.auth import cycle at load.
     from core.auth.cache import synchronize_authorization_cache
 
     synchronize_authorization_cache(user)

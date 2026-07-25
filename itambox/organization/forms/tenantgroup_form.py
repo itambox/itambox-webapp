@@ -8,6 +8,7 @@ from extras.models import Tag
 
 from ..filters import TenantGroupFilterSet
 from ..models import TenantGroup
+from .helpers import add_standard_buttons
 
 
 class TenantGroupForm(forms.ModelForm):
@@ -40,7 +41,6 @@ class TenantGroupForm(forms.ModelForm):
         self.helper.form_method = "post"
         self.helper.form_tag = True
         self.helper.layout = Layout("name", "slug", "parent", "description", "tags")
-        from .helpers import add_standard_buttons
 
         add_standard_buttons(self.helper, self.instance, "organization:tenantgroup_list")
 
