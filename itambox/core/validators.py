@@ -81,67 +81,85 @@ class CustomValidator:
             parse_json_rules(instance, rules)
 
 
+def _json_length_error(field_name, value, field_rules):
+    error = None
+    if "min_length" in field_rules and isinstance(value, str):
+        min_length = field_rules["min_length"]
+        if len(value) < min_length:
+            error = ValidationError(
+                _("%(field)s must be at least %(min)d characters."),
+                params={"field": field_name, "min": min_length},
+            )
+
+    if "max_length" in field_rules and isinstance(value, str):
+        max_length = field_rules["max_length"]
+        if len(value) > max_length:
+            error = ValidationError(
+                _("%(field)s must be at most %(max)d characters."),
+                params={"field": field_name, "max": max_length},
+            )
+    return error
+
+
+def _json_numeric_error(field_name, value, field_rules):
+    error = None
+    if "min" in field_rules and isinstance(value, (int, float)):
+        min_val = field_rules["min"]
+        if value < min_val:
+            error = ValidationError(
+                _("%(field)s must be at least %(min)s."),
+                params={"field": field_name, "min": min_val},
+            )
+
+    if "max" in field_rules and isinstance(value, (int, float)):
+        max_val = field_rules["max"]
+        if value > max_val:
+            error = ValidationError(
+                _("%(field)s must be at most %(max)s."),
+                params={"field": field_name, "max": max_val},
+            )
+    return error
+
+
+def _json_pattern_error(field_name, value, field_rules):
+    if "pattern" not in field_rules or not isinstance(value, str):
+        return None
+    try:
+        if not re.match(field_rules["pattern"], value):
+            return ValidationError(
+                _("%(field)s does not match required pattern."),
+                params={"field": field_name},
+            )
+    except re.error:
+        pass
+    return None
+
+
+def _validate_json_field(field_name, value, field_rules):
+    if field_rules.get("required", False) and not value:
+        return ValidationError(
+            _("%(field)s is required."),
+            params={"field": field_name},
+        )
+    if value is None or value == "":
+        return None
+
+    error = None
+    for validator in (_json_length_error, _json_numeric_error, _json_pattern_error):
+        field_error = validator(field_name, value, field_rules)
+        if field_error is not None:
+            error = field_error
+    return error
+
+
 def parse_json_rules(instance, rules):
     errors = {}
-
     for field_name, field_rules in rules.items():
         if field_name == "__all__":
             continue
-
-        value = getattr(instance, field_name, None)
-
-        if field_rules.get("required", False) and not value:
-            errors[field_name] = ValidationError(
-                _("%(field)s is required."),
-                params={"field": field_name},
-            )
-            continue
-
-        if value is None or value == "":
-            continue
-
-        if "min_length" in field_rules and isinstance(value, str):
-            min_length = field_rules["min_length"]
-            if len(value) < min_length:
-                errors[field_name] = ValidationError(
-                    _("%(field)s must be at least %(min)d characters."),
-                    params={"field": field_name, "min": min_length},
-                )
-
-        if "max_length" in field_rules and isinstance(value, str):
-            max_length = field_rules["max_length"]
-            if len(value) > max_length:
-                errors[field_name] = ValidationError(
-                    _("%(field)s must be at most %(max)d characters."),
-                    params={"field": field_name, "max": max_length},
-                )
-
-        if "min" in field_rules and isinstance(value, (int, float)):
-            min_val = field_rules["min"]
-            if value < min_val:
-                errors[field_name] = ValidationError(
-                    _("%(field)s must be at least %(min)s."),
-                    params={"field": field_name, "min": min_val},
-                )
-
-        if "max" in field_rules and isinstance(value, (int, float)):
-            max_val = field_rules["max"]
-            if value > max_val:
-                errors[field_name] = ValidationError(
-                    _("%(field)s must be at most %(max)s."),
-                    params={"field": field_name, "max": max_val},
-                )
-
-        if "pattern" in field_rules and isinstance(value, str):
-            pattern = field_rules["pattern"]
-            try:
-                if not re.match(pattern, value):
-                    errors[field_name] = ValidationError(
-                        _("%(field)s does not match required pattern."),
-                        params={"field": field_name},
-                    )
-            except re.error:
-                pass
+        error = _validate_json_field(field_name, getattr(instance, field_name, None), field_rules)
+        if error is not None:
+            errors[field_name] = error
 
     if errors:
         raise ValidationError(errors)
