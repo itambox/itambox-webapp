@@ -4,7 +4,9 @@ import uuid
 from django.contrib.auth import get_user_model
 from django.core.exceptions import PermissionDenied
 
-from core.managers import (
+from core.context import (
+    _current_user,
+    _request_id,
     get_current_all_accessible,
     get_current_membership,
     get_current_tenant,
@@ -43,8 +45,6 @@ class TaskContext:
         self.user = None
 
     def __enter__(self):
-        from itambox.middleware import _current_user, _request_id
-
         # Capture the context active on entry so __exit__ can restore it.
         self._prev_request_id = _request_id.get()
         self._prev_user = _current_user.get()
@@ -112,8 +112,6 @@ class TaskContext:
                 raise PermissionDenied("Task principal cannot access target tenant")
 
     def _restore_context(self):
-        from itambox.middleware import _current_user, _request_id
-
         _request_id.set(self._prev_request_id)
         _current_user.set(self._prev_user)
         set_current_tenant(self._prev_tenant)

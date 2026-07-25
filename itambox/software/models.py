@@ -1,3 +1,4 @@
+from django.apps import apps
 from django.db import models
 from django.urls import reverse
 from django.utils.translation import gettext_lazy as _
@@ -12,6 +13,10 @@ from core.managers import (
 from core.mixins import CustomFieldDataMixin
 from core.models import BaseModel, ChangeLoggingMixin, DeletableVaultModel, VaultModel
 from extras.models import Tag
+
+# ``licenses.reconciliation`` resolves its models through the app registry, so
+# it carries no import edge back into this module (see its module docstring).
+from licenses.reconciliation import reconcile_software
 
 
 class SoftwareCategoryChoices(models.TextChoices):
@@ -123,9 +128,11 @@ class Software(CustomFieldDataMixin, DeletableVaultModel):
     def license_count(self):
         if hasattr(self, "_license_count"):
             return self._license_count
-        # inline import: cycle: software.models <-> licenses.models at module load.
-        from licenses.models import License
-
+        # Resolved through the app registry: ``licenses.models`` imports this
+        # module for the ``License.software`` FK, so a static import here would
+        # close a cycle. The registry returns the same class and therefore the
+        # same tenant-scoped manager.
+        License = apps.get_model("licenses", "License")
         return License.objects.filter(software=self, deleted_at__isnull=True).count()
 
     def reconcile(self) -> dict:
@@ -148,9 +155,6 @@ class Software(CustomFieldDataMixin, DeletableVaultModel):
         fresh data on each access without the risk of serving a stale cache in a
         long-lived request or background task.
         """
-        # inline import: cycle: software.models <-> licenses.reconciliation at module load.
-        from licenses.reconciliation import reconcile_software
-
         return reconcile_software(self)
 
 

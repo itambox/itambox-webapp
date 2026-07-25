@@ -1,21 +1,20 @@
 import logging
 
 from django.contrib.contenttypes.fields import GenericForeignKey
-from django.core.exceptions import (
-    FieldDoesNotExist,
-    MultipleObjectsReturned,
-    ObjectDoesNotExist,
-    ValidationError,
-)
+from django.core.exceptions import FieldDoesNotExist
 from django.db.models import Count
 from django.db.models.fields.related import ManyToOneRel, RelatedField
 from django.utils.module_loading import import_string
-from django.utils.translation import gettext_lazy as _
 from rest_framework.serializers import ListSerializer
 from rest_framework.views import get_view_name as drf_get_view_name
 
+from itambox.api.base import BaseModelSerializer
 from itambox.api.exceptions import SerializerNotFound
 from itambox.api.fields import RelatedObjectCountField
+
+# Re-exported: this was this module's public name before the helper moved to the
+# leaf module that breaks the base <-> utils cycle.
+from itambox.api.related import get_related_object_by_attrs  # noqa: F401
 
 logger = logging.getLogger("itambox.utilities.api")
 
@@ -45,10 +44,6 @@ def get_view_name(view):
 
 
 def _get_nested_serializer(serializer_field):
-    # inline import: cycle: itambox.api.utils <-> itambox.api.base are mutually
-    # dependent; one of the two must stay deferred.
-    from itambox.api.base import BaseModelSerializer
-
     if isinstance(serializer_field, ListSerializer):
         serializer_field = serializer_field.child
     if isinstance(serializer_field, BaseModelSerializer):
@@ -114,43 +109,6 @@ def get_annotations_for_serializer(serializer_class, fields=None, omit=None):
             annotations[field_name] = Count(related_field.name)
 
     return annotations
-
-
-def get_related_object_by_attrs(queryset, attrs):
-    if attrs is None:
-        return None
-
-    if isinstance(attrs, dict):
-        params = _dict_to_filter_params(attrs)
-        try:
-            return queryset.get(**params)
-        except ObjectDoesNotExist as exc:
-            raise ValidationError(
-                _("Related object not found using the provided attributes: {params}").format(params=params)
-            ) from exc
-        except MultipleObjectsReturned as exc:
-            raise ValidationError(
-                _("Multiple objects match the provided attributes: {params}").format(params=params)
-            ) from exc
-
-    try:
-        pk = int(attrs)
-    except (TypeError, ValueError):
-        raise ValidationError(
-            _(
-                "Related objects must be referenced by numeric ID or by dictionary of attributes. Received an "
-                "unrecognized value: {value}"
-            ).format(value=attrs)
-        ) from None
-
-    try:
-        return queryset.get(pk=pk)
-    except ObjectDoesNotExist as exc:
-        raise ValidationError(_("Related object not found using the provided numeric ID: {id}").format(id=pk)) from exc
-
-
-def _dict_to_filter_params(d):
-    return {f"{k}__in" if isinstance(v, list) else k: v for k, v in d.items()}
 
 
 def title(s):

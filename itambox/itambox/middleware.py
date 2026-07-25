@@ -1,34 +1,31 @@
 import base64
-import contextvars
 import os
 import uuid
 
+# The user/request-id contextvars and their accessors live in the leaf module
+# ``core.context`` (issue #87 phase D). This middleware is what *populates*
+# them, while the tenant-scoping managers and the auth backends *read* them —
+# owning them here forced those readers into a circular import back onto this
+# module. They are re-exported unchanged so the established
+# ``from itambox.middleware import get_current_user`` import sites keep working;
+# ``core.context`` is the canonical home for new code.
+from core.context import (  # noqa: F401 -- re-exported for existing importers
+    _current_user,
+    _request_id,
+    get_current_all_accessible,
+    get_current_membership,
+    get_current_request_id,
+    get_current_tenant,
+    get_current_tenant_group,
+    get_current_user,
+    set_current_all_accessible,
+    set_current_membership,
+    set_current_tenant,
+    set_current_tenant_group,
+    set_current_user,
+)
+
 from .ratelimit import RateLimitMiddleware
-
-_current_user = contextvars.ContextVar("current_user", default=None)
-_request_id = contextvars.ContextVar("request_id", default=None)
-
-
-def get_current_request_id():
-    return _request_id.get()
-
-
-def get_current_user():
-    return _current_user.get()
-
-
-def set_current_user(user):
-    """Bind the current-user contextvar after the fact.
-
-    DRF authentication runs inside a view's ``initial()`` — *after*
-    ``CurrentUserMiddleware`` has already captured ``request.user`` (which is
-    ``AnonymousUser`` for a token-authenticated request at that point). Token-auth
-    views (e.g. SCIM) call this once authenticated so changelog rows are attributed
-    to the acting principal instead of being recorded as ``user=None`` ('System').
-    The middleware's response phase resets the contextvar via its entry token, so
-    this set is correctly torn down at request end (no cross-request leak).
-    """
-    _current_user.set(user)
 
 
 class CurrentUserMiddleware:
@@ -142,18 +139,6 @@ class CSPMiddleware:
                 "frame-ancestors 'self'"
             )
         return response
-
-
-from core.managers import (
-    get_current_all_accessible,
-    get_current_membership,
-    get_current_tenant,
-    get_current_tenant_group,
-    set_current_all_accessible,
-    set_current_membership,
-    set_current_tenant,
-    set_current_tenant_group,
-)
 
 
 class TenantMiddleware:

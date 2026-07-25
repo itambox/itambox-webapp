@@ -1,77 +1,30 @@
-import contextvars
-from typing import Any, List, Optional
-
 from django.core.exceptions import FieldDoesNotExist, FieldError
 from django.db import models
 from django.db.models import QuerySet
 
-_current_tenant = contextvars.ContextVar("current_tenant", default=None)
-_current_tenant_group = contextvars.ContextVar("current_tenant_group", default=None)
-_current_membership = contextvars.ContextVar("current_membership", default=None)
-# "All accessible tenants" scope for a non-superuser: no single tenant/group is
-# active, yet the request is NOT global — it is scoped to exactly the tenants the
-# canonical resolver authorizes (issue #29). Distinct from the superuser global
-# scope (all three None + is_superuser) so it can never widen into it.
-_current_all_accessible = contextvars.ContextVar("current_all_accessible", default=False)
-_descendant_group_ids_cache = contextvars.ContextVar("descendant_group_ids_cache", default=None)
-
-
-def set_current_tenant(tenant: Optional[Any]) -> None:
-    _current_tenant.set(tenant)
-    _descendant_group_ids_cache.set(None)
-
-
-def get_current_tenant() -> Optional[Any]:
-    return _current_tenant.get()
-
-
-def set_current_tenant_group(group: Optional[Any]) -> None:
-    _current_tenant_group.set(group)
-    _descendant_group_ids_cache.set(None)
-
-
-def get_current_tenant_group() -> Optional[Any]:
-    return _current_tenant_group.get()
-
-
-def set_current_membership(membership: Optional[Any]) -> None:
-    _current_membership.set(membership)
-    _descendant_group_ids_cache.set(None)
-
-
-def get_current_membership() -> Optional[Any]:
-    return _current_membership.get()
-
-
-def set_current_all_accessible(flag: bool) -> None:
-    _current_all_accessible.set(bool(flag))
-    _descendant_group_ids_cache.set(None)
-
-
-def get_current_all_accessible() -> bool:
-    return _current_all_accessible.get()
-
-
-def get_current_scope_conflict(user: Optional[Any]) -> bool:
-    """True when more than one of tenant / group / all-accessible scope is
-    active for an authenticated non-superuser.
-
-    The session/middleware resolution, token authentication, and TaskContext
-    each set at most one of these by construction, so a contradiction here
-    means the contextvars were poked directly (a bug, or a background task
-    inheriting stale ambient state from a wrapping request). Tenant-scoping
-    consumers must fail closed to nothing in that case rather than silently
-    prioritize one of the contradictory states — a superuser has no such
-    ambiguity (they keep their own global/explicit-scope path regardless).
-    """
-    if user is None or not getattr(user, "is_authenticated", False) or getattr(user, "is_superuser", False):
-        return False
-    active_states = (
-        get_current_tenant(),
-        get_current_tenant_group(),
-        get_current_all_accessible(),
-    )
-    return sum(bool(state) for state in active_states) > 1
+# The request-context contextvars and their accessors live in the leaf module
+# ``core.context`` (issue #87 phase D): the middleware that populates them and
+# the auth backends that read them need the same objects, and hosting them here
+# forced both halves into a circular import. They are re-exported unchanged so
+# the established ``from core.managers import set_current_tenant`` import sites
+# keep working; ``core.context`` is the canonical home for new code.
+from core.context import (  # noqa: F401 -- re-exported for existing importers
+    _current_all_accessible,
+    _current_membership,
+    _current_tenant,
+    _current_tenant_group,
+    _descendant_group_ids_cache,
+    get_current_all_accessible,
+    get_current_membership,
+    get_current_scope_conflict,
+    get_current_tenant,
+    get_current_tenant_group,
+    get_current_user,
+    set_current_all_accessible,
+    set_current_membership,
+    set_current_tenant,
+    set_current_tenant_group,
+)
 
 
 class SoftDeleteQuerySet(models.QuerySet):
@@ -139,10 +92,6 @@ class TenantScopingQuerySet(models.QuerySet):
         covered by the same write-invalidation without any change there.
         """
         allowed_group_ids = get_descendant_group_ids(active_group.pk)
-        # inline import: cycle: avoid a core.managers -> itambox.middleware circular
-        # import at module load.
-        from itambox.middleware import get_current_user
-
         user = get_current_user()
         if user and user.is_superuser:
             return list(
@@ -155,9 +104,10 @@ class TenantScopingQuerySet(models.QuerySet):
             can_cache = hasattr(user, "__dict__")
             cache_key = f"_group_scope_tenants_ids_{active_group.pk}"
             if can_cache:
-                # inline import: cycle: avoid a core.managers -> core.auth package
-                # circular import at module load (core.auth.__init__ imports
-                # core.managers).
+                # inline import: app-registry: core.auth.__init__ calls
+                # get_user_model() at module scope, so importing core.auth.cache
+                # from this (model-layer) module at load time raises
+                # AppRegistryNotReady.
                 from core.auth.cache import synchronize_authorization_cache
 
                 synchronize_authorization_cache(user)
@@ -196,10 +146,6 @@ class TenantScopingQuerySet(models.QuerySet):
         # "All accessible tenants" scope: no single tenant or group is active,
         # but the request is NOT global. This never returns the unscoped
         # queryset, so it can never widen into the superuser/global view.
-        # inline import: cycle: avoid a core.managers -> itambox.middleware circular
-        # import at module load.
-        from itambox.middleware import get_current_user
-
         return self._all_accessible_tenant_ids(get_current_user())
 
     @staticmethod
@@ -230,8 +176,9 @@ class TenantScopingQuerySet(models.QuerySet):
         """
         if user is None or not hasattr(user, "__dict__"):
             return frozenset()
-        # inline imports: cycle: core.managers <-> core.auth (core.auth.__init__
-        # imports core.managers) and <-> organization at module load.
+        # inline imports: app-registry: core.auth.__init__ calls get_user_model()
+        # at module scope and organization.access reaches models, so neither can
+        # be imported from this model-layer module at load time.
         from core.auth.cache import synchronize_authorization_cache
         from organization.access import get_ancestor_tenant_group_ids
 
@@ -262,10 +209,6 @@ class TenantScopingQuerySet(models.QuerySet):
         all_accessible = get_current_all_accessible()
 
         if active_tenant or active_group or all_accessible:
-            # inline import: cycle: avoid a core.managers -> itambox.middleware circular
-            # import at module load.
-            from itambox.middleware import get_current_user
-
             current_user = get_current_user()
             if get_current_scope_conflict(current_user):
                 return self.none()
@@ -458,9 +401,6 @@ class TenantScopingQuerySet(models.QuerySet):
         # paths legitimately operate without a tenant. Note Membership
         # uses the default (unscoped) manager, so tenant resolution itself is
         # not affected by this guard.
-        # inline import: cycle: core.managers <-> itambox.middleware at module load.
-        from itambox.middleware import get_current_user
-
         user = get_current_user()
         if user is not None and not getattr(user, "is_superuser", False):
             return self.none()

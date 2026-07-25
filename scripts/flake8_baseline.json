@@ -3980,14 +3980,6 @@
       "count": 1
     },
     {
-      "path": "itambox/core/managers.py",
-      "code": "F401",
-      "message": "'typing.List' imported but unused",
-      "source": "from typing import Any, List, Optional",
-      "context": "Module:body",
-      "count": 1
-    },
-    {
       "path": "itambox/core/mixins.py",
       "code": "C901",
       "message": "'SoftDeleteMixin.delete' is too complex (13)",
@@ -7028,9 +7020,9 @@
       "count": 1
     },
     {
-      "path": "itambox/inventory/services.py",
+      "path": "itambox/inventory/stock.py",
       "code": "C901",
-      "message": "'adjust_inventory_stock' is too complex (18)",
+      "message": "'adjust_inventory_stock' is too complex (16)",
       "source": "def adjust_inventory_stock(",
       "context": "Module:body/FunctionDef:adjust_inventory_stock:self",
       "count": 1
@@ -7601,14 +7593,6 @@
       "message": "'TenantMiddleware.process_request' is too complex (27)",
       "source": "    def process_request(self, request):",
       "context": "Module:body/ClassDef:TenantMiddleware:body/FunctionDef:process_request:self",
-      "count": 1
-    },
-    {
-      "path": "itambox/itambox/middleware.py",
-      "code": "E402",
-      "message": "module level import not at top of file",
-      "source": "from core.managers import (",
-      "context": "Module:body",
       "count": 1
     },
     {

@@ -4,6 +4,7 @@ from django.db import IntegrityError, transaction
 from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
 
+from core.context import _current_user, set_current_membership, set_current_tenant
 from core.events import send_notification_to_channel
 from core.tasks.context import TaskContext
 from extras.models import AlertLog, AlertRule, NotificationChannel
@@ -18,12 +19,6 @@ def evaluate_alert_rules_task():
     unresolved alerts on the configured cadence, and dispatch channel
     notifications (unless the rule is muted).
     """
-    from core.managers import set_current_membership, set_current_tenant
-
-    # Deferred to keep the django-q task module import-light. Not a module-level
-    # cycle -- tracked as local-import debt rather than a policy justification.
-    from itambox.middleware import _current_user
-
     # Run as a true system context: clear any ambient tenant/membership AND the
     # current user. A non-superuser principal left bound here makes the tenant-
     # scoping managers fail closed (both the rule query and the open-log
@@ -71,11 +66,6 @@ def run_alert_rule_now(rule_id):
 
     Returns the number of fresh alerts triggered.
     """
-    from core.managers import set_current_membership, set_current_tenant
-
-    # Deferred: see evaluate_alert_rules_task.
-    from itambox.middleware import _current_user
-
     set_current_tenant(None)
     set_current_membership(None)
     _current_user.set(None)

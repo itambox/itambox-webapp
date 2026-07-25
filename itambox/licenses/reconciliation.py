@@ -46,12 +46,24 @@ Both functions rely entirely on the model managers, which apply
   active tenant's licenses are counted).
 
 Result: a tenant A call cannot see tenant B's installs or entitlements.
+
+Module dependencies
+-------------------
+The four models are resolved through the Django app registry rather than
+imported at module scope. ``licenses.models`` already imports ``software.models``
+for the ``License.software`` FK, so a static import here would put this module
+inside a ``software.models`` <-> ``licenses.models`` loop the moment
+``Software.reconcile()`` delegates to it. Registry lookups keep this module a
+runtime leaf, which is what lets ``software.models`` depend on it directly.
 """
 
+from typing import TYPE_CHECKING
+
+from django.apps import apps
 from django.db.models import Count, Q, Sum
 
-from licenses.models import License, LicenseSeatAssignment
-from software.models import InstalledSoftware, Software
+if TYPE_CHECKING:  # pragma: no cover - typing only, no runtime import edge
+    from software.models import Software
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Status constants
@@ -60,6 +72,21 @@ from software.models import InstalledSoftware, Software
 STATUS_COMPLIANT = "compliant"
 STATUS_OVER_DEPLOYED = "over_deployed"
 STATUS_UNLICENSED = "unlicensed"
+
+
+def _models():
+    """Resolve the four models this module queries via the app registry.
+
+    Called at query time, never at import time, so this module stays a runtime
+    leaf. The returned classes are the same objects a static import would bind,
+    so manager behaviour (tenant scoping, soft-delete filtering) is unchanged.
+    """
+    return (
+        apps.get_model("licenses", "License"),
+        apps.get_model("licenses", "LicenseSeatAssignment"),
+        apps.get_model("software", "InstalledSoftware"),
+        apps.get_model("software", "Software"),
+    )
 
 
 def _compute_status(installed_count: int, entitled_seats: int) -> str:
@@ -72,7 +99,7 @@ def _compute_status(installed_count: int, entitled_seats: int) -> str:
 
 
 def _build_result(
-    software: Software,
+    software: "Software",
     installed_count: int,
     entitled_seats: int,
     linked_seats: int = 0,
@@ -97,7 +124,7 @@ def _build_result(
 # ─────────────────────────────────────────────────────────────────────────────
 
 
-def reconcile_software(software: Software) -> dict:
+def reconcile_software(software: "Software") -> dict:
     """Return a compliance dict for a single ``Software`` entry.
 
     Both queries are scoped by the model managers (active tenant + soft-delete
@@ -109,6 +136,8 @@ def reconcile_software(software: Software) -> dict:
     Returns:
         A reconciliation dict as described in the module docstring.
     """
+    License, LicenseSeatAssignment, InstalledSoftware, *_ = _models()
+
     # Installs for this software visible to the current tenant (scoped via
     # tenant_lookup='asset__tenant' on InstalledSoftware.objects).
     installed_count = InstalledSoftware.objects.filter(software=software).count()
@@ -144,6 +173,8 @@ def reconcile_tenant_licensing() -> list:
         A list of reconciliation dicts (one per relevant ``Software`` entry),
         sorted by software name.
     """
+    License, LicenseSeatAssignment, InstalledSoftware, Software = _models()
+
     # ── bulk install counts (scoped to active tenant via manager) ────────────
     install_counts: dict[int, int] = {
         row["software_id"]: row["count"]

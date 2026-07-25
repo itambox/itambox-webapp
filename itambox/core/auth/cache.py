@@ -7,6 +7,8 @@ from uuid import uuid4
 from django.core.cache import cache
 from django.db import transaction
 
+from core.context import get_current_request_id
+
 logger = logging.getLogger(__name__)
 
 _CACHE_KEY_PREFIX = "itambox:authz-version:"
@@ -48,8 +50,6 @@ def end_authorization_request(token=None):
 
 def _request_state():
     """Return invalidation epochs scoped to the active HTTP request."""
-    from itambox.middleware import get_current_request_id
-
     request_id = get_current_request_id()
     if request_id is None:
         return None

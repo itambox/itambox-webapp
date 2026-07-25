@@ -1,6 +1,17 @@
-"""MFA policy for local-password sessions."""
+"""MFA policy for local-password sessions.
+
+Also the home of the privilege classification this policy is built on
+(``PRIVILEGED_ROLE_NAMES`` / :func:`role_is_privileged`). The constant used to
+live in ``core.auth.provisioning``, which imports :func:`role_is_privileged`
+from here — a real cycle that a function-body import only hid (issue #87 phase
+D). The classification is policy, not provisioning mechanics, so it belongs on
+this side of the edge and leaves this module a dependency-free leaf.
+"""
 
 PASSWORD_BACKEND = "core.auth.PasswordLoginOnlyBackend"
+
+# Role names that convey privileged access regardless of their permission set.
+PRIVILEGED_ROLE_NAMES = {"Admin", "Manager"}
 
 
 def _role_is_privileged(role_name, permissions, privileged_names_lower) -> bool:
@@ -17,9 +28,6 @@ def _role_is_privileged(role_name, permissions, privileged_names_lower) -> bool:
 
 def role_is_privileged(role) -> bool:
     """Classify privilege by canonical names or any non-view permission."""
-    # inline import: cycle: core.mfa <-> core.auth.provisioning at module load.
-    from core.auth.provisioning import PRIVILEGED_ROLE_NAMES
-
     privileged_names_lower = {name.lower() for name in PRIVILEGED_ROLE_NAMES}
     return _role_is_privileged(role.name, role.permissions, privileged_names_lower)
 

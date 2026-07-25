@@ -5,7 +5,11 @@ from django.contrib.auth.backends import ModelBackend
 from django.utils import timezone
 
 from core.auth.cache import synchronize_authorization_cache
-from core.managers import (
+
+# Read the request context from the leaf module rather than from
+# ``core.managers`` (issue #87 phase D): the managers import this package for
+# its authorization cache, so importing them back here closed an import loop.
+from core.context import (
     get_current_all_accessible,
     get_current_membership,
     get_current_scope_conflict,
