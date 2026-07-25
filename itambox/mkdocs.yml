@@ -162,6 +162,8 @@ nav:
   - Development:
       - Release Checklist: 'development/release-checklist.md'
       - Python Import Policy: 'development/python-import-policy.md'
+      - Test Coverage Policy: 'development/test-coverage-policy.md'
+      - Security Test Expectations: 'development/security-test-expectations.md'
       - Security Scanning: 'development/security-scanning.md'
       - Module Maturity: 'development/module-maturity.md'
       - Migration Verification: 'development/migration-verification.md'

@@ -94,14 +94,34 @@ uv run --locked --group dev pytest assets/tests/test_assignments.py
 # Run a single test
 uv run --locked --group dev pytest assets/tests/test_assignments.py::TestAssetAssignment::test_active_assignment
 
-# Run with coverage
-uv run --locked --group dev pytest --cov=. --cov-report=html
+# Run with coverage (--cov-config is required: coverage.py reads its config from
+# the current directory, and pytest runs from itambox/)
+uv run --locked --group dev pytest --cov=. --cov-config=../pyproject.toml --cov-report=html
 
 # Adversarial GraphQL suite (uses a separate test DB to avoid collisions)
 uv run --locked --group dev pytest assets/tests/test_graphql_adversarial.py
 ```
 
 Tests require a running PostgreSQL instance. SQLite is explicitly rejected by settings. The `conftest.py` at `itambox/` clears tenant/user contextvars after each test via an `autouse` fixture.
+
+### Coverage gates
+
+Coverage is measured (line **and** branch) from the complete serial suite against a database migrated from scratch, and three blocking gates read the result. Run them the way CI does, from the repository root:
+
+```bash
+make coverage        # suite + branch coverage, then run certification + global ratchet
+make coverage-diff   # differential coverage of the branch against origin/main
+```
+
+| Gate | Script | Rule |
+|---|---|---|
+| Global ratchet | `scripts/check_coverage_baseline.py` | Line and branch rates may not fall below `scripts/coverage_baseline.json`; improvements must be recorded (`make coverage-baseline`); a decline needs `--allow-decline --reason`. Growth in excluded lines fails too. |
+| Differential | `scripts/check_diff_coverage.py` | 85% of the executable lines a change touches must be covered — executed **and** not the origin of an untaken branch. An unmeasured changed production file fails closed. |
+| Run certification | `scripts/check_test_report.py` | No failures, no errors, and no skipped tests (`MAX_SKIPPED_TESTS = 0`). Durations are published, never gated. |
+
+The measurement policy is declared once in `scripts/coverage_policy.py` and mirrored in `pyproject.toml`; the gates refuse to run when the two disagree, so an `omit` entry cannot be added silently, and `# pragma: no cover` cannot be used to retire a hard-to-test branch because the excluded-line count is itself ratcheted. pytest-xdist stays disabled — the complete serial suite is the correctness source of truth until #21 proves safe parallel execution.
+
+Full policy: `itambox/docs/development/test-coverage-policy.md`. What tests for tenancy, RBAC, tokens, encryption, imports, SCIM, task context, and destructive operations must assert: `itambox/docs/development/security-test-expectations.md` — coverage proves a line ran, not that the test asserted anything about the boundary it crosses.
 
 ### Frontend
 ```bash

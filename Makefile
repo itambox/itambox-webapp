@@ -10,9 +10,20 @@
 UV := uv
 UV_DEV := $(UV) run --locked --group dev
 
-.PHONY: help setup run migrate seed test lint format format-check e2e clean
+.PHONY: help setup run migrate seed test coverage coverage-diff coverage-baseline lint format format-check e2e clean
 
 FORMAT_TARGETS := itambox scripts
+
+# Same measurement CI performs: complete serial suite, clean database, branch
+# coverage, and the report artifacts the quality gates read.
+#
+# --cov-config is required: coverage.py reads its configuration from the current
+# directory, and pytest runs from itambox/, so without it the root pyproject.toml
+# is ignored -- no branch measurement, and migrations and tests counted as source.
+COVERAGE_ARGS := -o addopts="--tb=short -p no:warnings" --create-db \
+	--cov=. --cov-config=../pyproject.toml --cov-report=term-missing:skip-covered \
+	--cov-report=xml:coverage.xml --cov-report=json:coverage.json \
+	--cov-report=html:htmlcov --junitxml=junit.xml --durations=25
 
 help:
 	@echo "ITAMbox Development Automation Command Hub"
@@ -23,6 +34,9 @@ help:
 	@echo "  make migrate       - Run database migrations"
 	@echo "  make seed          - Wipe database and seed mock organization and assets data"
 	@echo "  make test          - Run all automated unit and integration tests"
+	@echo "  make coverage      - Run the suite with branch coverage and check the quality gates"
+	@echo "  make coverage-diff - Check differential coverage of the current branch (needs make coverage first)"
+	@echo "  make coverage-baseline - Record the measured coverage as the reviewed baseline"
 	@echo "  make lint          - Run pre-commit style and syntax checks on all files"
 	@echo "  make format        - Sort imports then format Python source with Ruff"
 	@echo "  make format-check  - Check import order and formatting without writing (CI-safe)"
@@ -46,6 +60,23 @@ seed:
 
 test:
 	cd itambox && $(UV_DEV) pytest
+
+coverage:
+	cd itambox && $(UV_DEV) pytest $(COVERAGE_ARGS)
+	$(UV_DEV) python scripts/check_test_report.py --report itambox/junit.xml
+	$(UV_DEV) python scripts/check_coverage_baseline.py --coverage-json itambox/coverage.json
+
+# Differential gate for the current branch. Defaults to origin/main as the base;
+# override with `make coverage-diff BASE_REF=origin/release-1.0`.
+BASE_REF ?= origin/main
+coverage-diff:
+	$(UV_DEV) python scripts/check_diff_coverage.py --base-ref $(BASE_REF) --coverage-json itambox/coverage.json
+
+# Records the measured rates as the reviewed baseline. Recording a DECLINE
+# additionally requires --allow-decline --reason "..." (see
+# itambox/docs/development/test-coverage-policy.md).
+coverage-baseline:
+	$(UV_DEV) python scripts/check_coverage_baseline.py --coverage-json itambox/coverage.json --write-baseline
 
 lint:
 	$(UV_DEV) pre-commit run --all-files
