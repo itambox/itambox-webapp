@@ -138,9 +138,15 @@ omit = [
 # scripts/check_coverage_baseline.py, which holds both line and branch rates to
 # the recorded values. This number exists so an ad-hoc local `pytest --cov` run
 # still fails loudly on a catastrophic drop; the gate refuses to run if this
-# floor is ever raised above the recorded baseline (a floor above the baseline
-# would make the two gates contradict each other).
-fail_under = 45
+# floor is ever raised above the measured combined rate, since a floor above
+# what the suite achieves fails every run and therefore enforces nothing.
+#
+# coverage.py compares this against the COMBINED line+branch percentage. The old
+# value of 45 was calibrated against a measurement that never applied this file
+# (see --cov-config in the Makefile): it counted generated migrations and test
+# modules as covered source and reported ~86%, so the floor was unreachable in
+# principle and unenforced in practice.
+fail_under = 70
 show_missing = true
 # Line-level exclusions: unreachable-by-design or import-time-only boilerplate.
 # Keep this list short and specific -- each pattern hides real lines from the
