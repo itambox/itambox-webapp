@@ -1,3 +1,5 @@
+from collections import defaultdict
+
 from itambox.release import VERSION
 
 
@@ -48,8 +50,6 @@ def tenant_switcher_processor(request):
             "own_tenants_switcher": [],
             "grouped_managed_tenants_switcher": [],
         }
-
-    from collections import defaultdict
 
     from django.utils.functional import SimpleLazyObject
 

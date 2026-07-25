@@ -1,5 +1,9 @@
 """Asset state machine and the core Asset model."""
 
+import datetime
+from datetime import timedelta
+from decimal import Decimal
+
 from django.conf import settings
 from django.core.exceptions import ValidationError
 from django.db import models
@@ -192,8 +196,6 @@ class Asset(CustomFieldDataMixin, BookmarkableMixin, SubscribableMixin, Deletabl
     @property
     def current_warranty_end(self):
         """Max end_date among all currently active warranties, or None."""
-        import datetime
-
         today = datetime.date.today()
         result = (
             self.warranties.filter(start_date__lte=today, end_date__gte=today, deleted_at__isnull=True)
@@ -226,7 +228,6 @@ class Asset(CustomFieldDataMixin, BookmarkableMixin, SubscribableMixin, Deletabl
         category = self.category
         if not category or not category.audit_interval_months:
             return None
-        from datetime import timedelta
 
         interval_days = category.audit_interval_months * 30
         base = self.last_audited or self.created_at
@@ -256,8 +257,6 @@ class Asset(CustomFieldDataMixin, BookmarkableMixin, SubscribableMixin, Deletabl
     def time_to_eol(self):
         eol = self.eol_date
         if eol:
-            import datetime
-
             from dateutil.relativedelta import relativedelta
 
             today = datetime.date.today()
@@ -275,8 +274,6 @@ class Asset(CustomFieldDataMixin, BookmarkableMixin, SubscribableMixin, Deletabl
 
     @property
     def total_cost_of_ownership(self):
-        from decimal import Decimal
-
         cost = self.purchase_cost or Decimal("0.00")
         maintenance_cost = sum(m.cost or Decimal("0.00") for m in self.maintenances.all())
         return cost + maintenance_cost
@@ -386,8 +383,6 @@ class Asset(CustomFieldDataMixin, BookmarkableMixin, SubscribableMixin, Deletabl
                 old_type = old.status.type if old.status else None
                 new_type = self.status.type if self.status else None
                 if old_type != "archived" and new_type == "archived":
-                    from decimal import Decimal
-
                     from assets.depreciation import compute_book_value
 
                     self.disposal_value = compute_book_value(self) or Decimal("0.00")

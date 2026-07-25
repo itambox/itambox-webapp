@@ -7,6 +7,7 @@ from django.utils.translation import gettext_lazy as _
 from rest_framework import status
 from rest_framework.response import Response
 
+from itambox.api.exceptions import PreconditionFailed, PreconditionRequired
 from itambox.api.serializers.bulk import BulkOperationSerializer
 
 logger = logging.getLogger("itambox.api.views")
@@ -27,8 +28,6 @@ class ETagMixin:
 
     def _require_etag(self, request, instance):
         if not self._get_if_match(request):
-            from itambox.api.exceptions import PreconditionRequired
-
             raise PreconditionRequired(
                 detail=_("If-Match header is required for mutating requests."),
                 etag=self._get_etag(instance),
@@ -39,8 +38,6 @@ class ETagMixin:
         if provided := self._get_if_match(request):
             current_etag = self._get_etag(instance)
             if current_etag and current_etag not in provided:
-                from itambox.api.exceptions import PreconditionFailed
-
                 raise PreconditionFailed(etag=current_etag)
 
 

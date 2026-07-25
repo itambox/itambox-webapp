@@ -133,7 +133,7 @@ class MembershipListView(ObjectListView):
         empty-set fallback in practice (middleware always resolves them an active
         tenant, group, or all-accessible scope).
         """
-        # inline import: keep accessible_tenant_ids as the single source of truth
+        # inline import: cycle: keep accessible_tenant_ids as the single source of truth
         # without a module-load cycle risk.
         from organization.access import accessible_tenant_ids, get_descendant_tenant_group_ids
 

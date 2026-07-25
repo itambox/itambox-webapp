@@ -2,6 +2,7 @@ import json
 import re
 from datetime import date, timedelta
 from html import unescape
+from types import SimpleNamespace
 
 import markdown as md
 from django import forms
@@ -17,7 +18,17 @@ from django.utils.translation import gettext as _
 from django.utils.translation import gettext_lazy as _lazy
 
 from assets.models import Asset, AssetMaintenance, StatusLabel
-from inventory.models import Accessory, Consumable
+from inventory.models import (
+    Accessory,
+    AccessoryAssignment,
+    AccessoryStock,
+    Component,
+    ComponentAllocation,
+    ComponentStock,
+    Consumable,
+    ConsumableAssignment,
+    ConsumableStock,
+)
 from licenses.models import License
 from subscriptions.models import Subscription
 
@@ -93,7 +104,7 @@ def _resolve_target_tenant(config):
     tenant_id = (config or {}).get("tenant_id")
     if not tenant_id:
         return None
-    # inline import: avoid an extras.dashboard.widgets -> organization.models
+    # inline import: cycle: avoid an extras.dashboard.widgets -> organization.models
     # import cycle at app load.
     from organization.models import Tenant
 
@@ -433,8 +444,6 @@ class FinancialWidget(DashboardWidget):
         )
 
     def get_context(self, request):
-        from types import SimpleNamespace
-
         assets = get_scoped_queryset(Asset, request, config=self.config.get("config", {}))
         maintenances = get_scoped_queryset(AssetMaintenance, request, config=self.config.get("config", {}))
 
@@ -896,8 +905,6 @@ class RenewalsWidget(DashboardWidget):
         cutoff = today + timedelta(days=days_horizon)
 
         # Resolve the scoped tenant for currency fallback (mirrors FinancialWidget).
-        from types import SimpleNamespace
-
         tenant = None
         tenant_id = self.get_config_value("tenant_id") or self.config.get("tenant_id")
         if tenant_id:
@@ -1028,10 +1035,6 @@ class LowStockWidget(DashboardWidget):
         }
 
     def _low_stock_accessories(self, request, target_id):
-        # inline import: defer the inventory sub-models (avoids widening this
-        # module's import surface for a widget that may not render).
-        from inventory.models import AccessoryAssignment, AccessoryStock
-
         acc_qs = get_scoped_queryset(Accessory, request, config=self.config.get("config", {})).filter(min_qty__gt=0)
 
         # Scoped total stock subquery
@@ -1061,9 +1064,6 @@ class LowStockWidget(DashboardWidget):
         return low_accessories
 
     def _low_stock_consumables(self, request, target_id):
-        # inline import: defer the inventory sub-models (see _low_stock_accessories).
-        from inventory.models import ConsumableAssignment, ConsumableStock
-
         con_qs = get_scoped_queryset(Consumable, request, config=self.config.get("config", {})).filter(min_qty__gt=0)
 
         # Scoped total stock subquery
@@ -1093,9 +1093,6 @@ class LowStockWidget(DashboardWidget):
         return low_consumables
 
     def _low_stock_components(self, request, target_id):
-        # inline import: defer the inventory sub-models (see _low_stock_accessories).
-        from inventory.models import Component, ComponentAllocation, ComponentStock
-
         comp_qs = Component.objects.filter(min_qty__gt=0).order_by("name")
 
         # Scoped total stock subquery
@@ -1270,8 +1267,6 @@ class TenantSpendWidget(DashboardWidget):
         )
 
     def get_context(self, request):
-        from types import SimpleNamespace
-
         limit = self.get_config_value("limit", 8)
         exclude_unassigned = self.get_config_value("exclude_unassigned", False)
 

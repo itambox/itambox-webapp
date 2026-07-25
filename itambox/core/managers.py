@@ -108,7 +108,7 @@ class TenantScopingQuerySet(models.QuerySet):
         """
         from django.apps import apps
 
-        # inline imports: avoid a core.managers -> organization import cycle at load.
+        # inline imports: cycle: avoid a core.managers -> organization import cycle at load.
         from organization.access import accessible_tenant_ids
 
         Tenant = apps.get_model("organization", "Tenant")
@@ -139,7 +139,7 @@ class TenantScopingQuerySet(models.QuerySet):
         covered by the same write-invalidation without any change there.
         """
         allowed_group_ids = get_descendant_group_ids(active_group.pk)
-        # inline import: avoid a core.managers -> itambox.middleware circular
+        # inline import: cycle: avoid a core.managers -> itambox.middleware circular
         # import at module load.
         from itambox.middleware import get_current_user
 
@@ -155,7 +155,7 @@ class TenantScopingQuerySet(models.QuerySet):
             can_cache = hasattr(user, "__dict__")
             cache_key = f"_group_scope_tenants_ids_{active_group.pk}"
             if can_cache:
-                # inline import: avoid a core.managers -> core.auth package
+                # inline import: cycle: avoid a core.managers -> core.auth package
                 # circular import at module load (core.auth.__init__ imports
                 # core.managers).
                 from core.auth.cache import synchronize_authorization_cache
@@ -164,7 +164,7 @@ class TenantScopingQuerySet(models.QuerySet):
                 cached = user.__dict__.get(cache_key)
                 if cached is not None:
                     return cached
-            # inline import: avoid a core.managers -> organization cycle at load.
+            # inline import: cycle: avoid a core.managers -> organization cycle at load.
             from organization.access import accessible_tenant_ids
 
             accessible = accessible_tenant_ids(user)
@@ -196,7 +196,7 @@ class TenantScopingQuerySet(models.QuerySet):
         # "All accessible tenants" scope: no single tenant or group is active,
         # but the request is NOT global. This never returns the unscoped
         # queryset, so it can never widen into the superuser/global view.
-        # inline import: avoid a core.managers -> itambox.middleware circular
+        # inline import: cycle: avoid a core.managers -> itambox.middleware circular
         # import at module load.
         from itambox.middleware import get_current_user
 
@@ -211,7 +211,7 @@ class TenantScopingQuerySet(models.QuerySet):
         members, and a superuser keeps their own global path.
         """
         if user is not None and getattr(user, "is_authenticated", False) and not getattr(user, "is_superuser", False):
-            # inline import: avoid a core.managers -> organization circular
+            # inline import: cycle: avoid a core.managers -> organization circular
             # import at module load.
             from organization.access import accessible_tenant_ids
 
@@ -230,6 +230,8 @@ class TenantScopingQuerySet(models.QuerySet):
         """
         if user is None or not hasattr(user, "__dict__"):
             return frozenset()
+        # inline imports: cycle: core.managers <-> core.auth (core.auth.__init__
+        # imports core.managers) and <-> organization at module load.
         from core.auth.cache import synchronize_authorization_cache
         from organization.access import get_ancestor_tenant_group_ids
 
@@ -260,7 +262,7 @@ class TenantScopingQuerySet(models.QuerySet):
         all_accessible = get_current_all_accessible()
 
         if active_tenant or active_group or all_accessible:
-            # inline import: avoid a core.managers -> itambox.middleware circular
+            # inline import: cycle: avoid a core.managers -> itambox.middleware circular
             # import at module load.
             from itambox.middleware import get_current_user
 
@@ -323,8 +325,8 @@ class TenantScopingQuerySet(models.QuerySet):
             # system/anonymous contexts see all. The parent walk uses
             # _base_manager so it does not recurse through this (scoped) manager.
             if self.model._meta.model_name == "tenantgroup":
-                # inline imports: avoid a core.managers -> middleware /
-                # organization circular import at module load.
+                # apps.get_model instead of a module-top import: core.managers
+                # cannot import organization at load time (circular).
                 tg_user = current_user
                 TenantGroupModel = apps.get_model("organization", "TenantGroup")
 
@@ -456,6 +458,7 @@ class TenantScopingQuerySet(models.QuerySet):
         # paths legitimately operate without a tenant. Note Membership
         # uses the default (unscoped) manager, so tenant resolution itself is
         # not affected by this guard.
+        # inline import: cycle: core.managers <-> itambox.middleware at module load.
         from itambox.middleware import get_current_user
 
         user = get_current_user()

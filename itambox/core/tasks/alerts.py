@@ -20,8 +20,8 @@ def evaluate_alert_rules_task():
     """
     from core.managers import set_current_membership, set_current_tenant
 
-    # inline import: matches the existing inline manager-setter style in this
-    # module and avoids importing the middleware contextvar at module load.
+    # Deferred to keep the django-q task module import-light. Not a module-level
+    # cycle -- tracked as local-import debt rather than a policy justification.
     from itambox.middleware import _current_user
 
     # Run as a true system context: clear any ambient tenant/membership AND the
@@ -73,7 +73,7 @@ def run_alert_rule_now(rule_id):
     """
     from core.managers import set_current_membership, set_current_tenant
 
-    # inline import: see evaluate_alert_rules_task.
+    # Deferred: see evaluate_alert_rules_task.
     from itambox.middleware import _current_user
 
     set_current_tenant(None)

@@ -43,7 +43,7 @@ def report_xlsx_bytes(headers, rows, sheet_title="Report"):
 def report_pdf_bytes(rendered_html):
     """Render already-compiled report HTML into PDF bytes via the shared
     xhtml2pdf renderer (same engine + SSRF-safe link callback as label PDFs)."""
-    # inline import: reuse the label PDF renderer without a core.reports -> core.tasks
+    # inline import: cycle: reuse the label PDF renderer without a core.reports -> core.tasks
     # import at module load (and keep xhtml2pdf an on-demand dependency).
     from core.tasks.labels import _html_to_pdf_bytes
 

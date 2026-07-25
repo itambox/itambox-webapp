@@ -1,3 +1,6 @@
+import datetime
+import json
+
 from django.contrib import messages
 from django.contrib.auth import get_user_model
 from django.contrib.auth.decorators import login_required
@@ -204,8 +207,6 @@ class UserApiTokensView(UserGenericTabView):
 
             token.tenant = get_current_tenant()
             if form.cleaned_data.get("expires"):
-                import datetime
-
                 from django.utils import timezone
 
                 expires_date = form.cleaned_data["expires"]
@@ -344,8 +345,6 @@ class BookmarkToggleView(LoginRequiredMixin, View):
     """
 
     def post(self, request, content_type_id, object_id):
-        import json
-
         from django.contrib.contenttypes.models import ContentType
         from django.http import Http404
 
@@ -414,8 +413,6 @@ class WatchToggleView(LoginRequiredMixin, View):
     """Toggle an ObjectWatch for a generic object (used via HTMX)."""
 
     def post(self, request, content_type_id, object_id):
-        import json
-
         from django.contrib.contenttypes.models import ContentType
         from django.http import Http404
 

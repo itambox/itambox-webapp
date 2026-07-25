@@ -1,5 +1,6 @@
 import datetime
 import logging
+import os
 from decimal import Decimal
 
 from django.conf import settings
@@ -41,9 +42,9 @@ def get_paginate_count(request):
 
     if request.user.is_authenticated:
         try:
-            # Local import: users.models imports ChangeLoggingMixin from core.models,
-            # which imports this module (itambox.utils) — a top-level import here
-            # would close that cycle at app-load time.
+            # inline import: cycle: users.models imports ChangeLoggingMixin from
+            # core.models, which imports this module (itambox.utils) — a module-top
+            # import here would close that cycle at app-load time.
             from users.models import UserPreference
 
             if not hasattr(request, "_user_preferences_cache"):
@@ -163,8 +164,6 @@ def get_help_url(view_instance, app_label=None, model_name=None):
 
     if not doc_path:
         return f"{settings.STATIC_URL}docs/index.html"
-
-    import os
 
     static_docs_dir = os.path.join(settings.BASE_DIR, "static", "docs")
 

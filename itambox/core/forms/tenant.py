@@ -35,7 +35,7 @@ def scope_tenant_field(form, field_name="tenant", autoset_when_single=True):
     if field is None:
         return
 
-    # inline imports: avoid a core.forms -> middleware/models import cycle at load
+    # inline imports: cycle: avoid a core.forms -> middleware/models import cycle at load
     from itambox.middleware import get_current_user
 
     user = get_current_user()

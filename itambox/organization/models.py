@@ -8,6 +8,8 @@ from django.urls import reverse
 from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
 
+from core.choices import ObjectChangeActionChoices
+
 
 def _default_currency():
     return getattr(settings, "ITAMBOX_DEFAULT_CURRENCY", "EUR")
@@ -1390,9 +1392,6 @@ class TenantResourceGrant(SoftDeleteMixin, ChangeLoggingMixin, BaseModel):
 
         with transaction.atomic():
             if hasattr(self, "_changelog_action"):
-                # inline import: mirrors SoftDeleteMixin.delete's soft branch
-                from core.choices import ObjectChangeActionChoices
-
                 self._changelog_action = ObjectChangeActionChoices.ACTION_DELETE
             if hasattr(self, "snapshot") and callable(self.snapshot):
                 self.snapshot()

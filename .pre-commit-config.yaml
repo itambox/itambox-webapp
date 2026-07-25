@@ -40,3 +40,17 @@ repos:
           - pyflakes==3.2.0
         pass_filenames: false
         always_run: true
+
+  # Deterministic AST gate for function-body imports (see
+  # itambox/docs/development/python-import-policy.md). Stdlib-only, so it needs
+  # no managed environment beyond the canonical interpreter the baseline was
+  # generated with.
+  - repo: local
+    hooks:
+      - id: local-import-policy
+        name: local imports (blocking policy gate)
+        entry: python scripts/check_local_imports.py
+        language: python
+        language_version: python3.12
+        pass_filenames: false
+        always_run: true

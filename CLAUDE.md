@@ -169,9 +169,28 @@ and `itambox/static/docs`). `[tool.ruff.lint] select = ["I"]` enables
 import-order enforcement only -- this phase deliberately does not enable any
 of Ruff's own pycodestyle/pyflakes/bugbear-equivalent rules, so Flake8 above
 remains the sole semantic lint gate; nothing here weakens or replaces it.
-Local-import classification (cycle break / optional dependency / expensive
-import / unjustified, per the inline-import policy above) is a separate,
-later phase -- this formatting pass does not move any import between scopes.
+Local-import classification is enforced separately by the gate below; this
+formatting pass does not move any import between scopes.
+
+### Lint: local imports (AST policy gate)
+```bash
+# From the repository root -- blocking gate, same command CI and pre-commit run:
+uv run --locked --only-group dev python scripts/check_local_imports.py
+
+# After hoisting or annotating debt, regenerate on canonical Python 3.12:
+uv run --locked --only-group dev python scripts/check_local_imports.py --write-baseline
+```
+Function-body imports must be annotated with a categorised reason (see
+"Inline-import policy" below) or recorded in `scripts/local_import_baseline.json`,
+a schema-v1 identity baseline keyed by path, enclosing scope path, and the
+normalised import statement -- never by line number. A SHA-256 policy
+fingerprint binds the baseline to the effective policy (categories, marker
+grammar, targets, exclusions). New unannotated imports are regressions;
+hoisted or annotated ones make the baseline stale and must be regenerated in
+the same reviewed change. A comment carrying the `inline import:` marker
+without a recognised category always fails and can never be baselined. The gate
+refuses to run outside canonical Python 3.12. `itambox/` and `scripts/` are
+scanned; migrations, vendored trees, and test modules are excluded.
 
 ### Docs (MkDocs)
 ```bash
@@ -226,7 +245,16 @@ Layout panels are declared as a tuple of `Panel(slot, title)` objects on the vie
 
 ### Inline-import policy
 
-Imports live at module top. A function-local (inline) import is justified ONLY to (a) avoid `AppRegistryNotReady` at import time, (b) break a real circular import, or (c) defer an optional/heavy dependency. Every other inline import — plain stdlib, plain Django, and local-app imports with no cycle — must be hoisted. When an inline import is genuinely required, annotate it with a one-line reason, e.g. `# inline import: breaks <A> <-> <B> circular import`.
+Imports live at module top. A function-body (inline) import is justified ONLY by one of four categories: `cycle` (breaks a real circular import), `app-registry` (avoids `AppRegistryNotReady` at import time), `optional-dependency` (absent in a supported environment), or `heavy-import` (defers an expensive import off a hot import path). Every other inline import — plain stdlib, plain Django, and local-app imports with no cycle — must be hoisted.
+
+A justified inline import is annotated in place as `# inline import: <category>: <reason>` (plural `# inline imports:` covers a contiguous group), naming the modules involved:
+
+```python
+# inline import: cycle: core.managers <-> itambox.middleware at module load
+from itambox.middleware import get_current_user
+```
+
+`scripts/check_local_imports.py` enforces this as a blocking, AST-based gate (see "Lint: local imports" above). The full policy — grammar, scope, ratchet semantics, and how to pay down baselined debt — is in [python-import-policy.md](itambox/docs/development/python-import-policy.md).
 
 ## Architecture: permissions & auth
 

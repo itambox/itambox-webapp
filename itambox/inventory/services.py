@@ -106,7 +106,7 @@ def shared_stock_union(queryset, stock_model):
     tenant via live TenantResourceGrants (ADR-0001 phase 4b: grantees may VIEW
     shared stock). Read surfaces only — mutation views keep pure scoping.
     No active tenant → unchanged queryset."""
-    # inline imports: break an inventory <-> organization import cycle at load
+    # inline imports: cycle: break an inventory <-> organization import cycle at load
     from core.managers import get_current_tenant
     from organization.access import shared_resource_ids
 
@@ -122,7 +122,7 @@ def recipient_assignment_union(queryset, assignment_model):
     """Extend a tenant-scoped assignment queryset with live rows TARGETING the
     active tenant (ADR-0001 phase 4b: recipients may view inbound cross-tenant
     assignments and run the return workflow). No active tenant → unchanged."""
-    # inline import: break an inventory <-> core import cycle at load
+    # inline import: cycle: break an inventory <-> core import cycle at load
     from core.managers import get_current_tenant
 
     tenant = get_current_tenant()
@@ -144,7 +144,7 @@ def resolve_grant_for_checkout(item, item_field, stock_model, assignment_model, 
     exact grant row is returned for provenance. Shared by the item checkout
     flow and the kit checkout flow.
     """
-    # inline imports: break an inventory <-> organization import cycle at load
+    # inline imports: cycle: break an inventory <-> organization import cycle at load
     from core.managers import get_current_tenant
     from itambox.middleware import get_current_user
     from organization.models import TenantResourceGrant

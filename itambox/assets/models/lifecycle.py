@@ -1,5 +1,7 @@
 """Lifecycle models: AssetDisposal, Warranty, AssetReservation, and DateRange helper."""
 
+import datetime
+
 from django.conf import settings
 from django.contrib.postgres.constraints import ExclusionConstraint
 from django.contrib.postgres.fields import RangeBoundary, RangeOperators
@@ -207,8 +209,6 @@ class Warranty(JournalingMixin, SoftDeleteMixin, ChangeLoggingMixin, BaseModel):
     @property
     def is_active(self) -> bool:
         """True when today falls within [start_date, end_date]."""
-        import datetime
-
         today = datetime.date.today()
         return self.start_date <= today <= self.end_date
 

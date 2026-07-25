@@ -8,6 +8,7 @@ from extras.models import Tag
 
 from ..filters import SiteGroupFilterSet
 from ..models import SiteGroup
+from .helpers import add_standard_buttons
 
 
 class SiteGroupForm(forms.ModelForm):
@@ -38,7 +39,6 @@ class SiteGroupForm(forms.ModelForm):
         self.helper.form_method = "post"
         self.helper.form_tag = True
         self.helper.layout = Layout("name", "slug", "parent", "description", "tags")
-        from .helpers import add_standard_buttons
 
         add_standard_buttons(self.helper, self.instance, "organization:sitegroup_list")
 

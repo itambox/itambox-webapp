@@ -455,12 +455,14 @@ class ComponentAllocation(AbstractAssignment):
         return self.component.get_absolute_url()
 
     def save(self, *args, **kwargs):
+        # inline import: cycle: inventory.models <-> inventory.services at module load.
         from .services import adjust_inventory_stock
 
         adjust_inventory_stock(self)
         super().save(*args, **kwargs)
 
     def delete(self, *args, **kwargs):
+        # inline import: cycle: inventory.models <-> inventory.services at module load.
         from .services import adjust_inventory_stock
 
         adjust_inventory_stock(self, is_delete=True)
@@ -501,12 +503,14 @@ class AccessoryAssignment(AbstractAssignment):
         return f"{self.qty}x {self.accessory} assigned to {recipient}"
 
     def save(self, *args, **kwargs):
+        # inline import: cycle: inventory.models <-> inventory.services at module load.
         from .services import adjust_inventory_stock
 
         adjust_inventory_stock(self)
         super().save(*args, **kwargs)
 
     def delete(self, *args, **kwargs):
+        # inline import: cycle: inventory.models <-> inventory.services at module load.
         from .services import adjust_inventory_stock
 
         adjust_inventory_stock(self, is_delete=True)
@@ -547,12 +551,14 @@ class ConsumableAssignment(AbstractAssignment):
         return f"{self.qty}x {self.consumable} consumed by {recipient}"
 
     def save(self, *args, **kwargs):
+        # inline import: cycle: inventory.models <-> inventory.services at module load.
         from .services import adjust_inventory_stock
 
         adjust_inventory_stock(self)
         super().save(*args, **kwargs)
 
     def delete(self, *args, **kwargs):
+        # inline import: cycle: inventory.models <-> inventory.services at module load.
         from .services import adjust_inventory_stock
 
         adjust_inventory_stock(self, is_delete=True)
@@ -596,6 +602,7 @@ class Kit(
         return reverse("inventory:kit_detail", kwargs={"pk": self.pk})
 
     def checkout_to_holder(self, holder, source_location, user=None):
+        # inline import: cycle: inventory.models <-> assets.services at module load.
         from assets.services import checkout_kit
 
         return checkout_kit(self, holder=holder, location=source_location, source_location=source_location, user=user)

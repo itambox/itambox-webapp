@@ -7,6 +7,7 @@ from core.forms import FilterForm
 
 from ..filters import ContactRoleFilterSet
 from ..models import Contact, ContactAssignment, ContactRole
+from .helpers import add_standard_buttons
 
 
 class ContactRoleForm(forms.ModelForm):
@@ -25,7 +26,6 @@ class ContactRoleForm(forms.ModelForm):
         self.helper.form_method = "post"
         self.helper.form_tag = True
         self.helper.layout = Layout("name", "slug", "description")
-        from .helpers import add_standard_buttons
 
         add_standard_buttons(self.helper, self.instance, "organization:contactrole_list")
 

@@ -14,7 +14,7 @@ class SubscriptionsConfig(AppConfig):
         post_migrate.connect(self._register_subscription_tasks, sender=self)
 
     def _register_subscription_tasks(self, sender, **kwargs):
-        # inline import: avoid AppRegistryNotReady at app-load time
+        # inline import: app-registry: avoid AppRegistryNotReady at app-load time
         from django_q.models import Schedule
 
         from core.schedules import register_schedule

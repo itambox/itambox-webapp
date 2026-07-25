@@ -297,7 +297,7 @@ class AbstractAssignment(JournalingMixin, TaggableMixin, SoftDeleteMixin, Change
 
     def _grant_coverage_problems(self, grant):
         """Structural coverage check — RBAC is the resolver's/service's job."""
-        # inline import: breaks an inventory <-> organization import cycle at load
+        # inline import: cycle: breaks an inventory <-> organization import cycle at load
         from organization.access import get_ancestor_tenant_group_ids
         from organization.models import TenantResourceGrant
 

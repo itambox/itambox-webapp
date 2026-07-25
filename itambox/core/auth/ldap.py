@@ -126,6 +126,8 @@ class TenantLDAPSettings:
             # val could be a string representing the class name in django_auth_ldap.config
             # e.g., 'GroupOfNamesType', 'PosixGroupType', etc.
             try:
+                # inline import: optional-dependency: django-auth-ldap is excluded on
+                # native Windows (python-ldap has no wheel there).
                 from django_auth_ldap import config as ldap_config
 
                 if hasattr(ldap_config, val):

@@ -997,7 +997,9 @@ class MembershipForm(forms.ModelForm):
 
 
 class MembershipFilterForm(FilterForm):
-    from ..filters import MembershipFilterSet  # inline import: breaks forms <-> filters cycle at import time
+    # Class-body position, not a function-body import: breaks a forms <-> filters
+    # cycle by running after this module's own definitions.
+    from ..filters import MembershipFilterSet
 
     filterset_class = MembershipFilterSet
 

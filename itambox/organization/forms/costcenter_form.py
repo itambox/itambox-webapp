@@ -8,6 +8,7 @@ from extras.customfields import CustomFieldModelFormMixin
 
 from ..filters import CostCenterFilterSet
 from ..models import CostCenter, Tenant
+from .helpers import add_standard_buttons
 
 
 class CostCenterForm(CustomFieldModelFormMixin, forms.ModelForm):
@@ -58,7 +59,6 @@ class CostCenterForm(CustomFieldModelFormMixin, forms.ModelForm):
             "is_active",
         )
         self.append_custom_fields_to_layout()
-        from .helpers import add_standard_buttons
 
         add_standard_buttons(self.helper, self.instance, "organization:costcenter_list")
 

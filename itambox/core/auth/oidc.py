@@ -186,7 +186,7 @@ class TenantOIDCBackend(TenantOIDCSettingsMixin, OIDCAuthenticationBackend):
 
         tenant_configs = getattr(settings, "ITAMBOX_TENANT_OIDC_CONFIGS", {})
 
-        # inline import: avoids loading organization models while Django's auth
+        # inline import: app-registry: avoids loading organization models while Django's auth
         # backends are initialized during app setup.
         from organization.models import AssetHolder, Membership
 

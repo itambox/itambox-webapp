@@ -123,6 +123,7 @@ class Software(CustomFieldDataMixin, DeletableVaultModel):
     def license_count(self):
         if hasattr(self, "_license_count"):
             return self._license_count
+        # inline import: cycle: software.models <-> licenses.models at module load.
         from licenses.models import License
 
         return License.objects.filter(software=self, deleted_at__isnull=True).count()
@@ -147,6 +148,7 @@ class Software(CustomFieldDataMixin, DeletableVaultModel):
         fresh data on each access without the risk of serving a stale cache in a
         long-lived request or background task.
         """
+        # inline import: cycle: software.models <-> licenses.reconciliation at module load.
         from licenses.reconciliation import reconcile_software
 
         return reconcile_software(self)

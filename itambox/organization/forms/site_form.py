@@ -9,6 +9,7 @@ from extras.models import Tag
 
 from ..filters import SiteFilterSet
 from ..models import Region, Site, SiteGroup
+from .helpers import add_standard_buttons
 
 
 class SiteForm(forms.ModelForm):
@@ -105,7 +106,6 @@ class SiteForm(forms.ModelForm):
             "comments",
             "tags",
         )
-        from .helpers import add_standard_buttons
 
         add_standard_buttons(self.helper, self.instance, "organization:site_list")
 

@@ -111,6 +111,7 @@ def get_registered_import_form(model):
         # Import side-effect: curated forms self-register via @register_import_form.
         # Lazy (request-time) to avoid app-loading circular imports.
         try:
+            # inline import: cycle: core.forms.import_forms <-> assets.forms.import_forms
             import assets.forms.import_forms  # noqa: F401
         except Exception:
             logger.exception("Failed to load curated import forms")

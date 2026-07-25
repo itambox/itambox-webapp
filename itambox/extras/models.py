@@ -648,7 +648,7 @@ class ExportTemplate(ChangeLoggingMixin, BaseModel):
         ``undefined``, …) to stored template data — that is the CVE-2026-29514 RCE
         vector in NetBox's analogous ExportTemplate.
         """
-        # inline import: jinja2 is a render-only dependency; keep it off the
+        # inline import: heavy-import: jinja2 is a render-only dependency; keep it off the
         # import-time path of extras.models.
         from jinja2.sandbox import ImmutableSandboxedEnvironment
 

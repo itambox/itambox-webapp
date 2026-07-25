@@ -17,7 +17,7 @@ class Command(BaseCommand):
     help = "Report Role.permissions codenames that do not match any auth.Permission (read-only)."
 
     def handle(self, *args, **options):
-        # inline import: avoids AppRegistryNotReady when the command module is imported early
+        # inline import: app-registry: avoids AppRegistryNotReady when the command module is imported early
         from organization.models import Role
 
         valid = {

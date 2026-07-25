@@ -81,7 +81,7 @@ class MembershipBackend:
             if valid_until is None or valid_until > timezone.now():
                 return permissions
 
-        # inline import: avoids AppRegistryNotReady at auth-backend import time.
+        # inline import: app-registry: avoids AppRegistryNotReady at auth-backend import time.
         from organization.rbac import resolve_effective_permissions_with_expiry
 
         permissions, valid_until = resolve_effective_permissions_with_expiry(
@@ -125,7 +125,7 @@ class MembershipBackend:
                 tenants, valid_until = getattr(user_obj, cache_key)
                 if valid_until is None or valid_until > timezone.now():
                     return tenants
-            # inline imports: avoid AppRegistryNotReady / a core<->organization cycle at load
+            # inline imports: app-registry: avoid AppRegistryNotReady / a core<->organization cycle at load
             from organization.access import accessible_tenant_ids_with_expiry
             from organization.models import Tenant
 
@@ -146,7 +146,7 @@ class MembershipBackend:
             tenants, valid_until = getattr(user_obj, cache_key)
             if valid_until is None or valid_until > timezone.now():
                 return tenants
-        # inline imports: avoid AppRegistryNotReady / a core<->organization cycle at load
+        # inline imports: app-registry: avoid AppRegistryNotReady / a core<->organization cycle at load
         from organization.access import (
             accessible_tenant_ids_with_expiry,
             get_descendant_tenant_group_ids,
@@ -237,7 +237,7 @@ class MembershipBackend:
         group_tenants = self._group_scope_tenants(user_obj)
         if group_tenants is None:
             return frozenset()
-        # inline import: avoids AppRegistryNotReady at auth-backend import time.
+        # inline import: app-registry: avoids AppRegistryNotReady at auth-backend import time.
         from organization.rbac import build_accessible_tenant_permissions_map
 
         build_accessible_tenant_permissions_map(user_obj)

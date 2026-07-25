@@ -1,3 +1,5 @@
+from datetime import timedelta
+
 import django_filters
 from django import forms
 from django.contrib.auth import get_user_model
@@ -163,7 +165,6 @@ class AssetFilterSet(BaseFilterSet):
     def filter_audit_due(self, queryset, name, value):
         if value is None:
             return queryset
-        from datetime import timedelta
 
         from django.db.models import Case, DurationField, ExpressionWrapper, F, When
         from django.utils import timezone

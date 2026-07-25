@@ -1,5 +1,7 @@
+import base64
 import io
 import logging
+import os
 import zipfile
 
 from django.contrib.contenttypes.models import ContentType
@@ -20,8 +22,6 @@ def generate_single_label_graphic(asset, label_format):
     """
     Renders QR code or Barcode PNG bytes for the given asset.
     """
-    import io
-
     buffer = io.BytesIO()
 
     if label_format == "qr":
@@ -114,9 +114,6 @@ def generate_label_batch_task(job_id, asset_pks, label_format, user_id, tenant_i
 
 
 def generate_base64_barcode(asset, barcode_format):
-    import base64
-    import io
-
     buffer = io.BytesIO()
 
     fmt = barcode_format.lower() if barcode_format else "code128"
@@ -340,8 +337,6 @@ def _pdf_safe_link_callback(uri, rel):
     ``data:`` URIs and files physically under STATIC_ROOT / MEDIA_ROOT; anything
     else (remote URLs, ``file://``, traversal) resolves to nothing.
     """
-    import os
-
     from django.conf import settings
 
     if uri.startswith("data:"):

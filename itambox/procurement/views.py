@@ -1,3 +1,5 @@
+from decimal import Decimal
+
 from django.contrib import messages
 from django.db import transaction
 from django.http import HttpResponse
@@ -35,8 +37,6 @@ class PurchaseOrderDetailView(ObjectDetailView):
         context["line_form"] = PurchaseOrderLineForm()
 
         # Calculate total value of the PO
-        from decimal import Decimal
-
         total_value = Decimal("0.00")
         for line in lines:
             if line.unit_price and line.qty_ordered:
@@ -245,8 +245,6 @@ class PurchaseOrderLineEditView(PermissionRequiredMixin, View):
             unit_price_raw = request.POST.get("unit_price")
             unit_price = None
             if unit_price_raw and unit_price_raw.strip():
-                from decimal import Decimal
-
                 unit_price = Decimal(unit_price_raw)
                 if unit_price < 0:
                     raise ValueError("Price cannot be negative.")

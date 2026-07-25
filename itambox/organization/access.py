@@ -2,6 +2,7 @@
 
 import contextvars
 
+from django.db.models import Q
 from django.utils import timezone
 
 # Request-local memo for the recursive descendant walk below. Each request runs
@@ -23,7 +24,7 @@ def get_descendant_tenant_group_ids(group_id, live_only=False):
     cache_key = (group_id, live_only)
     if cache_key in cache:
         return cache[cache_key]
-    # inline import: avoids organization model import during app initialization.
+    # inline import: app-registry: avoids organization model import during app initialization.
     from organization.models import TenantGroup
 
     if (
@@ -56,7 +57,7 @@ def get_descendant_tenant_group_ids(group_id, live_only=False):
 def get_ancestor_tenant_group_ids(group_id, live_only=False):
     if group_id is None:
         return set()
-    # inline import: avoids organization model import during app initialization.
+    # inline import: app-registry: avoids organization model import during app initialization.
     from organization.models import TenantGroup
 
     seen = set()
@@ -72,9 +73,10 @@ def get_ancestor_tenant_group_ids(group_id, live_only=False):
 
 def shared_resource_ids(model, tenant):
     """Pool ids of ``model`` explicitly shared to ``tenant``."""
-    # inline imports: avoid AppRegistryNotReady during app initialization.
+    # inline imports: app-registry: ContentType and organization models are not
+    # loadable while Django is still loading apps, and this module is imported
+    # during app setup (core.auth, core.managers, itambox.middleware).
     from django.contrib.contenttypes.models import ContentType
-    from django.db.models import Q
 
     from organization.models import TenantResourceGrant
 
@@ -122,7 +124,7 @@ def accessible_tenant_ids_with_expiry(user):
     # serving a stale set while the shared cache is unreachable.
     can_cache = hasattr(user, "__dict__")
     if can_cache:
-        # inline import: avoids an organization.access -> core.auth import cycle
+        # inline import: cycle: avoids an organization.access -> core.auth import cycle
         # at load (core.auth resolves permissions through organization.rbac).
         from core.auth.cache import synchronize_authorization_cache
 
@@ -132,7 +134,7 @@ def accessible_tenant_ids_with_expiry(user):
             cached_valid_until = user.__dict__.get(expiry_key)
             if cached_valid_until is None or cached_valid_until > timezone.now():
                 return cached, cached_valid_until
-    # inline import: avoids organization.access <-> organization.rbac at load time.
+    # inline import: cycle: avoids organization.access <-> organization.rbac at load time.
     from organization.rbac import resolve_accessible_tenant_ids_with_expiry
 
     result, valid_until = resolve_accessible_tenant_ids_with_expiry(user)
@@ -151,7 +153,7 @@ def accessible_tenant_ids(user):
 def managed_accessible_tenant_ids(user):
     if user is None or not getattr(user, "is_authenticated", False):
         return set()
-    # inline import: avoids organization.access <-> organization.rbac at load time.
+    # inline import: cycle: avoids organization.access <-> organization.rbac at load time.
     from organization.rbac import applicable_grants
 
     tenant_ids = set()
@@ -162,10 +164,8 @@ def managed_accessible_tenant_ids(user):
 
 def tenant_access_report(tenant, external_only=False):
     """Return users who can access ``tenant`` with native grant provenance."""
-    # inline imports: keep this model-heavy module safe during app setup.
-    from django.db.models import Q
-    from django.utils import timezone
-
+    # inline import: app-registry: organization models are not loadable while
+    # Django is still loading apps, and this module is imported during app setup.
     from organization.models import Membership, RoleGrant
 
     user_data = {}

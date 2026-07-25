@@ -741,7 +741,9 @@ class RoleForm(forms.ModelForm):
 
 
 class RoleFilterForm(FilterForm):
-    from ..filters import RoleFilterSet  # inline import: breaks forms <-> filters cycle at import time
+    # Class-body position, not a function-body import: breaks a forms <-> filters
+    # cycle by running after this module's own definitions.
+    from ..filters import RoleFilterSet
 
     filterset_class = RoleFilterSet
 

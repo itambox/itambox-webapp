@@ -7,6 +7,8 @@ Handles the multiple input shapes that a scan can produce:
 - Full / partial URL:  https://itam.example.com/assets/7/  (last path segment used as pk)
 """
 
+from urllib.parse import urlencode
+
 from django.db.models import Q
 
 
@@ -77,8 +79,6 @@ def resolve_scanned_target(code, user):
 
     Returns ``{'url': ..., 'label': ...}`` or ``None``.
     """
-    from urllib.parse import urlencode
-
     from django.urls import reverse
 
     if user.has_perm("assets.view_asset"):
@@ -100,7 +100,9 @@ def resolve_scanned_target(code, user):
             return {"url": url, "label": str(atype)}
 
     # Inventory item EAN -> item detail.
-    # inline import: inventory imports from assets — avoid a load-time cycle.
+    # Deferred at call time: inventory reaches back into assets, so a module-top
+    # import here would couple the two apps' load order. Not a module-level cycle
+    # today -- tracked as local-import debt rather than a policy justification.
     from inventory.models import Accessory, Component, Consumable
 
     for model, perm in (

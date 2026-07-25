@@ -1,3 +1,5 @@
+from datetime import timedelta
+
 from crispy_forms.helper import FormHelper
 from crispy_forms.layout import HTML, Column, Div, Fieldset, Layout, Row, Submit
 from django import forms
@@ -347,8 +349,6 @@ class SubscriptionRenewForm(forms.Form):
         if subscription:
             self.fields["renewal_cost"].initial = subscription.renewal_cost
             if subscription.renewal_date:
-                from datetime import timedelta
-
                 cycle = subscription.billing_cycle
                 current_date = subscription.renewal_date
                 if cycle == "monthly":

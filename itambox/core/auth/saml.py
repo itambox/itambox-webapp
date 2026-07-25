@@ -1,3 +1,4 @@
+import logging
 import os
 
 import saml2
@@ -91,8 +92,6 @@ class TenantSaml2Backend(Saml2Backend):
         tenant = get_current_tenant()
         if not tenant:
             return
-
-        import logging
 
         from django.db import transaction
         from django.db.utils import IntegrityError
