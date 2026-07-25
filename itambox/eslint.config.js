@@ -33,6 +33,11 @@ export default [
     rules: {
       'no-console': ['warn', { allow: ['warn', 'error'] }],
       'no-var': 'error',
+      // ESLint 10 newly enables these in its recommended preset. Preserve the
+      // existing lint policy; enabling them belongs in a separate lint ratchet.
+      'no-unassigned-vars': 'off',
+      'no-useless-assignment': 'off',
+      'preserve-caught-error': 'off',
       'prefer-const': 'warn',
       'eqeqeq': ['error', 'always', { null: 'ignore' }],
     },
