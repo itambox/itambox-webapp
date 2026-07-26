@@ -79,6 +79,12 @@ class WidgetRetireView(SimplePostView):
 `ValidationError` for a business-rule failure (danger toast for HTMX, message +
 redirect otherwise) and `PermissionDenied` for an authorization failure.
 
+The inventory stock +/- control deliberately uses its domain-level
+`StockAdjustView` instead: its buttons use `hx-swap="outerHTML"` and therefore
+require a `200` HTML replacement fragment rather than `SimplePostView`'s
+`204 + HX-Trigger` response. It still inherits `SecuredObjectActionMixin`; do not
+move it to `SimplePostView` without changing and testing that client contract.
+
 There is no GET handler by design — an action that mutates state must not be
 reachable by navigation.
 
