@@ -1,14 +1,7 @@
-import json
-
 from django.contrib import messages
-from django.contrib.auth.mixins import LoginRequiredMixin, PermissionRequiredMixin
-from django.db import transaction
-from django.http import Http404, HttpResponse, HttpResponseForbidden
-from django.shortcuts import get_object_or_404, redirect, render
+from django.shortcuts import redirect
 from django.urls import reverse, reverse_lazy
-from django.utils.html import format_html
 from django.utils.translation import gettext_lazy as _
-from django.views.generic import View
 
 from inventory.services import (
     checkin_accessory,
@@ -30,6 +23,7 @@ from itambox.views.generic.service_views import GenericTransactionView, SimplePo
 
 from .. import filters, forms, tables
 from ..models import Accessory, AccessoryAssignment, AccessoryStock, Kit
+from .stock_actions import StockAdjustView, StockCreateModalView
 
 
 class AccessoryListView(ObjectListView):
@@ -265,102 +259,14 @@ class AccessoryAssignmentListView(ObjectListView):
         return context
 
 
-class AccessoryStockAdjustView(LoginRequiredMixin, PermissionRequiredMixin, View):
+class AccessoryStockAdjustView(StockAdjustView):
     permission_required = "inventory.change_accessorystock"
-
-    def post(self, request, pk):
-        with transaction.atomic():
-            try:
-                stock = AccessoryStock.objects.select_for_update().get(pk=pk)
-            except AccessoryStock.DoesNotExist:
-                raise Http404 from None
-            # Anchor at the POOL (its tenant is the owner) — never the catalogue
-            # item: grantees and other tenants must not adjust foreign stock
-            # (ADR-0001), and the owner must not be blocked by a foreign item.
-            if not request.user.has_perm("inventory.change_accessorystock", obj=stock):
-                return HttpResponseForbidden(_("Permission denied."))
-            action = request.GET.get("action")
-
-            if action == "increment":
-                stock.qty += 1
-                stock.save()
-            elif action == "decrement":
-                if stock.qty > 0:
-                    stock.qty -= 1
-                    stock.save()
-
-        return HttpResponse(
-            format_html(
-                '<div class="d-flex align-items-center justify-content-start">'
-                '  <button class="btn btn-sm btn-icon btn-outline-secondary me-2 px-1 py-0 lh-1" '
-                '          hx-post="{}" hx-swap="outerHTML" hx-target="closest div" style="height: 1.5rem; width: 1.5rem;">'
-                '    <i class="mdi mdi-minus" style="font-size: 0.75rem;"></i>'
-                "  </button>"
-                '  <span class="badge bg-blue-lt text-blue font-weight-bold px-2 py-1" style="font-size: 0.85rem;">{}</span>'
-                '  <button class="btn btn-sm btn-icon btn-outline-secondary ms-2 px-1 py-0 lh-1" '
-                '          hx-post="{}" hx-swap="outerHTML" hx-target="closest div" style="height: 1.5rem; width: 1.5rem;">'
-                '    <i class="mdi mdi-plus" style="font-size: 0.75rem;"></i>'
-                "  </button>"
-                "</div>",
-                reverse("inventory:accessorystock_adjust", kwargs={"pk": stock.pk}) + "?action=decrement",
-                stock.qty,
-                reverse("inventory:accessorystock_adjust", kwargs={"pk": stock.pk}) + "?action=increment",
-            )
-        )
+    # Adjustments are owner-only: scope authorization at the pool, never a
+    # shared catalogue item or the grantee-widened stock-list queryset.
+    queryset = AccessoryStock.objects.all()
 
 
-class AccessoryStockCreateModalView(LoginRequiredMixin, PermissionRequiredMixin, View):
+class AccessoryStockCreateModalView(StockCreateModalView):
     permission_required = "inventory.add_accessorystock"
-
-    def get(self, request, pk):
-        accessory = get_object_or_404(Accessory, pk=pk)
-        from ..forms import AccessoryStockModalForm
-
-        initial = {}
-        location_id = request.GET.get("location")
-        if location_id:
-            initial["location"] = location_id
-        form = AccessoryStockModalForm(initial=initial)
-        return render(
-            request,
-            "generic/includes/add_stock_modal.html",
-            {
-                "object": accessory,
-                "form": form,
-                "post_url": reverse("inventory:accessory_add_stock", kwargs={"pk": accessory.pk}),
-            },
-        )
-
-    def post(self, request, pk):
-        accessory = get_object_or_404(Accessory, pk=pk)
-        from ..forms import AccessoryStockModalForm
-
-        form = AccessoryStockModalForm(request.POST)
-        if form.is_valid():
-            stock = form.save(commit=False)
-            stock.accessory = accessory
-            stock.save()
-            if request.headers.get("HX-Request"):
-                response = HttpResponse(status=204)
-                response["HX-Trigger"] = json.dumps(
-                    {
-                        "closeModalEvent": None,
-                        "tableRefreshRequired": None,
-                        "showMessage": {
-                            "message": str(_("Added stock pool for %(location)s.") % {"location": stock.location}),
-                            "level": "success",
-                        },
-                    }
-                )
-                return response
-            return redirect(accessory.get_absolute_url())
-
-        return render(
-            request,
-            "generic/includes/add_stock_modal.html",
-            {
-                "object": accessory,
-                "form": form,
-                "post_url": reverse("inventory:accessory_add_stock", kwargs={"pk": accessory.pk}),
-            },
-        )
+    queryset = Accessory.objects.all()
+    modal_form = forms.AccessoryStockModalForm

@@ -1,13 +1,6 @@
-import json
-
-from django.contrib.auth.mixins import LoginRequiredMixin, PermissionRequiredMixin
-from django.db import transaction
-from django.http import Http404, HttpResponse, HttpResponseForbidden
-from django.shortcuts import get_object_or_404, redirect, render
+from django.shortcuts import redirect
 from django.urls import reverse, reverse_lazy
-from django.utils.html import format_html
 from django.utils.translation import gettext_lazy as _
-from django.views.generic import View
 
 from inventory.services import (
     checkin_component,
@@ -28,6 +21,7 @@ from itambox.views.generic.service_views import GenericTransactionView, SimplePo
 
 from .. import filters, forms, tables
 from ..models import Component, ComponentAllocation, ComponentStock
+from .stock_actions import StockAdjustView, StockCreateModalView
 
 
 class ComponentListView(ObjectListView):
@@ -209,103 +203,16 @@ class ComponentAllocationDeleteView(ObjectDeleteView):
     success_url = reverse_lazy("inventory:component_list")
 
 
-class ComponentStockAdjustView(LoginRequiredMixin, PermissionRequiredMixin, View):
+class ComponentStockAdjustView(StockAdjustView):
     permission_required = "inventory.change_componentstock"
-
-    def post(self, request, pk):
-        with transaction.atomic():
-            try:
-                stock = ComponentStock.objects.select_for_update().get(pk=pk)
-            except ComponentStock.DoesNotExist:
-                raise Http404 from None
-            # Anchor at the POOL — see AccessoryStockAdjustView.
-            if not request.user.has_perm("inventory.change_componentstock", obj=stock):
-                return HttpResponseForbidden(_("Permission denied."))
-            action = request.GET.get("action")
-
-            if action == "increment":
-                stock.qty += 1
-                stock.save()
-            elif action == "decrement":
-                if stock.qty > 0:
-                    stock.qty -= 1
-                    stock.save()
-
-        return HttpResponse(
-            format_html(
-                '<div class="d-flex align-items-center justify-content-start">'
-                '  <button class="btn btn-sm btn-icon btn-outline-secondary me-2 px-1 py-0 lh-1" '
-                '          hx-post="{}" hx-swap="outerHTML" hx-target="closest div" style="height: 1.5rem; width: 1.5rem;">'
-                '    <i class="mdi mdi-minus" style="font-size: 0.75rem;"></i>'
-                "  </button>"
-                '  <span class="badge bg-blue-lt text-blue font-weight-bold px-2 py-1" style="font-size: 0.85rem;">{}</span>'
-                '  <button class="btn btn-sm btn-icon btn-outline-secondary ms-2 px-1 py-0 lh-1" '
-                '          hx-post="{}" hx-swap="outerHTML" hx-target="closest div" style="height: 1.5rem; width: 1.5rem;">'
-                '    <i class="mdi mdi-plus" style="font-size: 0.75rem;"></i>'
-                "  </button>"
-                "</div>",
-                reverse("inventory:componentstock_adjust", kwargs={"pk": stock.pk}) + "?action=decrement",
-                stock.qty,
-                reverse("inventory:componentstock_adjust", kwargs={"pk": stock.pk}) + "?action=increment",
-            )
-        )
+    # Adjustments are owner-only; shared pools remain read/consume-only.
+    queryset = ComponentStock.objects.all()
 
 
-class ComponentStockCreateModalView(LoginRequiredMixin, PermissionRequiredMixin, View):
+class ComponentStockCreateModalView(StockCreateModalView):
     permission_required = "inventory.add_componentstock"
-
-    def get(self, request, pk):
-        component = get_object_or_404(Component, pk=pk)
-        from ..forms import ComponentStockModalForm
-
-        initial = {}
-        location_id = request.GET.get("location")
-        if location_id:
-            initial["location"] = location_id
-        form = ComponentStockModalForm(initial=initial)
-        return render(
-            request,
-            "generic/includes/add_stock_modal.html",
-            {
-                "object": component,
-                "form": form,
-                "post_url": reverse("inventory:component_add_stock", kwargs={"pk": component.pk}),
-            },
-        )
-
-    def post(self, request, pk):
-        component = get_object_or_404(Component, pk=pk)
-        from ..forms import ComponentStockModalForm
-
-        form = ComponentStockModalForm(request.POST)
-        if form.is_valid():
-            stock = form.save(commit=False)
-            stock.component = component
-            stock.save()
-            if request.headers.get("HX-Request"):
-                response = HttpResponse(status=204)
-                response["HX-Trigger"] = json.dumps(
-                    {
-                        "closeModalEvent": None,
-                        "tableRefreshRequired": None,
-                        "showMessage": {
-                            "message": str(_("Added stock pool for %(location)s.") % {"location": stock.location}),
-                            "level": "success",
-                        },
-                    }
-                )
-                return response
-            return redirect(component.get_absolute_url())
-
-        return render(
-            request,
-            "generic/includes/add_stock_modal.html",
-            {
-                "object": component,
-                "form": form,
-                "post_url": reverse("inventory:component_add_stock", kwargs={"pk": component.pk}),
-            },
-        )
+    queryset = Component.objects.all()
+    modal_form = forms.ComponentStockModalForm
 
 
 class ComponentCheckoutView(GenericTransactionView):

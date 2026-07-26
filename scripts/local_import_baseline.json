@@ -2939,18 +2939,6 @@
     },
     {
       "path": "itambox/inventory/views/accessory_views.py",
-      "context": "ClassDef:AccessoryStockCreateModalView/FunctionDef:get",
-      "statement": "from ..forms import AccessoryStockModalForm",
-      "count": 1
-    },
-    {
-      "path": "itambox/inventory/views/accessory_views.py",
-      "context": "ClassDef:AccessoryStockCreateModalView/FunctionDef:post",
-      "statement": "from ..forms import AccessoryStockModalForm",
-      "count": 1
-    },
-    {
-      "path": "itambox/inventory/views/accessory_views.py",
       "context": "ClassDef:AccessoryStockListView/FunctionDef:get_context_data",
       "statement": "from assets.models import Asset",
       "count": 1
@@ -3011,18 +2999,6 @@
     },
     {
       "path": "itambox/inventory/views/component_views.py",
-      "context": "ClassDef:ComponentStockCreateModalView/FunctionDef:get",
-      "statement": "from ..forms import ComponentStockModalForm",
-      "count": 1
-    },
-    {
-      "path": "itambox/inventory/views/component_views.py",
-      "context": "ClassDef:ComponentStockCreateModalView/FunctionDef:post",
-      "statement": "from ..forms import ComponentStockModalForm",
-      "count": 1
-    },
-    {
-      "path": "itambox/inventory/views/component_views.py",
       "context": "ClassDef:ComponentStockListView/FunctionDef:get_context_data",
       "statement": "from assets.models import Asset",
       "count": 1
@@ -3043,18 +3019,6 @@
       "path": "itambox/inventory/views/consumable_views.py",
       "context": "ClassDef:ConsumableListView/FunctionDef:get_context_data",
       "statement": "from organization.models import AssetHolder, Location",
-      "count": 1
-    },
-    {
-      "path": "itambox/inventory/views/consumable_views.py",
-      "context": "ClassDef:ConsumableStockCreateModalView/FunctionDef:get",
-      "statement": "from ..forms import ConsumableStockModalForm",
-      "count": 1
-    },
-    {
-      "path": "itambox/inventory/views/consumable_views.py",
-      "context": "ClassDef:ConsumableStockCreateModalView/FunctionDef:post",
-      "statement": "from ..forms import ConsumableStockModalForm",
       "count": 1
     },
     {

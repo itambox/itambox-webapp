@@ -2,7 +2,9 @@ import json
 
 from django.contrib.auth import get_user_model
 from django.contrib.auth.mixins import PermissionRequiredMixin
+from django.db import connection
 from django.test import TestCase
+from django.test.utils import CaptureQueriesContext
 from django.urls import reverse
 
 from assets.models import Category, Manufacturer
@@ -23,6 +25,8 @@ from inventory.views import (
     ConsumableStockAdjustView,
     ConsumableStockCreateModalView,
 )
+from inventory.views.stock_actions import StockAdjustView, StockCreateModalView
+from itambox.views.generic.authorization import SecuredObjectActionMixin
 from organization.models import Location, Site, Tenant
 
 User = get_user_model()
@@ -181,6 +185,29 @@ class StockActionPermissionTests(TenantTestMixin, TestCase):
                 self.assertTrue(issubclass(family["adjust_view"], PermissionRequiredMixin))
                 self.assertEqual(family["adjust_view"].permission_required, family["change_perm"])
 
+    def test_six_views_share_the_secured_stock_action_implementations(self):
+        for family in self.families:
+            create_view = family["create_view"]
+            adjust_view = family["adjust_view"]
+            with self.subTest(family=family["name"], action="create"):
+                self.assertTrue(issubclass(create_view, StockCreateModalView))
+                self.assertIn(SecuredObjectActionMixin, create_view.__mro__)
+                self.assertIs(create_view.get_permission_required, SecuredObjectActionMixin.get_permission_required)
+                self.assertIs(create_view.has_permission, SecuredObjectActionMixin.has_permission)
+                self.assertIs(create_view.get_queryset, SecuredObjectActionMixin.get_queryset)
+                self.assertIs(create_view.get_object, SecuredObjectActionMixin.get_object)
+                self.assertIs(create_view.get, StockCreateModalView.get)
+                self.assertIs(create_view.post, StockCreateModalView.post)
+            with self.subTest(family=family["name"], action="adjust"):
+                self.assertTrue(issubclass(adjust_view, StockAdjustView))
+                self.assertIn(SecuredObjectActionMixin, adjust_view.__mro__)
+                self.assertIs(adjust_view.get_permission_required, SecuredObjectActionMixin.get_permission_required)
+                self.assertIs(adjust_view.has_permission, SecuredObjectActionMixin.has_permission)
+                self.assertIs(adjust_view.get_queryset, SecuredObjectActionMixin.get_queryset)
+                self.assertIs(adjust_view.get_object, SecuredObjectActionMixin.get_object)
+                self.assertIs(adjust_view.get_locked_object, StockAdjustView.get_locked_object)
+                self.assertIs(adjust_view.post, StockAdjustView.post)
+
     def test_anonymous_create_and_adjust_requests_are_rejected(self):
         for family in self.families:
             with self.subTest(family=family["name"], action="create"):
@@ -192,6 +219,20 @@ class StockActionPermissionTests(TenantTestMixin, TestCase):
             with self.subTest(family=family["name"], action="adjust"):
                 response = self.client.post(self._adjust_url(family))
                 self.assertEqual(response.status_code, 302)
+
+    def test_authorized_create_get_renders_the_existing_prefilled_modal_contract(self):
+        self._login([family["add_perm"] for family in self.families])
+        for family in self.families:
+            with self.subTest(family=family["name"]):
+                response = self.client.get(
+                    self._create_url(family),
+                    {"location": self.create_location.pk},
+                )
+                self.assertEqual(response.status_code, 200)
+                self.assertTemplateUsed(response, "generic/includes/add_stock_modal.html")
+                self.assertEqual(response.context["object"], self.items[family["name"]])
+                self.assertEqual(response.context["post_url"], self._create_url(family))
+                self.assertEqual(response.context["form"].initial["location"], str(self.create_location.pk))
 
     def test_authenticated_user_without_permissions_cannot_mutate_stock(self):
         self._login([])
@@ -242,11 +283,36 @@ class StockActionPermissionTests(TenantTestMixin, TestCase):
                 )
             with self.subTest(family=family["name"], action="adjust"):
                 stock = self.stocks[family["name"]]
-                response = self.client.post(self._adjust_url(family))
+                with CaptureQueriesContext(connection) as queries:
+                    response = self.client.post(
+                        self._adjust_url(family),
+                        HTTP_HX_REQUEST="true",
+                    )
                 self.assertEqual(response.status_code, 200)
+                self.assertNotIn("HX-Trigger", response)
                 stock.refresh_from_db()
                 self.assertEqual(stock.qty, 6)
-                self.assertContains(response, "6")
+                adjust_url = reverse(family["adjust_url"], kwargs={"pk": stock.pk})
+                self.assertContains(response, f'hx-post="{adjust_url}?action=decrement"')
+                self.assertContains(response, f'hx-post="{adjust_url}?action=increment"')
+                self.assertContains(response, ">6</span>")
+                locking_queries = [
+                    query["sql"]
+                    for query in queries.captured_queries
+                    if "FOR UPDATE" in query["sql"].upper() and family["stock_model"]._meta.db_table in query["sql"]
+                ]
+                self.assertTrue(locking_queries, "stock adjustment must retain its SELECT FOR UPDATE row lock")
+
+    def test_authorized_non_htmx_create_preserves_detail_redirect(self):
+        self._login([family["add_perm"] for family in self.families])
+        for family in self.families:
+            with self.subTest(family=family["name"]):
+                response = self.client.post(
+                    self._create_url(family),
+                    {"location": self.create_location.pk, "qty": 4},
+                )
+                self.assertEqual(response.status_code, 302)
+                self.assertEqual(response["Location"], self.items[family["name"]].get_absolute_url())
 
     def test_cross_tenant_item_location_and_stock_identifiers_fail_closed(self):
         permissions = [
@@ -310,3 +376,20 @@ class StockActionPermissionTests(TenantTestMixin, TestCase):
                 self.assertEqual(response.status_code, 200)
                 stock.refresh_from_db()
                 self.assertEqual(stock.qty, 5)
+
+            stock.qty = 0
+            stock.save()
+            with self.subTest(family=family["name"], action="decrement-at-zero"):
+                with CaptureQueriesContext(connection) as queries:
+                    response = self.client.post(self._adjust_url(family, action="decrement"))
+                self.assertEqual(response.status_code, 200)
+                self.assertContains(response, ">0</span>")
+                stock_table = family["stock_model"]._meta.db_table
+                updates = [
+                    query["sql"]
+                    for query in queries.captured_queries
+                    if query["sql"].lstrip().upper().startswith("UPDATE") and stock_table in query["sql"]
+                ]
+                self.assertEqual(updates, [])
+                stock.refresh_from_db()
+                self.assertEqual(stock.qty, 0)

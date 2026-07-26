@@ -4,22 +4,22 @@
   "coverage_series": "7.15",
   "policy_sha256": "d361fd8b3ad72413b002fabc4612c7646ef74b2bc39a07ef07c4884f47551845",
   "totals": {
-    "num_statements": 38741,
-    "covered_lines": 30422,
-    "line_rate": 78.53,
-    "num_branches": 10506,
-    "covered_branches": 6005,
+    "num_statements": 38674,
+    "covered_lines": 30385,
+    "line_rate": 78.57,
+    "num_branches": 10474,
+    "covered_branches": 5987,
     "branch_rate": 57.16,
     "excluded_lines": 29,
-    "measured_files": 457
+    "measured_files": 458
   },
   "decline_justification": {
-    "reason": "Generic CBV foundation extraction removed 34 duplicated authorization, queryset, and HTMX branch paths in #154; all 2552 tests and differential coverage pass.",
-    "previous_line_rate": 78.45,
-    "previous_branch_rate": 57.01,
+    "reason": "Consolidating six inventory stock create/adjust views into shared secure bases removed 67 duplicated statements and 32 branches; all 2555 tests and differential coverage pass.",
+    "previous_line_rate": 78.53,
+    "previous_branch_rate": 57.16,
     "previous_excluded_lines": 29,
-    "previous_measured_files": 453,
-    "previous_num_statements": 38733,
-    "previous_num_branches": 10540
+    "previous_measured_files": 457,
+    "previous_num_statements": 38741,
+    "previous_num_branches": 10506
   }
 }
