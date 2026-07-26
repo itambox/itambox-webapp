@@ -1,8 +1,10 @@
 import io
+import json
 import tempfile
 import unittest
 from contextlib import redirect_stderr, redirect_stdout
 from pathlib import Path
+from unittest.mock import patch
 
 from scripts.check_test_report import (
     MAX_SKIPPED_TESTS,
@@ -10,6 +12,7 @@ from scripts.check_test_report import (
     PolicyError,
     load_report,
     main,
+    read_suite_baseline,
     summarise,
 )
 
@@ -44,7 +47,32 @@ def write_report(root, cases, name="junit.xml"):
     return path
 
 
-def run_main(arguments):
+_AUTO_BASELINE = object()
+
+
+def run_main(arguments, baseline_tests=_AUTO_BASELINE):
+    arguments = list(arguments)
+    if "--suite-baseline" not in arguments:
+        report = Path(arguments[arguments.index("--report") + 1])
+        baseline = report.parent / "suite_baseline.json"
+        if baseline_tests is _AUTO_BASELINE:
+            try:
+                baseline_tests = len(load_report(report))
+            except PolicyError:
+                baseline_tests = 1
+        if baseline_tests is not None:
+            baseline.write_text(
+                json.dumps(
+                    {
+                        "schema_version": 1,
+                        "canonical_python": "3.12",
+                        "executed_tests": baseline_tests,
+                    }
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+        arguments.extend(["--suite-baseline", str(baseline)])
     stdout, stderr = io.StringIO(), io.StringIO()
     with redirect_stdout(stdout), redirect_stderr(stderr):
         status = main(arguments)
@@ -265,6 +293,90 @@ class DurationReportingTests(unittest.TestCase):
             self.assertIn("| Test | Seconds |", markdown)
             self.assertIn(f"| `assets.tests.test_api.TestAssets::test_slow` | {SLOW_TEST_SECONDS + 1:.2f} |", markdown)
             self.assertIn(f"1 test(s) over {SLOW_TEST_SECONDS:.0f}s", markdown)
+
+
+class SuiteSizeRatchetTests(unittest.TestCase):
+    """A green but unexpectedly smaller suite is not certified as complete."""
+
+    def test_a_smaller_suite_fails_against_the_reviewed_baseline(self):
+        with tempfile.TemporaryDirectory() as temporary_directory:
+            path = write_report(temporary_directory, [testcase("test_only")])
+
+            status, _, stderr = run_main(["--report", str(path)], baseline_tests=2)
+
+            self.assertEqual(status, 1)
+            self.assertIn("below the reviewed baseline of 2", stderr)
+
+    def test_suite_growth_is_free(self):
+        with tempfile.TemporaryDirectory() as temporary_directory:
+            path = write_report(temporary_directory, [testcase("test_one"), testcase("test_two")])
+
+            status, _, stderr = run_main(["--report", str(path)], baseline_tests=1)
+
+            self.assertEqual(status, 0, stderr)
+
+    def test_a_missing_suite_baseline_fails_closed(self):
+        with tempfile.TemporaryDirectory() as temporary_directory:
+            path = write_report(temporary_directory, [testcase("test_one")])
+
+            status, _, stderr = run_main(["--report", str(path)], baseline_tests=None)
+
+            self.assertEqual(status, 2)
+            self.assertIn("no suite baseline", stderr)
+
+    def test_invalid_suite_baselines_fail_closed(self):
+        documents = (
+            {"schema_version": 2, "canonical_python": "3.12", "executed_tests": 2},
+            {"schema_version": 1, "canonical_python": "3.11", "executed_tests": 2},
+            {"schema_version": 1, "canonical_python": "3.12", "executed_tests": 0},
+            {"schema_version": 1, "canonical_python": "3.12", "executed_tests": True},
+        )
+        with tempfile.TemporaryDirectory() as temporary_directory:
+            baseline = Path(temporary_directory) / "suite_baseline.json"
+            for document in documents:
+                with self.subTest(document=document):
+                    baseline.write_text(json.dumps(document), encoding="utf-8")
+                    with self.assertRaises(PolicyError):
+                        read_suite_baseline(baseline)
+
+    def test_writing_a_smaller_suite_requires_a_reason(self):
+        with tempfile.TemporaryDirectory() as temporary_directory:
+            path = write_report(temporary_directory, [testcase("test_only")])
+            with patch("scripts.check_test_report.verify_baseline_write_environment"):
+                status, _, stderr = run_main(
+                    ["--report", str(path), "--write-baseline"],
+                    baseline_tests=2,
+                )
+                self.assertEqual(status, 1)
+                self.assertIn("Refusing to record a smaller suite", stderr)
+
+                status, _, stderr = run_main(
+                    [
+                        "--report",
+                        str(path),
+                        "--write-baseline",
+                        "--allow-decline",
+                        "--reason",
+                        "obsolete test removed",
+                    ],
+                    baseline_tests=2,
+                )
+                self.assertEqual(status, 0, stderr)
+
+            baseline = json.loads((Path(temporary_directory) / "suite_baseline.json").read_text(encoding="utf-8"))
+            self.assertEqual(baseline["executed_tests"], 1)
+            self.assertEqual(baseline["decline_justification"]["reason"], "obsolete test removed")
+
+    def test_suite_baseline_write_checks_the_canonical_environment(self):
+        with tempfile.TemporaryDirectory() as temporary_directory:
+            path = write_report(temporary_directory, [testcase("test_one")])
+            with patch("scripts.check_test_report.verify_baseline_write_environment") as guard:
+                status, _, stderr = run_main(
+                    ["--report", str(path), "--write-baseline"],
+                    baseline_tests=1,
+                )
+            self.assertEqual(status, 0, stderr)
+            guard.assert_called_once_with()
 
 
 if __name__ == "__main__":

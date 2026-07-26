@@ -9,12 +9,13 @@ from scripts.check_diff_coverage import (
     evaluate_file,
     format_line_ranges,
     main,
-    parse_changed_lines,
+    parse_diff,
 )
 from scripts.coverage_policy import (
     DIFF_COVERAGE_TARGET,
     EXCLUDE_ALSO_PATTERNS,
     OMIT_PATTERNS,
+    PolicyError,
     load_coverage_report,
 )
 
@@ -86,6 +87,11 @@ def load_report(files):
         return load_coverage_report(path)
 
 
+def parse_changed_lines(diff_text):
+    """The attributable changed lines of a diff, for the many cases that only assert those."""
+    return parse_diff(diff_text).changed
+
+
 def diff_for(path, hunks):
     """A ``git diff --unified=0`` style diff adding ``count`` lines at ``start``."""
     lines = [f"diff --git a/{path} b/{path}", "index 1111111..2222222 100644", f"--- a/{path}", f"+++ b/{path}"]
@@ -150,9 +156,59 @@ class DiffParsingTests(unittest.TestCase):
         self.assertEqual(parse_changed_lines(diff_text), {})
 
     def test_paths_without_a_b_prefix_are_recorded_verbatim(self):
-        diff_text = "--- itambox/assets/models.py\n+++ itambox/assets/models.py\n@@ -7,0 +8,1 @@\n+    added = 1\n"
+        """`git diff --no-prefix` output, still anchored by its `diff --git` line."""
+        diff_text = (
+            "diff --git itambox/assets/models.py itambox/assets/models.py\n"
+            "--- itambox/assets/models.py\n"
+            "+++ itambox/assets/models.py\n"
+            "@@ -7,0 +8,1 @@\n"
+            "+    added = 1\n"
+        )
 
         self.assertEqual(parse_changed_lines(diff_text), {"itambox/assets/models.py": {8}})
+
+    def test_git_quoted_non_ascii_paths_are_decoded(self):
+        """`core.quotePath` is on by default: a non-ASCII path arrives octal-escaped."""
+        diff_text = (
+            'diff --git "a/itambox/assets/mod\\303\\250le.py" "b/itambox/assets/mod\\303\\250le.py"\n'
+            '--- "a/itambox/assets/mod\\303\\250le.py"\n'
+            '+++ "b/itambox/assets/mod\\303\\250le.py"\n'
+            "@@ -1,0 +2,1 @@\n"
+            "+    added = 1\n"
+        )
+
+        self.assertEqual(parse_changed_lines(diff_text), {"itambox/assets/modèle.py": {2}})
+
+    def test_unreadable_quoted_path_escape_fails_closed(self):
+        diff_text = (
+            'diff --git "a/itambox/assets/bad\\q.py" "b/itambox/assets/bad\\q.py"\n'
+            '--- "a/itambox/assets/bad\\q.py"\n'
+            '+++ "b/itambox/assets/bad\\q.py"\n'
+            "@@ -1,0 +2,1 @@\n"
+            "+    added = 1\n"
+        )
+
+        with self.assertRaisesRegex(PolicyError, "unreadable escape sequence"):
+            parse_diff(diff_text)
+
+    def test_non_utf8_quoted_path_fails_closed(self):
+        diff_text = (
+            'diff --git "a/itambox/assets/bad\\377.py" "b/itambox/assets/bad\\377.py"\n'
+            '--- "a/itambox/assets/bad\\377.py"\n'
+            '+++ "b/itambox/assets/bad\\377.py"\n'
+            "@@ -1,0 +2,1 @@\n"
+            "+    added = 1\n"
+        )
+
+        with self.assertRaisesRegex(PolicyError, "does not decode as UTF-8"):
+            parse_diff(diff_text)
+
+    def test_an_unanchored_diff_is_refused_rather_than_read(self):
+        diff_text = "--- itambox/assets/models.py\n+++ itambox/assets/models.py\n@@ -7,0 +8,1 @@\n+    added = 1\n"
+
+        with self.assertRaises(PolicyError) as caught:
+            parse_changed_lines(diff_text)
+        self.assertIn("outside any `diff --git` section", str(caught.exception))
 
     def test_an_added_line_that_looks_like_a_header_does_not_reattribute_later_hunks(self):
         diff_text = (
@@ -167,6 +223,146 @@ class DiffParsingTests(unittest.TestCase):
         )
 
         self.assertEqual(parse_changed_lines(diff_text), {"itambox/assets/models.py": {4, 21, 22}})
+
+    def test_a_removed_and_added_line_pair_that_looks_like_a_file_header_is_hunk_content(self):
+        """The pair is what a diff of a diff fixture -- like this file -- produces."""
+        diff_text = (
+            "diff --git a/itambox/assets/models.py b/itambox/assets/models.py\n"
+            "--- a/itambox/assets/models.py\n"
+            "+++ b/itambox/assets/models.py\n"
+            "@@ -3,1 +4,1 @@\n"
+            "--- a/spoofed.py\n"
+            "+++ b/spoofed.py\n"
+            "@@ -20,0 +21,2 @@\n"
+            "+    first = 1\n"
+            "+    second = 2\n"
+        )
+
+        self.assertEqual(parse_changed_lines(diff_text), {"itambox/assets/models.py": {4, 21, 22}})
+
+    def test_a_rename_attributes_changed_lines_to_the_destination_path(self):
+        diff_text = (
+            "diff --git a/itambox/assets/old_name.py b/itambox/assets/new_name.py\n"
+            "similarity index 92%\n"
+            "rename from itambox/assets/old_name.py\n"
+            "rename to itambox/assets/new_name.py\n"
+            "index 1111111..2222222 100644\n"
+            "--- a/itambox/assets/old_name.py\n"
+            "+++ b/itambox/assets/new_name.py\n"
+            "@@ -12,0 +13,2 @@\n"
+            "+    first = 1\n"
+            "+    second = 2\n"
+        )
+
+        self.assertEqual(parse_changed_lines(diff_text), {"itambox/assets/new_name.py": {13, 14}})
+
+    def test_a_pure_rename_and_a_mode_only_change_contribute_no_lines(self):
+        """Neither authors a post-change line, so neither is anyone's to cover."""
+        diff_text = (
+            "diff --git a/itambox/assets/old_name.py b/itambox/assets/renamed.py\n"
+            "similarity index 100%\n"
+            "rename from itambox/assets/old_name.py\n"
+            "rename to itambox/assets/renamed.py\n"
+            "diff --git a/itambox/assets/models.py b/itambox/assets/models.py\n"
+            "old mode 100644\n"
+            "new mode 100755\n"
+        )
+
+        self.assertEqual(parse_changed_lines(diff_text), {})
+
+    def test_a_binary_python_change_is_recorded_as_opaque_not_dropped(self):
+        """A `.py` file marked `-diff` in .gitattributes diffs exactly like this."""
+        diff_text = (
+            "diff --git a/itambox/assets/opaque.py b/itambox/assets/opaque.py\n"
+            "index 1111111..2222222 100644\n"
+            "Binary files a/itambox/assets/opaque.py and b/itambox/assets/opaque.py differ\n"
+        )
+
+        result = parse_diff(diff_text)
+
+        self.assertEqual(result.changed, {})
+        self.assertIn("itambox/assets/opaque.py", result.opaque)
+        self.assertIn("without a line-level diff", result.opaque["itambox/assets/opaque.py"])
+
+    def test_a_binary_quoted_python_path_with_spaces_is_still_opaque(self):
+        diff_text = (
+            'diff --git "a/itambox/assets/caf\\303\\251 module.py" '
+            '"b/itambox/assets/caf\\303\\251 module.py"\n'
+            "index 1111111..2222222 100644\n"
+            'Binary files "a/itambox/assets/caf\\303\\251 module.py" and '
+            '"b/itambox/assets/caf\\303\\251 module.py" differ\n'
+        )
+
+        result = parse_diff(diff_text)
+
+        self.assertEqual(result.changed, {})
+        self.assertIn("itambox/assets/café module.py", result.opaque)
+
+    def test_an_unquoted_path_with_spaces_is_parsed(self):
+        diff_text = (
+            "diff --git a/itambox/assets/my module.py b/itambox/assets/my module.py\n"
+            "--- a/itambox/assets/my module.py\t\n"
+            "+++ b/itambox/assets/my module.py\t\n"
+            "@@ -1,0 +2,1 @@\n"
+            "+    added = 1\n"
+        )
+
+        self.assertEqual(parse_changed_lines(diff_text), {"itambox/assets/my module.py": {2}})
+
+    def test_an_unquoted_binary_path_with_spaces_is_opaque(self):
+        diff_text = (
+            "diff --git a/itambox/assets/my module.py b/itambox/assets/my module.py\n"
+            "index 1111111..2222222 100644\n"
+            "Binary files a/itambox/assets/my module.py and b/itambox/assets/my module.py differ\n"
+        )
+
+        self.assertIn("itambox/assets/my module.py", parse_diff(diff_text).opaque)
+
+    def test_a_git_binary_patch_section_is_recorded_as_opaque(self):
+        diff_text = (
+            "diff --git a/itambox/assets/opaque.py b/itambox/assets/opaque.py\n"
+            "new file mode 100644\n"
+            "index 0000000..2222222\n"
+            "GIT binary patch\n"
+            "literal 12\n"
+            "TcmZQzU|?Yo0Rn;40|Nsi0ssI2\n"
+            "\n"
+        )
+
+        self.assertEqual(list(parse_diff(diff_text).opaque), ["itambox/assets/opaque.py"])
+
+    def test_an_unreadable_header_line_is_refused_rather_than_skipped(self):
+        """Silently skipping it would silently skip whatever it describes."""
+        diff_text = (
+            "diff --git a/itambox/assets/models.py b/itambox/assets/models.py\n"
+            "invented header line 42\n"
+            "--- a/itambox/assets/models.py\n"
+            "+++ b/itambox/assets/models.py\n"
+            "@@ -7,0 +8,1 @@\n"
+            "+    added = 1\n"
+        )
+
+        with self.assertRaises(PolicyError) as caught:
+            parse_diff(diff_text)
+        self.assertIn("unrecognised line", str(caught.exception))
+
+    def test_binary_section_without_a_resolvable_path_fails_closed(self):
+        diff_text = "diff --git a/old name.py b/new name.py\nBinary files a/old name.py and b/new name.py differ\n"
+
+        with self.assertRaisesRegex(PolicyError, "names no post-change file"):
+            parse_diff(diff_text)
+
+    def test_an_unreadable_hunk_header_is_refused(self):
+        diff_text = (
+            "diff --git a/itambox/assets/models.py b/itambox/assets/models.py\n"
+            "--- a/itambox/assets/models.py\n"
+            "+++ b/itambox/assets/models.py\n"
+            "@@ mangled @@\n"
+        )
+
+        with self.assertRaises(PolicyError) as caught:
+            parse_diff(diff_text)
+        self.assertIn("unparseable hunk header", str(caught.exception))
 
 
 class LineRangeFormattingTests(unittest.TestCase):
@@ -337,6 +533,40 @@ class CommandLineTests(unittest.TestCase):
             self.assertEqual(status, 1)
             self.assertIn("never measured", output)
             self.assertIn("itambox/assets/brand_new.py", output)
+
+    def test_a_binary_python_change_fails_closed_instead_of_disappearing(self):
+        with tempfile.TemporaryDirectory() as temporary_directory:
+            diff_text = diff_for("itambox/assets/models.py", [(10, 4)]) + (
+                "diff --git a/itambox/assets/opaque.py b/itambox/assets/opaque.py\n"
+                "index 1111111..2222222 100644\n"
+                "Binary files a/itambox/assets/opaque.py and b/itambox/assets/opaque.py differ\n"
+            )
+
+            status, output = self.run_gate(
+                temporary_directory,
+                diff_text,
+                {"assets/models.py": coverage_entry(executed=[10, 11, 12, 13])},
+            )
+
+            self.assertEqual(status, 1)
+            self.assertIn("itambox/assets/opaque.py", output)
+            self.assertIn("without a line-level diff", output)
+
+    def test_a_binary_change_to_a_non_python_file_is_ignored(self):
+        with tempfile.TemporaryDirectory() as temporary_directory:
+            diff_text = diff_for("itambox/assets/models.py", [(10, 4)]) + (
+                "diff --git a/itambox/static/img/logo.png b/itambox/static/img/logo.png\n"
+                "index 1111111..2222222 100644\n"
+                "Binary files a/itambox/static/img/logo.png and b/itambox/static/img/logo.png differ\n"
+            )
+
+            status, output = self.run_gate(
+                temporary_directory,
+                diff_text,
+                {"assets/models.py": coverage_entry(executed=[10, 11, 12, 13])},
+            )
+
+            self.assertEqual(status, 0, output)
 
     def test_a_change_touching_no_python_files_passes(self):
         with tempfile.TemporaryDirectory() as temporary_directory:
