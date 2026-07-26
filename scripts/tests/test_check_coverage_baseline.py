@@ -4,6 +4,7 @@ import tempfile
 import unittest
 from contextlib import redirect_stderr, redirect_stdout
 from pathlib import Path
+from unittest.mock import patch
 
 from scripts.check_coverage_baseline import (
     BASELINE_TOTAL_FIELDS,
@@ -73,6 +74,9 @@ class CoverageBaselineGateTests(unittest.TestCase):
     """End-to-end exit codes: 0 compliant, 1 policy violation, 2 unusable input."""
 
     def setUp(self):
+        environment = patch("scripts.check_coverage_baseline.verify_baseline_write_environment")
+        self.environment_guard = environment.start()
+        self.addCleanup(environment.stop)
         temporary_directory = tempfile.TemporaryDirectory()
         self.addCleanup(temporary_directory.cleanup)
         self.root = Path(temporary_directory.name)
@@ -192,6 +196,21 @@ class CoverageBaselineGateTests(unittest.TestCase):
         self.assertEqual(status, 1)
         self.assertIn("excluded lines grew to 5 from the recorded 2", output)
         self.assertNotIn("coverage fell", output)
+
+    def test_a_smaller_measured_denominator_is_review_required(self):
+        cases = (
+            ("measured_files", 2, "measured file(s) fell"),
+            ("num_statements", 101, "measured statement(s) fell"),
+            ("num_branches", 41, "measured branch(es) fell"),
+        )
+        for field, recorded_value, message in cases:
+            with self.subTest(field=field):
+                self.write_baseline({field: recorded_value})
+
+                status, output = self.run_main()
+
+                self.assertEqual(status, 1)
+                self.assertIn(message, output)
 
     def test_evaluate_reports_regressions_and_staleness_together(self):
         current = dict(MEASURED_TOTALS, branch_rate=60.0, excluded_lines=9)
@@ -334,6 +353,7 @@ class CoverageBaselineGateTests(unittest.TestCase):
         status, output = self.run_main("--write-baseline")
 
         self.assertEqual(status, 0, output)
+        self.environment_guard.assert_called_once_with()
         self.assertIn("Wrote coverage baseline", output)
 
         recorded = load_baseline(self.baseline, compute_policy_fingerprint(COVERAGE_SERIES), COVERAGE_SERIES)
@@ -395,21 +415,50 @@ class CoverageBaselineGateTests(unittest.TestCase):
                 "previous_line_rate": 90.0,
                 "previous_branch_rate": 85.0,
                 "previous_excluded_lines": 1,
+                "previous_measured_files": 1,
+                "previous_num_statements": 100,
+                "previous_num_branches": 40,
             },
         )
 
         status, output = self.run_main()
         self.assertEqual(status, 0, output)
 
-    def test_write_baseline_replaces_a_baseline_bound_to_a_superseded_policy(self):
+    def test_superseded_policy_does_not_bypass_decline_justification(self):
         self.write_baseline({"line_rate": 90.0}, series="7.5")
 
         status, output = self.run_main("--write-baseline")
 
+        self.assertEqual(status, 1, output)
+        self.assertIn("Refusing to record a coverage decline", output)
+
+        status, output = self.run_main(
+            "--write-baseline",
+            "--allow-decline",
+            "--reason",
+            "coverage.py upgrade changed measurement semantics",
+        )
         self.assertEqual(status, 0, output)
         recorded = load_baseline(self.baseline, compute_policy_fingerprint(COVERAGE_SERIES), COVERAGE_SERIES)
         self.assertEqual(recorded["coverage_series"], COVERAGE_SERIES)
         self.assertEqual(recorded["totals"]["line_rate"], 80.0)
+
+    def test_schema_or_python_binding_change_does_not_bypass_decline_justification(self):
+        for label, overrides in (
+            ("schema", {"schema_version": SCHEMA_VERSION + 1}),
+            ("python", {"canonical_python": "3.11"}),
+        ):
+            with self.subTest(binding=label):
+                self.write_baseline({"line_rate": 90.0}, **overrides)
+
+                status, output = self.run_main("--write-baseline")
+
+                self.assertEqual(status, 1, output)
+                self.assertIn("Refusing to record a coverage decline", output)
+                self.assertEqual(
+                    json.loads(self.baseline.read_text(encoding="utf-8"))["totals"]["line_rate"],
+                    90.0,
+                )
 
     def test_write_baseline_refuses_an_unusable_report(self):
         self.write_report(branch_coverage=False)

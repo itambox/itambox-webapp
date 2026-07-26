@@ -21,6 +21,7 @@ on:
       - "scripts/migration_audit.json"
       - "scripts/local_import_baseline.json"
       - "scripts/coverage_baseline.json"
+      - "scripts/suite_baseline.json"
   workflow_dispatch:
 
 permissions:
@@ -78,21 +79,22 @@ jobs:
           enable-cache: true
           cache-dependency-glob: uv.lock
 
-      - name: Check static migration audit
-        run: |
-          python -m unittest scripts.tests.test_migration_audit
-          python scripts/migration_audit.py --check
-
       # Fail fast: a broken quality gate must be caught before the ~40 minute
       # suite runs, not after it. These suites are stdlib-only and need no
-      # database or application environment.
-      - name: Check the coverage and test-reporting gates
+      # database or application environment, which is why they run on the bare
+      # interpreter before any dependency is installed.
+      #
+      # Discovered, never enumerated. A hand-written module list is one a new
+      # scripts/tests/test_*.py can be left out of, and a gate whose tests never
+      # run is not a gate. scripts/tests/test_ci_workflow_policy.py holds this
+      # step to discovery.
+      - name: Check the repository gate suites
         run: |
-          python -m unittest \
-            scripts.tests.test_coverage_policy \
-            scripts.tests.test_check_coverage_baseline \
-            scripts.tests.test_check_diff_coverage \
-            scripts.tests.test_check_test_report
+          python -m unittest discover --start-directory scripts/tests --top-level-directory . --pattern 'test_*.py'
+
+      - name: Check static migration audit
+        run: |
+          python scripts/migration_audit.py --check
 
       # python-ldap (pulled by django-auth-ldap) needs libldap2/sasl headers for
       # source builds. ubuntu-latest images can miss these under transient updates.
@@ -177,9 +179,12 @@ jobs:
             --durations=25
 
       # Published even when the suite failed: the durations and partial coverage
-      # of a failing run are the data you need to act on it.
+      # of a failing run are the data you need to act on it. Not published when
+      # the suite was never attempted -- an earlier step failed, so there is no
+      # report at all and `if-no-files-found: error` would report a missing
+      # artifact as the failure instead of the one that actually happened.
       - name: Upload coverage and duration artifacts
-        if: always()
+        if: always() && steps.suite.conclusion != 'skipped'
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: coverage-and-durations-py${{ matrix.python-version }}
@@ -195,15 +200,22 @@ jobs:
       # report, not on each other. They answer independent questions, so one
       # failing must not skip the next and hide its finding: a run that both
       # regressed globally and left new code untested has to report both.
+      #
+      # `always()` is what makes that true. A step with no `if:` -- or with a
+      # condition that does not call a status function -- inherits `success()`,
+      # so a failing gate (or a failing artifact upload) would silently skip
+      # every step after it and the run would report one finding instead of
+      # three. The explicit `steps.suite.conclusion` test then supplies the real
+      # precondition: these gates read files the suite writes.
       - name: Certify the run and publish durations
-        if: steps.suite.conclusion == 'success'
+        if: always() && steps.suite.conclusion == 'success'
         run: |
           python scripts/check_test_report.py \
             --report itambox/junit.xml \
             --summary-file "$GITHUB_STEP_SUMMARY"
 
       - name: Check the global coverage ratchet
-        if: steps.suite.conclusion == 'success'
+        if: always() && steps.suite.conclusion == 'success'
         run: |
           python scripts/check_coverage_baseline.py \
             --coverage-json itambox/coverage.json \
@@ -212,7 +224,7 @@ jobs:
       # Pull requests only: on a push to a protected branch there is no
       # meaningful "changed code" range to hold to the differential target.
       - name: Check differential coverage for changed production code
-        if: steps.suite.conclusion == 'success' && github.event_name == 'pull_request'
+        if: always() && steps.suite.conclusion == 'success' && github.event_name == 'pull_request'
         run: |
           python scripts/check_diff_coverage.py \
             --base-ref "${{ github.event.pull_request.base.sha }}" \
@@ -255,9 +267,9 @@ jobs:
         run: |
           uv run --locked --no-sync python scripts/check_flake8_baseline.py
 
+      # The suite backing this gate runs by discovery in the `test` job above.
       - name: Check the local-import policy gate
         run: |
-          python -m unittest scripts.tests.test_local_imports
           uv run --locked --no-sync python scripts/check_local_imports.py
 
   docs:

@@ -22,6 +22,7 @@ from scripts.coverage_policy import (
     rate,
     to_coverage_path,
     to_repo_path,
+    verify_baseline_write_environment,
     verify_measurement_policy,
     write_summary,
 )
@@ -415,6 +416,17 @@ class FingerprintTests(unittest.TestCase):
             with self.subTest(version=version):
                 with self.assertRaisesRegex(PolicyError, "unrecognised coverage.py version"):
                     coverage_series(version)
+
+
+class BaselineWriteEnvironmentTests(unittest.TestCase):
+    def test_canonical_linux_python_312_is_accepted(self):
+        self.assertIsNone(verify_baseline_write_environment((3, 12), "linux"))
+
+    def test_noncanonical_python_or_platform_is_rejected(self):
+        for version, platform in (((3, 11), "linux"), ((3, 12), "win32")):
+            with self.subTest(version=version, platform=platform):
+                with self.assertRaisesRegex(PolicyError, "canonical measurement environment"):
+                    verify_baseline_write_environment(version, platform)
 
 
 class SummaryWritingTests(unittest.TestCase):

@@ -1,8 +1,8 @@
 # Test coverage policy
 
 ITAMbox measures line **and** branch coverage of the complete serial test suite
-against a PostgreSQL database migrated from scratch, and holds three properties
-in CI:
+against a PostgreSQL test database that pytest-django creates and migrates from
+scratch, and holds three properties in CI:
 
 | Gate | Script | Question it answers |
 |---|---|---|
@@ -90,9 +90,14 @@ The gate fails when:
 - either rate rises more than `1.00` percentage point above it (**stale
   baseline**) — unrecorded improvement becomes headroom that later untested code
   can spend, so improvements must be recorded;
-- the excluded-line count grows.
+- the excluded-line count grows;
+- the measured file, statement, or branch count shrinks. A smaller denominator
+  can make both rates rise while less production code is measured.
 
-Recording a new baseline after an improvement:
+Coverage baselines may only be written under Python 3.12 on Linux, matching the
+canonical CI environment. Reading and checking them remains supported on every
+development platform. Record a new baseline after an improvement from a clean
+Linux/CI-equivalent run:
 
 ```bash
 make coverage            # measure
@@ -143,6 +148,10 @@ which names the gate that covers that path instead:
 Adding an exemption requires a reason and a real alternative gate. "It is hard
 to test" is not one.
 
+The repository-tooling suites in the main CI test job are loaded with `unittest
+discover`, not a hand-maintained module list. Therefore every new
+`scripts/tests/test_*.py` file is included automatically there.
+
 Test code, generated migrations, and process entry points are not exemptions —
 they are excluded from "production code" by the same declared policy the global
 gate uses.
@@ -168,7 +177,10 @@ every shape where a green tick would mislead:
   `continue-on-error`;
 - skipped tests above `MAX_SKIPPED_TESTS` (currently `0`). A skip is a test that
   silently did not run. Raising the allowance means naming which tests may skip,
-  and why, in review.
+  and why, in review;
+- fewer executed tests than `scripts/suite_baseline.json` records. Suite growth
+  is free; a deliberate reduction must be recorded on Python 3.12/Linux with
+  `--write-baseline --allow-decline --reason "..."`.
 
 Durations are **published, never gated**. Wall-clock on a shared runner is too
 noisy to fail a build on, and a flaky timing gate teaches people to ignore
@@ -186,8 +198,9 @@ Every CI run uploads `coverage-and-durations-py3.12`, containing:
 | `junit.xml` | Per-test outcomes and durations. |
 | `htmlcov/` | Browsable line-and-branch report. |
 
-They are uploaded even when the suite fails: the durations and partial coverage
-of a failing run are what you need to act on it.
+They are uploaded when the suite ran, even if it failed: the durations and
+partial coverage of a failing run are what you need to act on. If an earlier
+step prevented the suite from starting, there is no misleading empty artifact.
 
 Job summaries carry the same numbers inline — global coverage against baseline,
 the differential result with the uncovered lines named, and the slowest tests.
@@ -208,8 +221,10 @@ reproduce before it can replace it.
 | `global coverage regressed against the reviewed baseline` | Coverage fell below the recorded rate. | Add tests. If the decline is genuinely correct, record it with `--allow-decline --reason`. |
 | `the coverage baseline is stale` | Coverage improved beyond the drift allowance. | `make coverage-baseline` and commit the diff. |
 | `excluded lines grew to N` | New `# pragma: no cover` or excluded-line matches. | Justify each one in review, then record the baseline. |
+| `measured ... fell to N` | The coverage denominator shrank. | Restore measurement, or explicitly record a legitimate deletion with `--allow-decline --reason`. |
 | `differential coverage X% is below the target` | New or changed lines are untested, or a new conditional is only half-tested. | Cover the listed lines. |
 | `changed production file(s) the coverage run never measured` | A changed file was outside the measured tree. | Bring it under the pytest run, or add a reasoned exemption. |
 | `measurement policy mismatch` | `pyproject.toml` and `scripts/coverage_policy.py` disagree. | Change both in the same reviewed commit. |
 | `baseline policy_sha256 does not match` | The policy changed without regenerating the baseline. | Regenerate in the same change. |
 | `skipped test(s) exceed the allowance` | A test silently did not run. | Fix the condition, delete the test, or raise `MAX_SKIPPED_TESTS` with a stated reason. |
+| `test(s) ran, below the reviewed baseline` | Part of the suite no longer executed. | Restore collection, or explicitly record deliberate test deletion in `suite_baseline.json`. |

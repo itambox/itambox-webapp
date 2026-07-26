@@ -1,22 +1,33 @@
 #!/usr/bin/env python
 """Fail-closed ratchet for ITAMbox's global line and branch coverage.
 
-CI measures the complete serial suite against a clean PostgreSQL database and
-writes ``itambox/coverage.json``. This gate holds that report against the
-reviewed baseline in ``scripts/coverage_baseline.json``:
+CI runs the complete serial suite -- pytest-django creates and migrates its own
+test database from scratch under ``--create-db`` -- and writes
+``itambox/coverage.json``. This gate holds that report against the reviewed
+baseline in ``scripts/coverage_baseline.json``:
 
-* A rate below the recorded one (beyond a small jitter tolerance) is a
-  regression and fails the build.
-* A rate materially *above* the recorded one is also a failure, asking for the
-  baseline to be regenerated. Unrecorded improvement is headroom, and headroom
-  is what lets a later change ship untested code without any gate noticing.
+* A rate more than ``TOLERANCE_PERCENTAGE_POINTS`` below the recorded one is a
+  regression and fails the build. Smaller movements are jitter and pass.
+* A rate more than ``DRIFT_PERCENTAGE_POINTS`` *above* the recorded one is also
+  a failure, asking for the baseline to be regenerated. Unrecorded improvement
+  is headroom, and headroom is what lets a later change ship untested code
+  without any gate noticing. An improvement inside that allowance is not a
+  failure; it is simply not yet recorded.
 * Growth in excluded lines fails too. ``# pragma: no cover`` and the configured
   line exclusions are invisible to every rate, so an unreviewed exclusion is a
   coverage decline the percentages would not show.
+* A fall in how much was measured -- files, statements or branches -- fails as
+  well. A rate is a ratio: measuring less code raises it without a single test
+  being written, so a shrinking denominator is review-required rather than
+  something a branch may do to itself.
 
 Lowering the baseline is possible but never silent: it requires
 ``--write-baseline --allow-decline --reason "..."``, and the justification is
-recorded in the baseline file next to the rates it replaces.
+recorded in the baseline file next to the rates it replaces. That requirement
+holds even when the policy fingerprint or the coverage.py series moved in the
+same change -- that is precisely the change a decline could otherwise hide in.
+A baseline may only be written on canonical Python and Linux, because a
+baseline recorded anywhere else records numbers CI cannot reproduce.
 
 The gate refuses to run at all (exit code 2) on an unusable report -- missing,
 line-only, empty, or produced under a measurement configuration that no longer
@@ -39,6 +50,7 @@ from scripts.coverage_policy import (  # noqa: E402  -- deliberate, see the boot
     COVERAGE_ROOT,
     DRIFT_PERCENTAGE_POINTS,
     PYPROJECT_PATH,
+    RATCHETED_COVERAGE_SIZE_FIELDS,
     REPO_ROOT,
     SCHEMA_VERSION,
     TOLERANCE_PERCENTAGE_POINTS,
@@ -50,6 +62,7 @@ from scripts.coverage_policy import (  # noqa: E402  -- deliberate, see the boot
     line_rate,
     load_coverage_report,
     load_measurement_config,
+    verify_baseline_write_environment,
     verify_measurement_policy,
     write_summary,
 )
@@ -66,6 +79,13 @@ BASELINE_TOTAL_FIELDS = (
     "excluded_lines",
     "measured_files",
 )
+
+# Size fields, ratcheted separately from the rates. A rate is a ratio and says
+# nothing about how much was measured: deleting a poorly covered module, losing
+# a package to a collection error, or an `omit` that quietly matched more than
+# it used to all *raise* both rates while measuring less code. Growth is free;
+# a decrease is review-required and must be recorded deliberately.
+BASELINE_SIZE_FIELDS = RATCHETED_COVERAGE_SIZE_FIELDS
 
 
 def current_totals(report):
@@ -91,8 +111,16 @@ def _validate_totals(totals):
             raise PolicyError(f"baseline total {field!r} is not a non-negative number")
 
 
-def load_baseline(baseline_path, expected_fingerprint, expected_series):
-    """Load the recorded baseline, refusing anything not bound to this policy."""
+def read_baseline(baseline_path):
+    """Read and structurally validate a baseline, without checking its bindings.
+
+    Split from the binding checks on purpose. A baseline bound to a superseded
+    policy or coverage.py series cannot be *compared* against a new run, but its
+    recorded numbers are still the numbers this repository last reviewed. They
+    have to stay visible to ``--write-baseline``, or bumping coverage.py in the
+    same change would let an arbitrary decline through without the explicit
+    justification the gate exists to demand.
+    """
     path = Path(baseline_path)
     try:
         raw = json.loads(path.read_text(encoding="utf-8"))
@@ -108,6 +136,12 @@ def load_baseline(baseline_path, expected_fingerprint, expected_series):
     optional = {"decline_justification"}
     if not isinstance(raw, dict) or not required <= set(raw) or not set(raw) <= (required | optional):
         raise PolicyError("coverage baseline has invalid top-level fields")
+    _validate_totals(raw["totals"])
+    return raw
+
+
+def verify_baseline_bindings(raw, expected_fingerprint, expected_series):
+    """Refuse a baseline that is not bound to this exact policy and tool series."""
     if raw["schema_version"] != SCHEMA_VERSION:
         raise PolicyError(f"expected coverage baseline schema {SCHEMA_VERSION}")
     if raw["canonical_python"] != f"{CANONICAL_PYTHON[0]}.{CANONICAL_PYTHON[1]}":
@@ -124,7 +158,12 @@ def load_baseline(baseline_path, expected_fingerprint, expected_series):
             "regenerate the baseline in the reviewed change that altered "
             "scripts/coverage_policy.py"
         )
-    _validate_totals(raw["totals"])
+
+
+def load_baseline(baseline_path, expected_fingerprint, expected_series):
+    """Load the recorded baseline, refusing anything not bound to this policy."""
+    raw = read_baseline(baseline_path)
+    verify_baseline_bindings(raw, expected_fingerprint, expected_series)
     return raw
 
 
@@ -177,7 +216,19 @@ def evaluate(current, recorded):
             f"{recorded['excluded_lines']}; excluded lines are invisible to both rates, so each "
             "new exclusion must be reviewed rather than absorbed"
         )
+    regressions.extend(shrink_notes(current, recorded))
     return regressions, stale_notes
+
+
+def shrink_notes(current, recorded):
+    """Every measured-size field that fell below the recorded one."""
+    return [
+        f"{label} fell to {current[field]} from the recorded {recorded[field]}; measuring less "
+        "code raises both rates without a test being written, so a genuine deletion is recorded "
+        "deliberately rather than absorbed"
+        for field, label in BASELINE_SIZE_FIELDS
+        if current[field] < recorded[field]
+    ]
 
 
 def report_mismatches(regressions, stale_notes):
@@ -213,6 +264,8 @@ def format_summary(current, recorded):
         ("Branch coverage", "branch_rate", "%"),
         ("Excluded lines", "excluded_lines", ""),
         ("Measured files", "measured_files", ""),
+        ("Measured statements", "num_statements", ""),
+        ("Measured branches", "num_branches", ""),
     )
     for label, field, unit in rows:
         measured = current[field]
@@ -230,7 +283,8 @@ def format_summary(current, recorded):
             "",
             f"Statements {current['covered_lines']}/{current['num_statements']} · "
             f"branches {current['covered_branches']}/{current['num_branches']} · "
-            "measured from the complete serial suite against a clean PostgreSQL database.",
+            "measured from the complete serial suite against a test database pytest-django "
+            "created and migrated from scratch.",
         ]
     )
     return "\n".join(lines)
@@ -273,41 +327,74 @@ def parse_args(argv):
     return parser.parse_args(argv)
 
 
+def collect_declines(current, recorded):
+    """Everything about a proposed baseline that is worse than the recorded one."""
+    declines = [
+        f"{label} coverage {recorded[field]:.2f}% -> {current[field]:.2f}%"
+        for field, label in (("line_rate", "line"), ("branch_rate", "branch"))
+        if current[field] < recorded[field] - TOLERANCE_PERCENTAGE_POINTS
+    ]
+    if current["excluded_lines"] > recorded["excluded_lines"]:
+        declines.append(f"excluded lines {recorded['excluded_lines']} -> {current['excluded_lines']}")
+    declines.extend(
+        f"{label} {recorded[field]} -> {current[field]}"
+        for field, label in BASELINE_SIZE_FIELDS
+        if current[field] < recorded[field]
+    )
+    return declines
+
+
+def _existing_baseline(baseline_path, fingerprint, series):
+    """The recorded baseline to compare a write against, and whether it still binds.
+
+    A baseline whose bindings no longer hold is still compared. Regenerating it
+    is exactly the change most likely to hide a decline -- the policy or the
+    coverage.py version moved in the same commit -- so the justification
+    requirement has to survive that, not be skipped by it.
+    """
+    if not Path(baseline_path).exists():
+        return None, None
+    try:
+        existing = read_baseline(baseline_path)
+    except PolicyError:
+        # Structurally unreadable: there is no recorded number to compare
+        # against, so a reviewed write replaces it wholesale.
+        return None, None
+    try:
+        verify_baseline_bindings(existing, fingerprint, series)
+    except PolicyError as exc:
+        return existing, str(exc)
+    return existing, None
+
+
 def _handle_write(args, current, fingerprint, series):
     """Write a new baseline, refusing an unjustified decline."""
     justification = None
-    if args.baseline.exists():
-        try:
-            existing = load_baseline(args.baseline, fingerprint, series)
-        except PolicyError:
-            # A baseline bound to a superseded policy or tool series cannot be
-            # compared; the reviewed regeneration replaces it wholesale.
-            existing = None
-        if existing is not None:
-            recorded = existing["totals"]
-            declines = [
-                f"{label} coverage {recorded[field]:.2f}% -> {current[field]:.2f}%"
-                for field, label in (("line_rate", "line"), ("branch_rate", "branch"))
-                if current[field] < recorded[field] - TOLERANCE_PERCENTAGE_POINTS
-            ]
-            if current["excluded_lines"] > recorded["excluded_lines"]:
-                declines.append(f"excluded lines {recorded['excluded_lines']} -> {current['excluded_lines']}")
-            if declines:
-                if not args.allow_decline or not args.reason:
-                    print(
-                        "Refusing to record a coverage decline without an explicit justification:\n  - "
-                        + "\n  - ".join(declines)
-                        + '\n\nRe-run with --allow-decline --reason "<why this is correct>" so the '
-                        "reason is recorded in the baseline and reviewed with the diff.",
-                        file=sys.stderr,
-                    )
-                    return 1
-                justification = {
-                    "reason": args.reason,
-                    "previous_line_rate": recorded["line_rate"],
-                    "previous_branch_rate": recorded["branch_rate"],
-                    "previous_excluded_lines": recorded["excluded_lines"],
-                }
+    existing, unbound_reason = _existing_baseline(args.baseline, fingerprint, series)
+    if existing is not None:
+        recorded = existing["totals"]
+        declines = collect_declines(current, recorded)
+        if declines:
+            if unbound_reason is not None:
+                print(f"note: the recorded baseline no longer binds to this run ({unbound_reason})", file=sys.stderr)
+            if not args.allow_decline or not args.reason:
+                print(
+                    "Refusing to record a coverage decline without an explicit justification:\n  - "
+                    + "\n  - ".join(declines)
+                    + '\n\nRe-run with --allow-decline --reason "<why this is correct>" so the '
+                    "reason is recorded in the baseline and reviewed with the diff.",
+                    file=sys.stderr,
+                )
+                return 1
+            justification = {
+                "reason": args.reason,
+                "previous_line_rate": recorded["line_rate"],
+                "previous_branch_rate": recorded["branch_rate"],
+                "previous_excluded_lines": recorded["excluded_lines"],
+                "previous_measured_files": recorded["measured_files"],
+                "previous_num_statements": recorded["num_statements"],
+                "previous_num_branches": recorded["num_branches"],
+            }
     write_baseline(args.baseline, current, fingerprint, series, justification)
     return 0
 
@@ -330,6 +417,7 @@ def main(argv=None):
                 "actually achieves, or every run fails the floor and the floor enforces nothing"
             )
         if args.write_baseline:
+            verify_baseline_write_environment()
             return _handle_write(args, current, fingerprint, series)
         baseline = load_baseline(args.baseline, fingerprint, series)
     except PolicyError as exc:

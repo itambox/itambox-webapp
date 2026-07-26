@@ -35,6 +35,7 @@ import collections
 import fnmatch
 import hashlib
 import json
+import sys
 import tomllib
 from pathlib import Path
 
@@ -109,6 +110,21 @@ TOLERANCE_PERCENTAGE_POINTS = 0.10
 # Improvements above this margin must be recorded. Without it, a genuine
 # improvement silently becomes headroom that later untested code can spend.
 DRIFT_PERCENTAGE_POINTS = 1.00
+
+
+# The environment a recorded baseline must come from. Every gate *reads* its
+# baseline anywhere -- a contributor on Windows must be able to run them -- but
+# a baseline *written* anywhere else records numbers CI can never reproduce.
+CANONICAL_PLATFORM = "linux"
+
+# Coverage denominator fields whose unexpected shrink must be reviewed. The
+# global gate imports this declaration and the policy fingerprint serialises it,
+# so removing a ratchet necessarily invalidates the reviewed baseline.
+RATCHETED_COVERAGE_SIZE_FIELDS = (
+    ("measured_files", "measured file(s)"),
+    ("num_statements", "measured statement(s)"),
+    ("num_branches", "measured branch(es)"),
+)
 
 
 class PolicyError(Exception):
@@ -347,6 +363,7 @@ def compute_policy_fingerprint(coverage_version_series):
     payload = {
         "schema_version": SCHEMA_VERSION,
         "canonical_python": f"{CANONICAL_PYTHON[0]}.{CANONICAL_PYTHON[1]}",
+        "canonical_platform": CANONICAL_PLATFORM,
         "coverage_series": coverage_version_series,
         "coverage_root": COVERAGE_ROOT,
         "omit": list(OMIT_PATTERNS),
@@ -355,9 +372,43 @@ def compute_policy_fingerprint(coverage_version_series):
         "diff_exemptions": [list(item) for item in DIFF_COVERAGE_EXEMPTIONS],
         "tolerance": TOLERANCE_PERCENTAGE_POINTS,
         "drift": DRIFT_PERCENTAGE_POINTS,
+        "ratcheted_size_fields": [field for field, _label in RATCHETED_COVERAGE_SIZE_FIELDS],
     }
     canonical = json.dumps(payload, sort_keys=True, separators=(",", ":")).encode("utf-8")
     return hashlib.sha256(canonical).hexdigest()
+
+
+def verify_baseline_write_environment(version_info=None, platform_name=None):
+    """Refuse to record a baseline outside the environment CI measures in.
+
+    A baseline is a number every later run is held to, so it has to come from
+    the run everyone else reproduces. Both the interpreter and the platform
+    move the measurement: a different Python takes different branches through
+    version-conditional code, and a different platform changes which optional
+    dependencies import at all (``python-ldap`` and ``python-magic`` are absent
+    on Windows by declared policy, and their fallbacks are different code).
+    Recording either would ratchet the project against numbers CI can never
+    reach again.
+
+    Reading a baseline is unrestricted; only writing one is pinned.
+    """
+    version_info = tuple(version_info or sys.version_info[:2])
+    platform_name = platform_name if platform_name is not None else sys.platform
+    problems = []
+    if version_info != CANONICAL_PYTHON:
+        problems.append(
+            f"Python {CANONICAL_PYTHON[0]}.{CANONICAL_PYTHON[1]} is required "
+            f"(running {version_info[0]}.{version_info[1]})"
+        )
+    if not platform_name.startswith(CANONICAL_PLATFORM):
+        problems.append(f"{CANONICAL_PLATFORM} is required (running on {platform_name})")
+    if problems:
+        raise PolicyError(
+            "refusing to record a baseline outside the canonical measurement environment: "
+            + "; ".join(problems)
+            + ". Record it from a clean CI run instead, so the recorded numbers are the ones "
+            "every later run is compared against"
+        )
 
 
 def write_summary(summary_file, markdown):
