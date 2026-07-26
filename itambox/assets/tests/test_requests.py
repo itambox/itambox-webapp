@@ -1,6 +1,8 @@
 from decimal import Decimal
 
 from django.contrib.auth import get_user_model
+from django.contrib.messages.middleware import MessageMiddleware
+from django.contrib.sessions.middleware import SessionMiddleware
 from django.core.exceptions import ValidationError
 from django.test import TestCase
 from django.urls import reverse
@@ -482,9 +484,10 @@ class RequisitionSystemTestCase(TestCase):
 
         # Test form submission auto-fulfills request
         post_data = {"target_type": "location", "location": self.location.pk, "notes": "Checkout notes"}
-        post_request = factory.post(f"/?request_id={req.pk}", data=post_data)
+        post_request = factory.post(f"/?request_id={req.pk}", data=post_data, HTTP_HX_REQUEST="true")
         post_request.user = self.admin
-        post_request.headers = {"HX-Request": "true"}
+        SessionMiddleware(lambda request: None).process_request(post_request)
+        MessageMiddleware(lambda request: None).process_request(post_request)
 
         from assets.forms.checkout_forms import AssetCheckOutForm
 
@@ -496,7 +499,8 @@ class RequisitionSystemTestCase(TestCase):
         view_post.kwargs = {"pk": self.asset_requestable.pk}
 
         response = view_post.form_valid(form)
-        self.assertEqual(response.status_code, 200)  # HTMX HX-Redirect response
+        self.assertEqual(response.status_code, 204)
+        self.assertEqual(response["HX-Redirect"], self.asset_requestable.get_absolute_url())
 
         # Check request status
         req.refresh_from_db()
