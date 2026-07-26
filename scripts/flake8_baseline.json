@@ -8078,14 +8078,6 @@
     {
       "path": "itambox/itambox/views/generic/detail.py",
       "code": "C901",
-      "message": "'ObjectDetailView._build_related_objects_list' is too complex (20)",
-      "source": "    def _build_related_objects_list(self, obj):",
-      "context": "Module:body/ClassDef:ObjectDetailView:body/FunctionDef:_build_related_objects_list:self",
-      "count": 1
-    },
-    {
-      "path": "itambox/itambox/views/generic/detail.py",
-      "code": "C901",
       "message": "'ObjectDetailView.get_context_data' is too complex (31)",
       "source": "    def get_context_data(self, **kwargs):",
       "context": "Module:body/ClassDef:ObjectDetailView:body/FunctionDef:get_context_data:self",
@@ -8129,14 +8121,6 @@
       "message": "'ObjectListView.get_context_data' is too complex (30)",
       "source": "    def get_context_data(self, **kwargs):",
       "context": "Module:body/ClassDef:ObjectListView:body/FunctionDef:get_context_data:self",
-      "count": 1
-    },
-    {
-      "path": "itambox/itambox/views/generic/list_.py",
-      "code": "C901",
-      "message": "'ObjectListView.get_queryset' is too complex (17)",
-      "source": "    def get_queryset(self):",
-      "context": "Module:body/ClassDef:ObjectListView:body/FunctionDef:get_queryset:self",
       "count": 1
     },
     {

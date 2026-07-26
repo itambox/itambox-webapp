@@ -1,4 +1,3 @@
-import json
 import logging
 
 from django.contrib import messages
@@ -6,7 +5,7 @@ from django.contrib.auth.mixins import LoginRequiredMixin, PermissionRequiredMix
 from django.contrib.contenttypes.models import ContentType
 from django.core.exceptions import PermissionDenied, ValidationError
 from django.db import transaction
-from django.http import HttpResponse, HttpResponseRedirect
+from django.http import HttpResponseRedirect
 from django.shortcuts import get_object_or_404
 from django.urls import reverse
 from django.utils.translation import gettext as _
@@ -17,6 +16,7 @@ from core.auth.guards import (
     validate_role_reactivation_grants,
 )
 from itambox.utils import get_model_viewname
+from itambox.views.generic.htmx_responses import is_htmx_request, success_response
 from itambox.views.generic.mixins import (
     filter_permitted_rows,
     user_can_mutate_model,
@@ -43,18 +43,10 @@ class HtmxActionMixin:
     """
 
     def _htmx_or_redirect(self, request, success_msg, list_url):
-        if request.headers.get("HX-Request") or getattr(request, "htmx", False):
-            response = HttpResponse(status=204)
-            response["HX-Trigger"] = json.dumps(
-                {
-                    "tableRefreshRequired": None,
-                    "showMessage": {
-                        "message": success_msg,
-                        "level": "success",
-                    },
-                }
-            )
-            return response
+        if is_htmx_request(request):
+            # No closeModalEvent: restore/purge are page-level actions, not modal
+            # submissions.
+            return success_response(success_msg, close_modal=False)
 
         messages.success(request, success_msg)
         return HttpResponseRedirect(safe_return_url(request, request.META.get("HTTP_REFERER"), list_url))

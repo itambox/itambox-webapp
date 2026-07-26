@@ -6,14 +6,34 @@
 # via "from itambox.views.generic import ...".
 #
 # Dependency order (no cycles):
-#   utils -> mixins -> {table_config, restore, import_, delete, edit, detail, list_, bulk}
+#   utils -> {authorization, htmx_responses, related_objects, table_context}
+#         -> mixins -> {table_config, restore, import_, delete, edit, detail, list_, bulk}
 # Ruff's import sorting would move the features re-export to the top and create
 # a runtime circular import, so preserve this explicitly documented order.
 # isort: off
 
 from itambox.views.htmx import BaseHTMXView  # noqa: F401
 
-from itambox.views.generic.utils import safe_return_url  # noqa: F401
+from itambox.views.generic.utils import (  # noqa: F401
+    resolve_view_model,
+    safe_return_url,
+)
+
+from itambox.views.generic.authorization import (  # noqa: F401
+    PermissionResolver,
+    SecuredObjectActionMixin,
+)
+
+from itambox.views.generic.htmx_responses import (  # noqa: F401
+    error_response,
+    is_htmx_request,
+    success_response,
+    trigger_response,
+)
+
+from itambox.views.generic.related_objects import RelatedObjectProvider  # noqa: F401
+
+from itambox.views.generic.table_context import TableContextBuilder  # noqa: F401
 
 from itambox.views.generic.mixins import (  # noqa: F401
     CachedObjectMixin,
@@ -66,6 +86,18 @@ __all__ = [
     "BaseHTMXView",
     # utils
     "safe_return_url",
+    "resolve_view_model",
+    # authorization
+    "PermissionResolver",
+    "SecuredObjectActionMixin",
+    # htmx responses
+    "trigger_response",
+    "success_response",
+    "error_response",
+    "is_htmx_request",
+    # context components
+    "RelatedObjectProvider",
+    "TableContextBuilder",
     # mixins
     "CachedObjectMixin",
     "ObjectPermissionRequiredMixin",

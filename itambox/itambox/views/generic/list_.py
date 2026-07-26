@@ -4,7 +4,7 @@ from django.contrib.auth.mixins import LoginRequiredMixin, PermissionRequiredMix
 from django.contrib.contenttypes.models import ContentType
 from django.core.exceptions import ImproperlyConfigured, PermissionDenied
 from django.db.models import Q
-from django.http import Http404, QueryDict
+from django.http import QueryDict
 from django.template import TemplateDoesNotExist
 from django.template.loader import get_template
 from django.urls import NoReverseMatch, reverse
@@ -17,11 +17,14 @@ from core.forms.import_forms import is_model_importable
 from extras.customfields import apply_custom_field_filters
 from extras.models import ExportTemplate, LabelTemplate, SavedFilter
 from itambox.registry import registry
-from itambox.utils import get_help_url, get_model_viewname, get_table_for_model
+from itambox.utils import get_help_url, get_model_viewname
+from itambox.views.generic.authorization import PermissionResolver
 from itambox.views.generic.mixins import (
     TenantScopingViewMixin,
     user_can_mutate_model,
 )
+from itambox.views.generic.table_context import TableContextBuilder
+from itambox.views.generic.utils import resolve_view_model
 from itambox.views.htmx import BaseHTMXView
 
 logger = logging.getLogger(__name__)
@@ -36,22 +39,13 @@ class ObjectListView(TenantScopingViewMixin, PermissionRequiredMixin, LoginRequi
     action_buttons = ()
 
     def get_permission_required(self):
-        model = getattr(self, "model", None)
-        if model is None and hasattr(self, "queryset") and self.queryset is not None:
-            model = self.queryset.model
-        if model:
-            app_label = model._meta.app_label
-            model_name = model._meta.model_name
-            return (f"{app_label}.view_{model_name}",)
-        return ("",)
+        return PermissionResolver.model_permissions(resolve_view_model(self), "view")
 
     def get_template_names(self):
         if self.template_name and self.template_name != "generic/object_list.html":
             return [self.template_name]
 
-        model = getattr(self, "model", None)
-        if model is None and hasattr(self, "queryset") and self.queryset is not None:
-            model = self.queryset.model
+        model = resolve_view_model(self)
 
         if model:
             app_label = model._meta.app_label
@@ -87,56 +81,70 @@ class ObjectListView(TenantScopingViewMixin, PermissionRequiredMixin, LoginRequi
             Q(tenant__isnull=True) | Q(shared=True) | Q(created_by=self.request.user)
         )
 
+    def _get_recycle_bin_queryset(self, model):
+        """The soft-deleted rows for ``?deleted=true``, still tenant-scoped."""
+        if not self.request.user.is_superuser and not self.request.user.has_perm("core.view_recyclebin"):
+            raise PermissionDenied(_("You do not have permission to view the Recycle Bin."))
+        manager = getattr(model, "all_objects", model._base_manager)
+        queryset = manager.all()
+        if hasattr(queryset, "filter_by_tenant"):
+            queryset = queryset.filter_by_tenant()
+        elif any(f.name == "tenant" for f in model._meta.fields):
+            # Fail loud: a tenant-bearing model whose all_objects manager cannot
+            # scope by tenant would expose other tenants' deleted objects here.
+            raise ImproperlyConfigured(
+                f"{model.__name__}.all_objects is not tenant-scoped but the model "
+                f"has a tenant field. Use TenantScopingAllObjectsManager."
+            )
+        return queryset.filter(deleted_at__isnull=False)
+
+    def _resolve_filter_params(self, model):
+        """The parameters the filterset should read.
+
+        ``?filter=<pk>`` applies a saved filter's stored parameters in place of
+        the raw ``request.GET``. Falls back to ``request.GET`` if the pk is
+        missing, non-numeric, not visible to this user, or for a different model.
+        Also records which saved filter (if any) ended up applied, so the UI can
+        highlight it.
+        """
+        self._active_saved_filter_id = None
+        if not model:
+            return self.request.GET
+
+        raw_filter_pk = self.request.GET.get("filter")
+        if not raw_filter_pk:
+            return self.request.GET
+        try:
+            filter_pk = int(raw_filter_pk)
+        except (TypeError, ValueError):
+            return self.request.GET
+
+        saved = self.get_visible_saved_filters(model).filter(pk=filter_pk).first()
+        if saved is None:
+            return self.request.GET
+
+        saved_params = QueryDict(mutable=True)
+        # Stored parameters are a dict; multi-valued filter params
+        # (e.g. status=[...]) arrive as lists and need setlist so
+        # the filterset sees every value, not one list object.
+        for key, value in (saved.parameters or {}).items():
+            if isinstance(value, (list, tuple)):
+                saved_params.setlist(key, list(value))
+            else:
+                saved_params[key] = value
+        self._active_saved_filter_id = saved.pk
+        return saved_params
+
     def get_queryset(self):
-        model = getattr(self, "model", None)
-        if model is None and hasattr(self, "queryset") and self.queryset is not None:
-            model = self.queryset.model
+        model = resolve_view_model(self)
 
         show_deleted = self.request.GET.get("deleted") == "true"
         if show_deleted and model and registry.model_has_feature(model, "soft_delete"):
-            if not self.request.user.is_superuser and not self.request.user.has_perm("core.view_recyclebin"):
-                raise PermissionDenied(_("You do not have permission to view the Recycle Bin."))
-            manager = getattr(model, "all_objects", model._base_manager)
-            queryset = manager.all()
-            if hasattr(queryset, "filter_by_tenant"):
-                queryset = queryset.filter_by_tenant()
-            elif any(f.name == "tenant" for f in model._meta.fields):
-                # Fail loud: a tenant-bearing model whose all_objects manager cannot
-                # scope by tenant would expose other tenants' deleted objects here.
-                raise ImproperlyConfigured(
-                    f"{model.__name__}.all_objects is not tenant-scoped but the model "
-                    f"has a tenant field. Use TenantScopingAllObjectsManager."
-                )
-            queryset = queryset.filter(deleted_at__isnull=False)
+            queryset = self._get_recycle_bin_queryset(model)
         else:
             queryset = super().get_queryset()
 
-        # ?filter=<pk> applies a saved filter's stored parameters in place of the
-        # raw request.GET. Falls back to request.GET if the pk is missing,
-        # non-numeric, not visible to this user, or for a different model.
-        self._active_saved_filter_id = None
-        filter_params = self.request.GET
-        if model:
-            raw_filter_pk = self.request.GET.get("filter")
-            if raw_filter_pk:
-                try:
-                    filter_pk = int(raw_filter_pk)
-                except (TypeError, ValueError):
-                    filter_pk = None
-                if filter_pk is not None:
-                    saved = self.get_visible_saved_filters(model).filter(pk=filter_pk).first()
-                    if saved is not None:
-                        saved_params = QueryDict(mutable=True)
-                        # Stored parameters are a dict; multi-valued filter params
-                        # (e.g. status=[...]) arrive as lists and need setlist so
-                        # the filterset sees every value, not one list object.
-                        for key, value in (saved.parameters or {}).items():
-                            if isinstance(value, (list, tuple)):
-                                saved_params.setlist(key, list(value))
-                            else:
-                                saved_params[key] = value
-                        filter_params = saved_params
-                        self._active_saved_filter_id = saved.pk
+        filter_params = self._resolve_filter_params(model)
 
         if self.filterset:
             self.filter = self.filterset(filter_params, queryset)
@@ -161,20 +169,16 @@ class ObjectListView(TenantScopingViewMixin, PermissionRequiredMixin, LoginRequi
         # A5: reuse self.object_list (already filtered + resolved by get_queryset
         # via ListView.get()) instead of calling get_queryset() a second time,
         # which would re-run the full filterset and custom-field filters.
-        queryset = self.object_list
-        table_class = self.table or get_table_for_model(self.model)
-        if not table_class:
-            raise Http404(f"No table defined for model {self.model._meta.model_name}")
-
-        table = table_class(queryset, request=self.request)
-        return table
+        return TableContextBuilder(self.model, self.table).build(self.object_list, self.request)
 
     def get_context_data(self, **kwargs):
-        _model = getattr(self, "model", None)
-        if not _model and hasattr(self, "queryset") and self.queryset is not None:
-            _model = self.queryset.model
-        elif not _model and hasattr(self, "object_list") and self.object_list is not None:
-            _model = self.object_list.model
+        _model = resolve_view_model(self)
+        if not _model:
+            # Last resort: a view that only overrides get_queryset() still leaves
+            # the resolved rows on self.object_list.
+            object_list = getattr(self, "object_list", None)
+            if object_list is not None:
+                _model = object_list.model
 
         if not _model:
             raise ImproperlyConfigured(
@@ -194,7 +198,7 @@ class ObjectListView(TenantScopingViewMixin, PermissionRequiredMixin, LoginRequi
         context["model"] = _model
         context["verbose_name_plural"] = _model._meta.verbose_name_plural
         context["model_name_str"] = f"{_model._meta.app_label}.{_model._meta.model_name}"
-        context["table_config_key"] = f"{_model._meta.app_label}.{table.__class__.__name__}"
+        context["table_config_key"] = TableContextBuilder.config_key(_model, table)
         context["app_label"] = _model._meta.app_label
         context["model_name"] = _model._meta.model_name
         context["object_type"] = _model._meta.verbose_name

@@ -3,7 +3,7 @@ import logging
 from django.contrib import messages
 from django.contrib.auth.mixins import LoginRequiredMixin, PermissionRequiredMixin
 from django.db.models import ProtectedError
-from django.http import Http404, HttpResponseRedirect
+from django.http import HttpResponseRedirect
 from django.shortcuts import redirect
 from django.urls import NoReverseMatch, reverse
 from django.utils.translation import gettext as _
@@ -11,12 +11,13 @@ from django.views.generic import DeleteView
 
 from core.forms import ConfirmationForm
 from itambox.utils import get_help_url, get_model_viewname
+from itambox.views.generic.authorization import PermissionResolver
 from itambox.views.generic.mixins import (
     CachedObjectMixin,
     TenantScopingViewMixin,
     user_can_mutate_model,
 )
-from itambox.views.generic.utils import safe_return_url
+from itambox.views.generic.utils import resolve_view_model, safe_return_url
 from itambox.views.htmx import BaseHTMXView
 
 logger = logging.getLogger(__name__)
@@ -29,32 +30,13 @@ class ObjectDeleteView(
     form_class = ConfirmationForm
 
     def has_permission(self):
-        model = self.model or (self.queryset.model if self.queryset is not None else None)
-        if not user_can_mutate_model(self.request.user, model):
+        if not user_can_mutate_model(self.request.user, resolve_view_model(self)):
             return False
         perms = self.get_permission_required()
-        try:
-            obj = self.get_object()
-        except Http404:
-            # 404 (not 403) for objects outside the tenant scope: don't reveal
-            # whether the pk exists in another tenant. Anonymous users fall
-            # through to the permission check (and the login redirect).
-            if self.request.user.is_authenticated:
-                raise
-            obj = None
-        return self.request.user.has_perms(perms, obj=obj)
+        return self.request.user.has_perms(perms, obj=PermissionResolver.object_under_check(self))
 
     def get_permission_required(self):
-        if self.model:
-            app_label = self.model._meta.app_label
-            model_name = self.model._meta.model_name
-            return (f"{app_label}.delete_{model_name}",)
-        if hasattr(self, "queryset") and self.queryset is not None:
-            model = self.queryset.model
-            app_label = model._meta.app_label
-            model_name = model._meta.model_name
-            return (f"{app_label}.delete_{model_name}",)
-        return ("",)
+        return PermissionResolver.model_permissions(resolve_view_model(self), "delete")
 
     def get_success_url(self):
         if hasattr(self, "default_return_url") and self.default_return_url:
