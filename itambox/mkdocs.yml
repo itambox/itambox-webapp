@@ -161,6 +161,7 @@ nav:
       - Management Commands: 'operations/management-commands.md'
   - Development:
       - Release Checklist: 'development/release-checklist.md'
+      - View Patterns: 'development/view-patterns.md'
       - Python Import Policy: 'development/python-import-policy.md'
       - Test Coverage Policy: 'development/test-coverage-policy.md'
       - Security Test Expectations: 'development/security-test-expectations.md'

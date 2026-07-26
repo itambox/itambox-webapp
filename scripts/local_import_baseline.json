@@ -3370,12 +3370,6 @@
       "count": 1
     },
     {
-      "path": "itambox/itambox/views/generic/detail.py",
-      "context": "ClassDef:ObjectDetailView/FunctionDef:_related_count_uses_distinct",
-      "statement": "from django.core.exceptions import FieldDoesNotExist",
-      "count": 1
-    },
-    {
       "path": "itambox/itambox/views/jobs.py",
       "context": "ClassDef:JobDetailView/FunctionDef:get_context_data",
       "statement": "from extras.models import FileAttachment",

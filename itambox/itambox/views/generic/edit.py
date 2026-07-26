@@ -12,12 +12,13 @@ from django.utils.translation import gettext as _
 from django.views.generic import UpdateView
 
 from itambox.utils import get_help_url, get_model_viewname
+from itambox.views.generic.authorization import PermissionResolver
 from itambox.views.generic.mixins import (
     CachedObjectMixin,
     TenantScopingViewMixin,
     user_can_mutate_model,
 )
-from itambox.views.generic.utils import safe_return_url
+from itambox.views.generic.utils import resolve_view_model, safe_return_url
 from itambox.views.htmx import BaseHTMXView
 
 logger = logging.getLogger(__name__)
@@ -33,36 +34,25 @@ class ObjectEditView(
         if not user_can_mutate_model(self.request.user, self._get_model()):
             return False
         perms = self.get_permission_required()
-        try:
-            obj = self.get_object()
-        except Http404:
-            # 404 (not 403) for objects outside the tenant scope: don't reveal
-            # whether the pk exists in another tenant. Anonymous users fall
-            # through to the permission check (and the login redirect).
-            if self.request.user.is_authenticated:
-                raise
-            obj = None
-        return self.request.user.has_perms(perms, obj=obj)
+        return self.request.user.has_perms(perms, obj=PermissionResolver.object_under_check(self))
 
     def get_permission_required(self):
         model = self._get_model()
-        if model:
-            app_label = model._meta.app_label
-            model_name = model._meta.model_name
-            try:
-                obj = self.get_object()
-            except Http404:
-                obj = None
-            if obj:
-                return (f"{app_label}.change_{model_name}",)
-            return (f"{app_label}.add_{model_name}",)
-        return ("",)
+        if model is None:
+            return PermissionResolver.model_permissions(None, "change")
+        # An existing object is a change; no object (add form, or a clone that is
+        # not persisted yet) is a creation. Http404 is swallowed here on purpose —
+        # has_permission() re-raises it after the perms are chosen.
+        try:
+            obj = self.get_object()
+        except Http404:
+            obj = None
+        return PermissionResolver.model_permissions(model, "change" if obj else "add")
 
     def _get_model(self):
-        if hasattr(self, "model") and self.model:
-            return self.model
-        if hasattr(self, "queryset") and self.queryset is not None:
-            return self.queryset.model
+        model = resolve_view_model(self)
+        if model is not None:
+            return model
         if hasattr(self, "model_form") and self.model_form:
             return self.model_form._meta.model
         if hasattr(self, "form_class") and self.form_class and hasattr(self.form_class, "_meta"):
