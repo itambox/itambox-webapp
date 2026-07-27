@@ -12,6 +12,7 @@ on:
       - "setup.cfg"
       - "uv.lock"
       - "itambox/**/*.py"
+      - "itambox/schema.yaml"
       - "itambox/docs/development/migration-verification.md"
       - "itambox/docs/development/python-import-policy.md"
       - "itambox/mkdocs.yml"
@@ -21,6 +22,7 @@ on:
       - "scripts/migration_audit.json"
       - "scripts/local_import_baseline.json"
       - "scripts/coverage_baseline.json"
+      - "scripts/openapi_diagnostics_baseline.json"
       - "scripts/suite_baseline.json"
   workflow_dispatch:
 
@@ -131,6 +133,28 @@ jobs:
         run: |
           uv run --locked --no-sync python -c "import ldap, magic; print(ldap.__version__); print(magic.from_buffer(b'ITAMbox'))"
           xmlsec1 --version
+
+      - name: Check deterministic OpenAPI schema and diagnostics baseline
+        id: openapi
+        env:
+          PYTHONPATH: ""
+          PYTHONHASHSEED: "0"
+        run: |
+          uv run --locked --no-sync python scripts/check_openapi_schema.py \
+            --schema-output artifacts/openapi/schema.generated.yaml \
+            --diagnostics-output artifacts/openapi/diagnostics.generated.json
+
+      # The first run of a baseline bootstrap intentionally fails after writing
+      # these files. Upload on both success and failure so reviewers can use the
+      # canonical Linux output rather than committing a platform-local snapshot.
+      - name: Upload OpenAPI generation artifacts
+        if: always() && steps.openapi.conclusion != 'skipped'
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: openapi-generation-py${{ matrix.python-version }}
+          path: artifacts/openapi/
+          if-no-files-found: error
+          retention-days: 30
 
       - name: Check for missing migrations
         working-directory: ./itambox
