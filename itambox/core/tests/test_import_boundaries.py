@@ -503,6 +503,71 @@ class InventoryStockBoundaryTests(SimpleTestCase):
         self.assertIs(via_services, via_leaf, "the published inventory.services call path must stay valid")
 
 
+class MembershipServiceLayerTests(SimpleTestCase):
+    """``organization.services.*`` -> ``organization.forms``.
+
+    The membership/RBAC services (issue #86) exist so the domain decisions no
+    longer live in ``MembershipForm``. The form imports the services; the
+    services must never import the form, at module scope or deferred, or the
+    extraction has only added an indirection to the same cycle.
+
+    ``organization.services.__init__`` additionally keeps its re-export surface
+    narrow: ``itambox.views.features`` imports it at module scope, so pulling
+    ``membership``/``rolegrants`` (and through them ``core.auth``) into the
+    package ``__init__`` would widen that edge for no benefit.
+    """
+
+    SERVICE_MODULES = ("organization.services.membership", "organization.services.rolegrants")
+
+    def test_services_do_not_import_the_form_layer(self):
+        for module in self.SERVICE_MODULES:
+            with self.subTest(module=module):
+                self.assertFalse(
+                    _imports(module, "organization.forms"),
+                    f"{module} must not import organization.forms, at module scope or deferred -- "
+                    "the form depends on the service, never the reverse",
+                )
+
+    def test_form_imports_the_services_at_module_scope(self):
+        self.assertTrue(
+            _imports("organization.forms.membership_form", "organization.services", top_level_only=True),
+            "organization.forms.membership_form -> organization.services is the load-bearing direction",
+        )
+
+    def test_package_init_does_not_pull_in_the_membership_services(self):
+        for module in self.SERVICE_MODULES:
+            with self.subTest(module=module):
+                self.assertFalse(
+                    _imports("organization.services", module),
+                    f"organization.services.__init__ must not import {module}: itambox.views.features "
+                    "imports the package at module scope and would gain an edge to core.auth",
+                )
+
+    def test_resource_access_helpers_stay_importable_from_the_package(self):
+        """The package conversion must keep every published name byte-identical
+        for the existing importers (``itambox.views.features``,
+        ``organization.views.membership_views``, ``inventory.services``)."""
+        import organization.services as services
+        import organization.services.resource_access as resource_access
+
+        for name in (
+            "visible_to_containers",
+            "is_container_scoped_unfiltered",
+            "resolve_stock_access",
+            "ResourceAccessDecision",
+            "REASON_SAME_TENANT",
+            "REASON_DIRECT_GRANT",
+            "REASON_GROUP_GRANT",
+            "DENIED_NO_ACTIVE_TENANT",
+            "DENIED_OWNER_UNRESOLVABLE",
+            "DENIED_NO_GRANT",
+            "DENIED_INSUFFICIENT_LEVEL",
+            "DENIED_RBAC",
+        ):
+            with self.subTest(name=name):
+                self.assertIs(getattr(services, name), getattr(resource_access, name))
+
+
 class KitCheckoutBoundaryTests(SimpleTestCase):
     """``inventory.models`` -> ``assets.services``.
 

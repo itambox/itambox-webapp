@@ -9,23 +9,34 @@ from crispy_forms.helper import FormHelper
 from crispy_forms.layout import Fieldset, Layout
 from django import forms
 from django.contrib.auth import get_user_model
-from django.db import transaction
-from django.db.models import Q
+from django.core.exceptions import NON_FIELD_ERRORS
 from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
 
-from core.auth.guards import validate_group_membership_grant, validate_role_grant
 from core.forms import BulkEditForm, FilterForm
 from core.mfa import role_is_privileged
-from organization.access import get_descendant_tenant_group_ids
-from users.services import (
-    AmbiguousEmailError,
-    normalize_email,
-    resolve_existing_user,
-    resolve_or_create_user,
+from organization.services.errors import MembershipServiceError
+from organization.services.membership import (
+    MembershipIntent,
+    NewIdentitySpec,
+    apply_membership_grants,
+    execute_membership_write,
+    may_manage_memberships,
+    plan_membership_write,
 )
+from organization.services.rolegrants import (
+    SCOPE_EXPLICIT,
+    GrantPlan,
+    ManagedGrantSpec,
+    OwnGrantSpec,
+    assignable_roles_qs,
+    live_managed_grants,
+    live_own_grants,
+    managed_target_tenants_qs,
+)
+from users.services import AmbiguousEmailError, normalize_email, resolve_existing_user
 
-from ..models import Membership, Role, RoleGrant, RoleGrantScope, Tenant, TenantGroup
+from ..models import Membership, Role, RoleGrantScope, Tenant, TenantGroup
 
 User = get_user_model()
 
@@ -61,33 +72,6 @@ class _RoleChoiceField(_RoleLabelMixin, forms.ModelChoiceField):
     """Single-select role picker (one managed-grant formset row)."""
 
 
-def _role_assignable_in(role, tenant):
-    """Whether ``role`` may be assigned inside ``tenant``: owned by it, or shared
-    down by its managing organization."""
-    if role.tenant_id == tenant.pk:
-        return True
-    return bool(role.shared_with_managed and role.tenant.is_provider and tenant.managed_by_id == role.tenant_id)
-
-
-def _roles_visible_in_qs(membership_tenant):
-    """Queryset of roles assignable in ``membership_tenant`` (own + shared-down).
-
-    Unknown tenant (context-free GET) falls back to all roles; ``clean()`` and the
-    per-row escalation guard re-validate ownership against the tenant submitted.
-    """
-    qs = Role._base_manager.filter(deleted_at__isnull=True).select_related("tenant")
-    if membership_tenant is not None:
-        ownership = Q(tenant=membership_tenant)
-        if membership_tenant.managed_by_id:
-            ownership |= Q(
-                tenant_id=membership_tenant.managed_by_id,
-                tenant__is_provider=True,
-                shared_with_managed=True,
-            )
-        qs = qs.filter(ownership)
-    return qs.order_by("name")
-
-
 # ---------------------------------------------------------------------------
 # Managed-reach grant formset — one row per RoleGrant aggregate
 # ---------------------------------------------------------------------------
@@ -109,11 +93,11 @@ class ManagedRoleGrantForm(forms.Form):
     )
     managed_scope = forms.ChoiceField(
         choices=(
-            ("explicit", _("Specific tenants")),
+            (SCOPE_EXPLICIT, _("Specific tenants")),
             (RoleGrantScope.SCOPE_TENANT_GROUP, _("A tenant group + its descendants")),
             (RoleGrantScope.SCOPE_ALL_MANAGED, _("All managed tenants")),
         ),
-        initial="explicit",
+        initial=SCOPE_EXPLICIT,
         required=False,
         label=_("Coverage"),
         widget=forms.Select(attrs={"class": "form-select managed-scope"}),
@@ -146,128 +130,66 @@ class ManagedRoleGrantForm(forms.Form):
         help_text=_("Required and must be in the future for elevated direct grants."),
     )
 
-    def __init__(self, *args, membership_tenant=None, requesting_user=None, **kwargs):
+    def __init__(self, *args, membership_tenant=None, **kwargs):
         super().__init__(*args, **kwargs)
-        self._membership_tenant = membership_tenant
-        self._requesting_user = requesting_user
-        self.fields["role"].queryset = _roles_visible_in_qs(membership_tenant)
+        # The tenant shapes the row's querysets and labels only; it carries no
+        # authorization weight and the actor is deliberately not kept here —
+        # every decision about this row is taken by validate_grant_plan.
+        self.fields["role"].queryset = assignable_roles_qs(membership_tenant)
         self.fields["role"].membership_tenant = membership_tenant
         self.fields["scope_group"].queryset = TenantGroup._base_manager.filter(deleted_at__isnull=True).order_by("name")
-        if membership_tenant is not None:
-            self.fields["assigned_tenants"].queryset = Tenant._base_manager.filter(
-                managed_by=membership_tenant,
-                deleted_at__isnull=True,
-            ).order_by("name")
-        else:
-            self.fields["assigned_tenants"].queryset = Tenant._base_manager.filter(deleted_at__isnull=True).order_by(
-                "name"
-            )
+        self.fields["assigned_tenants"].queryset = managed_target_tenants_qs(membership_tenant)
 
     def is_blank(self):
         """A row the user never touched (no role selected) is ignored, not errored."""
         return not (self.cleaned_data.get("role") if hasattr(self, "cleaned_data") else None)
 
     def clean(self):
+        """Shape and required-ness only — every domain rule lives in the plan.
+
+        Coverage normalisation stays here because the *widget* contract owns it:
+        the JS toggle leaves the unselected coverage inputs in the POST, so the
+        server clears the side the user did not choose before anything reads the
+        row. Assignability, provider reach, the elevated-grant policy and the
+        escalation guard are decided by
+        ``organization.services.rolegrants.validate_grant_plan`` and reported
+        back onto this row by ``MembershipForm._add_service_errors``.
+        """
         cleaned = super().clean()
         # Deleted or entirely-blank rows carry no grant and are skipped.
         if cleaned.get("DELETE"):
             return cleaned
-        role = cleaned.get("role")
-        if not role:
+        if not cleaned.get("role"):
             return cleaned
 
-        tenant = self._membership_tenant
-        if tenant is None or not tenant.is_provider:
-            raise forms.ValidationError(_("Managed grants require a managing (provider) tenant."))
-
-        scope = cleaned.get("managed_scope") or "explicit"
+        scope = cleaned.get("managed_scope") or SCOPE_EXPLICIT
         cleaned["managed_scope"] = scope
-        requested_tenant_ids = None
         if scope == RoleGrantScope.SCOPE_TENANT_GROUP:
             cleaned["assigned_tenants"] = []
-            scope_group = cleaned.get("scope_group")
-            if not scope_group:
+            if not cleaned.get("scope_group"):
                 self.add_error(
                     "scope_group", _("A tenant group is required when coverage is 'A tenant group + its descendants'.")
                 )
-                return cleaned
-            requested_tenant_ids = set(
-                Tenant._base_manager.filter(
-                    managed_by=tenant,
-                    group_id__in=get_descendant_tenant_group_ids(scope_group.pk),
-                ).values_list("pk", flat=True)
-            )
-        elif scope == "explicit":
+        elif scope == SCOPE_EXPLICIT:
             cleaned["scope_group"] = None
-            assigned = list(cleaned.get("assigned_tenants") or [])
-            if not assigned:
+            if not cleaned.get("assigned_tenants"):
                 self.add_error("assigned_tenants", _("Pick at least one tenant for 'Specific tenants'."))
-                return cleaned
-            outside = [t for t in assigned if t.managed_by_id != tenant.pk]
-            if outside:
-                self.add_error(
-                    "assigned_tenants",
-                    _("These tenants are not managed by %(tenant)s: %(names)s")
-                    % {"tenant": tenant, "names": ", ".join(str(t) for t in outside)},
-                )
-                return cleaned
-            requested_tenant_ids = {t.pk for t in assigned}
-        else:  # SCOPE_ALL → requested_tenant_ids stays None (guard semantics)
+        else:  # SCOPE_ALL_MANAGED carries no explicit target of either kind.
             cleaned["scope_group"] = None
             cleaned["assigned_tenants"] = []
-
-        # Role must be assignable inside this tenant (owned or shared-down).
-        if not _role_assignable_in(role, tenant):
-            raise forms.ValidationError(_("Role '%(role)s' is not available in the selected tenant.") % {"role": role})
-
-        # Escalation guard for this one managed row — a single invalid row makes
-        # the formset (and thus the whole transaction) fail.
-        if role_is_privileged(role):
-            reason = (cleaned.get("reason") or "").strip()
-            valid_until = cleaned.get("valid_until")
-            if not reason:
-                self.add_error("reason", _("Elevated direct grants require a reason."))
-            if valid_until is None:
-                self.add_error("valid_until", _("Elevated direct grants require an expiration."))
-            elif valid_until <= timezone.now():
-                self.add_error("valid_until", _("The expiration must be in the future."))
-            cleaned["reason"] = reason
-
-        try:
-            validate_role_grant(
-                self._requesting_user,
-                role,
-                tenant,
-                scope_type=scope,
-                requested_tenant_ids=requested_tenant_ids,
-            )
-        except forms.ValidationError as exc:
-            raise forms.ValidationError(exc.messages) from None
+        cleaned["reason"] = (cleaned.get("reason") or "").strip()
         return cleaned
 
 
 class BaseManagedRoleGrantFormSet(forms.BaseFormSet):
-    """Rejects two managed rows for the same role (they'd collide on the unique
-    ``(membership, role, reach)`` grant constraint)."""
+    """Plain formset.
 
-    def clean(self):
-        super().clean()
-        if any(self.errors):
-            return
-        seen = set()
-        for form in self.forms:
-            if not hasattr(form, "cleaned_data"):
-                continue
-            cd = form.cleaned_data
-            if cd.get("DELETE") or not cd.get("role"):
-                continue
-            role = cd["role"]
-            if role.pk in seen:
-                raise forms.ValidationError(
-                    _("Role '%(role)s' is granted twice in Managed tenants — combine the coverage into one row.")
-                    % {"role": role}
-                )
-            seen.add(role.pk)
+    The "one row per role" rule used to live here and could only be reported as
+    a formset-wide non-form error. It is now a plan check
+    (``validate_grant_plan``), which knows the offending row and reports it
+    there — so this class keeps only the base behaviour and exists to document
+    where the rule went.
+    """
 
 
 ManagedRoleGrantFormSet = forms.formset_factory(
@@ -426,7 +348,7 @@ class MembershipForm(forms.ModelForm):
 
         # own_roles: the tenant's own roles plus roles shared down by its managing
         # organization. Unknown tenant (context-free GET) falls back to all roles.
-        self.fields["own_roles"].queryset = _roles_visible_in_qs(membership_tenant)
+        self.fields["own_roles"].queryset = assignable_roles_qs(membership_tenant)
         self.fields["own_roles"].membership_tenant = membership_tenant
 
         # The Managed block (per-grant formset) only exists on managing
@@ -437,35 +359,13 @@ class MembershipForm(forms.ModelForm):
         managed_initial = []
         self._existing_own_role_ids = set()
         if self.instance.pk:
-            self._existing_own_role_ids = set(
-                self.instance.role_grants.filter(
-                    scopes__scope_type=RoleGrantScope.SCOPE_OWN,
-                    role__deleted_at__isnull=True,
-                )
-                .filter(Q(valid_until__isnull=True) | Q(valid_until__gt=timezone.now()))
-                .values_list("role_id", flat=True)
-                .distinct()
-            )
+            # INV-10 (expired grants are inert audit history, soft-deleted roles
+            # are not offered) is defined once, in the service: these are the
+            # very reads the write phase and its tamper check use, so the editor
+            # cannot show a selection the reconciler would disagree about.
+            self._existing_own_role_ids = set(live_own_grants(self.instance).values_list("role_id", flat=True))
             self.fields["own_roles"].initial = sorted(self._existing_own_role_ids)
-            grants = (
-                self.instance.role_grants.filter(
-                    role__deleted_at__isnull=True,
-                    scopes__scope_type__in=(
-                        RoleGrantScope.SCOPE_TENANT,
-                        RoleGrantScope.SCOPE_TENANT_GROUP,
-                        RoleGrantScope.SCOPE_ALL_MANAGED,
-                    ),
-                )
-                .filter(Q(valid_until__isnull=True) | Q(valid_until__gt=timezone.now()))
-                .select_related("role")
-                .prefetch_related(
-                    "scopes",
-                    "scopes__tenant",
-                    "scopes__tenant_group",
-                )
-                .distinct()
-            )
-            for grant in grants:
+            for grant in live_managed_grants(self.instance):
                 scopes = list(grant.scopes.all())
                 if any(s.scope_type == RoleGrantScope.SCOPE_ALL_MANAGED for s in scopes):
                     scope = RoleGrantScope.SCOPE_ALL_MANAGED
@@ -481,7 +381,7 @@ class MembershipForm(forms.ModelForm):
                         scope_group_id = group_scope.tenant_group_id
                         tenant_ids = []
                     else:
-                        scope = "explicit"
+                        scope = SCOPE_EXPLICIT
                         scope_group_id = None
                         tenant_ids = [
                             s.tenant_id for s in scopes if s.scope_type == RoleGrantScope.SCOPE_TENANT and s.tenant_id
@@ -519,10 +419,7 @@ class MembershipForm(forms.ModelForm):
     def _build_managed_formset(self, offer_managed, membership_tenant, managed_initial):
         if not offer_managed:
             return None
-        form_kwargs = {
-            "membership_tenant": membership_tenant,
-            "requesting_user": self._requesting_user,
-        }
+        form_kwargs = {"membership_tenant": membership_tenant}
         if self.is_bound:
             return ManagedRoleGrantFormSet(
                 self.data,
@@ -601,88 +498,81 @@ class MembershipForm(forms.ModelForm):
         return form_valid and formset_valid
 
     def clean(self):
+        """UI rules, then one read-only plan.
+
+        Planning here is for ERROR REPORTING ONLY: ``save()`` re-plans inside the
+        transaction, after the row lock, so nothing computed here is carried into
+        the write and the plan is deliberately not retained on the form.
+        """
         cleaned = super().clean()
         tenant = cleaned.get("tenant") or (self.instance.tenant if self.instance.pk else None)
         if tenant is None:
             raise forms.ValidationError(_("Pick the tenant this membership belongs to."))
         cleaned["tenant"] = tenant
 
+        # Field-level UI rules first, so their precise messages always exist even
+        # when the service also rejects the write (this is what keeps the
+        # membership-oracle message on ``new_user_email``).
         self._clean_who(cleaned, tenant)
+        cleaned["reason"] = (cleaned.get("reason") or "").strip()
 
-        own_roles = list(cleaned.get("own_roles") or [])
+        # The formset must be cleaned before its rows can be read. The expensive
+        # part -- full_clean() -- runs once behind the cached ``errors``
+        # property, so the later call in is_valid() only re-reads per-form errors.
+        if self.managed_formset is not None:
+            self.managed_formset.is_valid()
 
-        # Each own-reach role must be assignable inside this tenant.
-        for role in own_roles:
-            if not _role_assignable_in(role, tenant):
-                raise forms.ValidationError(
-                    _("Role '%(role)s' is not available in the selected tenant.") % {"role": role}
-                )
-
-        # Escalation guard — one per direct own-scope grant, aggregated so the
-        # admin sees all failures. Managed-reach rows are guarded inside the formset.
-        errors = []
-        for role in own_roles:
-            try:
-                validate_role_grant(
-                    self._requesting_user,
-                    role,
-                    tenant,
-                    scope_type=RoleGrantScope.SCOPE_OWN,
-                )
-            except forms.ValidationError as exc:
-                errors.extend(exc.messages)
-
-        reactivating = bool(self.instance.pk and self._initial_is_active is False and cleaned.get("is_active"))
-        if reactivating:
-            # MembershipForm never edits GroupMembership rows. Switching the
-            # principal back on is equivalent to adding it to every retained,
-            # live group again and must pass the same inheritance guard,
-            # including provider-managed projections. Inactive/deleted groups
-            # remain inert and are handled if they are reactivated separately.
-            retained_group_memberships = self.instance.group_memberships.filter(
-                user_group__is_active=True,
-                user_group__deleted_at__isnull=True,
-            ).select_related("user_group")
-            for group_membership in retained_group_memberships:
-                try:
-                    validate_group_membership_grant(
-                        self._requesting_user,
-                        group_membership.user_group,
-                    )
-                except forms.ValidationError as exc:
-                    errors.extend(exc.messages)
-        if errors:
-            seen = set()
-            raise forms.ValidationError([e for e in errors if not (e in seen or seen.add(e))])
-
-        new_privileged_roles = [
-            role for role in own_roles if role.pk not in self._existing_own_role_ids and role_is_privileged(role)
-        ]
-        reason = (cleaned.get("reason") or "").strip()
-        valid_until = cleaned.get("valid_until")
-        cleaned["reason"] = reason
-        if new_privileged_roles:
-            if not reason:
-                self.add_error("reason", _("Elevated direct grants require a reason."))
-            if valid_until is None:
-                self.add_error("valid_until", _("Elevated direct grants require an expiration."))
-            elif valid_until <= timezone.now():
-                self.add_error("valid_until", _("The expiration must be in the future."))
+        try:
+            plan_membership_write(
+                actor=self._requesting_user,
+                intent=self._build_intent(cleaned, tenant),
+                membership=self.instance if self.instance.pk else None,
+                # INV-14. Derived from the row as LOADED, never from the POST.
+                # execute_membership_write re-derives it from the locked row and
+                # that derivation is the authoritative one; this one exists so a
+                # blocked reactivation renders as a form error instead of a 500.
+                revalidate_inherited_groups=bool(
+                    self.instance.pk and self._initial_is_active is False and cleaned.get("is_active")
+                ),
+            )
+        except MembershipServiceError as exc:
+            self._add_service_errors(exc)
         return cleaned
 
-    def _actor_may_manage_memberships(self, tenant):
-        """Whether the acting user may add/change memberships in ``tenant``.
+    @staticmethod
+    def _already_reported(form, field, message):
+        """Whether ``form`` already shows ``message`` on that exact target.
 
-        Superusers and an absent actor (system/programmatic contexts) are trusted;
-        otherwise the relevant object-level Django permission is required. Used only
-        for the membership-oracle defense in ``_clean_who`` — role-permission
-        escalation is a separate, unconditional check.
+        Per target, not per form: the identical sentence on two different rows
+        is two distinct locations and both must survive — the same rule the
+        service's own ``(message, field, row_index)`` de-duplication follows.
         """
-        user = self._requesting_user
-        if user is None or getattr(user, "is_superuser", False):
-            return True
-        perm = "organization.change_membership" if self.instance.pk else "organization.add_membership"
-        return user.has_perm(perm, obj=tenant)
+        return message in form.errors.get(field or NON_FIELD_ERRORS, [])
+
+    def _add_service_errors(self, exc):
+        """Route each rejection back to the field or row it names.
+
+        ``row_index`` is an index into ``managed_formset.forms`` (§4.2). An index
+        this form cannot render, or a field name it does not carry, degrades to a
+        form-level error rather than raising ``IndexError``/``ValueError`` in the
+        middle of validation.
+
+        A message the target already carries is skipped. This only ever ADDS to
+        errors the form's own field-level rules produced first (that ordering is
+        what keeps the non-revealing message on ``new_user_email``), so without
+        the check the same sentence can render twice under one label.
+        """
+        rows = self.managed_formset.forms if self.managed_formset is not None else ()
+        for err in exc.errors:
+            if err.row_index is not None and 0 <= err.row_index < len(rows):
+                row = rows[err.row_index]
+                field = err.field if err.field in row.fields else None
+                if not self._already_reported(row, field, err.message):
+                    row.add_error(field, err.message)
+                continue
+            field = err.field if err.row_index is None and err.field in self.fields else None
+            if not self._already_reported(self, field, err.message):
+                self.add_error(field, err.message)
 
     def _clean_who(self, cleaned, tenant):
         """Enforce exactly one side of the who-radio (create only).
@@ -697,66 +587,93 @@ class MembershipForm(forms.ModelForm):
         cleaned["who"] = who
 
         if who == self.WHO_NEW:
-            cleaned["user"] = None
-            email = normalize_email(cleaned.get("new_user_email"))
-            cleaned["new_user_email"] = email
-            if not email:
-                if "new_user_email" not in self.errors:
-                    self.add_error("new_user_email", _("An email address is required to create a new user."))
-            else:
-                try:
-                    # Resolve (never create) here; the actual write is delegated to
-                    # users.services on save so it is transaction-/race-safe.
-                    self._existing_user_by_email = resolve_existing_user(email)
-                except AmbiguousEmailError:
-                    # More than one account shares this email — fail closed rather
-                    # than silently picking one (email is not globally unique).
-                    self._existing_user_by_email = None
-                    self.add_error(
-                        "new_user_email",
-                        _(
-                            "More than one account already uses this email address — "
-                            "resolve the duplicate before adding a membership."
-                        ),
-                    )
-                else:
-                    if self._existing_user_by_email is not None:
-                        # Get-or-create semantics: reuse the account instead of
-                        # duplicating it — but a second membership at the same tenant
-                        # is an edit, not an add.
-                        cleaned["user"] = self._existing_user_by_email
-                        if Membership.objects.filter(
-                            user=self._existing_user_by_email,
-                            tenant=tenant,
-                        ).exists():
-                            # Defense-in-depth against a membership oracle: only
-                            # reveal that the account already belongs to THIS tenant
-                            # to an actor allowed to manage its memberships (the
-                            # create view already 404s an unauthorized deep link;
-                            # this covers directly-built forms / tampered posts). An
-                            # unauthorized actor gets a non-revealing error instead.
-                            if self._actor_may_manage_memberships(tenant):
-                                self.add_error(
-                                    "new_user_email",
-                                    _("%(user)s is already a member of %(tenant)s — edit their membership instead.")
-                                    % {"user": self._existing_user_by_email, "tenant": tenant},
-                                )
-                            else:
-                                self.add_error(
-                                    "new_user_email", _("This account cannot be added to the selected tenant.")
-                                )
-                    # No match → a new account is created on save with a length-safe
-                    # username (users.services), so a long email / username clash is
-                    # handled there rather than rejected here.
-            if not (cleaned.get("new_user_first_name") or "").strip():
-                self.add_error("new_user_first_name", _("Required for a new user."))
-            if not (cleaned.get("new_user_last_name") or "").strip():
-                self.add_error("new_user_last_name", _("Required for a new user."))
+            self._clean_who_new(cleaned, tenant)
         else:
-            for fname in ("new_user_email", "new_user_first_name", "new_user_last_name"):
-                cleaned[fname] = ""
-            if not cleaned.get("user"):
-                self.add_error("user", _("Pick the user to add as a member."))
+            self._clean_who_existing(cleaned)
+
+    def _clean_who_new(self, cleaned, tenant):
+        """The "new user" side of the who-radio: resolve-or-create by email."""
+        cleaned["user"] = None
+        email = normalize_email(cleaned.get("new_user_email"))
+        cleaned["new_user_email"] = email
+        # Authorization must short-circuit before email lookup or membership
+        # probing: either operation can disclose account/tenant state.
+        if not may_manage_memberships(
+            actor=self._requesting_user,
+            tenant=tenant,
+            creating=not bool(self.instance.pk),
+        ):
+            self.add_error(
+                "new_user_email",
+                _("This account cannot be added to the selected tenant."),
+            )
+            return
+        if not email:
+            if "new_user_email" not in self.errors:
+                self.add_error("new_user_email", _("An email address is required to create a new user."))
+        else:
+            self._resolve_new_user_by_email(cleaned, tenant, email)
+        if not (cleaned.get("new_user_first_name") or "").strip():
+            self.add_error("new_user_first_name", _("Required for a new user."))
+        if not (cleaned.get("new_user_last_name") or "").strip():
+            self.add_error("new_user_last_name", _("Required for a new user."))
+
+    def _resolve_new_user_by_email(self, cleaned, tenant, email):
+        """Look up ``email`` and, on a single match, apply get-or-create semantics."""
+        try:
+            # Resolve (never create) here; the actual write is delegated to
+            # users.services on save so it is transaction-/race-safe.
+            self._existing_user_by_email = resolve_existing_user(email)
+        except AmbiguousEmailError:
+            # More than one account shares this email — fail closed rather
+            # than silently picking one (email is not globally unique).
+            self._existing_user_by_email = None
+            self.add_error(
+                "new_user_email",
+                _(
+                    "More than one account already uses this email address — "
+                    "resolve the duplicate before adding a membership."
+                ),
+            )
+            return
+        if self._existing_user_by_email is None:
+            # No match → a new account is created on save with a length-safe
+            # username (users.services), so a long email / username clash is
+            # handled there rather than rejected here.
+            return
+        # Get-or-create semantics: reuse the account instead of duplicating it —
+        # but a second membership at the same tenant is an edit, not an add.
+        cleaned["user"] = self._existing_user_by_email
+        self._check_email_reuse_conflict(tenant)
+
+    def _check_email_reuse_conflict(self, tenant):
+        """A reused account already a member of ``tenant`` is an edit, not an add."""
+        if not Membership.objects.filter(user=self._existing_user_by_email, tenant=tenant).exists():
+            return
+        # Defense-in-depth against a membership oracle: only reveal that the
+        # account already belongs to THIS tenant to an actor allowed to manage
+        # its memberships (the create view already 404s an unauthorized deep
+        # link; this covers directly-built forms / tampered posts). An
+        # unauthorized actor gets a non-revealing error instead.
+        if may_manage_memberships(
+            actor=self._requesting_user,
+            tenant=tenant,
+            creating=not bool(self.instance.pk),
+        ):
+            self.add_error(
+                "new_user_email",
+                _("%(user)s is already a member of %(tenant)s — edit their membership instead.")
+                % {"user": self._existing_user_by_email, "tenant": tenant},
+            )
+        else:
+            self.add_error("new_user_email", _("This account cannot be added to the selected tenant."))
+
+    def _clean_who_existing(self, cleaned):
+        """The "existing user" side of the who-radio: clear the new-user fields."""
+        for fname in ("new_user_email", "new_user_first_name", "new_user_last_name"):
+            cleaned[fname] = ""
+        if not cleaned.get("user"):
+            self.add_error("user", _("Pick the user to add as a member."))
 
     def _get_validation_exclusions(self):
         exclusions = super()._get_validation_exclusions()
@@ -767,8 +684,109 @@ class MembershipForm(forms.ModelForm):
             exclusions.add("user")
         return exclusions
 
+    # ---------------------------------------------------- service input objects
+    def _own_specs(self, cleaned):
+        """The own-reach half of the intent.
+
+        Every selected role carries the single main-form reason/expiry pair; the
+        service applies INV-5's own-half gate (metadata only on a newly created
+        grant, and only when the role is privileged).
+        """
+        reason = (cleaned.get("reason") or "").strip()
+        valid_until = cleaned.get("valid_until")
+        return tuple(
+            OwnGrantSpec(role=role, reason=reason, valid_until=valid_until) for role in cleaned.get("own_roles") or []
+        )
+
+    def _managed_specs(self):
+        """The managed-reach half, one spec per submitted formset row.
+
+        Three kinds of row are skipped, exactly as the reconciler skipped them
+        before: rows the formset never cleaned, deleted/blank rows, and rows that
+        already carry a field-level error. The last matters because
+        ``add_error`` deletes the offending key from ``cleaned_data``: an
+        explicit row that failed *"Pick at least one tenant"* would otherwise
+        reach the plan as ``tenants=()`` and collect a second, duplicate message
+        on the same field. ``row_index`` stays the index into
+        ``managed_formset.forms`` regardless of how many rows were skipped, so a
+        service error can always be rendered on the row it came from.
+        """
+        if self.managed_formset is None:
+            return ()
+        specs = []
+        for index, row in enumerate(self.managed_formset.forms):
+            if not hasattr(row, "cleaned_data"):
+                continue
+            cd = row.cleaned_data
+            if cd.get("DELETE") or not cd.get("role"):
+                continue
+            if row.errors:
+                continue
+            scope = cd.get("managed_scope") or SCOPE_EXPLICIT
+            specs.append(
+                ManagedGrantSpec(
+                    role=cd["role"],
+                    scope=scope,
+                    grant_id=cd.get("id"),
+                    scope_group=cd.get("scope_group") if scope == RoleGrantScope.SCOPE_TENANT_GROUP else None,
+                    tenants=tuple(cd.get("assigned_tenants") or []) if scope == SCOPE_EXPLICIT else (),
+                    reason=(cd.get("reason") or "").strip(),
+                    valid_until=cd.get("valid_until"),
+                    row_index=index,
+                )
+            )
+        return tuple(specs)
+
+    def _grant_plan(self, cleaned):
+        """The grant half of the intent, shared by ``save(commit=True)``'s
+        ``MembershipIntent`` and the deferred ``save_m2m`` path so there is only
+        ever one translation from form data to service input."""
+        return GrantPlan(own=self._own_specs(cleaned), managed=self._managed_specs())
+
+    def _build_intent(self, cleaned, tenant):
+        """Translate ``cleaned_data`` + the formset rows into a ``MembershipIntent``."""
+        new_identity = None
+        if "who" in self.fields and cleaned.get("who") == self.WHO_NEW:
+            new_identity = NewIdentitySpec(
+                email=cleaned.get("new_user_email") or "",
+                first_name=(cleaned.get("new_user_first_name") or "").strip(),
+                last_name=(cleaned.get("new_user_last_name") or "").strip(),
+            )
+        if self.instance.pk:
+            # The user is immutable on an edit; the disabled field's cleaned
+            # value is the instance's own user either way.
+            user = self.instance.user
+        else:
+            # _clean_who already put a reused account here, so the service's
+            # "intent.user wins over new_identity" precedence keeps the
+            # get-or-create semantics the who-block promises.
+            user = cleaned.get("user")
+        plan = self._grant_plan(cleaned)
+        return MembershipIntent(
+            tenant=tenant,
+            is_active=bool(cleaned.get("is_active")),
+            user=user,
+            new_identity=new_identity,
+            own_roles=plan.own,
+            managed_grants=plan.managed,
+        )
+
     # ------------------------------------------------------------------ saving
     def save(self, commit=True):
+        # ``commit=True`` deliberately never reaches super().save() (the service
+        # owns the row, the identity and the transaction), so BaseModelForm's
+        # "the data didn't validate" guard has to be re-stated here or the two
+        # branches disagree: commit=False would still raise it while commit=True
+        # walked into cleaned_data with keys add_error() had removed. Same
+        # wording as Django's, because commit=False still raises Django's.
+        if self.errors:
+            raise ValueError(
+                "The %s could not be %s because the data didn't validate."
+                % (
+                    self.instance._meta.object_name,
+                    "created" if self.instance._state.adding else "changed",
+                )
+            )
         # who=new only creates a user when the email did NOT resolve to an
         # existing account in clean() (instance.user is already populated then).
         creating_new_user = (
@@ -786,214 +804,42 @@ class MembershipForm(forms.ModelForm):
                 "MembershipForm cannot save(commit=False) while creating a new "
                 "user inline. Save with commit=True, or select an existing user."
             )
-        with transaction.atomic():
-            if creating_new_user:
-                # No user matched the email in clean(): create one inline.
-                self.instance.user = self._create_inline_user()
-            instance = super().save(commit=commit)
-            if commit:
-                # Assignments hang off a persisted membership: reconcile now.
-                self._sync_grants(instance)
-            else:
-                # Canonical two-step (instance.save() then form.save_m2m()):
-                # chain the grant reconciliation onto Django's save_m2m so the
-                # deferred save writes the SAME rows a commit=True save would —
-                # not a membership silently stripped of its grants.
-                django_save_m2m = self.save_m2m
+        if commit:
+            # The service owns the transaction, the row, the identity, and the
+            # grant reconciliation. super().save() is deliberately not called:
+            # _post_clean has already built and unique-validated self.instance,
+            # and this form has no m2m model fields, so nothing is skipped.
+            result = execute_membership_write(
+                actor=self._requesting_user,
+                intent=self._build_intent(self.cleaned_data, self.cleaned_data["tenant"]),
+                membership=self.instance if self.instance.pk else None,
+            )
+            self.new_user_created = result.identity_created
+            self.instance = result.membership
+            return result.membership
 
-                def save_m2m():
-                    django_save_m2m()
-                    self._sync_grants(self.instance)
+        instance = super().save(commit=False)
+        django_save_m2m = self.save_m2m
+        # Captured BEFORE the caller persists the row: once it has, the stored
+        # is_active no longer shows a False -> True transition (INV-14). None on
+        # create, which fails closed over an empty retained-group set.
+        previous_is_active = self._initial_is_active
 
-                self.save_m2m = save_m2m
+        def save_m2m():
+            # Canonical two-step (instance.save() then form.save_m2m()): chain
+            # the grant reconciliation on so the deferred save writes the SAME
+            # rows a commit=True save would — not a membership silently stripped
+            # of its grants.
+            django_save_m2m()
+            apply_membership_grants(
+                actor=self._requesting_user,
+                membership=self.instance,
+                plan=self._grant_plan(self.cleaned_data),
+                previous_is_active=previous_is_active,
+            )
+
+        self.save_m2m = save_m2m
         return instance
-
-    def _create_inline_user(self):
-        """Get-or-create the who-block's "new user" via the identity service.
-
-        Delegates the write to ``users.services.resolve_or_create_user`` so it is
-        transaction-/race-safe, length-safe (username fits the field), and reuses a
-        concurrently-created account rather than duplicating it. Credentials are
-        never issued automatically — the membership detail's "Send password setup
-        link" action does that explicitly.
-        """
-        cleaned = self.cleaned_data
-        user, created = resolve_or_create_user(
-            email=cleaned["new_user_email"],
-            first_name=cleaned.get("new_user_first_name"),
-            last_name=cleaned.get("new_user_last_name"),
-        )
-        self.new_user_created = created
-        return user
-
-    def _sync_grants(self, membership):
-        """Reconcile the membership's assignments per instance, losslessly.
-
-        Own-reach rows follow ``own_roles``; managed-reach rows follow the formset,
-        one row per grant. Surviving rows keep their ``granted_by`` provenance;
-        only newly requested rows are created (stamped ``granted_by=<actor>``) and
-        only removed/deselected rows are deleted (per-object ``delete()`` so each
-        revocation is change-logged).
-        """
-        with transaction.atomic():
-            self._sync_own_roles(membership)
-            self._sync_managed_formset(membership)
-
-    def _sync_own_roles(self, membership):
-        selected = list(self.cleaned_data.get("own_roles") or [])
-        selected_ids = {r.pk for r in selected}
-        existing = list(
-            membership.role_grants.filter(
-                scopes__scope_type=RoleGrantScope.SCOPE_OWN,
-                role__deleted_at__isnull=True,
-            )
-            .filter(Q(valid_until__isnull=True) | Q(valid_until__gt=timezone.now()))
-            .prefetch_related("scopes")
-            .distinct()
-        )
-        existing_by_role = {}
-        for grant in existing:
-            existing_by_role.setdefault(grant.role_id, grant)
-            if grant.role_id in selected_ids:
-                continue
-            for scope in list(grant.scopes.all()):
-                if scope.scope_type == RoleGrantScope.SCOPE_OWN:
-                    scope.delete()
-            if not RoleGrantScope.objects.filter(role_grant=grant).exists():
-                grant.delete()
-
-        for role in selected:
-            if role.pk in existing_by_role:
-                continue
-            privileged = role_is_privileged(role)
-            grant = RoleGrant(
-                membership=membership,
-                role=role,
-                granted_by=self._requesting_user,
-                reason=self.cleaned_data.get("reason", "") if privileged else "",
-                valid_until=self.cleaned_data.get("valid_until") if privileged else None,
-            )
-            grant.save()
-            RoleGrantScope.objects.create(
-                role_grant=grant,
-                scope_type=RoleGrantScope.SCOPE_OWN,
-            )
-
-    def _intended_managed_rows(self, existing):
-        """Pass 1: the grant rows the submitted formset intends, as
-        ``(surviving_grant_or_None, role, scope, scope_group, assigned, metadata)``."""
-        kept = []
-        for form in self.managed_formset.forms:
-            if not hasattr(form, "cleaned_data"):
-                continue
-            cd = form.cleaned_data
-            if cd.get("DELETE") or not cd.get("role"):
-                continue
-            scope = cd.get("managed_scope") or "explicit"
-            scope_group = cd.get("scope_group") if scope == RoleGrantScope.SCOPE_TENANT_GROUP else None
-            assigned = list(cd.get("assigned_tenants") or []) if scope == "explicit" else []
-            raw_id = cd.get("id")
-            # An id must belong to THIS membership; a stray/tampered id is ignored
-            # (treated as a new row) so it can never touch another membership's grant.
-            grant = existing.get(raw_id) if raw_id in existing else None
-            # A role change is a revoke plus a fresh grant, never an in-place
-            # mutation: granted_by/granted_at document who granted THIS role, so
-            # the old row must die (a change-logged revocation via Pass 2) and a
-            # new row is created under the acting user's provenance. Scope-only
-            # changes still update the surviving row in place (Pass 3).
-            if grant is not None and grant.role_id != cd["role"].pk:
-                grant = None
-            kept.append(
-                (
-                    grant,
-                    cd["role"],
-                    scope,
-                    scope_group,
-                    assigned,
-                    (cd.get("reason") or "").strip(),
-                    cd.get("valid_until"),
-                )
-            )
-        return kept
-
-    def _sync_managed_formset(self, membership):
-        if self.managed_formset is None:
-            return
-        existing = {
-            grant.pk: grant
-            for grant in membership.role_grants.filter(
-                role__deleted_at__isnull=True,
-                scopes__scope_type__in=(
-                    RoleGrantScope.SCOPE_TENANT,
-                    RoleGrantScope.SCOPE_TENANT_GROUP,
-                    RoleGrantScope.SCOPE_ALL_MANAGED,
-                ),
-            )
-            .filter(Q(valid_until__isnull=True) | Q(valid_until__gt=timezone.now()))
-            .prefetch_related("scopes")
-            .distinct()
-        }
-
-        # Pass 1: collect the intended rows (an existing grant or a new one).
-        kept = self._intended_managed_rows(existing)
-
-        kept_existing_ids = {
-            grant.pk for (grant, _role, _scope, _group, _tenants, _reason, _expiry) in kept if grant is not None
-        }
-
-        # Pass 2: revoke every managed scope omitted by the submitted formset.
-        # Preserve a possible own scope on the same aggregate.
-        for pk, grant in existing.items():
-            if pk not in kept_existing_ids:
-                for child in list(grant.scopes.all()):
-                    if child.scope_type != RoleGrantScope.SCOPE_OWN:
-                        child.delete()
-                if not RoleGrantScope.objects.filter(role_grant=grant).exists():
-                    grant.delete()
-
-        # Pass 3: create new aggregates and synchronize their scope children.
-        for grant, role, scope, scope_group, assigned, reason, valid_until in kept:
-            if grant is None:
-                grant = RoleGrant(
-                    membership=membership,
-                    role=role,
-                    granted_by=self._requesting_user,
-                    reason=reason,
-                    valid_until=valid_until,
-                )
-                grant.save()
-            else:
-                changed = False
-                if grant.reason != reason:
-                    grant.reason = reason
-                    changed = True
-                if grant.valid_until != valid_until:
-                    grant.valid_until = valid_until
-                    changed = True
-                if changed:
-                    grant.save(update_fields=["reason", "valid_until"])
-
-            if scope == RoleGrantScope.SCOPE_ALL_MANAGED:
-                desired = {(RoleGrantScope.SCOPE_ALL_MANAGED, None, None)}
-            elif scope == RoleGrantScope.SCOPE_TENANT_GROUP:
-                desired = {(RoleGrantScope.SCOPE_TENANT_GROUP, None, scope_group.pk)}
-            else:
-                desired = {(RoleGrantScope.SCOPE_TENANT, tenant.pk, None) for tenant in assigned}
-            current = {
-                (child.scope_type, child.tenant_id, child.tenant_group_id): child
-                for child in grant.scopes.all()
-                if child.scope_type != RoleGrantScope.SCOPE_OWN
-            }
-            for key, child in current.items():
-                if key not in desired:
-                    child.delete()
-            for scope_type, tenant_id, tenant_group_id in desired - set(current):
-                RoleGrantScope.objects.create(
-                    role_grant=grant,
-                    scope_type=scope_type,
-                    tenant_id=tenant_id,
-                    tenant_group_id=tenant_group_id,
-                )
 
 
 class MembershipFilterForm(FilterForm):

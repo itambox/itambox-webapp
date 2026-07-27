@@ -8606,41 +8606,9 @@
     {
       "path": "itambox/organization/forms/membership_form.py",
       "code": "C901",
-      "message": "'ManagedRoleGrantForm.clean' is too complex (16)",
-      "source": "    def clean(self):",
-      "context": "Module:body/ClassDef:ManagedRoleGrantForm:body/FunctionDef:clean:self",
-      "count": 1
-    },
-    {
-      "path": "itambox/organization/forms/membership_form.py",
-      "code": "C901",
       "message": "'MembershipForm.__init__' is too complex (13)",
       "source": "    def __init__(self, *args, **kwargs):",
       "context": "Module:body/ClassDef:MembershipForm:body/FunctionDef:__init__:self",
-      "count": 1
-    },
-    {
-      "path": "itambox/organization/forms/membership_form.py",
-      "code": "C901",
-      "message": "'MembershipForm._clean_who' is too complex (14)",
-      "source": "    def _clean_who(self, cleaned, tenant):",
-      "context": "Module:body/ClassDef:MembershipForm:body/FunctionDef:_clean_who:self",
-      "count": 1
-    },
-    {
-      "path": "itambox/organization/forms/membership_form.py",
-      "code": "C901",
-      "message": "'MembershipForm._sync_managed_formset' is too complex (17)",
-      "source": "    def _sync_managed_formset(self, membership):",
-      "context": "Module:body/ClassDef:MembershipForm:body/FunctionDef:_sync_managed_formset:self",
-      "count": 1
-    },
-    {
-      "path": "itambox/organization/forms/membership_form.py",
-      "code": "C901",
-      "message": "'MembershipForm.clean' is too complex (16)",
-      "source": "    def clean(self):",
-      "context": "Module:body/ClassDef:MembershipForm:body/FunctionDef:clean:self",
       "count": 1
     },
     {

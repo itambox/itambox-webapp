@@ -37,6 +37,11 @@ view that cannot resolve its model denies rather than opening up.
 Authorization is object-scoped: the check runs with `obj=` so the tenant
 membership backend can anchor it at the row's own tenant.
 
+One exception worth knowing: the membership screens are CRUD views whose form
+does not own its write. Interactive `Membership` and `RoleGrant` changes go
+through `organization.services.membership`, the single write entry point for
+them — add or change such a path there, not in the form or the view.
+
 ## 2. Form-backed transaction — `GenericTransactionView`
 
 **Use when** the action needs user input (a form) *and* runs a domain service

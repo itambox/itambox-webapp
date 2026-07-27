@@ -3508,12 +3508,6 @@
       "count": 1
     },
     {
-      "path": "itambox/organization/services.py",
-      "context": "FunctionDef:_find_covering_grant",
-      "statement": "from django.contrib.contenttypes.models import ContentType",
-      "count": 1
-    },
-    {
       "path": "itambox/organization/tables.py",
       "context": "ClassDef:LocationTable/FunctionDef:render_status",
       "statement": "from itambox.utils import get_status_color",
