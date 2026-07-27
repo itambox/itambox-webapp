@@ -5,11 +5,24 @@ from django.contrib.auth.models import Permission
 from django.contrib.contenttypes.models import ContentType
 from django.test import Client, TestCase
 from django.urls import reverse
+from django.utils import timezone
 
 from assets.models import Asset
+from core.context import (
+    _current_user,
+    get_current_all_accessible,
+    get_current_membership,
+    get_current_tenant,
+    get_current_tenant_group,
+    get_current_user,
+    set_current_all_accessible,
+    set_current_membership,
+    set_current_tenant,
+    set_current_tenant_group,
+)
 from core.models import Notification
 from core.tests.mixins import grant
-from organization.models import Location, Site, Tenant, TenantGroup
+from organization.models import Location, Membership, Site, Tenant, TenantGroup
 from subscriptions.models import (
     BillingCycleChoices,
     Provider,
@@ -174,66 +187,160 @@ class SubscriptionFixesTests(TestCase):
         self.assertEqual(resp.status_code, 200)  # Form re-renders on error
         self.assertFormError(resp.context["form"], None, "This subscription is already assigned to this object.")
 
-    def test_background_task_expiry_and_reminders(self):
-        # Create a subscription that has expired
-        sub_expired = Subscription.objects.create(
-            name="Expired Sub",
-            provider=self.provider_a,
-            tenant=self.tenant_a,
+    def _make_sub(self, name, provider, tenant, days, owner=None):
+        """Create an ACTIVE subscription renewing in ``days`` days (negative = past)."""
+        sub = Subscription.objects.create(
+            name=name,
+            provider=provider,
+            tenant=tenant,
             status=SubscriptionStatusChoices.ACTIVE,
-            renewal_date=date.today() + timedelta(days=10),
+            renewal_date=date.today() + timedelta(days=max(days, 10)),
             renewal_cost=100.00,
+            owner=owner,
         )
-        # Bypass pre_save signal using .update() to set renewal_date to the past
-        Subscription.objects.filter(pk=sub_expired.pk).update(renewal_date=date.today() - timedelta(days=1))
-        # Create subscriptions approaching renewal (30, 14, 7 days)
-        Subscription.objects.create(
-            name="Sub 30",
-            provider=self.provider_a,
-            tenant=self.tenant_a,
-            status=SubscriptionStatusChoices.ACTIVE,
-            renewal_date=date.today() + timedelta(days=30),
-            renewal_cost=100.00,
-        )
-        Subscription.objects.create(
-            name="Sub 14",
-            provider=self.provider_a,
-            tenant=self.tenant_a,
-            status=SubscriptionStatusChoices.ACTIVE,
-            renewal_date=date.today() + timedelta(days=14),
-            renewal_cost=100.00,
-        )
-        Subscription.objects.create(
-            name="Sub 7",
-            provider=self.provider_a,
-            tenant=self.tenant_a,
-            status=SubscriptionStatusChoices.ACTIVE,
-            renewal_date=date.today() + timedelta(days=7),
-            renewal_cost=100.00,
-        )
+        if days < 10:
+            # Bypass the pre_save signal using .update() so a past/near renewal
+            # date survives (the signal re-derives it for active subscriptions).
+            Subscription.objects.filter(pk=sub.pk).update(renewal_date=date.today() + timedelta(days=days))
+            sub.refresh_from_db()
+        return sub
 
-        # Clear existing notifications
+    @staticmethod
+    def _clear_scope_context():
+        """Drop every ambient scoping contextvar a request/middleware may have set.
+
+        The daily subscription task is a cross-tenant SYSTEM task: it runs in a
+        django-q worker with no tenant, no tenant group, no membership, no
+        "all accessible" flag and no bound principal. Clearing all five here
+        stops a permissive context leaked by an earlier test from making these
+        regression tests pass for the wrong reason (issue #145).
+        """
+        set_current_tenant(None)
+        set_current_tenant_group(None)
+        set_current_membership(None)
+        set_current_all_accessible(False)
+        _current_user.set(None)
+
+    def _seed_expiry_and_reminder_subscriptions(self):
+        """Subscriptions in BOTH tenants, so a single-tenant scope cannot pass."""
+        subs = {
+            "expired_a": self._make_sub("Expired Sub", self.provider_a, self.tenant_a, -1),
+            "expired_b": self._make_sub("Expired Sub B", self.provider_b, self.tenant_b, -1, owner=self.user_b),
+            "sub_30": self._make_sub("Sub 30", self.provider_a, self.tenant_a, 30),
+            "sub_14": self._make_sub("Sub 14", self.provider_a, self.tenant_a, 14),
+            "sub_7": self._make_sub("Sub 7", self.provider_a, self.tenant_a, 7),
+            "sub_30_b": self._make_sub("Sub 30 B", self.provider_b, self.tenant_b, 30, owner=self.user_b),
+        }
         Notification.objects.all().delete()
+        return subs
 
-        # Run background task
+    def test_background_task_expiry_and_reminders(self):
+        subs = self._seed_expiry_and_reminder_subscriptions()
+
+        # Enter the task exactly as a worker does: no tenant, no group, no
+        # membership, no all-accessible flag, no bound user. Asserting the
+        # cleared state keeps an order-dependent false pass impossible.
+        self._clear_scope_context()
+        self.assertIsNone(get_current_tenant())
+        self.assertIsNone(get_current_tenant_group())
+        self.assertIsNone(get_current_membership())
+        self.assertFalse(get_current_all_accessible())
+        self.assertIsNone(get_current_user())
+
         check_subscription_expiries_and_reminders()
 
-        # Refresh expired sub
-        sub_expired.refresh_from_db()
-        self.assertEqual(sub_expired.status, SubscriptionStatusChoices.EXPIRED)
+        # Both tenants' past-due subscriptions must be auto-expired.
+        subs["expired_a"].refresh_from_db()
+        subs["expired_b"].refresh_from_db()
+        self.assertEqual(subs["expired_a"].status, SubscriptionStatusChoices.EXPIRED)
+        self.assertEqual(subs["expired_b"].status, SubscriptionStatusChoices.EXPIRED)
 
-        # Check that notifications were created
-        notifications = Notification.objects.all()
-        subjects = [n.subject for n in notifications]
+        # Subscriptions that are not due must be left alone.
+        for key in ("sub_30", "sub_14", "sub_7", "sub_30_b"):
+            subs[key].refresh_from_db()
+            self.assertEqual(subs[key].status, SubscriptionStatusChoices.ACTIVE)
 
-        # Expecting notifications for:
-        # - Expired Sub
-        # - Sub 30
-        # - Sub 14
-        # - Sub 7
-        # Note: notifications go to staff who are members of the subscription's
-        # tenant (B7). self.super_user is staff AND a member of tenant_a.
-        self.assertTrue(any("Subscription Expired: Expired Sub" in s for s in subjects))
-        self.assertTrue(any("Subscription Renewal Warning: Sub 30 in 30 Days" in s for s in subjects))
-        self.assertTrue(any("Subscription Renewal Warning: Sub 14 in 14 Days" in s for s in subjects))
+        # Notifications are unscoped rows; recipients are staff who are MEMBERS
+        # of the subscription's tenant (B7) plus the subscription owner.
+        # self.super_user is staff AND a member of tenant_a; tenant_b's
+        # subscriptions are delivered through their owner (self.user_b).
+        subjects = [n.subject for n in Notification.objects.all()]
+        for expected in (
+            "Subscription Expired: Expired Sub",
+            "Subscription Expired: Expired Sub B",
+            "Subscription Renewal Warning: Sub 30 in 30 Days",
+            "Subscription Renewal Warning: Sub 14 in 14 Days",
+            "Subscription Renewal Warning: Sub 7 in 7 Days",
+            "Subscription Renewal Warning: Sub 30 B in 30 Days",
+        ):
+            self.assertTrue(any(expected in s for s in subjects), f"missing notification: {expected}")
+
+    def test_background_task_enumerates_outside_an_ambient_tenant_scope(self):
+        """An inline (Q_CLUSTER sync) run inherits the caller's tenant scope.
+
+        The cross-tenant enumeration must not narrow to it: tenant_a's work has
+        to happen even while tenant_b is the active scope.
+        """
+        subs = self._seed_expiry_and_reminder_subscriptions()
+
+        self._clear_scope_context()
+        membership = Membership.objects.get(user=self.user_b, tenant=self.tenant_b)
+        _current_user.set(self.user_b)
+        set_current_tenant(self.tenant_b)
+        set_current_membership(membership)
+        try:
+            check_subscription_expiries_and_reminders()
+        finally:
+            self._clear_scope_context()
+
+        subs["expired_a"].refresh_from_db()
+        subs["expired_b"].refresh_from_db()
+        self.assertEqual(subs["expired_a"].status, SubscriptionStatusChoices.EXPIRED)
+        self.assertEqual(subs["expired_b"].status, SubscriptionStatusChoices.EXPIRED)
+
+        subjects = [n.subject for n in Notification.objects.all()]
         self.assertTrue(any("Subscription Renewal Warning: Sub 7 in 7 Days" in s for s in subjects))
+        self.assertTrue(any("Subscription Renewal Warning: Sub 30 B in 30 Days" in s for s in subjects))
+
+    def test_background_task_enumerates_with_a_bound_member_principal(self):
+        """A bound non-superuser with no active tenant fails the scoped manager closed.
+
+        That is the documented worker condition for this bug class: the default
+        manager returns an empty queryset, so nothing expires and no reminder is
+        ever sent. The bootstrap query must not depend on the bound principal.
+        """
+        subs = self._seed_expiry_and_reminder_subscriptions()
+
+        self._clear_scope_context()
+        _current_user.set(self.user_a)
+        self.assertIsNone(get_current_tenant())
+        try:
+            check_subscription_expiries_and_reminders()
+        finally:
+            self._clear_scope_context()
+
+        subs["expired_a"].refresh_from_db()
+        subs["expired_b"].refresh_from_db()
+        self.assertEqual(subs["expired_a"].status, SubscriptionStatusChoices.EXPIRED)
+        self.assertEqual(subs["expired_b"].status, SubscriptionStatusChoices.EXPIRED)
+
+        subjects = [n.subject for n in Notification.objects.all()]
+        self.assertTrue(any("Subscription Renewal Warning: Sub 14 in 14 Days" in s for s in subjects))
+        self.assertTrue(any("Subscription Renewal Warning: Sub 30 B in 30 Days" in s for s in subjects))
+
+    def test_background_task_skips_soft_deleted_subscriptions(self):
+        """The bootstrap path is unscoped by tenant, never by soft delete."""
+        subs = self._seed_expiry_and_reminder_subscriptions()
+        deleted = self._make_sub("Deleted Sub", self.provider_a, self.tenant_a, -1)
+        Subscription.objects.filter(pk=deleted.pk).update(deleted_at=timezone.now())
+
+        self._clear_scope_context()
+        check_subscription_expiries_and_reminders()
+
+        deleted.refresh_from_db()
+        self.assertEqual(deleted.status, SubscriptionStatusChoices.ACTIVE)
+        subs["expired_a"].refresh_from_db()
+        self.assertEqual(subs["expired_a"].status, SubscriptionStatusChoices.EXPIRED)
+
+        subjects = [n.subject for n in Notification.objects.all()]
+        self.assertFalse(any("Deleted Sub" in s for s in subjects))

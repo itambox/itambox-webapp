@@ -23,12 +23,19 @@ def check_subscription_expiries_and_reminders():
     work is wrapped in its own TaskContext bound to that subscription's tenant.
     That ensures every save and Notification is recorded as an ObjectChange and
     attributed to the correct tenant rather than the global (None) context.
+
+    Both enumerations deliberately bootstrap through ``Subscription.unscoped``
+    (see the manager's declaration): the tenant-scoping default manager cannot
+    discover the first row here, because the per-tenant scope is only entered
+    afterwards. ``unscoped`` widens the tenant boundary and nothing else —
+    soft-deleted subscriptions remain excluded — and every row found is still
+    processed inside its own tenant's TaskContext below.
     """
     today = timezone.now().date()
 
     # 1. Handle auto-expiries
     expired_count = 0
-    expired_subs = Subscription.objects.filter(status=SubscriptionStatusChoices.ACTIVE, renewal_date__lt=today)
+    expired_subs = Subscription.unscoped.filter(status=SubscriptionStatusChoices.ACTIVE, renewal_date__lt=today)
     for sub in expired_subs:
         with TaskContext(tenant_id=sub.tenant_id, user_id=None):
             sub.status = SubscriptionStatusChoices.EXPIRED
@@ -66,7 +73,7 @@ def check_subscription_expiries_and_reminders():
     reminder_days = [30, 14, 7]
     for days in reminder_days:
         target_date = today + timezone.timedelta(days=days)
-        subs_to_remind = Subscription.objects.filter(status=SubscriptionStatusChoices.ACTIVE, renewal_date=target_date)
+        subs_to_remind = Subscription.unscoped.filter(status=SubscriptionStatusChoices.ACTIVE, renewal_date=target_date)
         for sub in subs_to_remind:
             with TaskContext(tenant_id=sub.tenant_id, user_id=None):
                 # Scope recipients to staff who belong to this subscription's tenant.
