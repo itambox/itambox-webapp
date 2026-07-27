@@ -81,7 +81,7 @@ node_modules/
 # and diagnostics baseline are tracked; these transient comparison files are not.
 itambox/schema.generated.yaml
 itambox/openapi-diagnostics.generated.json
-/.artifacts/
+/artifacts/
 
 # Local-only HTTP settings override
 local_http_settings.py

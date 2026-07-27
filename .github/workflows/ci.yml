@@ -140,8 +140,8 @@ jobs:
           PYTHONHASHSEED: "0"
         run: |
           uv run --locked --no-sync python scripts/check_openapi_schema.py \
-            --schema-output .artifacts/openapi/schema.generated.yaml \
-            --diagnostics-output .artifacts/openapi/diagnostics.generated.json
+            --schema-output artifacts/openapi/schema.generated.yaml \
+            --diagnostics-output artifacts/openapi/diagnostics.generated.json
 
       # The first run of a baseline bootstrap intentionally fails after writing
       # these files. Upload on both success and failure so reviewers can use the
@@ -151,7 +151,7 @@ jobs:
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: openapi-generation-py${{ matrix.python-version }}
-          path: .artifacts/openapi/
+          path: artifacts/openapi/
           if-no-files-found: error
           retention-days: 30
 

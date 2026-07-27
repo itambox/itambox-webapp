@@ -54,6 +54,7 @@ GENERATION_POLICY = {
     "generations": 2,
     "process_isolation": True,
     "log_level": "WARNING",
+    "secret_key": "itambox-openapi-schema-generation-not-for-production",
 }
 DIAGNOSTIC_MARKER_RE = re.compile(r"(?:^|: )(Warning|Error)(?= \[|: )")
 SUMMARY_COUNT_RE = re.compile(r"^(Warnings|Errors):\s+(\d+) \((\d+) unique\)$")
@@ -357,6 +358,7 @@ def _prepare_django_runtime():
     environment = os.environ.setdefault("ITAMBOX_ENV", "dev")
     if environment != "dev":
         raise PolicyError("canonical OpenAPI generation requires ITAMBOX_ENV=dev")
+    os.environ["ITAMBOX_SECRET_KEY"] = GENERATION_POLICY["secret_key"]
     application_root = str(REPO_ROOT / "itambox")
     if application_root not in sys.path:
         sys.path.insert(0, application_root)
@@ -385,6 +387,7 @@ def _prepare_django_runtime():
     child_environment["PYTHONHASHSEED"] = "0"
     child_environment["DJANGO_SETTINGS_MODULE"] = "core.settings"
     child_environment["ITAMBOX_ENV"] = "dev"
+    child_environment["ITAMBOX_SECRET_KEY"] = GENERATION_POLICY["secret_key"]
     child_environment["ITAMBOX_LOG_LEVEL"] = GENERATION_POLICY["log_level"]
     child_environment.pop("PYTHONPATH", None)
     return {"environment": child_environment, "header": header}

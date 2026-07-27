@@ -6,6 +6,7 @@ from unittest.mock import patch
 
 from scripts.check_openapi_schema import (
     BASELINE_SCHEMA_VERSION,
+    GENERATION_POLICY,
     GenerationResult,
     PolicyError,
     build_header,
@@ -136,6 +137,12 @@ class OpenApiBaselineTests(unittest.TestCase):
 class OpenApiGenerationPolicyTests(unittest.TestCase):
     def result(self, schema=b"openapi: 3.0.3\n", diagnostics=None):
         return GenerationResult(schema=schema, diagnostics=diagnostics or {WARNING: 2})
+
+    def test_canonical_generation_has_an_explicit_nonproduction_secret(self):
+        secret = GENERATION_POLICY["secret_key"]
+
+        self.assertIn("not-for-production", secret)
+        self.assertGreaterEqual(len(secret), 32)
 
     def test_two_clean_generations_must_match_bytes_and_diagnostics(self):
         calls = []
