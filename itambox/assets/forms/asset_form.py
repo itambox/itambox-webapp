@@ -1,18 +1,41 @@
 from crispy_forms.helper import FormHelper
 from crispy_forms.layout import HTML, Column, Div, Fieldset, Layout, Row, Submit
 from django import forms
+from django.contrib.contenttypes.models import ContentType
 from django.template.loader import render_to_string
 from django.urls import reverse
+from django.utils.html import format_html
 from django.utils.translation import gettext_lazy as _
 
 from core.forms import CrispyFormMixin, scope_tenant_field
 from extras.models import CustomField, Tag
-from organization.models import CostCenter, Location
+from organization.models import CostCenter, Location, Tenant
 from procurement.models import PurchaseOrderLine
 
-from ..models import Asset, AssetRole, AssetType, StatusLabel, Warranty
+from ..models import Asset, AssetRole, AssetTagSequence, AssetType, StatusLabel, Warranty
 from ..models.choices import WarrantyTypeChoices
 from .fields import StatusModelChoiceField
+
+# Changing the asset type or the owning tenant re-derives the tag preview, the
+# tenant-scoped FK choices and the dynamic custom fields, so both fields swap the
+# whole form back in. The two widgets must carry the identical attribute set.
+HTMX_RELOAD_ATTRS = {
+    "hx-post": "",
+    "hx-trigger": "change",
+    "hx-target": "closest form",
+    "hx-swap": "outerHTML",
+    "hx-vals": '{"_reload": "1"}',
+    "hx-include": "closest form",
+}
+
+# Quick-add buttons live inside the field label. The markup is a literal
+# developer-controlled format string; every translated or dynamic value is
+# passed to format_html() as an argument so it is escaped.
+QUICK_ADD_LABEL_FORMAT = (
+    '{} <button type="button" class="btn btn-link p-0 ms-1 align-baseline border-0 bg-transparent'
+    ' text-primary" style="font-size: 1.1rem; line-height: 1;" title="{}" hx-get="{}"'
+    ' hx-target="#modal-placeholder"><i class="mdi mdi-plus-circle-outline"></i></button>'
+)
 
 
 class AssetForm(CrispyFormMixin, forms.ModelForm):
@@ -20,18 +43,7 @@ class AssetForm(CrispyFormMixin, forms.ModelForm):
         queryset=AssetType.objects.select_related("manufacturer").all(),
         label=_("Asset Type"),
         required=True,
-        widget=forms.Select(
-            attrs={
-                "class": "form-select",
-                "data-tom-select": "",
-                "hx-post": "",
-                "hx-trigger": "change",
-                "hx-target": "closest form",
-                "hx-swap": "outerHTML",
-                "hx-vals": '{"_reload": "1"}',
-                "hx-include": "closest form",
-            }
-        ),
+        widget=forms.Select(attrs={"class": "form-select", "data-tom-select": "", **HTMX_RELOAD_ATTRS}),
     )
     asset_role = forms.ModelChoiceField(
         queryset=AssetRole.objects.all(),
@@ -213,78 +225,68 @@ class AssetForm(CrispyFormMixin, forms.ModelForm):
         self.helper.form_method = "post"
         self.helper.form_tag = True
 
-        cancel_url = reverse("assets:asset_list")
+        self._configure_requestable_initial()
+        self._configure_required_fields()
+        self._configure_quick_add_labels()
+        self._configure_htmx_reload_widgets()
 
-        asset_type_id = None
+        asset_type_id = self._resolve_asset_type_id(request, explicit_initial)
+        selected_asset_type = self._resolve_asset_type(asset_type_id)
+        selected_tenant = self._resolve_selected_tenant()
+
+        self._configure_tenant_scoped_querysets(selected_tenant)
+        self._configure_asset_tag_sequence_help_text(selected_tenant, selected_asset_type)
+        self._configure_default_asset_role(selected_asset_type)
+        # Custom fields must exist before the layout pairs them into rows.
+        self._configure_custom_fields(selected_asset_type)
+
+        self.helper.layout = self._build_layout(reverse("assets:asset_list"))
+
+    def _resolve_asset_type_id(self, request, explicit_initial):
+        """Return the raw asset-type ID the form should work from, or None.
+
+        Precedence (#81): a bound ``asset_type`` key wins outright — an empty or
+        malformed submitted value must *not* fall back to a lower-precedence
+        source, form validation reports it instead. Otherwise the quick-add
+        ``?asset_type=`` query value, then explicit ``initial``, then the
+        instance. Never mutates ``data`` / ``initial`` / ``instance``.
+        """
         if self.is_bound and "asset_type" in self.data:
             try:
-                asset_type_id = int(self.data.get("asset_type"))
+                return int(self.data.get("asset_type"))
             except (ValueError, TypeError):
-                pass
-        elif request and request.GET.get("asset_type"):
+                return None
+
+        if request and request.GET.get("asset_type"):
             try:
-                asset_type_id = int(request.GET.get("asset_type"))
+                return int(request.GET.get("asset_type"))
             except (ValueError, TypeError):
-                pass
-        elif "asset_type" in explicit_initial:
+                return None
+
+        if "asset_type" in explicit_initial:
             asset_type_val = explicit_initial.get("asset_type")
             if isinstance(asset_type_val, AssetType):
-                asset_type_id = asset_type_val.pk
-            else:
-                asset_type_id = asset_type_val
-        else:
-            asset_type_id = self.instance.asset_type_id
+                return asset_type_val.pk
+            return asset_type_val
 
-        if self.instance and self.instance.pk:
-            if self.instance.requestable is None:
-                self.initial["requestable"] = ""
-            elif self.instance.requestable is True:
-                self.initial["requestable"] = "true"
-            else:
-                self.initial["requestable"] = "false"
+        return self.instance.asset_type_id
 
-        # Ensure asset_tag is required in the form
-        self.fields["asset_tag"].required = True
+    def _resolve_asset_type(self, asset_type_id):
+        """Resolve the one AssetType driving preview, role default and custom fields."""
+        if not asset_type_id:
+            return None
+        try:
+            return AssetType.objects.get(pk=asset_type_id)
+        except AssetType.DoesNotExist:
+            return None
 
-        from django.utils.safestring import mark_safe
+    def _resolve_selected_tenant(self):
+        """Resolve the tenant the form is scoped to, or None.
 
-        # Configure quick-add buttons inside labels instead of layout divs
-        if "asset_type" in self.fields:
-            url_type = reverse("assets:assettype_create") + "?_quickadd=1"
-            self.fields["asset_type"].label = mark_safe(
-                f'Asset Type <button type="button" class="btn btn-link p-0 ms-1 align-baseline border-0 bg-transparent text-primary" style="font-size: 1.1rem; line-height: 1;" title="Add new Asset Type" hx-get="{url_type}" hx-target="#modal-placeholder"><i class="mdi mdi-plus-circle-outline"></i></button>'
-            )
-
-        if "asset_role" in self.fields:
-            url_role = reverse("assets:assetrole_create") + "?_quickadd=1"
-            self.fields["asset_role"].label = mark_safe(
-                f'Asset Role <button type="button" class="btn btn-link p-0 ms-1 align-baseline border-0 bg-transparent text-primary" style="font-size: 1.1rem; line-height: 1;" title="Add new Asset Role" hx-get="{url_role}" hx-target="#modal-placeholder"><i class="mdi mdi-plus-circle-outline"></i></button>'
-            )
-
-        if "location" in self.fields:
-            url_loc = reverse("organization:location_create") + "?_quickadd=1"
-            self.fields["location"].label = mark_safe(
-                f'Location <button type="button" class="btn btn-link p-0 ms-1 align-baseline border-0 bg-transparent text-primary" style="font-size: 1.1rem; line-height: 1;" title="Add new Location" hx-get="{url_loc}" hx-target="#modal-placeholder"><i class="mdi mdi-plus-circle-outline"></i></button>'
-            )
-
-        # Hook up HTMX trigger on tenant field to update suggestion on change
-        if "tenant" in self.fields:
-            self.fields["tenant"].widget.attrs.update(
-                {
-                    "hx-post": "",
-                    "hx-trigger": "change",
-                    "hx-target": "closest form",
-                    "hx-swap": "outerHTML",
-                    "hx-vals": '{"_reload": "1"}',
-                    "hx-include": "closest form",
-                }
-            )
-
-        # Calculate suggested tag based on selected tenant and asset_type
-        # 1. Resolve tenant
-        from organization.models import Tenant
-
-        selected_tenant = None
+        A *truthy* bound value wins; an empty one falls through to ``initial``
+        (which ``scope_tenant_field()`` may have autoset) and then to the
+        instance. An unresolvable value simply yields no selected tenant.
+        """
         raw_tenant = None
         if self.is_bound and self.data.get("tenant"):
             raw_tenant = self.data.get("tenant")
@@ -293,22 +295,62 @@ class AssetForm(CrispyFormMixin, forms.ModelForm):
         elif self.instance and self.instance.tenant:
             raw_tenant = self.instance.tenant
 
-        if raw_tenant:
-            if isinstance(raw_tenant, Tenant):
-                selected_tenant = raw_tenant
-            else:
-                try:
-                    selected_tenant = Tenant.objects.get(pk=raw_tenant)
-                except (Tenant.DoesNotExist, ValueError, TypeError):
-                    pass
+        if not raw_tenant:
+            return None
+        if isinstance(raw_tenant, Tenant):
+            return raw_tenant
+        try:
+            return Tenant.objects.get(pk=raw_tenant)
+        except (Tenant.DoesNotExist, ValueError, TypeError):
+            return None
 
-        # B2: rescope tenant-owned FK choice fields per request. Their querysets
-        # are frozen at import time (no tenant context), so they would otherwise
-        # expose every tenant's Locations / CostCenters / PurchaseOrderLines and
-        # permit cross-tenant FK assignment. Re-evaluate through the scoping
-        # managers so choices are limited to the active tenant, narrowed to the
-        # selected tenant when one is resolvable. Asset.clean() validates the
-        # final selection as defence-in-depth.
+    def _configure_requestable_initial(self):
+        """Map the saved tri-state ``requestable`` onto the select's choices."""
+        if not (self.instance and self.instance.pk):
+            return
+        if self.instance.requestable is None:
+            self.initial["requestable"] = ""
+        elif self.instance.requestable is True:
+            self.initial["requestable"] = "true"
+        else:
+            self.initial["requestable"] = "false"
+
+    def _configure_required_fields(self):
+        # Ensure asset_tag is required in the form
+        self.fields["asset_tag"].required = True
+
+    def _configure_quick_add_labels(self):
+        """Put quick-add buttons inside the field labels instead of layout divs."""
+        quick_add_fields = (
+            ("asset_type", _("Asset Type"), _("Add new Asset Type"), "assets:assettype_create"),
+            ("asset_role", _("Asset Role"), _("Add new Asset Role"), "assets:assetrole_create"),
+            ("location", _("Location"), _("Add new Location"), "organization:location_create"),
+        )
+        for field_name, label, title, url_name in quick_add_fields:
+            if field_name not in self.fields:
+                continue
+            self.fields[field_name].label = format_html(
+                QUICK_ADD_LABEL_FORMAT,
+                label,
+                title,
+                reverse(url_name) + "?_quickadd=1",
+            )
+
+    def _configure_htmx_reload_widgets(self):
+        # The tenant picker reloads the form for the same reasons asset_type does.
+        if "tenant" in self.fields:
+            self.fields["tenant"].widget.attrs.update(HTMX_RELOAD_ATTRS)
+
+    def _configure_tenant_scoped_querysets(self, selected_tenant):
+        """Rescope tenant-owned FK choice fields per request.
+
+        B2: their querysets are frozen at import time (no tenant context), so they
+        would otherwise expose every tenant's Locations / CostCenters /
+        PurchaseOrderLines and permit cross-tenant FK assignment. Re-evaluate
+        through the scoping managers so choices are limited to the active tenant,
+        narrowed to the selected tenant when one is resolvable. Asset.clean()
+        validates the final selection as defence-in-depth.
+        """
         tenant_scoped_fk_fields = {
             "location": Location,
             "cost_center": CostCenter,
@@ -321,115 +363,112 @@ class AssetForm(CrispyFormMixin, forms.ModelForm):
                     fk_qs = fk_qs.filter(tenant=selected_tenant)
                 self.fields[fk_field_name].queryset = fk_qs
 
-        # 2. Resolve asset_type object
-        selected_type = None
-        if asset_type_id:
-            try:
-                selected_type = AssetType.objects.get(pk=asset_type_id)
-            except AssetType.DoesNotExist:
-                pass
+    def _configure_asset_tag_sequence_help_text(self, selected_tenant, selected_asset_type):
+        """Preview the next tag for the selected scope in the asset_tag help text.
 
-        # 3. Resolve sequence preview
-        from django.utils.safestring import mark_safe
-
-        from ..models import AssetTagSequence
-
-        dummy_asset = Asset(tenant=selected_tenant, asset_type=selected_type)
-        seq = AssetTagSequence.resolve_sequence_for_asset(dummy_asset)
-        if seq:
-            suggested_tag = seq.next_tag_preview
-            self.fields["asset_tag"].help_text = mark_safe(
-                f'<span class="text-muted small">Suggested: <a href="#" class="text-primary font-monospace" data-fill-target="id_asset_tag" data-fill-value="{suggested_tag}">{suggested_tag}</a></span>'
+        Resolving does not consume a tag, but it does create the global default
+        sequence when nothing else matches — a deliberately preserved side effect.
+        """
+        preview_asset = Asset(tenant=selected_tenant, asset_type=selected_asset_type)
+        sequence = AssetTagSequence.resolve_sequence_for_asset(preview_asset)
+        if sequence:
+            suggested_tag = sequence.next_tag_preview
+            help_text = format_html(
+                '<span class="text-muted small">{} <a href="#" class="text-primary font-monospace"'
+                ' data-fill-target="id_asset_tag" data-fill-value="{}">{}</a></span>',
+                _("Suggested:"),
+                suggested_tag,
+                suggested_tag,
             )
         else:
-            self.fields["asset_tag"].help_text = mark_safe(
-                f'<span class="text-muted small">No active tag sequence found for this scope.</span>'
+            help_text = format_html(
+                '<span class="text-muted small">{}</span>',
+                _("No active tag sequence found for this scope."),
             )
+        self.fields["asset_tag"].help_text = help_text
 
-        # Default the asset role from the selected asset type if not already set
-        if not self.instance.pk and asset_type_id:
-            current_role = None
-            if self.data and "asset_role" in self.data:
-                current_role = self.data.get("asset_role")
-            elif self.initial and "asset_role" in self.initial:
-                current_role = self.initial.get("asset_role")
+    def _configure_default_asset_role(self, selected_asset_type):
+        """Seed a brand-new asset's role from its type; never overwrite a set one."""
+        if self.instance.pk or selected_asset_type is None:
+            return
 
-            if not current_role:
-                try:
-                    asset_type_obj = AssetType.objects.get(pk=asset_type_id)
-                    if asset_type_obj.asset_role:
-                        self.fields["asset_role"].initial = asset_type_obj.asset_role
-                except AssetType.DoesNotExist:
-                    pass
+        current_role = None
+        if self.data and "asset_role" in self.data:
+            current_role = self.data.get("asset_role")
+        elif self.initial and "asset_role" in self.initial:
+            current_role = self.initial.get("asset_role")
 
-        # Per-device custom fields: globally-applicable Asset fields (not bound
-        # to any fieldset) plus the selected asset type's fieldset fields that
-        # target Asset.
-        from django.contrib.contenttypes.models import ContentType
+        if not current_role and selected_asset_type.asset_role:
+            self.fields["asset_role"].initial = selected_asset_type.asset_role
 
+    def _custom_field_queryset(self, selected_asset_type):
+        """Per-device custom fields: globally-applicable Asset fields (not bound
+        to any fieldset) plus the selected asset type's fieldset fields that
+        target Asset."""
         asset_ct = ContentType.objects.get_for_model(Asset)
         custom_fields = CustomField.objects.filter(object_types=asset_ct, fieldsets__isnull=True)
-        if asset_type_id:
-            try:
-                asset_type_obj = AssetType.objects.get(pk=asset_type_id)
-                if asset_type_obj.custom_fieldset:
-                    custom_fields = custom_fields | asset_type_obj.custom_fieldset.fields.filter(object_types=asset_ct)
-            except AssetType.DoesNotExist:
-                pass
-        custom_fields = custom_fields.distinct()
+        if selected_asset_type and selected_asset_type.custom_fieldset:
+            custom_fields = custom_fields | selected_asset_type.custom_fieldset.fields.filter(object_types=asset_ct)
+        return custom_fields.distinct()
+
+    def _build_custom_form_field(self, field, initial_value):
+        """Build the form field for one CustomField, or None for unknown types."""
+        if field.field_type == CustomField.FIELD_TYPE_TEXT:
+            return forms.CharField(
+                label=field.label,
+                required=field.required,
+                initial=initial_value,
+                widget=forms.TextInput(attrs={"class": "form-control"}),
+            )
+        if field.field_type == CustomField.FIELD_TYPE_NUMBER:
+            return forms.DecimalField(
+                label=field.label,
+                required=field.required,
+                initial=initial_value,
+                widget=forms.NumberInput(attrs={"class": "form-control"}),
+            )
+        if field.field_type == CustomField.FIELD_TYPE_DATE:
+            return forms.DateField(
+                label=field.label,
+                required=field.required,
+                initial=initial_value,
+                widget=forms.DateInput(attrs={"type": "date", "class": "form-control"}),
+            )
+        if field.field_type == CustomField.FIELD_TYPE_BOOLEAN:
+            return forms.BooleanField(
+                label=field.label,
+                required=field.required,
+                initial=initial_value or False,
+                widget=forms.CheckboxInput(attrs={"class": "form-check-input"}),
+            )
+        if field.field_type == CustomField.FIELD_TYPE_SELECT:
+            choice_lines = [line.strip() for line in (field.choices or "").split("\n") if line.strip()]
+            choices = [("", "---------")] + [(choice, choice) for choice in choice_lines]
+            return forms.ChoiceField(
+                label=field.label,
+                required=field.required,
+                choices=choices,
+                initial=initial_value,
+                widget=forms.Select(attrs={"class": "form-select"}),
+            )
+        return None
+
+    def _configure_custom_fields(self, selected_asset_type):
+        """Attach the dynamic ``cf_*`` fields and record their layout order."""
+        stored_values = {}
+        if self.instance and self.instance.pk and self.instance.custom_field_data:
+            stored_values = self.instance.custom_field_data
 
         self.custom_field_keys = []
-        for field in custom_fields:
+        for field in self._custom_field_queryset(selected_asset_type):
             field_key = f"cf_{field.name}"
             self.custom_field_keys.append(field_key)
 
-            initial_value = None
-            if self.instance and self.instance.pk and self.instance.custom_field_data:
-                initial_value = self.instance.custom_field_data.get(field.name)
-
-            form_field = None
-            if field.field_type == CustomField.FIELD_TYPE_TEXT:
-                form_field = forms.CharField(
-                    label=field.label,
-                    required=field.required,
-                    initial=initial_value,
-                    widget=forms.TextInput(attrs={"class": "form-control"}),
-                )
-            elif field.field_type == CustomField.FIELD_TYPE_NUMBER:
-                form_field = forms.DecimalField(
-                    label=field.label,
-                    required=field.required,
-                    initial=initial_value,
-                    widget=forms.NumberInput(attrs={"class": "form-control"}),
-                )
-            elif field.field_type == CustomField.FIELD_TYPE_DATE:
-                form_field = forms.DateField(
-                    label=field.label,
-                    required=field.required,
-                    initial=initial_value,
-                    widget=forms.DateInput(attrs={"type": "date", "class": "form-control"}),
-                )
-            elif field.field_type == CustomField.FIELD_TYPE_BOOLEAN:
-                form_field = forms.BooleanField(
-                    label=field.label,
-                    required=field.required,
-                    initial=initial_value or False,
-                    widget=forms.CheckboxInput(attrs={"class": "form-check-input"}),
-                )
-            elif field.field_type == CustomField.FIELD_TYPE_SELECT:
-                choice_lines = [line.strip() for line in (field.choices or "").split("\n") if line.strip()]
-                choices = [("", "---------")] + [(choice, choice) for choice in choice_lines]
-                form_field = forms.ChoiceField(
-                    label=field.label,
-                    required=field.required,
-                    choices=choices,
-                    initial=initial_value,
-                    widget=forms.Select(attrs={"class": "form-select"}),
-                )
-
+            form_field = self._build_custom_form_field(field, stored_values.get(field.name))
             if form_field:
                 self.fields[field_key] = form_field
 
+    def _build_layout(self, cancel_url):
         # Grouped, standardized section order: Identity -> Classification ->
         # Assignment -> Procurement & Financial -> Lifecycle -> Custom -> Notes.
         layout_elements = [
@@ -485,9 +524,10 @@ class AssetForm(CrispyFormMixin, forms.ModelForm):
             Fieldset(
                 _("Optional: Warranty"),
                 HTML(
-                    '<p class="text-muted small">'
-                    + str(_("Fill in to create a warranty for this asset; leave blank to skip."))
-                    + "</p>"
+                    format_html(
+                        '<p class="text-muted small">{}</p>',
+                        _("Fill in to create a warranty for this asset; leave blank to skip."),
+                    )
                 ),
                 Div(
                     Div("warranty_provider", css_class="col-md-6"),
@@ -513,7 +553,7 @@ class AssetForm(CrispyFormMixin, forms.ModelForm):
 
         layout_elements.extend(self.action_buttons(cancel_url))
 
-        self.helper.layout = Layout(*layout_elements)
+        return Layout(*layout_elements)
 
     def save(self, commit=True):
         instance = super().save(commit=False)
