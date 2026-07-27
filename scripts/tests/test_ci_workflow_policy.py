@@ -151,6 +151,22 @@ class GateSuiteDiscoveryTests(unittest.TestCase):
     def test_suite_baseline_changes_trigger_ci(self):
         self.assertIn('- "scripts/suite_baseline.json"', self.workflow_text)
 
+    def test_openapi_artifacts_and_baseline_changes_trigger_ci(self):
+        self.assertIn('- "itambox/schema.yaml"', self.workflow_text)
+        self.assertIn('- "scripts/openapi_diagnostics_baseline.json"', self.workflow_text)
+
+    def test_openapi_gate_uses_canonical_hash_seed_and_always_uploads_failure_artifacts(self):
+        steps = load_steps()
+        gate = step_named(steps, "Check deterministic OpenAPI schema and diagnostics baseline")
+        self.assertEqual(gate.get("id"), "openapi")
+        self.assertIn('PYTHONHASHSEED: "0"', self.workflow_text)
+        self.assertIn("scripts/check_openapi_schema.py", gate.get("run", ""))
+
+        upload = step_named(steps, "Upload OpenAPI generation artifacts")
+        condition = upload.get("if", "")
+        self.assertIn("always()", condition)
+        self.assertIn("steps.openapi.conclusion != 'skipped'", condition)
+
     def test_the_discovery_invocation_reaches_every_suite_on_disk(self):
         """The arguments CI passes must actually load every suite that exists."""
         step = step_named(load_steps(), "Check the repository gate suites")

@@ -10,7 +10,7 @@
 UV := uv
 UV_DEV := $(UV) run --locked --group dev
 
-.PHONY: help setup run migrate seed test coverage coverage-diff coverage-baseline lint format format-check e2e clean
+.PHONY: help setup run migrate seed test coverage coverage-diff coverage-baseline openapi-check openapi-write lint format format-check e2e clean
 
 FORMAT_TARGETS := itambox scripts
 
@@ -37,6 +37,8 @@ help:
 	@echo "  make coverage      - Run the suite with branch coverage and check the quality gates"
 	@echo "  make coverage-diff - Check differential coverage of the current branch (needs make coverage first)"
 	@echo "  make coverage-baseline - Record the measured coverage as the reviewed baseline"
+	@echo "  make openapi-check  - Verify deterministic schema and no-growth diagnostics baseline"
+	@echo "  make openapi-write  - Update reviewed OpenAPI artifacts (Linux/Python 3.12 only)"
 	@echo "  make lint          - Run pre-commit style and syntax checks on all files"
 	@echo "  make format        - Sort imports then format Python source with Ruff"
 	@echo "  make format-check  - Check import order and formatting without writing (CI-safe)"
@@ -77,6 +79,14 @@ coverage-diff:
 # itambox/docs/development/test-coverage-policy.md).
 coverage-baseline:
 	$(UV_DEV) python scripts/check_coverage_baseline.py --coverage-json itambox/coverage.json --write-baseline
+
+openapi-check:
+	PYTHONHASHSEED=0 $(UV_DEV) python scripts/check_openapi_schema.py
+
+# Canonical writes are guarded by the script and only work on Linux/Python 3.12.
+# Existing baselines may remove fixed identities but never accept new debt.
+openapi-write:
+	PYTHONHASHSEED=0 $(UV_DEV) python scripts/check_openapi_schema.py --write-schema --write-baseline
 
 lint:
 	$(UV_DEV) pre-commit run --all-files
