@@ -53,30 +53,6 @@
     },
     {
       "path": "itambox/assets/forms/asset_form.py",
-      "context": "ClassDef:AssetForm/FunctionDef:__init__",
-      "statement": "from ..models import AssetTagSequence",
-      "count": 1
-    },
-    {
-      "path": "itambox/assets/forms/asset_form.py",
-      "context": "ClassDef:AssetForm/FunctionDef:__init__",
-      "statement": "from django.contrib.contenttypes.models import ContentType",
-      "count": 1
-    },
-    {
-      "path": "itambox/assets/forms/asset_form.py",
-      "context": "ClassDef:AssetForm/FunctionDef:__init__",
-      "statement": "from django.utils.safestring import mark_safe",
-      "count": 2
-    },
-    {
-      "path": "itambox/assets/forms/asset_form.py",
-      "context": "ClassDef:AssetForm/FunctionDef:__init__",
-      "statement": "from organization.models import Tenant",
-      "count": 1
-    },
-    {
-      "path": "itambox/assets/forms/asset_form.py",
       "context": "ClassDef:AssetForm/FunctionDef:clean_status",
       "statement": "from django.db.models import Q",
       "count": 1
