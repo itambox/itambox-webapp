@@ -5,14 +5,41 @@ from django.contrib.auth import get_user_model
 from django.contrib.auth.models import Permission
 from django.core.exceptions import ImproperlyConfigured, SuspiciousOperation
 from django.db import IntegrityError, models, transaction
+from django.http import Http404
 from mozilla_django_oidc.auth import OIDCAuthenticationBackend
 from mozilla_django_oidc.utils import import_from_settings
 from mozilla_django_oidc.views import OIDCAuthenticationCallbackView, OIDCAuthenticationRequestView
 
+from core.auth.providers import is_usable_oidc_config
 from core.auth.provisioning import provision_membership, provision_provider_membership
 from core.managers import get_current_tenant, set_current_tenant
+from organization.models import Tenant
 
 logger = logging.getLogger(__name__)
+
+
+def _usable_tenant_oidc_config(tenant):
+    """Return the tenant's usable OIDC config, or ``None`` to fail closed."""
+    configs = getattr(settings, "ITAMBOX_TENANT_OIDC_CONFIGS", {})
+    if not isinstance(configs, dict):
+        return None
+    config = configs.get(tenant.slug)
+    if not isinstance(config, dict) or not is_usable_oidc_config(config):
+        return None
+    return config
+
+
+def _get_usable_oidc_tenant(tenant_slug, session):
+    """Resolve a live, configured tenant without falling back to global OIDC."""
+    try:
+        tenant = Tenant.objects.get(slug=tenant_slug)
+    except Tenant.DoesNotExist:
+        session.pop("oidc_tenant_slug", None)
+        raise Http404(f"Tenant {tenant_slug!r} does not exist.") from None
+    if _usable_tenant_oidc_config(tenant) is None:
+        session.pop("oidc_tenant_slug", None)
+        raise Http404(f"OIDC is not configured for tenant {tenant_slug!r}.")
+    return tenant
 
 
 class TenantOIDCSettingsMixin:
@@ -33,11 +60,13 @@ class TenantOIDCSettingsMixin:
             if tenant_config and attr.lower() in tenant_config:
                 return tenant_config[attr.lower()]
 
-        # Defaults for algorithm and scopes
+        # Defaults for algorithm and scopes. ``import_from_settings`` must get
+        # the default so an explicit global setting still wins, exactly as it
+        # does for every other OIDC setting and during provider discovery.
         if attr == "OIDC_RP_SIGN_ALGO":
-            return "RS256"
+            args = args or ("RS256",)
         elif attr == "OIDC_RP_SCOPES":
-            return "openid email profile"
+            args = args or ("openid email profile",)
 
         # Fallback to global django settings
         try:
@@ -352,25 +381,16 @@ class TenantOIDCAuthorizeView(TenantOIDCSettingsMixin, OIDCAuthenticationRequest
 
     def dispatch(self, request, *args, **kwargs):
         tenant_slug = kwargs.pop("tenant_slug", None) or request.GET.get("tenant")
-        from organization.models import Tenant
 
         tenant = None
         if tenant_slug:
-            try:
-                tenant = Tenant.objects.get(slug=tenant_slug)
-                request.session["oidc_tenant_slug"] = tenant.slug
-            except Tenant.DoesNotExist:
-                from django.http import Http404
-
-                raise Http404(f"Tenant {tenant_slug!r} does not exist.") from None
+            tenant = _get_usable_oidc_tenant(tenant_slug, request.session)
+            request.session["oidc_tenant_slug"] = tenant.slug
 
         if not tenant:
             sess_tenant_slug = request.session.get("oidc_tenant_slug")
             if sess_tenant_slug:
-                try:
-                    tenant = Tenant.objects.get(slug=sess_tenant_slug)
-                except Tenant.DoesNotExist:
-                    request.session.pop("oidc_tenant_slug", None)
+                tenant = _get_usable_oidc_tenant(sess_tenant_slug, request.session)
 
         if tenant:
             set_current_tenant(tenant)
@@ -382,23 +402,13 @@ class TenantOIDCCallbackView(TenantOIDCSettingsMixin, OIDCAuthenticationCallback
     def dispatch(self, request, *args, **kwargs):
         tenant_slug = request.session.get("oidc_tenant_slug")
         if tenant_slug:
-            from organization.models import Tenant
-
-            try:
-                tenant = Tenant.objects.get(slug=tenant_slug)
-                set_current_tenant(tenant)
-            except Tenant.DoesNotExist:
-                request.session.pop("oidc_tenant_slug", None)
+            tenant = _get_usable_oidc_tenant(tenant_slug, request.session)
+            set_current_tenant(tenant)
         return super().dispatch(request, *args, **kwargs)
 
     def login_success(self):
         tenant_slug = self.request.session.get("oidc_tenant_slug")
         if tenant_slug:
-            from organization.models import Tenant
-
-            try:
-                tenant = Tenant.objects.get(slug=tenant_slug)
-                self.request.session["active_tenant_id"] = tenant.pk
-            except Tenant.DoesNotExist:
-                self.request.session.pop("oidc_tenant_slug", None)
+            tenant = _get_usable_oidc_tenant(tenant_slug, self.request.session)
+            self.request.session["active_tenant_id"] = tenant.pk
         return super().login_success()

@@ -219,6 +219,11 @@ The SAML backend (`core.auth.saml.TenantSaml2Backend`) wraps `djangosaml2` /
 }
 ```
 
+Each key normally names the tenant slug whose login flow and memberships the
+provider belongs to. A deployment-wide `default` entry is accepted only when
+exactly one live tenant exists; with multiple tenants it is intentionally not
+shown on the login page because the callback could not be scoped safely.
+
 ### Required Parameters
 
 | Parameter | Description |
@@ -237,6 +242,8 @@ The SAML backend (`core.auth.saml.TenantSaml2Backend`) wraps `djangosaml2` /
 | `want_assertions_signed` | Require signed assertions. Default: `true`. |
 | `want_response_signed` | Require signed responses. Default: `true`. |
 | `SAML_GROUP_ROLE_MAPPING` | Map SAML group attribute values to ITAMbox role names. |
+| `enabled` | Set to `false` to disable the provider and hide its login action without deleting the configuration. Default: `true`. |
+| `display_name` | Optional label used on the login page. The tenant name is used when omitted. |
 
 ### Attribute Mapping
 
@@ -279,6 +286,7 @@ additional token validation.
     "OIDC_OP_TOKEN_ENDPOINT": "https://login.microsoftonline.com/<tenant-id>/oauth2/v2.0/token",
     "OIDC_OP_USER_ENDPOINT": "https://graph.microsoft.com/oidc/userinfo",
     "OIDC_OP_ISSUER": "https://login.microsoftonline.com/<tenant-id>/v2.0",
+    "OIDC_OP_JWKS_ENDPOINT": "https://login.microsoftonline.com/<tenant-id>/discovery/v2.0/keys",
     "OIDC_RP_SIGN_ALGO": "RS256",
     "OIDC_RP_SCOPES": "openid email profile",
     "OIDC_GROUP_ROLE_MAPPING": {
@@ -300,6 +308,7 @@ additional token validation.
 | `OIDC_OP_TOKEN_ENDPOINT` | IdP's token endpoint URL. |
 | `OIDC_OP_USER_ENDPOINT` | IdP's userinfo endpoint URL. |
 | `OIDC_OP_ISSUER` | The expected `iss` claim value. **Mandatory** — authentication is rejected if this is not configured or does not match the token's issuer. |
+| `OIDC_OP_JWKS_ENDPOINT` | JWKS endpoint used to verify RS/ES-signed ID tokens. Instead of this endpoint, `OIDC_RP_IDP_SIGN_KEY` may provide the IdP signing key directly. |
 
 ### Optional Parameters
 
@@ -309,14 +318,20 @@ additional token validation.
 | `OIDC_RP_SCOPES` | Space-separated OIDC scopes. Default: `openid email profile`. |
 | `OIDC_GROUP_ROLE_MAPPING` | Map OIDC `groups` claim values to ITAMbox role names. |
 | `OIDC_GROUP_PROVIDER_ROLE_MAPPING` | For managed tenants: map OIDC groups to provider-staff roles (see below). |
+| `enabled` | Set to `false` to disable the provider and hide its login action without deleting the configuration. Default: `true`. |
+| `display_name` | Optional label used on the login page. The tenant name is used when omitted. |
 
 ### Callback URLs
 
-The OIDC callback URL is constructed from the tenant slug:
+All tenant-specific OIDC entry points use the shared callback URL:
 
 ```
-https://<your-instance>/oidc/<tenant_slug>/callback/
+https://<your-instance>/oidc/callback/
 ```
+
+ITAMbox stores the selected tenant in the login session before redirecting to
+the identity provider. The shared callback restores that tenant context before
+validating the response and provisioning memberships.
 
 Register this exact URL as the **Redirect URI** in your IdP application
 configuration. The authorization URL is:

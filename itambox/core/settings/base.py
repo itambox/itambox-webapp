@@ -101,6 +101,11 @@ MIDDLEWARE = [
     "django.middleware.security.SecurityMiddleware",
     "corsheaders.middleware.CorsMiddleware",
     "django.contrib.sessions.middleware.SessionMiddleware",
+    # Every djangosaml2 view reads request.saml_session (outstanding queries,
+    # identity cache); without this the SAML entry point raises AttributeError
+    # instead of starting a flow. It only writes its cookie while a SAML flow is
+    # in progress, so non-SAML requests are unaffected.
+    "djangosaml2.middleware.SamlSessionMiddleware",
     "django.middleware.locale.LocaleMiddleware",
     "django.middleware.common.CommonMiddleware",
     "django.middleware.csrf.CsrfViewMiddleware",
@@ -325,8 +330,13 @@ LOGIN_URL = "login"
 LOGIN_REDIRECT_URL = "dashboard"
 LOGOUT_REDIRECT_URL = "login"
 
-# Suppress djangosaml2 django-csp warnings since we manage CSP headers manually
-SAML_CSP_HANDLER = ""
+# djangosaml2 may initiate authentication with an auto-submitted HTTP-POST form.
+# Pin our nonce-bearing project template so it never falls back to pysaml2's
+# inline body-onload form, which the application CSP correctly blocks.
+SAML_POST_BINDING_FORM_TEMPLATE = "djangosaml2/post_binding_form.html"
+# Its custom handler marks only SAML responses so our CSP middleware can permit
+# an HTTPS IdP target without relaxing form-action on the rest of the application.
+SAML_CSP_HANDLER = "itambox.middleware.allow_saml_https_form_action"
 
 AUTHENTICATION_BACKENDS = [
     # MembershipBackend is the single authorization path: all permissions resolve

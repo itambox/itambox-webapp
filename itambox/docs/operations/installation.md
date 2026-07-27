@@ -234,7 +234,7 @@ Each variable accepts a JSON object keyed by tenant slug. These configure per-te
 |---|---|---|---|
 | `ITAMBOX_TENANT_LDAP_CONFIGS` | Optional | *(empty)* | Per-tenant LDAP directory configuration. JSON object keyed by tenant slug. Each value is an object with keys: `SERVER_URI`, `BIND_DN`, `BIND_PASSWORD`, `USER_SEARCH_BASE`, `USER_SEARCH_FILTER`, and optional `REQUIRE_GROUP`. See `.env.example` for the full example. |
 | `ITAMBOX_TENANT_SAML_CONFIGS` | Optional | *(empty)* | Per-tenant SAML 2.0 identity provider configuration. JSON object keyed by tenant slug. Uses `djangosaml2` / `pysaml2` configuration format. Each entry requires `entityid` and `metadata` (remote URL or inline XML). |
-| `ITAMBOX_TENANT_OIDC_CONFIGS` | Optional | *(empty)* | Per-tenant OpenID Connect provider configuration. JSON object keyed by tenant slug. Each value is an object with standard `mozilla-django-oidc` keys: `OIDC_RP_CLIENT_ID`, `OIDC_RP_CLIENT_SECRET`, `OIDC_OP_AUTHORIZATION_ENDPOINT`, `OIDC_OP_TOKEN_ENDPOINT`, `OIDC_OP_USER_ENDPOINT`. |
+| `ITAMBOX_TENANT_OIDC_CONFIGS` | Optional | *(empty)* | Per-tenant OpenID Connect provider configuration. JSON object keyed by tenant slug. Each value includes the standard `mozilla-django-oidc` client, secret, authorization, token, userinfo and issuer settings, plus a JWKS endpoint or static IdP signing key for RS/ES tokens. |
 
 !!! note "SSO configuration format"
     Each SSO variable is a single-line JSON string. Escape inner quotes or use a `.env`-compatible quoting strategy. Example for LDAP:

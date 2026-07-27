@@ -82,6 +82,15 @@ class CurrentUserMiddleware:
         return response
 
 
+_SAML_HTTPS_FORM_ACTION = "_itambox_saml_https_form_action"
+
+
+def allow_saml_https_form_action(response):
+    """Mark a djangosaml2 response as allowed to POST its form to an HTTPS IdP."""
+    setattr(response, _SAML_HTTPS_FORM_ACTION, True)
+    return response
+
+
 class CSPMiddleware:
     """
     Adds Content-Security-Policy headers to all responses.
@@ -101,6 +110,7 @@ class CSPMiddleware:
 
     def process_response(self, request, response):
         nonce = getattr(request, "csp_nonce", "")
+        form_action = "'self' https:" if getattr(response, _SAML_HTTPS_FORM_ACTION, False) else "'self'"
         if nonce:
             response["Content-Security-Policy"] = (
                 "default-src 'self'; "
@@ -117,7 +127,7 @@ class CSPMiddleware:
                 "connect-src 'self'; "
                 "object-src 'none'; "
                 "base-uri 'self'; "
-                "form-action 'self'; "
+                f"form-action {form_action}; "
                 "frame-ancestors 'self'"
             )
         else:
@@ -135,7 +145,7 @@ class CSPMiddleware:
                 "connect-src 'self'; "
                 "object-src 'none'; "
                 "base-uri 'self'; "
-                "form-action 'self'; "
+                f"form-action {form_action}; "
                 "frame-ancestors 'self'"
             )
         return response

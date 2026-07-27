@@ -28,6 +28,8 @@ TEST_OIDC_CONFIGS = {
         "OIDC_OP_AUTHORIZATION_ENDPOINT": "https://auth.alpha.com/authorize",
         "OIDC_OP_TOKEN_ENDPOINT": "https://auth.alpha.com/token",
         "OIDC_OP_USER_ENDPOINT": "https://auth.alpha.com/userinfo",
+        "OIDC_OP_ISSUER": "https://auth.alpha.com/",
+        "OIDC_OP_JWKS_ENDPOINT": "https://auth.alpha.com/.well-known/jwks.json",
         "OIDC_GROUP_ROLE_MAPPING": {"alpha-admins": "Admin", "alpha-managers": "Manager", "alpha-members": "Member"},
     },
     "tenant-beta": {
@@ -36,6 +38,8 @@ TEST_OIDC_CONFIGS = {
         "OIDC_OP_AUTHORIZATION_ENDPOINT": "https://auth.beta.org/oauth2/authorize",
         "OIDC_OP_TOKEN_ENDPOINT": "https://auth.beta.org/oauth2/token",
         "OIDC_OP_USER_ENDPOINT": "https://auth.beta.org/oauth2/userinfo",
+        "OIDC_OP_ISSUER": "https://auth.beta.org/",
+        "OIDC_OP_JWKS_ENDPOINT": "https://auth.beta.org/.well-known/jwks.json",
         "OIDC_GROUP_ROLE_MAPPING": {"beta-staff": "Manager", "beta-users": "Member"},
     },
 }
@@ -941,8 +945,11 @@ class TenantOIDCTestCase(TestCase):
 
         # Access callback view
         url = reverse("oidc_authentication_callback") + "?code=code-456&state=state-456"
-        # It should not crash on invalid/missing tenant; it should proceed (and fail authentication or handle it gracefully)
+        # A stale tenant pin must fail closed instead of falling back to global
+        # OIDC settings or attempting authentication without tenant context.
         with patch("django.contrib.auth.authenticate") as mock_authenticate:
-            mock_authenticate.return_value = None
             response = self.client.get(url)
-            self.assertEqual(response.status_code, 302)
+
+        self.assertEqual(response.status_code, 404)
+        mock_authenticate.assert_not_called()
+        self.assertNotIn("oidc_tenant_slug", self.client.session)

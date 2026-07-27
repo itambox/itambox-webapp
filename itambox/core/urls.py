@@ -28,6 +28,7 @@ from django.views.i18n import JavaScriptCatalog
 from assets import views as asset_views  # Import the assets views
 from assets.views_scan import ScanResolveView
 from core.schema import schema
+from core.views.auth import ITAMboxLoginView, TenantSamlAcsView, TenantSamlLoginView
 from core.views.graphql import PrivateGraphQLView
 from extras.dashboard import views as dashboard_views
 from itambox.views.features import (
@@ -78,6 +79,9 @@ urlpatterns = [
     ),
     path("offline/", TemplateView.as_view(template_name="offline.html"), name="offline"),
     path("admin/", admin.site.urls),
+    # Must precede the auth include: our login view renders the configured SSO
+    # entry points alongside the local credential form.
+    path("accounts/login/", ITAMboxLoginView.as_view(), name="login"),
     path("accounts/", include("django.contrib.auth.urls")),
     # MFA gate (TOTP) for local-password logins; the OTP middleware redirects here.
     path("accounts/mfa/", MFASetupView.as_view(), name="mfa_setup"),
@@ -222,7 +226,11 @@ urlpatterns = [
     path("i18n/", include("django.conf.urls.i18n")),
     # JS translation catalog (djangojs domain) consumed by static/src/*.ts via gettext()
     path("jsi18n/", JavaScriptCatalog.as_view(), name="javascript-catalog"),
-    # SAML SSO
+    # SAML SSO. The tenant-aware entry point and the assertion consumer must
+    # precede the djangosaml2 include so a flow started for a tenant keeps that
+    # binding through the IdP round trip.
+    path("saml2/login/<slug:tenant_slug>/", TenantSamlLoginView.as_view(), name="saml2_login_tenant"),
+    path("saml2/acs/", TenantSamlAcsView.as_view(), name="saml2_acs"),
     path("saml2/", include("djangosaml2.urls")),
     # OIDC SSO
     path("oidc/authenticate/", TenantOIDCAuthorizeView.as_view(), name="oidc_authentication_init"),

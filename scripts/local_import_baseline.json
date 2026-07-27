@@ -995,32 +995,8 @@
     },
     {
       "path": "itambox/core/auth/oidc.py",
-      "context": "ClassDef:TenantOIDCAuthorizeView/FunctionDef:dispatch",
-      "statement": "from django.http import Http404",
-      "count": 1
-    },
-    {
-      "path": "itambox/core/auth/oidc.py",
-      "context": "ClassDef:TenantOIDCAuthorizeView/FunctionDef:dispatch",
-      "statement": "from organization.models import Tenant",
-      "count": 1
-    },
-    {
-      "path": "itambox/core/auth/oidc.py",
       "context": "ClassDef:TenantOIDCBackend/FunctionDef:get_permissions_for_role",
       "statement": "from organization.forms.role_form import MATRIX_MODELS",
-      "count": 1
-    },
-    {
-      "path": "itambox/core/auth/oidc.py",
-      "context": "ClassDef:TenantOIDCCallbackView/FunctionDef:dispatch",
-      "statement": "from organization.models import Tenant",
-      "count": 1
-    },
-    {
-      "path": "itambox/core/auth/oidc.py",
-      "context": "ClassDef:TenantOIDCCallbackView/FunctionDef:login_success",
-      "statement": "from organization.models import Tenant",
       "count": 1
     },
     {

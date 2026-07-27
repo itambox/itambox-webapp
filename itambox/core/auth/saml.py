@@ -3,24 +3,117 @@ import os
 
 import saml2
 from django.conf import settings
+from django.http import Http404
 from saml2.config import SPConfig
 
-from core.managers import get_current_tenant
+from core.managers import get_current_tenant, set_current_tenant
+from organization.models import Tenant
+
+#: Session key pinning the tenant a SAML flow was started for. The IdP posts the
+#: assertion back to an anonymous, cross-site endpoint (``/saml2/acs/``), so
+#: without this pin neither the SP configuration nor JIT provisioning could tell
+#: which tenant the assertion belongs to.
+SAML_TENANT_SESSION_KEY = "saml_tenant_slug"
 
 
-def load_saml_config():
+def resolve_saml_tenant_slug(request=None):
+    """The tenant slug a SAML request belongs to, or ``None``.
+
+    The active tenant context wins; anonymous SAML endpoints have none, so the
+    slug pinned by :func:`bind_saml_tenant` is used instead.
+    """
+    tenant = get_current_tenant()
+    if tenant is not None:
+        return tenant.slug
+    session = getattr(request, "saml_session", None)
+    if session is None:
+        return None
+    return session.get(SAML_TENANT_SESSION_KEY)
+
+
+def bind_saml_tenant(request, tenant_slug):
+    """Bind ``tenant_slug`` to this request and pin it for the ACS callback.
+
+    Raises :class:`~django.http.Http404` for an unknown or deleted tenant rather
+    than silently falling back to another tenant's identity provider.
+    """
+    tenant = _live_tenant(tenant_slug)
+    if tenant is None or _configured_saml_tenant(tenant_slug) is None:
+        raise Http404(f"No SAML tenant {tenant_slug!r}.")
+    request.saml_session[SAML_TENANT_SESSION_KEY] = tenant.slug
+    set_current_tenant(tenant)
+    return tenant
+
+
+def restore_saml_tenant(request):
+    """Re-activate the pinned tenant, failing closed if it is no longer usable."""
+    slug = getattr(request, "saml_session", {}).get(SAML_TENANT_SESSION_KEY)
+    if not slug:
+        raise Http404("The SAML tenant binding is missing.")
+    tenant = _live_tenant(slug)
+    if tenant is None or _configured_saml_tenant(slug) is None:
+        raise Http404(f"No SAML tenant {slug!r}.")
+    set_current_tenant(tenant)
+    return tenant
+
+
+def _live_tenant(slug):
+    """``_base_manager``: the SAML endpoints are anonymous, so no tenant scope is
+    established yet — the same bootstrap lookup ``TenantMiddleware`` performs.
+    """
+    return Tenant._base_manager.filter(slug=slug, deleted_at__isnull=True).first()
+
+
+def _configured_saml_tenant(slug):
+    """Return the enabled config for ``slug`` or a safe single-tenant default."""
+    configs = getattr(settings, "ITAMBOX_TENANT_SAML_CONFIGS", {})
+    if not isinstance(configs, dict):
+        return None
+    config = configs.get(slug)
+    if not isinstance(config, dict) and _is_sole_live_tenant(slug):
+        # A deployment-wide/default config is safe to apply only when exactly
+        # one live tenant exists; otherwise the IdP response cannot be scoped.
+        config = configs.get("default")
+    if not isinstance(config, dict) or config.get("enabled", True) is False:
+        return None
+    return config
+
+
+def _is_sole_live_tenant(slug):
+    live_slugs = list(
+        Tenant._base_manager.filter(deleted_at__isnull=True).order_by("pk").values_list("slug", flat=True)[:2]
+    )
+    return live_slugs == [slug]
+
+
+def _tenant_saml_config(slug):
+    """Resolve role-mapping options with the same safe default fallback."""
+    tenant_configs = getattr(settings, "ITAMBOX_TENANT_SAML_CONFIGS", {})
+    config = tenant_configs.get(slug) if isinstance(tenant_configs, dict) else None
+    if not isinstance(config, dict) and _is_sole_live_tenant(slug):
+        config = tenant_configs.get("default", {})
+    return config if isinstance(config, dict) else {}
+
+
+def load_saml_config(request=None):
     """
     Dynamically constructs and returns the pysaml2 SPConfig object
     configured specifically for the active tenant context.
+
+    djangosaml2 always calls its configured loader with the current request, so
+    the tenant a flow was started for is honoured even on the anonymous
+    endpoints (``/saml2/login/``, ``/saml2/acs/``, ``/saml2/metadata/``).
     """
-    tenant = get_current_tenant()
+    tenant_slug = resolve_saml_tenant_slug(request)
     saml_configs = getattr(settings, "ITAMBOX_TENANT_SAML_CONFIGS", {})
 
     tenant_config = None
-    if tenant:
-        tenant_config = saml_configs.get(tenant.slug)
+    if tenant_slug:
+        tenant_config = _configured_saml_tenant(tenant_slug)
+        if tenant_config is None:
+            raise Http404(f"SAML is not configured for tenant {tenant_slug!r}.")
 
-    if not tenant_config:
+    if tenant_config is None:
         if "default" in saml_configs:
             tenant_config = saml_configs["default"]
         elif saml_configs:
@@ -33,7 +126,7 @@ def load_saml_config():
     # Resolve active hosts/base URLs
     base_url = tenant_config.get("base_url")
     if not base_url:
-        base_url = f"https://{tenant.slug if tenant else 'itambox'}.local"
+        base_url = f"https://{tenant_slug or 'itambox'}.local"
 
     sp_config = {
         "entityid": tenant_config.get("entityid", f"{base_url}/saml2/metadata/"),
@@ -163,8 +256,7 @@ class TenantSaml2Backend(Saml2Backend):
             else:
                 groups_cleaned.append(str(g))
 
-        tenant_configs = getattr(settings, "ITAMBOX_TENANT_SAML_CONFIGS", {})
-        tenant_config = tenant_configs.get(tenant.slug, {})
+        tenant_config = _tenant_saml_config(tenant.slug)
         group_role_mapping = tenant_config.get("SAML_GROUP_ROLE_MAPPING", {})
 
         user_roles = []
