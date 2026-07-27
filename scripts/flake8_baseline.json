@@ -10166,14 +10166,6 @@
     {
       "path": "itambox/subscriptions/models.py",
       "code": "F401",
-      "message": "'core.managers.SoftDeleteManager' imported but unused",
-      "source": "from core.managers import (",
-      "context": "Module:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/subscriptions/models.py",
-      "code": "F401",
       "message": "'core.mixins.CloneableMixin' imported but unused",
       "source": "from core.mixins import (",
       "context": "Module:body",
