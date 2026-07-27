@@ -1,4 +1,5 @@
 import json
+import os
 import tempfile
 import unittest
 from pathlib import Path
@@ -9,11 +10,14 @@ from scripts.check_openapi_schema import (
     GENERATION_POLICY,
     GenerationResult,
     PolicyError,
+    _prepare_django_runtime,
+    bootstrap_from_ci_artifacts,
     build_header,
     check_tracked_schema,
     compare_identities,
     generate_twice,
     load_baseline,
+    load_diagnostics_report,
     parse_spectacular_stderr,
     render_baseline,
     render_diagnostics_report,
@@ -133,6 +137,43 @@ class OpenApiBaselineTests(unittest.TestCase):
 
             guard.assert_called_once_with()
 
+    def test_canonical_ci_report_bootstraps_a_count_free_baseline(self):
+        report = render_diagnostics_report({WARNING: 2, ERROR: 1}, HEADER, warning_occurrences=7, error_occurrences=3)
+        result = GenerationResult(
+            schema=b"openapi: 3.0.3\n",
+            diagnostics={WARNING: 2, ERROR: 1},
+            warning_occurrences=7,
+            error_occurrences=3,
+        )
+        with tempfile.TemporaryDirectory() as temporary_directory:
+            root = Path(temporary_directory)
+            schema_artifact = root / "schema.generated.yaml"
+            report_artifact = root / "diagnostics.generated.json"
+            tracked_schema = root / "tracked" / "schema.yaml"
+            baseline = root / "tracked" / "baseline.json"
+            schema_artifact.write_bytes(result.schema)
+            write_lf(report_artifact, report)
+
+            counts, summary = load_diagnostics_report(report_artifact, HEADER)
+            self.assertEqual(counts, {WARNING: 2, ERROR: 1})
+            self.assertEqual(summary["warnings"], 7)
+            bootstrap_from_ci_artifacts(schema_artifact, report_artifact, tracked_schema, baseline, result, HEADER)
+
+            self.assertEqual(tracked_schema.read_bytes(), result.schema)
+            self.assertEqual(load_baseline(baseline, HEADER), {WARNING, ERROR})
+            self.assertNotIn("occurrences", baseline.read_text(encoding="utf-8"))
+            with self.assertRaisesRegex(PolicyError, "bootstrap-only"):
+                bootstrap_from_ci_artifacts(schema_artifact, report_artifact, tracked_schema, baseline, result, HEADER)
+
+    def test_canonical_ci_report_rejects_inconsistent_unique_counts(self):
+        report = render_diagnostics_report({WARNING: 1}, HEADER).replace('"unique_warnings": 1', '"unique_warnings": 2')
+        with tempfile.TemporaryDirectory() as temporary_directory:
+            path = Path(temporary_directory) / "diagnostics.generated.json"
+            write_lf(path, report)
+
+            with self.assertRaisesRegex(PolicyError, "unique counts"):
+                load_diagnostics_report(path, HEADER)
+
 
 class OpenApiGenerationPolicyTests(unittest.TestCase):
     def result(self, schema=b"openapi: 3.0.3\n", diagnostics=None):
@@ -143,6 +184,11 @@ class OpenApiGenerationPolicyTests(unittest.TestCase):
 
         self.assertIn("not-for-production", secret)
         self.assertGreaterEqual(len(secret), 32)
+
+    def test_canonical_generation_rejects_ambient_pythonpath(self):
+        with patch.dict(os.environ, {"PYTHONHASHSEED": "0", "PYTHONPATH": "C:/contaminated"}):
+            with self.assertRaisesRegex(PolicyError, "empty PYTHONPATH"):
+                _prepare_django_runtime()
 
     def test_two_clean_generations_must_match_bytes_and_diagnostics(self):
         calls = []

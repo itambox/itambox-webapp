@@ -137,6 +137,7 @@ jobs:
       - name: Check deterministic OpenAPI schema and diagnostics baseline
         id: openapi
         env:
+          PYTHONPATH: ""
           PYTHONHASHSEED: "0"
         run: |
           uv run --locked --no-sync python scripts/check_openapi_schema.py \

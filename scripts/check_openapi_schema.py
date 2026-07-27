@@ -44,6 +44,8 @@ BASELINE_HEADER_FIELDS = (
     "policy_sha256",
 )
 DIAGNOSTIC_FIELDS = ("severity", "location", "breadcrumb", "message")
+REPORT_SUMMARY_FIELDS = ("warnings", "errors", "unique_warnings", "unique_errors")
+REPORT_DIAGNOSTIC_FIELDS = ("identity", "occurrences")
 IDENTITY_RULE_VERSION = 1
 GENERATION_POLICY = {
     "format": "openapi-yaml",
@@ -167,6 +169,97 @@ def render_diagnostics_report(diagnostics, header, warning_occurrences=None, err
         {"identity": identity.as_dict(), "occurrences": counts[identity]} for identity in sorted(counts)
     ]
     return json.dumps(document, indent=2, ensure_ascii=False) + "\n"
+
+
+def load_diagnostics_report(path, expected_header):  # noqa: C901 - strict canonical artifact parser
+    """Load a canonical CI report without treating occurrence counts as baseline headroom."""
+    path = Path(path)
+    try:
+        raw_bytes = path.read_bytes()
+    except OSError as exc:
+        raise PolicyError(f"cannot read canonical OpenAPI diagnostics report {path}: {exc}") from exc
+    if raw_bytes.startswith(b"\xef\xbb\xbf") or b"\r" in raw_bytes:
+        raise PolicyError("canonical OpenAPI diagnostics report must be UTF-8 without BOM and use LF line endings")
+    try:
+        raw_text = raw_bytes.decode("utf-8")
+        document = json.loads(raw_text)
+    except (UnicodeError, json.JSONDecodeError) as exc:
+        raise PolicyError(f"cannot read canonical OpenAPI diagnostics report {path}: {exc}") from exc
+
+    expected_fields = BASELINE_HEADER_FIELDS + ("summary", "diagnostics")
+    if not isinstance(document, dict) or tuple(document) != expected_fields:
+        raise PolicyError("canonical OpenAPI diagnostics report has invalid top-level fields or field order")
+    header = {field: document[field] for field in BASELINE_HEADER_FIELDS}
+    _validate_header(header)
+    if header != expected_header:
+        raise PolicyError("canonical OpenAPI diagnostics report does not match the current generation policy")
+
+    summary = document["summary"]
+    if not isinstance(summary, dict) or tuple(summary) != REPORT_SUMMARY_FIELDS:
+        raise PolicyError("canonical OpenAPI diagnostics report has an invalid summary")
+    if any(
+        isinstance(summary[field], bool) or not isinstance(summary[field], int) or summary[field] < 0
+        for field in summary
+    ):
+        raise PolicyError("canonical OpenAPI diagnostics report summary counts must be non-negative integers")
+
+    rows = document["diagnostics"]
+    if not isinstance(rows, list):
+        raise PolicyError("canonical OpenAPI diagnostics report diagnostics must be a list")
+    counts = Counter()
+    for index, row in enumerate(rows):
+        if not isinstance(row, dict) or tuple(row) != REPORT_DIAGNOSTIC_FIELDS:
+            raise PolicyError(f"canonical OpenAPI diagnostics report row {index} has invalid fields or field order")
+        identity_data = row["identity"]
+        if not isinstance(identity_data, dict) or tuple(identity_data) != DIAGNOSTIC_FIELDS:
+            raise PolicyError(
+                f"canonical OpenAPI diagnostics report identity {index} has invalid fields or field order"
+            )
+        occurrences = row["occurrences"]
+        if isinstance(occurrences, bool) or not isinstance(occurrences, int) or occurrences < 1:
+            raise PolicyError(f"canonical OpenAPI diagnostics report row {index} has invalid occurrences")
+        try:
+            identity = DiagnosticIdentity(**identity_data)
+        except (IdentityError, TypeError) as exc:
+            raise PolicyError(f"canonical OpenAPI diagnostics report identity {index} is invalid: {exc}") from exc
+        if identity in counts:
+            raise PolicyError("canonical OpenAPI diagnostics report contains duplicate identities")
+        counts[identity] = occurrences
+
+    unique_warnings = sum(identity.severity == "warning" for identity in counts)
+    unique_errors = sum(identity.severity == "error" for identity in counts)
+    if summary["unique_warnings"] != unique_warnings or summary["unique_errors"] != unique_errors:
+        raise PolicyError("canonical OpenAPI diagnostics report unique counts do not match its identities")
+    canonical = render_diagnostics_report(
+        counts,
+        expected_header,
+        warning_occurrences=summary["warnings"],
+        error_occurrences=summary["errors"],
+    )
+    if raw_text != canonical:
+        raise PolicyError("canonical OpenAPI diagnostics report is not in canonical sorted form")
+    return counts, summary
+
+
+def bootstrap_from_ci_artifacts(schema_path, report_path, tracked_schema, baseline, result, expected_header):
+    """Import immutable canonical CI artifacts after proving parity with the current local generator."""
+    tracked_schema = Path(tracked_schema)
+    baseline = Path(baseline)
+    if tracked_schema.exists() or baseline.exists():
+        raise PolicyError("CI artifact import is bootstrap-only; tracked schema and baseline must both be absent")
+    try:
+        schema = Path(schema_path).read_bytes()
+    except OSError as exc:
+        raise PolicyError(f"cannot read canonical OpenAPI schema artifact {schema_path}: {exc}") from exc
+    if schema != result.schema:
+        raise PolicyError("canonical CI schema artifact differs from the current deterministic generation")
+    report_counts, summary = load_diagnostics_report(report_path, expected_header)
+    if report_counts != Counter(result.diagnostics):
+        raise PolicyError("canonical CI diagnostics identities differ from the current deterministic generation")
+    if summary["warnings"] != result.warning_occurrences or summary["errors"] != result.error_occurrences:
+        raise PolicyError("canonical CI diagnostics occurrence totals differ from the current deterministic generation")
+    _write_bytes(tracked_schema, schema)
+    _write_lf(baseline, render_baseline(report_counts, expected_header))
 
 
 def _normalise_identities(identities):
@@ -352,6 +445,8 @@ def parse_spectacular_stderr(stderr, repo_root):  # noqa: C901 - strict parser r
 def _prepare_django_runtime():
     if os.environ.get("PYTHONHASHSEED") != "0":
         raise PolicyError("canonical OpenAPI generation requires PYTHONHASHSEED=0 before Python starts")
+    if os.environ.get("PYTHONPATH"):
+        raise PolicyError("canonical OpenAPI generation requires an empty PYTHONPATH")
     settings_module = os.environ.setdefault("DJANGO_SETTINGS_MODULE", "core.settings")
     if settings_module != "core.settings":
         raise PolicyError("canonical OpenAPI generation requires DJANGO_SETTINGS_MODULE=core.settings")
@@ -494,6 +589,8 @@ def parse_args(argv=None):
         action="store_true",
         help="Bootstrap or record diagnostic cleanup on canonical Linux; new identities are refused.",
     )
+    parser.add_argument("--bootstrap-schema-artifact", type=Path)
+    parser.add_argument("--bootstrap-diagnostics-artifact", type=Path)
     return parser.parse_args(argv)
 
 
@@ -513,6 +610,24 @@ def main(argv=None):
         _write_bytes(args.diagnostics_output, diagnostics_bytes)
         print(f"Generated OpenAPI schema sha256={_artifact_hash(result.schema)} at {args.schema_output}")
         print(f"Generated OpenAPI diagnostics sha256={_artifact_hash(diagnostics_bytes)} at {args.diagnostics_output}")
+
+        bootstrap_requested = args.bootstrap_schema_artifact or args.bootstrap_diagnostics_artifact
+        if bootstrap_requested:
+            if not args.bootstrap_schema_artifact or not args.bootstrap_diagnostics_artifact:
+                raise PolicyError("both canonical CI bootstrap artifacts must be provided together")
+            if args.write_schema or args.write_baseline:
+                raise PolicyError("CI artifact bootstrap cannot be combined with canonical write flags")
+            bootstrap_from_ci_artifacts(
+                args.bootstrap_schema_artifact,
+                args.bootstrap_diagnostics_artifact,
+                args.tracked_schema,
+                args.baseline,
+                result,
+                runtime["header"],
+            )
+            print(f"Bootstrapped tracked OpenAPI schema from {args.bootstrap_schema_artifact}")
+            print(f"Bootstrapped count-free diagnostics baseline from {args.bootstrap_diagnostics_artifact}")
+            return 0
 
         if args.write_schema:
             verify_write_environment()

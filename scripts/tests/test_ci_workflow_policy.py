@@ -160,6 +160,7 @@ class GateSuiteDiscoveryTests(unittest.TestCase):
         gate = step_named(steps, "Check deterministic OpenAPI schema and diagnostics baseline")
         self.assertEqual(gate.get("id"), "openapi")
         self.assertIn('PYTHONHASHSEED: "0"', self.workflow_text)
+        self.assertIn('PYTHONPATH: ""', self.workflow_text)
         self.assertIn("scripts/check_openapi_schema.py", gate.get("run", ""))
         self.assertIn("artifacts/openapi/schema.generated.yaml", gate.get("run", ""))
         self.assertNotIn(".artifacts/openapi", self.workflow_text)

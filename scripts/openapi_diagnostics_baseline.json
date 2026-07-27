@@ -1,0 +1,1406 @@
+{
+  "schema_version": 1,
+  "canonical_python": "3.12",
+  "canonical_platform": "linux",
+  "django_version": "5.2.16",
+  "djangorestframework_version": "3.17.1",
+  "drf_spectacular_version": "0.29.0",
+  "pyyaml_version": "6.0.3",
+  "python_hash_seed": "0",
+  "settings_sha256": "7e0a6f95ecc9874c5b66d897e0dbf89c5f473821abad045ea0662557610fa211",
+  "policy_sha256": "0180ad370341ce74066f5ac0b32d96f4b95f2dd035744eef1204ad4c99d24d09",
+  "diagnostics": [
+    {
+      "severity": "error",
+      "location": "itambox/users/api/scim/provider_views.py",
+      "breadcrumb": "ProviderServiceProviderConfigView",
+      "message": "unable to guess serializer. This is graceful fallback handling for APIViews. Consider using GenericAPIView as view base class, if view is under your control. Either way you may want to add a serializer_class (or method). Ignoring view for now."
+    },
+    {
+      "severity": "error",
+      "location": "itambox/users/api/scim/provider_views.py",
+      "breadcrumb": "SCIMProviderGroupDetailView",
+      "message": "unable to guess serializer. This is graceful fallback handling for APIViews. Consider using GenericAPIView as view base class, if view is under your control. Either way you may want to add a serializer_class (or method). Ignoring view for now."
+    },
+    {
+      "severity": "error",
+      "location": "itambox/users/api/scim/provider_views.py",
+      "breadcrumb": "SCIMProviderGroupListView",
+      "message": "unable to guess serializer. This is graceful fallback handling for APIViews. Consider using GenericAPIView as view base class, if view is under your control. Either way you may want to add a serializer_class (or method). Ignoring view for now."
+    },
+    {
+      "severity": "error",
+      "location": "itambox/users/api/scim/provider_views.py",
+      "breadcrumb": "SCIMProviderUserDetailView",
+      "message": "unable to guess serializer. This is graceful fallback handling for APIViews. Consider using GenericAPIView as view base class, if view is under your control. Either way you may want to add a serializer_class (or method). Ignoring view for now."
+    },
+    {
+      "severity": "error",
+      "location": "itambox/users/api/scim/provider_views.py",
+      "breadcrumb": "SCIMProviderUserListView",
+      "message": "unable to guess serializer. This is graceful fallback handling for APIViews. Consider using GenericAPIView as view base class, if view is under your control. Either way you may want to add a serializer_class (or method). Ignoring view for now."
+    },
+    {
+      "severity": "error",
+      "location": "itambox/users/api/scim/views.py",
+      "breadcrumb": "SCIMGroupDetailView",
+      "message": "unable to guess serializer. This is graceful fallback handling for APIViews. Consider using GenericAPIView as view base class, if view is under your control. Either way you may want to add a serializer_class (or method). Ignoring view for now."
+    },
+    {
+      "severity": "error",
+      "location": "itambox/users/api/scim/views.py",
+      "breadcrumb": "SCIMGroupListView",
+      "message": "unable to guess serializer. This is graceful fallback handling for APIViews. Consider using GenericAPIView as view base class, if view is under your control. Either way you may want to add a serializer_class (or method). Ignoring view for now."
+    },
+    {
+      "severity": "error",
+      "location": "itambox/users/api/scim/views.py",
+      "breadcrumb": "SCIMUserDetailView",
+      "message": "unable to guess serializer. This is graceful fallback handling for APIViews. Consider using GenericAPIView as view base class, if view is under your control. Either way you may want to add a serializer_class (or method). Ignoring view for now."
+    },
+    {
+      "severity": "error",
+      "location": "itambox/users/api/scim/views.py",
+      "breadcrumb": "SCIMUserListView",
+      "message": "unable to guess serializer. This is graceful fallback handling for APIViews. Consider using GenericAPIView as view base class, if view is under your control. Either way you may want to add a serializer_class (or method). Ignoring view for now."
+    },
+    {
+      "severity": "error",
+      "location": "itambox/users/api/scim/views.py",
+      "breadcrumb": "ServiceProviderConfigView",
+      "message": "unable to guess serializer. This is graceful fallback handling for APIViews. Consider using GenericAPIView as view base class, if view is under your control. Either way you may want to add a serializer_class (or method). Ignoring view for now."
+    },
+    {
+      "severity": "warning",
+      "location": "<unknown>",
+      "breadcrumb": "",
+      "message": "enum naming encountered a non-optimally resolvable collision for fields named \"status\". The same name has been used for multiple choice sets in multiple components. The collision was resolved with \"StatusCf3Enum\". add an entry to ENUM_NAME_OVERRIDES to fix the naming."
+    },
+    {
+      "severity": "warning",
+      "location": "<unknown>",
+      "breadcrumb": "",
+      "message": "enum naming encountered a non-optimally resolvable collision for fields named \"status\". The same name has been used for multiple choice sets in multiple components. The collision was resolved with \"StatusE67Enum\". add an entry to ENUM_NAME_OVERRIDES to fix the naming."
+    },
+    {
+      "severity": "warning",
+      "location": "<unknown>",
+      "breadcrumb": "",
+      "message": "operationId \"assets_asset_assignments_destroy\" has collisions [('/api/assets/asset-assignments/', 'delete'), ('/api/assets/asset-assignments/{id}/', 'delete')]. resolving with numeral suffixes."
+    },
+    {
+      "severity": "warning",
+      "location": "<unknown>",
+      "breadcrumb": "",
+      "message": "operationId \"assets_asset_assignments_partial_update\" has collisions [('/api/assets/asset-assignments/', 'patch'), ('/api/assets/asset-assignments/{id}/', 'patch')]. resolving with numeral suffixes."
+    },
+    {
+      "severity": "warning",
+      "location": "<unknown>",
+      "breadcrumb": "",
+      "message": "operationId \"assets_asset_assignments_update\" has collisions [('/api/assets/asset-assignments/', 'put'), ('/api/assets/asset-assignments/{id}/', 'put')]. resolving with numeral suffixes."
+    },
+    {
+      "severity": "warning",
+      "location": "<unknown>",
+      "breadcrumb": "",
+      "message": "operationId \"assets_asset_disposals_destroy\" has collisions [('/api/assets/asset-disposals/', 'delete'), ('/api/assets/asset-disposals/{id}/', 'delete')]. resolving with numeral suffixes."
+    },
+    {
+      "severity": "warning",
+      "location": "<unknown>",
+      "breadcrumb": "",
+      "message": "operationId \"assets_asset_disposals_partial_update\" has collisions [('/api/assets/asset-disposals/', 'patch'), ('/api/assets/asset-disposals/{id}/', 'patch')]. resolving with numeral suffixes."
+    },
+    {
+      "severity": "warning",
+      "location": "<unknown>",
+      "breadcrumb": "",
+      "message": "operationId \"assets_asset_disposals_update\" has collisions [('/api/assets/asset-disposals/', 'put'), ('/api/assets/asset-disposals/{id}/', 'put')]. resolving with numeral suffixes."
+    },
+    {
+      "severity": "warning",
+      "location": "<unknown>",
+      "breadcrumb": "",
+      "message": "operationId \"assets_asset_requests_destroy\" has collisions [('/api/assets/asset-requests/', 'delete'), ('/api/assets/asset-requests/{id}/', 'delete')]. resolving with numeral suffixes."
+    },
+    {
+      "severity": "warning",
+      "location": "<unknown>",
+      "breadcrumb": "",
+      "message": "operationId \"assets_asset_requests_partial_update\" has collisions [('/api/assets/asset-requests/', 'patch'), ('/api/assets/asset-requests/{id}/', 'patch')]. resolving with numeral suffixes."
+    },
+    {
+      "severity": "warning",
+      "location": "<unknown>",
+      "breadcrumb": "",
+      "message": "operationId \"assets_asset_requests_update\" has collisions [('/api/assets/asset-requests/', 'put'), ('/api/assets/asset-requests/{id}/', 'put')]. resolving with numeral suffixes."
+    },
+    {
+      "severity": "warning",
+      "location": "<unknown>",
+      "breadcrumb": "",
+      "message": "operationId \"assets_asset_reservations_destroy\" has collisions [('/api/assets/asset-reservations/', 'delete'), ('/api/assets/asset-reservations/{id}/', 'delete')]. resolving with numeral suffixes."
+    },
+    {
+      "severity": "warning",
+      "location": "<unknown>",
+      "breadcrumb": "",
+      "message": "operationId \"assets_asset_reservations_partial_update\" has collisions [('/api/assets/asset-reservations/', 'patch'), ('/api/assets/asset-reservations/{id}/', 'patch')]. resolving with numeral suffixes."
+    },
+    {
+      "severity": "warning",
+      "location": "<unknown>",
+      "breadcrumb": "",
+      "message": "operationId \"assets_asset_reservations_update\" has collisions [('/api/assets/asset-reservations/', 'put'), ('/api/assets/asset-reservations/{id}/', 'put')]. resolving with numeral suffixes."
+    },
+    {
+      "severity": "warning",
+      "location": "<unknown>",
+      "breadcrumb": "",
+      "message": "operationId \"assets_asset_roles_destroy\" has collisions [('/api/assets/asset-roles/', 'delete'), ('/api/assets/asset-roles/{id}/', 'delete')]. resolving with numeral suffixes."
+    },
+    {
+      "severity": "warning",
+      "location": "<unknown>",
+      "breadcrumb": "",
+      "message": "operationId \"assets_asset_roles_partial_update\" has collisions [('/api/assets/asset-roles/', 'patch'), ('/api/assets/asset-roles/{id}/', 'patch')]. resolving with numeral suffixes."
+    },
+    {
+      "severity": "warning",
+      "location": "<unknown>",
+      "breadcrumb": "",
+      "message": "operationId \"assets_asset_roles_update\" has collisions [('/api/assets/asset-roles/', 'put'), ('/api/assets/asset-roles/{id}/', 'put')]. resolving with numeral suffixes."
+    },
+    {
+      "severity": "warning",
+      "location": "<unknown>",
+      "breadcrumb": "",
+      "message": "operationId \"assets_asset_tag_sequences_destroy\" has collisions [('/api/assets/asset-tag-sequences/', 'delete'), ('/api/assets/asset-tag-sequences/{id}/', 'delete')]. resolving with numeral suffixes."
+    },
+    {
+      "severity": "warning",
+      "location": "<unknown>",
+      "breadcrumb": "",
+      "message": "operationId \"assets_asset_tag_sequences_partial_update\" has collisions [('/api/assets/asset-tag-sequences/', 'patch'), ('/api/assets/asset-tag-sequences/{id}/', 'patch')]. resolving with numeral suffixes."
+    },
+    {
+      "severity": "warning",
+      "location": "<unknown>",
+      "breadcrumb": "",
+      "message": "operationId \"assets_asset_tag_sequences_update\" has collisions [('/api/assets/asset-tag-sequences/', 'put'), ('/api/assets/asset-tag-sequences/{id}/', 'put')]. resolving with numeral suffixes."
+    },
+    {
+      "severity": "warning",
+      "location": "<unknown>",
+      "breadcrumb": "",
+      "message": "operationId \"assets_asset_types_destroy\" has collisions [('/api/assets/asset-types/', 'delete'), ('/api/assets/asset-types/{id}/', 'delete')]. resolving with numeral suffixes."
+    },
+    {
+      "severity": "warning",
+      "location": "<unknown>",
+      "breadcrumb": "",
+      "message": "operationId \"assets_asset_types_partial_update\" has collisions [('/api/assets/asset-types/', 'patch'), ('/api/assets/asset-types/{id}/', 'patch')]. resolving with numeral suffixes."
+    },
+    {
+      "severity": "warning",
+      "location": "<unknown>",
+      "breadcrumb": "",
+      "message": "operationId \"assets_asset_types_update\" has collisions [('/api/assets/asset-types/', 'put'), ('/api/assets/asset-types/{id}/', 'put')]. resolving with numeral suffixes."
+    },
+    {
+      "severity": "warning",
+      "location": "<unknown>",
+      "breadcrumb": "",
+      "message": "operationId \"assets_assets_destroy\" has collisions [('/api/assets/assets/', 'delete'), ('/api/assets/assets/{id}/', 'delete')]. resolving with numeral suffixes."
+    },
+    {
+      "severity": "warning",
+      "location": "<unknown>",
+      "breadcrumb": "",
+      "message": "operationId \"assets_assets_partial_update\" has collisions [('/api/assets/assets/', 'patch'), ('/api/assets/assets/{id}/', 'patch')]. resolving with numeral suffixes."
+    },
+    {
+      "severity": "warning",
+      "location": "<unknown>",
+      "breadcrumb": "",
+      "message": "operationId \"assets_assets_update\" has collisions [('/api/assets/assets/', 'put'), ('/api/assets/assets/{id}/', 'put')]. resolving with numeral suffixes."
+    },
+    {
+      "severity": "warning",
+      "location": "<unknown>",
+      "breadcrumb": "",
+      "message": "operationId \"assets_categories_destroy\" has collisions [('/api/assets/categories/', 'delete'), ('/api/assets/categories/{id}/', 'delete')]. resolving with numeral suffixes."
+    },
+    {
+      "severity": "warning",
+      "location": "<unknown>",
+      "breadcrumb": "",
+      "message": "operationId \"assets_categories_partial_update\" has collisions [('/api/assets/categories/', 'patch'), ('/api/assets/categories/{id}/', 'patch')]. resolving with numeral suffixes."
+    },
+    {
+      "severity": "warning",
+      "location": "<unknown>",
+      "breadcrumb": "",
+      "message": "operationId \"assets_categories_update\" has collisions [('/api/assets/categories/', 'put'), ('/api/assets/categories/{id}/', 'put')]. resolving with numeral suffixes."
+    },
+    {
+      "severity": "warning",
+      "location": "<unknown>",
+      "breadcrumb": "",
+      "message": "operationId \"assets_depreciations_destroy\" has collisions [('/api/assets/depreciations/', 'delete'), ('/api/assets/depreciations/{id}/', 'delete')]. resolving with numeral suffixes."
+    },
+    {
+      "severity": "warning",
+      "location": "<unknown>",
+      "breadcrumb": "",
+      "message": "operationId \"assets_depreciations_partial_update\" has collisions [('/api/assets/depreciations/', 'patch'), ('/api/assets/depreciations/{id}/', 'patch')]. resolving with numeral suffixes."
+    },
+    {
+      "severity": "warning",
+      "location": "<unknown>",
+      "breadcrumb": "",
+      "message": "operationId \"assets_depreciations_update\" has collisions [('/api/assets/depreciations/', 'put'), ('/api/assets/depreciations/{id}/', 'put')]. resolving with numeral suffixes."
+    },
+    {
+      "severity": "warning",
+      "location": "<unknown>",
+      "breadcrumb": "",
+      "message": "operationId \"assets_manufacturers_destroy\" has collisions [('/api/assets/manufacturers/', 'delete'), ('/api/assets/manufacturers/{id}/', 'delete')]. resolving with numeral suffixes."
+    },
+    {
+      "severity": "warning",
+      "location": "<unknown>",
+      "breadcrumb": "",
+      "message": "operationId \"assets_manufacturers_partial_update\" has collisions [('/api/assets/manufacturers/', 'patch'), ('/api/assets/manufacturers/{id}/', 'patch')]. resolving with numeral suffixes."
+    },
+    {
+      "severity": "warning",
+      "location": "<unknown>",
+      "breadcrumb": "",
+      "message": "operationId \"assets_manufacturers_update\" has collisions [('/api/assets/manufacturers/', 'put'), ('/api/assets/manufacturers/{id}/', 'put')]. resolving with numeral suffixes."
+    },
+    {
+      "severity": "warning",
+      "location": "<unknown>",
+      "breadcrumb": "",
+      "message": "operationId \"assets_status_labels_destroy\" has collisions [('/api/assets/status-labels/', 'delete'), ('/api/assets/status-labels/{id}/', 'delete')]. resolving with numeral suffixes."
+    },
+    {
+      "severity": "warning",
+      "location": "<unknown>",
+      "breadcrumb": "",
+      "message": "operationId \"assets_status_labels_partial_update\" has collisions [('/api/assets/status-labels/', 'patch'), ('/api/assets/status-labels/{id}/', 'patch')]. resolving with numeral suffixes."
+    },
+    {
+      "severity": "warning",
+      "location": "<unknown>",
+      "breadcrumb": "",
+      "message": "operationId \"assets_status_labels_update\" has collisions [('/api/assets/status-labels/', 'put'), ('/api/assets/status-labels/{id}/', 'put')]. resolving with numeral suffixes."
+    },
+    {
+      "severity": "warning",
+      "location": "<unknown>",
+      "breadcrumb": "",
+      "message": "operationId \"assets_suppliers_destroy\" has collisions [('/api/assets/suppliers/', 'delete'), ('/api/assets/suppliers/{id}/', 'delete')]. resolving with numeral suffixes."
+    },
+    {
+      "severity": "warning",
+      "location": "<unknown>",
+      "breadcrumb": "",
+      "message": "operationId \"assets_suppliers_partial_update\" has collisions [('/api/assets/suppliers/', 'patch'), ('/api/assets/suppliers/{id}/', 'patch')]. resolving with numeral suffixes."
+    },
+    {
+      "severity": "warning",
+      "location": "<unknown>",
+      "breadcrumb": "",
+      "message": "operationId \"assets_suppliers_update\" has collisions [('/api/assets/suppliers/', 'put'), ('/api/assets/suppliers/{id}/', 'put')]. resolving with numeral suffixes."
+    },
+    {
+      "severity": "warning",
+      "location": "<unknown>",
+      "breadcrumb": "",
+      "message": "operationId \"assets_warranties_destroy\" has collisions [('/api/assets/warranties/', 'delete'), ('/api/assets/warranties/{id}/', 'delete')]. resolving with numeral suffixes."
+    },
+    {
+      "severity": "warning",
+      "location": "<unknown>",
+      "breadcrumb": "",
+      "message": "operationId \"assets_warranties_partial_update\" has collisions [('/api/assets/warranties/', 'patch'), ('/api/assets/warranties/{id}/', 'patch')]. resolving with numeral suffixes."
+    },
+    {
+      "severity": "warning",
+      "location": "<unknown>",
+      "breadcrumb": "",
+      "message": "operationId \"assets_warranties_update\" has collisions [('/api/assets/warranties/', 'put'), ('/api/assets/warranties/{id}/', 'put')]. resolving with numeral suffixes."
+    },
+    {
+      "severity": "warning",
+      "location": "<unknown>",
+      "breadcrumb": "",
+      "message": "operationId \"compliance_asset_audits_destroy\" has collisions [('/api/compliance/asset-audits/', 'delete'), ('/api/compliance/asset-audits/{id}/', 'delete')]. resolving with numeral suffixes."
+    },
+    {
+      "severity": "warning",
+      "location": "<unknown>",
+      "breadcrumb": "",
+      "message": "operationId \"compliance_asset_audits_partial_update\" has collisions [('/api/compliance/asset-audits/', 'patch'), ('/api/compliance/asset-audits/{id}/', 'patch')]. resolving with numeral suffixes."
+    },
+    {
+      "severity": "warning",
+      "location": "<unknown>",
+      "breadcrumb": "",
+      "message": "operationId \"compliance_asset_audits_update\" has collisions [('/api/compliance/asset-audits/', 'put'), ('/api/compliance/asset-audits/{id}/', 'put')]. resolving with numeral suffixes."
+    },
+    {
+      "severity": "warning",
+      "location": "<unknown>",
+      "breadcrumb": "",
+      "message": "operationId \"compliance_asset_maintenances_destroy\" has collisions [('/api/compliance/asset-maintenances/', 'delete'), ('/api/compliance/asset-maintenances/{id}/', 'delete')]. resolving with numeral suffixes."
+    },
+    {
+      "severity": "warning",
+      "location": "<unknown>",
+      "breadcrumb": "",
+      "message": "operationId \"compliance_asset_maintenances_partial_update\" has collisions [('/api/compliance/asset-maintenances/', 'patch'), ('/api/compliance/asset-maintenances/{id}/', 'patch')]. resolving with numeral suffixes."
+    },
+    {
+      "severity": "warning",
+      "location": "<unknown>",
+      "breadcrumb": "",
+      "message": "operationId \"compliance_asset_maintenances_update\" has collisions [('/api/compliance/asset-maintenances/', 'put'), ('/api/compliance/asset-maintenances/{id}/', 'put')]. resolving with numeral suffixes."
+    },
+    {
+      "severity": "warning",
+      "location": "<unknown>",
+      "breadcrumb": "",
+      "message": "operationId \"compliance_audit_sessions_destroy\" has collisions [('/api/compliance/audit-sessions/', 'delete'), ('/api/compliance/audit-sessions/{id}/', 'delete')]. resolving with numeral suffixes."
+    },
+    {
+      "severity": "warning",
+      "location": "<unknown>",
+      "breadcrumb": "",
+      "message": "operationId \"compliance_audit_sessions_partial_update\" has collisions [('/api/compliance/audit-sessions/', 'patch'), ('/api/compliance/audit-sessions/{id}/', 'patch')]. resolving with numeral suffixes."
+    },
+    {
+      "severity": "warning",
+      "location": "<unknown>",
+      "breadcrumb": "",
+      "message": "operationId \"compliance_audit_sessions_update\" has collisions [('/api/compliance/audit-sessions/', 'put'), ('/api/compliance/audit-sessions/{id}/', 'put')]. resolving with numeral suffixes."
+    },
+    {
+      "severity": "warning",
+      "location": "<unknown>",
+      "breadcrumb": "",
+      "message": "operationId \"compliance_custody_receipts_destroy\" has collisions [('/api/compliance/custody-receipts/', 'delete'), ('/api/compliance/custody-receipts/{id}/', 'delete')]. resolving with numeral suffixes."
+    },
+    {
+      "severity": "warning",
+      "location": "<unknown>",
+      "breadcrumb": "",
+      "message": "operationId \"compliance_custody_receipts_partial_update\" has collisions [('/api/compliance/custody-receipts/', 'patch'), ('/api/compliance/custody-receipts/{id}/', 'patch')]. resolving with numeral suffixes."
+    },
+    {
+      "severity": "warning",
+      "location": "<unknown>",
+      "breadcrumb": "",
+      "message": "operationId \"compliance_custody_receipts_update\" has collisions [('/api/compliance/custody-receipts/', 'put'), ('/api/compliance/custody-receipts/{id}/', 'put')]. resolving with numeral suffixes."
+    },
+    {
+      "severity": "warning",
+      "location": "<unknown>",
+      "breadcrumb": "",
+      "message": "operationId \"compliance_custody_templates_destroy\" has collisions [('/api/compliance/custody-templates/', 'delete'), ('/api/compliance/custody-templates/{id}/', 'delete')]. resolving with numeral suffixes."
+    },
+    {
+      "severity": "warning",
+      "location": "<unknown>",
+      "breadcrumb": "",
+      "message": "operationId \"compliance_custody_templates_partial_update\" has collisions [('/api/compliance/custody-templates/', 'patch'), ('/api/compliance/custody-templates/{id}/', 'patch')]. resolving with numeral suffixes."
+    },
+    {
+      "severity": "warning",
+      "location": "<unknown>",
+      "breadcrumb": "",
+      "message": "operationId \"compliance_custody_templates_update\" has collisions [('/api/compliance/custody-templates/', 'put'), ('/api/compliance/custody-templates/{id}/', 'put')]. resolving with numeral suffixes."
+    },
+    {
+      "severity": "warning",
+      "location": "<unknown>",
+      "breadcrumb": "",
+      "message": "operationId \"extras_alert_rules_destroy\" has collisions [('/api/extras/alert-rules/', 'delete'), ('/api/extras/alert-rules/{id}/', 'delete')]. resolving with numeral suffixes."
+    },
+    {
+      "severity": "warning",
+      "location": "<unknown>",
+      "breadcrumb": "",
+      "message": "operationId \"extras_alert_rules_partial_update\" has collisions [('/api/extras/alert-rules/', 'patch'), ('/api/extras/alert-rules/{id}/', 'patch')]. resolving with numeral suffixes."
+    },
+    {
+      "severity": "warning",
+      "location": "<unknown>",
+      "breadcrumb": "",
+      "message": "operationId \"extras_alert_rules_update\" has collisions [('/api/extras/alert-rules/', 'put'), ('/api/extras/alert-rules/{id}/', 'put')]. resolving with numeral suffixes."
+    },
+    {
+      "severity": "warning",
+      "location": "<unknown>",
+      "breadcrumb": "",
+      "message": "operationId \"extras_custom_fields_destroy\" has collisions [('/api/extras/custom-fields/', 'delete'), ('/api/extras/custom-fields/{id}/', 'delete')]. resolving with numeral suffixes."
+    },
+    {
+      "severity": "warning",
+      "location": "<unknown>",
+      "breadcrumb": "",
+      "message": "operationId \"extras_custom_fields_partial_update\" has collisions [('/api/extras/custom-fields/', 'patch'), ('/api/extras/custom-fields/{id}/', 'patch')]. resolving with numeral suffixes."
+    },
+    {
+      "severity": "warning",
+      "location": "<unknown>",
+      "breadcrumb": "",
+      "message": "operationId \"extras_custom_fields_update\" has collisions [('/api/extras/custom-fields/', 'put'), ('/api/extras/custom-fields/{id}/', 'put')]. resolving with numeral suffixes."
+    },
+    {
+      "severity": "warning",
+      "location": "<unknown>",
+      "breadcrumb": "",
+      "message": "operationId \"extras_custom_fieldsets_destroy\" has collisions [('/api/extras/custom-fieldsets/', 'delete'), ('/api/extras/custom-fieldsets/{id}/', 'delete')]. resolving with numeral suffixes."
+    },
+    {
+      "severity": "warning",
+      "location": "<unknown>",
+      "breadcrumb": "",
+      "message": "operationId \"extras_custom_fieldsets_partial_update\" has collisions [('/api/extras/custom-fieldsets/', 'patch'), ('/api/extras/custom-fieldsets/{id}/', 'patch')]. resolving with numeral suffixes."
+    },
+    {
+      "severity": "warning",
+      "location": "<unknown>",
+      "breadcrumb": "",
+      "message": "operationId \"extras_custom_fieldsets_update\" has collisions [('/api/extras/custom-fieldsets/', 'put'), ('/api/extras/custom-fieldsets/{id}/', 'put')]. resolving with numeral suffixes."
+    },
+    {
+      "severity": "warning",
+      "location": "<unknown>",
+      "breadcrumb": "",
+      "message": "operationId \"extras_dashboards_destroy\" has collisions [('/api/extras/dashboards/', 'delete'), ('/api/extras/dashboards/{id}/', 'delete')]. resolving with numeral suffixes."
+    },
+    {
+      "severity": "warning",
+      "location": "<unknown>",
+      "breadcrumb": "",
+      "message": "operationId \"extras_dashboards_partial_update\" has collisions [('/api/extras/dashboards/', 'patch'), ('/api/extras/dashboards/{id}/', 'patch')]. resolving with numeral suffixes."
+    },
+    {
+      "severity": "warning",
+      "location": "<unknown>",
+      "breadcrumb": "",
+      "message": "operationId \"extras_dashboards_update\" has collisions [('/api/extras/dashboards/', 'put'), ('/api/extras/dashboards/{id}/', 'put')]. resolving with numeral suffixes."
+    },
+    {
+      "severity": "warning",
+      "location": "<unknown>",
+      "breadcrumb": "",
+      "message": "operationId \"extras_event_rules_destroy\" has collisions [('/api/extras/event-rules/', 'delete'), ('/api/extras/event-rules/{id}/', 'delete')]. resolving with numeral suffixes."
+    },
+    {
+      "severity": "warning",
+      "location": "<unknown>",
+      "breadcrumb": "",
+      "message": "operationId \"extras_event_rules_partial_update\" has collisions [('/api/extras/event-rules/', 'patch'), ('/api/extras/event-rules/{id}/', 'patch')]. resolving with numeral suffixes."
+    },
+    {
+      "severity": "warning",
+      "location": "<unknown>",
+      "breadcrumb": "",
+      "message": "operationId \"extras_event_rules_update\" has collisions [('/api/extras/event-rules/', 'put'), ('/api/extras/event-rules/{id}/', 'put')]. resolving with numeral suffixes."
+    },
+    {
+      "severity": "warning",
+      "location": "<unknown>",
+      "breadcrumb": "",
+      "message": "operationId \"extras_journal_entries_destroy\" has collisions [('/api/extras/journal-entries/', 'delete'), ('/api/extras/journal-entries/{id}/', 'delete')]. resolving with numeral suffixes."
+    },
+    {
+      "severity": "warning",
+      "location": "<unknown>",
+      "breadcrumb": "",
+      "message": "operationId \"extras_journal_entries_partial_update\" has collisions [('/api/extras/journal-entries/', 'patch'), ('/api/extras/journal-entries/{id}/', 'patch')]. resolving with numeral suffixes."
+    },
+    {
+      "severity": "warning",
+      "location": "<unknown>",
+      "breadcrumb": "",
+      "message": "operationId \"extras_journal_entries_update\" has collisions [('/api/extras/journal-entries/', 'put'), ('/api/extras/journal-entries/{id}/', 'put')]. resolving with numeral suffixes."
+    },
+    {
+      "severity": "warning",
+      "location": "<unknown>",
+      "breadcrumb": "",
+      "message": "operationId \"extras_notification_channels_destroy\" has collisions [('/api/extras/notification-channels/', 'delete'), ('/api/extras/notification-channels/{id}/', 'delete')]. resolving with numeral suffixes."
+    },
+    {
+      "severity": "warning",
+      "location": "<unknown>",
+      "breadcrumb": "",
+      "message": "operationId \"extras_notification_channels_partial_update\" has collisions [('/api/extras/notification-channels/', 'patch'), ('/api/extras/notification-channels/{id}/', 'patch')]. resolving with numeral suffixes."
+    },
+    {
+      "severity": "warning",
+      "location": "<unknown>",
+      "breadcrumb": "",
+      "message": "operationId \"extras_notification_channels_update\" has collisions [('/api/extras/notification-channels/', 'put'), ('/api/extras/notification-channels/{id}/', 'put')]. resolving with numeral suffixes."
+    },
+    {
+      "severity": "warning",
+      "location": "<unknown>",
+      "breadcrumb": "",
+      "message": "operationId \"extras_tags_destroy\" has collisions [('/api/extras/tags/', 'delete'), ('/api/extras/tags/{id}/', 'delete')]. resolving with numeral suffixes."
+    },
+    {
+      "severity": "warning",
+      "location": "<unknown>",
+      "breadcrumb": "",
+      "message": "operationId \"extras_tags_partial_update\" has collisions [('/api/extras/tags/', 'patch'), ('/api/extras/tags/{id}/', 'patch')]. resolving with numeral suffixes."
+    },
+    {
+      "severity": "warning",
+      "location": "<unknown>",
+      "breadcrumb": "",
+      "message": "operationId \"extras_tags_update\" has collisions [('/api/extras/tags/', 'put'), ('/api/extras/tags/{id}/', 'put')]. resolving with numeral suffixes."
+    },
+    {
+      "severity": "warning",
+      "location": "<unknown>",
+      "breadcrumb": "",
+      "message": "operationId \"extras_webhook_endpoints_destroy\" has collisions [('/api/extras/webhook-endpoints/', 'delete'), ('/api/extras/webhook-endpoints/{id}/', 'delete')]. resolving with numeral suffixes."
+    },
+    {
+      "severity": "warning",
+      "location": "<unknown>",
+      "breadcrumb": "",
+      "message": "operationId \"extras_webhook_endpoints_partial_update\" has collisions [('/api/extras/webhook-endpoints/', 'patch'), ('/api/extras/webhook-endpoints/{id}/', 'patch')]. resolving with numeral suffixes."
+    },
+    {
+      "severity": "warning",
+      "location": "<unknown>",
+      "breadcrumb": "",
+      "message": "operationId \"extras_webhook_endpoints_update\" has collisions [('/api/extras/webhook-endpoints/', 'put'), ('/api/extras/webhook-endpoints/{id}/', 'put')]. resolving with numeral suffixes."
+    },
+    {
+      "severity": "warning",
+      "location": "<unknown>",
+      "breadcrumb": "",
+      "message": "operationId \"inventory_accessories_destroy\" has collisions [('/api/inventory/accessories/', 'delete'), ('/api/inventory/accessories/{id}/', 'delete')]. resolving with numeral suffixes."
+    },
+    {
+      "severity": "warning",
+      "location": "<unknown>",
+      "breadcrumb": "",
+      "message": "operationId \"inventory_accessories_partial_update\" has collisions [('/api/inventory/accessories/', 'patch'), ('/api/inventory/accessories/{id}/', 'patch')]. resolving with numeral suffixes."
+    },
+    {
+      "severity": "warning",
+      "location": "<unknown>",
+      "breadcrumb": "",
+      "message": "operationId \"inventory_accessories_update\" has collisions [('/api/inventory/accessories/', 'put'), ('/api/inventory/accessories/{id}/', 'put')]. resolving with numeral suffixes."
+    },
+    {
+      "severity": "warning",
+      "location": "<unknown>",
+      "breadcrumb": "",
+      "message": "operationId \"inventory_accessory_assignments_destroy\" has collisions [('/api/inventory/accessory-assignments/', 'delete'), ('/api/inventory/accessory-assignments/{id}/', 'delete')]. resolving with numeral suffixes."
+    },
+    {
+      "severity": "warning",
+      "location": "<unknown>",
+      "breadcrumb": "",
+      "message": "operationId \"inventory_accessory_assignments_partial_update\" has collisions [('/api/inventory/accessory-assignments/', 'patch'), ('/api/inventory/accessory-assignments/{id}/', 'patch')]. resolving with numeral suffixes."
+    },
+    {
+      "severity": "warning",
+      "location": "<unknown>",
+      "breadcrumb": "",
+      "message": "operationId \"inventory_accessory_assignments_update\" has collisions [('/api/inventory/accessory-assignments/', 'put'), ('/api/inventory/accessory-assignments/{id}/', 'put')]. resolving with numeral suffixes."
+    },
+    {
+      "severity": "warning",
+      "location": "<unknown>",
+      "breadcrumb": "",
+      "message": "operationId \"inventory_accessory_stocks_destroy\" has collisions [('/api/inventory/accessory-stocks/', 'delete'), ('/api/inventory/accessory-stocks/{id}/', 'delete')]. resolving with numeral suffixes."
+    },
+    {
+      "severity": "warning",
+      "location": "<unknown>",
+      "breadcrumb": "",
+      "message": "operationId \"inventory_accessory_stocks_partial_update\" has collisions [('/api/inventory/accessory-stocks/', 'patch'), ('/api/inventory/accessory-stocks/{id}/', 'patch')]. resolving with numeral suffixes."
+    },
+    {
+      "severity": "warning",
+      "location": "<unknown>",
+      "breadcrumb": "",
+      "message": "operationId \"inventory_accessory_stocks_update\" has collisions [('/api/inventory/accessory-stocks/', 'put'), ('/api/inventory/accessory-stocks/{id}/', 'put')]. resolving with numeral suffixes."
+    },
+    {
+      "severity": "warning",
+      "location": "<unknown>",
+      "breadcrumb": "",
+      "message": "operationId \"inventory_component_allocations_destroy\" has collisions [('/api/inventory/component-allocations/', 'delete'), ('/api/inventory/component-allocations/{id}/', 'delete')]. resolving with numeral suffixes."
+    },
+    {
+      "severity": "warning",
+      "location": "<unknown>",
+      "breadcrumb": "",
+      "message": "operationId \"inventory_component_allocations_partial_update\" has collisions [('/api/inventory/component-allocations/', 'patch'), ('/api/inventory/component-allocations/{id}/', 'patch')]. resolving with numeral suffixes."
+    },
+    {
+      "severity": "warning",
+      "location": "<unknown>",
+      "breadcrumb": "",
+      "message": "operationId \"inventory_component_allocations_update\" has collisions [('/api/inventory/component-allocations/', 'put'), ('/api/inventory/component-allocations/{id}/', 'put')]. resolving with numeral suffixes."
+    },
+    {
+      "severity": "warning",
+      "location": "<unknown>",
+      "breadcrumb": "",
+      "message": "operationId \"inventory_component_stocks_destroy\" has collisions [('/api/inventory/component-stocks/', 'delete'), ('/api/inventory/component-stocks/{id}/', 'delete')]. resolving with numeral suffixes."
+    },
+    {
+      "severity": "warning",
+      "location": "<unknown>",
+      "breadcrumb": "",
+      "message": "operationId \"inventory_component_stocks_partial_update\" has collisions [('/api/inventory/component-stocks/', 'patch'), ('/api/inventory/component-stocks/{id}/', 'patch')]. resolving with numeral suffixes."
+    },
+    {
+      "severity": "warning",
+      "location": "<unknown>",
+      "breadcrumb": "",
+      "message": "operationId \"inventory_component_stocks_update\" has collisions [('/api/inventory/component-stocks/', 'put'), ('/api/inventory/component-stocks/{id}/', 'put')]. resolving with numeral suffixes."
+    },
+    {
+      "severity": "warning",
+      "location": "<unknown>",
+      "breadcrumb": "",
+      "message": "operationId \"inventory_components_destroy\" has collisions [('/api/inventory/components/', 'delete'), ('/api/inventory/components/{id}/', 'delete')]. resolving with numeral suffixes."
+    },
+    {
+      "severity": "warning",
+      "location": "<unknown>",
+      "breadcrumb": "",
+      "message": "operationId \"inventory_components_partial_update\" has collisions [('/api/inventory/components/', 'patch'), ('/api/inventory/components/{id}/', 'patch')]. resolving with numeral suffixes."
+    },
+    {
+      "severity": "warning",
+      "location": "<unknown>",
+      "breadcrumb": "",
+      "message": "operationId \"inventory_components_update\" has collisions [('/api/inventory/components/', 'put'), ('/api/inventory/components/{id}/', 'put')]. resolving with numeral suffixes."
+    },
+    {
+      "severity": "warning",
+      "location": "<unknown>",
+      "breadcrumb": "",
+      "message": "operationId \"inventory_consumable_assignments_destroy\" has collisions [('/api/inventory/consumable-assignments/', 'delete'), ('/api/inventory/consumable-assignments/{id}/', 'delete')]. resolving with numeral suffixes."
+    },
+    {
+      "severity": "warning",
+      "location": "<unknown>",
+      "breadcrumb": "",
+      "message": "operationId \"inventory_consumable_assignments_partial_update\" has collisions [('/api/inventory/consumable-assignments/', 'patch'), ('/api/inventory/consumable-assignments/{id}/', 'patch')]. resolving with numeral suffixes."
+    },
+    {
+      "severity": "warning",
+      "location": "<unknown>",
+      "breadcrumb": "",
+      "message": "operationId \"inventory_consumable_assignments_update\" has collisions [('/api/inventory/consumable-assignments/', 'put'), ('/api/inventory/consumable-assignments/{id}/', 'put')]. resolving with numeral suffixes."
+    },
+    {
+      "severity": "warning",
+      "location": "<unknown>",
+      "breadcrumb": "",
+      "message": "operationId \"inventory_consumable_stocks_destroy\" has collisions [('/api/inventory/consumable-stocks/', 'delete'), ('/api/inventory/consumable-stocks/{id}/', 'delete')]. resolving with numeral suffixes."
+    },
+    {
+      "severity": "warning",
+      "location": "<unknown>",
+      "breadcrumb": "",
+      "message": "operationId \"inventory_consumable_stocks_partial_update\" has collisions [('/api/inventory/consumable-stocks/', 'patch'), ('/api/inventory/consumable-stocks/{id}/', 'patch')]. resolving with numeral suffixes."
+    },
+    {
+      "severity": "warning",
+      "location": "<unknown>",
+      "breadcrumb": "",
+      "message": "operationId \"inventory_consumable_stocks_update\" has collisions [('/api/inventory/consumable-stocks/', 'put'), ('/api/inventory/consumable-stocks/{id}/', 'put')]. resolving with numeral suffixes."
+    },
+    {
+      "severity": "warning",
+      "location": "<unknown>",
+      "breadcrumb": "",
+      "message": "operationId \"inventory_consumables_destroy\" has collisions [('/api/inventory/consumables/', 'delete'), ('/api/inventory/consumables/{id}/', 'delete')]. resolving with numeral suffixes."
+    },
+    {
+      "severity": "warning",
+      "location": "<unknown>",
+      "breadcrumb": "",
+      "message": "operationId \"inventory_consumables_partial_update\" has collisions [('/api/inventory/consumables/', 'patch'), ('/api/inventory/consumables/{id}/', 'patch')]. resolving with numeral suffixes."
+    },
+    {
+      "severity": "warning",
+      "location": "<unknown>",
+      "breadcrumb": "",
+      "message": "operationId \"inventory_consumables_update\" has collisions [('/api/inventory/consumables/', 'put'), ('/api/inventory/consumables/{id}/', 'put')]. resolving with numeral suffixes."
+    },
+    {
+      "severity": "warning",
+      "location": "<unknown>",
+      "breadcrumb": "",
+      "message": "operationId \"inventory_kit_items_destroy\" has collisions [('/api/inventory/kit-items/', 'delete'), ('/api/inventory/kit-items/{id}/', 'delete')]. resolving with numeral suffixes."
+    },
+    {
+      "severity": "warning",
+      "location": "<unknown>",
+      "breadcrumb": "",
+      "message": "operationId \"inventory_kit_items_partial_update\" has collisions [('/api/inventory/kit-items/', 'patch'), ('/api/inventory/kit-items/{id}/', 'patch')]. resolving with numeral suffixes."
+    },
+    {
+      "severity": "warning",
+      "location": "<unknown>",
+      "breadcrumb": "",
+      "message": "operationId \"inventory_kit_items_update\" has collisions [('/api/inventory/kit-items/', 'put'), ('/api/inventory/kit-items/{id}/', 'put')]. resolving with numeral suffixes."
+    },
+    {
+      "severity": "warning",
+      "location": "<unknown>",
+      "breadcrumb": "",
+      "message": "operationId \"inventory_kits_destroy\" has collisions [('/api/inventory/kits/', 'delete'), ('/api/inventory/kits/{id}/', 'delete')]. resolving with numeral suffixes."
+    },
+    {
+      "severity": "warning",
+      "location": "<unknown>",
+      "breadcrumb": "",
+      "message": "operationId \"inventory_kits_partial_update\" has collisions [('/api/inventory/kits/', 'patch'), ('/api/inventory/kits/{id}/', 'patch')]. resolving with numeral suffixes."
+    },
+    {
+      "severity": "warning",
+      "location": "<unknown>",
+      "breadcrumb": "",
+      "message": "operationId \"inventory_kits_update\" has collisions [('/api/inventory/kits/', 'put'), ('/api/inventory/kits/{id}/', 'put')]. resolving with numeral suffixes."
+    },
+    {
+      "severity": "warning",
+      "location": "<unknown>",
+      "breadcrumb": "",
+      "message": "operationId \"licenses_assignments_destroy\" has collisions [('/api/licenses/assignments/', 'delete'), ('/api/licenses/assignments/{id}/', 'delete')]. resolving with numeral suffixes."
+    },
+    {
+      "severity": "warning",
+      "location": "<unknown>",
+      "breadcrumb": "",
+      "message": "operationId \"licenses_assignments_partial_update\" has collisions [('/api/licenses/assignments/', 'patch'), ('/api/licenses/assignments/{id}/', 'patch')]. resolving with numeral suffixes."
+    },
+    {
+      "severity": "warning",
+      "location": "<unknown>",
+      "breadcrumb": "",
+      "message": "operationId \"licenses_assignments_update\" has collisions [('/api/licenses/assignments/', 'put'), ('/api/licenses/assignments/{id}/', 'put')]. resolving with numeral suffixes."
+    },
+    {
+      "severity": "warning",
+      "location": "<unknown>",
+      "breadcrumb": "",
+      "message": "operationId \"licenses_licenses_destroy\" has collisions [('/api/licenses/licenses/', 'delete'), ('/api/licenses/licenses/{id}/', 'delete')]. resolving with numeral suffixes."
+    },
+    {
+      "severity": "warning",
+      "location": "<unknown>",
+      "breadcrumb": "",
+      "message": "operationId \"licenses_licenses_partial_update\" has collisions [('/api/licenses/licenses/', 'patch'), ('/api/licenses/licenses/{id}/', 'patch')]. resolving with numeral suffixes."
+    },
+    {
+      "severity": "warning",
+      "location": "<unknown>",
+      "breadcrumb": "",
+      "message": "operationId \"licenses_licenses_update\" has collisions [('/api/licenses/licenses/', 'put'), ('/api/licenses/licenses/{id}/', 'put')]. resolving with numeral suffixes."
+    },
+    {
+      "severity": "warning",
+      "location": "<unknown>",
+      "breadcrumb": "",
+      "message": "operationId \"organization_asset_holders_destroy\" has collisions [('/api/organization/asset-holders/', 'delete'), ('/api/organization/asset-holders/{id}/', 'delete')]. resolving with numeral suffixes."
+    },
+    {
+      "severity": "warning",
+      "location": "<unknown>",
+      "breadcrumb": "",
+      "message": "operationId \"organization_asset_holders_partial_update\" has collisions [('/api/organization/asset-holders/', 'patch'), ('/api/organization/asset-holders/{id}/', 'patch')]. resolving with numeral suffixes."
+    },
+    {
+      "severity": "warning",
+      "location": "<unknown>",
+      "breadcrumb": "",
+      "message": "operationId \"organization_asset_holders_update\" has collisions [('/api/organization/asset-holders/', 'put'), ('/api/organization/asset-holders/{id}/', 'put')]. resolving with numeral suffixes."
+    },
+    {
+      "severity": "warning",
+      "location": "<unknown>",
+      "breadcrumb": "",
+      "message": "operationId \"organization_contact_assignments_destroy\" has collisions [('/api/organization/contact-assignments/', 'delete'), ('/api/organization/contact-assignments/{id}/', 'delete')]. resolving with numeral suffixes."
+    },
+    {
+      "severity": "warning",
+      "location": "<unknown>",
+      "breadcrumb": "",
+      "message": "operationId \"organization_contact_assignments_partial_update\" has collisions [('/api/organization/contact-assignments/', 'patch'), ('/api/organization/contact-assignments/{id}/', 'patch')]. resolving with numeral suffixes."
+    },
+    {
+      "severity": "warning",
+      "location": "<unknown>",
+      "breadcrumb": "",
+      "message": "operationId \"organization_contact_assignments_update\" has collisions [('/api/organization/contact-assignments/', 'put'), ('/api/organization/contact-assignments/{id}/', 'put')]. resolving with numeral suffixes."
+    },
+    {
+      "severity": "warning",
+      "location": "<unknown>",
+      "breadcrumb": "",
+      "message": "operationId \"organization_contact_roles_destroy\" has collisions [('/api/organization/contact-roles/', 'delete'), ('/api/organization/contact-roles/{id}/', 'delete')]. resolving with numeral suffixes."
+    },
+    {
+      "severity": "warning",
+      "location": "<unknown>",
+      "breadcrumb": "",
+      "message": "operationId \"organization_contact_roles_partial_update\" has collisions [('/api/organization/contact-roles/', 'patch'), ('/api/organization/contact-roles/{id}/', 'patch')]. resolving with numeral suffixes."
+    },
+    {
+      "severity": "warning",
+      "location": "<unknown>",
+      "breadcrumb": "",
+      "message": "operationId \"organization_contact_roles_update\" has collisions [('/api/organization/contact-roles/', 'put'), ('/api/organization/contact-roles/{id}/', 'put')]. resolving with numeral suffixes."
+    },
+    {
+      "severity": "warning",
+      "location": "<unknown>",
+      "breadcrumb": "",
+      "message": "operationId \"organization_contacts_destroy\" has collisions [('/api/organization/contacts/', 'delete'), ('/api/organization/contacts/{id}/', 'delete')]. resolving with numeral suffixes."
+    },
+    {
+      "severity": "warning",
+      "location": "<unknown>",
+      "breadcrumb": "",
+      "message": "operationId \"organization_contacts_partial_update\" has collisions [('/api/organization/contacts/', 'patch'), ('/api/organization/contacts/{id}/', 'patch')]. resolving with numeral suffixes."
+    },
+    {
+      "severity": "warning",
+      "location": "<unknown>",
+      "breadcrumb": "",
+      "message": "operationId \"organization_contacts_update\" has collisions [('/api/organization/contacts/', 'put'), ('/api/organization/contacts/{id}/', 'put')]. resolving with numeral suffixes."
+    },
+    {
+      "severity": "warning",
+      "location": "<unknown>",
+      "breadcrumb": "",
+      "message": "operationId \"organization_cost_centers_destroy\" has collisions [('/api/organization/cost-centers/', 'delete'), ('/api/organization/cost-centers/{id}/', 'delete')]. resolving with numeral suffixes."
+    },
+    {
+      "severity": "warning",
+      "location": "<unknown>",
+      "breadcrumb": "",
+      "message": "operationId \"organization_cost_centers_partial_update\" has collisions [('/api/organization/cost-centers/', 'patch'), ('/api/organization/cost-centers/{id}/', 'patch')]. resolving with numeral suffixes."
+    },
+    {
+      "severity": "warning",
+      "location": "<unknown>",
+      "breadcrumb": "",
+      "message": "operationId \"organization_cost_centers_update\" has collisions [('/api/organization/cost-centers/', 'put'), ('/api/organization/cost-centers/{id}/', 'put')]. resolving with numeral suffixes."
+    },
+    {
+      "severity": "warning",
+      "location": "<unknown>",
+      "breadcrumb": "",
+      "message": "operationId \"organization_locations_destroy\" has collisions [('/api/organization/locations/', 'delete'), ('/api/organization/locations/{id}/', 'delete')]. resolving with numeral suffixes."
+    },
+    {
+      "severity": "warning",
+      "location": "<unknown>",
+      "breadcrumb": "",
+      "message": "operationId \"organization_locations_partial_update\" has collisions [('/api/organization/locations/', 'patch'), ('/api/organization/locations/{id}/', 'patch')]. resolving with numeral suffixes."
+    },
+    {
+      "severity": "warning",
+      "location": "<unknown>",
+      "breadcrumb": "",
+      "message": "operationId \"organization_locations_update\" has collisions [('/api/organization/locations/', 'put'), ('/api/organization/locations/{id}/', 'put')]. resolving with numeral suffixes."
+    },
+    {
+      "severity": "warning",
+      "location": "<unknown>",
+      "breadcrumb": "",
+      "message": "operationId \"organization_regions_destroy\" has collisions [('/api/organization/regions/', 'delete'), ('/api/organization/regions/{id}/', 'delete')]. resolving with numeral suffixes."
+    },
+    {
+      "severity": "warning",
+      "location": "<unknown>",
+      "breadcrumb": "",
+      "message": "operationId \"organization_regions_partial_update\" has collisions [('/api/organization/regions/', 'patch'), ('/api/organization/regions/{id}/', 'patch')]. resolving with numeral suffixes."
+    },
+    {
+      "severity": "warning",
+      "location": "<unknown>",
+      "breadcrumb": "",
+      "message": "operationId \"organization_regions_update\" has collisions [('/api/organization/regions/', 'put'), ('/api/organization/regions/{id}/', 'put')]. resolving with numeral suffixes."
+    },
+    {
+      "severity": "warning",
+      "location": "<unknown>",
+      "breadcrumb": "",
+      "message": "operationId \"organization_site_groups_destroy\" has collisions [('/api/organization/site-groups/', 'delete'), ('/api/organization/site-groups/{id}/', 'delete')]. resolving with numeral suffixes."
+    },
+    {
+      "severity": "warning",
+      "location": "<unknown>",
+      "breadcrumb": "",
+      "message": "operationId \"organization_site_groups_partial_update\" has collisions [('/api/organization/site-groups/', 'patch'), ('/api/organization/site-groups/{id}/', 'patch')]. resolving with numeral suffixes."
+    },
+    {
+      "severity": "warning",
+      "location": "<unknown>",
+      "breadcrumb": "",
+      "message": "operationId \"organization_site_groups_update\" has collisions [('/api/organization/site-groups/', 'put'), ('/api/organization/site-groups/{id}/', 'put')]. resolving with numeral suffixes."
+    },
+    {
+      "severity": "warning",
+      "location": "<unknown>",
+      "breadcrumb": "",
+      "message": "operationId \"organization_sites_destroy\" has collisions [('/api/organization/sites/', 'delete'), ('/api/organization/sites/{id}/', 'delete')]. resolving with numeral suffixes."
+    },
+    {
+      "severity": "warning",
+      "location": "<unknown>",
+      "breadcrumb": "",
+      "message": "operationId \"organization_sites_partial_update\" has collisions [('/api/organization/sites/', 'patch'), ('/api/organization/sites/{id}/', 'patch')]. resolving with numeral suffixes."
+    },
+    {
+      "severity": "warning",
+      "location": "<unknown>",
+      "breadcrumb": "",
+      "message": "operationId \"organization_sites_update\" has collisions [('/api/organization/sites/', 'put'), ('/api/organization/sites/{id}/', 'put')]. resolving with numeral suffixes."
+    },
+    {
+      "severity": "warning",
+      "location": "<unknown>",
+      "breadcrumb": "",
+      "message": "operationId \"organization_tenant_groups_destroy\" has collisions [('/api/organization/tenant-groups/', 'delete'), ('/api/organization/tenant-groups/{id}/', 'delete')]. resolving with numeral suffixes."
+    },
+    {
+      "severity": "warning",
+      "location": "<unknown>",
+      "breadcrumb": "",
+      "message": "operationId \"organization_tenant_groups_partial_update\" has collisions [('/api/organization/tenant-groups/', 'patch'), ('/api/organization/tenant-groups/{id}/', 'patch')]. resolving with numeral suffixes."
+    },
+    {
+      "severity": "warning",
+      "location": "<unknown>",
+      "breadcrumb": "",
+      "message": "operationId \"organization_tenant_groups_update\" has collisions [('/api/organization/tenant-groups/', 'put'), ('/api/organization/tenant-groups/{id}/', 'put')]. resolving with numeral suffixes."
+    },
+    {
+      "severity": "warning",
+      "location": "<unknown>",
+      "breadcrumb": "",
+      "message": "operationId \"organization_tenants_destroy\" has collisions [('/api/organization/tenants/', 'delete'), ('/api/organization/tenants/{id}/', 'delete')]. resolving with numeral suffixes."
+    },
+    {
+      "severity": "warning",
+      "location": "<unknown>",
+      "breadcrumb": "",
+      "message": "operationId \"organization_tenants_partial_update\" has collisions [('/api/organization/tenants/', 'patch'), ('/api/organization/tenants/{id}/', 'patch')]. resolving with numeral suffixes."
+    },
+    {
+      "severity": "warning",
+      "location": "<unknown>",
+      "breadcrumb": "",
+      "message": "operationId \"organization_tenants_update\" has collisions [('/api/organization/tenants/', 'put'), ('/api/organization/tenants/{id}/', 'put')]. resolving with numeral suffixes."
+    },
+    {
+      "severity": "warning",
+      "location": "<unknown>",
+      "breadcrumb": "",
+      "message": "operationId \"procurement_contracts_destroy\" has collisions [('/api/procurement/contracts/', 'delete'), ('/api/procurement/contracts/{id}/', 'delete')]. resolving with numeral suffixes."
+    },
+    {
+      "severity": "warning",
+      "location": "<unknown>",
+      "breadcrumb": "",
+      "message": "operationId \"procurement_contracts_partial_update\" has collisions [('/api/procurement/contracts/', 'patch'), ('/api/procurement/contracts/{id}/', 'patch')]. resolving with numeral suffixes."
+    },
+    {
+      "severity": "warning",
+      "location": "<unknown>",
+      "breadcrumb": "",
+      "message": "operationId \"procurement_contracts_update\" has collisions [('/api/procurement/contracts/', 'put'), ('/api/procurement/contracts/{id}/', 'put')]. resolving with numeral suffixes."
+    },
+    {
+      "severity": "warning",
+      "location": "<unknown>",
+      "breadcrumb": "",
+      "message": "operationId \"procurement_purchase_order_lines_destroy\" has collisions [('/api/procurement/purchase-order-lines/', 'delete'), ('/api/procurement/purchase-order-lines/{id}/', 'delete')]. resolving with numeral suffixes."
+    },
+    {
+      "severity": "warning",
+      "location": "<unknown>",
+      "breadcrumb": "",
+      "message": "operationId \"procurement_purchase_order_lines_partial_update\" has collisions [('/api/procurement/purchase-order-lines/', 'patch'), ('/api/procurement/purchase-order-lines/{id}/', 'patch')]. resolving with numeral suffixes."
+    },
+    {
+      "severity": "warning",
+      "location": "<unknown>",
+      "breadcrumb": "",
+      "message": "operationId \"procurement_purchase_order_lines_update\" has collisions [('/api/procurement/purchase-order-lines/', 'put'), ('/api/procurement/purchase-order-lines/{id}/', 'put')]. resolving with numeral suffixes."
+    },
+    {
+      "severity": "warning",
+      "location": "<unknown>",
+      "breadcrumb": "",
+      "message": "operationId \"procurement_purchase_orders_destroy\" has collisions [('/api/procurement/purchase-orders/', 'delete'), ('/api/procurement/purchase-orders/{id}/', 'delete')]. resolving with numeral suffixes."
+    },
+    {
+      "severity": "warning",
+      "location": "<unknown>",
+      "breadcrumb": "",
+      "message": "operationId \"procurement_purchase_orders_partial_update\" has collisions [('/api/procurement/purchase-orders/', 'patch'), ('/api/procurement/purchase-orders/{id}/', 'patch')]. resolving with numeral suffixes."
+    },
+    {
+      "severity": "warning",
+      "location": "<unknown>",
+      "breadcrumb": "",
+      "message": "operationId \"procurement_purchase_orders_update\" has collisions [('/api/procurement/purchase-orders/', 'put'), ('/api/procurement/purchase-orders/{id}/', 'put')]. resolving with numeral suffixes."
+    },
+    {
+      "severity": "warning",
+      "location": "<unknown>",
+      "breadcrumb": "",
+      "message": "operationId \"providers_scim_v2_Groups_retrieve\" has collisions [('/api/providers/{provider_slug}/scim/v2/Groups', 'get'), ('/api/providers/{provider_slug}/scim/v2/Groups/{id}', 'get')]. resolving with numeral suffixes."
+    },
+    {
+      "severity": "warning",
+      "location": "<unknown>",
+      "breadcrumb": "",
+      "message": "operationId \"providers_scim_v2_Users_retrieve\" has collisions [('/api/providers/{provider_slug}/scim/v2/Users', 'get'), ('/api/providers/{provider_slug}/scim/v2/Users/{id}', 'get')]. resolving with numeral suffixes."
+    },
+    {
+      "severity": "warning",
+      "location": "<unknown>",
+      "breadcrumb": "",
+      "message": "operationId \"software_software_destroy\" has collisions [('/api/software/software/', 'delete'), ('/api/software/software/{id}/', 'delete')]. resolving with numeral suffixes."
+    },
+    {
+      "severity": "warning",
+      "location": "<unknown>",
+      "breadcrumb": "",
+      "message": "operationId \"software_software_partial_update\" has collisions [('/api/software/software/', 'patch'), ('/api/software/software/{id}/', 'patch')]. resolving with numeral suffixes."
+    },
+    {
+      "severity": "warning",
+      "location": "<unknown>",
+      "breadcrumb": "",
+      "message": "operationId \"software_software_update\" has collisions [('/api/software/software/', 'put'), ('/api/software/software/{id}/', 'put')]. resolving with numeral suffixes."
+    },
+    {
+      "severity": "warning",
+      "location": "<unknown>",
+      "breadcrumb": "",
+      "message": "operationId \"subscriptions_assignments_destroy\" has collisions [('/api/subscriptions/assignments/', 'delete'), ('/api/subscriptions/assignments/{id}/', 'delete')]. resolving with numeral suffixes."
+    },
+    {
+      "severity": "warning",
+      "location": "<unknown>",
+      "breadcrumb": "",
+      "message": "operationId \"subscriptions_assignments_partial_update\" has collisions [('/api/subscriptions/assignments/', 'patch'), ('/api/subscriptions/assignments/{id}/', 'patch')]. resolving with numeral suffixes."
+    },
+    {
+      "severity": "warning",
+      "location": "<unknown>",
+      "breadcrumb": "",
+      "message": "operationId \"subscriptions_assignments_update\" has collisions [('/api/subscriptions/assignments/', 'put'), ('/api/subscriptions/assignments/{id}/', 'put')]. resolving with numeral suffixes."
+    },
+    {
+      "severity": "warning",
+      "location": "<unknown>",
+      "breadcrumb": "",
+      "message": "operationId \"subscriptions_providers_destroy\" has collisions [('/api/subscriptions/providers/', 'delete'), ('/api/subscriptions/providers/{id}/', 'delete')]. resolving with numeral suffixes."
+    },
+    {
+      "severity": "warning",
+      "location": "<unknown>",
+      "breadcrumb": "",
+      "message": "operationId \"subscriptions_providers_partial_update\" has collisions [('/api/subscriptions/providers/', 'patch'), ('/api/subscriptions/providers/{id}/', 'patch')]. resolving with numeral suffixes."
+    },
+    {
+      "severity": "warning",
+      "location": "<unknown>",
+      "breadcrumb": "",
+      "message": "operationId \"subscriptions_providers_update\" has collisions [('/api/subscriptions/providers/', 'put'), ('/api/subscriptions/providers/{id}/', 'put')]. resolving with numeral suffixes."
+    },
+    {
+      "severity": "warning",
+      "location": "<unknown>",
+      "breadcrumb": "",
+      "message": "operationId \"subscriptions_subscriptions_destroy\" has collisions [('/api/subscriptions/subscriptions/', 'delete'), ('/api/subscriptions/subscriptions/{id}/', 'delete')]. resolving with numeral suffixes."
+    },
+    {
+      "severity": "warning",
+      "location": "<unknown>",
+      "breadcrumb": "",
+      "message": "operationId \"subscriptions_subscriptions_partial_update\" has collisions [('/api/subscriptions/subscriptions/', 'patch'), ('/api/subscriptions/subscriptions/{id}/', 'patch')]. resolving with numeral suffixes."
+    },
+    {
+      "severity": "warning",
+      "location": "<unknown>",
+      "breadcrumb": "",
+      "message": "operationId \"subscriptions_subscriptions_update\" has collisions [('/api/subscriptions/subscriptions/', 'put'), ('/api/subscriptions/subscriptions/{id}/', 'put')]. resolving with numeral suffixes."
+    },
+    {
+      "severity": "warning",
+      "location": "<unknown>",
+      "breadcrumb": "",
+      "message": "operationId \"tenants_scim_v2_Groups_retrieve\" has collisions [('/api/tenants/{tenant_slug}/scim/v2/Groups', 'get'), ('/api/tenants/{tenant_slug}/scim/v2/Groups/{id}', 'get')]. resolving with numeral suffixes."
+    },
+    {
+      "severity": "warning",
+      "location": "<unknown>",
+      "breadcrumb": "",
+      "message": "operationId \"tenants_scim_v2_Users_retrieve\" has collisions [('/api/tenants/{tenant_slug}/scim/v2/Users', 'get'), ('/api/tenants/{tenant_slug}/scim/v2/Users/{id}', 'get')]. resolving with numeral suffixes."
+    },
+    {
+      "severity": "warning",
+      "location": "<unknown>",
+      "breadcrumb": "",
+      "message": "operationId \"users_tokens_destroy\" has collisions [('/api/users/tokens/', 'delete'), ('/api/users/tokens/{id}/', 'delete')]. resolving with numeral suffixes."
+    },
+    {
+      "severity": "warning",
+      "location": "<unknown>",
+      "breadcrumb": "",
+      "message": "operationId \"users_tokens_partial_update\" has collisions [('/api/users/tokens/', 'patch'), ('/api/users/tokens/{id}/', 'patch')]. resolving with numeral suffixes."
+    },
+    {
+      "severity": "warning",
+      "location": "<unknown>",
+      "breadcrumb": "",
+      "message": "operationId \"users_tokens_update\" has collisions [('/api/users/tokens/', 'put'), ('/api/users/tokens/{id}/', 'put')]. resolving with numeral suffixes."
+    },
+    {
+      "severity": "warning",
+      "location": "itambox/assets/api/serializers.py",
+      "breadcrumb": "AssetAssignmentViewSet > AssetAssignmentSerializer",
+      "message": "unable to resolve type hint for function \"get_assigned_to_name\". Consider using a type hint or @extend_schema_field. Defaulting to string."
+    },
+    {
+      "severity": "warning",
+      "location": "itambox/assets/api/serializers.py",
+      "breadcrumb": "AssetViewSet > AssetSerializer",
+      "message": "Encountered 2 components with identical names \"AssetRequest\" and different identities <class 'assets.api.serializers.AssetSerializer'> and <class 'assets.api.serializers.AssetRequestSerializer'>. This will very likely result in an incorrect schema. Try renaming one."
+    },
+    {
+      "severity": "warning",
+      "location": "itambox/assets/api/serializers.py",
+      "breadcrumb": "AssetViewSet > AssetSerializer",
+      "message": "unable to resolve type hint for function \"get_assigned_to\". Consider using a type hint or @extend_schema_field. Defaulting to string."
+    },
+    {
+      "severity": "warning",
+      "location": "itambox/assets/filters.py",
+      "breadcrumb": "AssetViewSet > AssetFilterSet",
+      "message": "Unable to guess choice types from values, filter method's type hint or find \"tags\" in model. Defaulting to string."
+    },
+    {
+      "severity": "warning",
+      "location": "itambox/extras/api/views.py",
+      "breadcrumb": "DashboardViewSet",
+      "message": "could not derive type of path parameter \"id\" because it is untyped and obtaining queryset from the viewset failed. Consider adding a type to the path (e.g. <int:id>) or annotating the parameter type with @extend_schema. Defaulting to \"string\"."
+    },
+    {
+      "severity": "warning",
+      "location": "itambox/inventory/api/serializers.py",
+      "breadcrumb": "AccessoryViewSet > AccessorySerializer",
+      "message": "unable to resolve type hint for function \"get_category\". Consider using a type hint or @extend_schema_field. Defaulting to string."
+    },
+    {
+      "severity": "warning",
+      "location": "itambox/inventory/api/serializers.py",
+      "breadcrumb": "ComponentViewSet > ComponentSerializer",
+      "message": "unable to resolve type hint for function \"get_category\". Consider using a type hint or @extend_schema_field. Defaulting to string."
+    },
+    {
+      "severity": "warning",
+      "location": "itambox/inventory/api/serializers.py",
+      "breadcrumb": "ConsumableViewSet > ConsumableSerializer",
+      "message": "unable to resolve type hint for function \"get_category\". Consider using a type hint or @extend_schema_field. Defaulting to string."
+    },
+    {
+      "severity": "warning",
+      "location": "itambox/itambox/api/serializers/__init__.py",
+      "breadcrumb": "ObjectChangeViewSet > ObjectChangeSerializer",
+      "message": "could not resolve serializer field \"ChoiceField(choices=<core.choices.ObjectChangeActionChoices object>, read_only=True)\". Defaulting to \"string\""
+    },
+    {
+      "severity": "warning",
+      "location": "itambox/itambox/api/serializers/__init__.py",
+      "breadcrumb": "ObjectChangeViewSet > ObjectChangeSerializer",
+      "message": "unable to resolve type hint for function \"get_changed_object\". Consider using a type hint or @extend_schema_field. Defaulting to string."
+    },
+    {
+      "severity": "warning",
+      "location": "itambox/itambox/api/serializers/__init__.py",
+      "breadcrumb": "ObjectChangeViewSet > ObjectChangeSerializer",
+      "message": "unable to resolve type hint for function \"get_display\". Consider using a type hint or @extend_schema_field. Defaulting to string."
+    },
+    {
+      "severity": "warning",
+      "location": "itambox/itambox/api/serializers/__init__.py",
+      "breadcrumb": "SupplierViewSet > SupplierSerializer > ContactAssignmentSerializer > GenericObjectSerializer",
+      "message": "could not resolve serializer field \"GFKSerializerField(read_only=True)\". Defaulting to \"string\""
+    },
+    {
+      "severity": "warning",
+      "location": "itambox/organization/filters.py",
+      "breadcrumb": "AssetHolderViewSet > AssetHolderFilterSet",
+      "message": "Unable to guess choice types from values, filter method's type hint or find \"tag\" in model. Defaulting to string."
+    },
+    {
+      "severity": "warning",
+      "location": "itambox/organization/filters.py",
+      "breadcrumb": "ContactViewSet > ContactFilterSet",
+      "message": "Unable to guess choice types from values, filter method's type hint or find \"tag\" in model. Defaulting to string."
+    },
+    {
+      "severity": "warning",
+      "location": "itambox/organization/filters.py",
+      "breadcrumb": "LocationViewSet > LocationFilterSet",
+      "message": "Unable to guess choice types from values, filter method's type hint or find \"tag\" in model. Defaulting to string."
+    },
+    {
+      "severity": "warning",
+      "location": "itambox/organization/filters.py",
+      "breadcrumb": "RegionViewSet > RegionFilterSet",
+      "message": "Unable to guess choice types from values, filter method's type hint or find \"tag\" in model. Defaulting to string."
+    },
+    {
+      "severity": "warning",
+      "location": "itambox/organization/filters.py",
+      "breadcrumb": "SiteGroupViewSet > SiteGroupFilterSet",
+      "message": "Unable to guess choice types from values, filter method's type hint or find \"tag\" in model. Defaulting to string."
+    },
+    {
+      "severity": "warning",
+      "location": "itambox/organization/filters.py",
+      "breadcrumb": "SiteViewSet > SiteFilterSet",
+      "message": "Unable to guess choice types from values, filter method's type hint or find \"tag\" in model. Defaulting to string."
+    },
+    {
+      "severity": "warning",
+      "location": "itambox/organization/filters.py",
+      "breadcrumb": "TenantGroupViewSet > TenantGroupFilterSet",
+      "message": "Unable to guess choice types from values, filter method's type hint or find \"tag\" in model. Defaulting to string."
+    },
+    {
+      "severity": "warning",
+      "location": "itambox/organization/filters.py",
+      "breadcrumb": "TenantViewSet > TenantFilterSet",
+      "message": "Unable to guess choice types from values, filter method's type hint or find \"tag\" in model. Defaulting to string."
+    },
+    {
+      "severity": "warning",
+      "location": "itambox/procurement/api/serializers.py",
+      "breadcrumb": "ContractViewSet > ContractSerializer",
+      "message": "unable to resolve type hint for function \"get_cost_center_display\". Consider using a type hint or @extend_schema_field. Defaulting to string."
+    },
+    {
+      "severity": "warning",
+      "location": "itambox/procurement/api/serializers.py",
+      "breadcrumb": "PurchaseOrderLineViewSet > PurchaseOrderLineSerializer",
+      "message": "unable to resolve type hint for function \"get_license_display\". Consider using a type hint or @extend_schema_field. Defaulting to string."
+    },
+    {
+      "severity": "warning",
+      "location": "itambox/procurement/api/serializers.py",
+      "breadcrumb": "PurchaseOrderViewSet > PurchaseOrderSerializer",
+      "message": "unable to resolve type hint for function \"get_created_by_display\". Consider using a type hint or @extend_schema_field. Defaulting to string."
+    },
+    {
+      "severity": "warning",
+      "location": "itambox/subscriptions/api/serializers.py",
+      "breadcrumb": "SubscriptionAssignmentViewSet > SubscriptionAssignmentSerializer",
+      "message": "unable to resolve type hint for function \"get_assigned_object\". Consider using a type hint or @extend_schema_field. Defaulting to string."
+    },
+    {
+      "severity": "warning",
+      "location": "itambox/users/api/scim/provider_views.py",
+      "breadcrumb": "ProviderServiceProviderConfigView",
+      "message": "could not resolve authenticator <class 'users.api.scim.provider_authentication.SCIMProviderBearerTokenAuthentication'>. There was no OpenApiAuthenticationExtension registered for that class. Try creating one by subclassing it. Ignoring for now."
+    },
+    {
+      "severity": "warning",
+      "location": "itambox/users/api/scim/provider_views.py",
+      "breadcrumb": "SCIMProviderGroupDetailView",
+      "message": "could not resolve authenticator <class 'users.api.scim.provider_authentication.SCIMProviderBearerTokenAuthentication'>. There was no OpenApiAuthenticationExtension registered for that class. Try creating one by subclassing it. Ignoring for now."
+    },
+    {
+      "severity": "warning",
+      "location": "itambox/users/api/scim/provider_views.py",
+      "breadcrumb": "SCIMProviderGroupListView",
+      "message": "could not resolve authenticator <class 'users.api.scim.provider_authentication.SCIMProviderBearerTokenAuthentication'>. There was no OpenApiAuthenticationExtension registered for that class. Try creating one by subclassing it. Ignoring for now."
+    },
+    {
+      "severity": "warning",
+      "location": "itambox/users/api/scim/provider_views.py",
+      "breadcrumb": "SCIMProviderUserDetailView",
+      "message": "could not resolve authenticator <class 'users.api.scim.provider_authentication.SCIMProviderBearerTokenAuthentication'>. There was no OpenApiAuthenticationExtension registered for that class. Try creating one by subclassing it. Ignoring for now."
+    },
+    {
+      "severity": "warning",
+      "location": "itambox/users/api/scim/provider_views.py",
+      "breadcrumb": "SCIMProviderUserListView",
+      "message": "could not resolve authenticator <class 'users.api.scim.provider_authentication.SCIMProviderBearerTokenAuthentication'>. There was no OpenApiAuthenticationExtension registered for that class. Try creating one by subclassing it. Ignoring for now."
+    },
+    {
+      "severity": "warning",
+      "location": "itambox/users/api/scim/views.py",
+      "breadcrumb": "SCIMGroupDetailView",
+      "message": "could not resolve authenticator <class 'users.api.scim.authentication.SCIMBearerTokenAuthentication'>. There was no OpenApiAuthenticationExtension registered for that class. Try creating one by subclassing it. Ignoring for now."
+    },
+    {
+      "severity": "warning",
+      "location": "itambox/users/api/scim/views.py",
+      "breadcrumb": "SCIMGroupListView",
+      "message": "could not resolve authenticator <class 'users.api.scim.authentication.SCIMBearerTokenAuthentication'>. There was no OpenApiAuthenticationExtension registered for that class. Try creating one by subclassing it. Ignoring for now."
+    },
+    {
+      "severity": "warning",
+      "location": "itambox/users/api/scim/views.py",
+      "breadcrumb": "SCIMUserDetailView",
+      "message": "could not resolve authenticator <class 'users.api.scim.authentication.SCIMBearerTokenAuthentication'>. There was no OpenApiAuthenticationExtension registered for that class. Try creating one by subclassing it. Ignoring for now."
+    },
+    {
+      "severity": "warning",
+      "location": "itambox/users/api/scim/views.py",
+      "breadcrumb": "SCIMUserListView",
+      "message": "could not resolve authenticator <class 'users.api.scim.authentication.SCIMBearerTokenAuthentication'>. There was no OpenApiAuthenticationExtension registered for that class. Try creating one by subclassing it. Ignoring for now."
+    },
+    {
+      "severity": "warning",
+      "location": "itambox/users/api/scim/views.py",
+      "breadcrumb": "ServiceProviderConfigView",
+      "message": "could not resolve authenticator <class 'users.api.scim.authentication.SCIMBearerTokenAuthentication'>. There was no OpenApiAuthenticationExtension registered for that class. Try creating one by subclassing it. Ignoring for now."
+    },
+    {
+      "severity": "warning",
+      "location": "itambox/users/api/serializers.py",
+      "breadcrumb": "TokenViewSet > TokenSerializer",
+      "message": "unable to resolve type hint for function \"key\". Consider using a type hint or @extend_schema_field. Defaulting to string."
+    },
+    {
+      "severity": "warning",
+      "location": "itambox/users/api/views.py",
+      "breadcrumb": "TokenViewSet",
+      "message": "could not derive type of path parameter \"id\" because it is untyped and obtaining queryset from the viewset failed. Consider adding a type to the path (e.g. <int:id>) or annotating the parameter type with @extend_schema. Defaulting to \"string\"."
+    }
+  ]
+}

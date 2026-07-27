@@ -81,12 +81,12 @@ coverage-baseline:
 	$(UV_DEV) python scripts/check_coverage_baseline.py --coverage-json itambox/coverage.json --write-baseline
 
 openapi-check:
-	PYTHONHASHSEED=0 $(UV_DEV) python scripts/check_openapi_schema.py
+	PYTHONPATH= PYTHONHASHSEED=0 $(UV_DEV) python scripts/check_openapi_schema.py
 
 # Canonical writes are guarded by the script and only work on Linux/Python 3.12.
 # Existing baselines may remove fixed identities but never accept new debt.
 openapi-write:
-	PYTHONHASHSEED=0 $(UV_DEV) python scripts/check_openapi_schema.py --write-schema --write-baseline
+	PYTHONPATH= PYTHONHASHSEED=0 $(UV_DEV) python scripts/check_openapi_schema.py --write-schema --write-baseline
 
 lint:
 	$(UV_DEV) pre-commit run --all-files
