@@ -10,12 +10,13 @@ tenant, plus the centralized cross-tenant resource-access resolver
 from dataclasses import dataclass
 from typing import Optional
 
+from django.contrib.contenttypes.models import ContentType
 from django.db.models import Q
 
 from core.managers import get_current_tenant
 
-from .access import accessible_tenant_ids, get_ancestor_tenant_group_ids
-from .models import Tenant, TenantResourceGrant
+from ..access import accessible_tenant_ids, get_ancestor_tenant_group_ids
+from ..models import Tenant, TenantResourceGrant
 
 # Access-control models whose default manager is deliberately unscoped (their
 # tenant resolution is itself an *input* to tenant scoping, so they cannot ride
@@ -173,8 +174,6 @@ def resolve_stock_access(user, stock, access_level, perm, active_tenant=None):
 def _find_covering_grant(owner_tenant_id, active_tenant, stock):
     """The live grant covering (pool, active tenant), preferring a direct
     grant over an ancestor-group grant. Returns ``(grant, reason)``."""
-    from django.contrib.contenttypes.models import ContentType
-
     ct = ContentType.objects.get_for_model(type(stock))
     base = TenantResourceGrant.objects.filter(
         tenant_id=owner_tenant_id,

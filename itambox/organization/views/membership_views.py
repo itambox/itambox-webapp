@@ -33,6 +33,7 @@ from ..filters import MembershipFilterSet
 from ..forms import MembershipBulkRoleForm, MembershipFilterForm, MembershipForm
 from ..models import Membership, RoleGrant, RoleGrantScope, Tenant
 from ..services import visible_to_containers
+from ..services.errors import MembershipServiceError
 from ..tables import MembershipTable
 
 User = get_user_model()
@@ -314,6 +315,24 @@ class _MembershipFormViewMixin:
         form = context.get("form")
         context["managed_formset"] = getattr(form, "managed_formset", None)
         return context
+
+    def form_valid(self, form):
+        """Re-render a rejection the service raised at save time.
+
+        ``MembershipForm.clean()`` plans read-only, but the authoritative
+        decision is re-taken inside the write transaction against the locked
+        row — so a grant that moved in between (an unmigrated writer, or simply
+        an expiry elapsing) surfaces here, after validation passed. Those are
+        typed service errors precisely so the admin gets the form back with the
+        message on it instead of an HTTP 500. ``_add_service_errors`` is safe
+        after ``full_clean`` and degrades an unrenderable field/row to a
+        form-level error.
+        """
+        try:
+            return super().form_valid(form)
+        except MembershipServiceError as exc:
+            form._add_service_errors(exc)
+            return self.form_invalid(form)
 
 
 class MembershipCreateView(_MembershipFormViewMixin, ObjectEditView):
