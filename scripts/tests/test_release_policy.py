@@ -1,4 +1,5 @@
 import io
+import re
 import tempfile
 import unittest
 from contextlib import redirect_stdout
@@ -61,10 +62,18 @@ class VersionPolicyTests(unittest.TestCase):
 
 class RepositoryPolicyTests(unittest.TestCase):
     def test_checked_in_release_metadata_is_consistent(self):
-        version = validate_repository(REPOSITORY_ROOT, expected_version="1.0.0-alpha.1")
+        version = validate_repository(REPOSITORY_ROOT, expected_version="1.0.0-alpha.2")
 
-        self.assertEqual(version.semver, "1.0.0-alpha.1")
-        self.assertEqual(version.pep440, "1.0.0a1")
+        self.assertEqual(version.semver, "1.0.0-alpha.2")
+        self.assertEqual(version.pep440, "1.0.0a2")
+
+    def test_checked_in_openapi_schema_matches_release_identity(self):
+        version = validate_repository(REPOSITORY_ROOT)
+        schema = (REPOSITORY_ROOT / "itambox" / "schema.yaml").read_text(encoding="utf-8")
+        match = re.search(r"(?m)^  version: (?P<version>\S+)$", schema)
+
+        self.assertIsNotNone(match)
+        self.assertEqual(match.group("version"), version.semver)
 
     def _write_fixture(
         self,
