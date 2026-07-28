@@ -1,3 +1,5 @@
+from unittest.mock import patch
+
 from django.contrib.auth import get_user_model
 from django.test import TestCase
 from django.urls import reverse
@@ -132,3 +134,25 @@ class BulkCheckoutInventoryTests(TestCase):
         self.assertEqual(ComponentAllocation.objects.filter(assigned_holder=self.holder).count(), 2)
         self.assertEqual(ComponentStock.objects.get(pk=stock1.pk).qty, 5)
         self.assertEqual(ComponentStock.objects.get(pk=stock2.pk).qty, 5)
+
+    @patch("inventory.views.base_views.checkout_inventory_item", side_effect=RuntimeError("provider failed"))
+    def test_catalog_item_failure_is_logged_and_does_not_crash_error_reporting(self, checkout):
+        missing_pk = 999999
+
+        with self.assertLogs("inventory.views.base_views", level="ERROR") as logs:
+            response = self.client.post(
+                self.url,
+                {
+                    "model_name": "inventory.consumable",
+                    "pk": [self.consumable1.pk, missing_pk],
+                    "assigned_holder": self.holder.pk,
+                    "qty": 1,
+                    "from_location": self.loc_a.pk,
+                },
+            )
+
+        self.assertEqual(response.status_code, 302)
+        self.assertEqual(checkout.call_count, 1)
+        output = "\n".join(logs.output)
+        self.assertIn(str(self.consumable1.pk), output)
+        self.assertIn(str(missing_pk), output)

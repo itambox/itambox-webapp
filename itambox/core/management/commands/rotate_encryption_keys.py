@@ -1,4 +1,4 @@
-from django.core.management.base import BaseCommand
+from django.core.management.base import BaseCommand, CommandError
 from django.db import transaction
 
 from core.crypto import decrypt_string, encrypt_string
@@ -47,6 +47,13 @@ class Command(BaseCommand):
                 for key in totals:
                     totals[key] += result[key]
 
+            if totals["errors"]:
+                raise CommandError(
+                    "Key rotation failed; all database changes were rolled back. "
+                    f"Rotated: {totals['rotated']}, Skipped: {totals['skipped']}, "
+                    f"Errors: {totals['errors']}."
+                )
+
             prefix = "[DRY RUN] Simulation complete." if dry_run else "Rotation complete!"
             self.stdout.write(
                 self.style.SUCCESS(
@@ -75,7 +82,7 @@ class Command(BaseCommand):
             else:
                 try:
                     decrypted_val = decrypt_string(raw)
-                except Exception as e:
+                except ValueError as e:
                     self.stderr.write(self.style.ERROR(f"Failed to decrypt {label} pk={obj.pk}: {e}"))
                     errors += 1
                     continue

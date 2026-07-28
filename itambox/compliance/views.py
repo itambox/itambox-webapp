@@ -1,8 +1,10 @@
 import hashlib
+import logging
 from urllib.parse import parse_qsl, urlencode, urlparse, urlunparse
 
 from django.contrib.auth.decorators import login_required, permission_required
-from django.shortcuts import get_object_or_404, render
+from django.db import transaction
+from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse_lazy
 from django.utils import timezone
 
@@ -11,7 +13,10 @@ from itambox.views.generic import ObjectCloneView, ObjectDeleteView, ObjectDetai
 
 from .forms import CustodyTemplateForm
 from .models import CustodyReceipt, CustodyTemplate
+from .registry import signature_providers
 from .tables import CustodyTemplateTable
+
+logger = logging.getLogger(__name__)
 
 
 def _authenticated_user_is_holder(user, holder):
@@ -31,6 +36,118 @@ def _authenticated_user_is_holder(user, holder):
     return bool((holder_email and holder_email in candidates) or (holder_upn and holder_upn in candidates))
 
 
+def _external_signature_redirect(receipt, request):
+    if receipt.signature_provider == "local":
+        return None
+    provider = signature_providers.get(receipt.signature_provider)
+    if provider is None:
+        return None
+    url = provider.initiate_signature(receipt, request)
+    if request.GET.get("onsite") == "true":
+        parsed_url = urlparse(url)
+        query = dict(parse_qsl(parsed_url.query))
+        query["onsite"] = "true"
+        url = urlunparse(parsed_url._replace(query=urlencode(query)))
+    return redirect(url)
+
+
+def _completed_receipt_response(request, receipt):
+    context = {"receipt": receipt, "asset": receipt.asset, "holder": receipt.holder}
+    if receipt.acceptance_status == CustodyReceipt.STATUS_ACCEPTED:
+        return render(request, "compliance/custody/receipt_success.html", context)
+    if receipt.acceptance_status == CustodyReceipt.STATUS_DECLINED:
+        return render(
+            request,
+            "compliance/custody/sign_error.html",
+            {"error": "This custody transfer has been declined."},
+        )
+    return None
+
+
+def _expired_receipt_response(request, receipt):
+    if receipt.created_date and (timezone.now() - receipt.created_date).days > 7:
+        return render(
+            request,
+            "compliance/custody/sign_error.html",
+            {"error": "This custody acceptance link has expired (7 day limit)."},
+        )
+    return None
+
+
+def _signer_error_response(request, holder):
+    if request.user.is_authenticated and holder is not None and not _authenticated_user_is_holder(request.user, holder):
+        return render(
+            request,
+            "compliance/custody/sign_error.html",
+            {"error": "You are not the intended recipient of this custody receipt."},
+        )
+    return None
+
+
+def _process_custody_post(request, token, receipt, asset, holder):
+    with transaction.atomic():
+        # Re-fetch under a row lock and re-check status so concurrent or
+        # double-submitted POSTs cannot compute non-deterministic evidence.
+        receipt = CustodyReceipt.objects.select_for_update().get(pk=receipt.pk)
+        completed_response = _completed_receipt_response(request, receipt)
+        if completed_response is not None:
+            return completed_response
+
+        action = request.POST.get("action", "accept")
+        signature_data = request.POST.get("signature_canvas")
+        if action == "decline":
+            receipt.acceptance_status = CustodyReceipt.STATUS_DECLINED
+            receipt.save(update_fields=["acceptance_status", "updated_at"])
+            return render(
+                request,
+                "compliance/custody/sign_error.html",
+                {"error": "You have declined the custody transfer."},
+            )
+        if not signature_data or signature_data == "empty":
+            return render(
+                request,
+                "compliance/custody/sign_portal.html",
+                {
+                    "asset": asset,
+                    "holder": holder,
+                    "token": token,
+                    "receipt": receipt,
+                    "error": "Please provide a valid signature.",
+                },
+            )
+
+        timestamp_str = timezone.now().isoformat()
+        raw_to_hash = f"{holder.upn}|{asset.asset_tag}|{timestamp_str}|{signature_data}"
+        verification_hash = hashlib.sha256(raw_to_hash.encode("utf-8")).hexdigest()
+        receipt.accepted = True
+        receipt.accepted_date = timezone.now()
+        receipt.acceptance_method = "digital"
+        receipt.acceptance_status = CustodyReceipt.STATUS_ACCEPTED
+        receipt.signature_canvas = signature_data
+        receipt.signature_data = signature_data
+        receipt.signature_hash = verification_hash
+        receipt.verification_hash = verification_hash
+        receipt.eula_version = "1.0"
+        receipt.signed_at = timezone.now()
+        receipt.save()
+
+        transaction.on_commit(
+            lambda: _safe_dispatch_custody(
+                receipt,
+                actor_id=request.user.pk,
+                tenant_id=asset.tenant_id,
+            )
+        )
+        asset._changelog_action = "audit"
+        asset._changelog_message = f"EULA digital custody receipt accepted. SHA-256 Hash: {verification_hash[:16]}..."
+        asset.save()
+        return render(
+            request,
+            "compliance/custody/receipt_success.html",
+            {"receipt": receipt, "asset": asset, "holder": holder},
+        )
+
+
 def custody_eula_sign(request, token):
     from django.conf import settings
 
@@ -41,39 +158,17 @@ def custody_eula_sign(request, token):
 
     receipt = get_object_or_404(CustodyReceipt, token=token)
 
-    if receipt.signature_provider != "local":
-        from compliance.registry import signature_providers
+    external_redirect = _external_signature_redirect(receipt, request)
+    if external_redirect is not None:
+        return external_redirect
 
-        provider = signature_providers.get(receipt.signature_provider)
-        if provider:
-            url = provider.initiate_signature(receipt, request)
-            if request.GET.get("onsite") == "true":
-                u = urlparse(url)
-                q = dict(parse_qsl(u.query))
-                q["onsite"] = "true"
-                url = urlunparse(u._replace(query=urlencode(q)))
-            from django.shortcuts import redirect
+    expired_response = _expired_receipt_response(request, receipt)
+    if expired_response is not None:
+        return expired_response
 
-            return redirect(url)
-
-    if receipt.created_date and (timezone.now() - receipt.created_date).days > 7:
-        return render(
-            request,
-            "compliance/custody/sign_error.html",
-            {"error": "This custody acceptance link has expired (7 day limit)."},
-        )
-
-    if receipt.acceptance_status == CustodyReceipt.STATUS_ACCEPTED:
-        return render(
-            request,
-            "compliance/custody/receipt_success.html",
-            {"receipt": receipt, "asset": receipt.asset, "holder": receipt.holder},
-        )
-
-    if receipt.acceptance_status == CustodyReceipt.STATUS_DECLINED:
-        return render(
-            request, "compliance/custody/sign_error.html", {"error": "This custody transfer has been declined."}
-        )
+    completed_response = _completed_receipt_response(request, receipt)
+    if completed_response is not None:
+        return completed_response
 
     asset = receipt.asset
     holder = receipt.holder
@@ -82,88 +177,12 @@ def custody_eula_sign(request, token):
     # credential, but if the visitor IS authenticated they must be the holder —
     # otherwise a logged-in user (Bob) who obtains Alice's token could sign on
     # her behalf, and the verification hash would falsely embed Alice's identity.
-    if request.user.is_authenticated and holder is not None and not _authenticated_user_is_holder(request.user, holder):
-        return render(
-            request,
-            "compliance/custody/sign_error.html",
-            {"error": "You are not the intended recipient of this custody receipt."},
-        )
+    signer_error = _signer_error_response(request, holder)
+    if signer_error is not None:
+        return signer_error
 
     if request.method == "POST":
-        from django.db import transaction
-
-        with transaction.atomic():
-            # Re-fetch under a row lock and re-check status so two concurrent (or
-            # double-submitted) POSTs cannot both compute a fresh signature/hash from
-            # timezone.now() — that would leave non-deterministic compliance evidence.
-            receipt = CustodyReceipt.objects.select_for_update().get(pk=receipt.pk)
-            if receipt.acceptance_status == CustodyReceipt.STATUS_ACCEPTED:
-                # Already signed by the winning request — idempotent success, no rewrite.
-                return render(
-                    request,
-                    "compliance/custody/receipt_success.html",
-                    {"receipt": receipt, "asset": asset, "holder": holder},
-                )
-            if receipt.acceptance_status == CustodyReceipt.STATUS_DECLINED:
-                return render(
-                    request, "compliance/custody/sign_error.html", {"error": "This custody transfer has been declined."}
-                )
-
-            action = request.POST.get("action", "accept")
-            signature_data = request.POST.get("signature_canvas")
-
-            if action == "decline":
-                receipt.acceptance_status = CustodyReceipt.STATUS_DECLINED
-                receipt.save(update_fields=["acceptance_status", "updated_at"])
-                return render(
-                    request, "compliance/custody/sign_error.html", {"error": "You have declined the custody transfer."}
-                )
-
-            if not signature_data or signature_data == "empty":
-                return render(
-                    request,
-                    "compliance/custody/sign_portal.html",
-                    {
-                        "asset": asset,
-                        "holder": holder,
-                        "token": token,
-                        "receipt": receipt,
-                        "error": "Please provide a valid signature.",
-                    },
-                )
-
-            timestamp_str = timezone.now().isoformat()
-            raw_to_hash = f"{holder.upn}|{asset.asset_tag}|{timestamp_str}|{signature_data}"
-            verification_hash = hashlib.sha256(raw_to_hash.encode("utf-8")).hexdigest()
-
-            receipt.accepted = True
-            receipt.accepted_date = timezone.now()
-            receipt.acceptance_method = "digital"
-            receipt.acceptance_status = CustodyReceipt.STATUS_ACCEPTED
-            receipt.signature_canvas = signature_data
-            receipt.signature_data = signature_data
-            receipt.signature_hash = verification_hash
-            receipt.verification_hash = verification_hash
-            receipt.eula_version = "1.0"
-            receipt.signed_at = timezone.now()
-            receipt.save()
-
-            try:
-                transaction.on_commit(lambda: _safe_dispatch_custody(receipt))
-            except Exception:
-                _safe_dispatch_custody(receipt)
-
-            asset._changelog_action = "audit"
-            asset._changelog_message = (
-                f"EULA digital custody receipt accepted. SHA-256 Hash: {verification_hash[:16]}..."
-            )
-            asset.save()
-
-            return render(
-                request,
-                "compliance/custody/receipt_success.html",
-                {"receipt": receipt, "asset": asset, "holder": holder},
-            )
+        return _process_custody_post(request, token, receipt, asset, holder)
 
     return render(
         request,
@@ -172,13 +191,20 @@ def custody_eula_sign(request, token):
     )
 
 
-def _safe_dispatch_custody(receipt):
+def _safe_dispatch_custody(receipt, *, actor_id=None, tenant_id=None):
     try:
         from core.events import dispatch_event
 
         dispatch_event(CustodyReceipt, receipt, action="update")
-    except Exception:
-        pass
+    # broad except: boundary-isolation: event delivery failure must not invalidate accepted custody
+    except Exception as exc:
+        logger.error(
+            "Custody event dispatch failed for receipt_id=%s tenant_id=%s actor_id=%s exception_type=%s",
+            receipt.pk,
+            tenant_id,
+            actor_id,
+            type(exc).__name__,
+        )
 
 
 class CustodyTemplateListView(ObjectListView):

@@ -146,12 +146,18 @@ def bulk_checkout_inventory(request):
                         source_location=from_location,
                     )
                     success_count += 1
+                # broad except: task-isolation: one failed item must not abort the reviewed batch
                 except Exception as ex:
                     failure_count += 1
-                    logger.exception(f"Failed to bulk checkout {item_model.__name__} PK {pk}")
-                    messages.error(
-                        request, _("Failed to check out %(item)s: %(error)s") % {"item": item, "error": str(ex)}
+                    logger.error(
+                        "Bulk checkout failed for model=%s pk=%s tenant_id=%s actor_id=%s exception_type=%s",
+                        item_model.__name__,
+                        pk,
+                        getattr(holder, "tenant_id", None),
+                        request.user.pk,
+                        type(ex).__name__,
                     )
+                    messages.error(request, _("Failed to check out item %(pk)s.") % {"pk": pk})
 
         elif model_name_str in ("inventory.accessorystock", "inventory.consumablestock", "inventory.componentstock"):
             # Stocks page checkouts: from_location determined per stock record
@@ -170,10 +176,18 @@ def bulk_checkout_inventory(request):
                         source_location=stock.location,
                     )
                     success_count += 1
+                # broad except: task-isolation: one failed stock row must not abort the reviewed batch
                 except Exception as ex:
                     failure_count += 1
-                    logger.exception(f"Failed to bulk checkout {stock_model.__name__} PK {pk}")
-                    messages.error(request, _("Failed to check out stock item: %(error)s") % {"error": str(ex)})
+                    logger.error(
+                        "Bulk checkout failed for model=%s pk=%s tenant_id=%s actor_id=%s exception_type=%s",
+                        stock_model.__name__,
+                        pk,
+                        getattr(holder, "tenant_id", None),
+                        request.user.pk,
+                        type(ex).__name__,
+                    )
+                    messages.error(request, _("Failed to check out stock item."))
 
     if success_count > 0:
         messages.success(request, _("Successfully checked out %(count)s item(s).") % {"count": success_count})

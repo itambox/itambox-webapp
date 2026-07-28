@@ -1,4 +1,8 @@
+import io
 import json
+import sys
+from types import SimpleNamespace
+from unittest.mock import patch
 
 from django.contrib.auth import get_user_model
 from django.core.exceptions import ValidationError
@@ -120,21 +124,29 @@ class MitigationsPhase4Tests(TestCase):
         with self.assertRaises(ValidationError):
             validate_file_attachment(dangerous_file)
 
-        # 2. Spoofed extension with dangerous magic bytes (e.g. exe bytes inside .txt)
-        spoofed_file = SimpleUploadedFile("safe.txt", b"MZ" + b"\x00" * 120)
-        with self.assertRaises(ValidationError):
-            validate_file_attachment(spoofed_file)
+        # Exercise MIME classification deterministically on every supported
+        # development platform. Native Windows intentionally omits libmagic.
+        magic = SimpleNamespace(
+            from_buffer=lambda chunk, mime: "application/x-dosexec" if chunk.startswith(b"MZ") else "application/pdf"
+        )
+        with patch.dict(sys.modules, {"magic": magic}):
+            # 2. Spoofed extension with dangerous magic bytes (e.g. exe bytes inside .txt)
+            spoofed_file = SimpleUploadedFile("safe.txt", b"MZ" + b"\x00" * 120)
+            with self.assertRaises(ValidationError):
+                validate_file_attachment(spoofed_file)
 
-        # 3. Clean file attachment
-        clean_file = SimpleUploadedFile("clean.pdf", b"%PDF-1.4\n...")
-        # Should not raise ValidationError
-        validate_file_attachment(clean_file)
+            # 3. Clean file attachment
+            clean_file = SimpleUploadedFile("clean.pdf", b"%PDF-1.4\n...")
+            # Should not raise ValidationError
+            validate_file_attachment(clean_file)
 
     def test_magic_byte_validation_images(self):
         # 1. Safe PNG image
-        png_data = (
-            b"\x89PNG\r\n\x1a\n\x00\x00\x00\rIHDR\x00\x00\x00\x01\x00\x00\x00\x01\x08\x06\x00\x00\x00\x1f\x15\xc4\x89"
-        )
+        from PIL import Image
+
+        png_buffer = io.BytesIO()
+        Image.new("RGBA", (1, 1), (0, 0, 0, 0)).save(png_buffer, format="PNG")
+        png_data = png_buffer.getvalue()
         safe_image = SimpleUploadedFile("image.png", png_data)
         # Should not raise
         validate_image_attachment(safe_image)

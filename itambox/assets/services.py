@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import datetime
+import logging
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
@@ -35,6 +36,8 @@ from licenses.models import LicenseSeatAssignment
 
 from .choices import StatusTypeChoices
 from .models import Asset, AssetAssignment, StatusLabel
+
+logger = logging.getLogger(__name__)
 
 
 def checkout_asset(
@@ -219,10 +222,19 @@ def checkout_asset(
                                     },
                                     from_email=email_config.from_address,
                                     recipient_list=[recipient],
-                                    fail_silently=True,
+                                    fail_silently=False,
                                 )
-                    except Exception:
-                        pass
+                    # broad except: boundary-isolation: custody notification failure must not roll back assignment
+                    except Exception as exc:
+                        logger.error(
+                            "Custody notification failed for asset_id=%s receipt_id=%s tenant_id=%s actor_id=%s "
+                            "exception_type=%s",
+                            asset.pk,
+                            receipt.pk,
+                            asset.tenant_id,
+                            getattr(getattr(request, "user", None), "pk", None),
+                            type(exc).__name__,
+                        )
 
     return target
 

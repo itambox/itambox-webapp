@@ -132,4 +132,4 @@ try:
                 "description": 'Token-based authentication using "Token <token_key>"',
             }
 except ImportError:
-    pass
+    TokenAuthenticationScheme = None

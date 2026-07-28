@@ -3,9 +3,11 @@ Django base settings for ITAMbox.
 Contains all common settings shared between dev and prod.
 """
 
+import json
 import os
 from pathlib import Path
 
+from django.core.exceptions import ImproperlyConfigured
 from django.utils.translation import gettext_lazy as _
 
 from itambox.release import VERSION
@@ -161,8 +163,6 @@ WSGI_APPLICATION = "core.wsgi.application"
 DB_ENGINE = os.environ.get("ITAMBOX_DB_ENGINE", "django.db.backends.postgresql")
 
 if "sqlite" in DB_ENGINE:
-    from django.core.exceptions import ImproperlyConfigured
-
     raise ImproperlyConfigured(
         "SQLite is strictly deprecated and not supported in ITAMbox. Please use PostgreSQL 15+ for all environments."
     )
@@ -354,33 +354,29 @@ PAGINATE_COUNT_CHOICES = (
     (1000, "1000"),
 )
 
-import json
-import logging
 
-try:
-    ITAMBOX_TENANT_LDAP_CONFIGS = json.loads(os.environ.get("ITAMBOX_TENANT_LDAP_CONFIGS", "{}"))
-except Exception:
-    ITAMBOX_TENANT_LDAP_CONFIGS = {}
+def _load_tenant_json_config(environment_name):
+    raw = os.environ.get(environment_name, "{}")
+    try:
+        value = json.loads(raw)
+    except json.JSONDecodeError as exc:
+        raise ImproperlyConfigured(
+            f"{environment_name} contains invalid JSON at line {exc.lineno}, column {exc.colno}."
+        ) from exc
+    if not isinstance(value, dict):
+        raise ImproperlyConfigured(f"{environment_name} must contain a JSON object.")
+    return value
 
-try:
-    ITAMBOX_TENANT_SAML_CONFIGS = json.loads(os.environ.get("ITAMBOX_TENANT_SAML_CONFIGS", "{}"))
-except Exception:
-    ITAMBOX_TENANT_SAML_CONFIGS = {}
 
-try:
-    ITAMBOX_TENANT_OIDC_CONFIGS = json.loads(os.environ.get("ITAMBOX_TENANT_OIDC_CONFIGS", "{}"))
-except Exception as e:
-    logging.getLogger(__name__).warning("Failed to parse ITAMBOX_TENANT_OIDC_CONFIGS: %s", e)
-    ITAMBOX_TENANT_OIDC_CONFIGS = {}
+ITAMBOX_TENANT_LDAP_CONFIGS = _load_tenant_json_config("ITAMBOX_TENANT_LDAP_CONFIGS")
+ITAMBOX_TENANT_SAML_CONFIGS = _load_tenant_json_config("ITAMBOX_TENANT_SAML_CONFIGS")
+ITAMBOX_TENANT_OIDC_CONFIGS = _load_tenant_json_config("ITAMBOX_TENANT_OIDC_CONFIGS")
 
 # Intune discovery connector — per-tenant config.
 # Keys per tenant slug: azure_tenant_id, client_id, client_secret,
 #   create_missing (bool, default false), default_status (StatusLabel slug, default "deployable"),
 #   sync_software (bool, default true).
-try:
-    ITAMBOX_TENANT_INTUNE_CONFIGS = json.loads(os.environ.get("ITAMBOX_TENANT_INTUNE_CONFIGS", "{}"))
-except Exception:
-    ITAMBOX_TENANT_INTUNE_CONFIGS = {}
+ITAMBOX_TENANT_INTUNE_CONFIGS = _load_tenant_json_config("ITAMBOX_TENANT_INTUNE_CONFIGS")
 
 
 # SAML SSO Configuration Loader

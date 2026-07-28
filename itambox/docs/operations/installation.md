@@ -49,6 +49,17 @@ python -c "import secrets; print(secrets.token_urlsafe(48))"
 
 The last value can be placed in a pepper mapping such as `{"1":"<generated-value>"}`. Invalid JSON is ignored and falls back to a `SECRET_KEY`-derived pepper, so verify the syntax before admitting users.
 
+!!! warning "Upgrade legacy field-encryption passphrases before deployment"
+    Older revisions accepted arbitrary strings in `ITAMBOX_FIELD_ENCRYPTION_KEYS` and silently derived a Fernet key from each string. Current revisions fail closed unless every configured entry is already a valid Fernet key. Before upgrading an installation that used a passphrase, convert each existing entry to the exact key the older revision derived:
+
+    ```bash
+    read -rsp 'Legacy field-encryption passphrase: ' LEGACY_FIELD_KEY && printf '\n'
+    LEGACY_FIELD_KEY="$LEGACY_FIELD_KEY" python -c "import base64, hashlib, os; print(base64.urlsafe_b64encode(hashlib.sha256(os.environ['LEGACY_FIELD_KEY'].encode()).digest()).decode())"
+    unset LEGACY_FIELD_KEY
+    ```
+
+    Store the printed value as the corresponding entry in `ITAMBOX_FIELD_ENCRYPTION_KEYS`, then discard terminal scrollback according to your secrets-handling policy. Do **not** generate a replacement key for this migration: changing the key would make existing encrypted SMTP passwords, license keys, and webhook secrets unreadable. For a later controlled rotation, keep the converted old key in the comma-separated keyring until all values have been re-encrypted.
+
 !!! danger "Back up the complete secret set"
     Back up `.env`, especially `ITAMBOX_SECRET_KEY`, `ITAMBOX_FIELD_ENCRYPTION_KEYS`, and `ITAMBOX_API_TOKEN_PEPPERS`, with the database and media. Losing the field-encryption keyring makes encrypted SMTP passwords, license keys, and webhook secrets unreadable. Losing token peppers invalidates existing API tokens.
 
@@ -80,7 +91,7 @@ The tables below document every variable available in `.env.example`, organized 
 | Variable | Required | Default | Purpose |
 |---|---|---|---|
 | `ITAMBOX_SECRET_KEY` ⚠️ | **Required** (prod) | *(insecure dev fallback)* | Django secret key used for cryptographic signing (sessions, CSRF tokens, password reset tokens). Generate with `python -c "import secrets; print(secrets.token_urlsafe(64))"`. The app refuses to boot in production with the fallback. |
-| `ITAMBOX_FIELD_ENCRYPTION_KEYS` ⚠️ | **Required** (prod) | *(derived from SECRET_KEY)* | Fernet key(s) that encrypt sensitive stored values (license keys, SMTP passwords, webhook secrets). Comma-separated; the **first** key encrypts, **all** keys decrypt. Append the old key when rotating. Generate with `python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"`. When unset, the key is derived from `ITAMBOX_SECRET_KEY` as a dev convenience — then rotating `SECRET_KEY` makes every encrypted field **permanently unreadable**. Set a dedicated value and back it up with every database dump. |
+| `ITAMBOX_FIELD_ENCRYPTION_KEYS` ⚠️ | **Required** (prod) | *(derived from SECRET_KEY)* | Valid Fernet key(s) that encrypt sensitive stored values (license keys, SMTP passwords, webhook secrets). Comma-separated; the **first** key encrypts, **all** keys decrypt. Append the old key when rotating. Generate with `python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"`. Arbitrary passphrases are rejected; follow the legacy-passphrase upgrade procedure above before deploying over an older installation. When unset, the key is derived from `ITAMBOX_SECRET_KEY` as a dev convenience — then rotating `SECRET_KEY` makes every encrypted field **permanently unreadable**. Set a dedicated value and back it up with every database dump. |
 | `ITAMBOX_API_TOKEN_PEPPERS` ⚠️ | **Required** (prod) | *(derived from SECRET_KEY)* | Server-side peppers used to HMAC-hash API tokens at rest. Must be a JSON object whose numeric keys are rotation IDs and values are dedicated secrets of ≥50 characters. The highest ID peppers new tokens; older IDs keep existing tokens valid. Example: `{"1":"replace-with-a-random-secret-of-at-least-50-characters"}`. When unset or malformed, falls back to a `SECRET_KEY`-derived pepper — acceptable for development only. |
 | `ITAMBOX_ALLOWED_HOSTS` ⚠️ | **Required** (prod) | `localhost,127.0.0.1` | Comma-separated host/domain names the site may serve. Django's `ALLOWED_HOSTS` — requests with unrecognized `Host` headers receive HTTP 400. Always include `127.0.0.1` so the container health probe works. |
 | `ITAMBOX_CSRF_TRUSTED_ORIGINS` ⚠️ | **Required** (prod) | *(empty)* | Origins trusted for cross-origin POST/PUT/PATCH/DELETE. Scheme-qualified (e.g. `https://itam.example.com`). Must match the external URL users access the site through. |

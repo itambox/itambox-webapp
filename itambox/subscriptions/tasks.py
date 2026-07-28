@@ -31,7 +31,10 @@ def check_subscription_expiries_and_reminders():
     soft-deleted subscriptions remain excluded — and every row found is still
     processed inside its own tenant's TaskContext below.
     """
-    today = timezone.now().date()
+    # Renewal dates are calendar dates in the configured application timezone,
+    # not UTC dates. Around local midnight ``timezone.now().date()`` can still
+    # be yesterday and leave already-expired subscriptions active for a day.
+    today = timezone.localdate()
 
     # 1. Handle auto-expiries
     expired_count = 0

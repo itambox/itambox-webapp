@@ -96,23 +96,25 @@ def clear_local_authorization_cache(user):
 def _publish_user_version(user_id):
     try:
         cache.set(_cache_key(user_id), uuid4().hex, timeout=None)
-    except Exception:
+    # broad except: availability-tradeoff: a cache write failure falls back to uncached authorization resolution
+    except Exception as exc:
         # A cache outage must not turn an authorization write into a 500. Reads
         # fail closed to uncached resolution in synchronize_authorization_cache.
         logger.warning(
-            "Could not publish authorization cache invalidation for user %s",
+            "Could not publish authorization cache invalidation for user %s (exception_type=%s)",
             user_id,
-            exc_info=True,
+            type(exc).__name__,
         )
 
 
 def _publish_topology_version():
     try:
         cache.set(_TOPOLOGY_CACHE_KEY, uuid4().hex, timeout=None)
-    except Exception:
+    # broad except: availability-tradeoff: a cache write failure falls back to uncached authorization resolution
+    except Exception as exc:
         logger.warning(
-            "Could not publish authorization topology invalidation",
-            exc_info=True,
+            "Could not publish authorization topology invalidation (exception_type=%s)",
+            type(exc).__name__,
         )
 
 
@@ -185,11 +187,17 @@ def synchronize_authorization_cache(user):
         versions = cache.get_many(keys)
         version = tuple(versions.get(key) for key in keys)
         cache_available = True
-    except Exception:
+    # broad except: availability-tradeoff: a cache read failure forces fresh authorization resolution
+    except Exception as exc:
         # A fresh value on every check prevents stale authorization while the
         # shared cache is unavailable, at the cost of temporarily re-querying.
         version = (uuid4().hex, uuid4().hex)
         cache_available = False
+        logger.warning(
+            "Authorization cache unavailable; forcing uncached resolution for user %s (exception_type=%s)",
+            user.pk,
+            type(exc).__name__,
+        )
 
     if (
         crossed_request_boundary

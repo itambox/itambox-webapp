@@ -154,6 +154,7 @@ def _defer_notify_watchers(sender, instance, action):
         transaction.on_commit(lambda: _notify_watchers(sender, instance, action))
     except Exception:
         # No active transaction (autocommit): run inline so the notification still fires.
+        logger.debug("Failed to defer watcher notification; notifying inline", exc_info=True)
         try:
             _notify_watchers(sender, instance, action)
         except Exception as e:

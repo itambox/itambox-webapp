@@ -924,14 +924,6 @@
       "count": 1
     },
     {
-      "path": "itambox/assets/tests/test_assignments.py",
-      "code": "F401",
-      "message": "'assets.models.AssetAssignment' imported but unused",
-      "source": "from assets.models import Asset, AssetAssignment, StatusLabel",
-      "context": "Module:body",
-      "count": 1
-    },
-    {
       "path": "itambox/assets/tests/test_audit_cadence.py",
       "code": "F401",
       "message": "'django.test.RequestFactory' imported but unused",
@@ -2781,14 +2773,6 @@
     },
     {
       "path": "itambox/compliance/views.py",
-      "code": "C901",
-      "message": "'custody_eula_sign' is too complex (16)",
-      "source": "def custody_eula_sign(request, token):",
-      "context": "Module:body/FunctionDef:custody_eula_sign:self",
-      "count": 1
-    },
-    {
-      "path": "itambox/compliance/views.py",
       "code": "F401",
       "message": "'itambox.panels.Panel' imported but unused",
       "source": "from itambox.panels import Panel",
@@ -4376,22 +4360,6 @@
       "code": "E402",
       "message": "module level import not at top of file",
       "source": "from itambox.plugins.utils import load_plugins",
-      "context": "Module:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/core/settings/base.py",
-      "code": "E402",
-      "message": "module level import not at top of file",
-      "source": "import json",
-      "context": "Module:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/core/settings/base.py",
-      "code": "E402",
-      "message": "module level import not at top of file",
-      "source": "import logging",
       "context": "Module:body",
       "count": 1
     },
@@ -6464,14 +6432,6 @@
       "code": "E402",
       "message": "module level import not at top of file",
       "source": "import logging",
-      "context": "Module:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/extras/views.py",
-      "code": "F401",
-      "message": "'django.http.QueryDict' imported but unused",
-      "source": "from django.http import HttpResponse, QueryDict",
       "context": "Module:body",
       "count": 1
     },

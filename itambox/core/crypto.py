@@ -5,6 +5,7 @@ import os
 
 from cryptography.fernet import Fernet, InvalidToken, MultiFernet
 from django.conf import settings
+from django.core.exceptions import ImproperlyConfigured
 
 logger = logging.getLogger(__name__)
 
@@ -24,18 +25,14 @@ def get_fernet():
         keys = [k.strip() for k in keys_str.split(",") if k.strip()]
         if keys:
             fernet_instances = []
-            for k in keys:
+            for index, k in enumerate(keys, start=1):
                 try:
-                    decoded = base64.urlsafe_b64decode(k)
-                    if len(decoded) == 32:
-                        fernet_instances.append(Fernet(k))
-                        continue
-                except Exception:
-                    pass
-
-                key_bytes = hashlib.sha256(k.encode("utf-8")).digest()
-                fernet_key = base64.urlsafe_b64encode(key_bytes)
-                fernet_instances.append(Fernet(fernet_key))
+                    fernet_instances.append(Fernet(k))
+                except (TypeError, ValueError) as exc:
+                    raise ImproperlyConfigured(
+                        "ITAMBOX_FIELD_ENCRYPTION_KEYS contains an invalid Fernet key "
+                        f"at index {index}; configured keys must be urlsafe base64-encoded 32-byte keys."
+                    ) from exc
 
             if len(fernet_instances) > 1:
                 return MultiFernet(fernet_instances)
@@ -84,7 +81,7 @@ def decrypt_string(cipher_text: str) -> str:
     Decrypt a cipher string starting with the 'enc$' prefix sentinel.
     Raises ValueError if a non-encrypted string is passed.
 
-    If decryption fails, returns the original cipher_text to avoid data loss.
+    Raises ValueError when decryption fails.
     """
     if not cipher_text:
         return ""
