@@ -1,7 +1,7 @@
 from types import SimpleNamespace
 from unittest.mock import Mock, PropertyMock, patch
 
-from django.http import HttpResponse
+from django.http import Http404, HttpResponse
 from django.test import SimpleTestCase, TestCase
 
 from core.auth.ldap import MultiTenantLDAPBackend
@@ -67,10 +67,11 @@ class OIDCStaleTenantTests(TestCase):
         with patch(
             "mozilla_django_oidc.views.OIDCAuthenticationRequestView.dispatch",
             return_value=HttpResponse(status=200),
-        ):
-            response = TenantOIDCAuthorizeView().dispatch(request)
+        ) as parent_dispatch:
+            with self.assertRaises(Http404):
+                TenantOIDCAuthorizeView().dispatch(request)
 
-        self.assertEqual(response.status_code, 200)
+        parent_dispatch.assert_not_called()
         self.assertNotIn("oidc_tenant_slug", request.session)
 
     def test_stale_callback_session_tenant_is_removed(self):
@@ -78,10 +79,11 @@ class OIDCStaleTenantTests(TestCase):
         with patch(
             "mozilla_django_oidc.views.OIDCAuthenticationCallbackView.dispatch",
             return_value=HttpResponse(status=200),
-        ):
-            response = TenantOIDCCallbackView().dispatch(request)
+        ) as parent_dispatch:
+            with self.assertRaises(Http404):
+                TenantOIDCCallbackView().dispatch(request)
 
-        self.assertEqual(response.status_code, 200)
+        parent_dispatch.assert_not_called()
         self.assertNotIn("oidc_tenant_slug", request.session)
 
     def test_stale_login_success_tenant_is_removed(self):
@@ -90,8 +92,9 @@ class OIDCStaleTenantTests(TestCase):
         with patch(
             "mozilla_django_oidc.views.OIDCAuthenticationCallbackView.login_success",
             return_value=HttpResponse(status=302),
-        ):
-            response = view.login_success()
+        ) as parent_login_success:
+            with self.assertRaises(Http404):
+                view.login_success()
 
-        self.assertEqual(response.status_code, 302)
+        parent_login_success.assert_not_called()
         self.assertNotIn("oidc_tenant_slug", view.request.session)
