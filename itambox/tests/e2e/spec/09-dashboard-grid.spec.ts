@@ -46,6 +46,7 @@ test('dashboard grid initializes and persists a resized widget', async ({ page }
   await page.locator('#unlock-dashboard').click();
   await expect(page.locator('#dashboard-unlocked-controls')).toBeVisible();
 
+  await item.hover();
   const resizeHandle = item.locator('.ui-resizable-se');
   await expect(resizeHandle).toBeVisible();
   const handleBox = await resizeHandle.boundingBox();
