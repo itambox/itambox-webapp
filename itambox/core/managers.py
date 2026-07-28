@@ -342,7 +342,8 @@ class TenantScopingQuerySet(models.QuerySet):
                     )
                 qs = qs.filter(models.Q(tenant_group_id__in=group_ids) | models.Q(tenant_group__isnull=True))
             except FieldDoesNotExist:
-                pass
+                # Models without tenant-group support retain the tenant-only queryset.
+                qs = self
 
             # Filter by tenant if field exists
             try:

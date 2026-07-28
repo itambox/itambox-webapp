@@ -1,12 +1,14 @@
 import os
+from unittest.mock import patch
 
 from cryptography.fernet import Fernet
 from django.contrib.auth import get_user_model
+from django.core.exceptions import ImproperlyConfigured
 from django.core.management import call_command
 from django.test import TestCase
 
 from assets.models import Manufacturer
-from core.crypto import decrypt_string, encrypt_string
+from core.crypto import decrypt_string, encrypt_string, get_fernet
 from licenses.models import License
 from software.models import Software
 
@@ -14,6 +16,20 @@ User = get_user_model()
 
 
 class CoreCryptoTestCase(TestCase):
+    def test_malformed_configured_key_fails_closed_without_disclosing_key(self):
+        secret_key_material = "not-a-valid-fernet-key-secret"
+
+        with patch.dict(
+            os.environ,
+            {"ITAMBOX_FIELD_ENCRYPTION_KEYS": secret_key_material},
+        ):
+            with self.assertRaises(ImproperlyConfigured) as raised:
+                get_fernet()
+
+        message = str(raised.exception)
+        self.assertIn("index 1", message)
+        self.assertNotIn(secret_key_material, message)
+
     def test_multi_key_encryption_consolidation(self):
         """Test encryption key rotation using MultiFernet."""
         key1 = Fernet.generate_key().decode("ascii")

@@ -810,12 +810,6 @@
     {
       "path": "itambox/compliance/views.py",
       "context": "FunctionDef:custody_eula_sign",
-      "statement": "from compliance.registry import signature_providers",
-      "count": 1
-    },
-    {
-      "path": "itambox/compliance/views.py",
-      "context": "FunctionDef:custody_eula_sign",
       "statement": "from django.conf import settings",
       "count": 1
     },
@@ -823,18 +817,6 @@
       "path": "itambox/compliance/views.py",
       "context": "FunctionDef:custody_eula_sign",
       "statement": "from django.contrib.auth.views import redirect_to_login",
-      "count": 1
-    },
-    {
-      "path": "itambox/compliance/views.py",
-      "context": "FunctionDef:custody_eula_sign",
-      "statement": "from django.db import transaction",
-      "count": 1
-    },
-    {
-      "path": "itambox/compliance/views.py",
-      "context": "FunctionDef:custody_eula_sign",
-      "statement": "from django.shortcuts import redirect",
       "count": 1
     },
     {
@@ -967,12 +949,6 @@
       "path": "itambox/core/auth/__init__.py",
       "context": "ClassDef:MembershipBackend/FunctionDef:_object_tenant",
       "statement": "from organization.models import Tenant",
-      "count": 1
-    },
-    {
-      "path": "itambox/core/auth/ldap.py",
-      "context": "ClassDef:MultiTenantLDAPBackend/FunctionDef:authenticate",
-      "statement": "from django.core.exceptions import ImproperlyConfigured",
       "count": 1
     },
     {

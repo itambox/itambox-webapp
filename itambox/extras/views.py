@@ -8,7 +8,7 @@ from django.contrib.auth.decorators import login_required
 from django.contrib.auth.mixins import LoginRequiredMixin, PermissionRequiredMixin
 from django.contrib.contenttypes.models import ContentType
 from django.db.models import Count
-from django.http import HttpResponse, QueryDict
+from django.http import Http404, HttpResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse, reverse_lazy
 from django.utils.http import urlencode
@@ -881,11 +881,10 @@ class ReportTriggerImmediateView(PermissionRequiredMixin, LoginRequiredMixin, Vi
 
     def has_permission(self):
         perms = self.get_permission_required()
-        obj = None
         try:
             obj = get_object_or_404(ScheduledReport, pk=self.kwargs.get("pk"))
-        except Exception:
-            pass
+        except Http404:
+            return False
         return self.request.user.has_perms(perms, obj=obj)
 
     def post(self, request, pk):
@@ -1026,11 +1025,10 @@ class ReportTemplateDownloadView(PermissionRequiredMixin, LoginRequiredMixin, Vi
 
     def has_permission(self):
         perms = self.get_permission_required()
-        obj = None
         try:
             obj = get_object_or_404(ReportTemplate, pk=self.kwargs.get("pk"))
-        except Exception:
-            pass
+        except Http404:
+            return False
         return self.request.user.has_perms(perms, obj=obj)
 
     def get(self, request, pk, *args, **kwargs):

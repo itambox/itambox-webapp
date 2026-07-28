@@ -10,7 +10,7 @@
 UV := uv
 UV_DEV := $(UV) run --locked --group dev
 
-.PHONY: help setup run migrate seed test coverage coverage-diff coverage-baseline openapi-check openapi-write lint format format-check e2e clean
+.PHONY: help setup run migrate seed test coverage coverage-diff coverage-baseline openapi-check openapi-write exception-check exception-baseline lint format format-check e2e clean
 
 FORMAT_TARGETS := itambox scripts
 
@@ -39,6 +39,8 @@ help:
 	@echo "  make coverage-baseline - Record the measured coverage as the reviewed baseline"
 	@echo "  make openapi-check  - Verify deterministic schema and no-growth diagnostics baseline"
 	@echo "  make openapi-write  - Update reviewed OpenAPI artifacts (Linux/Python 3.12 only)"
+	@echo "  make exception-check - Verify broad/pass-only exception policy and baseline"
+	@echo "  make exception-baseline - Record reviewed exception-handler cleanup"
 	@echo "  make lint          - Run pre-commit style and syntax checks on all files"
 	@echo "  make format        - Sort imports then format Python source with Ruff"
 	@echo "  make format-check  - Check import order and formatting without writing (CI-safe)"
@@ -87,6 +89,14 @@ openapi-check:
 # Existing baselines may remove fixed identities but never accept new debt.
 openapi-write:
 	PYTHONPATH= PYTHONHASHSEED=0 $(UV_DEV) python scripts/check_openapi_schema.py --write-schema --write-baseline
+
+exception-check:
+	PYTHONPATH= $(UV_DEV) python scripts/check_exception_policy.py
+
+# Records only cleanup of known identities; the script refuses new debt and
+# security-sensitive silent handlers even in write mode.
+exception-baseline:
+	PYTHONPATH= $(UV_DEV) python scripts/check_exception_policy.py --write-baseline
 
 lint:
 	$(UV_DEV) pre-commit run --all-files

@@ -5,6 +5,8 @@ from django.http import HttpResponse
 from django.test import RequestFactory, SimpleTestCase
 
 from core.auth.cache import (
+    _publish_topology_version,
+    _publish_user_version,
     invalidate_authorization_topology,
     invalidate_user_authorization_cache,
     synchronize_authorization_cache,
@@ -27,6 +29,24 @@ class RequestLocalAuthorizationSyncTests(SimpleTestCase):
 
     def tearDown(self):
         self.middleware.process_response(self.request, None, self.tokens)
+
+    @mock.patch("core.auth.cache.cache.set", side_effect=ConnectionError("offline"))
+    def test_user_generation_publish_failure_is_logged_and_swallowed(self, cache_set):
+        with self.assertLogs("core.auth.cache", level="WARNING") as logs:
+            _publish_user_version(self.user.pk)
+
+        cache_set.assert_called_once()
+        message = "\n".join(logs.output)
+        self.assertIn("user 42", message)
+        self.assertIn("ConnectionError", message)
+
+    @mock.patch("core.auth.cache.cache.set", side_effect=ConnectionError("offline"))
+    def test_topology_generation_publish_failure_is_logged_and_swallowed(self, cache_set):
+        with self.assertLogs("core.auth.cache", level="WARNING") as logs:
+            _publish_topology_version()
+
+        cache_set.assert_called_once()
+        self.assertIn("ConnectionError", "\n".join(logs.output))
 
     @mock.patch(
         "core.auth.cache.cache.get_many",
@@ -165,7 +185,8 @@ class RequestLocalAuthorizationSyncTests(SimpleTestCase):
     @mock.patch("core.auth.cache.cache.get_many", side_effect=ConnectionError("offline"))
     def test_cache_outage_never_enables_request_shortcut(self, get_many):
         self.user._perms_tenant_1 = {"assets.view_asset"}
-        synchronize_authorization_cache(self.user)
+        with self.assertLogs("core.auth.cache", level="WARNING") as logs:
+            synchronize_authorization_cache(self.user)
         self.assertFalse(hasattr(self.user, "_perms_tenant_1"))
 
         self.user._perms_tenant_1 = {"assets.view_asset"}
@@ -173,6 +194,7 @@ class RequestLocalAuthorizationSyncTests(SimpleTestCase):
 
         self.assertEqual(get_many.call_count, 2)
         self.assertFalse(hasattr(self.user, "_perms_tenant_1"))
+        self.assertIn("user 42", "\n".join(logs.output))
 
     @mock.patch("core.auth.cache._repeat_after_commit")
     @mock.patch("core.auth.cache._publish_user_version")

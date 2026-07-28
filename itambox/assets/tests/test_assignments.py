@@ -1,3 +1,6 @@
+from types import SimpleNamespace
+from unittest.mock import patch
+
 from django.contrib.auth import get_user_model
 from django.core.exceptions import ValidationError
 from django.test import TestCase
@@ -6,6 +9,7 @@ from model_bakery import baker
 
 from assets.models import Asset, AssetAssignment, StatusLabel
 from assets.services import checkin_asset, checkout_asset
+from compliance.models import CustodyReceipt, CustodyTemplate
 
 User = get_user_model()
 
@@ -64,6 +68,50 @@ class AssetAssignmentTestCase(TestCase):
         )
         self.peripheral_monitor.refresh_from_db()
         self.assertEqual(self.peripheral_monitor.status, deployed_status)
+
+    def test_custody_email_failure_is_logged_without_rolling_back_checkout(self):
+        tenant = baker.make("organization.Tenant")
+        category = baker.make("assets.Category")
+        asset_type = baker.make("assets.AssetType", category=category)
+        asset = baker.make(Asset, status=self.status, tenant=tenant, asset_type=asset_type)
+        holder = baker.make(
+            "organization.AssetHolder",
+            tenant=tenant,
+            email="holder@example.test",
+        )
+        baker.make(
+            CustodyTemplate,
+            tenant=tenant,
+            category=category,
+            is_active=True,
+            require_acceptance=True,
+            email_signature_request=True,
+            signature_provider="local",
+        )
+        email_config = SimpleNamespace(
+            enabled=True,
+            from_address="itambox@example.test",
+            test_recipient="",
+        )
+        provider = SimpleNamespace(initiate_signature=lambda receipt, request: "https://example.test/accept")
+        request = SimpleNamespace(user=self.user)
+
+        with (
+            patch("core.models.EmailSettings.load", return_value=email_config),
+            patch("compliance.registry.signature_providers.get", return_value=provider),
+            patch("assets.services.send_mail", side_effect=RuntimeError("mail backend offline")),
+            self.assertLogs("assets.services", level="ERROR") as logs,
+        ):
+            target = checkout_asset(asset=asset, holder=holder, user=self.user, request=request)
+
+        self.assertEqual(target, holder)
+        self.assertTrue(AssetAssignment.objects.filter(asset=asset, is_active=True).exists())
+        receipt = CustodyReceipt.objects.get(asset=asset, holder=holder)
+        output = "\n".join(logs.output)
+        self.assertIn(f"asset_id={asset.pk}", output)
+        self.assertIn(f"receipt_id={receipt.pk}", output)
+        self.assertIn(f"tenant_id={tenant.pk}", output)
+        self.assertIn(f"actor_id={self.user.pk}", output)
 
     def test_checkin_asset_with_custom_status_location_and_date(self):
         """

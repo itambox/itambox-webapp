@@ -13,6 +13,7 @@ on:
       - "uv.lock"
       - "itambox/**/*.py"
       - "itambox/schema.yaml"
+      - "itambox/docs/development/exception-policy.md"
       - "itambox/docs/development/migration-verification.md"
       - "itambox/docs/development/python-import-policy.md"
       - "itambox/mkdocs.yml"
@@ -20,6 +21,7 @@ on:
       - "itambox/docs/development/test-coverage-policy.md"
       - "scripts/**/*.py"
       - "scripts/migration_audit.json"
+      - "scripts/exception_baseline.json"
       - "scripts/local_import_baseline.json"
       - "scripts/coverage_baseline.json"
       - "scripts/openapi_diagnostics_baseline.json"
@@ -295,6 +297,20 @@ jobs:
       - name: Check the local-import policy gate
         run: |
           uv run --locked --no-sync python scripts/check_local_imports.py
+
+      # Two independent checks in one step: an identity ratchet over broad and
+      # pass-only handlers, and a hard refusal of silent failures in crypto,
+      # authentication, authorization, tenant resolution, configuration load,
+      # and lexically transactional code. The second has no baseline; only the
+      # explicitly permitted, logged boundary categories can satisfy it.
+      #
+      # Bare `except:` stays with flake8 E722 above, whose baseline records
+      # none; this gate only cross-checks that the division still holds.
+      #
+      # The suite backing this gate runs by discovery in the `test` job above.
+      - name: Check the exception policy gate
+        run: |
+          uv run --locked --no-sync python scripts/check_exception_policy.py
 
   docs:
     runs-on: ubuntu-latest

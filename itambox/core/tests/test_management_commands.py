@@ -30,7 +30,10 @@ class ManagementCommandsTestCase(TransactionTestCase):
 
         mfr = Manufacturer.objects.create(name="Microsoft", slug="microsoft")
         software = Software.objects.create(name="Office 365", manufacturer=mfr)
-        License.objects.create(name="Office 365", software=software, product_key="enc$abc")
+        # Let the model produce a valid Fernet ciphertext. A literal ``enc$abc``
+        # is malformed encrypted data and the rotation command now correctly
+        # fails closed instead of reporting a false-success dry run.
+        License.objects.create(name="Office 365", software=software, product_key="abc")
         call_command("rotate_encryption_keys", dry_run=True, stdout=self.stdout, stderr=self.stderr)
         self.assertIn("Scanning for encrypted fields", self.stdout.getvalue())
 

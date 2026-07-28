@@ -2,6 +2,7 @@ import logging
 import sys
 
 from django.conf import settings
+from django.core.exceptions import ImproperlyConfigured
 
 from core.managers import get_current_tenant, set_current_tenant
 
@@ -175,7 +176,7 @@ class MultiTenantLDAPBackend(LDAPBackend):
         try:
             s = self.settings
             return bool(getattr(s, "USER_SEARCH", None) or getattr(s, "USER_DN_TEMPLATE", None))
-        except Exception:
+        except ImproperlyConfigured:
             return False
 
     def authenticate(self, request, username=None, password=None, **kwargs):  # noqa: C901
@@ -195,14 +196,12 @@ class MultiTenantLDAPBackend(LDAPBackend):
                     tenant = Tenant.objects.get(slug=domain)
                     set_current_tenant(tenant)
                 except Tenant.DoesNotExist:
-                    pass
+                    tenant = None
 
         # No LDAP configured for this tenant or globally — skip rather than raise,
         # so password (and SSO) backends further down the chain can authenticate.
         if not self._is_configured():
             return None
-
-        from django.core.exceptions import ImproperlyConfigured
 
         try:
             user = super().authenticate(request, username, password, **kwargs)
@@ -252,8 +251,14 @@ class MultiTenantLDAPBackend(LDAPBackend):
                     email = get_attr("mail") or email
                     first_name = get_attr("givenName") or first_name
                     last_name = get_attr("sn") or last_name
-            except Exception as e:
-                logger.warning(f"Error reading LDAP attributes: {e}")
+            # broad except: boundary-isolation: LDAP attribute proxies expose provider-specific failures
+            except Exception as exc:
+                logger.warning(
+                    "Could not read LDAP attributes for user_id=%s tenant_id=%s exception_type=%s",
+                    user.pk,
+                    tenant.pk,
+                    type(exc).__name__,
+                )
 
         if not upn:
             upn = email or f"{user.username}@ldap"
@@ -291,11 +296,24 @@ class MultiTenantLDAPBackend(LDAPBackend):
         if hasattr(user, "ldap_user") and user.ldap_user:
             try:
                 groups = list(user.ldap_user.group_names)
-            except Exception:
+            # broad except: boundary-isolation: LDAP group proxies expose provider-specific failures
+            except Exception as exc:
+                logger.debug(
+                    "LDAP group_names unavailable for user_id=%s tenant_id=%s; trying group_dns (exception_type=%s)",
+                    user.pk,
+                    tenant.pk,
+                    type(exc).__name__,
+                )
                 try:
                     groups = list(user.ldap_user.group_dns)
-                except Exception:
-                    pass
+                # broad except: boundary-isolation: LDAP group proxies expose provider-specific failures
+                except Exception as exc:
+                    logger.warning(
+                        "Could not read LDAP groups for user_id=%s tenant_id=%s exception_type=%s",
+                        user.pk,
+                        tenant.pk,
+                        type(exc).__name__,
+                    )
 
         tenant_configs = getattr(settings, "ITAMBOX_TENANT_LDAP_CONFIGS", {})
         tenant_config = tenant_configs.get(tenant.slug, {})

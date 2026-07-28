@@ -54,3 +54,10 @@ repos:
         language_version: python3.12
         pass_filenames: false
         always_run: true
+      - id: exception-policy
+        name: exception handlers (blocking policy gate)
+        entry: python scripts/check_exception_policy.py
+        language: python
+        language_version: python3.12
+        pass_filenames: false
+        always_run: true

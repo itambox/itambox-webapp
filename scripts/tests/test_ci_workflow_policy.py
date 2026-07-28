@@ -24,6 +24,7 @@ from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 WORKFLOW_PATH = REPO_ROOT / ".github" / "workflows" / "ci.yml"
+PRE_COMMIT_PATH = REPO_ROOT / ".pre-commit-config.yaml"
 
 STEP_START = "      - "
 FIELD_INDENT = "        "
@@ -154,6 +155,18 @@ class GateSuiteDiscoveryTests(unittest.TestCase):
     def test_openapi_artifacts_and_baseline_changes_trigger_ci(self):
         self.assertIn('- "itambox/schema.yaml"', self.workflow_text)
         self.assertIn('- "scripts/openapi_diagnostics_baseline.json"', self.workflow_text)
+
+    def test_exception_policy_changes_trigger_ci_and_run_the_gate(self):
+        self.assertIn('- "scripts/exception_baseline.json"', self.workflow_text)
+        self.assertIn('- "itambox/docs/development/exception-policy.md"', self.workflow_text)
+        gate = step_named(load_steps(), "Check the exception policy gate")
+        self.assertIn("scripts/check_exception_policy.py", gate.get("run", ""))
+
+    def test_pre_commit_runs_the_same_exception_gate(self):
+        config = PRE_COMMIT_PATH.read_text(encoding="utf-8")
+        self.assertIn("id: exception-policy", config)
+        self.assertIn("entry: python scripts/check_exception_policy.py", config)
+        self.assertIn("language_version: python3.12", config)
 
     def test_openapi_gate_uses_canonical_hash_seed_and_always_uploads_failure_artifacts(self):
         steps = load_steps()

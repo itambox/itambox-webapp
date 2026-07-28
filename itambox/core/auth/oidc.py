@@ -370,7 +370,7 @@ class TenantOIDCAuthorizeView(TenantOIDCSettingsMixin, OIDCAuthenticationRequest
                 try:
                     tenant = Tenant.objects.get(slug=sess_tenant_slug)
                 except Tenant.DoesNotExist:
-                    pass
+                    request.session.pop("oidc_tenant_slug", None)
 
         if tenant:
             set_current_tenant(tenant)
@@ -388,7 +388,7 @@ class TenantOIDCCallbackView(TenantOIDCSettingsMixin, OIDCAuthenticationCallback
                 tenant = Tenant.objects.get(slug=tenant_slug)
                 set_current_tenant(tenant)
             except Tenant.DoesNotExist:
-                pass
+                request.session.pop("oidc_tenant_slug", None)
         return super().dispatch(request, *args, **kwargs)
 
     def login_success(self):
@@ -400,5 +400,5 @@ class TenantOIDCCallbackView(TenantOIDCSettingsMixin, OIDCAuthenticationCallback
                 tenant = Tenant.objects.get(slug=tenant_slug)
                 self.request.session["active_tenant_id"] = tenant.pk
             except Tenant.DoesNotExist:
-                pass
+                self.request.session.pop("oidc_tenant_slug", None)
         return super().login_success()
