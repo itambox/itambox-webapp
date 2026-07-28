@@ -4,6 +4,18 @@ site_url: https://docs.itambox.local/
 site_dir: static/docs  # Outputs compiled files directly into Django's static folder
 use_directory_urls: false
 
+# Raised above the MkDocs 1.6 defaults (info) so `mkdocs build --strict` fails on
+# them: a new page missing from the nav is unreachable in the built site, and a
+# stale anchor is a dead link that renders as a working one.
+validation:
+  nav:
+    omitted_files: warn
+    not_found: warn
+  links:
+    not_found: warn
+    anchors: warn
+    unrecognized_links: warn
+
 
 theme:
   name: material  # Mirror of NetBox's gorgeous Material for MkDocs theme
@@ -162,6 +174,7 @@ nav:
   - Development:
       - Release Checklist: 'development/release-checklist.md'
       - View Patterns: 'development/view-patterns.md'
+      - Architecture Policy: 'development/architecture-policy.md'
       - Python Import Policy: 'development/python-import-policy.md'
       - Exception Policy: 'development/exception-policy.md'
       - Test Coverage Policy: 'development/test-coverage-policy.md'
@@ -170,3 +183,4 @@ nav:
       - Security Scanning: 'development/security-scanning.md'
       - Module Maturity: 'development/module-maturity.md'
       - Migration Verification: 'development/migration-verification.md'
+      - 'ADR 0001 — Architecture Boundaries and Layering': 'development/adr-0001-architecture-boundaries-and-layering.md'

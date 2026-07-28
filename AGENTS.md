@@ -208,6 +208,36 @@ without a recognised category always fails and can never be baselined. The gate
 refuses to run outside canonical Python 3.12. `itambox/` and `scripts/` are
 scanned; migrations, vendored trees, and test modules are excluded.
 
+### Lint: architecture boundaries (AST policy gate)
+```bash
+# From the repository root -- blocking gate, same command CI and pre-commit run:
+uv run --locked --only-group dev python scripts/check_architecture.py
+
+# Why are these two modules coupled?
+uv run --locked --only-group dev python scripts/check_architecture.py --explain core.managers organization.access
+
+# After removing a cycle or a cross-layer edge, regenerate on canonical Python 3.12:
+uv run --locked --only-group dev python scripts/check_architecture.py --write-baseline
+```
+Every first-party module is classified into one layer and the policy declares
+which direction a dependency may run (see "Architecture: layers and dependency
+direction" below). The gate builds the first-party import graph twice -- once
+from module-top imports, once including function-body imports -- and both graphs
+block, so moving an import into a function changes which rule fails and nothing
+else. `if TYPE_CHECKING:` imports are in neither graph. Accepted debt is frozen
+in `scripts/architecture_baseline.json`, a schema-v1 identity baseline whose rows
+each carry a derived `area:*` owner, a removal issue, and a removal direction of
+at least 40 characters; a SHA-256 fingerprint binds it to the effective policy.
+A model importing a form, a table, or a view (`R-M1`) has no baseline
+representation at any severity and cannot be written even by
+`--write-baseline`. New identities are never absorbed: hand-review the row in
+first. `--report-only` is a triage inventory, prints `REPORT ONLY -- NOT A PASS`,
+and must never be wired into CI. The gate refuses to run outside canonical
+Python 3.12 and scans `itambox/` only. Full policy:
+[architecture-policy.md](itambox/docs/development/architecture-policy.md); the
+layer definitions and the matrix:
+[adr-0001-architecture-boundaries-and-layering.md](itambox/docs/development/adr-0001-architecture-boundaries-and-layering.md).
+
 ### Docs (MkDocs)
 ```bash
 # Build docs to static/docs/ (run from itambox/)
@@ -271,6 +301,36 @@ from itambox.middleware import get_current_user
 ```
 
 `scripts/check_local_imports.py` enforces this as a blocking, AST-based gate (see "Lint: local imports" above). The full policy — grammar, scope, ratchet semantics, and how to pay down baselined debt — is in [python-import-policy.md](itambox/docs/development/python-import-policy.md).
+
+## Architecture: layers and dependency direction
+
+Every first-party module belongs to exactly one layer, derived from its dotted
+name: `framework` (`itambox.api.*`, `itambox.middleware`, `itambox.plugins.*`),
+`kernel` (`core.models`, `core.managers`, `core.mixins`, `core.choices`),
+`platform-service` (`core.tasks.*`, `core.events`, `core.reports.*`),
+`integration` (`core.auth.*`, `core.importers.*`, `core.integrations.*`),
+`domain-model`, `domain-service`, `presentation`, and `composition` (URLconfs,
+`apps.py`, `admin.py`, settings). `presentation` splits by origin: a domain
+app's presentation may name its own domain, while the platform's generic
+presentation (`itambox.views.*`, `core.tables.*`) is held to the framework
+standard.
+
+Four invariants follow, and `scripts/check_architecture.py` enforces them:
+
+- Nothing imports `composition`; composition roots are wired *into*, never *from*.
+- Nothing below `presentation` imports `presentation`. A model may not depend on
+  a form, table, view, or presentation helper -- the one rule with no baseline
+  escape at any severity.
+- `framework` and `kernel` are domain-blind. They may recurse into each other --
+  they are one mutually recursive substrate -- but neither may name a domain app.
+- Cross-application `domain-model -> domain-model` coupling needs an entry in
+  `CROSS_DOMAIN_MODEL_EDGES`; same-app model coupling is always fine.
+
+The usual fixes when the gate blocks an import are `apps.get_model()` for a model
+the substrate needs, a registry hook the platform publishes and the domain
+registers with, or moving the shared helper down a layer. The gate cannot see
+dynamic imports (`importlib.import_module`, `import_string`) and does not guess
+at them; it reports their count in the substrate as information.
 
 ## Architecture: permissions & auth
 

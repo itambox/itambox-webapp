@@ -162,9 +162,15 @@ Two limits of that starting point are worth knowing:
 
 ## Related gates
 
-Three independent gates cover imports, and none replaces another:
+Four independent gates cover imports, and none replaces another:
 
 - **Ruff** (`make format-check`) owns import *order* and formatting.
 - **Flake8** (`scripts/check_flake8_baseline.py`) owns semantic lint, including
   `E402` and unused imports.
 - **This gate** owns import *placement*: module top versus function body.
+- **The architecture gate** (`scripts/check_architecture.py`) owns import
+  *direction*: which layer may import which, and whether a `cycle` annotation's
+  claim is supported by the measured graph. It reads this policy's annotation
+  parser rather than reimplementing it, so a malformed `inline import:` comment
+  stays this gate's finding. See
+  [architecture-policy.md](architecture-policy.md).

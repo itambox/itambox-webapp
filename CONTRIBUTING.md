@@ -1,6 +1,6 @@
 # Contributing to ITAMbox
 
-ITAMbox accepts focused changes through pull requests. This guide describes the repository's development and review gates; deeper implementation notes live in [DEVELOPMENT.md](DEVELOPMENT.md), and authorization boundaries are recorded in the [tenancy, RBAC, and resource-sharing ADR](itambox/docs/development/adr-0001-tenancy-rbac-and-resource-sharing.md).
+ITAMbox accepts focused changes through pull requests. This guide describes the repository's development and review gates; deeper implementation notes live in [DEVELOPMENT.md](DEVELOPMENT.md), and the layering that authorization and tenancy code sits inside is recorded in the [architecture boundaries ADR](itambox/docs/development/adr-0001-architecture-boundaries-and-layering.md).
 
 ## Before you start
 
@@ -121,7 +121,7 @@ Use `!` or a `BREAKING CHANGE:` footer when a change breaks an API, route, confi
 
 - Follow the neighboring Django app instead of introducing a new local pattern. Standard app layout and cross-layer wiring are documented in [DEVELOPMENT.md](DEVELOPMENT.md).
 - Generate migrations with `makemigrations`; do not hand-write them unless the migration cannot be expressed safely by Django and the pull request explains why.
-- Preserve tenant scoping and object-level permissions in UI, REST, GraphQL, background jobs, imports, and bulk actions. Cross-tenant access must use explicit `RoleGrant` and `RoleGrantScope` records described by the [authorization ADR](itambox/docs/development/adr-0001-tenancy-rbac-and-resource-sharing.md).
+- Preserve tenant scoping and object-level permissions in UI, REST, GraphQL, background jobs, imports, and bulk actions. Cross-tenant access must use explicit `RoleGrant` and `RoleGrantScope` records, written through the single service entry point described in [view patterns](itambox/docs/development/view-patterns.md).
 - Use scoped managers and established tenant-aware service boundaries rather than unscoped model queries. Add regression tests for fixes and tests for new behavior; tenant-aware tests should use `TenantTestMixin`.
 - Build shared API behavior on `itambox.api`, keep generic object detail/edit/delete routes primary-key based, and retain slugs only where an integration contract explicitly requires them.
 - Follow the existing HTMX partial/modal/toast conventions, and propagate `TaskContext` through django-q2 jobs so tenant and actor attribution is preserved.
@@ -140,6 +140,7 @@ uv run --locked --group dev pre-commit run --all-files
 make format-check
 uv run --locked --only-group dev python scripts/check_flake8_baseline.py
 uv run --locked --only-group dev python scripts/check_local_imports.py
+uv run --locked --only-group dev python scripts/check_architecture.py
 ```
 
 Ruff is the canonical formatter and import sorter (`make format` applies it
@@ -148,12 +149,24 @@ Ruff owns formatting and import order only -- Flake8 above remains the
 separate blocking semantic gate, and this split is deliberate: see
 [AGENTS.md](AGENTS.md#format-and-import-order-ruff) for the full policy.
 
-The last command is the import-placement gate. Imports belong at module top; a
+The fourth command is the import-placement gate. Imports belong at module top; a
 function-body import needs an explicit `# inline import: <category>: <reason>`
 annotation, and everything not yet triaged is frozen in
 `scripts/local_import_baseline.json` so new untriaged imports fail review. Read
 the [Python import policy](itambox/docs/development/python-import-policy.md)
 before adding one or paying down baselined debt.
+
+The last command is the architecture boundary gate. It builds the first-party
+import graph twice — once from module-top imports and once including
+function-body imports — and blocks on import cycles and on edges that cross a
+layer boundary the policy forbids. Accepted debt is recorded in
+`scripts/architecture_baseline.json` with an owning area label, a removal issue,
+and a stated removal direction, so the baseline is a work list rather than a
+suppression file. A model that imports a form, a table, or a view is the one
+finding with no baseline representation at any severity. Read the
+[architecture policy](itambox/docs/development/architecture-policy.md) and the
+[architecture boundaries ADR](itambox/docs/development/adr-0001-architecture-boundaries-and-layering.md)
+before adding an entry.
 
 From `itambox/`:
 
