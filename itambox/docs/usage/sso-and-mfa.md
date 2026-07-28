@@ -37,7 +37,8 @@ Each tenant can use a **different identity provider type**:
 The SSO backends resolve the tenant from several sources, tried in order:
 
 1. **Session** — the `oidc_tenant_slug` session key (set during OIDC flow).
-2. **URL path** — `/accounts/ldap/<tenant_slug>/login` or `/oidc/<tenant_slug>/`.
+2. **URL path** — `/accounts/ldap/<tenant_slug>/login` or
+   `/oidc/authenticate/<tenant_slug>/`.
 3. **Domain suffix** — for LDAP, the domain part of the username
    (e.g. `user@alpha-corp` resolves to tenant `alpha-corp` by matching
    the domain's first component against tenant slugs).
@@ -337,7 +338,7 @@ Register this exact URL as the **Redirect URI** in your IdP application
 configuration. The authorization URL is:
 
 ```
-https://<your-instance>/oidc/<tenant_slug>/authorize/
+https://<your-instance>/oidc/authenticate/<tenant_slug>/
 ```
 
 ### Token Validation
@@ -453,7 +454,7 @@ or "reply URL mismatch".
 ITAMbox constructs.
 
 **Fix:**
-- OIDC: Register `https://<your-instance>/oidc/<tenant_slug>/callback/`
+- OIDC: Register the shared `https://<your-instance>/oidc/callback/`
   exactly, including the trailing slash.
 - SAML: Ensure the `base_url` in the tenant config matches the ACS endpoint
   the IdP sends assertions to.
