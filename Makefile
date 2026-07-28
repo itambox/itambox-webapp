@@ -10,7 +10,7 @@
 UV := uv
 UV_DEV := $(UV) run --locked --group dev
 
-.PHONY: help setup run migrate seed test coverage coverage-diff coverage-baseline openapi-check openapi-write exception-check exception-baseline lint format format-check e2e clean
+.PHONY: help setup run migrate seed test coverage coverage-diff coverage-baseline openapi-check openapi-write exception-check exception-baseline architecture-check architecture-baseline lint format format-check e2e clean
 
 FORMAT_TARGETS := itambox scripts
 
@@ -41,6 +41,8 @@ help:
 	@echo "  make openapi-write  - Update reviewed OpenAPI artifacts (Linux/Python 3.12 only)"
 	@echo "  make exception-check - Verify broad/pass-only exception policy and baseline"
 	@echo "  make exception-baseline - Record reviewed exception-handler cleanup"
+	@echo "  make architecture-check - Verify the architecture boundary graph and baseline"
+	@echo "  make architecture-baseline - Record reviewed architecture-boundary cleanup"
 	@echo "  make lint          - Run pre-commit style and syntax checks on all files"
 	@echo "  make format        - Sort imports then format Python source with Ruff"
 	@echo "  make format-check  - Check import order and formatting without writing (CI-safe)"
@@ -97,6 +99,15 @@ exception-check:
 # security-sensitive silent handlers even in write mode.
 exception-baseline:
 	PYTHONPATH= $(UV_DEV) python scripts/check_exception_policy.py --write-baseline
+
+architecture-check:
+	PYTHONPATH= $(UV_DEV) python scripts/check_architecture.py
+
+# Normalises ordering and re-stamps the fingerprint. Drops rows that are no
+# longer observed and refuses newly observed ones; see
+# itambox/docs/development/architecture-policy.md for the bootstrap sequence.
+architecture-baseline:
+	PYTHONPATH= $(UV_DEV) python scripts/check_architecture.py --write-baseline
 
 lint:
 	$(UV_DEV) pre-commit run --all-files

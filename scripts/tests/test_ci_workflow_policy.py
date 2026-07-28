@@ -22,9 +22,12 @@ import re
 import unittest
 from pathlib import Path
 
+from scripts.check_architecture import linked_documents
+
 REPO_ROOT = Path(__file__).resolve().parents[2]
 WORKFLOW_PATH = REPO_ROOT / ".github" / "workflows" / "ci.yml"
 PRE_COMMIT_PATH = REPO_ROOT / ".pre-commit-config.yaml"
+MAKEFILE_PATH = REPO_ROOT / "Makefile"
 
 STEP_START = "      - "
 FIELD_INDENT = "        "
@@ -86,6 +89,47 @@ def parse_steps(workflow_text):
 
 def load_steps():
     return parse_steps(WORKFLOW_PATH.read_text(encoding="utf-8"))
+
+
+def path_filters(workflow_text):
+    """The ``on.pull_request.paths`` entries, unquoted, in file order."""
+    filters = []
+    inside = False
+    for line in workflow_text.splitlines():
+        stripped = line.strip()
+        if stripped == "paths:":
+            inside = True
+            continue
+        if not inside:
+            continue
+        if stripped.startswith("- "):
+            filters.append(stripped[2:].strip().strip('"'))
+            continue
+        # A comment inside the sequence is not the end of it. Treating it as one
+        # would silently shorten the filter list and pass every assertion below.
+        if stripped and not stripped.startswith("#"):
+            break
+    return filters
+
+
+def _filter_matcher(pattern):
+    """Compile one path filter the way GitHub matches it.
+
+    ``**`` crosses directory separators and ``*`` does not, so a filter naming
+    ``itambox/docs/development/*.md`` would not cover a future subdirectory
+    while ``**/*.md`` does. Translating rather than reaching for ``fnmatch``
+    keeps that distinction, which is the whole point of the assertion below.
+    """
+    compiled = []
+    for token in re.split(r"(\*\*/|\*\*|\*|\?)", pattern):
+        compiled.append(
+            {"**/": r"(?:[^/]+/)*", "**": r".*", "*": r"[^/]*", "?": r"[^/]"}.get(token) or re.escape(token)
+        )
+    return re.compile("".join(compiled) + r"\Z")
+
+
+def triggers_ci(workflow_text, repository_path):
+    return any(_filter_matcher(pattern).match(repository_path) for pattern in path_filters(workflow_text))
 
 
 def step_named(steps, name):
@@ -158,7 +202,7 @@ class GateSuiteDiscoveryTests(unittest.TestCase):
 
     def test_exception_policy_changes_trigger_ci_and_run_the_gate(self):
         self.assertIn('- "scripts/exception_baseline.json"', self.workflow_text)
-        self.assertIn('- "itambox/docs/development/exception-policy.md"', self.workflow_text)
+        self.assertTrue(triggers_ci(self.workflow_text, "itambox/docs/development/exception-policy.md"))
         gate = step_named(load_steps(), "Check the exception policy gate")
         self.assertIn("scripts/check_exception_policy.py", gate.get("run", ""))
 
@@ -182,6 +226,102 @@ class GateSuiteDiscoveryTests(unittest.TestCase):
         condition = upload.get("if", "")
         self.assertIn("always()", condition)
         self.assertIn("steps.openapi.conclusion != 'skipped'", condition)
+
+    def test_architecture_policy_changes_trigger_ci_and_run_the_gate(self):
+        self.assertIn('- "scripts/architecture_baseline.json"', self.workflow_text)
+        for document in (
+            "itambox/docs/development/architecture-policy.md",
+            "itambox/docs/development/adr-0001-architecture-boundaries-and-layering.md",
+            "itambox/docs/plugins/api_reference.md",
+        ):
+            with self.subTest(document=document):
+                self.assertTrue(triggers_ci(self.workflow_text, document))
+        gate = step_named(load_steps(), "Check the architecture boundary gate")
+        self.assertIn("scripts/check_architecture.py", gate.get("run", ""))
+
+    def test_the_architecture_gate_runs_after_the_local_import_gate(self):
+        """The two import-shaped gates stay adjacent and in dependency order."""
+        names = [step.get("name") for step in load_steps() if step.get("name")]
+
+        self.assertLess(
+            names.index("Check the local-import policy gate"),
+            names.index("Check the architecture boundary gate"),
+        )
+
+    def test_the_architecture_gate_is_not_wired_in_report_only_mode(self):
+        """`--report-only` always exits 0; wiring it would be a silent pass."""
+        gate = step_named(load_steps(), "Check the architecture boundary gate")
+
+        self.assertNotIn("--report-only", gate.get("run", ""))
+        self.assertNotIn("--report-only", PRE_COMMIT_PATH.read_text(encoding="utf-8"))
+
+    def test_pre_commit_runs_the_same_architecture_gate(self):
+        config = PRE_COMMIT_PATH.read_text(encoding="utf-8")
+
+        self.assertIn("id: architecture-policy", config)
+        self.assertIn("entry: python scripts/check_architecture.py", config)
+        self.assertIn("pass_filenames: false", config)
+        self.assertIn("always_run: true", config)
+
+    def test_the_makefile_exposes_the_architecture_targets(self):
+        makefile = MAKEFILE_PATH.read_text(encoding="utf-8")
+        phony = next(line for line in makefile.splitlines() if line.startswith(".PHONY:"))
+
+        for target in ("architecture-check", "architecture-baseline"):
+            with self.subTest(target=target):
+                self.assertIn(target, phony)
+                self.assertIn(f"\n{target}:\n", makefile)
+                self.assertIn(f"make {target}", makefile)
+
+    def test_every_document_the_link_rule_reads_also_triggers_ci(self):
+        """`R-DOC1` is pointless on a document whose change runs no CI at all.
+
+        Derived from the gate's own document set rather than from a list
+        repeated here: enumerating the inputs in two places is how five of the
+        development documents came to be scanned by a rule that never ran on them.
+        """
+        for document in linked_documents(REPO_ROOT):
+            relative = document.relative_to(REPO_ROOT).as_posix()
+            with self.subTest(document=relative):
+                self.assertTrue(
+                    triggers_ci(self.workflow_text, relative),
+                    f"{relative} is read by R-DOC1 but matches no on.pull_request.paths filter",
+                )
+
+    def test_a_development_document_that_does_not_exist_yet_is_already_covered(self):
+        """The filter has to cover the rule's glob, not today's file listing."""
+        for future in (
+            "itambox/docs/development/adr-9999-not-yet-written.md",
+            "itambox/docs/development/nested/deeper-note.md",
+        ):
+            with self.subTest(document=future):
+                self.assertTrue(triggers_ci(self.workflow_text, future))
+
+    def test_the_path_filter_reader_distinguishes_star_from_double_star(self):
+        """Guards the assertions above: a matcher that ignores `**` proves nothing."""
+        self.assertTrue(triggers_ci('paths:\n  - "a/**/*.md"\n', "a/b/c.md"))
+        self.assertFalse(triggers_ci('paths:\n  - "a/*.md"\n', "a/b/c.md"))
+        self.assertTrue(triggers_ci('paths:\n  - "a/*.md"\n', "a/c.md"))
+        self.assertEqual(path_filters('paths:\n  - "a/*.md"\n  - "b.py"\n'), ["a/*.md", "b.py"])
+        self.assertEqual(path_filters('paths:\n  # note\n  - "a.md"\nother:\n  - "b"\n'), ["a.md"])
+
+    def test_the_new_docs_are_reachable_in_the_mkdocs_nav(self):
+        navigation = (REPO_ROOT / "itambox" / "mkdocs.yml").read_text(encoding="utf-8")
+
+        self.assertIn("'development/architecture-policy.md'", navigation)
+        self.assertIn("'development/adr-0001-architecture-boundaries-and-layering.md'", navigation)
+        self.assertIn("omitted_files: warn", navigation)
+
+    def test_no_policy_text_implies_plugin_support_for_internal_modules(self):
+        """Layer membership describes ITAMbox's structure; it promises nothing."""
+        policy_doc = REPO_ROOT / "itambox" / "docs" / "development" / "architecture-policy.md"
+        text = policy_doc.read_text(encoding="utf-8")
+
+        self.assertIn("scans first-party code under `itambox/`", text)
+        for layer in ("framework", "kernel", "platform-service"):
+            for promise in ("public API", "supported API", "stable API"):
+                with self.subTest(layer=layer, promise=promise):
+                    self.assertNotIn(f"{layer} {promise}", text)
 
     def test_the_discovery_invocation_reaches_every_suite_on_disk(self):
         """The arguments CI passes must actually load every suite that exists."""
