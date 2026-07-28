@@ -6,6 +6,10 @@ This changelog follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) 
 
 ## [Unreleased]
 
+### Security
+
+- Removed the unused global pip installation and ensurepip bootstrap from the production runtime image, with build-time checks that the copied runtime environment remains pip-free, while preserving locked uv-based dependency resolution in the builder.
+
 ## [1.0.0-alpha.2] - 2026-07-28
 
 ### Added

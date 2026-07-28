@@ -71,10 +71,50 @@ RUN apt-get update \
         postgresql-client libldap-2.5-0 libsasl2-2 xmlsec1 libmagic1 \
     && rm -rf /var/lib/apt/lists/*
 
+# collectstatic, gunicorn, qcluster, and the health check all run from the locked
+# /app/.venv and never install packages. Remove the unused global pip package and
+# its ensurepip bootstrap wheel from the final image only.
+RUN set -eu; \
+    test -x /usr/local/bin/python3.12; \
+    if /usr/local/bin/python3.12 -c "import pip" 2>/dev/null; then \
+        /usr/local/bin/python3.12 -m pip uninstall --yes pip; \
+    fi; \
+    rm -rf /usr/local/lib/python3.12/ensurepip
+
 COPY --from=python-deps /app/.venv /app/.venv
 COPY itambox/ .
 COPY --from=frontend /app/static/dist ./static/dist
 COPY --from=docs /app/itambox/static/docs ./static/docs
+
+# Verify the complete runtime filesystem, including the copied venv, cannot
+# import or invoke pip before any application command runs.
+RUN set -eu; \
+    test -x /usr/local/bin/python3.12; \
+    test -x /app/.venv/bin/python; \
+    if /usr/local/bin/python3.12 -c "import pip" 2>/dev/null; then \
+        echo "global pip module survived runtime-image hardening" >&2; \
+        exit 1; \
+    fi; \
+    if /usr/local/bin/python3.12 -c "import ensurepip" 2>/dev/null; then \
+        echo "ensurepip survived runtime-image hardening" >&2; \
+        exit 1; \
+    fi; \
+    if /app/.venv/bin/python -c "import pip" 2>/dev/null; then \
+        echo "runtime venv contains pip" >&2; \
+        exit 1; \
+    fi; \
+    for pip_path in /app/.venv/bin/pip /app/.venv/bin/pip3 /app/.venv/bin/pip3.12; do \
+        if [ -e "$pip_path" ]; then \
+            echo "runtime venv contains pip entry point: $pip_path" >&2; \
+            exit 1; \
+        fi; \
+    done; \
+    for pip_command in pip pip3 pip3.12; do \
+        if command -v "$pip_command" >/dev/null 2>&1; then \
+            echo "runtime PATH exposes pip entry point: $pip_command" >&2; \
+            exit 1; \
+        fi; \
+    done
 
 # Collect static assets at build time. No database access is required, but prod
 # settings reject missing secrets, so use a throwaway build-only value.
