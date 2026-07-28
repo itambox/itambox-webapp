@@ -36,6 +36,13 @@ test('dashboard grid initializes and persists a resized widget', async ({ page }
   await expect(item).toBeVisible();
   const original = await readGridItemState(item);
 
+  // The development-only Django Debug Toolbar overlaps the dashboard controls in CI.
+  // Remove it so pointer interactions exercise the application UI, as they do in production.
+  const debugToolbar = page.locator('#djDebug');
+  if (await debugToolbar.count()) {
+    await debugToolbar.evaluate(element => element.remove());
+  }
+
   await page.locator('#unlock-dashboard').click();
   await expect(page.locator('#dashboard-unlocked-controls')).toBeVisible();
 
