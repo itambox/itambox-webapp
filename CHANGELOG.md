@@ -6,6 +6,50 @@ This changelog follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) 
 
 ## [Unreleased]
 
+## [1.0.0-alpha.2] - 2026-07-28
+
+### Added
+
+- Added deterministic CI ratchets for test coverage and certification, changed-code coverage, local imports, exception handling, OpenAPI diagnostics, architecture layers, and import cycles. Existing debt is explicit and cannot grow silently.
+- Added an architecture decision record and contributor guidance for module layers, approved import directions, inline-import annotations, exception boundaries, and the supported public plugin API.
+- Added focused security and authorization regression coverage for generic views, membership and role-grant services, login and tenant SSO entry points, inventory stock actions, and asset-form scoping.
+
+### Changed
+
+- Standardized Python formatting and import ordering with Ruff, reduced selected function complexity, and paid down selected findings while preserving the existing deterministic flake8 no-growth ratchet.
+- Stabilized generic detail, list, create, edit, delete, and service-action views around fail-closed authorization checks, and standardized HTMX success responses for restore and service actions.
+- Extracted membership and role-grant operations from presentation forms into explicit organization services with tenant-, container-, and delegated-scope enforcement.
+- Consolidated accessory, consumable, and component stock actions on shared transactional services and authorization checks.
+- Decomposed `AssetForm` initialization into focused collaborators while preserving tenant scoping, initial-value precedence, and validation behavior.
+- Made OpenAPI generation deterministic and checked in the canonical schema plus a warning/error identity baseline.
+- Made the daily subscription expiry/reminder task enumerate all tenants and use the local date, avoiding tenant omissions and one-day boundary drift.
+- Updated locked dashboard and Django integration dependencies to GridStack 13.1.2, django-filter 26.1, django-htmx 1.28.0, and django-otp 1.7.0; refreshed frontend build and browser-test tooling and added browser coverage for GridStack initialization, resizing, and persisted layouts.
+
+### Fixed
+
+- Hardened login and tenant SSO entry points against stale tenant selection, unsafe fallback behavior, ambiguous provider routing, and signing-algorithm drift; corrected the documented tenant OIDC routes.
+- Replaced security-sensitive silent exception handling with explicit, justified boundary behavior and a blocking policy gate.
+- Removed an accidental internal gap report from release source archives.
+- Updated PostCSS and brace-expansion dependencies past their reported security advisories.
+
+### Security
+
+- Added fail-closed authorization tests around shared action views, membership and RBAC mutations, tenant selection, SAML POST handling, and OIDC provider validation.
+- Escaped configurable `AssetForm` tag-prefix help text so crafted values cannot break HTML attributes or inject active SVG markup.
+- Made `domain-model -> presentation` imports unconditionally forbidden and made new module-top or deferred import cycles fail CI.
+- Required every retained broad/silent exception, local import, cycle, and cross-layer dependency in the scanned production scope to carry a reviewable identity or inline justification.
+
+### Known limitations and upgrade requirements
+
+- The architecture, exception, local-import, OpenAPI, lint, and coverage baselines intentionally freeze pre-existing debt; they prevent growth but do not claim that the recorded debt is already removed.
+- Upgrades from deployments that used arbitrary passphrases in `ITAMBOX_FIELD_ENCRYPTION_KEYS` must carry forward the exact previously derived Fernet key. Substituting a replacement key makes existing encrypted secrets unreadable; follow the installation guide before deploying this alpha.
+- `ITAMBOX_TENANT_LDAP_CONFIGS`, `ITAMBOX_TENANT_SAML_CONFIGS`, `ITAMBOX_TENANT_OIDC_CONFIGS`, and `ITAMBOX_TENANT_INTUNE_CONFIGS` must contain JSON objects. Malformed JSON or non-object values now stop startup with `ImproperlyConfigured` instead of silently disabling the integration configuration.
+- Review tenant-specific SAML and OIDC mappings before upgrading. SAML requests now require a live, configured tenant; a `default` SAML configuration is accepted only when exactly one live tenant makes it unambiguous, and missing, deleted, or inactive tenant bindings return 404.
+- SaaS subscriptions, procurement, reporting, webhooks and event rules, SCIM, and the plugin lifecycle remain Beta. Their interfaces may change during the prerelease series.
+- Alpha upgrades may include breaking migrations. No general version-skipping policy exists yet; review and test the exact target revision with a complete backup and rollback plan.
+- The full pytest suite is not safe to run with `pytest-xdist`; use the default serial configuration.
+- SQLite is not supported. PostgreSQL 15 or newer is required for development, tests, and production.
+
 ## [1.0.0-alpha.1] - 2026-07-24
 
 ### Added
@@ -72,5 +116,6 @@ This changelog follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) 
 - The full pytest suite is not safe to run with `pytest-xdist`; use the default serial configuration.
 - SQLite is not supported. PostgreSQL 15 or newer is required for development, tests, and production.
 
-[Unreleased]: https://github.com/itambox/itambox-webapp/compare/v1.0.0-alpha.1...HEAD
+[Unreleased]: https://github.com/itambox/itambox-webapp/compare/v1.0.0-alpha.2...HEAD
+[1.0.0-alpha.2]: https://github.com/itambox/itambox-webapp/releases/tag/v1.0.0-alpha.2
 [1.0.0-alpha.1]: https://github.com/itambox/itambox-webapp/releases/tag/v1.0.0-alpha.1
