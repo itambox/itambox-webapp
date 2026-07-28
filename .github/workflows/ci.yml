@@ -7,19 +7,28 @@ on:
     paths:
       - ".github/workflows/**"
       - ".pre-commit-config.yaml"
+      # The six root documents and every development document below are read by
+      # the architecture gate's R-DOC1 link rule. They are matched by prefix and
+      # by glob rather than enumerated: a rule whose inputs are listed in two
+      # places quietly stops running on the ones somebody forgot to list here,
+      # which is a broken link merging on a green tick.
+      - "AGENTS.md"
+      - "CLAUDE.md"
+      - "CONTRIBUTING.md"
+      - "DEVELOPMENT.md"
+      - "README.md"
+      - "SECURITY.md"
       - "Makefile"
       - "pyproject.toml"
       - "setup.cfg"
       - "uv.lock"
       - "itambox/**/*.py"
       - "itambox/schema.yaml"
-      - "itambox/docs/development/exception-policy.md"
-      - "itambox/docs/development/migration-verification.md"
-      - "itambox/docs/development/python-import-policy.md"
+      - "itambox/docs/development/**"
+      - "itambox/docs/plugins/api_reference.md"
       - "itambox/mkdocs.yml"
-      - "itambox/docs/development/security-test-expectations.md"
-      - "itambox/docs/development/test-coverage-policy.md"
       - "scripts/**/*.py"
+      - "scripts/architecture_baseline.json"
       - "scripts/migration_audit.json"
       - "scripts/exception_baseline.json"
       - "scripts/local_import_baseline.json"
@@ -297,6 +306,17 @@ jobs:
       - name: Check the local-import policy gate
         run: |
           uv run --locked --no-sync python scripts/check_local_imports.py
+
+      # Blocking over both graphs from the first run: a cycle or a cross-layer
+      # edge that only exists once function-body imports are counted is still a
+      # real runtime coupling. A model importing presentation is the one finding
+      # with no baseline representation at any severity (see
+      # itambox/docs/development/architecture-policy.md).
+      #
+      # The suite backing this gate runs by discovery in the `test` job above.
+      - name: Check the architecture boundary gate
+        run: |
+          uv run --locked --no-sync python scripts/check_architecture.py
 
       # Two independent checks in one step: an identity ratchet over broad and
       # pass-only handlers, and a hard refusal of silent failures in crypto,

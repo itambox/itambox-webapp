@@ -54,6 +54,16 @@ repos:
         language_version: python3.12
         pass_filenames: false
         always_run: true
+      # Whole-graph analysis, so it cannot take filenames: a per-file
+      # invocation would build a different graph on every commit and report
+      # different findings each time.
+      - id: architecture-policy
+        name: architecture boundaries (blocking policy gate)
+        entry: python scripts/check_architecture.py
+        language: python
+        language_version: python3.12
+        pass_filenames: false
+        always_run: true
       - id: exception-policy
         name: exception handlers (blocking policy gate)
         entry: python scripts/check_exception_policy.py
