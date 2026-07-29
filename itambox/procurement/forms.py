@@ -4,9 +4,18 @@ from django import forms
 from django.core.exceptions import ValidationError
 from django.utils.translation import gettext_lazy as _
 
-from core.forms import scope_tenant_field
+from core.forms import FilterForm, scope_tenant_field
 
+from .filters import ContractFilterSet, PurchaseOrderFilterSet
 from .models import Contract, PurchaseOrder, PurchaseOrderLine
+
+
+class PurchaseOrderFilterForm(FilterForm):
+    filterset_class = PurchaseOrderFilterSet
+
+
+class ContractFilterForm(FilterForm):
+    filterset_class = ContractFilterSet
 
 
 class PurchaseOrderForm(forms.ModelForm):

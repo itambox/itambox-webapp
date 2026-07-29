@@ -12,15 +12,22 @@ from itambox.views.generic import ObjectDeleteView, ObjectDetailView, ObjectEdit
 from itambox.views.generic.service_views import SimplePostView
 
 from .filters import ContractFilterSet, PurchaseOrderFilterSet
-from .forms import ContractForm, PurchaseOrderForm, PurchaseOrderLineForm
+from .forms import (
+    ContractFilterForm,
+    ContractForm,
+    PurchaseOrderFilterForm,
+    PurchaseOrderForm,
+    PurchaseOrderLineForm,
+)
 from .models import Contract, PurchaseOrder, PurchaseOrderLine
 from .tables import ContractTable, PurchaseOrderTable
 
 
 class PurchaseOrderListView(ObjectListView):
     queryset = PurchaseOrder.objects.select_related("supplier", "destination_location")
-    filterset_class = PurchaseOrderFilterSet
-    table_class = PurchaseOrderTable
+    filterset = PurchaseOrderFilterSet
+    filterset_form = PurchaseOrderFilterForm
+    table = PurchaseOrderTable
     template_name = "procurement/purchaseorder_list.html"
     permission_required = "procurement.view_purchaseorder"
 
@@ -503,8 +510,9 @@ class PurchaseOrderReceiveFormView(ObjectDetailView):
 
 class ContractListView(ObjectListView):
     queryset = Contract.objects.select_related("supplier")
-    filterset_class = ContractFilterSet
-    table_class = ContractTable
+    filterset = ContractFilterSet
+    filterset_form = ContractFilterForm
+    table = ContractTable
     template_name = "procurement/contract_list.html"
     permission_required = "procurement.view_contract"
 

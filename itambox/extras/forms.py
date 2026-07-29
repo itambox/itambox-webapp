@@ -1332,6 +1332,12 @@ class AlertRuleFilterForm(FilterForm):
     filterset_class = AlertRuleFilterSet
 
 
+class AlertLogFilterForm(FilterForm):
+    from extras.filters import AlertLogFilterSet
+
+    filterset_class = AlertLogFilterSet
+
+
 class NotificationChannelFilterForm(FilterForm):
     from extras.filters import NotificationChannelFilterSet
 
