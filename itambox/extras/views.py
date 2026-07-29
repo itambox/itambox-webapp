@@ -347,6 +347,7 @@ from .filters import (
     ScheduledReportFilterSet,
 )
 from .forms import (
+    AlertLogFilterForm,
     AlertRuleFilterForm,
     AlertRuleForm,
     NotificationChannelFilterForm,
@@ -470,7 +471,8 @@ class AlertLogListView(ObjectListView):
     table = AlertLogTable
     template_name = "core/alerts/alert_list.html"
     action_buttons = ()
-    filterset_class = AlertLogFilterSet
+    filterset = AlertLogFilterSet
+    filterset_form = AlertLogFilterForm
 
     def get_breadcrumbs(self):
         return [(reverse("dashboard"), _("Dashboard")), (None, _("Alerts Center"))]
