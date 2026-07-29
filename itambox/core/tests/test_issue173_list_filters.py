@@ -1,9 +1,9 @@
 """Regression tests for issue #173 list-filter wiring and isolation.
 
-Invalid filtersets currently render validation errors while retaining the
-already tenant-scoped base queryset.  Issue #173 deliberately does not change
-that generic-list behaviour; the invalid-input assertions below bound its
-tenant visibility rather than endorsing it as the desired filtering contract.
+Issue #173 originally bounded invalid filtersets to the tenant-scoped base
+queryset without endorsing that generic fallback. Issue #199 now makes the
+app-wide contract explicit: invalid filters retain their validation errors and
+fail closed to an empty queryset.
 """
 
 import datetime
@@ -312,14 +312,12 @@ class Issue173ListRequestTests(TenantTestMixin, TestCase):
         self.assertIn(self.rule_a, rule_choices)
         self.assertNotIn(self.rule_b, rule_choices)
 
-    def test_foreign_related_values_show_validation_without_expanding_tenant_queryset(self):
-        """Bound the established generic invalid-filter fallback to tenant A."""
+    def test_foreign_related_values_show_validation_and_fail_closed(self):
         cases = (
             (
                 "procurement:purchaseorder_list",
                 "destination_location",
                 self.location_b.pk,
-                [self.po_a_match, self.po_a_other],
                 str(self.location_b),
             ),
             (
@@ -329,41 +327,34 @@ class Issue173ListRequestTests(TenantTestMixin, TestCase):
                 # is no tenant-B supplier identity.  An unknown related id is
                 # the applicable non-disclosure case for this list.
                 self.supplier.pk + 999_999,
-                [self.contract_a_match, self.contract_a_other],
                 None,
             ),
             (
                 "extras:alertlog_list",
                 "rule",
                 self.rule_b.pk,
-                [self.alert_a_match, self.alert_a_other],
                 str(self.rule_b),
             ),
         )
 
-        for url_name, field_name, foreign_value, own_rows, foreign_label in cases:
+        for url_name, field_name, foreign_value, foreign_label in cases:
             with self.subTest(url=url_name, field=field_name):
                 response = self.client.get(reverse(url_name), {field_name: foreign_value})
                 self.assertEqual(response.status_code, 200)
                 self.assertIn(field_name, response.context["filter_form"].errors)
-                self.assertEqual(set(self._table_objects(response)), set(own_rows))
+                self.assertEqual(self._table_objects(response), [])
                 if foreign_label:
                     self.assertNotContains(response, foreign_label)
 
-    def test_invalid_status_shows_validation_without_expanding_tenant_queryset(self):
-        """Document validation plus the existing tenant-scoped fallback."""
-        cases = (
-            ("procurement:purchaseorder_list", [self.po_a_match, self.po_a_other]),
-            ("procurement:contract_list", [self.contract_a_match, self.contract_a_other]),
-            ("extras:alertlog_list", [self.alert_a_match, self.alert_a_other]),
-        )
+    def test_invalid_status_shows_validation_and_fails_closed(self):
+        cases = ("procurement:purchaseorder_list", "procurement:contract_list", "extras:alertlog_list")
 
-        for url_name, own_rows in cases:
+        for url_name in cases:
             with self.subTest(url=url_name):
                 response = self.client.get(reverse(url_name), {"status": "not-a-valid-status"})
                 self.assertEqual(response.status_code, 200)
                 self.assertIn("status", response.context["filter_form"].errors)
-                self.assertEqual(set(self._table_objects(response)), set(own_rows))
+                self.assertEqual(self._table_objects(response), [])
 
     def test_missing_view_permissions_deny_all_three_lists(self):
         user = User.objects.create_user(username="wp3-no-perms", password="password")

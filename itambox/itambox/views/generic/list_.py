@@ -2,7 +2,7 @@ import logging
 
 from django.contrib.auth.mixins import LoginRequiredMixin, PermissionRequiredMixin
 from django.contrib.contenttypes.models import ContentType
-from django.core.exceptions import ImproperlyConfigured, PermissionDenied
+from django.core.exceptions import NON_FIELD_ERRORS, ImproperlyConfigured, PermissionDenied
 from django.db.models import Q
 from django.http import QueryDict
 from django.template import TemplateDoesNotExist
@@ -136,6 +136,23 @@ class ObjectListView(TenantScopingViewMixin, PermissionRequiredMixin, LoginRequi
         self._active_saved_filter_id = saved.pk
         return saved_params
 
+    def _merge_filterset_errors_into_form(self):
+        """Keep the rendered form authoritative when its validation diverges."""
+        form_errors = self.filter_form.errors.as_data()
+        for field_name, errors in self.filter.errors.as_data().items():
+            target_field = field_name if field_name in self.filter_form.fields else None
+            target_key = target_field or NON_FIELD_ERRORS
+            existing_messages = {
+                str(message)
+                for existing_error in form_errors.get(target_key, ())
+                for message in existing_error.messages
+            }
+            for error in errors:
+                error_messages = {str(message) for message in error.messages}
+                if not error_messages.issubset(existing_messages):
+                    self.filter_form.add_error(target_field, error)
+                    existing_messages.update(error_messages)
+
     def get_queryset(self):
         model = resolve_view_model(self)
 
@@ -146,12 +163,27 @@ class ObjectListView(TenantScopingViewMixin, PermissionRequiredMixin, LoginRequi
             queryset = super().get_queryset()
 
         filter_params = self._resolve_filter_params(model)
+        self._resolved_filter_params = filter_params
+        self.filter_form = None
+
+        if self.filterset_form:
+            self.filter_form = self.filterset_form(filter_params, queryset=queryset)
+            configured_filterset = getattr(self.filter_form, "filterset_class", None)
+            if configured_filterset is not self.filterset or not hasattr(self.filter_form, "filterset"):
+                filterset_name = self.filterset.__name__ if self.filterset else "None"
+                raise ImproperlyConfigured(
+                    f"{self.__class__.__name__}.filterset_form must use {filterset_name} as its filterset_class."
+                )
 
         if self.filterset:
-            self.filter = self.filterset(filter_params, queryset)
-            if not self.filter.is_valid():
+            self.filter = self.filter_form.filterset if self.filter_form else self.filterset(filter_params, queryset)
+            filter_is_valid = self.filter.is_valid()
+            form_is_valid = self.filter_form.is_valid() if self.filter_form else True
+            if not filter_is_valid or not form_is_valid:
+                if self.filter_form and not filter_is_valid:
+                    self._merge_filterset_errors_into_form()
                 logger.warning("Invalid filter params for %s: %s", self.__class__.__name__, self.filter.errors)
-                self.filter = None
+                queryset = queryset.none()
             else:
                 queryset = self.filter.qs
 
@@ -193,9 +225,8 @@ class ObjectListView(TenantScopingViewMixin, PermissionRequiredMixin, LoginRequi
 
         table = self.get_table()
         table.configure(self.request)
-        filter_form = self.filterset_form(self.request.GET) if self.filterset_form else None
         context["table"] = table
-        context["filter_form"] = filter_form
+        context["filter_form"] = getattr(self, "filter_form", None)
         context["model"] = _model
         context["verbose_name_plural"] = _model._meta.verbose_name_plural
         context["model_name_str"] = f"{_model._meta.app_label}.{_model._meta.model_name}"

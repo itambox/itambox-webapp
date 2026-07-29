@@ -19,18 +19,22 @@ the view layer rather than a test that needs adjusting.
 """
 
 import json
+from unittest.mock import patch
 
 from django import forms
 from django.contrib.auth import get_user_model
 from django.contrib.contenttypes.models import ContentType
 from django.contrib.messages.storage.fallback import FallbackStorage
 from django.contrib.sessions.backends.db import SessionStore
-from django.core.exceptions import PermissionDenied, ValidationError
+from django.core.exceptions import ImproperlyConfigured, PermissionDenied, ValidationError
 from django.http import Http404
 from django.test import RequestFactory, TestCase
 from django.urls import reverse
 
+from assets.filters import StatusLabelFilterSet
+from assets.forms.filter_forms import AssetFilterForm
 from assets.models import Asset, AssetType, Manufacturer, StatusLabel
+from assets.views.asset_views import AssetListView
 from core.tests.mixins import TenantTestMixin
 from extras.models import SavedFilter
 from itambox.views.generic.detail import ObjectDetailView
@@ -461,6 +465,144 @@ class ListContextCharacterizationTests(_CatalogFixtureMixin, TenantTestMixin, Te
 
         self.assertEqual(response.status_code, 200)
         self.assertIsNone(response.context["active_saved_filter_id"])
+
+    def test_invalid_model_choice_filter_fails_closed_and_preserves_errors(self):
+        response = self.client.get(self.url, {"status": "999999999"})
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(list(response.context["table"].data.data), [])
+        self.assertTrue(response.context["filter_form"].is_bound)
+        self.assertIn("status", response.context["filter_form"].errors)
+
+    def test_invalid_saved_filter_fails_closed_and_binds_its_errors(self):
+        saved_filter = SavedFilter.objects.create(
+            name="Invalid asset status GVF",
+            content_type=ContentType.objects.get_for_model(Asset),
+            tenant=self.tenant,
+            shared=False,
+            created_by=self.tenant_user,
+            parameters={"status": "999999999"},
+        )
+
+        response = self.client.get(self.url, {"filter": saved_filter.pk})
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(list(response.context["table"].data.data), [])
+        self.assertEqual(response.context["active_saved_filter_id"], saved_filter.pk)
+        self.assertEqual(response.context["filter_form"].data.get("status"), "999999999")
+        self.assertIn("status", response.context["filter_form"].errors)
+
+    def test_invalid_model_choice_filter_fails_closed_for_htmx(self):
+        response = self.client.get(self.url, {"status": "999999999"}, HTTP_HX_REQUEST="true")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(list(response.context["table"].data.data), [])
+        self.assertIn("status", response.context["filter_form"].errors)
+        self.assertIn("htmx/list_page_wrapper.html", [template.name for template in response.templates])
+
+    def test_mixed_valid_and_invalid_filters_fail_closed(self):
+        response = self.client.get(
+            self.url,
+            {"q": self.asset.name, "status": "999999999"},
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(list(response.context["table"].data.data), [])
+        self.assertEqual(response.context["filter_form"].data.get("q"), self.asset.name)
+        self.assertIn("status", response.context["filter_form"].errors)
+
+    def test_valid_filter_still_returns_matching_rows(self):
+        response = self.client.get(self.url, {"status": self.status.pk})
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual({row.pk for row in response.context["table"].data.data}, {self.asset.pk})
+        self.assertEqual(response.context["filter_form"].errors, {})
+
+    def test_valid_filter_with_no_matches_remains_empty_without_errors(self):
+        response = self.client.get(self.url, {"q": "definitely-no-match-gvf"})
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(list(response.context["table"].data.data), [])
+        self.assertEqual(response.context["filter_form"].errors, {})
+
+    def test_invalid_choice_filter_fails_closed_on_a_concrete_list_view(self):
+        self.tenant_role.permissions = ["assets.view_asset", "assets.view_statuslabel"]
+        self.tenant_role.save(update_fields=["permissions"])
+
+        response = self.client.get(reverse("assets:statuslabel_list"), {"type": "not-a-status-type"})
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(list(response.context["table"].data.data), [])
+        self.assertIn("type", response.context["filter_form"].errors)
+
+    def test_configured_display_form_validation_also_fails_closed(self):
+        instances = []
+
+        class RejectingAssetFilterForm(AssetFilterForm):
+            def __init__(self, *args, **kwargs):
+                super().__init__(*args, **kwargs)
+                instances.append(self)
+
+            def clean_q(self):
+                raise forms.ValidationError("Rejected only by the configured display form.")
+
+        with patch.object(AssetListView, "filterset_form", RejectingAssetFilterForm):
+            response = self.client.get(self.url, {"q": self.asset.name})
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(list(response.context["table"].data.data), [])
+        self.assertEqual(len(instances), 1)
+        self.assertIs(response.context["filter_form"], instances[0])
+        self.assertIn("q", response.context["filter_form"].errors)
+
+    def test_filterset_errors_are_preserved_on_a_divergent_display_form(self):
+        class LenientAssetFilterForm(AssetFilterForm):
+            def __init__(self, *args, **kwargs):
+                super().__init__(*args, **kwargs)
+                self.fields["status"] = forms.CharField(required=False)
+
+        with patch.object(AssetListView, "filterset_form", LenientAssetFilterForm):
+            response = self.client.get(self.url, {"status": "999999999"})
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(list(response.context["table"].data.data), [])
+        self.assertIn("status", response.context["filter_form"].errors)
+
+    def test_custom_field_filtering_cannot_reopen_an_invalid_standard_filter(self):
+        self.asset.custom_field_data = {"hostname": "list-asset-gvf"}
+        self.asset.save(update_fields=["custom_field_data"])
+        invalid_params = {"status": "999999999", "cf_hostname": "list-asset-gvf"}
+        saved_filter = SavedFilter.objects.create(
+            name="Invalid status with custom field GVF",
+            content_type=ContentType.objects.get_for_model(Asset),
+            tenant=self.tenant,
+            shared=False,
+            created_by=self.tenant_user,
+            parameters=invalid_params,
+        )
+        cases = (
+            (invalid_params, {}),
+            (invalid_params, {"HTTP_HX_REQUEST": "true"}),
+            ({"filter": saved_filter.pk}, {}),
+        )
+
+        for params, extra in cases:
+            with self.subTest(params=params, extra=extra):
+                response = self.client.get(self.url, params, **extra)
+                self.assertEqual(response.status_code, 200)
+                self.assertEqual(list(response.context["table"].data.data), [])
+                self.assertIn("status", response.context["filter_form"].errors)
+
+    def test_mismatched_filterset_form_configuration_fails_loud(self):
+        class MismatchedAssetFilterForm(AssetFilterForm):
+            filterset_class = StatusLabelFilterSet
+
+        with patch.object(AssetListView, "filterset_form", MismatchedAssetFilterForm):
+            with self.assertRaisesRegex(
+                ImproperlyConfigured,
+                "AssetListView.filterset_form must use AssetFilterSet as its filterset_class",
+            ):
+                self.client.get(self.url)
 
     def test_list_is_scoped_to_the_active_tenant(self):
         tenant_b = Tenant.objects.create(name="List Scope B GVF", slug="list-scope-b-gvf")
