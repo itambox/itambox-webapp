@@ -25,6 +25,7 @@ from extras.models import (
 from itambox.registry import registry
 from itambox.utils import get_help_url, get_model_viewname
 from itambox.views.generic.authorization import PermissionResolver
+from itambox.views.generic.capability_notices import capability_notice
 from itambox.views.generic.mixins import (
     CachedObjectMixin,
     TenantScopingViewMixin,
@@ -133,6 +134,7 @@ class ObjectDetailView(
 
         context["model"] = obj.__class__
         context["layout"] = self.layout
+        context.setdefault("capability_notice", capability_notice(obj.__class__))
 
         mutation_allowed = user_can_mutate_model(self.request.user, obj.__class__)
         can_change = mutation_allowed and self.request.user.has_perm(

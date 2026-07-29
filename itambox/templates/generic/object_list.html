@@ -293,7 +293,7 @@
         {{ pretitle|default:_("Manage") }}
     </div>
     <h2 class="page-title">
-        {{ title|default:_("Objects") }}
+        {{ title|default:_("Objects") }}{% include "generic/includes/capability_badge.html" %}
     </h2>
 {% endblock %}
 

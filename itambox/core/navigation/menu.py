@@ -2,6 +2,8 @@ from functools import cache
 
 from django.utils.translation import gettext_lazy as _
 
+from itambox.capabilities import registry
+
 from . import Menu, MenuGroup, MenuItem, MenuItemButton, get_model_item
 
 
@@ -84,6 +86,11 @@ def can_manage_user_groups(user):
         user.has_perm("users.add_usergroup", obj=tenant) or user.has_perm("users.change_usergroup", obj=tenant)
         for tenant in Tenant._base_manager.filter(pk__in=ids, deleted_at__isnull=True)
     )
+
+
+def _report_designer_active(_user):
+    """Keep designer navigation in lock-step with its route capability gate."""
+    return registry.is_active("reporting.designer")
 
 
 ORG_MENU = Menu(
@@ -280,7 +287,6 @@ OPERATIONS_MENU = Menu(
     groups=(
         MenuGroup(
             label=_("Procurement"),
-            beta=True,
             items=(
                 MenuItem(
                     link="procurement:purchaseorder_list",
@@ -424,6 +430,7 @@ MONITORING_MENU = Menu(
                     link="extras:reporttemplate_list",
                     link_text=_("Report Templates"),
                     permissions=["extras.view_reporttemplate"],
+                    condition=_report_designer_active,
                     buttons=(
                         MenuItemButton(
                             link="extras:reporttemplate_create",

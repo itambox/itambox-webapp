@@ -35,13 +35,13 @@ ITAMbox gives internal IT teams and managed service providers one tenant-aware s
 | Asset lifecycle | Hardware catalogues, assignments, check-in and check-out, reservations, warranties, maintenance, depreciation, disposal, and total cost tracking |
 | Inventory and stock | Accessories, consumables, components, kits, location-level stock, barcode and QR scanning, and bulk operations |
 | Software and licenses | Installed-software records, license-seat assignment, suppliers, cost centers, and software catalogue management |
-| Subscriptions and procurement — Beta | SaaS subscriptions, purchase orders and lines, contracts, fulfillment links, and asset-request workflows |
+| Subscriptions and procurement | SaaS subscriptions, purchase orders and lines, contracts, fulfillment links, and asset-request workflows; the requisition fulfilment seam is Beta |
 | Governance | Tenant and tenant-group scoping, role-based access, delegated resource grants, custody receipts, audit campaigns, change history, retention, and recycle-bin workflows |
 | Customization | Custom fields, tags, imports and exports, labels, saved filters, attachments, and journals |
-| Reporting and automation — Beta | Dashboards, reports, alerts, notification channels, event rules, webhooks, and background jobs |
-| Identity and integrations | LDAP, SAML, OIDC, TOTP for privileged local accounts, Intune discovery, REST/OpenAPI, and scoped GraphQL; SCIM and plugins are Beta |
+| Reporting and automation | Dashboards, curated reports, and the alerts inbox; the report designer, scheduled reports, alert rules and channels, event rules, and webhooks are Beta |
+| Identity and integrations | LDAP, SAML, OIDC, TOTP for privileged local accounts, Intune discovery, REST/OpenAPI, and scoped GraphQL; SCIM is Beta and the plugin system is Experimental |
 
-See [module maturity](itambox/docs/development/module-maturity.md) for the current Stable and Beta designations. SCIM is Beta: tenant endpoints provision Users and expose Groups read-only, while provider-scoped endpoints provision both Users and provider-owned Groups.
+Maturity is declared per capability, not per module. The authoritative list, with each entry's activation mode and declared limitations, is the [capability registry](itambox/docs/development/capability-registry.md); [module maturity](itambox/docs/development/module-maturity.md) is the short reader's guide. SCIM is Beta: tenant endpoints provision Users and expose Groups read-only, while provider-scoped endpoints provision both Users and provider-owned Groups.
 
 ## Architecture
 
@@ -101,6 +101,12 @@ Configure the reverse proxy, TLS, and port restriction before starting the long-
 ```bash
 docker compose up -d
 ```
+
+Existing deployments that use the Beta report-template designer must set
+`ITAMBOX_REPORT_DESIGNER_ENABLED=True` before upgrading; it is disabled by
+default. The curated catalogue is unaffected and scheduled delivery of existing
+report templates continues, but a fresh deployment must enable the designer
+before it can author a template to schedule.
 
 Back up PostgreSQL, uploaded media, `ITAMBOX_SECRET_KEY`, `ITAMBOX_FIELD_ENCRYPTION_KEYS`, and `ITAMBOX_API_TOKEN_PEPPERS` together. Follow the [installation guide](itambox/docs/operations/installation.md), [backup and restore guide](itambox/docs/operations/backup-restore.md), and [upgrade guide](itambox/docs/operations/upgrades.md).
 

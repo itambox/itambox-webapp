@@ -9,13 +9,14 @@ form today, so these tests write a hostile value straight onto the model
 (bypassing the form) to prove the template is robust regardless of the writer.
 """
 
-from django.test import TestCase
+from django.test import TestCase, override_settings
 from django.urls import reverse
 
 from core.tests.mixins import TenantTestMixin
 from extras.models import ReportTemplate
 
 
+@override_settings(REPORT_DESIGNER_ENABLED=True)
 class ReportTemplateFormSavedSequenceXSSTests(TenantTestMixin, TestCase):
     # A column value crafted to break out of an HTML attribute and inject markup.
     HOSTILE_COL = 'name"><img src=x onerror=alert(1)>'

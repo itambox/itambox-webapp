@@ -12,13 +12,14 @@ from django.utils.translation import gettext as _
 from django.utils.translation import override
 from django.views.generic import ListView
 
-from core.features import BETA, module_maturity
+from core.features import STABLE
 from core.forms.import_forms import is_model_importable
 from extras.customfields import apply_custom_field_filters
 from extras.models import ExportTemplate, LabelTemplate, SavedFilter
 from itambox.registry import registry
 from itambox.utils import get_help_url, get_model_viewname
 from itambox.views.generic.authorization import PermissionResolver
+from itambox.views.generic.capability_notices import capability_notice
 from itambox.views.generic.mixins import (
     TenantScopingViewMixin,
     user_can_mutate_model,
@@ -204,7 +205,11 @@ class ObjectListView(TenantScopingViewMixin, PermissionRequiredMixin, LoginRequi
         context["object_type"] = _model._meta.verbose_name
         mutation_allowed = user_can_mutate_model(self.request.user, _model)
 
-        context.setdefault("is_beta_module", module_maturity(_model._meta.app_label) == BETA)
+        # The registry answers per model; `is_beta_module` stays for the views
+        # that still set it directly and is derived from the notice otherwise.
+        notice = capability_notice(_model)
+        context.setdefault("capability_notice", notice)
+        context.setdefault("is_beta_module", notice is not None and notice["maturity"] != STABLE)
 
         context.setdefault("title", _model._meta.verbose_name_plural)
 
