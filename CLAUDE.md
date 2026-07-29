@@ -240,6 +240,36 @@ Python 3.12 and scans `itambox/` only. Full policy:
 layer definitions and the matrix:
 [adr-0001-architecture-boundaries-and-layering.md](itambox/docs/development/adr-0001-architecture-boundaries-and-layering.md).
 
+### Published 1.0 contract (AST policy gate)
+```bash
+# From the repository root -- blocking gate; CI reaches it through the
+# scripts/tests gate-suite discovery rather than a dedicated workflow step:
+uv run --locked --only-group dev python scripts/check_contract_policy.py
+
+# What is the gate comparing the inventory against?
+uv run --locked --only-group dev python scripts/check_contract_policy.py --list
+
+# The behavioural suite CI actually runs:
+uv run --locked --only-group dev python -m unittest scripts.tests.test_contract_policy
+```
+The 1.x compatibility promise
+([compatibility-policy.md](itambox/docs/development/compatibility-policy.md)) and
+the bounded enumeration it applies to
+([external-contract-inventory.md](itambox/docs/development/external-contract-inventory.md))
+are checked against source rather than kept in step by hand. The gate derives
+persisted choice values, `ITAMBOX_*` settings reads, capability declarations and
+their limitation text, custom permission codenames, the webhook envelope and its
+signature header, SCIM routes, UI URL namespaces, and root entry routes with
+`ast`, then compares them against the anchored tables in the inventory. It
+imports no Django and touches no database. There is deliberately **no write
+mode**: publication is a reviewed edit, so when the gate fails the fix is to
+restore the surface or to edit the document. A closed-for-1.x enum records its
+frozen values in `scripts/contract_policy.py` as well as in the document, and
+each capability's published exclusions summary is pinned to the exact declared
+limitation text it was written against, so changing either takes coordinated
+reviewed edits. Rule identifiers (`C-ENUM1` ... `C-DOC3`) and what each blocks
+are tabulated in the policy document.
+
 ### Docs (MkDocs)
 ```bash
 # Build docs to static/docs/ (run from itambox/)
