@@ -1,0 +1,8 @@
+{% load i18n %}
+{% comment %}
+The compact form of the maturity banner, for a page header beside the title.
+Silent for Stable and for anything the capability registry does not own.
+{% endcomment %}
+{% if capability_notice %}<span class="badge bg-warning-lt ms-2 align-middle"
+      data-capability="{{ capability_notice.key }}"
+      title="{% blocktranslate with name=capability_notice.title %}{{ name }} is still settling; its API and data model may change.{% endblocktranslate %}">{{ capability_notice.maturity|title }}</span>{% endif %}

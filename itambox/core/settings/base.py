@@ -253,7 +253,9 @@ CRISPY_ALLOWED_TEMPLATE_PACKS = "bootstrap5"
 CRISPY_TEMPLATE_PACK = "bootstrap5"
 
 REST_FRAMEWORK = {
-    "DEFAULT_SCHEMA_CLASS": "drf_spectacular.openapi.AutoSchema",
+    # drf-spectacular's AutoSchema plus the x-itambox-maturity extension, so a
+    # generated client can see which endpoints are still settling (issue #171).
+    "DEFAULT_SCHEMA_CLASS": "itambox.api.openapi.CapabilityAwareAutoSchema",
     "DEFAULT_AUTHENTICATION_CLASSES": [
         "itambox.api.authentication.TokenAuthentication",
         "rest_framework.authentication.SessionAuthentication",
@@ -467,6 +469,15 @@ ITAMBOX_QTASK_FAILED_RETENTION_DAYS = int(os.environ.get("ITAMBOX_QTASK_FAILED_R
 
 ALLOW_GLOBAL_CUSTODY_TEMPLATES = os.environ.get("ITAMBOX_ALLOW_GLOBAL_CUSTODY_TEMPLATES", "True") == "True"
 REQUIRE_CUSTODY_SIGNIN = os.environ.get("ITAMBOX_REQUIRE_CUSTODY_SIGNIN", "True") == "True"
+
+# The operator switch for the Beta report designer (capability
+# `reporting.designer`, issue #171). Off by default: the designer's column,
+# filter, and grouping model is still expected to change, so a deployment opts
+# in rather than inheriting it. The registry probe reads this setting and the
+# designer's routes read the registry, so there is one switch and one answer --
+# see itambox/docs/development/capability-registry.md. The Stable curated
+# report catalogue is a separate capability and is unaffected.
+REPORT_DESIGNER_ENABLED = os.environ.get("ITAMBOX_REPORT_DESIGNER_ENABLED", "False") == "True"
 
 # Server-side peppers used to HMAC-hash API tokens at rest (NetBox v4.5 style).
 # JSON object of {"<numeric id>": "<>=50-char secret>"}; the highest id hashes

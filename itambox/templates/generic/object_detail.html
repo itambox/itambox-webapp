@@ -11,7 +11,7 @@
         {{ object_type|default:_("Object") }} {% translate "Details" %}
     </div>
     <h2 class="page-title">
-        {{ object }}
+        {{ object }}{% include "generic/includes/capability_badge.html" %}
     </h2>
 {% endblock %}
 
@@ -128,6 +128,7 @@
 {% endblock tabs %}
 
 {% block content %}
+{% include "generic/includes/beta_banner.html" %}
 {% if object %}{% plugin_template_content object 'alerts' object %}{% endif %}
 <div class="tab-content">
     <div class="tab-pane fade {% if not request.GET.tab or request.GET.tab == 'details' %}show active{% endif %}" id="details" role="tabpanel">

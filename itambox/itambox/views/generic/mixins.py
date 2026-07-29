@@ -7,6 +7,7 @@ from django.urls import NoReverseMatch, reverse
 from django.utils.http import url_has_allowed_host_and_scheme
 from django.views.generic import View
 
+from itambox.capabilities import registry as capability_registry
 from itambox.utils import get_model_viewname
 
 SUPERUSER_ONLY_MUTATION_MODELS = frozenset(
@@ -117,6 +118,31 @@ class TenantScopingViewMixin:
         if hasattr(queryset, "filter_by_tenant"):
             queryset = queryset.filter_by_tenant()
         return queryset
+
+
+class CapabilityRequiredMixin:
+    """Close a route whose capability the deployment has not switched on.
+
+    ``capability_key`` names an entry in the capability registry, and the
+    registry -- not a setting re-read here -- decides whether it is active. That
+    is the point: an opt-in slice has exactly one switch, so its routes, its
+    ``manage.py capabilities`` row, and its declared grade can never disagree
+    about what a deployment turned on.
+
+    Inactive reads as *absent* rather than *forbidden*. A 403 would confirm the
+    feature is installed and merely closed to this user; a slice a deployment
+    never opted into has no route to speak of. Placed first in a view's bases so
+    the answer does not depend on how far down the MRO a permission check sits.
+    """
+
+    capability_key = None
+
+    def dispatch(self, request, *args, **kwargs):
+        if not self.capability_key:
+            raise ImproperlyConfigured(f"{type(self).__name__} sets no capability_key")
+        if not capability_registry.is_active(self.capability_key):
+            raise Http404(f"capability {self.capability_key!r} is not active in this deployment")
+        return super().dispatch(request, *args, **kwargs)
 
 
 def filter_permitted_rows(user, rows, model, action):

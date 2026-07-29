@@ -19,6 +19,7 @@ from django_tables2 import RequestConfig
 
 from assets.tables import AssetTable  # Import AssetTable
 from core.managers import get_current_tenant
+from itambox.capabilities import registry
 from itambox.panels import Panel
 from itambox.utils import get_model_viewname, get_paginate_count  # Import the utility function
 from itambox.views.generic import (
@@ -29,6 +30,7 @@ from itambox.views.generic import (
     ObjectEditView,
     ObjectListView,
 )
+from itambox.views.generic.mixins import CapabilityRequiredMixin
 from itambox.views.generic.utils import safe_return_url
 from users.models import UserPreference  # Import UserPreference
 
@@ -687,9 +689,18 @@ class NotificationChannelTestView(SimplePostView):
 # Reporting Views
 # =============================================================================
 
+#: The report designer is opt-in (ITAMBOX_REPORT_DESIGNER_ENABLED). Every route
+#: below that edits, previews, or renders a ReportTemplate is closed while the
+#: capability is inactive, so the flag an operator sets and the routes a
+#: deployment serves cannot drift apart. The Stable curated report catalogue
+#: (`reporting.curated`) and the scheduled-report views are separate
+#: capabilities and are deliberately not gated here.
+REPORT_DESIGNER_CAPABILITY = "reporting.designer"
+
 
 @method_decorator(login_required, name="dispatch")
-class ReportTemplateListView(ObjectListView):
+class ReportTemplateListView(CapabilityRequiredMixin, ObjectListView):
+    capability_key = REPORT_DESIGNER_CAPABILITY
     queryset = ReportTemplate.objects.all()
     filterset = ReportTemplateFilterSet
     filterset_form = ReportTemplateFilterForm
@@ -708,7 +719,8 @@ class ReportTemplateListView(ObjectListView):
 
 
 @method_decorator(login_required, name="dispatch")
-class ReportTemplateDetailView(ObjectDetailView):
+class ReportTemplateDetailView(CapabilityRequiredMixin, ObjectDetailView):
+    capability_key = REPORT_DESIGNER_CAPABILITY
     queryset = ReportTemplate.objects.all()
     template_name = "core/reports/report_template_detail.html"
 
@@ -721,7 +733,8 @@ class ReportTemplateDetailView(ObjectDetailView):
 
 
 @method_decorator(login_required, name="dispatch")
-class ReportTemplateCreateView(ObjectEditView):
+class ReportTemplateCreateView(CapabilityRequiredMixin, ObjectEditView):
+    capability_key = REPORT_DESIGNER_CAPABILITY
     queryset = ReportTemplate.objects.all()
     model_form = ReportTemplateForm
     template_name = "core/reports/report_template_form.html"
@@ -733,7 +746,8 @@ class ReportTemplateCreateView(ObjectEditView):
 
 
 @method_decorator(login_required, name="dispatch")
-class ReportTemplateUpdateView(ObjectEditView):
+class ReportTemplateUpdateView(CapabilityRequiredMixin, ObjectEditView):
+    capability_key = REPORT_DESIGNER_CAPABILITY
     queryset = ReportTemplate.objects.all()
     model_form = ReportTemplateForm
     template_name = "core/reports/report_template_form.html"
@@ -745,12 +759,14 @@ class ReportTemplateUpdateView(ObjectEditView):
 
 
 @method_decorator(login_required, name="dispatch")
-class ReportTemplateDeleteView(ObjectDeleteView):
+class ReportTemplateDeleteView(CapabilityRequiredMixin, ObjectDeleteView):
+    capability_key = REPORT_DESIGNER_CAPABILITY
     queryset = ReportTemplate.objects.all()
     template_name = "core/reports/report_template_confirm_delete.html"
 
 
-class ReportTemplateBulkDeleteView(ObjectBulkDeleteView):
+class ReportTemplateBulkDeleteView(CapabilityRequiredMixin, ObjectBulkDeleteView):
+    capability_key = REPORT_DESIGNER_CAPABILITY
     queryset = ReportTemplate.objects.all()
 
 
@@ -770,6 +786,7 @@ class ScheduledReportListView(ObjectListView):
         context = super().get_context_data(**kwargs)
         context["title"] = _("Scheduled Reports")
         context["templates"] = ReportTemplate.objects.all()
+        context["report_designer_active"] = registry.is_active(REPORT_DESIGNER_CAPABILITY)
         context["is_beta_module"] = True
         return context
 
@@ -913,7 +930,8 @@ class ReportTriggerImmediateView(PermissionRequiredMixin, LoginRequiredMixin, Vi
 
 
 @method_decorator(login_required, name="dispatch")
-class ReportTemplatePreviewView(PermissionRequiredMixin, View):
+class ReportTemplatePreviewView(CapabilityRequiredMixin, PermissionRequiredMixin, View):
+    capability_key = REPORT_DESIGNER_CAPABILITY
     permission_required = ("extras.view_reporttemplate",)
 
     def post(self, request, *args, **kwargs):
@@ -1020,7 +1038,8 @@ class ReportTemplatePreviewView(PermissionRequiredMixin, View):
 
 
 @method_decorator(login_required, name="dispatch")
-class ReportTemplateDownloadView(PermissionRequiredMixin, LoginRequiredMixin, View):
+class ReportTemplateDownloadView(CapabilityRequiredMixin, PermissionRequiredMixin, LoginRequiredMixin, View):
+    capability_key = REPORT_DESIGNER_CAPABILITY
     permission_required = ("extras.view_reporttemplate",)
 
     def has_permission(self):

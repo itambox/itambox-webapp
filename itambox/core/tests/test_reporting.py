@@ -2,7 +2,7 @@ from unittest.mock import MagicMock, patch
 
 from django.contrib.auth import get_user_model
 from django.core.exceptions import ValidationError
-from django.test import RequestFactory, TestCase
+from django.test import TestCase, override_settings
 from django.urls import reverse
 from django_q.models import Schedule
 
@@ -135,6 +135,7 @@ class ScheduledReportingAndAlertsTests(TestCase):
         # Verify Slack channel was called
         mock_request_pinned.assert_called_once()
 
+    @override_settings(REPORT_DESIGNER_ENABLED=True)
     def test_report_preview_compilation_and_view(self):
         """Test report template context compilation and preview endpoint rendering without ValueError."""
         # Create some sample assets to exercise the asset summary report compilation path
@@ -174,6 +175,20 @@ class ScheduledReportingAndAlertsTests(TestCase):
         response = self.client.post(url, data)
         self.assertEqual(response.status_code, 200)
         self.assertIn(b"Asset Inventory Test Report", response.content)
+
+    @override_settings(REPORT_DESIGNER_ENABLED=False)
+    def test_scheduled_report_list_hides_inactive_designer_links(self):
+        self.client.force_login(self.user)
+        response = self.client.get(reverse("extras:scheduledreport_list"))
+        self.assertEqual(response.status_code, 200)
+        self.assertNotContains(response, reverse("extras:reporttemplate_list"))
+
+    @override_settings(REPORT_DESIGNER_ENABLED=True)
+    def test_scheduled_report_list_shows_active_designer_links(self):
+        self.client.force_login(self.user)
+        response = self.client.get(reverse("extras:scheduledreport_list"))
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, reverse("extras:reporttemplate_list"))
 
     def test_new_report_types_compilation(self):
         """Test that the new report types compile context and preview successfully."""

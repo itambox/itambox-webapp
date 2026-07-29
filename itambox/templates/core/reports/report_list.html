@@ -2,17 +2,19 @@
 {% load i18n %}
 
 {% block extra_controls %}
+    {% if report_designer_active %}
     <a href="{% url 'extras:reporttemplate_list' %}" class="btn btn-outline-secondary">
         <i class="mdi mdi-file-document-outline me-1"></i>
         {% translate "Manage Templates" %}
     </a>
+    {% endif %}
 {% endblock %}
 
 {% block content %}
 {% include "generic/includes/beta_banner.html" %}
 <div class="row g-3 mb-3">
     <!-- Active Schedules Count -->
-    <div class="col-sm-6 col-lg-6">
+    <div class="col-sm-6 {% if report_designer_active %}col-lg-6{% else %}col-lg-12{% endif %}">
         <div class="card card-sm">
             <div class="card-body">
                 <div class="row align-items-center">
@@ -33,7 +35,8 @@
             </div>
         </div>
     </div>
-    
+
+    {% if report_designer_active %}
     <!-- Report Templates Count -->
     <div class="col-sm-6 col-lg-6">
         <div class="card card-sm bg-purple-lt">
@@ -58,6 +61,7 @@
             </div>
         </div>
     </div>
+    {% endif %}
 </div>
 
 {{ block.super }}

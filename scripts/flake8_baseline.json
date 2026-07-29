@@ -5676,14 +5676,6 @@
       "count": 1
     },
     {
-      "path": "itambox/core/tests/test_reporting.py",
-      "code": "F401",
-      "message": "'django.test.RequestFactory' imported but unused",
-      "source": "from django.test import RequestFactory, TestCase",
-      "context": "Module:body",
-      "count": 1
-    },
-    {
       "path": "itambox/core/tests/test_security_boundaries.py",
       "code": "B907",
       "message": "'self.asset_b.pk' is manually surrounded by quotes, consider using the `!r` conversion flag.",
@@ -8001,14 +7993,6 @@
       "message": "'ObjectListView.get_context_data' is too complex (30)",
       "source": "    def get_context_data(self, **kwargs):",
       "context": "Module:body/ClassDef:ObjectListView:body/FunctionDef:get_context_data:self",
-      "count": 1
-    },
-    {
-      "path": "itambox/itambox/views/generic/mixins.py",
-      "code": "F401",
-      "message": "'django.core.exceptions.ImproperlyConfigured' imported but unused",
-      "source": "from django.core.exceptions import ImproperlyConfigured",
-      "context": "Module:body",
       "count": 1
     },
     {

@@ -175,6 +175,7 @@ In development, the app uses a local SMTP catcher automatically. In production, 
 | `ITAMBOX_SESSION_COOKIE_AGE` | Optional | `1209600` (2 weeks) | Interactive session lifetime in seconds. After this duration of inactivity, users must re-authenticate. |
 | `ITAMBOX_DOCS_ROOT` | Optional | `BASE_DIR/docs` | Filesystem path to compiled MkDocs output. Override to serve documentation from an external volume. |
 | `ITAMBOX_REQUIRE_MFA` | Optional | `True` (in prod) | Enforce TOTP multi-factor authentication for local-password logins by superusers and owner-admin roles. SSO/LDAP/SAML/OIDC logins always delegate MFA to the identity provider regardless of this setting. Set to `False` to disable for local accounts. |
+| `ITAMBOX_REPORT_DESIGNER_ENABLED` | Optional | `False` | Enable the Beta report-template designer. When `False`, designer navigation is hidden and its routes return 404. The curated catalogue is unaffected and scheduled delivery of existing report templates continues, but a fresh deployment must enable the designer before it can author a template to schedule. Existing deployments that use saved designer templates must set this to `True` before upgrading. |
 
 ---
 
