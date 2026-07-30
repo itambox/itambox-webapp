@@ -185,9 +185,7 @@ class ContractTenantIsolationUITests(ContractTenantIsolationSetupMixin, TestCase
         self.assertEqual(self.contract_b.updated_at, original_updated_at)
 
 
-class PurchaseOrderTenantIsolationAPITests(APITestCase):
-    """Characterize the Stable REST boundary for tenant-owned purchase orders."""
-
+class PurchaseOrderTenantIsolationSetupMixin:
     def setUp(self):
         super().setUp()
         self.tenant_a = Tenant.objects.create(name="PO API Tenant A", slug="po-security-api-tenant-a")
@@ -199,13 +197,13 @@ class PurchaseOrderTenantIsolationAPITests(APITestCase):
             permissions=["procurement.view_purchaseorder", "procurement.change_purchaseorder"],
         )
         grant(self.writer_a, self.tenant_a, writer_role_a)
-        self.reader_b = User.objects.create_user(username="po-security-api-reader-b", password="password")
-        reader_role_b = Role.objects.create(
+        self.writer_b = User.objects.create_user(username="po-security-api-writer-b", password="password")
+        writer_role_b = Role.objects.create(
             tenant=self.tenant_b,
-            name="Purchase order reader",
-            permissions=["procurement.view_purchaseorder"],
+            name="Purchase order writer",
+            permissions=["procurement.view_purchaseorder", "procurement.change_purchaseorder"],
         )
-        grant(self.reader_b, self.tenant_b, reader_role_b)
+        grant(self.writer_b, self.tenant_b, writer_role_b)
         self.site = Site.objects.create(name="PO Security API Site", slug="po-security-api-site")
         self.supplier = Supplier.objects.create(name="PO Security API Supplier", slug="po-security-api-supplier")
         self.purchase_order_a = self._make_purchase_order(
@@ -216,7 +214,7 @@ class PurchaseOrderTenantIsolationAPITests(APITestCase):
         self.purchase_order_b = self._make_purchase_order(
             self.tenant_b,
             "PO-SECURITY-TENANT-B",
-            self.reader_b,
+            self.writer_b,
         )
 
     def _make_purchase_order(self, tenant, order_number, created_by):
@@ -247,6 +245,25 @@ class PurchaseOrderTenantIsolationAPITests(APITestCase):
             kwargs={"pk": purchase_order.pk},
         )
 
+    def _ui_update_payload(self, purchase_order, notes):
+        return {
+            "order_number": purchase_order.order_number,
+            "status": purchase_order.status,
+            "supplier": purchase_order.supplier_id,
+            "currency": purchase_order.currency,
+            "order_date": purchase_order.order_date.isoformat() if purchase_order.order_date else "",
+            "expected_delivery_date": (
+                purchase_order.expected_delivery_date.isoformat() if purchase_order.expected_delivery_date else ""
+            ),
+            "destination_location": purchase_order.destination_location_id,
+            "tenant": purchase_order.tenant_id,
+            "notes": notes,
+        }
+
+
+class PurchaseOrderTenantIsolationAPITests(PurchaseOrderTenantIsolationSetupMixin, APITestCase):
+    """Characterize the Stable REST boundary for tenant-owned purchase orders."""
+
     def test_rest_list_excludes_other_tenant_purchase_order(self):
         self._login_to_tenant(self.writer_a, self.tenant_a)
 
@@ -265,12 +282,12 @@ class PurchaseOrderTenantIsolationAPITests(APITestCase):
         self.assertEqual(own_response.status_code, status.HTTP_200_OK, own_response.content)
         self.assertEqual(foreign_response.status_code, status.HTTP_404_NOT_FOUND, foreign_response.content)
 
-        self._login_to_tenant(self.reader_b, self.tenant_b)
+        self._login_to_tenant(self.writer_b, self.tenant_b)
         tenant_b_response = self.client.get(self._detail_url(self.purchase_order_b))
         self.assertEqual(tenant_b_response.status_code, status.HTTP_200_OK, tenant_b_response.content)
 
     def test_rest_update_for_other_tenant_purchase_order_returns_404_without_mutation(self):
-        self._login_to_tenant(self.reader_b, self.tenant_b)
+        self._login_to_tenant(self.writer_b, self.tenant_b)
         tenant_b_response = self.client.get(self._detail_url(self.purchase_order_b))
         self.assertEqual(tenant_b_response.status_code, status.HTTP_200_OK, tenant_b_response.content)
         foreign_etag = ETagMixin._get_etag(self.purchase_order_b)
@@ -299,6 +316,78 @@ class PurchaseOrderTenantIsolationAPITests(APITestCase):
         )
 
         self.assertEqual(foreign_update.status_code, status.HTTP_404_NOT_FOUND, foreign_update.content)
+        self.purchase_order_b.refresh_from_db()
+        self.assertEqual(self.purchase_order_b.notes, original_notes)
+        self.assertEqual(self.purchase_order_b.updated_at, original_updated_at)
+
+
+class PurchaseOrderTenantIsolationUITests(PurchaseOrderTenantIsolationSetupMixin, TestCase):
+    """Characterize the Stable UI boundary for tenant-owned purchase orders."""
+
+    def test_ui_list_excludes_other_tenant_purchase_order(self):
+        self._login_to_tenant(self.writer_a, self.tenant_a)
+
+        response = self.client.get(reverse("procurement:purchaseorder_list"))
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK, response.content)
+        self.assertContains(response, self.purchase_order_a.order_number)
+        self.assertNotContains(response, self.purchase_order_b.order_number)
+
+    def test_ui_detail_for_other_tenant_purchase_order_returns_404(self):
+        self._login_to_tenant(self.writer_a, self.tenant_a)
+
+        own_response = self.client.get(
+            reverse("procurement:purchaseorder_detail", kwargs={"pk": self.purchase_order_a.pk})
+        )
+        foreign_response = self.client.get(
+            reverse("procurement:purchaseorder_detail", kwargs={"pk": self.purchase_order_b.pk})
+        )
+
+        self.assertEqual(own_response.status_code, status.HTTP_200_OK, own_response.content)
+        self.assertContains(own_response, self.purchase_order_a.order_number)
+        self.assertEqual(foreign_response.status_code, status.HTTP_404_NOT_FOUND, foreign_response.content)
+        self.assertNotContains(
+            foreign_response,
+            self.purchase_order_b.order_number,
+            status_code=status.HTTP_404_NOT_FOUND,
+        )
+
+        self._login_to_tenant(self.writer_b, self.tenant_b)
+        tenant_b_response = self.client.get(
+            reverse("procurement:purchaseorder_detail", kwargs={"pk": self.purchase_order_b.pk})
+        )
+        self.assertEqual(tenant_b_response.status_code, status.HTTP_200_OK, tenant_b_response.content)
+        self.assertContains(tenant_b_response, self.purchase_order_b.order_number)
+
+    def test_ui_update_for_other_tenant_purchase_order_returns_404_without_mutation(self):
+        self._login_to_tenant(self.writer_a, self.tenant_a)
+        own_response = self.client.post(
+            reverse("procurement:purchaseorder_edit", kwargs={"pk": self.purchase_order_a.pk}),
+            self._ui_update_payload(self.purchase_order_a, "Authorized tenant UI update"),
+        )
+        self.assertEqual(own_response.status_code, status.HTTP_302_FOUND, own_response.content)
+        self.purchase_order_a.refresh_from_db()
+        self.assertEqual(self.purchase_order_a.notes, "Authorized tenant UI update")
+
+        self._login_to_tenant(self.writer_b, self.tenant_b)
+        tenant_b_response = self.client.post(
+            reverse("procurement:purchaseorder_edit", kwargs={"pk": self.purchase_order_b.pk}),
+            self._ui_update_payload(self.purchase_order_b, "Authorized tenant B UI update"),
+        )
+        self.assertEqual(tenant_b_response.status_code, status.HTTP_302_FOUND, tenant_b_response.content)
+        self.purchase_order_b.refresh_from_db()
+        self.assertEqual(self.purchase_order_b.notes, "Authorized tenant B UI update")
+
+        original_notes = self.purchase_order_b.notes
+        original_updated_at = self.purchase_order_b.updated_at
+
+        self._login_to_tenant(self.writer_a, self.tenant_a)
+        foreign_response = self.client.post(
+            reverse("procurement:purchaseorder_edit", kwargs={"pk": self.purchase_order_b.pk}),
+            self._ui_update_payload(self.purchase_order_b, "Cross-tenant overwrite"),
+        )
+
+        self.assertEqual(foreign_response.status_code, status.HTTP_404_NOT_FOUND, foreign_response.content)
         self.purchase_order_b.refresh_from_db()
         self.assertEqual(self.purchase_order_b.notes, original_notes)
         self.assertEqual(self.purchase_order_b.updated_at, original_updated_at)
