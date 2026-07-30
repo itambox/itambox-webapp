@@ -8,6 +8,7 @@ from django.utils import timezone
 from assets.choices import RequestStatusChoices
 from assets.models import AssetRequest, AssetType, Manufacturer, StatusLabel, Supplier
 from core.currency import CURRENCY_CHOICES
+from inventory.models import Accessory, AccessoryStock, Consumable, ConsumableStock
 from licenses.models import License
 from organization.models import Location, Site, Tenant
 from procurement.forms import ContractForm, PurchaseOrderForm, PurchaseOrderLineForm
@@ -70,6 +71,17 @@ class ProcurementStatusTransitionTests(TestCase):
         from procurement.services import approve_purchase_order
 
         with self.assertRaises(ValidationError):
+            approve_purchase_order(self.po)
+
+    def test_approve_purchase_order_rejects_stale_deleted_instance(self):
+        from procurement.services import approve_purchase_order
+
+        PurchaseOrderLine.objects.create(
+            purchase_order=self.po, asset_type=self.asset_type, qty_ordered=1, unit_price=10.00
+        )
+        self.po.delete()
+
+        with self.assertRaisesMessage(ValidationError, "Purchase order no longer exists"):
             approve_purchase_order(self.po)
 
     def test_order_purchase_order_successful(self):
@@ -269,6 +281,31 @@ class ProcurementStatusTransitionTests(TestCase):
         self.assertEqual(len(lock_queries), 1, lock_queries)
         self.assertIn("order by", lock_queries[0])
         self.assertIn("component_id", lock_queries[0])
+
+    def test_receive_accessory_and_consumable_updates_locked_stock(self):
+        from procurement.services import approve_purchase_order, order_purchase_order, receive_purchase_order
+
+        accessory = Accessory.objects.create(name="Dock", manufacturer=self.manufacturer)
+        consumable = Consumable.objects.create(name="Cable ties", manufacturer=self.manufacturer)
+        accessory_line = PurchaseOrderLine.objects.create(
+            purchase_order=self.po,
+            accessory=accessory,
+            qty_ordered=4,
+            unit_price=20.00,
+        )
+        consumable_line = PurchaseOrderLine.objects.create(
+            purchase_order=self.po,
+            consumable=consumable,
+            qty_ordered=10,
+            unit_price=1.00,
+        )
+        approve_purchase_order(self.po)
+        order_purchase_order(self.po)
+
+        receive_purchase_order(self.po, {accessory_line.pk: 3, consumable_line.pk: 7})
+
+        self.assertEqual(AccessoryStock.objects.get(accessory=accessory, location=self.location).qty, 3)
+        self.assertEqual(ConsumableStock.objects.get(consumable=consumable, location=self.location).qty, 7)
 
     def test_receiving_status_guards(self):
         line = PurchaseOrderLine.objects.create(
