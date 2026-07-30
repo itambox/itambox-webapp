@@ -1,4 +1,5 @@
 import datetime
+from decimal import Decimal
 
 from django.contrib.auth import get_user_model
 from django.test import TestCase
@@ -6,11 +7,11 @@ from django.urls import reverse
 from rest_framework import status
 from rest_framework.test import APITestCase
 
-from assets.models import Supplier
+from assets.models import AssetType, Manufacturer, Supplier
 from core.tests.mixins import grant
 from itambox.api.mixins import ETagMixin
 from organization.models import Location, Role, Site, Tenant
-from procurement.models import Contract, PurchaseOrder
+from procurement.models import Contract, PurchaseOrder, PurchaseOrderLine
 
 User = get_user_model()
 
@@ -391,3 +392,215 @@ class PurchaseOrderTenantIsolationUITests(PurchaseOrderTenantIsolationSetupMixin
         self.purchase_order_b.refresh_from_db()
         self.assertEqual(self.purchase_order_b.notes, original_notes)
         self.assertEqual(self.purchase_order_b.updated_at, original_updated_at)
+
+
+class PurchaseOrderLineTenantIsolationSetupMixin:
+    """Provide an authorized purchase-order-line writer in each tenant."""
+
+    def setUp(self):
+        super().setUp()
+        self.tenant_a = Tenant.objects.create(name="PO Line Tenant A", slug="po-line-security-tenant-a")
+        self.tenant_b = Tenant.objects.create(name="PO Line Tenant B", slug="po-line-security-tenant-b")
+        self.site = Site.objects.create(name="PO Line Security Site", slug="po-line-security-site")
+        self.supplier = Supplier.objects.create(name="PO Line Security Supplier", slug="po-line-security-supplier")
+        manufacturer = Manufacturer.objects.create(
+            name="PO Line Security Manufacturer",
+            slug="po-line-security-manufacturer",
+        )
+        self.asset_type = AssetType.objects.create(
+            manufacturer=manufacturer,
+            model="PO Line Security Model",
+            slug="po-line-security-model",
+        )
+        self.writer_a = self._make_writer("po-line-security-writer-a", self.tenant_a)
+        self.writer_b = self._make_writer("po-line-security-writer-b", self.tenant_b)
+        self.line_a = self._make_line(self.tenant_a, "PO-LINE-SECURITY-TENANT-A", self.writer_a)
+        self.line_b = self._make_line(self.tenant_b, "PO-LINE-SECURITY-TENANT-B", self.writer_b)
+
+    def _make_writer(self, username, tenant):
+        user = User.objects.create_user(username=username, password="password")
+        role = Role.objects.create(
+            tenant=tenant,
+            name=f"Purchase order line writer {tenant.pk}",
+            permissions=[
+                "procurement.view_purchaseorder",
+                "procurement.change_purchaseorder",
+                "procurement.view_purchaseorderline",
+                "procurement.change_purchaseorderline",
+            ],
+        )
+        grant(user, tenant, role)
+        return user
+
+    def _make_line(self, tenant, order_number, created_by):
+        location = Location.objects.create(
+            name=f"PO line location for {tenant.name}",
+            slug=f"po-line-security-location-{tenant.pk}",
+            site=self.site,
+            tenant=tenant,
+        )
+        purchase_order = PurchaseOrder.objects.create(
+            tenant=tenant,
+            order_number=order_number,
+            supplier=self.supplier,
+            destination_location=location,
+            created_by=created_by,
+        )
+        return PurchaseOrderLine.objects.create(
+            tenant=tenant,
+            purchase_order=purchase_order,
+            asset_type=self.asset_type,
+            qty_ordered=1,
+            unit_price=Decimal("10.00"),
+        )
+
+    def _login_to_tenant(self, user, tenant):
+        self.client.force_login(user)
+        session = self.client.session
+        session["active_tenant_id"] = tenant.pk
+        session.save()
+
+    def _rest_detail_url(self, line):
+        return reverse("api:procurement_api:purchaseorderline-detail", kwargs={"pk": line.pk})
+
+    def _ui_edit_url(self, line):
+        return reverse("procurement:purchaseorderline_edit", kwargs={"pk": line.pk})
+
+
+class PurchaseOrderLineTenantIsolationAPITests(PurchaseOrderLineTenantIsolationSetupMixin, APITestCase):
+    """Characterize the Stable REST boundary for tenant-owned purchase order lines."""
+
+    def test_rest_list_excludes_other_tenant_purchase_order_line(self):
+        self._login_to_tenant(self.writer_b, self.tenant_b)
+        tenant_b_response = self.client.get(reverse("api:procurement_api:purchaseorderline-list"))
+        self.assertEqual(tenant_b_response.status_code, status.HTTP_200_OK, tenant_b_response.content)
+        self.assertEqual({row["id"] for row in tenant_b_response.data["results"]}, {self.line_b.pk})
+
+        self._login_to_tenant(self.writer_a, self.tenant_a)
+        response = self.client.get(reverse("api:procurement_api:purchaseorderline-list"))
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK, response.content)
+        self.assertEqual({row["id"] for row in response.data["results"]}, {self.line_a.pk})
+
+    def test_rest_detail_for_other_tenant_purchase_order_line_returns_404(self):
+        self._login_to_tenant(self.writer_b, self.tenant_b)
+        tenant_b_response = self.client.get(self._rest_detail_url(self.line_b))
+        self.assertEqual(tenant_b_response.status_code, status.HTTP_200_OK, tenant_b_response.content)
+
+        self._login_to_tenant(self.writer_a, self.tenant_a)
+        own_response = self.client.get(self._rest_detail_url(self.line_a))
+        foreign_response = self.client.get(self._rest_detail_url(self.line_b))
+
+        self.assertEqual(own_response.status_code, status.HTTP_200_OK, own_response.content)
+        self.assertEqual(foreign_response.status_code, status.HTTP_404_NOT_FOUND, foreign_response.content)
+
+    def test_rest_update_for_other_tenant_purchase_order_line_returns_404_without_mutation(self):
+        self._login_to_tenant(self.writer_b, self.tenant_b)
+        tenant_b_update = self.client.patch(
+            self._rest_detail_url(self.line_b),
+            {"unit_price": "22.00"},
+            format="json",
+            HTTP_IF_MATCH=ETagMixin._get_etag(self.line_b),
+        )
+        self.assertEqual(tenant_b_update.status_code, status.HTTP_200_OK, tenant_b_update.content)
+        self.line_b.refresh_from_db()
+        self.assertEqual(self.line_b.unit_price, Decimal("22.00"))
+        foreign_etag = ETagMixin._get_etag(self.line_b)
+
+        self._login_to_tenant(self.writer_a, self.tenant_a)
+        own_update = self.client.patch(
+            self._rest_detail_url(self.line_a),
+            {"unit_price": "33.00"},
+            format="json",
+            HTTP_IF_MATCH=ETagMixin._get_etag(self.line_a),
+        )
+        self.assertEqual(own_update.status_code, status.HTTP_200_OK, own_update.content)
+        self.line_a.refresh_from_db()
+        self.assertEqual(self.line_a.unit_price, Decimal("33.00"))
+
+        original_unit_price = self.line_b.unit_price
+        original_updated_at = self.line_b.updated_at
+        foreign_update = self.client.patch(
+            self._rest_detail_url(self.line_b),
+            {"unit_price": "99.00"},
+            format="json",
+            HTTP_IF_MATCH=foreign_etag,
+        )
+
+        self.assertEqual(foreign_update.status_code, status.HTTP_404_NOT_FOUND, foreign_update.content)
+        self.line_b.refresh_from_db()
+        self.assertEqual(self.line_b.unit_price, original_unit_price)
+        self.assertEqual(self.line_b.updated_at, original_updated_at)
+
+
+class PurchaseOrderLineTenantIsolationUITests(PurchaseOrderLineTenantIsolationSetupMixin, TestCase):
+    """Characterize the parent-detail listing and edit UI; no standalone line detail exists."""
+
+    def test_ui_parent_detail_for_other_tenant_purchase_order_line_returns_404(self):
+        tenant_b_url = reverse(
+            "procurement:purchaseorder_detail",
+            kwargs={"pk": self.line_b.purchase_order_id},
+        )
+        self._login_to_tenant(self.writer_b, self.tenant_b)
+        tenant_b_response = self.client.get(tenant_b_url)
+        self.assertEqual(tenant_b_response.status_code, status.HTTP_200_OK, tenant_b_response.content)
+        self.assertContains(tenant_b_response, self._ui_edit_url(self.line_b))
+
+        self._login_to_tenant(self.writer_a, self.tenant_a)
+        own_response = self.client.get(
+            reverse("procurement:purchaseorder_detail", kwargs={"pk": self.line_a.purchase_order_id})
+        )
+        foreign_response = self.client.get(tenant_b_url)
+
+        self.assertEqual(own_response.status_code, status.HTTP_200_OK, own_response.content)
+        self.assertContains(own_response, self._ui_edit_url(self.line_a))
+        self.assertEqual(foreign_response.status_code, status.HTTP_404_NOT_FOUND, foreign_response.content)
+
+    def test_ui_edit_read_for_other_tenant_purchase_order_line_returns_404(self):
+        self._login_to_tenant(self.writer_b, self.tenant_b)
+        tenant_b_response = self.client.get(self._ui_edit_url(self.line_b))
+        self.assertEqual(tenant_b_response.status_code, status.HTTP_200_OK, tenant_b_response.content)
+
+        self._login_to_tenant(self.writer_a, self.tenant_a)
+        own_response = self.client.get(self._ui_edit_url(self.line_a))
+        foreign_response = self.client.get(self._ui_edit_url(self.line_b))
+
+        self.assertEqual(own_response.status_code, status.HTTP_200_OK, own_response.content)
+        self.assertEqual(foreign_response.status_code, status.HTTP_404_NOT_FOUND, foreign_response.content)
+
+    def test_ui_update_for_other_tenant_purchase_order_line_returns_404_without_mutation(self):
+        self._login_to_tenant(self.writer_a, self.tenant_a)
+        own_response = self.client.post(
+            self._ui_edit_url(self.line_a),
+            {"qty_ordered": 4, "unit_price": "44.00"},
+        )
+        self.assertEqual(own_response.status_code, status.HTTP_200_OK, own_response.content)
+        self.line_a.refresh_from_db()
+        self.assertEqual(self.line_a.qty_ordered, 4)
+        self.assertEqual(self.line_a.unit_price, Decimal("44.00"))
+
+        self._login_to_tenant(self.writer_b, self.tenant_b)
+        tenant_b_response = self.client.post(
+            self._ui_edit_url(self.line_b),
+            {"qty_ordered": 5, "unit_price": "55.00"},
+        )
+        self.assertEqual(tenant_b_response.status_code, status.HTTP_200_OK, tenant_b_response.content)
+        self.line_b.refresh_from_db()
+        self.assertEqual(self.line_b.qty_ordered, 5)
+        self.assertEqual(self.line_b.unit_price, Decimal("55.00"))
+
+        original_qty_ordered = self.line_b.qty_ordered
+        original_unit_price = self.line_b.unit_price
+        original_updated_at = self.line_b.updated_at
+
+        self._login_to_tenant(self.writer_a, self.tenant_a)
+        foreign_response = self.client.post(
+            self._ui_edit_url(self.line_b),
+            {"qty_ordered": 99, "unit_price": "99.00"},
+        )
+
+        self.assertEqual(foreign_response.status_code, status.HTTP_404_NOT_FOUND, foreign_response.content)
+        self.line_b.refresh_from_db()
+        self.assertEqual(self.line_b.qty_ordered, original_qty_ordered)
+        self.assertEqual(self.line_b.unit_price, original_unit_price)
+        self.assertEqual(self.line_b.updated_at, original_updated_at)
