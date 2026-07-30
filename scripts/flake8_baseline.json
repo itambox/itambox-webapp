@@ -9764,38 +9764,6 @@
       "count": 1
     },
     {
-      "path": "itambox/procurement/tests.py",
-      "code": "E402",
-      "message": "module level import not at top of file",
-      "source": "from core.currency import CURRENCY_CHOICES",
-      "context": "Module:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/procurement/tests.py",
-      "code": "E402",
-      "message": "module level import not at top of file",
-      "source": "from procurement.forms import ContractForm, PurchaseOrderForm, PurchaseOrderLineForm",
-      "context": "Module:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/procurement/tests.py",
-      "code": "E402",
-      "message": "module level import not at top of file",
-      "source": "from procurement.models import Contract",
-      "context": "Module:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/procurement/tests.py",
-      "code": "E402",
-      "message": "module level import not at top of file",
-      "source": "import datetime",
-      "context": "Module:body",
-      "count": 1
-    },
-    {
       "path": "itambox/procurement/views.py",
       "code": "B905",
       "message": "`zip()` without an explicit `strict=` parameter.",

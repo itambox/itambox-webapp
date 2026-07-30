@@ -4,6 +4,7 @@ from rest_framework import status
 from rest_framework.test import APITestCase
 
 from assets.models import Asset, AssetType, Manufacturer, StatusLabel, Supplier
+from core.models import ObjectChange
 from core.tests.mixins import grant
 from inventory.models import AccessoryStock, ComponentStock, ConsumableStock
 from itambox.api.mixins import ETagMixin
@@ -79,8 +80,21 @@ class PurchaseOrderActionAPITests(APITestCase):
         )
         return user
 
+    def _assert_status_audit(self, before, after, actor):
+        changes = ObjectChange._base_manager.filter(
+            changed_object_type__app_label="procurement",
+            changed_object_type__model="purchaseorder",
+            changed_object_id=self.purchase_order.pk,
+        )
+        self.assertEqual(changes.count(), 1)
+        change = changes.get()
+        self.assertEqual(change.tenant_id, self.tenant.pk)
+        self.assertEqual(change.user_id, actor.pk)
+        self.assertEqual(change.prechange_data["status"], before)
+        self.assertEqual(change.postchange_data["status"], after)
+
     def test_approve_action_uses_purchase_order_service(self):
-        self.client.force_authenticate(user=self.approver)
+        self._login_to_tenant(self.approver)
 
         response = self.client.post(
             f"/api/procurement/purchase-orders/{self.purchase_order.pk}/approve/",
@@ -92,6 +106,7 @@ class PurchaseOrderActionAPITests(APITestCase):
         self.purchase_order.refresh_from_db()
         self.assertEqual(self.purchase_order.status, PurchaseOrder.STATUS_APPROVED)
         self.assertIn("approved", str(response.data["message"]).lower())
+        self._assert_status_audit(PurchaseOrder.STATUS_DRAFT, PurchaseOrder.STATUS_APPROVED, self.approver)
 
     def test_approve_action_returns_400_for_service_validation_error(self):
         self.client.force_authenticate(user=self.creator)
@@ -107,6 +122,7 @@ class PurchaseOrderActionAPITests(APITestCase):
         self.assertIn("cannot be approved", response.content.decode().lower())
         self.purchase_order.refresh_from_db()
         self.assertEqual(self.purchase_order.status, PurchaseOrder.STATUS_DRAFT)
+        self.assertFalse(ObjectChange._base_manager.filter(changed_object_id=self.purchase_order.pk).exists())
 
     def test_approve_action_requires_custom_permission_not_add_permission(self):
         add_only = self._user_with_permissions(
@@ -345,7 +361,7 @@ class PurchaseOrderActionAPITests(APITestCase):
     def test_order_action_uses_purchase_order_service(self):
         self.purchase_order.status = PurchaseOrder.STATUS_APPROVED
         self.purchase_order.save(update_fields=["status"])
-        self.client.force_authenticate(user=self.approver)
+        self._login_to_tenant(self.approver)
 
         response = self.client.post(
             f"/api/procurement/purchase-orders/{self.purchase_order.pk}/order/",
@@ -357,6 +373,7 @@ class PurchaseOrderActionAPITests(APITestCase):
         self.purchase_order.refresh_from_db()
         self.assertEqual(self.purchase_order.status, PurchaseOrder.STATUS_ORDERED)
         self.assertIn("ordered", str(response.data["message"]).lower())
+        self._assert_status_audit(PurchaseOrder.STATUS_APPROVED, PurchaseOrder.STATUS_ORDERED, self.approver)
 
     def test_order_action_requires_change_not_add_permission(self):
         self.purchase_order.status = PurchaseOrder.STATUS_APPROVED
@@ -387,7 +404,7 @@ class PurchaseOrderActionAPITests(APITestCase):
     def test_receive_action_uses_purchase_order_service(self):
         self.purchase_order.status = PurchaseOrder.STATUS_ORDERED
         self.purchase_order.save(update_fields=["status"])
-        self.client.force_authenticate(user=self.approver)
+        self._login_to_tenant(self.approver)
 
         response = self.client.post(
             f"/api/procurement/purchase-orders/{self.purchase_order.pk}/receive/",
@@ -401,6 +418,7 @@ class PurchaseOrderActionAPITests(APITestCase):
         self.assertEqual(self.purchase_order.status, PurchaseOrder.STATUS_RECEIVED)
         self.assertEqual(self.line.qty_received, 1)
         self.assertIn("received", str(response.data["message"]).lower())
+        self._assert_status_audit(PurchaseOrder.STATUS_ORDERED, PurchaseOrder.STATUS_RECEIVED, self.approver)
 
     def test_completed_receive_replay_is_rejected_without_duplicate_materialization(self):
         """A stale retry after full receipt is inert; partial receipt replay needs a durable key owned by WP-5."""
@@ -629,7 +647,7 @@ class PurchaseOrderActionAPITests(APITestCase):
         self.assertEqual(self.line.qty_received, 0)
 
     def test_cancel_action_uses_purchase_order_service(self):
-        self.client.force_authenticate(user=self.approver)
+        self._login_to_tenant(self.approver)
 
         response = self.client.post(
             f"/api/procurement/purchase-orders/{self.purchase_order.pk}/cancel/",
@@ -641,11 +659,12 @@ class PurchaseOrderActionAPITests(APITestCase):
         self.purchase_order.refresh_from_db()
         self.assertEqual(self.purchase_order.status, PurchaseOrder.STATUS_CANCELLED)
         self.assertIn("cancelled", str(response.data["message"]).lower())
+        self._assert_status_audit(PurchaseOrder.STATUS_DRAFT, PurchaseOrder.STATUS_CANCELLED, self.approver)
 
     def test_reopen_action_uses_purchase_order_service(self):
         self.purchase_order.status = PurchaseOrder.STATUS_CANCELLED
         self.purchase_order.save(update_fields=["status"])
-        self.client.force_authenticate(user=self.approver)
+        self._login_to_tenant(self.approver)
 
         response = self.client.post(
             f"/api/procurement/purchase-orders/{self.purchase_order.pk}/reopen/",
@@ -657,6 +676,7 @@ class PurchaseOrderActionAPITests(APITestCase):
         self.purchase_order.refresh_from_db()
         self.assertEqual(self.purchase_order.status, PurchaseOrder.STATUS_DRAFT)
         self.assertIn("reopened", str(response.data["message"]).lower())
+        self._assert_status_audit(PurchaseOrder.STATUS_CANCELLED, PurchaseOrder.STATUS_DRAFT, self.approver)
 
     def test_cancel_and_reopen_require_change_not_add_permission(self):
         add_only = self._user_with_permissions(

@@ -180,6 +180,7 @@ nav:
       - Test Coverage Policy: 'development/test-coverage-policy.md'
       - OpenAPI Schema Policy: 'development/openapi-schema-policy.md'
       - Security Test Expectations: 'development/security-test-expectations.md'
+      - Procurement Stable Qualification: 'development/procurement-stable-qualification.md'
       - Security Scanning: 'development/security-scanning.md'
       - Capability Registry: 'development/capability-registry.md'
       - Module Maturity: 'development/module-maturity.md'
