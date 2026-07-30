@@ -23,7 +23,6 @@ class PurchaseOrderForm(forms.ModelForm):
         model = PurchaseOrder
         fields = [
             "order_number",
-            "status",
             "supplier",
             "currency",
             "order_date",
@@ -39,23 +38,15 @@ class PurchaseOrderForm(forms.ModelForm):
             "destination_location": forms.Select(attrs={"data-tom-select": ""}),
             "tenant": forms.Select(attrs={"data-tom-select": ""}),
             "currency": forms.Select(attrs={"data-tom-select": ""}),
-            "status": forms.Select(attrs={"class": "form-select"}),
         }
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         scope_tenant_field(self)
-        # status has a model default (draft); keep it optional in the form so a
-        # new PO can be created without explicitly choosing one, while still
-        # letting users change it. clean_status() falls back to the default.
-        if "status" in self.fields:
-            self.fields["status"].required = False
-            self.fields["status"].initial = PurchaseOrder.STATUS_DRAFT
         self.helper = FormHelper()
         self.helper.layout = Layout(
             Row(
-                Column("order_number", css_class="col-md-6"),
-                Column("status", css_class="col-md-6"),
+                Column("order_number", css_class="col-md-12"),
                 css_class="row g-3",
             ),
             Row(
@@ -77,10 +68,6 @@ class PurchaseOrderForm(forms.ModelForm):
                 + "</a>"
             ),
         )
-
-    def clean_status(self):
-        # Empty submission falls back to the model default rather than saving ''.
-        return self.cleaned_data.get("status") or PurchaseOrder.STATUS_DRAFT
 
 
 class PurchaseOrderLineForm(forms.ModelForm):

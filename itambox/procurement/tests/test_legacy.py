@@ -1,3 +1,5 @@
+import datetime
+
 from django.contrib.auth import get_user_model
 from django.core.exceptions import ValidationError
 from django.test import TestCase
@@ -5,9 +7,11 @@ from django.utils import timezone
 
 from assets.choices import RequestStatusChoices
 from assets.models import AssetRequest, AssetType, Manufacturer, StatusLabel, Supplier
+from core.currency import CURRENCY_CHOICES
 from licenses.models import License
 from organization.models import Location, Site, Tenant
-from procurement.models import FulfillmentLink, PurchaseOrder, PurchaseOrderLine
+from procurement.forms import ContractForm, PurchaseOrderForm, PurchaseOrderLineForm
+from procurement.models import Contract, FulfillmentLink, PurchaseOrder, PurchaseOrderLine
 from software.models import Software
 
 User = get_user_model()
@@ -217,10 +221,8 @@ class ProcurementStatusTransitionTests(TestCase):
         request.refresh_from_db()
         self.assertEqual(request.status, RequestStatusChoices.APPROVED)
 
-    def test_receive_component_locks_stock_row(self):
-        """WS2-2: the component-stock read-modify-write must hold a row lock
-        (SELECT ... FOR UPDATE) so concurrent receipts cannot lose an increment.
-        Fails before the fix — plain get_or_create emits no FOR UPDATE on the stock row."""
+    def test_receive_component_locks_stock_rows_in_global_item_order(self):
+        """Stock locks are acquired by item id, not by PO-line order."""
         from django.db import connection
         from django.test.utils import CaptureQueriesContext
 
@@ -234,10 +236,17 @@ class ProcurementStatusTransitionTests(TestCase):
 
         StatusLabel.objects.get_or_create(name="Deployable", defaults={"type": "deployable", "slug": "deployable"})
         category = Category.objects.create(name="Comp Cat", slug="comp-cat", applies_to={"component": True})
-        component = Component.objects.create(name="RAM", manufacturer=self.manufacturer, category=category)
-        line = PurchaseOrderLine.objects.create(
+        lower_component = Component.objects.create(name="RAM", manufacturer=self.manufacturer, category=category)
+        higher_component = Component.objects.create(name="SSD", manufacturer=self.manufacturer, category=category)
+        higher_line = PurchaseOrderLine.objects.create(
             purchase_order=self.po,
-            component=component,
+            component=higher_component,
+            qty_ordered=10,
+            unit_price=5.00,
+        )
+        lower_line = PurchaseOrderLine.objects.create(
+            purchase_order=self.po,
+            component=lower_component,
             qty_ordered=10,
             unit_price=5.00,
         )
@@ -245,15 +254,21 @@ class ProcurementStatusTransitionTests(TestCase):
         order_purchase_order(self.po)
 
         with CaptureQueriesContext(connection) as ctx:
-            receive_purchase_order(self.po, {line.pk: 5})
+            receive_purchase_order(self.po, {higher_line.pk: 5, lower_line.pk: 3})
 
-        stock = ComponentStock.objects.get(component=component, location=self.location)
-        self.assertEqual(stock.qty, 5)
+        lower_stock = ComponentStock.objects.get(component=lower_component, location=self.location)
+        higher_stock = ComponentStock.objects.get(component=higher_component, location=self.location)
+        self.assertEqual(lower_stock.qty, 3)
+        self.assertEqual(higher_stock.qty, 5)
 
-        locked = any(
-            "componentstock" in q["sql"].lower() and "for update" in q["sql"].lower() for q in ctx.captured_queries
-        )
-        self.assertTrue(locked, "receive_purchase_order must lock the component stock row (FOR UPDATE)")
+        lock_queries = [
+            q["sql"].lower()
+            for q in ctx.captured_queries
+            if "componentstock" in q["sql"].lower() and "for update" in q["sql"].lower()
+        ]
+        self.assertEqual(len(lock_queries), 1, lock_queries)
+        self.assertIn("order by", lock_queries[0])
+        self.assertIn("component_id", lock_queries[0])
 
     def test_receiving_status_guards(self):
         line = PurchaseOrderLine.objects.create(
@@ -378,11 +393,6 @@ class ProcurementStatusTransitionTests(TestCase):
         self.assertEqual(float(line.unit_price), 15.50)
 
 
-from core.currency import CURRENCY_CHOICES
-from procurement.forms import ContractForm, PurchaseOrderForm, PurchaseOrderLineForm
-from procurement.models import Contract
-
-
 class PurchaseOrderFormTests(TestCase):
     def setUp(self):
         self.site = Site.objects.create(name="Test Site", slug="test-site")
@@ -393,6 +403,10 @@ class PurchaseOrderFormTests(TestCase):
     def test_po_form_has_tenant_field(self):
         form = PurchaseOrderForm()
         self.assertIn("tenant", form.fields)
+
+    def test_po_form_does_not_expose_lifecycle_status(self):
+        form = PurchaseOrderForm()
+        self.assertNotIn("status", form.fields)
 
     def test_po_form_saves_tenant(self):
         form_data = {
@@ -581,8 +595,6 @@ class PurchaseOrderCurrencyTests(TestCase):
 # ---------------------------------------------------------------------------
 # Contract tests
 # ---------------------------------------------------------------------------
-
-import datetime
 
 
 class ContractModelTests(TestCase):

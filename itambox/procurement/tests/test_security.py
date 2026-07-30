@@ -63,7 +63,7 @@ class ContractTenantIsolationSetupMixin:
 
     def _etag(self, contract):
         contract.refresh_from_db()
-        return f'W/"{contract.updated_at.isoformat()}"'
+        return 'W/"' + contract.updated_at.isoformat() + '"'
 
     def _ui_update_payload(self, contract, name):
         return {
@@ -392,6 +392,21 @@ class PurchaseOrderTenantIsolationUITests(PurchaseOrderTenantIsolationSetupMixin
         self.purchase_order_b.refresh_from_db()
         self.assertEqual(self.purchase_order_b.notes, original_notes)
         self.assertEqual(self.purchase_order_b.updated_at, original_updated_at)
+
+    def test_ui_edit_cannot_bypass_lifecycle_action_or_creator_approver_separation(self):
+        self._login_to_tenant(self.writer_a, self.tenant_a)
+        payload = self._ui_update_payload(self.purchase_order_a, "Attempted lifecycle bypass")
+        payload["status"] = PurchaseOrder.STATUS_APPROVED
+
+        response = self.client.post(
+            reverse("procurement:purchaseorder_edit", kwargs={"pk": self.purchase_order_a.pk}),
+            payload,
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_302_FOUND, response.content)
+        self.purchase_order_a.refresh_from_db()
+        self.assertEqual(self.purchase_order_a.status, PurchaseOrder.STATUS_DRAFT)
+        self.assertEqual(self.purchase_order_a.notes, "Attempted lifecycle bypass")
 
 
 class PurchaseOrderLineTenantIsolationSetupMixin:

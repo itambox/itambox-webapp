@@ -9,6 +9,36 @@ from inventory.models import AccessoryStock, ComponentStock, ConsumableStock
 from procurement.models import FulfillmentLink, PurchaseOrder
 
 
+def _lock_receipt_stock_rows(lines, line_quantities, location):
+    """Create and lock every stock row in one deterministic global order."""
+    stock_maps = {}
+    specifications = (
+        (ComponentStock, "component_id"),
+        (AccessoryStock, "accessory_id"),
+        (ConsumableStock, "consumable_id"),
+    )
+    for stock_model, item_field in specifications:
+        item_ids = sorted(
+            {
+                getattr(line, item_field)
+                for line in lines
+                if getattr(line, item_field) is not None and line_quantities.get(line.pk, 0) > 0
+            }
+        )
+        for item_id in item_ids:
+            stock_model.objects.get_or_create(
+                **{item_field: item_id, "location": location},
+                defaults={"qty": 0},
+            )
+        locked = (
+            stock_model.objects.select_for_update()
+            .filter(**{f"{item_field}__in": item_ids, "location": location})
+            .order_by(item_field)
+        )
+        stock_maps[stock_model] = {getattr(stock, item_field): stock for stock in locked}
+    return stock_maps
+
+
 @transaction.atomic
 def receive_purchase_order(po, line_quantities, asset_details=None):
     """
@@ -39,7 +69,10 @@ def receive_purchase_order(po, line_quantities, asset_details=None):
             lid = int(detail["line_id"])
             details_by_line.setdefault(lid, []).append(detail)
 
-    for line in po.lines.select_for_update().all():
+    lines = list(po.lines.select_for_update().order_by("pk"))
+    stock_maps = _lock_receipt_stock_rows(lines, line_quantities, po.destination_location)
+
+    for line in lines:
         qty = line_quantities.get(line.pk, 0)
         if qty <= 0:
             if line.qty_outstanding > 0:
@@ -86,6 +119,7 @@ def receive_purchase_order(po, line_quantities, asset_details=None):
                     location=po.destination_location,
                     supplier=po.supplier,
                     purchase_cost=line.unit_price,
+                    currency=po.currency,
                     purchase_date=timezone.now().date(),
                     order_number=po.order_number,
                     tenant=po.tenant,
@@ -104,9 +138,7 @@ def receive_purchase_order(po, line_quantities, asset_details=None):
             # Lock the stock row across the read-modify-write so concurrent receipts (or a
             # concurrent checkout deduction) on the same component+location cannot lose an
             # increment. Mirrors adjust_inventory_stock's locking discipline.
-            stock, _created = ComponentStock.objects.select_for_update().get_or_create(
-                component=line.component, location=po.destination_location, defaults={"qty": 0}
-            )
+            stock = stock_maps[ComponentStock][line.component_id]
             stock.qty += qty
             stock.save()
 
@@ -123,9 +155,7 @@ def receive_purchase_order(po, line_quantities, asset_details=None):
                 req.save()
 
         elif line.accessory:
-            stock, _created = AccessoryStock.objects.select_for_update().get_or_create(
-                accessory=line.accessory, location=po.destination_location, defaults={"qty": 0}
-            )
+            stock = stock_maps[AccessoryStock][line.accessory_id]
             stock.qty += qty
             stock.save()
 
@@ -142,9 +172,7 @@ def receive_purchase_order(po, line_quantities, asset_details=None):
                 req.save()
 
         elif line.consumable:
-            stock, _created = ConsumableStock.objects.select_for_update().get_or_create(
-                consumable=line.consumable, location=po.destination_location, defaults={"qty": 0}
-            )
+            stock = stock_maps[ConsumableStock][line.consumable_id]
             stock.qty += qty
             stock.save()
 
@@ -196,6 +224,11 @@ def receive_purchase_order(po, line_quantities, asset_details=None):
 @transaction.atomic
 def approve_purchase_order(po, user=None, request=None):
     """Transition PO from draft to approved status."""
+    try:
+        locked_po = PurchaseOrder._base_manager.select_for_update().get(pk=po.pk, deleted_at__isnull=True)
+    except PurchaseOrder.DoesNotExist as exc:
+        raise ValidationError(_("Purchase order no longer exists.")) from exc
+    po.status = locked_po.status
     if po.status != PurchaseOrder.STATUS_DRAFT:
         raise ValidationError(
             _("Cannot approve a purchase order in '%(status)s' status.") % {"status": po.get_status_display()}
