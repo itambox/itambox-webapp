@@ -6,9 +6,11 @@ from django.urls import reverse
 from rest_framework import status
 from rest_framework.test import APITestCase
 
+from assets.models import Supplier
 from core.tests.mixins import grant
-from organization.models import Role, Tenant
-from procurement.models import Contract
+from itambox.api.mixins import ETagMixin
+from organization.models import Location, Role, Site, Tenant
+from procurement.models import Contract, PurchaseOrder
 
 User = get_user_model()
 
@@ -181,3 +183,122 @@ class ContractTenantIsolationUITests(ContractTenantIsolationSetupMixin, TestCase
         self.contract_b.refresh_from_db()
         self.assertEqual(self.contract_b.name, original_name)
         self.assertEqual(self.contract_b.updated_at, original_updated_at)
+
+
+class PurchaseOrderTenantIsolationAPITests(APITestCase):
+    """Characterize the Stable REST boundary for tenant-owned purchase orders."""
+
+    def setUp(self):
+        super().setUp()
+        self.tenant_a = Tenant.objects.create(name="PO API Tenant A", slug="po-security-api-tenant-a")
+        self.tenant_b = Tenant.objects.create(name="PO API Tenant B", slug="po-security-api-tenant-b")
+        self.writer_a = User.objects.create_user(username="po-security-api-writer-a", password="password")
+        writer_role_a = Role.objects.create(
+            tenant=self.tenant_a,
+            name="Purchase order writer",
+            permissions=["procurement.view_purchaseorder", "procurement.change_purchaseorder"],
+        )
+        grant(self.writer_a, self.tenant_a, writer_role_a)
+        self.reader_b = User.objects.create_user(username="po-security-api-reader-b", password="password")
+        reader_role_b = Role.objects.create(
+            tenant=self.tenant_b,
+            name="Purchase order reader",
+            permissions=["procurement.view_purchaseorder"],
+        )
+        grant(self.reader_b, self.tenant_b, reader_role_b)
+        self.site = Site.objects.create(name="PO Security API Site", slug="po-security-api-site")
+        self.supplier = Supplier.objects.create(name="PO Security API Supplier", slug="po-security-api-supplier")
+        self.purchase_order_a = self._make_purchase_order(
+            self.tenant_a,
+            "PO-SECURITY-TENANT-A",
+            self.writer_a,
+        )
+        self.purchase_order_b = self._make_purchase_order(
+            self.tenant_b,
+            "PO-SECURITY-TENANT-B",
+            self.reader_b,
+        )
+
+    def _make_purchase_order(self, tenant, order_number, created_by):
+        location = Location.objects.create(
+            name=f"Location for {tenant.name}",
+            slug=f"po-security-location-{tenant.pk}",
+            site=self.site,
+            tenant=tenant,
+        )
+        return PurchaseOrder.objects.create(
+            tenant=tenant,
+            order_number=order_number,
+            supplier=self.supplier,
+            destination_location=location,
+            notes=f"Notes for {tenant.name}",
+            created_by=created_by,
+        )
+
+    def _login_to_tenant(self, user, tenant):
+        self.client.force_login(user)
+        session = self.client.session
+        session["active_tenant_id"] = tenant.pk
+        session.save()
+
+    def _detail_url(self, purchase_order):
+        return reverse(
+            "api:procurement_api:purchaseorder-detail",
+            kwargs={"pk": purchase_order.pk},
+        )
+
+    def test_rest_list_excludes_other_tenant_purchase_order(self):
+        self._login_to_tenant(self.writer_a, self.tenant_a)
+
+        response = self.client.get(reverse("api:procurement_api:purchaseorder-list"))
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK, response.content)
+        rows = response.data["results"]
+        self.assertEqual({row["id"] for row in rows}, {self.purchase_order_a.pk})
+
+    def test_rest_detail_for_other_tenant_purchase_order_returns_404(self):
+        self._login_to_tenant(self.writer_a, self.tenant_a)
+
+        own_response = self.client.get(self._detail_url(self.purchase_order_a))
+        foreign_response = self.client.get(self._detail_url(self.purchase_order_b))
+
+        self.assertEqual(own_response.status_code, status.HTTP_200_OK, own_response.content)
+        self.assertEqual(foreign_response.status_code, status.HTTP_404_NOT_FOUND, foreign_response.content)
+
+        self._login_to_tenant(self.reader_b, self.tenant_b)
+        tenant_b_response = self.client.get(self._detail_url(self.purchase_order_b))
+        self.assertEqual(tenant_b_response.status_code, status.HTTP_200_OK, tenant_b_response.content)
+
+    def test_rest_update_for_other_tenant_purchase_order_returns_404_without_mutation(self):
+        self._login_to_tenant(self.reader_b, self.tenant_b)
+        tenant_b_response = self.client.get(self._detail_url(self.purchase_order_b))
+        self.assertEqual(tenant_b_response.status_code, status.HTTP_200_OK, tenant_b_response.content)
+        foreign_etag = ETagMixin._get_etag(self.purchase_order_b)
+
+        self._login_to_tenant(self.writer_a, self.tenant_a)
+        own_response = self.client.get(self._detail_url(self.purchase_order_a))
+        self.assertEqual(own_response.status_code, status.HTTP_200_OK, own_response.content)
+        own_update = self.client.patch(
+            self._detail_url(self.purchase_order_a),
+            {"notes": "Authorized tenant update"},
+            format="json",
+            HTTP_IF_MATCH=ETagMixin._get_etag(self.purchase_order_a),
+        )
+        self.assertEqual(own_update.status_code, status.HTTP_200_OK, own_update.content)
+        self.purchase_order_a.refresh_from_db()
+        self.assertEqual(self.purchase_order_a.notes, "Authorized tenant update")
+
+        self.purchase_order_b.refresh_from_db()
+        original_notes = self.purchase_order_b.notes
+        original_updated_at = self.purchase_order_b.updated_at
+        foreign_update = self.client.patch(
+            self._detail_url(self.purchase_order_b),
+            {"notes": "Cross-tenant overwrite"},
+            format="json",
+            HTTP_IF_MATCH=foreign_etag,
+        )
+
+        self.assertEqual(foreign_update.status_code, status.HTTP_404_NOT_FOUND, foreign_update.content)
+        self.purchase_order_b.refresh_from_db()
+        self.assertEqual(self.purchase_order_b.notes, original_notes)
+        self.assertEqual(self.purchase_order_b.updated_at, original_updated_at)
