@@ -15198,6 +15198,146 @@ paths:
         '204':
           description: No response body
       x-itambox-maturity: stable
+  /api/procurement/purchase-orders/{id}/approve/:
+    post:
+      operationId: procurement_purchase_orders_approve_create
+      description: Approve this Purchase Order through the sanctioned lifecycle transition.
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: A unique integer value identifying this purchase order.
+        required: true
+      tags:
+      - procurement
+      security:
+      - TokenAuth: []
+      - cookieAuth: []
+      - basicAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PurchaseOrderActionResponse'
+          description: ''
+      x-itambox-maturity: stable
+  /api/procurement/purchase-orders/{id}/cancel/:
+    post:
+      operationId: procurement_purchase_orders_cancel_create
+      description: Cancel this Purchase Order through the sanctioned lifecycle transition.
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: A unique integer value identifying this purchase order.
+        required: true
+      tags:
+      - procurement
+      security:
+      - TokenAuth: []
+      - cookieAuth: []
+      - basicAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PurchaseOrderActionResponse'
+          description: ''
+      x-itambox-maturity: stable
+  /api/procurement/purchase-orders/{id}/order/:
+    post:
+      operationId: procurement_purchase_orders_order_create
+      description: Mark this approved Purchase Order as ordered through the sanctioned
+        lifecycle transition.
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: A unique integer value identifying this purchase order.
+        required: true
+      tags:
+      - procurement
+      security:
+      - TokenAuth: []
+      - cookieAuth: []
+      - basicAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PurchaseOrderActionResponse'
+          description: ''
+      x-itambox-maturity: stable
+  /api/procurement/purchase-orders/{id}/receive/:
+    post:
+      operationId: procurement_purchase_orders_receive_create
+      description: Receive quantities for this Purchase Order through the sanctioned
+        lifecycle transition.
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: A unique integer value identifying this purchase order.
+        required: true
+      tags:
+      - procurement
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PurchaseOrderReceiveRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PurchaseOrderReceiveRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PurchaseOrderReceiveRequest'
+        required: true
+      security:
+      - TokenAuth: []
+      - cookieAuth: []
+      - basicAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PurchaseOrderActionResponse'
+          description: ''
+      x-itambox-maturity: stable
+  /api/procurement/purchase-orders/{id}/reopen/:
+    post:
+      operationId: procurement_purchase_orders_reopen_create
+      description: Reopen this cancelled Purchase Order through the sanctioned lifecycle
+        transition.
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: A unique integer value identifying this purchase order.
+        required: true
+      tags:
+      - procurement
+      security:
+      - TokenAuth: []
+      - cookieAuth: []
+      - basicAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PurchaseOrderActionResponse'
+          description: ''
+      x-itambox-maturity: stable
   /api/providers/{provider_slug}/scim/v2/Groups:
     get:
       operationId: providers_scim_v2_Groups_retrieve
@@ -25415,10 +25555,6 @@ components:
           type: integer
           maximum: 2147483647
           minimum: 0
-        qty_received:
-          type: integer
-          maximum: 2147483647
-          minimum: 0
         unit_price:
           type: string
           format: decimal
@@ -25431,8 +25567,6 @@ components:
           type: string
           minLength: 1
           maxLength: 100
-        status:
-          $ref: '#/components/schemas/PurchaseOrderStatusEnum'
         tenant_id:
           type: integer
           writeOnly: true
@@ -26049,7 +26183,9 @@ components:
           type: string
           maxLength: 100
         status:
-          $ref: '#/components/schemas/PurchaseOrderStatusEnum'
+          allOf:
+          - $ref: '#/components/schemas/PurchaseOrderStatusEnum'
+          readOnly: true
         status_display:
           type: string
           readOnly: true
@@ -26115,11 +26251,19 @@ components:
       - id
       - lines
       - order_number
+      - status
       - status_display
       - supplier
       - tenant
       - updated_at
       - url
+    PurchaseOrderActionResponse:
+      type: object
+      properties:
+        message:
+          type: string
+      required:
+      - message
     PurchaseOrderLine:
       type: object
       properties:
@@ -26165,8 +26309,7 @@ components:
           minimum: 0
         qty_received:
           type: integer
-          maximum: 2147483647
-          minimum: 0
+          readOnly: true
         qty_outstanding:
           type: integer
           readOnly: true
@@ -26203,6 +26346,7 @@ components:
       - license_display
       - purchase_order
       - qty_outstanding
+      - qty_received
       - tenant
       - total_cost
       - updated_at
@@ -26241,10 +26385,6 @@ components:
           type: integer
           maximum: 2147483647
           minimum: 0
-        qty_received:
-          type: integer
-          maximum: 2147483647
-          minimum: 0
         unit_price:
           type: string
           format: decimal
@@ -26252,6 +26392,16 @@ components:
           nullable: true
       required:
       - purchase_order_id
+    PurchaseOrderReceiveRequest:
+      type: object
+      properties:
+        line_quantities:
+          type: object
+          additionalProperties:
+            type: integer
+            minimum: 0
+      required:
+      - line_quantities
     PurchaseOrderRequest:
       type: object
       properties:
@@ -26259,8 +26409,6 @@ components:
           type: string
           minLength: 1
           maxLength: 100
-        status:
-          $ref: '#/components/schemas/PurchaseOrderStatusEnum'
         tenant_id:
           type: integer
           writeOnly: true

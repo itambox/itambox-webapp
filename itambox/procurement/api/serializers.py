@@ -1,3 +1,5 @@
+import re
+
 from rest_framework import serializers
 
 from assets.models import Asset, AssetType, Supplier
@@ -126,6 +128,7 @@ class ContractSerializer(BaseModelSerializer):
 
 class PurchaseOrderLineSerializer(BaseModelSerializer):
     url = serializers.HyperlinkedIdentityField(view_name="api:procurement_api:purchaseorderline-detail")
+    qty_received = serializers.IntegerField(read_only=True)
 
     tenant = NestedTenantSerializer(read_only=True)
     tenant_id = serializers.PrimaryKeyRelatedField(
@@ -235,9 +238,58 @@ class PurchaseOrderLineSerializer(BaseModelSerializer):
             return None
         return {"id": lic.pk, "name": str(lic)}
 
+    def validate(self, attrs):
+        attrs = super().validate(attrs)
+        if "qty_received" not in self.initial_data:
+            return attrs
+
+        message = "Use the purchase order /receive/ action to change qty_received."
+        try:
+            submitted_quantity = serializers.IntegerField(min_value=0).run_validation(self.initial_data["qty_received"])
+        except serializers.ValidationError as exc:
+            raise serializers.ValidationError({"qty_received": message}) from exc
+
+        current_quantity = self.instance.qty_received if self.instance else 0
+        if submitted_quantity != current_quantity:
+            raise serializers.ValidationError({"qty_received": message})
+        return attrs
+
+
+class PurchaseOrderReceiveSerializer(serializers.Serializer):
+    line_quantities = serializers.DictField(child=serializers.IntegerField(min_value=0))
+
+    def __init__(self, *args, **kwargs):
+        # Sparse-field controls apply to model response serializers, not this
+        # action's fixed request payload.
+        kwargs.pop("fields", None)
+        kwargs.pop("omit", None)
+        super().__init__(*args, **kwargs)
+
+    def validate_line_quantities(self, value):
+        if any(not re.fullmatch(r"[1-9][0-9]*", line_id) for line_id in value):
+            raise serializers.ValidationError("Line IDs must be canonical positive decimal integers.")
+        quantities = {int(line_id): quantity for line_id, quantity in value.items()}
+
+        if not any(quantity > 0 for quantity in quantities.values()):
+            raise serializers.ValidationError("At least one line quantity must be positive.")
+
+        purchase_order = self.context.get("purchase_order")
+        if purchase_order is None:
+            raise serializers.ValidationError("Purchase order context is required.")
+
+        owned_line_ids = set(purchase_order.lines.filter(pk__in=quantities).values_list("pk", flat=True))
+        if owned_line_ids != set(quantities):
+            raise serializers.ValidationError("Every line must belong to this purchase order.")
+        return quantities
+
+
+class PurchaseOrderActionResponseSerializer(serializers.Serializer):
+    message = serializers.CharField()
+
 
 class PurchaseOrderSerializer(BaseModelSerializer):
     url = serializers.HyperlinkedIdentityField(view_name="api:procurement_api:purchaseorder-detail")
+    status = serializers.ChoiceField(choices=PurchaseOrder.STATUS_CHOICES, read_only=True)
 
     tenant = NestedTenantSerializer(read_only=True)
     tenant_id = serializers.PrimaryKeyRelatedField(
@@ -305,3 +357,30 @@ class PurchaseOrderSerializer(BaseModelSerializer):
         if user is None:
             return None
         return {"id": user.pk, "name": str(user)}
+
+    def validate(self, attrs):
+        attrs = super().validate(attrs)
+        if "status" not in self.initial_data:
+            return attrs
+
+        current_status = self.instance.status if self.instance else PurchaseOrder.STATUS_DRAFT
+        requested_status = self.initial_data["status"]
+        if requested_status != current_status:
+            action_by_status = {
+                PurchaseOrder.STATUS_DRAFT: "reopen",
+                PurchaseOrder.STATUS_APPROVED: "approve",
+                PurchaseOrder.STATUS_ORDERED: "order",
+                PurchaseOrder.STATUS_PARTIAL: "receive",
+                PurchaseOrder.STATUS_RECEIVED: "receive",
+                PurchaseOrder.STATUS_CANCELLED: "cancel",
+            }
+            action = action_by_status.get(requested_status)
+            if action is None:
+                raise serializers.ValidationError(
+                    {
+                        "status": "Purchase order status changes must use a lifecycle action "
+                        "(/approve/, /order/, /receive/, /cancel/, /reopen/)."
+                    }
+                )
+            raise serializers.ValidationError({"status": f"Use the /{action}/ action to change purchase order status."})
+        return attrs
