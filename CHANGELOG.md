@@ -9,6 +9,11 @@ This changelog follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) 
 ### Added
 
 - Published the 1.x compatibility, deprecation, and support policy together with a bounded external-contract inventory covering REST/GraphQL/SCIM surfaces, the webhook envelope, persisted choice values, contract-bearing settings, permission codenames, UI URL namespaces, and each capability's contract class and exclusions. A stdlib gate derives every enumerated surface from source and fails when the published contract and the code disagree.
+- Added explicit Purchase Order lifecycle endpoints at `/api/procurement/purchase-orders/{id}/approve/`, `/order/`, `/receive/`, `/cancel/`, and `/reopen/`.
+
+### Changed
+
+- Purchase Order `status` and Purchase Order Line `qty_received` are read-only in the REST schema. API clients must use the corresponding lifecycle endpoint: differing direct writes now return HTTP 400 with sanctioned-action guidance, while identical values remain accepted and ignored for full-representation PUT compatibility. Existing rows require no migration.
 
 ### Fixed
 
