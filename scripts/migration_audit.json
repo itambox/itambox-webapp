@@ -16031,6 +16031,49 @@
     },
     {
       "dependencies": [
+        "subscriptions.0100_issue88_shard_47_subscriptions_relations",
+        "users.0100_issue88_shard_62_users_relations"
+      ],
+      "id": "subscriptions.0101_remove_subscription_auto_renewal_and_more",
+      "is_replacement": false,
+      "operations": {
+        "BtreeGistExtension": {
+          "count": 0
+        },
+        "RunPython": {
+          "with_noop_reverse": 1,
+          "with_reverse": 0,
+          "without_reverse": 0
+        },
+        "RunSQL": {
+          "with_noop_reverse": 0,
+          "with_reverse": 0,
+          "without_reverse": 0
+        },
+        "SeparateDatabaseAndState": {
+          "count": 0
+        }
+      },
+      "path": "itambox/subscriptions/migrations/0101_remove_subscription_auto_renewal_and_more.py",
+      "replaces": [],
+      "reviewed_disposition": {
+        "disposition": "upgrade-only",
+        "rationale": "Preserves subscription renewal-term values while normalizing removed legacy lifecycle states during 1.0 upgrade."
+      },
+      "run_before": [],
+      "special_users_bootstrap": false,
+      "swappable_user_dependency": false,
+      "syntactic_facts": {
+        "has_custom_operations": {
+          "BtreeGistExtension": false,
+          "RunPython": true,
+          "RunSQL": false,
+          "SeparateDatabaseAndState": false
+        }
+      }
+    },
+    {
+      "dependencies": [
         "auth.0012_alter_user_first_name_max_length"
       ],
       "id": "users.0000_issue88_shard_01_users_bootstrap",
@@ -16938,7 +16981,8 @@
     }
   ],
   "post_transition_migrations": [
-    "extras.0101_issue88_drop_legacy_webhook_name_like"
+    "extras.0101_issue88_drop_legacy_webhook_name_like",
+    "subscriptions.0101_remove_subscription_auto_renewal_and_more"
   ],
   "reviewed_semantics": {
     "blockers": [
@@ -17018,6 +17062,7 @@
       "software.0007_installedsoftware",
       "software.0008_repoint_installedsoftware_contenttype",
       "subscriptions.0006_remove_provider_contact_email_and_more",
+      "subscriptions.0101_remove_subscription_auto_renewal_and_more",
       "users.0005_remove_token_key_token_digest_token_key_preview_and_more",
       "users.0007_usergroup",
       "users.0013_remove_usergroup_users_usergroup_unique_tenant_name_active_and_more"
@@ -17200,7 +17245,7 @@
         ]
       }
     },
-    "post_transition_migrations": 1,
+    "post_transition_migrations": 2,
     "replacement_shards": 62,
     "replacement_targets": 262
   }
