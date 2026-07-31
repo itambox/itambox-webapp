@@ -17,6 +17,7 @@ OPERATION_TYPES = (
 )
 POST_TRANSITION_MIGRATIONS = {
     "extras.0101_issue88_drop_legacy_webhook_name_like",
+    "subscriptions.0101_remove_subscription_auto_renewal_and_more",
 }
 ISSUE88_SHARD_RE = re.compile(r"issue88_shard_(\d{2})(?:_|$)")
 ALLOWED_DISPOSITIONS = {
@@ -42,6 +43,11 @@ def _dispositions(disposition, rationale, migration_ids):
 # This is a checked, human-reviewed policy. It is intentionally independent of
 # migration/function names, reversibility syntax, and operation implementation.
 SEMANTIC_DISPOSITIONS = {
+    **_dispositions(
+        "upgrade-only",
+        "Preserves subscription renewal-term values while normalizing removed legacy lifecycle states during 1.0 upgrade.",
+        {"subscriptions.0101_remove_subscription_auto_renewal_and_more"},
+    ),
     **_dispositions(
         "required-fresh",
         "Enables the PostgreSQL btree_gist extension required by the asset reservation exclusion constraint.",
