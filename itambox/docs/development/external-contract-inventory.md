@@ -481,6 +481,7 @@ and Django-settings fallback for the canonical setting below.
 | `ITAMBOX_CHANGELOG_RETENTION_DAYS` | Retention of object-change rows |
 | `ITAMBOX_ALERTLOG_RETENTION_DAYS` | Retention of alert-log rows |
 | `ITAMBOX_NOTIFICATION_RETENTION_DAYS` | Retention of notification rows |
+| `ITAMBOX_EVENT_RETENTION_DAYS` | Retention of event rows (0 = unlimited/never prune) |
 | `ITAMBOX_QTASK_FAILED_RETENTION_DAYS` | Retention of failed background-task rows |
 
 The activation flags above are Beta or Experimental *activation surfaces*, which

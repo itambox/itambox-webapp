@@ -3774,7 +3774,7 @@
     {
       "path": "itambox/core/management/commands/prune_changelog.py",
       "code": "C901",
-      "message": "'Command.handle' is too complex (12)",
+      "message": "'Command.handle' is too complex (13)",
       "source": "    def handle(self, *args, **options):",
       "context": "Module:body/ClassDef:Command:body/FunctionDef:handle:self",
       "count": 1
