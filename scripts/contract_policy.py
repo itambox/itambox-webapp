@@ -165,7 +165,7 @@ ENUM_SOURCES = (
         KIND_TEXT_CHOICES,
         CLOSED,
         CLASS_STABLE,
-        ("active", "expired", "cancelled", "pending", "suspended", "renewing", "trial"),
+        ("active", "suspended", "cancelled", "expired"),
     ),
     _enum(
         "subscriptions.BillingCycleChoices",

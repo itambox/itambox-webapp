@@ -50,14 +50,11 @@ NINE_FREQUENCIES = (
     "cron",
 )
 
-SEVEN_SUBSCRIPTION_STATUSES = (
+FOUR_SUBSCRIPTION_STATUSES = (
     "active",
-    "expired",
-    "cancelled",
-    "pending",
     "suspended",
-    "renewing",
-    "trial",
+    "cancelled",
+    "expired",
 )
 
 #: Every anchored surface the published inventory declares, so a parser probe
@@ -114,10 +111,10 @@ class DerivationEnumTests(unittest.TestCase):
             ("draft", "approved", "ordered", "partial", "received", "cancelled"),
         )
 
-    def test_subscription_statuses_are_the_seven_persisted_values(self):
+    def test_subscription_statuses_are_the_four_persisted_values(self):
         self.assertEqual(
             self.enums["subscriptions.SubscriptionStatusChoices"],
-            ("active", "expired", "cancelled", "pending", "suspended", "renewing", "trial"),
+            FOUR_SUBSCRIPTION_STATUSES,
         )
 
     def test_alert_types_and_severities_are_derived_from_the_model(self):
@@ -450,16 +447,16 @@ class TextChoicesDerivationTests(unittest.TestCase):
         """Mutation probe: the exact edit that used to leave the gate green."""
         source = (REPO_ROOT / "itambox" / "subscriptions" / "models.py").read_text(encoding="utf-8")
         mutated = source.replace(
-            '    TRIAL = "trial", _("Trial")',
-            '    TRIAL = "trial", _("Trial")\n    ARCHIVED = "archived"',
+            '    EXPIRED = "expired", _("Expired")',
+            '    EXPIRED = "expired", _("Expired")\n    ARCHIVED = "archived"',
             1,
         )
         self.assertNotEqual(mutated, source, "the probe no longer matches the model source it mutates")
         node = policy._class_node(ast.parse(mutated), "SubscriptionStatusChoices")
         values = policy._text_choices_values(node)
-        self.assertEqual(values, SEVEN_SUBSCRIPTION_STATUSES + ("archived",))
+        self.assertEqual(values, FOUR_SUBSCRIPTION_STATUSES + ("archived",))
         name = "subscriptions.SubscriptionStatusChoices"
-        findings = policy.compare_enums({name: values}, {name: SEVEN_SUBSCRIPTION_STATUSES})
+        findings = policy.compare_enums({name: values}, {name: FOUR_SUBSCRIPTION_STATUSES})
         self.assertEqual(sorted({finding.rule for finding in findings}), ["C-ENUM1", "C-ENUM2"])
 
 
@@ -765,7 +762,7 @@ class EnumRowFidelityTests(unittest.TestCase):
     def test_a_reordered_closed_enum_is_a_finding(self):
         name = "subscriptions.SubscriptionStatusChoices"
         findings = policy.compare_enums(
-            {name: SEVEN_SUBSCRIPTION_STATUSES}, {name: tuple(reversed(SEVEN_SUBSCRIPTION_STATUSES))}
+            {name: FOUR_SUBSCRIPTION_STATUSES}, {name: tuple(reversed(FOUR_SUBSCRIPTION_STATUSES))}
         )
         self.assertEqual([finding.rule for finding in findings], ["C-ENUM1"])
         self.assertIn("order", findings[0].detail.lower())

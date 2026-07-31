@@ -155,12 +155,9 @@ that produces them may change.
 | Value | Meaning |
 |---|---|
 | `active` | Active |
-| `expired` | Expired |
-| `cancelled` | Cancelled |
-| `pending` | Pending |
 | `suspended` | Suspended |
-| `renewing` | Renewing |
-| `trial` | Trial |
+| `cancelled` | Cancelled |
+| `expired` | Expired |
 
 ### Purchase-order status — closed
 
@@ -532,14 +529,11 @@ not publish.
 | `subscriptions.tracking` | `stable` | always-on | Providers, subscriptions, assignments | none |
 | `users.scim_provisioning` | `beta-opt-in` | opt-in | Tenant- and provider-scoped SCIM mounts | PATCH semantics and filtering are partial; the tenant mount provisions Users and exposes Groups read-only, only provider mounts provision Groups |
 
-## Prospective surfaces
-
-Recorded so a later change inherits a decision rather than inventing one. None
-of these exists today and none is scheduled by this document.
+## Compatibility aliases
 
 | Surface | Promise |
 |---|---|
-| `subscriptions.Subscription.auto_renewal` | If WP-7 replaces it with `vendor_contract_auto_renews`, the legacy name keeps a read alias through the whole of 1.x and the alias is removed no earlier than 2.0 |
+| `subscriptions.Subscription.auto_renewal` | Legacy read/write alias for `vendor_contract_auto_renews` through the whole of 1.x; removed no earlier than 2.0 |
 
 ## Related
 

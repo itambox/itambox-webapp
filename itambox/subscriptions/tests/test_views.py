@@ -314,6 +314,13 @@ class SubscriptionLifecycleViewTests(TestCase):
         self.assertEqual(self.sub.status, SubscriptionStatusChoices.SUSPENDED)
         self.assertIn("tableRefreshRequired", resp["HX-Trigger"])
 
+        resume_url = reverse("subscriptions:subscription_resume", kwargs={"pk": self.sub.pk})
+        resp = self.client.post(resume_url, HTTP_HX_REQUEST="true")
+        self.assertEqual(resp.status_code, 204)
+        self.sub.refresh_from_db()
+        self.assertEqual(self.sub.status, SubscriptionStatusChoices.ACTIVE)
+        self.assertIn("tableRefreshRequired", resp["HX-Trigger"])
+
     def test_subscription_assignment_lifecycle(self):
         # 1. Test GET request to checkout/assign renders form
         url = reverse("subscriptions:subscription_checkout", kwargs={"pk": self.sub.pk})

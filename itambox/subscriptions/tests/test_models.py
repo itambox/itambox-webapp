@@ -216,12 +216,56 @@ class SubscriptionModelTests(TestCase):
         self.assertEqual(sub.slug, "adobe-creative-cloud-all-apps")
 
     def test_subscription_status_choices(self):
-        self.assertEqual(SubscriptionStatusChoices.ACTIVE, "active")
-        self.assertEqual(SubscriptionStatusChoices.EXPIRED, "expired")
-        self.assertEqual(SubscriptionStatusChoices.CANCELLED, "cancelled")
-        self.assertEqual(SubscriptionStatusChoices.PENDING, "pending")
-        self.assertEqual(SubscriptionStatusChoices.SUSPENDED, "suspended")
-        self.assertEqual(SubscriptionStatusChoices.RENEWING, "renewing")
+        self.assertEqual(
+            list(SubscriptionStatusChoices.values),
+            ["active", "suspended", "cancelled", "expired"],
+        )
+
+    def test_vendor_contract_auto_renews_is_canonical_with_legacy_model_alias(self):
+        field_names = {field.name for field in Subscription._meta.fields}
+        self.assertIn("vendor_contract_auto_renews", field_names)
+        self.assertNotIn("auto_renewal", field_names)
+
+        sub = Subscription.objects.create(
+            name="Declarative Renewal Policy",
+            provider=self.provider,
+            vendor_contract_auto_renews=False,
+        )
+        self.assertIs(sub.vendor_contract_auto_renews, False)
+        self.assertIs(sub.auto_renewal, False)
+
+        sub.auto_renewal = True
+        self.assertIs(sub.vendor_contract_auto_renews, True)
+
+    def test_cancelled_subscription_cannot_be_renewed_back_to_active(self):
+        sub = Subscription.objects.create(
+            name="Cancelled Contract",
+            provider=self.provider,
+            status=SubscriptionStatusChoices.CANCELLED,
+        )
+
+        with self.assertRaisesMessage(ValidationError, "cancelled to active"):
+            sub.renew(timezone.now().date() + datetime.timedelta(days=365))
+
+        sub.refresh_from_db()
+        self.assertEqual(sub.status, SubscriptionStatusChoices.CANCELLED)
+
+    def test_lifecycle_action_retries_are_idempotent(self):
+        sub = Subscription.objects.create(name="Retry Contract", provider=self.provider)
+        sub.suspend()
+        suspended_at = sub.updated_at
+        sub.suspend()
+        sub.refresh_from_db()
+        self.assertEqual(sub.updated_at, suspended_at)
+
+        sub.resume()
+        sub.cancel(reason="Retired")
+        cancelled_at = sub.updated_at
+        notes = sub.notes
+        sub.cancel(reason="Retired")
+        sub.refresh_from_db()
+        self.assertEqual(sub.updated_at, cancelled_at)
+        self.assertEqual(sub.notes, notes)
 
     def test_subscription_billing_cycle_choices(self):
         self.assertEqual(BillingCycleChoices.MONTHLY, "monthly")
@@ -306,12 +350,12 @@ class SubscriptionAssignmentModelTests(TestCase):
         self.assertIn(str(self.subscription.pk), url)
 
 
-class SubscriptionAutoExpirySignalTests(TestCase):
+class SubscriptionExplicitExpiryTests(TestCase):
     def setUp(self):
         self.provider = Provider.objects.create(name="Test Provider")
         self.yesterday = timezone.now().date() - datetime.timedelta(days=1)
 
-    def test_signal_marks_expired(self):
+    def test_save_does_not_silently_expire_and_explicit_action_does(self):
         sub = Subscription.objects.create(
             name="Should Expire",
             provider=self.provider,
@@ -319,9 +363,11 @@ class SubscriptionAutoExpirySignalTests(TestCase):
             renewal_date=self.yesterday,
         )
         sub.save()
+        self.assertEqual(sub.status, SubscriptionStatusChoices.ACTIVE)
+        sub.expire()
         self.assertEqual(sub.status, SubscriptionStatusChoices.EXPIRED)
 
-    def test_signal_does_not_mark_future_renewal(self):
+    def test_explicit_action_is_not_required_for_future_renewal(self):
         future = timezone.now().date() + datetime.timedelta(days=30)
         sub = Subscription.objects.create(
             name="Future Renewal",

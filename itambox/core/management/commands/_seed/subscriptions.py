@@ -68,7 +68,7 @@ class SeedSubscriptionsMixin:
                     currency=currency,
                     billing_cycle="annual",
                     term_months=12,
-                    auto_renewal=True,
+                    vendor_contract_auto_renews=True,
                     contract_reference=f"MSA-{prov_name.split()[0].upper()}-{start.year}",
                     owner=self._provisioner,
                     description=f"{prov_name} cloud subscription — group contract held by {tenant.name}.",

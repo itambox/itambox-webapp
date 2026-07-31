@@ -18,7 +18,7 @@
         <span class="badge px-2.5 py-1 text-uppercase" style="background-color: #{{ object.status|status_color }}1a; color: #{{ object.status|status_color }}; border: 1px solid #{{ object.status|status_color }}33;">
             {{ object.get_status_display }}
         </span>
-        {% if object.auto_renewal %}<span class="badge bg-info ms-1">{% translate "Auto-Renewal" %}</span>{% endif %}
+        {% if object.vendor_contract_auto_renews %}<span class="badge bg-info ms-1">{% translate "Vendor Contract Auto-Renews" %}</span>{% endif %}
     </dd>
 
     {% if object.tenant %}

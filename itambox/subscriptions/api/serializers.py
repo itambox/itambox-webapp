@@ -11,7 +11,7 @@ from organization.api.serializers import (
     NestedTenantSerializer,
 )
 from organization.models import CostCenter, Tenant, TenantGroup
-from subscriptions.models import Provider, Subscription, SubscriptionAssignment
+from subscriptions.models import Provider, Subscription, SubscriptionAssignment, SubscriptionStatusChoices
 
 User = get_user_model()
 
@@ -73,6 +73,7 @@ class ProviderSerializer(BaseModelSerializer):
 
 
 class SubscriptionSerializer(BaseModelSerializer):
+    auto_renewal = serializers.BooleanField(required=False)
     provider = ProviderSerializer(read_only=True)
     provider_id = serializers.PrimaryKeyRelatedField(queryset=Provider.objects, source="provider", write_only=True)
     tenant = NestedTenantSerializer(read_only=True)
@@ -121,6 +122,7 @@ class SubscriptionSerializer(BaseModelSerializer):
             "billing_cycle",
             "billing_cycle_display",
             "term_months",
+            "vendor_contract_auto_renews",
             "auto_renewal",
             "licensed_quantity",
             "contract_reference",
@@ -135,13 +137,51 @@ class SubscriptionSerializer(BaseModelSerializer):
             "created_at",
             "updated_at",
         )
-        read_only_fields = ("created_at", "updated_at", "days_until_renewal", "annual_cost")
+        read_only_fields = (
+            "status",
+            "cancellation_date",
+            "created_at",
+            "updated_at",
+            "days_until_renewal",
+            "annual_cost",
+        )
         brief_fields = ("id", "name", "slug", "provider", "status", "status_display", "days_until_renewal")
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         if "owner_id" in self.fields:
             self.fields["owner_id"].queryset = _tenant_member_user_queryset()
+
+    def validate(self, attrs):
+        lifecycle_errors = {}
+        current_status = self.instance.status if self.instance else SubscriptionStatusChoices.ACTIVE
+        if "status" in self.initial_data and self.initial_data["status"] != current_status:
+            lifecycle_errors["status"] = "Use the explicit subscription lifecycle actions."
+        current_cancellation_date = self.instance.cancellation_date if self.instance else None
+        if "cancellation_date" in self.initial_data:
+            supplied_date = self.initial_data["cancellation_date"] or None
+            if supplied_date != (str(current_cancellation_date) if current_cancellation_date else None):
+                lifecycle_errors["cancellation_date"] = "Use the explicit cancel action."
+        if lifecycle_errors:
+            raise serializers.ValidationError(lifecycle_errors)
+
+        legacy_value = attrs.pop("auto_renewal", serializers.empty)
+        canonical_value = attrs.get("vendor_contract_auto_renews", serializers.empty)
+        if legacy_value is not serializers.empty:
+            if canonical_value is not serializers.empty and canonical_value != legacy_value:
+                raise serializers.ValidationError({"auto_renewal": "Conflicts with vendor_contract_auto_renews."})
+            attrs["vendor_contract_auto_renews"] = legacy_value
+        return super().validate(attrs)
+
+    def to_representation(self, instance):
+        data = super().to_representation(instance)
+        data["auto_renewal"] = instance.vendor_contract_auto_renews
+        return data
+
+    def update(self, instance, validated_data):
+        if not validated_data:
+            return instance
+        return super().update(instance, validated_data)
 
 
 class SubscriptionAssignmentSerializer(BaseModelSerializer):

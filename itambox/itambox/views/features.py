@@ -260,6 +260,7 @@ def _get_export_queryset(request, model, app_label, model_name, export_scope):
 
 def _render_yaml_export(model, model_name, queryset):
     fields = [field for field in model._meta.fields if not field.many_to_many]
+    aliases = getattr(model, "export_aliases", {})
     export_data = []
     for obj in queryset:
         row_dict = {}
@@ -274,6 +275,8 @@ def _render_yaml_export(model, model_name, queryset):
                 row_dict[field.name] = value
             else:
                 row_dict[field.name] = str(value)
+        for alias, source in aliases.items():
+            row_dict[alias] = getattr(obj, source)
         export_data.append(row_dict)
 
     yaml_content = yaml.safe_dump(export_data, default_flow_style=False, sort_keys=False)
@@ -287,7 +290,8 @@ def _render_csv_export(model, model_name, queryset):
     response["Content-Disposition"] = f'attachment; filename="{model_name}_export.csv"'
     writer = csv.writer(response)
     fields = [field for field in model._meta.fields if not field.many_to_many]
-    writer.writerow([field.name for field in fields])
+    aliases = getattr(model, "export_aliases", {})
+    writer.writerow([field.name for field in fields] + list(aliases))
     for obj in queryset:
         row = []
         for field in fields:
@@ -296,6 +300,7 @@ def _render_csv_export(model, model_name, queryset):
                 row.append("***")
                 continue
             row.append(csv_safe(value))
+        row.extend(csv_safe(getattr(obj, source)) for source in aliases.values())
         writer.writerow(row)
     return response
 

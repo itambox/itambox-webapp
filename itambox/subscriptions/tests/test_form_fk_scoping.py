@@ -5,10 +5,37 @@ from model_bakery import baker
 
 from core.tests.mixins import TenantTestMixin
 from organization.models import CostCenter, Tenant
-from subscriptions.forms import SubscriptionForm
+from subscriptions.forms import SubscriptionBulkEditForm, SubscriptionBulkImportForm, SubscriptionForm
+from subscriptions.models import Subscription
 
 
 class SubscriptionFormFkScopingTests(TenantTestMixin, TestCase):
+    def test_form_exposes_canonical_terms_but_not_lifecycle_fields(self):
+        fields = SubscriptionForm().fields
+        self.assertIn("vendor_contract_auto_renews", fields)
+        self.assertNotIn("auto_renewal", fields)
+        self.assertNotIn("status", fields)
+        self.assertNotIn("cancellation_date", fields)
+
+        bulk_fields = SubscriptionBulkEditForm(model=Subscription).fields
+        self.assertNotIn("status", bulk_fields)
+        self.assertNotIn("cancellation_date", bulk_fields)
+
+    def test_import_form_maps_legacy_and_canonical_renewal_terms_without_lifecycle_fields(self):
+        form = SubscriptionBulkImportForm()
+        self.assertNotIn("status", form.field_names)
+        self.assertNotIn("cancellation_date", form.field_names)
+        self.assertEqual(
+            form.map_row({"auto_renewal": "false"})["vendor_contract_auto_renews"],
+            False,
+        )
+        self.assertEqual(
+            form.map_row({"vendor_contract_auto_renews": "yes"})["vendor_contract_auto_renews"],
+            True,
+        )
+        with self.assertRaisesMessage(Exception, "conflicts"):
+            form.map_row({"auto_renewal": "false", "vendor_contract_auto_renews": "true"})
+
     def setUp(self):
         self.setup_tenant_context(name="Tenant A", slug="sffk-a")
         self.tenant_b = Tenant.objects.create(name="Tenant B", slug="sffk-b")

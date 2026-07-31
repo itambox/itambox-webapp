@@ -33,9 +33,17 @@ class SubscriptionAdmin(admin.ModelAdmin):
         "renewal_date",
         "renewal_cost",
         "currency",
-        "auto_renewal",
+        "vendor_contract_auto_renews",
     )
-    list_filter = ("status", "type", "provider", "tenant", "auto_renewal", "tags", "billing_cycle")
+    list_filter = (
+        "status",
+        "type",
+        "provider",
+        "tenant",
+        "vendor_contract_auto_renews",
+        "tags",
+        "billing_cycle",
+    )
     search_fields = (
         "name",
         "provider__name",
@@ -45,19 +53,33 @@ class SubscriptionAdmin(admin.ModelAdmin):
         "notes",
         "tenant__name",
     )
-    readonly_fields = ("created_at", "updated_at", "is_expired_display", "days_until_renewal_display")
+    readonly_fields = (
+        "status",
+        "cancellation_date",
+        "created_at",
+        "updated_at",
+        "is_expired_display",
+        "days_until_renewal_display",
+    )
     raw_id_fields = ("provider", "owner", "tenant", "cost_center")
     filter_horizontal = ("tags",)
     inlines = [SubscriptionAssignmentInline]
     date_hierarchy = "renewal_date"
     prepopulated_fields = {"slug": ("name",)}
-    list_editable = ("status",)
 
     fieldsets = (
         (_("Identity"), {"fields": ("name", "slug", "provider", "type", "status", "tenant")}),
         (
             _("Dates & Terms"),
-            {"fields": ("start_date", "renewal_date", "term_months", "auto_renewal", "cancellation_date")},
+            {
+                "fields": (
+                    "start_date",
+                    "renewal_date",
+                    "term_months",
+                    "vendor_contract_auto_renews",
+                    "cancellation_date",
+                )
+            },
         ),
         (_("Costs"), {"fields": ("renewal_cost", "currency", "billing_cycle", "cost_center")}),
         (_("Details"), {"fields": ("licensed_quantity", "contract_reference", "owner")}),
@@ -86,8 +108,7 @@ class SubscriptionAdmin(admin.ModelAdmin):
         # (QuerySet.update() bypasses ChangeLoggingMixin.save()).
         updated = 0
         for subscription in queryset:
-            subscription.status = "expired"
-            subscription.save(update_fields=["status"])
+            subscription.expire()
             updated += 1
         self.message_user(request, f"{updated} subscription(s) marked as expired.")
 
@@ -95,12 +116,9 @@ class SubscriptionAdmin(admin.ModelAdmin):
     def mark_cancelled(self, request, queryset):
         from django.utils import timezone
 
-        cancellation_date = timezone.now().date()
         updated = 0
         for subscription in queryset:
-            subscription.status = "cancelled"
-            subscription.cancellation_date = cancellation_date
-            subscription.save(update_fields=["status", "cancellation_date"])
+            subscription.cancel(cancellation_date=timezone.now().date())
             updated += 1
         self.message_user(request, f"{updated} subscription(s) cancelled.")
 

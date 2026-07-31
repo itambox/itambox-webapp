@@ -14,6 +14,7 @@ This changelog follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) 
 
 ### Changed
 
+- Subscription status is now a closed four-state lifecycle (`active`, `suspended`, `cancelled`, `expired`) driven by explicit UI, REST, GraphQL, admin, and background actions. The canonical renewal-term field is `vendor_contract_auto_renews`; `auto_renewal` remains a 1.x read/write API compatibility alias.
 - Purchase Order `status` and Purchase Order Line `qty_received` are read-only in the REST schema. API clients must use the corresponding lifecycle endpoint: differing direct writes now return HTTP 400 with sanctioned-action guidance, while identical values remain accepted and ignored for full-representation PUT compatibility. Existing rows require no migration.
 - Asset Request auto-approval and the Beta Asset Request procurement seam are now opt-in through `ITAMBOX_REQUISITION_AUTO_APPROVAL_THRESHOLDS`; fresh deployments leave requests pending. The legacy setting name remains a deprecated 1.x fallback with a startup warning.
 
