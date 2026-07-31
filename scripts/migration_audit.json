@@ -10800,6 +10800,46 @@
     },
     {
       "dependencies": [
+        "extras.0101_issue88_drop_legacy_webhook_name_like",
+        "users.0100_issue88_shard_62_users_relations"
+      ],
+      "id": "extras.0102_alter_event_action",
+      "is_replacement": false,
+      "operations": {
+        "BtreeGistExtension": {
+          "count": 0
+        },
+        "RunPython": {
+          "with_noop_reverse": 0,
+          "with_reverse": 0,
+          "without_reverse": 0
+        },
+        "RunSQL": {
+          "with_noop_reverse": 0,
+          "with_reverse": 0,
+          "without_reverse": 0
+        },
+        "SeparateDatabaseAndState": {
+          "count": 0
+        }
+      },
+      "path": "itambox/extras/migrations/0102_alter_event_action.py",
+      "replaces": [],
+      "reviewed_disposition": null,
+      "run_before": [],
+      "special_users_bootstrap": false,
+      "swappable_user_dependency": false,
+      "syntactic_facts": {
+        "has_custom_operations": {
+          "BtreeGistExtension": false,
+          "RunPython": false,
+          "RunSQL": false,
+          "SeparateDatabaseAndState": false
+        }
+      }
+    },
+    {
+      "dependencies": [
         "assets.0018_alter_assetaudit_unique_together_and_more",
         "extras.0004_alter_configcontext_options_alter_dashboard_options_and_more",
         "licenses.0002_license_supplier",
@@ -16982,6 +17022,7 @@
   ],
   "post_transition_migrations": [
     "extras.0101_issue88_drop_legacy_webhook_name_like",
+    "extras.0102_alter_event_action",
     "subscriptions.0101_remove_subscription_auto_renewal_and_more"
   ],
   "reviewed_semantics": {
@@ -17245,7 +17286,7 @@
         ]
       }
     },
-    "post_transition_migrations": 2,
+    "post_transition_migrations": 3,
     "replacement_shards": 62,
     "replacement_targets": 262
   }

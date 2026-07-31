@@ -17,6 +17,7 @@ OPERATION_TYPES = (
 )
 POST_TRANSITION_MIGRATIONS = {
     "extras.0101_issue88_drop_legacy_webhook_name_like",
+    "extras.0102_alter_event_action",
     "subscriptions.0101_remove_subscription_auto_renewal_and_more",
 }
 ISSUE88_SHARD_RE = re.compile(r"issue88_shard_(\d{2})(?:_|$)")

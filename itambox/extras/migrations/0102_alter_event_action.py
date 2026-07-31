@@ -7,6 +7,7 @@ class Migration(migrations.Migration):
 
     dependencies = [
         ('extras', '0101_issue88_drop_legacy_webhook_name_like'),
+        ('users', '0100_issue88_shard_62_users_relations'),
     ]
 
     operations = [
