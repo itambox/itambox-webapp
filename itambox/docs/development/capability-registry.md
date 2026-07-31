@@ -64,7 +64,7 @@ and only its exception *type* is ever published.
 | `organization.role_grants` | Role Grants | Stable | always-on | always | area:auth-rbac |
 | `platform.plugins` | Plugin System | Experimental | opt-in | operator-flag | area:plugins |
 | `procurement.core` | Purchase Orders and Contracts | Stable | always-on | always | area:procurement |
-| `procurement.requisition_seam` | Requisition Fulfillment Seam | Beta | enabled | configured | area:procurement |
+| `procurement.requisition_seam` | Asset Request Procurement Seam | Beta | enabled | configured | area:procurement |
 | `reporting.curated` | Curated Reports | Stable | always-on | always | area:operations |
 | `reporting.designer` | Report Designer | Beta | opt-in | operator-flag | area:operations |
 | `reporting.scheduled` | Scheduled Reports | Beta | enabled | object-enabled | area:operations |
@@ -98,10 +98,13 @@ stale reference is a report rather than a boot failure.
 Most capability probes are **observational**: they report the state that already
 decides behaviour and do not add another authorization or execution gate:
 
-* `procurement.requisition_seam` reads `REQUISITION_AUTO_APPROVAL_THRESHOLDS`,
-  which auto-approval already consults with built-in fallbacks. Absent the
-  setting the capability reports active on defaults, because that is what the
-  code does.
+* `procurement.requisition_seam` reads
+  `ITAMBOX_REQUISITION_AUTO_APPROVAL_THRESHOLDS`. The seam and automatic
+  approval are inert when the setting is absent. A configured JSON object
+  reports only presence booleans, never threshold values. The legacy
+  `REQUISITION_AUTO_APPROVAL_THRESHOLDS` name remains a 1.x fallback and emits
+  a startup deprecation warning. The seam remains Beta: partial receipts can
+  still require manual reconciliation.
 * `reporting.scheduled`, `alerting.rules`, and `automation.webhooks` count
   enabled rows. A deployment that already has an enabled event rule keeps
   reporting active; nothing new switches off.

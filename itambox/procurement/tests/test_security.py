@@ -2,16 +2,18 @@ import datetime
 from decimal import Decimal
 
 from django.contrib.auth import get_user_model
-from django.test import TestCase
+from django.contrib.messages import get_messages
+from django.test import TestCase, override_settings
 from django.urls import reverse
 from rest_framework import status
 from rest_framework.test import APITestCase
 
-from assets.models import AssetType, Manufacturer, Supplier
+from assets.choices import RequestStatusChoices
+from assets.models import AssetRequest, AssetType, Manufacturer, Supplier
 from core.tests.mixins import grant
 from itambox.api.mixins import ETagMixin
 from organization.models import Location, Role, Site, Tenant
-from procurement.models import Contract, PurchaseOrder, PurchaseOrderLine
+from procurement.models import Contract, FulfillmentLink, PurchaseOrder, PurchaseOrderLine
 
 User = get_user_model()
 
@@ -195,14 +197,24 @@ class PurchaseOrderTenantIsolationSetupMixin:
         writer_role_a = Role.objects.create(
             tenant=self.tenant_a,
             name="Purchase order writer",
-            permissions=["procurement.view_purchaseorder", "procurement.change_purchaseorder"],
+            permissions=[
+                "procurement.view_purchaseorder",
+                "procurement.change_purchaseorder",
+                "procurement.approve_purchaseorder",
+                "procurement.receive_purchaseorder",
+            ],
         )
         grant(self.writer_a, self.tenant_a, writer_role_a)
         self.writer_b = User.objects.create_user(username="po-security-api-writer-b", password="password")
         writer_role_b = Role.objects.create(
             tenant=self.tenant_b,
             name="Purchase order writer",
-            permissions=["procurement.view_purchaseorder", "procurement.change_purchaseorder"],
+            permissions=[
+                "procurement.view_purchaseorder",
+                "procurement.change_purchaseorder",
+                "procurement.approve_purchaseorder",
+                "procurement.receive_purchaseorder",
+            ],
         )
         grant(self.writer_b, self.tenant_b, writer_role_b)
         self.site = Site.objects.create(name="PO Security API Site", slug="po-security-api-site")
@@ -407,6 +419,24 @@ class PurchaseOrderTenantIsolationUITests(PurchaseOrderTenantIsolationSetupMixin
         self.purchase_order_a.refresh_from_db()
         self.assertEqual(self.purchase_order_a.status, PurchaseOrder.STATUS_DRAFT)
         self.assertEqual(self.purchase_order_a.notes, "Attempted lifecycle bypass")
+
+    def test_ui_lifecycle_actions_reject_foreign_purchase_order_ids(self):
+        self._login_to_tenant(self.writer_a, self.tenant_a)
+        original_status = self.purchase_order_b.status
+
+        for route_name in (
+            "procurement:purchaseorder_approve",
+            "procurement:purchaseorder_order",
+            "procurement:purchaseorder_cancel",
+            "procurement:purchaseorder_reopen",
+            "procurement:purchaseorder_receive",
+        ):
+            with self.subTest(route_name=route_name):
+                response = self.client.post(reverse(route_name, kwargs={"pk": self.purchase_order_b.pk}))
+                self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND, response.content)
+
+        self.purchase_order_b.refresh_from_db()
+        self.assertEqual(self.purchase_order_b.status, original_status)
 
 
 class PurchaseOrderLineTenantIsolationSetupMixin:
@@ -619,3 +649,204 @@ class PurchaseOrderLineTenantIsolationUITests(PurchaseOrderLineTenantIsolationSe
         self.assertEqual(self.line_b.qty_ordered, original_qty_ordered)
         self.assertEqual(self.line_b.unit_price, original_unit_price)
         self.assertEqual(self.line_b.updated_at, original_updated_at)
+
+
+class AssetRequestProcurementPermissionTests(TestCase):
+    def setUp(self):
+        self.tenant = Tenant.objects.create(name="Seam Tenant", slug="seam-tenant")
+        site = Site.objects.create(name="Seam Site", slug="seam-site")
+        self.location = Location.objects.create(
+            tenant=self.tenant,
+            site=site,
+            name="Seam Location",
+            slug="seam-location",
+        )
+        self.supplier = Supplier.objects.create(name="Seam Supplier", slug="seam-supplier")
+        manufacturer = Manufacturer.objects.create(name="Seam Manufacturer", slug="seam-manufacturer")
+        asset_type = AssetType.objects.create(
+            manufacturer=manufacturer,
+            model="Seam Model",
+            slug="seam-model",
+            requestable=True,
+        )
+        self.user = User.objects.create_user(username="seam-po-writer", password="password")
+        self.admin = User.objects.create_superuser(username="seam-admin", password="password")
+        role = Role.objects.create(
+            tenant=self.tenant,
+            name="PO writer without fulfillment",
+            permissions=[
+                "procurement.add_purchaseorder",
+                "procurement.change_purchaseorder",
+                "procurement.view_purchaseorder",
+            ],
+        )
+        grant(self.user, self.tenant, role)
+        self.asset_request = AssetRequest.objects.create(
+            tenant=self.tenant,
+            requester=self.user,
+            asset_type=asset_type,
+            status=RequestStatusChoices.APPROVED,
+        )
+        self.create_from_request_url = (
+            f"{reverse('procurement:purchaseorder_create')}?from_request={self.asset_request.pk}"
+        )
+
+    def _login_to_tenant(self, user):
+        self.client.force_login(user)
+        session = self.client.session
+        session["active_tenant_id"] = self.tenant.pk
+        session.save()
+
+    def _payload(self, order_number):
+        return {
+            "order_number": order_number,
+            "supplier": self.supplier.pk,
+            "currency": "EUR",
+            "destination_location": self.location.pk,
+            "tenant": self.tenant.pk,
+            "notes": "must roll back",
+        }
+
+    @override_settings(ITAMBOX_REQUISITION_AUTO_APPROVAL_THRESHOLDS={"accessory": 3, "consumable": 5})
+    def test_po_writer_without_asset_request_fulfillment_permission_cannot_link_request(self):
+        self._login_to_tenant(self.user)
+
+        get_response = self.client.get(self.create_from_request_url)
+        response = self.client.post(self.create_from_request_url, self._payload("PO-SEAM-DENIED"))
+
+        self.assertEqual(get_response.status_code, status.HTTP_403_FORBIDDEN)
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+        emitted_messages = [str(message) for message in get_messages(response.wsgi_request)]
+        self.assertFalse(any("Created" in message for message in emitted_messages))
+        self.assertFalse(PurchaseOrder.objects.filter(order_number="PO-SEAM-DENIED").exists())
+        self.assertFalse(FulfillmentLink.objects.filter(asset_request=self.asset_request).exists())
+        self.asset_request.refresh_from_db()
+        self.assertEqual(self.asset_request.status, RequestStatusChoices.APPROVED)
+
+    @override_settings(
+        ITAMBOX_REQUISITION_AUTO_APPROVAL_THRESHOLDS=None,
+        REQUISITION_AUTO_APPROVAL_THRESHOLDS=None,
+    )
+    def test_unconfigured_seam_rolls_back_purchase_order_without_success_message(self):
+        self._login_to_tenant(self.admin)
+
+        response = self.client.post(self.create_from_request_url, self._payload("PO-SEAM-INACTIVE"))
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        emitted_messages = [str(message) for message in get_messages(response.wsgi_request)]
+        self.assertFalse(any("Created" in message for message in emitted_messages))
+        self.assertFalse(PurchaseOrder.objects.filter(order_number="PO-SEAM-INACTIVE").exists())
+        self.assertFalse(FulfillmentLink.objects.filter(asset_request=self.asset_request).exists())
+
+    @override_settings(ITAMBOX_REQUISITION_AUTO_APPROVAL_THRESHOLDS={"accessory": 3})
+    def test_malformed_asset_request_id_fails_closed(self):
+        self._login_to_tenant(self.admin)
+        malformed_url = f"{reverse('procurement:purchaseorder_create')}?from_request=not-an-id"
+
+        response = self.client.get(malformed_url)
+
+        self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
+
+    @override_settings(ITAMBOX_REQUISITION_AUTO_APPROVAL_THRESHOLDS={"accessory": 3})
+    def test_authorized_create_from_request_commits_complete_fulfillment_graph_and_messages(self):
+        self._login_to_tenant(self.admin)
+
+        response = self.client.post(self.create_from_request_url, self._payload("PO-SEAM-SUCCESS"))
+
+        self.assertEqual(response.status_code, status.HTTP_302_FOUND)
+        purchase_order = PurchaseOrder.objects.get(order_number="PO-SEAM-SUCCESS")
+        link = FulfillmentLink.objects.select_related("purchase_order_line").get(asset_request=self.asset_request)
+        self.asset_request.refresh_from_db()
+        self.assertEqual(purchase_order.tenant, self.tenant)
+        self.assertEqual(link.tenant, self.tenant)
+        self.assertEqual(link.purchase_order_line.purchase_order, purchase_order)
+        self.assertEqual(link.purchase_order_line.asset_type, self.asset_request.asset_type)
+        self.assertEqual(self.asset_request.status, RequestStatusChoices.PROCUREMENT)
+        emitted_messages = [str(message) for message in get_messages(response.wsgi_request)]
+        self.assertTrue(any("Created" in message for message in emitted_messages))
+        self.assertTrue(any("Linked Purchase Order" in message for message in emitted_messages))
+
+    @override_settings(
+        ITAMBOX_REQUISITION_AUTO_APPROVAL_THRESHOLDS=None,
+        REQUISITION_AUTO_APPROVAL_THRESHOLDS=None,
+    )
+    def test_unconfigured_seam_hides_purchase_order_action(self):
+        self._login_to_tenant(self.admin)
+
+        response = self.client.get(reverse("assets:request_detail", kwargs={"pk": self.asset_request.pk}))
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertNotContains(response, "Create Purchase Order")
+
+    @override_settings(ITAMBOX_REQUISITION_AUTO_APPROVAL_THRESHOLDS={"accessory": 3})
+    def test_configured_seam_shows_purchase_order_action_to_authorized_user(self):
+        self._login_to_tenant(self.admin)
+
+        response = self.client.get(reverse("assets:request_detail", kwargs={"pk": self.asset_request.pk}))
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertContains(response, "Create Purchase Order")
+
+
+class AssetRequestCrossTenantLifecycleUITests(TestCase):
+    def setUp(self):
+        self.tenant_a = Tenant.objects.create(name="Request Tenant A", slug="request-tenant-a")
+        self.tenant_b = Tenant.objects.create(name="Request Tenant B", slug="request-tenant-b")
+        requester = User.objects.create_user(username="request-tenant-a-requester", password="password")
+        approved_requester = User.objects.create_user(
+            username="request-tenant-a-approved-requester",
+            password="password",
+        )
+        self.actor_b = User.objects.create_user(username="request-tenant-b-actor", password="password")
+        role_b = Role.objects.create(
+            tenant=self.tenant_b,
+            name="Request lifecycle actor",
+            permissions=[
+                "assets.view_assetrequest",
+                "assets.approve_assetrequest",
+                "assets.fulfill_assetrequest",
+            ],
+        )
+        grant(self.actor_b, self.tenant_b, role_b)
+        manufacturer = Manufacturer.objects.create(name="Request Tenant Manufacturer", slug="request-tenant-maker")
+        asset_type = AssetType.objects.create(
+            manufacturer=manufacturer,
+            model="Request Tenant Model",
+            slug="request-tenant-model",
+            requestable=True,
+        )
+        self.pending_request_a = AssetRequest.objects.create(
+            tenant=self.tenant_a,
+            requester=requester,
+            asset_type=asset_type,
+            status=RequestStatusChoices.PENDING,
+        )
+        self.approved_request_a = AssetRequest.objects.create(
+            tenant=self.tenant_a,
+            requester=approved_requester,
+            asset_type=asset_type,
+            status=RequestStatusChoices.APPROVED,
+        )
+        self.client.force_login(self.actor_b)
+        session = self.client.session
+        session["active_tenant_id"] = self.tenant_b.pk
+        session.save()
+
+    def test_tenant_b_cannot_drive_tenant_a_asset_request_lifecycle_by_foreign_id(self):
+        actions = (
+            ("assets:request_approve", self.pending_request_a),
+            ("assets:request_deny", self.pending_request_a),
+            ("assets:request_cancel", self.pending_request_a),
+            ("assets:request_claim", self.approved_request_a),
+            ("assets:request_mark_fulfilled", self.approved_request_a),
+        )
+
+        for route_name, asset_request in actions:
+            with self.subTest(route_name=route_name):
+                response = self.client.post(reverse(route_name, kwargs={"pk": asset_request.pk}))
+                self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND, response.content)
+
+        self.pending_request_a.refresh_from_db()
+        self.approved_request_a.refresh_from_db()
+        self.assertEqual(self.pending_request_a.status, RequestStatusChoices.PENDING)
+        self.assertEqual(self.approved_request_a.status, RequestStatusChoices.APPROVED)

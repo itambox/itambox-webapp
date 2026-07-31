@@ -1,6 +1,6 @@
 # Asset Requests
 
-An **Asset Request** represents a self-service requisition ticket submitted by a user for a physical asset, component, accessory, consumable, or catalog asset type. Requests flow through a state machine from initial submission through approval (or denial) to eventual fulfilment.
+An **Asset Request** represents a self-service request submitted by a user for a physical asset, component, accessory, consumable, or catalog asset type. Requests flow through a state machine from initial submission through approval (or denial) to eventual fulfilment.
 
 ---
 
@@ -16,7 +16,7 @@ An **Asset Request** represents a self-service requisition ticket submitted by a
 | **Consumable** | A consumable catalog item being requested. Mutually exclusive with Asset, Asset Type, Component, and Accessory. | Foreign Key | No |
 | **Quantity** | Number of units requested (applies to accessories, consumables, and components). | Integer | Yes |
 | **Source Location** | The preferred stock location from which items should be drawn. | Foreign Key | No |
-| **Status** | Requisition lifecycle state: `Pending`, `Approved`, `Awaiting Procurement`, `Denied`, `Fulfilled`, or `Cancelled`. | Choice | Yes |
+| **Status** | Asset Request lifecycle state: `Pending`, `Approved`, `Awaiting Procurement`, `Denied`, `Fulfilled`, or `Cancelled`. | Choice | Yes |
 | **Request Date** | Timestamp when the request was submitted (auto-set on creation). | DateTime | Yes |
 | **Response Date** | Timestamp when an administrator responded to the request. | DateTime | No |
 | **Responded By** | The administrator who approved, denied, or processed the request. | Foreign Key | No |
@@ -54,4 +54,14 @@ Valid status transitions are enforced at the model level:
 
 ## Auto-Approval
 
-Accessory and consumable requests may be auto-approved at creation time when the requested quantity is within configured thresholds and sufficient available stock exists. This is advisory only — capacity enforcement occurs at fulfilment time.
+Automatic approval is disabled on a fresh deployment. Set
+`ITAMBOX_REQUISITION_AUTO_APPROVAL_THRESHOLDS` to a JSON object containing
+non-negative `accessory` and/or `consumable` thresholds, for example
+`{"accessory": 3, "consumable": 5}`. A request is auto-approved at creation
+only when its quantity is within the configured threshold and sufficient stock
+exists. The persisted response notes record the automatic decision. Thresholds
+are process-wide rather than tenant-specific, so this seam remains Beta.
+
+The legacy `REQUISITION_AUTO_APPROVAL_THRESHOLDS` name remains a deprecated 1.x
+fallback and emits a startup warning. If neither name is configured, requests
+remain pending and the Asset Request procurement seam is inactive.

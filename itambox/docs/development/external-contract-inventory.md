@@ -453,9 +453,9 @@ parameters — that change no API, no persisted value, and no integration wire.
 
 Settings without the `ITAMBOX_` prefix are outside this table by construction.
 Where a differently named Django settings *attribute* carries a 1.x
-compatibility requirement it is named in the policy instead; the only one today
-is `REQUISITION_AUTO_APPROVAL_THRESHOLDS`, which is read with `getattr` and
-built-in fallbacks and has no environment variable at all.
+compatibility requirement it is named in the policy instead. The legacy
+`REQUISITION_AUTO_APPROVAL_THRESHOLDS` name remains a deprecated environment
+and Django-settings fallback for the canonical setting below.
 
 <!-- contract-inventory: settings -->
 
@@ -471,6 +471,7 @@ built-in fallbacks and has no environment variable at all.
 | `ITAMBOX_FIELD_ENCRYPTION_KEYS` | Field-encryption key set; value never published |
 | `ITAMBOX_API_TOKEN_PEPPERS` | API-token pepper set; value never published |
 | `ITAMBOX_REQUIRE_MFA` | TOTP enforcement for privileged local logins |
+| `ITAMBOX_REQUISITION_AUTO_APPROVAL_THRESHOLDS` | Opt-in Asset Request auto-approval thresholds and Beta procurement-seam activation |
 | `ITAMBOX_REQUIRE_CUSTODY_SIGNIN` | Signature requirement on custody sign-off |
 | `ITAMBOX_ALLOW_GLOBAL_CUSTODY_TEMPLATES` | Whether custody templates may be tenant-less |
 | `ITAMBOX_REPORT_DESIGNER_ENABLED` | Activation flag of the Beta opt-in report designer |
@@ -524,7 +525,7 @@ not publish.
 | `organization.role_grants` | `stable` | always-on | Role grants; the one security-critical entry | none |
 | `platform.plugins` | `experimental` | opt-in | Plugin loading and plugin API | Lifecycle hooks are still being defined, so a plugin that loads today may need changes; plugin code runs in-process with full database access and is not sandboxed |
 | `procurement.core` | `stable` | always-on | Purchase orders, order lines, contracts | none |
-| `procurement.requisition_seam` | `beta-enabled` | enabled | Requisition fulfillment links | Request-to-order-line reservation is incomplete; auto-approval thresholds are process-wide, not per tenant |
+| `procurement.requisition_seam` | `beta-enabled` | enabled | Asset Request fulfillment links | The asset-request to purchase-order-line reservation flow is incomplete; partial fulfilment may need manual reconciliation.<br>Auto-approval thresholds are process-wide, not per tenant. |
 | `reporting.curated` | `stable` | always-on | Curated report catalogue | none |
 | `reporting.designer` | `beta-opt-in` | opt-in | Saved report templates | Column, filter, and grouping model is expected to change; saved templates may need rebuilding |
 | `reporting.scheduled` | `beta-enabled` | enabled | Scheduled reports and generation archive | Delivery depends on a running worker; archive retention is not per-schedule configurable |

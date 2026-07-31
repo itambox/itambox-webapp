@@ -9820,14 +9820,6 @@
       "count": 1
     },
     {
-      "path": "itambox/procurement/views.py",
-      "code": "F401",
-      "message": "'django.db.transaction' imported but unused",
-      "source": "from django.db import transaction",
-      "context": "Module:body",
-      "count": 1
-    },
-    {
       "path": "itambox/software/filters.py",
       "code": "F401",
       "message": "'extras.filters.TagFilter' imported but unused",

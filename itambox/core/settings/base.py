@@ -5,6 +5,7 @@ Contains all common settings shared between dev and prod.
 
 import json
 import os
+import warnings as py_warnings
 from pathlib import Path
 
 from django.core.exceptions import ImproperlyConfigured
@@ -380,9 +381,43 @@ def _load_tenant_json_config(environment_name):
     return value
 
 
+def _load_requisition_auto_approval_thresholds():
+    canonical_name = "ITAMBOX_REQUISITION_AUTO_APPROVAL_THRESHOLDS"
+    legacy_name = "REQUISITION_AUTO_APPROVAL_THRESHOLDS"
+    raw = os.environ.get(canonical_name)
+    if raw is None:
+        raw = os.environ.get(legacy_name)
+        if raw is not None:
+            py_warnings.warn(
+                f"{legacy_name} is deprecated; configure {canonical_name} instead. "
+                "The legacy fallback will be removed in ITAMbox 2.0.",
+                UserWarning,
+                stacklevel=2,
+            )
+    if raw is None or not raw.strip():
+        return None
+    try:
+        value = json.loads(raw)
+    except json.JSONDecodeError as exc:
+        raise ImproperlyConfigured(
+            f"{canonical_name} contains invalid JSON at line {exc.lineno}, column {exc.colno}."
+        ) from exc
+    if not isinstance(value, dict):
+        raise ImproperlyConfigured(f"{canonical_name} must contain a JSON object.")
+    supported_items = {"accessory", "consumable"}
+    if set(value) - supported_items:
+        raise ImproperlyConfigured(f"{canonical_name} supports only the 'accessory' and 'consumable' keys.")
+    if any(
+        isinstance(threshold, bool) or not isinstance(threshold, int) or threshold < 0 for threshold in value.values()
+    ):
+        raise ImproperlyConfigured(f"{canonical_name} thresholds must be non-negative integers.")
+    return value
+
+
 ITAMBOX_TENANT_LDAP_CONFIGS = _load_tenant_json_config("ITAMBOX_TENANT_LDAP_CONFIGS")
 ITAMBOX_TENANT_SAML_CONFIGS = _load_tenant_json_config("ITAMBOX_TENANT_SAML_CONFIGS")
 ITAMBOX_TENANT_OIDC_CONFIGS = _load_tenant_json_config("ITAMBOX_TENANT_OIDC_CONFIGS")
+ITAMBOX_REQUISITION_AUTO_APPROVAL_THRESHOLDS = _load_requisition_auto_approval_thresholds()
 
 # Intune discovery connector — per-tenant config.
 # Keys per tenant slug: azure_tenant_id, client_id, client_secret,

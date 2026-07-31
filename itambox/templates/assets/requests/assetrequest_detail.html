@@ -24,7 +24,7 @@
         </button>
     {% endif %}
 
-    {% if request.user.is_staff and object.status == 'approved' and not object.asset %}
+    {% if asset_request_procurement_enabled and perms.procurement.add_purchaseorder and perms.assets.fulfill_assetrequest and object.status == 'approved' and not object.asset and not object.parent_id %}
         <a href="{% url 'procurement:purchaseorder_create' %}?from_request={{ object.pk }}" class="btn btn-warning">
             <i class="mdi mdi-cart-plus"></i>
             {% translate "Create Purchase Order..." %}
@@ -98,11 +98,11 @@
                     
                     <!-- Step 3: Procurement -->
                     {% if object.status != 'denied' and object.status != 'cancelled' %}
-                        {% with links=object.fulfillment_links.all %}
-                            <li class="step-item {% if object.status == 'procurement' or object.status == 'fulfilled' or links.exists %}active{% endif %}">
+                        {% with links=asset_request_fulfillment_links %}
+                            <li class="step-item {% if object.status == 'procurement' or object.status == 'fulfilled' or links %}active{% endif %}">
                                 <div class="step-title">{% translate "Procurement" %}</div>
                                 <div class="step-description">
-                                    {% if links.exists %}
+                                    {% if links %}
                                         {% for link in links %}
                                             <a href="{{ link.purchase_order_line.purchase_order.get_absolute_url }}" class="fw-bold">
                                                 {{ link.purchase_order_line.purchase_order.order_number }}

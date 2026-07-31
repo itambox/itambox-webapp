@@ -31,6 +31,7 @@ from itambox.capabilities import (
     registry,
 )
 from itambox.tests.capability_harness import deactivatable_keys, deactivated, half_registered, probe_failing
+from procurement import apps as procurement_apps
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
 DOCS_ROOT = REPO_ROOT / "itambox" / "docs"
@@ -146,11 +147,43 @@ class TestActivationDefaults:
                 assert state.probe_error == "", capability.key
                 assert state.active is False, capability.key
 
-    def test_the_configured_seams_keep_their_documented_default(self):
-        """Preserved behaviour: the requisition seam runs on built-in thresholds."""
+    def test_the_unconfigured_requisition_seam_is_inert(self):
         state = registry.state("procurement.requisition_seam")
-        assert state.active is True
-        assert state.value_present is False
+        assert state == ActivationState(active=False, value_present=False)
+
+    @override_settings(ITAMBOX_REQUISITION_AUTO_APPROVAL_THRESHOLDS={"accessory": 3, "consumable": 5})
+    def test_the_configured_requisition_seam_reports_presence_without_values(self):
+        state = registry.state("procurement.requisition_seam")
+        assert state == ActivationState(active=True, value_present=True)
+        assert "accessory" not in repr(state)
+        assert "consumable" not in repr(state)
+
+    @override_settings(ITAMBOX_REQUISITION_AUTO_APPROVAL_THRESHOLDS={})
+    def test_an_empty_threshold_object_is_present_but_keeps_the_seam_inactive(self):
+        state = registry.state("procurement.requisition_seam")
+
+        assert state == ActivationState(active=False, value_present=True)
+
+    @override_settings(
+        ITAMBOX_REQUISITION_AUTO_APPROVAL_THRESHOLDS=None,
+        REQUISITION_AUTO_APPROVAL_THRESHOLDS={"accessory": 2},
+    )
+    def test_the_legacy_threshold_setting_keeps_the_seam_active_for_1x(self):
+        state = registry.state("procurement.requisition_seam")
+
+        assert state == ActivationState(active=True, value_present=True)
+        assert "accessory" not in repr(state)
+
+    @override_settings(
+        ITAMBOX_REQUISITION_AUTO_APPROVAL_THRESHOLDS=None,
+        REQUISITION_AUTO_APPROVAL_THRESHOLDS={"accessory": 2},
+    )
+    def test_a_legacy_django_setting_emits_the_startup_deprecation_warning(self):
+        warning_hook = getattr(procurement_apps, "_warn_legacy_auto_approval_setting", None)
+        assert callable(warning_hook), "legacy Django-setting warning hook is missing"
+
+        with pytest.warns(UserWarning, match="ITAMBOX_REQUISITION_AUTO_APPROVAL_THRESHOLDS"):
+            warning_hook()
 
     @override_settings(PLUGINS=["demo_plugin"])
     def test_an_operator_flag_reports_a_configured_value_without_naming_it(self):

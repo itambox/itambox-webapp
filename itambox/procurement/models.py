@@ -385,6 +385,17 @@ class FulfillmentLink(BaseModel, ChangeLoggingMixin, SoftDeleteMixin):
     )
     qty_allocated = models.PositiveIntegerField(default=1, verbose_name=_("Qty Allocated"))
 
+    def clean(self):
+        super().clean()
+        request_tenant_id = self.asset_request.tenant_id if self.asset_request_id else None
+        line_tenant_id = self.purchase_order_line.tenant_id if self.purchase_order_line_id else None
+        po_tenant_id = self.purchase_order_line.purchase_order.tenant_id if self.purchase_order_line_id else None
+        tenant_ids = {self.tenant_id, request_tenant_id, line_tenant_id, po_tenant_id}
+        if None in tenant_ids or len(tenant_ids) != 1:
+            raise ValidationError(
+                _("The fulfillment link, Asset Request, line, and purchase order must use the same tenant.")
+            )
+
     class Meta:
         constraints = [
             models.UniqueConstraint(fields=["asset_request", "purchase_order_line"], name="unique_request_po_line_link")

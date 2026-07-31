@@ -3677,18 +3677,6 @@
     },
     {
       "path": "itambox/procurement/views.py",
-      "context": "ClassDef:PurchaseOrderEditView/FunctionDef:form_valid",
-      "statement": "from assets.models import AssetRequest",
-      "count": 1
-    },
-    {
-      "path": "itambox/procurement/views.py",
-      "context": "ClassDef:PurchaseOrderEditView/FunctionDef:form_valid",
-      "statement": "from procurement.models import FulfillmentLink, PurchaseOrderLine",
-      "count": 1
-    },
-    {
-      "path": "itambox/procurement/views.py",
       "context": "ClassDef:PurchaseOrderEditView/FunctionDef:get_initial",
       "statement": "from assets.models import AssetRequest",
       "count": 1

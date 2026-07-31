@@ -4,7 +4,7 @@ from django.contrib.auth import get_user_model
 from django.contrib.messages.middleware import MessageMiddleware
 from django.contrib.sessions.middleware import SessionMiddleware
 from django.core.exceptions import ValidationError
-from django.test import TestCase
+from django.test import TestCase, override_settings
 from django.urls import reverse
 from django.utils import timezone
 
@@ -23,6 +23,8 @@ from assets.models import (
 from assets.services import checkout_asset
 from assets.views.request_views import approve_asset_request, deny_asset_request
 from core.managers import set_current_membership, set_current_tenant
+from core.models import ObjectChange
+from core.tasks.context import TaskContext
 from core.tests.mixins import grant
 from inventory.models import (
     Accessory,
@@ -697,6 +699,18 @@ class RequisitionSystemTestCase(TestCase):
         with self.assertRaises(ValidationError):
             AssetRequest.objects.create(requester=self.requester_user, component=comp, qty=1, tenant=self.tenant)
 
+    def test_unconfigured_auto_approval_leaves_request_pending(self):
+        acc_cat = Category.objects.create(name="Accessories", slug="accessories", applies_to={"accessory": True})
+        acc = Accessory.objects.create(name="Wireless Mouse", manufacturer=self.manufacturer, category=acc_cat)
+        AccessoryStock.objects.create(accessory=acc, location=self.location, qty=10)
+
+        request = AssetRequest.objects.create(requester=self.requester_user, accessory=acc, qty=2, tenant=self.tenant)
+
+        self.assertEqual(request.status, RequestStatusChoices.PENDING)
+        self.assertIsNone(request.response_date)
+        self.assertEqual(request.response_notes, "")
+
+    @override_settings(ITAMBOX_REQUISITION_AUTO_APPROVAL_THRESHOLDS={"accessory": 3, "consumable": 5})
     def test_auto_approval_thresholds(self):
         acc_cat = Category.objects.create(name="Accessories", slug="accessories", applies_to={"accessory": True})
         acc = Accessory.objects.create(name="Wireless Mouse", manufacturer=self.manufacturer, category=acc_cat)
@@ -710,11 +724,59 @@ class RequisitionSystemTestCase(TestCase):
             requester=self.requester_user, accessory=acc, qty=2, tenant=self.tenant
         )
         self.assertEqual(req_approved.status, RequestStatusChoices.APPROVED)
-        self.assertIn("Automatically approved based on available stock.", req_approved.response_notes)
+        self.assertIn("configured threshold", req_approved.response_notes)
+        self.assertIn("sufficient stock", req_approved.response_notes)
 
         # Qty = 4 (> 3) -> should remain pending
         req_pending = AssetRequest.objects.create(requester=self.other_user, accessory=acc, qty=4, tenant=self.tenant)
         self.assertEqual(req_pending.status, RequestStatusChoices.PENDING)
+
+    @override_settings(ITAMBOX_REQUISITION_AUTO_APPROVAL_THRESHOLDS={"accessory": 3})
+    def test_automatic_approval_records_reason_and_attributed_object_change(self):
+        category = Category.objects.create(
+            name="Audited Accessories",
+            slug="audited-accessories",
+            applies_to={"accessory": True},
+        )
+        accessory = Accessory.objects.create(
+            name="Audited Mouse",
+            manufacturer=self.manufacturer,
+            category=category,
+        )
+        AccessoryStock.objects.create(accessory=accessory, location=self.location, qty=10)
+
+        with TaskContext(tenant_id=self.tenant.pk, user_id=self.admin.pk):
+            request = AssetRequest.objects.create(
+                requester=self.requester_user,
+                accessory=accessory,
+                qty=2,
+                tenant=self.tenant,
+            )
+
+        change = ObjectChange._base_manager.get(
+            changed_object_type__app_label="assets",
+            changed_object_type__model="assetrequest",
+            changed_object_id=request.pk,
+        )
+        self.assertEqual(request.status, RequestStatusChoices.APPROVED)
+        self.assertIn("Automatically approved", request.response_notes)
+        self.assertEqual(change.user, self.admin)
+        self.assertEqual(change.tenant, self.tenant)
+        self.assertEqual(change.postchange_data["status"], RequestStatusChoices.APPROVED)
+        self.assertIn("Automatically approved", change.postchange_data["response_notes"])
+
+    @override_settings(
+        ITAMBOX_REQUISITION_AUTO_APPROVAL_THRESHOLDS=None,
+        REQUISITION_AUTO_APPROVAL_THRESHOLDS={"accessory": 3, "consumable": 5},
+    )
+    def test_legacy_auto_approval_threshold_setting_remains_a_runtime_fallback(self):
+        acc_cat = Category.objects.create(name="Accessories", slug="accessories", applies_to={"accessory": True})
+        acc = Accessory.objects.create(name="Wireless Mouse", manufacturer=self.manufacturer, category=acc_cat)
+        AccessoryStock.objects.create(accessory=acc, location=self.location, qty=10)
+
+        request = AssetRequest.objects.create(requester=self.requester_user, accessory=acc, qty=2, tenant=self.tenant)
+
+        self.assertEqual(request.status, RequestStatusChoices.APPROVED)
 
     def test_partial_approval_and_location(self):
         from assets.forms.request_forms import AssetRequestActionForm

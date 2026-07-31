@@ -1,4 +1,4 @@
-from django.core.exceptions import ValidationError
+from django.core.exceptions import PermissionDenied, ValidationError
 from django.db import transaction
 from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
@@ -6,7 +6,146 @@ from django.utils.translation import gettext_lazy as _
 from assets.choices import RequestStatusChoices
 from assets.models import Asset, AssetRequest, StatusLabel
 from inventory.models import AccessoryStock, ComponentStock, ConsumableStock
-from procurement.models import FulfillmentLink, PurchaseOrder
+from itambox.capabilities import registry
+from procurement.models import FulfillmentLink, PurchaseOrder, PurchaseOrderLine
+
+
+def _lock_purchase_order_for_asset_request(po):
+    try:
+        locked_po = PurchaseOrder._base_manager.select_for_update().get(pk=po.pk, deleted_at__isnull=True)
+    except PurchaseOrder.DoesNotExist as exc:
+        raise ValidationError(_("Purchase order no longer exists.")) from exc
+    if locked_po.tenant_id is None:
+        raise ValidationError(_("Asset Request procurement requires a tenant-owned purchase order."))
+    return locked_po
+
+
+def _lock_asset_request_for_purchase_order(asset_request_id, po):
+    try:
+        asset_request_id = int(asset_request_id)
+    except (TypeError, ValueError) as exc:
+        raise ValidationError(_("Invalid Asset Request identifier.")) from exc
+    try:
+        return AssetRequest._base_manager.select_for_update().get(
+            pk=asset_request_id,
+            tenant_id=po.tenant_id,
+            deleted_at__isnull=True,
+        )
+    except AssetRequest.DoesNotExist as exc:
+        raise ValidationError(_("Asset Request does not exist in the purchase order tenant.")) from exc
+
+
+def _lock_fulfillment_targets(asset_request):
+    if asset_request.parent_id is not None:
+        raise ValidationError(_("Asset Request group children must be procured through their group parent."))
+    if not asset_request.is_group:
+        return [asset_request]
+    targets = list(
+        AssetRequest._base_manager.select_for_update()
+        .filter(
+            parent_id=asset_request.pk,
+            tenant_id=asset_request.tenant_id,
+            deleted_at__isnull=True,
+        )
+        .order_by("pk")
+    )
+    item_ids = (
+        asset_request.asset_type_id,
+        asset_request.component_id,
+        asset_request.accessory_id,
+        asset_request.consumable_id,
+    )
+    if (
+        not targets
+        or sum(target.qty for target in targets) != asset_request.qty
+        or any(
+            (
+                target.asset_type_id,
+                target.component_id,
+                target.accessory_id,
+                target.consumable_id,
+            )
+            != item_ids
+            for target in targets
+        )
+    ):
+        raise ValidationError(_("Asset Request group children do not match the approved parent request."))
+    return targets
+
+
+def _existing_fulfillment_link(asset_request, targets, po):
+    target_ids = {target.pk for target in targets}
+    candidate_ids = target_ids | {asset_request.pk}
+    existing_links = list(
+        FulfillmentLink._base_manager.select_related("purchase_order_line")
+        .filter(asset_request_id__in=candidate_ids, deleted_at__isnull=True)
+        .order_by("pk")
+    )
+    if not existing_links:
+        return None
+    if any(link.purchase_order_line.purchase_order_id != po.pk for link in existing_links):
+        raise ValidationError(_("Asset Request is already linked to another purchase order."))
+    linked_target_ids = {link.asset_request_id for link in existing_links}
+    line_ids = {link.purchase_order_line_id for link in existing_links}
+    if linked_target_ids != target_ids or len(line_ids) != 1:
+        raise ValidationError(_("Asset Request has an incomplete fulfillment graph that requires reconciliation."))
+    return existing_links[0]
+
+
+def _create_fulfillment_link(po, asset_request, targets):
+    line = PurchaseOrderLine(
+        tenant=po.tenant,
+        purchase_order=po,
+        asset_type=asset_request.asset_type,
+        component=asset_request.component,
+        accessory=asset_request.accessory,
+        consumable=asset_request.consumable,
+        qty_ordered=asset_request.qty,
+    )
+    line.full_clean()
+    line.save()
+    links = []
+    for target in targets:
+        link = FulfillmentLink(
+            tenant=po.tenant,
+            asset_request=target,
+            purchase_order_line=line,
+            qty_allocated=target.qty,
+        )
+        link.full_clean()
+        link.save()
+        target.status = RequestStatusChoices.PROCUREMENT
+        target.save(update_fields=["status"])
+        links.append(link)
+    if asset_request.pk not in {target.pk for target in targets}:
+        asset_request.status = RequestStatusChoices.PROCUREMENT
+        asset_request.save(update_fields=["status"])
+    return links[0]
+
+
+@transaction.atomic
+def link_asset_request_to_purchase_order(po, asset_request_id, user):
+    """Create the Procurement-owned fulfillment graph for an approved Asset Request."""
+    if not registry.is_active("procurement.requisition_seam"):
+        raise ValidationError(_("The Asset Request procurement seam is not configured."))
+    locked_po = _lock_purchase_order_for_asset_request(po)
+    if user is None or not user.has_perm("procurement.change_purchaseorder", locked_po):
+        raise PermissionDenied(_("You do not have permission to change this purchase order."))
+    asset_request = _lock_asset_request_for_purchase_order(asset_request_id, locked_po)
+    if not user.has_perm("assets.fulfill_assetrequest", asset_request):
+        raise PermissionDenied(_("You do not have permission to fulfill this Asset Request."))
+    targets = _lock_fulfillment_targets(asset_request)
+    existing_link = _existing_fulfillment_link(asset_request, targets, locked_po)
+    if existing_link is not None:
+        return existing_link
+    if locked_po.status != PurchaseOrder.STATUS_DRAFT:
+        raise ValidationError(_("Asset Requests can be linked only to draft purchase orders."))
+    if asset_request.status != RequestStatusChoices.APPROVED or any(
+        target.status != RequestStatusChoices.APPROVED for target in targets
+    ):
+        raise ValidationError(_("Only approved Asset Requests can be linked to a purchase order."))
+
+    return _create_fulfillment_link(locked_po, asset_request, targets)
 
 
 def _lock_receipt_stock_rows(lines, line_quantities, location):
@@ -37,6 +176,26 @@ def _lock_receipt_stock_rows(lines, line_quantities, location):
         )
         stock_maps[stock_model] = {getattr(stock, item_field): stock for stock in locked}
     return stock_maps
+
+
+def _approve_completed_group_parents(linked_requests):
+    parent_ids = sorted({request.parent_id for request in linked_requests if request.parent_id is not None})
+    if not parent_ids:
+        return
+    parents = AssetRequest._base_manager.select_for_update().filter(
+        pk__in=parent_ids,
+        status=RequestStatusChoices.PROCUREMENT,
+        deleted_at__isnull=True,
+    )
+    for parent in parents:
+        has_pending_child = AssetRequest._base_manager.filter(
+            parent_id=parent.pk,
+            status=RequestStatusChoices.PROCUREMENT,
+            deleted_at__isnull=True,
+        ).exists()
+        if not has_pending_child:
+            parent.status = RequestStatusChoices.APPROVED
+            parent.save(update_fields=["status"])
 
 
 @transaction.atomic
@@ -133,6 +292,7 @@ def receive_purchase_order(po, line_quantities, asset_details=None):
                     req.status = RequestStatusChoices.APPROVED
                     req.save()
                     req_idx += 1
+            _approve_completed_group_parents(linked_requests)
 
         elif line.component:
             # Lock the stock row across the read-modify-write so concurrent receipts (or a
@@ -268,6 +428,7 @@ def cancel_purchase_order(po, user=None, request=None):
         )
 
     # Revert linked AssetRequests back to Approved and delete FulfillmentLinks
+    reverted_requests = []
     for line in po.lines.all():
         links = FulfillmentLink.objects.filter(purchase_order_line=line)
         for link in links:
@@ -275,7 +436,9 @@ def cancel_purchase_order(po, user=None, request=None):
             if req.status == RequestStatusChoices.PROCUREMENT:
                 req.status = RequestStatusChoices.APPROVED
                 req.save(update_fields=["status"])
+                reverted_requests.append(req)
             link.delete()
+    _approve_completed_group_parents(reverted_requests)
 
     po.status = PurchaseOrder.STATUS_CANCELLED
     po.save(update_fields=["status"])

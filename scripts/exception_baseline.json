@@ -1373,14 +1373,6 @@
     },
     {
       "path": "itambox/procurement/views.py",
-      "scope": "ClassDef:PurchaseOrderEditView/FunctionDef:form_valid",
-      "handler_type": "Exception",
-      "classification": "silent",
-      "body_sha256": "cb0174275e43813a293c0f63f62dab018829f46204319c3ac66164cd474bf1ad",
-      "count": 1
-    },
-    {
-      "path": "itambox/procurement/views.py",
       "scope": "ClassDef:PurchaseOrderEditView/FunctionDef:get_initial",
       "handler_type": "AssetRequest.DoesNotExist",
       "classification": "pass-only",

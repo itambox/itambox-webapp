@@ -1,13 +1,13 @@
 from decimal import Decimal
 
 from django.contrib import messages
+from django.core.exceptions import PermissionDenied, ValidationError
 from django.db import transaction
-from django.http import HttpResponse
+from django.http import Http404, HttpResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse, reverse_lazy
 from django.utils.translation import gettext_lazy as _
 
-from assets.choices import RequestStatusChoices
 from itambox.views.generic import ObjectDeleteView, ObjectDetailView, ObjectEditView, ObjectListView
 from itambox.views.generic.service_views import SimplePostView
 
@@ -20,6 +20,7 @@ from .forms import (
     PurchaseOrderLineForm,
 )
 from .models import Contract, PurchaseOrder, PurchaseOrderLine
+from .services import link_asset_request_to_purchase_order
 from .tables import ContractTable, PurchaseOrderTable
 
 
@@ -68,11 +69,16 @@ class PurchaseOrderEditView(ObjectEditView):
     def get_initial(self):
         initial = super().get_initial()
         if "from_request" in self.request.GET:
-            from_request_id = self.request.GET.get("from_request")
+            try:
+                from_request_id = int(self.request.GET.get("from_request"))
+            except (TypeError, ValueError) as exc:
+                raise Http404(_("Invalid Asset Request identifier.")) from exc
             from assets.models import AssetRequest
 
             try:
                 asset_request = AssetRequest.objects.get(pk=from_request_id)
+                if not self.request.user.has_perm("assets.fulfill_assetrequest", asset_request):
+                    raise PermissionDenied(_("You do not have permission to fulfill this Asset Request."))
                 loc = asset_request.assigned_location or asset_request.source_location
                 if loc:
                     initial["destination_location"] = loc.pk
@@ -80,53 +86,44 @@ class PurchaseOrderEditView(ObjectEditView):
                 pass
         return initial
 
+    def add_success_message(self, message):
+        if getattr(self, "_defer_success_message", False):
+            self._deferred_success_message = message
+            return
+        super().add_success_message(message)
+
     def form_valid(self, form):
         is_creating = self.get_object() is None
+        self._defer_success_message = is_creating and "from_request" in self.request.GET
+        self._deferred_success_message = None
+        linked_request_id = None
         if is_creating:
             form.instance.created_by = self.request.user
-        response = super().form_valid(form)
-        if is_creating and "from_request" in self.request.GET:
-            from_request_id = self.request.GET.get("from_request")
-            from assets.models import AssetRequest
-            from procurement.models import FulfillmentLink, PurchaseOrderLine
-
-            try:
-                asset_request = AssetRequest.objects.get(pk=from_request_id)
-                # Create the line item matching the request
-                line = PurchaseOrderLine(
-                    purchase_order=self.object, qty_ordered=asset_request.qty, tenant=self.object.tenant
-                )
-                if asset_request.asset_type:
-                    line.asset_type = asset_request.asset_type
-                elif asset_request.component:
-                    line.component = asset_request.component
-                elif asset_request.accessory:
-                    line.accessory = asset_request.accessory
-                elif asset_request.consumable:
-                    line.consumable = asset_request.consumable
-                line.save()
-
-                # Create FulfillmentLink
-                FulfillmentLink.objects.create(
-                    tenant=self.object.tenant,
-                    asset_request=asset_request,
-                    purchase_order_line=line,
-                    qty_allocated=asset_request.qty,
-                )
-
-                # Transition request status to procurement
-                asset_request.status = RequestStatusChoices.PROCUREMENT
-                asset_request.save()
-
-                messages.success(
-                    self.request,
-                    _(
-                        "Linked Purchase Order to Asset Request #%(pk)s and transitioned request status to Awaiting Procurement."
+        try:
+            with transaction.atomic():
+                response = super().form_valid(form)
+                if is_creating and "from_request" in self.request.GET:
+                    from_request_id = self.request.GET.get("from_request")
+                    link_asset_request_to_purchase_order(
+                        self.object,
+                        from_request_id,
+                        user=self.request.user,
                     )
-                    % {"pk": asset_request.pk},
+                    linked_request_id = int(from_request_id)
+        except ValidationError as exc:
+            form.add_error(None, exc)
+            return self.form_invalid(form)
+        if self._deferred_success_message is not None:
+            super().add_success_message(self._deferred_success_message)
+        if linked_request_id is not None:
+            messages.success(
+                self.request,
+                _(
+                    "Linked Purchase Order to Asset Request #%(pk)s and transitioned request status "
+                    "to Awaiting Procurement."
                 )
-            except Exception as e:
-                messages.error(self.request, _("Failed to link PO to request: %(error)s") % {"error": e})
+                % {"pk": linked_request_id},
+            )
         return response
 
 

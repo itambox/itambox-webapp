@@ -39,7 +39,7 @@ limitations before production use.
 
 | Capability | Area | Grade |
 |------------|------|-------|
-| Requisition Fulfillment Seam | `procurement` | Beta |
+| Asset Request Procurement Seam | `procurement` | Beta |
 | Report Designer | `extras` — reports | Beta |
 | Scheduled Reports | `extras` — reports | Beta |
 | Alert Rules and Channels | `extras` — alerting | Beta |
@@ -48,8 +48,8 @@ limitations before production use.
 | Plugin System | infrastructure | Experimental |
 
 Subscriptions and the purchase-order core graduated to Stable when the registry
-landed; what remains Beta in procurement is the requisition fulfilment seam, not
-purchase orders themselves. See the
+landed; what remains Beta in procurement is the Asset Request fulfillment seam,
+not purchase orders themselves. See the
 [Capability Registry](capability-registry.md) for each entry's activation mode,
 source, and declared limitations.
 

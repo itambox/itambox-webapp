@@ -130,6 +130,9 @@ class ObjectEditView(
             fallback = reverse("dashboard")
         return safe_return_url(self.request, self.request.POST.get("return_url"), fallback)
 
+    def add_success_message(self, message):
+        messages.success(self.request, message)
+
     def form_valid(self, form):
         # Unsaved instances (new objects and clones) are creations.
         is_creating = self.object is None or self.object.pk is None
@@ -163,8 +166,7 @@ class ObjectEditView(
             if hasattr(self.object, "get_absolute_url")
             else str(self.object)
         )
-        messages.success(
-            self.request,
+        self.add_success_message(
             _("%(verb)s %(model)s %(link)s") % {"verb": msg_verb, "model": _model._meta.verbose_name, "link": msg_link},
         )
 

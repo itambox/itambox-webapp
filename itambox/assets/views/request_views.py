@@ -11,6 +11,7 @@ from assets import filters, tables
 from assets.choices import RequestStatusChoices
 from assets.forms.request_forms import AssetRequestActionForm, AssetRequestForm
 from assets.models import Asset, AssetRequest, StatusLabel
+from itambox.capabilities import registry
 from itambox.panels import Panel
 from itambox.views.generic import (
     ObjectDeleteView,
@@ -94,7 +95,7 @@ def deny_asset_request(request_instance, user, request=None, **kwargs):
     return request_instance
 
 
-# --- Requisition Views ---
+# --- Asset Request Views ---
 
 
 class RequestListView(ObjectListView):
@@ -139,6 +140,22 @@ class RequestDetailView(ObjectDetailView):
         Panel("Decision & Response Details", ["responded_by", "response_date", "response_notes"]),
         Panel("Requester Notes", ["notes"], position="right"),
     ]
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context["asset_request_procurement_enabled"] = registry.is_active("procurement.requisition_seam")
+        if self.object.is_group:
+            children = self.object.sub_requests.prefetch_related(
+                "fulfillment_links__purchase_order_line__purchase_order"
+            )
+            context["asset_request_fulfillment_links"] = [
+                link for child in children for link in child.fulfillment_links.all()
+            ]
+        else:
+            context["asset_request_fulfillment_links"] = list(
+                self.object.fulfillment_links.select_related("purchase_order_line__purchase_order")
+            )
+        return context
 
     def get_queryset(self):
         qs = super().get_queryset()
