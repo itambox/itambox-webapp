@@ -35,7 +35,7 @@ ITAMbox gives internal IT teams and managed service providers one tenant-aware s
 | Asset lifecycle | Hardware catalogues, assignments, check-in and check-out, reservations, warranties, maintenance, depreciation, disposal, and total cost tracking |
 | Inventory and stock | Accessories, consumables, components, kits, location-level stock, barcode and QR scanning, and bulk operations |
 | Software and licenses | Installed-software records, license-seat assignment, suppliers, cost centers, and software catalogue management |
-| Subscriptions and procurement | SaaS subscriptions, purchase orders and lines, contracts, fulfillment links, and asset-request workflows; the requisition fulfilment seam is Beta |
+| Subscriptions and procurement | SaaS subscriptions, purchase orders and lines, contracts, fulfillment links, and Asset Request workflows; the Asset Request procurement seam is Beta |
 | Governance | Tenant and tenant-group scoping, role-based access, delegated resource grants, custody receipts, audit campaigns, change history, retention, and recycle-bin workflows |
 | Customization | Custom fields, tags, imports and exports, labels, saved filters, attachments, and journals |
 | Reporting and automation | Dashboards, curated reports, and the alerts inbox; the report designer, scheduled reports, alert rules and channels, event rules, and webhooks are Beta |

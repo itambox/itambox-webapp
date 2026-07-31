@@ -274,14 +274,13 @@ of them is created, changed, or scheduled by this document.
   GraphQL type, and the edit form, and any surface a later release adds — and the
   alias is **removed no earlier than 2.0**. This document does not perform,
   schedule, or authorise the rename.
-- **The legacy requisition setting keeps a compatibility read through 1.x.**
-  `REQUISITION_AUTO_APPROVAL_THRESHOLDS` is a Django settings attribute read with
-  `getattr` and built-in fallbacks — it is not an `ITAMBOX_*` environment
-  variable and the settings package never reads one. An absent attribute
-  therefore means "running on defaults", not "switched off". WP-2 records only
-  the 1.x compatibility requirement: the attribute name stays readable for the
-  whole of 1.x even if a per-tenant replacement arrives. No new setting, env
-  knob, or default is introduced here.
+- **The legacy auto-approval setting keeps a compatibility read through 1.x.**
+  `ITAMBOX_REQUISITION_AUTO_APPROVAL_THRESHOLDS` is the canonical environment
+  and Django-settings name. `REQUISITION_AUTO_APPROVAL_THRESHOLDS` remains a
+  deprecated fallback for the whole of 1.x and emits a startup warning when it
+  supplies the value. The canonical name wins when both are present. If neither
+  name is configured, automatic approval and the Asset Request procurement seam
+  are inactive; there are no built-in thresholds.
 - **Integer-keyed SCIM detail routes remain supported for the whole of 1.x.**
   Both SCIM mounts route `Users/<int:pk>` and `Groups/<int:pk>`. Identity
   providers store those URLs, so a change of key shape is a breaking change for

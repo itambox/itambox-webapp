@@ -110,7 +110,7 @@ urlpatterns = [
     path(
         "custom-fieldsets/<int:pk>/", RedirectView.as_view(pattern_name="extras:customfieldset_detail", permanent=True)
     ),
-    # Requisition System routes
+    # Asset Request routes
     path("", include("assets.urls_requests")),
 ]
 

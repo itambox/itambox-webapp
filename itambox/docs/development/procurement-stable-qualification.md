@@ -32,7 +32,7 @@ Procurement currently has no:
 - search index;
 - django-q task module or discoverable background task;
 - CSV/import form;
-- bulk, clone, or requisition view;
+- bulk, clone, or dedicated Asset Request procurement view;
 - procurement signal module.
 
 Qualification does not invent these surfaces. Adding one is a separate product and compatibility decision with its own tenant, permission, audit, schema, and concurrency review.

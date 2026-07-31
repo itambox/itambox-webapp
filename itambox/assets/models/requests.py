@@ -292,28 +292,28 @@ class AssetRequest(JournalingMixin, TaggableMixin, ChangeLoggingMixin, BaseModel
             from django.conf import settings
             from django.utils import timezone
 
-            # Auto-approval thresholds come from settings (sane defaults below).
-            thresholds = getattr(
-                settings,
-                "REQUISITION_AUTO_APPROVAL_THRESHOLDS",
-                {
-                    "accessory": 3,
-                    "consumable": 5,
-                },
-            )
+            thresholds = getattr(settings, "ITAMBOX_REQUISITION_AUTO_APPROVAL_THRESHOLDS", None)
+            if thresholds is None:
+                thresholds = getattr(settings, "REQUISITION_AUTO_APPROVAL_THRESHOLDS", None)
 
-            if self.accessory:
+            if thresholds and self.accessory:
                 max_qty = thresholds.get("accessory", 0)
                 if self.qty <= max_qty and self.accessory.available >= self.qty:
                     self.status = RequestStatusChoices.APPROVED
                     self.response_date = timezone.now()
-                    self.response_notes = "Automatically approved based on available stock."
-            elif self.consumable:
+                    self.response_notes = (
+                        "Automatically approved because the quantity is within the configured threshold "
+                        "and sufficient stock is available."
+                    )
+            elif thresholds and self.consumable:
                 max_qty = thresholds.get("consumable", 0)
                 if self.qty <= max_qty and self.consumable.available >= self.qty:
                     self.status = RequestStatusChoices.APPROVED
                     self.response_date = timezone.now()
-                    self.response_notes = "Automatically approved based on available stock."
+                    self.response_notes = (
+                        "Automatically approved because the quantity is within the configured threshold "
+                        "and sufficient stock is available."
+                    )
 
         self.full_clean()
         super().save(*args, **kwargs)

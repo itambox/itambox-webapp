@@ -16,7 +16,7 @@ itambox/          # Django project root
   inventory/      # Accessories, consumables, components + stock management
   organization/   # Tenants, tenant groups, contacts, locations, AssetHolder
   compliance/     # Custody receipts, audit campaigns
-  procurement/    # Purchase orders, requisitions
+  procurement/    # Purchase orders, contracts, Asset Request fulfillment
   subscriptions/  # SaaS subscription tracking
   licenses/       # Software license seat management
   software/       # Installed software catalogue
@@ -418,6 +418,7 @@ A fully-wired model touches every layer below. Skipping one leaves a half-wired 
 | `ITAMBOX_TENANT_INTUNE_CONFIGS` | JSON per-tenant Intune discovery configs | `{}` |
 | `ITAMBOX_DOCS_ROOT` | Filesystem path to compiled MkDocs output | `BASE_DIR/docs` |
 | `ITAMBOX_REQUIRE_MFA` | Enforce TOTP MFA (django-otp) for local-password logins by superusers/owner-admin roles. SSO/LDAP/SAML/OIDC delegate MFA to the IdP and are always exempt. | `False` (dev); `True` (prod) |
+| `ITAMBOX_REQUISITION_AUTO_APPROVAL_THRESHOLDS` | JSON object with optional non-negative `accessory` and `consumable` thresholds. Enables Asset Request auto-approval and the Beta procurement seam; absent means inert. | unset |
 | `ITAMBOX_REQUIRE_CUSTODY_SIGNIN` | Require digital signature on custody receipt sign-off | `True` |
 | `ITAMBOX_ALLOW_GLOBAL_CUSTODY_TEMPLATES` | Allow custody templates not scoped to a tenant | `True` |
 | `ITAMBOX_SERVER_EMAIL` | From-address for error emails (prod only) | `DEFAULT_FROM_EMAIL` |

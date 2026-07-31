@@ -1,6 +1,8 @@
-from django.apps import AppConfig
+import warnings as py_warnings
 
-from core.features import settings_probe
+from django.apps import AppConfig
+from django.conf import settings
+
 from itambox.capabilities import (
     ALWAYS_ON,
     BETA,
@@ -9,9 +11,30 @@ from itambox.capabilities import (
     SOURCE_ALWAYS,
     SOURCE_CONFIGURED,
     STABLE,
+    ActivationState,
     Capability,
     registry,
 )
+
+
+def _asset_request_procurement_probe():
+    thresholds = getattr(settings, "ITAMBOX_REQUISITION_AUTO_APPROVAL_THRESHOLDS", None)
+    if thresholds is None:
+        thresholds = getattr(settings, "REQUISITION_AUTO_APPROVAL_THRESHOLDS", None)
+    return ActivationState(active=bool(thresholds), value_present=thresholds is not None)
+
+
+def _warn_legacy_auto_approval_setting():
+    canonical = getattr(settings, "ITAMBOX_REQUISITION_AUTO_APPROVAL_THRESHOLDS", None)
+    legacy = getattr(settings, "REQUISITION_AUTO_APPROVAL_THRESHOLDS", None)
+    if canonical is None and legacy is not None:
+        py_warnings.warn(
+            "REQUISITION_AUTO_APPROVAL_THRESHOLDS is deprecated; configure "
+            "ITAMBOX_REQUISITION_AUTO_APPROVAL_THRESHOLDS instead. "
+            "The legacy fallback will be removed in ITAMbox 2.0.",
+            UserWarning,
+            stacklevel=2,
+        )
 
 
 class ProcurementConfig(AppConfig):
@@ -19,6 +42,7 @@ class ProcurementConfig(AppConfig):
     name = "procurement"
 
     def ready(self):
+        _warn_legacy_auto_approval_setting()
         self._register_capabilities()
 
     def _register_capabilities(self):
@@ -48,15 +72,12 @@ class ProcurementConfig(AppConfig):
             ),
             Capability(
                 key="procurement.requisition_seam",
-                title="Requisition Fulfillment Seam",
+                title="Asset Request Procurement Seam",
                 owning_area="area:procurement",
                 maturity=BETA,
                 security_critical=False,
                 activation=ENABLED,
-                # Observation only. Auto-approval already runs on built-in
-                # thresholds when the setting is absent, so the probe reports
-                # active-on-defaults and never becomes a new gate.
-                activation_probe=settings_probe("REQUISITION_AUTO_APPROVAL_THRESHOLDS", default=True),
+                activation_probe=_asset_request_procurement_probe,
                 activation_source=SOURCE_CONFIGURED,
                 owns=("procurement.FulfillmentLink",),
                 docs_url="development/capability-registry.md",

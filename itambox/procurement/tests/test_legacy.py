@@ -2,7 +2,7 @@ import datetime
 
 from django.contrib.auth import get_user_model
 from django.core.exceptions import ValidationError
-from django.test import TestCase
+from django.test import TestCase, override_settings
 from django.utils import timezone
 
 from assets.choices import RequestStatusChoices
@@ -67,6 +67,305 @@ class ProcurementStatusTransitionTests(TestCase):
         self.po.refresh_from_db()
         self.assertEqual(self.po.status, PurchaseOrder.STATUS_APPROVED)
 
+    @override_settings(ITAMBOX_REQUISITION_AUTO_APPROVAL_THRESHOLDS={"accessory": 3, "consumable": 5})
+    def test_link_asset_request_to_purchase_order_creates_the_owned_fulfillment_graph(self):
+        from procurement import services
+
+        link_request = getattr(services, "link_asset_request_to_purchase_order", None)
+        self.assertTrue(callable(link_request), "Asset Request procurement service is missing")
+        self.po.tenant = self.tenant
+        self.po.save(update_fields=["tenant"])
+        request = AssetRequest.objects.create(
+            tenant=self.tenant,
+            requester=self.user,
+            asset_type=self.asset_type,
+            qty=2,
+            status=RequestStatusChoices.APPROVED,
+        )
+
+        link = link_request(self.po, request.pk, user=self.user)
+
+        request.refresh_from_db()
+        self.assertEqual(request.status, RequestStatusChoices.PROCUREMENT)
+        self.assertEqual(link.tenant, self.tenant)
+        self.assertEqual(link.asset_request, request)
+        self.assertEqual(link.qty_allocated, 2)
+        self.assertEqual(link.purchase_order_line.tenant, self.tenant)
+        self.assertEqual(link.purchase_order_line.purchase_order, self.po)
+        self.assertEqual(link.purchase_order_line.asset_type, self.asset_type)
+        self.assertEqual(link.purchase_order_line.qty_ordered, 2)
+
+    @override_settings(ITAMBOX_REQUISITION_AUTO_APPROVAL_THRESHOLDS={"accessory": 3, "consumable": 5})
+    def test_link_asset_request_to_purchase_order_is_idempotent(self):
+        from procurement.services import link_asset_request_to_purchase_order
+
+        self.po.tenant = self.tenant
+        self.po.save(update_fields=["tenant"])
+        request = AssetRequest.objects.create(
+            tenant=self.tenant,
+            requester=self.user,
+            asset_type=self.asset_type,
+            qty=2,
+            status=RequestStatusChoices.APPROVED,
+        )
+
+        first = link_asset_request_to_purchase_order(self.po, request.pk, user=self.user)
+        second = link_asset_request_to_purchase_order(self.po, request.pk, user=self.user)
+
+        self.assertEqual(second.pk, first.pk)
+        self.assertEqual(FulfillmentLink.objects.filter(asset_request=request).count(), 1)
+        self.assertEqual(PurchaseOrderLine.objects.filter(purchase_order=self.po).count(), 1)
+
+    @override_settings(ITAMBOX_REQUISITION_AUTO_APPROVAL_THRESHOLDS={"accessory": 3})
+    def test_multi_unit_asset_type_group_links_and_receives_each_child_idempotently(self):
+        from procurement.services import (
+            approve_purchase_order,
+            link_asset_request_to_purchase_order,
+            order_purchase_order,
+            receive_purchase_order,
+        )
+
+        self.po.tenant = self.tenant
+        self.po.save(update_fields=["tenant"])
+        parent = AssetRequest.objects.create(
+            tenant=self.tenant,
+            requester=self.user,
+            asset_type=self.asset_type,
+            qty=2,
+            is_group=True,
+            status=RequestStatusChoices.APPROVED,
+        )
+        children = []
+        for _ in range(2):
+            child = AssetRequest(
+                tenant=self.tenant,
+                requester=self.user,
+                asset_type=self.asset_type,
+                qty=1,
+                parent=parent,
+                status=RequestStatusChoices.APPROVED,
+            )
+            child._skip_duplicate_check = True
+            child.save()
+            children.append(child)
+
+        from django.urls import reverse
+
+        self.client.force_login(self.user)
+        session = self.client.session
+        session["active_tenant_id"] = self.tenant.pk
+        session.save()
+        child_response = self.client.get(reverse("assets:request_detail", kwargs={"pk": children[0].pk}))
+        self.assertNotContains(child_response, "Create Purchase Order")
+
+        with self.assertRaisesMessage(ValidationError, "group parent"):
+            link_asset_request_to_purchase_order(self.po, children[0].pk, user=self.user)
+
+        first_link = link_asset_request_to_purchase_order(self.po, parent.pk, user=self.user)
+        second_link = link_asset_request_to_purchase_order(self.po, parent.pk, user=self.user)
+
+        line = first_link.purchase_order_line
+        self.assertEqual(second_link.pk, first_link.pk)
+        self.assertEqual(line.qty_ordered, 2)
+        self.assertSetEqual(
+            set(FulfillmentLink.objects.filter(purchase_order_line=line).values_list("asset_request_id", flat=True)),
+            {child.pk for child in children},
+        )
+        parent.refresh_from_db()
+        self.assertEqual(parent.status, RequestStatusChoices.PROCUREMENT)
+        self.assertFalse(parent.fulfillment_links.exists())
+        for child in children:
+            child.refresh_from_db()
+            self.assertEqual(child.status, RequestStatusChoices.PROCUREMENT)
+
+        detail_response = self.client.get(reverse("assets:request_detail", kwargs={"pk": parent.pk}))
+        self.assertContains(detail_response, self.po.order_number)
+
+        approve_purchase_order(self.po)
+        order_purchase_order(self.po)
+        receive_purchase_order(
+            self.po,
+            {line.pk: 1},
+            [{"line_id": line.pk, "serial_number": "GROUP-SN-1", "asset_tag": "GROUP-TAG-1"}],
+        )
+
+        parent.refresh_from_db()
+        for child in children:
+            child.refresh_from_db()
+        self.assertEqual(parent.status, RequestStatusChoices.PROCUREMENT)
+        self.assertEqual(
+            [child.status for child in children].count(RequestStatusChoices.APPROVED),
+            1,
+        )
+        self.assertEqual(
+            [child.status for child in children].count(RequestStatusChoices.PROCUREMENT),
+            1,
+        )
+
+        receive_purchase_order(
+            self.po,
+            {line.pk: 1},
+            [{"line_id": line.pk, "serial_number": "GROUP-SN-2", "asset_tag": "GROUP-TAG-2"}],
+        )
+
+        parent.refresh_from_db()
+        self.assertEqual(parent.status, RequestStatusChoices.APPROVED)
+        for child in children:
+            child.refresh_from_db()
+            self.assertEqual(child.status, RequestStatusChoices.APPROVED)
+            self.assertIsNotNone(child.asset_id)
+
+    @override_settings(ITAMBOX_REQUISITION_AUTO_APPROVAL_THRESHOLDS={"accessory": 3})
+    def test_cancelling_group_purchase_order_reverts_parent_and_children(self):
+        from procurement.services import cancel_purchase_order, link_asset_request_to_purchase_order
+
+        self.po.tenant = self.tenant
+        self.po.save(update_fields=["tenant"])
+        parent = AssetRequest.objects.create(
+            tenant=self.tenant,
+            requester=self.user,
+            asset_type=self.asset_type,
+            qty=2,
+            is_group=True,
+            status=RequestStatusChoices.APPROVED,
+        )
+        children = []
+        for _ in range(2):
+            child = AssetRequest(
+                tenant=self.tenant,
+                requester=self.user,
+                asset_type=self.asset_type,
+                qty=1,
+                parent=parent,
+                status=RequestStatusChoices.APPROVED,
+            )
+            child._skip_duplicate_check = True
+            child.save()
+            children.append(child)
+        link_asset_request_to_purchase_order(self.po, parent.pk, user=self.user)
+
+        cancel_purchase_order(self.po)
+
+        parent.refresh_from_db()
+        self.assertEqual(parent.status, RequestStatusChoices.APPROVED)
+        for child in children:
+            child.refresh_from_db()
+            self.assertEqual(child.status, RequestStatusChoices.APPROVED)
+            self.assertFalse(child.fulfillment_links.exists())
+
+    @override_settings(
+        ITAMBOX_REQUISITION_AUTO_APPROVAL_THRESHOLDS=None,
+        REQUISITION_AUTO_APPROVAL_THRESHOLDS=None,
+    )
+    def test_unconfigured_asset_request_procurement_seam_is_inert(self):
+        from procurement.services import link_asset_request_to_purchase_order
+
+        self.po.tenant = self.tenant
+        self.po.save(update_fields=["tenant"])
+        request = AssetRequest.objects.create(
+            tenant=self.tenant,
+            requester=self.user,
+            asset_type=self.asset_type,
+            status=RequestStatusChoices.APPROVED,
+        )
+
+        with self.assertRaisesMessage(ValidationError, "not configured"):
+            link_asset_request_to_purchase_order(self.po, request.pk, user=self.user)
+
+        request.refresh_from_db()
+        self.assertEqual(request.status, RequestStatusChoices.APPROVED)
+        self.assertFalse(FulfillmentLink.objects.filter(asset_request=request).exists())
+        self.assertFalse(PurchaseOrderLine.objects.filter(purchase_order=self.po).exists())
+
+    @override_settings(ITAMBOX_REQUISITION_AUTO_APPROVAL_THRESHOLDS={"accessory": 3})
+    def test_link_asset_request_to_purchase_order_rejects_foreign_request_id(self):
+        from procurement.services import link_asset_request_to_purchase_order
+
+        self.po.tenant = self.tenant
+        self.po.save(update_fields=["tenant"])
+        other_tenant = Tenant.objects.create(name="Foreign Request Tenant", slug="foreign-request-tenant")
+        foreign_request = AssetRequest.objects.create(
+            tenant=other_tenant,
+            requester=self.user,
+            asset_type=self.asset_type,
+            status=RequestStatusChoices.APPROVED,
+        )
+
+        with self.assertRaisesMessage(ValidationError, "does not exist"):
+            link_asset_request_to_purchase_order(self.po, foreign_request.pk, user=self.user)
+
+        foreign_request.refresh_from_db()
+        self.assertEqual(foreign_request.status, RequestStatusChoices.APPROVED)
+        self.assertFalse(FulfillmentLink.objects.filter(asset_request=foreign_request).exists())
+        self.assertFalse(PurchaseOrderLine.objects.filter(purchase_order=self.po).exists())
+
+    @override_settings(ITAMBOX_REQUISITION_AUTO_APPROVAL_THRESHOLDS={"accessory": 3})
+    def test_link_asset_request_to_purchase_order_rejects_tenantless_legacy_rows(self):
+        from procurement.services import link_asset_request_to_purchase_order
+
+        tenantless_request = AssetRequest.objects.create(
+            requester=self.user,
+            asset_type=self.asset_type,
+            status=RequestStatusChoices.APPROVED,
+        )
+
+        with self.assertRaisesMessage(ValidationError, "tenant-owned"):
+            link_asset_request_to_purchase_order(self.po, tenantless_request.pk, user=self.user)
+
+        tenantless_request.refresh_from_db()
+        self.assertEqual(tenantless_request.status, RequestStatusChoices.APPROVED)
+        self.assertFalse(FulfillmentLink.objects.filter(asset_request=tenantless_request).exists())
+        self.assertFalse(PurchaseOrderLine.objects.filter(purchase_order=self.po).exists())
+
+    @override_settings(ITAMBOX_REQUISITION_AUTO_APPROVAL_THRESHOLDS={"accessory": 3})
+    def test_link_asset_request_to_purchase_order_rejects_malformed_request_id(self):
+        from procurement.services import link_asset_request_to_purchase_order
+
+        self.po.tenant = self.tenant
+        self.po.save(update_fields=["tenant"])
+
+        with self.assertRaisesMessage(ValidationError, "Invalid Asset Request identifier"):
+            link_asset_request_to_purchase_order(self.po, "not-an-id", user=self.user)
+
+        self.assertFalse(PurchaseOrderLine.objects.filter(purchase_order=self.po).exists())
+
+    def test_fulfillment_link_rejects_cross_tenant_request_and_line(self):
+        other_tenant = Tenant.objects.create(name="Other Procurement Tenant", slug="other-procurement-tenant")
+        other_location = Location.objects.create(
+            tenant=other_tenant,
+            site=self.site,
+            name="Other Location",
+            slug="other-location",
+        )
+        other_po = PurchaseOrder.objects.create(
+            tenant=other_tenant,
+            order_number="PO-OTHER",
+            supplier=self.supplier,
+            destination_location=other_location,
+            created_by=self.user,
+        )
+        other_line = PurchaseOrderLine.objects.create(
+            tenant=other_tenant,
+            purchase_order=other_po,
+            asset_type=self.asset_type,
+            qty_ordered=1,
+        )
+        request = AssetRequest.objects.create(
+            tenant=self.tenant,
+            requester=self.user,
+            asset_type=self.asset_type,
+            status=RequestStatusChoices.APPROVED,
+        )
+        link = FulfillmentLink(
+            tenant=self.tenant,
+            asset_request=request,
+            purchase_order_line=other_line,
+            qty_allocated=1,
+        )
+
+        with self.assertRaisesMessage(ValidationError, "same tenant"):
+            link.full_clean()
+
     def test_approve_purchase_order_no_lines_fails(self):
         from procurement.services import approve_purchase_order
 
@@ -104,15 +403,30 @@ class ProcurementStatusTransitionTests(TestCase):
             order_purchase_order(self.po)
 
     def test_cancel_purchase_order_reverts_linked_requests(self):
+        self.po.tenant = self.tenant
+        self.po.save(update_fields=["tenant"])
         # Create a PO line
         line = PurchaseOrderLine.objects.create(
-            purchase_order=self.po, asset_type=self.asset_type, qty_ordered=2, unit_price=100.00
+            tenant=self.tenant,
+            purchase_order=self.po,
+            asset_type=self.asset_type,
+            qty_ordered=2,
+            unit_price=100.00,
         )
         # Create an asset request and fulfillment link
         request = AssetRequest.objects.create(
-            requester=self.user, asset_type=self.asset_type, qty=2, status=RequestStatusChoices.PROCUREMENT
+            tenant=self.tenant,
+            requester=self.user,
+            asset_type=self.asset_type,
+            qty=2,
+            status=RequestStatusChoices.PROCUREMENT,
         )
-        FulfillmentLink.objects.create(asset_request=request, purchase_order_line=line, qty_allocated=2)
+        FulfillmentLink.objects.create(
+            tenant=self.tenant,
+            asset_request=request,
+            purchase_order_line=line,
+            qty_allocated=2,
+        )
 
         # Cancel the PO
         from procurement.services import cancel_purchase_order
@@ -189,7 +503,10 @@ class ProcurementStatusTransitionTests(TestCase):
         from receipts. Receiving a license line only transitions its linked requests
         from procurement to approved; the seat pool is left untouched. This codifies
         that documented contract."""
+        self.po.tenant = self.tenant
+        self.po.save(update_fields=["tenant"])
         line = PurchaseOrderLine.objects.create(
+            tenant=self.tenant,
             purchase_order=self.po,
             license=self.license,
             qty_ordered=5,
@@ -197,12 +514,14 @@ class ProcurementStatusTransitionTests(TestCase):
         )
         # Link a request awaiting procurement to the license line.
         request = AssetRequest.objects.create(
+            tenant=self.tenant,
             requester=self.user,
             asset_type=self.asset_type,
             qty=3,
             status=RequestStatusChoices.PROCUREMENT,
         )
         FulfillmentLink.objects.create(
+            tenant=self.tenant,
             asset_request=request,
             purchase_order_line=line,
             qty_allocated=3,

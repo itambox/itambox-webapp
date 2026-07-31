@@ -15,6 +15,7 @@ This changelog follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) 
 ### Changed
 
 - Purchase Order `status` and Purchase Order Line `qty_received` are read-only in the REST schema. API clients must use the corresponding lifecycle endpoint: differing direct writes now return HTTP 400 with sanctioned-action guidance, while identical values remain accepted and ignored for full-representation PUT compatibility. Existing rows require no migration.
+- Asset Request auto-approval and the Beta Asset Request procurement seam are now opt-in through `ITAMBOX_REQUISITION_AUTO_APPROVAL_THRESHOLDS`; fresh deployments leave requests pending. The legacy setting name remains a deprecated 1.x fallback with a startup warning.
 
 ### Fixed
 
@@ -24,6 +25,7 @@ This changelog follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) 
 ### Security
 
 - Added cross-tenant read/write matrices for contracts, Purchase Orders, and Purchase Order lines together with real two-connection receipt and approval race tests.
+- Centralized Asset Request-to-Purchase Order linking in a tenant-locked, permission-checked, idempotent service and made failed UI linking roll back the new purchase order.
 - Removed the unused global pip installation and ensurepip bootstrap from the production runtime image, with build-time checks that the copied runtime environment remains pip-free, while preserving locked uv-based dependency resolution in the builder.
 
 ## [1.0.0-alpha.2] - 2026-07-28
@@ -77,7 +79,7 @@ This changelog follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) 
 - Multi-tenant asset lifecycle management for catalogues, assignments, check-in and check-out, reservations, warranties, maintenance, depreciation, disposal, and total cost history.
 - Location-aware stock management for accessories, consumables, components, and kits, including barcode and QR workflows and transactional bulk operations.
 - Software catalogues, installed-software records, license-seat management, suppliers, and cost centers.
-- Beta subscription and procurement workflows for SaaS subscriptions, purchase orders and lines, contracts, and fulfillment links. Requisition-style requests remain part of the asset-request workflow.
+- Beta subscription and procurement workflows for SaaS subscriptions, purchase orders and lines, contracts, and Asset Request fulfillment links.
 - Custody receipts, digital sign-off, audit campaigns, reconciliation reports, frozen audit evidence, and CSV export.
 - Tenant roles, tenant groups, delegated resource grants, scoped administration, and provenance-aware sharing for managed-service-provider environments.
 - Search, tags, custom fields, saved filters, journals, attachments, labels, dashboards, reports, alerts, notification channels, event rules, and webhooks.

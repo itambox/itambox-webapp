@@ -9,7 +9,7 @@ every reservation is collision-proof at the database level.
 
 ## Asset Requests
 
-An **Asset Request** is a self-service requisition ticket. Users browse the
+An **Asset Request** is a self-service request. Users browse the
 catalogue and submit requests for specific assets, asset types, components,
 accessories, or consumables. Managers approve or deny them; fulfilment creates
 the corresponding assignments and stock deductions.
@@ -33,7 +33,7 @@ Navigate to **Assets → Requests** and click **Add Request**. Fill in:
 > component, accessory, or consumable). A database-level check constraint
 > (`exactly_one_requested_category`) enforces this — combining a laptop AND a
 > monitor in one request is not possible. Use **bulk requests** (group requests)
-> for multi-item requisitions.
+> for multi-item requests.
 
 ### Validation Gating
 
@@ -85,17 +85,20 @@ stateDiagram-v2
 
 #### Auto-Approval for Low-Risk Items
 
-Accessory and consumable requests below configured quantity thresholds are
+Automatic approval is disabled by default. When explicitly configured,
+accessory and consumable requests at or below their quantity thresholds are
 **automatically approved** on creation if sufficient stock exists:
 
-| Item Type | Default Threshold | Behaviour |
+| Item Type | Example Threshold | Behaviour |
 |---|---|---|
 | Accessory | ≤ 3 units | Auto-approved if `available >= qty` |
 | Consumable | ≤ 5 units | Auto-approved if `available >= qty` |
 
-Thresholds are configured via `REQUISITION_AUTO_APPROVAL_THRESHOLDS` in your
-Django settings. Set a threshold to `0` to disable auto-approval for that
-category entirely.
+Set `ITAMBOX_REQUISITION_AUTO_APPROVAL_THRESHOLDS` to a JSON object such as
+`{"accessory": 3, "consumable": 5}`. Omit a category or set its threshold to
+`0` to prevent positive-quantity requests in that category from being approved
+automatically. The legacy `REQUISITION_AUTO_APPROVAL_THRESHOLDS` name is accepted
+through 1.x with a startup deprecation warning.
 
 > [!IMPORTANT]
 > Auto-approval is **advisory only** — it reserves no stock. Capacity is
@@ -112,6 +115,11 @@ When you need multiple items at once, use **Group Requests**:
    item category, quantity, and assignee.
 3. The group tracks the **unallocated count** — how many child requests still
    need concrete items assigned.
+
+For a multi-unit Asset Type sent to procurement, ITAMbox creates one Purchase
+Order Line and reserves each unit for its child request. A partial receipt
+approves only the children that received assets; the parent stays in
+**Procurement** until every child has an asset.
 
 Group requests are useful for:
 - **New hire onboarding**: one group request with laptop, monitor, keyboard,
@@ -316,7 +324,7 @@ but it no longer participates in overlap checks. This means:
 
 **Auto-approval is not triggering**
 
-: Check that `REQUISITION_AUTO_APPROVAL_THRESHOLDS` is configured with
+: Check that `ITAMBOX_REQUISITION_AUTO_APPROVAL_THRESHOLDS` is configured with
   positive thresholds. Auto-approval only applies to accessories and
   consumables, and only when sufficient stock is available. Asset and
   component requests always require manual approval.
