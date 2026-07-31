@@ -1,6 +1,7 @@
 from django.conf import settings
 from django.contrib.contenttypes.fields import GenericForeignKey, GenericRelation
 from django.contrib.contenttypes.models import ContentType
+from django.core.exceptions import ValidationError
 from django.db import models
 from django.urls import NoReverseMatch, reverse
 from django.utils import timezone
@@ -159,12 +160,9 @@ class SubscriptionTypeChoices(models.TextChoices):
 
 class SubscriptionStatusChoices(models.TextChoices):
     ACTIVE = "active", _("Active")
-    EXPIRED = "expired", _("Expired")
-    CANCELLED = "cancelled", _("Cancelled")
-    PENDING = "pending", _("Pending")
     SUSPENDED = "suspended", _("Suspended")
-    RENEWING = "renewing", _("Renewing")
-    TRIAL = "trial", _("Trial")
+    CANCELLED = "cancelled", _("Cancelled")
+    EXPIRED = "expired", _("Expired")
 
 
 class BillingCycleChoices(models.TextChoices):
@@ -177,6 +175,7 @@ class BillingCycleChoices(models.TextChoices):
 
 
 class Subscription(CustomFieldDataMixin, AutoSlugMixin, BookmarkableMixin, DeletableVaultModel):
+    export_aliases = {"auto_renewal": "vendor_contract_auto_renews"}
     objects = TenantScopingSoftDeleteManager()
     all_objects = TenantScopingAllObjectsManager()
     # Deliberately cross-tenant / unscoped bootstrap manager for the daily
@@ -257,8 +256,13 @@ class Subscription(CustomFieldDataMixin, AutoSlugMixin, BookmarkableMixin, Delet
         verbose_name=_("Term (Months)"),
         help_text=_("Duration of the subscription term in months"),
     )
-    auto_renewal = models.BooleanField(
-        default=True, verbose_name=_("Auto-Renewal"), help_text=_("Whether this subscription renews automatically")
+    vendor_contract_auto_renews = models.BooleanField(
+        default=True,
+        verbose_name=_("Vendor Contract Auto-Renews"),
+        help_text=_(
+            "Records whether the vendor's contract renews automatically. ITAMbox does not renew subscriptions: "
+            "a subscription past its renewal date is marked expired."
+        ),
     )
     licensed_quantity = models.PositiveIntegerField(
         blank=True,
@@ -321,6 +325,24 @@ class Subscription(CustomFieldDataMixin, AutoSlugMixin, BookmarkableMixin, Delet
                 fields=["slug"], condition=models.Q(deleted_at__isnull=True), name="unique_subscription_slug_active"
             ),
         ]
+
+    ALLOWED_STATUS_TRANSITIONS = {
+        SubscriptionStatusChoices.ACTIVE: {
+            SubscriptionStatusChoices.SUSPENDED,
+            SubscriptionStatusChoices.CANCELLED,
+            SubscriptionStatusChoices.EXPIRED,
+        },
+        SubscriptionStatusChoices.SUSPENDED: {
+            SubscriptionStatusChoices.ACTIVE,
+            SubscriptionStatusChoices.CANCELLED,
+            SubscriptionStatusChoices.EXPIRED,
+        },
+        SubscriptionStatusChoices.EXPIRED: {
+            SubscriptionStatusChoices.ACTIVE,
+            SubscriptionStatusChoices.CANCELLED,
+        },
+        SubscriptionStatusChoices.CANCELLED: set(),
+    }
 
     def __str__(self):
         return f"{self.provider} - {self.name}"
@@ -385,24 +407,70 @@ class Subscription(CustomFieldDataMixin, AutoSlugMixin, BookmarkableMixin, Delet
             return self.renewal_cost * 2
         return self.renewal_cost
 
+    @property
+    def auto_renewal(self):
+        """Deprecated 1.x compatibility alias for vendor contract renewal terms."""
+        return self.vendor_contract_auto_renews
+
+    @auto_renewal.setter
+    def auto_renewal(self, value):
+        self.vendor_contract_auto_renews = value
+
+    def validate_transition(self, target_status):
+        if target_status == self.status:
+            return
+        allowed = self.ALLOWED_STATUS_TRANSITIONS.get(self.status, set())
+        if target_status not in allowed:
+            raise ValidationError(
+                _("Invalid subscription status transition from %(source)s to %(target)s.")
+                % {"source": self.status, "target": target_status}
+            )
+
     def renew(self, new_renewal_date, cost=None):
+        if (
+            self.status == SubscriptionStatusChoices.ACTIVE
+            and self.renewal_date == new_renewal_date
+            and (cost is None or self.renewal_cost == cost)
+        ):
+            return
+        self.validate_transition(SubscriptionStatusChoices.ACTIVE)
         self.renewal_date = new_renewal_date
         if cost is not None:
             self.renewal_cost = cost
         self.status = SubscriptionStatusChoices.ACTIVE
-        self.save(update_fields=["renewal_date", "renewal_cost", "status"])
+        self.save(update_fields=["renewal_date", "renewal_cost", "status", "updated_at"])
 
     def cancel(self, cancellation_date=None, reason=""):
+        if self.status == SubscriptionStatusChoices.CANCELLED:
+            return
+        self.validate_transition(SubscriptionStatusChoices.CANCELLED)
         self.cancellation_date = cancellation_date or timezone.now().date()
         self.status = SubscriptionStatusChoices.CANCELLED
         if reason:
             existing = self.notes or ""
             self.notes = f"{existing}\n[{timezone.now().date()}] Cancelled: {reason}".strip()
-        self.save(update_fields=["cancellation_date", "status", "notes"])
+        self.save(update_fields=["cancellation_date", "status", "notes", "updated_at"])
 
     def suspend(self):
+        if self.status == SubscriptionStatusChoices.SUSPENDED:
+            return
+        self.validate_transition(SubscriptionStatusChoices.SUSPENDED)
         self.status = SubscriptionStatusChoices.SUSPENDED
-        self.save(update_fields=["status"])
+        self.save(update_fields=["status", "updated_at"])
+
+    def resume(self):
+        if self.status == SubscriptionStatusChoices.ACTIVE:
+            return
+        self.validate_transition(SubscriptionStatusChoices.ACTIVE)
+        self.status = SubscriptionStatusChoices.ACTIVE
+        self.save(update_fields=["status", "updated_at"])
+
+    def expire(self):
+        if self.status == SubscriptionStatusChoices.EXPIRED:
+            return
+        self.validate_transition(SubscriptionStatusChoices.EXPIRED)
+        self.status = SubscriptionStatusChoices.EXPIRED
+        self.save(update_fields=["status", "updated_at"])
 
 
 class SubscriptionAssignment(ChangeLoggingMixin, BaseModel):

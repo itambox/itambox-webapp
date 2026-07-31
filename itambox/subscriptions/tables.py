@@ -42,7 +42,7 @@ class SubscriptionTable(BaseTable):
     renewal_date = tables.DateColumn(format="Y-m-d", verbose_name=_("Next Renewal"))
     renewal_cost = tables.Column(verbose_name=_("Renewal Cost"))
     currency = tables.Column(verbose_name=_("Currency"))
-    auto_renewal = tables.BooleanColumn(verbose_name=_("Auto-Renew"), yesno="✓,")
+    vendor_contract_auto_renews = tables.BooleanColumn(verbose_name=_("Vendor Auto-Renews"), yesno="✓,")
     tags = TagColumn(url_name="subscriptions:subscription_list")
 
     days_until_renewal = tables.Column(accessor="days_until_renewal", verbose_name=_("Due In"), orderable=False)
@@ -61,7 +61,7 @@ class SubscriptionTable(BaseTable):
             "renewal_date",
             "renewal_cost",
             "currency",
-            "auto_renewal",
+            "vendor_contract_auto_renews",
             "tags",
             "days_until_renewal",
             "actions",

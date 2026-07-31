@@ -17,7 +17,6 @@ from django.urls import reverse
 from rest_framework import status
 from rest_framework.test import APITestCase
 
-from core.choices import ObjectChangeActionChoices
 from core.models import ObjectChange
 from core.tests.mixins import grant
 from organization.models import (
@@ -114,8 +113,8 @@ class A5ApiHygieneTests(APITestCase):
         obj.refresh_from_db()
         return 'W/"{0}"'.format(obj.updated_at.isoformat())
 
-    def test_update_status_requires_if_match(self):
-        """A status write with no If-Match is refused (428), not last-writer-wins."""
+    def test_status_compatibility_path_requires_if_match(self):
+        """The legacy status path preserves optimistic concurrency."""
         self._login_as_staff()
         url = reverse(
             "api:subscriptions_api:subscription-update-status",
@@ -126,8 +125,7 @@ class A5ApiHygieneTests(APITestCase):
         self.subscription.refresh_from_db()
         self.assertEqual(self.subscription.status, SubscriptionStatusChoices.ACTIVE)
 
-    def test_update_status_stale_if_match_yields_412(self):
-        """A stale (no-longer-current) If-Match loses the concurrency race."""
+    def test_status_compatibility_path_stale_if_match_yields_412(self):
         self._login_as_staff()
         url = reverse(
             "api:subscriptions_api:subscription-update-status",
@@ -143,11 +141,9 @@ class A5ApiHygieneTests(APITestCase):
         self.subscription.refresh_from_db()
         self.assertEqual(self.subscription.status, SubscriptionStatusChoices.ACTIVE)
 
-    def test_update_status_records_accurate_changelog_diff(self):
-        """A valid status write records an UPDATE ObjectChange with the real diff."""
+    def test_status_compatibility_path_accepts_identical_value_without_side_effect(self):
         self._login_as_staff()
         etag = self._etag_for(self.subscription)
-
         ct = ContentType.objects.get_for_model(Subscription)
         before = ObjectChange.objects.filter(
             changed_object_type=ct,
@@ -160,38 +156,20 @@ class A5ApiHygieneTests(APITestCase):
         )
         response = self.client.patch(
             url,
-            data={"status": "suspended"},
+            data={"status": "active"},
             format="json",
             HTTP_IF_MATCH=etag,
         )
         self.assertEqual(response.status_code, status.HTTP_200_OK)
-        self.assertEqual(response.data["status"], "suspended")
-        # The ETag advanced with the write, so the response carries a fresh token.
-        self.assertIn("ETag", response)
-        self.assertNotEqual(response["ETag"], etag)
-
+        self.assertEqual(response.data["status"], "active")
+        self.assertEqual(response["ETag"], etag)
         self.subscription.refresh_from_db()
-        self.assertEqual(self.subscription.status, SubscriptionStatusChoices.SUSPENDED)
-
-        change = (
-            ObjectChange.objects.filter(
-                changed_object_type=ct,
-                changed_object_id=self.subscription.pk,
-                action=ObjectChangeActionChoices.ACTION_UPDATE,
-            )
-            .order_by("-time")
-            .first()
-        )
-        self.assertIsNotNone(change, "update_status must record an ObjectChange")
-        # The snapshot()/save() path produced an accurate old->new status diff.
-        self.assertEqual(change.prechange_data.get("status"), SubscriptionStatusChoices.ACTIVE)
-        self.assertEqual(change.postchange_data.get("status"), SubscriptionStatusChoices.SUSPENDED)
-        # Exactly one new change row for this write.
+        self.assertEqual(self.subscription.status, SubscriptionStatusChoices.ACTIVE)
         after = ObjectChange.objects.filter(
             changed_object_type=ct,
             changed_object_id=self.subscription.pk,
         ).count()
-        self.assertEqual(after, before + 1)
+        self.assertEqual(after, before)
 
     # ----- WS3-7b ----------------------------------------------------------
 

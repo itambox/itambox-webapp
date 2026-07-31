@@ -9,7 +9,7 @@ from core.schema import schema
 from core.tests.mixins import grant
 from itambox.middleware import set_current_tenant
 from organization.models import AssetHolder, Role, Tenant, TenantGroup
-from subscriptions.models import Provider, Subscription, SubscriptionAssignment
+from subscriptions.models import Provider, Subscription, SubscriptionAssignment, SubscriptionStatusChoices
 
 
 class SubscriptionsGraphQLTestCase(TestCase):
@@ -286,6 +286,76 @@ class SubscriptionsGraphQLTestCase(TestCase):
         sub_data = result.data["createSubscription"]["subscription"]
         self.assertEqual(sub_data["name"], "Office 365")
         self.assertEqual(sub_data["provider"]["name"], "Adobe")
+
+    def test_explicit_lifecycle_mutations_suspend_and_resume(self):
+        context = self.get_context(self.user, self.tenant)
+        set_current_tenant(self.tenant)
+
+        result = schema.execute(
+            f"""
+            mutation {{
+                updateSubscription(id: {self.subscription.id}, status: "suspended") {{
+                    subscription {{ status }}
+                }}
+            }}
+            """,
+            context_value=context,
+        )
+        self.assertIsNotNone(result.errors)
+        self.subscription.refresh_from_db()
+        self.assertEqual(self.subscription.status, SubscriptionStatusChoices.ACTIVE)
+
+        result = schema.execute(
+            f"""
+            mutation {{
+                suspendSubscription(id: {self.subscription.id}) {{
+                    subscription {{ status }}
+                }}
+            }}
+            """,
+            context_value=context,
+        )
+        self.assertIsNone(result.errors)
+        self.assertEqual(result.data["suspendSubscription"]["subscription"]["status"], "SUSPENDED")
+
+        result = schema.execute(
+            f"""
+            mutation {{
+                resumeSubscription(id: {self.subscription.id}) {{
+                    subscription {{ status }}
+                }}
+            }}
+            """,
+            context_value=context,
+        )
+        self.assertIsNone(result.errors)
+        self.assertEqual(result.data["resumeSubscription"]["subscription"]["status"], "ACTIVE")
+
+        result = schema.execute(
+            f"""
+            mutation {{
+                renewSubscription(id: {self.subscription.id}, renewalDate: "2031-02-03") {{
+                    subscription {{ status renewalDate }}
+                }}
+            }}
+            """,
+            context_value=context,
+        )
+        self.assertIsNone(result.errors)
+        self.assertEqual(result.data["renewSubscription"]["subscription"]["renewalDate"], "2031-02-03")
+
+        result = schema.execute(
+            f"""
+            mutation {{
+                cancelSubscription(id: {self.subscription.id}, reason: "No longer needed") {{
+                    subscription {{ status }}
+                }}
+            }}
+            """,
+            context_value=context,
+        )
+        self.assertIsNone(result.errors)
+        self.assertEqual(result.data["cancelSubscription"]["subscription"]["status"], "CANCELLED")
 
     def test_create_subscription_assignment(self):
         # Create another asset to assign

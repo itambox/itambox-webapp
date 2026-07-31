@@ -9,7 +9,7 @@ from graphql import GraphQLError
 from core.graphql_utils import check_permission, generate_slug, get_object_or_denied, paginate_queryset
 from organization.models import Contact, ContactAssignment, ContactRole, Tenant, TenantGroup
 
-from .models import Provider, Subscription, SubscriptionAssignment
+from .models import Provider, Subscription, SubscriptionAssignment, SubscriptionStatusChoices
 
 
 def _resolve_owner(owner_id, user, active_tenant):
@@ -92,6 +92,7 @@ class ProviderNode(DjangoObjectType):
 class SubscriptionNode(DjangoObjectType):
     cost_center_id = graphene.ID()
     cost_center_name = graphene.String()
+    auto_renewal = graphene.Boolean(deprecation_reason="Use vendorContractAutoRenews; autoRenewal is removed in 2.0.")
 
     class Meta:
         model = Subscription
@@ -108,7 +109,7 @@ class SubscriptionNode(DjangoObjectType):
             "currency",
             "billing_cycle",
             "term_months",
-            "auto_renewal",
+            "vendor_contract_auto_renews",
             "licensed_quantity",
             "contract_reference",
             "cancellation_date",
@@ -125,6 +126,9 @@ class SubscriptionNode(DjangoObjectType):
 
     def resolve_cost_center_name(self, info):
         return str(self.cost_center) if self.cost_center_id else None
+
+    def resolve_auto_renewal(self, info):
+        return self.vendor_contract_auto_renews
 
 
 class SubscriptionAssignmentNode(DjangoObjectType):
@@ -424,13 +428,29 @@ def _resolve_cost_center(cost_center_id, user):
     return get_object_or_denied(CostCenter, cost_center_id, user)
 
 
+def _apply_subscription_renewal_terms(subscription, kwargs):
+    legacy_value = kwargs.pop("auto_renewal", None)
+    canonical_value = kwargs.pop("vendor_contract_auto_renews", None)
+    if legacy_value is not None and canonical_value is not None and legacy_value != canonical_value:
+        raise GraphQLError("autoRenewal conflicts with vendorContractAutoRenews.")
+    value = canonical_value if canonical_value is not None else legacy_value
+    if value is not None:
+        subscription.vendor_contract_auto_renews = value
+
+
+def _validate_subscription_status_input(kwargs, current_status=SubscriptionStatusChoices.ACTIVE):
+    submitted_status = kwargs.pop("status", None)
+    if submitted_status is not None and submitted_status != current_status:
+        raise GraphQLError("Use the explicit suspend, resume, renew, or cancel subscription mutation.")
+
+
 class CreateSubscription(graphene.Mutation):
     class Arguments:
         name = graphene.String(required=True)
         slug = graphene.String()
         provider_id = graphene.ID(required=True)
         type = graphene.String()
-        status = graphene.String()
+        status = graphene.String(deprecation_reason="Use explicit lifecycle mutations")
         start_date = graphene.Date()
         renewal_date = graphene.Date()
         renewal_cost = graphene.Float()
@@ -438,10 +458,10 @@ class CreateSubscription(graphene.Mutation):
         billing_cycle = graphene.String()
         term_months = graphene.Int()
         auto_renewal = graphene.Boolean()
+        vendor_contract_auto_renews = graphene.Boolean()
         licensed_quantity = graphene.Int()
         contract_reference = graphene.String()
         cost_center_id = graphene.ID()
-        cancellation_date = graphene.Date()
         owner_id = graphene.ID()
         description = graphene.String()
         notes = graphene.String()
@@ -466,21 +486,21 @@ class CreateSubscription(graphene.Mutation):
         if "cost_center_id" in kwargs:
             subscription.cost_center = _resolve_cost_center(kwargs.pop("cost_center_id"), user)
 
+        _validate_subscription_status_input(kwargs, subscription.status)
+        _apply_subscription_renewal_terms(subscription, kwargs)
+
         ALLOWED_FIELDS = {
             "name",
             "slug",
             "type",
-            "status",
             "start_date",
             "renewal_date",
             "renewal_cost",
             "currency",
             "billing_cycle",
             "term_months",
-            "auto_renewal",
             "licensed_quantity",
             "contract_reference",
-            "cancellation_date",
             "description",
             "notes",
         }
@@ -508,7 +528,7 @@ class UpdateSubscription(graphene.Mutation):
         slug = graphene.String()
         provider_id = graphene.ID()
         type = graphene.String()
-        status = graphene.String()
+        status = graphene.String(deprecation_reason="Use explicit lifecycle mutations")
         start_date = graphene.Date()
         renewal_date = graphene.Date()
         renewal_cost = graphene.Float()
@@ -516,10 +536,10 @@ class UpdateSubscription(graphene.Mutation):
         billing_cycle = graphene.String()
         term_months = graphene.Int()
         auto_renewal = graphene.Boolean()
+        vendor_contract_auto_renews = graphene.Boolean()
         licensed_quantity = graphene.Int()
         contract_reference = graphene.String()
         cost_center_id = graphene.ID()
-        cancellation_date = graphene.Date()
         owner_id = graphene.ID()
         description = graphene.String()
         notes = graphene.String()
@@ -544,21 +564,21 @@ class UpdateSubscription(graphene.Mutation):
         if "cost_center_id" in kwargs:
             subscription.cost_center = _resolve_cost_center(kwargs.pop("cost_center_id"), user)
 
+        _validate_subscription_status_input(kwargs, subscription.status)
+        _apply_subscription_renewal_terms(subscription, kwargs)
+
         ALLOWED_FIELDS = {
             "name",
             "slug",
             "type",
-            "status",
             "start_date",
             "renewal_date",
             "renewal_cost",
             "currency",
             "billing_cycle",
             "term_months",
-            "auto_renewal",
             "licensed_quantity",
             "contract_reference",
-            "cancellation_date",
             "description",
             "notes",
         }
@@ -575,6 +595,73 @@ class UpdateSubscription(graphene.Mutation):
             ) from e
         subscription.save()
         return UpdateSubscription(subscription=subscription)
+
+
+def _run_subscription_lifecycle(info, subscription_id, method_name, *args, **kwargs):
+    user = check_permission(info, "subscriptions.change_subscription")
+    active_tenant = getattr(info.context, "active_tenant", None)
+    subscription = get_object_or_denied(Subscription, subscription_id, user, tenant=active_tenant)
+    check_permission(info, "subscriptions.change_subscription", obj=subscription)
+    subscription.snapshot()
+    try:
+        getattr(subscription, method_name)(*args, **kwargs)
+    except ValidationError as exc:
+        raise GraphQLError("Invalid subscription lifecycle transition", extensions={"errors": exc.messages}) from exc
+    return subscription
+
+
+class SuspendSubscription(graphene.Mutation):
+    class Arguments:
+        id = graphene.ID(required=True)
+
+    subscription = graphene.Field(SubscriptionNode)
+
+    def mutate(self, info, id):
+        return SuspendSubscription(subscription=_run_subscription_lifecycle(info, id, "suspend"))
+
+
+class ResumeSubscription(graphene.Mutation):
+    class Arguments:
+        id = graphene.ID(required=True)
+
+    subscription = graphene.Field(SubscriptionNode)
+
+    def mutate(self, info, id):
+        return ResumeSubscription(subscription=_run_subscription_lifecycle(info, id, "resume"))
+
+
+class RenewSubscription(graphene.Mutation):
+    class Arguments:
+        id = graphene.ID(required=True)
+        renewal_date = graphene.Date(required=True)
+        renewal_cost = graphene.Float()
+
+    subscription = graphene.Field(SubscriptionNode)
+
+    def mutate(self, info, id, renewal_date, renewal_cost=None):
+        return RenewSubscription(
+            subscription=_run_subscription_lifecycle(info, id, "renew", renewal_date, cost=renewal_cost)
+        )
+
+
+class CancelSubscription(graphene.Mutation):
+    class Arguments:
+        id = graphene.ID(required=True)
+        cancellation_date = graphene.Date()
+        reason = graphene.String()
+
+    subscription = graphene.Field(SubscriptionNode)
+
+    def mutate(self, info, id, cancellation_date=None, reason=""):
+        return CancelSubscription(
+            subscription=_run_subscription_lifecycle(
+                info,
+                id,
+                "cancel",
+                cancellation_date=cancellation_date,
+                reason=reason,
+            )
+        )
 
 
 class DeleteSubscription(graphene.Mutation):
@@ -705,6 +792,10 @@ class Mutation(graphene.ObjectType):
 
     create_subscription = CreateSubscription.Field()
     update_subscription = UpdateSubscription.Field()
+    suspend_subscription = SuspendSubscription.Field()
+    resume_subscription = ResumeSubscription.Field()
+    renew_subscription = RenewSubscription.Field()
+    cancel_subscription = CancelSubscription.Field()
     delete_subscription = DeleteSubscription.Field()
 
     create_subscription_assignment = CreateSubscriptionAssignment.Field()

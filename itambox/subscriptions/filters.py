@@ -27,6 +27,14 @@ class SubscriptionFilterSet(BaseFilterSet):
         label=_("Status"),
         widget=forms.Select(attrs={"class": "form-select"}),
     )
+    vendor_contract_auto_renews = django_filters.BooleanFilter(
+        field_name="vendor_contract_auto_renews",
+        label=_("Vendor Contract Auto-Renews"),
+    )
+    auto_renewal = django_filters.BooleanFilter(
+        field_name="vendor_contract_auto_renews",
+        label=_("Auto-Renewal (deprecated alias)"),
+    )
     tenant = django_filters.ModelChoiceFilter(
         queryset=Tenant.objects.all(), widget=forms.Select(attrs={"class": "form-select"}), label=_("Tenant")
     )
@@ -48,7 +56,15 @@ class SubscriptionFilterSet(BaseFilterSet):
 
     class Meta:
         model = Subscription
-        fields = ["type", "status", "tenant", "provider", "cost_center"]
+        fields = [
+            "type",
+            "status",
+            "vendor_contract_auto_renews",
+            "auto_renewal",
+            "tenant",
+            "provider",
+            "cost_center",
+        ]
 
     def search(self, queryset, name, value):
         if not value.strip():

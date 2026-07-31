@@ -41,8 +41,7 @@ def check_subscription_expiries_and_reminders():
     expired_subs = Subscription.unscoped.filter(status=SubscriptionStatusChoices.ACTIVE, renewal_date__lt=today)
     for sub in expired_subs:
         with TaskContext(tenant_id=sub.tenant_id, user_id=None):
-            sub.status = SubscriptionStatusChoices.EXPIRED
-            sub.save(update_fields=["status"])
+            sub.expire()
             expired_count += 1
 
             # Notify owner and admins about auto-expiry

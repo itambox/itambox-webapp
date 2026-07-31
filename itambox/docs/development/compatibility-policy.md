@@ -265,15 +265,12 @@ This section is policy only; it adds no migration and changes no runtime.
 Each of these is a decision published now and implemented later or never. None
 of them is created, changed, or scheduled by this document.
 
-- **A prospective subscription field alias, for WP-7.** No alias exists today:
-  `subscriptions.Subscription.auto_renewal` is the only such field, and it is
-  published under its current name in the inventory. The promise recorded here is
-  conditional and forward-looking — *if* WP-7 replaces `auto_renewal` with
-  `vendor_contract_auto_renews`, the legacy name keeps a read alias for the whole
-  of 1.x on every surface that exposes it — today the REST serializer, the
-  GraphQL type, and the edit form, and any surface a later release adds — and the
-  alias is **removed no earlier than 2.0**. This document does not perform,
-  schedule, or authorise the rename.
+- **The subscription renewal-term alias remains supported through 1.x.**
+  `subscriptions.Subscription.vendor_contract_auto_renews` is the canonical
+  field; the canonical wire name is `vendor_contract_auto_renews`. The legacy
+  `auto_renewal` name remains a read/write alias on the model,
+  REST API, and GraphQL API for the whole of 1.x and is **removed no earlier than
+  2.0**. New UI and documentation use only the canonical, non-ambiguous name.
 - **The legacy auto-approval setting keeps a compatibility read through 1.x.**
   `ITAMBOX_REQUISITION_AUTO_APPROVAL_THRESHOLDS` is the canonical environment
   and Django-settings name. `REQUISITION_AUTO_APPROVAL_THRESHOLDS` remains a

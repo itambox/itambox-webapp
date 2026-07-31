@@ -11,6 +11,7 @@ from django.utils.translation import gettext_lazy as _
 from django.views.generic import View
 from django_tables2 import RequestConfig
 
+from extras.models import JournalEntry
 from itambox.panels import Panel
 from itambox.utils import get_paginate_count
 from itambox.views.generic import (
@@ -22,6 +23,7 @@ from itambox.views.generic import (
     ObjectEditView,
     ObjectListView,
 )
+from itambox.views.generic.authorization import SecuredObjectActionMixin
 from itambox.views.generic.utils import safe_return_url
 
 from . import filters, forms, tables
@@ -146,14 +148,16 @@ class SubscriptionCloneView(SubscriptionEditView, ObjectCloneView):
 
 class SubscriptionBulkEditView(ObjectBulkEditView):
     queryset = Subscription.objects.all()
+    form_class = forms.SubscriptionBulkEditForm
 
 
 class SubscriptionBulkDeleteView(ObjectBulkDeleteView):
     queryset = Subscription.objects.all()
 
 
-class SubscriptionRenewView(LoginRequiredMixin, PermissionRequiredMixin, View):
+class SubscriptionRenewView(SecuredObjectActionMixin, LoginRequiredMixin, PermissionRequiredMixin, View):
     permission_required = "subscriptions.change_subscription"
+    queryset = Subscription.objects.all()
     template_name = "subscriptions/includes/subscription_renew_modal.html"
 
     def get(self, request, pk, *args, **kwargs):
@@ -175,9 +179,6 @@ class SubscriptionRenewView(LoginRequiredMixin, PermissionRequiredMixin, View):
             renewal_date = form.cleaned_data["renewal_date"]
             renewal_cost = form.cleaned_data["renewal_cost"]
             subscription.renew(renewal_date, renewal_cost)
-
-            # Create Journal Entry
-            from extras.models import JournalEntry
 
             obj_type = ContentType.objects.get_for_model(Subscription)
             JournalEntry.objects.create(
@@ -214,8 +215,9 @@ class SubscriptionRenewView(LoginRequiredMixin, PermissionRequiredMixin, View):
         )
 
 
-class SubscriptionCancelView(LoginRequiredMixin, PermissionRequiredMixin, View):
+class SubscriptionCancelView(SecuredObjectActionMixin, LoginRequiredMixin, PermissionRequiredMixin, View):
     permission_required = "subscriptions.change_subscription"
+    queryset = Subscription.objects.all()
     template_name = "subscriptions/includes/subscription_cancel_modal.html"
 
     def get(self, request, pk, *args, **kwargs):
@@ -237,9 +239,6 @@ class SubscriptionCancelView(LoginRequiredMixin, PermissionRequiredMixin, View):
             cancellation_date = form.cleaned_data["cancellation_date"]
             reason = form.cleaned_data["reason"]
             subscription.cancel(cancellation_date, reason)
-
-            # Create Journal Entry
-            from extras.models import JournalEntry
 
             obj_type = ContentType.objects.get_for_model(Subscription)
             comment_text = f"Cancelled subscription. Cancellation Date: {cancellation_date}."
@@ -278,15 +277,13 @@ class SubscriptionCancelView(LoginRequiredMixin, PermissionRequiredMixin, View):
         )
 
 
-class SubscriptionSuspendView(LoginRequiredMixin, PermissionRequiredMixin, View):
+class SubscriptionSuspendView(SecuredObjectActionMixin, LoginRequiredMixin, PermissionRequiredMixin, View):
     permission_required = "subscriptions.change_subscription"
+    queryset = Subscription.objects.all()
 
     def post(self, request, pk, *args, **kwargs):
         subscription = get_object_or_404(Subscription.objects.all(), pk=pk)
         subscription.suspend()
-
-        # Create Journal Entry
-        from extras.models import JournalEntry
 
         obj_type = ContentType.objects.get_for_model(Subscription)
         JournalEntry.objects.create(
@@ -305,6 +302,33 @@ class SubscriptionSuspendView(LoginRequiredMixin, PermissionRequiredMixin, View)
                         ),
                         "level": "success",
                     },
+                }
+            )
+            return response
+        return redirect(subscription.get_absolute_url())
+
+
+class SubscriptionResumeView(SecuredObjectActionMixin, LoginRequiredMixin, PermissionRequiredMixin, View):
+    permission_required = "subscriptions.change_subscription"
+    queryset = Subscription.objects.all()
+
+    def post(self, request, pk, *args, **kwargs):
+        subscription = get_object_or_404(Subscription.objects.all(), pk=pk)
+        subscription.resume()
+
+        obj_type = ContentType.objects.get_for_model(Subscription)
+        JournalEntry.objects.create(
+            model=obj_type, object_id=subscription.pk, user=request.user, comment="Resumed subscription."
+        )
+
+        message = _("Subscription '%(name)s' resumed successfully.") % {"name": subscription.name}
+        messages.success(request, message)
+        if request.htmx:
+            response = HttpResponse(status=204)
+            response["HX-Trigger"] = json.dumps(
+                {
+                    "tableRefreshRequired": None,
+                    "showMessage": {"message": str(message), "level": "success"},
                 }
             )
             return response

@@ -3874,24 +3874,6 @@
       "count": 1
     },
     {
-      "path": "itambox/subscriptions/views.py",
-      "context": "ClassDef:SubscriptionCancelView/FunctionDef:post",
-      "statement": "from extras.models import JournalEntry",
-      "count": 1
-    },
-    {
-      "path": "itambox/subscriptions/views.py",
-      "context": "ClassDef:SubscriptionRenewView/FunctionDef:post",
-      "statement": "from extras.models import JournalEntry",
-      "count": 1
-    },
-    {
-      "path": "itambox/subscriptions/views.py",
-      "context": "ClassDef:SubscriptionSuspendView/FunctionDef:post",
-      "statement": "from extras.models import JournalEntry",
-      "count": 1
-    },
-    {
       "path": "itambox/users/api/scim/authentication.py",
       "context": "ClassDef:SCIMBearerTokenAuthentication/FunctionDef:authenticate",
       "statement": "from itambox.ratelimit import get_client_ip",

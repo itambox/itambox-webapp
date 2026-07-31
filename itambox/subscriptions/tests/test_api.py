@@ -138,21 +138,59 @@ class SubscriptionAPITests(APITestCase):
             "renewal_cost": "100.00",
             "currency": "USD",
             "billing_cycle": BillingCycleChoices.MONTHLY,
+            "auto_renewal": False,
             "tenant_id": self.tenant.id,
         }
         response = self.client.post(list_url, data=post_data, format="json")
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        self.assertIs(response.data["vendor_contract_auto_renews"], False)
+        self.assertIs(response.data["auto_renewal"], False)
         new_pk = response.data["id"]
         etag = response["ETag"]
 
-        # Update status action — now routed through the optimistic-concurrency
-        # machinery, so it requires the current If-Match ETag like update().
-        status_url = reverse("api:subscriptions_api:subscription-update-status", kwargs={"pk": new_pk})
-        response = self.client.patch(status_url, data={"status": "suspended"}, format="json", HTTP_IF_MATCH=etag)
+        detail_url = reverse("api:subscriptions_api:subscription-detail", kwargs={"pk": new_pk})
+        response = self.client.patch(
+            detail_url,
+            data={"status": "cancelled", "cancellation_date": "2029-01-01"},
+            format="json",
+            HTTP_IF_MATCH=etag,
+        )
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn("lifecycle", str(response.data["status"]).lower())
+
+        # Explicit lifecycle action with optimistic concurrency.
+        status_url = reverse("api:subscriptions_api:subscription-suspend", kwargs={"pk": new_pk})
+        response = self.client.post(status_url, format="json", HTTP_IF_MATCH=etag)
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(response.data["status"], "suspended")
-        # The status write advanced the row, so its response carries a fresh ETag
-        # that the subsequent delete must use (the create ETag is now stale).
+        etag = response["ETag"]
+
+        resume_url = reverse("api:subscriptions_api:subscription-resume", kwargs={"pk": new_pk})
+        response = self.client.post(resume_url, format="json", HTTP_IF_MATCH=etag)
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data["status"], "active")
+        etag = response["ETag"]
+
+        renew_url = reverse("api:subscriptions_api:subscription-renew", kwargs={"pk": new_pk})
+        response = self.client.post(
+            renew_url,
+            data={"renewal_date": "2030-01-15", "renewal_cost": "125.00"},
+            format="json",
+            HTTP_IF_MATCH=etag,
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data["renewal_date"], "2030-01-15")
+        etag = response["ETag"]
+
+        cancel_url = reverse("api:subscriptions_api:subscription-cancel", kwargs={"pk": new_pk})
+        response = self.client.post(
+            cancel_url,
+            data={"cancellation_date": "2030-01-16", "reason": "No longer needed"},
+            format="json",
+            HTTP_IF_MATCH=etag,
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data["status"], "cancelled")
         etag = response["ETag"]
 
         # Delete

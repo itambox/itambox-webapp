@@ -5,10 +5,22 @@ from model_bakery import baker
 
 from core.tests.mixins import TenantTestMixin
 from organization.models import CostCenter, Tenant
-from subscriptions.forms import SubscriptionForm
+from subscriptions.forms import SubscriptionBulkEditForm, SubscriptionForm
+from subscriptions.models import Subscription
 
 
 class SubscriptionFormFkScopingTests(TenantTestMixin, TestCase):
+    def test_form_exposes_canonical_terms_but_not_lifecycle_fields(self):
+        fields = SubscriptionForm().fields
+        self.assertIn("vendor_contract_auto_renews", fields)
+        self.assertNotIn("auto_renewal", fields)
+        self.assertNotIn("status", fields)
+        self.assertNotIn("cancellation_date", fields)
+
+        bulk_fields = SubscriptionBulkEditForm(model=Subscription).fields
+        self.assertNotIn("status", bulk_fields)
+        self.assertNotIn("cancellation_date", bulk_fields)
+
     def setUp(self):
         self.setup_tenant_context(name="Tenant A", slug="sffk-a")
         self.tenant_b = Tenant.objects.create(name="Tenant B", slug="sffk-b")

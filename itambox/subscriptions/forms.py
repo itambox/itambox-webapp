@@ -3,17 +3,66 @@ from datetime import timedelta
 from crispy_forms.helper import FormHelper
 from crispy_forms.layout import HTML, Column, Div, Fieldset, Layout, Row, Submit
 from django import forms
+from django.core.exceptions import ValidationError
 from django.db import models as db_models
 from django.urls import reverse
 from django.utils.translation import gettext_lazy as _
 
 from assets.models import Asset
-from core.forms import CrispyFormMixin, FilterForm, scope_tenant_field, scope_tenant_group_field
+from core.forms import BulkEditForm, CrispyFormMixin, FilterForm, scope_tenant_field, scope_tenant_group_field
+from core.forms.import_forms import BulkImportForm, register_import_form
 from extras.customfields import CustomFieldModelFormMixin
 from organization.models import AssetHolder, CostCenter, Location, Tenant, TenantGroup
 
 from .filters import ProviderFilterSet, SubscriptionFilterSet
 from .models import Provider, Subscription, SubscriptionAssignment
+
+
+@register_import_form
+class SubscriptionBulkImportForm(BulkImportForm):
+    model = Subscription
+    required_fields = ["name", "provider"]
+    optional_fields = [
+        "slug",
+        "type",
+        "start_date",
+        "renewal_date",
+        "renewal_cost",
+        "currency",
+        "billing_cycle",
+        "term_months",
+        "vendor_contract_auto_renews",
+        "auto_renewal",
+        "licensed_quantity",
+        "contract_reference",
+        "cost_center",
+        "owner",
+        "description",
+        "notes",
+        "tenant",
+    ]
+
+    @staticmethod
+    def _boolean(value):
+        normalized = str(value).strip().lower()
+        if normalized in {"1", "true", "yes", "on"}:
+            return True
+        if normalized in {"0", "false", "no", "off"}:
+            return False
+        raise ValidationError("Renewal terms must be a boolean value.")
+
+    def map_row(self, row):
+        mapped = super().map_row(row)
+        canonical = row.get("vendor_contract_auto_renews")
+        legacy = row.get("auto_renewal")
+        canonical_value = self._boolean(canonical) if canonical not in (None, "") else None
+        legacy_value = self._boolean(legacy) if legacy not in (None, "") else None
+        if canonical_value is not None and legacy_value is not None and canonical_value != legacy_value:
+            raise ValidationError("auto_renewal conflicts with vendor_contract_auto_renews.")
+        value = canonical_value if canonical_value is not None else legacy_value
+        if value is not None:
+            mapped["vendor_contract_auto_renews"] = value
+        return mapped
 
 
 class ProviderForm(CrispyFormMixin, forms.ModelForm):
@@ -111,6 +160,16 @@ class ProviderForm(CrispyFormMixin, forms.ModelForm):
         )
 
 
+class SubscriptionBulkEditForm(BulkEditForm):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        for field_name in ("status", "cancellation_date"):
+            self.fields.pop(field_name, None)
+        self.fields["_selected_fields"].choices = [
+            choice for choice in self.fields["_selected_fields"].choices if choice[0] in self.fields
+        ]
+
+
 class SubscriptionForm(CrispyFormMixin, CustomFieldModelFormMixin, forms.ModelForm):
     tenant = forms.ModelChoiceField(
         queryset=Tenant.objects.all(),
@@ -132,7 +191,6 @@ class SubscriptionForm(CrispyFormMixin, CustomFieldModelFormMixin, forms.ModelFo
             "slug",
             "provider",
             "type",
-            "status",
             "start_date",
             "renewal_date",
             "term_months",
@@ -142,9 +200,8 @@ class SubscriptionForm(CrispyFormMixin, CustomFieldModelFormMixin, forms.ModelFo
             "licensed_quantity",
             "contract_reference",
             "cost_center",
-            "cancellation_date",
             "owner",
-            "auto_renewal",
+            "vendor_contract_auto_renews",
             "description",
             "notes",
             "tags",
@@ -155,7 +212,6 @@ class SubscriptionForm(CrispyFormMixin, CustomFieldModelFormMixin, forms.ModelFo
             "slug": forms.TextInput(attrs={"class": "form-control"}),
             "provider": forms.Select(attrs={"class": "form-select", "data-tom-select": ""}),
             "type": forms.Select(attrs={"class": "form-select"}),
-            "status": forms.Select(attrs={"class": "form-select"}),
             "start_date": forms.DateInput(attrs={"type": "date", "class": "form-control"}),
             "renewal_date": forms.DateInput(attrs={"type": "date", "class": "form-control"}),
             "renewal_cost": forms.NumberInput(attrs={"class": "form-control", "step": "0.01"}),
@@ -164,7 +220,6 @@ class SubscriptionForm(CrispyFormMixin, CustomFieldModelFormMixin, forms.ModelFo
             "term_months": forms.NumberInput(attrs={"class": "form-control", "min": 1}),
             "licensed_quantity": forms.NumberInput(attrs={"class": "form-control", "min": 1}),
             "contract_reference": forms.TextInput(attrs={"class": "form-control"}),
-            "cancellation_date": forms.DateInput(attrs={"type": "date", "class": "form-control"}),
             "owner": forms.Select(attrs={"class": "form-select", "data-tom-select": ""}),
             "description": forms.Textarea(attrs={"class": "form-control", "rows": 2}),
             "notes": forms.Textarea(attrs={"class": "form-control", "rows": 2}),
@@ -195,8 +250,7 @@ class SubscriptionForm(CrispyFormMixin, CustomFieldModelFormMixin, forms.ModelFo
                 ),
                 Div(
                     Div("provider", css_class="col-md-6"),
-                    Div("type", css_class="col-md-3"),
-                    Div("status", css_class="col-md-3"),
+                    Div("type", css_class="col-md-6"),
                     css_class="row",
                 ),
             ),
@@ -206,10 +260,6 @@ class SubscriptionForm(CrispyFormMixin, CustomFieldModelFormMixin, forms.ModelFo
                     Div("start_date", css_class="col-md-4"),
                     Div("renewal_date", css_class="col-md-4"),
                     Div("term_months", css_class="col-md-4"),
-                    css_class="row",
-                ),
-                Div(
-                    Div("cancellation_date", css_class="col-md-4"),
                     css_class="row",
                 ),
             ),
@@ -231,7 +281,7 @@ class SubscriptionForm(CrispyFormMixin, CustomFieldModelFormMixin, forms.ModelFo
             Fieldset(
                 _("Policy"),
                 Div(
-                    Div("auto_renewal", css_class="col-md-6"),
+                    Div("vendor_contract_auto_renews", css_class="col-md-6"),
                     css_class="row",
                 ),
             ),

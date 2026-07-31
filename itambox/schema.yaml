@@ -16551,6 +16551,11 @@ paths:
       description: API ViewSet for managing recurring Subscriptions.
       parameters:
       - in: query
+        name: auto_renewal
+        schema:
+          type: boolean
+        description: Auto-Renewal (deprecated alias)
+      - in: query
         name: cost_center
         schema:
           type: integer
@@ -16599,20 +16604,14 @@ paths:
           - active
           - cancelled
           - expired
-          - pending
-          - renewing
           - suspended
-          - trial
         description: |-
           Status
 
           * `active` - Active
-          * `expired` - Expired
-          * `cancelled` - Cancelled
-          * `pending` - Pending
           * `suspended` - Suspended
-          * `renewing` - Renewing
-          * `trial` - Trial
+          * `cancelled` - Cancelled
+          * `expired` - Expired
       - in: query
         name: tenant
         schema:
@@ -16637,6 +16636,11 @@ paths:
           * `maintenance` - Maintenance
           * `lease` - Lease
           * `other` - Other
+      - in: query
+        name: vendor_contract_auto_renews
+        schema:
+          type: boolean
+        description: Vendor Contract Auto-Renews
       tags:
       - subscriptions
       security:
@@ -16866,15 +16870,10 @@ paths:
         '204':
           description: No response body
       x-itambox-maturity: stable
-  /api/subscriptions/subscriptions/{id}/status/:
-    patch:
-      operationId: subscriptions_subscriptions_status_partial_update
-      description: |-
-        Update only the status of a subscription.
-
-        Routed through the same optimistic-concurrency machinery as the standard
-        ``update()`` so two concurrent status writes get a 412 instead of silent
-        last-writer-wins, and the snapshot keeps the change-log diff accurate.
+  /api/subscriptions/subscriptions/{id}/cancel/:
+    post:
+      operationId: subscriptions_subscriptions_cancel_create
+      description: API ViewSet for managing recurring Subscriptions.
       parameters:
       - in: path
         name: id
@@ -16888,13 +16887,13 @@ paths:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/PatchedSubscriptionStatusRequest'
+              $ref: '#/components/schemas/SubscriptionCancelRequest'
           application/x-www-form-urlencoded:
             schema:
-              $ref: '#/components/schemas/PatchedSubscriptionStatusRequest'
+              $ref: '#/components/schemas/SubscriptionCancelRequest'
           multipart/form-data:
             schema:
-              $ref: '#/components/schemas/PatchedSubscriptionStatusRequest'
+              $ref: '#/components/schemas/SubscriptionCancelRequest'
       security:
       - TokenAuth: []
       - cookieAuth: []
@@ -16904,7 +16903,130 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/SubscriptionStatus'
+                $ref: '#/components/schemas/Subscription'
+          description: ''
+      x-itambox-maturity: stable
+  /api/subscriptions/subscriptions/{id}/renew/:
+    post:
+      operationId: subscriptions_subscriptions_renew_create
+      description: API ViewSet for managing recurring Subscriptions.
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: A unique integer value identifying this Subscription.
+        required: true
+      tags:
+      - subscriptions
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SubscriptionRenewRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/SubscriptionRenewRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/SubscriptionRenewRequest'
+        required: true
+      security:
+      - TokenAuth: []
+      - cookieAuth: []
+      - basicAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Subscription'
+          description: ''
+      x-itambox-maturity: stable
+  /api/subscriptions/subscriptions/{id}/resume/:
+    post:
+      operationId: subscriptions_subscriptions_resume_create
+      description: API ViewSet for managing recurring Subscriptions.
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: A unique integer value identifying this Subscription.
+        required: true
+      tags:
+      - subscriptions
+      security:
+      - TokenAuth: []
+      - cookieAuth: []
+      - basicAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Subscription'
+          description: ''
+      x-itambox-maturity: stable
+  /api/subscriptions/subscriptions/{id}/status/:
+    patch:
+      operationId: subscriptions_subscriptions_status_partial_update
+      description: API ViewSet for managing recurring Subscriptions.
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: A unique integer value identifying this Subscription.
+        required: true
+      tags:
+      - subscriptions
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchedSubscriptionStatusCompatibilityRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PatchedSubscriptionStatusCompatibilityRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PatchedSubscriptionStatusCompatibilityRequest'
+      security:
+      - TokenAuth: []
+      - cookieAuth: []
+      - basicAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Subscription'
+          description: ''
+      x-itambox-maturity: stable
+  /api/subscriptions/subscriptions/{id}/suspend/:
+    post:
+      operationId: subscriptions_subscriptions_suspend_create
+      description: API ViewSet for managing recurring Subscriptions.
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: A unique integer value identifying this Subscription.
+        required: true
+      tags:
+      - subscriptions
+      security:
+      - TokenAuth: []
+      - cookieAuth: []
+      - basicAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Subscription'
           description: ''
       x-itambox-maturity: stable
   /api/tenants/{tenant_slug}/scim/v2/Groups:
@@ -25789,8 +25911,6 @@ components:
           allOf:
           - $ref: '#/components/schemas/SubscriptionTypeEnum'
           title: Subscription Type
-        status:
-          $ref: '#/components/schemas/StatusE67Enum'
         tenant_id:
           type: integer
           writeOnly: true
@@ -25839,9 +25959,13 @@ components:
           nullable: true
           title: Term (Months)
           description: Duration of the subscription term in months
+        vendor_contract_auto_renews:
+          type: boolean
+          description: 'Records whether the vendor''s contract renews automatically.
+            ITAMbox does not renew subscriptions: a subscription past its renewal
+            date is marked expired.'
         auto_renewal:
           type: boolean
-          description: Whether this subscription renews automatically
         licensed_quantity:
           type: integer
           maximum: 2147483647
@@ -25856,22 +25980,18 @@ components:
           type: integer
           writeOnly: true
           nullable: true
-        cancellation_date:
-          type: string
-          format: date
-          nullable: true
         description:
           type: string
           description: Optional text detailing coverage or terms
         notes:
           type: string
           description: Optional internal notes
-    PatchedSubscriptionStatusRequest:
+    PatchedSubscriptionStatusCompatibilityRequest:
       type: object
-      description: Serializer for updating only the status of a Subscription.
       properties:
         status:
-          $ref: '#/components/schemas/StatusE67Enum'
+          type: string
+          minLength: 1
     PatchedSupplierRequest:
       type: object
       properties:
@@ -26865,24 +26985,6 @@ components:
         * `denied` - Denied
         * `fulfilled` - Fulfilled
         * `cancelled` - Cancelled
-    StatusE67Enum:
-      enum:
-      - active
-      - expired
-      - cancelled
-      - pending
-      - suspended
-      - renewing
-      - trial
-      type: string
-      description: |-
-        * `active` - Active
-        * `expired` - Expired
-        * `cancelled` - Cancelled
-        * `pending` - Pending
-        * `suspended` - Suspended
-        * `renewing` - Renewing
-        * `trial` - Trial
     StatusLabel:
       type: object
       properties:
@@ -26997,7 +27099,9 @@ components:
           type: string
           readOnly: true
         status:
-          $ref: '#/components/schemas/StatusE67Enum'
+          allOf:
+          - $ref: '#/components/schemas/SubscriptionStatusEnum'
+          readOnly: true
         status_display:
           type: string
           readOnly: true
@@ -27051,9 +27155,13 @@ components:
           nullable: true
           title: Term (Months)
           description: Duration of the subscription term in months
+        vendor_contract_auto_renews:
+          type: boolean
+          description: 'Records whether the vendor''s contract renews automatically.
+            ITAMbox does not renew subscriptions: a subscription past its renewal
+            date is marked expired.'
         auto_renewal:
           type: boolean
-          description: Whether this subscription renews automatically
         licensed_quantity:
           type: integer
           maximum: 2147483647
@@ -27070,6 +27178,7 @@ components:
         cancellation_date:
           type: string
           format: date
+          readOnly: true
           nullable: true
         days_until_renewal:
           type: integer
@@ -27101,6 +27210,7 @@ components:
       required:
       - annual_cost
       - billing_cycle_display
+      - cancellation_date
       - cost_center
       - created_at
       - days_until_renewal
@@ -27108,6 +27218,7 @@ components:
       - name
       - owner
       - provider
+      - status
       - status_display
       - tags
       - tenant
@@ -27183,6 +27294,27 @@ components:
       - content_type
       - object_id
       - subscription_id
+    SubscriptionCancelRequest:
+      type: object
+      properties:
+        cancellation_date:
+          type: string
+          format: date
+        reason:
+          type: string
+          default: ''
+    SubscriptionRenewRequest:
+      type: object
+      properties:
+        renewal_date:
+          type: string
+          format: date
+        renewal_cost:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,10}(?:\.\d{0,2})?$
+      required:
+      - renewal_date
     SubscriptionRequest:
       type: object
       properties:
@@ -27204,8 +27336,6 @@ components:
           allOf:
           - $ref: '#/components/schemas/SubscriptionTypeEnum'
           title: Subscription Type
-        status:
-          $ref: '#/components/schemas/StatusE67Enum'
         tenant_id:
           type: integer
           writeOnly: true
@@ -27254,9 +27384,13 @@ components:
           nullable: true
           title: Term (Months)
           description: Duration of the subscription term in months
+        vendor_contract_auto_renews:
+          type: boolean
+          description: 'Records whether the vendor''s contract renews automatically.
+            ITAMbox does not renew subscriptions: a subscription past its renewal
+            date is marked expired.'
         auto_renewal:
           type: boolean
-          description: Whether this subscription renews automatically
         licensed_quantity:
           type: integer
           maximum: 2147483647
@@ -27271,10 +27405,6 @@ components:
           type: integer
           writeOnly: true
           nullable: true
-        cancellation_date:
-          type: string
-          format: date
-          nullable: true
         description:
           type: string
           description: Optional text detailing coverage or terms
@@ -27284,14 +27414,18 @@ components:
       required:
       - name
       - provider_id
-    SubscriptionStatus:
-      type: object
-      description: Serializer for updating only the status of a Subscription.
-      properties:
-        status:
-          $ref: '#/components/schemas/StatusE67Enum'
-      required:
-      - status
+    SubscriptionStatusEnum:
+      enum:
+      - active
+      - suspended
+      - cancelled
+      - expired
+      type: string
+      description: |-
+        * `active` - Active
+        * `suspended` - Suspended
+        * `cancelled` - Cancelled
+        * `expired` - Expired
     SubscriptionTypeEnum:
       enum:
       - saas
