@@ -80,12 +80,6 @@
       "severity": "warning",
       "location": "<unknown>",
       "breadcrumb": "",
-      "message": "enum naming encountered a non-optimally resolvable collision for fields named \"status\". The same name has been used for multiple choice sets in multiple components. The collision was resolved with \"StatusE67Enum\". add an entry to ENUM_NAME_OVERRIDES to fix the naming."
-    },
-    {
-      "severity": "warning",
-      "location": "<unknown>",
-      "breadcrumb": "",
       "message": "operationId \"assets_asset_assignments_destroy\" has collisions [('/api/assets/asset-assignments/', 'delete'), ('/api/assets/asset-assignments/{id}/', 'delete')]. resolving with numeral suffixes."
     },
     {
