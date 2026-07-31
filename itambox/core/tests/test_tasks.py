@@ -419,3 +419,57 @@ class AlertDedupRegressionTests(TransactionTestCase):
         self.assertEqual(log.status, AlertLog.STATUS_ACTIVE)
         self.assertIsNone(log.last_notified_at)  # muted: never dispatched
         self.assertEqual(log.delivery_status, {})
+
+
+class AlertChannelFanOutTests(TransactionTestCase):
+    """WP-13a: implicit channel fan-out removed — empty channels = no delivery."""
+
+    def setUp(self):
+        from organization.models import Tenant
+
+        self.tenant = Tenant.objects.create(name="FanOut Tenant", slug="fanout")
+        self.rule = AlertRule.objects.create(
+            name="Fan-out Test Rule",
+            alert_type=AlertRule.ALERT_TYPE_LOW_STOCK,
+            threshold_value=1,
+            is_active=True,
+            tenant=self.tenant,
+        )
+        # Create an enabled channel for the tenant — it should NOT be used
+        # unless explicitly attached to the rule.
+        self.channel = NotificationChannel.objects.create(
+            name="FanOut Channel",
+            channel_type=NotificationChannel.TYPE_IN_APP,
+            tenant=self.tenant,
+            enabled=True,
+            config={"recipients": []},
+        )
+        self.match = {"subject": "Test", "message": "test body", "tenant": self.tenant}
+
+    def test_empty_channels_delivers_nothing(self):
+        """A rule with no channels delivers to zero channels — no implicit fan-out."""
+        from core.tasks.alerts import _dispatch_channels
+
+        delivery = _dispatch_channels(self.rule, self.match, None)
+        self.assertEqual(
+            delivery,
+            {"__no_channels__": "no channels attached to this rule"},
+            "empty channels should not fan out to every tenant channel",
+        )
+
+    def test_empty_channels_records_reason(self):
+        """When no channels are attached, delivery status records the reason."""
+        from core.tasks.alerts import _dispatch_channels
+
+        delivery = _dispatch_channels(self.rule, self.match, None)
+        self.assertIn("__no_channels__", delivery, "delivery status must record the no-channels reason")
+
+    def test_explicitly_attached_channel_dispatches(self):
+        """An explicitly attached channel is still dispatched normally."""
+        self.rule.channels.add(self.channel)
+        self.match["recipients"] = []  # empty recipients = no actual send, but channel is iterated
+        from core.tasks.alerts import _dispatch_channels
+
+        delivery = _dispatch_channels(self.rule, self.match, None)
+        str_pk = str(self.channel.pk)
+        self.assertIn(str_pk, delivery, "explicitly attached channel must appear in delivery status")
