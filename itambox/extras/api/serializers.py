@@ -6,6 +6,7 @@ from extras.models import (
     CustomField,
     CustomFieldset,
     Dashboard,
+    Event,
     EventRule,
     JournalEntry,
     NotificationChannel,
@@ -137,6 +138,18 @@ class EventRuleSerializer(BaseModelSerializer):
         required=False,
         allow_null=True,
     )
+
+    def validate_events(self, value):
+        """Reject unsupported event action values (WP-16a — closed vocabulary)."""
+        valid = {choice[0] for choice in Event.ACTION_CHOICES}
+        if not isinstance(value, list):
+            raise serializers.ValidationError("events must be a list of action strings.")
+        unknown = [v for v in value if v not in valid]
+        if unknown:
+            raise serializers.ValidationError(
+                f"Unsupported event action(s): {', '.join(unknown)}. Accepted values: {', '.join(sorted(valid))}."
+            )
+        return value
 
     class Meta:
         model = EventRule
