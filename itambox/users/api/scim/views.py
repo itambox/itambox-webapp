@@ -1,4 +1,5 @@
 import logging
+import uuid
 
 from django.contrib.auth import get_user_model
 from django.db import transaction
@@ -101,6 +102,12 @@ class SCIMTenantMixin:
         # captured AnonymousUser before DRF auth ran).
         if getattr(request, "user", None) and request.user.is_authenticated:
             set_current_user(request.user)
+        # Ensure ObjectChange records are created for SCIM mutations by wiring
+        # a request-id contextvar (WP-18 — SCIM bypassed CurrentUserMiddleware).
+        # inline import: app-registry: avoid AppRegistryNotReady at module-load time
+        from itambox.middleware import _request_id
+
+        _request_id.set(str(uuid.uuid4()))
 
 
 class ServiceProviderConfigView(SCIMTenantMixin, APIView):
@@ -120,12 +127,6 @@ class ServiceProviderConfigView(SCIMTenantMixin, APIView):
                     "specUri": "http://tools.ietf.org/html/rfc6750",
                     "type": "oauthbearertoken",
                     "primary": True,
-                },
-                {
-                    "name": "HTTP Basic",
-                    "description": "Standard basic authentication",
-                    "specUri": "http://tools.ietf.org/html/rfc2617",
-                    "type": "httpbasic",
                 },
             ],
         }

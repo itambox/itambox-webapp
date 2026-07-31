@@ -1,5 +1,6 @@
 import logging
 import re
+import uuid
 
 from django.contrib.auth import get_user_model
 from django.db import transaction
@@ -136,6 +137,11 @@ class SCIMProviderMixin:
         set_current_tenant(self.tenant)
         if getattr(request, "user", None) and request.user.is_authenticated:
             set_current_user(request.user)
+        # Wire request-id so SCIM mutations create ObjectChange records (WP-18).
+        # inline import: app-registry: avoid AppRegistryNotReady at module-load time
+        from itambox.middleware import _request_id
+
+        _request_id.set(str(uuid.uuid4()))
 
 
 class ProviderServiceProviderConfigView(SCIMProviderMixin, APIView):
@@ -155,12 +161,6 @@ class ProviderServiceProviderConfigView(SCIMProviderMixin, APIView):
                     "specUri": "http://tools.ietf.org/html/rfc6750",
                     "type": "oauthbearertoken",
                     "primary": True,
-                },
-                {
-                    "name": "HTTP Basic",
-                    "description": "Standard basic authentication",
-                    "specUri": "http://tools.ietf.org/html/rfc2617",
-                    "type": "httpbasic",
                 },
             ],
         }

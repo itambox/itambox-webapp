@@ -512,3 +512,54 @@ class SCIMProvisioningTests(TestCase):
         self.assertFalse(UserGroup.objects.filter(name="Injected Group").exists())
         self.assertFalse(Membership.objects.filter(user=foreign_user, tenant=self.tenant).exists())
         self.assertFalse(AssetHolder.objects.filter(user=foreign_user, tenant=self.tenant).exists())
+
+
+class SCIMServiceProviderConfigAccuracyTests(SCIMProvisioningTests):
+    """WP-18: ServiceProviderConfig must truthfully advertise only implemented capabilities."""
+
+    def setUp(self):
+        super().setUp()
+        self.config_url = reverse("api:scim:service-provider-config", kwargs={"tenant_slug": self.tenant.slug})
+
+    def test_bearer_is_advertised_and_httpbasic_is_not(self):
+        """Only Bearer auth is implemented → only Bearer is advertised."""
+        response = self.client.get(self.config_url, **self.auth_headers)
+        self.assertEqual(response.status_code, 200)
+        schemes = response.json()["authenticationSchemes"]
+        types = {s["type"] for s in schemes}
+        self.assertIn("oauthbearertoken", types, "Bearer must be advertised")
+        self.assertNotIn("httpbasic", types, "HTTP Basic is not implemented and must not be advertised")
+
+    def test_bearer_metadata_is_truthful(self):
+        """Bearer entry carries accurate description and primary flag."""
+        response = self.client.get(self.config_url, **self.auth_headers)
+        bearer = next(s for s in response.json()["authenticationSchemes"] if s["type"] == "oauthbearertoken")
+        self.assertTrue(bearer["primary"], "Bearer must be the primary scheme")
+        self.assertEqual(bearer["name"], "OAuth Bearer Token")
+
+    def test_user_lastmodified_is_not_creation_time(self):
+        """After a SCIM PATCH, meta.lastModified must advance beyond created."""
+        user = self.admin_user
+        user_url = reverse("api:scim:user-detail", kwargs={"tenant_slug": self.tenant.slug, "pk": user.id})
+
+        # GET before mutation — capture created and lastModified
+        resp_before = self.client.get(user_url, **self.auth_headers)
+        meta_before = resp_before.json()["meta"]
+        # Note: current behaviour returns created==lastModified (the bug).
+        # After the fix, PATCH should advance lastModified.
+
+        # Mutate the user via SCIM PATCH
+        patch_payload = {
+            "schemas": ["urn:ietf:params:scim:api:messages:2.0:PatchOp"],
+            "Operations": [{"op": "replace", "path": "name.givenName", "value": "Updated Name"}],
+        }
+        self.client.patch(user_url, data=patch_payload, content_type="application/json", **self.auth_headers)
+
+        # GET after mutation
+        resp_after = self.client.get(user_url, **self.auth_headers)
+        meta_after = resp_after.json()["meta"]
+
+        self.assertEqual(meta_after["created"], meta_before["created"], "created must never change")
+        self.assertNotEqual(
+            meta_after["lastModified"], meta_after["created"], "lastModified must differ from created after mutation"
+        )

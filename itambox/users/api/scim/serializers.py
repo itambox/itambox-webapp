@@ -1,4 +1,5 @@
 from django.contrib.auth import get_user_model
+from django.contrib.contenttypes.models import ContentType
 from rest_framework import serializers
 
 from organization.models import Membership
@@ -68,13 +69,28 @@ class SCIMUserSerializer(serializers.ModelSerializer):
 
     def get_meta(self, obj):
         created_str = obj.date_joined.isoformat() if obj.date_joined else ""
+        last_modified_str = self._get_last_modified(obj) or created_str
         tenant_slug = self.context.get("tenant_slug", "")
         return {
             "resourceType": "User",
             "created": created_str,
-            "lastModified": created_str,
+            "lastModified": last_modified_str,
             "location": f"/api/tenants/{tenant_slug}/scim/v2/Users/{obj.id}" if tenant_slug else "",
         }
+
+    @staticmethod
+    def _get_last_modified(obj):
+        # inline import: app-registry: avoid AppRegistryNotReady at module-load time
+        from core.models import ObjectChange
+
+        ct = ContentType.objects.get_for_model(obj)
+        last_change = (
+            ObjectChange.objects.filter(changed_object_type=ct, changed_object_id=obj.pk)
+            .order_by("-time")
+            .values_list("time", flat=True)
+            .first()
+        )
+        return last_change.isoformat() if last_change else None
 
 
 class SCIMGroupSerializer(serializers.ModelSerializer):
