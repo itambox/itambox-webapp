@@ -498,6 +498,9 @@ if "test" in sys.argv or any("test" in arg or "pytest" in arg for arg in sys.arg
 ITAMBOX_CHANGELOG_RETENTION_DAYS = int(os.environ.get("ITAMBOX_CHANGELOG_RETENTION_DAYS", "365"))
 ITAMBOX_ALERTLOG_RETENTION_DAYS = int(os.environ.get("ITAMBOX_ALERTLOG_RETENTION_DAYS", "180"))
 ITAMBOX_NOTIFICATION_RETENTION_DAYS = int(os.environ.get("ITAMBOX_NOTIFICATION_RETENTION_DAYS", "90"))
+# Default 0 = retain / never prune.  Pruning starts only when an operator
+# explicitly configures a positive value.
+ITAMBOX_EVENT_RETENTION_DAYS = int(os.environ.get("ITAMBOX_EVENT_RETENTION_DAYS", "0"))
 # Pruned against django-q2's own Failure proxy model (Task rows with
 # success=False). See the `save_limit` comment on Q_CLUSTER above.
 ITAMBOX_QTASK_FAILED_RETENTION_DAYS = int(os.environ.get("ITAMBOX_QTASK_FAILED_RETENTION_DAYS", "90"))

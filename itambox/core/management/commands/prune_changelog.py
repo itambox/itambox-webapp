@@ -25,10 +25,10 @@ from django.utils import timezone
 from django_q.models import Failure
 
 from core.models import Notification, ObjectChange
-from extras.models import AlertLog
+from extras.models import AlertLog, Event
 from organization.models import Tenant
 
-CLASS_CHOICES = ("changelog", "alertlog", "notification", "qtask")
+CLASS_CHOICES = ("changelog", "alertlog", "notification", "event", "qtask")
 
 
 class _ArchiveWriter:
@@ -87,6 +87,12 @@ class Command(BaseCommand):
             type=int,
             default=None,
             help="Override ITAMBOX_NOTIFICATION_RETENTION_DAYS for this run (0 = unlimited).",
+        )
+        parser.add_argument(
+            "--event-days",
+            type=int,
+            default=None,
+            help="Override ITAMBOX_EVENT_RETENTION_DAYS for this run (0 = unlimited).",
         )
         parser.add_argument(
             "--qtask-days",
@@ -175,6 +181,7 @@ class Command(BaseCommand):
         notification_days = self._resolve_days(
             options["notification_days"], settings.ITAMBOX_NOTIFICATION_RETENTION_DAYS, "notification"
         )
+        event_days = self._resolve_days(options["event_days"], settings.ITAMBOX_EVENT_RETENTION_DAYS, "event")
         qtask_days = self._resolve_days(options["qtask_days"], settings.ITAMBOX_QTASK_FAILED_RETENTION_DAYS, "qtask")
 
         now = timezone.now()
@@ -230,6 +237,24 @@ class Command(BaseCommand):
                     dry_run=dry_run,
                     archive_writer=writer,
                     label="notification",
+                ),
+            )
+
+        if "event" in classes:
+            grand_total += self._run_pruner(
+                "event",
+                archive_dir,
+                run_stamp,
+                dry_run,
+                prune_fn=lambda writer: self._prune_simple(
+                    Event._base_manager,
+                    "timestamp",
+                    now,
+                    event_days,
+                    batch_size=batch_size,
+                    dry_run=dry_run,
+                    archive_writer=writer,
+                    label="event",
                 ),
             )
 
