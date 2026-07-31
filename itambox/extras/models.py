@@ -218,6 +218,8 @@ class Event(BaseModel):
     ACTION_UPDATE = "update"
     ACTION_DELETE = "delete"
     ACTION_RESTORE = "restore"
+    ACTION_CHECKOUT = "checkout"
+    ACTION_CHECKIN = "checkin"
 
     ACTION_CHOICES = [
         (ACTION_CREATE, _("Create")),
@@ -226,6 +228,8 @@ class Event(BaseModel):
         # Emitted on a soft-delete restore (set -> None). A distinct, subscribable
         # action so EventRules can target restores and the value is a declared choice.
         (ACTION_RESTORE, _("Restore")),
+        (ACTION_CHECKOUT, _("Checkout")),
+        (ACTION_CHECKIN, _("Checkin")),
     ]
 
     model = models.ForeignKey(ContentType, on_delete=models.CASCADE, related_name="events")

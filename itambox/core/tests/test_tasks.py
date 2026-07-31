@@ -473,3 +473,46 @@ class AlertChannelFanOutTests(TransactionTestCase):
         delivery = _dispatch_channels(self.rule, self.match, None)
         str_pk = str(self.channel.pk)
         self.assertIn(str_pk, delivery, "explicitly attached channel must appear in delivery status")
+
+
+class EventActionVocabularyTests(TransactionTestCase):
+    """WP-16a: Event action vocabulary — checkout/checkin reconciliation + EventRule validation."""
+
+    def test_checkout_checkin_in_action_choices(self):
+        """checkout and checkin are dispatched by assets/signals.py and must be in ACTION_CHOICES."""
+        from extras.models import Event
+
+        valid_actions = {choice[0] for choice in Event.ACTION_CHOICES}
+        self.assertIn("checkout", valid_actions, "checkout must be in Event.ACTION_CHOICES")
+        self.assertIn("checkin", valid_actions, "checkin must be in Event.ACTION_CHOICES")
+
+    def test_eventrule_rejects_unknown_action(self):
+        """EventRule.events with an unknown action must be rejected by the serializer."""
+        from extras.api.serializers import EventRuleSerializer
+        from extras.models import EventRule
+
+        data = {
+            "name": "Test Rule",
+            "model": "assets.asset",
+            "events": ["create", "bogus_action"],
+            "action_type": EventRule.ACTION_WEBHOOK,
+        }
+        serializer = EventRuleSerializer(data=data)
+        # Currently no validation — this will FAIL until we add the guard.
+        self.assertFalse(serializer.is_valid(), "unknown event action 'bogus_action' must be rejected")
+        self.assertIn("events", serializer.errors)
+
+    def test_eventrule_accepts_valid_actions(self):
+        """EventRule.events with all valid actions must pass validation."""
+        from extras.api.serializers import EventRuleSerializer
+        from extras.models import EventRule
+
+        data = {
+            "name": "Valid Rule",
+            "model": "assets.asset",
+            "events": ["create", "update", "checkout"],
+            "action_type": EventRule.ACTION_WEBHOOK,
+        }
+        serializer = EventRuleSerializer(data=data)
+        if not serializer.is_valid():
+            self.fail(f"valid actions were rejected: {serializer.errors}")
