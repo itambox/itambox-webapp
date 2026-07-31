@@ -231,10 +231,11 @@ class SubscriptionAssignmentSerializer(BaseModelSerializer):
         return attrs
 
     def get_assigned_object(self, obj):
-        if obj.assigned_object:
+        target = obj.tenant_safe_assigned_object
+        if target:
             return {
                 "id": obj.object_id,
                 "type": obj.content_type.model,
-                "name": str(obj.assigned_object),
+                "name": str(target),
             }
         return None

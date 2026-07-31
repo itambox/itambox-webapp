@@ -2,7 +2,7 @@ from django.conf import settings
 from django.contrib.contenttypes.fields import GenericForeignKey, GenericRelation
 from django.contrib.contenttypes.models import ContentType
 from django.core.exceptions import ValidationError
-from django.db import models
+from django.db import models, transaction
 from django.urls import NoReverseMatch, reverse
 from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
@@ -344,6 +344,10 @@ class Subscription(CustomFieldDataMixin, AutoSlugMixin, BookmarkableMixin, Delet
         SubscriptionStatusChoices.CANCELLED: set(),
     }
 
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self._loaded_status = self.__dict__.get("status")
+
     def __str__(self):
         return f"{self.provider} - {self.name}"
 
@@ -352,18 +356,34 @@ class Subscription(CustomFieldDataMixin, AutoSlugMixin, BookmarkableMixin, Delet
         """Total entitled seats across all licenses funded by this subscription."""
         from django.db.models import Sum
 
-        return self.licenses.filter(deleted_at__isnull=True).aggregate(total=Sum("seats"))["total"] or 0
+        return (
+            self.licenses.model._base_manager.filter(subscription=self, deleted_at__isnull=True).aggregate(
+                total=Sum("seats")
+            )["total"]
+            or 0
+        )
 
     @property
     def assigned_seats(self):
         """Seats currently assigned across this subscription's licenses."""
         from licenses.models import LicenseSeatAssignment
 
-        return LicenseSeatAssignment.objects.filter(
-            license__subscription=self,
-            license__deleted_at__isnull=True,
-            deleted_at__isnull=True,
-        ).count()
+        return (
+            LicenseSeatAssignment._base_manager.filter(
+                license__subscription=self,
+                license__deleted_at__isnull=True,
+                deleted_at__isnull=True,
+            )
+            .filter(
+                models.Q(asset__isnull=False, asset__deleted_at__isnull=True, asset__tenant_id=self.tenant_id)
+                | models.Q(
+                    assigned_holder__isnull=False,
+                    assigned_holder__deleted_at__isnull=True,
+                    assigned_holder__tenant_id=self.tenant_id,
+                )
+            )
+            .count()
+        )
 
     @property
     def available_seats(self):
@@ -416,61 +436,115 @@ class Subscription(CustomFieldDataMixin, AutoSlugMixin, BookmarkableMixin, Delet
     def auto_renewal(self, value):
         self.vendor_contract_auto_renews = value
 
-    def validate_transition(self, target_status):
-        if target_status == self.status:
+    def validate_transition(self, target_status, source_status=None):
+        source_status = source_status or self.status
+        if target_status == source_status:
             return
-        allowed = self.ALLOWED_STATUS_TRANSITIONS.get(self.status, set())
+        allowed = self.ALLOWED_STATUS_TRANSITIONS.get(source_status, set())
         if target_status not in allowed:
             raise ValidationError(
                 _("Invalid subscription status transition from %(source)s to %(target)s.")
-                % {"source": self.status, "target": target_status}
+                % {"source": source_status, "target": target_status}
             )
 
-    def renew(self, new_renewal_date, cost=None):
-        if (
-            self.status == SubscriptionStatusChoices.ACTIVE
-            and self.renewal_date == new_renewal_date
-            and (cost is None or self.renewal_cost == cost)
-        ):
+    def clean(self):
+        super().clean()
+        if not self.pk:
             return
-        self.validate_transition(SubscriptionStatusChoices.ACTIVE)
-        self.renewal_date = new_renewal_date
-        if cost is not None:
-            self.renewal_cost = cost
-        self.status = SubscriptionStatusChoices.ACTIVE
-        self.save(update_fields=["renewal_date", "renewal_cost", "status", "updated_at"])
+        previous_status = type(self)._base_manager.filter(pk=self.pk).values_list("status", flat=True).first()
+        if previous_status is not None:
+            self.validate_transition(self.status, source_status=previous_status)
+
+    def save(self, *args, **kwargs):
+        if self._state.adding or self.pk is None:
+            result = super().save(*args, **kwargs)
+            self._loaded_status = self.status
+            return result
+        with transaction.atomic():
+            current = type(self)._base_manager.select_for_update().get(pk=self.pk)
+            if self._loaded_status != current.status and self.status == current.status:
+                self.cancellation_date = current.cancellation_date
+                self.renewal_date = current.renewal_date
+                self.renewal_cost = current.renewal_cost
+                self.notes = current.notes
+            self._prechange_snapshot = None
+            result = super().save(*args, **kwargs)
+            self._loaded_status = self.status
+            return result
+
+    def refresh_from_db(self, using=None, fields=None, from_queryset=None):
+        super().refresh_from_db(using=using, fields=fields, from_queryset=from_queryset)
+        if fields is None or "status" in fields:
+            self._loaded_status = self.status
+
+    def _refresh_from_locked_row(self):
+        if self.pk is not None:
+            type(self)._base_manager.select_for_update().only("pk").get(pk=self.pk)
+            self.refresh_from_db()
+            self._prechange_snapshot = None
+
+    def renew(self, new_renewal_date, cost=None):
+        with transaction.atomic():
+            self._refresh_from_locked_row()
+            if (
+                self.status == SubscriptionStatusChoices.ACTIVE
+                and self.renewal_date == new_renewal_date
+                and (cost is None or self.renewal_cost == cost)
+            ):
+                return False
+            self.validate_transition(SubscriptionStatusChoices.ACTIVE)
+            self.renewal_date = new_renewal_date
+            if cost is not None:
+                self.renewal_cost = cost
+            self.status = SubscriptionStatusChoices.ACTIVE
+            self.save(update_fields=["renewal_date", "renewal_cost", "status", "updated_at"])
+            return True
 
     def cancel(self, cancellation_date=None, reason=""):
-        if self.status == SubscriptionStatusChoices.CANCELLED:
-            return
-        self.validate_transition(SubscriptionStatusChoices.CANCELLED)
-        self.cancellation_date = cancellation_date or timezone.now().date()
-        self.status = SubscriptionStatusChoices.CANCELLED
-        if reason:
-            existing = self.notes or ""
-            self.notes = f"{existing}\n[{timezone.now().date()}] Cancelled: {reason}".strip()
-        self.save(update_fields=["cancellation_date", "status", "notes", "updated_at"])
+        with transaction.atomic():
+            self._refresh_from_locked_row()
+            if self.status == SubscriptionStatusChoices.CANCELLED:
+                return False
+            self.validate_transition(SubscriptionStatusChoices.CANCELLED)
+            self.cancellation_date = cancellation_date or timezone.now().date()
+            self.status = SubscriptionStatusChoices.CANCELLED
+            if reason:
+                existing = self.notes or ""
+                self.notes = f"{existing}\n[{timezone.now().date()}] Cancelled: {reason}".strip()
+            self.save(update_fields=["cancellation_date", "status", "notes", "updated_at"])
+            return True
 
     def suspend(self):
-        if self.status == SubscriptionStatusChoices.SUSPENDED:
-            return
-        self.validate_transition(SubscriptionStatusChoices.SUSPENDED)
-        self.status = SubscriptionStatusChoices.SUSPENDED
-        self.save(update_fields=["status", "updated_at"])
+        with transaction.atomic():
+            self._refresh_from_locked_row()
+            if self.status == SubscriptionStatusChoices.SUSPENDED:
+                return False
+            self.validate_transition(SubscriptionStatusChoices.SUSPENDED)
+            self.status = SubscriptionStatusChoices.SUSPENDED
+            self.save(update_fields=["status", "updated_at"])
+            return True
 
     def resume(self):
-        if self.status == SubscriptionStatusChoices.ACTIVE:
-            return
-        self.validate_transition(SubscriptionStatusChoices.ACTIVE)
-        self.status = SubscriptionStatusChoices.ACTIVE
-        self.save(update_fields=["status", "updated_at"])
+        with transaction.atomic():
+            self._refresh_from_locked_row()
+            if self.status == SubscriptionStatusChoices.ACTIVE:
+                return False
+            self.validate_transition(SubscriptionStatusChoices.ACTIVE)
+            self.status = SubscriptionStatusChoices.ACTIVE
+            self.save(update_fields=["status", "updated_at"])
+            return True
 
     def expire(self):
-        if self.status == SubscriptionStatusChoices.EXPIRED:
-            return
-        self.validate_transition(SubscriptionStatusChoices.EXPIRED)
-        self.status = SubscriptionStatusChoices.EXPIRED
-        self.save(update_fields=["status", "updated_at"])
+        with transaction.atomic():
+            self._refresh_from_locked_row()
+            if self.status == SubscriptionStatusChoices.EXPIRED:
+                return False
+            if self.renewal_date and self.renewal_date >= timezone.localdate():
+                return False
+            self.validate_transition(SubscriptionStatusChoices.EXPIRED)
+            self.status = SubscriptionStatusChoices.EXPIRED
+            self.save(update_fields=["status", "updated_at"])
+            return True
 
 
 class SubscriptionAssignment(ChangeLoggingMixin, BaseModel):
@@ -520,9 +594,42 @@ class SubscriptionAssignment(ChangeLoggingMixin, BaseModel):
         ]
 
     def __str__(self):
-        if self.assigned_object:
-            return f"Subscription {self.subscription} -> {self.assigned_object}"
+        target = self.tenant_safe_assigned_object
+        if target:
+            return f"Subscription {self.subscription} -> {target}"
         return f"Subscription {self.subscription} assignment (unlinked)"
+
+    @property
+    def tenant_safe_assigned_object(self):
+        target = self._resolve_assigned_object_unscoped()
+        if target is None:
+            return None
+        if getattr(target, "tenant_id", None) != self.subscription.tenant_id:
+            return None
+        return target
+
+    def _resolve_assigned_object_unscoped(self):
+        if not self.content_type_id or not self.object_id:
+            return None
+        model = self.content_type.model_class()
+        if model is None:
+            return None
+        filters = {"pk": self.object_id}
+        if any(field.name == "deleted_at" for field in model._meta.concrete_fields):
+            filters["deleted_at__isnull"] = True
+        return model._base_manager.filter(**filters).first()
+
+    def clean(self):
+        super().clean()
+        if not self.content_type_id or not self.object_id:
+            return
+        target = self._resolve_assigned_object_unscoped()
+        if target is None:
+            raise ValidationError(_("The assignment target does not exist."))
+        target_tenant_id = getattr(target, "tenant_id", None)
+        subscription_tenant_id = self.subscription.tenant_id if self.subscription_id else None
+        if target_tenant_id != subscription_tenant_id:
+            raise ValidationError(_("The assignment target must belong to the subscription tenant."))
 
     def get_absolute_url(self):
         if self.subscription:

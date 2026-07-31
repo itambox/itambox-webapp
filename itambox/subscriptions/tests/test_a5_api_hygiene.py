@@ -11,9 +11,13 @@ Covers two audit findings:
   to see.
 """
 
+from datetime import timedelta
+from unittest.mock import patch
+
 from django.contrib.auth import get_user_model
 from django.contrib.contenttypes.models import ContentType
 from django.urls import reverse
+from django.utils import timezone
 from rest_framework import status
 from rest_framework.test import APITestCase
 
@@ -170,6 +174,31 @@ class A5ApiHygieneTests(APITestCase):
             changed_object_id=self.subscription.pk,
         ).count()
         self.assertEqual(after, before)
+
+    def test_lifecycle_action_lost_race_rechecks_etag_under_row_lock(self):
+        from subscriptions.api.views import SubscriptionViewSet
+
+        self._login_as_staff()
+        etag = self._etag_for(self.subscription)
+        url = reverse("api:subscriptions_api:subscription-suspend", kwargs={"pk": self.subscription.pk})
+        original_validate = SubscriptionViewSet._validate_etag
+        calls = 0
+
+        def inject_race(view, request, instance):
+            nonlocal calls
+            calls += 1
+            original_validate(view, request, instance)
+            if calls == 1:
+                Subscription._base_manager.filter(pk=instance.pk).update(
+                    updated_at=timezone.now() + timedelta(seconds=1)
+                )
+
+        with patch.object(SubscriptionViewSet, "_validate_etag", new=inject_race):
+            response = self.client.post(url, format="json", HTTP_IF_MATCH=etag)
+
+        self.assertEqual(response.status_code, status.HTTP_412_PRECONDITION_FAILED)
+        self.subscription.refresh_from_db()
+        self.assertEqual(self.subscription.status, SubscriptionStatusChoices.ACTIVE)
 
     # ----- WS3-7b ----------------------------------------------------------
 

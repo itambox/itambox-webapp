@@ -150,6 +150,7 @@ class SubscriptionFixesTests(TestCase):
         renew_url = reverse("subscriptions:subscription_renew", kwargs={"pk": self.sub_b.pk})
         cancel_url = reverse("subscriptions:subscription_cancel", kwargs={"pk": self.sub_b.pk})
         suspend_url = reverse("subscriptions:subscription_suspend", kwargs={"pk": self.sub_b.pk})
+        resume_url = reverse("subscriptions:subscription_resume", kwargs={"pk": self.sub_b.pk})
         checkout_url = reverse("subscriptions:subscription_checkout", kwargs={"pk": self.sub_b.pk})
 
         self.assertEqual(self.client.get(renew_url).status_code, 404)
@@ -159,6 +160,7 @@ class SubscriptionFixesTests(TestCase):
             self.client.post(cancel_url, {"cancellation_date": "2026-06-01", "reason": "test"}).status_code, 404
         )
         self.assertEqual(self.client.post(suspend_url).status_code, 404)
+        self.assertEqual(self.client.post(resume_url).status_code, 404)
         self.assertEqual(self.client.get(checkout_url).status_code, 404)
         self.assertEqual(self.client.post(checkout_url, {"target_type": "location"}).status_code, 404)
 
@@ -231,6 +233,8 @@ class SubscriptionFixesTests(TestCase):
             "sub_7": self._make_sub("Sub 7", self.provider_a, self.tenant_a, 7),
             "sub_30_b": self._make_sub("Sub 30 B", self.provider_b, self.tenant_b, 30, owner=self.user_b),
         }
+        subs["sub_7"].vendor_contract_auto_renews = False
+        subs["sub_7"].save(update_fields=["vendor_contract_auto_renews"])
         Notification.objects.all().delete()
         return subs
 
@@ -261,7 +265,8 @@ class SubscriptionFixesTests(TestCase):
             self.assertEqual(subs[key].status, SubscriptionStatusChoices.ACTIVE)
 
         # Notifications are unscoped rows; recipients are staff who are MEMBERS
-        # of the subscription's tenant (B7) plus the subscription owner.
+        # of the subscription's tenant (B7), plus an active owner who remains a
+        # member of that same tenant.
         # self.super_user is staff AND a member of tenant_a; tenant_b's
         # subscriptions are delivered through their owner (self.user_b).
         subjects = [n.subject for n in Notification.objects.all()]
@@ -274,6 +279,19 @@ class SubscriptionFixesTests(TestCase):
             "Subscription Renewal Warning: Sub 30 B in 30 Days",
         ):
             self.assertTrue(any(expected in s for s in subjects), f"missing notification: {expected}")
+
+        notification_count = Notification.objects.count()
+        check_subscription_expiries_and_reminders()
+        self.assertEqual(Notification.objects.count(), notification_count)
+
+    def test_background_task_does_not_notify_a_former_tenant_owner(self):
+        self._seed_expiry_and_reminder_subscriptions()
+        Membership.objects.filter(user=self.user_b, tenant=self.tenant_b).delete()
+
+        self._clear_scope_context()
+        check_subscription_expiries_and_reminders()
+
+        self.assertFalse(Notification.objects.filter(user=self.user_b).exists())
 
     def test_background_task_enumerates_outside_an_ambient_tenant_scope(self):
         """An inline (Q_CLUSTER sync) run inherits the caller's tenant scope.

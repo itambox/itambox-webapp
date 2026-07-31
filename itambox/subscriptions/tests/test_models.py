@@ -1,14 +1,17 @@
 import datetime
+import threading
 
 from django.contrib.auth import get_user_model
 from django.contrib.contenttypes.models import ContentType
 from django.core.exceptions import ValidationError
-from django.db import IntegrityError
-from django.test import TestCase
+from django.db import IntegrityError, close_old_connections
+from django.test import TestCase, TransactionTestCase
 from django.utils import timezone
 from model_bakery import baker
 
 from assets.models import Asset
+from core.managers import set_current_tenant
+from core.models import Notification
 from licenses.models import License, LicenseSeatAssignment
 from organization.models import AssetHolder, CostCenter, Location, Site, Tenant, TenantGroup
 from software.models import Software
@@ -53,6 +56,34 @@ class SubscriptionSeatRollupTests(TestCase):
         lic = baker.prepare(License, software=software, subscription=sub_b, seats=1, tenant=t_a)
         with self.assertRaises(ValidationError):
             lic.clean()
+
+    def test_seat_accounting_ignores_stale_targets_and_is_stable_while_suspended(self):
+        tenant = baker.make(Tenant, name="Seat tenant", slug="seat-tenant")
+        other_tenant = baker.make(Tenant, name="Former tenant", slug="former-tenant")
+        sub = baker.make(Subscription, tenant=tenant)
+        software = baker.make(Software, manufacturer__name="Seat Co", manufacturer__slug="seat-co", tenant=None)
+        license_obj = baker.make(License, software=software, subscription=sub, seats=4, tenant=tenant)
+        holder = baker.make(AssetHolder, tenant=tenant)
+        asset = baker.make(Asset, tenant=tenant)
+        baker.make(LicenseSeatAssignment, license=license_obj, assigned_holder=holder, asset=None)
+        baker.make(LicenseSeatAssignment, license=license_obj, assigned_holder=None, asset=asset)
+
+        self.assertEqual(sub.assigned_seats, 2)
+        set_current_tenant(other_tenant)
+        try:
+            self.assertEqual((sub.total_seats, sub.assigned_seats, sub.available_seats), (4, 2, 2))
+        finally:
+            set_current_tenant(None)
+
+        sub.suspend()
+        self.assertEqual((sub.total_seats, sub.assigned_seats, sub.available_seats), (4, 2, 2))
+
+        asset.delete()
+        self.assertEqual(sub.assigned_seats, 1)
+
+        holder.tenant = other_tenant
+        holder.save(update_fields=["tenant"])
+        self.assertEqual(sub.assigned_seats, 0)
 
 
 class ProviderModelTests(TestCase):
@@ -267,6 +298,70 @@ class SubscriptionModelTests(TestCase):
         self.assertEqual(sub.updated_at, cancelled_at)
         self.assertEqual(sub.notes, notes)
 
+    def test_clean_enforces_transition_matrix_but_allows_same_state_updates(self):
+        sub = Subscription.objects.create(name="Clean Contract", provider=self.provider)
+        sub.description = "Ordinary update"
+        sub.full_clean()
+
+        sub.status = SubscriptionStatusChoices.CANCELLED
+        sub.full_clean()
+        sub.save(update_fields=["status"])
+
+        sub.status = SubscriptionStatusChoices.ACTIVE
+        with self.assertRaisesMessage(ValidationError, "cancelled to active"):
+            sub.full_clean()
+
+    def test_clean_covers_every_source_target_pair(self):
+        allowed = {
+            SubscriptionStatusChoices.ACTIVE: {
+                SubscriptionStatusChoices.ACTIVE,
+                SubscriptionStatusChoices.SUSPENDED,
+                SubscriptionStatusChoices.CANCELLED,
+                SubscriptionStatusChoices.EXPIRED,
+            },
+            SubscriptionStatusChoices.SUSPENDED: {
+                SubscriptionStatusChoices.SUSPENDED,
+                SubscriptionStatusChoices.ACTIVE,
+                SubscriptionStatusChoices.CANCELLED,
+                SubscriptionStatusChoices.EXPIRED,
+            },
+            SubscriptionStatusChoices.EXPIRED: {
+                SubscriptionStatusChoices.EXPIRED,
+                SubscriptionStatusChoices.ACTIVE,
+                SubscriptionStatusChoices.CANCELLED,
+            },
+            SubscriptionStatusChoices.CANCELLED: {SubscriptionStatusChoices.CANCELLED},
+        }
+        for source in SubscriptionStatusChoices.values:
+            for target in SubscriptionStatusChoices.values:
+                with self.subTest(source=source, target=target):
+                    sub = Subscription.objects.create(
+                        name=f"Matrix {source} {target}", provider=self.provider, status=source
+                    )
+                    sub.status = target
+                    if target in allowed[source]:
+                        sub.full_clean()
+                    else:
+                        with self.assertRaises(ValidationError):
+                            sub.full_clean()
+
+    def test_clean_enforces_transition_under_a_foreign_ambient_tenant(self):
+        tenant_a = baker.make(Tenant, name="Lifecycle A", slug="lifecycle-a")
+        tenant_b = baker.make(Tenant, name="Lifecycle B", slug="lifecycle-b")
+        sub = Subscription.objects.create(
+            name="Ambient Contract",
+            provider=self.provider,
+            tenant=tenant_a,
+            status=SubscriptionStatusChoices.CANCELLED,
+        )
+        set_current_tenant(tenant_b)
+        try:
+            sub.status = SubscriptionStatusChoices.ACTIVE
+            with self.assertRaises(ValidationError):
+                sub.full_clean()
+        finally:
+            set_current_tenant(None)
+
     def test_subscription_billing_cycle_choices(self):
         self.assertEqual(BillingCycleChoices.MONTHLY, "monthly")
         self.assertEqual(BillingCycleChoices.ANNUAL, "annual")
@@ -293,6 +388,8 @@ class SubscriptionAssignmentModelTests(TestCase):
         )
         self.tg = TenantGroup.objects.create(name="G", slug="g")
         self.tenant = Tenant.objects.create(name="Tenant", slug="tenant", group=self.tg)
+        self.subscription.tenant = self.tenant
+        self.subscription.save(update_fields=["tenant"])
         self.site = Site.objects.create(name="Office", slug="office", tenant=self.tenant)
         self.location = Location.objects.create(name="Room 101", slug="room-101", site=self.site, tenant=self.tenant)
         self.asset = Asset.objects.create(
@@ -330,7 +427,9 @@ class SubscriptionAssignmentModelTests(TestCase):
             )
 
     def test_assignment_to_asset_holder(self):
-        holder = AssetHolder.objects.create(first_name="John", last_name="Doe", upn="john.doe", email="john@test.com")
+        holder = AssetHolder.objects.create(
+            first_name="John", last_name="Doe", upn="john.doe", email="john@test.com", tenant=self.tenant
+        )
         ct = ContentType.objects.get_for_model(AssetHolder)
         assignment = SubscriptionAssignment.objects.create(
             subscription=self.subscription,
@@ -348,6 +447,46 @@ class SubscriptionAssignmentModelTests(TestCase):
         )
         url = assignment.get_absolute_url()
         self.assertIn(str(self.subscription.pk), url)
+
+    def test_assignment_model_rejects_cross_tenant_gfk_target(self):
+        foreign_tenant = Tenant.objects.create(name="Foreign", slug="foreign", group=self.tg)
+        foreign_asset = baker.make(Asset, tenant=foreign_tenant)
+        assignment = SubscriptionAssignment(
+            subscription=self.subscription,
+            content_type=ContentType.objects.get_for_model(Asset),
+            object_id=foreign_asset.pk,
+        )
+
+        with self.assertRaisesMessage(ValidationError, "subscription tenant"):
+            assignment.full_clean()
+
+    def test_assignment_hides_target_that_later_moves_to_another_tenant(self):
+        holder = baker.make(AssetHolder, tenant=self.tenant)
+        assignment = SubscriptionAssignment.objects.create(
+            subscription=self.subscription,
+            content_type=ContentType.objects.get_for_model(AssetHolder),
+            object_id=holder.pk,
+        )
+        self.assertEqual(assignment.assigned_object, holder)
+        foreign = Tenant.objects.create(name="Moved", slug="moved", group=self.tg)
+        AssetHolder._base_manager.filter(pk=holder.pk).update(tenant=foreign)
+
+        self.assertIsNone(assignment.tenant_safe_assigned_object)
+        self.assertIn("unlinked", str(assignment))
+
+    def test_assignment_rejects_and_hides_a_soft_deleted_target(self):
+        assignment = SubscriptionAssignment.objects.create(
+            subscription=self.subscription,
+            content_type=ContentType.objects.get_for_model(Asset),
+            object_id=self.asset.pk,
+        )
+
+        self.asset.delete()
+
+        self.assertIsNone(assignment.tenant_safe_assigned_object)
+        self.assertIn("unlinked", str(assignment))
+        with self.assertRaisesMessage(ValidationError, "does not exist"):
+            assignment.full_clean()
 
 
 class SubscriptionExplicitExpiryTests(TestCase):
@@ -377,3 +516,192 @@ class SubscriptionExplicitExpiryTests(TestCase):
         )
         sub.save()
         self.assertEqual(sub.status, SubscriptionStatusChoices.ACTIVE)
+
+
+class SubscriptionConcurrencyTests(TransactionTestCase):
+    def _post_teardown(self):
+        super()._post_teardown()
+        ContentType.objects.clear_cache()
+
+    def test_stale_direct_writer_cannot_overwrite_a_terminal_cancellation(self):
+        provider = Provider.objects.create(name="Race Provider")
+        subscription = Subscription.objects.create(
+            name="Race Contract", provider=provider, status=SubscriptionStatusChoices.ACTIVE
+        )
+        stale_loaded = threading.Event()
+        allow_stale_save = threading.Event()
+        stale_errors = []
+
+        def stale_writer():
+            close_old_connections()
+            try:
+                stale = Subscription._base_manager.get(pk=subscription.pk)
+                stale_loaded.set()
+                allow_stale_save.wait(timeout=10)
+                stale.status = SubscriptionStatusChoices.SUSPENDED
+                stale.save()
+            except ValidationError as exc:
+                stale_errors.append(exc)
+            finally:
+                close_old_connections()
+
+        thread = threading.Thread(target=stale_writer)
+        thread.start()
+        self.assertTrue(stale_loaded.wait(timeout=10))
+
+        current = Subscription._base_manager.get(pk=subscription.pk)
+        current.cancel(timezone.now().date(), reason="terminal winner")
+        allow_stale_save.set()
+        thread.join(timeout=10)
+
+        self.assertFalse(thread.is_alive())
+        self.assertEqual(len(stale_errors), 1)
+        subscription.refresh_from_db()
+        self.assertEqual(subscription.status, SubscriptionStatusChoices.CANCELLED)
+
+    def test_stale_retried_cancellation_cannot_replace_the_winning_effects(self):
+        provider = Provider.objects.create(name="Cancellation Race Provider")
+        subscription = Subscription.objects.create(name="Cancellation Race", provider=provider)
+        stale_loaded = threading.Event()
+        winner_committed = threading.Event()
+        errors = []
+
+        def stale_cancellation():
+            close_old_connections()
+            stale = Subscription._base_manager.get(pk=subscription.pk)
+            stale_loaded.set()
+            winner_committed.wait(timeout=10)
+            try:
+                stale.cancel(datetime.date(2026, 2, 2), "loser")
+            except Exception as exc:  # pragma: no cover - asserted below
+                errors.append(exc)
+            finally:
+                close_old_connections()
+
+        thread = threading.Thread(target=stale_cancellation)
+        thread.start()
+        self.assertTrue(stale_loaded.wait(timeout=10))
+
+        winner = Subscription._base_manager.get(pk=subscription.pk)
+        winner.cancel(datetime.date(2026, 1, 1), "winner")
+        winner_committed.set()
+        thread.join(timeout=10)
+
+        self.assertFalse(thread.is_alive())
+        self.assertEqual(errors, [])
+        subscription.refresh_from_db()
+        self.assertEqual(subscription.cancellation_date, datetime.date(2026, 1, 1))
+        self.assertIn("winner", subscription.notes)
+        self.assertNotIn("loser", subscription.notes)
+
+    def test_stale_direct_same_status_writer_cannot_replace_the_winning_effects(self):
+        provider = Provider.objects.create(name="Direct cancellation race provider")
+        subscription = Subscription.objects.create(name="Direct cancellation race", provider=provider)
+        loaded = threading.Event()
+        allow_stale_save = threading.Event()
+        errors = []
+
+        def stale_writer():
+            close_old_connections()
+            stale = Subscription._base_manager.get(pk=subscription.pk)
+            stale.status = SubscriptionStatusChoices.CANCELLED
+            stale.cancellation_date = datetime.date(2026, 2, 2)
+            stale.notes = "loser"
+            loaded.set()
+            allow_stale_save.wait(timeout=10)
+            try:
+                stale.save()
+            except Exception as exc:  # pragma: no cover - asserted below
+                errors.append(exc)
+            finally:
+                close_old_connections()
+
+        thread = threading.Thread(target=stale_writer)
+        thread.start()
+        self.assertTrue(loaded.wait(timeout=10))
+
+        winner = Subscription._base_manager.get(pk=subscription.pk)
+        winner.cancel(cancellation_date=datetime.date(2026, 1, 1), reason="winner")
+        allow_stale_save.set()
+        thread.join(timeout=10)
+
+        self.assertFalse(thread.is_alive())
+        self.assertEqual(errors, [])
+        subscription.refresh_from_db()
+        self.assertEqual(subscription.status, SubscriptionStatusChoices.CANCELLED)
+        self.assertEqual(subscription.cancellation_date, datetime.date(2026, 1, 1))
+        self.assertIn("winner", subscription.notes)
+        self.assertNotIn("loser", subscription.notes)
+
+    def test_concurrent_reminder_delivery_is_idempotent(self):
+        from subscriptions.tasks import _notify_once
+
+        user = User.objects.create_user(username="notification-race")
+        barrier = threading.Barrier(2)
+        errors = []
+
+        def notify():
+            close_old_connections()
+            thread_user = User._base_manager.get(pk=user.pk)
+            try:
+                barrier.wait(timeout=10)
+                _notify_once(
+                    user=thread_user,
+                    subject="Renewal reminder",
+                    message="Same daily effect",
+                    target_url="/subscriptions/1/",
+                )
+            except Exception as exc:  # pragma: no cover - asserted below
+                errors.append(exc)
+            finally:
+                close_old_connections()
+
+        threads = [threading.Thread(target=notify) for _ in range(2)]
+        for thread in threads:
+            thread.start()
+        for thread in threads:
+            thread.join(timeout=10)
+
+        self.assertTrue(all(not thread.is_alive() for thread in threads))
+        self.assertEqual(errors, [])
+        self.assertEqual(Notification.objects.filter(user=user, subject="Renewal reminder").count(), 1)
+
+    def test_concurrent_renew_prevents_expiry(self):
+        today = timezone.localdate()
+        subscription = Subscription.objects.create(
+            name="Expiry race sub",
+            provider=Provider.objects.create(name="Expiry race provider"),
+            status=SubscriptionStatusChoices.ACTIVE,
+            renewal_date=today - datetime.timedelta(days=1),
+        )
+        loaded = threading.Event()
+        allow_expire = threading.Event()
+        errors = []
+
+        def expirer():
+            close_old_connections()
+            candidate = Subscription._base_manager.get(pk=subscription.pk)
+            loaded.set()
+            allow_expire.wait(timeout=10)
+            try:
+                candidate.expire()
+            except Exception as exc:  # pragma: no cover - asserted below
+                errors.append(exc)
+            finally:
+                close_old_connections()
+
+        t = threading.Thread(target=expirer)
+        t.start()
+        self.assertTrue(loaded.wait(timeout=10))
+
+        winner = Subscription._base_manager.get(pk=subscription.pk)
+        future = today + datetime.timedelta(days=365)
+        winner.renew(future)
+        allow_expire.set()
+        t.join(timeout=10)
+
+        self.assertFalse(t.is_alive())
+        self.assertEqual(errors, [])
+        subscription.refresh_from_db()
+        self.assertEqual(subscription.status, SubscriptionStatusChoices.ACTIVE)
+        self.assertEqual(subscription.renewal_date, future)

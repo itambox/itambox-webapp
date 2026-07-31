@@ -131,7 +131,7 @@ class SubscriptionAssignmentTable(BaseTable):
         default_columns = ("pk", "subscription", "assigned_object", "assigned_date", "assigned_by", "actions")
 
     def render_assigned_object(self, value, record):
-        obj = record.assigned_object
+        obj = record.tenant_safe_assigned_object
         if obj is None:
             return "—"
         return str(obj)
