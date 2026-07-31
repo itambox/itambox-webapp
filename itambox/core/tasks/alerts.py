@@ -7,7 +7,7 @@ from django.utils.translation import gettext_lazy as _
 from core.context import _current_user, set_current_membership, set_current_tenant
 from core.events import send_notification_to_channel
 from core.tasks.context import TaskContext
-from extras.models import AlertLog, AlertRule, NotificationChannel
+from extras.models import AlertLog, AlertRule
 
 logger = logging.getLogger(__name__)
 
@@ -199,14 +199,10 @@ def _evaluate_rule(rule, today, existing_logs):
 
 
 def _dispatch_channels(rule, match, alert_log):
-    """Send notifications to all effective channels; return per-channel delivery dict."""
+    """Send notifications to all explicitly attached channels; return per-channel delivery dict."""
     channels = rule.channels.all()
     if not channels.exists():
-        tenant = match.get("tenant")
-        if tenant:
-            channels = NotificationChannel.objects.filter(tenant=tenant, enabled=True)
-        else:
-            channels = NotificationChannel.objects.filter(tenant__isnull=True, enabled=True)
+        return {"__no_channels__": "no channels attached to this rule"}
 
     delivery = {}
     for channel in channels:
