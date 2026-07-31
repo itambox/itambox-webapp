@@ -250,6 +250,23 @@ class SubscriptionModelTests(TestCase):
         sub.refresh_from_db()
         self.assertEqual(sub.status, SubscriptionStatusChoices.CANCELLED)
 
+    def test_lifecycle_action_retries_are_idempotent(self):
+        sub = Subscription.objects.create(name="Retry Contract", provider=self.provider)
+        sub.suspend()
+        suspended_at = sub.updated_at
+        sub.suspend()
+        sub.refresh_from_db()
+        self.assertEqual(sub.updated_at, suspended_at)
+
+        sub.resume()
+        sub.cancel(reason="Retired")
+        cancelled_at = sub.updated_at
+        notes = sub.notes
+        sub.cancel(reason="Retired")
+        sub.refresh_from_db()
+        self.assertEqual(sub.updated_at, cancelled_at)
+        self.assertEqual(sub.notes, notes)
+
     def test_subscription_billing_cycle_choices(self):
         self.assertEqual(BillingCycleChoices.MONTHLY, "monthly")
         self.assertEqual(BillingCycleChoices.ANNUAL, "annual")
