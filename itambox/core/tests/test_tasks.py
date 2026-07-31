@@ -516,3 +516,18 @@ class EventActionVocabularyTests(TransactionTestCase):
         serializer = EventRuleSerializer(data=data)
         if not serializer.is_valid():
             self.fail(f"valid actions were rejected: {serializer.errors}")
+
+    def test_eventrule_rejects_non_list_events(self):
+        """EventRule.events that is not a list must be rejected."""
+        from extras.api.serializers import EventRuleSerializer
+        from extras.models import EventRule
+
+        data = {
+            "name": "Bad Events",
+            "model": "assets.asset",
+            "events": "not-a-list",
+            "action_type": EventRule.ACTION_WEBHOOK,
+        }
+        serializer = EventRuleSerializer(data=data)
+        self.assertFalse(serializer.is_valid(), "non-list events must be rejected")
+        self.assertIn("events", serializer.errors, "rejection must target the events field")
