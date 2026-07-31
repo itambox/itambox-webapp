@@ -10093,14 +10093,6 @@
     },
     {
       "path": "itambox/subscriptions/views.py",
-      "code": "B950",
-      "message": "line too long (137 > 120 characters)",
-      "source": "                comment=f\"Renewed subscription. Next renewal date: {renewal_date}. Cost: {renewal_cost or '\u2014'} {subscription.currency}.\",",
-      "context": "Module:body/ClassDef:SubscriptionRenewView:body/FunctionDef:post:body/If:Call(func=Attribute(value=Name(id='form', ctx=Load()), attr='is_valid', ctx=Load()), args=[], keywords=[]):body",
-      "count": 1
-    },
-    {
-      "path": "itambox/subscriptions/views.py",
       "code": "F401",
       "message": "'django_tables2.RequestConfig' imported but unused",
       "source": "from django_tables2 import RequestConfig",

@@ -40,7 +40,11 @@ def _tenant_recipients(subscription):
             memberships__tenant_id=subscription.tenant_id,
         ).distinct()
     )
-    if subscription.owner and subscription.owner.is_active:
+    if (
+        subscription.owner
+        and subscription.owner.is_active
+        and subscription.owner.memberships.filter(tenant_id=subscription.tenant_id).exists()
+    ):
         recipients.add(subscription.owner)
     return recipients
 

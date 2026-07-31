@@ -3,6 +3,7 @@ import json
 from django.contrib import messages
 from django.contrib.auth.mixins import LoginRequiredMixin, PermissionRequiredMixin
 from django.contrib.contenttypes.models import ContentType
+from django.core.exceptions import ValidationError
 from django.db.models import Count, Q
 from django.http import HttpResponse, HttpResponseBadRequest
 from django.shortcuts import get_object_or_404, redirect, render
@@ -28,6 +29,16 @@ from itambox.views.generic.utils import safe_return_url
 
 from . import filters, forms, tables
 from .models import Provider, Subscription, SubscriptionAssignment
+
+
+def _lifecycle_error_response(request, error):
+    message = " ".join(error.messages)
+    if request.htmx:
+        response = HttpResponse(status=204)
+        response["HX-Trigger"] = json.dumps({"showMessage": {"message": message, "level": "danger"}})
+        return response
+    return HttpResponseBadRequest(message)
+
 
 # =============================================================================
 # Provider Views
@@ -178,15 +189,27 @@ class SubscriptionRenewView(SecuredObjectActionMixin, LoginRequiredMixin, Permis
         if form.is_valid():
             renewal_date = form.cleaned_data["renewal_date"]
             renewal_cost = form.cleaned_data["renewal_cost"]
-            subscription.renew(renewal_date, renewal_cost)
+            try:
+                changed = subscription.renew(renewal_date, renewal_cost)
+            except ValidationError as error:
+                form.add_error(None, error)
+                return render(
+                    request,
+                    self.template_name,
+                    {"form": form, "subscription": subscription},
+                )
 
-            obj_type = ContentType.objects.get_for_model(Subscription)
-            JournalEntry.objects.create(
-                model=obj_type,
-                object_id=subscription.pk,
-                user=request.user,
-                comment=f"Renewed subscription. Next renewal date: {renewal_date}. Cost: {renewal_cost or '—'} {subscription.currency}.",
-            )
+            if changed:
+                obj_type = ContentType.objects.get_for_model(Subscription)
+                JournalEntry.objects.create(
+                    model=obj_type,
+                    object_id=subscription.pk,
+                    user=request.user,
+                    comment=(
+                        f"Renewed subscription. Next renewal date: {renewal_date}. "
+                        f"Cost: {renewal_cost or '—'} {subscription.currency}."
+                    ),
+                )
 
             messages.success(request, _("Subscription '%(name)s' renewed successfully.") % {"name": subscription.name})
             if request.htmx:
@@ -238,15 +261,24 @@ class SubscriptionCancelView(SecuredObjectActionMixin, LoginRequiredMixin, Permi
         if form.is_valid():
             cancellation_date = form.cleaned_data["cancellation_date"]
             reason = form.cleaned_data["reason"]
-            subscription.cancel(cancellation_date, reason)
+            try:
+                changed = subscription.cancel(cancellation_date, reason)
+            except ValidationError as error:
+                form.add_error(None, error)
+                return render(
+                    request,
+                    self.template_name,
+                    {"form": form, "subscription": subscription},
+                )
 
-            obj_type = ContentType.objects.get_for_model(Subscription)
-            comment_text = f"Cancelled subscription. Cancellation Date: {cancellation_date}."
-            if reason:
-                comment_text += f" Reason: {reason}"
-            JournalEntry.objects.create(
-                model=obj_type, object_id=subscription.pk, user=request.user, comment=comment_text
-            )
+            if changed:
+                obj_type = ContentType.objects.get_for_model(Subscription)
+                comment_text = f"Cancelled subscription. Cancellation Date: {cancellation_date}."
+                if reason:
+                    comment_text += f" Reason: {reason}"
+                JournalEntry.objects.create(
+                    model=obj_type, object_id=subscription.pk, user=request.user, comment=comment_text
+                )
 
             messages.success(
                 request, _("Subscription '%(name)s' cancelled successfully.") % {"name": subscription.name}
@@ -283,12 +315,16 @@ class SubscriptionSuspendView(SecuredObjectActionMixin, LoginRequiredMixin, Perm
 
     def post(self, request, pk, *args, **kwargs):
         subscription = get_object_or_404(Subscription.objects.all(), pk=pk)
-        subscription.suspend()
+        try:
+            changed = subscription.suspend()
+        except ValidationError as error:
+            return _lifecycle_error_response(request, error)
 
-        obj_type = ContentType.objects.get_for_model(Subscription)
-        JournalEntry.objects.create(
-            model=obj_type, object_id=subscription.pk, user=request.user, comment="Suspended subscription."
-        )
+        if changed:
+            obj_type = ContentType.objects.get_for_model(Subscription)
+            JournalEntry.objects.create(
+                model=obj_type, object_id=subscription.pk, user=request.user, comment="Suspended subscription."
+            )
 
         messages.success(request, _("Subscription '%(name)s' suspended successfully.") % {"name": subscription.name})
         if request.htmx:
@@ -314,12 +350,16 @@ class SubscriptionResumeView(SecuredObjectActionMixin, LoginRequiredMixin, Permi
 
     def post(self, request, pk, *args, **kwargs):
         subscription = get_object_or_404(Subscription.objects.all(), pk=pk)
-        subscription.resume()
+        try:
+            changed = subscription.resume()
+        except ValidationError as error:
+            return _lifecycle_error_response(request, error)
 
-        obj_type = ContentType.objects.get_for_model(Subscription)
-        JournalEntry.objects.create(
-            model=obj_type, object_id=subscription.pk, user=request.user, comment="Resumed subscription."
-        )
+        if changed:
+            obj_type = ContentType.objects.get_for_model(Subscription)
+            JournalEntry.objects.create(
+                model=obj_type, object_id=subscription.pk, user=request.user, comment="Resumed subscription."
+            )
 
         message = _("Subscription '%(name)s' resumed successfully.") % {"name": subscription.name}
         messages.success(request, message)

@@ -491,19 +491,20 @@ class Subscription(CustomFieldDataMixin, AutoSlugMixin, BookmarkableMixin, Delet
                 and self.renewal_date == new_renewal_date
                 and (cost is None or self.renewal_cost == cost)
             ):
-                return
+                return False
             self.validate_transition(SubscriptionStatusChoices.ACTIVE)
             self.renewal_date = new_renewal_date
             if cost is not None:
                 self.renewal_cost = cost
             self.status = SubscriptionStatusChoices.ACTIVE
             self.save(update_fields=["renewal_date", "renewal_cost", "status", "updated_at"])
+            return True
 
     def cancel(self, cancellation_date=None, reason=""):
         with transaction.atomic():
             self._refresh_from_locked_row()
             if self.status == SubscriptionStatusChoices.CANCELLED:
-                return
+                return False
             self.validate_transition(SubscriptionStatusChoices.CANCELLED)
             self.cancellation_date = cancellation_date or timezone.now().date()
             self.status = SubscriptionStatusChoices.CANCELLED
@@ -511,33 +512,37 @@ class Subscription(CustomFieldDataMixin, AutoSlugMixin, BookmarkableMixin, Delet
                 existing = self.notes or ""
                 self.notes = f"{existing}\n[{timezone.now().date()}] Cancelled: {reason}".strip()
             self.save(update_fields=["cancellation_date", "status", "notes", "updated_at"])
+            return True
 
     def suspend(self):
         with transaction.atomic():
             self._refresh_from_locked_row()
             if self.status == SubscriptionStatusChoices.SUSPENDED:
-                return
+                return False
             self.validate_transition(SubscriptionStatusChoices.SUSPENDED)
             self.status = SubscriptionStatusChoices.SUSPENDED
             self.save(update_fields=["status", "updated_at"])
+            return True
 
     def resume(self):
         with transaction.atomic():
             self._refresh_from_locked_row()
             if self.status == SubscriptionStatusChoices.ACTIVE:
-                return
+                return False
             self.validate_transition(SubscriptionStatusChoices.ACTIVE)
             self.status = SubscriptionStatusChoices.ACTIVE
             self.save(update_fields=["status", "updated_at"])
+            return True
 
     def expire(self):
         with transaction.atomic():
             self._refresh_from_locked_row()
             if self.status == SubscriptionStatusChoices.EXPIRED:
-                return
+                return False
             self.validate_transition(SubscriptionStatusChoices.EXPIRED)
             self.status = SubscriptionStatusChoices.EXPIRED
             self.save(update_fields=["status", "updated_at"])
+            return True
 
 
 class SubscriptionAssignment(ChangeLoggingMixin, BaseModel):

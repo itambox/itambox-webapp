@@ -4,6 +4,7 @@ from django.test import Client, TestCase
 from django.urls import reverse
 
 from assets.models import Asset
+from extras.models import JournalEntry
 from organization.models import Location, Site, Tenant, TenantGroup
 from subscriptions.models import (
     BillingCycleChoices,
@@ -324,6 +325,57 @@ class SubscriptionLifecycleViewTests(TestCase):
         self.sub.refresh_from_db()
         self.assertEqual(self.sub.status, SubscriptionStatusChoices.ACTIVE)
         self.assertIn("tableRefreshRequired", resp["HX-Trigger"])
+
+    def test_illegal_lifecycle_transitions_return_controlled_responses(self):
+        self.sub.cancel(cancellation_date=date(2026, 6, 2), reason="terminal")
+
+        renew_url = reverse("subscriptions:subscription_renew", kwargs={"pk": self.sub.pk})
+        response = self.client.post(renew_url, {"renewal_date": "2027-06-01", "renewal_cost": "1099.99"})
+        self.assertEqual(response.status_code, 200)
+        self.assertFormError(
+            response.context["form"],
+            None,
+            "Invalid subscription status transition from cancelled to active.",
+        )
+
+        suspend_url = reverse("subscriptions:subscription_suspend", kwargs={"pk": self.sub.pk})
+        response = self.client.post(suspend_url)
+        self.assertEqual(response.status_code, 400)
+
+        resume_url = reverse("subscriptions:subscription_resume", kwargs={"pk": self.sub.pk})
+        response = self.client.post(resume_url, HTTP_HX_REQUEST="true")
+        self.assertEqual(response.status_code, 204)
+        self.assertIn('"level": "danger"', response["HX-Trigger"])
+
+    def test_lifecycle_view_retries_do_not_duplicate_journal_entries(self):
+        object_type = ContentType.objects.get_for_model(Subscription)
+        entries = JournalEntry.objects.filter(model=object_type, object_id=self.sub.pk)
+
+        renew_url = reverse("subscriptions:subscription_renew", kwargs={"pk": self.sub.pk})
+        renewal = {"renewal_date": "2027-06-01", "renewal_cost": "1099.99"}
+        self.assertEqual(self.client.post(renew_url, renewal).status_code, 302)
+        count_after_renewal = entries.count()
+        self.assertEqual(self.client.post(renew_url, renewal).status_code, 302)
+        self.assertEqual(entries.count(), count_after_renewal)
+
+        suspend_url = reverse("subscriptions:subscription_suspend", kwargs={"pk": self.sub.pk})
+        self.assertEqual(self.client.post(suspend_url).status_code, 302)
+        count_after_suspend = entries.count()
+        self.assertEqual(self.client.post(suspend_url).status_code, 302)
+        self.assertEqual(entries.count(), count_after_suspend)
+
+        resume_url = reverse("subscriptions:subscription_resume", kwargs={"pk": self.sub.pk})
+        self.assertEqual(self.client.post(resume_url).status_code, 302)
+        count_after_resume = entries.count()
+        self.assertEqual(self.client.post(resume_url).status_code, 302)
+        self.assertEqual(entries.count(), count_after_resume)
+
+        cancel_url = reverse("subscriptions:subscription_cancel", kwargs={"pk": self.sub.pk})
+        cancellation = {"cancellation_date": "2026-06-02", "reason": "retired"}
+        self.assertEqual(self.client.post(cancel_url, cancellation).status_code, 302)
+        count_after_cancel = entries.count()
+        self.assertEqual(self.client.post(cancel_url, cancellation).status_code, 302)
+        self.assertEqual(entries.count(), count_after_cancel)
 
     def test_subscription_assignment_lifecycle(self):
         # 1. Test GET request to checkout/assign renders form

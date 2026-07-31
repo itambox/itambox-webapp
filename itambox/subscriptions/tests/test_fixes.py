@@ -265,7 +265,8 @@ class SubscriptionFixesTests(TestCase):
             self.assertEqual(subs[key].status, SubscriptionStatusChoices.ACTIVE)
 
         # Notifications are unscoped rows; recipients are staff who are MEMBERS
-        # of the subscription's tenant (B7) plus the subscription owner.
+        # of the subscription's tenant (B7), plus an active owner who remains a
+        # member of that same tenant.
         # self.super_user is staff AND a member of tenant_a; tenant_b's
         # subscriptions are delivered through their owner (self.user_b).
         subjects = [n.subject for n in Notification.objects.all()]
@@ -282,6 +283,15 @@ class SubscriptionFixesTests(TestCase):
         notification_count = Notification.objects.count()
         check_subscription_expiries_and_reminders()
         self.assertEqual(Notification.objects.count(), notification_count)
+
+    def test_background_task_does_not_notify_a_former_tenant_owner(self):
+        self._seed_expiry_and_reminder_subscriptions()
+        Membership.objects.filter(user=self.user_b, tenant=self.tenant_b).delete()
+
+        self._clear_scope_context()
+        check_subscription_expiries_and_reminders()
+
+        self.assertFalse(Notification.objects.filter(user=self.user_b).exists())
 
     def test_background_task_enumerates_outside_an_ambient_tenant_scope(self):
         """An inline (Q_CLUSTER sync) run inherits the caller's tenant scope.

@@ -28,7 +28,7 @@ Seat totals are rolled up from active funded licenses. Assigned-seat counts incl
 
 ## Task observability and idempotency
 
-The daily job enumerates active, non-deleted subscriptions across tenants and enters a separate `TaskContext` for every subscription. It locks each candidate and rechecks its status and renewal date before expiring it or sending a reminder, so a concurrent renewal cannot receive stale effects. Automatic expiry is recorded as a tenant-attributed system change with no human actor. Notifications use their complete recipient, subject, message, level, and target identity as the idempotency key, so retrying the same daily run does not create duplicate effects. Invalid explicit tenant or principal identifiers fail rather than becoming an empty successful run.
+The daily job enumerates active, non-deleted subscriptions across tenants and enters a separate `TaskContext` for every subscription. It locks each candidate and rechecks its status and renewal date before expiring it or sending a reminder, so a concurrent renewal cannot receive stale effects. Notifications are limited to active staff members and owners who remain members of the subscription tenant. Automatic expiry is recorded as a tenant-attributed system change with no human actor. Notifications use their complete recipient, subject, message, level, and target identity as the idempotency key, so retrying the same daily run does not create duplicate effects. Invalid explicit tenant or principal identifiers fail rather than becoming an empty successful run.
 
 ## Deliberately absent surfaces
 
