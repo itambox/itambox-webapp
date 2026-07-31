@@ -508,8 +508,9 @@ class SubscriptionAssignmentDeleteView(ObjectDeleteView):
 
     def get_success_url(self):
         obj = self.object
-        if obj and obj.assigned_object and hasattr(obj.assigned_object, "get_absolute_url"):
-            fallback = obj.assigned_object.get_absolute_url()
+        target = obj.tenant_safe_assigned_object if obj else None
+        if target and hasattr(target, "get_absolute_url"):
+            fallback = target.get_absolute_url()
         else:
             fallback = reverse("dashboard")
         # Only honor a caller-supplied return_url when it is same-host (open-redirect guard).

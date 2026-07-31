@@ -189,6 +189,8 @@ class SubscriptionAssignmentViewTests(TestCase):
         )
         self.tg = TenantGroup.objects.create(name="TG1", slug="tg1")
         self.tenant = Tenant.objects.create(name="Tenant1", slug="tenant1", group=self.tg)
+        self.subscription.tenant = self.tenant
+        self.subscription.save(update_fields=["tenant"])
         self.site = Site.objects.create(name="Dublin", slug="dublin", tenant=self.tenant)
         self.location = Location.objects.create(name="Rack A", slug="rack-a", site=self.site, tenant=self.tenant)
         self.asset = Asset.objects.create(
@@ -258,6 +260,8 @@ class SubscriptionLifecycleViewTests(TestCase):
         )
         self.tg = TenantGroup.objects.create(name="TG1", slug="tg1")
         self.tenant = Tenant.objects.create(name="Tenant1", slug="tenant1", group=self.tg)
+        self.sub.tenant = self.tenant
+        self.sub.save(update_fields=["tenant"])
         self.site = Site.objects.create(name="Dublin", slug="dublin", tenant=self.tenant)
         self.location = Location.objects.create(name="Rack A", slug="rack-a", site=self.site, tenant=self.tenant)
         self.asset = Asset.objects.create(
