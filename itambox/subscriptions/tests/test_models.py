@@ -665,3 +665,43 @@ class SubscriptionConcurrencyTests(TransactionTestCase):
         self.assertTrue(all(not thread.is_alive() for thread in threads))
         self.assertEqual(errors, [])
         self.assertEqual(Notification.objects.filter(user=user, subject="Renewal reminder").count(), 1)
+
+    def test_concurrent_renew_prevents_expiry(self):
+        today = timezone.localdate()
+        subscription = Subscription.objects.create(
+            name="Expiry race sub",
+            provider=Provider.objects.create(name="Expiry race provider"),
+            status=SubscriptionStatusChoices.ACTIVE,
+            renewal_date=today - datetime.timedelta(days=1),
+        )
+        loaded = threading.Event()
+        allow_expire = threading.Event()
+        errors = []
+
+        def expirer():
+            close_old_connections()
+            candidate = Subscription._base_manager.get(pk=subscription.pk)
+            loaded.set()
+            allow_expire.wait(timeout=10)
+            try:
+                candidate.expire()
+            except Exception as exc:  # pragma: no cover - asserted below
+                errors.append(exc)
+            finally:
+                close_old_connections()
+
+        t = threading.Thread(target=expirer)
+        t.start()
+        self.assertTrue(loaded.wait(timeout=10))
+
+        winner = Subscription._base_manager.get(pk=subscription.pk)
+        future = today + datetime.timedelta(days=365)
+        winner.renew(future)
+        allow_expire.set()
+        t.join(timeout=10)
+
+        self.assertFalse(t.is_alive())
+        self.assertEqual(errors, [])
+        subscription.refresh_from_db()
+        self.assertEqual(subscription.status, SubscriptionStatusChoices.ACTIVE)
+        self.assertEqual(subscription.renewal_date, future)

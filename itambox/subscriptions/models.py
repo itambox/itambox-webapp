@@ -539,6 +539,8 @@ class Subscription(CustomFieldDataMixin, AutoSlugMixin, BookmarkableMixin, Delet
             self._refresh_from_locked_row()
             if self.status == SubscriptionStatusChoices.EXPIRED:
                 return False
+            if self.renewal_date and self.renewal_date >= timezone.localdate():
+                return False
             self.validate_transition(SubscriptionStatusChoices.EXPIRED)
             self.status = SubscriptionStatusChoices.EXPIRED
             self.save(update_fields=["status", "updated_at"])
