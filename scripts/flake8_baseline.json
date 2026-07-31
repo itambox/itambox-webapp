@@ -4222,7 +4222,7 @@
     {
       "path": "itambox/core/reports/compiler.py",
       "code": "C901",
-      "message": "'compile_report_context' is too complex (385)",
+      "message": "'compile_report_context' is too complex (388)",
       "source": "def compile_report_context(template, active_tenant=None, filter_tenants=None):",
       "context": "Module:body/FunctionDef:compile_report_context:self",
       "count": 1
