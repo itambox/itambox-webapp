@@ -65,6 +65,7 @@ def generate_scheduled_report_task(scheduled_report_id):
 
         try:
             template = sched.report
+            archive_entry = None
 
             # 1. Compile report data using unified compiler helper
             headers, rows, summary_cards, grouped_data, chart_svg, context_data = compile_report_context(

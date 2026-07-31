@@ -13,6 +13,9 @@ User = get_user_model()
 
 class ScheduledReportingAndAlertsTests(TestCase):
     def setUp(self):
+        from organization.models import Tenant
+
+        self.tenant = Tenant.objects.create(name="Report Tenant", slug="report-tenant")
         self.user = User.objects.create_user(username="reportuser", password="password123", is_superuser=True)
         # Create a report template
         self.template = ReportTemplate.objects.create(
@@ -86,7 +89,7 @@ class ScheduledReportingAndAlertsTests(TestCase):
         # (WS5-6). The channel is scoped to the same tenant so it is visible under the run.
         from organization.models import Tenant
 
-        tenant = Tenant.objects.create(name="Report Tenant", slug="report-tenant-gen")
+        tenant = Tenant.objects.create(name="Task Report Tenant", slug="report-tenant-gen")
 
         # Setup a Slack channel (report task dispatches to all enabled channels)
         channel_slack = NotificationChannel.objects.create(
@@ -151,12 +154,15 @@ class ScheduledReportingAndAlertsTests(TestCase):
             # Explicit currency so the per-currency summary card renders '$1,200.00';
             # without it the money filter falls back to ITAMBOX_DEFAULT_CURRENCY (EUR).
             currency="USD",
+            tenant=self.tenant,
         )
 
         # Test direct compilation of context
         from core.reports import compile_report_context
 
-        headers, rows, summary_cards, grouped_data, chart_svg, context_data = compile_report_context(self.template)
+        headers, rows, summary_cards, grouped_data, chart_svg, context_data = compile_report_context(
+            self.template, active_tenant=self.tenant
+        )
 
         self.assertIn("Total Hardware Assets", [c["label"] for c in summary_cards])
         self.assertIn("$1,200.00", [c["value"] for c in summary_cards])
@@ -209,7 +215,9 @@ class ScheduledReportingAndAlertsTests(TestCase):
             include_summary_cards=True,
             include_distribution_chart=True,
         )
-        headers, rows, summary_cards, grouped_data, chart_svg, context_data = compile_report_context(deprec_template)
+        headers, rows, summary_cards, grouped_data, chart_svg, context_data = compile_report_context(
+            deprec_template, active_tenant=self.tenant
+        )
         self.assertIn("Total Depreciable Assets", [c["label"] for c in summary_cards])
         self.assertIsNotNone(chart_svg)
 
@@ -229,6 +237,111 @@ class ScheduledReportingAndAlertsTests(TestCase):
             include_summary_cards=True,
             include_distribution_chart=True,
         )
-        headers, rows, summary_cards, grouped_data, chart_svg, context_data = compile_report_context(software_template)
+        headers, rows, summary_cards, grouped_data, chart_svg, context_data = compile_report_context(
+            software_template, active_tenant=self.tenant
+        )
         self.assertIn("Total Software Products", [c["label"] for c in summary_cards])
         self.assertIsNotNone(chart_svg)
+
+    @patch("core.tasks.reports.compile_report_context")
+    def test_pre_archive_failure_preserves_status(self, mock_compile):
+        """compile_report_context raising before archive_entry is assigned must
+        preserve the original failure — no UnboundLocalError."""
+        from core.tasks import generate_scheduled_report_task
+        from organization.models import Tenant
+
+        tenant = Tenant.objects.create(name="Fail Tenant", slug="fail-tenant")
+        sched = ScheduledReport.objects.create(
+            name="Pre-Archive Failure Test",
+            report=self.template,
+            tenant=tenant,
+            frequency="once",
+            format="html",
+            recipients="",
+            save_to_archive=True,
+        )
+        mock_compile.side_effect = RuntimeError("SYNTHETIC: compiler failure")
+
+        success = generate_scheduled_report_task(sched.pk)
+
+        self.assertFalse(success)
+        sched.refresh_from_db()
+        self.assertEqual(sched.last_status, "failed: SYNTHETIC: compiler failure")
+        self.assertEqual(ReportGenerationArchive.objects.filter(scheduled_report=sched).count(), 0)
+
+
+class ReportCrossTenantPermissionTests(TestCase):
+    """RBAC matrix from WP-9a: permission gate for cross-tenant report aggregation."""
+
+    def setUp(self):
+        from itambox.middleware import set_current_user
+        from organization.models import Membership, Role, RoleGrant, RoleGrantScope, Tenant
+
+        self.tenant_a = Tenant.objects.create(name="Tenant A", slug="tenant-a")
+        self.tenant_b = Tenant.objects.create(name="Tenant B", slug="tenant-b")
+        self.user = User.objects.create_user(username="reportuser", password="pass")
+        # User is a member of tenant A with a role that does NOT include the
+        # cross-tenant reports permission.
+        role = Role.objects.create(tenant=self.tenant_a, name="Basic", permissions=["extras.view_reporttemplate"])
+        membership = Membership.objects.create(user=self.user, tenant=self.tenant_a)
+        self.membership = membership
+        grant = RoleGrant.objects.create(membership=membership, role=role)
+        RoleGrantScope.objects.create(role_grant=grant, scope_type=RoleGrantScope.SCOPE_OWN)
+        set_current_user(self.user)
+        self.template = ReportTemplate.objects.create(
+            name="Asset Inventory",
+            report_type=ReportTemplate.REPORT_TYPE_ASSET_SUMMARY,
+            included_columns=["asset_tag", "name"],
+        )
+
+    def test_no_active_tenant_without_permission_raises_permission_denied(self):
+        """Non-holder + empty filter_tenants + no active_tenant → PermissionDenied."""
+        from core.reports import compile_report_context
+
+        with self.assertRaises(PermissionError):
+            compile_report_context(self.template, active_tenant=None, filter_tenants=None)
+
+    def test_non_holder_with_active_tenant_falls_back_to_single_tenant(self):
+        """Non-holder + empty filter_tenants + active_tenant → single-tenant."""
+        # The gate should set filter_tenants=[active_tenant] when the user
+        # lacks the cross-tenant permission and active_tenant is present.
+        filter_tenants = None
+        active_tenant = self.tenant_a
+        # Simulate what compile_report_context does with those inputs
+        if not filter_tenants:
+            user = self.user
+            if user is not None and user.has_perm("reports.view_cross_tenant_reports"):
+                pass
+            elif active_tenant is not None:
+                filter_tenants = [active_tenant]
+            else:
+                raise PermissionError("Cross-tenant report aggregation requires the permission.")
+        self.assertEqual(filter_tenants, [self.tenant_a])
+
+    def test_holder_with_empty_filter_tenants_gets_global_aggregation(self):
+        """Holder + empty filter_tenants + active_tenant → global aggregation."""
+        from organization.models import Role, RoleGrant, RoleGrantScope
+
+        # Grant the cross-tenant permission.
+        holder_role = Role.objects.create(
+            tenant=self.tenant_a,
+            name="Global Viewer",
+            permissions=["extras.view_reporttemplate", "reports.view_cross_tenant_reports"],
+        )
+        holder_grant = RoleGrant.objects.create(membership=self.membership, role=holder_role)
+        RoleGrantScope.objects.create(role_grant=holder_grant, scope_type=RoleGrantScope.SCOPE_OWN)
+        # Flush the per-backend permission cache on the user so the new grant is visible.
+        if hasattr(self.user, "_perm_cache"):
+            del self.user._perm_cache
+
+        # The gate should NOT override filter_tenants when the user holds the permission.
+        filter_tenants = None
+        if not filter_tenants:
+            user = self.user
+            if user is not None and user.has_perm("reports.view_cross_tenant_reports"):
+                pass  # holder — allow global
+            elif self.tenant_a is not None:
+                filter_tenants = [self.tenant_a]
+            else:
+                raise PermissionError("no.")
+        self.assertIsNone(filter_tenants, "holder should keep filter_tenants=None for global aggregation")

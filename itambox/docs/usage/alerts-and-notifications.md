@@ -163,7 +163,7 @@ many-to-many relationship.
 
 | Type | Choice value | Transport | Typical config |
 |---|---|---|---|
-| Email | `email` | SMTP | `smtp_host`, `smtp_port`, `username`, `password`, `use_tls`, `from_email`, `recipients` |
+| Email | `email` | SMTP (global) | `recipients` — SMTP settings come from global `EmailSettings`, **not** per-channel config |
 | Slack | `slack` | Incoming Webhook | `webhook_url` |
 | Microsoft Teams | `teams` | Incoming Webhook | `webhook_url` |
 | In-App | `in_app` | Built-in | No config needed — alerts appear in the Alert Center bell icon |
@@ -172,19 +172,17 @@ many-to-many relationship.
 
 1. Go to **Extras → Notification Channels** and click **Add**.
 2. Set **Channel Type** to `Email`.
-3. Fill in the **Config** JSON:
+3. Fill in the **Config** JSON with the recipient addresses:
 
 ```json
 {
-    "smtp_host": "smtp.example.com",
-    "smtp_port": 587,
-    "username": "alerts@example.com",
-    "password": "your-app-password",
-    "use_tls": true,
-    "from_email": "itambox@example.com",
     "recipients": ["it-team@example.com", "procurement@example.com"]
 }
 ```
+
+Email delivery uses the **global** SMTP configuration (host, port, credentials,
+TLS) from the System Email Settings page, not per-channel SMTP. The channel
+config only contributes the recipient list.
 
 > [!IMPORTANT]
 > The `config` field is excluded from the change log (`_change_logging_excluded_fields`)
@@ -234,8 +232,8 @@ Every channel attached to a rule receives the notification when the rule fires.
 | Property | Behaviour |
 |---|---|
 | Delivery tracking | Each `AlertLog` records per-channel delivery status in `delivery_status` (`ok` / `failed` / error message) |
-| SSRF protection | Outbound webhook URLs are validated against `ALLOWED_WEBHOOK_DOMAINS` before dispatch |
-| Retry | Failed webhook calls are retried via `django-q2` task retry with exponential backoff |
+| SSRF protection | Outbound webhook URLs are validated at send time by `request_pinned` — DNS is resolved, the destination IP is pinned, redirects are not followed |
+| Delivery model | Synchronous, single-attempt best-effort. Failed channel notifications are **not** retried through `django-q2` or any other queue. A transient failure loses that channel's notification until the next renotify interval (which may be never) |
 | Timeout | Webhook requests time out after 10 seconds |
 
 ---
@@ -323,7 +321,7 @@ procurement can re-order before you run out.
    |---|---|
    | Name | `Procurement Email` |
    | Channel Type | `Email` |
-   | Config | `{"smtp_host": "...", "from_email": "...", "recipients": ["buyer@example.com"]}` |
+   | Config | `{"recipients": ["buyer@example.com"]}` |
 
 2. Create an Alert Rule:
 
@@ -391,8 +389,8 @@ daily critical alert until the license is renewed.
 **Slack / Teams notifications never arrive**
 
 : The webhook URL in the channel's `config` may be expired, mistyped, or
-  pointing to a deleted integration. The SSRF guard also blocks URLs whose
-  domain is not listed in `ALLOWED_WEBHOOK_DOMAINS` — check your Django settings.
+  pointing to a deleted integration. The outbound call resolves the destination
+  hostname at send time and pins the resolved IP; redirects are not followed.
   Test the webhook URL with `curl` from the ITAMbox server to rule out network
   issues.
 
@@ -424,8 +422,8 @@ daily critical alert until the license is renewed.
   check that your tenant scope matches — switching tenants changes which alerts
   are visible.
 
-**Webhook dispatch fails with SSRF error**
+**Webhook dispatch fails with a network error**
 
-: The outbound webhook URL's domain is not in the `ALLOWED_WEBHOOK_DOMAINS`
-  setting. Add the domain (e.g. `hooks.slack.com`, `*.webhook.office.com`) to
-  the allowlist and restart the application server.
+: The outbound call resolves the destination hostname at send time and does not
+  follow redirects. Verify the webhook URL is reachable from the ITAMbox server
+  and that no firewall or proxy is blocking the pinned destination.

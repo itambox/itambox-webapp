@@ -7,6 +7,8 @@ from django.db.models import Count, Q, Sum
 from django.utils import timezone
 from django.utils.translation import gettext as _
 
+from itambox.middleware import get_current_user
+
 from .charts import generate_bar_chart, generate_doughnut_chart
 
 
@@ -62,6 +64,21 @@ def compile_report_context(template, active_tenant=None, filter_tenants=None):
     include Q(tenant__isnull=True) so their global rows appear in every tenant's report.
     """
     from extras.models import ReportTemplate
+
+    # Permission gate for cross-tenant report aggregation (WP-9a).
+    # An empty filter_tenants signals "global aggregation."  Without the
+    # permission, fall back to single-tenant when active_tenant is set, or
+    # refuse when neither tenant scope is available.
+    if not filter_tenants:
+        user = get_current_user()
+        if user is not None and user.has_perm("reports.view_cross_tenant_reports"):
+            pass  # permission holder — allow global aggregation
+        elif active_tenant is not None:
+            filter_tenants = [active_tenant]  # non-holder — single-tenant fallback
+        else:
+            raise PermissionError(
+                "Cross-tenant report aggregation requires the 'reports.view_cross_tenant_reports' permission."
+            )
 
     # Resolve active columns sequence
     active_cols = template.included_columns or []
