@@ -15374,7 +15374,7 @@ paths:
       - in: path
         name: id
         schema:
-          type: integer
+          type: string
         required: true
       - in: path
         name: provider_slug
@@ -15393,7 +15393,7 @@ paths:
       - in: path
         name: id
         schema:
-          type: integer
+          type: string
         required: true
       - in: path
         name: provider_slug
@@ -15412,7 +15412,7 @@ paths:
       - in: path
         name: id
         schema:
-          type: integer
+          type: string
         required: true
       - in: path
         name: provider_slug
@@ -15431,7 +15431,7 @@ paths:
       - in: path
         name: id
         schema:
-          type: integer
+          type: string
         required: true
       - in: path
         name: provider_slug
@@ -15495,7 +15495,7 @@ paths:
       - in: path
         name: id
         schema:
-          type: integer
+          type: string
         required: true
       - in: path
         name: provider_slug
@@ -15514,7 +15514,7 @@ paths:
       - in: path
         name: id
         schema:
-          type: integer
+          type: string
         required: true
       - in: path
         name: provider_slug
@@ -15533,7 +15533,7 @@ paths:
       - in: path
         name: id
         schema:
-          type: integer
+          type: string
         required: true
       - in: path
         name: provider_slug
@@ -15552,7 +15552,7 @@ paths:
       - in: path
         name: id
         schema:
-          type: integer
+          type: string
         required: true
       - in: path
         name: provider_slug
@@ -17065,7 +17065,7 @@ paths:
       - in: path
         name: id
         schema:
-          type: integer
+          type: string
         required: true
       - in: path
         name: tenant_slug
@@ -17084,7 +17084,7 @@ paths:
       - in: path
         name: id
         schema:
-          type: integer
+          type: string
         required: true
       - in: path
         name: tenant_slug
@@ -17103,7 +17103,7 @@ paths:
       - in: path
         name: id
         schema:
-          type: integer
+          type: string
         required: true
       - in: path
         name: tenant_slug
@@ -17122,7 +17122,7 @@ paths:
       - in: path
         name: id
         schema:
-          type: integer
+          type: string
         required: true
       - in: path
         name: tenant_slug
@@ -17186,7 +17186,7 @@ paths:
       - in: path
         name: id
         schema:
-          type: integer
+          type: string
         required: true
       - in: path
         name: tenant_slug
@@ -17205,7 +17205,7 @@ paths:
       - in: path
         name: id
         schema:
-          type: integer
+          type: string
         required: true
       - in: path
         name: tenant_slug
@@ -17224,7 +17224,7 @@ paths:
       - in: path
         name: id
         schema:
-          type: integer
+          type: string
         required: true
       - in: path
         name: tenant_slug
@@ -17243,7 +17243,7 @@ paths:
       - in: path
         name: id
         schema:
-          type: integer
+          type: string
         required: true
       - in: path
         name: tenant_slug
