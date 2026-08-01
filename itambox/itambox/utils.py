@@ -2,6 +2,7 @@ import datetime
 import logging
 import os
 from decimal import Decimal
+from uuid import UUID
 
 from django.conf import settings
 from django.contrib.contenttypes.models import ContentType
@@ -115,7 +116,7 @@ def serialize_object(obj: Model, extra_fields=None, exclude_fields=None) -> dict
         else:
             if isinstance(field_value, (datetime.date, datetime.datetime, datetime.time)):
                 data[field_name] = field_value.isoformat()
-            elif isinstance(field_value, Decimal):
+            elif isinstance(field_value, (Decimal, UUID)):
                 data[field_name] = str(field_value)
             else:
                 from django.db.models.fields.files import FieldFile

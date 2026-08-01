@@ -10110,7 +10110,7 @@
     {
       "path": "itambox/users/api/scim/authentication.py",
       "code": "C901",
-      "message": "'SCIMBearerTokenAuthentication.authenticate' is too complex (22)",
+      "message": "'SCIMBearerTokenAuthentication.authenticate' is too complex (20)",
       "source": "    def authenticate(self, request):",
       "context": "Module:body/ClassDef:SCIMBearerTokenAuthentication:body/FunctionDef:authenticate:self",
       "count": 1
@@ -10126,7 +10126,7 @@
     {
       "path": "itambox/users/api/scim/filters.py",
       "code": "C901",
-      "message": "'parse_scim_filter' is too complex (32)",
+      "message": "'parse_scim_filter' is too complex (19)",
       "source": "def parse_scim_filter(filter_str, model_type=\"user\"):",
       "context": "Module:body/FunctionDef:parse_scim_filter:self",
       "count": 1
@@ -10134,7 +10134,7 @@
     {
       "path": "itambox/users/api/scim/provider_authentication.py",
       "code": "C901",
-      "message": "'SCIMProviderBearerTokenAuthentication.authenticate' is too complex (21)",
+      "message": "'SCIMProviderBearerTokenAuthentication.authenticate' is too complex (20)",
       "source": "    def authenticate(self, request):",
       "context": "Module:body/ClassDef:SCIMProviderBearerTokenAuthentication:body/FunctionDef:authenticate:self",
       "count": 1
@@ -10142,7 +10142,7 @@
     {
       "path": "itambox/users/api/scim/views.py",
       "code": "C901",
-      "message": "'SCIMUserDetailView.patch' is too complex (22)",
+      "message": "'SCIMUserDetailView.patch' is too complex (26)",
       "source": "    def patch(self, request, pk, *args, **kwargs):",
       "context": "Module:body/ClassDef:SCIMUserDetailView:body/FunctionDef:patch:self",
       "count": 1
@@ -10150,7 +10150,7 @@
     {
       "path": "itambox/users/api/scim/views.py",
       "code": "C901",
-      "message": "'SCIMUserListView.post' is too complex (11)",
+      "message": "'SCIMUserListView.post' is too complex (18)",
       "source": "    def post(self, request, *args, **kwargs):",
       "context": "Module:body/ClassDef:SCIMUserListView:body/FunctionDef:post:self",
       "count": 1

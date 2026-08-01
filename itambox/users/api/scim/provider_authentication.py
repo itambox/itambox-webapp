@@ -90,13 +90,12 @@ class SCIMProviderBearerTokenAuthentication(BaseAuthentication):
             # organization.change_membership permission inside it — the same real
             # has_perm check the tenant SCIM path performs, resolved against role
             # content, never a role-name match. Fail closed otherwise.
-            if not user.is_superuser:
-                if token.tenant_id != tenant.pk:
-                    raise exceptions.AuthenticationFailed("Token is not scoped to this provider.")
-                if not user.has_perm("organization.change_membership", obj=tenant):
-                    raise exceptions.AuthenticationFailed(
-                        "User does not have sufficient permissions (organization.change_membership required)."
-                    )
+            if token.tenant_id != tenant.pk:
+                raise exceptions.AuthenticationFailed("Token is not scoped to this provider.")
+            if not user.is_superuser and not user.has_perm("organization.change_membership", obj=tenant):
+                raise exceptions.AuthenticationFailed(
+                    "User does not have sufficient permissions (organization.change_membership required)."
+                )
 
             # Enforce write_enabled token flag for write methods
             if request.method in ("POST", "PUT", "PATCH", "DELETE"):

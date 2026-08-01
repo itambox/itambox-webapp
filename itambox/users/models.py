@@ -2,6 +2,7 @@ import hashlib
 import hmac
 import ipaddress
 import secrets
+import uuid
 
 from django.conf import settings
 from django.contrib.auth.models import AbstractUser
@@ -74,6 +75,13 @@ class User(AbstractUser):
             "If unchecked, this user cannot perform interactive login (password or SSO). "
             "API tokens and account status (is_active) are unaffected."
         ),
+    )
+    scim_id = models.UUIDField(
+        default=uuid.uuid4,
+        unique=True,
+        editable=False,
+        verbose_name=_("SCIM resource ID"),
+        help_text=_("Stable opaque identifier emitted by the SCIM API."),
     )
     # NOTE: email is deliberately NOT globally unique. SSO (OIDC/SAML/LDAP), SCIM,
     # and the SnipeIT importer all provision accounts independently of email, and
@@ -271,6 +279,20 @@ class UserGroup(AutoSlugMixin, StandardModel, SoftDeleteMixin):
         verbose_name=_("Tenant"),
     )
     is_active = models.BooleanField(default=True, db_index=True, verbose_name=_("Active"))
+    scim_id = models.UUIDField(
+        default=uuid.uuid4,
+        unique=True,
+        editable=False,
+        verbose_name=_("SCIM resource ID"),
+        help_text=_("Stable opaque identifier emitted by the SCIM API."),
+    )
+    external_id = models.CharField(
+        max_length=255,
+        blank=True,
+        default="",
+        verbose_name=_("External ID"),
+        help_text=_("Stable identifier supplied by the provisioning domain that owns this group."),
+    )
 
     class Meta:
         ordering = ["name"]
@@ -286,6 +308,11 @@ class UserGroup(AutoSlugMixin, StandardModel, SoftDeleteMixin):
                 fields=["tenant", "slug"],
                 condition=models.Q(deleted_at__isnull=True),
                 name="users_usergroup_unique_tenant_slug_active",
+            ),
+            models.UniqueConstraint(
+                fields=["tenant", "external_id"],
+                condition=models.Q(deleted_at__isnull=True) & ~models.Q(external_id=""),
+                name="users_usergroup_unique_tenant_external_id",
             ),
         ]
 

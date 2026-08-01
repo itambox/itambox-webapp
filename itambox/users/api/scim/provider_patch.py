@@ -9,6 +9,7 @@ import re
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from typing import Any
+from uuid import UUID
 
 UNSET = object()
 
@@ -29,13 +30,14 @@ class UserPatch:
     first_name: Any = UNSET
     last_name: Any = UNSET
     active: Any = UNSET
+    external_id: Any = UNSET
 
 
 @dataclass(frozen=True)
 class GroupMemberOperation:
     op: str
-    member_ids: tuple[int, ...] = ()
-    filter_member_id: int | None = None
+    member_ids: tuple[int | str, ...] = ()
+    filter_member_id: int | str | None = None
     clear_members: bool = False
 
 
@@ -43,6 +45,7 @@ class GroupMemberOperation:
 class GroupPatch:
     display_name: Any = UNSET
     member_operations: tuple[GroupMemberOperation, ...] = ()
+    external_id: Any = UNSET
 
 
 _MEMBER_FILTER_RE = re.compile(
@@ -60,10 +63,10 @@ MAX_PATCH_PATH_LENGTH = 256
 USER_NAME_MAX_LENGTH = 150
 EMAIL_MAX_LENGTH = 254
 NAME_FIELD_MAX_LENGTH = 150
+EXTERNAL_ID_MAX_LENGTH = 255
 DISPLAY_NAME_MAX_LENGTH = 100
 _UNMANAGED_USER_PATHS = {
     "displayname",
-    "externalid",
     "usertype",
     "preferredlanguage",
     "locale",
@@ -171,24 +174,31 @@ def _iter_operations(operations: Any) -> Sequence[Mapping[str, Any]]:
     return parsed
 
 
-def _coerce_member_id(value: Any) -> int:
+def _coerce_member_id(value: Any) -> int | str:
     if isinstance(value, bool):
         raise SCIMPatchError("Invalid member ID")
     if isinstance(value, int):
         member_id = value
-    elif isinstance(value, str):
-        normalized = value.strip()
-        if len(normalized) > MAX_MEMBER_ID_DIGITS or not re.fullmatch(r"[0-9]+", normalized):
+        if not 0 < member_id <= 2**63 - 1:
             raise SCIMPatchError("Invalid member ID")
-        member_id = int(normalized)
-    else:
-        raise SCIMPatchError("Invalid member ID")
-    if not 0 < member_id <= 2**63 - 1:
-        raise SCIMPatchError("Invalid member ID")
-    return member_id
+        return member_id
+    if isinstance(value, str):
+        normalized = value.strip()
+        if re.fullmatch(r"[0-9]+", normalized):
+            if len(normalized) > MAX_MEMBER_ID_DIGITS:
+                raise SCIMPatchError("Invalid member ID")
+            member_id = int(normalized)
+            if not 0 < member_id <= 2**63 - 1:
+                raise SCIMPatchError("Invalid member ID")
+            return member_id
+        try:
+            return str(UUID(normalized))
+        except (TypeError, ValueError, AttributeError) as exc:
+            raise SCIMPatchError("Invalid member ID") from exc
+    raise SCIMPatchError("Invalid member ID")
 
 
-def _member_values(value: Any) -> tuple[int, ...]:
+def _member_values(value: Any) -> tuple[int | str, ...]:
     if isinstance(value, Mapping) and "members" in value:
         unknown_keys = set(value) - {"members", "displayName"}
         if unknown_keys:
@@ -214,7 +224,7 @@ def _member_values(value: Any) -> tuple[int, ...]:
     return tuple(member_ids)
 
 
-def parse_member_ids(value: Any) -> tuple[int, ...]:
+def parse_member_ids(value: Any) -> tuple[int | str, ...]:
     """Validate a complete SCIM ``members`` array without touching the database."""
     if not isinstance(value, list):
         raise SCIMPatchError("members must be a list")
@@ -337,6 +347,8 @@ def _set_user_attribute(fields: dict[str, Any], name: Any, value: Any) -> None:
         fields["username"] = _required_text(value, "userName", USER_NAME_MAX_LENGTH)
     elif normalized_name == "emails":
         fields["email"] = _email(value)
+    elif normalized_name == "externalid":
+        fields["external_id"] = parse_external_id(value)
     elif normalized_name == "name":
         _set_user_name_attributes(fields, value)
     elif _is_unmanaged_user_path(normalized_name):
@@ -351,6 +363,8 @@ def _parse_user_path(fields: dict[str, Any], path: str, value: Any) -> None:
         fields["active"] = _active(value)
     elif normalized_path == "username":
         fields["username"] = _required_text(value, "userName", USER_NAME_MAX_LENGTH)
+    elif normalized_path == "externalid":
+        fields["external_id"] = parse_external_id(value)
     elif normalized_path in {"email", "emails", "emails.value"} or _email_filter_type(path) == "work":
         fields["email"] = _email(value)
     elif normalized_path == "name" and isinstance(value, Mapping):
@@ -373,6 +387,8 @@ def _parse_user_remove(fields: dict[str, Any], path: str) -> None:
     email_type = _email_filter_type(path)
     if normalized_path in {"email", "emails", "emails.value"} or email_type == "work":
         fields["email"] = ""
+    elif normalized_path == "externalid":
+        fields["external_id"] = ""
     elif normalized_path == "name.givenname":
         fields["first_name"] = ""
     elif normalized_path == "name.familyname":
@@ -428,6 +444,7 @@ def parse_user_resource(document: Any) -> UserPatch:
     username = _required_text(document["userName"], "userName", USER_NAME_MAX_LENGTH)
     emails = document.get("emails", [])
     email = "" if emails == [] else _email(emails)
+    external_id = parse_external_id(document.get("externalId"))
 
     name = document.get("name", {})
     if not isinstance(name, Mapping):
@@ -452,6 +469,7 @@ def parse_user_resource(document: Any) -> UserPatch:
         first_name=first_name,
         last_name=last_name,
         active=_active(document.get("active", True)),
+        external_id=external_id,
     )
 
 
@@ -486,23 +504,35 @@ def _parse_group_remove(path: str, value: Any, *, value_present: bool) -> GroupM
     raise SCIMPatchError(f"Unsupported remove path: {path}")
 
 
-def _nested_group_values(value: Any) -> tuple[Any, Any]:
+def _nested_group_values(value: Any) -> tuple[Any, Any, Any]:
     if not isinstance(value, Mapping):
-        return UNSET, UNSET
-    unknown_keys = set(value) - {"displayName", "members"}
-    if unknown_keys and ("displayName" in value or "members" in value):
+        return UNSET, UNSET, UNSET
+    unknown_keys = set(value) - {"displayName", "externalId", "members"}
+    if unknown_keys and ("displayName" in value or "externalId" in value or "members" in value):
         raise SCIMPatchError(f"Unsupported SCIM PATCH group keys: {sorted(unknown_keys)}")
-    return value.get("displayName", UNSET), value.get("members", UNSET)
+    return value.get("displayName", UNSET), value.get("externalId", UNSET), value.get("members", UNSET)
+
+
+def _external_id(value: Any) -> str:
+    return _required_text(value, "externalId", EXTERNAL_ID_MAX_LENGTH)
+
+
+def parse_external_id(value: Any) -> str:
+    if value is None or value == "":
+        return ""
+    return _external_id(value)
 
 
 def _parse_group_add_or_replace(
     operation_type: str,
     path: str,
     value: Any,
-) -> tuple[Any, GroupMemberOperation | None]:
+) -> tuple[Any, Any, GroupMemberOperation | None]:
     normalized_path = path.lower()
     if normalized_path == "displayname":
-        return _display_name(value), None
+        return _display_name(value), UNSET, None
+    if normalized_path == "externalid":
+        return UNSET, _external_id(value), None
     if normalized_path == "members":
         if isinstance(value, Mapping) and "members" in value:
             unknown_keys = set(value) - {"members"}
@@ -511,45 +541,51 @@ def _parse_group_add_or_replace(
             member_value = value["members"]
         else:
             member_value = value
-        return UNSET, GroupMemberOperation(op=operation_type, member_ids=_member_values(member_value))
+        return UNSET, UNSET, GroupMemberOperation(op=operation_type, member_ids=_member_values(member_value))
     if path:
         raise SCIMPatchError(f"Unsupported SCIM PATCH path: {path}")
 
-    nested_display_name, nested_members = _nested_group_values(value)
-    if nested_display_name is UNSET and nested_members is UNSET:
-        return UNSET, GroupMemberOperation(op=operation_type, member_ids=_member_values(value))
+    nested_display_name, nested_external_id, nested_members = _nested_group_values(value)
+    if nested_display_name is UNSET and nested_external_id is UNSET and nested_members is UNSET:
+        return UNSET, UNSET, GroupMemberOperation(op=operation_type, member_ids=_member_values(value))
 
     display_name = UNSET if nested_display_name is UNSET else _display_name(nested_display_name)
+    external_id = UNSET if nested_external_id is UNSET else _external_id(nested_external_id)
     member_operation = (
         None
         if nested_members is UNSET
         else GroupMemberOperation(op=operation_type, member_ids=_member_values(nested_members))
     )
-    return display_name, member_operation
+    return display_name, external_id, member_operation
 
 
 def _parse_group_operation(
     operation: Mapping[str, Any],
-) -> tuple[Any, GroupMemberOperation | None]:
+) -> tuple[Any, Any, GroupMemberOperation | None]:
     operation_type = _operation_type(operation)
     path = _operation_path(operation)
     value = _operation_value(operation, operation_type)
     if operation_type == "remove":
-        return UNSET, _parse_group_remove(path, value, value_present="value" in operation)
+        if path.lower() == "externalid":
+            return UNSET, "", None
+        return UNSET, UNSET, _parse_group_remove(path, value, value_present="value" in operation)
     return _parse_group_add_or_replace(operation_type, path, value)
 
 
 def parse_group_patch_operations(operations: Any) -> GroupPatch:
     """Parse provider ``/Groups/<id>`` PATCH operations without database access."""
     display_name: Any = UNSET
+    external_id: Any = UNSET
     member_operations: list[GroupMemberOperation] = []
-    unique_member_ids: set[int] = set()
+    unique_member_ids: set[int | str] = set()
     total_member_entries = 0
 
     for operation in _iter_operations(operations):
-        operation_display_name, member_operation = _parse_group_operation(operation)
+        operation_display_name, operation_external_id, member_operation = _parse_group_operation(operation)
         if operation_display_name is not UNSET:
             display_name = operation_display_name
+        if operation_external_id is not UNSET:
+            external_id = operation_external_id
         if member_operation is not None:
             total_member_entries += len(member_operation.member_ids) + int(
                 member_operation.filter_member_id is not None
@@ -565,5 +601,6 @@ def parse_group_patch_operations(operations: Any) -> GroupPatch:
 
     return GroupPatch(
         display_name=display_name,
+        external_id=external_id,
         member_operations=tuple(member_operations),
     )

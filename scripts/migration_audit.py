@@ -18,7 +18,9 @@ OPERATION_TYPES = (
 POST_TRANSITION_MIGRATIONS = {
     "extras.0101_issue88_drop_legacy_webhook_name_like",
     "extras.0102_alter_event_action",
+    "organization.0101_membership_external_id_and_more",
     "subscriptions.0101_remove_subscription_auto_renewal_and_more",
+    "users.0101_user_scim_id_usergroup_external_id_usergroup_scim_id_and_more",
 }
 ISSUE88_SHARD_RE = re.compile(r"issue88_shard_(\d{2})(?:_|$)")
 ALLOWED_DISPOSITIONS = {
@@ -48,6 +50,14 @@ SEMANTIC_DISPOSITIONS = {
         "upgrade-only",
         "Preserves subscription renewal-term values while normalizing removed legacy lifecycle states during 1.0 upgrade.",
         {"subscriptions.0101_remove_subscription_auto_renewal_and_more"},
+    ),
+    **_dispositions(
+        "upgrade-only",
+        (
+            "Populates stable opaque SCIM IDs idempotently and adds scoped group/user "
+            "correlation fields while preserving legacy principals for the 1.x dual-read window."
+        ),
+        {"users.0101_user_scim_id_usergroup_external_id_usergroup_scim_id_and_more"},
     ),
     **_dispositions(
         "required-fresh",

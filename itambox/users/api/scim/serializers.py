@@ -1,9 +1,12 @@
 from django.contrib.auth import get_user_model
 from django.contrib.contenttypes.models import ContentType
+from django.db.models import Q
 from rest_framework import serializers
 
 from organization.models import Membership
 from users.models import GroupMembership, UserGroup
+
+_UNSET = object()
 
 User = get_user_model()
 
@@ -15,7 +18,9 @@ def _scim_base_path(context):
 
 class SCIMUserSerializer(serializers.ModelSerializer):
     schemas = serializers.SerializerMethodField(read_only=True)
+    id = serializers.UUIDField(source="scim_id", read_only=True)
     userName = serializers.CharField(source="username")
+    externalId = serializers.SerializerMethodField()
     name = serializers.SerializerMethodField(required=False)
     emails = serializers.SerializerMethodField(required=False)
     active = serializers.SerializerMethodField()
@@ -24,11 +29,28 @@ class SCIMUserSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = User
-        fields = ["schemas", "id", "userName", "name", "emails", "active", "groups", "meta"]
-        read_only_fields = ["id", "schemas", "groups", "meta"]
+        fields = ["schemas", "id", "externalId", "userName", "name", "emails", "active", "groups", "meta"]
+        read_only_fields = ["id", "externalId", "schemas", "groups", "meta"]
 
     def get_schemas(self, obj):
         return ["urn:ietf:params:scim:schemas:core:2.0:User"]
+
+    def _get_scim_membership(self, obj):
+        cached = getattr(obj, "_scim_membership", _UNSET)
+        if cached is not _UNSET:
+            return cached
+        prefetched = getattr(obj, "_scim_memberships", None)
+        if prefetched is not None:
+            membership = prefetched[0] if prefetched else None
+        else:
+            tenant = self.context.get("tenant")
+            membership = Membership.objects.filter(user=obj, tenant=tenant).first() if tenant is not None else None
+        obj._scim_membership = membership
+        return membership
+
+    def get_externalId(self, obj):
+        membership = self._get_scim_membership(obj)
+        return membership.external_id if membership and membership.external_id else None
 
     def get_active(self, obj):
         # SCIM is tenant-scoped: report the user's active state IN THIS TENANT, i.e. the
@@ -40,7 +62,7 @@ class SCIMUserSerializer(serializers.ModelSerializer):
         tenant = self.context.get("tenant")
         if tenant is None:
             return bool(obj.is_active)
-        membership = Membership.objects.filter(user=obj, tenant=tenant).first()
+        membership = self._get_scim_membership(obj)
         return bool(membership and membership.is_active)
 
     def get_name(self, obj):
@@ -70,9 +92,9 @@ class SCIMUserSerializer(serializers.ModelSerializer):
         base_path = _scim_base_path(self.context)
         return [
             {
-                "value": str(g.id),
+                "value": str(g.scim_id),
                 "display": g.name,
-                **({"$ref": f"{base_path}/Groups/{g.id}"} if base_path else {}),
+                **({"$ref": f"{base_path}/Groups/{g.scim_id}"} if base_path else {}),
             }
             for g in user_groups
         ]
@@ -85,34 +107,39 @@ class SCIMUserSerializer(serializers.ModelSerializer):
             "resourceType": "User",
             "created": created_str,
             "lastModified": last_modified_str,
-            "location": f"{base_path}/Users/{obj.id}" if base_path else "",
+            "location": f"{base_path}/Users/{obj.scim_id}" if base_path else "",
         }
 
-    @staticmethod
-    def _get_last_modified(obj):
+    def _get_last_modified(self, obj):
         # inline import: app-registry: avoid AppRegistryNotReady at module-load time
         from core.models import ObjectChange
 
-        ct = ContentType.objects.get_for_model(obj)
+        user_ct = ContentType.objects.get_for_model(obj)
+        change_filter = Q(changed_object_type=user_ct, changed_object_id=obj.pk)
+        tenant = self.context.get("tenant")
+        if tenant is not None:
+            membership = self._get_scim_membership(obj)
+            if membership is not None:
+                membership_ct = ContentType.objects.get_for_model(Membership)
+                change_filter |= Q(changed_object_type=membership_ct, changed_object_id=membership.pk)
         last_change = (
-            ObjectChange.objects.filter(changed_object_type=ct, changed_object_id=obj.pk)
-            .order_by("-time")
-            .values_list("time", flat=True)
-            .first()
+            ObjectChange.objects.filter(change_filter).order_by("-time").values_list("time", flat=True).first()
         )
         return last_change.isoformat() if last_change else None
 
 
 class SCIMGroupSerializer(serializers.ModelSerializer):
     schemas = serializers.SerializerMethodField(read_only=True)
+    id = serializers.UUIDField(source="scim_id", read_only=True)
     displayName = serializers.CharField(source="name")
+    externalId = serializers.CharField(source="external_id", read_only=True)
     members = serializers.SerializerMethodField(required=False)
     meta = serializers.SerializerMethodField(read_only=True)
 
     class Meta:
         model = UserGroup
-        fields = ["schemas", "id", "displayName", "members", "meta"]
-        read_only_fields = ["id", "schemas", "meta"]
+        fields = ["schemas", "id", "externalId", "displayName", "members", "meta"]
+        read_only_fields = ["id", "externalId", "schemas", "meta"]
 
     def get_schemas(self, obj):
         return ["urn:ietf:params:scim:schemas:core:2.0:Group"]
@@ -128,9 +155,9 @@ class SCIMGroupSerializer(serializers.ModelSerializer):
         ).select_related("membership__user")
         return [
             {
-                "value": str(group_membership.membership.user_id),
+                "value": str(group_membership.membership.user.scim_id),
                 "display": group_membership.membership.user.username,
-                **({"$ref": f"{base_path}/Users/{group_membership.membership.user_id}"} if base_path else {}),
+                **({"$ref": f"{base_path}/Users/{group_membership.membership.user.scim_id}"} if base_path else {}),
             }
             for group_membership in group_memberships
         ]
@@ -143,7 +170,7 @@ class SCIMGroupSerializer(serializers.ModelSerializer):
             "resourceType": "Group",
             "created": created_str,
             "lastModified": updated_str,
-            "location": f"{base_path}/Groups/{obj.id}" if base_path else "",
+            "location": f"{base_path}/Groups/{obj.scim_id}" if base_path else "",
         }
 
 

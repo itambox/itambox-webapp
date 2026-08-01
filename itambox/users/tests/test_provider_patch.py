@@ -215,7 +215,7 @@ class ProviderPatchParserTests(SimpleTestCase):
                 ]
             )
 
-    def test_parser_accepts_standard_unmanaged_user_attributes_as_noops(self):
+    def test_parser_accepts_standard_unmanaged_attributes_and_external_id(self):
         patch = parse_user_patch_operations(
             [
                 {"op": "replace", "path": "displayName", "value": "Ada Lovelace"},
@@ -250,6 +250,7 @@ class ProviderPatchParserTests(SimpleTestCase):
         self.assertIs(patch.first_name, UNSET)
         self.assertIs(patch.last_name, UNSET)
         self.assertIs(patch.active, UNSET)
+        self.assertEqual(patch.external_id, "external-1")
 
     def test_parser_bounds_documents_operations_and_member_arrays(self):
         with self.assertRaisesRegex(SCIMPatchError, "SCIM document must be an object"):

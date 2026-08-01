@@ -11,7 +11,7 @@ urlpatterns = [
         name="service-provider-config",
     ),
     path("Users", provider_views.SCIMProviderUserListView.as_view(), name="user-list"),
-    path("Users/<int:pk>", provider_views.SCIMProviderUserDetailView.as_view(), name="user-detail"),
+    path("Users/<str:pk>", provider_views.SCIMProviderUserDetailView.as_view(), name="user-detail"),
     path("Groups", provider_views.SCIMProviderGroupListView.as_view(), name="group-list"),
-    path("Groups/<int:pk>", provider_views.SCIMProviderGroupDetailView.as_view(), name="group-detail"),
+    path("Groups/<str:pk>", provider_views.SCIMProviderGroupDetailView.as_view(), name="group-detail"),
 ]

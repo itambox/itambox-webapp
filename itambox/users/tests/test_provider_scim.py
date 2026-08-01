@@ -306,7 +306,7 @@ class ProviderSCIMProvisioningTests(TestCase):
         put_payload = dict(payload, userName="lifecycle_renamed", active=True)
         response = self.client.put(detail_url, data=put_payload, content_type="application/json", **self.auth_headers)
         self.assertEqual(response.status_code, status.HTTP_200_OK)
-        user = User.objects.get(id=pk)
+        user = User.objects.get(scim_id=pk)
         self.assertEqual(user.username, "lifecycle_renamed")
         self.assertTrue(Membership.objects.get(user=user, tenant=self.provider).is_active)
 
@@ -320,7 +320,7 @@ class ProviderSCIMProvisioningTests(TestCase):
         )
         self.assertEqual(conflict_response.status_code, status.HTTP_409_CONFLICT)
         self.assertEqual(conflict_response.json()["scimType"], "uniqueness")
-        self.assertEqual(User.objects.get(id=pk).username, "lifecycle_renamed")
+        self.assertEqual(User.objects.get(scim_id=pk).username, "lifecycle_renamed")
 
         Membership.objects.create(user=user, tenant=self.tenant, is_active=True)
         deactivate_payload = {
@@ -332,7 +332,7 @@ class ProviderSCIMProvisioningTests(TestCase):
         )
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertFalse(Membership.objects.get(user=user, tenant=self.provider).is_active)
-        self.assertTrue(User.objects.get(id=pk).is_active)
+        self.assertTrue(User.objects.get(scim_id=pk).is_active)
         list_response = self.client.get(url, **self.auth_headers)
         listed = {resource["id"]: resource for resource in list_response.json()["Resources"]}
         self.assertIn(pk, listed)
@@ -349,14 +349,14 @@ class ProviderSCIMProvisioningTests(TestCase):
         )
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertTrue(Membership.objects.get(user=user, tenant=self.provider).is_active)
-        self.assertTrue(User.objects.get(id=pk).is_active)
+        self.assertTrue(User.objects.get(scim_id=pk).is_active)
 
         # DELETE removes the membership.
         response = self.client.delete(detail_url, **self.auth_headers)
         self.assertEqual(response.status_code, status.HTTP_204_NO_CONTENT)
         self.assertFalse(Membership.objects.filter(user=user, tenant=self.provider).exists())
         # The User row survives.
-        self.assertTrue(User.objects.filter(id=pk).exists())
+        self.assertTrue(User.objects.filter(scim_id=pk).exists())
 
     # ---- Groups -------------------------------------------------------------------------
 
@@ -388,7 +388,7 @@ class ProviderSCIMProvisioningTests(TestCase):
         )
         group_membership = GroupMembership.objects.get(user_group=group)
         self.assertEqual(group_membership.source, GroupMembership.SOURCE_SCIM)
-        self.assertEqual(group_membership.external_id, str(self.admin_user.id))
+        self.assertEqual(group_membership.external_id, str(self.admin_user.scim_id))
         self.assertEqual(group_membership.added_by, self.admin_user)
 
         # Now the list shows it.
@@ -523,7 +523,7 @@ class ProviderSCIMProvisioningTests(TestCase):
         )
         self.assertEqual(reconcile_response.status_code, status.HTTP_200_OK)
         scim_row.refresh_from_db()
-        self.assertEqual(scim_row.external_id, str(scim_user.pk))
+        self.assertEqual(scim_row.external_id, str(scim_user.scim_id))
 
         put_payload = {
             "displayName": "Mixed provenance renamed",
@@ -736,10 +736,10 @@ class ProviderSCIMProvisioningTests(TestCase):
         user_list_url = reverse("api:provider_scim:user-list", kwargs={"provider_slug": self.provider.slug})
         self.assertTrue(user_list_url.endswith("/Users"))
         base = user_list_url[: -len("/Users")]
-        self.assertEqual(user_data["meta"]["location"], f"{base}/Users/{self.admin_user.pk}")
-        self.assertEqual(user_data["groups"][0]["$ref"], f"{base}/Groups/{group.pk}")
-        self.assertEqual(group_data["meta"]["location"], f"{base}/Groups/{group.pk}")
-        self.assertEqual(group_data["members"][0]["$ref"], f"{base}/Users/{self.admin_user.pk}")
+        self.assertEqual(user_data["meta"]["location"], f"{base}/Users/{self.admin_user.scim_id}")
+        self.assertEqual(user_data["groups"][0]["$ref"], f"{base}/Groups/{group.scim_id}")
+        self.assertEqual(group_data["meta"]["location"], f"{base}/Groups/{group.scim_id}")
+        self.assertEqual(group_data["members"][0]["$ref"], f"{base}/Users/{self.admin_user.scim_id}")
 
     def test_extracted_services_fail_closed_and_update_global_state(self):
         foreign_group = UserGroup.objects.create(tenant=self.other_provider, name="Foreign")
@@ -763,6 +763,7 @@ class ProviderSCIMProvisioningTests(TestCase):
     def test_group_service_branch_and_raw_integrity_error_paths(self):
         group = UserGroup.objects.create(tenant=self.provider, name="Branch coverage")
         result = _apply_group_member_operations(
+            self.provider,
             group,
             [
                 GroupMemberOperation(op="remove", filter_member_id=101),
@@ -771,7 +772,7 @@ class ProviderSCIMProvisioningTests(TestCase):
                 GroupMemberOperation(op="replace", member_ids=(103,)),
             ],
         )
-        self.assertEqual(result, {103})
+        self.assertEqual(result, set())
 
         UserGroup.objects.create(tenant=self.provider, name="Integrity branch")
         conflicting_group = UserGroup(tenant=self.provider, name="Integrity branch")
