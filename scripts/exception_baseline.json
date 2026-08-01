@@ -1436,14 +1436,6 @@
       "count": 1
     },
     {
-      "path": "itambox/users/api/scim/filters.py",
-      "scope": "FunctionDef:parse_scim_filter",
-      "handler_type": "ValueError",
-      "classification": "pass-only",
-      "body_sha256": "5c04595997820c90159baeb6d4411d9a479f4dc26f1ac532dd740dcb011f3e23",
-      "count": 1
-    },
-    {
       "path": "itambox/users/api/scim/views.py",
       "scope": "FunctionDef:link_or_create_assetholder",
       "handler_type": "Exception",
