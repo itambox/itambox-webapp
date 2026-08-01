@@ -49,7 +49,10 @@ Provider User detail operations resolve only active provider memberships. After 
 
 Do not enable Group writes against the tenant endpoint; those operations are intentionally rejected.
 
-Provider User and Group list endpoints currently ignore the SCIM `filter` parameter. Verify that the identity provider can operate with paged, unfiltered lists before enabling automatic provisioning; do not rely on filter-based discovery at provider scope.
+Provider User and Group list endpoints support the SCIM `filter` parameter and cap
+results at 200 resources. External-ID filters are scoped to the selected tenant or
+provider and are case-sensitive; test the provider's supported filter expressions
+before enabling automatic provisioning.
 
 ### User attribute mapping
 
@@ -66,6 +69,8 @@ Provider User and Group list endpoints currently ignore the SCIM `filter` parame
 
 - Bulk operations, password changes, sorting, and ETags are not supported.
 - List responses are capped at 200 resources per request.
-- Provider User and Group list endpoints do not apply SCIM filters. Tenant filtering is separate and must still be tested with the selected identity provider.
+- Provider User and Group list endpoints support the SCIM `filter` parameter, with the
+  supported expression subset enforced server-side. External-ID matching is scoped to
+  the provider and is case-sensitive.
 - Provider Group membership sync skips users who are not active staff of that provider; provision Users first.
-- `ServiceProviderConfig` currently overstates provider filtering and advertises HTTP Basic authentication. Use Bearer authentication only and treat provider filtering as unsupported until the implementation and metadata agree.
+- `ServiceProviderConfig` advertises filter support with a 200-resource maximum and OAuth Bearer authentication; ITAMbox accepts Bearer authentication only.

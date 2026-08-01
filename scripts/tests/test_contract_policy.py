@@ -165,16 +165,17 @@ class DerivationSurfaceTests(unittest.TestCase):
         self.assertEqual(envelope.fields, ("event", "model", "object_id", "timestamp", "data"))
         self.assertEqual(envelope.signature_header, "X-Hub-Signature-256")
 
-    def test_both_scim_mounts_still_route_on_integer_primary_keys(self):
+    def test_both_scim_mounts_route_on_string_compatible_dual_read_identifiers(self):
         routes = policy.derived_scim_routes(REPO_ROOT)
         mounts = {route.mount for route in routes}
         self.assertEqual(mounts, {"scim", "provider_scim"})
-        integer_routes = [route for route in routes if "<int:pk>" in route.path]
+        string_routes = [route for route in routes if "<str:pk>" in route.path]
         self.assertEqual(
-            sorted(route.name for route in integer_routes),
+            sorted(route.name for route in string_routes),
             ["group-detail", "group-detail", "user-detail", "user-detail"],
-            "the legacy integer detail routes are a published 1.x compatibility surface",
+            "1.x accepts both decimal legacy IDs and opaque IDs through string-compatible routes",
         )
+        self.assertFalse(any("<int:pk>" in route.path for route in routes))
 
     def test_the_custom_permission_codenames_are_derived_from_model_meta(self):
         codenames = {permission.codename for permission in policy.derived_custom_permissions(REPO_ROOT)}

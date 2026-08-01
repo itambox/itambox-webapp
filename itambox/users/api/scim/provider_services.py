@@ -3,11 +3,13 @@
 import logging
 
 from django.db import IntegrityError, transaction
+from django.db.models import Q
 
 from core.auth.guards import validate_group_membership_grant
 from organization.models import Membership
+from users.api.scim.identifiers import identifier_lookup_or_none
 from users.api.scim.provider_patch import UNSET, GroupPatch, SCIMPatchError, UserPatch
-from users.models import GroupMembership, UserGroup
+from users.models import GroupMembership, User, UserGroup
 
 logger = logging.getLogger("itambox.scim.provider_services")
 
@@ -19,6 +21,54 @@ def _require_provider_actor(tenant, actor, *, permission: str) -> None:
         raise SCIMPatchError("SCIM mutation requires an authenticated actor", status_code=401)
     if not getattr(actor, "is_superuser", False) and not actor.has_perm(permission, obj=tenant):
         raise SCIMPatchError(f"SCIM mutation requires permission: {permission}", status_code=403)
+
+
+def _resolve_provider_member_ids(tenant, identifiers):
+    legacy_ids = set()
+    opaque_ids = set()
+    invalid_count = 0
+    for identifier in set(identifiers):
+        lookup = identifier_lookup_or_none(identifier)
+        if lookup is None:
+            invalid_count += 1
+        elif "pk" in lookup:
+            legacy_ids.add(lookup["pk"])
+        else:
+            opaque_ids.add(lookup["scim_id"])
+
+    identifier_filter = Q()
+    if legacy_ids:
+        identifier_filter |= Q(pk__in=legacy_ids)
+    if opaque_ids:
+        identifier_filter |= Q(scim_id__in=opaque_ids)
+    if not identifier_filter:
+        return set(), invalid_count
+
+    resolved_rows = list(
+        User.objects.filter(
+            memberships__tenant=tenant,
+            memberships__is_active=True,
+        )
+        .filter(identifier_filter)
+        .values_list("pk", "scim_id")
+        .distinct()
+    )
+    resolved_user_ids = {user_pk for user_pk, _ in resolved_rows}
+    matched_identifiers = sum(
+        (user_pk in legacy_ids) + (opaque_id in opaque_ids) for user_pk, opaque_id in resolved_rows
+    )
+    skipped_count = invalid_count + len(legacy_ids) + len(opaque_ids) - matched_identifiers
+    return resolved_user_ids, skipped_count
+
+
+def _log_skipped_provider_members(tenant, skipped_count):
+    if skipped_count:
+        logger.warning(
+            "SCIM provider group sync skipped %s requested user identifiers: not active staff of provider %s "
+            "(provision via SCIM /Users first).",
+            skipped_count,
+            tenant.slug,
+        )
 
 
 def _sync_provider_group_members(tenant, group, member_ids, *, actor):
@@ -35,27 +85,24 @@ def _sync_provider_group_members(tenant, group, member_ids, *, actor):
             status_code=403,
         )
     group = UserGroup.objects.select_for_update().get(pk=group.pk, tenant=tenant)
-    requested_user_ids = set(member_ids)
+    requested_user_ids, skipped_count = _resolve_provider_member_ids(tenant, member_ids)
     memberships_by_user_id = {
         membership.user_id: membership
         for membership in Membership.objects.filter(
             user_id__in=requested_user_ids,
             tenant=tenant,
             is_active=True,
-        )
+        ).select_related("user")
     }
-    skipped_user_ids = requested_user_ids - set(memberships_by_user_id)
-    if skipped_user_ids:
-        logger.warning(
-            "SCIM provider group sync skipped %s requested user IDs: not active staff of provider %s "
-            "(provision via SCIM /Users first).",
-            len(skipped_user_ids),
-            tenant.slug,
-        )
+    _log_skipped_provider_members(
+        tenant,
+        skipped_count + len(requested_user_ids - set(memberships_by_user_id)),
+    )
 
     # Apply only the delta (add/remove) so ChangeLoggingMixin does not fire on unchanged
     # members.
     current_rows = {row.membership.user_id: row for row in group.group_memberships.select_related("membership__user")}
+    membership_changed = False
     additions = set(memberships_by_user_id) - set(current_rows)
     if additions:
         validate_group_membership_grant(actor, group)
@@ -67,18 +114,23 @@ def _sync_provider_group_members(tenant, group, member_ids, *, actor):
                 user_group=group,
                 membership=membership,
                 source=GroupMembership.SOURCE_SCIM,
-                external_id=str(user_id),
+                external_id=str(membership.user.scim_id),
                 added_by=actor,
             )
+            membership_changed = True
             continue
-        if row.source == GroupMembership.SOURCE_SCIM and row.external_id != str(user_id):
-            row.external_id = str(user_id)
+        if row.source == GroupMembership.SOURCE_SCIM and row.external_id != str(row.membership.user.scim_id):
+            row.external_id = str(row.membership.user.scim_id)
             row.save(update_fields=["external_id"])
+            membership_changed = True
 
     desired_user_ids = set(memberships_by_user_id)
     for user_id, row in current_rows.items():
         if row.source == GroupMembership.SOURCE_SCIM and user_id not in desired_user_ids:
             row.delete()
+            membership_changed = True
+    if membership_changed:
+        group.save(update_fields=["updated_at"])
 
 
 @transaction.atomic
@@ -102,6 +154,23 @@ def _apply_provider_user_active_state(user, tenant, active) -> None:
     if user.is_active != any_active:
         user.is_active = any_active
         user.save(update_fields=["is_active"])
+
+
+def _save_provider_user_external_id(user, tenant, external_id) -> None:
+    if external_id is UNSET:
+        return
+    membership = Membership.objects.filter(user=user, tenant=tenant).first()
+    if membership is None or membership.external_id == external_id:
+        return
+    membership.external_id = external_id
+    try:
+        membership.save(update_fields=["external_id"])
+    except IntegrityError as exc:
+        raise SCIMPatchError(
+            "externalId is already used in this provider tenant",
+            scim_type="uniqueness",
+            status_code=409,
+        ) from exc
 
 
 def _save_provider_user_identity(user, patch: UserPatch) -> None:
@@ -138,6 +207,7 @@ def apply_provider_user_patch(user, tenant, patch: UserPatch, *, actor):
         # a historical or inactive membership for the same user.
         has_other = Membership.objects.filter(user=user).exclude(tenant=tenant).exists()
         _apply_provider_user_active_state(user, tenant, patch.active)
+        _save_provider_user_external_id(user, tenant, patch.external_id)
         if has_other:
             # Leave the shared global identity alone and make the skipped mutation visible
             # to operators without changing the established SCIM 200 response contract.
@@ -152,6 +222,16 @@ def apply_provider_user_patch(user, tenant, patch: UserPatch, *, actor):
         return user
 
 
+def ensure_provider_group_external_id_available(tenant, external_id, *, exclude_pk=None) -> None:
+    if not external_id:
+        return
+    queryset = UserGroup.objects.filter(tenant=tenant, external_id=external_id)
+    if exclude_pk is not None:
+        queryset = queryset.exclude(pk=exclude_pk)
+    if queryset.exists():
+        raise SCIMPatchError("Group externalId already exists", scim_type="uniqueness", status_code=409)
+
+
 def ensure_provider_group_name_available(tenant, name, *, exclude_pk=None) -> None:
     queryset = UserGroup.objects.filter(tenant=tenant, name=name)
     if exclude_pk is not None:
@@ -161,10 +241,11 @@ def ensure_provider_group_name_available(tenant, name, *, exclude_pk=None) -> No
 
 
 @transaction.atomic
-def create_provider_group(tenant, name, member_ids, *, actor):
+def create_provider_group(tenant, name, member_ids, *, actor, external_id=""):
     _require_provider_actor(tenant, actor, permission="users.add_usergroup")
+    ensure_provider_group_external_id_available(tenant, external_id)
     try:
-        group = UserGroup.objects.create(tenant=tenant, name=name)
+        group = UserGroup.objects.create(tenant=tenant, name=name, external_id=external_id)
     except IntegrityError as exc:
         raise SCIMPatchError("Group already exists", scim_type="uniqueness", status_code=409) from exc
     _sync_provider_group_members(tenant, group, member_ids, actor=actor)
@@ -176,6 +257,13 @@ def save_provider_group(group, tenant, *, actor) -> None:
     _save_group_or_raise(group, translate_integrity=True)
 
 
+def _set_group_external_id(tenant, group, external_id) -> None:
+    if external_id is UNSET:
+        return
+    ensure_provider_group_external_id_available(tenant, external_id, exclude_pk=group.pk)
+    group.external_id = external_id
+
+
 def _set_group_display_name(tenant, group, display_name) -> None:
     if display_name is UNSET:
         return
@@ -183,20 +271,34 @@ def _set_group_display_name(tenant, group, display_name) -> None:
     group.name = display_name
 
 
-def _apply_group_member_operations(group, operations):
+def _resolved_operation_member_ids(tenant, operation):
+    resolved_ids, skipped_count = _resolve_provider_member_ids(tenant, operation.member_ids)
+    _log_skipped_provider_members(tenant, skipped_count)
+    return resolved_ids
+
+
+def _apply_group_member_operation(tenant, current_member_ids, operation):
+    resolved_member_ids = _resolved_operation_member_ids(tenant, operation)
+    if operation.op == "add":
+        current_member_ids.update(resolved_member_ids)
+    elif operation.op == "remove":
+        if operation.filter_member_id is not None:
+            resolved_filter_ids, skipped_count = _resolve_provider_member_ids(tenant, (operation.filter_member_id,))
+            _log_skipped_provider_members(tenant, skipped_count)
+            current_member_ids.difference_update(resolved_filter_ids)
+        elif resolved_member_ids:
+            current_member_ids.difference_update(resolved_member_ids)
+        elif operation.clear_members:
+            current_member_ids.clear()
+    elif operation.op == "replace":
+        return resolved_member_ids
+    return current_member_ids
+
+
+def _apply_group_member_operations(tenant, group, operations):
     current_member_ids = set(group.group_memberships.values_list("membership__user_id", flat=True))
     for operation in operations:
-        if operation.op == "add":
-            current_member_ids.update(operation.member_ids)
-        elif operation.op == "remove":
-            if operation.filter_member_id is not None:
-                current_member_ids.discard(operation.filter_member_id)
-            elif operation.member_ids:
-                current_member_ids.difference_update(operation.member_ids)
-            elif operation.clear_members:
-                current_member_ids.clear()
-        elif operation.op == "replace":
-            current_member_ids = set(operation.member_ids)
+        current_member_ids = _apply_group_member_operation(tenant, current_member_ids, operation)
     return current_member_ids
 
 
@@ -221,15 +323,23 @@ def apply_provider_group_patch(tenant, group, patch: GroupPatch, *, actor):
             group = UserGroup.objects.select_for_update().get(pk=group.pk, tenant=tenant)
         except UserGroup.DoesNotExist as exc:
             raise SCIMPatchError("SCIM group was deleted", status_code=404) from exc
+        _set_group_external_id(tenant, group, patch.external_id)
         _set_group_display_name(tenant, group, patch.display_name)
-        current_member_ids = _apply_group_member_operations(group, patch.member_operations)
+        if patch.member_operations:
+            current_member_ids = _apply_group_member_operations(tenant, group, patch.member_operations)
+        else:
+            current_member_ids = None
 
         # Persist the mutation inside the same transaction as membership reconciliation.
-        _save_group_or_raise(group, translate_integrity=patch.display_name is not UNSET)
-        sync_provider_group_members(
-            tenant,
+        _save_group_or_raise(
             group,
-            current_member_ids,
-            actor=actor,
+            translate_integrity=patch.display_name is not UNSET or patch.external_id is not UNSET,
         )
+        if current_member_ids is not None:
+            sync_provider_group_members(
+                tenant,
+                group,
+                current_member_ids,
+                actor=actor,
+            )
         return group

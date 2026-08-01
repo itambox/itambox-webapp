@@ -278,10 +278,12 @@ of them is created, changed, or scheduled by this document.
   supplies the value. The canonical name wins when both are present. If neither
   name is configured, automatic approval and the Asset Request procurement seam
   are inactive; there are no built-in thresholds.
-- **Integer-keyed SCIM detail routes remain supported for the whole of 1.x.**
-  Both SCIM mounts route `Users/<int:pk>` and `Groups/<int:pk>`. Identity
-  providers store those URLs, so a change of key shape is a breaking change for
-  every configured connector and does not happen inside 1.x.
+- **Integer-keyed SCIM detail routes remain supported for the whole of 1.x** as a
+  compatibility read. Both SCIM mounts use string-compatible `Users/<str:pk>` and
+  `Groups/<str:pk>` converters. Decimal identifiers resolve legacy integer
+  primary keys, while opaque stable identifiers resolve the new SCIM resource ID;
+  successful responses emit opaque IDs only. Legacy integer lookup is removed no
+  earlier than 2.0, after the documented migration notice and re-sync window.
 
 ## API and wire versioning
 

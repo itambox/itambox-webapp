@@ -1,8 +1,8 @@
 import uuid
 
 from django.contrib.auth import get_user_model
-from django.db import transaction
-from django.shortcuts import get_object_or_404
+from django.db import IntegrityError, transaction
+from django.db.models import Exists, OuterRef, Prefetch, Q
 from rest_framework import exceptions, status
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
@@ -11,10 +11,13 @@ from rest_framework.views import APIView
 from core.managers import set_current_tenant
 from itambox.middleware import set_current_user
 from organization.models import Membership, Tenant
+from users.api.scim.filters import SCIMFilterError, parse_scim_filter, parse_scim_membership_filter
+from users.api.scim.identifiers import get_scim_object_or_404
 from users.api.scim.provider_authentication import SCIMProviderBearerTokenAuthentication
 from users.api.scim.provider_patch import (
     SCIMPatchError,
     get_patch_operations,
+    parse_external_id,
     parse_group_patch_operations,
     parse_member_ids,
     parse_user_patch_operations,
@@ -26,6 +29,7 @@ from users.api.scim.provider_services import (
     apply_provider_group_patch,
     apply_provider_user_patch,
     create_provider_group,
+    ensure_provider_group_external_id_available,
     ensure_provider_group_name_available,
     save_provider_group,
     sync_provider_group_members,
@@ -128,10 +132,51 @@ class ProviderServiceProviderConfigView(SCIMProviderMixin, APIView):
 
 
 class SCIMProviderUserListView(SCIMProviderMixin, APIView):
+    def _retry_correlated_user(self, username, external_id):
+        if not external_id:
+            raise SCIMPatchError("User already exists", scim_type="uniqueness", status_code=409)
+        correlated = (
+            Membership.objects.select_related("user").filter(tenant=self.tenant, external_id=external_id).first()
+        )
+        if correlated is None:
+            raise SCIMPatchError(
+                "User correlation raced with another resource", scim_type="uniqueness", status_code=409
+            )
+        if correlated.user.username != username:
+            raise SCIMPatchError(
+                "externalId already identifies a different user",
+                scim_type="uniqueness",
+                status_code=409,
+            )
+        return correlated.user
+
     def get(self, request, *args, **kwargs):
-        queryset = User.objects.filter(
-            memberships__tenant=self.tenant,
-        ).distinct()
+        try:
+            q_obj = parse_scim_filter(request.query_params.get("filter"), "user")
+        except SCIMFilterError:
+            return Response(
+                {
+                    "schemas": ["urn:ietf:params:scim:api:messages:2.0:Error"],
+                    "status": "400",
+                    "detail": "Invalid SCIM filter.",
+                },
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        membership_q = parse_scim_membership_filter(request.query_params.get("filter"))
+        scoped_membership_prefetch = Prefetch(
+            "memberships",
+            queryset=Membership.objects.filter(tenant=self.tenant),
+            to_attr="_scim_memberships",
+        )
+        if membership_q is not None:
+            scoped_memberships = Membership.objects.filter(user=OuterRef("pk"), tenant=self.tenant).filter(membership_q)
+            queryset = (
+                User.objects.filter(memberships__tenant=self.tenant).filter(Exists(scoped_memberships)).distinct()
+            )
+        else:
+            queryset = User.objects.filter(Q(memberships__tenant=self.tenant) & q_obj).distinct()
+        queryset = queryset.prefetch_related(scoped_membership_prefetch)
 
         try:
             start_index = int(request.query_params.get("startIndex", 1))
@@ -179,38 +224,82 @@ class SCIMProviderUserListView(SCIMProviderMixin, APIView):
         first_name = patch.first_name
         last_name = patch.last_name
         active = patch.active
+        external_id = patch.external_id
 
         user = User.objects.filter(username=username).first()
-        if user:
-            existing = Membership.objects.filter(user=user, tenant=self.tenant).first()
-            if existing:
+        correlated_membership = (
+            Membership.objects.select_related("user").filter(tenant=self.tenant, external_id=external_id).first()
+            if external_id
+            else None
+        )
+        response_status = status.HTTP_201_CREATED
+
+        if correlated_membership:
+            if correlated_membership.user.username != username:
                 return Response(
                     {
                         "schemas": ["urn:ietf:params:scim:api:messages:2.0:Error"],
                         "status": "409",
-                        "detail": "User already exists in this provider",
+                        "scimType": "uniqueness",
+                        "detail": "externalId already identifies a different user in this provider",
                     },
                     status=status.HTTP_409_CONFLICT,
                 )
-
-            with transaction.atomic():
-                # SCIM provisions identity only: a bare membership at the managing
-                # tenant with NO RoleGrant rows — zero permissions and zero reach
-                # until granted in-app. Were a
-                # provisioning config ever to map roles, it would resolve them against
-                # this tenant's own roles and create grants with granted_by=None —
-                # SCIM is trusted operator configuration, deliberately unguarded.
-                Membership.objects.create(user=user, tenant=self.tenant, is_active=active)
+            user = correlated_membership.user
+            response_status = status.HTTP_200_OK
+        elif user:
+            existing = Membership.objects.filter(user=user, tenant=self.tenant).first()
+            if existing:
+                if external_id and existing.external_id == external_id:
+                    response_status = status.HTTP_200_OK
+                else:
+                    return Response(
+                        {
+                            "schemas": ["urn:ietf:params:scim:api:messages:2.0:Error"],
+                            "status": "409",
+                            "scimType": "uniqueness",
+                            "detail": "User already exists in this provider",
+                        },
+                        status=status.HTTP_409_CONFLICT,
+                    )
+            else:
+                try:
+                    with transaction.atomic():
+                        # SCIM provisions identity only: a bare membership at the managing
+                        # tenant with NO RoleGrant rows — zero permissions and zero reach
+                        # until granted in-app.
+                        Membership.objects.create(
+                            user=user,
+                            tenant=self.tenant,
+                            is_active=active,
+                            external_id=external_id,
+                        )
+                except IntegrityError:
+                    user = self._retry_correlated_user(username, external_id)
+                    response_status = status.HTTP_200_OK
         else:
-            with transaction.atomic():
-                user = User.objects.create_user(
-                    username=username, email=email, first_name=first_name, last_name=last_name, is_active=active
-                )
-                user.set_unusable_password()
-                user.save()
+            try:
+                with transaction.atomic():
+                    user = User.objects.create_user(
+                        username=username,
+                        email=email,
+                        first_name=first_name,
+                        last_name=last_name,
+                        is_active=active,
+                    )
+                    user.set_unusable_password()
+                    user.save()
 
-                # See comment above: bare membership, assignments granted in-app.
-                Membership.objects.create(user=user, tenant=self.tenant, is_active=active)
+                    # See comment above: bare membership, assignments granted in-app.
+                    Membership.objects.create(
+                        user=user,
+                        tenant=self.tenant,
+                        is_active=active,
+                        external_id=external_id,
+                    )
+            except IntegrityError:
+                user = self._retry_correlated_user(username, external_id)
+                response_status = status.HTTP_200_OK
 
         serializer = SCIMUserSerializer(
             user,
@@ -221,7 +310,7 @@ class SCIMProviderUserListView(SCIMProviderMixin, APIView):
                 "scim_base_path": f"/api/providers/{self.tenant.slug}/scim/v2",
             },
         )
-        return Response(serializer.data, status=status.HTTP_201_CREATED)
+        return Response(serializer.data, status=response_status)
 
 
 class SCIMProviderUserDetailView(SCIMProviderMixin, APIView):
@@ -229,7 +318,7 @@ class SCIMProviderUserDetailView(SCIMProviderMixin, APIView):
         return User.objects.filter(memberships__tenant=self.tenant).distinct()
 
     def get(self, request, pk, *args, **kwargs):
-        user = get_object_or_404(self._staff_queryset(), id=pk)
+        user = get_scim_object_or_404(self._staff_queryset(), pk)
         serializer = SCIMUserSerializer(
             user,
             context={
@@ -243,7 +332,7 @@ class SCIMProviderUserDetailView(SCIMProviderMixin, APIView):
 
     def put(self, request, pk, *args, **kwargs):
         document = require_object_document(request.data)
-        user = get_object_or_404(self._staff_queryset(), id=pk)
+        user = get_scim_object_or_404(self._staff_queryset(), pk)
         patch = parse_user_resource(document)
         user = apply_provider_user_patch(user, self.tenant, patch, actor=request.user)
 
@@ -259,7 +348,7 @@ class SCIMProviderUserDetailView(SCIMProviderMixin, APIView):
         return Response(serializer.data, status=status.HTTP_200_OK)
 
     def patch(self, request, pk, *args, **kwargs):
-        user = get_object_or_404(self._staff_queryset(), id=pk)
+        user = get_scim_object_or_404(self._staff_queryset(), pk)
 
         patch = parse_user_patch_operations(get_patch_operations(request.data))
         user = apply_provider_user_patch(user, self.tenant, patch, actor=request.user)
@@ -276,7 +365,7 @@ class SCIMProviderUserDetailView(SCIMProviderMixin, APIView):
         return Response(serializer.data, status=status.HTTP_200_OK)
 
     def delete(self, request, pk, *args, **kwargs):
-        user = get_object_or_404(self._staff_queryset(), id=pk)
+        user = get_scim_object_or_404(self._staff_queryset(), pk)
         with transaction.atomic():
             # Remove only the membership at this managing tenant. Delete per-instance so
             # each removal is change-logged (QuerySet.delete() bypasses
@@ -296,6 +385,17 @@ class SCIMProviderGroupListView(SCIMProviderMixin, APIView):
     def get(self, request, *args, **kwargs):
         self.require_group_permission(request, "users.view_usergroup")
         queryset = UserGroup.objects.filter(tenant=self.tenant)
+        try:
+            queryset = queryset.filter(parse_scim_filter(request.query_params.get("filter"), "group")).distinct()
+        except SCIMFilterError:
+            return Response(
+                {
+                    "schemas": ["urn:ietf:params:scim:api:messages:2.0:Error"],
+                    "status": "400",
+                    "detail": "Invalid SCIM filter.",
+                },
+                status=status.HTTP_400_BAD_REQUEST,
+            )
 
         try:
             start_index = int(request.query_params.get("startIndex", 1))
@@ -349,10 +449,42 @@ class SCIMProviderGroupListView(SCIMProviderMixin, APIView):
             )
 
         name = validate_display_name(name)
+        external_id = parse_external_id(document.get("externalId"))
+        correlated_group = (
+            UserGroup.objects.filter(tenant=self.tenant, external_id=external_id).first() if external_id else None
+        )
+        if correlated_group is not None:
+            if correlated_group.name != name:
+                return Response(
+                    {
+                        "schemas": ["urn:ietf:params:scim:api:messages:2.0:Error"],
+                        "status": "409",
+                        "scimType": "uniqueness",
+                        "detail": "externalId already identifies a different group in this provider",
+                    },
+                    status=status.HTTP_409_CONFLICT,
+                )
+            serializer = SCIMGroupSerializer(
+                correlated_group,
+                context={
+                    "request": request,
+                    "tenant_slug": self.tenant.slug,
+                    "scim_base_path": f"/api/providers/{self.tenant.slug}/scim/v2",
+                },
+            )
+            return Response(serializer.data, status=status.HTTP_200_OK)
+
         ensure_provider_group_name_available(self.tenant, name)
+        ensure_provider_group_external_id_available(self.tenant, external_id)
         member_ids = set(parse_member_ids(document.get("members", [])))
 
-        group = create_provider_group(self.tenant, name, member_ids, actor=request.user)
+        group = create_provider_group(
+            self.tenant,
+            name,
+            member_ids,
+            actor=request.user,
+            external_id=external_id,
+        )
 
         serializer = SCIMGroupSerializer(
             group,
@@ -368,7 +500,7 @@ class SCIMProviderGroupListView(SCIMProviderMixin, APIView):
 class SCIMProviderGroupDetailView(SCIMProviderMixin, APIView):
     def get(self, request, pk, *args, **kwargs):
         self.require_group_permission(request, "users.view_usergroup")
-        group = get_object_or_404(UserGroup.objects.filter(tenant=self.tenant), id=pk)
+        group = get_scim_object_or_404(UserGroup.objects.filter(tenant=self.tenant), pk)
         serializer = SCIMGroupSerializer(
             group,
             context={
@@ -394,15 +526,18 @@ class SCIMProviderGroupDetailView(SCIMProviderMixin, APIView):
             )
 
         name = validate_display_name(name)
+        external_id = parse_external_id(document.get("externalId"))
         member_ids = set(parse_member_ids(document.get("members", [])))
 
         with transaction.atomic():
-            group = get_object_or_404(
+            group = get_scim_object_or_404(
                 UserGroup.objects.select_for_update().filter(tenant=self.tenant),
-                id=pk,
+                pk,
             )
             ensure_provider_group_name_available(self.tenant, name, exclude_pk=group.pk)
+            ensure_provider_group_external_id_available(self.tenant, external_id, exclude_pk=group.pk)
             group.name = name
+            group.external_id = external_id
             save_provider_group(group, self.tenant, actor=request.user)
             sync_provider_group_members(
                 self.tenant,
@@ -423,7 +558,7 @@ class SCIMProviderGroupDetailView(SCIMProviderMixin, APIView):
 
     def patch(self, request, pk, *args, **kwargs):
         self.require_group_permission(request, "users.change_usergroup")
-        group = get_object_or_404(UserGroup.objects.filter(tenant=self.tenant), id=pk)
+        group = get_scim_object_or_404(UserGroup.objects.filter(tenant=self.tenant), pk)
 
         patch = parse_group_patch_operations(get_patch_operations(request.data))
         group = apply_provider_group_patch(
@@ -445,7 +580,7 @@ class SCIMProviderGroupDetailView(SCIMProviderMixin, APIView):
 
     def delete(self, request, pk, *args, **kwargs):
         self.require_group_permission(request, "users.delete_usergroup")
-        group = get_object_or_404(UserGroup.objects.filter(tenant=self.tenant), id=pk)
+        group = get_scim_object_or_404(UserGroup.objects.filter(tenant=self.tenant), pk)
         with transaction.atomic():
             # Soft-delete via the model's delete() for change-logging.
             group.delete()

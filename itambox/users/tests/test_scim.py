@@ -325,7 +325,7 @@ class SCIMProvisioningTests(TestCase):
         response = self.client.get(detail_url, **self.auth_headers)
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(response.json()["displayName"], "Software Managers")
-        self.assertEqual(response.json()["members"][0]["value"], str(self.admin_user.id))
+        self.assertEqual(response.json()["members"][0]["value"], str(self.admin_user.scim_id))
 
         # 5. PUT / PATCH / DELETE are all rejected; the group is unchanged.
         put_payload = dict(post_payload, displayName="Renamed")

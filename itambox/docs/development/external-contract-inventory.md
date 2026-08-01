@@ -58,9 +58,11 @@ identity; it is not versioned by the application release number.
 ## SCIM routes
 
 Both SCIM mounts are tenant- or provider-scoped and route detail operations on
-**integer primary keys**. Identity providers persist these URLs, so the key
-shape is a 1.x compatibility surface — see the SCIM entry under *Deferred,
-documented, not implemented* in the policy.
+**string-compatible resource identifiers**. During 1.x, decimal path segments
+remain a compatibility read for legacy integer primary keys, while new responses
+emit only stable opaque IDs. Legacy integer lookup is announced for removal in
+2.0; see the SCIM entry under *Deferred, documented, not implemented* in the
+policy for the removal rule.
 
 <!-- contract-inventory: scim-routes -->
 
@@ -68,14 +70,14 @@ documented, not implemented* in the policy.
 |---|---|---|
 | `scim:ServiceProviderConfig` | `/api/tenants/<tenant_slug>/scim/v2/` | `beta-opt-in` |
 | `scim:Users` | `/api/tenants/<tenant_slug>/scim/v2/` | `beta-opt-in` |
-| `scim:Users/<int:pk>` | `/api/tenants/<tenant_slug>/scim/v2/` | `beta-opt-in` |
+| `scim:Users/<str:pk>` | `/api/tenants/<tenant_slug>/scim/v2/` | `beta-opt-in` |
 | `scim:Groups` | `/api/tenants/<tenant_slug>/scim/v2/` | `beta-opt-in` |
-| `scim:Groups/<int:pk>` | `/api/tenants/<tenant_slug>/scim/v2/` | `beta-opt-in` |
+| `scim:Groups/<str:pk>` | `/api/tenants/<tenant_slug>/scim/v2/` | `beta-opt-in` |
 | `provider_scim:ServiceProviderConfig` | `/api/providers/<provider_slug>/scim/v2/` | `beta-opt-in` |
 | `provider_scim:Users` | `/api/providers/<provider_slug>/scim/v2/` | `beta-opt-in` |
-| `provider_scim:Users/<int:pk>` | `/api/providers/<provider_slug>/scim/v2/` | `beta-opt-in` |
+| `provider_scim:Users/<str:pk>` | `/api/providers/<provider_slug>/scim/v2/` | `beta-opt-in` |
 | `provider_scim:Groups` | `/api/providers/<provider_slug>/scim/v2/` | `beta-opt-in` |
-| `provider_scim:Groups/<int:pk>` | `/api/providers/<provider_slug>/scim/v2/` | `beta-opt-in` |
+| `provider_scim:Groups/<str:pk>` | `/api/providers/<provider_slug>/scim/v2/` | `beta-opt-in` |
 
 The `v2` in the mount path is the SCIM specification's schema version, not an
 ITAMbox API generation.

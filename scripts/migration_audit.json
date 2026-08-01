@@ -14209,6 +14209,46 @@
     },
     {
       "dependencies": [
+        "organization.0100_issue88_shard_61_organization_relations",
+        "users.0100_issue88_shard_62_users_relations"
+      ],
+      "id": "organization.0101_membership_external_id_and_more",
+      "is_replacement": false,
+      "operations": {
+        "BtreeGistExtension": {
+          "count": 0
+        },
+        "RunPython": {
+          "with_noop_reverse": 0,
+          "with_reverse": 0,
+          "without_reverse": 0
+        },
+        "RunSQL": {
+          "with_noop_reverse": 0,
+          "with_reverse": 0,
+          "without_reverse": 0
+        },
+        "SeparateDatabaseAndState": {
+          "count": 0
+        }
+      },
+      "path": "itambox/organization/migrations/0101_membership_external_id_and_more.py",
+      "replaces": [],
+      "reviewed_disposition": null,
+      "run_before": [],
+      "special_users_bootstrap": false,
+      "swappable_user_dependency": true,
+      "syntactic_facts": {
+        "has_custom_operations": {
+          "BtreeGistExtension": false,
+          "RunPython": false,
+          "RunSQL": false,
+          "SeparateDatabaseAndState": false
+        }
+      }
+    },
+    {
+      "dependencies": [
         "assets.0025_assetrequest_is_group_assetrequest_parent",
         "inventory.0003_alter_component_tags_alter_component_tenant_and_more",
         "organization.0010_assetholder_deleted_at_contact_deleted_at_and_more"
@@ -17018,12 +17058,57 @@
           "SeparateDatabaseAndState": false
         }
       }
+    },
+    {
+      "dependencies": [
+        "organization.0101_membership_external_id_and_more",
+        "users.0100_issue88_shard_62_users_relations"
+      ],
+      "id": "users.0101_user_scim_id_usergroup_external_id_usergroup_scim_id_and_more",
+      "is_replacement": false,
+      "operations": {
+        "BtreeGistExtension": {
+          "count": 0
+        },
+        "RunPython": {
+          "with_noop_reverse": 1,
+          "with_reverse": 0,
+          "without_reverse": 0
+        },
+        "RunSQL": {
+          "with_noop_reverse": 0,
+          "with_reverse": 0,
+          "without_reverse": 0
+        },
+        "SeparateDatabaseAndState": {
+          "count": 0
+        }
+      },
+      "path": "itambox/users/migrations/0101_user_scim_id_usergroup_external_id_usergroup_scim_id_and_more.py",
+      "replaces": [],
+      "reviewed_disposition": {
+        "disposition": "upgrade-only",
+        "rationale": "Populates stable opaque SCIM IDs idempotently and adds scoped group/user correlation fields while preserving legacy principals for the 1.x dual-read window."
+      },
+      "run_before": [],
+      "special_users_bootstrap": false,
+      "swappable_user_dependency": false,
+      "syntactic_facts": {
+        "has_custom_operations": {
+          "BtreeGistExtension": false,
+          "RunPython": true,
+          "RunSQL": false,
+          "SeparateDatabaseAndState": false
+        }
+      }
     }
   ],
   "post_transition_migrations": [
     "extras.0101_issue88_drop_legacy_webhook_name_like",
     "extras.0102_alter_event_action",
-    "subscriptions.0101_remove_subscription_auto_renewal_and_more"
+    "organization.0101_membership_external_id_and_more",
+    "subscriptions.0101_remove_subscription_auto_renewal_and_more",
+    "users.0101_user_scim_id_usergroup_external_id_usergroup_scim_id_and_more"
   ],
   "reviewed_semantics": {
     "blockers": [
@@ -17106,7 +17191,8 @@
       "subscriptions.0101_remove_subscription_auto_renewal_and_more",
       "users.0005_remove_token_key_token_digest_token_key_preview_and_more",
       "users.0007_usergroup",
-      "users.0013_remove_usergroup_users_usergroup_unique_tenant_name_active_and_more"
+      "users.0013_remove_usergroup_users_usergroup_unique_tenant_name_active_and_more",
+      "users.0101_user_scim_id_usergroup_external_id_usergroup_scim_id_and_more"
     ]
   },
   "schema_version": 3,
@@ -17159,6 +17245,7 @@
       "organization.0034_roleassignment_remove_provider_internal_tenant_and_more",
       "organization.0037_tenantresourcegrant",
       "organization.0038_rolegrant_rolegrantscope_and_more",
+      "organization.0101_membership_external_id_and_more",
       "procurement.0001_initial",
       "procurement.0008_alter_purchaseorder_order_number_and_more",
       "procurement.0012_alter_contract_contract_number_and_more",
@@ -17286,7 +17373,7 @@
         ]
       }
     },
-    "post_transition_migrations": 3,
+    "post_transition_migrations": 5,
     "replacement_shards": 62,
     "replacement_targets": 262
   }

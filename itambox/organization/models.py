@@ -718,6 +718,13 @@ class Membership(ChangeLoggingMixin, models.Model):
         verbose_name=_("Tenant"),
     )
     is_active = models.BooleanField(default=True, db_index=True, verbose_name=_("Active"))
+    external_id = models.CharField(
+        max_length=255,
+        blank=True,
+        default="",
+        verbose_name=_("External ID"),
+        help_text=_("SCIM identifier scoped to this provisioning domain."),
+    )
     joined_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
@@ -729,6 +736,14 @@ class Membership(ChangeLoggingMixin, models.Model):
                 fields=["user", "tenant"],
                 name="organization_membership_unique_user_tenant",
             ),
+            models.UniqueConstraint(
+                fields=["tenant", "external_id"],
+                condition=~models.Q(external_id=""),
+                name="organization_membership_unique_tenant_external_id",
+            ),
+        ]
+        indexes = [
+            models.Index(fields=["tenant", "external_id"], name="org_membership_external_idx"),
         ]
 
     def __str__(self):

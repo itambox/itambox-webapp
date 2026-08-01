@@ -25,10 +25,13 @@ class SCIMBearerTokenAuthentication(BaseAuthentication):
         if not tenant_slug:
             return None
 
-        try:
-            tenant = Tenant._base_manager.get(slug=tenant_slug)
-        except Tenant.DoesNotExist:
-            raise exceptions.AuthenticationFailed("Tenant not found.") from None
+        tenant = Tenant._base_manager.filter(
+            slug=tenant_slug,
+            is_provider=False,
+            deleted_at__isnull=True,
+        ).first()
+        if tenant is None:
+            raise exceptions.AuthenticationFailed("Tenant not found.")
 
         auth = get_authorization_header(request).split()
 
@@ -73,13 +76,12 @@ class SCIMBearerTokenAuthentication(BaseAuthentication):
             # permissions, never a Role.name string match (that magic-string pattern was a
             # backdoor: any role literally named 'admin'/'owner' granted access regardless
             # of its permissions). Fail closed otherwise.
-            if not user.is_superuser:
-                if token.tenant_id != tenant.pk:
-                    raise exceptions.AuthenticationFailed("Token is not scoped to this tenant.")
-                if not user.has_perm("organization.change_membership", obj=tenant):
-                    raise exceptions.AuthenticationFailed(
-                        "User does not have sufficient permissions (organization.change_membership required)."
-                    )
+            if token.tenant_id != tenant.pk:
+                raise exceptions.AuthenticationFailed("Token is not scoped to this tenant.")
+            if not user.is_superuser and not user.has_perm("organization.change_membership", obj=tenant):
+                raise exceptions.AuthenticationFailed(
+                    "User does not have sufficient permissions (organization.change_membership required)."
+                )
 
             # Enforce write_enabled token flag for write methods
             if request.method in ("POST", "PUT", "PATCH", "DELETE"):

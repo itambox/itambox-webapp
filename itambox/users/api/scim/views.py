@@ -1,9 +1,10 @@
 import logging
 import uuid
+from collections.abc import Mapping
 
 from django.contrib.auth import get_user_model
-from django.db import transaction
-from django.shortcuts import get_object_or_404
+from django.db import IntegrityError, transaction
+from django.db.models import Exists, OuterRef, Prefetch, Q
 from rest_framework import exceptions, status
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
@@ -13,7 +14,8 @@ from core.managers import set_current_tenant
 from itambox.middleware import set_current_user
 from organization.models import AssetHolder, Membership, Tenant
 from users.api.scim.authentication import SCIMBearerTokenAuthentication
-from users.api.scim.filters import SCIMFilterError, parse_scim_filter
+from users.api.scim.filters import SCIMFilterError, parse_scim_filter, parse_scim_membership_filter
+from users.api.scim.identifiers import get_scim_object_or_404
 from users.api.scim.serializers import SCIMGroupSerializer, SCIMServiceProviderConfigSerializer, SCIMUserSerializer
 from users.models import UserGroup
 
@@ -23,6 +25,60 @@ User = get_user_model()
 # Sentinel for "attribute not supplied by this SCIM request" (distinct from an explicit
 # empty/false value) so partial PATCH/PUT updates only touch the fields actually sent.
 _UNSET = object()
+
+
+def _validate_scim_document(document):
+    if not isinstance(document, Mapping):
+        raise exceptions.ValidationError("SCIM resource must be a JSON object.")
+    emails = document.get("emails")
+    if emails is not None and (not isinstance(emails, list) or any(not isinstance(email, Mapping) for email in emails)):
+        raise exceptions.ValidationError("emails must be a list of objects.")
+
+
+def _normalize_external_id(value):
+    if value is None:
+        return ""
+    if not isinstance(value, str):
+        raise exceptions.ValidationError("externalId must be a string.")
+    if not value.strip():
+        raise exceptions.ValidationError("externalId must not be whitespace-only.")
+    if len(value) > 255:
+        raise exceptions.ValidationError("externalId exceeds maximum length of 255 characters.")
+    if any(ord(character) < 32 or ord(character) == 127 for character in value):
+        raise exceptions.ValidationError("externalId contains control characters.")
+    return value
+
+
+def _save_scim_external_id(user, tenant, external_id):
+    if external_id is _UNSET:
+        return
+    membership = Membership.objects.filter(user=user, tenant=tenant).first()
+    if membership is None or membership.external_id == external_id:
+        return
+    membership.external_id = external_id
+    try:
+        membership.save(update_fields=["external_id"])
+    except IntegrityError as exc:
+        conflict = exceptions.APIException("externalId is already used in this tenant.")
+        conflict.status_code = status.HTTP_409_CONFLICT
+        conflict.scim_type = "uniqueness"
+        raise conflict from exc
+
+
+def _tenant_conflict(detail):
+    conflict = exceptions.APIException(detail)
+    conflict.status_code = status.HTTP_409_CONFLICT
+    conflict.scim_type = "uniqueness"
+    return conflict
+
+
+def _retry_tenant_correlated_user(tenant, username, external_id):
+    if not external_id:
+        raise _tenant_conflict("User already exists in this tenant")
+    correlated = Membership.objects.select_related("user").filter(tenant=tenant, external_id=external_id).first()
+    if correlated is None or correlated.user.username != username:
+        raise _tenant_conflict("externalId already identifies a different user in this tenant")
+    return correlated.user
 
 
 def link_or_create_assetholder(user, tenant):
@@ -82,6 +138,8 @@ class SCIMTenantMixin:
                 "status": str(response.status_code),
                 "detail": detail,
             }
+            if getattr(exc, "scim_type", None):
+                response.data["scimType"] = exc.scim_type
         return response
 
     def initial(self, request, *args, **kwargs):
@@ -91,7 +149,7 @@ class SCIMTenantMixin:
             raise exceptions.ValidationError("tenant_slug is required")
 
         try:
-            self.tenant = Tenant._base_manager.get(slug=tenant_slug)
+            self.tenant = Tenant._base_manager.get(slug=tenant_slug, is_provider=False, deleted_at__isnull=True)
         except Tenant.DoesNotExist:
             raise exceptions.NotFound("Tenant not found.") from None
 
@@ -153,9 +211,20 @@ class SCIMUserListView(SCIMTenantMixin, APIView):
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
-        queryset = (
-            User.objects.filter(memberships__tenant=self.tenant).filter(q_obj).distinct().prefetch_related("groups")
+        membership_q = parse_scim_membership_filter(filter_str)
+        scoped_membership_prefetch = Prefetch(
+            "memberships",
+            queryset=Membership.objects.filter(tenant=self.tenant),
+            to_attr="_scim_memberships",
         )
+        if membership_q is not None:
+            scoped_memberships = Membership.objects.filter(user=OuterRef("pk"), tenant=self.tenant).filter(membership_q)
+            queryset = (
+                User.objects.filter(memberships__tenant=self.tenant).filter(Exists(scoped_memberships)).distinct()
+            )
+        else:
+            queryset = User.objects.filter(Q(memberships__tenant=self.tenant) & q_obj).distinct()
+        queryset = queryset.prefetch_related("groups", scoped_membership_prefetch)
 
         try:
             start_index = int(request.query_params.get("startIndex", 1))
@@ -191,6 +260,7 @@ class SCIMUserListView(SCIMTenantMixin, APIView):
         )
 
     def post(self, request, *args, **kwargs):
+        _validate_scim_document(request.data)
         username = request.data.get("userName")
         if not username:
             return Response(
@@ -260,55 +330,107 @@ class SCIMUserListView(SCIMTenantMixin, APIView):
         else:
             active = bool(active)
 
+        external_id = _normalize_external_id(request.data.get("externalId"))
         user = User.objects.filter(username=username).first()
-        if user:
-            membership = Membership.objects.filter(user=user, tenant=self.tenant).first()
-            if membership:
+        correlated_membership = (
+            Membership.objects.select_related("user").filter(tenant=self.tenant, external_id=external_id).first()
+            if external_id
+            else None
+        )
+        response_status = status.HTTP_201_CREATED
+
+        if correlated_membership:
+            if correlated_membership.user.username != username:
                 return Response(
                     {
                         "schemas": ["urn:ietf:params:scim:api:messages:2.0:Error"],
                         "status": "409",
-                        "detail": "User already exists in this tenant",
+                        "scimType": "uniqueness",
+                        "detail": "externalId already identifies a different user in this tenant",
                     },
                     status=status.HTTP_409_CONFLICT,
                 )
-
-            with transaction.atomic():
-                # SCIM provisions identity only: a bare membership with NO RoleGrant
-                # rows — permissions are granted in-app. Were a
-                # provisioning config ever to map roles, it would create own scopes
-                # with granted_by=None — SCIM is trusted operator
-                # configuration, deliberately unguarded.
-                Membership.objects.create(user=user, tenant=self.tenant, is_active=active)
-                link_or_create_assetholder(user, self.tenant)
+            user = correlated_membership.user
+            response_status = status.HTTP_200_OK
+        elif user:
+            membership = Membership.objects.filter(user=user, tenant=self.tenant).first()
+            if membership:
+                if external_id and membership.external_id == external_id:
+                    response_status = status.HTTP_200_OK
+                else:
+                    return Response(
+                        {
+                            "schemas": ["urn:ietf:params:scim:api:messages:2.0:Error"],
+                            "status": "409",
+                            "scimType": "uniqueness",
+                            "detail": "User already exists in this tenant",
+                        },
+                        status=status.HTTP_409_CONFLICT,
+                    )
+            else:
+                try:
+                    with transaction.atomic():
+                        # SCIM provisions identity only: a bare membership with NO RoleGrant
+                        # rows — permissions are granted in-app.
+                        Membership.objects.create(
+                            user=user,
+                            tenant=self.tenant,
+                            is_active=active,
+                            external_id=external_id,
+                        )
+                        link_or_create_assetholder(user, self.tenant)
+                except IntegrityError:
+                    user = _retry_tenant_correlated_user(self.tenant, username, external_id)
+                    response_status = status.HTTP_200_OK
         else:
-            with transaction.atomic():
-                user = User.objects.create_user(
-                    username=username, email=email, first_name=first_name, last_name=last_name, is_active=active
-                )
-                user.set_unusable_password()
-                user.save()
+            try:
+                with transaction.atomic():
+                    user = User.objects.create_user(
+                        username=username,
+                        email=email,
+                        first_name=first_name,
+                        last_name=last_name,
+                        is_active=active,
+                    )
+                    user.set_unusable_password()
+                    user.save()
 
-                # See comment above: bare membership, assignments granted in-app.
-                Membership.objects.create(user=user, tenant=self.tenant, is_active=active)
-                link_or_create_assetholder(user, self.tenant)
+                    # See comment above: bare membership, assignments granted in-app.
+                    Membership.objects.create(
+                        user=user,
+                        tenant=self.tenant,
+                        is_active=active,
+                        external_id=external_id,
+                    )
+                    link_or_create_assetholder(user, self.tenant)
+            except IntegrityError:
+                user = _retry_tenant_correlated_user(self.tenant, username, external_id)
+                response_status = status.HTTP_200_OK
 
         serializer = SCIMUserSerializer(
             user, context={"request": request, "tenant_slug": self.tenant.slug, "tenant": self.tenant}
         )
-        return Response(serializer.data, status=status.HTTP_201_CREATED)
+        return Response(serializer.data, status=response_status)
 
 
 class SCIMUserDetailView(SCIMTenantMixin, APIView):
     def get(self, request, pk, *args, **kwargs):
-        user = get_object_or_404(User.objects.filter(memberships__tenant=self.tenant).distinct(), id=pk)
+        user = get_scim_object_or_404(User.objects.filter(memberships__tenant=self.tenant).distinct(), pk)
         serializer = SCIMUserSerializer(
             user, context={"request": request, "tenant_slug": self.tenant.slug, "tenant": self.tenant}
         )
         return Response(serializer.data, status=status.HTTP_200_OK)
 
     def _apply_scim_identity(
-        self, user, *, username=_UNSET, email=_UNSET, first_name=_UNSET, last_name=_UNSET, active=_UNSET
+        self,
+        user,
+        *,
+        username=_UNSET,
+        email=_UNSET,
+        first_name=_UNSET,
+        last_name=_UNSET,
+        active=_UNSET,
+        external_id=_UNSET,
     ):
         """Apply SCIM-provisioned identity/active changes to the User.
 
@@ -341,6 +463,8 @@ class SCIMUserDetailView(SCIMTenantMixin, APIView):
                 user.is_active = any_active
                 user.save(update_fields=["is_active"])
 
+        _save_scim_external_id(user, self.tenant, external_id)
+
         if has_other:
             # Keep this tenant's AssetHolder linked, but leave the shared global identity alone.
             link_or_create_assetholder(user, self.tenant)
@@ -366,7 +490,8 @@ class SCIMUserDetailView(SCIMTenantMixin, APIView):
         return user
 
     def put(self, request, pk, *args, **kwargs):
-        user = get_object_or_404(User.objects.filter(memberships__tenant=self.tenant).distinct(), id=pk)
+        _validate_scim_document(request.data)
+        user = get_scim_object_or_404(User.objects.filter(memberships__tenant=self.tenant).distinct(), pk)
 
         username = request.data.get("userName")
         if not username:
@@ -437,6 +562,7 @@ class SCIMUserDetailView(SCIMTenantMixin, APIView):
         else:
             active = bool(active)
 
+        external_id = _normalize_external_id(request.data.get("externalId"))
         with transaction.atomic():
             user = self._apply_scim_identity(
                 user,
@@ -445,6 +571,7 @@ class SCIMUserDetailView(SCIMTenantMixin, APIView):
                 first_name=first_name,
                 last_name=last_name,
                 active=active,
+                external_id=external_id,
             )
 
         serializer = SCIMUserSerializer(
@@ -453,7 +580,8 @@ class SCIMUserDetailView(SCIMTenantMixin, APIView):
         return Response(serializer.data, status=status.HTTP_200_OK)
 
     def patch(self, request, pk, *args, **kwargs):
-        user = get_object_or_404(User.objects.filter(memberships__tenant=self.tenant).distinct(), id=pk)
+        _validate_scim_document(request.data)
+        user = get_scim_object_or_404(User.objects.filter(memberships__tenant=self.tenant).distinct(), pk)
 
         # Parse the requested attribute changes into locals (sentinel = not supplied), then
         # apply them through the tenant-boundary guard so a shared multi-tenant user's global
@@ -463,8 +591,12 @@ class SCIMUserDetailView(SCIMTenantMixin, APIView):
         new_first = _UNSET
         new_last = _UNSET
         new_active = _UNSET
+        new_external_id = _UNSET
 
-        for op in request.data.get("Operations", []):
+        operations = request.data.get("Operations", [])
+        if not isinstance(operations, list) or any(not isinstance(operation, Mapping) for operation in operations):
+            raise exceptions.ValidationError("Operations must be a list of objects.")
+        for op in operations:
             op_type = op.get("op", "").lower()
             path = op.get("path", "")
             value = op.get("value")
@@ -474,6 +606,8 @@ class SCIMUserDetailView(SCIMTenantMixin, APIView):
                     for k, v in value.items():
                         if k == "active":
                             new_active = bool(v)
+                        elif k == "externalId":
+                            new_external_id = _normalize_external_id(v)
                         elif k == "userName":
                             new_username = v
                         elif k == "emails":
@@ -492,6 +626,8 @@ class SCIMUserDetailView(SCIMTenantMixin, APIView):
                             new_active = value.lower() == "true"
                         else:
                             new_active = bool(value)
+                    elif path_lower == "externalid":
+                        new_external_id = _normalize_external_id(value)
                     elif path_lower == "username":
                         new_username = str(value)
                     elif path_lower in ("email", "emails", "emails.value"):
@@ -509,6 +645,8 @@ class SCIMUserDetailView(SCIMTenantMixin, APIView):
                         if isinstance(value, dict):
                             new_first = value.get("givenName", user.first_name)
                             new_last = value.get("familyName", user.last_name)
+            elif op_type == "remove" and str(path).lower() == "externalid":
+                new_external_id = ""
 
         with transaction.atomic():
             user = self._apply_scim_identity(
@@ -518,6 +656,7 @@ class SCIMUserDetailView(SCIMTenantMixin, APIView):
                 first_name=new_first,
                 last_name=new_last,
                 active=new_active,
+                external_id=new_external_id,
             )
 
         serializer = SCIMUserSerializer(
@@ -526,7 +665,7 @@ class SCIMUserDetailView(SCIMTenantMixin, APIView):
         return Response(serializer.data, status=status.HTTP_200_OK)
 
     def delete(self, request, pk, *args, **kwargs):
-        user = get_object_or_404(User.objects.filter(memberships__tenant=self.tenant).distinct(), id=pk)
+        user = get_scim_object_or_404(User.objects.filter(memberships__tenant=self.tenant).distinct(), pk)
         with transaction.atomic():
             # Remove only the membership for the current tenant. Delete per-instance
             # so each removal is change-logged (QuerySet.delete() bypasses
@@ -611,9 +750,9 @@ class SCIMGroupListView(SCIMTenantMixin, APIView):
 
 class SCIMGroupDetailView(SCIMTenantMixin, APIView):
     def get(self, request, pk, *args, **kwargs):
-        group = get_object_or_404(
+        group = get_scim_object_or_404(
             UserGroup.objects.filter(tenant=self.tenant),
-            id=pk,
+            pk,
         )
         serializer = SCIMGroupSerializer(group, context={"request": request, "tenant_slug": self.tenant.slug})
         return Response(serializer.data, status=status.HTTP_200_OK)
