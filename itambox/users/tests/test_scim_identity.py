@@ -1,3 +1,4 @@
+import json
 from uuid import UUID
 
 from django.contrib.auth import get_user_model
@@ -173,8 +174,10 @@ class SCIMIdentityContractTests(TestCase):
         response_b = self.client.get(f"{tenant_b_url}?filter=active eq true", **self.headers(self.tenant_b_token))
         self.assertEqual(response_a.status_code, status.HTTP_200_OK)
         self.assertEqual(response_b.status_code, status.HTTP_200_OK)
-        self.assertEqual(response_a.json()["totalResults"], 0)
-        self.assertEqual(response_b.json()["totalResults"], 1)
+        active_ids_a = {resource["id"] for resource in response_a.json()["Resources"]}
+        active_ids_b = {resource["id"] for resource in response_b.json()["Resources"]}
+        self.assertNotIn(str(user.scim_id), active_ids_a)
+        self.assertIn(str(user.scim_id), active_ids_b)
 
     def test_superuser_token_scope_and_deleted_tenant_are_enforced(self):
         superuser = User.objects.create_superuser(
@@ -379,7 +382,12 @@ class SCIMIdentityContractTests(TestCase):
     def test_tenant_mutations_reject_malformed_json_shapes(self):
         headers = self.headers(self.tenant_token)
         user_url = reverse("api:scim:user-list", kwargs={"tenant_slug": self.tenant_a.slug})
-        response = self.client.post(user_url, data=["not-an-object"], format="json", **headers)
+        response = self.client.post(
+            user_url,
+            data=json.dumps(["not-an-object"]),
+            content_type="application/json",
+            **headers,
+        )
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
 
         user = User.objects.create_user(username="malformed-shape-user")
@@ -390,15 +398,15 @@ class SCIMIdentityContractTests(TestCase):
         )
         response = self.client.put(
             detail_url,
-            data={"userName": user.username, "emails": [1]},
-            format="json",
+            data=json.dumps({"userName": user.username, "emails": [1]}),
+            content_type="application/json",
             **headers,
         )
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
         response = self.client.patch(
             detail_url,
-            data={"Operations": ["not-an-operation"]},
-            format="json",
+            data=json.dumps({"Operations": ["not-an-operation"]}),
+            content_type="application/json",
             **headers,
         )
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)

@@ -51,7 +51,6 @@ class Migration(migrations.Migration):
             model_name="user",
             name="scim_id",
             field=models.UUIDField(
-                db_index=True,
                 editable=False,
                 help_text="Stable opaque identifier emitted by the SCIM API.",
                 null=True,
@@ -73,7 +72,6 @@ class Migration(migrations.Migration):
             model_name="usergroup",
             name="scim_id",
             field=models.UUIDField(
-                db_index=True,
                 editable=False,
                 help_text="Stable opaque identifier emitted by the SCIM API.",
                 null=True,
