@@ -1,4 +1,5 @@
 from django.contrib.auth import get_user_model
+from django.db import IntegrityError, transaction
 from django.test import TestCase
 from django.urls import reverse
 from django.utils import timezone
@@ -6,6 +7,15 @@ from rest_framework import status
 
 from core.tests.mixins import grant
 from organization.models import Membership, Role, RoleGrant, RoleGrantScope, Tenant
+from users.api.scim.provider_patch import GroupMemberOperation, GroupPatch, SCIMPatchError, UserPatch
+from users.api.scim.provider_services import (
+    _apply_group_member_operations,
+    _save_group_or_raise,
+    apply_provider_group_patch,
+    apply_provider_user_patch,
+    create_provider_group,
+    sync_provider_group_members,
+)
 from users.models import GroupMembership, Token, UserGroup
 
 User = get_user_model()
@@ -99,6 +109,12 @@ class ProviderSCIMProvisioningTests(TestCase):
             "urn:ietf:params:scim:schemas:core:2.0:ServiceProviderConfig",
             response.json()["schemas"],
         )
+
+    def test_real_provider_actor_permissions_are_tenant_scoped(self):
+        self.assertFalse(self.admin_user.is_superuser)
+        self.assertTrue(self.admin_user.has_perm("organization.change_membership", self.provider))
+        self.assertTrue(self.admin_user.has_perm("users.change_usergroup", self.provider))
+        self.assertFalse(self.admin_user.has_perm("organization.change_membership", self.tenant))
 
     def test_token_not_scoped_to_provider_rejected(self):
         """A token whose ``tenant`` is an ordinary tenant (not this provider) is rejected
@@ -228,6 +244,24 @@ class ProviderSCIMProvisioningTests(TestCase):
         self.assertIn("provadmin", usernames)
         self.assertIn("weak", usernames)
 
+    def test_provider_patch_preserves_identity_when_other_membership_is_inactive(self):
+        shared_user = User.objects.create_user(username="shared-provider-user", email="shared@example.com")
+        Membership.objects.create(user=shared_user, tenant=self.provider, is_active=True)
+        Membership.objects.create(user=shared_user, tenant=self.tenant, is_active=False)
+        detail_url = reverse(
+            "api:provider_scim:user-detail",
+            kwargs={"provider_slug": self.provider.slug, "pk": shared_user.pk},
+        )
+        response = self.client.patch(
+            detail_url,
+            data={"Operations": [{"op": "replace", "path": "userName", "value": "rewritten"}]},
+            content_type="application/json",
+            **self.auth_headers,
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        shared_user.refresh_from_db()
+        self.assertEqual(shared_user.username, "shared-provider-user")
+
     def test_user_post_creates_user_and_membership(self):
         url = reverse("api:provider_scim:user-list", kwargs={"provider_slug": self.provider.slug})
         payload = {
@@ -269,16 +303,43 @@ class ProviderSCIMProvisioningTests(TestCase):
         self.assertEqual(self.client.get(detail_url, **self.auth_headers).status_code, status.HTTP_200_OK)
 
         # PUT: this user's only membership is this provider, so global identity is editable.
-        put_payload = dict(payload, userName="lifecycle_renamed", active=False)
+        put_payload = dict(payload, userName="lifecycle_renamed", active=True)
         response = self.client.put(detail_url, data=put_payload, content_type="application/json", **self.auth_headers)
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         user = User.objects.get(id=pk)
         self.assertEqual(user.username, "lifecycle_renamed")
-        self.assertFalse(Membership.objects.get(user=user, tenant=self.provider).is_active)
+        self.assertTrue(Membership.objects.get(user=user, tenant=self.provider).is_active)
 
-        # PATCH active back to true. Detail queryset requires active membership, so first
-        # reactivate via PATCH against the (still-resolvable-by-pk) staff set: the user is no
-        # longer active staff, so it 404s — confirming detail is scoped to active staff.
+        collision_user = User.objects.create_user(username="already-used", email="already-used@msp.com")
+        Membership.objects.create(user=collision_user, tenant=self.provider, is_active=True)
+        conflict_response = self.client.patch(
+            detail_url,
+            data={"Operations": [{"op": "replace", "path": "userName", "value": "already-used"}]},
+            content_type="application/json",
+            **self.auth_headers,
+        )
+        self.assertEqual(conflict_response.status_code, status.HTTP_409_CONFLICT)
+        self.assertEqual(conflict_response.json()["scimType"], "uniqueness")
+        self.assertEqual(User.objects.get(id=pk).username, "lifecycle_renamed")
+
+        Membership.objects.create(user=user, tenant=self.tenant, is_active=True)
+        deactivate_payload = {
+            "schemas": ["urn:ietf:params:scim:api:messages:2.0:PatchOp"],
+            "Operations": [{"op": "replace", "path": "active", "value": False}],
+        }
+        response = self.client.patch(
+            detail_url, data=deactivate_payload, content_type="application/json", **self.auth_headers
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertFalse(Membership.objects.get(user=user, tenant=self.provider).is_active)
+        self.assertTrue(User.objects.get(id=pk).is_active)
+        list_response = self.client.get(url, **self.auth_headers)
+        listed = {resource["id"]: resource for resource in list_response.json()["Resources"]}
+        self.assertIn(pk, listed)
+        self.assertFalse(listed[pk]["active"])
+
+        # PATCH active back to true. Inactive provider memberships remain addressable
+        # so an IdP can re-enable a previously deprovisioned assignment.
         patch_payload = {
             "schemas": ["urn:ietf:params:scim:api:messages:2.0:PatchOp"],
             "Operations": [{"op": "replace", "path": "active", "value": True}],
@@ -286,10 +347,11 @@ class ProviderSCIMProvisioningTests(TestCase):
         response = self.client.patch(
             detail_url, data=patch_payload, content_type="application/json", **self.auth_headers
         )
-        self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertTrue(Membership.objects.get(user=user, tenant=self.provider).is_active)
+        self.assertTrue(User.objects.get(id=pk).is_active)
 
-        # Reactivate directly, then DELETE removes the membership.
-        Membership.objects.filter(user=user, tenant=self.provider).update(is_active=True)
+        # DELETE removes the membership.
         response = self.client.delete(detail_url, **self.auth_headers)
         self.assertEqual(response.status_code, status.HTTP_204_NO_CONTENT)
         self.assertFalse(Membership.objects.filter(user=user, tenant=self.provider).exists())
@@ -387,12 +449,13 @@ class ProviderSCIMProvisioningTests(TestCase):
             with self.subTest(user=user.username):
                 payload = {
                     "Operations": [
+                        {"op": "replace", "path": "displayName", "value": "Must roll back"},
                         {
                             "op": "add",
                             "path": "members",
                             "value": [{"value": str(user.pk)}],
-                        }
-                    ],
+                        },
+                    ]
                 }
                 response = self.client.patch(
                     detail_url,
@@ -401,6 +464,8 @@ class ProviderSCIMProvisioningTests(TestCase):
                     **self.auth_headers,
                 )
                 self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+                group.refresh_from_db()
+                self.assertEqual(group.name, "Privileged SCIM group")
                 self.assertIn("Privilege escalation", str(response.json()))
                 self.assertFalse(
                     GroupMembership.objects.filter(
@@ -448,6 +513,17 @@ class ProviderSCIMProvisioningTests(TestCase):
             "api:provider_scim:group-detail",
             kwargs={"provider_slug": self.provider.slug, "pk": group.pk},
         )
+        scim_row.external_id = "stale-external-id"
+        scim_row.save(update_fields=["external_id"])
+        reconcile_response = self.client.patch(
+            detail_url,
+            data={"Operations": [{"op": "replace", "path": "members", "value": [{"value": str(scim_user.pk)}]}]},
+            content_type="application/json",
+            **self.auth_headers,
+        )
+        self.assertEqual(reconcile_response.status_code, status.HTTP_200_OK)
+        scim_row.refresh_from_db()
+        self.assertEqual(scim_row.external_id, str(scim_user.pk))
 
         put_payload = {
             "displayName": "Mixed provenance renamed",
@@ -507,6 +583,20 @@ class ProviderSCIMProvisioningTests(TestCase):
             ).exists()
         )
 
+        # A tenant-local displayName collision is a SCIM 409, not a database 500.
+        UserGroup.objects.create(tenant=self.provider, name="Conflict Group")
+        conflict_response = self.client.patch(
+            detail_url,
+            data={"Operations": [{"op": "replace", "path": "displayName", "value": "Conflict Group"}]},
+            content_type="application/json",
+            **self.auth_headers,
+        )
+        self.assertEqual(conflict_response.status_code, status.HTTP_409_CONFLICT)
+        self.assertEqual(conflict_response.json()["status"], "409")
+        self.assertEqual(conflict_response.json()["scimType"], "uniqueness")
+        group.refresh_from_db()
+        self.assertEqual(group.name, "Renamed Group")
+
         # PATCH removes the member.
         patch_payload = {
             "schemas": ["urn:ietf:params:scim:api:messages:2.0:PatchOp"],
@@ -530,6 +620,38 @@ class ProviderSCIMProvisioningTests(TestCase):
         self.assertEqual(response.status_code, status.HTTP_204_NO_CONTENT)
         self.assertFalse(UserGroup.objects.filter(id=group.id).exists())
 
+    def test_group_patch_validation_errors_use_scim_contract(self):
+        group = UserGroup.objects.create(tenant=self.provider, name="Validation Group")
+        detail_url = reverse(
+            "api:provider_scim:group-detail", kwargs={"provider_slug": self.provider.slug, "pk": group.id}
+        )
+        cases = [
+            (
+                {"op": "add", "path": "members", "value": [{"value": "not-an-id"}]},
+                None,
+                "Invalid member ID",
+            ),
+            ({"op": "remove"}, "noTarget", "remove operation requires a path"),
+        ]
+
+        for operation, expected_scim_type, expected_detail in cases:
+            with self.subTest(operation=operation):
+                response = self.client.patch(
+                    detail_url,
+                    data={"Operations": [operation]},
+                    content_type="application/json",
+                    **self.auth_headers,
+                )
+                self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+                self.assertEqual(
+                    response.json()["schemas"],
+                    ["urn:ietf:params:scim:api:messages:2.0:Error"],
+                )
+                self.assertEqual(response.json()["status"], "400")
+                self.assertEqual(response.json()["detail"], expected_detail)
+                if expected_scim_type:
+                    self.assertEqual(response.json()["scimType"], expected_scim_type)
+
     def test_provider_group_isolation(self):
         """Groups owned by another provider tenant are not visible/editable through this
         provider's SCIM mount."""
@@ -542,3 +664,122 @@ class ProviderSCIMProvisioningTests(TestCase):
             "api:provider_scim:group-detail", kwargs={"provider_slug": self.provider.slug, "pk": other_group.id}
         )
         self.assertEqual(self.client.get(detail_url, **self.auth_headers).status_code, status.HTTP_404_NOT_FOUND)
+
+    def test_group_post_and_put_reject_malformed_members_without_mutation(self):
+        list_url = reverse("api:provider_scim:group-list", kwargs={"provider_slug": self.provider.slug})
+        group = UserGroup.objects.create(tenant=self.provider, name="Stable group")
+        membership = Membership.objects.get(tenant=self.provider, user=self.admin_user)
+        GroupMembership.objects.create(
+            user_group=group,
+            membership=membership,
+            source=GroupMembership.SOURCE_SCIM,
+            external_id=str(self.admin_user.pk),
+            added_by=self.admin_user,
+        )
+        detail_url = reverse(
+            "api:provider_scim:group-detail",
+            kwargs={"provider_slug": self.provider.slug, "pk": group.pk},
+        )
+        malformed_members = (
+            [{"value": True}],
+            [{"value": 1.5}],
+            [{}],
+            [{"value": "0"}],
+            "not-a-list",
+            None,
+        )
+        for index, members in enumerate(malformed_members):
+            with self.subTest(members=members):
+                payload = {"displayName": f"Malformed {index}", "members": members}
+                post_response = self.client.post(
+                    list_url,
+                    data=payload,
+                    content_type="application/json",
+                    **self.auth_headers,
+                )
+                self.assertEqual(post_response.status_code, status.HTTP_400_BAD_REQUEST)
+                put_response = self.client.put(
+                    detail_url,
+                    data={"displayName": "Should not apply", "members": members},
+                    content_type="application/json",
+                    **self.auth_headers,
+                )
+                self.assertEqual(put_response.status_code, status.HTTP_400_BAD_REQUEST)
+
+        group.refresh_from_db()
+        self.assertEqual(group.name, "Stable group")
+        self.assertEqual(
+            GroupMembership.objects.filter(user_group=group).values_list("membership__user_id", flat=True).count(),
+            1,
+        )
+
+    def test_provider_resource_locations_and_refs_use_provider_mount(self):
+        group = UserGroup.objects.create(tenant=self.provider, name="Provider links")
+        membership = Membership.objects.get(tenant=self.provider, user=self.admin_user)
+        GroupMembership.objects.create(
+            user_group=group,
+            membership=membership,
+            source=GroupMembership.SOURCE_SCIM,
+            external_id=str(self.admin_user.pk),
+            added_by=self.admin_user,
+        )
+        user_url = reverse(
+            "api:provider_scim:user-detail",
+            kwargs={"provider_slug": self.provider.slug, "pk": self.admin_user.pk},
+        )
+        group_url = reverse(
+            "api:provider_scim:group-detail",
+            kwargs={"provider_slug": self.provider.slug, "pk": group.pk},
+        )
+        user_data = self.client.get(user_url, **self.auth_headers).json()
+        group_data = self.client.get(group_url, **self.auth_headers).json()
+        user_list_url = reverse("api:provider_scim:user-list", kwargs={"provider_slug": self.provider.slug})
+        self.assertTrue(user_list_url.endswith("/Users"))
+        base = user_list_url[: -len("/Users")]
+        self.assertEqual(user_data["meta"]["location"], f"{base}/Users/{self.admin_user.pk}")
+        self.assertEqual(user_data["groups"][0]["$ref"], f"{base}/Groups/{group.pk}")
+        self.assertEqual(group_data["meta"]["location"], f"{base}/Groups/{group.pk}")
+        self.assertEqual(group_data["members"][0]["$ref"], f"{base}/Users/{self.admin_user.pk}")
+
+    def test_extracted_services_fail_closed_and_update_global_state(self):
+        foreign_group = UserGroup.objects.create(tenant=self.other_provider, name="Foreign")
+        with self.assertRaisesRegex(SCIMPatchError, "provider tenant"):
+            sync_provider_group_members(self.provider, foreign_group, (), actor=self.admin_user)
+
+        orphan = User.objects.create_user(username="orphan-service-user")
+        with self.assertRaisesRegex(SCIMPatchError, "not staff"):
+            apply_provider_user_patch(orphan, self.provider, UserPatch(), actor=self.admin_user)
+
+        local_user = User.objects.create_user(username="local-service-user")
+        Membership.objects.create(user=local_user, tenant=self.provider, is_active=True)
+        apply_provider_user_patch(local_user, self.provider, UserPatch(active=False), actor=self.admin_user)
+        local_user.refresh_from_db()
+        self.assertFalse(local_user.is_active)
+
+        create_provider_group(self.provider, "Service duplicate", (), actor=self.admin_user)
+        with self.assertRaisesRegex(SCIMPatchError, "Group already exists"):
+            create_provider_group(self.provider, "Service duplicate", (), actor=self.admin_user)
+
+    def test_group_service_branch_and_raw_integrity_error_paths(self):
+        group = UserGroup.objects.create(tenant=self.provider, name="Branch coverage")
+        result = _apply_group_member_operations(
+            group,
+            [
+                GroupMemberOperation(op="remove", filter_member_id=101),
+                GroupMemberOperation(op="remove", member_ids=(102,)),
+                GroupMemberOperation(op="remove", clear_members=True),
+                GroupMemberOperation(op="replace", member_ids=(103,)),
+            ],
+        )
+        self.assertEqual(result, {103})
+
+        UserGroup.objects.create(tenant=self.provider, name="Integrity branch")
+        conflicting_group = UserGroup(tenant=self.provider, name="Integrity branch")
+        with self.assertRaises(IntegrityError):
+            with transaction.atomic():
+                _save_group_or_raise(conflicting_group, translate_integrity=False)
+
+        deleted_group = UserGroup.objects.create(tenant=self.provider, name="Deleted race")
+        deleted_group.delete()
+        with self.assertRaisesRegex(SCIMPatchError, "group was deleted"):
+            apply_provider_group_patch(self.provider, deleted_group, GroupPatch(), actor=self.admin_user)
