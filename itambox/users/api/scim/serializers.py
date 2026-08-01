@@ -8,6 +8,11 @@ from users.models import GroupMembership, UserGroup
 User = get_user_model()
 
 
+def _scim_base_path(context):
+    tenant_slug = context.get("tenant_slug", "")
+    return context.get("scim_base_path") or (f"/api/tenants/{tenant_slug}/scim/v2" if tenant_slug else "")
+
+
 class SCIMUserSerializer(serializers.ModelSerializer):
     schemas = serializers.SerializerMethodField(read_only=True)
     userName = serializers.CharField(source="username")
@@ -62,20 +67,25 @@ class SCIMUserSerializer(serializers.ModelSerializer):
             group_memberships__membership__user=obj,
             group_memberships__membership__tenant=tenant,
         ).distinct()
+        base_path = _scim_base_path(self.context)
         return [
-            {"value": str(g.id), "display": g.name, "$ref": f"/api/tenants/{tenant.slug}/scim/v2/Groups/{g.id}"}
+            {
+                "value": str(g.id),
+                "display": g.name,
+                **({"$ref": f"{base_path}/Groups/{g.id}"} if base_path else {}),
+            }
             for g in user_groups
         ]
 
     def get_meta(self, obj):
         created_str = obj.date_joined.isoformat() if obj.date_joined else ""
         last_modified_str = self._get_last_modified(obj) or created_str
-        tenant_slug = self.context.get("tenant_slug", "")
+        base_path = _scim_base_path(self.context)
         return {
             "resourceType": "User",
             "created": created_str,
             "lastModified": last_modified_str,
-            "location": f"/api/tenants/{tenant_slug}/scim/v2/Users/{obj.id}" if tenant_slug else "",
+            "location": f"{base_path}/Users/{obj.id}" if base_path else "",
         }
 
     @staticmethod
@@ -111,7 +121,7 @@ class SCIMGroupSerializer(serializers.ModelSerializer):
         # A group contains tenant Membership principals, never arbitrary global users.
         # The owner predicate is redundant for valid rows, but keeps serialization
         # fail-closed if pre-constraint data is ever imported.
-        tenant_slug = self.context.get("tenant_slug", "")
+        base_path = _scim_base_path(self.context)
         group_memberships = GroupMembership.objects.filter(
             user_group=obj,
             membership__tenant=obj.tenant,
@@ -120,7 +130,7 @@ class SCIMGroupSerializer(serializers.ModelSerializer):
             {
                 "value": str(group_membership.membership.user_id),
                 "display": group_membership.membership.user.username,
-                "$ref": (f"/api/tenants/{tenant_slug}/scim/v2/Users/{group_membership.membership.user_id}"),
+                **({"$ref": f"{base_path}/Users/{group_membership.membership.user_id}"} if base_path else {}),
             }
             for group_membership in group_memberships
         ]
@@ -128,12 +138,12 @@ class SCIMGroupSerializer(serializers.ModelSerializer):
     def get_meta(self, obj):
         created_str = obj.created_at.isoformat() if hasattr(obj, "created_at") and obj.created_at else ""
         updated_str = obj.updated_at.isoformat() if hasattr(obj, "updated_at") and obj.updated_at else created_str
-        tenant_slug = self.context.get("tenant_slug", "")
+        base_path = _scim_base_path(self.context)
         return {
             "resourceType": "Group",
             "created": created_str,
             "lastModified": updated_str,
-            "location": f"/api/tenants/{tenant_slug}/scim/v2/Groups/{obj.id}",
+            "location": f"{base_path}/Groups/{obj.id}" if base_path else "",
         }
 
 

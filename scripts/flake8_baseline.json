@@ -10140,30 +10140,6 @@
       "count": 1
     },
     {
-      "path": "itambox/users/api/scim/provider_views.py",
-      "code": "C901",
-      "message": "'SCIMProviderGroupDetailView.patch' is too complex (30)",
-      "source": "    def patch(self, request, pk, *args, **kwargs):",
-      "context": "Module:body/ClassDef:SCIMProviderGroupDetailView:body/FunctionDef:patch:self",
-      "count": 1
-    },
-    {
-      "path": "itambox/users/api/scim/provider_views.py",
-      "code": "C901",
-      "message": "'SCIMProviderUserDetailView.patch' is too complex (22)",
-      "source": "    def patch(self, request, pk, *args, **kwargs):",
-      "context": "Module:body/ClassDef:SCIMProviderUserDetailView:body/FunctionDef:patch:self",
-      "count": 1
-    },
-    {
-      "path": "itambox/users/api/scim/provider_views.py",
-      "code": "C901",
-      "message": "'SCIMProviderUserListView.post' is too complex (11)",
-      "source": "    def post(self, request, *args, **kwargs):",
-      "context": "Module:body/ClassDef:SCIMProviderUserListView:body/FunctionDef:post:self",
-      "count": 1
-    },
-    {
       "path": "itambox/users/api/scim/views.py",
       "code": "C901",
       "message": "'SCIMUserDetailView.patch' is too complex (22)",
