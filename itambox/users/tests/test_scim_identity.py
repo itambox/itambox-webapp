@@ -1,16 +1,21 @@
 import json
+from unittest.mock import patch
 from uuid import UUID
 
 from django.contrib.auth import get_user_model
+from django.db import IntegrityError
 from django.http import Http404
 from django.test import TestCase
 from django.urls import reverse
 from django.utils import timezone
 from rest_framework import status
+from rest_framework.exceptions import APIException, ValidationError
 
 from core.tests.mixins import grant
 from organization.models import Membership, Role, Tenant
 from users.api.scim.identifiers import identifier_lookup
+from users.api.scim.provider_patch import SCIMPatchError
+from users.api.scim.serializers import SCIMUserSerializer
 from users.models import GroupMembership, Token, UserGroup
 
 User = get_user_model()
@@ -453,3 +458,175 @@ class SCIMIdentityContractTests(TestCase):
         )
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
         self.assertEqual(response.json()["schemas"], ["urn:ietf:params:scim:api:messages:2.0:Error"])
+
+    def test_external_id_validation_conflicts_and_patch_paths(self):
+        from users.api.scim.views import _normalize_external_id
+
+        invalid_values = (123, "   ", "x" * 256, "bad\x00id")
+        for value in invalid_values:
+            with self.subTest(value=repr(value)), self.assertRaises(ValidationError):
+                _normalize_external_id(value)
+
+        user = User.objects.create_user(username="external-id-patch-user")
+        membership = grant(user, self.tenant_a, self.tenant_role).membership
+        detail_url = reverse(
+            "api:scim:user-detail",
+            kwargs={"tenant_slug": self.tenant_a.slug, "pk": str(user.scim_id)},
+        )
+        response = self.client.patch(
+            detail_url,
+            data=json.dumps(
+                {
+                    "Operations": [
+                        {"op": "replace", "value": {"externalId": "pathless-id"}},
+                        {"op": "replace", "path": "externalId", "value": "path-id"},
+                        {"op": "remove", "path": "externalId"},
+                    ]
+                }
+            ),
+            content_type="application/json",
+            **self.headers(self.tenant_token),
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        membership.refresh_from_db()
+        self.assertEqual(membership.external_id, "")
+
+    def test_tenant_external_id_conflicts_and_create_races_are_translated(self):
+        occupied = User.objects.create_user(username="occupied-external-user")
+        occupied_membership = grant(occupied, self.tenant_a, self.tenant_role).membership
+        occupied_membership.external_id = "occupied"
+        occupied_membership.save(update_fields=["external_id"])
+        url = reverse("api:scim:user-list", kwargs={"tenant_slug": self.tenant_a.slug})
+
+        conflicting = self.client.post(
+            url,
+            data=json.dumps({"userName": "different-user", "externalId": "occupied"}),
+            content_type="application/json",
+            **self.headers(self.tenant_token),
+        )
+        self.assertEqual(conflicting.status_code, status.HTTP_409_CONFLICT)
+        self.assertEqual(conflicting.json()["scimType"], "uniqueness")
+
+        existing = User.objects.create_user(username="existing-without-match")
+        existing_membership = grant(existing, self.tenant_a, self.tenant_role).membership
+        existing_membership.external_id = "existing-id"
+        existing_membership.save(update_fields=["external_id"])
+        duplicate = self.client.post(
+            url,
+            data=json.dumps({"userName": existing.username, "externalId": "different-id"}),
+            content_type="application/json",
+            **self.headers(self.tenant_token),
+        )
+        self.assertEqual(duplicate.status_code, status.HTTP_409_CONFLICT)
+
+        orphan = User.objects.create_user(username="orphan-race")
+        with patch("users.api.scim.views.Membership.objects.create", side_effect=IntegrityError):
+            raced_existing = self.client.post(
+                url,
+                data=json.dumps({"userName": orphan.username, "externalId": "race-existing"}),
+                content_type="application/json",
+                **self.headers(self.tenant_token),
+            )
+        self.assertEqual(raced_existing.status_code, status.HTTP_409_CONFLICT)
+
+        with patch("users.api.scim.views.Membership.objects.create", side_effect=IntegrityError):
+            raced_new = self.client.post(
+                url,
+                data=json.dumps({"userName": "race-new", "externalId": "race-new-id"}),
+                content_type="application/json",
+                **self.headers(self.tenant_token),
+            )
+        self.assertEqual(raced_new.status_code, status.HTTP_409_CONFLICT)
+
+    def test_scim_external_id_conflict_and_retry_helpers_are_scoped(self):
+        from users.api.scim.views import _retry_tenant_correlated_user, _save_scim_external_id
+
+        first = User.objects.create_user(username="external-conflict-first")
+        first_membership = grant(first, self.tenant_a, self.tenant_role).membership
+        first_membership.external_id = "conflict-id"
+        first_membership.save(update_fields=["external_id"])
+        second = User.objects.create_user(username="external-conflict-second")
+        second_membership = grant(second, self.tenant_a, self.tenant_role).membership
+        second_membership.external_id = "second-id"
+        second_membership.save(update_fields=["external_id"])
+
+        with self.assertRaises(APIException):
+            _save_scim_external_id(second, self.tenant_a, "conflict-id")
+
+        detail_url = reverse(
+            "api:scim:user-detail",
+            kwargs={"tenant_slug": self.tenant_a.slug, "pk": str(second.scim_id)},
+        )
+        response = self.client.patch(
+            detail_url,
+            data=json.dumps({"Operations": [{"op": "replace", "path": "externalId", "value": "conflict-id"}]}),
+            content_type="application/json",
+            **self.headers(self.tenant_token),
+        )
+        self.assertEqual(response.status_code, status.HTTP_409_CONFLICT)
+        self.assertEqual(response.json()["scimType"], "uniqueness")
+
+        with self.assertRaises(APIException):
+            _retry_tenant_correlated_user(self.tenant_a, "missing", "")
+        with self.assertRaises(APIException):
+            _retry_tenant_correlated_user(self.tenant_a, "missing", "not-present")
+
+        unbound = User.objects.create_user(username="unbound-serializer-user")
+        serializer = SCIMUserSerializer(unbound, context={"tenant": self.tenant_a})
+        self.assertFalse(serializer.get_active(unbound))
+        self.assertEqual(SCIMUserSerializer(unbound, context={}).get_groups(unbound), [])
+
+    def test_provider_conflicts_filters_and_retry_paths_are_scoped(self):
+        from users.api.scim.provider_views import SCIMProviderUserListView
+
+        provider_user = User.objects.create_user(username="provider-existing")
+        provider_membership = grant(provider_user, self.provider, self.provider_role).membership
+        provider_membership.external_id = "provider-occupied"
+        provider_membership.save(update_fields=["external_id"])
+        user_url = reverse("api:provider_scim:user-list", kwargs={"provider_slug": self.provider.slug})
+
+        invalid_filter = self.client.get(
+            f"{user_url}?filter=not a valid filter",
+            **self.headers(self.provider_token),
+        )
+        self.assertEqual(invalid_filter.status_code, status.HTTP_400_BAD_REQUEST)
+
+        conflicting = self.client.post(
+            user_url,
+            data=json.dumps({"userName": "provider-other", "externalId": "provider-occupied"}),
+            content_type="application/json",
+            **self.headers(self.provider_token),
+        )
+        self.assertEqual(conflicting.status_code, status.HTTP_409_CONFLICT)
+
+        duplicate = self.client.post(
+            user_url,
+            data=json.dumps({"userName": provider_user.username, "externalId": "different-provider-id"}),
+            content_type="application/json",
+            **self.headers(self.provider_token),
+        )
+        self.assertEqual(duplicate.status_code, status.HTTP_409_CONFLICT)
+
+        view = SCIMProviderUserListView()
+        view.tenant = self.provider
+        with self.assertRaises(SCIMPatchError):
+            view._retry_correlated_user("missing", "")
+        with self.assertRaises(SCIMPatchError):
+            view._retry_correlated_user("missing", "not-present")
+        with self.assertRaises(SCIMPatchError):
+            view._retry_correlated_user("different", "provider-occupied")
+
+        group_url = reverse("api:provider_scim:group-list", kwargs={"provider_slug": self.provider.slug})
+        invalid_group_filter = self.client.get(
+            f"{group_url}?filter=not a valid filter",
+            **self.headers(self.provider_token),
+        )
+        self.assertEqual(invalid_group_filter.status_code, status.HTTP_400_BAD_REQUEST)
+        UserGroup.objects.create(tenant=self.provider, name="occupied-group", external_id="group-occupied")
+        group_conflict = self.client.post(
+            group_url,
+            data=json.dumps({"displayName": "different-group", "externalId": "group-occupied"}),
+            content_type="application/json",
+            **self.headers(self.provider_token),
+        )
+        self.assertEqual(group_conflict.status_code, status.HTTP_409_CONFLICT)

@@ -57,7 +57,8 @@ def _save_scim_external_id(user, tenant, external_id):
         return
     membership.external_id = external_id
     try:
-        membership.save(update_fields=["external_id"])
+        with transaction.atomic():
+            membership.save(update_fields=["external_id"])
     except IntegrityError as exc:
         conflict = exceptions.APIException("externalId is already used in this tenant.")
         conflict.status_code = status.HTTP_409_CONFLICT

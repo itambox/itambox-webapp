@@ -164,7 +164,8 @@ def _save_provider_user_external_id(user, tenant, external_id) -> None:
         return
     membership.external_id = external_id
     try:
-        membership.save(update_fields=["external_id"])
+        with transaction.atomic():
+            membership.save(update_fields=["external_id"])
     except IntegrityError as exc:
         raise SCIMPatchError(
             "externalId is already used in this provider tenant",
