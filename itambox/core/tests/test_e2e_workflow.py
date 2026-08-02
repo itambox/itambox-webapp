@@ -56,13 +56,17 @@ def test_scim_negative_paths_match_authentication_and_url_routing_contracts():
     assert "Unauthenticated SCIM request targeting a non-existent tenant fails closed" in spec
     assert "expect(response.status()).toBe(401);" in spec
     assert "SCIM User patch with a malformed resource ID returns 404" in spec
+    assert 'Operations: [{ op: "replace", path: "active", value: false }]' in spec
+    assert 'data: "{invalid json payload"' not in spec
     assert "expect(response.status()).toBe(404);" in spec
 
 
 def test_e2e_workflow_provisions_full_demo_and_masked_scim_credentials():
     workflow = WORKFLOW_PATH.read_text(encoding="utf-8")
 
-    assert "E2E_TENANT_SLUG: northwind-internal-it" in workflow
+    assert "E2E_TENANT_SLUG: helix-rnd" in workflow
+    assert "is_provider=False" in workflow
+    assert "deleted_at__isnull=True" in workflow
     assert "uv run --locked --no-sync python manage.py seed_data --force" in workflow
     assert "uv run --locked --no-sync python manage.py runserver" in workflow
     assert "seed_data --production" not in workflow

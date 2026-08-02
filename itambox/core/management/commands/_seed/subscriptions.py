@@ -40,8 +40,8 @@ class SeedSubscriptionsMixin:
         self._subscriptions = []
         ct_asset = ContentType.objects.get_for_model(Asset)
         # One cloud footprint per organization, contracted centrally by the parent
-        # entity (the group's primary tenant) and consumed across its sibling entities.
-        x_entity = 0
+        # entity (the group's primary tenant). SubscriptionAssignment is a strict
+        # tenant boundary, so the demo data may only link targets owned by that tenant.
         for org in self._orgs:
             primary_slug = org["tenants"][0]["slug"]
             tenant = self._tenants[primary_slug]
@@ -77,33 +77,23 @@ class SeedSubscriptionsMixin:
                 self._subscriptions.append(sub)
                 if prov_name == "Amazon Web Services":
                     aws_sub = sub
-            # Cross-entity consumption: assign the group AWS contract to servers in EVERY
-            # entity of the group, not just the contracting one (shared-service realism).
+            # The contract belongs to the primary tenant, so only its servers are
+            # valid assignment targets. Cross-entity cost allocation needs a separate,
+            # explicitly group-scoped model rather than weakening this boundary.
             if aws_sub:
-                for t in org["tenants"]:
-                    servers = [
-                        a
-                        for a in self._assets_by_tenant.get(t["slug"], [])
-                        if a.asset_role and "server" in a.asset_role.slug
-                    ]
-                    sibling = t["slug"] != primary_slug
-                    for srv in servers[:3]:
-                        _, made = SubscriptionAssignment.objects.get_or_create(
-                            subscription=aws_sub,
-                            content_type=ct_asset,
-                            object_id=srv.pk,
-                            defaults={
-                                "assigned_by": self._provisioner,
-                                "notes": (
-                                    "Hybrid workload node (intercompany — billed to group contract)"
-                                    if sibling
-                                    else "Hybrid workload node"
-                                ),
-                            },
-                        )
-                        if made and sibling:
-                            x_entity += 1
-        self.stdout.write(
-            f"  {len(self._subscriptions)} subscriptions across {len(self._orgs)} organizations, "
-            f"{x_entity} cross-entity workload assignments."
-        )
+                servers = [
+                    asset
+                    for asset in self._assets_by_tenant.get(primary_slug, [])
+                    if asset.asset_role and "server" in asset.asset_role.slug
+                ]
+                for server in servers[:3]:
+                    SubscriptionAssignment.objects.get_or_create(
+                        subscription=aws_sub,
+                        content_type=ct_asset,
+                        object_id=server.pk,
+                        defaults={
+                            "assigned_by": self._provisioner,
+                            "notes": "Hybrid workload node",
+                        },
+                    )
+        self.stdout.write(f"  {len(self._subscriptions)} subscriptions across {len(self._orgs)} organizations.")
