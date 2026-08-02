@@ -10,6 +10,7 @@ from core.management.commands.sync_tenant_ldap import Command as SyncTenantLDAPC
 from core.models import EmailSettings, Job
 from licenses.models import License
 from organization.models import Tenant
+from subscriptions.models import SubscriptionAssignment
 
 User = get_user_model()
 
@@ -49,6 +50,16 @@ class ManagementCommandsTestCase(TransactionTestCase):
         # (the guard that prevents an accidental production wipe).
         call_command("seed_data", production=True, force=True, stdout=self.stdout, stderr=self.stderr)
         self.assertIn("Database seeding complete", self.stdout.getvalue())
+
+    def test_full_seed_data_keeps_subscription_assignments_within_tenant(self):
+        call_command("seed_data", force=True, stdout=self.stdout, stderr=self.stderr)
+
+        assignments = list(SubscriptionAssignment._base_manager.select_related("subscription"))
+        self.assertGreater(len(assignments), 0)
+        for assignment in assignments:
+            target = assignment._resolve_assigned_object_unscoped()
+            self.assertIsNotNone(target)
+            self.assertEqual(target.tenant_id, assignment.subscription.tenant_id)
 
     def test_seed_data_refuses_to_wipe_without_force_when_not_debug(self):
         # The destructive clear must be blocked outside DEBUG unless --force is passed.

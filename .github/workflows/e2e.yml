@@ -43,7 +43,7 @@ jobs:
       DJANGO_SUPERUSER_USERNAME: e2e-admin
       DJANGO_SUPERUSER_EMAIL: e2e@itambox.local
       E2E_USERNAME: e2e-admin
-      E2E_TENANT_SLUG: northwind-internal-it
+      E2E_TENANT_SLUG: helix-rnd
       E2E_BASE_URL: http://localhost:8000
       # Playwright's webServer config uses a venv path; in CI we manage the server
       # ourselves for reliability and to avoid venv path assumptions.
@@ -167,7 +167,11 @@ jobs:
           user.set_password(os.environ["E2E_PASSWORD"])
           user.save()
 
-          tenant = Tenant._base_manager.get(slug=os.environ["E2E_TENANT_SLUG"])
+          tenant = Tenant._base_manager.get(
+              slug=os.environ["E2E_TENANT_SLUG"],
+              is_provider=False,
+              deleted_at__isnull=True,
+          )
           Token.objects.filter(user=user, description="GitHub Actions E2E SCIM").delete()
           token = Token.objects.create(
               user=user,

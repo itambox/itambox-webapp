@@ -205,13 +205,15 @@ test.describe('SSO and SCIM 2.0 Provisioning Specs', () => {
     expect(response.status()).toBe(401);
   });
 
-  test('9. SCIM User patch with a malformed resource ID returns 404 without crashing', async ({ request }) => {
+  test('9. SCIM User patch with a malformed resource ID returns 404 without crashing', async () => {
     const response = await scimRequest.patch(scimUrl('Users/some-user-id'), {
-      headers: { 'Content-Type': 'application/scim+json' },
-      data: "{invalid json payload"
+      data: {
+        schemas: ["urn:ietf:params:scim:api:messages:2.0:PatchOp"],
+        Operations: [{ op: "replace", path: "active", value: false }]
+      }
     });
-    // User detail routes accept integer IDs. Django rejects this malformed ID
-    // before dispatching the request body to the SCIM view.
+    // Detail routes dual-read opaque UUIDs and legacy integer IDs. An identifier
+    // matching neither shape must fail closed without reaching a resource.
     expect(response.status()).toBe(404);
   });
 
