@@ -120,13 +120,20 @@ Navigate to **Extras → Label Templates** and click **Add**:
 
 ### Template Code Variables
 
-Label templates have access to asset properties including:
+Label templates receive a deliberately small scalar DTO — not the Django `Asset`
+model. Supported values are:
 
 - `{{ asset.asset_tag }}` — the unique asset tag (encoded in the barcode)
 - `{{ asset.name }}` — asset display name
 - `{{ asset.serial_number }}` — manufacturer serial number
-- `{{ asset.asset_type.name }}` — the asset type / model name
-- `{{ asset.location.name }}` — current location
+- `{{ asset.location }}` — current location name
+- `{{ asset.status }}` — current status name
+- `{{ barcode_data_uri }}` — the internally generated barcode image URI
+- `{{ barcode_img }}` — the internally generated barcode image element
+- `{{ barcode_format }}` — the selected symbology
+
+Rendered output is sanitized before PDF generation. Scripts, event handlers,
+external resources, unsafe CSS, and model/dunder access are not supported.
 
 ---
 
@@ -150,8 +157,6 @@ Navigate to **Extras → Report Templates** and click **Add**:
 | **Group By Field** | Optional column to group grid rows under (e.g. `location`, `status`) |
 | **Style Preset** | Visual layout for HTML/PDF renders |
 | **Filter Tenants** | Limit data to selected tenants (blank = global aggregate) |
-| **Advanced Mode** | Enable custom Jinja2/HTML template override |
-| **Template Content** | Custom Jinja2 HTML layout (only when Advanced Mode is on) |
 | **Description** | Optional notes |
 
 ### Available Report Types
@@ -178,36 +183,6 @@ Navigate to **Extras → Report Templates** and click **Add**:
 | **Compact (Dense)** | `compact` | Dense rows with zebra striping — for audit and operations lists |
 | **Financial (Ledger)** | `financial` | Stone ledger with emphasised monetary totals and tabular figures |
 | **Minimal (Clean)** | `minimal` | Clean black-on-white, single indigo hairline — for forwarding, embedding, or printing |
-
-### Custom Layouts (Advanced Mode)
-
-When **Advanced Mode** is enabled, you provide a full Jinja2 HTML template
-in the **Template Content** field. The template has access to the compiled
-report data and can completely override the generated output:
-
-```jinja2
-<!DOCTYPE html>
-<html>
-<head><title>{{ report.name }}</title></head>
-<body>
-  <h1>{{ report.name }}</h1>
-  <table>
-    {% for row in data %}
-    <tr>
-      <td>{{ row.asset_tag }}</td>
-      <td>{{ row.status }}</td>
-      <td>{{ row.book_value|floatformat:2 }} €</td>
-    </tr>
-    {% endfor %}
-  </table>
-</body>
-</html>
-```
-
-> [!WARNING]
-> Advanced Mode templates bypass the built-in layout engine entirely.
-> You are responsible for the full HTML document, styling, and responsive
-> behaviour. Invalid Jinja2 syntax is caught during template save validation.
 
 ---
 
@@ -367,12 +342,6 @@ operating systems.
   the export template's **Content Type** matches the model you are exporting.
   For report templates, ensure the **Included Columns** list has the columns
   you expect checked.
-
-**"Jinja2 template compilation failed" when saving a Report Template**
-: Your **Template Content** (Advanced Mode) contains invalid Jinja2 syntax.
-  Common causes: unmatched `{% %}` / `{{ }}` tags, undefined variables in
-  control flow blocks, or unclosed HTML tags. Validate the template syntax
-  before saving.
 
 **Label print is misaligned or scaled wrong**
 : Check browser print settings — margins must be **None**, scale must be

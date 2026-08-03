@@ -7,6 +7,7 @@ from django.utils.translation import gettext_lazy as _
 from django_tables2.utils import A  # Alias for Accessor
 
 from compliance.models import AssetAudit
+from core.html_styles import color_chip_class, safe_hex_color, status_color_class
 from core.tables import (
     ActionsColumn,
     AssigneeColumn,
@@ -142,10 +143,11 @@ class AssetTable(BaseTable):  # Inherit from BaseTable
         # .badge-status derives fill/text/border from --status-color and adds
         # the leading dot (light/dark variants handled in _components.scss).
         if value:
+            color_class, style_block = status_color_class(value.color)
             return format_html(
-                '<span class="badge badge-status" style="--status-color: #{};">'
-                '<span class="badge-status-dot"></span>{}</span>',
-                value.color or "6c757d",
+                '{}<span class="badge badge-status {}"><span class="badge-status-dot"></span>{}</span>',
+                style_block,
+                color_class,
                 value.name,
             )
         return "—"
@@ -175,7 +177,7 @@ class AssetTable(BaseTable):  # Inherit from BaseTable
             return format_html(
                 '<span class="{} opacity-50" title="{}">'
                 '<i class="mdi {}"></i>'
-                '<i class="mdi mdi-arrow-bottom-left text-muted ms-1" style="font-size:.7em"></i>'
+                '<i class="inheritance-marker mdi mdi-arrow-bottom-left text-muted ms-1"></i>'
                 "</span>",
                 color,
                 _("Inherited from asset type"),
@@ -247,17 +249,19 @@ class AssetTable(BaseTable):  # Inherit from BaseTable
             # outline (take back). Equal width via .check-action.
             if record.active_assignment:
                 checkin_url = reverse("assets:asset_checkin", kwargs={"pk": record.pk})
-                html += (
-                    '<a class="btn btn-sm btn-soft-outline-success check-action" role="button" style="cursor: pointer" '
-                    f'hx-get="{checkin_url}" hx-target="#modal-placeholder" hx-swap="innerHTML" '
-                    'title="Check-in" aria-label="Check-in"><i class="mdi mdi-login me-1"></i>Check-in</a>'
+                html += format_html(
+                    '<a class="btn btn-sm btn-soft-outline-success check-action cursor-pointer" role="button" '
+                    'hx-get="{}" hx-target="#modal-placeholder" hx-swap="innerHTML" '
+                    'title="Check-in" aria-label="Check-in"><i class="mdi mdi-login me-1"></i>Check-in</a>',
+                    checkin_url,
                 )
             else:
                 checkout_url = reverse("assets:asset_checkout_modal", kwargs={"pk": record.pk})
-                html += (
-                    '<a class="btn btn-sm btn-soft-success check-action" role="button" style="cursor: pointer" '
-                    f'hx-get="{checkout_url}" hx-target="#modal-placeholder" hx-swap="innerHTML" '
-                    'title="Check-out" aria-label="Check-out"><i class="mdi mdi-logout me-1"></i>Check-out</a>'
+                html += format_html(
+                    '<a class="btn btn-sm btn-soft-success check-action cursor-pointer" role="button" '
+                    'hx-get="{}" hx-target="#modal-placeholder" hx-swap="innerHTML" '
+                    'title="Check-out" aria-label="Check-out"><i class="mdi mdi-logout me-1"></i>Check-out</a>',
+                    checkout_url,
                 )
 
         if can_clone:
@@ -318,7 +322,9 @@ class StatusLabelTable(BaseTable):
 
     def render_color(self, value):
         if value:
-            return format_html('<span class="badge" style="background-color: #{};">&nbsp;</span> #{}', value, value)
+            normalized = safe_hex_color(value)
+            color_class, style_block = color_chip_class(normalized)
+            return format_html('{}<span class="badge {}">&nbsp;</span> #{}', style_block, color_class, normalized)
         return "—"
 
     def render_type(self, value):
@@ -340,7 +346,9 @@ class AssetRoleTable(BaseTable):
 
     def render_color(self, value):
         if value:
-            return format_html('<span class="badge" style="background-color: #{};">&nbsp;</span> #{}', value, value)
+            normalized = safe_hex_color(value)
+            color_class, style_block = color_chip_class(normalized)
+            return format_html('{}<span class="badge {}">&nbsp;</span> #{}', style_block, color_class, normalized)
         return "—"
 
 
@@ -599,7 +607,9 @@ class CategoryTable(BaseTable):
 
     def render_color(self, value):
         if value:
-            return format_html('<span class="badge" style="background-color: #{};">&nbsp;</span> #{}', value, value)
+            normalized = safe_hex_color(value)
+            color_class, style_block = color_chip_class(normalized)
+            return format_html('{}<span class="badge {}">&nbsp;</span> #{}', style_block, color_class, normalized)
         return "—"
 
 

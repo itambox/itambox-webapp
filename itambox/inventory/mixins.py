@@ -94,7 +94,7 @@ class CheckoutActionsColumn(ActionsColumn):
 
         title = _("Check-out")
         return format_html(
-            '<a class="btn btn-sm btn-soft-success check-action me-1" role="button" style="cursor: pointer" '
+            '<a class="btn btn-sm btn-soft-success check-action cursor-pointer me-1" role="button" '
             'hx-get="{url}" hx-target="#modal-placeholder" hx-swap="innerHTML" '
             'title="{title}" aria-label="{title}"><i class="mdi mdi-logout me-1"></i>{title}</a>',
             url=url,

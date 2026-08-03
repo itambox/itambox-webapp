@@ -2230,24 +2230,6 @@
       "count": 1
     },
     {
-      "path": "itambox/core/tasks/labels.py",
-      "context": "FunctionDef:render_label_html",
-      "statement": "from jinja2.sandbox import SandboxedEnvironment",
-      "count": 1
-    },
-    {
-      "path": "itambox/core/tasks/reports.py",
-      "context": "FunctionDef:generate_scheduled_report_task",
-      "statement": "from core.reports.exporters import PDF_MIME, report_pdf_bytes",
-      "count": 1
-    },
-    {
-      "path": "itambox/core/tasks/reports.py",
-      "context": "FunctionDef:generate_scheduled_report_task",
-      "statement": "from core.reports.exporters import XLSX_MIME, report_xlsx_bytes",
-      "count": 1
-    },
-    {
       "path": "itambox/core/tasks/utils.py",
       "context": "FunctionDef:reverse_job_detail",
       "statement": "from django.urls import reverse",
@@ -2609,12 +2591,6 @@
     },
     {
       "path": "itambox/extras/models.py",
-      "context": "ClassDef:ReportTemplate/FunctionDef:clean",
-      "statement": "from jinja2 import Environment",
-      "count": 1
-    },
-    {
-      "path": "itambox/extras/models.py",
       "context": "ClassDef:ScheduledReport/FunctionDef:clean",
       "statement": "from croniter import croniter",
       "count": 1
@@ -2711,12 +2687,6 @@
     },
     {
       "path": "itambox/extras/views.py",
-      "context": "ClassDef:ReportTemplateDownloadView/FunctionDef:get",
-      "statement": "from jinja2.sandbox import SandboxedEnvironment",
-      "count": 1
-    },
-    {
-      "path": "itambox/extras/views.py",
       "context": "ClassDef:ReportTemplatePreviewView/FunctionDef:post",
       "statement": "from core.managers import get_current_tenant",
       "count": 1
@@ -2731,12 +2701,6 @@
       "path": "itambox/extras/views.py",
       "context": "ClassDef:ReportTemplatePreviewView/FunctionDef:post",
       "statement": "from django.template import Context, Template",
-      "count": 1
-    },
-    {
-      "path": "itambox/extras/views.py",
-      "context": "ClassDef:ReportTemplatePreviewView/FunctionDef:post",
-      "statement": "from jinja2.sandbox import SandboxedEnvironment",
       "count": 1
     },
     {

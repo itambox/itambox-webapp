@@ -1,5 +1,6 @@
 {% load i18n %}
 {% load l10n %}
+{% load utility_tags %}
 {% if status_stats %}
   <div class="d-flex align-items-baseline mb-2">
     <span class="h2 mb-0">{{ total_assets }}</span>
@@ -7,13 +8,14 @@
   </div>
   {% if chart_type == 'list' %}
     <!-- Simple List View -->
-    <div class="row g-2" style="font-size: 0.75rem;">
+    <div class="row g-2 csp-style-8b511f076fb1">
       {% for status in status_stats %}
         <div class="col-6">
           <a href="{% url 'assets:statuslabel_detail' status.pk %}"
              class="d-flex align-items-center text-reset text-decoration-none gap-1">
-            <span class="badge badge-dot"
-                  style="background-color: #{{ status.color|default:'626976' }}"></span>
+            {% csp_color_style status.color "chip" as status_style %}
+            {{ status_style.style_block|safe }}
+            <span class="badge badge-dot {{ status_style.class_name }}"></span>
             <span class="text-truncate">{{ status.name }}</span>
             <span class="ms-auto text-muted fw-bold">{{ status.asset_count }}</span>
           </a>
@@ -22,11 +24,10 @@
     </div>
   {% else %}
     <!-- ApexCharts Doughnut / Pie / Bar Chart -->
-    <div class="itambox-status-labels-chart"
+    <div class="itambox-status-labels-chart csp-style-0b342f935f33"
          id="chart-status-labels-{{ widget.index }}"
          data-chart-type="{{ chart_type }}"
-         data-chart-data="{{ chart_data_json }}"
-         style="min-height: 220px"></div>
+         data-chart-data="{{ chart_data_json }}"></div>
   {% endif %}
 {% else %}
   <div class="text-muted text-center py-4">{% translate "No status labels configured." %}</div>

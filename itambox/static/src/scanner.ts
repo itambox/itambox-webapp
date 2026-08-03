@@ -52,13 +52,13 @@ export class AssetScanner {
     if (this.errorDiv) {
       const msgEl = this.errorDiv.querySelector('[data-scanner-error-msg]') as HTMLElement | null;
       if (msgEl) msgEl.textContent = msg;
-      this.errorDiv.style.display = '';
+      this.errorDiv.classList.remove('d-none');
     }
   }
 
   private hideError(): void {
     if (this.errorDiv) {
-      this.errorDiv.style.display = 'none';
+      this.errorDiv.classList.add('d-none');
     }
   }
 
@@ -68,7 +68,7 @@ export class AssetScanner {
       return;
     }
 
-    this.modal.style.display = 'flex';
+    this.modal.classList.add('is-open');
     this.hideError();
 
     // iOS WebKit only grants getUserMedia on HTTPS or literal localhost (not 127.0.0.1).
@@ -132,7 +132,7 @@ export class AssetScanner {
       try {
         const capabilities = this.html5QrcodeScanner.getRunningTrackCapabilities();
         if (capabilities && (capabilities as any).torch && this.torchBtn) {
-          this.torchBtn.style.display = 'block';
+          this.torchBtn.classList.remove('d-none');
           this.isTorchOn = false;
         }
       } catch (_capErr) {
@@ -167,10 +167,10 @@ export class AssetScanner {
 
   public stop(): void {
     if (this.modal) {
-      this.modal.style.display = 'none';
+      this.modal.classList.remove('is-open');
     }
     if (this.torchBtn) {
-      this.torchBtn.style.display = 'none';
+      this.torchBtn.classList.add('d-none');
     }
     this.isTorchOn = false;
 

@@ -25,9 +25,7 @@
         <div class="list-group-item py-3 {% if not notif.is_read %}bg-light-lt{% endif %}">
           <div class="row align-items-center g-3">
             <div class="col-auto">
-              <span class="status-dot status-dot-animated {% if notif.level == 'danger' %}bg-red{% elif notif.level == 'warning' %}bg-warning{% elif notif.level == 'success' %}bg-success{% else %}bg-blue{% endif %} d-block"
-                    style="width: 10px;
-                           height: 10px"></span>
+              <span class="status-dot status-dot-animated {% if notif.level == 'danger' %}bg-red{% elif notif.level == 'warning' %}bg-warning{% elif notif.level == 'success' %}bg-success{% else %}bg-blue{% endif %} d-block csp-style-3b8a53a9afec"></span>
             </div>
             <div class="col">
               <div class="d-flex align-items-center mb-1">
@@ -42,12 +40,10 @@
                     {% endif %}
                   </a>
                 </span>
-                <span class="ms-2 badge {% if notif.level == 'danger' %}bg-red-lt{% elif notif.level == 'warning' %}bg-warning-lt{% elif notif.level == 'success' %}bg-success-lt{% else %}bg-blue-lt{% endif %} text-uppercase px-2 py-0.5"
-                      style="font-size: 0.65rem">{{ notif.get_level_display }}</span>
+                <span class="ms-2 badge {% if notif.level == 'danger' %}bg-red-lt{% elif notif.level == 'warning' %}bg-warning-lt{% elif notif.level == 'success' %}bg-success-lt{% else %}bg-blue-lt{% endif %} text-uppercase px-2 py-0.5 csp-style-061aae1ab3fc">{{ notif.get_level_display }}</span>
               </div>
               <p class="text-secondary mb-0 small">{{ notif.message }}</p>
-              <span class="text-muted d-block mt-1 font-monospace"
-                    style="font-size: 0.75rem">{{ notif.created_at|date:"Y-m-d H:i" }}</span>
+              <span class="text-muted d-block mt-1 font-monospace csp-style-932e018c8821">{{ notif.created_at|date:"Y-m-d H:i" }}</span>
             </div>
             {% if not notif.is_read %}
               <div class="col-auto ms-auto">

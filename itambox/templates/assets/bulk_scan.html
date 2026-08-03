@@ -79,7 +79,7 @@
                     <th>{% translate "Status" %}</th>
                     {% if mode == 'dispose' %}
                       <th class="text-end">{% translate "Book value" %}</th>
-                      <th style="width: 9rem;">{% translate "Proceeds" %}</th>
+                      <th class="csp-style-22e445681534">{% translate "Proceeds" %}</th>
                     {% else %}
                       <th>{% translate "Assigned to" %}</th>
                     {% endif %}
@@ -92,7 +92,7 @@
               </table>
             </div>
             <div class="card-body text-center text-muted py-5" id="scan-basket-empty">
-              <i class="mdi mdi-basket-outline d-block mb-2" style="font-size: 2.5rem"></i>
+              <i class="mdi mdi-basket-outline d-block mb-2 csp-style-d574d0f6d3c1"></i>
               {% translate "No assets yet — start scanning." %}
             </div>
           </div>
@@ -193,9 +193,7 @@
 {% endblock content %}
 {% block page_modals %}
   {# ── Camera scanner overlay (distinct IDs from audit / global scanners) ── #}
-  <div id="basket-scanner-modal"
-       class="scanner-overlay"
-       style="display:none">
+  <div id="basket-scanner-modal" class="scanner-overlay d-none">
     <div class="text-center mb-3">
       <h3 class="text-white mb-1">
         {% if mode == 'dispose' %}
@@ -218,17 +216,14 @@
          class="scanner-feedback"
          role="status"
          aria-live="polite"></div>
-    <div id="basket-scanner-error"
-         class="alert alert-warning mt-3"
-         style="display:none">
+    <div id="basket-scanner-error" class="alert alert-warning mt-3 d-none">
       <i class="mdi mdi-alert-outline me-2"></i>
       <span data-scanner-error-msg>{% translate "Camera unavailable. On iPhone/iPad this requires HTTPS and camera permission — check Settings › Safari › Camera, or use a hardware scanner." %}</span>
     </div>
     <div class="mt-4 d-flex gap-2">
       <button type="button"
               id="basket-toggle-torch-btn"
-              class="btn btn-outline-light"
-              style="display:none">
+              class="btn btn-outline-light d-none">
         <i class="mdi mdi-flashlight"></i> {% translate "Toggle Flash" %}
       </button>
       <button type="button" id="basket-close-scanner-btn" class="btn btn-danger">{% translate "Done" %}</button>

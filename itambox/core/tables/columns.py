@@ -1,11 +1,10 @@
-import re
-
 import django_tables2 as tables
 from django.urls import NoReverseMatch, reverse
 from django.utils.html import format_html
 from django.utils.safestring import mark_safe
 from django.utils.translation import gettext_lazy as _
 
+from core.html_styles import color_chip_class, safe_hex_color
 from itambox.utils import get_model_viewname
 
 
@@ -22,20 +21,14 @@ class ColorChipColumn(tables.Column):
     def render(self, value):
         if not value:
             return mark_safe('<span class="text-muted">&mdash;</span>')
-        raw_color = value.color or ""
-        # Sanitize: accept only valid 3- or 6-digit hex strings; fall back to a
-        # neutral grey so that an invalid/arbitrary value stored in the DB cannot
-        # inject CSS metacharacters into the style attribute.
-        if re.fullmatch(r"[0-9A-Fa-f]{3,6}", raw_color):
-            safe_color = raw_color
-        else:
-            safe_color = "6c757d"
+        safe_color = safe_hex_color(value.color)
+        color_class, style_block = color_chip_class(safe_color)
         return format_html(
-            '<a href="{}" class="text-reset text-decoration-none d-inline-flex align-items-center">'
-            '<span class="d-inline-block rounded-circle me-1" '
-            'style="width:.6rem;height:.6rem;background-color:#{};"></span>{}</a>',
+            '{}<a href="{}" class="text-reset text-decoration-none d-inline-flex align-items-center">'
+            '<span class="color-chip-dot d-inline-block rounded-circle me-1 {}"></span>{}</a>',
+            style_block,
             value.get_absolute_url(),
-            safe_color,
+            color_class,
             value.name,
         )
 

@@ -60,7 +60,7 @@
                          class="list-group-item list-group-item-action py-2">
                         <div class="d-flex align-items-center">
                           <span class="status-dot status-dot-animated {% if notif.level == 'danger' %}bg-red{% elif notif.level == 'warning' %}bg-warning{% else %}bg-blue{% endif %} me-2"></span>
-                          <div class="text-truncate" style="max-width: 180px;">{{ notif.subject }}</div>
+                          <div class="text-truncate csp-style-7ef9446763d9">{{ notif.subject }}</div>
                         </div>
                       </a>
                     {% endfor %}
@@ -81,9 +81,9 @@
                class="nav-link d-flex align-items-center lh-1 text-reset p-0"
                data-bs-toggle="dropdown"
                aria-label="{% translate 'Open user menu' %}">
-              <div class="ps-1 text-end" style="max-width: 96px;">
+              <div class="ps-1 text-end csp-style-b7ef83b20586">
                 <div class="fw-bold text-truncate small">{% if user.is_authenticated %}{{ user.get_full_name|default:user.username }}{% else %}{% translate "Guest" %}{% endif %}</div>
-                <div class="text-muted text-truncate" style="font-size: 0.65rem;">
+                <div class="text-muted text-truncate csp-style-a6c62bdf9337">
                   {% if user.is_staff %}
                     {% translate "Admin" %}
                   {% elif user.is_authenticated %}
@@ -168,9 +168,9 @@
                   <i class="mdi mdi-unfold-more-horizontal text-muted"></i>
                 </a>
                 <div class="collapse" id="mobile-tenant-switcher">
-                  <div class="list-group list-group-flush list-group-hoverable border-top"
-                       style="max-height: 45vh;
-                              overflow-y: auto">{% include 'global_includes/_tenant_switcher_list.html' %}</div>
+                  <div class="list-group list-group-flush list-group-hoverable border-top csp-style-e592dfc6c0f2">
+                    {% include 'global_includes/_tenant_switcher_list.html' %}
+                  </div>
                 </div>
               </div>
             {% endif %}

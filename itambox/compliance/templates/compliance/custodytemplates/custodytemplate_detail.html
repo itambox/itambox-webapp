@@ -69,13 +69,9 @@
     <div class="col-md-6 text-center text-md-end">
       {% if object.logo %}
         <div class="mb-2 text-secondary small">{% translate "Custom Acceptance Logo" %}</div>
-        <img src="{{ object.logo.url }}"
-             alt="{% translate 'Logo' %}"
-             style="max-height: 80px;
-                    border: 1px solid #ddd;
-                    padding: 5px;
-                    border-radius: 4px;
-                    background: white" />
+        <img class="csp-style-111e2c1bce4e"
+             src="{{ object.logo.url }}"
+             alt="{% translate 'Logo' %}" />
       {% else %}
         <div class="text-muted italic small py-4">{% translate "No custom logo uploaded. Standard global branding will apply." %}</div>
       {% endif %}
@@ -85,11 +81,7 @@
     <div class="card-header border-0 bg-transparent">
       <h3 class="card-title text-secondary">{% translate "Custody Terms & Conditions (EULA)" %}</h3>
     </div>
-    <div class="card-body bg-body-tertiary border rounded text-secondary"
-         style="max-height: 250px;
-                overflow-y: auto;
-                font-size: 9.5pt;
-                line-height: 1.5">{{ object.eula_text|linebreaksbr }}</div>
+    <div class="card-body bg-body-tertiary border rounded text-secondary csp-style-50ad24378a83">{{ object.eula_text|linebreaksbr }}</div>
   </div>
   {% if object.disclaimer %}
     <div class="card mt-3 border-0 shadow-sm">

@@ -1,0 +1,100 @@
+.label-card-table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 0;
+  padding: 0;
+}
+
+.label-card-table td {
+  padding: 2px;
+  vertical-align: middle;
+}
+
+.label-card-metadata {
+  width: 55%;
+  text-align: left;
+  font-family: Helvetica, Arial, sans-serif;
+  font-size: 8pt;
+  font-weight: bold;
+  line-height: 1.1;
+}
+
+.label-card-barcode-cell {
+  width: 45%;
+  text-align: right;
+}
+
+.label-card-title {
+  max-height: 24pt;
+  margin-bottom: 3px;
+  overflow: hidden;
+  font-size: 9.5pt;
+}
+
+.label-card-tag {
+  display: inline-block;
+  margin-bottom: 4px;
+  padding: 1px 3px;
+  border-radius: 2px;
+  background-color: #000;
+  color: #fff;
+  font-family: monospace;
+  font-size: 8pt;
+}
+
+.label-card-serial {
+  color: #555;
+  font-size: 7pt;
+  font-weight: normal;
+}
+
+.label-card-barcode {
+  display: block;
+  width: 0.95in;
+  height: 0.95in;
+  margin-left: auto;
+}
+
+.grid-table {
+  width: 100%;
+  height: 100%;
+  border-collapse: collapse;
+}
+
+.grid-cell {
+  width: 33.33%;
+  border: 1px dashed #ccc;
+  padding: 2mm;
+  vertical-align: middle;
+  box-sizing: border-box;
+  overflow: hidden;
+}
+
+.label-card {
+  box-sizing: border-box;
+  padding: 0.1in;
+  overflow: hidden;
+}
+
+.page-break-always {
+  page-break-after: always;
+  break-after: always;
+}
+
+.page-break-avoid {
+  page-break-after: avoid;
+  break-after: avoid;
+}
+
+.label-seed-centered {
+  text-align: center;
+}
+
+.label-seed-small {
+  font-size: 7pt;
+}
+
+.label-seed-rack-title {
+  font-size: 11pt;
+  font-weight: bold;
+}

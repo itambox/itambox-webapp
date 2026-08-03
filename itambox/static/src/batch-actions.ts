@@ -59,7 +59,7 @@
       const fieldName = cb.value;
       const container = document.getElementById('field_container_' + fieldName);
       if (container) {
-        container.style.display = cb.checked ? '' : 'none';
+        container.classList.toggle('d-none', !cb.checked);
       }
     });
   }
@@ -96,7 +96,7 @@
       const fieldName = target.value;
       const container = document.getElementById('field_container_' + fieldName);
       if (container) {
-        container.style.display = target.checked ? '' : 'none';
+        container.classList.toggle('d-none', !target.checked);
       }
       return;
     }

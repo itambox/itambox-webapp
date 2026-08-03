@@ -140,12 +140,23 @@ Run the Django selector from the repository root:
 ```bash
 PYTHONPATH=itambox uv run --locked --group dev python -m pytest -q -p no:cacheprovider \
   itambox/assets/tests/test_existing.py \
+  itambox/assets/tests/test_tables_category.py \
   itambox/assets/tests/test_requests.py \
   itambox/core/tests/test_import_boundaries.py \
+  itambox/core/tests/test_csp_nonce_context.py \
+  itambox/core/tests/test_global_label_template_permissions.py \
+  itambox/core/tests/test_html_sanitizer.py \
+  itambox/core/tests/test_html_styles.py \
   itambox/core/tests/test_import_snipeit.py \
   itambox/core/tests/test_integrity_report.py \
+  itambox/core/tests/test_label_renderer_html.py \
+  itambox/core/tests/test_mitigations_phase2.py \
+  itambox/core/tests/test_report_chart_html.py \
+  itambox/core/tests/test_report_custom_html_removal.py \
+  itambox/core/tests/test_reporting.py \
   itambox/extras/tests/test_dashboard_all_accessible.py \
   itambox/extras/tests/test_dashboard_widgets.py \
+  itambox/extras/tests/test_existing.py \
   itambox/inventory/tests/test_accessories.py \
   itambox/inventory/tests/test_api_over_allocation.py \
   itambox/inventory/tests/test_assignment_system_authorization_provenance.py \
@@ -167,6 +178,8 @@ PYTHONPATH=itambox uv run --locked --group dev python -m pytest -q -p no:cachepr
   itambox/organization/tests/test_resource_grant_views.py \
   itambox/organization/tests/test_resource_grants.py \
   scripts/tests/test_contract_policy.py \
+  scripts/tests/test_inline_style_workflow_policy.py \
+  scripts/tests/test_inline_styles.py \
   scripts/tests/test_migration_audit.py
 ```
 

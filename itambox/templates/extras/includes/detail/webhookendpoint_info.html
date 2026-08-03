@@ -46,10 +46,7 @@
   {% if object.headers %}
     <dt class="col-sm-3">{% translate "Custom HTTP Headers:" %}</dt>
     <dd class="col-sm-9">
-      <pre class="bg-dark text-light p-3 rounded font-monospace"
-           style="max-height: 150px;
-                  overflow-y: auto;
-                  font-size: 8.5pt">{{ object.headers }}</pre>
+      <pre class="bg-dark text-light p-3 rounded font-monospace csp-style-ec1ffaf1ff16">{{ object.headers }}</pre>
     </dd>
   {% endif %}
   <dt class="col-sm-3">{% translate "Used By Rules:" %}</dt>

@@ -10,7 +10,7 @@ function initBetaBanner() {
     if (sessionStorage.getItem('beta_banner_dismissed') === '1') {
       el.remove();
     } else {
-      el.style.removeProperty('display');
+      el.classList.remove('d-none');
       
       const closeBtn = el.querySelector('.btn-close');
       if (closeBtn && !closeBtn.getAttribute('data-listener-active')) {

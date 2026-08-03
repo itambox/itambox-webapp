@@ -860,6 +860,9 @@ class LabelTemplateEditView(ObjectEditView):
     queryset = LabelTemplate.objects.all()
     model_form = LabelTemplateForm
 
+    def has_permission(self):
+        return self.request.user.is_superuser
+
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         context["title"] = _("Edit Label Template") if self.object else _("Create Label Template")
@@ -869,3 +872,6 @@ class LabelTemplateEditView(ObjectEditView):
 @method_decorator(login_required, name="dispatch")
 class LabelTemplateDeleteView(ObjectDeleteView):
     queryset = LabelTemplate.objects.all()
+
+    def has_permission(self):
+        return self.request.user.is_superuser

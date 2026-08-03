@@ -21,7 +21,7 @@
 
   function toggleWrapper(root: ParentNode, id: string, show: boolean) {
     const el = root.querySelector('#' + id) as HTMLElement | null;
-    if (el) el.style.display = show ? '' : 'none';
+    if (el) el.classList.toggle('d-none', !show);
   }
 
   function syncWho(form: HTMLElement) {
@@ -39,8 +39,8 @@
     const group = row.querySelector('[data-scope-group]') as HTMLElement | null;
     const tenants = row.querySelector('[data-scope-tenants]') as HTMLElement | null;
     if (!scope) return;
-    if (group) group.style.display = scope.value === 'tenant_group' ? '' : 'none';
-    if (tenants) tenants.style.display = scope.value === 'explicit' ? '' : 'none';
+    if (group) group.classList.toggle('d-none', scope.value !== 'tenant_group');
+    if (tenants) tenants.classList.toggle('d-none', scope.value !== 'explicit');
   }
 
   function syncAllRows(scope: ParentNode) {
@@ -76,7 +76,7 @@
       // reconciler revokes the grant. Brand-new (unsaved) rows have one too —
       // marking it simply makes the server ignore the row.
       del.checked = true;
-      row.style.display = 'none';
+      row.classList.add('d-none');
     } else {
       row.remove();
     }

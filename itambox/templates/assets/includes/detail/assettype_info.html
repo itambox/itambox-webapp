@@ -1,4 +1,4 @@
-{% load i18n %}
+{% load i18n utility_tags %}
 <dl class="row mb-0">
   <dt class="col-sm-3">{% translate "Manufacturer:" %}</dt>
   <dd class="col-sm-9">
@@ -21,10 +21,9 @@
   <dt class="col-sm-3">{% translate "Category:" %}</dt>
   <dd class="col-sm-9">
     {% if object.category %}
-      <span class="badge"
-            style="background-color: #{{ object.category.color }}1a;
-                   color: #{{ object.category.color }};
-                   border: 1px solid #{{ object.category.color }}33">{{ object.category.name }}</span>
+      {% csp_color_style object.category.color "status" as category_style %}
+      {{ category_style.style_block|safe }}
+      <span class="badge {{ category_style.class_name }}">{{ object.category.name }}</span>
     {% else %}
       <span class="text-muted"><i>{% translate "Not Set" %}</i></span>
     {% endif %}

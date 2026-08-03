@@ -1,4 +1,4 @@
-{% load i18n money %}
+{% load i18n money utility_tags %}
 {# Panel: Asset core information (tag, serial, type, manufacturer, role, status, purchase info) #}
 <dl class="row mb-0">
   <dt class="col-sm-3">{% translate "Asset Tag:" %}</dt>
@@ -34,12 +34,11 @@
   <dt class="col-sm-3">{% translate "Status:" %}</dt>
   <dd class="col-sm-9">
     {% if object.status %}
+      {% csp_color_style object.status.color "status" as status_style %}
+      {{ status_style.style_block|safe }}
       <a href="{% url 'assets:statuslabel_detail' pk=object.status.pk %}"
          class="text-decoration-none">
-        <span class="badge px-2.5 py-1 text-uppercase"
-              style="background-color: #{{ object.status.color }}1a;
-                     color: #{{ object.status.color }};
-                     border: 1px solid #{{ object.status.color }}33">{{ object.status.name }}</span>
+        <span class="badge px-2.5 py-1 text-uppercase {{ status_style.class_name }}">{{ object.status.name }}</span>
       </a>
     {% else %}
       —

@@ -13,11 +13,11 @@
     const startTimeField = form.querySelector('#div_id_start_time') as HTMLElement | null;
 
     if (cronField) {
-      cronField.style.display = (freq === 'cron') ? '' : 'none';
+      cronField.classList.toggle('d-none', freq !== 'cron');
     }
     if (startTimeField) {
       const showStartTime = ['daily', 'weekly', 'biweekly', 'monthly', 'quarterly', 'yearly'].includes(freq);
-      startTimeField.style.display = showStartTime ? '' : 'none';
+      startTimeField.classList.toggle('d-none', !showStartTime);
     }
   }
 
@@ -30,7 +30,7 @@
 
   function toggleDisplay(id: string, show: boolean) {
     const el = document.getElementById(id);
-    if (el) el.style.display = show ? '' : 'none';
+    if (el) el.classList.toggle('d-none', !show);
   }
 
   function toggleChannelFields() {

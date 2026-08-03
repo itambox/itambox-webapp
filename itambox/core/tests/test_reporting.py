@@ -176,7 +176,6 @@ class ScheduledReportingAndAlertsTests(TestCase):
             "included_columns": self.template.included_columns,
             "include_summary_cards": "true",
             "include_distribution_chart": "true",
-            "advanced_mode": "false",
         }
         response = self.client.post(url, data)
         self.assertEqual(response.status_code, 200)

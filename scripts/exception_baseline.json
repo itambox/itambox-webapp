@@ -812,22 +812,6 @@
       "count": 1
     },
     {
-      "path": "itambox/core/tasks/reports.py",
-      "scope": "FunctionDef:generate_scheduled_report_task",
-      "handler_type": "Exception",
-      "classification": "cleanup-reraise",
-      "body_sha256": "6c9ea9d3291be26c12d1e9417b348bac240b930d3c6ce7ddde8fb801887799a5",
-      "count": 1
-    },
-    {
-      "path": "itambox/core/tasks/reports.py",
-      "scope": "FunctionDef:generate_scheduled_report_task",
-      "handler_type": "Exception",
-      "classification": "log-only",
-      "body_sha256": "e91962810c768d536a39e7fd6132216acdd06a56a60f8f18ea575bc4b1065b70",
-      "count": 1
-    },
-    {
       "path": "itambox/core/tasks/utils.py",
       "scope": "FunctionDef:reverse_job_detail",
       "handler_type": "Exception",
@@ -957,14 +941,6 @@
     },
     {
       "path": "itambox/extras/models.py",
-      "scope": "ClassDef:ReportTemplate/FunctionDef:clean",
-      "handler_type": "Exception",
-      "classification": "raise",
-      "body_sha256": "e10e59984887c547f608460244345c788f5a8cab4f04dc9c236ff980325bc8a1",
-      "count": 1
-    },
-    {
-      "path": "itambox/extras/models.py",
       "scope": "ClassDef:ScheduledReport/FunctionDef:clean",
       "handler_type": "Exception",
       "classification": "raise",
@@ -985,14 +961,6 @@
       "handler_type": "Exception",
       "classification": "silent",
       "body_sha256": "12e9f7a5f0f515c8064d859edce8684e4927bcdab3034efab2186aa4a602a81f",
-      "count": 1
-    },
-    {
-      "path": "itambox/extras/tables.py",
-      "scope": "ClassDef:TagColumn/FunctionDef:render",
-      "handler_type": "Exception",
-      "classification": "silent",
-      "body_sha256": "ba4bc99d6f036e411297ba4804d26ef6dcce3f505dcc66d79e6d8da43f39294a",
       "count": 1
     },
     {
@@ -1039,24 +1007,8 @@
       "path": "itambox/extras/views.py",
       "scope": "ClassDef:ReportTemplateDownloadView/FunctionDef:get",
       "handler_type": "Exception",
-      "classification": "cleanup-reraise",
-      "body_sha256": "dba66ce8093a10e0380453e941eeb3e984529d943441a60a32766c0e57abcba9",
-      "count": 1
-    },
-    {
-      "path": "itambox/extras/views.py",
-      "scope": "ClassDef:ReportTemplateDownloadView/FunctionDef:get",
-      "handler_type": "Exception",
       "classification": "log-only",
       "body_sha256": "070fae5a5fce167ed83fa4ad71dd4c21564483b083078e92c24b7bca62334941",
-      "count": 1
-    },
-    {
-      "path": "itambox/extras/views.py",
-      "scope": "ClassDef:ReportTemplatePreviewView/FunctionDef:post",
-      "handler_type": "Exception",
-      "classification": "cleanup-reraise",
-      "body_sha256": "dba66ce8093a10e0380453e941eeb3e984529d943441a60a32766c0e57abcba9",
       "count": 1
     },
     {

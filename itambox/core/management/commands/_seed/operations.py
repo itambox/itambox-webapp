@@ -251,10 +251,10 @@ class SeedOperationsMixin:
 
         # Label template
         qr_cell = (
-            '<table style="width:100%"><tr>'
-            '<td style="width:55%"><div style="font-weight:bold">{{ asset.name }}</div>'
-            '<div style="font-family:monospace">{{ asset.asset_tag }}</div></td>'
-            '<td style="width:45%;text-align:right">{{ barcode_img }}</td></tr></table>'
+            '<table class="label-card-table"><tr>'
+            '<td class="label-card-metadata"><div class="label-card-title">{{ asset.name }}</div>'
+            '<div class="label-card-tag">{{ asset.asset_tag }}</div></td>'
+            '<td class="label-card-barcode-cell">{{ barcode_img }}</td></tr></table>'
         )
         label_templates = [
             ("Standard QR Asset Label", "2.0 x 1.0 inch QR label for laptops & desktops", "qr", 2.0, 1.0, qr_cell),
@@ -264,8 +264,8 @@ class SeedOperationsMixin:
                 "qr",
                 1.5,
                 0.5,
-                '<div style="text-align:center">{{ barcode_img }}'
-                '<div style="font-family:monospace;font-size:7pt">{{ asset.asset_tag }}</div></div>',
+                '<div class="label-seed-centered">{{ barcode_img }}'
+                '<div class="label-card-tag label-seed-small">{{ asset.asset_tag }}</div></div>',
             ),
             (
                 "Datacenter Rack Label (Code 128)",
@@ -273,9 +273,10 @@ class SeedOperationsMixin:
                 "code128",
                 4.0,
                 1.0,
-                '<table style="width:100%"><tr><td><div style="font-weight:bold;font-size:11pt">{{ asset.name }}</div>'
+                '<table class="label-card-table"><tr><td class="label-card-metadata">'
+                '<div class="label-seed-rack-title">{{ asset.name }}</div>'
                 "<div>{{ asset.asset_tag }} · {{ asset.serial_number }}</div></td>"
-                '<td style="text-align:right">{{ barcode_img }}</td></tr></table>',
+                '<td class="label-card-barcode-cell">{{ barcode_img }}</td></tr></table>',
             ),
             (
                 "Shipping / Transfer Label (Code 39)",
@@ -283,7 +284,7 @@ class SeedOperationsMixin:
                 "code39",
                 4.0,
                 2.0,
-                '<div><div style="font-weight:bold">{{ asset.name }}</div>'
+                '<div><div class="label-card-title">{{ asset.name }}</div>'
                 "<div>From: {{ asset.location }}</div><div>{{ asset.asset_tag }}</div>{{ barcode_img }}</div>",
             ),
             (
@@ -292,8 +293,8 @@ class SeedOperationsMixin:
                 "datamatrix",
                 1.0,
                 1.0,
-                '<div style="text-align:center">{{ barcode_img }}'
-                '<div style="font-family:monospace;font-size:6pt">{{ asset.asset_tag }}</div></div>',
+                '<div class="label-seed-centered">{{ barcode_img }}'
+                '<div class="label-card-tag label-seed-small">{{ asset.asset_tag }}</div></div>',
             ),
         ]
         for name, desc, fmt, w, h, code in label_templates:

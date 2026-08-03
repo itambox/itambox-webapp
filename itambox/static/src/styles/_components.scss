@@ -298,8 +298,8 @@ $badge-colors: ('primary', 'secondary', 'success', 'info', 'warning', 'danger',
 }
 
 // Status badges with custom per-label hex colors (StatusLabel.color).
-// Server renders: <span class="badge badge-status" style="--status-color:#xxx">
-//                   <span class="badge-status-dot"></span>Label</span>
+// Server renders a hash-based class and a request-nonce-authorized rule for
+// --status-color; the badge itself never carries an inline style attribute.
 .badge-status {
     --status-color: var(--tblr-secondary);
 
@@ -599,4 +599,94 @@ $badge-colors: ('primary', 'secondary', 'success', 'info', 'warning', 'danger',
             border-bottom: 0 !important;
         }
     }
+}
+
+.quick-add-icon {
+    font-size: 1.1rem;
+    line-height: 1;
+}
+
+.cursor-pointer {
+    cursor: pointer;
+}
+
+.inheritance-marker {
+    font-size: 0.7em;
+}
+
+.color-chip-dot {
+    width: 0.6rem;
+    height: 0.6rem;
+}
+
+.color-chip-text-dark {
+    color: #212529;
+}
+
+.color-chip-text-light {
+    color: #fff;
+}
+
+.category-color-chip {
+    display: inline-block;
+    width: 24px;
+    height: 16px;
+    vertical-align: middle;
+}
+
+.navbar-brand-image {
+    display: block;
+    width: auto;
+}
+
+.tag-chip {
+    margin-right: 0.25rem;
+    font-weight: 600;
+}
+
+.tag-chip-light {
+    border: 1px solid #e6e8e9;
+}
+
+.dashboard-card-editing {
+    outline: 2px dashed var(--tblr-primary);
+}
+
+.pointer-events-none {
+    pointer-events: none;
+}
+
+.audit-verify-btn--success {
+    animation: audit-verify-spring 300ms ease;
+}
+
+@keyframes audit-verify-spring {
+    0% {
+        transform: scale(0.95);
+    }
+
+    40% {
+        transform: scale(1.05);
+    }
+
+    100% {
+        transform: scale(1);
+    }
+}
+
+.breadcrumbs-header-min-height {
+    min-height: 2.25rem;
+}
+
+.stock-adjust-button {
+    width: 1.5rem;
+    height: 1.5rem;
+}
+
+.stock-adjust-icon {
+    font-size: 0.75rem;
+}
+
+.stock-adjust-quantity {
+    font-size: 0.85rem;
 }

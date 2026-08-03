@@ -51,14 +51,14 @@ class StockAdjustView(StockActionView):
         )
         return format_html(
             '<div class="d-flex align-items-center justify-content-start">'
-            '  <button class="btn btn-sm btn-icon btn-outline-secondary me-2 px-1 py-0 lh-1" '
-            '          hx-post="{}" hx-swap="outerHTML" hx-target="closest div" style="height: 1.5rem; width: 1.5rem;">'
-            '    <i class="mdi mdi-minus" style="font-size: 0.75rem;"></i>'
+            '  <button class="stock-adjust-button btn btn-sm btn-icon btn-outline-secondary me-2 px-1 py-0 lh-1" '
+            '          hx-post="{}" hx-swap="outerHTML" hx-target="closest div">'
+            '    <i class="stock-adjust-icon mdi mdi-minus"></i>'
             "  </button>"
-            '  <span class="badge bg-blue-lt text-blue font-weight-bold px-2 py-1" style="font-size: 0.85rem;">{}</span>'
-            '  <button class="btn btn-sm btn-icon btn-outline-secondary ms-2 px-1 py-0 lh-1" '
-            '          hx-post="{}" hx-swap="outerHTML" hx-target="closest div" style="height: 1.5rem; width: 1.5rem;">'
-            '    <i class="mdi mdi-plus" style="font-size: 0.75rem;"></i>'
+            '  <span class="stock-adjust-quantity badge bg-blue-lt text-blue font-weight-bold px-2 py-1">{}</span>'
+            '  <button class="stock-adjust-button btn btn-sm btn-icon btn-outline-secondary ms-2 px-1 py-0 lh-1" '
+            '          hx-post="{}" hx-swap="outerHTML" hx-target="closest div">'
+            '    <i class="stock-adjust-icon mdi mdi-plus"></i>'
             "  </button>"
             "</div>",
             f"{adjust_url}?action=decrement",

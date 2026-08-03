@@ -15,6 +15,12 @@
           "-webkit-mask-image"
         ]
       }
+    ],
+    "property-no-deprecated": [
+      true,
+      {
+        "ignoreProperties": ["page-break-after"]
+      }
     ]
   }
 }

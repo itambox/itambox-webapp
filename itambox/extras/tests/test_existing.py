@@ -317,17 +317,23 @@ class TagColumnTests(TestCase):
 
         # Test up to 3 tags
         qs_3 = Tag.objects.filter(name__in=["Tag1", "Tag2", "Tag3"])
-        html_3 = column.render(qs_3)
-        self.assertIn("background-color: #ffffff", html_3)
-        self.assertIn("color: #212529", html_3)  # contrast text for white bg
-        self.assertIn("background-color: #000000", html_3)
-        self.assertIn("color: #ffffff", html_3)  # contrast text for black bg
-        self.assertNotIn("+1", html_3)
+        from core.context import reset_current_csp_nonce, set_current_csp_nonce
 
-        # Test 4 tags (limit exceeded)
-        qs_4 = Tag.objects.all()
-        html_4 = column.render(qs_4)
-        self.assertIn("+1", html_4)
+        token = set_current_csp_nonce("test-nonce")
+        try:
+            html_3 = column.render(qs_3)
+            self.assertIn("background-color:#ffffff", html_3)
+            self.assertIn("color-chip-text-dark", html_3)  # contrast text for white bg
+            self.assertIn("background-color:#000000", html_3)
+            self.assertIn("color-chip-text-light", html_3)  # contrast text for black bg
+            self.assertNotIn("+1", html_3)
+
+            # Test 4 tags (limit exceeded)
+            qs_4 = Tag.objects.all()
+            html_4 = column.render(qs_4)
+            self.assertIn("+1", html_4)
+        finally:
+            reset_current_csp_nonce(token)
 
 
 class BulkEditFormTests(TestCase):

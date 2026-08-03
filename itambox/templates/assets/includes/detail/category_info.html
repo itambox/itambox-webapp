@@ -1,4 +1,4 @@
-{% load i18n %}
+{% load i18n utility_tags %}
 <dl class="row mb-0">
   <dt class="col-sm-4">{% translate "Name:" %}</dt>
   <dd class="col-sm-8">
@@ -11,12 +11,9 @@
   <dt class="col-sm-4">{% translate "Color:" %}</dt>
   <dd class="col-sm-8">
     {% if object.color %}
-      <span class="badge"
-            style="background-color: #{{ object.color }};
-                   width: 24px;
-                   height: 16px;
-                   display: inline-block;
-                   vertical-align: middle"></span>
+      {% csp_color_style object.color "chip" as color_style %}
+      {{ color_style.style_block|safe }}
+      <span class="badge color-chip-dot {{ color_style.class_name }} category-color-chip"></span>
       <code class="ms-1">#{{ object.color }}</code>
     {% else %}
       <span class="text-muted small"><i>{% translate "None" %}</i></span>

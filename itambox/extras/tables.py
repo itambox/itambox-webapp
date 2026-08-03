@@ -7,6 +7,7 @@ from django.utils.text import Truncator
 from django.utils.translation import gettext_lazy as _
 from django_tables2.utils import A
 
+from core.html_styles import color_chip_class, safe_hex_color
 from core.tables import ActionsColumn, BaseTable, BooleanColumn, ToggleColumn
 
 from .models import (
@@ -51,25 +52,24 @@ class TagColumn(tables.ManyToManyColumn):
 
         rendered_tags = []
         for tag in visible_tags:
-            color_hex = tag.color or "6c757d"  # fallback default color if empty
+            color_hex = safe_hex_color(tag.color)
+            color_class, style_block = color_chip_class(color_hex)
 
             # calculate contrast color using YIQ formula
-            try:
-                r = int(color_hex[0:2], 16)
-                g = int(color_hex[2:4], 16)
-                b = int(color_hex[4:6], 16)
-                yiq = ((r * 299) + (g * 587) + (b * 114)) / 1000
-                text_color = "#212529" if yiq >= 150 else "#ffffff"
-            except Exception:
-                text_color = "#ffffff"
+            r = int(color_hex[0:2], 16)
+            g = int(color_hex[2:4], 16)
+            b = int(color_hex[4:6], 16)
+            yiq = ((r * 299) + (g * 587) + (b * 114)) / 1000
+            text_class = "color-chip-text-dark" if yiq >= 150 else "color-chip-text-light"
 
             url = reverse(self.url_name or "extras:tag_list") + "?tag=" + escape(tag.slug)
             rendered_tags.append(
                 format_html(
-                    '<a href="{}" class="badge me-1" style="background-color: #{}; color: {};">{}</a>',
+                    '{}<a href="{}" class="badge me-1 {} {}">{}</a>',
+                    style_block,
                     url,
-                    color_hex,
-                    text_color,
+                    color_class,
+                    text_class,
                     tag.name,
                 )
             )
@@ -106,7 +106,9 @@ class TagTable(BaseTable):
 
     def render_color(self, value):
         if value:
-            return format_html('<span class="badge" style="background-color: #{};">&nbsp;</span> #{}', value, value)
+            normalized = safe_hex_color(value)
+            color_class, style_block = color_chip_class(normalized)
+            return format_html('{}<span class="badge {}">&nbsp;</span> #{}', style_block, color_class, normalized)
         return "—"
 
 

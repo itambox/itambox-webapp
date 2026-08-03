@@ -126,11 +126,11 @@
 
     const lockedEl = document.getElementById('dashboard-locked-controls');
     const unlockedEl = document.getElementById('dashboard-unlocked-controls');
-    if (lockedEl) lockedEl.style.display = isNowLocked ? '' : 'none';
-    if (unlockedEl) unlockedEl.style.display = isNowLocked ? 'none' : '';
+    if (lockedEl) lockedEl.classList.toggle('d-none', !isNowLocked);
+    if (unlockedEl) unlockedEl.classList.toggle('d-none', isNowLocked);
 
     document.querySelectorAll<HTMLElement>('#dashboard-grid .card').forEach(function (card) {
-      card.style.outline = isNowLocked ? '' : '2px dashed var(--tblr-primary)';
+      card.classList.toggle('dashboard-card-editing', !isNowLocked);
     });
     document.querySelectorAll<HTMLElement>('.dashboard-manage-btn').forEach(function (btn) {
       btn.classList.toggle('d-none', isNowLocked);

@@ -210,7 +210,7 @@ class AccessoryStockTable(SharePoolActionMixin, BaseTable):
         return format_html(
             '<div class="d-flex gap-1 justify-content-end">'
             "  {}"
-            '  <a class="btn btn-sm btn-soft-success check-action d-flex align-items-center" role="button" style="cursor: pointer" '
+            '  <a class="btn btn-sm btn-soft-success check-action d-flex align-items-center cursor-pointer" role="button" '
             '     hx-get="{}?from_location={}" hx-target="#modal-placeholder" hx-swap="innerHTML" '
             '     title="{}" aria-label=_("{}")>'
             '    <i class="mdi mdi-logout me-1"></i> {}'
@@ -232,7 +232,7 @@ class AccessoryStockTable(SharePoolActionMixin, BaseTable):
 
     def render_qty(self, value, record):
         return format_html(
-            '<span class="badge bg-blue-lt text-blue font-weight-bold px-2 py-1" style="font-size: 0.85rem;">{}</span>',
+            '<span class="stock-adjust-quantity badge bg-blue-lt text-blue font-weight-bold px-2 py-1">{}</span>',
             value,
         )
 
@@ -405,7 +405,7 @@ class ConsumableStockTable(SharePoolActionMixin, BaseTable):
         return format_html(
             '<div class="d-flex gap-1 justify-content-end">'
             "  {}"
-            '  <a class="btn btn-sm btn-soft-success check-action d-flex align-items-center" role="button" style="cursor: pointer" '
+            '  <a class="btn btn-sm btn-soft-success check-action d-flex align-items-center cursor-pointer" role="button" '
             '     hx-get="{}?from_location={}" hx-target="#modal-placeholder" hx-swap="innerHTML" '
             '     title="{}" aria-label=_("{}")>'
             '    <i class="mdi mdi-logout me-1"></i> {}'
@@ -427,7 +427,7 @@ class ConsumableStockTable(SharePoolActionMixin, BaseTable):
 
     def render_qty(self, value, record):
         return format_html(
-            '<span class="badge bg-blue-lt text-blue font-weight-bold px-2 py-1" style="font-size: 0.85rem;">{}</span>',
+            '<span class="stock-adjust-quantity badge bg-blue-lt text-blue font-weight-bold px-2 py-1">{}</span>',
             value,
         )
 
@@ -583,7 +583,7 @@ class ComponentStockTable(SharePoolActionMixin, BaseTable):
         return format_html(
             '<div class="d-flex gap-1 justify-content-end">'
             "  {}"
-            '  <a class="btn btn-sm btn-soft-success check-action d-flex align-items-center" role="button" style="cursor: pointer" '
+            '  <a class="btn btn-sm btn-soft-success check-action d-flex align-items-center cursor-pointer" role="button" '
             '     hx-get="{}?from_location={}" hx-target="#modal-placeholder" hx-swap="innerHTML" '
             '     title="{}" aria-label=_("{}")>'
             '    <i class="mdi mdi-logout me-1"></i> {}'
@@ -605,7 +605,7 @@ class ComponentStockTable(SharePoolActionMixin, BaseTable):
 
     def render_qty(self, value, record):
         return format_html(
-            '<span class="badge bg-blue-lt text-blue font-weight-bold px-2 py-1" style="font-size: 0.85rem;">{}</span>',
+            '<span class="stock-adjust-quantity badge bg-blue-lt text-blue font-weight-bold px-2 py-1">{}</span>',
             value,
         )
 

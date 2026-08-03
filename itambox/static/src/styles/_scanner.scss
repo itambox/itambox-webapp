@@ -18,6 +18,10 @@
     color: #fff;
 }
 
+.scanner-overlay.is-open {
+    display: flex;
+}
+
 .scanner-viewfinder {
     position: relative;
     width: 280px;

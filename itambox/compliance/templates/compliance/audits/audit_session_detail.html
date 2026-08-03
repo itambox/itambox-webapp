@@ -1,6 +1,7 @@
 {% extends base_template|default:'layout.html' %}
 {% load static %}
 {% load i18n %}
+{% load utility_tags %}
 {% block title %}{% translate "Audit Campaign" %} - {{ object.name }} {% translate "- ITAMbox" %}{% endblock %}
 {% block page_header %}
   <div class="row align-items-center">
@@ -211,7 +212,7 @@
                     <i class="mdi mdi-notification-clear-all me-1"></i>{% translate "Clear" %}
                   </button>
                 </div>
-                <div class="table-responsive" style="max-height: 280px; overflow-y: auto;">
+                <div class="table-responsive csp-style-1821d596bdea">
                   <table class="table table-vcenter card-table table-sm">
                     <thead>
                       <tr>
@@ -225,7 +226,7 @@
                   </table>
                 </div>
                 <div class="card-body text-center text-muted py-4" id="audit-basket-empty">
-                  <i class="mdi mdi-basket-outline d-block mb-2" style="font-size: 2rem;"></i>
+                  <i class="mdi mdi-basket-outline d-block mb-2 csp-style-c5510aee071a"></i>
                   {% translate "No assets yet — start scanning." %}
                 </div>
                 <div class="card-footer">
@@ -239,7 +240,7 @@
               </div>
             </form>
             {# ── Camera scanner overlay (distinct IDs from bulk / global scanners) ── #}
-            <div id="audit-scanner-modal" class="scanner-overlay" style="display:none">
+            <div id="audit-scanner-modal" class="scanner-overlay d-none">
               <div class="text-center mb-3">
                 <h3 class="text-white mb-1">{% translate "Scan Asset Code" %}</h3>
                 <p class="text-secondary small mb-0">{% translate "Point camera at a barcode or QR code" %}</p>
@@ -254,17 +255,14 @@
                    class="scanner-feedback"
                    role="status"
                    aria-live="polite"></div>
-              <div id="audit-scanner-error"
-                   class="alert alert-warning mt-3"
-                   style="display:none">
+              <div id="audit-scanner-error" class="alert alert-warning mt-3 d-none">
                 <i class="mdi mdi-alert-outline me-2"></i>
                 <span data-scanner-error-msg>{% translate "Camera unavailable. On iPhone/iPad this requires HTTPS and camera permission — check Settings › Safari › Camera, or use a hardware scanner." %}</span>
               </div>
               <div class="mt-4 d-flex gap-2">
                 <button type="button"
                         id="audit-toggle-torch-btn"
-                        class="btn btn-outline-light"
-                        style="display:none">
+                        class="btn btn-outline-light d-none">
                   <i class="mdi mdi-flashlight"></i> {% translate "Toggle Flash" %}
                 </button>
                 <button type="button" id="audit-close-scanner-btn" class="btn btn-danger">{% translate "Done" %}</button>
@@ -439,10 +437,9 @@
                             <td>{{ row.serial_number|default:"—" }}</td>
                             <td>
                               {% if row.status_color %}
-                                <span class="badge"
-                                      style="background-color: #{{ row.status_color }}1a;
-                                             color: #{{ row.status_color }};
-                                             border: 1px solid #{{ row.status_color }}33">{{ row.status_name }}</span>
+                                {% csp_color_style row.status_color "status" as status_style %}
+                                {{ status_style.style_block|safe }}
+                                <span class="badge {{ status_style.class_name }}">{{ row.status_name }}</span>
                               {% else %}
                                 {{ row.status_name|default:"—" }}
                               {% endif %}

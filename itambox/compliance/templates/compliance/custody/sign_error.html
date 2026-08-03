@@ -10,7 +10,7 @@
     <title>{% translate "Link Validation Failure - ITAMbox" %}</title>
     <link href="{% static 'dist/vendor/tabler/css/tabler.min.css' %}"
           rel="stylesheet" />
-    <style>
+    <style nonce="{{ request.csp_nonce }}">
         body {
             background-color: #f4f6fa;
             min-height: 100vh;

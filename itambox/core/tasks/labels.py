@@ -3,12 +3,15 @@ import io
 import logging
 import os
 import zipfile
+from math import isfinite
+from pathlib import Path
 
 from django.contrib.contenttypes.models import ContentType
 from django.core.files.base import ContentFile
-from django.utils.html import escape
+from django.utils.html import escape, format_html
 from django.utils.translation import gettext_lazy as _
 
+from core.html_sanitizer import sanitize_label_html_for_pdf
 from core.models import Job, Notification
 from extras.models import FileAttachment
 
@@ -16,6 +19,23 @@ from .context import TaskContext
 from .utils import reverse_job_detail
 
 logger = logging.getLogger(__name__)
+_LABEL_PRINT_CSS_PATH = Path(__file__).resolve().parents[2] / "static" / "src" / "styles" / "_label-print.scss"
+
+
+def _label_print_css():
+    """Load the authored label CSS for the self-contained PDF document."""
+    return _LABEL_PRINT_CSS_PATH.read_text(encoding="utf-8")
+
+
+def _safe_label_measurement(value, default):
+    """Return a bounded, CSS-safe inch measurement for a label dimension."""
+    try:
+        numeric = float(value)
+    except (TypeError, ValueError, OverflowError):
+        numeric = default
+    if not isfinite(numeric) or not 0.1 <= numeric <= 100:
+        numeric = default
+    return f"{numeric:.3f}".rstrip("0").rstrip(".")
 
 
 def generate_single_label_graphic(asset, label_format):
@@ -159,25 +179,20 @@ def _default_label_card(asset, barcode_data_uri):
     name = escape(getattr(asset, "name", None) or str(asset))
     asset_tag = escape(getattr(asset, "asset_tag", "") or "")
     serial_number = escape(getattr(asset, "serial_number", "") or "")
-    serial_html = (
-        f'<div style="font-size: 7pt; font-weight: normal; color: #555;">S/N: {serial_number}</div>'
-        if serial_number
-        else ""
-    )
+    serial_html = f'<div class="label-card-serial">S/N: {serial_number}</div>' if serial_number else ""
+    barcode_img = format_html('<img src="{}" class="label-card-barcode" />', barcode_data_uri)
     return f"""
-    <table style="width: 100%; border-collapse: collapse; margin: 0; padding: 0;">
+    <table class="label-card-table">
         <tr>
-            <td style="width: 55%; vertical-align: middle; text-align: left; padding: 2px;">
-                <div style="font-family: Helvetica, Arial, sans-serif; font-size: 8pt; font-weight: bold; color: #000; line-height: 1.1;">
-                    <div style="font-size: 9.5pt; margin-bottom: 3px; max-height: 24pt; overflow: hidden;">{name}</div>
-                    <div style="font-size: 8pt; font-family: monospace; background-color: #000; color: #fff; padding: 1px 3px; display: inline-block; border-radius: 2px; margin-bottom: 4px;">
+            <td class="label-card-metadata">
+                    <div class="label-card-title">{name}</div>
+                    <div class="label-card-tag">
                         {asset_tag}
                     </div>
                     {serial_html}
-                </div>
             </td>
-            <td style="width: 45%; vertical-align: middle; text-align: right; padding: 2px;">
-                <img src="{barcode_data_uri}" style="width: 0.95in; height: 0.95in; display: block; margin-left: auto;" />
+            <td class="label-card-barcode-cell">
+                {barcode_img}
             </td>
         </tr>
     </table>
@@ -195,18 +210,40 @@ def render_label_html(asset, label_template, barcode_data_uri):
         return _default_label_card(asset, barcode_data_uri)
 
     try:
-        from jinja2.sandbox import SandboxedEnvironment
+        # inline import: heavy-import: Jinja2 is needed only when rendering a custom label.
+        from jinja2 import StrictUndefined
+        from jinja2.sandbox import ImmutableSandboxedEnvironment
+        from markupsafe import Markup
 
-        env = SandboxedEnvironment()
+        if len(label_template.template_code) > 64 * 1024:
+            raise ValueError("label template exceeds the maximum source size")
+
+        env = ImmutableSandboxedEnvironment(autoescape=True, undefined=StrictUndefined)
+        for unsafe_filter in ("attr", "format", "format_map", "map", "pprint", "xmlattr"):
+            env.filters.pop(unsafe_filter, None)
+        for unsafe_global in ("cycler", "joiner", "namespace", "lipsum"):
+            env.globals.pop(unsafe_global, None)
         template = env.from_string(label_template.template_code)
+        status = getattr(asset, "status", None)
+        location = getattr(asset, "location", None)
+        asset_context = {
+            "name": str(getattr(asset, "name", None) or ""),
+            "asset_tag": str(getattr(asset, "asset_tag", None) or ""),
+            "serial_number": str(getattr(asset, "serial_number", None) or ""),
+            "location": str(getattr(location, "name", None) or location or ""),
+            "status": str(getattr(status, "name", None) or status or ""),
+        }
         context = {
-            "obj": asset,
-            "asset": asset,
+            "obj": asset_context,
+            "asset": asset_context,
             "barcode_data_uri": barcode_data_uri,
-            "barcode_img": f'<img src="{barcode_data_uri}" style="width: 0.9in; height: 0.9in; background: #fff;" />',
+            "barcode_img": Markup(str(format_html('<img src="{}" class="label-card-barcode" />', barcode_data_uri))),
             "barcode_format": label_template.barcode_format,
         }
-        return template.render(**context)
+        rendered = template.render(**context)
+        if len(rendered) > 256 * 1024:
+            raise ValueError("rendered label exceeds the maximum output size")
+        return sanitize_label_html_for_pdf(rendered, allowed_data_uris=frozenset({barcode_data_uri}))
     except Exception as e:
         logger.warning(f"Error rendering custom template {label_template.name}: {e}. Falling back to default layout.")
         return _default_label_card(asset, barcode_data_uri)
@@ -221,6 +258,7 @@ def chunk_list(lst, n):
 def _build_labels_document(rendered_cards, label_template, layout_mode):
     """Wrap rendered label cards into a complete, printable HTML document sized
     for the chosen layout. Unknown layouts fall back to continuous-roll sizing."""
+    base_css = _label_print_css()
     if layout_mode in ("a4_grid", "letter_grid"):
         paper_size = "a4" if layout_mode == "a4_grid" else "letter"
         margin = "10mm" if layout_mode == "a4_grid" else "0.5in"
@@ -238,7 +276,7 @@ def _build_labels_document(rendered_cards, label_template, layout_mode):
 
         pages_block = ""
         for page_idx, page in enumerate(pages):
-            page_break = "page-break-after: always;" if page_idx < len(pages) - 1 else "page-break-after: avoid;"
+            page_break = "page-break-always" if page_idx < len(pages) - 1 else "page-break-avoid"
 
             rows_block = ""
             for row in page:
@@ -250,36 +288,20 @@ def _build_labels_document(rendered_cards, label_template, layout_mode):
                         cells_block += '<td class="grid-cell">&nbsp;</td>\n'
                 rows_block += f"<tr>\n{cells_block}</tr>\n"
 
-            pages_block += f'<table class="grid-table" style="{page_break}">\n{rows_block}</table>\n'
+            pages_block += '<table class="grid-table ' + page_break + '">\n' + rows_block + "</table>\n"
 
         return f"""<!DOCTYPE html>
 <html>
 <head>
     <meta charset="utf-8">
     <style>
+        {base_css}
         @page {{
             size: {paper_size};
             margin: {margin};
         }}
-        body {{
-            margin: 0;
-            padding: 0;
-            background-color: #ffffff;
-            font-family: Helvetica, Arial, sans-serif;
-        }}
-        .grid-table {{
-            width: 100%;
-            height: 100%;
-            border-collapse: collapse;
-        }}
         .grid-cell {{
-            width: 33.33%;
             height: {cell_height};
-            border: 1px dashed #cccccc;
-            padding: 2mm;
-            vertical-align: middle;
-            box-sizing: border-box;
-            overflow: hidden;
         }}
     </style>
 </head>
@@ -289,35 +311,27 @@ def _build_labels_document(rendered_cards, label_template, layout_mode):
 </html>"""
 
     # 'roll' (and any unrecognised layout): one label per page, sized to the template
-    width = label_template.page_width or 2.25
-    height = label_template.page_height or 1.25
+    width = _safe_label_measurement(getattr(label_template, "page_width", None), 2.25)
+    height = _safe_label_measurement(getattr(label_template, "page_height", None), 1.25)
 
     cards_block = ""
     for idx, card in enumerate(rendered_cards):
-        page_break = "page-break-after: always;" if idx < len(rendered_cards) - 1 else "page-break-after: avoid;"
-        cards_block += f'<div class="label-card" style="{page_break}">{card}</div>\n'
+        page_break = "page-break-always" if idx < len(rendered_cards) - 1 else "page-break-avoid"
+        cards_block += '<div class="label-card ' + page_break + '">' + card + "</div>\n"
 
     return f"""<!DOCTYPE html>
 <html>
 <head>
     <meta charset="utf-8">
     <style>
+        {base_css}
         @page {{
             size: {width}in {height}in;
             margin: 0;
         }}
-        body {{
-            margin: 0;
-            padding: 0;
-            background-color: #ffffff;
-            font-family: Helvetica, Arial, sans-serif;
-        }}
         .label-card {{
             width: {width}in;
             height: {height}in;
-            box-sizing: border-box;
-            padding: 0.1in;
-            overflow: hidden;
         }}
     </style>
 </head>

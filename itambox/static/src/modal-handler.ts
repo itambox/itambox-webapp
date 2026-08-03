@@ -81,9 +81,9 @@
     const assignedAssetDiv = form.querySelector('#div_id_assigned_asset') as HTMLElement | null;
     const assetDiv = isRequestForm ? assignedAssetDiv : (assignedAssetDiv || (form.querySelector('#div_id_asset_target, #div_id_asset') as HTMLElement | null));
 
-    if (holderDiv) holderDiv.style.display = (targetType === 'holder' || targetType === 'assetholder') ? '' : 'none';
-    if (locationDiv) locationDiv.style.display = (targetType === 'location') ? '' : 'none';
-    if (assetDiv) assetDiv.style.display = (targetType === 'asset') ? '' : 'none';
+    if (holderDiv) holderDiv.classList.toggle('d-none', !(targetType === 'holder' || targetType === 'assetholder'));
+    if (locationDiv) locationDiv.classList.toggle('d-none', targetType !== 'location');
+    if (assetDiv) assetDiv.classList.toggle('d-none', targetType !== 'asset');
   }
 
   function initCheckoutForms(root: HTMLElement | Document = document) {

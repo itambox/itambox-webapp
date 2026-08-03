@@ -10,7 +10,7 @@
 UV := uv
 UV_DEV := $(UV) run --locked --group dev
 
-.PHONY: help setup run migrate seed test coverage coverage-diff coverage-baseline openapi-check openapi-write exception-check exception-baseline architecture-check architecture-baseline lint lint-templates lint-styles format format-check format-templates format-styles e2e clean
+.PHONY: help setup run migrate seed test coverage coverage-diff coverage-baseline openapi-check openapi-write exception-check exception-baseline architecture-check architecture-baseline lint lint-templates lint-styles inline-style-check format format-check format-templates format-styles e2e clean
 
 FORMAT_TARGETS := itambox scripts
 
@@ -46,6 +46,7 @@ help:
 	@echo "  make lint          - Run pre-commit style and syntax checks on all files"
 	@echo "  make lint-templates - Check all authored Django templates with djLint"
 	@echo "  make lint-styles   - Check all authored CSS/SCSS with Stylelint"
+	@echo "  make inline-style-check - Check CSP inline-style policy"
 	@echo "  make format        - Sort imports then format Python source with Ruff"
 	@echo "  make format-check  - Check import order and formatting without writing (CI-safe)"
 	@echo "  make format-templates - Reformat authored Django templates (intentional write)"
@@ -126,6 +127,9 @@ lint-templates:
 # check-only; use format-styles for the intentional local cleanup pass.
 lint-styles:
 	cd itambox && npm run lint:styles
+
+inline-style-check:
+	$(UV_DEV) python scripts/check_inline_styles.py
 
 # Idempotent: import sort runs before formatting, and re-running produces no
 # further diff. Ruff owns formatting/import order only -- see [tool.ruff] in

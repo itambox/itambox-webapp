@@ -11,6 +11,7 @@ DB needed.
 from types import SimpleNamespace
 
 from assets.tables import AssetTable, AssetTypeTable
+from core.context import reset_current_csp_nonce, set_current_csp_nonce
 from core.tables import ColorChipColumn
 from inventory.tables import AccessoryTable, ComponentTable, ConsumableTable
 
@@ -21,7 +22,11 @@ def _chip(color="", name="Laptops", url="/assets/categories/1/"):
 
 class TestColorChipColumnRender:
     def _render(self, value):
-        return str(ColorChipColumn().render(value))
+        token = set_current_csp_nonce("test-nonce")
+        try:
+            return str(ColorChipColumn().render(value))
+        finally:
+            reset_current_csp_nonce(token)
 
     def test_renders_color_name_and_link(self):
         html = self._render(_chip(color="4263eb", name="Servers"))

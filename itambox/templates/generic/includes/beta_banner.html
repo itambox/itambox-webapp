@@ -7,11 +7,10 @@ is the deprecated app-level flag a handful of views still set directly. The id
 stays `beta-module-banner` so the existing dismissal script keeps working.
 {% endcomment %}
 {% if capability_notice %}
-  <div class="alert alert-warning border-0 rounded-0 border-bottom d-flex align-items-center justify-content-between mb-0 px-3 py-2"
+  <div class="alert alert-warning border-0 rounded-0 border-bottom d-flex align-items-center justify-content-between mb-0 px-3 py-2 d-none"
        id="beta-module-banner"
        data-capability="{{ capability_notice.key }}"
-       data-maturity="{{ capability_notice.maturity }}"
-       style="display:none!important">
+       data-maturity="{{ capability_notice.maturity }}">
     <div class="d-flex align-items-center">
       <i class="mdi mdi-flask-outline me-2 fs-3"></i>
       <div>
@@ -34,9 +33,8 @@ stays `beta-module-banner` so the existing dismissal script keeps working.
             aria-label="{% translate 'Dismiss' %}"></button>
   </div>
 {% elif is_beta_module %}
-  <div class="alert alert-warning border-0 rounded-0 border-bottom d-flex align-items-center justify-content-between mb-0 px-3 py-2"
-       id="beta-module-banner"
-       style="display:none!important">
+  <div class="alert alert-warning border-0 rounded-0 border-bottom d-flex align-items-center justify-content-between mb-0 px-3 py-2 d-none"
+       id="beta-module-banner">
     <div class="d-flex align-items-center">
       <i class="mdi mdi-flask-outline me-2 fs-3"></i>
       <div>

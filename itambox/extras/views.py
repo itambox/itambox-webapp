@@ -950,8 +950,6 @@ class ReportTemplatePreviewView(CapabilityRequiredMixin, PermissionRequiredMixin
             or request.POST.get("include_distribution_chart") == "true"
         )
         group_by_field = request.POST.get("group_by_field", "")
-        advanced_mode = request.POST.get("advanced_mode") == "on" or request.POST.get("advanced_mode") == "true"
-        template_content = request.POST.get("template_content", "")
         name = request.POST.get("name", "Preview Report")
         description = request.POST.get("description", "")
 
@@ -985,49 +983,19 @@ class ReportTemplatePreviewView(CapabilityRequiredMixin, PermissionRequiredMixin
             include_distribution_chart=include_distribution_chart,
             group_by_field=group_by_field,
             style_preset=style_preset,
-            advanced_mode=advanced_mode,
-            template_content=template_content,
         )
 
         from core.reports import compile_report_context, get_polished_system_html_template
 
         try:
-            headers, rows, summary_cards, grouped_data, chart_svg, context_data = compile_report_context(
+            _headers, _rows, _summary_cards, _grouped_data, _chart_svg, context_data = compile_report_context(
                 template_instance, active_tenant=active_tenant, filter_tenants=filter_tenants
             )
 
-            if advanced_mode and template_content.strip():
-                # Sandbox or legacy Django render
-                try:
-                    from jinja2.sandbox import SandboxedEnvironment
-
-                    env = SandboxedEnvironment(autoescape=True)
-                    jinja_template = env.from_string(template_content)
-                    if report_type == ReportTemplate.REPORT_TYPE_ASSET_SUMMARY:
-                        context_data.update(
-                            {
-                                "total_assets": len(rows),
-                                "acquisition_sum": sum(
-                                    float(r[headers[8]].replace("$", "").replace(",", ""))
-                                    for r in rows
-                                    if headers[8] in r and r[headers[8]] != "-"
-                                )
-                                if len(headers) > 8
-                                else 0,
-                                "location_distribution": [
-                                    {"location": k, "count": len(v)} for k, v in grouped_data.items()
-                                ],
-                            }
-                        )
-                    rendered_html = jinja_template.render(context_data)
-                except Exception as je:
-                    logger.exception(f"Jinja2 sandboxed render failed: {je}")
-                    raise je
-            else:
-                html_template_str = get_polished_system_html_template()
-                django_template = Template(html_template_str)
-                context_data["request"] = request
-                rendered_html = django_template.render(Context(context_data))
+            html_template_str = get_polished_system_html_template()
+            django_template = Template(html_template_str)
+            context_data["request"] = request
+            rendered_html = django_template.render(Context(context_data))
 
             return HttpResponse(rendered_html)
         except Exception:
@@ -1069,7 +1037,7 @@ class ReportTemplateDownloadView(CapabilityRequiredMixin, PermissionRequiredMixi
         from core.reports import compile_report_context, get_polished_system_html_template
 
         try:
-            headers, rows, summary_cards, grouped_data, chart_svg, context_data = compile_report_context(
+            headers, rows, _summary_cards, _grouped_data, _chart_svg, context_data = compile_report_context(
                 template, active_tenant=active_tenant, filter_tenants=filter_tenants
             )
 
@@ -1102,44 +1070,10 @@ class ReportTemplateDownloadView(CapabilityRequiredMixin, PermissionRequiredMixi
                 return response
 
             # HTML render — shared by the html and pdf formats.
-            if template.advanced_mode and template.template_content.strip():
-                try:
-                    from jinja2.sandbox import SandboxedEnvironment
-
-                    # autoescape escapes {{ data }} expressions (e.g. a malicious asset
-                    # name) when rendered into the text/html report; the author's literal
-                    # template markup is unaffected.
-                    env = SandboxedEnvironment(autoescape=True)
-                    jinja_template = env.from_string(template.template_content)
-                    if template.report_type == ReportTemplate.REPORT_TYPE_ASSET_SUMMARY:
-                        context_data.update(
-                            {
-                                "total_assets": len(rows),
-                                # Currency-correct figure from the summary card — never re-parse
-                                # the per-currency-formatted grid strings ('$'-strip yields 0 for
-                                # non-USD).
-                                "acquisition_sum": next(
-                                    (
-                                        c.get("value", "")
-                                        for c in summary_cards
-                                        if c.get("label") == gettext("Total Acquisition Sum")
-                                    ),
-                                    "",
-                                ),
-                                "location_distribution": [
-                                    {"location": k, "count": len(v)} for k, v in grouped_data.items()
-                                ],
-                            }
-                        )
-                    rendered_html = jinja_template.render(context_data)
-                except Exception as je:
-                    logger.exception(f"Jinja2 sandboxed render failed: {je}")
-                    raise je
-            else:
-                html_template_str = get_polished_system_html_template()
-                django_template = Template(html_template_str)
-                context_data["request"] = request
-                rendered_html = django_template.render(Context(context_data))
+            html_template_str = get_polished_system_html_template()
+            django_template = Template(html_template_str)
+            context_data["request"] = request
+            rendered_html = django_template.render(Context(context_data))
 
             if format_type == "pdf":
                 from core.reports.exporters import PDF_MIME, report_pdf_bytes

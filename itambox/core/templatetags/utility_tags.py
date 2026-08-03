@@ -11,6 +11,8 @@ from django.contrib.auth import get_user_model  # Import get_user_model
 from django.contrib.messages import constants as messages
 from django.utils.translation import gettext_lazy as _  # Import gettext_lazy
 
+from core.html_styles import color_chip_class, length_class, percentage_class, status_tint_class
+
 register = template.Library()
 
 
@@ -215,3 +217,27 @@ def status_color(status):
     from itambox.utils import get_status_color
 
     return get_status_color(status)
+
+
+@register.simple_tag(takes_context=True)
+def csp_color_style(context, color, variant="chip"):
+    """Return a class/style pair for a CSP-safe dynamic color."""
+    if variant == "status":
+        class_name, style_block = status_tint_class(color)
+    else:
+        class_name, style_block = color_chip_class(color)
+    return {"class_name": class_name, "style_block": style_block}
+
+
+@register.simple_tag(takes_context=True)
+def csp_percentage_style(context, value, prefix="percentage-width"):
+    """Return a bounded class/style pair for a dynamic percentage width."""
+    class_name, style_block = percentage_class(value, prefix=prefix)
+    return {"class_name": class_name, "style_block": style_block}
+
+
+@register.simple_tag(takes_context=True)
+def csp_length_style(context, value, prefix="safe-length", property_name="height"):
+    """Return a bounded class/style pair for a fixed CSS length."""
+    class_name, style_block = length_class(value, prefix=prefix, property_name=property_name)
+    return {"class_name": class_name, "style_block": style_block}
