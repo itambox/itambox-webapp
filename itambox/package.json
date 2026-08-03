@@ -39,7 +39,7 @@
     "bootstrap": "^5.3.3",
     "gridstack": "^13.1.0",
     "html5-qrcode": "^2.3.8",
-    "htmx.org": "^2.0.4",
+    "htmx.org": "^2.0.10",
     "tom-select": "^2.3.1"
   }
 }
