@@ -31,6 +31,10 @@ class InlineStylePolicyTests(unittest.TestCase):
 
     def test_pdf_and_standalone_style_exceptions_are_centralized(self):
         self.assertEqual(
+            scan_source("itambox/core/html_sanitizer.py", "return f'<style>{rules}</style>'"),
+            [],
+        )
+        self.assertEqual(
             scan_source("itambox/core/tasks/labels.py", "return '<style>.label{}</style>'"),
             [],
         )

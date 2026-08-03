@@ -4,11 +4,12 @@ Browser-delivered HTML must not contain ``style=`` attributes or un-nonced
 ``<style>`` elements. Authored TypeScript/JavaScript must not write CSS through
 DOM style APIs. Python HTML emitters are scanned for the same attribute pattern.
 
-The two explicit exceptions are self-contained HTML consumed by non-browser
-sinks: the xhtml2pdf label document and the chart helper used for standalone
-report/email/PDF output. The chart helper emits the request nonce whenever it
-runs in an HTTP request; the label document never becomes a browser response.
-These exceptions are centralized here so they cannot be hidden in product code.
+The three explicit exceptions are self-contained HTML consumed by non-browser
+sinks: the PDF-only label sanitizer, the xhtml2pdf label document, and the
+chart helper used for standalone report/email/PDF output. The chart helper
+emits the request nonce whenever it runs in an HTTP request; the PDF-only
+sanitizer and label document never become browser responses. These exceptions
+are centralized here so they cannot be hidden in product code.
 """
 
 from __future__ import annotations
@@ -24,6 +25,9 @@ REPO_ROOT = Path(__file__).resolve().parent.parent
 SOURCE_SUFFIXES = frozenset({".html", ".py", ".ts", ".js"})
 EXCLUDED_PARTS = frozenset({".git", "__pycache__", "build", "docs", "locale", "migrations", "node_modules", "tests"})
 PDF_STYLE_EXCEPTIONS = {
+    "itambox/core/html_sanitizer.py": (
+        "sanitize_label_html_for_pdf emits a sanitized style block only for the isolated xhtml2pdf sink"
+    ),
     "itambox/core/reports/charts.py": (
         "chart CSS is emitted with the request nonce for browser reports and without one "
         "only for standalone email/PDF output"

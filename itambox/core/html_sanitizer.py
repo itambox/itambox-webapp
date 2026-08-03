@@ -168,8 +168,8 @@ def _sanitize_label_html(
 
     The returned document contains only the small HTML vocabulary needed by
     labels.  Safe ``style=`` declarations become deterministic ``label-style-*``
-    classes and one generated ``<style>`` block.  User-provided ``<style>``
-    elements are discarded rather than allowing arbitrary selectors.
+    classes and one generated style block. User-provided style elements are
+    discarded rather than allowing arbitrary selectors.
     """
     fragment = html5lib.parseFragment(
         html_content or "",

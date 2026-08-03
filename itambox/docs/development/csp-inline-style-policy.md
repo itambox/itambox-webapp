@@ -85,12 +85,14 @@ The authored label stylesheet carries both modern `break-after` and legacy
 page boundaries. The single legacy-property exception is centralized in
 `.stylelintrc.json`; it is not an inline suppression.
 
-Two source-level style-element exceptions are centralized in
+Three source-level style-element exceptions are centralized in
 `scripts/check_inline_styles.py`:
 
-1. `core/tasks/labels.py` builds self-contained HTML consumed by xhtml2pdf; it is
+1. `core/html_sanitizer.py` emits a sanitized style block through
+   `sanitize_label_html_for_pdf()` only for the isolated xhtml2pdf sink.
+2. `core/tasks/labels.py` builds self-contained HTML consumed by xhtml2pdf; it is
    not returned as browser HTML.
-2. `core/reports/charts.py` emits a nonce-authorized chart style block only when
+3. `core/reports/charts.py` emits a nonce-authorized chart style block only when
    an HTTP request nonce is active. Standalone report HTML/PDF receives the same
    authored rules from `polished_report.html`; the chart helper itself emits no
    naked no-nonce style element.
