@@ -4,7 +4,9 @@ from django.test import TestCase
 from django.urls import reverse
 
 from assets.models import Asset, AssetRole, AssetType, Category, Manufacturer
+from core.tests.mixins import TenantTestMixin
 from inventory.models import Accessory, AccessoryAssignment, AccessoryStock
+from inventory.tests.factories import create_assignment_fixture
 from organization.models import AssetHolder, Location, Site, Tenant
 
 User = get_user_model()
@@ -80,7 +82,7 @@ class AccessoryModelTests(TestCase):
         holder = AssetHolder.objects.create(first_name="Jane", last_name="Doe", upn="jane.doe")
         acc = Accessory.objects.create(name="Keyboard", manufacturer=self.manufacturer)
         AccessoryStock.objects.create(accessory=acc, location=self.location, qty=10)
-        AccessoryAssignment.objects.create(accessory=acc, assigned_holder=holder, qty=3)
+        create_assignment_fixture(AccessoryAssignment, accessory=acc, assigned_holder=holder, qty=3)
         self.assertEqual(acc.available, 7)
         self.assertEqual(acc.checked_out_qty, 3)
 
@@ -108,18 +110,20 @@ class AccessoryAssignmentModelTests(TestCase):
 
     def test_assignment_to_holder(self):
         acc = Accessory.objects.create(name="Monitor", manufacturer=self.manufacturer)
-        assignment = AccessoryAssignment.objects.create(accessory=acc, assigned_holder=self.holder, qty=2)
+        assignment = create_assignment_fixture(AccessoryAssignment, accessory=acc, assigned_holder=self.holder, qty=2)
         self.assertEqual(assignment.qty, 2)
         self.assertIn("John Smith", str(assignment))
 
     def test_assignment_to_location(self):
         acc = Accessory.objects.create(name="Printer", manufacturer=self.manufacturer)
-        assignment = AccessoryAssignment.objects.create(accessory=acc, assigned_location=self.location, qty=1)
+        assignment = create_assignment_fixture(
+            AccessoryAssignment, accessory=acc, assigned_location=self.location, qty=1
+        )
         self.assertIn("Room A", str(assignment))
 
     def test_assignment_to_asset(self):
         acc = Accessory.objects.create(name="USB-C Mouse", manufacturer=self.manufacturer)
-        assignment = AccessoryAssignment.objects.create(accessory=acc, assigned_asset=self.asset, qty=1)
+        assignment = create_assignment_fixture(AccessoryAssignment, accessory=acc, assigned_asset=self.asset, qty=1)
         self.assertEqual(assignment.qty, 1)
         self.assertIn("Dell Latitude", str(assignment))
 
@@ -130,28 +134,37 @@ class AccessoryAssignmentModelTests(TestCase):
         # Holder + Location
         with self.assertRaises(IntegrityError):
             with transaction.atomic():
-                AccessoryAssignment.objects.create(
-                    accessory=acc, assigned_holder=self.holder, assigned_location=self.location, qty=1
+                create_assignment_fixture(
+                    AccessoryAssignment,
+                    accessory=acc,
+                    assigned_holder=self.holder,
+                    assigned_location=self.location,
+                    qty=1,
                 )
 
         # Holder + Asset
         with self.assertRaises(IntegrityError):
             with transaction.atomic():
-                AccessoryAssignment.objects.create(
-                    accessory=acc, assigned_holder=self.holder, assigned_asset=self.asset, qty=1
+                create_assignment_fixture(
+                    AccessoryAssignment, accessory=acc, assigned_holder=self.holder, assigned_asset=self.asset, qty=1
                 )
 
         # Location + Asset
         with self.assertRaises(IntegrityError):
             with transaction.atomic():
-                AccessoryAssignment.objects.create(
-                    accessory=acc, assigned_location=self.location, assigned_asset=self.asset, qty=1
+                create_assignment_fixture(
+                    AccessoryAssignment,
+                    accessory=acc,
+                    assigned_location=self.location,
+                    assigned_asset=self.asset,
+                    qty=1,
                 )
 
         # All three
         with self.assertRaises(IntegrityError):
             with transaction.atomic():
-                AccessoryAssignment.objects.create(
+                create_assignment_fixture(
+                    AccessoryAssignment,
                     accessory=acc,
                     assigned_holder=self.holder,
                     assigned_location=self.location,
@@ -262,8 +275,8 @@ class AccessoryViewTests(TestCase):
 
     def test_delete_view_blocked_with_assignments(self):
         holder = AssetHolder.objects.create(first_name="Test", last_name="User", upn="test.user")
-        AccessoryAssignment.objects.create(
-            accessory=self.accessory, assigned_holder=holder, from_location=self.location, qty=1
+        create_assignment_fixture(
+            AccessoryAssignment, accessory=self.accessory, assigned_holder=holder, from_location=self.location, qty=1
         )
         url = reverse("inventory:accessory_delete", kwargs={"pk": self.accessory.pk})
         response = self.client.post(url)
@@ -271,7 +284,7 @@ class AccessoryViewTests(TestCase):
         self.assertTrue(Accessory.objects.filter(pk=self.accessory.pk).exists())
 
 
-class AccessoryCheckoutViewTests(TestCase):
+class AccessoryCheckoutViewTests(TenantTestMixin, TestCase):
     def setUp(self):
         self.user = User.objects.create_user(
             username="testadmin", password="testpassword", is_staff=True, is_superuser=True
@@ -286,12 +299,23 @@ class AccessoryCheckoutViewTests(TestCase):
             name="MX Master 3S", manufacturer=self.manufacturer, category=self.cat_mouse
         )
         self.stock = AccessoryStock.objects.create(accessory=self.accessory, location=self.location, qty=10)
-        self.holder = AssetHolder.objects.create(first_name="Alice", last_name="Smith", upn="alice.smith")
+        self.holder = AssetHolder.objects.create(
+            first_name="Alice", last_name="Smith", upn="alice.smith", tenant=self.tenant
+        )
 
         self.asset_role = AssetRole.objects.create(name="Laptop", slug="laptop")
         self.asset_type = AssetType.objects.create(manufacturer=self.manufacturer, model="XPS 15", slug="xps-15")
         self.asset = Asset.objects.create(
-            name="Dell Laptop", asset_tag="DELL-002", asset_type=self.asset_type, asset_role=self.asset_role
+            name="Dell Laptop",
+            asset_tag="DELL-002",
+            asset_type=self.asset_type,
+            asset_role=self.asset_role,
+            tenant=self.tenant,
+        )
+        self.client_login_to_tenant(
+            self.user,
+            self.tenant,
+            role_permissions=["inventory.add_accessoryassignment"],
         )
 
     def test_checkout_view_get(self):

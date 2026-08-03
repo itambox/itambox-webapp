@@ -522,7 +522,8 @@ not publish.
 | `alerting.inbox` | `stable` | always-on | Notification and alert-log records | none |
 | `alerting.rules` | `beta-enabled` | enabled | Alert rules and notification channels | Evaluation is daily, not on write; channel delivery failures are logged, not retried |
 | `automation.webhooks` | `beta-opt-in` | opt-in | Event rules and webhook endpoints | Payload schema is not frozen; deliveries are fire-and-forget with no delivery log or replay |
-| `organization.role_grants` | `stable` | always-on | Role grants; the one security-critical entry | none |
+| `organization.role_grants` | `stable` | always-on | Role grants; security-critical authorization boundary | none |
+| `organization.resource_grants` | `stable` | always-on | Tenant resource grants; security-critical cross-tenant stock boundary | none |
 | `platform.plugins` | `experimental` | opt-in | Plugin loading and plugin API | Lifecycle hooks are still being defined, so a plugin that loads today may need changes; plugin code runs in-process with full database access and is not sandboxed |
 | `procurement.core` | `stable` | always-on | Purchase orders, order lines, contracts | none |
 | `procurement.requisition_seam` | `beta-enabled` | enabled | Asset Request fulfillment links | The asset-request to purchase-order-line reservation flow is incomplete; partial fulfilment may need manual reconciliation.<br>Auto-approval thresholds are process-wide, not per tenant. |

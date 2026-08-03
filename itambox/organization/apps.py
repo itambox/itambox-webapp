@@ -36,4 +36,18 @@ class OrganizationConfig(AppConfig):
                 limitations=(),
                 contract_version=CONTRACT_VERSION,
             ),
+            Capability(
+                key="organization.resource_grants",
+                title="Tenant Resource Grants",
+                owning_area="area:auth-rbac",
+                maturity=STABLE,
+                security_critical=True,
+                activation=ALWAYS_ON,
+                activation_probe=None,
+                activation_source=SOURCE_ALWAYS,
+                owns=("organization.TenantResourceGrant",),
+                docs_url="development/tenant-resource-grant-security.md",
+                limitations=(),
+                contract_version=CONTRACT_VERSION,
+            ),
         )

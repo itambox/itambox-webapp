@@ -1,10 +1,11 @@
 from django.core.exceptions import FieldError, ValidationError
-from django.db import models
+from django.db import models, transaction
 from django.db.models import CheckConstraint, Q, Sum
 from django.urls import reverse
 from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
 
+from core.context import _deletion_cascade_allows
 from core.managers import (
     AllObjectsManager,
     SoftDeleteManager,
@@ -29,7 +30,71 @@ from core.models import BaseModel, ChangeLoggingMixin, DeletableVaultModel, Stan
 
 from .abstract_models import AbstractAssignment, AbstractInventoryItem, AbstractStock
 from .kit_checkout import checkout_kit
+from .models_assignment_write import assignment_hard_purge_is_permitted
 from .stock import adjust_inventory_stock
+
+
+class AssignmentWriteProtectionMixin:
+    """Forbid assignment queryset writes that bypass authorized services."""
+
+    @staticmethod
+    def _deny_bulk_write():
+        raise ValidationError(_("Assignments must be mutated through the authorized inventory service."))
+
+    def _cascade_allows(self, operation, values=None):
+        pks = tuple(self.values_list("pk", flat=True))
+        return _deletion_cascade_allows(self.model._meta.label_lower, operation, pks, values)
+
+    def bulk_create(self, *args, **kwargs):
+        self._deny_bulk_write()
+
+    def bulk_update(self, *args, **kwargs):
+        self._deny_bulk_write()
+
+    def update(self, **kwargs):
+        if self._cascade_allows("update", kwargs):
+            return super().update(**kwargs)
+        self._deny_bulk_write()
+
+    def update_or_create(self, *args, **kwargs):
+        self._deny_bulk_write()
+
+    def get_or_create(self, *args, **kwargs):
+        self._deny_bulk_write()
+
+    def delete(self):
+        if self._cascade_allows("delete"):
+            return super().delete()
+        self._deny_bulk_write()
+
+    def _raw_delete(self, using):
+        if self._cascade_allows("delete"):
+            return super()._raw_delete(using)
+        self._deny_bulk_write()
+
+
+class AssignmentBaseQuerySet(AssignmentWriteProtectionMixin, models.QuerySet):
+    """Unscoped assignment reads with the fail-closed write boundary."""
+
+
+class AssignmentTenantSoftDeleteQuerySet(AssignmentWriteProtectionMixin, TenantScopingSoftDeleteQuerySet):
+    """Live tenant-scoped assignment reads with protected writes."""
+
+
+class AssignmentTenantAllObjectsQuerySet(AssignmentWriteProtectionMixin, TenantScopingQuerySet):
+    """All-row tenant-scoped assignment reads with protected writes."""
+
+
+class AssignmentBaseManager(models.Manager.from_queryset(AssignmentBaseQuerySet)):
+    """Unscoped base reads while retaining the fail-closed write boundary."""
+
+
+class AssignmentSoftDeleteManager(TenantScopingSoftDeleteManager.from_queryset(AssignmentTenantSoftDeleteQuerySet)):
+    pass
+
+
+class AssignmentAllObjectsManager(TenantScopingAllObjectsManager.from_queryset(AssignmentTenantAllObjectsQuerySet)):
+    pass
 
 
 class AccessoryQuerySet(TenantScopingSoftDeleteQuerySet):
@@ -401,8 +466,9 @@ class ComponentAllocation(AbstractAssignment):
     tenant_lookup = "component__tenant"
     _item_attr = "component"
     _stock_model_label = "inventory.ComponentStock"
-    objects = TenantScopingSoftDeleteManager()
-    all_objects = TenantScopingAllObjectsManager()
+    objects = AssignmentSoftDeleteManager()
+    all_objects = AssignmentAllObjectsManager()
+    base_objects = AssignmentBaseManager()
 
     @property
     def tenant(self):
@@ -457,20 +523,27 @@ class ComponentAllocation(AbstractAssignment):
         return self.component.get_absolute_url()
 
     def save(self, *args, **kwargs):
-        adjust_inventory_stock(self)
-        super().save(*args, **kwargs)
+        with transaction.atomic():
+            adjust_inventory_stock(self)
+            super().save(*args, **kwargs)
 
     def delete(self, *args, **kwargs):
-        adjust_inventory_stock(self, is_delete=True)
-        super().delete(*args, **kwargs)
+        force_hard = bool(kwargs.get("force_hard_delete", False))
+        if force_hard and not assignment_hard_purge_is_permitted(self):
+            raise ValidationError(_("Assignment hard purge requires the authorized purge service."))
+        with transaction.atomic():
+            if not force_hard:
+                adjust_inventory_stock(self, is_delete=True)
+            super().delete(*args, **kwargs)
 
 
 class AccessoryAssignment(AbstractAssignment):
     tenant_lookup = "accessory__tenant"
     _item_attr = "accessory"
     _stock_model_label = "inventory.AccessoryStock"
-    objects = TenantScopingSoftDeleteManager()
-    all_objects = TenantScopingAllObjectsManager()
+    objects = AssignmentSoftDeleteManager()
+    all_objects = AssignmentAllObjectsManager()
+    base_objects = AssignmentBaseManager()
 
     @property
     def tenant(self):
@@ -499,20 +572,27 @@ class AccessoryAssignment(AbstractAssignment):
         return f"{self.qty}x {self.accessory} assigned to {recipient}"
 
     def save(self, *args, **kwargs):
-        adjust_inventory_stock(self)
-        super().save(*args, **kwargs)
+        with transaction.atomic():
+            adjust_inventory_stock(self)
+            super().save(*args, **kwargs)
 
     def delete(self, *args, **kwargs):
-        adjust_inventory_stock(self, is_delete=True)
-        super().delete(*args, **kwargs)
+        force_hard = bool(kwargs.get("force_hard_delete", False))
+        if force_hard and not assignment_hard_purge_is_permitted(self):
+            raise ValidationError(_("Assignment hard purge requires the authorized purge service."))
+        with transaction.atomic():
+            if not force_hard:
+                adjust_inventory_stock(self, is_delete=True)
+            super().delete(*args, **kwargs)
 
 
 class ConsumableAssignment(AbstractAssignment):
     tenant_lookup = "consumable__tenant"
     _item_attr = "consumable"
     _stock_model_label = "inventory.ConsumableStock"
-    objects = TenantScopingSoftDeleteManager()
-    all_objects = TenantScopingAllObjectsManager()
+    objects = AssignmentSoftDeleteManager()
+    all_objects = AssignmentAllObjectsManager()
+    base_objects = AssignmentBaseManager()
 
     @property
     def tenant(self):
@@ -541,12 +621,18 @@ class ConsumableAssignment(AbstractAssignment):
         return f"{self.qty}x {self.consumable} consumed by {recipient}"
 
     def save(self, *args, **kwargs):
-        adjust_inventory_stock(self)
-        super().save(*args, **kwargs)
+        with transaction.atomic():
+            adjust_inventory_stock(self)
+            super().save(*args, **kwargs)
 
     def delete(self, *args, **kwargs):
-        adjust_inventory_stock(self, is_delete=True)
-        super().delete(*args, **kwargs)
+        force_hard = bool(kwargs.get("force_hard_delete", False))
+        if force_hard and not assignment_hard_purge_is_permitted(self):
+            raise ValidationError(_("Assignment hard purge requires the authorized purge service."))
+        with transaction.atomic():
+            if not force_hard:
+                adjust_inventory_stock(self, is_delete=True)
+            super().delete(*args, **kwargs)
 
 
 class Kit(
@@ -585,8 +671,21 @@ class Kit(
     def get_absolute_url(self):
         return reverse("inventory:kit_detail", kwargs={"pk": self.pk})
 
-    def checkout_to_holder(self, holder, source_location, user=None):
-        return checkout_kit(self, holder=holder, location=source_location, source_location=source_location, user=user)
+    def checkout_to_holder(
+        self,
+        holder,
+        source_location,
+        user=None,
+        *,
+        system_authorizations=None,
+    ):
+        return checkout_kit(
+            self,
+            holder=holder,
+            source_location=source_location,
+            user=user,
+            system_authorizations=system_authorizations,
+        )
 
 
 class KitItem(ChangeLoggingMixin, BaseModel):

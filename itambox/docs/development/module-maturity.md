@@ -33,7 +33,7 @@ limitations before production use.
 | Users & Auth | `users` |
 | SaaS Subscriptions | `subscriptions` |
 | Purchase Orders & Contracts | `procurement` |
-| Curated reports, alerts inbox, role grants | across apps |
+| Curated reports, alerts inbox, role grants, tenant resource grants | across apps |
 
 ### Beta and Experimental
 
@@ -49,7 +49,9 @@ limitations before production use.
 
 Subscriptions and the purchase-order core graduated to Stable when the registry
 landed; what remains Beta in procurement is the Asset Request fulfillment seam,
-not purchase orders themselves. See the
+not purchase orders themselves. Tenant Resource Grants are a separate Stable,
+security-critical capability with a dedicated
+[threat model](tenant-resource-grant-security.md). See the
 [Capability Registry](capability-registry.md) for each entry's activation mode,
 source, and declared limitations.
 

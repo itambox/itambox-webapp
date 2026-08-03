@@ -664,24 +664,6 @@
       "count": 1
     },
     {
-      "path": "itambox/assets/views/request_views.py",
-      "context": "ClassDef:RequestClaimView/FunctionDef:perform_action",
-      "statement": "from inventory.models import AccessoryAssignment",
-      "count": 1
-    },
-    {
-      "path": "itambox/assets/views/request_views.py",
-      "context": "ClassDef:RequestClaimView/FunctionDef:perform_action",
-      "statement": "from inventory.models import ComponentAllocation",
-      "count": 1
-    },
-    {
-      "path": "itambox/assets/views/request_views.py",
-      "context": "ClassDef:RequestClaimView/FunctionDef:perform_action",
-      "statement": "from inventory.models import ConsumableAssignment",
-      "count": 1
-    },
-    {
       "path": "itambox/assets/views/supplier_views.py",
       "context": "ClassDef:SupplierDetailView/FunctionDef:get_context_data",
       "statement": "from assets.models import AssetMaintenance",
@@ -1513,12 +1495,6 @@
       "path": "itambox/core/management/commands/_seed/history.py",
       "context": "ClassDef:SeedHistoryMixin/FunctionDef:_simulate_history",
       "statement": "from django.utils import timezone as _tz",
-      "count": 1
-    },
-    {
-      "path": "itambox/core/management/commands/_seed/inventory.py",
-      "context": "ClassDef:SeedInventoryStockMixin/FunctionDef:_seed_inventory_stock",
-      "statement": "from inventory.models import Accessory, AccessoryAssignment, AccessoryStock, ComponentStock, Consumable, ConsumableAssignment, ConsumableStock, Kit, KitItem",
       "count": 1
     },
     {
@@ -3042,13 +3018,7 @@
     {
       "path": "itambox/itambox/api/permissions.py",
       "context": "ClassDef:StrictTenantPermission/FunctionDef:_shared_read_allowed",
-      "statement": "from organization.access import shared_resource_ids",
-      "count": 1
-    },
-    {
-      "path": "itambox/itambox/api/permissions.py",
-      "context": "ClassDef:StrictTenantPermission/FunctionDef:_shared_read_allowed",
-      "statement": "from organization.models import TenantResourceGrant",
+      "statement": "from organization.access import shared_stock_read_allowed",
       "count": 1
     },
     {

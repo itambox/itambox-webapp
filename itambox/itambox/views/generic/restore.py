@@ -15,6 +15,7 @@ from core.auth.guards import (
     validate_group_membership_grant,
     validate_role_reactivation_grants,
 )
+from core.purge_handlers import purge_object
 from itambox.utils import get_model_viewname
 from itambox.views.generic.htmx_responses import is_htmx_request, success_response
 from itambox.views.generic.mixins import (
@@ -118,7 +119,7 @@ class ObjectPurgeView(HtmxActionMixin, PermissionRequiredMixin, LoginRequiredMix
 
     def post(self, request, *args, **kwargs):
         obj_repr = str(self.object)
-        self.object.delete(force_hard_delete=True)
+        purge_object(self.object)
 
         success_msg = _("Permanently purged {model} {object}").format(
             model=self.model._meta.verbose_name,
@@ -253,7 +254,7 @@ class ObjectBulkPurgeView(HtmxActionMixin, PermissionRequiredMixin, LoginRequire
         count = 0
         with transaction.atomic():
             for obj in rows:
-                obj.delete(force_hard_delete=True)
+                purge_object(obj)
                 count += 1
 
         success_msg = _("Successfully permanently purged {count} {model_plural}.").format(

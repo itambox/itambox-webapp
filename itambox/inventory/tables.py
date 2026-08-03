@@ -5,8 +5,11 @@ from django.utils.safestring import mark_safe
 from django.utils.translation import gettext_lazy as _
 from django_tables2.utils import A
 
+from core.managers import get_current_tenant
 from core.tables import ActionsColumn, BaseTable, ColorChipColumn, CountLinkColumn, ToggleColumn
 from extras.tables import TagColumn
+from organization.access import resolved_shared_stock_ids
+from organization.models import TenantResourceGrant
 
 from .mixins import CheckableInventoryTableMixin
 from .models import (
@@ -51,6 +54,48 @@ class SharePoolActionMixin:
             share_url,
             _("Share this pool with another tenant"),
             _("Share"),
+        )
+
+    def shared_checkout_html(self, request, record, *, permission, route, item):
+        if not request:
+            return ""
+        active_tenant = get_current_tenant()
+        if active_tenant is None:
+            return ""
+        cache_key = (
+            record._meta.label_lower,
+            permission,
+            active_tenant.pk,
+            getattr(request.user, "pk", None),
+        )
+        cache = getattr(self, "_shared_checkout_stock_ids", None)
+        if cache is None:
+            cache = self._shared_checkout_stock_ids = {}
+        if cache_key not in cache:
+            cache[cache_key] = set(
+                resolved_shared_stock_ids(
+                    type(record),
+                    active_tenant,
+                    request.user,
+                    TenantResourceGrant.ACCESS_USE,
+                    permission,
+                )
+            )
+        if record.pk not in cache[cache_key]:
+            return ""
+        checkout_url = reverse(route, kwargs={"pk": item.pk})
+        checkout_title = _("Check-out")
+        return format_html(
+            '<a class="btn btn-sm btn-soft-success check-action d-flex align-items-center" role="button" '
+            'hx-get="{}?from_location={}" hx-target="#modal-placeholder" hx-swap="innerHTML" '
+            'title="{}" aria-label="{}">'
+            '<i class="mdi mdi-logout me-1"></i> {}'
+            "</a>",
+            checkout_url,
+            record.location.pk,
+            checkout_title,
+            checkout_title,
+            checkout_title,
         )
 
 
@@ -130,14 +175,26 @@ class AccessoryStockTable(SharePoolActionMixin, BaseTable):
 
     def render_actions(self, record):
         request = getattr(self, "request", None)
-        if not request or not self.has_perm(request.user, "inventory.change_accessory", record.accessory):
+        shared_checkout = self.shared_checkout_html(
+            request,
+            record,
+            permission="inventory.add_accessoryassignment",
+            route="inventory:accessory_checkout",
+            item=record.accessory,
+        )
+        if shared_checkout:
+            return shared_checkout
+        can_manage_owner_item = bool(
+            request and self.has_perm(request.user, "inventory.change_accessory", record.accessory)
+        )
+        if not can_manage_owner_item and not shared_checkout:
             shared = self.share_pool_html(request, record)
             return shared or mark_safe('<span class="text-muted small">—</span>')
 
         checkout_url = reverse("inventory:accessory_checkout", kwargs={"pk": record.accessory.pk})
+        checkout_title = _("Check-out")
         delete_url = reverse("inventory:accessorystock_delete", kwargs={"pk": record.pk})
         add_stock_url = reverse("inventory:accessory_add_stock", kwargs={"pk": record.accessory.pk})
-        checkout_title = _("Check-out")
 
         add_stock_html = ""
         if self.has_perm(request.user, "inventory.change_accessorystock", record.accessory):
@@ -313,9 +370,21 @@ class ConsumableStockTable(SharePoolActionMixin, BaseTable):
 
     def render_actions(self, record):
         request = getattr(self, "request", None)
+        shared_checkout = self.shared_checkout_html(
+            request,
+            record,
+            permission="inventory.add_consumableassignment",
+            route="inventory:consumable_checkout",
+            item=record.consumable,
+        )
+        if shared_checkout:
+            return shared_checkout
         if not request or not self.has_perm(request.user, "inventory.change_consumable", record.consumable):
-            shared = self.share_pool_html(request, record)
-            return shared or mark_safe('<span class="text-muted small">—</span>')
+            return (
+                shared_checkout
+                or self.share_pool_html(request, record)
+                or mark_safe('<span class="text-muted small">—</span>')
+            )
 
         checkout_url = reverse("inventory:consumable_checkout", kwargs={"pk": record.consumable.pk})
         delete_url = reverse("inventory:consumablestock_delete", kwargs={"pk": record.pk})
@@ -479,9 +548,21 @@ class ComponentStockTable(SharePoolActionMixin, BaseTable):
 
     def render_actions(self, record):
         request = getattr(self, "request", None)
+        shared_checkout = self.shared_checkout_html(
+            request,
+            record,
+            permission="inventory.add_componentallocation",
+            route="inventory:component_checkout",
+            item=record.component,
+        )
+        if shared_checkout:
+            return shared_checkout
         if not request or not self.has_perm(request.user, "inventory.change_component", record.component):
-            shared = self.share_pool_html(request, record)
-            return shared or mark_safe('<span class="text-muted small">—</span>')
+            return (
+                shared_checkout
+                or self.share_pool_html(request, record)
+                or mark_safe('<span class="text-muted small">—</span>')
+            )
 
         checkout_url = reverse("inventory:component_checkout", kwargs={"pk": record.component.pk})
         delete_url = reverse("inventory:componentstock_delete", kwargs={"pk": record.pk})

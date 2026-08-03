@@ -8,13 +8,15 @@ SnipeITClient._get, which backs every paginated get_all() call.
 from __future__ import annotations
 
 import datetime
+from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
 
 import pytest
 from django.contrib.auth import get_user_model
 
-from core.importers.snipeit import SnipeITClient, SnipeITImporter, _clean_field_name
+from core.importers.snipeit import IMPORT_NOTE, SnipeITClient, SnipeITImporter, _clean_field_name
 from core.tests.mixins import TenantTestMixin
+from inventory.services import checkout_inventory_item, create_component_allocation
 
 User = get_user_model()
 
@@ -258,6 +260,8 @@ class TestSnipeITImporter(TenantTestMixin):
                 update=update,
                 map_companies=map_companies,
                 skip=skip or set(),
+                checkout_inventory_item=checkout_inventory_item,
+                create_component_allocation=create_component_allocation,
             )
             return importer.run()
 
@@ -477,7 +481,41 @@ class TestSnipeITImporter(TenantTestMixin):
                 user=self.admin,
                 dry_run=False,
                 skip={"assets", "accessories", "consumables", "components", "licenses", "maintenances"},
+                checkout_inventory_item=checkout_inventory_item,
+                create_component_allocation=create_component_allocation,
             )
             importer.run()
 
         assert StatusLabel._base_manager.filter(name__in=["Status A", "Status B", "Status C", "Status D"]).count() == 4
+
+    # ------------------------------------------------------------------
+    # Injected inventory services
+    # ------------------------------------------------------------------
+
+    def _injected_importer(self, checkout, allocate):
+        return SnipeITImporter(
+            client=_make_client_mock(),
+            tenant=self.tenant,
+            user=self.admin,
+            checkout_inventory_item=checkout,
+            create_component_allocation=allocate,
+        )
+
+    def test_assignment_goes_through_the_injected_services(self):
+        checkout, allocate = MagicMock(), MagicMock()
+        importer = self._injected_importer(checkout, allocate)
+        item = SimpleNamespace(tenant_id=self.tenant.pk)
+        holder = SimpleNamespace(tenant_id=self.tenant.pk)
+        asset = SimpleNamespace(tenant_id=self.tenant.pk)
+
+        importer._import_assignment(item, 2, holder=holder)
+        importer._import_assignment(item, 3, asset=asset)
+
+        checkout.assert_called_once_with(item, 2, holder=holder, user=self.admin, notes=IMPORT_NOTE)
+        allocate.assert_called_once_with(item, 3, asset=asset, user=self.admin, notes=IMPORT_NOTE)
+
+    def test_services_must_be_injected_explicitly(self):
+        # No default: the importer has no way to reach inventory.services on its
+        # own, so omitting either callable fails at construction, not mid-import.
+        with pytest.raises(TypeError):
+            SnipeITImporter(client=_make_client_mock(), tenant=self.tenant, user=self.admin)

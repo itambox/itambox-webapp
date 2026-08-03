@@ -5,7 +5,8 @@ from django.utils.translation import gettext_lazy as _
 
 from assets.models import Asset
 from core.managers import get_current_tenant
-from organization.models import AssetHolder, Location
+from organization.access import resolved_shared_stock_ids
+from organization.models import AssetHolder, Location, TenantResourceGrant
 
 
 class BaseCheckoutForm(forms.Form):
@@ -35,6 +36,7 @@ class BaseCheckoutForm(forms.Form):
         tenant = kwargs.pop("tenant", None)
         item = kwargs.pop("item", None)
         stock_model = kwargs.pop("stock_model", None)
+        user = kwargs.pop("user", None)
         super().__init__(*args, **kwargs)
         # ADR-0001 phase 4b: a checkout assigns INTO the acting tenant, so
         # targets scope to the ACTIVE tenant (falling back to the item's
@@ -55,7 +57,7 @@ class BaseCheckoutForm(forms.Form):
             )
             self.fields["assigned_asset"].queryset = Asset.objects.filter(tenant=scope_tenant).order_by("asset_tag")
             source_q = Q(tenant=scope_tenant)
-            shared_location_ids = self._shared_pool_location_ids(item, stock_model)
+            shared_location_ids = self._shared_pool_location_ids(item, stock_model, user)
             if shared_location_ids:
                 source_q |= Q(pk__in=shared_location_ids)
             for loc_field in ("source_location", "from_location"):
@@ -66,20 +68,32 @@ class BaseCheckoutForm(forms.Form):
                     self.fields[loc_field].queryset = Location._base_manager.filter(source_q).order_by("name")
 
     @staticmethod
-    def _shared_pool_location_ids(item, stock_model):
+    def _shared_pool_location_ids(item, stock_model, user):
         """Locations of THIS item's pools shared to the active tenant."""
         if item is None or stock_model is None or item.pk is None:
             return []
         active = get_current_tenant()
         if active is None:
             return []
-        # inline import: cycle: breaks an inventory <-> organization form-import cycle
-        from organization.access import shared_resource_ids
-
         item_field = stock_model._meta.model_name.replace("stock", "")
+        assignment_names = {
+            "accessorystock": "accessoryassignment",
+            "componentstock": "componentallocation",
+            "consumablestock": "consumableassignment",
+        }
+        assignment_name = assignment_names.get(stock_model._meta.model_name)
+        if assignment_name is None:
+            return []
+        perm = f"inventory.add_{assignment_name}"
         return list(
             stock_model._base_manager.filter(
-                pk__in=shared_resource_ids(stock_model, active),
+                pk__in=resolved_shared_stock_ids(
+                    stock_model,
+                    active,
+                    user,
+                    TenantResourceGrant.ACCESS_USE,
+                    perm,
+                ),
                 **{f"{item_field}_id": item.pk},
             ).values_list("location_id", flat=True)
         )

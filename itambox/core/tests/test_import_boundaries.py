@@ -10,6 +10,8 @@ regardless of import order at runtime and need no database.
 """
 
 import ast
+import json
+import subprocess
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -17,6 +19,7 @@ from django.test import SimpleTestCase
 
 # ``itambox/`` -- the Django project root that holds the app packages.
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
+REPO_ROOT = PROJECT_ROOT.parent
 
 
 def _module_path(dotted):
@@ -554,6 +557,7 @@ class MembershipServiceLayerTests(SimpleTestCase):
             "visible_to_containers",
             "is_container_scoped_unfiltered",
             "resolve_stock_access",
+            "resolved_shared_stock_ids",
             "ResourceAccessDecision",
             "REASON_SAME_TENANT",
             "REASON_DIRECT_GRANT",
@@ -561,21 +565,619 @@ class MembershipServiceLayerTests(SimpleTestCase):
             "DENIED_NO_ACTIVE_TENANT",
             "DENIED_OWNER_UNRESOLVABLE",
             "DENIED_NO_GRANT",
+            "DENIED_INVALID_ACCESS_LEVEL",
             "DENIED_INSUFFICIENT_LEVEL",
             "DENIED_RBAC",
+            "DENIED_UNSUPPORTED_RESOURCE",
         ):
             with self.subTest(name=name):
                 self.assertIs(getattr(services, name), getattr(resource_access, name))
 
 
-class KitCheckoutBoundaryTests(SimpleTestCase):
-    """``inventory.models`` -> ``assets.services``.
+SANCTIONED_RESOURCE_BOUNDARY_CALLS = {
+    "is_container_scoped_unfiltered",
+    "resolve_stock_access",
+    "resolved_shared_stock_ids",
+    "shared_stock_read_allowed",
+    "visible_to_containers",
+}
 
-    ``assets.services`` imports ``inventory.models`` and ``inventory.services``
-    at module scope, so the kit checkout implementation may keep living there.
-    ``Kit.checkout_to_holder`` was the back edge; it now goes through the leaf
-    ``inventory.kit_checkout``, whose implementation ``AssetsConfig.ready()``
-    registers once the app registry is populated.
+ASSIGNMENT_MODELS = frozenset({"AccessoryAssignment", "ComponentAllocation", "ConsumableAssignment"})
+# Every manager write that reaches the database without a checkout service.
+# ``create`` alone left ``get_or_create`` as a documented, in-tree bypass.
+ASSIGNMENT_WRITE_METHODS = frozenset(
+    {"_raw_delete", "bulk_create", "bulk_update", "create", "delete", "get_or_create", "update", "update_or_create"}
+)
+ASSIGNMENT_MANAGERS = frozenset({"_base_manager", "_default_manager", "all_objects", "objects"})
+ASSIGNMENT_INSTANCE_WRITE_METHODS = frozenset({"delete", "restore", "save"})
+ASSIGNMENT_READ_METHODS = frozenset({"first", "get", "last"})
+RESOURCE_GRANT_TEST_MANIFEST = json.loads(
+    (REPO_ROOT / "scripts" / "resource_grant_test_manifest.json").read_text(encoding="utf-8")
+)
+MANDATORY_RESOURCE_GRANT_TESTS = tuple(RESOURCE_GRANT_TEST_MANIFEST["mandatory_tests"])
+
+
+def _propagate_grant_aliases(tree, grant_names):
+    changed = True
+    while changed:
+        changed = False
+        for node in ast.walk(tree):
+            if not isinstance(node, (ast.Assign, ast.AnnAssign)):
+                continue
+            value_path = _attribute_path(node.value)
+            if value_path is None:
+                continue
+            is_grant = value_path in grant_names or value_path.rsplit(".", 1)[-1] == "TenantResourceGrant"
+            if not is_grant:
+                continue
+            targets = node.targets if isinstance(node, ast.Assign) else [node.target]
+            for target in targets:
+                target_path = _attribute_path(target)
+                if target_path and target_path not in grant_names:
+                    grant_names.add(target_path)
+                    changed = True
+
+
+def _grant_import_names(tree):
+    grant_names = {"TenantResourceGrant"}
+    organization_model_modules = set()
+    for node in ast.walk(tree):
+        if isinstance(node, ast.ImportFrom) and node.module == "organization.models":
+            grant_names.update(
+                alias.asname or alias.name for alias in node.names if alias.name == "TenantResourceGrant"
+            )
+        if isinstance(node, ast.Import):
+            organization_model_modules.update(
+                alias.asname or alias.name for alias in node.names if alias.name == "organization.models"
+            )
+    _propagate_grant_aliases(tree, grant_names)
+    return grant_names, organization_model_modules
+
+
+def _attribute_path(node):
+    if isinstance(node, ast.Name):
+        return node.id
+    if isinstance(node, ast.Attribute):
+        parent = _attribute_path(node.value)
+        return f"{parent}.{node.attr}" if parent else node.attr
+    return None
+
+
+def _raw_grant_manager_violation(node, grant_names, organization_model_modules):
+    if not isinstance(node, ast.Attribute) or node.attr not in {"objects", "_base_manager"}:
+        return None
+    target = node.value
+    if isinstance(target, ast.Name) and target.id in grant_names:
+        return node.lineno, "raw-grant-manager"
+    target_path = _attribute_path(target)
+    if any(target_path == f"{module}.TenantResourceGrant" for module in organization_model_modules):
+        return node.lineno, "qualified-grant-manager"
+    return None
+
+
+def _assignment_model_aliases(tree):
+    """Local names bound to an assignment model, ``as`` aliases included."""
+    aliases = set(ASSIGNMENT_MODELS)
+    for node in ast.walk(tree):
+        if isinstance(node, ast.ImportFrom):
+            aliases.update(alias.asname or alias.name for alias in node.names if alias.name in ASSIGNMENT_MODELS)
+    changed = True
+    while changed:
+        changed = False
+        for node in ast.walk(tree):
+            if not isinstance(node, (ast.Assign, ast.AnnAssign)):
+                continue
+            value_path = _attribute_path(node.value)
+            if not value_path or value_path.rsplit(".", 1)[-1] not in aliases:
+                continue
+            targets = node.targets if isinstance(node, ast.Assign) else [node.target]
+            for target in targets:
+                target_path = _attribute_path(target)
+                if target_path and target_path not in aliases:
+                    aliases.add(target_path)
+                    changed = True
+    return aliases
+
+
+def _assignment_manager_owner(node):
+    """The model expression behind a manager, through any chained queryset call.
+
+    ``Model.objects.create`` and ``Model.objects.filter(...).create`` are the
+    same bypass; only the depth of the chain differs.
+    """
+    while True:
+        if isinstance(node, ast.Call):
+            node = node.func
+            continue
+        if not isinstance(node, ast.Attribute):
+            return None
+        if node.attr in ASSIGNMENT_MANAGERS:
+            return node.value
+        node = node.value
+
+
+def _assignment_write_violation(node, aliases):
+    """One manager-level assignment write, however the model is spelled."""
+    if not isinstance(node, ast.Call) or not isinstance(node.func, ast.Attribute):
+        return None
+    method = node.func.attr
+    if method not in ASSIGNMENT_WRITE_METHODS:
+        return None
+    model = _assignment_manager_owner(node.func.value)
+    if model is None:
+        return None
+    if isinstance(model, ast.Name):
+        return (node.lineno, f"direct-{method}") if model.id in aliases else None
+    path = _attribute_path(model)
+    if path and path.rsplit(".", 1)[-1] in ASSIGNMENT_MODELS:
+        return node.lineno, f"qualified-{method}"
+    return None
+
+
+def _is_assignment_model_expr(node, aliases):
+    path = _attribute_path(node)
+    return bool(
+        (isinstance(node, ast.Name) and node.id in aliases) or (path and path.rsplit(".", 1)[-1] in ASSIGNMENT_MODELS)
+    )
+
+
+def _assignment_target_paths(target):
+    if isinstance(target, (ast.Tuple, ast.List)):
+        return [path for element in target.elts for path in _assignment_target_paths(element)]
+    path = _attribute_path(target)
+    return [path] if path else []
+
+
+def _assignment_call_kind(value, aliases, queryset_paths):
+    if not isinstance(value, ast.Call):
+        return None
+    if isinstance(value.func, ast.Name) and value.func.id in aliases:
+        return "instance"
+    if isinstance(value.func, ast.Name) and value.func.id == "get_object_or_404" and value.args:
+        first = value.args[0]
+        owner = _assignment_manager_owner(first)
+        if (
+            _is_assignment_model_expr(first, aliases)
+            or _is_assignment_model_expr(owner, aliases)
+            or _attribute_path(first) in queryset_paths
+        ):
+            return "instance"
+    if not isinstance(value.func, ast.Attribute):
+        return None
+    owner = _assignment_manager_owner(value.func.value)
+    receiver_path = _attribute_path(value.func.value)
+    if not (_is_assignment_model_expr(owner, aliases) or receiver_path in queryset_paths):
+        return None
+    return "instance" if value.func.attr in ASSIGNMENT_READ_METHODS else "queryset"
+
+
+def _assignment_dataflow_paths(tree, aliases):
+    instance_paths = set()
+    queryset_paths = set()
+    changed = True
+    while changed:
+        changed = False
+        for node in ast.walk(tree):
+            if isinstance(node, (ast.Assign, ast.AnnAssign)):
+                targets = node.targets if isinstance(node, ast.Assign) else [node.target]
+                targets = [path for target in targets for path in _assignment_target_paths(target)]
+                value_path = _attribute_path(node.value)
+                kind = (
+                    "instance" if value_path in instance_paths else "queryset" if value_path in queryset_paths else None
+                )
+                owner = _assignment_manager_owner(node.value) if not isinstance(node.value, ast.Call) else None
+                if kind is None and _is_assignment_model_expr(owner, aliases):
+                    kind = "queryset"
+                kind = kind or _assignment_call_kind(node.value, aliases, queryset_paths)
+                selected = instance_paths if kind == "instance" else queryset_paths if kind == "queryset" else None
+                if selected is not None:
+                    before = len(selected)
+                    selected.update(targets)
+                    changed = changed or len(selected) != before
+            elif isinstance(node, (ast.For, ast.AsyncFor)):
+                owner = _assignment_manager_owner(node.iter)
+                if _is_assignment_model_expr(owner, aliases) or _attribute_path(node.iter) in queryset_paths:
+                    before = len(instance_paths)
+                    instance_paths.update(_assignment_target_paths(node.target))
+                    changed = changed or len(instance_paths) != before
+    return instance_paths, queryset_paths
+
+
+def _assignment_write_violations(source, filename="<mutation>"):
+    tree = ast.parse(source, filename=filename)
+    aliases = _assignment_model_aliases(tree)
+    violations = [
+        violation for node in ast.walk(tree) if (violation := _assignment_write_violation(node, aliases)) is not None
+    ]
+    instance_paths, queryset_paths = _assignment_dataflow_paths(tree, aliases)
+    for node in ast.walk(tree):
+        if not isinstance(node, ast.Call) or not isinstance(node.func, ast.Attribute):
+            continue
+        receiver = _attribute_path(node.func.value)
+        if receiver in instance_paths and node.func.attr in ASSIGNMENT_INSTANCE_WRITE_METHODS:
+            violations.append((node.lineno, f"instance-{node.func.attr}"))
+        if receiver in queryset_paths and node.func.attr in ASSIGNMENT_WRITE_METHODS:
+            violations.append((node.lineno, f"queryset-alias-{node.func.attr}"))
+    return violations
+
+
+def _called_name(node):
+    if not isinstance(node, ast.Call):
+        return None
+    return node.func.id if isinstance(node.func, ast.Name) else getattr(node.func, "attr", None)
+
+
+def _forbidden_capability_symbols(source, path, allowed_symbols):
+    return [symbol for symbol, allowed in allowed_symbols.items() if symbol in source and path not in allowed]
+
+
+def _forwards_system_overallocation(node):
+    return (
+        isinstance(node, ast.Call)
+        and _called_name(node) == "create_component_allocation"
+        and any(keyword.arg == "system_allow_overallocate" or keyword.arg is None for keyword in node.keywords)
+    )
+
+
+def _resource_grant_boundary_violations(source, filename="<mutation>"):
+    tree = ast.parse(source, filename=filename)
+    nodes = list(ast.walk(tree))
+    grant_names, organization_model_modules = _grant_import_names(tree)
+    violations = [
+        (node.lineno, "dynamic-grant-model")
+        for node in nodes
+        if isinstance(node, ast.Constant) and node.value == "TenantResourceGrant"
+    ]
+    violations.extend(
+        violation
+        for node in nodes
+        if (violation := _raw_grant_manager_violation(node, grant_names, organization_model_modules))
+    )
+    if not any(_called_name(node) in SANCTIONED_RESOURCE_BOUNDARY_CALLS for node in nodes):
+        violations.append((1, "missing-sanctioned-boundary-call"))
+    return violations
+
+
+class TenantResourceGrantBoundaryTests(SimpleTestCase):
+    """Freeze the sanctioned shared-resource authorization call graph (#194)."""
+
+    def test_production_shared_resource_id_calls_stay_inside_canonical_resolver(self):
+        allowed = {
+            PROJECT_ROOT / "organization" / "access.py",
+            PROJECT_ROOT / "organization" / "services" / "resource_access.py",
+        }
+        bypasses = []
+
+        for path in PROJECT_ROOT.rglob("*.py"):
+            relative_parts = path.relative_to(PROJECT_ROOT).parts
+            if "tests" in relative_parts or "migrations" in relative_parts or path in allowed:
+                continue
+            tree = ast.parse(path.read_text(encoding="utf-8"), filename=str(path))
+            for node in ast.walk(tree):
+                if isinstance(node, ast.ImportFrom) and any(
+                    alias.name == "shared_resource_ids" for alias in node.names
+                ):
+                    bypasses.append(f"{path.relative_to(PROJECT_ROOT)}:{node.lineno}")
+                if isinstance(node, ast.Constant) and node.value == "shared_resource_ids":
+                    bypasses.append(f"{path.relative_to(PROJECT_ROOT)}:{node.lineno}")
+                if not isinstance(node, ast.Call):
+                    continue
+                func = node.func
+                called_name = func.id if isinstance(func, ast.Name) else getattr(func, "attr", None)
+                if called_name == "shared_resource_ids":
+                    bypasses.append(f"{path.relative_to(PROJECT_ROOT)}:{node.lineno}")
+
+        self.assertEqual(
+            bypasses,
+            [],
+            "shared_resource_ids is only a candidate preselector inside the canonical "
+            f"resource-access resolver; direct production bypasses: {bypasses}",
+        )
+
+    def test_exposed_stock_surfaces_do_not_query_resource_grants_directly(self):
+        boundary_files = (
+            PROJECT_ROOT / "inventory" / "services.py",
+            PROJECT_ROOT / "inventory" / "tables.py",
+            PROJECT_ROOT / "inventory" / "forms" / "base_forms.py",
+            PROJECT_ROOT / "inventory" / "views" / "accessory_views.py",
+            PROJECT_ROOT / "inventory" / "views" / "component_views.py",
+            PROJECT_ROOT / "inventory" / "views" / "consumable_views.py",
+            PROJECT_ROOT / "itambox" / "api" / "permissions.py",
+            PROJECT_ROOT / "itambox" / "views" / "features.py",
+        )
+        bypasses = []
+        for path in boundary_files:
+            for line, reason in _resource_grant_boundary_violations(
+                path.read_text(encoding="utf-8"), filename=str(path)
+            ):
+                bypasses.append(f"{path.relative_to(PROJECT_ROOT)}:{line}:{reason}")
+        raw_only_surfaces = (
+            PROJECT_ROOT / "inventory" / "forms" / "accessory_forms.py",
+            PROJECT_ROOT / "inventory" / "forms" / "component_forms.py",
+            PROJECT_ROOT / "inventory" / "forms" / "consumable_forms.py",
+        )
+        for path in raw_only_surfaces:
+            for line, reason in _resource_grant_boundary_violations(
+                path.read_text(encoding="utf-8"), filename=str(path)
+            ):
+                if reason != "missing-sanctioned-boundary-call":
+                    bypasses.append(f"{path.relative_to(PROJECT_ROOT)}:{line}:{reason}")
+
+        self.assertEqual(
+            bypasses,
+            [],
+            "exposed stock surfaces must use resolve_stock_access or "
+            f"resolved_shared_stock_ids, never raw grant managers: {bypasses}",
+        )
+
+    def test_assignment_mutation_surfaces_call_canonical_services(self):
+        """API, request, import, and seed writers stay above inventory services."""
+        surface_calls = {
+            PROJECT_ROOT / "inventory" / "api" / "views.py": {"checkout_inventory_item"},
+            PROJECT_ROOT / "assets" / "views" / "request_views.py": {"checkout_inventory_item"},
+            PROJECT_ROOT / "core" / "importers" / "snipeit.py": {
+                "_checkout_inventory_item",
+                "_create_component_allocation",
+                "checkout_inventory_item",
+                "create_component_allocation",
+            },
+            PROJECT_ROOT / "core" / "management" / "commands" / "_seed" / "assets.py": {"create_component_allocation"},
+            PROJECT_ROOT / "core" / "management" / "commands" / "_seed" / "inventory.py": {"checkout_inventory_item"},
+        }
+        for path, sanctioned_calls in surface_calls.items():
+            with self.subTest(surface=path.relative_to(PROJECT_ROOT)):
+                tree = ast.parse(path.read_text(encoding="utf-8"), filename=str(path))
+                called = {name for node in ast.walk(tree) if (name := _called_name(node))}
+                self.assertTrue(
+                    called & sanctioned_calls,
+                    f"{path.relative_to(PROJECT_ROOT)} bypasses canonical inventory mutation services",
+                )
+                raw_grant_bypasses = [
+                    (line, reason)
+                    for line, reason in _resource_grant_boundary_violations(
+                        path.read_text(encoding="utf-8"), filename=str(path)
+                    )
+                    if reason != "missing-sanctioned-boundary-call"
+                ]
+                self.assertEqual(raw_grant_bypasses, [], path.relative_to(PROJECT_ROOT))
+
+    def test_documented_mandatory_selector_matches_complete_manifest(self):
+        document = (PROJECT_ROOT / "docs" / "development" / "tenant-resource-grant-security.md").read_text(
+            encoding="utf-8"
+        )
+        selector = document.split("Run the Django selector from the repository root:", 1)[1].split("```", 2)[1]
+        documented = tuple(
+            line.strip().removesuffix(" \\")
+            for line in selector.splitlines()
+            if line.strip().endswith(".py") or line.strip().endswith(".py \\")
+        )
+        self.assertEqual(documented, MANDATORY_RESOURCE_GRANT_TESTS)
+        self.assertTrue(all((REPO_ROOT / relative).is_file() for relative in documented))
+        manifest_coverage = set(RESOURCE_GRANT_TEST_MANIFEST["changed_tests"]) | set(
+            RESOURCE_GRANT_TEST_MANIFEST["baseline_tests"]
+        )
+        self.assertEqual(set(documented), manifest_coverage)
+        self.assertTrue(
+            all((REPO_ROOT / relative).is_file() for relative in RESOURCE_GRANT_TEST_MANIFEST["supporting_files"])
+        )
+
+        if (REPO_ROOT / ".git").exists():
+            base = RESOURCE_GRANT_TEST_MANIFEST["base_commit"]
+            diff = subprocess.run(
+                ["git", "diff", "--name-only", base, "--"],
+                cwd=REPO_ROOT,
+                check=True,
+                capture_output=True,
+                text=True,
+            ).stdout.splitlines()
+            status = subprocess.run(
+                ["git", "status", "--porcelain"],
+                cwd=REPO_ROOT,
+                check=True,
+                capture_output=True,
+                text=True,
+            ).stdout.splitlines()
+            candidates = {path.replace("\\", "/") for path in diff}
+            candidates.update(line[3:].replace("\\", "/") for line in status if line.startswith("?? "))
+            changed_tests = {
+                path
+                for path in candidates
+                if path.endswith(".py") and ("/tests/test_" in path or path.startswith("scripts/tests/test_"))
+            }
+            self.assertEqual(changed_tests, set(RESOURCE_GRANT_TEST_MANIFEST["changed_tests"]))
+
+    def test_corruption_fixture_is_outside_the_production_image_copy_context(self):
+        helper = REPO_ROOT / "scripts" / "tests" / "assignment_corruption.py"
+        self.assertTrue(helper.is_file())
+        self.assertNotIn(PROJECT_ROOT, helper.parents)
+        dockerfile = (REPO_ROOT / "Dockerfile").read_text(encoding="utf-8")
+        production_copies = [line.strip() for line in dockerfile.splitlines() if line.strip().startswith("COPY ")]
+        self.assertFalse(
+            any(line.startswith("COPY scripts") or line.startswith("COPY . ") for line in production_copies)
+        )
+
+    def test_boundary_gate_rejects_alias_dynamic_and_omission_mutations(self):
+        mutations = {
+            "alias": "from organization.models import TenantResourceGrant as Grant\nGrant.objects.all()",
+            "qualified": "import organization.models as models\nmodels.TenantResourceGrant.objects.all()",
+            "fully-qualified": (
+                "import organization.models\n"
+                "resolve_stock_access(user, stock, level, perm)\n"
+                "organization.models.TenantResourceGrant.objects.all()"
+            ),
+            "content-type": (
+                "from django.contrib.contenttypes.models import ContentType\n"
+                "from organization.models import TenantResourceGrant as Grant\n"
+                "resolve_stock_access(user, stock, level, perm)\n"
+                "Grant.objects.filter(resource_type=ContentType.objects.get_for_model(Model))"
+            ),
+            "dynamic": "resolve_stock_access(user, stock, level, perm)\ngetattr(models, 'TenantResourceGrant')",
+            "alias-propagation": (
+                "from organization.models import TenantResourceGrant\n"
+                "Grant = TenantResourceGrant\n"
+                "resolve_stock_access(user, stock, level, perm)\n"
+                "Grant.objects.all()"
+            ),
+            "omission": "def visible_surface(queryset):\n    return queryset.all()",
+        }
+        for mutation, source in mutations.items():
+            with self.subTest(mutation=mutation):
+                self.assertTrue(_resource_grant_boundary_violations(source))
+
+    def test_assignment_write_capabilities_stay_on_sanctioned_seams(self):
+        write_module = PROJECT_ROOT / "inventory" / "services.py"
+        validation_module = PROJECT_ROOT / "inventory" / "forms" / "component_forms.py"
+        bypasses = []
+        for path in PROJECT_ROOT.rglob("*.py"):
+            relative_parts = path.relative_to(PROJECT_ROOT).parts
+            if "tests" in relative_parts or "migrations" in relative_parts:
+                continue
+            source = path.read_text(encoding="utf-8")
+            tree = ast.parse(source, filename=str(path))
+            for node in ast.walk(tree):
+                if not isinstance(node, ast.ImportFrom):
+                    continue
+                for alias in node.names:
+                    if alias.name == "authorized_assignment_write" and path != write_module:
+                        bypasses.append(f"{path.relative_to(PROJECT_ROOT)}:{node.lineno}:write-permit")
+                    if alias.name == "authorized_assignment_validation" and path != validation_module:
+                        bypasses.append(f"{path.relative_to(PROJECT_ROOT)}:{node.lineno}:validation-permit")
+            if path != write_module:
+                for line, reason in _assignment_write_violations(source, filename=str(path)):
+                    bypasses.append(f"{path.relative_to(PROJECT_ROOT)}:{line}:{reason}")
+        self.assertEqual(bypasses, [], f"assignment writes bypass sanctioned services: {bypasses}")
+
+    def test_internal_cascade_and_overallocation_capabilities_stay_on_exact_seams(self):
+        allowed_symbols = {
+            "authorized_assignment_write": {
+                PROJECT_ROOT / "inventory" / "models_assignment_write.py",
+                PROJECT_ROOT / "inventory" / "services.py",
+            },
+            "_authorized_deletion_cascade": {
+                PROJECT_ROOT / "core" / "context.py",
+                PROJECT_ROOT / "core" / "models.py",
+            },
+            "_deletion_cascade_value_key": {
+                PROJECT_ROOT / "core" / "context.py",
+                PROJECT_ROOT / "core" / "models.py",
+            },
+            "_deletion_cascade_allows": {
+                PROJECT_ROOT / "core" / "context.py",
+                PROJECT_ROOT / "inventory" / "models.py",
+            },
+            "authorized_assignment_hard_purge": {
+                PROJECT_ROOT / "inventory" / "models_assignment_write.py",
+                PROJECT_ROOT / "inventory" / "services.py",
+            },
+            "assignment_hard_purge_is_permitted": {
+                PROJECT_ROOT / "inventory" / "models_assignment_write.py",
+                PROJECT_ROOT / "inventory" / "models.py",
+            },
+            "purge_inventory_assignment": {
+                PROJECT_ROOT / "inventory" / "services.py",
+                PROJECT_ROOT / "inventory" / "apps.py",
+            },
+        }
+        overallocate_root = PROJECT_ROOT / "core" / "management" / "commands" / "_seed" / "assets.py"
+        bypasses = []
+        for path in PROJECT_ROOT.rglob("*.py"):
+            relative_parts = path.relative_to(PROJECT_ROOT).parts
+            if "tests" in relative_parts or "migrations" in relative_parts:
+                continue
+            source = path.read_text(encoding="utf-8")
+            for symbol in _forbidden_capability_symbols(source, path, allowed_symbols):
+                bypasses.append(f"{path.relative_to(PROJECT_ROOT)}:{symbol}")
+            tree = ast.parse(source, filename=str(path))
+            for node in ast.walk(tree):
+                if _forwards_system_overallocation(node) and path != overallocate_root:
+                    bypasses.append(f"{path.relative_to(PROJECT_ROOT)}:{node.lineno}:overallocate")
+        self.assertEqual(bypasses, [], f"internal assignment capabilities escaped their exact seams: {bypasses}")
+
+    def test_capability_gate_rejects_qualified_permits_and_kwargs_forwarding(self):
+        rogue_path = PROJECT_ROOT / "rogue.py"
+        allowed = {
+            "authorized_assignment_write": {
+                PROJECT_ROOT / "inventory" / "models_assignment_write.py",
+                PROJECT_ROOT / "inventory" / "services.py",
+            }
+        }
+        qualified = (
+            "import inventory.models_assignment_write as maw\n"
+            "with maw.authorized_assignment_write(row):\n"
+            "    row.save()"
+        )
+        self.assertEqual(_forbidden_capability_symbols(qualified, rogue_path, allowed), ["authorized_assignment_write"])
+
+        forwarding = (
+            'kwargs = {"system_allow_overallocate": True}\ncreate_component_allocation(**kwargs)',
+            "system_allow_overallocate = True\n"
+            "create_component_allocation(**{'system_allow_overallocate': system_allow_overallocate})",
+        )
+        for source in forwarding:
+            with self.subTest(source=source):
+                self.assertTrue(any(_forwards_system_overallocation(node) for node in ast.walk(ast.parse(source))))
+
+    def test_assignment_write_gate_rejects_alias_qualified_and_method_mutations(self):
+        mutations = {
+            "create": "AccessoryAssignment.objects.create(qty=1)",
+            "get-or-create": "AccessoryAssignment.objects.get_or_create(qty=1)",
+            "update-or-create": "ConsumableAssignment.objects.update_or_create(qty=1)",
+            "bulk-create": "ComponentAllocation.objects.bulk_create([])",
+            "update": "AccessoryAssignment.objects.filter(qty=1).update(qty=2)",
+            "bulk-update": "ConsumableAssignment.objects.bulk_update([], ['qty'])",
+            "delete": "ComponentAllocation.objects.filter(qty=1).delete()",
+            "alias": ("from inventory.models import AccessoryAssignment as Alloc\nAlloc.objects.get_or_create(qty=1)"),
+            "qualified": ("import inventory.models\ninventory.models.ComponentAllocation.objects.create(qty=1)"),
+            "aliased-module": ("import inventory.models as m\nm.ConsumableAssignment._base_manager.create(qty=1)"),
+            "all-objects": "AccessoryAssignment.all_objects.get_or_create(qty=1)",
+            "default-manager": "AccessoryAssignment._default_manager.create(qty=1)",
+            "chained-queryset": "AccessoryAssignment.objects.filter(qty=1).get_or_create(qty=1)",
+            "read-mutate-save": (
+                "assignment = AccessoryAssignment.objects.get(pk=1)\nassignment.target_tenant_id = 2\nassignment.save()"
+            ),
+            "read-instance-delete": "assignment = ComponentAllocation.objects.get(pk=1)\nassignment.delete()",
+            "get-object-queryset": (
+                "assignment = get_object_or_404(AccessoryAssignment.objects.all(), pk=1)\nassignment.save()"
+            ),
+            "queryset-alias": (
+                "rows = ComponentAllocation.objects.filter(qty=1)\nassignment = rows.get(pk=1)\nassignment.delete()"
+            ),
+            "instance-alias": (
+                "assignment = ConsumableAssignment.objects.get(pk=1)\nother = assignment\nother.restore()"
+            ),
+            "loop-target": "for assignment in AccessoryAssignment.objects.all():\n    assignment.save()",
+            "queryset-alias-update": ("qs = AccessoryAssignment.objects.filter(pk=1)\nqs.update(qty=2)"),
+            "queryset-alias-delete": ("qs = ComponentAllocation.objects.filter(pk=1)\nqs.delete()"),
+            "queryset-alias-raw-delete": (
+                "qs = ConsumableAssignment.objects.filter(pk=1)\nqs._raw_delete(using='default')"
+            ),
+            "manager-alias-create": "manager = AccessoryAssignment.objects\nmanager.create(qty=1)",
+            "model-alias-create": "Alias = AccessoryAssignment\nAlias.objects.create(qty=1)",
+        }
+        for mutation, source in mutations.items():
+            with self.subTest(mutation=mutation):
+                self.assertTrue(_assignment_write_violations(source), mutation)
+
+    def test_assignment_write_gate_ignores_reads_and_unrelated_models(self):
+        allowed = {
+            "read": "AccessoryAssignment.objects.filter(qty=1).first()",
+            "unrelated-model": "AccessoryStock.objects.get_or_create(qty=1)",
+            "unrelated-qualified": "import inventory.models\ninventory.models.AccessoryStock.objects.create(qty=1)",
+            "similar-name": "AccessoryAssignmentReport.objects.create(qty=1)",
+        }
+        for name, source in allowed.items():
+            with self.subTest(allowed=name):
+                self.assertEqual(_assignment_write_violations(source), [], name)
+
+
+class KitCheckoutBoundaryTests(SimpleTestCase):
+    """Keep the inventory-model registration seam acyclic.
+
+    ``assets.services`` imports only ``inventory.services`` for stock-family
+    fulfillment; concrete inventory models stay behind that service boundary.
+    ``Kit.checkout_to_holder`` goes through the leaf ``inventory.kit_checkout``,
+    whose implementation ``AssetsConfig.ready()`` registers once the app
+    registry is populated.
     """
 
     def test_kit_checkout_module_is_a_leaf(self):
@@ -588,9 +1190,9 @@ class KitCheckoutBoundaryTests(SimpleTestCase):
                 )
 
     def test_assets_services_imports_inventory_at_module_scope(self):
-        self.assertTrue(
-            _imports("assets.services", "inventory.models", top_level_only=True),
-            "assets.services -> inventory.models is the load-bearing direction",
+        self.assertFalse(
+            _imports("assets.services", "inventory.models"),
+            "kit stock families must stay behind inventory.services",
         )
 
     def test_inventory_models_does_not_import_assets(self):
@@ -608,4 +1210,23 @@ class KitCheckoutBoundaryTests(SimpleTestCase):
             checkout_kit,
             "AssetsConfig.ready() must register assets.services.checkout_kit as the kit checkout "
             "implementation, otherwise Kit.checkout_to_holder has no backing callable",
+        )
+
+
+class SnipeITImporterBoundaryTests(SimpleTestCase):
+    """Freeze the inverted importer-to-inventory dependency."""
+
+    IMPORTER = "core.importers.snipeit"
+    COMMAND = "core.management.commands.import_snipeit"
+
+    def test_importer_does_not_import_inventory_services(self):
+        self.assertFalse(
+            _imports(self.IMPORTER, "inventory.services"),
+            f"{self.IMPORTER} must receive inventory service callables through injection",
+        )
+
+    def test_command_owns_the_inventory_services_edge(self):
+        self.assertTrue(
+            _imports(self.COMMAND, "inventory.services", top_level_only=True),
+            f"{self.COMMAND} must remain the inventory-service composition root",
         )

@@ -3,6 +3,7 @@ from datetime import timedelta
 from django.core.management.base import BaseCommand
 from django.utils import timezone
 
+from core.purge_handlers import purge_object
 from core.tasks.context import TaskContext
 from itambox.registry import registry
 
@@ -60,7 +61,7 @@ class Command(BaseCommand):
 
                 purged = 0
                 for obj in queryset.iterator(chunk_size=500):
-                    obj.delete(force_hard_delete=True)
+                    purge_object(obj)
                     purged += 1
 
                 total_purged += purged

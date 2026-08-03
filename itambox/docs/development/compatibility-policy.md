@@ -359,12 +359,13 @@ out of scope in the inventory with the reason.
 ## Cross-tenant resource grants
 
 `TenantResourceGrant` lets one tenant share one stock pool with another, under a
-tight `APPROVED_RESOURCE_MODELS` allowlist. It is **security-critical** in the
-sense this policy uses the word — it decides whether one tenant may reach
-another's rows — and the rules around it are deliberately stricter than any
-contract class alone would imply. It is not itself a registered capability;
-`organization.role_grants` is the one entry carrying the registry's
-`security_critical` flag, and grants are governed here instead.
+tight `APPROVED_RESOURCE_MODELS` allowlist. `organization.resource_grants` is a
+Stable, always-on capability and one of the registry's two `security_critical`
+entries, alongside `organization.role_grants`. It decides whether one tenant
+may reach another's rows, so its rules are deliberately stricter than the
+Stable contract class alone would imply. The authoritative threat model and
+authorization contract are published in [Tenant Resource Grant Security
+Boundary](tenant-resource-grant-security.md).
 
 The grant model reaches no REST, GraphQL, or SCIM surface, so its access levels
 are deliberately absent from the inventory's enum tables. That is a scoping
@@ -378,6 +379,12 @@ decision about *what is frozen*, not a relaxation of the duties below.
   boundary, not to confirm it holds.
 - Widening `APPROVED_RESOURCE_MODELS` carries a threat-model duty: the change
   must state what a hostile grantee can now reach, and what stops it.
+- A bare actorless call (`user=None`) is denied. Legitimate actorless work must
+  supply an explicit tenant-, permission-, and request-bound system
+  authorization issued from an active `TaskContext`.
+- `resolve_stock_access()` is the decision primitive. Queryset projections may
+  preselect candidates, but every returned pool must pass that resolver; direct
+  grant-table authorization in a product surface is forbidden.
 
 ## How this policy is enforced
 

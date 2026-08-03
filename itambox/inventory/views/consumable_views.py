@@ -3,6 +3,7 @@ from django.shortcuts import redirect
 from django.urls import reverse, reverse_lazy
 from django.utils.translation import gettext_lazy as _
 
+from core.managers import get_current_tenant
 from inventory.services import (
     checkout_inventory_item,
     recipient_assignment_union,
@@ -19,6 +20,8 @@ from itambox.views.generic import (
     ObjectListView,
 )
 from itambox.views.generic.service_views import GenericTransactionView
+from organization.access import resolved_shared_stock_ids
+from organization.models import TenantResourceGrant
 
 from .. import filters, forms, tables
 from ..models import Consumable, ConsumableAssignment, ConsumableStock, Kit
@@ -119,7 +122,7 @@ class ConsumableCloneView(ObjectCloneView):
 
 
 class ConsumableCheckoutView(GenericTransactionView):
-    permission_required = ("inventory.change_consumable",)
+    permission_required = ("inventory.add_consumableassignment",)
     queryset = Consumable.objects.all()
     model_form = forms.ConsumableCheckoutForm
     service_callable = checkout_inventory_item
@@ -134,10 +137,31 @@ class ConsumableCheckoutView(GenericTransactionView):
         "from_location": "source_location",
     }
 
+    def get_queryset(self):
+        queryset = super().get_queryset()
+        active_tenant = get_current_tenant()
+        if active_tenant is None:
+            return queryset.none()
+        shared_stock_ids = resolved_shared_stock_ids(
+            ConsumableStock,
+            active_tenant,
+            self.request.user,
+            TenantResourceGrant.ACCESS_USE,
+            "inventory.add_consumableassignment",
+        )
+        return (queryset | Consumable._base_manager.filter(stocks__pk__in=shared_stock_ids)).distinct()
+
+    def has_permission(self):
+        active_tenant = get_current_tenant()
+        return active_tenant is not None and self.request.user.has_perms(
+            self.get_permission_required(), obj=active_tenant
+        )
+
     def get_form_kwargs(self):
         kwargs = super().get_form_kwargs()
         del kwargs["instance"]
         kwargs["consumable"] = self.get_object()
+        kwargs["user"] = self.request.user
         if "initial" not in kwargs:
             kwargs["initial"] = {}
         for key in self.request.GET:

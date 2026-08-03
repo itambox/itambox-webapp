@@ -41,7 +41,7 @@ ITAMbox gives internal IT teams and managed service providers one tenant-aware s
 | Reporting and automation | Dashboards, curated reports, and the alerts inbox; the report designer, scheduled reports, alert rules and channels, event rules, and webhooks are Beta |
 | Identity and integrations | LDAP, SAML, OIDC, TOTP for privileged local accounts, Intune discovery, REST/OpenAPI, and scoped GraphQL; SCIM is Beta and the plugin system is Experimental |
 
-Maturity is declared per capability, not per module. The authoritative list, with each entry's activation mode and declared limitations, is the [capability registry](itambox/docs/development/capability-registry.md); [module maturity](itambox/docs/development/module-maturity.md) is the short reader's guide. SCIM is Beta: tenant endpoints provision Users and expose Groups read-only, while provider-scoped endpoints provision both Users and provider-owned Groups.
+Maturity is declared per capability, not per module. The authoritative list, with each entry's activation mode and declared limitations, is the [capability registry](itambox/docs/development/capability-registry.md); [module maturity](itambox/docs/development/module-maturity.md) is the short reader's guide. Tenant Resource Grants are a Stable, security-critical capability with a dedicated [threat model](itambox/docs/development/tenant-resource-grant-security.md). SCIM is Beta: tenant endpoints provision Users and expose Groups read-only, while provider-scoped endpoints provision both Users and provider-owned Groups.
 
 ## Architecture
 

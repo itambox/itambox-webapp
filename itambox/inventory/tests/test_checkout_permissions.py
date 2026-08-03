@@ -34,6 +34,7 @@ from inventory.models import (
     Consumable,
     Kit,
 )
+from inventory.tests.factories import create_assignment_fixture
 from organization.models import AssetHolder
 
 
@@ -46,19 +47,25 @@ class InventoryCheckoutPermissionTests(TenantTestMixin, TestCase):
         self.consumable = baker.make(Consumable, tenant=self.tenant)
         self.component = baker.make(Component, tenant=self.tenant)
         self.kit = baker.make(Kit, tenant=self.tenant)
-        self.acc_assignment = baker.make(
-            AccessoryAssignment, accessory=self.accessory, assigned_holder=self.holder, qty=1
+        self.acc_assignment = create_assignment_fixture(
+            AccessoryAssignment,
+            accessory=self.accessory,
+            assigned_holder=self.holder,
+            qty=1,
         )
-        self.comp_allocation = baker.make(
-            ComponentAllocation, component=self.component, assigned_holder=self.holder, qty=1
+        self.comp_allocation = create_assignment_fixture(
+            ComponentAllocation,
+            component=self.component,
+            assigned_holder=self.holder,
+            qty=1,
         )
 
         # (url name, pk, required permission)
         self.endpoints = [
-            ("inventory:accessory_checkout", self.accessory.pk, "inventory.change_accessory"),
+            ("inventory:accessory_checkout", self.accessory.pk, "inventory.add_accessoryassignment"),
             ("inventory:accessory_checkin", self.acc_assignment.pk, "inventory.change_accessory"),
-            ("inventory:consumable_checkout", self.consumable.pk, "inventory.change_consumable"),
-            ("inventory:component_checkout", self.component.pk, "inventory.change_component"),
+            ("inventory:consumable_checkout", self.consumable.pk, "inventory.add_consumableassignment"),
+            ("inventory:component_checkout", self.component.pk, "inventory.add_componentallocation"),
             ("inventory:component_checkin", self.comp_allocation.pk, "inventory.change_component"),
             ("inventory:kit_checkout_modal", self.kit.pk, "inventory.change_kit"),
         ]
@@ -89,6 +96,9 @@ class InventoryCheckoutPermissionTests(TenantTestMixin, TestCase):
         # Granting the permission must let the request past the gate. Asserted with
         # a non-mutating GET so no inventory side effects leak into later tests.
         self.tenant_role.permissions = [
+            "inventory.add_accessoryassignment",
+            "inventory.add_consumableassignment",
+            "inventory.add_componentallocation",
             "inventory.change_accessory",
             "inventory.change_consumable",
             "inventory.change_component",

@@ -30,11 +30,14 @@ class BulkCheckoutInventoryTests(TestCase):
         self.client.login(username="testadmin", password="testpassword")
 
         self.tenant = Tenant.objects.create(name="Tenant Bulk Checkout", slug="tenant-bulk-checkout")
+        session = self.client.session
+        session["active_tenant_id"] = self.tenant.pk
+        session.save()
         self.manufacturer = Manufacturer.objects.create(name="HP", slug="hp")
         self.site = Site.objects.create(name="Warehouse", slug="warehouse", tenant=self.tenant)
         self.loc_a = Location.objects.create(name="Shelf A", slug="shelf-a", site=self.site, tenant=self.tenant)
         self.loc_b = Location.objects.create(name="Shelf B", slug="shelf-b", site=self.site, tenant=self.tenant)
-        self.holder = AssetHolder.objects.create(first_name="John", last_name="Doe", upn="john.doe")
+        self.holder = AssetHolder.objects.create(first_name="John", last_name="Doe", upn="john.doe", tenant=self.tenant)
 
         self.cat_con = Category.objects.create(name="Consumable Cat", slug="con-cat", applies_to={"consumable": True})
         self.cat_acc = Category.objects.create(name="Accessory Cat", slug="acc-cat", applies_to={"accessory": True})
@@ -42,21 +45,25 @@ class BulkCheckoutInventoryTests(TestCase):
 
         # Create items
         self.consumable1 = Consumable.objects.create(
-            name="Toner 1", manufacturer=self.manufacturer, category=self.cat_con
+            name="Toner 1", manufacturer=self.manufacturer, category=self.cat_con, tenant=self.tenant
         )
         self.consumable2 = Consumable.objects.create(
-            name="Toner 2", manufacturer=self.manufacturer, category=self.cat_con
+            name="Toner 2", manufacturer=self.manufacturer, category=self.cat_con, tenant=self.tenant
         )
 
         self.accessory1 = Accessory.objects.create(
-            name="Mouse 1", manufacturer=self.manufacturer, category=self.cat_acc
+            name="Mouse 1", manufacturer=self.manufacturer, category=self.cat_acc, tenant=self.tenant
         )
         self.accessory2 = Accessory.objects.create(
-            name="Mouse 2", manufacturer=self.manufacturer, category=self.cat_acc
+            name="Mouse 2", manufacturer=self.manufacturer, category=self.cat_acc, tenant=self.tenant
         )
 
-        self.component1 = Component.objects.create(name="RAM 1", manufacturer=self.manufacturer, category=self.cat_comp)
-        self.component2 = Component.objects.create(name="RAM 2", manufacturer=self.manufacturer, category=self.cat_comp)
+        self.component1 = Component.objects.create(
+            name="RAM 1", manufacturer=self.manufacturer, category=self.cat_comp, tenant=self.tenant
+        )
+        self.component2 = Component.objects.create(
+            name="RAM 2", manufacturer=self.manufacturer, category=self.cat_comp, tenant=self.tenant
+        )
 
         # Add stocks
         ConsumableStock.objects.create(consumable=self.consumable1, location=self.loc_a, qty=10)

@@ -156,12 +156,21 @@ class AccessoryCheckoutForm(BaseCheckoutForm):
     def clean(self):
         cleaned_data = super().clean()
         qty = cleaned_data.get("qty")
-        if self.accessory and qty:
-            remaining = self.accessory.available
-            if not self.accessory.allow_overallocate and qty > remaining:
+        source_location = cleaned_data.get("from_location")
+        if self.accessory and qty and source_location:
+            stock_qty = (
+                AccessoryStock._base_manager.filter(
+                    accessory=self.accessory,
+                    location=source_location,
+                )
+                .values_list("qty", flat=True)
+                .first()
+                or 0
+            )
+            if not self.accessory.allow_overallocate and qty > stock_qty:
                 raise ValidationError(
                     _("Cannot checkout %(qty)s units. Only %(remaining)s units are currently in stock.")
-                    % {"qty": qty, "remaining": remaining}
+                    % {"qty": qty, "remaining": stock_qty}
                 )
         return cleaned_data
 

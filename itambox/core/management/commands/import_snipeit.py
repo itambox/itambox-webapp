@@ -23,6 +23,8 @@ from django.contrib.auth import get_user_model
 from django.core.management.base import BaseCommand, CommandError
 from django.utils import timezone
 
+from inventory.services import checkout_inventory_item, create_component_allocation
+
 User = get_user_model()
 
 
@@ -189,6 +191,10 @@ class Command(BaseCommand):
                 skip=skip,
                 job=job,
                 stdout=self.stdout,
+                # This command is the composition root: it owns the edge to the
+                # inventory domain services so the importer itself does not.
+                checkout_inventory_item=checkout_inventory_item,
+                create_component_allocation=create_component_allocation,
             )
             try:
                 counts = importer.run()

@@ -62,6 +62,7 @@ and only its exception *type* is ever published.
 | `alerting.rules` | Alert Rules and Channels | Beta | enabled | object-enabled | area:operations |
 | `automation.webhooks` | Webhooks and Event Rules | Beta | opt-in | object-enabled | area:operations |
 | `organization.role_grants` | Role Grants | Stable | always-on | always | area:auth-rbac |
+| `organization.resource_grants` | Tenant Resource Grants | Stable | always-on | always | area:auth-rbac |
 | `platform.plugins` | Plugin System | Experimental | opt-in | operator-flag | area:plugins |
 | `procurement.core` | Purchase Orders and Contracts | Stable | always-on | always | area:procurement |
 | `procurement.requisition_seam` | Asset Request Procurement Seam | Beta | enabled | configured | area:procurement |
@@ -71,8 +72,11 @@ and only its exception *type* is ever published.
 | `subscriptions.tracking` | SaaS Subscriptions | Stable | always-on | always | area:subscriptions |
 | `users.scim_provisioning` | SCIM Provisioning | Beta | opt-in | object-enabled | area:auth-rbac |
 
-`organization.role_grants` is the one `security_critical` entry, which is why it
-has no activation probe.
+`organization.role_grants` and `organization.resource_grants` are the two
+`security_critical` entries, which is why neither has an activation probe. The
+resource-grant boundary's frozen threat model, resolver contract, permission
+map, and mandatory selector are documented in
+[Tenant Resource Grant Security Boundary](tenant-resource-grant-security.md).
 
 ### Ownership
 
@@ -84,6 +88,7 @@ stale reference is a report rather than a boot failure.
 - `alerting.rules` — `extras.AlertRule`, `extras.NotificationChannel`
 - `automation.webhooks` — `extras.EventRule`, `extras.WebhookEndpoint`
 - `organization.role_grants` — `organization.RoleGrant`
+- `organization.resource_grants` — `organization.TenantResourceGrant`
 - `platform.plugins` — `itambox.plugins`
 - `procurement.core` — `procurement.Contract`, `procurement.PurchaseOrder`, `procurement.PurchaseOrderLine`
 - `procurement.requisition_seam` — `procurement.FulfillmentLink`

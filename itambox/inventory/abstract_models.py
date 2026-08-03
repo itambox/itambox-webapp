@@ -13,6 +13,7 @@ from core.mixins import (
 from core.models import BaseModel, ChangeLoggingMixin, DeletableVaultModel
 
 from .mixins import CheckableInventoryModelMixin
+from .models_assignment_write import assignment_write_is_authorized
 
 
 class AbstractInventoryItem(
@@ -234,37 +235,85 @@ class AbstractAssignment(JournalingMixin, TaggableMixin, SoftDeleteMixin, Change
             "The grant that authorized a cross-tenant assignment. Stays as history after the grant is revoked."
         ),
     )
+    system_authorization_operation = models.TextField(null=True, blank=True, editable=False)
+    system_authorization_reason = models.TextField(null=True, blank=True, editable=False)
 
     class Meta:
         abstract = True
         ordering = ("-assigned_date",)
+        base_manager_name = "base_objects"
+        default_manager_name = "objects"
 
     def __str__(self):
         recipient = self.assigned_holder or self.assigned_location or self.assigned_asset or "Unknown"
         return f"{self.qty}x assigned to {recipient}"
 
     # ------------------------------------------------------------ provenance
+    # Provenance is read back out of the database, never off this instance's
+    # relation cache: a caller can attach an arbitrary (or mutated, or never
+    # saved) object to ``from_location`` / ``assigned_*`` / ``resource_grant``,
+    # and a cache-derived owner would then describe the caller's object instead
+    # of the row the foreign key actually points at.
+    #
+    # Every related model is resolved through its own declared relation rather
+    # than imported, so this domain model carries no import edge into
+    # ``organization`` (ADR-0001 layering, ``R-X2``).
+    def _related_model(self, field_name):
+        """The model a declared relation points at, without importing it."""
+        return self._meta.get_field(field_name).remote_field.model
+
+    def _persisted_tenant_id(self, field_name, **extra_filters):
+        """Tenant of the live row ``field_name`` references, or None."""
+        related_id = getattr(self, f"{field_name}_id", None)
+        if related_id is None:
+            return None
+        related_model = self._related_model(field_name)
+        filters = {"pk": related_id, **extra_filters}
+        if any(field.name == "deleted_at" for field in related_model._meta.fields):
+            filters["deleted_at__isnull"] = True
+        return related_model._base_manager.filter(**filters).values_list("tenant_id", flat=True).first()
+
     def _derive_source_tenant_id(self):
-        """Owner of the source pool: from-location's tenant when a concrete
-        pool is referenced, else the catalogue item's tenant (None for a
-        global item without a pool — no owner is derivable)."""
+        """Resolve the live persisted owner of the concrete source pool."""
         if self.from_location_id:
-            return self.from_location.tenant_id
-        item = getattr(self, self._item_attr, None)
-        return item.tenant_id if item is not None else None
+            return self._persisted_tenant_id("from_location", tenant__deleted_at__isnull=True)
+        return self._persisted_tenant_id(self._item_attr)
 
     def _derive_target_tenant_id(self):
-        for target in (self.assigned_holder, self.assigned_location, self.assigned_asset):
-            if target is not None:
-                return target.tenant_id
+        """Resolve the live persisted tenant of the assignment destination."""
+        for field_name in ("assigned_holder", "assigned_location", "assigned_asset"):
+            if getattr(self, f"{field_name}_id", None) is not None:
+                return self._persisted_tenant_id(field_name)
         return None
 
     def clean(self):
         from django.core.exceptions import ValidationError
 
         super().clean()
+        if not self._state.adding and self.pk is not None:
+            persisted_provenance = (
+                type(self)
+                ._base_manager.filter(pk=self.pk)
+                .values_list(
+                    "system_authorization_operation",
+                    "system_authorization_reason",
+                )
+                .first()
+            )
+            current_provenance = (
+                self.system_authorization_operation,
+                self.system_authorization_reason,
+            )
+            if persisted_provenance is not None and current_provenance != persisted_provenance:
+                raise ValidationError(_("System authorization provenance cannot be modified."))
         self.source_tenant_id = self._derive_source_tenant_id()
         self.target_tenant_id = self._derive_target_tenant_id()
+
+        if self._state.adding:
+            if not assignment_write_is_authorized(self):
+                raise ValidationError(
+                    _("Assignments must be created through the authorized inventory checkout service.")
+                )
 
         cross_tenant = (
             self.source_tenant_id is not None
@@ -280,7 +329,8 @@ class AbstractAssignment(JournalingMixin, TaggableMixin, SoftDeleteMixin, Change
         # the row is history: never re-validated against a later revocation.
         if self.pk is not None:
             return
-        grant = self.resource_grant
+        # Reload persisted evidence: caller-held grant relations may be stale or modified.
+        grant = self._related_model("resource_grant")._base_manager.filter(pk=self.resource_grant_id).first()
         if grant is None:
             raise ValidationError(
                 _(
@@ -317,11 +367,10 @@ class AbstractAssignment(JournalingMixin, TaggableMixin, SoftDeleteMixin, Change
             if grant.grantee_tenant_id != self.target_tenant_id:
                 problems.append("the grant is for a different tenant")
         else:
-            target_group_id = (
-                grant.grantee_tenant_group_id is not None
-                and self.target_tenant is not None
-                and self.target_tenant.group_id
+            live_target_tenants = self._related_model("target_tenant")._base_manager.filter(
+                pk=self.target_tenant_id, deleted_at__isnull=True
             )
+            target_group_id = live_target_tenants.values_list("group_id", flat=True).first()
             if not target_group_id or grant.grantee_tenant_group_id not in get_ancestor_tenant_group_ids(
                 target_group_id, live_only=True
             ):

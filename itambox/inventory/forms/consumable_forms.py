@@ -156,12 +156,21 @@ class ConsumableCheckoutForm(BaseCheckoutForm):
     def clean(self):
         cleaned_data = super().clean()
         qty = cleaned_data.get("qty")
-        if self.consumable and qty:
-            remaining = self.consumable.available
-            if not self.consumable.allow_overallocate and qty > remaining:
+        source_location = cleaned_data.get("from_location")
+        if self.consumable and qty and source_location:
+            stock_qty = (
+                ConsumableStock._base_manager.filter(
+                    consumable=self.consumable,
+                    location=source_location,
+                )
+                .values_list("qty", flat=True)
+                .first()
+                or 0
+            )
+            if not self.consumable.allow_overallocate and qty > stock_qty:
                 raise ValidationError(
                     _("Cannot checkout %(qty)s units. Only %(remaining)s units are currently in stock.")
-                    % {"qty": qty, "remaining": remaining}
+                    % {"qty": qty, "remaining": stock_qty}
                 )
         return cleaned_data
 

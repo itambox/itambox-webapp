@@ -1273,6 +1273,10 @@ class TenantResourceGrant(SoftDeleteMixin, ChangeLoggingMixin, BaseModel):
     # revoked rows through _base_manager.
     objects = SoftDeleteManager()
 
+    # Grant rows are authorization metadata, not a generic data-transfer
+    # surface. Direct CSV/YAML/template export must fail closed.
+    generic_export_allowed = False
+
     ACCESS_VIEW = "view"
     ACCESS_USE = "use"
     ACCESS_CHOICES = [

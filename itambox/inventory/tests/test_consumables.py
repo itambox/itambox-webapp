@@ -4,7 +4,9 @@ from django.test import TestCase
 from django.urls import reverse
 
 from assets.models import Asset, AssetRole, AssetType, Category, Manufacturer
+from core.tests.mixins import TenantTestMixin
 from inventory.models import Consumable, ConsumableAssignment, ConsumableStock
+from inventory.tests.factories import create_assignment_fixture
 from organization.models import AssetHolder, Location, Site, Tenant
 
 User = get_user_model()
@@ -67,7 +69,7 @@ class ConsumableModelTests(TestCase):
 
     def test_consumable_available_with_consumptions(self):
         con = self._make_consumable("Paper", self.cat_toner, 500)
-        ConsumableAssignment.objects.create(consumable=con, assigned_location=self.location, qty=200)
+        create_assignment_fixture(ConsumableAssignment, consumable=con, assigned_location=self.location, qty=200)
         self.assertEqual(con.available, 300)
         self.assertEqual(con.consumed_qty, 200)
 
@@ -95,13 +97,13 @@ class ConsumableAssignmentModelTests(TestCase):
 
     def test_consumption_to_holder(self):
         con = Consumable.objects.create(name="Toner", manufacturer=self.manufacturer)
-        assignment = ConsumableAssignment.objects.create(consumable=con, assigned_holder=self.holder, qty=5)
+        assignment = create_assignment_fixture(ConsumableAssignment, consumable=con, assigned_holder=self.holder, qty=5)
         self.assertEqual(assignment.qty, 5)
         self.assertIn("Alice Brown", str(assignment))
 
     def test_consumption_to_asset(self):
         con = Consumable.objects.create(name="Thermal Paste", manufacturer=self.manufacturer)
-        assignment = ConsumableAssignment.objects.create(consumable=con, assigned_asset=self.asset, qty=2)
+        assignment = create_assignment_fixture(ConsumableAssignment, consumable=con, assigned_asset=self.asset, qty=2)
         self.assertEqual(assignment.qty, 2)
         self.assertIn("OptiPlex Desktop", str(assignment))
 
@@ -112,28 +114,37 @@ class ConsumableAssignmentModelTests(TestCase):
         # Holder + Location
         with self.assertRaises(IntegrityError):
             with transaction.atomic():
-                ConsumableAssignment.objects.create(
-                    consumable=con, assigned_holder=self.holder, assigned_location=self.location, qty=1
+                create_assignment_fixture(
+                    ConsumableAssignment,
+                    consumable=con,
+                    assigned_holder=self.holder,
+                    assigned_location=self.location,
+                    qty=1,
                 )
 
         # Holder + Asset
         with self.assertRaises(IntegrityError):
             with transaction.atomic():
-                ConsumableAssignment.objects.create(
-                    consumable=con, assigned_holder=self.holder, assigned_asset=self.asset, qty=1
+                create_assignment_fixture(
+                    ConsumableAssignment, consumable=con, assigned_holder=self.holder, assigned_asset=self.asset, qty=1
                 )
 
         # Location + Asset
         with self.assertRaises(IntegrityError):
             with transaction.atomic():
-                ConsumableAssignment.objects.create(
-                    consumable=con, assigned_location=self.location, assigned_asset=self.asset, qty=1
+                create_assignment_fixture(
+                    ConsumableAssignment,
+                    consumable=con,
+                    assigned_location=self.location,
+                    assigned_asset=self.asset,
+                    qty=1,
                 )
 
         # All three
         with self.assertRaises(IntegrityError):
             with transaction.atomic():
-                ConsumableAssignment.objects.create(
+                create_assignment_fixture(
+                    ConsumableAssignment,
                     consumable=con,
                     assigned_holder=self.holder,
                     assigned_location=self.location,
@@ -240,8 +251,12 @@ class ConsumableViewTests(TestCase):
         self.assertFalse(Consumable.objects.filter(pk=self.consumable.pk).exists())
 
     def test_delete_view_blocked_with_consumptions(self):
-        ConsumableAssignment.objects.create(
-            consumable=self.consumable, assigned_location=self.location, from_location=self.location, qty=1
+        create_assignment_fixture(
+            ConsumableAssignment,
+            consumable=self.consumable,
+            assigned_location=self.location,
+            from_location=self.location,
+            qty=1,
         )
         url = reverse("inventory:consumable_delete", kwargs={"pk": self.consumable.pk})
         response = self.client.post(url)
@@ -249,7 +264,7 @@ class ConsumableViewTests(TestCase):
         self.assertTrue(Consumable.objects.filter(pk=self.consumable.pk).exists())
 
 
-class ConsumableCheckoutViewTests(TestCase):
+class ConsumableCheckoutViewTests(TenantTestMixin, TestCase):
     def setUp(self):
         self.user = User.objects.create_user(
             username="testadmin", password="testpassword", is_staff=True, is_superuser=True
@@ -264,14 +279,25 @@ class ConsumableCheckoutViewTests(TestCase):
             name="LaserJet Cartridge", manufacturer=self.manufacturer, category=self.cat_toner
         )
         self.stock = ConsumableStock.objects.create(consumable=self.consumable, location=self.location, qty=5)
-        self.holder = AssetHolder.objects.create(first_name="Bob", last_name="Jones", upn="bob.jones")
+        self.holder = AssetHolder.objects.create(
+            first_name="Bob", last_name="Jones", upn="bob.jones", tenant=self.tenant
+        )
 
         self.asset_role = AssetRole.objects.create(name="Printer", slug="printer")
         self.asset_type = AssetType.objects.create(
             manufacturer=self.manufacturer, model="LaserJet Pro", slug="laserjet-pro"
         )
         self.asset = Asset.objects.create(
-            name="HP Printer", asset_tag="HP-001", asset_type=self.asset_type, asset_role=self.asset_role
+            name="HP Printer",
+            asset_tag="HP-001",
+            asset_type=self.asset_type,
+            asset_role=self.asset_role,
+            tenant=self.tenant,
+        )
+        self.client_login_to_tenant(
+            self.user,
+            self.tenant,
+            role_permissions=["inventory.add_consumableassignment"],
         )
 
     def test_checkout_view_get(self):

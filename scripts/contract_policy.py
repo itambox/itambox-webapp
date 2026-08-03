@@ -48,6 +48,7 @@ CONTRACT_POLICY_VERSION = 1
 
 POLICY_DOC = "itambox/docs/development/compatibility-policy.md"
 INVENTORY_DOC = "itambox/docs/development/external-contract-inventory.md"
+RESOURCE_GRANT_THREAT_DOC = "itambox/docs/development/tenant-resource-grant-security.md"
 CHANGELOG_DOC = "CHANGELOG.md"
 
 #: The four classes every external surface is sold under. Closed vocabulary.
@@ -297,6 +298,7 @@ CAPABILITY_LIMITATIONS = {
         "Deliveries are fire-and-forget; there is no delivery log or replay.",
     ),
     "organization.role_grants": (),
+    "organization.resource_grants": (),
     "platform.plugins": (
         "Lifecycle hooks are still being defined; a plugin that loads today may need changes to keep loading.",
         "Plugin code runs in-process with full database access and is not sandboxed.",
@@ -407,6 +409,94 @@ REQUIRED_STATEMENTS = (
     _statement("P-RESOURCE-GRANT", POLICY_DOC, "no baseline escape"),
     _statement("P-RESOURCE-GRANT-REVIEW", POLICY_DOC, "adversarial review"),
     _statement("P-RESOURCE-GRANT-THREAT", POLICY_DOC, "threat-model duty"),
+    _statement(
+        "P-RESOURCE-GRANT-DENY",
+        RESOURCE_GRANT_THREAT_DOC,
+        "Failure of any condition denies access. A grant authorizes a tenant, never a user.",
+    ),
+    _statement(
+        "P-RESOURCE-GRANT-ACTORLESS",
+        RESOURCE_GRANT_THREAT_DOC,
+        "a bare `user=None` is denied",
+    ),
+    _statement(
+        "P-RESOURCE-GRANT-CANONICAL",
+        RESOURCE_GRANT_THREAT_DOC,
+        "`organization.access.resolve_stock_access()` is the decision primitive",
+    ),
+    _statement(
+        "P-RESOURCE-GRANT-CANONICAL-REEXPORT",
+        RESOURCE_GRANT_THREAT_DOC,
+        "`organization.services.resolve_stock_access` is its compatibility re-export",
+    ),
+    _statement(
+        "P-RESOURCE-GRANT-PRECEDENCE",
+        RESOURCE_GRANT_THREAT_DOC,
+        "Direct tenant grants take deterministic precedence over ancestor-group grants.",
+    ),
+    _statement(
+        "P-RESOURCE-GRANT-MATRIX",
+        RESOURCE_GRANT_THREAT_DOC,
+        "inventory/tests/test_tenant_resource_grant_security.py",
+    ),
+    _statement(
+        "P-RESOURCE-GRANT-DIRECT-WRITES",
+        RESOURCE_GRANT_THREAT_DOC,
+        "inventory/tests/test_direct_assignment_writes.py",
+    ),
+    _statement(
+        "P-RESOURCE-GRANT-SYSTEM-PROVENANCE-SUITE",
+        RESOURCE_GRANT_THREAT_DOC,
+        "inventory/tests/test_assignment_system_authorization_provenance.py",
+    ),
+    _statement(
+        "P-RESOURCE-GRANT-ALLOWLIST-CLOSED",
+        RESOURCE_GRANT_THREAT_DOC,
+        "The approved resource allowlist is closed:",
+    ),
+    _statement("P-RESOURCE-GRANT-ACCESSORY-STOCK", RESOURCE_GRANT_THREAT_DOC, "`inventory.AccessoryStock`"),
+    _statement("P-RESOURCE-GRANT-COMPONENT-STOCK", RESOURCE_GRANT_THREAT_DOC, "`inventory.ComponentStock`"),
+    _statement("P-RESOURCE-GRANT-CONSUMABLE-STOCK", RESOURCE_GRANT_THREAT_DOC, "`inventory.ConsumableStock`"),
+    _statement(
+        "P-RESOURCE-GRANT-PERSISTED-DERIVATION",
+        RESOURCE_GRANT_THREAT_DOC,
+        "caller-held relation caches never define `source_tenant`, `target_tenant`, or the covering grant.",
+    ),
+    _statement(
+        "P-RESOURCE-GRANT-INDEPENDENT-RBAC",
+        RESOURCE_GRANT_THREAT_DOC,
+        "must independently pass RBAC in the active tenant.",
+    ),
+    _statement(
+        "P-RESOURCE-GRANT-TOPOLOGY-FAIL-CLOSED",
+        RESOURCE_GRANT_THREAT_DOC,
+        "live-only ancestry walk; no coverage through the broken chain",
+    ),
+    _statement(
+        "P-RESOURCE-GRANT-UNSCOPED-MANAGER",
+        RESOURCE_GRANT_THREAT_DOC,
+        "`TenantResourceGrant.objects` is deliberately unscoped",
+    ),
+    _statement(
+        "P-RESOURCE-GRANT-SYSTEM-PROVENANCE",
+        RESOURCE_GRANT_THREAT_DOC,
+        "Actorless assignments persist the exact authorized system operation and reason.",
+    ),
+    _statement(
+        "P-RESOURCE-GRANT-IMMUTABLE-PROVENANCE",
+        RESOURCE_GRANT_THREAT_DOC,
+        "Those values are immutable historical evidence",
+    ),
+    _statement(
+        "P-RESOURCE-GRANT-CONTAINER-VISIBILITY",
+        RESOURCE_GRANT_THREAT_DOC,
+        "`visible_to_containers()` or fail closed",
+    ),
+    _statement(
+        "P-RESOURCE-GRANT-LIFECYCLE-ATTRIBUTION",
+        RESOURCE_GRANT_THREAT_DOC,
+        "Future grant expiry or revocation workflows must preserve durable attribution",
+    ),
     _statement("P-SCOPE-EXCLUSIONS", POLICY_DOC, "What this policy deliberately does not cover"),
     _statement("P-URL-BOUNDARY", POLICY_DOC, "individual UI route names are not frozen"),
     _statement("P-INVENTORY-BOUNDED", INVENTORY_DOC, "bounded inventory"),
@@ -1356,7 +1446,7 @@ def forbidden_wording_sources(root):
     """
     root = Path(root)
     sources = {}
-    for relative in (POLICY_DOC, INVENTORY_DOC, CHANGELOG_DOC):
+    for relative in (POLICY_DOC, INVENTORY_DOC, RESOURCE_GRANT_THREAT_DOC, CHANGELOG_DOC):
         path = root / relative
         if path.is_file():
             sources[relative] = path.read_text(encoding="utf-8")
@@ -1381,7 +1471,7 @@ def check_forbidden_wording(root):
 def _documents(root):
     texts = {}
     missing = []
-    for relative in (POLICY_DOC, INVENTORY_DOC):
+    for relative in (POLICY_DOC, INVENTORY_DOC, RESOURCE_GRANT_THREAT_DOC):
         path = Path(root) / relative
         if path.is_file():
             texts[relative] = path.read_text(encoding="utf-8")

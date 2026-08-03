@@ -65,7 +65,13 @@ class RequisitionSystemTestCase(TestCase):
         self.role_standard = Role.objects.create(
             tenant=self.tenant,
             name="Standard Employee",
-            permissions=["assets.add_assetrequest", "assets.view_assetrequest"],
+            permissions=[
+                "assets.add_assetrequest",
+                "assets.view_assetrequest",
+                "inventory.add_accessoryassignment",
+                "inventory.add_componentallocation",
+                "inventory.add_consumableassignment",
+            ],
         )
         self.role_delegated = Role.objects.create(
             tenant=self.tenant,
@@ -842,6 +848,9 @@ class RequisitionSystemTestCase(TestCase):
             tenant=self.tenant,
         )
         self.client.login(username="requesteruser", password="password123")
+        session = self.client.session
+        session["active_tenant_id"] = self.tenant.pk
+        session.save()
         response = self.client.post(reverse("assets:request_claim", kwargs={"pk": req_comp.pk}))
         self.assertEqual(response.status_code, 302)
 

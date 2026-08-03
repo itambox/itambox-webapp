@@ -14,6 +14,8 @@ target). Every other model under test here has no such ``clean()`` guard, so
 the anomaly is created directly.
 """
 
+import importlib.util
+from pathlib import Path
 from types import SimpleNamespace
 
 from django.test import TestCase
@@ -38,10 +40,17 @@ from core.integrity import (
     run_all_checks,
 )
 from inventory.models import Accessory, AccessoryAssignment, AccessoryStock
+from inventory.tests.factories import create_assignment_fixture
 from licenses.models import License, LicenseSeatAssignment, LicenseTypeChoices
 from organization.models import AssetHolder, Contact, Location, Site, Tenant, TenantGroup
 from procurement.models import PurchaseOrder, PurchaseOrderLine
 from software.models import Software
+
+_corruption_path = Path(__file__).resolve().parents[3] / "scripts" / "tests" / "assignment_corruption.py"
+_corruption_spec = importlib.util.spec_from_file_location("wp21_assignment_corruption", _corruption_path)
+_corruption_module = importlib.util.module_from_spec(_corruption_spec)
+_corruption_spec.loader.exec_module(_corruption_module)
+force_assignment_fixture_update = _corruption_module.force_assignment_fixture_update
 
 
 def _build_msp_topology():
@@ -298,13 +307,14 @@ class CheckCrossTenantAssignmentsTests(TestCase):
             upn="own.holder@provider.example.com",
             tenant=self.t.provider,
         )
-        assignment = AccessoryAssignment.objects.create(
+        assignment = create_assignment_fixture(
+            AccessoryAssignment,
             accessory=accessory,
             from_location=from_location,
             assigned_holder=own_holder,
             qty=1,
         )
-        AccessoryAssignment._base_manager.filter(pk=assignment.pk).update(assigned_holder=holder)
+        force_assignment_fixture_update(assignment, assigned_holder=holder)
         stock = AccessoryStock.objects.get(accessory=accessory, location=from_location)
 
         findings, proposals = check_cross_tenant_assignments()
@@ -352,13 +362,14 @@ class CheckCrossTenantAssignmentsTests(TestCase):
             upn="own.unrelated@unrelated.example.com",
             tenant=self.t.unrelated,
         )
-        assignment = AccessoryAssignment.objects.create(
+        assignment = create_assignment_fixture(
+            AccessoryAssignment,
             accessory=accessory,
             from_location=from_location,
             assigned_holder=own_holder,
             qty=1,
         )
-        AccessoryAssignment._base_manager.filter(pk=assignment.pk).update(assigned_holder=holder)
+        force_assignment_fixture_update(assignment, assigned_holder=holder)
 
         findings, proposals = check_cross_tenant_assignments()
         matches = [f for f in findings if f.model == "inventory.AccessoryAssignment" and f.pk == assignment.pk]
@@ -379,7 +390,8 @@ class CheckCrossTenantAssignmentsTests(TestCase):
             upn="any.holder@managed.example.com",
             tenant=self.t.managed,
         )
-        assignment = AccessoryAssignment.objects.create(
+        assignment = create_assignment_fixture(
+            AccessoryAssignment,
             accessory=accessory,
             from_location=None,
             assigned_holder=holder,
@@ -423,20 +435,22 @@ class CheckCrossTenantAssignmentsTests(TestCase):
             upn="own.provider.dedup@provider.example.com",
             tenant=self.t.provider,
         )
-        a1 = AccessoryAssignment.objects.create(
+        a1 = create_assignment_fixture(
+            AccessoryAssignment,
             accessory=accessory,
             from_location=from_location,
             assigned_holder=own_holder,
             qty=1,
         )
-        AccessoryAssignment._base_manager.filter(pk=a1.pk).update(assigned_holder=holder1)
-        a2 = AccessoryAssignment.objects.create(
+        force_assignment_fixture_update(a1, assigned_holder=holder1)
+        a2 = create_assignment_fixture(
+            AccessoryAssignment,
             accessory=accessory,
             from_location=from_location,
             assigned_holder=own_holder,
             qty=1,
         )
-        AccessoryAssignment._base_manager.filter(pk=a2.pk).update(assigned_holder=holder2)
+        force_assignment_fixture_update(a2, assigned_holder=holder2)
 
         _findings, proposals, _stats = run_all_checks()
         matching = [

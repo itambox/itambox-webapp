@@ -2,13 +2,18 @@
 checkout_inventory_item(). Previously a POST with from_location omitted (or qty > available)
 bypassed every check because adjust_inventory_stock only checks/deducts when from_location is set."""
 
+from datetime import datetime, timezone
+from unittest.mock import patch
+
 from django.contrib.auth import get_user_model
 from django.test import TestCase
 from django.urls import reverse
+from rest_framework.exceptions import ValidationError
 
 from assets.models import Category, Manufacturer
 from core.tests.mixins import grant
-from inventory.models import Accessory, AccessoryStock
+from inventory.models import Accessory, AccessoryAssignment, AccessoryStock
+from inventory.services import checkout_inventory_item
 from organization.models import (
     AssetHolder,
     Location,
@@ -78,6 +83,90 @@ class InventoryAssignmentOverAllocationTests(TestCase):
             content_type="application/json",
         )
         self.assertEqual(resp.status_code, 201, resp.content)
+
+    def test_omitted_qty_defaults_to_one(self):
+        self._activate()
+        response = self.client.post(
+            reverse("api:inventory_api:accessoryassignment-list"),
+            {
+                "accessory_id": self.accessory.pk,
+                "assigned_holder_id": self.holder.pk,
+            },
+            content_type="application/json",
+        )
+
+        self.assertEqual(response.status_code, 201, response.content)
+        self.assertEqual(response.json()["qty"], 1)
+        self.assertEqual(AccessoryAssignment._base_manager.get().qty, 1)
+
+    def test_assigned_date_is_preserved_through_service_adapter(self):
+        self._activate()
+        response = self.client.post(
+            reverse("api:inventory_api:accessoryassignment-list"),
+            {
+                "accessory_id": self.accessory.pk,
+                "assigned_holder_id": self.holder.pk,
+                "assigned_date": "2024-01-02T03:04:05Z",
+            },
+            content_type="application/json",
+        )
+
+        self.assertEqual(response.status_code, 201, response.content)
+        assignment = AccessoryAssignment._base_manager.get()
+        self.assertEqual(assignment.assigned_date, datetime(2024, 1, 2, 3, 4, 5, tzinfo=timezone.utc))
+
+    def test_bulk_post_defaults_qty_and_returns_list(self):
+        self._activate()
+        response = self.client.post(
+            reverse("api:inventory_api:accessoryassignment-list"),
+            [
+                {
+                    "accessory_id": self.accessory.pk,
+                    "assigned_holder_id": self.holder.pk,
+                },
+                {
+                    "accessory_id": self.accessory.pk,
+                    "assigned_holder_id": self.holder.pk,
+                    "qty": 1,
+                },
+            ],
+            content_type="application/json",
+        )
+
+        self.assertEqual(response.status_code, 201, response.content)
+        self.assertEqual([row["qty"] for row in response.json()], [1, 1])
+        self.assertEqual(AccessoryAssignment._base_manager.count(), 2)
+
+    def test_bulk_post_rolls_back_when_second_service_call_fails(self):
+        self._activate()
+        calls = 0
+
+        def fail_second(*args, **kwargs):
+            nonlocal calls
+            calls += 1
+            if calls == 2:
+                raise ValidationError("injected second-row failure")
+            return checkout_inventory_item(*args, **kwargs)
+
+        with patch("inventory.api.views.checkout_inventory_item", side_effect=fail_second):
+            response = self.client.post(
+                reverse("api:inventory_api:accessoryassignment-list"),
+                [
+                    {
+                        "accessory_id": self.accessory.pk,
+                        "assigned_holder_id": self.holder.pk,
+                    },
+                    {
+                        "accessory_id": self.accessory.pk,
+                        "assigned_holder_id": self.holder.pk,
+                    },
+                ],
+                content_type="application/json",
+            )
+
+        self.assertEqual(response.status_code, 400, response.content)
+        self.assertEqual(AccessoryAssignment._base_manager.count(), 0)
+        self.assertEqual(AccessoryStock._base_manager.get().qty, 2)
 
     def test_cannot_over_allocate_on_patch_without_from_location(self):
         # D5-1: the over-allocation guard was create-only. A PATCH raising `qty`
