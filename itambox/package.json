@@ -35,7 +35,7 @@
     "@fontsource-variable/inter": "^5.2.8",
     "@mdi/font": "^7.4.47",
     "@tabler/core": "^1.1.0",
-    "apexcharts": "^5.13.0",
+    "apexcharts": "^6.6.1",
     "bootstrap": "^5.3.3",
     "gridstack": "^13.1.0",
     "html5-qrcode": "^2.3.8",
