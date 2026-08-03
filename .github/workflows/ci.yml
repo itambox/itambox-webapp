@@ -23,6 +23,12 @@ on:
       - "setup.cfg"
       - "uv.lock"
       - "itambox/**/*.py"
+      - "itambox/**/*.html"
+      - "itambox/static/src/**/*.css"
+      - "itambox/static/src/**/*.scss"
+      - "itambox/.stylelintrc.json"
+      - "itambox/package.json"
+      - "itambox/package-lock.json"
       - "itambox/schema.yaml"
       - "itambox/docs/development/**"
       - "itambox/docs/plugins/api_reference.md"
@@ -331,6 +337,54 @@ jobs:
       - name: Check the exception policy gate
         run: |
           uv run --locked --no-sync python scripts/check_exception_policy.py
+
+  template-lint:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.12"
+
+      - name: Set up uv
+        uses: astral-sh/setup-uv@c771a70e6277c0a99b617c7a806ffedaca235ff9 # v9.0.0
+        with:
+          version: "0.11.31"
+          enable-cache: true
+          cache-dependency-glob: uv.lock
+
+      - name: Install template-lint dependencies
+        run: |
+          uv lock --check
+          uv sync --locked --only-group dev
+
+      - name: Lint authored Django templates
+        run: |
+          uv run --locked --no-sync python scripts/lint_templates.py --check --lint --statistics
+
+  stylelint:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Set up Node.js 20
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
+        with:
+          node-version: "20"
+          cache: npm
+          cache-dependency-path: itambox/package-lock.json
+
+      - name: Install frontend dependencies
+        working-directory: ./itambox
+        run: npm ci
+
+      - name: Lint authored CSS and SCSS
+        working-directory: ./itambox
+        run: npm run lint:styles
 
   docs:
     runs-on: ubuntu-latest

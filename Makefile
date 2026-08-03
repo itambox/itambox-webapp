@@ -10,7 +10,7 @@
 UV := uv
 UV_DEV := $(UV) run --locked --group dev
 
-.PHONY: help setup run migrate seed test coverage coverage-diff coverage-baseline openapi-check openapi-write exception-check exception-baseline architecture-check architecture-baseline lint format format-check e2e clean
+.PHONY: help setup run migrate seed test coverage coverage-diff coverage-baseline openapi-check openapi-write exception-check exception-baseline architecture-check architecture-baseline lint lint-templates lint-styles format format-check format-templates format-styles e2e clean
 
 FORMAT_TARGETS := itambox scripts
 
@@ -44,8 +44,12 @@ help:
 	@echo "  make architecture-check - Verify the architecture boundary graph and baseline"
 	@echo "  make architecture-baseline - Record reviewed architecture-boundary cleanup"
 	@echo "  make lint          - Run pre-commit style and syntax checks on all files"
+	@echo "  make lint-templates - Check all authored Django templates with djLint"
+	@echo "  make lint-styles   - Check all authored CSS/SCSS with Stylelint"
 	@echo "  make format        - Sort imports then format Python source with Ruff"
 	@echo "  make format-check  - Check import order and formatting without writing (CI-safe)"
+	@echo "  make format-templates - Reformat authored Django templates (intentional write)"
+	@echo "  make format-styles - Auto-fix authored CSS/SCSS (intentional write)"
 	@echo "  make e2e           - Run Playwright end-to-end browser test suite"
 	@echo "  make clean         - Remove cache, temporary database, and virtual environment"
 
@@ -112,12 +116,29 @@ architecture-baseline:
 lint:
 	$(UV_DEV) pre-commit run --all-files
 
+# Full authored-template inventory; the central djLint configuration in
+# pyproject.toml owns profile, scope exclusions, and the 13 explicit partial
+# template exceptions. This target is check-only.
+lint-templates:
+	$(UV_DEV) python scripts/lint_templates.py --check --lint --statistics
+
+# Stylelint's config and source scope live under itambox/. This target is
+# check-only; use format-styles for the intentional local cleanup pass.
+lint-styles:
+	cd itambox && npm run lint:styles
+
 # Idempotent: import sort runs before formatting, and re-running produces no
 # further diff. Ruff owns formatting/import order only -- see [tool.ruff] in
 # pyproject.toml; Flake8 (make lint) remains the separate semantic gate.
 format:
 	$(UV_DEV) ruff check --select I --fix $(FORMAT_TARGETS)
 	$(UV_DEV) ruff format $(FORMAT_TARGETS)
+
+format-templates:
+	$(UV_DEV) python scripts/lint_templates.py --reformat --statistics
+
+format-styles:
+	cd itambox && npm run lint:styles:fix
 
 format-check:
 	$(UV_DEV) ruff check --select I $(FORMAT_TARGETS)

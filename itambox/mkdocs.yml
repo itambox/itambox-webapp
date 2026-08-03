@@ -185,6 +185,7 @@ nav:
       - Security Scanning: 'development/security-scanning.md'
       - Capability Registry: 'development/capability-registry.md'
       - Tenant Resource Grant Security: 'development/tenant-resource-grant-security.md'
+      - Template and Style Linting: 'development/template-and-style-linting.md'
       - Module Maturity: 'development/module-maturity.md'
       - Compatibility Policy: 'development/compatibility-policy.md'
       - External Contract Inventory: 'development/external-contract-inventory.md'
