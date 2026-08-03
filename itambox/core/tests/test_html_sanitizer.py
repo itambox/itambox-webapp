@@ -1,6 +1,17 @@
-from django.test import SimpleTestCase
+from collections import OrderedDict
+from types import SimpleNamespace
 
-from core.html_sanitizer import sanitize_label_html, sanitize_label_html_for_pdf
+import html5lib
+from django.test import SimpleTestCase
+from tinycss2 import parse_component_value_list
+
+from core.html_sanitizer import (
+    _safe_css_token,
+    _sanitize_children,
+    _sanitize_element,
+    sanitize_label_html,
+    sanitize_label_html_for_pdf,
+)
 
 
 class LabelHTMLSanitizerTests(SimpleTestCase):
@@ -80,3 +91,34 @@ class LabelHTMLSanitizerTests(SimpleTestCase):
         self.assertNotIn("<style", rendered.lower())
         self.assertNotIn("style=", rendered.lower())
         self.assertIn("Browser", rendered)
+
+    def test_rejects_invalid_attributes_and_exercises_css_token_boundaries(self):
+        rendered = sanitize_label_html_for_pdf(
+            '<div id="bad id"><img width="bad" height="1001" colspan="0" rowspan="1000" '
+            'align="diagonal" valign="diagonal"><span style="line-height: 2001; background: red !;">safe</span></div>'
+        )
+
+        self.assertNotIn("bad id", rendered)
+        self.assertNotIn('width="bad"', rendered)
+        self.assertIn('height="1001"', rendered)
+        self.assertNotIn("diagonal", rendered)
+        self.assertNotIn("line-height:2001", rendered.replace(" ", ""))
+        self.assertIn("safe", rendered)
+
+        self.assertTrue(_safe_css_token(parse_component_value_list("42")[0]))
+        self.assertFalse(_safe_css_token(parse_component_value_list("2001")[0]))
+        self.assertTrue(_safe_css_token(parse_component_value_list(",")[0]))
+        self.assertFalse(_safe_css_token(parse_component_value_list("!")[0]))
+        self.assertFalse(_safe_css_token(parse_component_value_list("url(x)")[0]))
+
+    def test_preserves_tail_text_when_dropping_elements(self):
+        fragment = html5lib.parseFragment(
+            "<script>bad</script>tail",
+            treebuilder="etree",
+            namespaceHTMLElements=False,
+        )
+
+        _sanitize_children(fragment, OrderedDict(), None)
+
+        self.assertEqual(fragment.text, "tail")
+        self.assertFalse(_sanitize_element(SimpleNamespace(tag=object()), OrderedDict(), None))

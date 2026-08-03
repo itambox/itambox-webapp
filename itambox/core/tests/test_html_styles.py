@@ -1,7 +1,7 @@
 from django.test import SimpleTestCase
 
 from core.context import reset_current_csp_nonce, set_current_csp_nonce
-from core.html_styles import percentage_class, status_color_class, status_tint_class
+from core.html_styles import color_chip_class, length_class, percentage_class, status_color_class, status_tint_class
 
 
 class DynamicHTMLStyleTests(SimpleTestCase):
@@ -34,3 +34,25 @@ class DynamicHTMLStyleTests(SimpleTestCase):
         self.assertIn('nonce="nonce-test"', percentage_style)
         self.assertTrue(percentage_name.startswith("budget-width-"))
         self.assertIn("width:100%;", percentage_style)
+
+    def test_style_helpers_cover_invalid_numbers_lengths_colors_and_nonce_fallbacks(self):
+        token = set_current_csp_nonce("nonce-test")
+        try:
+            invalid_percentage = percentage_class("not-a-number")
+            non_finite_percentage = percentage_class("NaN")
+            decimal_percentage = percentage_class("12.50")
+            invalid_length = length_class("not-a-length")
+            oversized_length = length_class("201px")
+            short_color = color_chip_class("#abc")
+        finally:
+            reset_current_csp_nonce(token)
+
+        self.assertIn("width:0%;", invalid_percentage[1])
+        self.assertIn("width:0%;", non_finite_percentage[1])
+        self.assertIn("width:12.5%;", decimal_percentage[1])
+        self.assertIn("height:36px;", invalid_length[1])
+        self.assertIn("height:36px;", oversized_length[1])
+        self.assertIn("#aabbcc", short_color[1])
+
+        _class_name, nonce_less_style = status_color_class("#123456")
+        self.assertEqual(nonce_less_style, "")

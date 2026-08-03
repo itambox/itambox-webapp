@@ -66,3 +66,28 @@ class LabelRendererHTMLTests(SimpleTestCase):
         self.assertIn("size: 2.25in 1.25in", document)
         self.assertIn('class="label-card page-break-avoid"', document)
         self.assertNotIn("color: red", document)
+
+    def test_custom_label_size_limits_fall_back_to_the_default_card(self):
+        oversized_source = SimpleNamespace(
+            name="Oversized source",
+            template_code="x" * (64 * 1024 + 1),
+            barcode_format="qr",
+        )
+        oversized_output = render_label_html(self.asset, oversized_source, self.barcode_uri)
+        self.assertIn('class="label-card-table"', oversized_output)
+
+        oversized_rendered = SimpleNamespace(
+            name="Oversized output",
+            template_code="{{ 'x' * 262145 }}",
+            barcode_format="qr",
+        )
+        rendered_output = render_label_html(self.asset, oversized_rendered, self.barcode_uri)
+        self.assertIn('class="label-card-table"', rendered_output)
+
+    def test_grid_document_pads_cards_and_marks_page_boundaries(self):
+        label_template = SimpleNamespace()
+        document = _build_labels_document(["<div>Label</div>"] * 25, label_template, "a4_grid")
+
+        self.assertIn('class="grid-table page-break-always"', document)
+        self.assertIn('class="grid-table page-break-avoid"', document)
+        self.assertIn("&nbsp;", document)
