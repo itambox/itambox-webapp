@@ -2,86 +2,92 @@
 {% load i18n %}
 {% load utility_tags %}
 {% load helpers %}
-
-{% if table.embed_bulk_bar %}{% bulk_action_context table as bulk %}<div class="js-selection-scope">{% if bulk.selectable and bulk.can_change and bulk.bulk_edit_url or bulk.selectable and bulk.can_delete and bulk.bulk_delete_url %}
-    <div class="batch-actions-bar d-none">
+{% if table.embed_bulk_bar %}
+  {% bulk_action_context table as bulk %}
+  <div class="js-selection-scope">
+    {% if bulk.selectable and bulk.can_change and bulk.bulk_edit_url or bulk.selectable and bulk.can_delete and bulk.bulk_delete_url %}
+      <div class="batch-actions-bar d-none">
         <div class="d-flex align-items-center gap-2 px-3 py-2 bg-body-tertiary border-bottom">
-            <span class="fw-bold me-2">{% translate "0 selected" %}</span>
-            {% if bulk.can_change and bulk.bulk_edit_url %}
-            <form class="bulk-edit-form d-inline" method="post" action="{{ bulk.bulk_edit_url }}" hx-boost="false">
-                {% csrf_token %}
-                <input type="hidden" name="model_name" value="{{ bulk.model_name_str }}">
-                <input type="hidden" name="return_url" value="{{ bulk.return_url }}">
-                <div class="bulk-pks-container d-inline"></div>
-                <button type="button" class="btn btn-sm btn-outline-primary btn-bulk-edit">
-                    <i class="mdi mdi-pencil-outline me-1"></i>{% translate "Edit Selected" %}
-                </button>
+          <span class="fw-bold me-2">{% translate "0 selected" %}</span>
+          {% if bulk.can_change and bulk.bulk_edit_url %}
+            <form class="bulk-edit-form d-inline"
+                  method="post"
+                  action="{{ bulk.bulk_edit_url }}"
+                  hx-boost="false">
+              {% csrf_token %}
+              <input type="hidden" name="model_name" value="{{ bulk.model_name_str }}">
+              <input type="hidden" name="return_url" value="{{ bulk.return_url }}">
+              <div class="bulk-pks-container d-inline"></div>
+              <button type="button" class="btn btn-sm btn-outline-primary btn-bulk-edit">
+                <i class="mdi mdi-pencil-outline me-1"></i>{% translate "Edit Selected" %}
+              </button>
             </form>
-            {% endif %}
-            {% if bulk.can_delete and bulk.bulk_delete_url %}
-            <form class="bulk-delete-form d-inline" method="post" action="{{ bulk.bulk_delete_url }}" hx-boost="false">
-                {% csrf_token %}
-                <input type="hidden" name="model_name" value="{{ bulk.model_name_str }}">
-                <input type="hidden" name="return_url" value="{{ bulk.return_url }}">
-                <div class="bulk-pks-container d-inline"></div>
-                <button type="button" class="btn btn-sm btn-outline-danger btn-bulk-delete">
-                    <i class="mdi mdi-trash-can-outline me-1"></i>{% translate "Delete Selected" %}
-                </button>
+          {% endif %}
+          {% if bulk.can_delete and bulk.bulk_delete_url %}
+            <form class="bulk-delete-form d-inline"
+                  method="post"
+                  action="{{ bulk.bulk_delete_url }}"
+                  hx-boost="false">
+              {% csrf_token %}
+              <input type="hidden" name="model_name" value="{{ bulk.model_name_str }}">
+              <input type="hidden" name="return_url" value="{{ bulk.return_url }}">
+              <div class="bulk-pks-container d-inline"></div>
+              <button type="button" class="btn btn-sm btn-outline-danger btn-bulk-delete">
+                <i class="mdi mdi-trash-can-outline me-1"></i>{% translate "Delete Selected" %}
+              </button>
             </form>
-            {% endif %}
+          {% endif %}
         </div>
-    </div>
-{% endif %}{% endif %}
+      </div>
+    {% endif %}
+{% endif %}
 <div class="htmx-container">
-    <table{% if table.attrs %} {{ table.attrs.as_html }}{% endif %}>
-        {% if table.show_header %}
-        <thead>
-            <tr>
-                {% for column in table.columns %}
-                    {% if column.orderable %}
-                        <th {{ column.attrs.th.as_html }}>
-                            <a href="#"
-                               hx-get="{{ request.path }}{% querystring_replace table.prefixed_order_by_field=column.order_by_alias.next %}"
-                               hx-target="#object-list-dynamic-content"
-                               hx-swap="innerHTML"
-                               hx-push-url="true">
-                                {% translate column.header %}
-                            </a>
-                            {% if column.is_ordered %}
-                                <span class="text-muted">
-                                    {% if column.order_by_alias.is_descending %}&darr;{% else %}&uarr;{% endif %}
-                                </span>
-                            {% endif %}
-                        </th>
-                    {% else %}
-                        <th {{ column.attrs.th.as_html }}>{% translate column.header %}</th>
-                    {% endif %}
-                {% endfor %}
-            </tr>
-        </thead>
-        {% endif %}
-        <tbody hx-target="#page-content-wrapper">
-            {% for row in table.page.object_list|default:table.rows %}
-                <tr {{ row.attrs.as_html }}>
-                    {% for column, cell in row.items %}
-                        <td {{ column.attrs.td.as_html }} data-label="{{ column.header|striptags }}">{{ cell }}</td>
-                    {% endfor %}
-                </tr>
-            {% empty %}
-                {% if table.empty_text %}
-                <tr>
-                    <td colspan="{{ table.columns|length }}" class="text-center text-muted">&mdash; {{ table.empty_text }} &mdash;</td>
-                </tr>
+  <table{% if table.attrs %} {{ table.attrs.as_html }}{% endif %}>
+    {% if table.show_header %}
+      <thead>
+        <tr>
+          {% for column in table.columns %}
+            {% if column.orderable %}
+              <th {{ column.attrs.th.as_html }}>
+                <a href="#"
+                   hx-get="{{ request.path }}{% querystring_replace table.prefixed_order_by_field=column.order_by_alias.next %}"
+                   hx-target="#object-list-dynamic-content"
+                   hx-swap="innerHTML"
+                   hx-push-url="true">{% translate column.header %}</a>
+                {% if column.is_ordered %}
+                  <span class="text-muted">{% if column.order_by_alias.is_descending %}↓{% else %}↑{% endif %}</span>
                 {% endif %}
-            {% endfor %}
-        </tbody>
-        {% if table.has_footer %}
-        <tfoot {{ table.attrs.tfoot.as_html }}>
-            <tr>
-                {% for column in table.columns %}<td {{ column.attrs.tf.as_html }}>{{ column.footer }}</td>{% endfor %}
-            </tr>
-        </tfoot>
+              </th>
+            {% else %}
+              <th {{ column.attrs.th.as_html }}>{% translate column.header %}</th>
+            {% endif %}
+          {% endfor %}
+        </tr>
+      </thead>
+    {% endif %}
+    <tbody hx-target="#page-content-wrapper">
+      {% for row in table.page.object_list|default:table.rows %}
+        <tr {{ row.attrs.as_html }}>
+          {% for column, cell in row.items %}
+            <td {{ column.attrs.td.as_html }}
+                data-label="{{ column.header|striptags }}">{{ cell }}</td>
+          {% endfor %}
+        </tr>
+      {% empty %}
+        {% if table.empty_text %}
+          <tr>
+            <td colspan="{{ table.columns|length }}" class="text-center text-muted">— {{ table.empty_text }} —</td>
+          </tr>
         {% endif %}
-    </table>
+      {% endfor %}
+    </tbody>
+    {% if table.has_footer %}
+      <tfoot {{ table.attrs.tfoot.as_html }}>
+        <tr>
+          {% for column in table.columns %}<td {{ column.attrs.tf.as_html }}>{{ column.footer }}</td>{% endfor %}
+        </tr>
+      </tfoot>
+    {% endif %}
+  </table>
 </div>
 {% if table.embed_bulk_bar %}</div>{% endif %}

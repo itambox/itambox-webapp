@@ -2,40 +2,43 @@
 {# templates/licenses/includes/license_checkout_modal.html #}
 {% load crispy_forms_tags %}
 {% load partials %}
-
 {# Define the form partial (used for both initial render and error re-render) #}
 {% startpartial checkout-modal-form %}
-    {% if form.non_field_errors %}
-        <div class="alert alert-danger mb-3">
-            {% for error in form.non_field_errors %}
-                <div>{{ error }}</div>
-            {% endfor %}
-        </div>
-    {% endif %}
-    {% crispy form %}
+{% if form.non_field_errors %}
+  <div class="alert alert-danger mb-3">
+    {% for error in form.non_field_errors %}
+      <div>{{ error }}</div>
+    {% endfor %}
+  </div>
+{% endif %}
+{% crispy form %}
 {% endpartial %}
-
 {# Self-contained modal — no _modal_base.html to avoid nested <form> bug #}
-<div class="modal modal-blur fade" id="license-checkout-modal" tabindex="-1" role="dialog" aria-hidden="true">
-    <div class="modal-dialog modal-dialog-centered" role="document">
-        <div class="modal-content">
-            <form id="license-checkout-form"
-                  hx-post="{% url 'licenses:license_checkout' pk=license.pk %}"
-                  hx-target="#license-checkout-modal-body"
-                  hx-swap="innerHTML">
-                {% csrf_token %}
-                <div class="modal-header">
-                    <h5 class="modal-title" id="licenseCheckOutModalLabel">{% translate "Check Out License:" %} {{ license.name }}</h5>
-                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="{% translate 'Close' %}"></button>
-                </div>
-                <div class="modal-body" id="license-checkout-modal-body">
-                    {% partial checkout-modal-form %}
-                </div>
-                <div class="modal-footer justify-content-start">
-                    <button type="submit" class="btn btn-primary">{% translate "Assign License" %}</button>
-                    <button type="button" class="btn btn-secondary ms-2" data-bs-dismiss="modal">{% translate "Cancel" %}</button>
-                </div>
-            </form>
+<div class="modal modal-blur fade"
+     id="license-checkout-modal"
+     tabindex="-1"
+     role="dialog"
+     aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered" role="document">
+    <div class="modal-content">
+      <form id="license-checkout-form"
+            hx-post="{% url 'licenses:license_checkout' pk=license.pk %}"
+            hx-target="#license-checkout-modal-body"
+            hx-swap="innerHTML">
+        {% csrf_token %}
+        <div class="modal-header">
+          <h5 class="modal-title" id="licenseCheckOutModalLabel">{% translate "Check Out License:" %} {{ license.name }}</h5>
+          <button type="button"
+                  class="btn-close"
+                  data-bs-dismiss="modal"
+                  aria-label="{% translate 'Close' %}"></button>
         </div>
+        <div class="modal-body" id="license-checkout-modal-body">{% partial checkout-modal-form %}</div>
+        <div class="modal-footer justify-content-start">
+          <button type="submit" class="btn btn-primary">{% translate "Assign License" %}</button>
+          <button type="button" class="btn btn-secondary ms-2" data-bs-dismiss="modal">{% translate "Cancel" %}</button>
+        </div>
+      </form>
     </div>
+  </div>
 </div>

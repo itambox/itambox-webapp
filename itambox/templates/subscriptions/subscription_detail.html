@@ -2,99 +2,99 @@
 {% load i18n %}
 {% load static %}
 {% load render_table from django_tables2 %}
-
 {% block title %}{{ object.name }} {% translate "— Subscription — ITAMbox" %}{% endblock %}
-
-{% block page_pretitle %}{% translate "Subscription Details" %}{% endblock %}
-
+{% block page_pretitle %}
+  {% translate "Subscription Details" %}
+{% endblock %}
 {# Object details rendered via panel layout #}
-
 {% block extra_cards_right %}
-{# Financial fields (renewal/annual cost, billing cycle, licensed/assigned qty) live #}
-{# in the info panel (subscription_info.html) — no duplicate Financial Details card here. #}
-{% if object.provider.portal_url %}
-<a href="{{ object.provider.portal_url }}" class="btn btn-outline-primary d-inline-flex align-items-center w-100 justify-content-center mb-3" target="_blank" rel="noopener">
-    <i class="mdi mdi-open-in-new me-1"></i>
-    {% translate "Open Provider Portal" %}
-</a>
-{% endif %}
+  {# Financial fields (renewal/annual cost, billing cycle, licensed/assigned qty) live #}
+  {# in the info panel (subscription_info.html) — no duplicate Financial Details card here. #}
+  {% if object.provider.portal_url %}
+    <a href="{{ object.provider.portal_url }}"
+       class="btn btn-outline-primary d-inline-flex align-items-center w-100 justify-content-center mb-3"
+       target="_blank"
+       rel="noopener">
+      <i class="mdi mdi-open-in-new me-1"></i>
+      {% translate "Open Provider Portal" %}
+    </a>
+  {% endif %}
 {% endblock extra_cards_right %}
-
 {% block extra_page_actions %}
-    {# Renew button #}
-    {% if object.status != 'cancelled' %}
-        <button type="button" class="btn btn-outline-primary"
-                hx-get="{% url 'subscriptions:subscription_renew' pk=object.pk %}"
-                hx-target="#modal-placeholder"
-                hx-swap="innerHTML">
-            <i class="mdi mdi-refresh me-1"></i>
-            {% translate "Renew..." %}
-        </button>
-    {% endif %}
-
-    {# Suspend button #}
-    {% if object.status == 'active' %}
-        <button type="button" class="btn btn-outline-warning"
-                hx-post="{% url 'subscriptions:subscription_suspend' pk=object.pk %}"
-                hx-headers='{"X-CSRFToken": "{{ csrf_token }}"}'
-                hx-confirm="{% translate 'Are you sure you want to suspend this subscription?' %}">
-            <i class="mdi mdi-view-column-outline me-1"></i>
-            {% translate "Suspend" %}
-        </button>
-    {% elif object.status == 'suspended' %}
-        <button type="button" class="btn btn-outline-success"
-                hx-post="{% url 'subscriptions:subscription_resume' pk=object.pk %}"
-                hx-headers='{"X-CSRFToken": "{{ csrf_token }}"}'
-                hx-confirm="{% translate 'Resume this subscription?' %}">
-            <i class="mdi mdi-play me-1"></i>
-            {% translate "Resume" %}
-        </button>
-    {% endif %}
-
-    {# Cancel button #}
-    {% if object.status != 'cancelled' %}
-        <button type="button" class="btn btn-outline-danger"
-                hx-get="{% url 'subscriptions:subscription_cancel' pk=object.pk %}"
-                hx-target="#modal-placeholder"
-                hx-swap="innerHTML">
-            <i class="mdi mdi-close me-1"></i>
-            {% translate "Cancel..." %}
-        </button>
-    {% endif %}
+  {# Renew button #}
+  {% if object.status != 'cancelled' %}
+    <button type="button"
+            class="btn btn-outline-primary"
+            hx-get="{% url 'subscriptions:subscription_renew' pk=object.pk %}"
+            hx-target="#modal-placeholder"
+            hx-swap="innerHTML">
+      <i class="mdi mdi-refresh me-1"></i>
+      {% translate "Renew..." %}
+    </button>
+  {% endif %}
+  {# Suspend button #}
+  {% if object.status == 'active' %}
+    <button type="button"
+            class="btn btn-outline-warning"
+            hx-post="{% url 'subscriptions:subscription_suspend' pk=object.pk %}"
+            hx-headers='{"X-CSRFToken": "{{ csrf_token }}"}'
+            hx-confirm="{% translate 'Are you sure you want to suspend this subscription?' %}">
+      <i class="mdi mdi-view-column-outline me-1"></i>
+      {% translate "Suspend" %}
+    </button>
+  {% elif object.status == 'suspended' %}
+    <button type="button"
+            class="btn btn-outline-success"
+            hx-post="{% url 'subscriptions:subscription_resume' pk=object.pk %}"
+            hx-headers='{"X-CSRFToken": "{{ csrf_token }}"}'
+            hx-confirm="{% translate 'Resume this subscription?' %}">
+      <i class="mdi mdi-play me-1"></i>
+      {% translate "Resume" %}
+    </button>
+  {% endif %}
+  {# Cancel button #}
+  {% if object.status != 'cancelled' %}
+    <button type="button"
+            class="btn btn-outline-danger"
+            hx-get="{% url 'subscriptions:subscription_cancel' pk=object.pk %}"
+            hx-target="#modal-placeholder"
+            hx-swap="innerHTML">
+      <i class="mdi mdi-close me-1"></i>
+      {% translate "Cancel..." %}
+    </button>
+  {% endif %}
 {% endblock extra_page_actions %}
-
 {% block full_width_content %}
-{% if assignments_table %}
-<div class="card mt-3 border-0 shadow-sm">
-    <div class="card-header border-0 bg-transparent d-flex justify-content-between align-items-center">
+  {% if assignments_table %}
+    <div class="card mt-3 border-0 shadow-sm">
+      <div class="card-header border-0 bg-transparent d-flex justify-content-between align-items-center">
         <h3 class="card-title text-secondary d-flex align-items-center">
-            <i class="mdi mdi-account-check-outline me-2 text-indigo"></i>
-            {% translate "Assignments" %}
+          <i class="mdi mdi-account-check-outline me-2 text-indigo"></i>
+          {% translate "Assignments" %}
         </h3>
         <div class="d-flex align-items-center gap-2">
-            <button type="button" class="btn btn-sm btn-primary"
-                    hx-get="{% url 'subscriptions:subscription_checkout' pk=object.pk %}"
-                    hx-target="#modal-placeholder"
-                    hx-swap="innerHTML">
-                <i class="mdi mdi-plus me-1"></i>
-                {% translate "Assign Subscription..." %}
-            </button>
-            <span class="badge bg-indigo-lt">{{ assignment_count }}</span>
+          <button type="button"
+                  class="btn btn-sm btn-primary"
+                  hx-get="{% url 'subscriptions:subscription_checkout' pk=object.pk %}"
+                  hx-target="#modal-placeholder"
+                  hx-swap="innerHTML">
+            <i class="mdi mdi-plus me-1"></i>
+            {% translate "Assign Subscription..." %}
+          </button>
+          <span class="badge bg-indigo-lt">{{ assignment_count }}</span>
         </div>
+      </div>
+      {% if assignments_table.rows %}
+        <div class="table-responsive">{% render_table assignments_table %}</div>
+        {% include 'generic/includes/table_pagination.html' with table=assignments_table %}
+      {% else %}
+        <div class="card-body py-5 text-muted text-center">
+          <i class="mdi mdi-link-variant-off text-muted mb-2"></i>
+          <p class="mb-0">{% translate "No assets, holders, or locations are currently assigned to this subscription." %}</p>
+        </div>
+      {% endif %}
     </div>
-    {% if assignments_table.rows %}
-    <div class="table-responsive">
-        {% render_table assignments_table %}
-    </div>
-    {% include 'generic/includes/table_pagination.html' with table=assignments_table %}
-    {% else %}
-    <div class="card-body py-5 text-muted text-center">
-        <i class="mdi mdi-link-variant-off text-muted mb-2"></i>
-        <p class="mb-0">{% translate "No assets, holders, or locations are currently assigned to this subscription." %}</p>
-    </div>
-    {% endif %}
-</div>
-{% endif %}
+  {% endif %}
 {% endblock full_width_content %}
 {% block javascript %}
 {% endblock javascript %}

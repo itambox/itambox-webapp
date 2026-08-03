@@ -1,86 +1,83 @@
 {% extends "base_public.html" %}
 {% load i18n %}
 {% load crispy_forms_tags %}
-
-{% block title %}{% translate "Log In" %} {% translate "- ITAMbox" %}{% endblock %}
-
+{% block title %}
+  {% translate "Log In" %} {% translate "- ITAMbox" %}
+{% endblock %}
 {% block content %}
-<div class="container py-4">
-  <div class="row justify-content-center">
-    <div class="col-12 col-sm-10 col-md-8 col-lg-6 col-xl-5 col-xxl-4">
-    <div class="text-center mb-4">
-        <a href="." class="navbar-brand">
-             {% with brand_height="48px" %}{% include "global_includes/_brand_lockup.html" %}{% endwith %}
-        </a>
-    </div>
-    <div class="card card-md mx-3">
-        <div class="card-body">
+  <div class="container py-4">
+    <div class="row justify-content-center">
+      <div class="col-12 col-sm-10 col-md-8 col-lg-6 col-xl-5 col-xxl-4">
+        <div class="text-center mb-4">
+          <a href="." class="navbar-brand">
+            {% with brand_height="48px" %}
+              {% include "global_includes/_brand_lockup.html" %}
+            {% endwith %}
+          </a>
+        </div>
+        <div class="card card-md mx-3">
+          <div class="card-body">
             <h2 class="h2 text-center mb-4">{% translate "Log In to Your Account" %}</h2>
-
             {% comment %}
                 One panel for the form-level authentication failure. Field-level
                 problems (a missing username) are rendered by crispy on the field
                 itself, so nothing is ever reported twice.
             {% endcomment %}
             {% if form.non_field_errors %}
-                <div id="login-form-errors" class="alert alert-danger" role="alert" aria-live="assertive">
-                    <div class="d-flex">
-                        <div>
-                            <i class="mdi mdi-alert-circle-outline alert-icon" aria-hidden="true"></i>
-                        </div>
-                        <div>
-                            {% for error in form.non_field_errors %}{{ error }}{% endfor %}
-                        </div>
-                    </div>
+              <div id="login-form-errors"
+                   class="alert alert-danger"
+                   role="alert"
+                   aria-live="assertive">
+                <div class="d-flex">
+                  <div>
+                    <i class="mdi mdi-alert-circle-outline alert-icon" aria-hidden="true"></i>
+                  </div>
+                  <div>{% for error in form.non_field_errors %}{{ error }}{% endfor %}</div>
                 </div>
+              </div>
             {% endif %}
-
             {% if user.is_authenticated %}
-                <div class="alert alert-info" role="alert">
-                    <div class="d-flex">
-                        <div>
-                            <i class="mdi mdi-information-outline alert-icon" aria-hidden="true"></i>
-                        </div>
-                        <div>
-                            {% translate "You are already logged in." %}
-                        </div>
-                     </div>
+              <div class="alert alert-info" role="alert">
+                <div class="d-flex">
+                  <div>
+                    <i class="mdi mdi-information-outline alert-icon" aria-hidden="true"></i>
+                  </div>
+                  <div>{% translate "You are already logged in." %}</div>
                 </div>
+              </div>
             {% else %}
-                <form method="post" action="{% url 'login' %}"{% if form.non_field_errors %} aria-describedby="login-form-errors"{% endif %}>
-                    {% csrf_token %}
-
-                    {{ form.username|as_crispy_field }}
-                    {{ form.password|as_crispy_field }}
-
-                    <div class="form-footer">
-                        <button type="submit" class="btn btn-primary w-100">{% translate "Sign in" %}</button>
-                    </div>
-
-                    {# Hidden "next" field for redirects after login #}
-                    <input type="hidden" name="next" value="{{ next }}">
-                </form>
-
-                {% if sso_providers %}
-                    <div class="hr-text">{% translate "or" %}</div>
-                    <nav class="d-grid gap-2" aria-label="{% translate 'Single sign-on providers' %}">
-                        {% for provider in sso_providers %}
-                            <a href="{{ provider.url }}" class="btn btn-outline-primary w-100" rel="nofollow">
-                                <i class="mdi mdi-shield-key-outline me-1" aria-hidden="true"></i>
-                                {% blocktranslate with provider_name=provider.name %}Sign in with {{ provider_name }}{% endblocktranslate %}
-                            </a>
-                        {% endfor %}
-                    </nav>
-                {% endif %}
+              <form method="post"
+                    action="{% url 'login' %}"
+                    {% if form.non_field_errors %} aria-describedby="login-form-errors"{% endif %}>
+                {% csrf_token %}
+                {{ form.username|as_crispy_field }}
+                {{ form.password|as_crispy_field }}
+                <div class="form-footer">
+                  <button type="submit" class="btn btn-primary w-100">{% translate "Sign in" %}</button>
+                </div>
+                {# Hidden "next" field for redirects after login #}
+                <input type="hidden" name="next" value="{{ next }}">
+              </form>
+              {% if sso_providers %}
+                <div class="hr-text">{% translate "or" %}</div>
+                <nav class="d-grid gap-2"
+                     aria-label="{% translate 'Single sign-on providers' %}">
+                  {% for provider in sso_providers %}
+                    <a href="{{ provider.url }}"
+                       class="btn btn-outline-primary w-100"
+                       rel="nofollow">
+                      <i class="mdi mdi-shield-key-outline me-1" aria-hidden="true"></i>
+                      {% blocktranslate with provider_name=provider.name %}Sign in with {{ provider_name }}{% endblocktranslate %}
+                    </a>
+                  {% endfor %}
+                </nav>
+              {% endif %}
             {% endif %}
-
+          </div>
         </div>
-    </div>
-    <div class="text-center text-muted mt-3 small">
-      {% translate "Accounts are provisioned by your administrator." %}
-    </div>
-    <div class="text-center text-muted mt-2 small">ITAMbox v{{ settings.VERSION }}</div>
+        <div class="text-center text-muted mt-3 small">{% translate "Accounts are provisioned by your administrator." %}</div>
+        <div class="text-center text-muted mt-2 small">ITAMbox v{{ settings.VERSION }}</div>
+      </div>
     </div>
   </div>
-</div>
 {% endblock %}

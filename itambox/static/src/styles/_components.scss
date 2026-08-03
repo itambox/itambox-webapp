@@ -15,12 +15,12 @@ pre.change-data {
     }
 
     >span.added {
-        background-color: rgba(var(--tblr-success-rgb), 0.1);
+        background-color: rgb(var(--tblr-success-rgb), 0.1);
         color: var(--tblr-success);
     }
 
     >span.removed {
-        background-color: rgba(214, 57, 57, 0.1);
+        background-color: rgb(214 57 57 / 10%);
         color: #d63939;
     }
 }
@@ -33,15 +33,15 @@ pre.change-diff {
     line-height: 1.4;
 
     &.change-added {
-        background-color: rgba(var(--tblr-success-rgb), 0.08);
+        background-color: rgb(var(--tblr-success-rgb), 0.08);
         color: var(--tblr-success);
-        border: 1px solid rgba(var(--tblr-success-rgb), 0.15);
+        border: 1px solid rgb(var(--tblr-success-rgb), 0.15);
     }
 
     &.change-removed {
-        background-color: rgba(214, 57, 57, 0.08);
+        background-color: rgb(214 57 57 / 8%);
         color: #d63939;
-        border: 1px solid rgba(214, 57, 57, 0.15);
+        border: 1px solid rgb(214 57 57 / 15%);
     }
 }
 
@@ -94,21 +94,22 @@ $soft-btn-colors: ('primary', 'secondary', 'success', 'danger', 'warning', 'info
 @each $c in $soft-btn-colors {
     .btn-soft-#{$c} {
         --tblr-btn-color: var(--tblr-#{$c});
+
         color: var(--tblr-#{$c});
-        background-color: rgba(var(--tblr-#{$c}-rgb), 0.08);
+        background-color: rgb(var(--tblr-#{$c}-rgb), 0.08);
         border-color: transparent;
 
         &:hover,
         &:focus-visible {
             color: var(--tblr-#{$c});
-            background-color: rgba(var(--tblr-#{$c}-rgb), 0.16);
-            border-color: rgba(var(--tblr-#{$c}-rgb), 0.25);
+            background-color: rgb(var(--tblr-#{$c}-rgb), 0.16);
+            border-color: rgb(var(--tblr-#{$c}-rgb), 0.25);
         }
 
         &:active {
             color: var(--tblr-#{$c});
-            background-color: rgba(var(--tblr-#{$c}-rgb), 0.22);
-            border-color: rgba(var(--tblr-#{$c}-rgb), 0.25);
+            background-color: rgb(var(--tblr-#{$c}-rgb), 0.22);
+            border-color: rgb(var(--tblr-#{$c}-rgb), 0.25);
         }
     }
 }
@@ -116,11 +117,11 @@ $soft-btn-colors: ('primary', 'secondary', 'success', 'danger', 'warning', 'info
 [data-bs-theme="dark"] {
     @each $c in $soft-btn-colors {
         .btn-soft-#{$c} {
-            background-color: rgba(var(--tblr-#{$c}-rgb), 0.12);
+            background-color: rgb(var(--tblr-#{$c}-rgb), 0.12);
 
             &:hover,
             &:focus-visible {
-                background-color: rgba(var(--tblr-#{$c}-rgb), 0.2);
+                background-color: rgb(var(--tblr-#{$c}-rgb), 0.2);
             }
         }
     }
@@ -131,29 +132,29 @@ $soft-btn-colors: ('primary', 'secondary', 'success', 'danger', 'warning', 'info
 // to differentiate two related actions (check-out filled / check-in outline).
 .btn-soft-outline-success {
     color: var(--tblr-success);
-    background-color: rgba(var(--tblr-success-rgb), 0.04);
-    border-color: rgba(var(--tblr-success-rgb), 0.45);
+    background-color: rgb(var(--tblr-success-rgb), 0.04);
+    border-color: rgb(var(--tblr-success-rgb), 0.45);
 
     &:hover,
     &:focus-visible {
         color: var(--tblr-success);
-        background-color: rgba(var(--tblr-success-rgb), 0.14);
-        border-color: rgba(var(--tblr-success-rgb), 0.6);
+        background-color: rgb(var(--tblr-success-rgb), 0.14);
+        border-color: rgb(var(--tblr-success-rgb), 0.6);
     }
 
     &:active {
         color: var(--tblr-success);
-        background-color: rgba(var(--tblr-success-rgb), 0.2);
-        border-color: rgba(var(--tblr-success-rgb), 0.6);
+        background-color: rgb(var(--tblr-success-rgb), 0.2);
+        border-color: rgb(var(--tblr-success-rgb), 0.6);
     }
 }
 
 [data-bs-theme="dark"] .btn-soft-outline-success {
-    background-color: rgba(var(--tblr-success-rgb), 0.06);
+    background-color: rgb(var(--tblr-success-rgb), 0.06);
 
     &:hover,
     &:focus-visible {
-        background-color: rgba(var(--tblr-success-rgb), 0.16);
+        background-color: rgb(var(--tblr-success-rgb), 0.16);
     }
 }
 
@@ -167,14 +168,14 @@ $soft-btn-colors: ('primary', 'secondary', 'success', 'danger', 'warning', 'info
     &:hover,
     &:focus-visible {
         color: var(--tblr-primary);
-        background-color: rgba(var(--tblr-primary-rgb), 0.1);
+        background-color: rgb(var(--tblr-primary-rgb), 0.1);
         border-color: transparent;
     }
 
     &.btn-action-danger:hover,
     &.btn-action-danger:focus-visible {
         color: var(--tblr-danger);
-        background-color: rgba(var(--tblr-danger-rgb), 0.1);
+        background-color: rgb(var(--tblr-danger-rgb), 0.1);
     }
 }
 
@@ -210,7 +211,7 @@ $soft-btn-colors: ('primary', 'secondary', 'success', 'danger', 'warning', 'info
     border-left: 1px solid var(--tblr-border-color);
     border-top-left-radius: 0;
     border-bottom-left-radius: 0;
-    background-color: rgba(var(--tblr-body-color-rgb), 0.04);
+    background-color: rgb(var(--tblr-body-color-rgb), 0.04);
 
     &::after {
         content: "";
@@ -219,8 +220,8 @@ $soft-btn-colors: ('primary', 'secondary', 'success', 'danger', 'warning', 'info
         height: 0.5em;
         margin-left: 0;
         border: 0;
-        border-bottom: 2px solid currentColor;
-        border-left: 2px solid currentColor;
+        border-bottom: 2px solid currentcolor;
+        border-left: 2px solid currentcolor;
         transform: rotate(-45deg);
         vertical-align: 0.15em;
         opacity: 1;
@@ -239,12 +240,12 @@ $soft-btn-colors: ('primary', 'secondary', 'success', 'danger', 'warning', 'info
 // they read as the same button. Check-out: unmistakably filled (still
 // translucent, no border). Check-in: pure outline, zero fill at rest.
 .check-action.btn-soft-success {
-    background-color: rgba(var(--tblr-success-rgb), 0.25);
+    background-color: rgb(var(--tblr-success-rgb), 0.25);
     border-color: transparent;
 
     &:hover,
     &:focus-visible {
-        background-color: rgba(var(--tblr-success-rgb), 0.38);
+        background-color: rgb(var(--tblr-success-rgb), 0.38);
         border-color: transparent;
     }
 }
@@ -254,7 +255,7 @@ $soft-btn-colors: ('primary', 'secondary', 'success', 'danger', 'warning', 'info
 
     &:hover,
     &:focus-visible {
-        background-color: rgba(var(--tblr-success-rgb), 0.12);
+        background-color: rgb(var(--tblr-success-rgb), 0.12);
     }
 }
 
@@ -277,20 +278,21 @@ $badge-colors: ('primary', 'secondary', 'success', 'info', 'warning', 'danger',
 
 @each $c in $badge-colors {
     .badge.bg-#{$c}:not(:empty) {
-        background-color: rgba(var(--tblr-#{$c}-rgb), 0.1) !important;
+        background-color: rgb(var(--tblr-#{$c}-rgb), 0.1) !important;
         color: var(--tblr-#{$c}) !important;
-        border: 1px solid rgba(var(--tblr-#{$c}-rgb), 0.2);
+        border: 1px solid rgb(var(--tblr-#{$c}-rgb), 0.2);
     }
 }
 
 [data-bs-theme="dark"] {
     @each $c in $badge-colors {
         .badge.bg-#{$c}:not(:empty) {
-            background-color: rgba(var(--tblr-#{$c}-rgb), 0.15) !important;
+            background-color: rgb(var(--tblr-#{$c}-rgb), 0.15) !important;
             color: color-mix(in srgb, var(--tblr-#{$c}) 70%, #fff) !important;
-            border-color: rgba(var(--tblr-#{$c}-rgb), 0.3);
+            border-color: rgb(var(--tblr-#{$c}-rgb), 0.3);
+
             // Neon glow — the depth cue on the flat midnight canvas
-            box-shadow: 0 0 12px -4px rgba(var(--tblr-#{$c}-rgb), 0.55);
+            box-shadow: 0 0 12px -4px rgb(var(--tblr-#{$c}-rgb), 0.55);
         }
     }
 }
@@ -300,6 +302,7 @@ $badge-colors: ('primary', 'secondary', 'success', 'info', 'warning', 'danger',
 //                   <span class="badge-status-dot"></span>Label</span>
 .badge-status {
     --status-color: var(--tblr-secondary);
+
     background-color: color-mix(in srgb, var(--status-color) 10%, transparent);
     color: color-mix(in srgb, var(--status-color) 85%, var(--tblr-body-color));
     border: 1px solid color-mix(in srgb, var(--status-color) 25%, transparent);
@@ -330,7 +333,7 @@ $badge-colors: ('primary', 'secondary', 'success', 'info', 'warning', 'danger',
 [data-bs-theme="dark"] .btn-primary {
     &:hover,
     &:focus-visible {
-        box-shadow: 0 0 20px -6px rgba(var(--tblr-primary-rgb), 0.65);
+        box-shadow: 0 0 20px -6px rgb(var(--tblr-primary-rgb), 0.65);
     }
 }
 
@@ -363,8 +366,7 @@ $badge-colors: ('primary', 'secondary', 'success', 'info', 'warning', 'danger',
 // ---- Compact & Interactive Slide-to-Expand Detail Tabs ----
 .page-header-tabs {
     flex-wrap: nowrap !important;
-    overflow-x: auto !important;
-    overflow-y: hidden !important;
+    overflow: auto hidden !important;
     -webkit-overflow-scrolling: touch;
     scrollbar-width: none; // Firefox
 
@@ -395,20 +397,20 @@ $badge-colors: ('primary', 'secondary', 'success', 'info', 'warning', 'danger',
 
             // Active tab: ALWAYS show text label (on all screen sizes!) and animate expansion
             &.active {
-                background-color: rgba(var(--tblr-primary-rgb), 0.06);
+                background-color: rgb(var(--tblr-primary-rgb), 0.06);
                 border-color: transparent transparent var(--tblr-primary);
                 font-weight: 600;
 
                 span.d-xl-inline {
                     display: inline-block !important;
-                    animation: slideExpand 0.25s cubic-bezier(0.4, 0, 0.2, 1) forwards;
+                    animation: slide-expand 0.25s cubic-bezier(0.4, 0, 0.2, 1) forwards;
                 }
             }
         }
     }
 }
 
-@keyframes slideExpand {
+@keyframes slide-expand {
     from {
         max-width: 0;
         opacity: 0;
@@ -484,7 +486,7 @@ $badge-colors: ('primary', 'secondary', 'success', 'info', 'warning', 'danger',
 
     &.has-scroll-end::after {
         opacity: 0.85;
-        animation: tabScrollPulse 1.6s ease-in-out infinite;
+        animation: tab-scroll-pulse 1.6s ease-in-out infinite;
     }
 
     &.has-scroll-start::before {
@@ -492,7 +494,7 @@ $badge-colors: ('primary', 'secondary', 'success', 'info', 'warning', 'danger',
     }
 }
 
-@keyframes tabScrollPulse {
+@keyframes tab-scroll-pulse {
     0%, 100% { opacity: 0.4; }
     50% { opacity: 0.9; }
 }
@@ -539,7 +541,7 @@ $badge-colors: ('primary', 'secondary', 'success', 'info', 'warning', 'danger',
             color: var(--tblr-secondary-color) !important;
 
             &.active {
-                background-color: rgba(var(--tblr-primary-rgb), 0.1) !important;
+                background-color: rgb(var(--tblr-primary-rgb), 0.1) !important;
             }
         }
 
@@ -584,15 +586,14 @@ $badge-colors: ('primary', 'secondary', 'success', 'info', 'warning', 'danger',
     td:last-child {
         width: 70%;
         color: var(--tblr-body-color);
+
         // Long serials/URLs/tokens must wrap instead of stretching the panel
         // beyond the viewport on narrow screens.
-        word-break: break-word;
         overflow-wrap: anywhere;
     }
 
     // Remove the bottom border on the last row to sit flush in card
     tr:last-child {
-
         th,
         td {
             border-bottom: 0 !important;

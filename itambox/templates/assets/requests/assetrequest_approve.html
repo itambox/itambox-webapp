@@ -1,54 +1,60 @@
 {% load i18n %}
-<div class="modal modal-blur fade" id="asset-request-approve-modal" tabindex="-1" role="dialog" aria-hidden="true">
-    <div class="modal-dialog modal-dialog-centered" role="document">
-        <div class="modal-content">
-            <form hx-post="{% url 'assets:request_approve' pk=object.pk %}"
-                  hx-target="#modal-placeholder"
-                  hx-swap="innerHTML">
-                {% csrf_token %}
-                <div class="modal-header">
-                    <h5 class="modal-title">{% translate "Approve Asset Request" %}</h5>
-                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="{% translate 'Close' %}"></button>
-                </div>
-                <div class="modal-body">
-                    {% if form.non_field_errors %}
-                        <div class="alert alert-danger">
-                            {% for error in form.non_field_errors %}
-                                <div class="mb-0">{{ error }}</div>
-                            {% endfor %}
-                        </div>
-                    {% endif %}
-                    
-                    <p>{% translate "You are approving the request from" %} <strong>{{ object.requester }}</strong> {% translate "for" %} 
-                    <strong>
-                        {% if object.component %}
-                            {{ object.component }} {% blocktranslate with qty=object.qty %}(Component, Qty: {{ qty }}){% endblocktranslate %}
-                        {% elif object.accessory %}
-                            {{ object.accessory }} {% blocktranslate with qty=object.qty %}(Accessory, Qty: {{ qty }}){% endblocktranslate %}
-                        {% elif object.consumable %}
-                            {{ object.consumable }} {% blocktranslate with qty=object.qty %}(Consumable, Qty: {{ qty }}){% endblocktranslate %}
-                        {% elif object.asset %}
-                            {{ object.asset }} {% translate "(Asset)" %}
-                        {% elif object.asset_type %}
-                            {{ object.asset_type }} {% translate "(Asset Type)" %}
-                        {% else %}
-                            {% translate "Any Asset" %}
-                        {% endif %}
-                    </strong>.</p>
-                    
-                    <div class="mb-3">
-                        <label class="form-label fw-bold">{% translate "Response/Decision Notes" %}</label>
-                        {{ form.response_notes }}
-                        {% if form.response_notes.errors %}
-                            <div class="invalid-feedback d-block">{{ form.response_notes.errors|join:", " }}</div>
-                        {% endif %}
-                    </div>
-                </div>
-                <div class="modal-footer">
-                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">{% translate "Cancel" %}</button>
-                    <button type="submit" class="btn btn-success">{% translate "Approve Request" %}</button>
-                </div>
-            </form>
+<div class="modal modal-blur fade"
+     id="asset-request-approve-modal"
+     tabindex="-1"
+     role="dialog"
+     aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered" role="document">
+    <div class="modal-content">
+      <form hx-post="{% url 'assets:request_approve' pk=object.pk %}"
+            hx-target="#modal-placeholder"
+            hx-swap="innerHTML">
+        {% csrf_token %}
+        <div class="modal-header">
+          <h5 class="modal-title">{% translate "Approve Asset Request" %}</h5>
+          <button type="button"
+                  class="btn-close"
+                  data-bs-dismiss="modal"
+                  aria-label="{% translate 'Close' %}"></button>
         </div>
+        <div class="modal-body">
+          {% if form.non_field_errors %}
+            <div class="alert alert-danger">
+              {% for error in form.non_field_errors %}
+                <div class="mb-0">{{ error }}</div>
+              {% endfor %}
+            </div>
+          {% endif %}
+          <p>{% translate "You are approving the request from" %} <strong>{{ object.requester }}</strong> {% translate "for" %}
+            <strong>
+              {% if object.component %}
+                {{ object.component }} {% blocktranslate with qty=object.qty %}(Component, Qty: {{ qty }}){% endblocktranslate %}
+              {% elif object.accessory %}
+                {{ object.accessory }} {% blocktranslate with qty=object.qty %}(Accessory, Qty: {{ qty }}){% endblocktranslate %}
+              {% elif object.consumable %}
+                {{ object.consumable }} {% blocktranslate with qty=object.qty %}(Consumable, Qty: {{ qty }}){% endblocktranslate %}
+              {% elif object.asset %}
+                {{ object.asset }} {% translate "(Asset)" %}
+              {% elif object.asset_type %}
+                {{ object.asset_type }} {% translate "(Asset Type)" %}
+              {% else %}
+                {% translate "Any Asset" %}
+              {% endif %}
+            </strong>.
+          </p>
+          <div class="mb-3">
+            <label class="form-label fw-bold">{% translate "Response/Decision Notes" %}</label>
+            {{ form.response_notes }}
+            {% if form.response_notes.errors %}
+              <div class="invalid-feedback d-block">{{ form.response_notes.errors|join:", " }}</div>
+            {% endif %}
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">{% translate "Cancel" %}</button>
+          <button type="submit" class="btn btn-success">{% translate "Approve Request" %}</button>
+        </div>
+      </form>
     </div>
+  </div>
 </div>

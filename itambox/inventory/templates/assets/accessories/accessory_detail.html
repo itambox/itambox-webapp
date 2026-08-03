@@ -2,90 +2,95 @@
 {% load i18n %}
 {% load render_table from django_tables2 %}
 {% load static %}
-
 {# --- Page Title and Header --- #}
 {% block title %}{{ object }} {% translate "- Accessory Details - ITAMbox" %}{% endblock %}
-
 {% block page_header %}
-    <div class="page-pretitle">{% translate "Assets / Accessories" %}</div>
-    <h2 class="page-title">
-        {{ object }}
-    </h2>
+  <div class="page-pretitle">{% translate "Assets / Accessories" %}</div>
+  <h2 class="page-title">{{ object }}</h2>
 {% endblock %}
-
 {# --- Page Actions --- #}
 {% block extra_page_actions %}
-    {% if object.allow_overallocate or object.available > 0 %}
-        <button type="button" class="btn btn-info"
-                hx-get="{% url 'inventory:accessory_checkout' pk=object.pk %}"
-                hx-target="#modal-placeholder"
-                hx-swap="innerHTML"
-                >
-            <i class="mdi mdi-upload"></i>
-            {% translate "Check Out..." %}
-        </button>
-    {% endif %}
+  {% if object.allow_overallocate or object.available > 0 %}
+    <button type="button"
+            class="btn btn-info"
+            hx-get="{% url 'inventory:accessory_checkout' pk=object.pk %}"
+            hx-target="#modal-placeholder"
+            hx-swap="innerHTML">
+      <i class="mdi mdi-upload"></i>
+      {% translate "Check Out..." %}
+    </button>
+  {% endif %}
 {% endblock extra_page_actions %}
-
 {# --- Tabs Hook --- #}
 {% block extra_tabs %}
-    <li class="nav-item" role="presentation">
-        <a href="?tab=stocks" data-bs-target="#stocks" class="nav-link {% if request.GET.tab == 'stocks' %}active{% endif %}" data-bs-toggle="tab" hx-boost="false" role="tab">
-            <i class="mdi mdi-store me-1 text-teal"></i>
-            {% translate "Stocks" %} <span class="badge bg-teal-lt ms-2">{{ stocks_table.rows|length }}</span>
-        </a>
-    </li>
-    <li class="nav-item" role="presentation">
-        <a href="?tab=assignments" data-bs-target="#assignments" class="nav-link {% if request.GET.tab == 'assignments' %}active{% endif %}" data-bs-toggle="tab" hx-boost="false" role="tab">
-            <i class="mdi mdi-account-check-outline me-1 text-purple"></i>
-            {% translate "Active Assignments" %} <span class="badge bg-purple-lt ms-2">{{ assignments_table.rows|length }}</span>
-        </a>
-    </li>
-    <li class="nav-item" role="presentation">
-        <a href="?tab=kits" data-bs-target="#kits" class="nav-link {% if request.GET.tab == 'kits' %}active{% endif %}" data-bs-toggle="tab" hx-boost="false" role="tab">
-            <i class="mdi mdi-package-variant-closed me-1 text-orange"></i>
-            {% translate "Kits" %} <span class="badge bg-orange-lt ms-2">{{ kits_table.rows|length }}</span>
-        </a>
-    </li>
+  <li class="nav-item" role="presentation">
+    <a href="?tab=stocks"
+       data-bs-target="#stocks"
+       class="nav-link {% if request.GET.tab == 'stocks' %}active{% endif %}"
+       data-bs-toggle="tab"
+       hx-boost="false"
+       role="tab">
+      <i class="mdi mdi-store me-1 text-teal"></i>
+      {% translate "Stocks" %} <span class="badge bg-teal-lt ms-2">{{ stocks_table.rows|length }}</span>
+    </a>
+  </li>
+  <li class="nav-item" role="presentation">
+    <a href="?tab=assignments"
+       data-bs-target="#assignments"
+       class="nav-link {% if request.GET.tab == 'assignments' %}active{% endif %}"
+       data-bs-toggle="tab"
+       hx-boost="false"
+       role="tab">
+      <i class="mdi mdi-account-check-outline me-1 text-purple"></i>
+      {% translate "Active Assignments" %} <span class="badge bg-purple-lt ms-2">{{ assignments_table.rows|length }}</span>
+    </a>
+  </li>
+  <li class="nav-item" role="presentation">
+    <a href="?tab=kits"
+       data-bs-target="#kits"
+       class="nav-link {% if request.GET.tab == 'kits' %}active{% endif %}"
+       data-bs-toggle="tab"
+       hx-boost="false"
+       role="tab">
+      <i class="mdi mdi-package-variant-closed me-1 text-orange"></i>
+      {% translate "Kits" %} <span class="badge bg-orange-lt ms-2">{{ kits_table.rows|length }}</span>
+    </a>
+  </li>
 {% endblock extra_tabs %}
-
 {# Object details rendered via panel layout #}
-
 {# --- Extra Tab Panes --- #}
 {% block extra_tab_panes %}
-    {# Stocks Tab Pane #}
-    <div class="tab-pane fade {% if request.GET.tab == 'stocks' %}show active{% endif %}" id="stocks" role="tabpanel">
-        <div class="card border-0 shadow-sm">
-            <div class="card-header border-0 bg-transparent d-flex justify-content-between align-items-center">
-                <h3 class="card-title">{% translate "Stock Pools by Location" %}</h3>
-                <button type="button" class="btn btn-sm btn-primary"
-                        hx-get="{% url 'inventory:accessory_add_stock' pk=object.pk %}"
-                        hx-target="#modal-placeholder"
-                        hx-swap="innerHTML">
-                    <i class="mdi mdi-plus"></i> {% translate "Add Stock..." %}
-                </button>
-            </div>
-            {% if stocks_table.rows %}
-                <div class="table-responsive">
-                    {% render_table stocks_table %}
-                </div>
-                {% include 'generic/includes/table_pagination.html' with table=stocks_table %}
-            {% else %}
-                <div class="card-body py-5 text-muted text-center">
-                    <p class="mb-0">{% translate "No stock pools registered for this accessory." %}</p>
-                </div>
-            {% endif %}
+  {# Stocks Tab Pane #}
+  <div class="tab-pane fade {% if request.GET.tab == 'stocks' %}show active{% endif %}"
+       id="stocks"
+       role="tabpanel">
+    <div class="card border-0 shadow-sm">
+      <div class="card-header border-0 bg-transparent d-flex justify-content-between align-items-center">
+        <h3 class="card-title">{% translate "Stock Pools by Location" %}</h3>
+        <button type="button"
+                class="btn btn-sm btn-primary"
+                hx-get="{% url 'inventory:accessory_add_stock' pk=object.pk %}"
+                hx-target="#modal-placeholder"
+                hx-swap="innerHTML">
+          <i class="mdi mdi-plus"></i> {% translate "Add Stock..." %}
+        </button>
+      </div>
+      {% if stocks_table.rows %}
+        <div class="table-responsive">{% render_table stocks_table %}</div>
+        {% include 'generic/includes/table_pagination.html' with table=stocks_table %}
+      {% else %}
+        <div class="card-body py-5 text-muted text-center">
+          <p class="mb-0">{% translate "No stock pools registered for this accessory." %}</p>
         </div>
+      {% endif %}
     </div>
-
-    {# Active Assignments Tab Pane #}
-    {% translate "Checked Out Assignments" as t_assignments %}
-    {% translate "No active checkout assignments logged for this peripheral." as e_assignments %}
-    {% include 'generic/includes/related_table_tab.html' with tab="assignments" table=assignments_table title=t_assignments empty=e_assignments icon="mdi mdi-keyboard-outline" %}
-
-    {# Kits Tab Pane #}
-    {% translate "Kits Allocating this Accessory" as t_kits %}
-    {% translate "No kits allocate this accessory." as e_kits %}
-    {% include 'generic/includes/related_table_tab.html' with tab="kits" table=kits_table title=t_kits empty=e_kits %}
+  </div>
+  {# Active Assignments Tab Pane #}
+  {% translate "Checked Out Assignments" as t_assignments %}
+  {% translate "No active checkout assignments logged for this peripheral." as e_assignments %}
+  {% include 'generic/includes/related_table_tab.html' with tab="assignments" table=assignments_table title=t_assignments empty=e_assignments icon="mdi mdi-keyboard-outline" %}
+  {# Kits Tab Pane #}
+  {% translate "Kits Allocating this Accessory" as t_kits %}
+  {% translate "No kits allocate this accessory." as e_kits %}
+  {% include 'generic/includes/related_table_tab.html' with tab="kits" table=kits_table title=t_kits empty=e_kits %}
 {% endblock extra_tab_panes %}
-

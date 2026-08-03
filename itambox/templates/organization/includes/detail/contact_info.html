@@ -1,35 +1,33 @@
 {% load i18n %}
 <dl class="row mb-0">
-    <dt class="col-sm-3">{% translate "Name:" %}</dt>
-    <dd class="col-sm-9"><strong>{{ object.name }}</strong></dd>
-
-    <dt class="col-sm-3">{% translate "Title:" %}</dt>
-    <dd class="col-sm-9">{% if object.title %}{{object.title}}{% else %}<i>{% translate "No title" %}</i>{% endif %}</dd>
-
-    <dt class="col-sm-3">{% translate "Phone:" %}</dt>
-    <dd class="col-sm-9">
-        {% if object.phone %}
-            <a href="tel:{{ object.phone }}">{{ object.phone }}</a>
-        {% else %}
-            <span class="text-muted"><i>{% translate "None" %}</i></span>
-        {% endif %}
-    </dd>
-
-    <dt class="col-sm-3">{% translate "Email:" %}</dt>
-    <dd class="col-sm-9">
-        {% if object.email %}
-            <a href="mailto:{{ object.email }}">{{ object.email }}</a>
-        {% else %}
-            <span class="text-muted"><i>{% translate "None" %}</i></span>
-        {% endif %}
-    </dd>
-
-    <dt class="col-sm-3">{% translate "Web URL:" %}</dt>
-    <dd class="col-sm-9">
-        {% if object.web_url %}
-            <a href="{{ object.web_url }}" target="_blank">{{ object.web_url }}</a>
-        {% else %}
-            <span class="text-muted"><i>{% translate "None" %}</i></span>
-        {% endif %}
-    </dd>
+  <dt class="col-sm-3">{% translate "Name:" %}</dt>
+  <dd class="col-sm-9">
+    <strong>{{ object.name }}</strong>
+  </dd>
+  <dt class="col-sm-3">{% translate "Title:" %}</dt>
+  <dd class="col-sm-9">{% if object.title %}{{ object.title }}{% else %}<i>{% translate "No title" %}</i>{% endif %}</dd>
+  <dt class="col-sm-3">{% translate "Phone:" %}</dt>
+  <dd class="col-sm-9">
+    {% if object.phone %}
+      <a href="tel:{{ object.phone }}">{{ object.phone }}</a>
+    {% else %}
+      <span class="text-muted"><i>{% translate "None" %}</i></span>
+    {% endif %}
+  </dd>
+  <dt class="col-sm-3">{% translate "Email:" %}</dt>
+  <dd class="col-sm-9">
+    {% if object.email %}
+      <a href="mailto:{{ object.email }}">{{ object.email }}</a>
+    {% else %}
+      <span class="text-muted"><i>{% translate "None" %}</i></span>
+    {% endif %}
+  </dd>
+  <dt class="col-sm-3">{% translate "Web URL:" %}</dt>
+  <dd class="col-sm-9">
+    {% if object.web_url %}
+      <a href="{{ object.web_url }}" target="_blank">{{ object.web_url }}</a>
+    {% else %}
+      <span class="text-muted"><i>{% translate "None" %}</i></span>
+    {% endif %}
+  </dd>
 </dl>

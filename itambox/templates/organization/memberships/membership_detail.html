@@ -1,136 +1,135 @@
 {% extends "generic/object_detail.html" %}
 {% load i18n %}
 {% load rbac_badges %}
-
 {% block extra_page_actions %}
-    {# Only a viewer who may change this membership sees the credential-issuing #}
-    {# action; MembershipSendResetView enforces the same change_membership guard #}
-    {# on POST, so hiding the button here just avoids a dead control. #}
-    {% if object.user.email and can_change %}
-    <form id="send-password-setup" method="post" action="{% url 'organization:membership_send_reset' pk=object.pk %}" class="d-inline">
-        {% csrf_token %}
-        <button type="submit" class="btn btn-outline-primary">
-            <i class="mdi mdi-email-lock-outline me-1"></i>
-            {% translate "Send password reset / set-password link" %}
-        </button>
+  {# Only a viewer who may change this membership sees the credential-issuing #}
+  {# action; MembershipSendResetView enforces the same change_membership guard #}
+  {# on POST, so hiding the button here just avoids a dead control. #}
+  {% if object.user.email and can_change %}
+    <form id="send-password-setup"
+          method="post"
+          action="{% url 'organization:membership_send_reset' pk=object.pk %}"
+          class="d-inline">
+      {% csrf_token %}
+      <button type="submit" class="btn btn-outline-primary">
+        <i class="mdi mdi-email-lock-outline me-1"></i>
+        {% translate "Send password reset / set-password link" %}
+      </button>
     </form>
-    {% endif %}
+  {% endif %}
 {% endblock %}
-
 {% block object_details %}
-<div class="row">
+  <div class="row">
     <div class="col-md-6 mb-3">
-        <label class="form-label text-muted">{% translate "User" %}</label>
-        <div class="fw-bold fs-4 text-dark">
-            {{ object.user }}
-            {% membership_kind_badge object %}
-        </div>
+      <label class="form-label text-muted">{% translate "User" %}</label>
+      <div class="fw-bold fs-4 text-dark">
+        {{ object.user }}
+        {% membership_kind_badge object %}
+      </div>
     </div>
     <div class="col-md-3 mb-3">
-        <label class="form-label text-muted">{% translate "Tenant" %}</label>
-        <div>
-            <a href="{% url 'organization:tenant_detail' pk=object.tenant.pk %}">{{ object.tenant.name }}</a>
-        </div>
+      <label class="form-label text-muted">{% translate "Tenant" %}</label>
+      <div>
+        <a href="{% url 'organization:tenant_detail' pk=object.tenant.pk %}">{{ object.tenant.name }}</a>
+      </div>
     </div>
     <div class="col-md-3 mb-3">
-        <label class="form-label text-muted">{% translate "Active" %}</label>
-        <div>
-            {% if object.is_active %}
-                <span class="badge bg-success">{% translate "Yes" %}</span>
-            {% else %}
-                <span class="badge bg-secondary">{% translate "No" %}</span>
-            {% endif %}
-        </div>
+      <label class="form-label text-muted">{% translate "Active" %}</label>
+      <div>
+        {% if object.is_active %}
+          <span class="badge bg-success">{% translate "Yes" %}</span>
+        {% else %}
+          <span class="badge bg-secondary">{% translate "No" %}</span>
+        {% endif %}
+      </div>
     </div>
-</div>
-
-<hr class="my-4">
-
-<h4 class="card-title text-primary mb-3">{% translate "Role grants" %}</h4>
-<p class="text-muted small">{% translate "Each grant carries one role and one or more additive scopes." %}</p>
-
-{% if grants %}
-<div class="table-responsive">
-    <table class="table table-hover align-middle border mb-0">
+  </div>
+  <hr class="my-4">
+  <h4 class="card-title text-primary mb-3">{% translate "Role grants" %}</h4>
+  <p class="text-muted small">{% translate "Each grant carries one role and one or more additive scopes." %}</p>
+  {% if grants %}
+    <div class="table-responsive">
+      <table class="table table-hover align-middle border mb-0">
         <thead class="table-light">
-            <tr>
-                <th>{% translate "Role" %}</th>
-                <th>{% translate "Reach" %}</th>
-                <th>{% translate "Scopes" %}</th>
-                <th>{% translate "Reason / expiration" %}</th>
-                <th>{% translate "Granted by" %}</th>
-                <th>{% translate "Granted at" %}</th>
-            </tr>
+          <tr>
+            <th>{% translate "Role" %}</th>
+            <th>{% translate "Reach" %}</th>
+            <th>{% translate "Scopes" %}</th>
+            <th>{% translate "Reason / expiration" %}</th>
+            <th>{% translate "Granted by" %}</th>
+            <th>{% translate "Granted at" %}</th>
+          </tr>
         </thead>
         <tbody>
-            {% for grant in grants %}
+          {% for grant in grants %}
             <tr>
-                <td>
-                    <a href="{% url 'organization:role_detail' pk=grant.role.pk %}" class="fw-bold text-decoration-none">{{ grant.role.name }}</a>
-                    {% shared_role_badge grant.role %}
-                </td>
-                <td>{% reach_badge grant icon=True %}</td>
-                <td>
-                    <ul class="list-unstyled mb-0">
-                        {% for scope in grant.scopes.all %}
-                        <li>
-                            {{ scope.get_scope_type_display }}
-                            {% if scope.tenant %}
-                                <a href="{% url 'organization:tenant_detail' pk=scope.tenant.pk %}" class="badge bg-secondary-lt ms-1">{{ scope.tenant.name }}</a>
-                            {% elif scope.tenant_group %}
-                                <a href="{% url 'organization:tenantgroup_detail' pk=scope.tenant_group.pk %}" class="badge bg-secondary-lt ms-1">{{ scope.tenant_group.name }}</a>
-                            {% endif %}
-                        </li>
-                        {% empty %}
-                        <li class="text-muted"><em>{% translate "No active scope." %}</em></li>
-                        {% endfor %}
-                    </ul>
-                </td>
-                <td>
-                    {% if grant.reason %}<div>{{ grant.reason }}</div>{% endif %}
-                    {% if grant.valid_until %}
-                        <div class="text-muted small">{% translate "Until" %} {{ grant.valid_until|date:"Y-m-d H:i" }}</div>
-                    {% elif not grant.reason %}
-                        <span class="text-muted">—</span>
-                    {% endif %}
-                </td>
-                <td>{% if grant.granted_by %}{{ grant.granted_by }}{% else %}<span class="text-muted">—</span>{% endif %}</td>
-                <td>{{ grant.granted_at|date:"Y-m-d H:i" }}</td>
+              <td>
+                <a href="{% url 'organization:role_detail' pk=grant.role.pk %}"
+                   class="fw-bold text-decoration-none">{{ grant.role.name }}</a>
+                {% shared_role_badge grant.role %}
+              </td>
+              <td>{% reach_badge grant icon=True %}</td>
+              <td>
+                <ul class="list-unstyled mb-0">
+                  {% for scope in grant.scopes.all %}
+                    <li>
+                      {{ scope.get_scope_type_display }}
+                      {% if scope.tenant %}
+                        <a href="{% url 'organization:tenant_detail' pk=scope.tenant.pk %}"
+                           class="badge bg-secondary-lt ms-1">{{ scope.tenant.name }}</a>
+                      {% elif scope.tenant_group %}
+                        <a href="{% url 'organization:tenantgroup_detail' pk=scope.tenant_group.pk %}"
+                           class="badge bg-secondary-lt ms-1">{{ scope.tenant_group.name }}</a>
+                      {% endif %}
+                    </li>
+                  {% empty %}
+                    <li class="text-muted"><em>{% translate "No active scope." %}</em></li>
+                  {% endfor %}
+                </ul>
+              </td>
+              <td>
+                {% if grant.reason %}<div>{{ grant.reason }}</div>{% endif %}
+                {% if grant.valid_until %}
+                  <div class="text-muted small">{% translate "Until" %} {{ grant.valid_until|date:"Y-m-d H:i" }}</div>
+                {% elif not grant.reason %}
+                  <span class="text-muted">—</span>
+                {% endif %}
+              </td>
+              <td>{% if grant.granted_by %}{{ grant.granted_by }}{% else %}<span class="text-muted">—</span>{% endif %}</td>
+              <td>{{ grant.granted_at|date:"Y-m-d H:i" }}</td>
             </tr>
-            {% endfor %}
+          {% endfor %}
         </tbody>
-    </table>
-</div>
-{% else %}
-<p class="text-muted mb-0"><em>{% translate "No direct role grants — this membership may still inherit access from groups." %}</em></p>
-{% endif %}
-
-<hr class="my-4">
-
-<h4 class="card-title text-primary mb-3">{% translate "Granted role permissions" %}</h4>
-<p class="text-muted small">{% translate "Read-only view of the permission sets attached directly to this membership." %}</p>
-
-{% if grants %}
-<div class="d-flex flex-column gap-2">
-    {% for grant in grants %}
-    <div>
-        <a href="{% url 'organization:role_detail' pk=grant.role.pk %}" class="fw-bold text-decoration-none">{{ grant.role.name }}</a>
-        {% reach_badge grant extra_class="ms-1" %}
-        {% if grant.role.permissions %}
-        <ul class="list-inline mb-0 mt-1">
-            {% for codename in grant.role.permissions %}
-            <li class="list-inline-item mb-1">
-                <code class="badge bg-secondary-lt text-secondary">{{ codename }}</code>
-            </li>
-            {% endfor %}
-        </ul>
-        {% else %}
-        <span class="text-muted small"><em>{% translate "No permissions." %}</em></span>
-        {% endif %}
+      </table>
     </div>
-    {% endfor %}
-</div>
-{% else %}
-<p class="text-muted mb-0"><em>{% translate "No direct roles granted." %}</em></p>
-{% endif %}
+  {% else %}
+    <p class="text-muted mb-0"><em>{% translate "No direct role grants — this membership may still inherit access from groups." %}</em></p>
+  {% endif %}
+  <hr class="my-4">
+  <h4 class="card-title text-primary mb-3">{% translate "Granted role permissions" %}</h4>
+  <p class="text-muted small">{% translate "Read-only view of the permission sets attached directly to this membership." %}</p>
+  {% if grants %}
+    <div class="d-flex flex-column gap-2">
+      {% for grant in grants %}
+        <div>
+          <a href="{% url 'organization:role_detail' pk=grant.role.pk %}"
+             class="fw-bold text-decoration-none">{{ grant.role.name }}</a>
+          {% reach_badge grant extra_class="ms-1" %}
+          {% if grant.role.permissions %}
+            <ul class="list-inline mb-0 mt-1">
+              {% for codename in grant.role.permissions %}
+                <li class="list-inline-item mb-1">
+                  <code class="badge bg-secondary-lt text-secondary">{{ codename }}</code>
+                </li>
+              {% endfor %}
+            </ul>
+          {% else %}
+            <span class="text-muted small"><em>{% translate "No permissions." %}</em></span>
+          {% endif %}
+        </div>
+      {% endfor %}
+    </div>
+  {% else %}
+    <p class="text-muted mb-0"><em>{% translate "No direct roles granted." %}</em></p>
+  {% endif %}
 {% endblock object_details %}

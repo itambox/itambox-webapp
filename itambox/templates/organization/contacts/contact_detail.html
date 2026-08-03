@@ -2,33 +2,35 @@
 {% load i18n %}
 {% load render_table from django_tables2 %}
 {% load static %}
-
 {# --- Page Title --- #}
 {% block title %}{{ object.name }} {% translate "- Contact Details - ITAMbox" %}{% endblock %}
-
 {# --- Page Header --- #}
-{% block page_pretitle %}{% translate "Organization / Contacts" %}{% endblock %}
-
+{% block page_pretitle %}
+  {% translate "Organization / Contacts" %}
+{% endblock %}
 {# --- Tabs Hook --- #}
 {% block extra_tabs %}
-    <li class="nav-item" role="presentation">
-        <a href="?tab=assignments" class="nav-link {% if request.GET.tab == 'assignments' %}active{% endif %}" data-bs-toggle="tab" hx-boost="false" data-bs-target="#assignments" role="tab" aria-selected="{% if request.GET.tab == 'assignments' %}true{% else %}false{% endif %}">
-            <i class="mdi mdi-account-circle-outline me-1 text-purple"></i>
-            {% translate "Assigned Objects" %} <span class="badge bg-purple-lt ms-2">{{ assignments_table.rows|length }}</span>
-        </a>
-    </li>
+  <li class="nav-item" role="presentation">
+    <a href="?tab=assignments"
+       class="nav-link {% if request.GET.tab == 'assignments' %}active{% endif %}"
+       data-bs-toggle="tab"
+       hx-boost="false"
+       data-bs-target="#assignments"
+       role="tab"
+       aria-selected="{% if request.GET.tab == 'assignments' %}true{% else %}false{% endif %}">
+      <i class="mdi mdi-account-circle-outline me-1 text-purple"></i>
+      {% translate "Assigned Objects" %} <span class="badge bg-purple-lt ms-2">{{ assignments_table.rows|length }}</span>
+    </a>
+  </li>
 {% endblock extra_tabs %}
-
 {# Object details rendered via panel layout #}
-
 {# --- Related Objects (Sidebar) --- #}
 {% block related_objects %}
 {% endblock related_objects %}
-
 {# --- Extra Tab Panes --- #}
 {% block extra_tab_panes %}
-    {# Assignments Tab Pane #}
-    {% translate "Associated Assignments" as t_assign %}
-    {% translate "This contact has no active assignments." as e_assign %}
-    {% include 'generic/includes/related_table_tab.html' with tab="assignments" table=assignments_table title=t_assign empty=e_assign icon="mdi mdi-account-group-outline" %}
+  {# Assignments Tab Pane #}
+  {% translate "Associated Assignments" as t_assign %}
+  {% translate "This contact has no active assignments." as e_assign %}
+  {% include 'generic/includes/related_table_tab.html' with tab="assignments" table=assignments_table title=t_assign empty=e_assign icon="mdi mdi-account-group-outline" %}
 {% endblock extra_tab_panes %}

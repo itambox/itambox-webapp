@@ -3,59 +3,67 @@
 {% load static %}
 {% load utility_tags %}
 {% load render_table from django_tables2 %}
-
 {# --- Page Title --- #}
 {% block title %}{{ object.name }} {% translate "- Licenses - ITAMbox" %}{% endblock %}
-
 {# --- Page Header --- #}
-{% block page_pretitle %}{% translate "Licenses / License Entitlements" %}{% endblock %}
-
+{% block page_pretitle %}
+  {% translate "Licenses / License Entitlements" %}
+{% endblock %}
 {# --- Page Actions --- #}
 {% block extra_page_actions %}
-    {% if object.available_seats > 0 %}
-        <button type="button" class="btn btn-primary"
-                hx-get="{% url 'licenses:license_checkout' pk=object.pk %}"
-                hx-target="#modal-placeholder"
-                hx-swap="innerHTML">
-            <i class="mdi mdi-upload"></i>
-            {% translate "Check Out Seat..." %}
-        </button>
-    {% else %}
-        <button type="button" class="btn btn-primary disabled" disabled>
-            <i class="mdi mdi-upload"></i>
-            {% translate "Check Out Seat..." %}
-        </button>
-    {% endif %}
+  {% if object.available_seats > 0 %}
+    <button type="button"
+            class="btn btn-primary"
+            hx-get="{% url 'licenses:license_checkout' pk=object.pk %}"
+            hx-target="#modal-placeholder"
+            hx-swap="innerHTML">
+      <i class="mdi mdi-upload"></i>
+      {% translate "Check Out Seat..." %}
+    </button>
+  {% else %}
+    <button type="button" class="btn btn-primary disabled" disabled>
+      <i class="mdi mdi-upload"></i>
+      {% translate "Check Out Seat..." %}
+    </button>
+  {% endif %}
 {% endblock extra_page_actions %}
-
 {# --- Tabs Hook --- #}
 {% block extra_tabs %}
-    <li class="nav-item" role="presentation">
-        <a href="?tab=seats" class="nav-link {% if request.GET.tab == 'seats' %}active{% endif %}" data-bs-toggle="tab" hx-boost="false" data-bs-target="#seats" role="tab" aria-selected="{% if request.GET.tab == 'seats' %}true{% else %}false{% endif %}">
-            <i class="mdi mdi-account-circle-outline me-1 text-purple"></i>
-            {% translate "Seat Assignments" %} <span class="badge bg-purple-lt ms-2">{{ assignments_table.rows|length }}</span>
-        </a>
-    </li>
-    <li class="nav-item" role="presentation">
-        <a href="?tab=kits" class="nav-link {% if request.GET.tab == 'kits' %}active{% endif %}" data-bs-toggle="tab" hx-boost="false" data-bs-target="#kits" role="tab" aria-selected="{% if request.GET.tab == 'kits' %}true{% else %}false{% endif %}">
-            <i class="mdi mdi-package-variant-closed me-1 text-orange"></i>
-            {% translate "Kit Assignments" %} <span class="badge bg-orange-lt ms-2">{{ kits_table.rows|length }}</span>
-        </a>
-    </li>
+  <li class="nav-item" role="presentation">
+    <a href="?tab=seats"
+       class="nav-link {% if request.GET.tab == 'seats' %}active{% endif %}"
+       data-bs-toggle="tab"
+       hx-boost="false"
+       data-bs-target="#seats"
+       role="tab"
+       aria-selected="{% if request.GET.tab == 'seats' %}true{% else %}false{% endif %}">
+      <i class="mdi mdi-account-circle-outline me-1 text-purple"></i>
+      {% translate "Seat Assignments" %} <span class="badge bg-purple-lt ms-2">{{ assignments_table.rows|length }}</span>
+    </a>
+  </li>
+  <li class="nav-item" role="presentation">
+    <a href="?tab=kits"
+       class="nav-link {% if request.GET.tab == 'kits' %}active{% endif %}"
+       data-bs-toggle="tab"
+       hx-boost="false"
+       data-bs-target="#kits"
+       role="tab"
+       aria-selected="{% if request.GET.tab == 'kits' %}true{% else %}false{% endif %}">
+      <i class="mdi mdi-package-variant-closed me-1 text-orange"></i>
+      {% translate "Kit Assignments" %} <span class="badge bg-orange-lt ms-2">{{ kits_table.rows|length }}</span>
+    </a>
+  </li>
 {% endblock extra_tabs %}
-
 {# --- Extra Tab Panes --- #}
 {% block extra_tab_panes %}
-    {# Assignments Tab Pane #}
-    {% translate "Active License Seat Allocations" as t_seats %}
-    {% translate "No active seats assigned for this license entitlement." as e_seats %}
-    {% include 'generic/includes/related_table_tab.html' with tab="seats" table=assignments_table title=t_seats empty=e_seats icon="mdi mdi-account-multiple-minus-outline" %}
-
-    {# Kit Assignments Tab Pane #}
-    {% translate "Kits Allocating this License" as t_kits %}
-    {% translate "No kits allocate this license." as e_kits %}
-    {% include 'generic/includes/related_table_tab.html' with tab="kits" table=kits_table title=t_kits empty=e_kits %}
+  {# Assignments Tab Pane #}
+  {% translate "Active License Seat Allocations" as t_seats %}
+  {% translate "No active seats assigned for this license entitlement." as e_seats %}
+  {% include 'generic/includes/related_table_tab.html' with tab="seats" table=assignments_table title=t_seats empty=e_seats icon="mdi mdi-account-multiple-minus-outline" %}
+  {# Kit Assignments Tab Pane #}
+  {% translate "Kits Allocating this License" as t_kits %}
+  {% translate "No kits allocate this license." as e_kits %}
+  {% include 'generic/includes/related_table_tab.html' with tab="kits" table=kits_table title=t_kits empty=e_kits %}
 {% endblock extra_tab_panes %}
-
 {% block javascript %}
 {% endblock javascript %}

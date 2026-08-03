@@ -1,86 +1,72 @@
 {% extends "generic/object_list.html" %}
 {% load i18n %}
-
 {% block extra_controls %}
-    <a href="{% url 'extras:alertrule_list' %}" class="btn btn-outline-secondary">
-        <i class="mdi mdi-tune me-1"></i>
-        {% translate "Manage Alert Rules" %}
-    </a>
+  <a href="{% url 'extras:alertrule_list' %}"
+     class="btn btn-outline-secondary">
+    <i class="mdi mdi-tune me-1"></i>
+    {% translate "Manage Alert Rules" %}
+  </a>
 {% endblock %}
-
 {% block content %}
-<div class="row g-3 mb-3">
+  <div class="row g-3 mb-3">
     <!-- Active Alerts Metric -->
     <div class="col-sm-6 col-lg-4">
-        <div class="card card-sm">
-            <div class="card-body">
-                <div class="row align-items-center">
-                    <div class="col-auto">
-                        <span class="bg-danger text-white avatar">
-                            <i class="mdi mdi-alert-outline"></i>
-                        </span>
-                    </div>
-                    <div class="col">
-                        <div class="font-weight-medium">
-                            {{ active_alerts_count }} {% translate "Active Alerts" %}
-                        </div>
-                        <div class="text-secondary">
-                            {% translate "Require immediate validation" %}
-                        </div>
-                    </div>
-                </div>
+      <div class="card card-sm">
+        <div class="card-body">
+          <div class="row align-items-center">
+            <div class="col-auto">
+              <span class="bg-danger text-white avatar">
+                <i class="mdi mdi-alert-outline"></i>
+              </span>
             </div>
+            <div class="col">
+              <div class="font-weight-medium">{{ active_alerts_count }} {% translate "Active Alerts" %}</div>
+              <div class="text-secondary">{% translate "Require immediate validation" %}</div>
+            </div>
+          </div>
         </div>
+      </div>
     </div>
-    
     <!-- Acknowledged Alerts Metric -->
     <div class="col-sm-6 col-lg-4">
-        <div class="card card-sm">
-            <div class="card-body">
-                <div class="row align-items-center">
-                    <div class="col-auto">
-                        <span class="bg-warning text-white avatar">
-                            <i class="mdi mdi-eye-outline"></i>
-                        </span>
-                    </div>
-                    <div class="col">
-                        <div class="font-weight-medium">
-                            {{ acknowledged_alerts_count }} {% translate "Acknowledged" %}
-                        </div>
-                        <div class="text-secondary">
-                            {% translate "Under review by administrators" %}
-                        </div>
-                    </div>
-                </div>
+      <div class="card card-sm">
+        <div class="card-body">
+          <div class="row align-items-center">
+            <div class="col-auto">
+              <span class="bg-warning text-white avatar">
+                <i class="mdi mdi-eye-outline"></i>
+              </span>
             </div>
+            <div class="col">
+              <div class="font-weight-medium">{{ acknowledged_alerts_count }} {% translate "Acknowledged" %}</div>
+              <div class="text-secondary">{% translate "Under review by administrators" %}</div>
+            </div>
+          </div>
         </div>
+      </div>
     </div>
-
     <!-- Alert Rules Quick Link -->
     <div class="col-sm-6 col-lg-4">
-        <div class="card card-sm bg-primary-lt">
-            <div class="card-body">
-                <div class="row align-items-center">
-                    <div class="col-auto">
-                        <span class="bg-primary text-white avatar">
-                            <i class="mdi mdi-bell-outline"></i>
-                        </span>
-                    </div>
-                    <div class="col">
-                        <div class="font-weight-medium">
-                            <a href="{% url 'extras:alertrule_list' %}" class="text-primary fw-bold">
-                                {% translate "Configure Threshold Rules" %}
-                            </a>
-                        </div>
-                        <div class="text-secondary">
-                            {% translate "Manage triggers &amp; notification channels" %}
-                        </div>
-                    </div>
-                </div>
+      <div class="card card-sm bg-primary-lt">
+        <div class="card-body">
+          <div class="row align-items-center">
+            <div class="col-auto">
+              <span class="bg-primary text-white avatar">
+                <i class="mdi mdi-bell-outline"></i>
+              </span>
             </div>
+            <div class="col">
+              <div class="font-weight-medium">
+                <a href="{% url 'extras:alertrule_list' %}" class="text-primary fw-bold">
+                  {% translate "Configure Threshold Rules" %}
+                </a>
+              </div>
+              <div class="text-secondary">{% translate "Manage triggers &amp; notification channels" %}</div>
+            </div>
+          </div>
         </div>
+      </div>
     </div>
-</div>
-
-{{ block.super }}
+  </div>
+  {{ block.super }}
 {% endblock %}

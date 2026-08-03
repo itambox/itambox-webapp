@@ -3,48 +3,58 @@
 {% load static %}
 {% load utility_tags %}
 {% load render_table from django_tables2 %}
-
 {# --- Page Title and Header --- #}
 {% block title %}{{ object.manufacturer.name }} {{ object.model }} {% translate "- Asset Type - ITAMbox" %}{% endblock %}
-
-{% block page_pretitle %}{% translate "Assets / Asset Types" %}{% endblock %}
-
+{% block page_pretitle %}
+  {% translate "Assets / Asset Types" %}
+{% endblock %}
 {# --- Tabs Hook --- #}
 {% block extra_tabs %}
-    <li class="nav-item" role="presentation">
-        <a href="?tab=related-assets" data-bs-target="#related-assets" class="nav-link {% if request.GET.tab == 'related-assets' %}active{% endif %}" data-bs-toggle="tab" hx-boost="false" role="tab">
-            <i class="mdi mdi-office-building-outline me-1 text-purple"></i>
-            {% translate "Related Assets" %} <span class="badge bg-purple-lt ms-2">{{ assets_table.rows|length }}</span>
-        </a>
-    </li>
-    <li class="nav-item" role="presentation">
-        <a href="?tab=requests" data-bs-target="#requests" class="nav-link {% if request.GET.tab == 'requests' %}active{% endif %}" data-bs-toggle="tab" hx-boost="false" role="tab">
-            <i class="mdi mdi-clipboard-text-outline me-1 text-yellow"></i>
-            {% translate "Requests" %} <span class="badge bg-yellow-lt ms-2">{{ object.requests.count }}</span>
-        </a>
-    </li>
-    <li class="nav-item" role="presentation">
-        <a href="?tab=kits" data-bs-target="#kits" class="nav-link {% if request.GET.tab == 'kits' %}active{% endif %}" data-bs-toggle="tab" hx-boost="false" role="tab">
-            <i class="mdi mdi-package-variant-closed me-1 text-orange"></i>
-            {% translate "Kits" %} <span class="badge bg-orange-lt ms-2">{{ kits_table.rows|length }}</span>
-        </a>
-    </li>
+  <li class="nav-item" role="presentation">
+    <a href="?tab=related-assets"
+       data-bs-target="#related-assets"
+       class="nav-link {% if request.GET.tab == 'related-assets' %}active{% endif %}"
+       data-bs-toggle="tab"
+       hx-boost="false"
+       role="tab">
+      <i class="mdi mdi-office-building-outline me-1 text-purple"></i>
+      {% translate "Related Assets" %} <span class="badge bg-purple-lt ms-2">{{ assets_table.rows|length }}</span>
+    </a>
+  </li>
+  <li class="nav-item" role="presentation">
+    <a href="?tab=requests"
+       data-bs-target="#requests"
+       class="nav-link {% if request.GET.tab == 'requests' %}active{% endif %}"
+       data-bs-toggle="tab"
+       hx-boost="false"
+       role="tab">
+      <i class="mdi mdi-clipboard-text-outline me-1 text-yellow"></i>
+      {% translate "Requests" %} <span class="badge bg-yellow-lt ms-2">{{ object.requests.count }}</span>
+    </a>
+  </li>
+  <li class="nav-item" role="presentation">
+    <a href="?tab=kits"
+       data-bs-target="#kits"
+       class="nav-link {% if request.GET.tab == 'kits' %}active{% endif %}"
+       data-bs-toggle="tab"
+       hx-boost="false"
+       role="tab">
+      <i class="mdi mdi-package-variant-closed me-1 text-orange"></i>
+      {% translate "Kits" %} <span class="badge bg-orange-lt ms-2">{{ kits_table.rows|length }}</span>
+    </a>
+  </li>
 {% endblock extra_tabs %}
-
 {# Object details rendered via panel layout #}
-
 {# --- Extra Tab Panes --- #}
 {% block extra_tab_panes %}
-    {# Related Assets Tab Pane #}
-    {% translate "Assets of this Model / Type" as t_assets %}
-    {% translate "No physical assets registered under this type/model yet." as e_assets %}
-    {% include 'generic/includes/related_table_tab.html' with tab="related-assets" table=assets_table title=t_assets empty=e_assets icon="mdi mdi-cancel" %}
-
-    {% translate "Asset Requests for this Model / Type" as t_requests %}
-    {% translate "No requests logged for this asset type." as e_requests %}
-    {% include 'generic/includes/related_table_tab.html' with tab="requests" table=requests_table title=t_requests empty=e_requests %}
-
-    {% translate "Kits Allocating this Model / Type" as t_kits %}
-    {% translate "No kits allocate this asset type." as e_kits %}
-    {% include 'generic/includes/related_table_tab.html' with tab="kits" table=kits_table title=t_kits empty=e_kits %}
+  {# Related Assets Tab Pane #}
+  {% translate "Assets of this Model / Type" as t_assets %}
+  {% translate "No physical assets registered under this type/model yet." as e_assets %}
+  {% include 'generic/includes/related_table_tab.html' with tab="related-assets" table=assets_table title=t_assets empty=e_assets icon="mdi mdi-cancel" %}
+  {% translate "Asset Requests for this Model / Type" as t_requests %}
+  {% translate "No requests logged for this asset type." as e_requests %}
+  {% include 'generic/includes/related_table_tab.html' with tab="requests" table=requests_table title=t_requests empty=e_requests %}
+  {% translate "Kits Allocating this Model / Type" as t_kits %}
+  {% translate "No kits allocate this asset type." as e_kits %}
+  {% include 'generic/includes/related_table_tab.html' with tab="kits" table=kits_table title=t_kits empty=e_kits %}
 {% endblock extra_tab_panes %}

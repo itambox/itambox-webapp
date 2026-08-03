@@ -1,140 +1,149 @@
 {% extends 'users/base.html' %}
 {% load i18n %}
 {% load crispy_forms_tags %}
-
-{% block title_tab %}{% translate "API Tokens" %}{% endblock %}
-
+{% block title_tab %}
+  {% translate "API Tokens" %}
+{% endblock %}
 {% block content_tab %}
-<div class="mb-4">
+  <div class="mb-4">
     <h3 class="card-title mb-0">{% translate "API Tokens" %}</h3>
     <p class="text-muted small mb-0">{% translate "Manage personal access tokens to authenticate external integrations, API scripts, and CLI utilities." %}</p>
-</div>
-
-{# Generated Key copy-once alert block #}
-{% if new_token_key %}
+  </div>
+  {# Generated Key copy-once alert block #}
+  {% if new_token_key %}
     <div class="alert alert-success alert-important" role="alert">
-        <div class="d-flex">
-            <div>
-                <i class="mdi mdi-check alert-icon"></i>
-            </div>
-            <div class="w-100">
-                <h4 class="alert-title">{% translate "New API Access Token Generated Successfully!" %}</h4>
-                <div class="mb-3">
-                    {% translate "Please copy this token key now. For your security, it will not be displayed on this page again." %}
-                </div>
-                <div class="input-group">
-                    <input type="text" class="form-control font-monospace fw-bold select-all" value="{{ new_token_key }}" readonly id="token-key-display">
-                    <button class="btn btn-success" type="button" data-copy-input="#token-key-display" data-copy-feedback="Copied!">
-                        {% translate "Copy" %}
-                    </button>
-                </div>
-            </div>
+      <div class="d-flex">
+        <div>
+          <i class="mdi mdi-check alert-icon"></i>
         </div>
+        <div class="w-100">
+          <h4 class="alert-title">{% translate "New API Access Token Generated Successfully!" %}</h4>
+          <div class="mb-3">
+            {% translate "Please copy this token key now. For your security, it will not be displayed on this page again." %}
+          </div>
+          <div class="input-group">
+            <input type="text"
+                   class="form-control font-monospace fw-bold select-all"
+                   value="{{ new_token_key }}"
+                   readonly
+                   id="token-key-display">
+            <button class="btn btn-success"
+                    type="button"
+                    data-copy-input="#token-key-display"
+                    data-copy-feedback="Copied!">{% translate "Copy" %}</button>
+          </div>
+        </div>
+      </div>
     </div>
-{% endif %}
-
-<div class="row row-cards">
+  {% endif %}
+  <div class="row row-cards">
     {# Left Card: Active API Tokens List #}
     <div class="col-md-8">
-        <div class="card">
-            <div class="card-header">
-                <h3 class="card-title">{% translate "Active Tokens" %}</h3>
-            </div>
-            {% if tokens %}
-                <div class="table-responsive">
-                    <table class="table card-table table-vcenter text-nowrap datatable">
-                        <thead>
-                            <tr>
-                                <th>{% translate "Token" %}</th>
-                                <th>{% translate "Description" %}</th>
-                                <th>{% translate "Permissions" %}</th>
-                                <th>{% translate "Created" %}</th>
-                                <th>{% translate "Expires" %}</th>
-                                <th>{% translate "Last Used" %}</th>
-                                <th class="text-end"></th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {% for token in tokens %}
-                                <tr>
-                                    <td data-label="{% translate 'Token' %}">
-                                        <code class="font-monospace text-body fw-medium" title="{{ token.key }}">{{ token.key|slice:":6" }}...</code>
-                                    </td>
-                                    <td data-label="{% translate 'Description' %}">
-                                        <span class="text-secondary small font-weight-medium d-block">{{ token.description|default:"—" }}</span>
-                                    </td>
-                                    <td data-label="{% translate 'Permissions' %}">
-                                        {% if token.write_enabled %}
-                                            <span class="badge bg-success-lt text-uppercase font-weight-bold px-2" style="font-size: 0.65rem;">{% translate "Read / Write" %}</span>
-                                        {% else %}
-                                            <span class="badge bg-info-lt text-uppercase font-weight-bold px-2" style="font-size: 0.65rem;">{% translate "Read-Only" %}</span>
-                                        {% endif %}
-                                    </td>
-                                    <td data-label="{% translate 'Created' %}">
-                                        <span class="small text-muted">{{ token.created|date:"Y-m-d" }}</span>
-                                    </td>
-                                    <td data-label="{% translate 'Expires' %}">
-                                        {% if token.expires %}
-                                            {% if token.is_expired %}
-                                                <span class="badge bg-danger-lt font-weight-medium">{% translate "Expired" %} ({{ token.expires|date:"Y-m-d" }})</span>
-                                            {% else %}
-                                                <span class="small text-muted">{{ token.expires|date:"Y-m-d" }}</span>
-                                            {% endif %}
-                                        {% else %}
-                                            <span class="small text-muted">{% translate "Never" %}</span>
-                                        {% endif %}
-                                    </td>
-                                    <td data-label="{% translate 'Last Used' %}">
-                                        {% if token.last_used %}
-                                            <span class="small text-muted font-monospace">{{ token.last_used|date:"Y-m-d H:i" }}</span>
-                                        {% else %}
-                                            <span class="small text-muted">{% translate "Never" %}</span>
-                                        {% endif %}
-                                    </td>
-                                    <td class="text-end" data-label="">
-                                        <form method="post" action="{% url 'users:delete_api_token' pk=token.pk %}" class="d-inline">
-                                            {% csrf_token %}
-                                            <button type="submit" class="btn btn-sm btn-ghost-danger border-0 px-2 py-1" title="{% translate "Revoke Token" %}" data-confirm="{% translate 'Are you sure you want to revoke this API token? External scripts using this key will immediately lose access.' %}">
-                                                <i class="mdi mdi-delete-forever-outline"></i>
-                                                <span class="d-none d-sm-inline ms-1">{% translate "Revoke" %}</span>
-                                            </button>
-                                        </form>
-                                    </td>
-                                </tr>
-                            {% endfor %}
-                        </tbody>
-                    </table>
-                </div>
-            {% else %}
-                <div class="py-5 text-muted text-center card border-0 bg-transparent shadow-none">
-                    <div class="card-body">
-                        <i class="mdi mdi-key-outline text-muted mb-2"></i>
-                        <p class="mb-0 small font-weight-medium">{% translate "You have not generated any API access tokens." %}</p>
-                    </div>
-                </div>
-            {% endif %}
+      <div class="card">
+        <div class="card-header">
+          <h3 class="card-title">{% translate "Active Tokens" %}</h3>
         </div>
+        {% if tokens %}
+          <div class="table-responsive">
+            <table class="table card-table table-vcenter text-nowrap datatable">
+              <thead>
+                <tr>
+                  <th>{% translate "Token" %}</th>
+                  <th>{% translate "Description" %}</th>
+                  <th>{% translate "Permissions" %}</th>
+                  <th>{% translate "Created" %}</th>
+                  <th>{% translate "Expires" %}</th>
+                  <th>{% translate "Last Used" %}</th>
+                  <th class="text-end"></th>
+                </tr>
+              </thead>
+              <tbody>
+                {% for token in tokens %}
+                  <tr>
+                    <td data-label="{% translate 'Token' %}">
+                      <code class="font-monospace text-body fw-medium" title="{{ token.key }}">{{ token.key|slice:":6" }}...</code>
+                    </td>
+                    <td data-label="{% translate 'Description' %}">
+                      <span class="text-secondary small font-weight-medium d-block">{{ token.description|default:"—" }}</span>
+                    </td>
+                    <td data-label="{% translate 'Permissions' %}">
+                      {% if token.write_enabled %}
+                        <span class="badge bg-success-lt text-uppercase font-weight-bold px-2"
+                              style="font-size: 0.65rem">{% translate "Read / Write" %}</span>
+                      {% else %}
+                        <span class="badge bg-info-lt text-uppercase font-weight-bold px-2"
+                              style="font-size: 0.65rem">{% translate "Read-Only" %}</span>
+                      {% endif %}
+                    </td>
+                    <td data-label="{% translate 'Created' %}">
+                      <span class="small text-muted">{{ token.created|date:"Y-m-d" }}</span>
+                    </td>
+                    <td data-label="{% translate 'Expires' %}">
+                      {% if token.expires %}
+                        {% if token.is_expired %}
+                          <span class="badge bg-danger-lt font-weight-medium">{% translate "Expired" %} ({{ token.expires|date:"Y-m-d" }})</span>
+                        {% else %}
+                          <span class="small text-muted">{{ token.expires|date:"Y-m-d" }}</span>
+                        {% endif %}
+                      {% else %}
+                        <span class="small text-muted">{% translate "Never" %}</span>
+                      {% endif %}
+                    </td>
+                    <td data-label="{% translate 'Last Used' %}">
+                      {% if token.last_used %}
+                        <span class="small text-muted font-monospace">{{ token.last_used|date:"Y-m-d H:i" }}</span>
+                      {% else %}
+                        <span class="small text-muted">{% translate "Never" %}</span>
+                      {% endif %}
+                    </td>
+                    <td class="text-end" data-label="">
+                      <form method="post"
+                            action="{% url 'users:delete_api_token' pk=token.pk %}"
+                            class="d-inline">
+                        {% csrf_token %}
+                        <button type="submit"
+                                class="btn btn-sm btn-ghost-danger border-0 px-2 py-1"
+                                title="{% translate "Revoke Token" %}"
+                                data-confirm="{% translate 'Are you sure you want to revoke this API token? External scripts using this key will immediately lose access.' %}">
+                          <i class="mdi mdi-delete-forever-outline"></i>
+                          <span class="d-none d-sm-inline ms-1">{% translate "Revoke" %}</span>
+                        </button>
+                      </form>
+                    </td>
+                  </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+        {% else %}
+          <div class="py-5 text-muted text-center card border-0 bg-transparent shadow-none">
+            <div class="card-body">
+              <i class="mdi mdi-key-outline text-muted mb-2"></i>
+              <p class="mb-0 small font-weight-medium">{% translate "You have not generated any API access tokens." %}</p>
+            </div>
+          </div>
+        {% endif %}
+      </div>
     </div>
-
     {# Right Card: Generate New Token Form #}
     <div class="col-md-4">
-        <div class="card">
-            <div class="card-header">
-                <h3 class="card-title">{% translate "Generate Token" %}</h3>
-            </div>
-            <div class="card-body">
-                <form method="post">
-                    {% csrf_token %}
-                    {{ form|crispy }}
-                    <div class="text-end mt-4">
-                        <button type="submit" class="btn btn-primary w-100">
-                            <i class="mdi mdi-plus me-1"></i>
-                            {% translate "Generate Token" %}
-                        </button>
-                    </div>
-                </form>
-            </div>
+      <div class="card">
+        <div class="card-header">
+          <h3 class="card-title">{% translate "Generate Token" %}</h3>
         </div>
+        <div class="card-body">
+          <form method="post">
+            {% csrf_token %}
+            {{ form|crispy }}
+            <div class="text-end mt-4">
+              <button type="submit" class="btn btn-primary w-100">
+                <i class="mdi mdi-plus me-1"></i>
+                {% translate "Generate Token" %}
+              </button>
+            </div>
+          </form>
+        </div>
+      </div>
     </div>
-</div>
+  </div>
 {% endblock %}

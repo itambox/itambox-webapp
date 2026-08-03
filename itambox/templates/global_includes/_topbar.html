@@ -1,168 +1,209 @@
 {% load i18n %}
 {% load plugins %}
 <header class="navbar navbar-expand-md d-none d-lg-flex d-print-none itambox-topbar">
-    <div class="container-fluid">
-        <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar-menu"
-            aria-controls="navbar-menu" aria-expanded="false" aria-label="{% translate 'Toggle navigation' %}">
-            <span class="navbar-toggler-icon"></span>
-        </button>
-
-        <div class="nav-item d-none d-md-flex me-auto">
-            <form hx-get="{% url 'search' %}" hx-target="#page-content-wrapper" hx-push-url="true" autocomplete="off">
-                <div class="input-icon">
-                    <span class="input-icon-addon">
-                        <i class="mdi mdi-magnify"></i>
-                    </span>
-                    <input type="text" id="global-search-input" name="q" value="{{ request.GET.q|default:'' }}" class="form-control" placeholder="{% translate "Search…" %}" aria-label="{% translate "Search in website" %}">
-                    <kbd class="global-search-kbd" aria-hidden="true">Ctrl K</kbd>
-                </div>
-            </form>
+  <div class="container-fluid">
+    <button class="navbar-toggler"
+            type="button"
+            data-bs-toggle="collapse"
+            data-bs-target="#navbar-menu"
+            aria-controls="navbar-menu"
+            aria-expanded="false"
+            aria-label="{% translate 'Toggle navigation' %}">
+      <span class="navbar-toggler-icon"></span>
+    </button>
+    <div class="nav-item d-none d-md-flex me-auto">
+      <form hx-get="{% url 'search' %}"
+            hx-target="#page-content-wrapper"
+            hx-push-url="true"
+            autocomplete="off">
+        <div class="input-icon">
+          <span class="input-icon-addon">
+            <i class="mdi mdi-magnify"></i>
+          </span>
+          <input type="text"
+                 id="global-search-input"
+                 name="q"
+                 value="{{ request.GET.q|default:'' }}"
+                 class="form-control"
+                 placeholder="{% translate "Search…" %}"
+                 aria-label="{% translate "Search in website" %}">
+          <kbd class="global-search-kbd" aria-hidden="true">Ctrl K</kbd>
         </div>
-        <div class="navbar-nav flex-row order-md-last">
-            <div class="d-flex">
-                {# Plugin navbar injections (global position) #}
-                {% if object %}
-                    {% plugin_template_content object "navbar" object %}
-                {% elif model_name_str %}
-                    {% plugin_template_content model_name_str "navbar" %}
-                {% endif %}
-                {# Workspace Switcher #}
-                {% if request.user.is_authenticated %}
-                <div class="nav-item dropdown me-3 d-none d-md-flex">
-                    <a href="#" class="btn workspace-switcher dropdown-toggle" data-bs-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
-                        <span class="workspace-switcher-icon" aria-hidden="true">
-                            <i class="mdi mdi-briefcase-outline"></i>
-                        </span>
-                        <span class="workspace-switcher-name">
-                        {% if request.active_tenant %}
-                        {{ request.active_tenant.name }}
-                        {% elif request.active_tenant_group %}
-                            {{ request.active_tenant_group.name }} {% translate "(Group)" %}
-                        {% else %}
-                            {% translate "All Tenants" %}
-                        {% endif %}
-                        </span>
-                    </a>
-                    <div class="dropdown-menu dropdown-menu-end dropdown-menu-card dropdown-menu-arrow"
-                        style="min-width: 22rem;">
-                        <div class="card">
-                            <div class="card-header py-2">
-                                <h3 class="card-title text-reset fs-6">{% translate "Active Workspace" %}</h3>
-                            </div>
-                            <div class="list-group list-group-flush list-group-hoverable" style="max-height: 400px; overflow-y: auto;">
-                                {% include 'global_includes/_tenant_switcher_list.html' %}
-                            </div>
-                        </div>
-                    </div>
-                </div>
-                {% endif %}
-
-                {# Language selection moved to user Preferences (applies app-wide). #}
-                <button class="nav-link px-0 color-mode-toggle hide-theme-dark" title="{% translate 'Enable dark mode' %}" aria-label="{% translate 'Enable dark mode' %}" data-bs-toggle="tooltip" data-bs-placement="bottom">
-                    <i class="mdi mdi-weather-night fs-2"></i>
-                </button>
-                <button class="nav-link px-0 color-mode-toggle hide-theme-light" title="{% translate 'Enable light mode' %}" aria-label="{% translate 'Enable light mode' %}" data-bs-toggle="tooltip" data-bs-placement="bottom">
-                    <i class="mdi mdi-weather-sunny fs-2"></i>
-                </button>
-                <div class="nav-item dropdown d-none d-md-flex me-3"
-                     hx-get="{% url 'users:notification_poll' %}"
-                     hx-trigger="load, every 30s"
-                     hx-target="#notification-dropdown-content"
-                     hx-swap="innerHTML">
-                    <a href="#" class="nav-link px-0" data-bs-toggle="dropdown" tabindex="-1" aria-label="{% translate 'Show notifications' %}">
-                        <i class="mdi mdi-bell-outline fs-2"></i>
-                        <span id="notification-badge">
-                            {% if unread_notifications_count > 0 %}
-                            <span class="badge bg-red"></span>
-                            {% endif %}
-                        </span>
-                    </a>
-                    <div class="dropdown-menu dropdown-menu-arrow dropdown-menu-end dropdown-menu-card">
-                        <div id="notification-dropdown-content">
-                            <div class="card">
-                                <div class="card-header">
-                                    <h3 class="card-title">{% translate "Unread Alerts" %} ({{ unread_notifications_count }})</h3>
-                                </div>
-                                <div class="list-group list-group-flush list-group-hoverable">
-                                    {% if recent_unread_notifications %}
-                                        {% for notif in recent_unread_notifications %}
-                                        <div class="list-group-item">
-                                            <div class="row align-items-center">
-                                                <div class="col-auto">
-                                                    <span class="status-dot status-dot-animated {% if notif.level == 'danger' %}bg-red{% elif notif.level == 'warning' %}bg-warning{% else %}bg-blue{% endif %} d-block"></span>
-                                                </div>
-                                                <div class="col text-truncate">
-                                                    <a href="{% url 'users:view_notification' pk=notif.pk %}"
-                                                        class="text-body d-block font-weight-bold" hx-target="#page-content-wrapper">{{ notif.subject }}</a>
-                                                    <div class="d-block text-muted text-truncate mt-n1 small">
-                                                        {{ notif.message }}
-                                                    </div>
-                                                </div>
-                                            </div>
-                                        </div>
-                                        {% endfor %}
-                                    {% else %}
-                                        <div class="list-group-item text-muted text-center py-3">
-                                            {% translate "No unread notifications" %}
-                                        </div>
-                                    {% endif %}
-                                </div>
-                                <div class="card-footer text-center py-2">
-                                    <a href="{% url 'users:user_notifications' %}" class="small font-weight-bold" hx-target="#page-content-wrapper">{% translate "View Notification Center" %}</a>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-            <div class="nav-item dropdown">
-                <a href="#" class="nav-link d-flex lh-1 text-reset p-0" data-bs-toggle="dropdown"
-                    aria-label="{% translate 'Open user menu' %}">
-                    <div class="d-none d-xl-block ps-2">
-                        <div>{% if user.is_authenticated %}{{ user.get_full_name|default:user.username }}{% else %}{% translate "Guest" %}{% endif %}</div>
-                        <div class="mt-1 small text-muted">{% if user.is_staff %}{% translate "Admin" %}{% elif user.is_authenticated %}{% translate "User" %}{% else %}{% translate "Not Logged In" %}{% endif %}</div>
-                    </div>
-                </a>
-                <div class="dropdown-menu dropdown-menu-end dropdown-menu-arrow">
-                    {% if user.is_authenticated %}
-                        <a href="{% url 'users:user_profile' %}" class="dropdown-item">
-                            <i class="mdi mdi-account-circle-outline dropdown-item-icon"></i>
-                             {% translate "Profile" %}
-                        </a>
-                        <a href="{% url 'users:user_notifications' %}" class="dropdown-item">
-                             <i class="mdi mdi-bell-outline dropdown-item-icon"></i>
-                             {% translate "Notifications" %}
-                             {% if unread_notifications_count > 0 %}
-                                 <span class="badge bg-red-lt ms-auto">{{ unread_notifications_count }}</span>
-                             {% endif %}
-                        </a>
-                         <a href="{% url 'users:user_subscriptions' %}" class="dropdown-item">
-                            <i class="mdi mdi-bookmark-outline dropdown-item-icon"></i>
-                             {% translate "Subscriptions" %}
-                        </a>
-                        <a href="{% url 'users:user_preferences' %}" class="dropdown-item">
-                            <i class="mdi mdi-cog-outline dropdown-item-icon"></i>
-                             {% translate "Preferences" %}
-                        </a>
-                        <a href="{% url 'users:user_api_tokens' %}" class="dropdown-item">
-                             <i class="mdi mdi-key-outline dropdown-item-icon"></i>
-                             {% translate "API Tokens" %}
-                        </a>
-                        <div class="dropdown-divider"></div>
-                        {# Logout Form #}
-                        <form action="{% url 'logout' %}" method="post" class="d-inline w-100" hx-boost="false"> {# Make form take width #}
-                            {% csrf_token %}
-                            <button type="submit" class="dropdown-item">
-                                <i class="mdi mdi-logout dropdown-item-icon"></i>
-                                {% translate "Logout" %}
-                            </button>
-                        </form>
-                    {% else %}
-                        <a href="{% url 'login' %}" class="dropdown-item">{% translate "Login" %}</a>
-                    {% endif %}
-                </div>
-            </div>
-        </div>
+      </form>
     </div>
+    <div class="navbar-nav flex-row order-md-last">
+      <div class="d-flex">
+        {# Plugin navbar injections (global position) #}
+        {% if object %}
+          {% plugin_template_content object "navbar" object %}
+        {% elif model_name_str %}
+          {% plugin_template_content model_name_str "navbar" %}
+        {% endif %}
+        {# Workspace Switcher #}
+        {% if request.user.is_authenticated %}
+          <div class="nav-item dropdown me-3 d-none d-md-flex">
+            <a href="#"
+               class="btn workspace-switcher dropdown-toggle"
+               data-bs-toggle="dropdown"
+               aria-haspopup="true"
+               aria-expanded="false">
+              <span class="workspace-switcher-icon" aria-hidden="true">
+                <i class="mdi mdi-briefcase-outline"></i>
+              </span>
+              <span class="workspace-switcher-name">
+                {% if request.active_tenant %}
+                  {{ request.active_tenant.name }}
+                {% elif request.active_tenant_group %}
+                  {{ request.active_tenant_group.name }} {% translate "(Group)" %}
+                {% else %}
+                  {% translate "All Tenants" %}
+                {% endif %}
+              </span>
+            </a>
+            <div class="dropdown-menu dropdown-menu-end dropdown-menu-card dropdown-menu-arrow"
+                 style="min-width: 22rem">
+              <div class="card">
+                <div class="card-header py-2">
+                  <h3 class="card-title text-reset fs-6">{% translate "Active Workspace" %}</h3>
+                </div>
+                <div class="list-group list-group-flush list-group-hoverable"
+                     style="max-height: 400px;
+                            overflow-y: auto">{% include 'global_includes/_tenant_switcher_list.html' %}</div>
+              </div>
+            </div>
+          </div>
+        {% endif %}
+        {# Language selection moved to user Preferences (applies app-wide). #}
+        <button class="nav-link px-0 color-mode-toggle hide-theme-dark"
+                title="{% translate 'Enable dark mode' %}"
+                aria-label="{% translate 'Enable dark mode' %}"
+                data-bs-toggle="tooltip"
+                data-bs-placement="bottom">
+          <i class="mdi mdi-weather-night fs-2"></i>
+        </button>
+        <button class="nav-link px-0 color-mode-toggle hide-theme-light"
+                title="{% translate 'Enable light mode' %}"
+                aria-label="{% translate 'Enable light mode' %}"
+                data-bs-toggle="tooltip"
+                data-bs-placement="bottom">
+          <i class="mdi mdi-weather-sunny fs-2"></i>
+        </button>
+        <div class="nav-item dropdown d-none d-md-flex me-3"
+             hx-get="{% url 'users:notification_poll' %}"
+             hx-trigger="load, every 30s"
+             hx-target="#notification-dropdown-content"
+             hx-swap="innerHTML">
+          <a href="#"
+             class="nav-link px-0"
+             data-bs-toggle="dropdown"
+             tabindex="-1"
+             aria-label="{% translate 'Show notifications' %}">
+            <i class="mdi mdi-bell-outline fs-2"></i>
+            <span id="notification-badge">
+              {% if unread_notifications_count > 0 %}
+                <span class="badge bg-red"></span>
+              {% endif %}
+            </span>
+          </a>
+          <div class="dropdown-menu dropdown-menu-arrow dropdown-menu-end dropdown-menu-card">
+            <div id="notification-dropdown-content">
+              <div class="card">
+                <div class="card-header">
+                  <h3 class="card-title">{% translate "Unread Alerts" %} ({{ unread_notifications_count }})</h3>
+                </div>
+                <div class="list-group list-group-flush list-group-hoverable">
+                  {% if recent_unread_notifications %}
+                    {% for notif in recent_unread_notifications %}
+                      <div class="list-group-item">
+                        <div class="row align-items-center">
+                          <div class="col-auto">
+                            <span class="status-dot status-dot-animated {% if notif.level == 'danger' %}bg-red{% elif notif.level == 'warning' %}bg-warning{% else %}bg-blue{% endif %} d-block"></span>
+                          </div>
+                          <div class="col text-truncate">
+                            <a href="{% url 'users:view_notification' pk=notif.pk %}"
+                               class="text-body d-block font-weight-bold"
+                               hx-target="#page-content-wrapper">{{ notif.subject }}</a>
+                            <div class="d-block text-muted text-truncate mt-n1 small">{{ notif.message }}</div>
+                          </div>
+                        </div>
+                      </div>
+                    {% endfor %}
+                  {% else %}
+                    <div class="list-group-item text-muted text-center py-3">{% translate "No unread notifications" %}</div>
+                  {% endif %}
+                </div>
+                <div class="card-footer text-center py-2">
+                  <a href="{% url 'users:user_notifications' %}"
+                     class="small font-weight-bold"
+                     hx-target="#page-content-wrapper">{% translate "View Notification Center" %}</a>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="nav-item dropdown">
+        <a href="#"
+           class="nav-link d-flex lh-1 text-reset p-0"
+           data-bs-toggle="dropdown"
+           aria-label="{% translate 'Open user menu' %}">
+          <div class="d-none d-xl-block ps-2">
+            <div>{% if user.is_authenticated %}{{ user.get_full_name|default:user.username }}{% else %}{% translate "Guest" %}{% endif %}</div>
+            <div class="mt-1 small text-muted">
+              {% if user.is_staff %}
+                {% translate "Admin" %}
+              {% elif user.is_authenticated %}
+                {% translate "User" %}
+              {% else %}
+                {% translate "Not Logged In" %}
+              {% endif %}
+            </div>
+          </div>
+        </a>
+        <div class="dropdown-menu dropdown-menu-end dropdown-menu-arrow">
+          {% if user.is_authenticated %}
+            <a href="{% url 'users:user_profile' %}" class="dropdown-item">
+              <i class="mdi mdi-account-circle-outline dropdown-item-icon"></i>
+              {% translate "Profile" %}
+            </a>
+            <a href="{% url 'users:user_notifications' %}" class="dropdown-item">
+              <i class="mdi mdi-bell-outline dropdown-item-icon"></i>
+              {% translate "Notifications" %}
+              {% if unread_notifications_count > 0 %}
+                <span class="badge bg-red-lt ms-auto">{{ unread_notifications_count }}</span>
+              {% endif %}
+            </a>
+            <a href="{% url 'users:user_subscriptions' %}" class="dropdown-item">
+              <i class="mdi mdi-bookmark-outline dropdown-item-icon"></i>
+              {% translate "Subscriptions" %}
+            </a>
+            <a href="{% url 'users:user_preferences' %}" class="dropdown-item">
+              <i class="mdi mdi-cog-outline dropdown-item-icon"></i>
+              {% translate "Preferences" %}
+            </a>
+            <a href="{% url 'users:user_api_tokens' %}" class="dropdown-item">
+              <i class="mdi mdi-key-outline dropdown-item-icon"></i>
+              {% translate "API Tokens" %}
+            </a>
+            <div class="dropdown-divider"></div>
+            {# Logout Form #}
+            <form action="{% url 'logout' %}"
+                  method="post"
+                  class="d-inline w-100"
+                  hx-boost="false">
+              {# Make form take width #}
+              {% csrf_token %}
+              <button type="submit" class="dropdown-item">
+                <i class="mdi mdi-logout dropdown-item-icon"></i>
+                {% translate "Logout" %}
+              </button>
+            </form>
+          {% else %}
+            <a href="{% url 'login' %}" class="dropdown-item">{% translate "Login" %}</a>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+  </div>
 </header>
 {# Removed the second header section which is now in _sidebar.html #}

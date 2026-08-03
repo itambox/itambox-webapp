@@ -1,5 +1,5 @@
 {% load i18n %}
 {% translate "Total Installations Detected" as l_inst %}
 <div class="row g-3 mb-4">
-    {% include "generic/includes/stat_card.html" with col="col-sm-12" color="purple" icon="mdi mdi-memory" label=l_inst value=instances_table.rows|length %}
+  {% include "generic/includes/stat_card.html" with col="col-sm-12" color="purple" icon="mdi mdi-memory" label=l_inst value=instances_table.rows|length %}
 </div>

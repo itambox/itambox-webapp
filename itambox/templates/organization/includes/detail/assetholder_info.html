@@ -1,35 +1,35 @@
 {% load i18n %}
 <dl class="row mb-0">
-    <dt class="col-sm-4">{% translate "Full Name:" %}</dt>
-    <dd class="col-sm-8"><strong>{{ object.first_name }} {{ object.last_name }}</strong></dd>
-
-    <dt class="col-sm-4">{% translate "User Principal Name (UPN):" %}</dt>
-    <dd class="col-sm-8"><span class="badge bg-purple-lt px-2 py-1"><code>{{ object.upn }}</code></span></dd>
-
-    <dt class="col-sm-4">{% translate "Email Address:" %}</dt>
-    <dd class="col-sm-8">
-        {% if object.email %}
-            <a href="mailto:{{ object.email }}">{{ object.email }}</a>
-        {% else %}
-            <span class="text-muted"><i>{% translate "Not Set" %}</i></span>
-        {% endif %}
-    </dd>
-
-    <dt class="col-sm-4">{% translate "Tenant:" %}</dt>
-    <dd class="col-sm-8">
-        {% if object.tenant %}
-            <a href="{% url 'organization:tenant_detail' pk=object.tenant.pk %}">{{ object.tenant }}</a>
-        {% else %}
-             <span class="text-muted"><i>{% translate "None" %}</i></span>
-        {% endif %}
-    </dd>
-
-    <dt class="col-sm-4">{% translate "Linked User account:" %}</dt>
-    <dd class="col-sm-8">
-        {% if object.user %}
-            <span class="badge bg-blue-lt"><i class="mdi mdi-account-outline me-1"></i>{{ object.user.username }}</span>
-        {% else %}
-            <span class="text-muted"><i>{% translate "No linked user" %}</i></span>
-        {% endif %}
-    </dd>
+  <dt class="col-sm-4">{% translate "Full Name:" %}</dt>
+  <dd class="col-sm-8">
+    <strong>{{ object.first_name }} {{ object.last_name }}</strong>
+  </dd>
+  <dt class="col-sm-4">{% translate "User Principal Name (UPN):" %}</dt>
+  <dd class="col-sm-8">
+    <span class="badge bg-purple-lt px-2 py-1"><code>{{ object.upn }}</code></span>
+  </dd>
+  <dt class="col-sm-4">{% translate "Email Address:" %}</dt>
+  <dd class="col-sm-8">
+    {% if object.email %}
+      <a href="mailto:{{ object.email }}">{{ object.email }}</a>
+    {% else %}
+      <span class="text-muted"><i>{% translate "Not Set" %}</i></span>
+    {% endif %}
+  </dd>
+  <dt class="col-sm-4">{% translate "Tenant:" %}</dt>
+  <dd class="col-sm-8">
+    {% if object.tenant %}
+      <a href="{% url 'organization:tenant_detail' pk=object.tenant.pk %}">{{ object.tenant }}</a>
+    {% else %}
+      <span class="text-muted"><i>{% translate "None" %}</i></span>
+    {% endif %}
+  </dd>
+  <dt class="col-sm-4">{% translate "Linked User account:" %}</dt>
+  <dd class="col-sm-8">
+    {% if object.user %}
+      <span class="badge bg-blue-lt"><i class="mdi mdi-account-outline me-1"></i>{{ object.user.username }}</span>
+    {% else %}
+      <span class="text-muted"><i>{% translate "No linked user" %}</i></span>
+    {% endif %}
+  </dd>
 </dl>

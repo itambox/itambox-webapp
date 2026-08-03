@@ -2,67 +2,64 @@
 {% load utility_tags %}
 {# Panel: Site basic information #}
 <dl class="row mb-0">
-    <dt class="col-sm-3">{% translate "Name:" %}</dt>
-    <dd class="col-sm-9"><strong>{{ object.name }}</strong></dd>
-
-    <dt class="col-sm-3">{% translate "Slug:" %}</dt>
-    <dd class="col-sm-9"><code>{{ object.slug }}</code></dd>
-
-    <dt class="col-sm-3">{% translate "Status:" %}</dt>
-    <dd class="col-sm-9">
-        <span class="badge px-2.5 py-1 text-uppercase" style="background-color: #{{ object.status|status_color }}1a; color: #{{ object.status|status_color }}; border: 1px solid #{{ object.status|status_color }}33;">
-            {{ object.get_status_display }}
-        </span>
-    </dd>
-
-    <dt class="col-sm-3">{% translate "Region:" %}</dt>
-    <dd class="col-sm-9">
-        {% if object.region %}
-            <a href="{% url 'organization:region_detail' pk=object.region.pk %}">{{ object.region }}</a>
-        {% else %}
-             <span class="text-muted"><i>{% translate "None" %}</i></span>
-        {% endif %}
-    </dd>
-
-    <dt class="col-sm-3">{% translate "Site Group:" %}</dt>
-    <dd class="col-sm-9">
-        {% if object.group %}
-            <a href="{% url 'organization:sitegroup_detail' pk=object.group.pk %}">{{ object.group }}</a>
-        {% else %}
-             <span class="text-muted"><i>{% translate "None" %}</i></span>
-        {% endif %}
-    </dd>
-
-    <dt class="col-sm-3">{% translate "Tenant:" %}</dt>
-    <dd class="col-sm-9">
-        {% if object.tenant %}
-            <a href="{% url 'organization:tenant_detail' pk=object.tenant.pk %}">{{ object.tenant }}</a>
-        {% else %}
-             <span class="text-muted"><i>{% translate "None" %}</i></span>
-        {% endif %}
-    </dd>
-
-    <dt class="col-sm-3">{% translate "Facility:" %}</dt>
-    <dd class="col-sm-9">{% if object.facility %}{{object.facility}}{% else %}<span class='text-muted'><i>{% translate "Not Set" %}</i></span>{% endif %}</dd>
-
-    <dt class="col-sm-3">{% translate "Time Zone:" %}</dt>
-    <dd class="col-sm-9"><span class="badge bg-purple-lt">{{ object.time_zone|default:"UTC" }}</span></dd>
-
-    <dt class="col-sm-3">{% translate "Physical Address:" %}</dt>
-    <dd class="col-sm-9 text-secondary">{% if object.physical_address %}{{object.physical_address|linebreaksbr}}{% else %}<span class='text-muted'><i>{% translate "Not Set" %}</i></span>{% endif %}</dd>
-
-    <dt class="col-sm-3">{% translate "Shipping Address:" %}</dt>
-    <dd class="col-sm-9 text-secondary">{% if object.shipping_address %}{{object.shipping_address|linebreaksbr}}{% else %}<span class='text-muted'><i>{% translate "Not Set" %}</i></span>{% endif %}</dd>
-
-    <dt class="col-sm-3">{% translate "GPS Coordinates:" %}</dt>
-    <dd class="col-sm-9">
-        {% if object.latitude and object.longitude %}
-            <span class="badge bg-blue-lt">
-                <i class="mdi mdi-crosshairs-gps me-1"></i>
-                {{ object.latitude }}, {{ object.longitude }}
-            </span>
-        {% else %}
-            <span class="text-muted"><i>{% translate "Not Set" %}</i></span>
-        {% endif %}
-    </dd>
+  <dt class="col-sm-3">{% translate "Name:" %}</dt>
+  <dd class="col-sm-9">
+    <strong>{{ object.name }}</strong>
+  </dd>
+  <dt class="col-sm-3">{% translate "Slug:" %}</dt>
+  <dd class="col-sm-9">
+    <code>{{ object.slug }}</code>
+  </dd>
+  <dt class="col-sm-3">{% translate "Status:" %}</dt>
+  <dd class="col-sm-9">
+    <span class="badge px-2.5 py-1 text-uppercase"
+          style="background-color: #{{ object.status|status_color }}1a;
+                 color: #{{ object.status|status_color }};
+                 border: 1px solid #{{ object.status|status_color }}33">{{ object.get_status_display }}</span>
+  </dd>
+  <dt class="col-sm-3">{% translate "Region:" %}</dt>
+  <dd class="col-sm-9">
+    {% if object.region %}
+      <a href="{% url 'organization:region_detail' pk=object.region.pk %}">{{ object.region }}</a>
+    {% else %}
+      <span class="text-muted"><i>{% translate "None" %}</i></span>
+    {% endif %}
+  </dd>
+  <dt class="col-sm-3">{% translate "Site Group:" %}</dt>
+  <dd class="col-sm-9">
+    {% if object.group %}
+      <a href="{% url 'organization:sitegroup_detail' pk=object.group.pk %}">{{ object.group }}</a>
+    {% else %}
+      <span class="text-muted"><i>{% translate "None" %}</i></span>
+    {% endif %}
+  </dd>
+  <dt class="col-sm-3">{% translate "Tenant:" %}</dt>
+  <dd class="col-sm-9">
+    {% if object.tenant %}
+      <a href="{% url 'organization:tenant_detail' pk=object.tenant.pk %}">{{ object.tenant }}</a>
+    {% else %}
+      <span class="text-muted"><i>{% translate "None" %}</i></span>
+    {% endif %}
+  </dd>
+  <dt class="col-sm-3">{% translate "Facility:" %}</dt>
+  <dd class="col-sm-9">{% if object.facility %}{{ object.facility }}{% else %}<span class="text-muted"><i>{% translate "Not Set" %}</i></span>{% endif %}</dd>
+  <dt class="col-sm-3">{% translate "Time Zone:" %}</dt>
+  <dd class="col-sm-9">
+    <span class="badge bg-purple-lt">{{ object.time_zone|default:"UTC" }}</span>
+  </dd>
+  <dt class="col-sm-3">{% translate "Physical Address:" %}</dt>
+  <dd class="col-sm-9 text-secondary">{% if object.physical_address %}{{ object.physical_address|linebreaksbr }}{% else %}<span class="text-muted"><i>{% translate "Not Set" %}</i></span>{% endif %}</dd>
+  <dt class="col-sm-3">{% translate "Shipping Address:" %}</dt>
+  <dd class="col-sm-9 text-secondary">{% if object.shipping_address %}{{ object.shipping_address|linebreaksbr }}{% else %}<span class="text-muted"><i>{% translate "Not Set" %}</i></span>{% endif %}</dd>
+  <dt class="col-sm-3">{% translate "GPS Coordinates:" %}</dt>
+  <dd class="col-sm-9">
+    {% if object.latitude and object.longitude %}
+      <span class="badge bg-blue-lt">
+        <i class="mdi mdi-crosshairs-gps me-1"></i>
+        {{ object.latitude }}, {{ object.longitude }}
+      </span>
+    {% else %}
+      <span class="text-muted"><i>{% translate "Not Set" %}</i></span>
+    {% endif %}
+  </dd>
 </dl>

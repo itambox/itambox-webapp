@@ -1,99 +1,92 @@
 {% load i18n money %}
 {# Panel: Asset core information (tag, serial, type, manufacturer, role, status, purchase info) #}
 <dl class="row mb-0">
-    <dt class="col-sm-3">{% translate "Asset Tag:" %}</dt>
-    <dd class="col-sm-9"><span class="badge bg-blue-lt px-2.5 py-1"><strong>{{ object.asset_tag }}</strong></span></dd>
-
-    <dt class="col-sm-3">{% translate "Serial Number:" %}</dt>
-    <dd class="col-sm-9"><code>{% if object.serial_number %}{{object.serial_number}}{% else %}<span class='text-muted'><i>{% translate "Not Set" %}</i></span>{% endif %}</code></dd>
-    
-    <dt class="col-sm-3">{% translate "Asset Type / Model:" %}</dt>
-    <dd class="col-sm-9">
-        {% if object.asset_type %}
-            <a href="{% url 'assets:assettype_detail' pk=object.asset_type.pk %}">{{ object.asset_type }}</a>
+  <dt class="col-sm-3">{% translate "Asset Tag:" %}</dt>
+  <dd class="col-sm-9">
+    <span class="badge bg-blue-lt px-2.5 py-1"><strong>{{ object.asset_tag }}</strong></span>
+  </dd>
+  <dt class="col-sm-3">{% translate "Serial Number:" %}</dt>
+  <dd class="col-sm-9"><code>{% if object.serial_number %}{{ object.serial_number }}{% else %}<span class="text-muted"><i>{% translate "Not Set" %}</i></span>{% endif %}</code></dd>
+  <dt class="col-sm-3">{% translate "Asset Type / Model:" %}</dt>
+  <dd class="col-sm-9">
+    {% if object.asset_type %}
+      <a href="{% url 'assets:assettype_detail' pk=object.asset_type.pk %}">{{ object.asset_type }}</a>
+    {% else %}
+      <span class="text-muted"><i>{% translate "Not Set" %}</i></span>
+    {% endif %}
+  </dd>
+  <dt class="col-sm-3">{% translate "Manufacturer:" %}</dt>
+  <dd class="col-sm-9">
+    {% if object.manufacturer %}
+      <a href="{% url 'assets:manufacturer_detail' pk=object.manufacturer.pk %}">{{ object.manufacturer }}</a>
+    {% else %}
+      <span class="text-muted"><i>{% translate "N/A" %}</i></span>
+    {% endif %}
+  </dd>
+  <dt class="col-sm-3">{% translate "Asset Role:" %}</dt>
+  <dd class="col-sm-9">
+    {% if object.asset_role %}
+      <a href="{% url 'assets:assetrole_detail' pk=object.asset_role.pk %}">{{ object.asset_role }}</a>
+    {% else %}
+      <span class="text-muted"><i>{% translate "Not Set" %}</i></span>
+    {% endif %}
+  </dd>
+  <dt class="col-sm-3">{% translate "Status:" %}</dt>
+  <dd class="col-sm-9">
+    {% if object.status %}
+      <a href="{% url 'assets:statuslabel_detail' pk=object.status.pk %}"
+         class="text-decoration-none">
+        <span class="badge px-2.5 py-1 text-uppercase"
+              style="background-color: #{{ object.status.color }}1a;
+                     color: #{{ object.status.color }};
+                     border: 1px solid #{{ object.status.color }}33">{{ object.status.name }}</span>
+      </a>
+    {% else %}
+      —
+    {% endif %}
+  </dd>
+  <dt class="col-sm-3">{% translate "Requestable Status:" %}</dt>
+  <dd class="col-sm-9">
+    {% if object.is_requestable %}
+      <span class="badge bg-green-lt text-success d-inline-flex align-items-center">
+        <i class="mdi mdi-checkbox-outline me-1"></i>
+        {% if object.requestable is None %}
+          {% translate "Requestable by Staff (Inherited)" %}
         {% else %}
-             <span class="text-muted"><i>{% translate "Not Set" %}</i></span>
+          {% translate "Requestable by Staff" %}
         {% endif %}
-    </dd>
-
-    <dt class="col-sm-3">{% translate "Manufacturer:" %}</dt>
-    <dd class="col-sm-9">
-         {% if object.manufacturer %}
-            <a href="{% url 'assets:manufacturer_detail' pk=object.manufacturer.pk %}">{{ object.manufacturer }}</a>
+      </span>
+    {% else %}
+      <span class="badge bg-secondary-lt text-secondary d-inline-flex align-items-center">
+        <i class="mdi mdi-lock me-1"></i>
+        {% if object.requestable is None %}
+          {% translate "Administrative Custody Only (Inherited)" %}
         {% else %}
-             <span class="text-muted"><i>{% translate "N/A" %}</i></span>
+          {% translate "Administrative Custody Only" %}
         {% endif %}
-    </dd>
-
-    <dt class="col-sm-3">{% translate "Asset Role:" %}</dt>
-    <dd class="col-sm-9">
-        {% if object.asset_role %}
-            <a href="{% url 'assets:assetrole_detail' pk=object.asset_role.pk %}">{{ object.asset_role }}</a>
-        {% else %}
-             <span class="text-muted"><i>{% translate "Not Set" %}</i></span>
-        {% endif %}
-    </dd>
-
-    <dt class="col-sm-3">{% translate "Status:" %}</dt>
-    <dd class="col-sm-9">
-        {% if object.status %}
-            <a href="{% url 'assets:statuslabel_detail' pk=object.status.pk %}" class="text-decoration-none">
-                <span class="badge px-2.5 py-1 text-uppercase" style="background-color: #{{ object.status.color }}1a; color: #{{ object.status.color }}; border: 1px solid #{{ object.status.color }}33;">
-                    {{ object.status.name }}
-                </span>
-            </a>
-        {% else %}
-            —
-        {% endif %}
-    </dd>
-    
-    <dt class="col-sm-3">{% translate "Requestable Status:" %}</dt>
-    <dd class="col-sm-9">
-        {% if object.is_requestable %}
-            <span class="badge bg-green-lt text-success d-inline-flex align-items-center">
-                <i class="mdi mdi-checkbox-outline me-1"></i>
-                {% if object.requestable is None %}
-                    {% translate "Requestable by Staff (Inherited)" %}
-                {% else %}
-                    {% translate "Requestable by Staff" %}
-                {% endif %}
-            </span>
-        {% else %}
-            <span class="badge bg-secondary-lt text-secondary d-inline-flex align-items-center">
-                <i class="mdi mdi-lock me-1"></i>
-                {% if object.requestable is None %}
-                    {% translate "Administrative Custody Only (Inherited)" %}
-                {% else %}
-                    {% translate "Administrative Custody Only" %}
-                {% endif %}
-            </span>
-        {% endif %}
-    </dd>
-    
-    <dt class="col-sm-3">{% translate "Purchase Date:" %}</dt>
-    <dd class="col-sm-9 text-secondary">{% if object.purchase_date %}{{object.purchase_date|date:"Y-m-d"}}{% else %}<span class='text-muted'><i>{% translate "Not Set" %}</i></span>{% endif %}</dd>
-
-    <dt class="col-sm-3">{% translate "Warranty Until:" %}</dt>
-    <dd class="col-sm-9 text-secondary">{% if object.current_warranty_end %}{{object.current_warranty_end|date:"Y-m-d"}}{% else %}<span class='text-muted'><i>{% translate "No active warranty" %}</i></span>{% endif %}</dd>
-
-    <dt class="col-sm-3">{% translate "Purchase Cost:" %}</dt>
-    <dd class="col-sm-9 text-secondary">
-        {% if object.purchase_cost %}
-            {{ object.purchase_cost|money:object }}
-        {% else %}
-            <span class="text-muted"><i>{% translate "Not Set" %}</i></span>
-        {% endif %}
-    </dd>
-
-    <dt class="col-sm-3">{% translate "Supplier:" %}</dt>
-    <dd class="col-sm-9 text-secondary">{% if object.supplier %}{{object.supplier}}{% else %}<span class='text-muted'><i>{% translate "Not Set" %}</i></span>{% endif %}</dd>
-
-    <dt class="col-sm-3">{% translate "Order Number:" %}</dt>
-    <dd class="col-sm-9 text-secondary">
-        {% if object.order_number %}
-            <code>{{ object.order_number }}</code>
-        {% else %}
-            <span class="text-muted"><i>{% translate "Not Set" %}</i></span>
-        {% endif %}
-    </dd>
+      </span>
+    {% endif %}
+  </dd>
+  <dt class="col-sm-3">{% translate "Purchase Date:" %}</dt>
+  <dd class="col-sm-9 text-secondary">{% if object.purchase_date %}{{ object.purchase_date|date:"Y-m-d" }}{% else %}<span class="text-muted"><i>{% translate "Not Set" %}</i></span>{% endif %}</dd>
+  <dt class="col-sm-3">{% translate "Warranty Until:" %}</dt>
+  <dd class="col-sm-9 text-secondary">{% if object.current_warranty_end %}{{ object.current_warranty_end|date:"Y-m-d" }}{% else %}<span class="text-muted"><i>{% translate "No active warranty" %}</i></span>{% endif %}</dd>
+  <dt class="col-sm-3">{% translate "Purchase Cost:" %}</dt>
+  <dd class="col-sm-9 text-secondary">
+    {% if object.purchase_cost %}
+      {{ object.purchase_cost|money:object }}
+    {% else %}
+      <span class="text-muted"><i>{% translate "Not Set" %}</i></span>
+    {% endif %}
+  </dd>
+  <dt class="col-sm-3">{% translate "Supplier:" %}</dt>
+  <dd class="col-sm-9 text-secondary">{% if object.supplier %}{{ object.supplier }}{% else %}<span class="text-muted"><i>{% translate "Not Set" %}</i></span>{% endif %}</dd>
+  <dt class="col-sm-3">{% translate "Order Number:" %}</dt>
+  <dd class="col-sm-9 text-secondary">
+    {% if object.order_number %}
+      <code>{{ object.order_number }}</code>
+    {% else %}
+      <span class="text-muted"><i>{% translate "Not Set" %}</i></span>
+    {% endif %}
+  </dd>
 </dl>

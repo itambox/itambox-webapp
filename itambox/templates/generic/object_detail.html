@@ -3,440 +3,516 @@
 {% load render_table from django_tables2 %}
 {% load utility_tags %}
 {% load plugins %}
-
 {% block title %}{{ object }} - {{ title|default:_("Detail View") }} {% translate "- ITAMbox" %}{% endblock %}
-
 {% block page_header %}
-    <div class="page-pretitle">
-        {{ object_type|default:_("Object") }} {% translate "Details" %}
-    </div>
-    <h2 class="page-title">
-        {{ object }}{% include "generic/includes/capability_badge.html" %}
-    </h2>
+  <div class="page-pretitle">{{ object_type|default:_("Object") }} {% translate "Details" %}</div>
+  <h2 class="page-title">{{ object }}{% include "generic/includes/capability_badge.html" %}</h2>
 {% endblock %}
-
 {% block page_actions %}
-    <div class="btn-list">
-        {% if is_bookmarkable %}
-        <button type="button" class="btn btn-icon {% if is_bookmarked %}btn-soft-warning{% else %}btn-ghost-secondary{% endif %}"
-                hx-post="{% url 'users:bookmark_toggle' content_type_id=bookmark_content_type_id object_id=object.pk %}"
-                hx-headers='{"X-CSRFToken": "{{ csrf_token }}"}'
-                hx-target="this"
-                hx-swap="outerHTML"
-                title="{% if is_bookmarked %}{% translate 'Remove Bookmark' %}{% else %}{% translate 'Bookmark' %}{% endif %}">
-            <i class="mdi {% if is_bookmarked %}mdi-star{% else %}mdi-star-outline{% endif %}"></i>
+  <div class="btn-list">
+    {% if is_bookmarkable %}
+      <button type="button"
+              class="btn btn-icon {% if is_bookmarked %}btn-soft-warning{% else %}btn-ghost-secondary{% endif %}"
+              hx-post="{% url 'users:bookmark_toggle' content_type_id=bookmark_content_type_id object_id=object.pk %}"
+              hx-headers='{"X-CSRFToken": "{{ csrf_token }}"}'
+              hx-target="this"
+              hx-swap="outerHTML"
+              title="{% if is_bookmarked %}{% translate 'Remove Bookmark' %}{% else %}{% translate 'Bookmark' %}{% endif %}">
+        <i class="mdi {% if is_bookmarked %}mdi-star{% else %}mdi-star-outline{% endif %}"></i>
+      </button>
+    {% endif %}
+    {% if is_watchable %}
+      <button type="button"
+              class="btn btn-icon {% if is_watched %}btn-soft-info{% else %}btn-ghost-secondary{% endif %}"
+              hx-post="{% url 'users:watch_toggle' content_type_id=watch_content_type_id object_id=object.pk %}"
+              hx-headers='{"X-CSRFToken": "{{ csrf_token }}"}'
+              hx-target="this"
+              hx-swap="outerHTML"
+              title="{% if is_watched %}{% translate 'Stop Watching' %}{% else %}{% translate 'Watch (notify me on changes)' %}{% endif %}">
+        <i class="mdi {% if is_watched %}mdi-bell{% else %}mdi-bell-outline{% endif %}"></i>
+      </button>
+    {% endif %}
+    {# --- Standard Edit/Delete using action_urls from context --- #}
+    {% if action_urls.edit %}
+      <a href="{{ action_urls.edit }}" class="btn btn-primary">
+        <i class="mdi mdi-pencil-outline"></i>
+        {% translate "Edit" %}
+      </a>
+    {% endif %}
+    {# Clone & Delete live in the [...] overflow menu below (all widths). #}
+    {# --- Placeholder for Extra Actions (like Check In/Out) --- #}
+    {% block extra_page_actions %}{% endblock %}
+    {% if object %}
+      {% plugin_template_content object 'buttons' object %}
+    {% endif %}
+    {# --- Overflow menu — secondary actions live here at all widths --- #}
+    {% if action_urls.delete or action_urls.clone %}
+      <div class="dropdown">
+        <button type="button"
+                class="btn btn-ghost-secondary btn-icon"
+                data-bs-toggle="dropdown"
+                aria-haspopup="true"
+                aria-expanded="false"
+                aria-label="{% translate 'More actions' %}">
+          <i class="mdi mdi-dots-vertical"></i>
         </button>
-        {% endif %}
-        {% if is_watchable %}
-        <button type="button" class="btn btn-icon {% if is_watched %}btn-soft-info{% else %}btn-ghost-secondary{% endif %}"
-                hx-post="{% url 'users:watch_toggle' content_type_id=watch_content_type_id object_id=object.pk %}"
-                hx-headers='{"X-CSRFToken": "{{ csrf_token }}"}'
-                hx-target="this"
-                hx-swap="outerHTML"
-                title="{% if is_watched %}{% translate 'Stop Watching' %}{% else %}{% translate 'Watch (notify me on changes)' %}{% endif %}">
-            <i class="mdi {% if is_watched %}mdi-bell{% else %}mdi-bell-outline{% endif %}"></i>
-        </button>
-        {% endif %}
-        {# --- Standard Edit/Delete using action_urls from context --- #}
-        {% if action_urls.edit %}
-        <a href="{{ action_urls.edit }}" class="btn btn-primary">
-            <i class="mdi mdi-pencil-outline"></i>
-            {% translate "Edit" %}
-        </a>
-        {% endif %}
-        {# Clone & Delete live in the [...] overflow menu below (all widths). #}
-
-        {# --- Placeholder for Extra Actions (like Check In/Out) --- #}
-        {% block extra_page_actions %}{% endblock %}
-        {% if object %}{% plugin_template_content object 'buttons' object %}{% endif %}
-
-        {# --- Overflow menu — secondary actions live here at all widths --- #}
-        {% if action_urls.delete or action_urls.clone %}
-        <div class="dropdown">
-            <button type="button" class="btn btn-ghost-secondary btn-icon" data-bs-toggle="dropdown" aria-haspopup="true" aria-expanded="false" aria-label="{% translate 'More actions' %}">
-                <i class="mdi mdi-dots-vertical"></i>
-            </button>
-            <div class="dropdown-menu dropdown-menu-end">
-                {% if action_urls.clone %}
-                <a class="dropdown-item" href="{{ action_urls.clone }}">
-                    <i class="mdi mdi-content-copy me-2"></i>
-                    {% translate "Clone" %}
-                </a>
-                {% endif %}
-                {% if action_urls.delete %}
-                <a class="dropdown-item text-danger" href="{{ action_urls.delete }}">
-                    <i class="mdi mdi-trash-can-outline me-2"></i>
-                    {% translate "Delete" %}
-                </a>
-                {% endif %}
-            </div>
+        <div class="dropdown-menu dropdown-menu-end">
+          {% if action_urls.clone %}
+            <a class="dropdown-item" href="{{ action_urls.clone }}">
+              <i class="mdi mdi-content-copy me-2"></i>
+              {% translate "Clone" %}
+            </a>
+          {% endif %}
+          {% if action_urls.delete %}
+            <a class="dropdown-item text-danger" href="{{ action_urls.delete }}">
+              <i class="mdi mdi-trash-can-outline me-2"></i>
+              {% translate "Delete" %}
+            </a>
+          {% endif %}
         </div>
-        {% endif %}
-    </div>
+      </div>
+    {% endif %}
+  </div>
 {% endblock %}
-
 {% block tabs %}
-{# Canonical tab order (see scratch/TAB_CONVENTIONS.md): #}
-{#   Details -> primary children + secondary relations ({% block extra_tabs %}) #}
-{#   -> Subscriptions -> Attachments -> Changelog -> Journal. #}
-{# hx-boost="false" on every tab anchor: panes switch client-side (Bootstrap), #}
-{# never a boosted full-content reload. id="detail-tabs" is the hx-sync abort #}
-{# group shared by lazy tabs. #}
-<ul id="detail-tabs" class="nav nav-tabs page-header-tabs" data-bs-toggle="tabs" role="tablist">
-    <li class="nav-item" role="presentation" data-bs-toggle="tooltip" data-bs-placement="top" title="{% translate 'Details' %}">
-        <a href="?tab=details" data-bs-target="#details" class="nav-link {% if not request.GET.tab or request.GET.tab == 'details' %}active{% endif %}" data-bs-toggle="tab" hx-boost="false" role="tab">
-            <i class="mdi mdi-information-outline me-1"></i>
-            <span class="d-none d-xl-inline ms-1">{% translate "Details" %}</span>
-        </a>
+  {# Canonical tab order (see scratch/TAB_CONVENTIONS.md): #}
+  {#   Details -> primary children + secondary relations ({% block extra_tabs %}) #}
+  {#   -> Subscriptions -> Attachments -> Changelog -> Journal. #}
+  {# hx-boost="false" on every tab anchor: panes switch client-side (Bootstrap), #}
+  {# never a boosted full-content reload. id="detail-tabs" is the hx-sync abort #}
+  {# group shared by lazy tabs. #}
+  <ul id="detail-tabs"
+      class="nav nav-tabs page-header-tabs"
+      data-bs-toggle="tabs"
+      role="tablist">
+    <li class="nav-item"
+        role="presentation"
+        data-bs-toggle="tooltip"
+        data-bs-placement="top"
+        title="{% translate 'Details' %}">
+      <a href="?tab=details"
+         data-bs-target="#details"
+         class="nav-link {% if not request.GET.tab or request.GET.tab == 'details' %}active{% endif %}"
+         data-bs-toggle="tab"
+         hx-boost="false"
+         role="tab">
+        <i class="mdi mdi-information-outline me-1"></i>
+        <span class="d-none d-xl-inline ms-1">{% translate "Details" %}</span>
+      </a>
     </li>
-    {% block extra_tabs %}{% endblock extra_tabs %}
+    {% block extra_tabs %}
+    {% endblock extra_tabs %}
     {% if has_subscriptions %}
-    <li class="nav-item" role="presentation" data-bs-toggle="tooltip" data-bs-placement="top" title="{% translate 'Subscriptions' %}">
-        <a href="?tab=subscriptions" data-bs-target="#subscriptions" class="nav-link {% if request.GET.tab == 'subscriptions' %}active{% endif %}" data-bs-toggle="tab" hx-boost="false" role="tab">
-            <i class="mdi mdi-receipt-text-outline me-1 text-info"></i>
-            <span class="d-none d-xl-inline ms-1">{% translate "Subscriptions" %}</span>
-            <span class="badge bg-info-lt ms-1">{{ subscription_assignments_count }}</span>
+      <li class="nav-item"
+          role="presentation"
+          data-bs-toggle="tooltip"
+          data-bs-placement="top"
+          title="{% translate 'Subscriptions' %}">
+        <a href="?tab=subscriptions"
+           data-bs-target="#subscriptions"
+           class="nav-link {% if request.GET.tab == 'subscriptions' %}active{% endif %}"
+           data-bs-toggle="tab"
+           hx-boost="false"
+           role="tab">
+          <i class="mdi mdi-receipt-text-outline me-1 text-info"></i>
+          <span class="d-none d-xl-inline ms-1">{% translate "Subscriptions" %}</span>
+          <span class="badge bg-info-lt ms-1">{{ subscription_assignments_count }}</span>
         </a>
-    </li>
+      </li>
     {% endif %}
     {% if has_image_attachments or has_file_attachments %}
-    <li class="nav-item" role="presentation" data-bs-toggle="tooltip" data-bs-placement="top" title="{% translate 'Attachments' %}">
-        <a href="?tab=attachments" data-bs-target="#attachments" class="nav-link {% if request.GET.tab == 'attachments' %}active{% endif %}" data-bs-toggle="tab" hx-boost="false" role="tab">
-            <i class="mdi mdi-paperclip me-1"></i>
-            <span class="d-none d-xl-inline ms-1">{% translate "Attachments" %}</span>
+      <li class="nav-item"
+          role="presentation"
+          data-bs-toggle="tooltip"
+          data-bs-placement="top"
+          title="{% translate 'Attachments' %}">
+        <a href="?tab=attachments"
+           data-bs-target="#attachments"
+           class="nav-link {% if request.GET.tab == 'attachments' %}active{% endif %}"
+           data-bs-toggle="tab"
+           hx-boost="false"
+           role="tab">
+          <i class="mdi mdi-paperclip me-1"></i>
+          <span class="d-none d-xl-inline ms-1">{% translate "Attachments" %}</span>
         </a>
-    </li>
+      </li>
     {% endif %}
     {% if changelog_table %}
-    <li class="nav-item" role="presentation" data-bs-toggle="tooltip" data-bs-placement="top" title="{% translate 'Changelog' %}">
-        <a href="?tab=changelog" data-bs-target="#changelog" class="nav-link {% if request.GET.tab == 'changelog' %}active{% endif %}" data-bs-toggle="tab" hx-boost="false" role="tab">
-            <i class="mdi mdi-history me-1"></i>
-            <span class="d-none d-xl-inline ms-1">{% translate "Changelog" %}</span>
+      <li class="nav-item"
+          role="presentation"
+          data-bs-toggle="tooltip"
+          data-bs-placement="top"
+          title="{% translate 'Changelog' %}">
+        <a href="?tab=changelog"
+           data-bs-target="#changelog"
+           class="nav-link {% if request.GET.tab == 'changelog' %}active{% endif %}"
+           data-bs-toggle="tab"
+           hx-boost="false"
+           role="tab">
+          <i class="mdi mdi-history me-1"></i>
+          <span class="d-none d-xl-inline ms-1">{% translate "Changelog" %}</span>
         </a>
-    </li>
+      </li>
     {% endif %}
     {% if has_journaling %}
-    <li class="nav-item" role="presentation" data-bs-toggle="tooltip" data-bs-placement="top" title="{% translate 'Journal' %}">
-        <a href="?tab=journal" data-bs-target="#journal" class="nav-link {% if request.GET.tab == 'journal' %}active{% endif %}" data-bs-toggle="tab" hx-boost="false" role="tab">
-            <i class="mdi mdi-notebook-outline me-1"></i>
-            <span class="d-none d-xl-inline ms-1">{% translate "Journal" %}</span>
-            <span class="badge bg-secondary ms-1">{{ journal_entries_count }}</span>
+      <li class="nav-item"
+          role="presentation"
+          data-bs-toggle="tooltip"
+          data-bs-placement="top"
+          title="{% translate 'Journal' %}">
+        <a href="?tab=journal"
+           data-bs-target="#journal"
+           class="nav-link {% if request.GET.tab == 'journal' %}active{% endif %}"
+           data-bs-toggle="tab"
+           hx-boost="false"
+           role="tab">
+          <i class="mdi mdi-notebook-outline me-1"></i>
+          <span class="d-none d-xl-inline ms-1">{% translate "Journal" %}</span>
+          <span class="badge bg-secondary ms-1">{{ journal_entries_count }}</span>
         </a>
-    </li>
+      </li>
     {% endif %}
-</ul>
+  </ul>
 {% endblock tabs %}
-
 {% block content %}
-{% include "generic/includes/beta_banner.html" %}
-{% if object %}{% plugin_template_content object 'alerts' object %}{% endif %}
-<div class="tab-content">
-    <div class="tab-pane fade {% if not request.GET.tab or request.GET.tab == 'details' %}show active{% endif %}" id="details" role="tabpanel">
-        {% block details_tab %}
+  {% include "generic/includes/beta_banner.html" %}
+  {% if object %}
+    {% plugin_template_content object 'alerts' object %}
+  {% endif %}
+  <div class="tab-content">
+    <div class="tab-pane fade {% if not request.GET.tab or request.GET.tab == 'details' %}show active{% endif %}"
+         id="details"
+         role="tabpanel">
+      {% block details_tab %}
         {% if worker_status %}
-        <div class="mb-3 rounded overflow-hidden border">
-            {% include "generic/includes/worker_status_banner.html" %}
-        </div>
+          <div class="mb-3 rounded overflow-hidden border">{% include "generic/includes/worker_status_banner.html" %}</div>
         {% endif %}
         <div class="row g-3">
-            {# --- Left Column: Main area (Panels or primary info) --- #}
-            <div class="col-12 col-lg-8">
-                {% if layout %}
-                    {% for row in layout %}
-                    <div class="row g-3 mb-3">
-                        {% for column in row %}
-                        <div class="col-12 col-md-{% widthratio 12 row|length 1 %}">
-                            {% for panel in column %}
-                                {% render_panel panel %}
-                            {% endfor %}
-                        </div>
-                        {% endfor %}
+          {# --- Left Column: Main area (Panels or primary info) --- #}
+          <div class="col-12 col-lg-8">
+            {% if layout %}
+              {% for row in layout %}
+                <div class="row g-3 mb-3">
+                  {% for column in row %}
+                    <div class="col-12 col-md-{% widthratio 12 row|length 1 %}">
+                      {% for panel in column %}
+                        {% render_panel panel %}
+                      {% endfor %}
                     </div>
-                    {% endfor %}
-                {% else %}
-                    {# --- Default Object Details Card --- #}
-                    <div class="card mb-3 shadow-sm">
-                        <div class="card-header">
-                            <h3 class="card-title">{{ object_type|default:_("Object") }} {% translate "Information" %}</h3>
-                        </div>
-                        <div class="card-body">
-                            {% block object_details %}
-                                {# Specific templates should override this block #}
-                                <p class="text-muted"><em>{% translate "Object details should be defined in the specific template extending this base." %}</em></p>
-                            {% endblock object_details %}
-                        </div>
-                    </div>
-                {% endif %}
-
-                {# --- Hierarchy Placeholder --- #}
-                {% block hierarchy %}{% endblock hierarchy %}
-
-                {# --- Comments, Notes, & Descriptions (ALWAYS Rendered Below Main Block) --- #}
-                {% if object.comments %}
-                <div class="card mt-3 shadow-sm">
-                    <div class="card-header border-0 bg-transparent">
-                        <h3 class="card-title text-secondary">{% translate "Comments" %}</h3>
-                    </div>
-                    <div class="card-body pt-0">{{ object.comments|linebreaksbr }}</div>
+                  {% endfor %}
                 </div>
-                {% endif %}
-                {% if object.notes %}
-                <div class="card mt-3 shadow-sm">
-                    <div class="card-header border-0 bg-transparent">
-                        <h3 class="card-title text-secondary">{% translate "Notes" %}</h3>
-                    </div>
-                    <div class="card-body pt-0">{{ object.notes|linebreaksbr }}</div>
+              {% endfor %}
+            {% else %}
+              {# --- Default Object Details Card --- #}
+              <div class="card mb-3 shadow-sm">
+                <div class="card-header">
+                  <h3 class="card-title">{{ object_type|default:_("Object") }} {% translate "Information" %}</h3>
                 </div>
-                {% endif %}
-                {% if object.description %}
-                <div class="card mt-3 shadow-sm">
-                    <div class="card-header border-0 bg-transparent">
-                        <h3 class="card-title text-secondary">{% translate "Description" %}</h3>
-                    </div>
-                    <div class="card-body pt-0">{{ object.description|linebreaksbr }}</div>
+                <div class="card-body">
+                  {% block object_details %}
+                    {# Specific templates should override this block #}
+                    <p class="text-muted"><em>{% translate "Object details should be defined in the specific template extending this base." %}</em></p>
+                  {% endblock object_details %}
                 </div>
-                {% endif %}
-
-                {# --- Placeholder for Extra Cards (Left Column) --- #}
-                {% block extra_cards_left %}{% endblock %}
-                {% if object %}{% plugin_template_content object 'left_panel' object %}{% endif %}
-
-                {# --- Full Width Content Block --- #}
-                <div class="row g-3 mt-2">
-                    <div class="col-12">
-                        {% block full_width_content %}
-                        {# Specific templates can add full-width cards/tables here #}
-                        {% endblock full_width_content %}
-                        {% if object %}{% plugin_template_content object 'full_width_panel' object %}{% endif %}
-                    </div>
+              </div>
+            {% endif %}
+            {# --- Hierarchy Placeholder --- #}
+            {% block hierarchy %}
+            {% endblock hierarchy %}
+            {# --- Comments, Notes, & Descriptions (ALWAYS Rendered Below Main Block) --- #}
+            {% if object.comments %}
+              <div class="card mt-3 shadow-sm">
+                <div class="card-header border-0 bg-transparent">
+                  <h3 class="card-title text-secondary">{% translate "Comments" %}</h3>
                 </div>
+                <div class="card-body pt-0">{{ object.comments|linebreaksbr }}</div>
+              </div>
+            {% endif %}
+            {% if object.notes %}
+              <div class="card mt-3 shadow-sm">
+                <div class="card-header border-0 bg-transparent">
+                  <h3 class="card-title text-secondary">{% translate "Notes" %}</h3>
+                </div>
+                <div class="card-body pt-0">{{ object.notes|linebreaksbr }}</div>
+              </div>
+            {% endif %}
+            {% if object.description %}
+              <div class="card mt-3 shadow-sm">
+                <div class="card-header border-0 bg-transparent">
+                  <h3 class="card-title text-secondary">{% translate "Description" %}</h3>
+                </div>
+                <div class="card-body pt-0">{{ object.description|linebreaksbr }}</div>
+              </div>
+            {% endif %}
+            {# --- Placeholder for Extra Cards (Left Column) --- #}
+            {% block extra_cards_left %}{% endblock %}
+            {% if object %}
+              {% plugin_template_content object 'left_panel' object %}
+            {% endif %}
+            {# --- Full Width Content Block --- #}
+            <div class="row g-3 mt-2">
+              <div class="col-12">
+                {% block full_width_content %}
+                  {# Specific templates can add full-width cards/tables here #}
+                {% endblock full_width_content %}
+                {% if object %}
+                  {% plugin_template_content object 'full_width_panel' object %}
+                {% endif %}
+              </div>
             </div>
-
-            {# --- Right Column: Sidebar (Metadata, Tags, Related summary) --- #}
-            <div class="col-12 col-lg-4">
-                {# --- Metadata Card --- #}
-                {% if object.created_at or object.updated_at %}
-                <div class="card mb-3 shadow-sm">
-                    <div class="card-body">
-                        <h3 class="card-title text-muted mb-2">{% translate "Metadata" %}</h3>
-                        <p class="text-secondary small mb-0">
-                            {% if object.created_at %}<strong>{% translate "Created:" %}</strong> {{ object.created_at|date:"Y-m-d H:i" }}<br>{% endif %}
-                            {% if object.updated_at %}<strong>{% translate "Updated:" %}</strong> {{ object.updated_at|date:"Y-m-d H:i" }}{% endif %}
-                        </p>
-                    </div>
+          </div>
+          {# --- Right Column: Sidebar (Metadata, Tags, Related summary) --- #}
+          <div class="col-12 col-lg-4">
+            {# --- Metadata Card --- #}
+            {% if object.created_at or object.updated_at %}
+              <div class="card mb-3 shadow-sm">
+                <div class="card-body">
+                  <h3 class="card-title text-muted mb-2">{% translate "Metadata" %}</h3>
+                  <p class="text-secondary small mb-0">
+                    {% if object.created_at %}<strong>{% translate "Created:" %}</strong> {{ object.created_at|date:"Y-m-d H:i" }}<br>{% endif %}
+                    {% if object.updated_at %}<strong>{% translate "Updated:" %}</strong> {{ object.updated_at|date:"Y-m-d H:i" }}{% endif %}
+                  </p>
                 </div>
-                {% endif %}
-
-                {# --- Generic Custom Fields Card --- #}
-                {% include 'extras/includes/custom_fields_panel.html' %}
-
-                {# --- Tags Card --- #}
-                {% if object.tags.all %}
-                <div class="card mb-3 shadow-sm">
-                    <div class="card-header border-0 bg-transparent">
-                        <h3 class="card-title text-secondary">{% translate "Assigned Tags" %}</h3>
-                    </div>
-                    <div class="card-body pt-0">
-                        {% for tag in object.tags.all %}
-                            {% include 'inc/tags.html' with tag=tag %}
-                        {% endfor %}
-                    </div>
+              </div>
+            {% endif %}
+            {# --- Generic Custom Fields Card --- #}
+            {% include 'extras/includes/custom_fields_panel.html' %}
+            {# --- Tags Card --- #}
+            {% if object.tags.all %}
+              <div class="card mb-3 shadow-sm">
+                <div class="card-header border-0 bg-transparent">
+                  <h3 class="card-title text-secondary">{% translate "Assigned Tags" %}</h3>
                 </div>
-                {% endif %}
-
-                {# --- Placeholder for Related Object Tables --- #}
-                {% block related_objects %}{% endblock related_objects %}
-
-                {# --- Related Objects Card (NetBox Style) --- #}
-                {% if related_objects_list %}
-                <div class="card mb-3 shadow-sm">
-                    <div class="card-header border-0 bg-transparent">
-                        <h3 class="card-title text-secondary">{% translate "Related Inventory" %}</h3>
-                    </div>
-                    <div class="list-group list-group-flush">
-                        {% for item in related_objects_list %}
-                            <a href="{{ item.url }}" class="list-group-item list-group-item-action d-flex justify-content-between align-items-center">
-                                {{ item.label }}
-                                <span class="badge bg-primary-lt text-primary rounded-pill">{{ item.count }}</span>
-                            </a>
-                        {% endfor %}
-                    </div>
+                <div class="card-body pt-0">
+                  {% for tag in object.tags.all %}
+                    {% include 'inc/tags.html' with tag=tag %}
+                  {% endfor %}
                 </div>
-                {% endif %}
-
-                {# --- Placeholder for Extra Cards (Right Column) --- #}
-                {% block extra_cards_right %}{% endblock %}
-                {% if object %}{% plugin_template_content object 'right_panel' object %}{% endif %}
-            </div>
+              </div>
+            {% endif %}
+            {# --- Placeholder for Related Object Tables --- #}
+            {% block related_objects %}
+            {% endblock related_objects %}
+            {# --- Related Objects Card (NetBox Style) --- #}
+            {% if related_objects_list %}
+              <div class="card mb-3 shadow-sm">
+                <div class="card-header border-0 bg-transparent">
+                  <h3 class="card-title text-secondary">{% translate "Related Inventory" %}</h3>
+                </div>
+                <div class="list-group list-group-flush">
+                  {% for item in related_objects_list %}
+                    <a href="{{ item.url }}"
+                       class="list-group-item list-group-item-action d-flex justify-content-between align-items-center">
+                      {{ item.label }}
+                      <span class="badge bg-primary-lt text-primary rounded-pill">{{ item.count }}</span>
+                    </a>
+                  {% endfor %}
+                </div>
+              </div>
+            {% endif %}
+            {# --- Placeholder for Extra Cards (Right Column) --- #}
+            {% block extra_cards_right %}{% endblock %}
+            {% if object %}
+              {% plugin_template_content object 'right_panel' object %}
+            {% endif %}
+          </div>
         </div>
-        {% endblock details_tab %}
+      {% endblock details_tab %}
     </div>
-
     {# --- Placeholder for extra tab panes --- #}
-    {% block extra_tab_panes %}{% endblock extra_tab_panes %}
-
+    {% block extra_tab_panes %}
+    {% endblock extra_tab_panes %}
     {# --- Generic Changelog History Tab Pane --- #}
     {% if changelog_table %}
-    <div class="tab-pane fade {% if request.GET.tab == 'changelog' %}show active{% endif %}" id="changelog" role="tabpanel">
+      <div class="tab-pane fade {% if request.GET.tab == 'changelog' %}show active{% endif %}"
+           id="changelog"
+           role="tabpanel">
         <div class="card">
-            <div class="card-header">
-                <h3 class="card-title">{% translate "Changelog History (Last 50 changes)" %}</h3>
-            </div>
-            <div class="table-responsive">
-                {% render_table changelog_table %}
-            </div>
-            {% include 'generic/includes/table_pagination.html' with table=changelog_table %}
+          <div class="card-header">
+            <h3 class="card-title">{% translate "Changelog History (Last 50 changes)" %}</h3>
+          </div>
+          <div class="table-responsive">{% render_table changelog_table %}</div>
+          {% include 'generic/includes/table_pagination.html' with table=changelog_table %}
         </div>
-    </div>
+      </div>
     {% endif %}
-
     {% if has_journaling %}
-    <div class="tab-pane fade {% if request.GET.tab == 'journal' %}show active{% endif %}" id="journal" role="tabpanel">
+      <div class="tab-pane fade {% if request.GET.tab == 'journal' %}show active{% endif %}"
+           id="journal"
+           role="tabpanel">
         <div class="card mb-4">
-            <div class="card-header">
-                <h3 class="card-title">{% translate "Journal Entries" %}</h3>
-            </div>
-            <div class="card-body">
-                {% if journal_entries %}
-                <ul class="list-group list-group-flush mb-3">
-                    {% for entry in journal_entries %}
-                    <li class="list-group-item">
-                        <div class="d-flex justify-content-between">
-                            <strong>{{ entry.user }}</strong>
-                            <small class="text-muted">{{ entry.created|date:"Y-m-d H:i" }}</small>
-                        </div>
-                        <p class="mb-0 mt-1">{{ entry.comment|linebreaksbr }}</p>
-                    </li>
-                    {% endfor %}
-                </ul>
-                {% else %}
-                <p class="text-muted">{% translate "No journal entries yet." %}</p>
-                {% endif %}
-            </div>
+          <div class="card-header">
+            <h3 class="card-title">{% translate "Journal Entries" %}</h3>
+          </div>
+          <div class="card-body">
+            {% if journal_entries %}
+              <ul class="list-group list-group-flush mb-3">
+                {% for entry in journal_entries %}
+                  <li class="list-group-item">
+                    <div class="d-flex justify-content-between">
+                      <strong>{{ entry.user }}</strong>
+                      <small class="text-muted">{{ entry.created|date:"Y-m-d H:i" }}</small>
+                    </div>
+                    <p class="mb-0 mt-1">{{ entry.comment|linebreaksbr }}</p>
+                  </li>
+                {% endfor %}
+              </ul>
+            {% else %}
+              <p class="text-muted">{% translate "No journal entries yet." %}</p>
+            {% endif %}
+          </div>
         </div>
         <div class="card">
-            <div class="card-header">
-                <h3 class="card-title">{% translate "Add Journal Entry" %}</h3>
+          <div class="card-header">
+            <h3 class="card-title">{% translate "Add Journal Entry" %}</h3>
+          </div>
+          <div class="card-body">
+            <form method="post"
+                  action="{% url 'journal_entry_add' app_label=journal_app_label model_name=journal_model_name object_id=object.pk %}">
+              {% csrf_token %}
+              <input type="hidden" name="return_url" value="{{ request.get_full_path }}">
+              {{ journal_form.comment }}
+              <button type="submit" class="btn btn-primary mt-2">
+                <i class="mdi mdi-plus me-1"></i>
+                {% translate "Add Entry" %}
+              </button>
+            </form>
+          </div>
+        </div>
+      </div>
+    {% endif %}
+    {% if has_subscriptions %}
+      <div class="tab-pane fade {% if request.GET.tab == 'subscriptions' %}show active{% endif %}"
+           id="subscriptions"
+           role="tabpanel">
+        <div class="card border-0 shadow-sm">
+          <div class="card-header border-0 bg-transparent d-flex justify-content-between align-items-center">
+            <h3 class="card-title">{% translate "Assigned SaaS &amp; Support Licenses" %}</h3>
+            {% if can_change %}
+              <button type="button"
+                      class="btn btn-sm btn-primary"
+                      hx-get="{% url 'subscriptions:subscriptionassignment_create' %}?content_type={{ subscribable_content_type_id }}&object_id={{ object.pk }}&_quickadd=1"
+                      hx-target="#modal-placeholder">
+                <i class="mdi mdi-plus"></i> {% translate "Assign Subscription" %}
+              </button>
+            {% endif %}
+          </div>
+          {% if subscription_assignments_table.rows %}
+            <div class="table-responsive">{% render_table subscription_assignments_table %}</div>
+          {% else %}
+            <div class="card-body py-5 text-muted text-center">
+              <p class="mb-0">{% translate "No active SaaS subscriptions or support agreements are assigned to this item." %}</p>
             </div>
-            <div class="card-body">
-                <form method="post" action="{% url 'journal_entry_add' app_label=journal_app_label model_name=journal_model_name object_id=object.pk %}">
+          {% endif %}
+        </div>
+      </div>
+    {% endif %}
+    {% if has_image_attachments or has_file_attachments %}
+      <div class="tab-pane fade {% if request.GET.tab == 'attachments' %}show active{% endif %}"
+           id="attachments"
+           role="tabpanel">
+        <div class="row g-4">
+          {% if has_image_attachments %}
+            <div class="col-md-6">
+              <div class="card">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                  <h3 class="card-title">{% translate "Images" %}</h3>
+                  <form method="post"
+                        action="{% url 'image_attachment_upload' app_label=attachment_app_label model_name=attachment_model_name object_id=object.pk %}"
+                        enctype="multipart/form-data"
+                        class="d-inline-flex gap-2">
                     {% csrf_token %}
                     <input type="hidden" name="return_url" value="{{ request.get_full_path }}">
-                    {{ journal_form.comment }}
-                    <button type="submit" class="btn btn-primary mt-2">
-                        <i class="mdi mdi-plus me-1"></i>
-                        {% translate "Add Entry" %}
-                    </button>
-                </form>
-            </div>
-        </div>
-    </div>
-    {% endif %}
-
-    {% if has_subscriptions %}
-    <div class="tab-pane fade {% if request.GET.tab == 'subscriptions' %}show active{% endif %}" id="subscriptions" role="tabpanel">
-        <div class="card border-0 shadow-sm">
-            <div class="card-header border-0 bg-transparent d-flex justify-content-between align-items-center">
-                <h3 class="card-title">{% translate "Assigned SaaS &amp; Support Licenses" %}</h3>
-                {% if can_change %}
-                <button type="button" class="btn btn-sm btn-primary"
-                        hx-get="{% url 'subscriptions:subscriptionassignment_create' %}?content_type={{ subscribable_content_type_id }}&object_id={{ object.pk }}&_quickadd=1"
-                        hx-target="#modal-placeholder">
-                    <i class="mdi mdi-plus"></i> {% translate "Assign Subscription" %}
-                </button>
-                {% endif %}
-            </div>
-            {% if subscription_assignments_table.rows %}
-                <div class="table-responsive">
-                    {% render_table subscription_assignments_table %}
+                    <input type="file"
+                           name="image"
+                           class="form-control form-control-sm"
+                           accept="image/*">
+                    <button type="submit" class="btn btn-sm btn-primary">{% translate "Upload" %}</button>
+                  </form>
                 </div>
-            {% else %}
-                <div class="card-body py-5 text-muted text-center">
-                    <p class="mb-0">{% translate "No active SaaS subscriptions or support agreements are assigned to this item." %}</p>
-                </div>
-            {% endif %}
-        </div>
-    </div>
-    {% endif %}
-
-    {% if has_image_attachments or has_file_attachments %}
-    <div class="tab-pane fade {% if request.GET.tab == 'attachments' %}show active{% endif %}" id="attachments" role="tabpanel">
-        <div class="row g-4">
-            {% if has_image_attachments %}
-            <div class="col-md-6">
-                <div class="card">
-                    <div class="card-header d-flex justify-content-between align-items-center">
-                        <h3 class="card-title">{% translate "Images" %}</h3>
-                        <form method="post" action="{% url 'image_attachment_upload' app_label=attachment_app_label model_name=attachment_model_name object_id=object.pk %}" enctype="multipart/form-data" class="d-inline-flex gap-2">
-                            {% csrf_token %}
-                            <input type="hidden" name="return_url" value="{{ request.get_full_path }}">
-                            <input type="file" name="image" class="form-control form-control-sm" accept="image/*">
-                            <button type="submit" class="btn btn-sm btn-primary">{% translate "Upload" %}</button>
-                        </form>
-                    </div>
-                    <div class="card-body">
-                        {% if image_attachments %}
-                        <div class="row g-2">
-                        {% for img in image_attachments %}
+                <div class="card-body">
+                  {% if image_attachments %}
+                    <div class="row g-2">
+                      {% for img in image_attachments %}
                         <div class="col-4 col-md-3">
-                            <div class="card card-sm">
-                                <img src="{{ img.get_serve_url }}" class="card-img-top" alt="{{ img.name }}" style="max-height:150px;object-fit:cover;">
-                                <div class="card-body p-2 text-center">
-                                    <small class="text-muted d-block text-truncate">{{ img.name }}</small>
-                                    <form method="post" action="{% url 'image_attachment_delete' pk=img.pk %}" class="mt-1">
-                                        {% csrf_token %}
-                                        <input type="hidden" name="return_url" value="{{ request.get_full_path }}">
-                                        <button type="submit" class="btn btn-sm btn-outline-danger" data-confirm="Delete this image?" title="{% translate 'Delete' %}">×</button>
-                                    </form>
-                                </div>
-                            </div>
-                        </div>
-                        {% endfor %}
-                        </div>
-                        {% else %}
-                        <p class="text-muted">{% translate "No images attached." %}</p>
-                        {% endif %}
-                    </div>
-                </div>
-            </div>
-            {% endif %}
-            {% if has_file_attachments %}
-            <div class="col-md-6">
-                <div class="card">
-                    <div class="card-header d-flex justify-content-between align-items-center">
-                        <h3 class="card-title">{% translate "Files" %}</h3>
-                        <form method="post" action="{% url 'file_attachment_upload' app_label=attachment_app_label model_name=attachment_model_name object_id=object.pk %}" enctype="multipart/form-data" class="d-inline-flex gap-2">
-                            {% csrf_token %}
-                            <input type="hidden" name="return_url" value="{{ request.get_full_path }}">
-                            <input type="file" name="file" class="form-control form-control-sm">
-                            <button type="submit" class="btn btn-sm btn-primary">{% translate "Upload" %}</button>
-                        </form>
-                    </div>
-                    <div class="card-body">
-                        {% if file_attachments %}
-                        <ul class="list-group list-group-flush">
-                        {% for file in file_attachments %}
-                        <li class="list-group-item d-flex justify-content-between align-items-center">
-                            <a href="{{ file.get_download_url }}" class="text-reset" download hx-boost="false">{{ file.name }}</a>
-                            <form method="post" action="{% url 'file_attachment_delete' pk=file.pk %}" class="d-inline">
+                          <div class="card card-sm">
+                            <img src="{{ img.get_serve_url }}"
+                                 class="card-img-top"
+                                 alt="{{ img.name }}"
+                                 style="max-height:150px;
+                                        object-fit:cover">
+                            <div class="card-body p-2 text-center">
+                              <small class="text-muted d-block text-truncate">{{ img.name }}</small>
+                              <form method="post"
+                                    action="{% url 'image_attachment_delete' pk=img.pk %}"
+                                    class="mt-1">
                                 {% csrf_token %}
                                 <input type="hidden" name="return_url" value="{{ request.get_full_path }}">
-                                <button type="submit" class="btn btn-sm btn-outline-danger" data-confirm="Delete this file?" title="{% translate 'Delete' %}">×</button>
-                            </form>
-                        </li>
-                        {% endfor %}
-                        </ul>
-                        {% else %}
-                        <p class="text-muted">{% translate "No files attached." %}</p>
-                        {% endif %}
+                                <button type="submit"
+                                        class="btn btn-sm btn-outline-danger"
+                                        data-confirm="Delete this image?"
+                                        title="{% translate 'Delete' %}">×</button>
+                              </form>
+                            </div>
+                          </div>
+                        </div>
+                      {% endfor %}
                     </div>
+                  {% else %}
+                    <p class="text-muted">{% translate "No images attached." %}</p>
+                  {% endif %}
                 </div>
+              </div>
             </div>
-            {% endif %}
+          {% endif %}
+          {% if has_file_attachments %}
+            <div class="col-md-6">
+              <div class="card">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                  <h3 class="card-title">{% translate "Files" %}</h3>
+                  <form method="post"
+                        action="{% url 'file_attachment_upload' app_label=attachment_app_label model_name=attachment_model_name object_id=object.pk %}"
+                        enctype="multipart/form-data"
+                        class="d-inline-flex gap-2">
+                    {% csrf_token %}
+                    <input type="hidden" name="return_url" value="{{ request.get_full_path }}">
+                    <input type="file" name="file" class="form-control form-control-sm">
+                    <button type="submit" class="btn btn-sm btn-primary">{% translate "Upload" %}</button>
+                  </form>
+                </div>
+                <div class="card-body">
+                  {% if file_attachments %}
+                    <ul class="list-group list-group-flush">
+                      {% for file in file_attachments %}
+                        <li class="list-group-item d-flex justify-content-between align-items-center">
+                          <a href="{{ file.get_download_url }}"
+                             class="text-reset"
+                             download
+                             hx-boost="false">{{ file.name }}</a>
+                          <form method="post"
+                                action="{% url 'file_attachment_delete' pk=file.pk %}"
+                                class="d-inline">
+                            {% csrf_token %}
+                            <input type="hidden" name="return_url" value="{{ request.get_full_path }}">
+                            <button type="submit"
+                                    class="btn btn-sm btn-outline-danger"
+                                    data-confirm="Delete this file?"
+                                    title="{% translate 'Delete' %}">×</button>
+                          </form>
+                        </li>
+                      {% endfor %}
+                    </ul>
+                  {% else %}
+                    <p class="text-muted">{% translate "No files attached." %}</p>
+                  {% endif %}
+                </div>
+              </div>
+            </div>
+          {% endif %}
         </div>
-    </div>
+      </div>
     {% endif %}
-</div>
+  </div>
 {% endblock content %}
 {% block javascript %}
 {% endblock javascript %}

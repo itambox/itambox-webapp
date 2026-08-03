@@ -1,41 +1,53 @@
 {% load i18n %}
-<div class="modal modal-blur fade" id="table-config-modal" tabindex="-1" aria-labelledby="tableConfigModalLabel" aria-hidden="true" data-table-name="{{ table_name }}">
-    <div class="modal-dialog modal-lg modal-dialog-centered">
-        <div class="modal-content">
-            <form class="form userconfigform" data-url="{% url 'api:users_api:user-config' %}" data-config-root="tables.{{ table_name }}">
-                {% csrf_token %}
-                <div class="modal-header">
-                    <h5 class="modal-title" id="tableConfigModalLabel">{% translate "Configure" %} {{ table_verbose_name }} {% translate "Table" %}</h5>
-                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="{% translate 'Close' %}"></button>
-                </div>
-                <div class="modal-body row">
-                    <div class="col-md-5 text-center">
-                        {{ form.available_columns.label_tag }}
-                        {{ form.available_columns }}
-                    </div>
-                    <div class="col-md-2 d-flex flex-column align-items-center justify-content-center">
-                        <button type="button" class="btn btn-success btn-sm w-100 my-1" id="btn-add-cols">
-                            {% translate "Add" %} &rarr;
-                        </button>
-                        <button type="button" class="btn btn-danger btn-sm w-100 my-1" id="btn-remove-cols">
-                            &larr; {% translate "Remove" %}
-                        </button>
-                    </div>
-                    <div class="col-md-5 text-center">
-                        {{ form.columns.label_tag }}
-                        {{ form.columns }}
-                        <div class="mt-2">
-                            <button type="button" class="btn btn-primary btn-sm" id="btn-cols-up">&uarr; {% translate "Move Up" %}</button>
-                            <button type="button" class="btn btn-primary btn-sm ms-1" id="btn-cols-down">&darr; {% translate "Move Down" %}</button>
-                        </div>
-                    </div>
-                </div>
-                <div class="modal-footer">
-                    <button type="button" class="btn btn-outline-danger me-auto" id="btn-reset-cols">{% translate "Reset" %}</button>
-                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">{% translate "Cancel" %}</button>
-                    <button type="button" class="btn btn-primary" id="btn-apply-cols">{% translate "Apply" %}</button>
-                </div>
-            </form>
+<div class="modal modal-blur fade"
+     id="table-config-modal"
+     tabindex="-1"
+     aria-labelledby="tableConfigModalLabel"
+     aria-hidden="true"
+     data-table-name="{{ table_name }}">
+  <div class="modal-dialog modal-lg modal-dialog-centered">
+    <div class="modal-content">
+      <form class="form userconfigform"
+            data-url="{% url 'api:users_api:user-config' %}"
+            data-config-root="tables.{{ table_name }}">
+        {% csrf_token %}
+        <div class="modal-header">
+          <h5 class="modal-title" id="tableConfigModalLabel">{% translate "Configure" %} {{ table_verbose_name }} {% translate "Table" %}</h5>
+          <button type="button"
+                  class="btn-close"
+                  data-bs-dismiss="modal"
+                  aria-label="{% translate 'Close' %}"></button>
         </div>
+        <div class="modal-body row">
+          <div class="col-md-5 text-center">
+            {{ form.available_columns.label_tag }}
+            {{ form.available_columns }}
+          </div>
+          <div class="col-md-2 d-flex flex-column align-items-center justify-content-center">
+            <button type="button"
+                    class="btn btn-success btn-sm w-100 my-1"
+                    id="btn-add-cols">{% translate "Add" %} →</button>
+            <button type="button"
+                    class="btn btn-danger btn-sm w-100 my-1"
+                    id="btn-remove-cols">← {% translate "Remove" %}</button>
+          </div>
+          <div class="col-md-5 text-center">
+            {{ form.columns.label_tag }}
+            {{ form.columns }}
+            <div class="mt-2">
+              <button type="button" class="btn btn-primary btn-sm" id="btn-cols-up">↑ {% translate "Move Up" %}</button>
+              <button type="button" class="btn btn-primary btn-sm ms-1" id="btn-cols-down">↓ {% translate "Move Down" %}</button>
+            </div>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button"
+                  class="btn btn-outline-danger me-auto"
+                  id="btn-reset-cols">{% translate "Reset" %}</button>
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">{% translate "Cancel" %}</button>
+          <button type="button" class="btn btn-primary" id="btn-apply-cols">{% translate "Apply" %}</button>
+        </div>
+      </form>
     </div>
+  </div>
 </div>

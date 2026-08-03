@@ -5,18 +5,27 @@
 {% load partials %}
 {% load django_htmx %}
 {% load plugins %}
-<!doctype html>
-<html lang="{{ LANGUAGE_CODE }}" data-itambox-user-id="{{ request.user.pk }}" data-itambox-user-name="{{ request.user.get_full_name|default:request.user.username }}" data-itambox-url-name="{{ request.resolver_match.url_name }}" data-itambox-version="{{ settings.VERSION }}">
-<head>
-    <meta charset="utf-8"/>
-    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover"/>
-    <meta http-equiv="X-UA-Compatible" content="ie=edge"/>
-    <title>{% block title %}{% translate "ITAMbox" %}{% endblock %}</title>
-
+<!DOCTYPE html>
+<html lang="{{ LANGUAGE_CODE }}"
+      data-itambox-user-id="{{ request.user.pk }}"
+      data-itambox-user-name="{{ request.user.get_full_name|default:request.user.username }}"
+      data-itambox-url-name="{{ request.resolver_match.url_name }}"
+      data-itambox-version="{{ settings.VERSION }}">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport"
+          content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta http-equiv="X-UA-Compatible" content="ie=edge" />
+    <title>
+      {% block title %}
+        {% translate "ITAMbox" %}
+      {% endblock %}
+    </title>
     <meta name="csrf-token" content="{{ csrf_token }}">
-
     {% include "includes/pwa_head.html" %}
-    <link rel="icon" type="image/svg+xml" href="{% static 'dist/brand/favicon.svg' %}">
+    <link rel="icon"
+          type="image/svg+xml"
+          href="{% static 'dist/brand/favicon.svg' %}">
     {# FOUC prevention: apply stored theme before CSS loads #}
     <script nonce="{{ request.csp_nonce }}">
         (function(){try{var t=localStorage.getItem('itambox.theme');if(t)document.documentElement.setAttribute('data-bs-theme',t);else if(window.matchMedia('(prefers-color-scheme:dark)').matches)document.documentElement.setAttribute('data-bs-theme','dark');}catch(e){}})();
@@ -26,14 +35,21 @@
         (function(){try{var p=localStorage.getItem('itambox-show-filters');var show=p==='false'?false:(p==='true'?true:!(window.innerWidth<768));if(!show)document.documentElement.classList.add('itambox-filters-hidden');}catch(e){}})();
     </script>
     <!-- CSS files -->
-    <link href="{% static 'dist/vendor/tabler/css/tabler.min.css' %}" rel="stylesheet"/>
-    <link href="{% static 'dist/vendor/tabler/css/tabler-flags.min.css' %}" rel="stylesheet"/>
-    <link href="{% static 'dist/vendor/tabler/css/tabler-payments.min.css' %}" rel="stylesheet"/>
-    <link href="{% static 'dist/vendor/tabler/css/tabler-vendors.min.css' %}" rel="stylesheet"/>
-    <link href="{% static 'dist/vendor/tom-select/css/tom-select.bootstrap5.css' %}" rel="stylesheet">
-    <link href="{% static 'dist/vendor/mdi/css/materialdesignicons.min.css' %}" rel="stylesheet"/>
-    <link href="{% static 'dist/vendor/gridstack/gridstack.min.css' %}" rel="stylesheet"/>
-    <link href="{% static 'dist/itambox.css' %}?v=1.2.2" rel="stylesheet"/>
+    <link href="{% static 'dist/vendor/tabler/css/tabler.min.css' %}"
+          rel="stylesheet" />
+    <link href="{% static 'dist/vendor/tabler/css/tabler-flags.min.css' %}"
+          rel="stylesheet" />
+    <link href="{% static 'dist/vendor/tabler/css/tabler-payments.min.css' %}"
+          rel="stylesheet" />
+    <link href="{% static 'dist/vendor/tabler/css/tabler-vendors.min.css' %}"
+          rel="stylesheet" />
+    <link href="{% static 'dist/vendor/tom-select/css/tom-select.bootstrap5.css' %}"
+          rel="stylesheet">
+    <link href="{% static 'dist/vendor/mdi/css/materialdesignicons.min.css' %}"
+          rel="stylesheet" />
+    <link href="{% static 'dist/vendor/gridstack/gridstack.min.css' %}"
+          rel="stylesheet" />
+    <link href="{% static 'dist/itambox.css' %}?v=1.2.2" rel="stylesheet" />
     {# Skip-nav: fixed + off-screen until keyboard focus, then slides in. Self-contained because #}
     {# Tabler's CSS does not ship Bootstrap's .visually-hidden-focusable utility. #}
     <style>
@@ -55,41 +71,47 @@
     <script src="{% static 'dist/vendor/apexcharts.min.js' %}"></script>
     {% block extra_head %}{% endblock %}
     {% if object %}
-        {% plugin_template_content object "head" object %}
+      {% plugin_template_content object "head" object %}
     {% elif model_name_str %}
-        {% plugin_template_content model_name_str "head" %}
+      {% plugin_template_content model_name_str "head" %}
     {% endif %}
-</head>
-<body class="layout-fluid layout-combo" hx-boost="true" hx-target="#page-content-wrapper" hx-indicator="#htmx-loading-indicator">
-
+  </head>
+  <body class="layout-fluid layout-combo"
+        hx-boost="true"
+        hx-target="#page-content-wrapper"
+        hx-indicator="#htmx-loading-indicator">
     {# Skip-nav: off-screen until keyboard focus (see .skip-link CSS in <head>), jumps to the main landmark #}
     <a href="#page-body-main" class="skip-link btn btn-primary">{% translate "Skip to main content" %}</a>
-
     {# Global loading indicator #}
-    <div id="htmx-loading-indicator" class="htmx-indicator" style="position:fixed;top:0;left:0;width:100%;z-index:9999;pointer-events:none;">
-        <div class="progress" style="height:3px;background:transparent;">
-            <div class="progress-bar progress-bar-animated progress-bar-striped bg-primary" style="width:100%;"></div>
-        </div>
+    <div id="htmx-loading-indicator"
+         class="htmx-indicator"
+         style="position:fixed;
+                top:0;
+                left:0;
+                width:100%;
+                z-index:9999;
+                pointer-events:none">
+      <div class="progress" style="height:3px;background:transparent;">
+        <div class="progress-bar progress-bar-animated progress-bar-striped bg-primary"
+             style="width:100%"></div>
+      </div>
     </div>
-
     {% block layout %}{% endblock %}
-
     {% block modals %}
-    <div id="modal-placeholder"></div>
+      <div id="modal-placeholder"></div>
     {% endblock modals %}
-
     {# Mobile bottom action bar (hidden on desktop via d-lg-none; includes global scanner modal) #}
     {% include "includes/mobile_action_bar.html" %}
-
     {# Toast Messages Container #}
-    <div id="django-messages" class="toast-container position-fixed bottom-0 end-0 p-3" style="z-index: 1100">
+    <div id="django-messages"
+         class="toast-container position-fixed bottom-0 end-0 p-3"
+         style="z-index: 1100">
       {% if messages %}
         {% for message in messages %}
           {% include "global_includes/_toast.html" with status=message.level_tag|status_from_tag message=message %}
         {% endfor %}
       {% endif %}
     </div>
-
     {# Vendor JS (preserves global assignments — bootstrap, GridStack, TomSelect) #}
     <script src="{% static 'dist/vendor/bootstrap.bundle.min.js' %}"></script>
     <script src="{% static 'dist/vendor/gridstack-all.js' %}"></script>
@@ -99,13 +121,10 @@
     <script src="{% url 'javascript-catalog' %}"></script>
     {# Application modules bundle #}
     <script src="{% static 'dist/itambox.js' %}?v=1.2.11"></script>
-
-
-    {% block javascript %}{% endblock javascript %}
-
+    {% block javascript %}
+    {% endblock javascript %}
     {# Standalone OOB target for dynamic title swaps #}
     <span id="page-title-block" style="display:none" aria-hidden="true">{% translate "ITAMbox" %}</span>
-
     {% include "includes/pwa_service_worker.html" %}
-</body>
+  </body>
 </html>

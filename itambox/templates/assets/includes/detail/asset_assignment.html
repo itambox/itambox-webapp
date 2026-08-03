@@ -1,91 +1,102 @@
 {% load i18n %}
 ﻿{# Panel: Assignment / Deployment details (holder, location, custody) #}
 <dl class="row mb-0">
-    <dt class="col-sm-4">{% translate "Assigned To:" %}</dt>
-    <dd class="col-sm-8">
-        {% if assignment and assignment.assigned_to %}
-            {% if assignment.assigned_to_type == 'asset' %}
-                <a href="{% url 'assets:asset_detail' pk=assignment.assigned_to.pk %}" class="badge bg-blue-lt px-2 py-1">
-                    <i class="mdi mdi-server me-1"></i>
-                    {{ assignment.assigned_to }}
-                </a>
-            {% elif assignment.assigned_to_type == 'location' %}
-                <a href="{% url 'organization:location_detail' pk=assignment.assigned_to.pk %}" class="badge bg-azure-lt px-2 py-1">
-                    <i class="mdi mdi-map-marker-outline me-1"></i>
-                    {{ assignment.assigned_to }}
-                </a>
-            {% else %}
-                <a href="{% url 'organization:assetholder_detail' pk=assignment.assigned_to.pk %}" class="badge bg-indigo-lt px-2 py-1">
-                    <i class="mdi mdi-account-outline me-1"></i>
-                    {{ assignment.assigned_to }}
-                </a>
-            {% endif %}
-        {% else %}
-            <span class="text-muted"><i>{% translate "No active assignment" %}</i></span>
-        {% endif %}
-    </dd>
-
-    {% if assignment and assignment.is_active %}
+  <dt class="col-sm-4">{% translate "Assigned To:" %}</dt>
+  <dd class="col-sm-8">
+    {% if assignment and assignment.assigned_to %}
+      {% if assignment.assigned_to_type == 'asset' %}
+        <a href="{% url 'assets:asset_detail' pk=assignment.assigned_to.pk %}"
+           class="badge bg-blue-lt px-2 py-1">
+          <i class="mdi mdi-server me-1"></i>
+          {{ assignment.assigned_to }}
+        </a>
+      {% elif assignment.assigned_to_type == 'location' %}
+        <a href="{% url 'organization:location_detail' pk=assignment.assigned_to.pk %}"
+           class="badge bg-azure-lt px-2 py-1">
+          <i class="mdi mdi-map-marker-outline me-1"></i>
+          {{ assignment.assigned_to }}
+        </a>
+      {% else %}
+        <a href="{% url 'organization:assetholder_detail' pk=assignment.assigned_to.pk %}"
+           class="badge bg-indigo-lt px-2 py-1">
+          <i class="mdi mdi-account-outline me-1"></i>
+          {{ assignment.assigned_to }}
+        </a>
+      {% endif %}
+    {% else %}
+      <span class="text-muted"><i>{% translate "No active assignment" %}</i></span>
+    {% endif %}
+  </dd>
+  {% if assignment and assignment.is_active %}
     <dt class="col-sm-4">{% translate "Checked Out:" %}</dt>
     <dd class="col-sm-8">
-        <span class="text-body">{{ assignment.checked_out_at|date:"Y-m-d H:i" }}</span>
-        {% if assignment.checked_out_by %}
-            <span class="text-muted"> {% translate "by" %} {{ assignment.checked_out_by }}</span>
-        {% endif %}
+      <span class="text-body">{{ assignment.checked_out_at|date:"Y-m-d H:i" }}</span>
+      {% if assignment.checked_out_by %}
+        <span class="text-muted">{% translate "by" %} {{ assignment.checked_out_by }}</span>
+      {% endif %}
     </dd>
     {% if assignment.expected_checkin_date %}
-    <dt class="col-sm-4">{% translate "Expected Return:" %}</dt>
-    <dd class="col-sm-8">{{ assignment.expected_checkin_date }}</dd>
+      <dt class="col-sm-4">{% translate "Expected Return:" %}</dt>
+      <dd class="col-sm-8">
+        {{ assignment.expected_checkin_date }}
+      </dd>
     {% endif %}
+  {% endif %}
+  <dt class="col-sm-4">{% translate "Physical Location:" %}</dt>
+  <dd class="col-sm-8">
+    {% if object.location %}
+      <a href="{% url 'organization:location_detail' pk=object.location.pk %}"
+         class="badge bg-azure-lt px-2 py-1">
+        <i class="mdi mdi-map-marker-outline me-1"></i>
+        {{ object.location }}
+      </a>
+    {% else %}
+      <span class="text-muted"><i>{% translate "Not Set" %}</i></span>
     {% endif %}
-
-    <dt class="col-sm-4">{% translate "Physical Location:" %}</dt>
+  </dd>
+  {% if assignment and assignment.assigned_to and assignment.assigned_to_type == 'assetholder' %}
+    <dt class="col-sm-4">{% translate "Custody Status:" %}</dt>
     <dd class="col-sm-8">
-         {% if object.location %}
-            <a href="{% url 'organization:location_detail' pk=object.location.pk %}" class="badge bg-azure-lt px-2 py-1">
-                <i class="mdi mdi-map-marker-outline me-1"></i>
-                {{ object.location }}
-            </a>
-        {% else %}
-            <span class="text-muted"><i>{% translate "Not Set" %}</i></span>
-        {% endif %}
+      {% if custody_receipt and custody_receipt.accepted %}
+        <span class="badge bg-success-lt text-success font-weight-bold px-2 py-1 align-middle">
+          <i class="mdi mdi-shield-check-outline me-1"></i>
+          {% translate "Custody Secured" %}
+        </span>
+        <a href="{% url 'compliance:custody_eula_sign' token=eula_token %}"
+           target="_blank"
+           class="btn btn-sm btn-ghost-success border-0 py-1.5 px-2 ms-2 font-weight-bold align-middle">
+          <i class="mdi mdi-file-document-outline me-1"></i>
+          {% translate "View Signed Receipt" %}
+        </a>
+      {% elif custody_receipt %}
+        <span class="badge bg-warning-lt text-warning font-weight-bold px-2 py-1 align-middle">
+          <i class="mdi mdi-alert-outline me-1"></i>
+          {% translate "Pending EULA Acceptance" %}
+        </span>
+        <a href="{% url 'compliance:custody_eula_sign' token=eula_token %}?onsite=true"
+           target="_blank"
+           class="btn btn-sm btn-primary py-1 px-2.5 ms-2 font-weight-bold align-middle shadow-sm">
+          <i class="mdi mdi-pencil-box-outline me-1"></i>
+          {% translate "Sign Custody (On-Site)..." %}
+        </a>
+        <div class="mt-2 input-group input-group-flat" style="max-width: 450px;">
+          <input type="text"
+                 class="form-control form-control-sm text-secondary small specs-container"
+                 readonly
+                 value="{{ request.scheme }}://{{ request.get_host }}{% url 'compliance:custody_eula_sign' token=eula_token %}"
+                 id="eula-link-input" />
+          <span class="input-group-text p-0 bg-transparent">
+            <button class="btn btn-sm btn-ghost-indigo font-weight-bold py-1 px-3 border-0"
+                    data-copy-input="#eula-link-input"
+                    data-copy-feedback="{% translate 'Copied!' %}">{% translate "Copy Link" %}</button>
+          </span>
+        </div>
+      {% else %}
+        <span class="badge bg-secondary-lt text-secondary font-weight-bold px-2 py-1 align-middle">
+          <i class="mdi mdi-information-outline me-1"></i>
+          {% translate "Acceptance Not Required" %}
+        </span>
+      {% endif %}
     </dd>
-
-    {% if assignment and assignment.assigned_to and assignment.assigned_to_type == 'assetholder' %}
-        <dt class="col-sm-4">{% translate "Custody Status:" %}</dt>
-        <dd class="col-sm-8">
-            {% if custody_receipt and custody_receipt.accepted %}
-                <span class="badge bg-success-lt text-success font-weight-bold px-2 py-1 align-middle">
-                    <i class="mdi mdi-shield-check-outline me-1"></i>
-                    {% translate "Custody Secured" %}
-                </span>
-                <a href="{% url 'compliance:custody_eula_sign' token=eula_token %}" target="_blank" class="btn btn-sm btn-ghost-success border-0 py-1.5 px-2 ms-2 font-weight-bold align-middle">
-                    <i class="mdi mdi-file-document-outline me-1"></i>
-                    {% translate "View Signed Receipt" %}
-                </a>
-            {% elif custody_receipt %}
-                <span class="badge bg-warning-lt text-warning font-weight-bold px-2 py-1 align-middle">
-                    <i class="mdi mdi-alert-outline me-1"></i>
-                    {% translate "Pending EULA Acceptance" %}
-                </span>
-                <a href="{% url 'compliance:custody_eula_sign' token=eula_token %}?onsite=true" target="_blank" class="btn btn-sm btn-primary py-1 px-2.5 ms-2 font-weight-bold align-middle shadow-sm">
-                    <i class="mdi mdi-pencil-box-outline me-1"></i>
-                    {% translate "Sign Custody (On-Site)..." %}
-                </a>
-                <div class="mt-2 input-group input-group-flat" style="max-width: 450px;">
-                    <input type="text" class="form-control form-control-sm text-secondary small specs-container" readonly value="{{ request.scheme }}://{{ request.get_host }}{% url 'compliance:custody_eula_sign' token=eula_token %}" id="eula-link-input"/>
-                    <span class="input-group-text p-0 bg-transparent">
-                        <button class="btn btn-sm btn-ghost-indigo font-weight-bold py-1 px-3 border-0" data-copy-input="#eula-link-input" data-copy-feedback="{% translate 'Copied!' %}">
-                            {% translate "Copy Link" %}
-                        </button>
-                    </span>
-                </div>
-            {% else %}
-                <span class="badge bg-secondary-lt text-secondary font-weight-bold px-2 py-1 align-middle">
-                    <i class="mdi mdi-information-outline me-1"></i>
-                    {% translate "Acceptance Not Required" %}
-                </span>
-            {% endif %}
-        </dd>
-    {% endif %}
+  {% endif %}
 </dl>

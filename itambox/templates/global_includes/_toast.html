@@ -1,14 +1,19 @@
 {% load i18n %}
 {% load utility_tags %}
-
 {# Note: Using Tabler icons instead of MDI directly #}
-<div class="toast" role="alert" aria-live="assertive" aria-atomic="true" data-bs-delay="5000" data-bs-autohide="true">
+<div class="toast"
+     role="alert"
+     aria-live="assertive"
+     aria-atomic="true"
+     data-bs-delay="5000"
+     data-bs-autohide="true">
   <div class="toast-header text-bg-{{ status|default:'info' }}">
     <i class="mdi {{ status|icon_from_status }} me-2"></i>
     <strong class="me-auto">{{ title|default:status|capfirst }}</strong>
-    <button type="button" class="btn-close" data-bs-dismiss="toast" aria-label="{% translate 'Close' %}"></button>
+    <button type="button"
+            class="btn-close"
+            data-bs-dismiss="toast"
+            aria-label="{% translate 'Close' %}"></button>
   </div>
-  <div class="toast-body">
-    {{ message }}
-  </div>
+  <div class="toast-body">{{ message }}</div>
 </div>

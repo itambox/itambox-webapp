@@ -1,67 +1,71 @@
 {% load i18n %}
 <dl class="row mb-0">
-    <dt class="col-sm-3">{% translate "Rule Name:" %}</dt>
-    <dd class="col-sm-9"><strong>{{ object.name }}</strong></dd>
-
-    <dt class="col-sm-3">{% translate "Target Model:" %}</dt>
-    <dd class="col-sm-9"><span class="badge bg-secondary-lt font-monospace">{{ object.model }}</span></dd>
-
-    <dt class="col-sm-3">{% translate "Status:" %}</dt>
-    <dd class="col-sm-9">
-        {% if object.enabled %}
-            <span class="badge bg-success">{% translate "Active / Enabled" %}</span>
-        {% else %}
-            <span class="badge bg-secondary">{% translate "Disabled" %}</span>
-        {% endif %}
-    </dd>
-
-    <dt class="col-sm-3">{% translate "Trigger Events:" %}</dt>
-    <dd class="col-sm-9">
-        {% if object.events %}
-            <div class="d-flex flex-wrap gap-1 mt-1">
-                {% for ev in object.events %}
-                    <span class="badge bg-blue-lt text-uppercase font-weight-bold">{{ ev }}</span>
-                {% endfor %}
-            </div>
-        {% else %}
-            <span class="text-muted"><i>{% translate "No events configured" %}</i></span>
-        {% endif %}
-    </dd>
-
-    <dt class="col-sm-3">{% translate "Action Type:" %}</dt>
-    <dd class="col-sm-9"><span class="badge bg-purple-lt px-2.5 py-1 text-uppercase">{{ object.get_action_type_display }}</span></dd>
-
-    {% if object.action_type == 'webhook' %}
+  <dt class="col-sm-3">{% translate "Rule Name:" %}</dt>
+  <dd class="col-sm-9">
+    <strong>{{ object.name }}</strong>
+  </dd>
+  <dt class="col-sm-3">{% translate "Target Model:" %}</dt>
+  <dd class="col-sm-9">
+    <span class="badge bg-secondary-lt font-monospace">{{ object.model }}</span>
+  </dd>
+  <dt class="col-sm-3">{% translate "Status:" %}</dt>
+  <dd class="col-sm-9">
+    {% if object.enabled %}
+      <span class="badge bg-success">{% translate "Active / Enabled" %}</span>
+    {% else %}
+      <span class="badge bg-secondary">{% translate "Disabled" %}</span>
+    {% endif %}
+  </dd>
+  <dt class="col-sm-3">{% translate "Trigger Events:" %}</dt>
+  <dd class="col-sm-9">
+    {% if object.events %}
+      <div class="d-flex flex-wrap gap-1 mt-1">
+        {% for ev in object.events %}
+          <span class="badge bg-blue-lt text-uppercase font-weight-bold">{{ ev }}</span>
+        {% endfor %}
+      </div>
+    {% else %}
+      <span class="text-muted"><i>{% translate "No events configured" %}</i></span>
+    {% endif %}
+  </dd>
+  <dt class="col-sm-3">{% translate "Action Type:" %}</dt>
+  <dd class="col-sm-9">
+    <span class="badge bg-purple-lt px-2.5 py-1 text-uppercase">{{ object.get_action_type_display }}</span>
+  </dd>
+  {% if object.action_type == 'webhook' %}
     <dt class="col-sm-3">{% translate "Webhook Endpoint:" %}</dt>
     <dd class="col-sm-9">
-        {% if object.webhook %}
-            <a href="{{ object.webhook.get_absolute_url }}" class="text-decoration-none">
-                {{ object.webhook.name }}
-            </a>
-            <span class="text-secondary small font-monospace ms-1">{{ object.webhook.url }}</span>
-            {% if not object.webhook.enabled %}
-                <span class="badge bg-warning ms-1">{% translate "Endpoint disabled" %}</span>
-            {% endif %}
-        {% elif object.action_config.url %}
-            <span class="font-monospace">{{ object.action_config.url }}</span>
-            <span class="text-secondary small ms-1">{% translate "(inline URL — consider linking a Webhook Endpoint)" %}</span>
-        {% else %}
-            <span class="badge bg-danger">{% translate "No endpoint set — this rule will not deliver" %}</span>
+      {% if object.webhook %}
+        <a href="{{ object.webhook.get_absolute_url }}"
+           class="text-decoration-none">{{ object.webhook.name }}</a>
+        <span class="text-secondary small font-monospace ms-1">{{ object.webhook.url }}</span>
+        {% if not object.webhook.enabled %}
+          <span class="badge bg-warning ms-1">{% translate "Endpoint disabled" %}</span>
         {% endif %}
+      {% elif object.action_config.url %}
+        <span class="font-monospace">{{ object.action_config.url }}</span>
+        <span class="text-secondary small ms-1">{% translate "(inline URL — consider linking a Webhook Endpoint)" %}</span>
+      {% else %}
+        <span class="badge bg-danger">{% translate "No endpoint set — this rule will not deliver" %}</span>
+      {% endif %}
     </dd>
-    {% endif %}
-
-    {% if object.conditions %}
+  {% endif %}
+  {% if object.conditions %}
     <dt class="col-sm-3">{% translate "Matching Conditions:" %}</dt>
     <dd class="col-sm-9">
-        <pre class="bg-dark text-light p-3 rounded font-monospace" style="max-height: 150px; overflow-y: auto; font-size: 8.5pt;">{{ object.conditions }}</pre>
+      <pre class="bg-dark text-light p-3 rounded font-monospace"
+           style="max-height: 150px;
+                  overflow-y: auto;
+                  font-size: 8.5pt">{{ object.conditions }}</pre>
     </dd>
-    {% endif %}
-
-    {% if object.action_config %}
+  {% endif %}
+  {% if object.action_config %}
     <dt class="col-sm-3">{% translate "Action Configuration:" %}</dt>
     <dd class="col-sm-9">
-        <pre class="bg-dark text-light p-3 rounded font-monospace" style="max-height: 200px; overflow-y: auto; font-size: 8.5pt;">{{ object.action_config }}</pre>
+      <pre class="bg-dark text-light p-3 rounded font-monospace"
+           style="max-height: 200px;
+                  overflow-y: auto;
+                  font-size: 8.5pt">{{ object.action_config }}</pre>
     </dd>
-    {% endif %}
+  {% endif %}
 </dl>

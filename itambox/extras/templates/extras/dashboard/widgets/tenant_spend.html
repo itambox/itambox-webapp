@@ -1,37 +1,35 @@
 {% load i18n %}
 {% load money %}
 {% if tenant_spend %}
-<div class="text-muted small mb-2">{% translate "Purchase cost by tenant" %}</div>
-
-{% comment %}Per-(tenant, currency) list. Assets carry a per-record currency, so a tenant
+  <div class="text-muted small mb-2">{% translate "Purchase cost by tenant" %}</div>
+  {% comment %}Per-(tenant, currency) list. Assets carry a per-record currency, so a tenant
    can have figures in multiple currencies; they are never summed across
-   currencies (no FX source). Each figure is formatted via the `money` filter.{% endcomment %}
-<div class="list-group list-group-flush" style="font-size: 0.85rem;">
+  currencies (no FX source). Each figure is formatted via the `money` filter.{% endcomment %}
+  <div class="list-group list-group-flush" style="font-size: 0.85rem;">
     {% for t in tenant_spend %}
-    <div class="list-group-item px-0 py-2">
+      <div class="list-group-item px-0 py-2">
         <div class="d-flex justify-content-between align-items-center {% if t.currency_spend|length > 1 %}mb-1{% endif %}">
-            <span class="d-inline-flex align-items-center gap-2">
-                <span class="badge badge-dot bg-blue"></span>
-                <span class="fw-medium">{{ t.name }}</span>
-            </span>
-            {% if t.currency_spend|length == 1 %}
+          <span class="d-inline-flex align-items-center gap-2">
+            <span class="badge badge-dot bg-blue"></span>
+            <span class="fw-medium">{{ t.name }}</span>
+          </span>
+          {% if t.currency_spend|length == 1 %}
             <span class="text-muted fw-bold">{{ t.currency_spend.0.total|money:t.currency_spend.0.currency_obj }}</span>
-            {% endif %}
+          {% endif %}
         </div>
         {% if t.currency_spend|length > 1 %}
-        <div class="ps-3">
+          <div class="ps-3">
             {% for cs in t.currency_spend %}
-            <div class="d-flex justify-content-between text-muted small">
+              <div class="d-flex justify-content-between text-muted small">
                 <span>{{ cs.currency_code }}</span>
                 <span class="fw-bold">{{ cs.total|money:cs.currency_obj }}</span>
-            </div>
+              </div>
             {% endfor %}
-        </div>
+          </div>
         {% endif %}
-    </div>
+      </div>
     {% endfor %}
-</div>
-
+  </div>
 {% else %}
-<div class="text-muted text-center py-4">{% translate "No tenant data available." %}</div>
+  <div class="text-muted text-center py-4">{% translate "No tenant data available." %}</div>
 {% endif %}

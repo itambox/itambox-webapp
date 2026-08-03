@@ -1,5 +1,5 @@
 {% load i18n %}
 {% translate "Assets Supplied" as l_assets %}
 <div class="row g-3 mb-4">
-    {% include "generic/includes/stat_card.html" with col="col-sm-12" color="green" icon="mdi mdi-storefront-outline" label=l_assets value=assets_table.rows|length %}
+  {% include "generic/includes/stat_card.html" with col="col-sm-12" color="green" icon="mdi mdi-storefront-outline" label=l_assets value=assets_table.rows|length %}
 </div>

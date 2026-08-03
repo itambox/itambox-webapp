@@ -51,7 +51,7 @@
         right: -4px;
         bottom: 0;
         width: 5px;
-        background: linear-gradient(to right, rgba(0, 0, 0, 0.04), transparent);
+        background: linear-gradient(to right, rgb(0 0 0 / 4%), transparent);
         pointer-events: none;
     }
 
@@ -63,7 +63,7 @@
         left: -4px;
         bottom: 0;
         width: 5px;
-        background: linear-gradient(to left, rgba(0, 0, 0, 0.04), transparent);
+        background: linear-gradient(to left, rgb(0 0 0 / 4%), transparent);
         pointer-events: none;
     }
 
@@ -75,7 +75,7 @@
         left: -4px;
         bottom: 0;
         width: 4px;
-        background: linear-gradient(to left, rgba(0, 0, 0, 0.04), transparent);
+        background: linear-gradient(to left, rgb(0 0 0 / 4%), transparent);
         pointer-events: none;
     }
 
@@ -108,6 +108,7 @@
     th.col-checkout,
     td.col-checkout {
         position: sticky !important;
+
         // Sits immediately left of the sticky actions column, so this offset must
         // equal the col-actions width below (120px).
         right: 120px !important;
@@ -168,7 +169,6 @@
 
 // Dark mode: solid sticky column backgrounds
 [data-bs-theme="dark"] .card-table {
-
     th:first-child,
     td:first-child {
         background-color: var(--tblr-bg-surface) !important;
@@ -195,12 +195,12 @@
 
     // Shadow opacity boost in dark mode
     td:first-child::after {
-        background: linear-gradient(to right, rgba(0, 0, 0, 0.15), transparent) !important;
+        background: linear-gradient(to right, rgb(0 0 0 / 15%), transparent) !important;
     }
 
     td:last-child::before,
     td.col-checkout::before {
-        background: linear-gradient(to left, rgba(0, 0, 0, 0.15), transparent) !important;
+        background: linear-gradient(to left, rgb(0 0 0 / 15%), transparent) !important;
     }
 }
 
@@ -293,6 +293,7 @@
         --tblr-table-hover-bg: transparent;
         --tblr-table-hover-color: var(--tblr-body-color);
         --tblr-table-border-color: var(--tblr-border-color);
+
         color: var(--tblr-table-color);
     }
 
@@ -310,7 +311,7 @@
     // Brief add-flash: a soft neutral wash (inset shadow, so it reads over the
     // sticky cells) instead of a light background.
     .table-active {
-        --tblr-table-bg-state: rgba(255, 255, 255, 0.06);
+        --tblr-table-bg-state: rgb(255 255 255 / 6%);
         --tblr-table-color-state: var(--tblr-body-color);
     }
 }
@@ -318,7 +319,7 @@
 // ============================================================
 //  Card-mode tables (≤ 575.98px) — stack row columns into cards
 // ============================================================
-@media (max-width: 575.98px) {
+@media (width <= 575.98px) {
     .card-table {
         display: block;
         width: 100%;
@@ -395,6 +396,7 @@
         // row, and grow the check button to fill the available space.
         td.col-actions-wide::before { display: none; }
         td.col-actions-wide > .d-flex { width: 100%; }
+
         .btn.check-action {
             flex: 1 1 auto;
             min-width: 0;

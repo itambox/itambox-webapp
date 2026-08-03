@@ -1,7 +1,8 @@
 {% load i18n %}
-<div class="alert alert-success d-flex align-items-center mb-0" role="alert">
-    <i class="mdi mdi-check alert-icon"></i>
-    <div>
-        {% translate "Scanned" %} <strong>{{ asset.name }}</strong> (<code>{{ asset.asset_tag }}</code>{% translate ") successfully!" %}
-    </div>
+<div class="alert alert-success d-flex align-items-center mb-0"
+     role="alert">
+  <i class="mdi mdi-check alert-icon"></i>
+  <div>
+    {% translate "Scanned" %} <strong>{{ asset.name }}</strong> (<code>{{ asset.asset_tag }}</code>{% translate ") successfully!" %}
+  </div>
 </div>

@@ -2,175 +2,199 @@
 {% load i18n %}
 {% load static %}
 {% load dashboard %}
-
-{% block title %}{% translate "Dashboard - ITAMbox" %}{% endblock %}
-
-{% block page_header %}
-<div class="dropdown d-inline-block">
-    <button class="btn btn-outline-primary dropdown-toggle d-flex align-items-center" type="button" id="dashboard-switcher" data-bs-toggle="dropdown" aria-expanded="false">
-        <i class="mdi mdi-view-dashboard-variant-outline me-1"></i>
-        {{ active_dashboard.name }}
-        {% if active_dashboard.tenant %}
-            <span class="badge bg-blue-lt ms-2">{{ active_dashboard.tenant.name }}</span>
-        {% endif %}
-    </button>
-    <ul class="dropdown-menu dropdown-menu-start" aria-labelledby="dashboard-switcher">
-        <li class="dropdown-header">{% translate "Switch Dashboard" %}</li>
-        {% for db in dashboards_list %}
-            <li>
-                <a class="dropdown-item d-flex align-items-center justify-content-between {% if db.id == active_dashboard.id %}active{% endif %}"
-                   href="?dashboard={{ db.id }}"
-                   hx-get="?dashboard={{ db.id }}"
-                   hx-target="#page-content-wrapper"
-                   hx-push-url="true">
-                    <span>
-                        {{ db.name }}
-                        {% if db.is_default %}
-                            <small class="text-muted ms-1">({% translate "Default" %})</small>
-                        {% endif %}
-                    </span>
-                    {% if db.tenant %}
-                        <span class="badge bg-blue-lt ms-2">{{ db.tenant.name }}</span>
-                    {% endif %}
-                </a>
-            </li>
-        {% endfor %}
-        <div class="dropdown-divider"></div>
-        <li>
-            <a class="dropdown-item d-flex align-items-center text-primary"
-               hx-get="{% url 'extras:dashboard_manage_modal' %}"
-               hx-target="#dashboard-modal-content"
-               data-bs-toggle="modal"
-               data-bs-target="#dashboard-modal"
-               href="#">
-                <i class="mdi mdi-cog-outline me-1"></i>
-                {% translate "Manage Dashboards" %}
-            </a>
-        </li>
-    </ul>
-</div>
+{% block title %}
+  {% translate "Dashboard - ITAMbox" %}
 {% endblock %}
-
+{% block page_header %}
+  <div class="dropdown d-inline-block">
+    <button class="btn btn-outline-primary dropdown-toggle d-flex align-items-center"
+            type="button"
+            id="dashboard-switcher"
+            data-bs-toggle="dropdown"
+            aria-expanded="false">
+      <i class="mdi mdi-view-dashboard-variant-outline me-1"></i>
+      {{ active_dashboard.name }}
+      {% if active_dashboard.tenant %}
+        <span class="badge bg-blue-lt ms-2">{{ active_dashboard.tenant.name }}</span>
+      {% endif %}
+    </button>
+    <ul class="dropdown-menu dropdown-menu-start"
+        aria-labelledby="dashboard-switcher">
+      <li class="dropdown-header">{% translate "Switch Dashboard" %}</li>
+      {% for db in dashboards_list %}
+        <li>
+          <a class="dropdown-item d-flex align-items-center justify-content-between {% if db.id == active_dashboard.id %}active{% endif %}"
+             href="?dashboard={{ db.id }}"
+             hx-get="?dashboard={{ db.id }}"
+             hx-target="#page-content-wrapper"
+             hx-push-url="true">
+            <span>
+              {{ db.name }}
+              {% if db.is_default %}
+                <small class="text-muted ms-1">({% translate "Default" %})</small>
+              {% endif %}
+            </span>
+            {% if db.tenant %}
+              <span class="badge bg-blue-lt ms-2">{{ db.tenant.name }}</span>
+            {% endif %}
+          </a>
+        </li>
+      {% endfor %}
+      <div class="dropdown-divider"></div>
+      <li>
+        <a class="dropdown-item d-flex align-items-center text-primary"
+           hx-get="{% url 'extras:dashboard_manage_modal' %}"
+           hx-target="#dashboard-modal-content"
+           data-bs-toggle="modal"
+           data-bs-target="#dashboard-modal"
+           href="#">
+          <i class="mdi mdi-cog-outline me-1"></i>
+          {% translate "Manage Dashboards" %}
+        </a>
+      </li>
+    </ul>
+  </div>
+{% endblock %}
 {% block page_actions %}
-<style>
+  <style>
     #dashboard-locked-controls, #dashboard-unlocked-controls {
         display: inline-flex;
         align-items: center;
         gap: 0.5rem;
     }
-</style>
-<div class="btn-list" id="dashboard-controls">
+  </style>
+  <div class="btn-list" id="dashboard-controls">
     {# On phones these controls collapse to icon-only to save space; labels return at ≥sm. #}
     <span id="dashboard-locked-controls">
-        <button id="unlock-dashboard" class="btn btn-outline-secondary d-flex align-items-center"
-            title="{% translate 'Unlock dashboard to resize and reorder widgets' %}">
-            <i class="mdi mdi-lock-open-outline"></i>
-            <span class="d-none d-sm-inline ms-1">{% translate 'Unlock' %}</span>
-        </button>
+      <button id="unlock-dashboard"
+              class="btn btn-outline-secondary d-flex align-items-center"
+              title="{% translate 'Unlock dashboard to resize and reorder widgets' %}">
+        <i class="mdi mdi-lock-open-outline"></i>
+        <span class="d-none d-sm-inline ms-1">{% translate 'Unlock' %}</span>
+      </button>
     </span>
     <span id="dashboard-unlocked-controls" style="display:none">
-        <button id="save-dashboard" class="btn btn-primary d-flex align-items-center"
-            title="{% translate 'Save layout' %}">
-            <i class="mdi mdi-floppy"></i>
-            <span class="d-none d-sm-inline ms-1">{% translate 'Save Layout' %}</span>
-        </button>
-        <button class="btn btn-outline-secondary d-flex align-items-center"
-            hx-get="{% url 'extras:dashboard_widget_add' dashboard_id=active_dashboard.id %}" hx-target="#dashboard-modal-content"
-            data-bs-toggle="modal" data-bs-target="#dashboard-modal" title="{% translate 'Add Widget' %}">
-            <i class="mdi mdi-plus"></i>
-            <span class="d-none d-sm-inline ms-1">{% translate 'Add Widget' %}</span>
-        </button>
-        <button id="lock-dashboard" class="btn btn-outline-secondary d-flex align-items-center"
-            title="{% translate 'Lock dashboard' %}">
-            <i class="mdi mdi-lock"></i>
-            <span class="d-none d-sm-inline ms-1">{% translate 'Lock' %}</span>
-        </button>
+      <button id="save-dashboard"
+              class="btn btn-primary d-flex align-items-center"
+              title="{% translate 'Save layout' %}">
+        <i class="mdi mdi-floppy"></i>
+        <span class="d-none d-sm-inline ms-1">{% translate 'Save Layout' %}</span>
+      </button>
+      <button class="btn btn-outline-secondary d-flex align-items-center"
+              hx-get="{% url 'extras:dashboard_widget_add' dashboard_id=active_dashboard.id %}"
+              hx-target="#dashboard-modal-content"
+              data-bs-toggle="modal"
+              data-bs-target="#dashboard-modal"
+              title="{% translate 'Add Widget' %}">
+        <i class="mdi mdi-plus"></i>
+        <span class="d-none d-sm-inline ms-1">{% translate 'Add Widget' %}</span>
+      </button>
+      <button id="lock-dashboard"
+              class="btn btn-outline-secondary d-flex align-items-center"
+              title="{% translate 'Lock dashboard' %}">
+        <i class="mdi mdi-lock"></i>
+        <span class="d-none d-sm-inline ms-1">{% translate 'Lock' %}</span>
+      </button>
     </span>
-    <form method="post" action="{% url 'extras:dashboard_reset' dashboard_id=active_dashboard.id %}" class="d-inline">
-        {% csrf_token %}
-        <button type="submit" class="btn btn-outline-danger" title="{% translate 'Reset' %}"
-            data-confirm="{% translate 'Reset dashboard to default layout? This cannot be undone.' %}">
-            <i class="mdi mdi-refresh"></i>
-            <span class="d-none d-sm-inline ms-1">{% translate 'Reset' %}</span>
-        </button>
+    <form method="post"
+          action="{% url 'extras:dashboard_reset' dashboard_id=active_dashboard.id %}"
+          class="d-inline">
+      {% csrf_token %}
+      <button type="submit"
+              class="btn btn-outline-danger"
+              title="{% translate 'Reset' %}"
+              data-confirm="{% translate 'Reset dashboard to default layout? This cannot be undone.' %}">
+        <i class="mdi mdi-refresh"></i>
+        <span class="d-none d-sm-inline ms-1">{% translate 'Reset' %}</span>
+      </button>
     </form>
-</div>
-{% endblock %}
-
-{% block content %}
-
-<div class="row row-cards grid-stack-loading" id="dashboard-grid" hx-history="false" data-save-url="{% url 'extras:dashboard_save_layout' dashboard_id=active_dashboard.id %}">
-    {% for entry in dashboard_widgets %}
-    <div class="col-lg-{{ entry.config.w|default:4 }} col-md-6 col-12" id="widget-{{ entry.index }}"
-         data-gs-w="{{ entry.config.w|default:4 }}" data-gs-h="{{ entry.config.h|default:2 }}"
-         data-gs-x="{{ entry.config.x|default_if_none:'' }}" data-gs-y="{{ entry.config.y|default_if_none:'' }}">
-        <div class="card card-sm">
-            {# Neutral header; the configured style accent lives in the icon chip #}
-            {% get_widget_icon entry.config as widget_icon %}
-            <div class="card-header d-flex justify-content-between align-items-center">
-                <h3 class="card-title">
-                    <span class="widget-icon-chip{% if entry.config.style %} widget-icon-chip--{{ entry.config.style }}{% endif %}" aria-hidden="true">
-                        <i class="mdi mdi-{{ widget_icon }}"></i>
-                    </span>
-                    <span class="widget-title-text">{{ entry.config.title }}</span>
-                </h3>
-                <div class="card-actions d-flex gap-1">
-                    <button class="btn btn-icon btn-sm btn-ghost-secondary"
-                        hx-get="{% url 'extras:dashboard_widget_config' dashboard_id=active_dashboard.id index=entry.index %}"
-                        hx-target="#dashboard-modal-content"
-                        data-bs-toggle="modal" data-bs-target="#dashboard-modal" title="{% translate 'Configure' %}">
-                        <i class="mdi mdi-cog-outline"></i>
-                    </button>
-                    <button class="btn btn-icon btn-sm btn-ghost-danger dashboard-manage-btn d-none"
-                        hx-get="{% url 'extras:dashboard_widget_delete' dashboard_id=active_dashboard.id index=entry.index %}"
-                        hx-target="#dashboard-modal-content"
-                        data-bs-toggle="modal" data-bs-target="#dashboard-modal" title="{% translate 'Remove' %}">
-                        <i class="mdi mdi-close"></i>
-                    </button>
-                </div>
-            </div>
-            <div class="card-body overflow-auto">
-                {% render_widget entry.config entry.index %}
-            </div>
-            {% get_widget_footer_links entry.config entry.index as footer_links %}
-            {% if footer_links %}
-            <div class="card-footer bg-surface-secondary d-flex justify-content-end align-items-center flex-wrap gap-2" style="padding: 0.5rem 1.25rem;">
-                {% for link in footer_links %}
-                <a href="{{ link.url }}" class="btn btn-sm p-0 px-2 btn-ghost-secondary" style="font-size: 0.72rem; line-height: 1.5;">
-                    {{ link.label }} <i class="mdi mdi-chevron-right ms-1"></i>
-                </a>
-                {% endfor %}
-            </div>
-            {% endif %}
-        </div>
-    </div>
-    {% empty %}
-    <div class="col-12">
-        <div class="card">
-            <div class="card-body text-center py-5">
-                <i class="mdi mdi-view-dashboard mb-3 text-muted"></i>
-                <h4>{% translate 'Your dashboard is empty' %}</h4>
-                <p class="text-muted mb-3">{% translate 'No widgets are currently configured.' %}</p>
-                <button class="btn btn-primary" hx-get="{% url 'extras:dashboard_widget_add' %}"
-                    hx-target="#dashboard-modal-content"
-                    data-bs-toggle="modal" data-bs-target="#dashboard-modal">
-                    <i class="mdi mdi-plus me-1"></i>
-                    {% translate 'Add your first widget' %}
-                </button>
-            </div>
-        </div>
-    </div>
-    {% endfor %}
-</div>
-
-{# dashboard.js is now bundled in itambox.js via base.html #}
-
-{% endblock content %}
-
-{% block page_modals %}
-<div class="modal modal-blur fade" id="dashboard-modal" tabindex="-1">
-  <div class="modal-dialog modal-xl modal-dialog-centered">
-    <div class="modal-content" id="dashboard-modal-content"></div>
   </div>
-</div>
+{% endblock %}
+{% block content %}
+  <div class="row row-cards grid-stack-loading"
+       id="dashboard-grid"
+       hx-history="false"
+       data-save-url="{% url 'extras:dashboard_save_layout' dashboard_id=active_dashboard.id %}">
+    {% for entry in dashboard_widgets %}
+      <div class="col-lg-{{ entry.config.w|default:4 }} col-md-6 col-12"
+           id="widget-{{ entry.index }}"
+           data-gs-w="{{ entry.config.w|default:4 }}"
+           data-gs-h="{{ entry.config.h|default:2 }}"
+           data-gs-x="{{ entry.config.x|default_if_none:'' }}"
+           data-gs-y="{{ entry.config.y|default_if_none:'' }}">
+        <div class="card card-sm">
+          {# Neutral header; the configured style accent lives in the icon chip #}
+          {% get_widget_icon entry.config as widget_icon %}
+          <div class="card-header d-flex justify-content-between align-items-center">
+            <h3 class="card-title">
+              <span class="widget-icon-chip{% if entry.config.style %} widget-icon-chip--{{ entry.config.style }}{% endif %}"
+                    aria-hidden="true">
+                <i class="mdi mdi-{{ widget_icon }}"></i>
+              </span>
+              <span class="widget-title-text">{{ entry.config.title }}</span>
+            </h3>
+            <div class="card-actions d-flex gap-1">
+              <button class="btn btn-icon btn-sm btn-ghost-secondary"
+                      hx-get="{% url 'extras:dashboard_widget_config' dashboard_id=active_dashboard.id index=entry.index %}"
+                      hx-target="#dashboard-modal-content"
+                      data-bs-toggle="modal"
+                      data-bs-target="#dashboard-modal"
+                      title="{% translate 'Configure' %}">
+                <i class="mdi mdi-cog-outline"></i>
+              </button>
+              <button class="btn btn-icon btn-sm btn-ghost-danger dashboard-manage-btn d-none"
+                      hx-get="{% url 'extras:dashboard_widget_delete' dashboard_id=active_dashboard.id index=entry.index %}"
+                      hx-target="#dashboard-modal-content"
+                      data-bs-toggle="modal"
+                      data-bs-target="#dashboard-modal"
+                      title="{% translate 'Remove' %}">
+                <i class="mdi mdi-close"></i>
+              </button>
+            </div>
+          </div>
+          <div class="card-body overflow-auto">{% render_widget entry.config entry.index %}</div>
+          {% get_widget_footer_links entry.config entry.index as footer_links %}
+          {% if footer_links %}
+            <div class="card-footer bg-surface-secondary d-flex justify-content-end align-items-center flex-wrap gap-2"
+                 style="padding: 0.5rem 1.25rem">
+              {% for link in footer_links %}
+                <a href="{{ link.url }}"
+                   class="btn btn-sm p-0 px-2 btn-ghost-secondary"
+                   style="font-size: 0.72rem;
+                          line-height: 1.5">
+                  {{ link.label }} <i class="mdi mdi-chevron-right ms-1"></i>
+                </a>
+              {% endfor %}
+            </div>
+          {% endif %}
+        </div>
+      </div>
+    {% empty %}
+      <div class="col-12">
+        <div class="card">
+          <div class="card-body text-center py-5">
+            <i class="mdi mdi-view-dashboard mb-3 text-muted"></i>
+            <h4>{% translate 'Your dashboard is empty' %}</h4>
+            <p class="text-muted mb-3">{% translate 'No widgets are currently configured.' %}</p>
+            <button class="btn btn-primary"
+                    hx-get="{% url 'extras:dashboard_widget_add' %}"
+                    hx-target="#dashboard-modal-content"
+                    data-bs-toggle="modal"
+                    data-bs-target="#dashboard-modal">
+              <i class="mdi mdi-plus me-1"></i>
+              {% translate 'Add your first widget' %}
+            </button>
+          </div>
+        </div>
+      </div>
+    {% endfor %}
+  </div>
+  {# dashboard.js is now bundled in itambox.js via base.html #}
+{% endblock content %}
+{% block page_modals %}
+  <div class="modal modal-blur fade" id="dashboard-modal" tabindex="-1">
+    <div class="modal-dialog modal-xl modal-dialog-centered">
+      <div class="modal-content" id="dashboard-modal-content"></div>
+    </div>
+  </div>
 {% endblock page_modals %}

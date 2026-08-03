@@ -1,46 +1,45 @@
 {% load i18n %}
 {% load utility_tags %}
 <dl class="row mb-0">
-    <dt class="col-sm-3">{% translate "Name:" %}</dt>
-    <dd class="col-sm-9"><strong>{{ object.name }}</strong></dd>
-
-    <dt class="col-sm-3">{% translate "Slug:" %}</dt>
-    <dd class="col-sm-9"><code>{{ object.slug }}</code></dd>
-
-    <dt class="col-sm-3">{% translate "Site:" %}</dt>
-    <dd class="col-sm-9">
-        {% if object.site %}
-            <a href="{% url 'organization:site_detail' pk=object.site.pk %}">{{ object.site }}</a>
-        {% else %}
-             <span class="text-muted"><i>{% translate "None" %}</i></span>
-        {% endif %}
-    </dd>
-
-    <dt class="col-sm-3">{% translate "Parent Location:" %}</dt>
-    <dd class="col-sm-9">
-        {% if object.parent %}
-            <a href="{% url 'organization:location_detail' pk=object.parent.pk %}">{{ object.parent }}</a>
-        {% else %}
-             <span class="text-muted"><i>{% translate "None" %}</i></span>
-        {% endif %}
-    </dd>
-
-    <dt class="col-sm-3">{% translate "Tenant:" %}</dt>
-    <dd class="col-sm-9">
-        {% if object.tenant %}
-            <a href="{% url 'organization:tenant_detail' pk=object.tenant.pk %}">{{ object.tenant }}</a>
-        {% else %}
-             <span class="text-muted"><i>{% translate "None" %}</i></span>
-        {% endif %}
-    </dd>
-
-    <dt class="col-sm-3">{% translate "Status:" %}</dt>
-    <dd class="col-sm-9">
-        <span class="badge px-2.5 py-1 text-uppercase" style="background-color: #{{ object.status|status_color }}1a; color: #{{ object.status|status_color }}; border: 1px solid #{{ object.status|status_color }}33;">
-            {{ object.get_status_display }}
-        </span>
-    </dd>
-
-    <dt class="col-sm-3">{% translate "Facility:" %}</dt>
-    <dd class="col-sm-9">{% if object.facility %}{{object.facility}}{% else %}<span class='text-muted'><i>{% translate "Not Set" %}</i></span>{% endif %}</dd>
+  <dt class="col-sm-3">{% translate "Name:" %}</dt>
+  <dd class="col-sm-9">
+    <strong>{{ object.name }}</strong>
+  </dd>
+  <dt class="col-sm-3">{% translate "Slug:" %}</dt>
+  <dd class="col-sm-9">
+    <code>{{ object.slug }}</code>
+  </dd>
+  <dt class="col-sm-3">{% translate "Site:" %}</dt>
+  <dd class="col-sm-9">
+    {% if object.site %}
+      <a href="{% url 'organization:site_detail' pk=object.site.pk %}">{{ object.site }}</a>
+    {% else %}
+      <span class="text-muted"><i>{% translate "None" %}</i></span>
+    {% endif %}
+  </dd>
+  <dt class="col-sm-3">{% translate "Parent Location:" %}</dt>
+  <dd class="col-sm-9">
+    {% if object.parent %}
+      <a href="{% url 'organization:location_detail' pk=object.parent.pk %}">{{ object.parent }}</a>
+    {% else %}
+      <span class="text-muted"><i>{% translate "None" %}</i></span>
+    {% endif %}
+  </dd>
+  <dt class="col-sm-3">{% translate "Tenant:" %}</dt>
+  <dd class="col-sm-9">
+    {% if object.tenant %}
+      <a href="{% url 'organization:tenant_detail' pk=object.tenant.pk %}">{{ object.tenant }}</a>
+    {% else %}
+      <span class="text-muted"><i>{% translate "None" %}</i></span>
+    {% endif %}
+  </dd>
+  <dt class="col-sm-3">{% translate "Status:" %}</dt>
+  <dd class="col-sm-9">
+    <span class="badge px-2.5 py-1 text-uppercase"
+          style="background-color: #{{ object.status|status_color }}1a;
+                 color: #{{ object.status|status_color }};
+                 border: 1px solid #{{ object.status|status_color }}33">{{ object.get_status_display }}</span>
+  </dd>
+  <dt class="col-sm-3">{% translate "Facility:" %}</dt>
+  <dd class="col-sm-9">{% if object.facility %}{{ object.facility }}{% else %}<span class="text-muted"><i>{% translate "Not Set" %}</i></span>{% endif %}</dd>
 </dl>

@@ -6,309 +6,326 @@
 {% load utility_tags %}
 {% load i18n %}
 {% load crispy_forms_tags %}
-
 {% block tabs %}
 {% endblock tabs %}
-
 {% block content %}
-<div class="row g-3">
+  <div class="row g-3">
     {# Main Content / Table Column — also the selection scope so the bulk toolbar can live OUTSIDE the table card #}
-    <div class="col-12 js-selection-scope {% if filter_form %}col-md-9 order-2 order-md-1{% endif %}" id="object-list-main-col">
-        <div class="card">
-            {% if app_label == 'inventory' and model_name in 'component,componentstock,componentallocation' %}
-            <div class="card-header">
-              <ul class="nav nav-tabs card-header-tabs">
-                <li class="nav-item">
-                  <a class="nav-link {% if model_name == 'component' %}active fw-bold{% endif %}" href="{% url 'inventory:component_list' %}">
-                    <i class="mdi mdi-book-open-outline me-2"></i>{% translate "Catalog" %}
-                  </a>
-                </li>
-                <li class="nav-item">
-                  <a class="nav-link {% if model_name == 'componentstock' %}active fw-bold{% endif %}" href="{% url 'inventory:componentstock_list' %}">
-                    <i class="mdi mdi-warehouse me-2"></i>{% translate "Stocks" %}
-                  </a>
-                </li>
-                <li class="nav-item">
-                  <a class="nav-link {% if model_name == 'componentallocation' %}active fw-bold{% endif %}" href="{% url 'inventory:componentallocation_list' %}">
-                    <i class="mdi mdi-account-arrow-right me-2"></i>{% translate "Allocations" %}
-                  </a>
-                </li>
-              </ul>
+    <div class="col-12 js-selection-scope {% if filter_form %}col-md-9 order-2 order-md-1{% endif %}"
+         id="object-list-main-col">
+      <div class="card">
+        {% if app_label == 'inventory' and model_name in 'component,componentstock,componentallocation' %}
+          <div class="card-header">
+            <ul class="nav nav-tabs card-header-tabs">
+              <li class="nav-item">
+                <a class="nav-link {% if model_name == 'component' %}active fw-bold{% endif %}"
+                   href="{% url 'inventory:component_list' %}">
+                  <i class="mdi mdi-book-open-outline me-2"></i>{% translate "Catalog" %}
+                </a>
+              </li>
+              <li class="nav-item">
+                <a class="nav-link {% if model_name == 'componentstock' %}active fw-bold{% endif %}"
+                   href="{% url 'inventory:componentstock_list' %}">
+                  <i class="mdi mdi-warehouse me-2"></i>{% translate "Stocks" %}
+                </a>
+              </li>
+              <li class="nav-item">
+                <a class="nav-link {% if model_name == 'componentallocation' %}active fw-bold{% endif %}"
+                   href="{% url 'inventory:componentallocation_list' %}">
+                  <i class="mdi mdi-account-arrow-right me-2"></i>{% translate "Allocations" %}
+                </a>
+              </li>
+            </ul>
+          </div>
+        {% elif app_label == 'inventory' and model_name in 'accessory,accessorystock,accessoryassignment' %}
+          <div class="card-header">
+            <ul class="nav nav-tabs card-header-tabs">
+              <li class="nav-item">
+                <a class="nav-link {% if model_name == 'accessory' %}active fw-bold{% endif %}"
+                   href="{% url 'inventory:accessory_list' %}">
+                  <i class="mdi mdi-book-open-outline me-2"></i>{% translate "Catalog" %}
+                </a>
+              </li>
+              <li class="nav-item">
+                <a class="nav-link {% if model_name == 'accessorystock' %}active fw-bold{% endif %}"
+                   href="{% url 'inventory:accessorystock_list' %}">
+                  <i class="mdi mdi-warehouse me-2"></i>{% translate "Stocks" %}
+                </a>
+              </li>
+              <li class="nav-item">
+                <a class="nav-link {% if model_name == 'accessoryassignment' %}active fw-bold{% endif %}"
+                   href="{% url 'inventory:accessoryassignment_list' %}">
+                  <i class="mdi mdi-account-arrow-right me-2"></i>{% translate "Assignments" %}
+                </a>
+              </li>
+            </ul>
+          </div>
+        {% elif app_label == 'inventory' and model_name in 'consumable,consumablestock,consumableassignment' %}
+          <div class="card-header">
+            <ul class="nav nav-tabs card-header-tabs">
+              <li class="nav-item">
+                <a class="nav-link {% if model_name == 'consumable' %}active fw-bold{% endif %}"
+                   href="{% url 'inventory:consumable_list' %}">
+                  <i class="mdi mdi-book-open-outline me-2"></i>{% translate "Catalog" %}
+                </a>
+              </li>
+              <li class="nav-item">
+                <a class="nav-link {% if model_name == 'consumablestock' %}active fw-bold{% endif %}"
+                   href="{% url 'inventory:consumablestock_list' %}">
+                  <i class="mdi mdi-warehouse me-2"></i>{% translate "Stocks" %}
+                </a>
+              </li>
+              <li class="nav-item">
+                <a class="nav-link {% if model_name == 'consumableassignment' %}active fw-bold{% endif %}"
+                   href="{% url 'inventory:consumableassignment_list' %}">
+                  <i class="mdi mdi-account-arrow-right me-2"></i>{% translate "Consumptions" %}
+                </a>
+              </li>
+            </ul>
+          </div>
+        {% endif %}
+        {% include "generic/includes/beta_banner.html" %}
+        {% include "generic/includes/worker_status_banner.html" %}
+        <div id="object-list-dynamic-content"
+             hx-get="{{ request.get_full_path }}"
+             hx-trigger="tableRefreshRequired from:body"
+             hx-target="#object-list-dynamic-content"
+             hx-swap="innerHTML">
+          {% if is_deleted_view %}
+            <div class="alert alert-warning border-0 rounded-0 border-bottom d-flex align-items-center mb-0 px-3 py-2">
+              <i class="mdi mdi-alert-circle-outline me-2 fs-3"></i>
+              <div>
+                {% blocktranslate %}You are viewing soft-deleted items in the Recycle Bin. Restoring parent objects does not automatically restore their deleted child dependencies.{% endblocktranslate %}
+              </div>
             </div>
-            {% elif app_label == 'inventory' and model_name in 'accessory,accessorystock,accessoryassignment' %}
-            <div class="card-header">
-              <ul class="nav nav-tabs card-header-tabs">
-                <li class="nav-item">
-                  <a class="nav-link {% if model_name == 'accessory' %}active fw-bold{% endif %}" href="{% url 'inventory:accessory_list' %}">
-                    <i class="mdi mdi-book-open-outline me-2"></i>{% translate "Catalog" %}
-                  </a>
-                </li>
-                <li class="nav-item">
-                  <a class="nav-link {% if model_name == 'accessorystock' %}active fw-bold{% endif %}" href="{% url 'inventory:accessorystock_list' %}">
-                    <i class="mdi mdi-warehouse me-2"></i>{% translate "Stocks" %}
-                  </a>
-                </li>
-                <li class="nav-item">
-                  <a class="nav-link {% if model_name == 'accessoryassignment' %}active fw-bold{% endif %}" href="{% url 'inventory:accessoryassignment_list' %}">
-                    <i class="mdi mdi-account-arrow-right me-2"></i>{% translate "Assignments" %}
-                  </a>
-                </li>
-              </ul>
-            </div>
-            {% elif app_label == 'inventory' and model_name in 'consumable,consumablestock,consumableassignment' %}
-            <div class="card-header">
-              <ul class="nav nav-tabs card-header-tabs">
-                <li class="nav-item">
-                  <a class="nav-link {% if model_name == 'consumable' %}active fw-bold{% endif %}" href="{% url 'inventory:consumable_list' %}">
-                    <i class="mdi mdi-book-open-outline me-2"></i>{% translate "Catalog" %}
-                  </a>
-                </li>
-                <li class="nav-item">
-                  <a class="nav-link {% if model_name == 'consumablestock' %}active fw-bold{% endif %}" href="{% url 'inventory:consumablestock_list' %}">
-                    <i class="mdi mdi-warehouse me-2"></i>{% translate "Stocks" %}
-                  </a>
-                </li>
-                <li class="nav-item">
-                  <a class="nav-link {% if model_name == 'consumableassignment' %}active fw-bold{% endif %}" href="{% url 'inventory:consumableassignment_list' %}">
-                    <i class="mdi mdi-account-arrow-right me-2"></i>{% translate "Consumptions" %}
-                  </a>
-                </li>
-              </ul>
-            </div>
-            {% endif %}
-
-            {% include "generic/includes/beta_banner.html" %}
-            {% include "generic/includes/worker_status_banner.html" %}
-
-            <div id="object-list-dynamic-content"
-                 hx-get="{{ request.get_full_path }}"
-                 hx-trigger="tableRefreshRequired from:body"
-                 hx-target="#object-list-dynamic-content"
-                 hx-swap="innerHTML">
-                 {% if is_deleted_view %}
-                 <div class="alert alert-warning border-0 rounded-0 border-bottom d-flex align-items-center mb-0 px-3 py-2">
-                     <i class="mdi mdi-alert-circle-outline me-2 fs-3"></i>
-                     <div>
-                         {% blocktranslate %}You are viewing soft-deleted items in the Recycle Bin. Restoring parent objects does not automatically restore their deleted child dependencies.{% endblocktranslate %}
-                     </div>
-                 </div>
-                 {% endif %}
-                 {# Search + table-config + filter-toggle row (shared with the HTMX refresh path) #}
-                 {% include "htmx/includes/list_toolbar.html" with show_filter_toggle=True %}
-
-                {# Table Rendering Container #}
-                <div id="object-list-table-container">
-                    <div class="table-responsive w-100">
-                       {% if table %}
-                           {% render_table table "global_includes/htmx_table.html" %}
-                       {% else %}
-                           <div class="p-3">
-                               <p class="text-muted mb-0">{% translate "No table data available." %}</p>
-                           </div>
-                       {% endif %}
-                    </div>
+          {% endif %}
+          {# Search + table-config + filter-toggle row (shared with the HTMX refresh path) #}
+          {% include "htmx/includes/list_toolbar.html" with show_filter_toggle=True %}
+          {# Table Rendering Container #}
+          <div id="object-list-table-container">
+            <div class="table-responsive w-100">
+              {% if table %}
+                {% render_table table "global_includes/htmx_table.html" %}
+              {% else %}
+                <div class="p-3">
+                  <p class="text-muted mb-0">{% translate "No table data available." %}</p>
                 </div>
-
-            </div> {# End #object-list-dynamic-content #}
-
-            {# Pagination Controls Container (Persistently outside dynamic content) #}
-            <div id="object-list-pagination">
-                {% if table.page %}
-                    {% include 'global_includes/pagination_links.html' with page_obj=table.page hx_target="#object-list-dynamic-content" %}
-                {% endif %}
-            </div> {# End #object-list-pagination #}
+              {% endif %}
+            </div>
+          </div>
         </div>
-
-        {# Bulk-Action Toolbar host — lives OUTSIDE the table card (NetBox-style), right-bound below the table. #}
-        {# Refreshed on HTMX list swaps via an out-of-band update from htmx/list_page_wrapper.html. #}
-        <div id="bulk-action-toolbar-host">
-            {% include 'generic/includes/bulk_action_toolbar.html' %}
+        {# End #object-list-dynamic-content #}
+        {# Pagination Controls Container (Persistently outside dynamic content) #}
+        <div id="object-list-pagination">
+          {% if table.page %}
+            {% include 'global_includes/pagination_links.html' with page_obj=table.page hx_target="#object-list-dynamic-content" %}
+          {% endif %}
         </div>
+        {# End #object-list-pagination #}
+      </div>
+      {# Bulk-Action Toolbar host — lives OUTSIDE the table card (NetBox-style), right-bound below the table. #}
+      {# Refreshed on HTMX list swaps via an out-of-band update from htmx/list_page_wrapper.html. #}
+      <div id="bulk-action-toolbar-host">{% include 'generic/includes/bulk_action_toolbar.html' %}</div>
     </div>
-
     {# Right-Side Filter Panel Column #}
     {% if filter_form %}
-    <div class="col-12 col-md-3 order-1 order-md-2" id="object-list-filter-col">
+      <div class="col-12 col-md-3 order-1 order-md-2"
+           id="object-list-filter-col">
         <div class="card">
-            <div class="card-header d-flex justify-content-between align-items-center p-3">
-                <h3 class="card-title text-secondary d-flex align-items-center m-0">
-                    <i class="mdi mdi-tune me-2 text-muted"></i>
-                    {% translate "Filters" %}
-                </h3>
-                <a href="#" class="link-secondary ms-auto d-flex align-items-center collapse-filters-btn" title="{% translate 'Collapse Panel' %}">
-                    <i class="mdi mdi-chevron-right"></i>
-                </a>
-            </div>
-            <div class="card-body p-3">
-                <div id="filters-sidebar-content">
-                    {% include 'htmx/filter_form_tab.html' %}
-                </div>
-            </div>
+          <div class="card-header d-flex justify-content-between align-items-center p-3">
+            <h3 class="card-title text-secondary d-flex align-items-center m-0">
+              <i class="mdi mdi-tune me-2 text-muted"></i>
+              {% translate "Filters" %}
+            </h3>
+            <a href="#"
+               class="link-secondary ms-auto d-flex align-items-center collapse-filters-btn"
+               title="{% translate 'Collapse Panel' %}">
+              <i class="mdi mdi-chevron-right"></i>
+            </a>
+          </div>
+          <div class="card-body p-3">
+            <div id="filters-sidebar-content">{% include 'htmx/filter_form_tab.html' %}</div>
+          </div>
         </div>
-    </div>
+      </div>
     {% endif %}
-</div>
+  </div>
 {% endblock content %}
-
 {% block page_modals %}
-    {% if table_config_form %}
-        {% include 'core/modals/table_config.html' %}
-    {% endif %}
-
-    {# Bulk Print Modal — only rendered on Asset list page #}
-    {% if model_name_str == 'assets.asset' %}
-    <div class="modal modal-blur fade" id="bulk-print-modal" tabindex="-1" aria-labelledby="bulkPrintModalLabel" aria-hidden="true">
-        <div class="modal-dialog modal-dialog-centered">
-            <div class="modal-content">
-                <form id="bulk-print-form" method="post" action="{% url 'assets:asset_bulk_print_labels' %}" hx-boost="false">
-                    {% csrf_token %}
-                    <div class="modal-header">
-                        <h5 class="modal-title" id="bulkPrintModalLabel">{% translate "Bulk Print Labels" %}</h5>
-                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="{% translate 'Close' %}"></button>
-                    </div>
-                    <div class="modal-body">
-                        <p class="text-muted">{% translate "Select the label template and layout for the selected assets:" %}</p>
-                        
-                        <div class="mb-3">
-                            <label for="bulk-print-template" class="form-label">{% translate "Label Template" %}</label>
-                            <select name="template_id" id="bulk-print-template" class="form-select" required>
-                                <option value="">{% translate "— Select a Template —" %}</option>
-                                {% for template in label_templates %}
-                                <option value="{{ template.pk }}">{{ template.name }}</option>
-                                {% empty %}
-                                <option value="" disabled>{% translate "No templates found in database" %}</option>
-                                {% endfor %}
-                            </select>
-                        </div>
-                        
-                        <div class="mb-3">
-                            <label for="bulk-print-layout" class="form-label">{% translate "Layout Mode" %}</label>
-                            <select name="layout_mode" id="bulk-print-layout" class="form-select" required>
-                                <option value="roll">{% translate "Roll Printer" %}</option>
-                                <option value="a4_grid">{% translate "A4 Grid (3x8)" %}</option>
-                                <option value="letter_grid">{% translate "Letter Grid (3x8)" %}</option>
-                            </select>
-                        </div>
-                    </div>
-                    <div class="modal-footer">
-                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">{% translate "Cancel" %}</button>
-                        <button type="submit" class="btn btn-primary">{% translate "Queue Print Job" %}</button>
-                    </div>
-                </form>
+  {% if table_config_form %}
+    {% include 'core/modals/table_config.html' %}
+  {% endif %}
+  {# Bulk Print Modal — only rendered on Asset list page #}
+  {% if model_name_str == 'assets.asset' %}
+    <div class="modal modal-blur fade"
+         id="bulk-print-modal"
+         tabindex="-1"
+         aria-labelledby="bulkPrintModalLabel"
+         aria-hidden="true">
+      <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+          <form id="bulk-print-form"
+                method="post"
+                action="{% url 'assets:asset_bulk_print_labels' %}"
+                hx-boost="false">
+            {% csrf_token %}
+            <div class="modal-header">
+              <h5 class="modal-title" id="bulkPrintModalLabel">{% translate "Bulk Print Labels" %}</h5>
+              <button type="button"
+                      class="btn-close"
+                      data-bs-dismiss="modal"
+                      aria-label="{% translate 'Close' %}"></button>
             </div>
-        </div>
-    </div>
-    {% endif %}
-
-    {# Bulk Checkout Modal — rendered on Accessory, Consumable, Component lists #}
-    {% if model_name_str == 'inventory.consumable' or model_name_str == 'inventory.consumablestock' or model_name_str == 'inventory.accessory' or model_name_str == 'inventory.accessorystock' or model_name_str == 'inventory.component' or model_name_str == 'inventory.componentstock' %}
-    <div class="modal modal-blur fade" id="bulk-checkout-inventory-modal" tabindex="-1" aria-labelledby="bulkCheckoutModalLabel" aria-hidden="true">
-        <div class="modal-dialog modal-dialog-centered">
-            <div class="modal-content">
-                <form id="bulk-checkout-inventory-form" method="post" action="{% url 'inventory:inventory_bulk_checkout' %}" hx-boost="false">
-                    {% csrf_token %}
-                    <input type="hidden" name="model_name" value="{{ model_name_str }}">
-                    <div class="modal-header">
-                        <h5 class="modal-title" id="bulkCheckoutModalLabel">{% translate "Bulk Check-out Items" %}</h5>
-                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="{% translate 'Close' %}"></button>
-                    </div>
-                    <div class="modal-body">
-                        <!-- Asset Holder Select -->
-                        <div class="mb-3" id="bulk-checkout-holder-container">
-                            <label for="bulk-checkout-holder" class="form-label">{% translate "Asset Holder" %}</label>
-                            <select name="assigned_holder" id="bulk-checkout-holder" class="form-select">
-                                <option value="">{% translate "— Select an Asset Holder —" %}</option>
-                                {% for holder in asset_holders %}
-                                <option value="{{ holder.pk }}">{{ holder }}</option>
-                                {% endfor %}
-                            </select>
-                        </div>
-
-                        <p class="text-muted text-center my-2">{% translate "OR" %}</p>
-
-                        <!-- Location Select -->
-                        <div class="mb-3" id="bulk-checkout-location-container">
-                            <label for="bulk-checkout-location" class="form-label">{% translate "Location" %}</label>
-                            <select name="assigned_location" id="bulk-checkout-location" class="form-select">
-                                <option value="">{% translate "— Select a Location —" %}</option>
-                                {% for location in locations %}
-                                <option value="{{ location.pk }}">{{ location }}</option>
-                                {% endfor %}
-                            </select>
-                        </div>
-
-                        <p class="text-muted text-center my-2">{% translate "OR" %}</p>
-
-                        <!-- Asset Select -->
-                        <div class="mb-3" id="bulk-checkout-asset-container">
-                            <label for="bulk-checkout-asset" class="form-label">{% translate "Asset" %}</label>
-                            <select name="assigned_asset" id="bulk-checkout-asset" class="form-select">
-                                <option value="">{% translate "— Select an Asset —" %}</option>
-                                {% for asset in assets %}
-                                <option value="{{ asset.pk }}">{{ asset.asset_tag }} - {{ asset.name }}</option>
-                                {% endfor %}
-                            </select>
-                        </div>
-
-                        <!-- From Location (Only shown if we checkout from Catalog page) -->
-                        {% if model_name_str == 'inventory.consumable' or model_name_str == 'inventory.accessory' or model_name_str == 'inventory.component' %}
-                        <div class="mb-3">
-                            <label for="bulk-checkout-from-location" class="form-label">{% translate "From Location (source of stock)" %}</label>
-                            <select name="from_location" id="bulk-checkout-from-location" class="form-select" required>
-                                <option value="">{% translate "— Select Source Location —" %}</option>
-                                {% for location in locations %}
-                                <option value="{{ location.pk }}">{{ location }}</option>
-                                {% endfor %}
-                            </select>
-                        </div>
-                        {% endif %}
-
-                        <!-- Quantity -->
-                        <div class="mb-3">
-                            <label for="bulk-checkout-qty" class="form-label">{% translate "Quantity to Check-out (per item)" %}</label>
-                            <input type="number" name="qty" id="bulk-checkout-qty" value="1" min="1" class="form-control" required>
-                        </div>
-
-                        <!-- Notes -->
-                        <div class="mb-3">
-                            <label for="bulk-checkout-notes" class="form-label">{% translate "Notes" %}</label>
-                            <textarea name="notes" id="bulk-checkout-notes" class="form-control" rows="2"></textarea>
-                        </div>
-                    </div>
-                    <div class="modal-footer">
-                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">{% translate "Cancel" %}</button>
-                        <button type="submit" class="btn btn-primary">{% translate "Check-out" %}</button>
-                    </div>
-                </form>
+            <div class="modal-body">
+              <p class="text-muted">{% translate "Select the label template and layout for the selected assets:" %}</p>
+              <div class="mb-3">
+                <label for="bulk-print-template" class="form-label">{% translate "Label Template" %}</label>
+                <select name="template_id"
+                        id="bulk-print-template"
+                        class="form-select"
+                        required>
+                  <option value="">{% translate "— Select a Template —" %}</option>
+                  {% for template in label_templates %}
+                    <option value="{{ template.pk }}">{{ template.name }}</option>
+                  {% empty %}
+                    <option value="" disabled>{% translate "No templates found in database" %}</option>
+                  {% endfor %}
+                </select>
+              </div>
+              <div class="mb-3">
+                <label for="bulk-print-layout" class="form-label">{% translate "Layout Mode" %}</label>
+                <select name="layout_mode"
+                        id="bulk-print-layout"
+                        class="form-select"
+                        required>
+                  <option value="roll">{% translate "Roll Printer" %}</option>
+                  <option value="a4_grid">{% translate "A4 Grid (3x8)" %}</option>
+                  <option value="letter_grid">{% translate "Letter Grid (3x8)" %}</option>
+                </select>
+              </div>
             </div>
+            <div class="modal-footer">
+              <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">{% translate "Cancel" %}</button>
+              <button type="submit" class="btn btn-primary">{% translate "Queue Print Job" %}</button>
+            </div>
+          </form>
         </div>
+      </div>
     </div>
-    {% endif %}
+  {% endif %}
+  {# Bulk Checkout Modal — rendered on Accessory, Consumable, Component lists #}
+  {% if model_name_str == 'inventory.consumable' or model_name_str == 'inventory.consumablestock' or model_name_str == 'inventory.accessory' or model_name_str == 'inventory.accessorystock' or model_name_str == 'inventory.component' or model_name_str == 'inventory.componentstock' %}
+    <div class="modal modal-blur fade"
+         id="bulk-checkout-inventory-modal"
+         tabindex="-1"
+         aria-labelledby="bulkCheckoutModalLabel"
+         aria-hidden="true">
+      <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+          <form id="bulk-checkout-inventory-form"
+                method="post"
+                action="{% url 'inventory:inventory_bulk_checkout' %}"
+                hx-boost="false">
+            {% csrf_token %}
+            <input type="hidden" name="model_name" value="{{ model_name_str }}">
+            <div class="modal-header">
+              <h5 class="modal-title" id="bulkCheckoutModalLabel">{% translate "Bulk Check-out Items" %}</h5>
+              <button type="button"
+                      class="btn-close"
+                      data-bs-dismiss="modal"
+                      aria-label="{% translate 'Close' %}"></button>
+            </div>
+            <div class="modal-body">
+              <!-- Asset Holder Select -->
+              <div class="mb-3" id="bulk-checkout-holder-container">
+                <label for="bulk-checkout-holder" class="form-label">{% translate "Asset Holder" %}</label>
+                <select name="assigned_holder" id="bulk-checkout-holder" class="form-select">
+                  <option value="">{% translate "— Select an Asset Holder —" %}</option>
+                  {% for holder in asset_holders %}
+                    <option value="{{ holder.pk }}">{{ holder }}</option>
+                  {% endfor %}
+                </select>
+              </div>
+              <p class="text-muted text-center my-2">{% translate "OR" %}</p>
+              <!-- Location Select -->
+              <div class="mb-3" id="bulk-checkout-location-container">
+                <label for="bulk-checkout-location" class="form-label">{% translate "Location" %}</label>
+                <select name="assigned_location"
+                        id="bulk-checkout-location"
+                        class="form-select">
+                  <option value="">{% translate "— Select a Location —" %}</option>
+                  {% for location in locations %}
+                    <option value="{{ location.pk }}">{{ location }}</option>
+                  {% endfor %}
+                </select>
+              </div>
+              <p class="text-muted text-center my-2">{% translate "OR" %}</p>
+              <!-- Asset Select -->
+              <div class="mb-3" id="bulk-checkout-asset-container">
+                <label for="bulk-checkout-asset" class="form-label">{% translate "Asset" %}</label>
+                <select name="assigned_asset" id="bulk-checkout-asset" class="form-select">
+                  <option value="">{% translate "— Select an Asset —" %}</option>
+                  {% for asset in assets %}
+                    <option value="{{ asset.pk }}">{{ asset.asset_tag }} - {{ asset.name }}</option>
+                  {% endfor %}
+                </select>
+              </div>
+              <!-- From Location (Only shown if we checkout from Catalog page) -->
+              {% if model_name_str == 'inventory.consumable' or model_name_str == 'inventory.accessory' or model_name_str == 'inventory.component' %}
+                <div class="mb-3">
+                  <label for="bulk-checkout-from-location" class="form-label">{% translate "From Location (source of stock)" %}</label>
+                  <select name="from_location"
+                          id="bulk-checkout-from-location"
+                          class="form-select"
+                          required>
+                    <option value="">{% translate "— Select Source Location —" %}</option>
+                    {% for location in locations %}
+                      <option value="{{ location.pk }}">{{ location }}</option>
+                    {% endfor %}
+                  </select>
+                </div>
+              {% endif %}
+              <!-- Quantity -->
+              <div class="mb-3">
+                <label for="bulk-checkout-qty" class="form-label">{% translate "Quantity to Check-out (per item)" %}</label>
+                <input type="number"
+                       name="qty"
+                       id="bulk-checkout-qty"
+                       value="1"
+                       min="1"
+                       class="form-control"
+                       required>
+              </div>
+              <!-- Notes -->
+              <div class="mb-3">
+                <label for="bulk-checkout-notes" class="form-label">{% translate "Notes" %}</label>
+                <textarea name="notes" id="bulk-checkout-notes" class="form-control" rows="2"></textarea>
+              </div>
+            </div>
+            <div class="modal-footer">
+              <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">{% translate "Cancel" %}</button>
+              <button type="submit" class="btn btn-primary">{% translate "Check-out" %}</button>
+            </div>
+          </form>
+        </div>
+      </div>
+    </div>
+  {% endif %}
 {% endblock page_modals %}
-
 {% block title %}{{ title|default:_("List View") }} {% translate "- ITAMbox" %}{% endblock %}
-
 {% block page_header %}
-    <div class="page-pretitle">
-        {{ pretitle|default:_("Manage") }}
-    </div>
-    <h2 class="page-title">
-        {{ title|default:_("Objects") }}{% include "generic/includes/capability_badge.html" %}
-    </h2>
+  <div class="page-pretitle">{{ pretitle|default:_("Manage") }}</div>
+  <h2 class="page-title">{{ title|default:_("Objects") }}{% include "generic/includes/capability_badge.html" %}</h2>
 {% endblock %}
-
 {% block page_actions %}
-    <div class="btn-list">
-        {% block extra_controls %}{% endblock %}
-
-        {% comment %}
+  <div class="btn-list">
+    {% block extra_controls %}{% endblock %}
+    {% comment %}
         #page-actions-block: OOB target refreshed by htmx/includes/list_oob_header.html on every
         HTMX list nav, so the toolbar stays in sync (Active / Recycle Bin, filter, paginate)
         without a full reload. extra_controls (above) live outside it and persist. Nested
         btn-list keeps button spacing.
-        {% endcomment %}
-        <div id="page-actions-block" class="btn-list">
-            {% include 'generic/includes/list_page_actions.html' %}
-        </div>
-    </div>
+    {% endcomment %}
+    <div id="page-actions-block" class="btn-list">{% include 'generic/includes/list_page_actions.html' %}</div>
+  </div>
 {% endblock page_actions %}

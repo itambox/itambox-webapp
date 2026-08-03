@@ -2,11 +2,11 @@
 {% translate "Total Purchased Seats" as l_total %}
 {% translate "Available Seats" as l_avail %}
 <div class="row g-3 mb-4">
-    {% include "generic/includes/stat_card.html" with color="blue" icon="mdi mdi-key-outline" label=l_total value=object.seats %}
-    {% if object.available_seats > 0 %}
-        {% include "generic/includes/stat_card.html" with color="green" icon="mdi mdi-check-circle-outline" label=l_avail value=object.available_seats %}
-    {% else %}
-        {% translate "0 (Fully Allocated)" as v_full %}
-        {% include "generic/includes/stat_card.html" with color="red" icon="mdi mdi-alert-circle-outline" label=l_avail value=v_full %}
-    {% endif %}
+  {% include "generic/includes/stat_card.html" with color="blue" icon="mdi mdi-key-outline" label=l_total value=object.seats %}
+  {% if object.available_seats > 0 %}
+    {% include "generic/includes/stat_card.html" with color="green" icon="mdi mdi-check-circle-outline" label=l_avail value=object.available_seats %}
+  {% else %}
+    {% translate "0 (Fully Allocated)" as v_full %}
+    {% include "generic/includes/stat_card.html" with color="red" icon="mdi mdi-alert-circle-outline" label=l_avail value=v_full %}
+  {% endif %}
 </div>

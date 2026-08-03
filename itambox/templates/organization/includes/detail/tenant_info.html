@@ -1,17 +1,19 @@
 {% load i18n %}
 <dl class="row mb-0">
-    <dt class="col-sm-3">{% translate "Name:" %}</dt>
-    <dd class="col-sm-9"><strong>{{ object.name }}</strong></dd>
-
-    <dt class="col-sm-3">{% translate "Slug:" %}</dt>
-    <dd class="col-sm-9"><code>{{ object.slug }}</code></dd>
-
-    <dt class="col-sm-3">{% translate "Group:" %}</dt>
-    <dd class="col-sm-9">
-        {% if object.group %}
-            <a href="{% url 'organization:tenantgroup_detail' pk=object.group.pk %}">{{ object.group.name }}</a>
-        {% else %}
-            <span class="text-muted"><i>{% translate "None" %}</i></span>
-        {% endif %}
-    </dd>
+  <dt class="col-sm-3">{% translate "Name:" %}</dt>
+  <dd class="col-sm-9">
+    <strong>{{ object.name }}</strong>
+  </dd>
+  <dt class="col-sm-3">{% translate "Slug:" %}</dt>
+  <dd class="col-sm-9">
+    <code>{{ object.slug }}</code>
+  </dd>
+  <dt class="col-sm-3">{% translate "Group:" %}</dt>
+  <dd class="col-sm-9">
+    {% if object.group %}
+      <a href="{% url 'organization:tenantgroup_detail' pk=object.group.pk %}">{{ object.group.name }}</a>
+    {% else %}
+      <span class="text-muted"><i>{% translate "None" %}</i></span>
+    {% endif %}
+  </dd>
 </dl>
