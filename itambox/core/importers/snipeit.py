@@ -23,7 +23,12 @@ from django.db import transaction
 from django.utils import timezone
 from django.utils.text import slugify
 
+from core.tasks.context import TaskContext
+
 logger = logging.getLogger(__name__)
+
+#: Provenance note stamped on every assignment this importer creates.
+IMPORT_NOTE = "Imported from Snipe-IT"
 
 # ---------------------------------------------------------------------------
 # Exceptions
@@ -216,6 +221,14 @@ class SnipeITImporter:
     Each entity-type pass runs inside TaskContext so change-logging and tenant
     scoping work correctly.  Writes are wrapped in per-batch transaction.atomic()
     rather than one giant transaction so partial progress survives errors.
+
+    Imported checkouts and component allocations must go through the inventory
+    domain services, but this module is an integration and may not reach into a
+    domain service to fetch them.  The two callables are therefore injected by
+    the composition root (the ``import_snipeit`` management command).  They are
+    keyword-only and have no default on purpose: a default would have to import
+    ``inventory.services`` here, which is exactly the edge being avoided, and a
+    ``None`` default would defer the failure to the middle of a live import.
     """
 
     def __init__(
@@ -229,6 +242,9 @@ class SnipeITImporter:
         skip: set | None = None,
         job=None,
         stdout=None,
+        *,
+        checkout_inventory_item,
+        create_component_allocation,
     ):
         self.client = client
         self.default_tenant = tenant
@@ -239,6 +255,10 @@ class SnipeITImporter:
         self.skip = skip or set()
         self.job = job
         self._stdout = stdout
+
+        # Injected inventory services -- see the class docstring.
+        self._checkout_inventory_item = checkout_inventory_item
+        self._create_component_allocation = create_component_allocation
 
         # Snipe-IT ID → local model instance caches
         self._status_map: dict[int, object] = {}
@@ -1090,6 +1110,25 @@ class SnipeITImporter:
 
         self._finish(key)
 
+    def _import_assignment(self, item, qty: int, *, holder=None, asset=None) -> None:
+        """Create one imported assignment through the sanctioned inventory service.
+
+        The assignment models refuse a direct ORM create, and refuse it before
+        any pool row is touched, so this is the only path that both records the
+        row and leaves stock consistent. The operator running the import is the
+        actor: the service applies their RBAC inside the target's own tenant, so
+        an import can never assign more than the operator may already assign.
+
+        Both services arrive by constructor injection, so this module never
+        names ``inventory.services`` itself.
+        """
+        target = holder if holder is not None else asset
+        with TaskContext(tenant_id=target.tenant_id, user_id=getattr(self.user, "pk", None)):
+            if asset is not None:
+                self._create_component_allocation(item, qty, asset=asset, user=self.user, notes=IMPORT_NOTE)
+            else:
+                self._checkout_inventory_item(item, qty, holder=holder, user=self.user, notes=IMPORT_NOTE)
+
     def _import_accessory_checkouts(self, accessory, snipe_id: int) -> None:
         """Import per-user checkouts for an accessory."""
         from inventory.models import AccessoryAssignment
@@ -1104,11 +1143,15 @@ class SnipeITImporter:
                 if not holder or not holder.pk or holder.pk < 0:
                     continue
                 qty = co.get("qty") or 1
-                AccessoryAssignment.objects.get_or_create(
+                # Replaces get_or_create: the service has no get-or-create seam,
+                # so re-import idempotency is an explicit live-row check.
+                if AccessoryAssignment._base_manager.filter(
                     accessory=accessory,
                     assigned_holder=holder,
-                    defaults={"qty": qty, "notes": "Imported from Snipe-IT"},
-                )
+                    deleted_at__isnull=True,
+                ).exists():
+                    continue
+                self._import_assignment(accessory, qty, holder=holder)
         except Exception as exc:
             logger.warning("Could not import checkouts for accessory %s: %s", snipe_id, exc)
 
@@ -1250,11 +1293,14 @@ class SnipeITImporter:
                 if not asset or not asset.pk or asset.pk < 0:
                     continue
                 qty = al.get("qty") or 1
-                ComponentAllocation.objects.get_or_create(
+                # Replaces get_or_create: see _import_accessory_checkouts.
+                if ComponentAllocation._base_manager.filter(
                     component=component,
                     assigned_asset=asset,
-                    defaults={"qty": qty, "notes": "Imported from Snipe-IT"},
-                )
+                    deleted_at__isnull=True,
+                ).exists():
+                    continue
+                self._import_assignment(component, qty, asset=asset)
         except Exception as exc:
             logger.warning("Could not import allocations for component %s: %s", snipe_id, exc)
 

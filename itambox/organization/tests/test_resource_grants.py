@@ -7,20 +7,26 @@ states are exercised both at the validation layer (friendly errors) and at
 the DB layer (constraints, via ``bulk_create`` which skips signals).
 """
 
+from django.contrib.auth import get_user_model
 from django.contrib.contenttypes.models import ContentType
 from django.core.exceptions import ValidationError
 from django.db import IntegrityError, transaction
 from django.test import TestCase
+from django.urls import reverse
 
 from assets.models import Manufacturer
+from core.tests.mixins import grant as grant_role
 from inventory.models import Accessory, AccessoryStock
 from organization.models import (
     Location,
+    Role,
     Site,
     Tenant,
     TenantGroup,
     TenantResourceGrant,
 )
+
+User = get_user_model()
 
 
 def _build_world():
@@ -253,3 +259,45 @@ class TenantResourceGrantOrphanCleanupTests(TestCase):
         stock.delete()
         grant.refresh_from_db()
         assert grant.deleted_at == first_revocation
+
+
+class TenantResourceGrantExportTests(TestCase):
+    def setUp(self):
+        provider, managed, _other, _location, _accessory, stock = _build_world()
+        self.resource_grant = TenantResourceGrant.objects.create(
+            tenant=provider,
+            grantee_tenant=managed,
+            resource_type=_stock_ct(),
+            resource_id=stock.pk,
+            access_level=TenantResourceGrant.ACCESS_USE,
+        )
+        user = User.objects.create_user(username="trg-export-owner", password="x")
+        role = Role.objects.create(
+            tenant=provider,
+            name="TRG Export Owner",
+            permissions=["organization.view_tenantresourcegrant"],
+        )
+        grant_role(user, provider, role)
+        self.client.force_login(user)
+        session = self.client.session
+        session["active_tenant_id"] = provider.pk
+        session.save()
+        self.url = reverse(
+            "object_export",
+            kwargs={
+                "app_label": "organization",
+                "model_name": "tenantresourcegrant",
+                "template_id": 0,
+            },
+        )
+
+    def test_direct_generic_exports_fail_closed(self):
+        queries = (
+            "?format=csv",
+            "?format=yaml",
+            f"?format=csv&pk={self.resource_grant.pk}",
+        )
+        for query in queries:
+            with self.subTest(query=query):
+                response = self.client.get(self.url + query)
+                self.assertEqual(response.status_code, 404)

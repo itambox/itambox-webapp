@@ -196,9 +196,10 @@ class DerivationSurfaceTests(unittest.TestCase):
 
     def test_every_registered_capability_is_derived_from_its_app_config(self):
         capabilities = policy.derived_capabilities(REPO_ROOT)
-        self.assertEqual(len(capabilities), 12)
+        self.assertEqual(len(capabilities), 13)
         by_key = {capability.key: capability for capability in capabilities}
         self.assertEqual(by_key["organization.role_grants"].security_critical, True)
+        self.assertEqual(by_key["organization.resource_grants"].security_critical, True)
         self.assertEqual(by_key["platform.plugins"].maturity, "experimental")
         self.assertEqual(by_key["users.scim_provisioning"].activation, "opt-in")
 
@@ -268,15 +269,46 @@ class PolicyShapeTests(unittest.TestCase):
         for statement in policy.REQUIRED_STATEMENTS:
             with self.subTest(statement=statement.identifier):
                 self.assertTrue(statement.identifier.startswith("P-"))
-                self.assertIn(statement.document, (policy.POLICY_DOC, policy.INVENTORY_DOC))
+                self.assertIn(
+                    statement.document,
+                    (
+                        policy.POLICY_DOC,
+                        policy.INVENTORY_DOC,
+                        policy.RESOURCE_GRANT_THREAT_DOC,
+                    ),
+                )
                 self.assertTrue(statement.text.strip())
+
+    def test_resource_grant_freeze_pins_named_suite_and_threat_invariants(self):
+        identifiers = {statement.identifier for statement in policy.REQUIRED_STATEMENTS}
+        self.assertTrue(
+            {
+                "P-RESOURCE-GRANT-DIRECT-WRITES",
+                "P-RESOURCE-GRANT-CANONICAL",
+                "P-RESOURCE-GRANT-CANONICAL-REEXPORT",
+                "P-RESOURCE-GRANT-SYSTEM-PROVENANCE-SUITE",
+                "P-RESOURCE-GRANT-ALLOWLIST-CLOSED",
+                "P-RESOURCE-GRANT-PERSISTED-DERIVATION",
+                "P-RESOURCE-GRANT-INDEPENDENT-RBAC",
+                "P-RESOURCE-GRANT-TOPOLOGY-FAIL-CLOSED",
+                "P-RESOURCE-GRANT-UNSCOPED-MANAGER",
+                "P-RESOURCE-GRANT-CONTAINER-VISIBILITY",
+                "P-RESOURCE-GRANT-SYSTEM-PROVENANCE",
+                "P-RESOURCE-GRANT-IMMUTABLE-PROVENANCE",
+                "P-RESOURCE-GRANT-LIFECYCLE-ATTRIBUTION",
+            }.issubset(identifiers)
+        )
 
 
 class PublishedContractTests(unittest.TestCase):
     """The repository as it stands satisfies every rule the gate enforces."""
 
     def test_the_policy_and_inventory_documents_are_tracked(self):
-        for relative in (policy.POLICY_DOC, policy.INVENTORY_DOC):
+        for relative in (
+            policy.POLICY_DOC,
+            policy.INVENTORY_DOC,
+            policy.RESOURCE_GRANT_THREAT_DOC,
+        ):
             with self.subTest(document=relative):
                 self.assertTrue((REPO_ROOT / relative).is_file())
 

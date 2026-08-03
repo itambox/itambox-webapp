@@ -2,20 +2,30 @@
 from __future__ import annotations
 
 import contextvars
+from collections import Counter
+from functools import reduce
+from operator import attrgetter, or_
 
 # Third-party / Django
 from django.conf import settings
 from django.contrib.contenttypes.fields import GenericForeignKey, GenericRelation
 from django.contrib.contenttypes.models import ContentType
 from django.core.exceptions import ObjectDoesNotExist, ValidationError
-from django.db import models
+from django.db import models, router, transaction
+from django.db.models import signals, sql
+from django.db.models.deletion import Collector
 from django.urls import reverse
 from django.utils import timezone
 from django.utils.http import urlencode
 from django.utils.translation import gettext_lazy as _
 
 from core.choices import JobStatusChoices, ObjectChangeActionChoices
-from core.context import get_current_request_id, get_current_user
+from core.context import (
+    _authorized_deletion_cascade,
+    _deletion_cascade_value_key,
+    get_current_request_id,
+    get_current_user,
+)
 from core.managers import (
     AllObjectsManager,
     SoftDeleteManager,
@@ -37,6 +47,104 @@ from core.validators import validate_file_attachment, validate_image_attachment
 # Local application
 from itambox.registry import registry
 from itambox.utils import serialize_object
+
+
+def _object_pks(objects):
+    if hasattr(objects, "values_list"):
+        return set(objects.values_list("pk", flat=True))
+    return {obj.pk for obj in objects if getattr(obj, "pk", None) is not None}
+
+
+def _cascade_permit(model, operation, pks, field=None, value=None):
+    permit = {"updates": (), "deletes": {}}
+    if operation == "delete":
+        permit["deletes"] = {model._meta.label_lower: frozenset(pks)}
+    else:
+        permit["updates"] = ((model._meta.label_lower, field.name, _deletion_cascade_value_key(value), frozenset(pks)),)
+    return permit
+
+
+class _AuthorizedCollector(Collector):
+    """Django 5.2 Collector with permits scoped only to its own queryset writes."""
+
+    def delete(self):  # noqa: C901 - mirrors django.db.models.deletion.Collector.delete
+        for model, instances in self.data.items():
+            self.data[model] = sorted(instances, key=attrgetter("pk"))
+        self.sort()
+        deleted_counter = Counter()
+
+        if len(self.data) == 1 and len(instances) == 1:
+            instance = list(instances)[0]
+            if self.can_fast_delete(instance):
+                with transaction.mark_for_rollback_on_error(self.using):
+                    count = sql.DeleteQuery(model).delete_batch([instance.pk], self.using)
+                setattr(instance, model._meta.pk.attname, None)
+                return count, {model._meta.label: count}
+
+        with transaction.atomic(using=self.using, savepoint=False):
+            for model, obj in self.instances_with_model():
+                if not model._meta.auto_created:
+                    signals.pre_delete.send(
+                        sender=model,
+                        instance=obj,
+                        using=self.using,
+                        origin=self.origin,
+                    )
+
+            for queryset in self.fast_deletes:
+                pks = _object_pks(queryset)
+                with _authorized_deletion_cascade(_cascade_permit(queryset.model, "delete", pks)):
+                    count = queryset._raw_delete(using=self.using)
+                if count:
+                    deleted_counter[queryset.model._meta.label] += count
+
+            for (field, value), instances_list in self.field_updates.items():
+                updates = []
+                objs = []
+                for instances in instances_list:
+                    if isinstance(instances, models.QuerySet) and instances._result_cache is None:
+                        updates.append(instances)
+                    else:
+                        objs.extend(instances)
+                if updates:
+                    combined_updates = reduce(or_, updates)
+                    pks = _object_pks(combined_updates)
+                    permit = _cascade_permit(field.model, "update", pks, field=field, value=value)
+                    with _authorized_deletion_cascade(permit):
+                        combined_updates.update(**{field.name: value})
+                if objs:
+                    model = objs[0].__class__
+                    query = sql.UpdateQuery(model)
+                    query.update_batch(list({obj.pk for obj in objs}), {field.name: value}, self.using)
+
+            for instances in self.data.values():
+                instances.reverse()
+
+            for model, instances in self.data.items():
+                query = sql.DeleteQuery(model)
+                pk_list = [obj.pk for obj in instances]
+                count = query.delete_batch(pk_list, self.using)
+                if count:
+                    deleted_counter[model._meta.label] += count
+                if not model._meta.auto_created:
+                    for obj in instances:
+                        signals.post_delete.send(
+                            sender=model,
+                            instance=obj,
+                            using=self.using,
+                            origin=self.origin,
+                        )
+
+        for model, instances in self.data.items():
+            for instance in instances:
+                setattr(instance, model._meta.pk.attname, None)
+        return sum(deleted_counter.values()), dict(deleted_counter)
+
+
+def _hard_delete_instance(instance, using):
+    collector = _AuthorizedCollector(using=using, origin=instance)
+    collector.collect([instance])
+    return collector.delete()
 
 
 class BaseModel(models.Model):
@@ -351,8 +459,13 @@ class ChangeLoggingMixin:
         force_hard = bool(kwargs.pop("force_hard_delete", False)) or getattr(self, "_force_hard_delete", False)
         self._force_hard_delete = force_hard
 
+        using = kwargs.get("using") or router.db_for_write(type(self), instance=self)
+
         if not get_current_request_id():
-            super().delete(*args, **kwargs)
+            if force_hard:
+                _hard_delete_instance(self, using)
+            else:
+                super().delete(*args, **kwargs)
             return
 
         is_soft_delete = isinstance(self, SoftDeleteMixin) and not force_hard
@@ -368,7 +481,10 @@ class ChangeLoggingMixin:
 
         self._log_change(action=action, prechange_data=prechange_data, message=self._changelog_message)
 
-        super().delete(*args, **kwargs)
+        if force_hard:
+            _hard_delete_instance(self, using)
+        else:
+            super().delete(*args, **kwargs)
 
     @classmethod
     def __init_subclass__(cls, **kwargs):

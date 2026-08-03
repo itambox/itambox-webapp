@@ -17,23 +17,23 @@ Designed to be mixed into ``Command`` in seed_data.py:
 
 import random
 
+from core.tasks.context import TaskContext
+from inventory.models import (
+    Accessory,
+    AccessoryStock,
+    ComponentStock,
+    Consumable,
+    ConsumableStock,
+    Kit,
+    KitItem,
+)
+from inventory.services import checkout_inventory_item
+
 
 class SeedInventoryStockMixin:
     """Mixin for Command(BaseCommand).  Reads/writes self._ registries."""
 
     def _seed_inventory_stock(self):
-        from inventory.models import (
-            Accessory,
-            AccessoryAssignment,
-            AccessoryStock,
-            ComponentStock,
-            Consumable,
-            ConsumableAssignment,
-            ConsumableStock,
-            Kit,
-            KitItem,
-        )
-
         self.stdout.write("--- Inventory: stock & kits ---")
 
         catalog_tenant = self._tenants["northwind-internal-it"]
@@ -127,24 +127,47 @@ class SeedInventoryStockMixin:
             if not locs or not holders:
                 continue
             loc = locs[0]
-            for holder in random.sample(holders, k=min(8, len(holders))):
-                for acc_slug in random.sample(list(self._accessories), k=random.randint(1, 3)):
-                    acc = self._accessories[acc_slug]
-                    pool, _created = AccessoryStock.objects.get_or_create(
-                        accessory=acc, location=loc, defaults={"qty": 0}
-                    )
-                    pool.qty += 1  # provision the unit locally before issuing it
-                    pool.save(update_fields=["qty"])
-                    AccessoryAssignment.objects.create(accessory=acc, assigned_holder=holder, qty=1, from_location=loc)
-                    assign_count += 1
-            for holder in random.sample(holders, k=min(1, len(holders))):
-                con = self._consumables["aa-batteries-24"]
-                pool, _created = ConsumableStock.objects.get_or_create(
-                    consumable=con, location=loc, defaults={"qty": 0}
+            with TaskContext(tenant_id=loc.tenant_id) as task_context:
+                accessory_authorization = task_context.authorize_system(
+                    permission="inventory.add_accessoryassignment",
+                    operation="inventory.checkout",
+                    reason="Seed approved same-tenant accessory assignments",
                 )
-                pool.qty += 1
-                pool.save(update_fields=["qty"])
-                ConsumableAssignment.objects.create(consumable=con, assigned_holder=holder, qty=1, from_location=loc)
+                consumable_authorization = task_context.authorize_system(
+                    permission="inventory.add_consumableassignment",
+                    operation="inventory.checkout",
+                    reason="Seed approved same-tenant consumable assignments",
+                )
+                for holder in random.sample(holders, k=min(8, len(holders))):
+                    for acc_slug in random.sample(list(self._accessories), k=random.randint(1, 3)):
+                        acc = self._accessories[acc_slug]
+                        pool, _created = AccessoryStock.objects.get_or_create(
+                            accessory=acc, location=loc, defaults={"qty": 0}
+                        )
+                        pool.qty += 1  # provision the unit locally before issuing it
+                        pool.save(update_fields=["qty"])
+                        checkout_inventory_item(
+                            acc,
+                            1,
+                            holder=holder,
+                            source_location=loc,
+                            system_authorization=accessory_authorization,
+                        )
+                        assign_count += 1
+                for holder in random.sample(holders, k=min(1, len(holders))):
+                    con = self._consumables["aa-batteries-24"]
+                    pool, _created = ConsumableStock.objects.get_or_create(
+                        consumable=con, location=loc, defaults={"qty": 0}
+                    )
+                    pool.qty += 1
+                    pool.save(update_fields=["qty"])
+                    checkout_inventory_item(
+                        con,
+                        1,
+                        holder=holder,
+                        source_location=loc,
+                        system_authorization=consumable_authorization,
+                    )
 
         # Kits
         kits = [

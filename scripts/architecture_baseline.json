@@ -567,20 +567,6 @@
       "accepted_reason": "Pre-existing at 66c74c4d when the architecture boundary gate was introduced."
     },
     {
-      "id": "R-F1|itambox.api.permissions|organization.models|function-body",
-      "rule": "R-F1",
-      "source": "itambox.api.permissions",
-      "source_layer": "framework",
-      "target": "organization.models",
-      "target_layer": "domain-model",
-      "kind": "function-body",
-      "count": 1,
-      "owner": "area:api",
-      "removal_issue": 100,
-      "removal_direction": "Resolve the organization model through apps.get_model() inside itambox.api.permissions, or accept the instance as an argument, so the framework layer carries no import edge into organization.models.",
-      "accepted_reason": "Pre-existing at 66c74c4d when the architecture boundary gate was introduced."
-    },
-    {
       "id": "R-F1|itambox.middleware|organization.models|function-body",
       "rule": "R-F1",
       "source": "itambox.middleware",
@@ -2176,19 +2162,6 @@
       "removal_direction": "Hoist `from organization.access import get_ancestor_tenant_group_ids` to module top in itambox/inventory/abstract_models.py, or re-categorise the annotation as app-registry, heavy-import, or optional-dependency: organization.access, organization.models shares no strongly connected component with this module in either graph."
     },
     {
-      "id": "itambox/inventory/forms/base_forms.py|ClassDef:BaseCheckoutForm/FunctionDef:_shared_pool_location_ids|from organization.access import shared_resource_ids",
-      "source": "inventory.forms.base_forms",
-      "path": "itambox/inventory/forms/base_forms.py",
-      "scope": "ClassDef:BaseCheckoutForm/FunctionDef:_shared_pool_location_ids",
-      "statement": "from organization.access import shared_resource_ids",
-      "targets": [
-        "organization.access"
-      ],
-      "owner": "area:inventory",
-      "removal_issue": 100,
-      "removal_direction": "Hoist `from organization.access import shared_resource_ids` to module top in itambox/inventory/forms/base_forms.py, or re-categorise the annotation as app-registry, heavy-import, or optional-dependency: organization.access shares no strongly connected component with this module in either graph."
-    },
-    {
       "id": "itambox/inventory/services.py|FunctionDef:recipient_assignment_union|from core.managers import get_current_tenant",
       "source": "inventory.services",
       "path": "itambox/inventory/services.py",
@@ -2214,20 +2187,6 @@
       "owner": "area:inventory",
       "removal_issue": 100,
       "removal_direction": "Hoist `from core.managers import get_current_tenant` to module top in itambox/inventory/services.py, or re-categorise the annotation as app-registry, heavy-import, or optional-dependency: core.managers, itambox.middleware, organization.models, organization.services.__init__ shares no strongly connected component with this module in either graph."
-    },
-    {
-      "id": "itambox/inventory/services.py|FunctionDef:shared_stock_union|from core.managers import get_current_tenant",
-      "source": "inventory.services",
-      "path": "itambox/inventory/services.py",
-      "scope": "FunctionDef:shared_stock_union",
-      "statement": "from core.managers import get_current_tenant",
-      "targets": [
-        "core.managers",
-        "organization.access"
-      ],
-      "owner": "area:inventory",
-      "removal_issue": 100,
-      "removal_direction": "Hoist `from core.managers import get_current_tenant` to module top in itambox/inventory/services.py, or re-categorise the annotation as app-registry, heavy-import, or optional-dependency: core.managers, organization.access shares no strongly connected component with this module in either graph."
     },
     {
       "id": "itambox/itambox/middleware.py|ClassDef:TenantMiddleware/FunctionDef:process_request|from organization.access import get_descendant_tenant_group_ids",

@@ -27,6 +27,9 @@ import random
 
 from django.utils import timezone
 
+from core.tasks.context import TaskContext
+from inventory.services import COMPONENT_ALLOCATION_OPERATION, create_component_allocation
+
 TODAY = datetime.date.today()
 
 
@@ -76,6 +79,35 @@ class SeedAssetsMixin:
         if "thinkpad" in atype_slug or "precision" in atype_slug:
             return random.choice(["Windows 11 23H2", "Ubuntu 24.04 LTS"])
         return "Windows 11 23H2"
+
+    def _seed_component_allocation(self, allocation_model, component, qty, asset):
+        """Allocate a seeded component through the authorized inventory seam.
+
+        The assignment models refuse a direct ORM create before any pool row is
+        touched, so the seed asks its own ``TaskContext`` for an explicit,
+        audited system authorization in the owning asset's tenant instead of
+        writing the row itself. ``get_or_create`` has no service equivalent, so
+        re-seed idempotency is an explicit live-row check. Demo generation
+        intentionally permits synthetic over-allocation, as the legacy seed did.
+        """
+        if allocation_model._base_manager.filter(
+            component=component,
+            assigned_asset=asset,
+            deleted_at__isnull=True,
+        ).exists():
+            return
+        with TaskContext(tenant_id=asset.tenant_id) as task_context:
+            create_component_allocation(
+                component,
+                qty,
+                asset=asset,
+                system_allow_overallocate=True,
+                system_authorization=task_context.authorize_system(
+                    permission="inventory.add_componentallocation",
+                    operation=COMPONENT_ALLOCATION_OPERATION,
+                    reason="Seed approved same-tenant component allocations",
+                ),
+            )
 
     def _seed_assets(self):
         from assets.models import Asset, AssetAssignment, AssetTagSequence
@@ -596,16 +628,12 @@ class SeedAssetsMixin:
                 ("dell-perc-h755", 1),
             ]:
                 if random.random() < 0.7:
-                    ComponentAllocation.objects.get_or_create(
-                        component=self._components[comp_slug], assigned_asset=srv, defaults={"qty": qty}
-                    )
+                    self._seed_component_allocation(ComponentAllocation, self._components[comp_slug], qty, srv)
                     alloc += 1
         for ws in cad[:30]:
             for comp_slug, qty in [("crucial-16gb-ddr5", 2), ("nvidia-rtx-6000", 1), ("samsung-2tb-nvme", 1)]:
                 if random.random() < 0.6:
-                    ComponentAllocation.objects.get_or_create(
-                        component=self._components[comp_slug], assigned_asset=ws, defaults={"qty": qty}
-                    )
+                    self._seed_component_allocation(ComponentAllocation, self._components[comp_slug], qty, ws)
                     alloc += 1
 
         # Custody receipts for regulated-industry laptops/mobiles (signed)

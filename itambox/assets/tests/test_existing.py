@@ -18,6 +18,7 @@ from assets.models import (
     Supplier,
 )
 from compliance.models import CustodyReceipt
+from core.managers import set_current_tenant
 from extras.models import CustomField, CustomFieldset
 from inventory.models import (
     Accessory,
@@ -29,6 +30,9 @@ from inventory.models import (
     Kit,
     KitItem,
 )
+from inventory.models_assignment_write import authorized_assignment_write
+from inventory.services import checkin_component, purge_inventory_assignment
+from inventory.tests.factories import create_assignment_fixture
 from organization.models import Contact, ContactAssignment, ContactRole
 
 User = get_user_model()
@@ -129,9 +133,33 @@ class ComponentTrackingTestCase(TransactionTestCase):
             status=self.status,
         )
 
-        self.allocation = ComponentAllocation.objects.create(
-            component=self.component, assigned_asset=self.asset, qty=2, notes="Initial RAM allocation"
+        self.allocation = create_assignment_fixture(
+            ComponentAllocation,
+            component=self.component,
+            assigned_asset=self.asset,
+            qty=2,
+            notes="Initial RAM allocation",
         )
+
+    def tearDown(self):
+        set_current_tenant(None)
+        super().tearDown()
+
+    def _activate_component_tenant(self):
+        from organization.models import Tenant
+
+        tenant = Tenant.objects.create(name="Component Mutation Co", slug="component-mutation-co")
+        self.component.tenant = tenant
+        self.component.save(update_fields=["tenant"])
+        self.asset.tenant = tenant
+        self.asset.save(update_fields=["tenant"])
+        with authorized_assignment_write(self.allocation):
+            self.allocation.save()
+        set_current_tenant(tenant)
+        session = self.client.session
+        session["active_tenant_id"] = tenant.pk
+        session.save()
+        return tenant
 
     def test_component_detail_view(self):
         # We replace any reference to specific request views that might be affected
@@ -194,16 +222,31 @@ class ComponentTrackingTestCase(TransactionTestCase):
         self.assertEqual(self.component.name, "16GB DDR5 RAM (Updated)")
 
     def test_component_delete_view(self):
-        self.allocation.delete(force_hard_delete=True)
+        self._activate_component_tenant()
+        checkin_component(self.allocation.pk, user=self.user)
+        allocation = ComponentAllocation._base_manager.get(pk=self.allocation.pk)
+        purge_inventory_assignment(allocation)
         response = self.client.post(reverse("inventory:component_delete", kwargs={"pk": self.component.pk}))
         self.assertEqual(response.status_code, 302)
-        self.assertFalse(Component.objects.filter(pk=self.component.pk).exists())
+        deleted_component = Component._base_manager.get(pk=self.component.pk)
+        self.assertIsNotNone(deleted_component.deleted_at)
 
     def test_componentallocation_list_view(self):
         response = self.client.get(reverse("inventory:componentallocation_list"))
         self.assertEqual(response.status_code, 200)
 
     def test_componentallocation_create_view(self):
+        from organization.models import Tenant
+
+        tenant = Tenant.objects.create(name="Component Allocation Co", slug="component-allocation-co")
+        self.component.tenant = tenant
+        self.component.save(update_fields=["tenant"])
+        self.asset.tenant = tenant
+        self.asset.save(update_fields=["tenant"])
+        session = self.client.session
+        session["active_tenant_id"] = tenant.pk
+        session.save()
+
         response = self.client.get(reverse("inventory:componentallocation_create"))
         self.assertEqual(response.status_code, 200)
 
@@ -218,6 +261,7 @@ class ComponentTrackingTestCase(TransactionTestCase):
         self.assertTrue(ComponentAllocation.objects.filter(qty=1, notes="Secondary RAM stick").exists())
 
     def test_componentallocation_update_view(self):
+        self._activate_component_tenant()
         response = self.client.get(reverse("inventory:componentallocation_update", kwargs={"pk": self.allocation.pk}))
         self.assertEqual(response.status_code, 200)
 
@@ -236,6 +280,7 @@ class ComponentTrackingTestCase(TransactionTestCase):
         self.assertEqual(self.allocation.notes, "Updated RAM allocation")
 
     def test_componentallocation_delete_view(self):
+        self._activate_component_tenant()
         response = self.client.post(reverse("inventory:componentallocation_delete", kwargs={"pk": self.allocation.pk}))
         self.assertEqual(response.status_code, 302)
         self.assertFalse(ComponentAllocation.objects.filter(pk=self.allocation.pk).exists())
@@ -285,7 +330,8 @@ class ComponentTrackingTestCase(TransactionTestCase):
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "Assigned System Hardware Specifications")
 
-        self.asset.component_allocations.all().delete()
+        self._activate_component_tenant()
+        checkin_component(self.allocation.pk, user=self.user)
         response = self.client.get(reverse("assets:asset_detail", kwargs={"pk": self.asset.pk}))
         self.assertEqual(response.status_code, 200)
         self.assertNotContains(response, "Assigned System Hardware Specifications")
@@ -303,6 +349,9 @@ class ComponentTrackingTestCase(TransactionTestCase):
         tenant = Tenant.objects.create(name="Accessory Crud Co", slug="accessory-crud-co")
         self.location.tenant = tenant
         self.location.save(update_fields=["tenant"])
+        session = self.client.session
+        session["active_tenant_id"] = tenant.pk
+        session.save()
 
         # Create Accessory
         acc = Accessory.objects.create(
@@ -347,7 +396,7 @@ class ComponentTrackingTestCase(TransactionTestCase):
         # 4. Strict Checkout Limit Validation (qty=11 > remaining=10, overallocate=False)
         from organization.models import AssetHolder
 
-        holder = AssetHolder.objects.create(first_name="John", last_name="Doe", email="john@example.com")
+        holder = AssetHolder.objects.create(first_name="John", last_name="Doe", email="john@example.com", tenant=tenant)
 
         checkout_data = {
             "from_location": self.location.pk,
@@ -1020,7 +1069,7 @@ class EnterpriseITAMTestCase(_SeededStatusLabelsMixin, TestCase):
 
         # ADR-0001 phase 4: stock requires a location owned by a tenant.
         tenant = Tenant.objects.create(name="Enterprise ITAM Co", slug="enterprise-itam-co")
-        site = Site.objects.create(name="HQ", slug="hq")
+        site = Site.objects.create(name="HQ", slug="hq", tenant=tenant)
         location = Location.objects.create(name="Warehouse", slug="warehouse", site=site, tenant=tenant)
 
         charger = Accessory.objects.create(
@@ -1029,7 +1078,12 @@ class EnterpriseITAMTestCase(_SeededStatusLabelsMixin, TestCase):
         AccessoryStock.objects.create(accessory=charger, location=location, qty=5)
 
         sw = Software.objects.create(manufacturer=self.manufacturer, name="Office 365")
-        license_obj = License.objects.create(software=sw, name="O365 Enterprise Seat", seats=2)
+        license_obj = License.objects.create(
+            software=sw,
+            name="O365 Enterprise Seat",
+            seats=2,
+            tenant=tenant,
+        )
 
         kit = Kit.objects.create(name="Developer Onboarding Kit", description="MacBook, Charger, and O365")
 
@@ -1037,7 +1091,16 @@ class EnterpriseITAMTestCase(_SeededStatusLabelsMixin, TestCase):
         KitItem.objects.create(kit=kit, accessory=charger, qty=1)
         KitItem.objects.create(kit=kit, license=license_obj)
 
-        holder = AssetHolder.objects.create(first_name="René", last_name="Rettig", upn="rene@example.com")
+        holder = AssetHolder.objects.create(
+            first_name="René",
+            last_name="Rettig",
+            upn="rene@example.com",
+            tenant=tenant,
+        )
+
+        session = self.client.session
+        session["active_tenant_id"] = tenant.pk
+        session.save()
 
         checkout_data = {
             "source_location": location.pk,
@@ -1058,7 +1121,11 @@ class EnterpriseITAMTestCase(_SeededStatusLabelsMixin, TestCase):
         self.assertEqual(license_obj.assignments.count(), 0)
 
         Asset.objects.create(
-            name="René MacBook Pro 16", asset_tag="LT-PRO-001", asset_type=laptop_type, status=self.available_status
+            name="René MacBook Pro 16",
+            asset_tag="LT-PRO-001",
+            asset_type=laptop_type,
+            status=self.available_status,
+            tenant=tenant,
         )
 
         response = self.client.post(

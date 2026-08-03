@@ -6,9 +6,13 @@ from django.core.exceptions import PermissionDenied
 
 from core.context import (
     _current_user,
+    _issue_system_authorization,
+    _issued_system_authorizations,
     _request_id,
+    _system_authorization_scope,
     get_current_all_accessible,
     get_current_membership,
+    get_current_request_id,
     get_current_tenant,
     get_current_tenant_group,
     set_current_all_accessible,
@@ -43,6 +47,7 @@ class TaskContext:
         self.user_id = user_id
         self.tenant = None
         self.user = None
+        self._entered = False
 
     def __enter__(self):
         # Capture the context active on entry so __exit__ can restore it.
@@ -52,6 +57,8 @@ class TaskContext:
         self._prev_membership = get_current_membership()
         self._prev_tenant_group = get_current_tenant_group()
         self._prev_all_accessible = get_current_all_accessible()
+        self._prev_system_authorization_scope = _system_authorization_scope.get()
+        self._prev_issued_system_authorizations = _issued_system_authorizations.get()
 
         # Every task starts from an explicit, isolated scope. In particular,
         # TaskContext(None, None) is a system/global task and must not inherit a
@@ -62,6 +69,9 @@ class TaskContext:
         set_current_membership(None)
         set_current_all_accessible(False)
         _current_user.set(None)
+        self._system_authorization_issuer = object()
+        _system_authorization_scope.set(self._system_authorization_issuer)
+        _issued_system_authorizations.set(())
 
         try:
             self._resolve_principal_and_tenant()
@@ -78,13 +88,41 @@ class TaskContext:
                         set_current_membership(membership)
 
             # Wire up change-logging contextvars so ChangeLoggingMixin records
-            # ObjectChange rows for all saves inside this task.
+            # ObjectChange rows for all saves inside the task.
             _request_id.set(uuid.uuid4())
+            self._entered = True
         except Exception:
+            self._entered = False
             self._restore_context()
             raise
 
         return self
+
+    def authorize_system(self, *, permission, operation, reason):
+        """Issue an explicit authorization bound to this actorless task.
+
+        Actor-bound tasks must use the actor's normal RBAC path. Tenantless or
+        inactive contexts cannot authorize domain work, and blank audit fields
+        fail closed rather than producing an unattributed system capability.
+        """
+        request_id = get_current_request_id()
+        current_tenant = get_current_tenant()
+        if not self._entered or request_id is None:
+            raise PermissionDenied("System authorization requires an entered TaskContext")
+        if self.user is not None:
+            raise PermissionDenied("Actor-bound tasks must use normal RBAC")
+        if self.tenant is None or current_tenant is None or current_tenant.pk != self.tenant.pk:
+            raise PermissionDenied("System authorization requires the task's live tenant scope")
+        if not all(isinstance(value, str) and value.strip() for value in (permission, operation, reason)):
+            raise PermissionDenied("System authorization requires permission, operation, and reason")
+        return _issue_system_authorization(
+            tenant_id=self.tenant.pk,
+            permission=permission,
+            operation=operation,
+            reason=reason,
+            request_id=request_id,
+            issuer=self._system_authorization_issuer,
+        )
 
     def _resolve_principal_and_tenant(self):
         """Load and authorize the task's explicit scope via unscoped managers."""
@@ -112,6 +150,8 @@ class TaskContext:
                 raise PermissionDenied("Task principal cannot access target tenant")
 
     def _restore_context(self):
+        _issued_system_authorizations.set(self._prev_issued_system_authorizations)
+        _system_authorization_scope.set(self._prev_system_authorization_scope)
         _request_id.set(self._prev_request_id)
         _current_user.set(self._prev_user)
         set_current_tenant(self._prev_tenant)
@@ -120,4 +160,5 @@ class TaskContext:
         set_current_all_accessible(self._prev_all_accessible)
 
     def __exit__(self, exc_type, exc_val, exc_tb):
+        self._entered = False
         self._restore_context()

@@ -333,6 +333,10 @@ def _render_template_export(request, model, queryset, template_id):
 class ObjectExportView(LoginRequiredMixin, View):
     def get(self, request, app_label, model_name, template_id):
         model = apps.get_model(app_label, model_name)
+        # Security-sensitive models may explicitly opt out of the generic
+        # direct-URL export surface even when Django defines a view permission.
+        if not getattr(model, "generic_export_allowed", True):
+            raise Http404
         if not request.user.has_perm(f"{app_label}.view_{model_name}"):
             raise Http404
 

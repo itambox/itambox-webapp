@@ -680,7 +680,7 @@
       "scope": "ClassDef:TaskContext/FunctionDef:__enter__",
       "handler_type": "Exception",
       "classification": "cleanup-reraise",
-      "body_sha256": "04f821fe35e663e09f346262831fe662bc049decefece9ddfc0cfcfaf32ba5d6",
+      "body_sha256": "4a92fc9640aaa1b6f64f58a954b24552ffe8f53c0fb240aff7807806920e2340",
       "count": 1
     },
     {

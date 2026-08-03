@@ -116,7 +116,12 @@ class TokenPermissions(BasePermission):
             from core.managers import get_current_tenant
 
             tenant = get_current_tenant()
-            if tenant is not None and StrictTenantPermission._shared_read_allowed(obj, tenant):
+            if tenant is not None and StrictTenantPermission._shared_read_allowed(
+                obj,
+                tenant,
+                request.user,
+                perms[0],
+            ):
                 return request.user.has_perms(perms)
         return False
 
@@ -178,7 +183,11 @@ class StrictTenantPermission(BasePermission):
                 # a stock pool shared to the active tenant by a live grant,
                 # and an assignment whose TARGET is the active tenant (the
                 # recipient side of a granted checkout). Never mutation.
-                if request.method in SAFE_METHODS and self._shared_read_allowed(obj, user_tenant):
+                if request.method in SAFE_METHODS and self._shared_read_allowed(
+                    obj,
+                    user_tenant,
+                    request.user,
+                ):
                     return True
                 from django.http import Http404
 
@@ -218,14 +227,12 @@ class StrictTenantPermission(BasePermission):
         raise Http404()
 
     @staticmethod
-    def _shared_read_allowed(obj, user_tenant):
-        # Deferred to keep the API layer decoupled from organization at load. Not a
-        # module-level cycle -- tracked as local-import debt, not a policy justification.
-        from organization.access import shared_resource_ids
-        from organization.models import TenantResourceGrant
+    def _shared_read_allowed(obj, user_tenant, user, perm=None):
+        # Deferred to keep the generic API framework decoupled from domain
+        # services at module load. This is tracked local-import debt.
+        from organization.access import shared_stock_read_allowed
 
-        label = obj._meta.label_lower
-        if label in TenantResourceGrant.APPROVED_RESOURCE_MODELS:
-            return shared_resource_ids(type(obj), user_tenant).filter(resource_id=obj.pk).exists()
+        if shared_stock_read_allowed(obj, user_tenant, user, perm):
+            return True
         target_tenant_id = getattr(obj, "target_tenant_id", None)
         return target_tenant_id is not None and target_tenant_id == user_tenant.pk

@@ -13,6 +13,7 @@ from organization.models import AssetHolder, Location
 
 from ..filters import ComponentAllocationFilterSet, ComponentFilterSet, ComponentStockFilterSet
 from ..models import Component, ComponentAllocation, ComponentStock
+from ..models_assignment_write import authorized_assignment_validation
 from .base_forms import BaseCheckoutForm
 
 
@@ -183,6 +184,13 @@ class ComponentAllocationForm(forms.ModelForm):
             "notes",
         ]
 
+    def _post_clean(self):
+        # Validation exercises model invariants before the view delegates the
+        # actual write to create_component_allocation(). The permit ends here,
+        # so direct form.save() remains fail-closed.
+        with authorized_assignment_validation():
+            super()._post_clean()
+
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         # Rescope every tenant-owned FK queryset per request (import-frozen unscoped).
@@ -271,12 +279,21 @@ class ComponentCheckoutForm(BaseCheckoutForm):
     def clean(self):
         cleaned_data = super().clean()
         qty = cleaned_data.get("qty")
-        if self.component and qty:
-            remaining = self.component.available_stock
-            if not self.component.allow_overallocate and qty > remaining:
+        source_location = cleaned_data.get("from_location")
+        if self.component and qty and source_location:
+            stock_qty = (
+                ComponentStock._base_manager.filter(
+                    component=self.component,
+                    location=source_location,
+                )
+                .values_list("qty", flat=True)
+                .first()
+                or 0
+            )
+            if not self.component.allow_overallocate and qty > stock_qty:
                 raise ValidationError(
                     _("Cannot checkout %(qty)s units. Only %(remaining)s units are currently in stock.")
-                    % {"qty": qty, "remaining": remaining}
+                    % {"qty": qty, "remaining": stock_qty}
                 )
         return cleaned_data
 

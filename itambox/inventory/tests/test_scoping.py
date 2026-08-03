@@ -12,6 +12,7 @@ from inventory.models import (
     ConsumableStock,
     Kit,
 )
+from inventory.tests.factories import create_assignment_fixture
 from organization.models import AssetHolder, Location, Site, Tenant
 
 User = get_user_model()
@@ -159,11 +160,19 @@ class InventorySymmetryAndHTMXTests(TestCase):
 
         self.holder = AssetHolder.objects.create(first_name="AliceSym", last_name="SmithSym", upn="alicesym.smithsym")
 
-        self.acc_assignment = AccessoryAssignment.objects.create(
-            accessory=self.accessory, assigned_holder=self.holder, from_location=self.location, qty=2
+        self.acc_assignment = create_assignment_fixture(
+            AccessoryAssignment,
+            accessory=self.accessory,
+            assigned_holder=self.holder,
+            from_location=self.location,
+            qty=2,
         )
-        self.con_assignment = ConsumableAssignment.objects.create(
-            consumable=self.consumable, assigned_holder=self.holder, from_location=self.location, qty=1
+        self.con_assignment = create_assignment_fixture(
+            ConsumableAssignment,
+            consumable=self.consumable,
+            assigned_holder=self.holder,
+            from_location=self.location,
+            qty=1,
         )
 
     def test_global_accessory_assignment_list_view(self):

@@ -8,9 +8,11 @@ made that a cycle, deferred behind a function-body import in six model methods.
 
 This module resolves the stock model through the app registry using the
 ``_item_attr`` / ``_stock_model_label`` hooks already declared on
-``AbstractAssignment``, so it imports nothing first-party and
-``inventory.models`` can depend on it at module scope. ``inventory.services``
-re-exports ``adjust_inventory_stock`` so the published call path is unchanged.
+``AbstractAssignment``, so ``inventory.models`` can depend on it at module
+scope. ``inventory.services`` re-exports ``adjust_inventory_stock`` so the
+published call path is unchanged. Its only first-party import is the
+``inventory.models_assignment_write`` leaf, which imports nothing itself and
+therefore reopens no cycle.
 """
 
 from typing import Any, Optional
@@ -20,6 +22,19 @@ from django.core.exceptions import ValidationError
 from django.db import transaction
 from django.utils.translation import gettext_lazy as _
 
+from .models_assignment_write import assignment_write_is_permitted
+
+
+def require_authorized_assignment_creation(assignment_instance: Any, is_delete: bool) -> None:
+    """Refuse any unpermitted assignment write before stock is touched.
+
+    ``AbstractAssignment.clean()`` refuses one too, but the concrete ``save()``
+    adjusts stock first and validates second: a check that lived only in
+    ``clean()`` would let a denied create leave the source pool deducted.
+    """
+    if not assignment_write_is_permitted(assignment_instance):
+        raise ValidationError(_("Assignments must be mutated through the authorized inventory service."))
+
 
 def adjust_inventory_stock(
     assignment_instance: Any, is_delete: bool = False, old_instance: Optional[Any] = None
@@ -27,6 +42,8 @@ def adjust_inventory_stock(
     """
     Unified stock adjustment logic for ComponentAllocation, AccessoryAssignment, and ConsumableAssignment.
     """
+    require_authorized_assignment_creation(assignment_instance, is_delete)
+
     item_field = getattr(assignment_instance, "_item_attr", None)
     stock_model_label = getattr(assignment_instance, "_stock_model_label", None)
     if not item_field or not stock_model_label:

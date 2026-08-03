@@ -4,7 +4,10 @@ from django.test import TestCase
 from django.urls import reverse
 
 from assets.models import Asset, AssetRole, Category, Manufacturer
+from core.tests.mixins import TenantTestMixin
 from inventory.models import Component, ComponentAllocation, ComponentStock
+from inventory.models_assignment_write import authorized_assignment_write
+from inventory.tests.factories import create_assignment_fixture
 from organization.models import Location, Site, Tenant
 
 User = get_user_model()
@@ -59,7 +62,8 @@ class ComponentAllocationModelTests(TestCase):
         self.asset = Asset.objects.create(name="WS-001", asset_tag="TAG-CPU-001", asset_role=self.role)
 
     def test_allocation_creation(self):
-        alloc = ComponentAllocation.objects.create(
+        alloc = create_assignment_fixture(
+            ComponentAllocation,
             component=self.component,
             assigned_asset=self.asset,
             qty=1,
@@ -68,12 +72,14 @@ class ComponentAllocationModelTests(TestCase):
         self.assertIn("WS-001", str(alloc))
 
     def test_allocation_absolute_url(self):
-        alloc = ComponentAllocation.objects.create(component=self.component, assigned_asset=self.asset, qty=1)
+        alloc = create_assignment_fixture(
+            ComponentAllocation, component=self.component, assigned_asset=self.asset, qty=1
+        )
         url = alloc.get_absolute_url()
         self.assertIn(str(self.asset.pk), url)
 
     def test_allocation_default_qty(self):
-        alloc = ComponentAllocation.objects.create(component=self.component, assigned_asset=self.asset)
+        alloc = create_assignment_fixture(ComponentAllocation, component=self.component, assigned_asset=self.asset)
         self.assertEqual(alloc.qty, 1)
 
 
@@ -96,8 +102,12 @@ class ComponentWarehouseOriginTests(TestCase):
         self.stock = ComponentStock.objects.create(component=self.component, location=self.warehouse, qty=10)
 
     def test_allocation_decrements_origin_stock(self):
-        alloc = ComponentAllocation.objects.create(
-            component=self.component, assigned_asset=self.asset, from_location=self.warehouse, qty=2
+        alloc = create_assignment_fixture(
+            ComponentAllocation,
+            component=self.component,
+            assigned_asset=self.asset,
+            from_location=self.warehouse,
+            qty=2,
         )
         self.stock.refresh_from_db()
         self.assertEqual(self.stock.qty, 8)
@@ -105,40 +115,52 @@ class ComponentWarehouseOriginTests(TestCase):
         self.asset.location = self.desk
         self.asset.save()
 
-        alloc.delete()
+        with authorized_assignment_write(alloc):
+            alloc.delete()
         self.stock.refresh_from_db()
         self.assertEqual(self.stock.qty, 10)
 
         self.assertFalse(ComponentStock.objects.filter(component=self.component, location=self.desk).exists())
 
     def test_allocation_update_quantity_recalculates_stock(self):
-        alloc = ComponentAllocation.objects.create(
-            component=self.component, assigned_asset=self.asset, from_location=self.warehouse, qty=2
+        alloc = create_assignment_fixture(
+            ComponentAllocation,
+            component=self.component,
+            assigned_asset=self.asset,
+            from_location=self.warehouse,
+            qty=2,
         )
         self.stock.refresh_from_db()
         self.assertEqual(self.stock.qty, 8)
 
         alloc.qty = 5
-        alloc.save()
+        with authorized_assignment_write(alloc):
+            alloc.save()
         self.stock.refresh_from_db()
         self.assertEqual(self.stock.qty, 5)
 
         alloc.qty = 1
-        alloc.save()
+        with authorized_assignment_write(alloc):
+            alloc.save()
         self.stock.refresh_from_db()
         self.assertEqual(self.stock.qty, 9)
 
     def test_allocation_update_location_reallocates_stock(self):
         desk_stock = ComponentStock.objects.create(component=self.component, location=self.desk, qty=5)
 
-        alloc = ComponentAllocation.objects.create(
-            component=self.component, assigned_asset=self.asset, from_location=self.warehouse, qty=3
+        alloc = create_assignment_fixture(
+            ComponentAllocation,
+            component=self.component,
+            assigned_asset=self.asset,
+            from_location=self.warehouse,
+            qty=3,
         )
         self.stock.refresh_from_db()
         self.assertEqual(self.stock.qty, 7)
 
         alloc.from_location = self.desk
-        alloc.save()
+        with authorized_assignment_write(alloc):
+            alloc.save()
 
         self.stock.refresh_from_db()
         desk_stock.refresh_from_db()
@@ -146,17 +168,23 @@ class ComponentWarehouseOriginTests(TestCase):
         self.assertEqual(desk_stock.qty, 2)
 
     def test_allocation_soft_delete_reverts_stock(self):
-        alloc = ComponentAllocation.objects.create(
-            component=self.component, assigned_asset=self.asset, from_location=self.warehouse, qty=4
+        alloc = create_assignment_fixture(
+            ComponentAllocation,
+            component=self.component,
+            assigned_asset=self.asset,
+            from_location=self.warehouse,
+            qty=4,
         )
         self.stock.refresh_from_db()
         self.assertEqual(self.stock.qty, 6)
 
-        alloc.delete()
+        with authorized_assignment_write(alloc):
+            alloc.delete()
         self.stock.refresh_from_db()
         self.assertEqual(self.stock.qty, 10)
 
-        alloc.restore()
+        with authorized_assignment_write(alloc):
+            alloc.restore()
         self.stock.refresh_from_db()
         self.assertEqual(self.stock.qty, 6)
 
@@ -253,24 +281,40 @@ class ComponentViewTests(TestCase):
         self.assertFalse(Component.objects.filter(pk=self.component.pk).exists())
 
 
-class ComponentAllocationViewTests(TestCase):
+class ComponentAllocationViewTests(TenantTestMixin, TestCase):
     def setUp(self):
         self.user = User.objects.create_user(
             username="testadmin", password="testpassword", is_staff=True, is_superuser=True
         )
         self.client.login(username="testadmin", password="testpassword")
+        self.tenant = Tenant.objects.create(name="Component Allocation Tenant", slug="component-allocation-tenant")
         self.manufacturer = Manufacturer.objects.create(name="Samsung", slug="samsung")
         self.category = Category.objects.create(name="Storage", slug="storage", applies_to={"component": True})
         self.component = Component.objects.create(
-            name="990 Pro 2TB", manufacturer=self.manufacturer, category=self.category, allow_overallocate=True
+            name="990 Pro 2TB",
+            manufacturer=self.manufacturer,
+            category=self.category,
+            allow_overallocate=True,
+            tenant=self.tenant,
         )
         self.role = AssetRole.objects.create(name="Server", slug="server")
-        self.asset = Asset.objects.create(name="SRV-001", asset_tag="SRV-001", asset_role=self.role)
-        self.allocation = ComponentAllocation.objects.create(
+        self.asset = Asset.objects.create(name="SRV-001", asset_tag="SRV-001", asset_role=self.role, tenant=self.tenant)
+        self.allocation = create_assignment_fixture(
+            ComponentAllocation,
             component=self.component,
             assigned_asset=self.asset,
             qty=2,
             notes="Initial setup",
+        )
+        self.client_login_to_tenant(
+            self.user,
+            self.tenant,
+            role_permissions=[
+                "inventory.add_componentallocation",
+                "inventory.change_componentallocation",
+                "inventory.delete_componentallocation",
+                "inventory.view_componentallocation",
+            ],
         )
 
     def test_list_view(self):
@@ -293,7 +337,7 @@ class ComponentAllocationViewTests(TestCase):
                 "qty": 1,
             },
         )
-        self.assertEqual(response.status_code, 302)
+        self.assertEqual(response.status_code, 302, response.content.decode())
 
     def test_edit_view_get(self):
         url = reverse("inventory:componentallocation_update", kwargs={"pk": self.allocation.pk})

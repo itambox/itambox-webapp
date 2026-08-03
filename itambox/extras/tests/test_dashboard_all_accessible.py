@@ -344,6 +344,7 @@ class LowStockAllAccessibleTests(DashboardContextMixin, TestCase):
 
     def _low_accessory(self, tenant, location, holder, tag):
         from inventory.models import Accessory, AccessoryAssignment, AccessoryStock
+        from inventory.tests.factories import create_assignment_fixture
 
         acc = Accessory.objects.create(
             name=f"Keyboard {tag}",
@@ -353,7 +354,7 @@ class LowStockAllAccessibleTests(DashboardContextMixin, TestCase):
         )
         AccessoryStock.objects.create(accessory=acc, location=location, qty=10)
         # 8 checked out -> 2 available, which is below the min of 5.
-        AccessoryAssignment.objects.create(accessory=acc, assigned_holder=holder, qty=8)
+        create_assignment_fixture(AccessoryAssignment, accessory=acc, assigned_holder=holder, qty=8)
         return acc
 
     def test_low_stock_aggregates_accessible_and_excludes_inaccessible(self):

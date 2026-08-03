@@ -51,6 +51,7 @@ DECLARED = {
     "alerting.inbox": (STABLE, ALWAYS_ON, SOURCE_ALWAYS),
     "alerting.rules": (BETA, "enabled", SOURCE_OBJECT_ENABLED),
     "organization.role_grants": (STABLE, ALWAYS_ON, SOURCE_ALWAYS),
+    "organization.resource_grants": (STABLE, ALWAYS_ON, SOURCE_ALWAYS),
     "automation.webhooks": (BETA, OPT_IN, SOURCE_OBJECT_ENABLED),
     "users.scim_provisioning": (BETA, OPT_IN, SOURCE_OBJECT_ENABLED),
     "platform.plugins": (EXPERIMENTAL, OPT_IN, SOURCE_OPERATOR_FLAG),
@@ -76,9 +77,12 @@ class TestDeclaredSlice:
         expected = DECLARED[key]
         assert (capability.maturity, capability.activation, capability.activation_source) == expected
 
-    def test_only_role_grants_is_security_critical(self):
+    def test_only_authorization_boundaries_are_security_critical(self):
         critical = {capability.key for capability in registry.all() if capability.security_critical}
-        assert critical == {"organization.role_grants"}
+        assert critical == {
+            "organization.resource_grants",
+            "organization.role_grants",
+        }
 
     def test_every_entry_carries_the_current_contract_version(self):
         assert {capability.contract_version for capability in registry.all()} == {1}
@@ -111,6 +115,7 @@ class TestOwnership:
             ("extras.WebhookEndpoint", "automation.webhooks"),
             ("extras.EventRule", "automation.webhooks"),
             ("organization.RoleGrant", "organization.role_grants"),
+            ("organization.TenantResourceGrant", "organization.resource_grants"),
         ],
     )
     def test_a_model_resolves_to_its_owning_capability(self, reference, expected):
@@ -340,9 +345,13 @@ class TestInactiveSafety:
         # too and this isolation would go unproven.
         assert [other for other, row in rows.items() if other != key and row["probe_error"]] == []
 
-    def test_a_security_critical_capability_has_no_deactivation_path(self):
-        assert "organization.role_grants" not in deactivatable_keys()
-        assert registry.is_active("organization.role_grants") is True
+    @pytest.mark.parametrize(
+        "key",
+        ["organization.resource_grants", "organization.role_grants"],
+    )
+    def test_a_security_critical_capability_has_no_deactivation_path(self, key):
+        assert key not in deactivatable_keys()
+        assert registry.is_active(key) is True
 
 
 class TestDeprecatedAdapters:

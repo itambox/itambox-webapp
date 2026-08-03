@@ -25,13 +25,7 @@ from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
 
 from compliance.models import CustodyReceipt
-from inventory.models import (
-    AccessoryAssignment,
-    AccessoryStock,
-    ConsumableAssignment,
-    ConsumableStock,
-)
-from inventory.services import resolve_grant_for_checkout
+from inventory.services import checkout_inventory_item, validate_checkout_targets
 from licenses.models import LicenseSeatAssignment
 
 from .choices import StatusTypeChoices
@@ -407,9 +401,21 @@ def dispose_asset(
     return disposal
 
 
-def checkout_kit(kit, holder=None, location=None, user=None, notes="", source_location=None, request=None, **kwargs):
+def checkout_kit(
+    kit,
+    holder=None,
+    location=None,
+    user=None,
+    notes="",
+    source_location=None,
+    request=None,
+    system_authorizations=None,
+    **kwargs,
+):
     if not holder and not location:
         raise ValidationError(_("Either holder or location must be specified."))
+    validate_checkout_targets(holder, location, None)
+    system_authorizations = system_authorizations or {}
 
     in_use_status = StatusLabel.objects.filter(type=StatusTypeChoices.DEPLOYED).first()
     if not in_use_status:
@@ -419,8 +425,28 @@ def checkout_kit(kit, holder=None, location=None, user=None, notes="", source_lo
         allocated_assets = []
         item_assets_map = {}
 
+        # Materialize the kit's items exactly once, under a row lock, and reuse that
+        # snapshot for both passes below. Re-reading kit.items for the allocation pass
+        # reopened the very TOCTOU window the locking pass exists to close: a kit item
+        # added, retargeted or removed by a concurrent transaction between the two
+        # SELECTs was allocated without ever being planned (an unplanned asset_type
+        # item raised KeyError; an unplanned license item consumed an unchecked seat).
+        # of=("self",) locks the kit item rows only: every target FK is nullable, and
+        # PostgreSQL rejects FOR UPDATE against the nullable side of an outer join.
+        kit_items = list(
+            kit.items.select_related(
+                "asset_type",
+                "accessory",
+                "license",
+                "consumable",
+                "component",
+            )
+            .select_for_update(of=("self",))
+            .order_by("pk")
+        )
+
         # 1. Lock all resources first to prevent race conditions (TOCTOU)
-        for item in kit.items.select_related("asset_type", "accessory", "license", "consumable").all():
+        for item in kit_items:
             if item.asset_type:
                 # Lock a deployable asset immediately
                 asset = (
@@ -434,33 +460,15 @@ def checkout_kit(kit, holder=None, location=None, user=None, notes="", source_lo
                     )
                 allocated_assets.append(asset)
                 item_assets_map[item.pk] = asset
-            elif item.accessory:
-                # Lock accessory stock pool
-                acc = item.accessory.__class__.objects.select_for_update().get(pk=item.accessory.pk)
-                rem = acc.available
-                if not acc.allow_overallocate and rem < item.qty:
-                    raise ValidationError(
-                        _("Insufficient stock for accessory '%(acc)s'. Required: %(qty)s, Available: %(rem)s")
-                        % {"acc": acc, "qty": item.qty, "rem": rem}
-                    )
             elif item.license:
                 # Lock license seat pool
                 lic = item.license.__class__.objects.select_for_update().get(pk=item.license.pk)
                 rem = lic.available_seats
                 if rem < 1:
                     raise ValidationError(_("No available seats for software license '%(lic)s'.") % {"lic": lic})
-            elif item.consumable:
-                # Lock consumable stock pool
-                con = item.consumable.__class__.objects.select_for_update().get(pk=item.consumable.pk)
-                rem = con.available
-                if not con.allow_overallocate and rem < item.qty:
-                    raise ValidationError(
-                        _("Insufficient stock for consumable '%(con)s'. Required: %(qty)s, Available: %(rem)s")
-                        % {"con": con, "qty": item.qty, "rem": rem}
-                    )
 
         # 2. Perform allocations safely under active locks
-        for item in kit.items.all():
+        for item in kit_items:
             if item.asset_type:
                 asset = item_assets_map[item.pk]
                 asset.status = in_use_status
@@ -470,13 +478,13 @@ def checkout_kit(kit, holder=None, location=None, user=None, notes="", source_lo
                     asset.location = location
 
                 asset._changelog_action = "checkout"
-                asset._changelog_message = f"Checked out via Kit '{kit.name}'. {notes}"
+                asset._changelog_message = f"Checked out via Kit {kit.name!r}. {notes}"
                 asset.save(update_fields=["status", "location"])
 
                 assignment_kwargs = {
                     "asset": asset,
                     "checked_out_by": user,
-                    "notes": f"Checked out via Kit '{kit.name}'. {notes}",
+                    "notes": f"Checked out via Kit {kit.name!r}. {notes}",
                 }
                 if holder:
                     assignment_kwargs["assigned_user"] = holder
@@ -485,51 +493,33 @@ def checkout_kit(kit, holder=None, location=None, user=None, notes="", source_lo
 
                 AssetAssignment.objects.create(**assignment_kwargs)
 
-            elif item.accessory:
-                AccessoryAssignment.objects.create(
-                    accessory=item.accessory,
-                    assigned_holder=holder,
-                    assigned_location=location,
-                    from_location=source_location,
-                    qty=item.qty,
-                    notes=f"Checked out via Kit '{kit.name}'. {notes}",
-                    # ADR-0001: a cross-tenant source pool needs a covering grant.
-                    resource_grant=resolve_grant_for_checkout(
-                        item.accessory,
-                        "accessory",
-                        AccessoryStock,
-                        AccessoryAssignment,
-                        source_location,
-                        user=user,
-                    ),
-                )
-            elif item.consumable:
-                ConsumableAssignment.objects.create(
-                    consumable=item.consumable,
-                    assigned_holder=holder,
-                    assigned_location=location,
-                    from_location=source_location,
-                    qty=item.qty,
-                    notes=f"Checked out via Kit '{kit.name}'. {notes}",
-                    resource_grant=resolve_grant_for_checkout(
-                        item.consumable,
-                        "consumable",
-                        ConsumableStock,
-                        ConsumableAssignment,
-                        source_location,
-                        user=user,
-                    ),
+            elif item.accessory or item.consumable or item.component:
+                stock_item = item.accessory or item.consumable or item.component
+                permission = {
+                    "Accessory": "inventory.add_accessoryassignment",
+                    "Consumable": "inventory.add_consumableassignment",
+                    "Component": "inventory.add_componentallocation",
+                }[stock_item.__class__.__name__]
+                checkout_inventory_item(
+                    stock_item,
+                    item.qty,
+                    holder=holder,
+                    location=location,
+                    source_location=source_location,
+                    user=user,
+                    notes=f"Checked out via Kit {kit.name!r}. {notes}",
+                    system_authorization=system_authorizations.get(permission),
                 )
             elif item.license:
                 if holder:
                     LicenseSeatAssignment.objects.create(
-                        license=item.license, assigned_holder=holder, notes=f"Checked out via Kit '{kit.name}'. {notes}"
+                        license=item.license, assigned_holder=holder, notes=f"Checked out via Kit {kit.name!r}. {notes}"
                     )
                 elif allocated_assets:
                     LicenseSeatAssignment.objects.create(
                         license=item.license,
                         asset=allocated_assets[0],
-                        notes=f"Checked out via Kit '{kit.name}'. {notes}",
+                        notes=f"Checked out via Kit {kit.name!r}. {notes}",
                     )
                 else:
                     raise ValidationError(

@@ -8,17 +8,23 @@ return workflow; the checkout form offers granted pools as sources.
 
 from django.contrib.auth import get_user_model
 from django.contrib.contenttypes.models import ContentType
-from django.test import TestCase
+from django.core.exceptions import PermissionDenied
+from django.db import connection
+from django.http import Http404
+from django.test import RequestFactory, TestCase
+from django.test.utils import CaptureQueriesContext
 from django.urls import reverse
 
 from assets.models import Manufacturer
 from core.tests.mixins import TenantTestMixin
 from inventory.forms import AccessoryCheckoutForm
-from inventory.models import Accessory, AccessoryStock
-from inventory.services import checkout_inventory_item
+from inventory.models import Accessory, AccessoryAssignment, AccessoryStock
+from inventory.services import checkin_accessory, checkout_inventory_item
+from inventory.tables import AccessoryStockTable
 from organization.models import (
     AssetHolder,
     Location,
+    Role,
     Site,
     Tenant,
     TenantGroup,
@@ -138,6 +144,58 @@ class SharedStockListVisibilityTests(SharedStockWorld):
         self.assertNotContains(response, "4b Depot")
 
 
+class SharedStockTableQueryTests(SharedStockWorld):
+    def setUp(self):
+        self.actor = User.objects.create_superuser(username="fourb-render", password="x")
+        self._grant()
+
+    def _render_query_count(self, stock_ids):
+        request = RequestFactory().get("/inventory/accessory-stock/")
+        request.user = self.actor
+        table = AccessoryStockTable(
+            AccessoryStock._base_manager.filter(pk__in=stock_ids).select_related(
+                "accessory",
+                "location",
+            )
+        )
+        table.request = request
+        with self.tenant_context(self.grantee), CaptureQueriesContext(connection) as queries:
+            for row in table.rows:
+                str(row.get_cell("actions"))
+        return len(queries)
+
+    def test_rendered_shared_stock_actions_do_not_query_per_candidate(self):
+        small_count = self._render_query_count([self.stock.pk])
+        stock_ids = [self.stock.pk]
+        resource_type = ContentType.objects.get_for_model(AccessoryStock)
+        for index in range(12):
+            accessory = Accessory.objects.create(
+                name=f"Shared Render {index}",
+                manufacturer=self.accessory.manufacturer,
+                tenant=self.owner,
+            )
+            stock = AccessoryStock.objects.create(
+                accessory=accessory,
+                location=self.owner_location,
+                qty=1,
+            )
+            TenantResourceGrant.objects.create(
+                tenant=self.owner,
+                grantee_tenant=self.grantee,
+                resource_type=resource_type,
+                resource_id=stock.pk,
+                access_level=TenantResourceGrant.ACCESS_USE,
+            )
+            stock_ids.append(stock.pk)
+
+        large_count = self._render_query_count(stock_ids)
+        self.assertLessEqual(
+            large_count,
+            small_count + 2,
+            f"render queries scaled with candidates: small={small_count}, large={large_count}",
+        )
+
+
 class SharedStockApiTests(SharedStockWorld):
     API_PERMS = [
         "inventory.view_accessorystock",
@@ -189,12 +247,20 @@ class SharedStockApiTests(SharedStockWorld):
 class RecipientAssignmentTests(SharedStockWorld):
     def _checkout_to_grantee(self):
         self._grant()
+        actor = User.objects.create_user(username="fourb-checkout-actor", password="x")
+        role = Role.objects.create(
+            tenant=self.grantee,
+            name="4b Checkout Actor",
+            permissions=["inventory.add_accessoryassignment"],
+        )
+        self.grant(actor, self.grantee, role)
         with self.tenant_context(self.grantee):
             return checkout_inventory_item(
                 self.accessory,
                 2,
                 holder=self.holder,
                 source_location=self.owner_location,
+                user=actor,
             )
 
     def test_recipient_sees_inbound_assignment_in_list(self):
@@ -258,6 +324,32 @@ class RecipientAssignmentTests(SharedStockWorld):
         assignment.refresh_from_db()
         self.assertIsNone(assignment.deleted_at)
 
+    def test_unrelated_tenant_cannot_check_in_through_service(self):
+        assignment = self._checkout_to_grantee()
+        user = User.objects.create_user(username="fourb-rec-service-unrelated", password="x")
+        role = Role.objects.create(
+            tenant=self.third,
+            name="4b Unrelated Return",
+            permissions=["inventory.change_accessory"],
+        )
+        self.grant(user, self.third, role)
+
+        with self.tenant_context(self.third), self.assertRaises(Http404):
+            checkin_accessory(assignment.pk, user=user)
+
+        assignment.refresh_from_db()
+        self.assertIsNone(assignment.deleted_at)
+
+    def test_recipient_without_permission_cannot_check_in_through_service(self):
+        assignment = self._checkout_to_grantee()
+        user = User.objects.create_user(username="fourb-rec-service-no-perm", password="x")
+
+        with self.tenant_context(self.grantee), self.assertRaises(PermissionDenied):
+            checkin_accessory(assignment.pk, user=user)
+
+        assignment.refresh_from_db()
+        self.assertIsNone(assignment.deleted_at)
+
 
 class StockAdjustBoundaryTests(SharedStockWorld):
     def test_owner_can_adjust_own_pool(self):
@@ -292,13 +384,29 @@ class StockAdjustBoundaryTests(SharedStockWorld):
 class CheckoutFormSourceTests(SharedStockWorld):
     def test_grantee_form_offers_granted_pool_location(self):
         self._grant()
+        actor = User.objects.create_user(username="fourb-form-actor", password="x")
+        role = Role.objects.create(
+            tenant=self.grantee,
+            name="4b Form Actor",
+            permissions=["inventory.add_accessoryassignment"],
+        )
+        self.grant(actor, self.grantee, role)
         with self.tenant_context(self.grantee):
-            form = AccessoryCheckoutForm(accessory=self.accessory)
+            form = AccessoryCheckoutForm(accessory=self.accessory, user=actor)
             source_ids = set(form.fields["from_location"].queryset.values_list("pk", flat=True))
             holder_ids = set(form.fields["assigned_holder"].queryset.values_list("pk", flat=True))
         self.assertIn(self.owner_location.pk, source_ids)  # the granted pool
         self.assertIn(self.grantee_location.pk, source_ids)  # own locations
         self.assertEqual(holder_ids, {self.holder.pk})  # targets stay own-tenant
+
+    def test_grant_without_actor_does_not_expose_foreign_pool_location(self):
+        self._grant()
+        with self.tenant_context(self.grantee):
+            form = AccessoryCheckoutForm(accessory=self.accessory)
+            source_ids = set(form.fields["from_location"].queryset.values_list("pk", flat=True))
+
+        self.assertNotIn(self.owner_location.pk, source_ids)
+        self.assertIn(self.grantee_location.pk, source_ids)
 
     def test_form_without_grant_offers_only_own_locations(self):
         with self.tenant_context(self.grantee):
@@ -321,3 +429,48 @@ class CheckoutFormSourceTests(SharedStockWorld):
         self.assertIn(self.owner_location.pk, source_ids)
         self.assertNotIn(self.grantee_location.pk, source_ids)
         self.assertEqual(holder_ids, {owner_holder.pk})
+
+
+class SharedStockCheckoutRequestTests(SharedStockWorld):
+    PERMS = [
+        "inventory.view_accessorystock",
+        "inventory.add_accessoryassignment",
+    ]
+
+    def test_grantee_reaches_shared_row_checkout_and_records_provenance(self):
+        grant_row = self._grant()
+        user = User.objects.create_user(username="fourb-request-checkout", password="x")
+        self.client_login_to_tenant(user, self.grantee, role_permissions=self.PERMS)
+        checkout_url = reverse("inventory:accessory_checkout", kwargs={"pk": self.accessory.pk})
+
+        listing = self.client.get(reverse("inventory:accessorystock_list"))
+        self.assertEqual(listing.status_code, 200)
+        self.assertContains(listing, f"{checkout_url}?from_location={self.owner_location.pk}")
+
+        modal = self.client.get(
+            f"{checkout_url}?from_location={self.owner_location.pk}",
+            HTTP_HX_REQUEST="true",
+        )
+        self.assertEqual(modal.status_code, 200)
+        self.assertContains(modal, "4b Depot")
+
+        response = self.client.post(
+            checkout_url,
+            {
+                "from_location": self.owner_location.pk,
+                "assigned_holder": self.holder.pk,
+                "assigned_location": "",
+                "assigned_asset": "",
+                "qty": 2,
+                "notes": "Request-level shared checkout",
+            },
+            HTTP_HX_REQUEST="true",
+        )
+        self.assertEqual(response.status_code, 204, response.content.decode())
+        assignment = AccessoryAssignment._base_manager.get(
+            accessory=self.accessory,
+            assigned_holder=self.holder,
+        )
+        self.assertEqual(assignment.resource_grant_id, grant_row.pk)
+        self.assertEqual(assignment.source_tenant_id, self.owner.pk)
+        self.assertEqual(assignment.target_tenant_id, self.grantee.pk)

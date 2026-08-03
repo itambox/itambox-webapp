@@ -11,6 +11,7 @@ from assets import filters, tables
 from assets.choices import RequestStatusChoices
 from assets.forms.request_forms import AssetRequestActionForm, AssetRequestForm
 from assets.models import Asset, AssetRequest, StatusLabel
+from inventory.services import checkout_inventory_item
 from itambox.capabilities import registry
 from itambox.panels import Panel
 from itambox.views.generic import (
@@ -339,40 +340,17 @@ class RequestClaimView(SimplePostView):
                             _("Requester does not have an active Asset Holder profile to assign the asset to.")
                         )
 
-                if req.component:
-                    from inventory.models import ComponentAllocation
-
-                    ComponentAllocation.objects.create(
-                        component=req.component,
-                        qty=req.qty,
-                        assigned_holder=holder,
-                        assigned_location=location,
-                        assigned_asset=asset_target,
-                        from_location=req.source_location,
-                        notes=f"Self-service claim for approved Request #{req.pk}",
-                    )
-                elif req.accessory:
-                    from inventory.models import AccessoryAssignment
-
-                    AccessoryAssignment.objects.create(
-                        accessory=req.accessory,
-                        qty=req.qty,
-                        assigned_holder=holder,
-                        assigned_location=location,
-                        assigned_asset=asset_target,
-                        from_location=req.source_location,
-                        notes=f"Self-service claim for approved Request #{req.pk}",
-                    )
-                elif req.consumable:
-                    from inventory.models import ConsumableAssignment
-
-                    ConsumableAssignment.objects.create(
-                        consumable=req.consumable,
-                        qty=req.qty,
-                        assigned_holder=holder,
-                        assigned_location=location,
-                        assigned_asset=asset_target,
-                        from_location=req.source_location,
+                inventory_item = req.component or req.accessory or req.consumable
+                if inventory_item:
+                    checkout_inventory_item(
+                        inventory_item,
+                        req.qty,
+                        holder=holder,
+                        location=location,
+                        asset=asset_target,
+                        source_location=req.source_location,
+                        user=request.user,
+                        request=request,
                         notes=f"Self-service claim for approved Request #{req.pk}",
                     )
                 else:

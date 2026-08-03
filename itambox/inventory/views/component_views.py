@@ -2,11 +2,14 @@ from django.shortcuts import redirect
 from django.urls import reverse, reverse_lazy
 from django.utils.translation import gettext_lazy as _
 
+from core.managers import get_current_tenant
 from inventory.services import (
     checkin_component,
     checkout_inventory_item,
+    create_component_allocation,
     recipient_assignment_union,
     shared_stock_union,
+    update_component_allocation,
 )
 from itambox.panels import Panel
 from itambox.quick_add import QuickAddMixin
@@ -18,6 +21,8 @@ from itambox.views.generic import (
     ObjectListView,
 )
 from itambox.views.generic.service_views import GenericTransactionView, SimplePostView
+from organization.access import resolved_shared_stock_ids
+from organization.models import TenantResourceGrant
 
 from .. import filters, forms, tables
 from ..models import Component, ComponentAllocation, ComponentStock
@@ -180,6 +185,33 @@ class ComponentAllocationEditView(QuickAddMixin, ObjectEditView):
     default_return_url = "inventory:component_list"
     quick_add_reload = True
 
+    def form_valid(self, form):
+        if self.object is not None and self.object.pk is not None:
+            cleaned = form.cleaned_data
+            self.object = update_component_allocation(
+                self.object.pk,
+                cleaned["component"],
+                cleaned["qty"],
+                holder=cleaned.get("assigned_holder"),
+                location=cleaned.get("assigned_location"),
+                asset=cleaned.get("assigned_asset"),
+                source_location=cleaned.get("from_location"),
+                user=self.request.user,
+                notes=cleaned.get("notes", ""),
+            )
+            return redirect(self.get_success_url())
+        cleaned = form.cleaned_data
+        self.object = create_component_allocation(
+            cleaned["component"],
+            cleaned["qty"],
+            holder=cleaned.get("assigned_holder"),
+            location=cleaned.get("assigned_location"),
+            asset=cleaned.get("assigned_asset"),
+            user=self.request.user,
+            notes=cleaned.get("notes", ""),
+        )
+        return redirect(self.get_success_url())
+
     def get_initial(self):
         initial = super().get_initial()
         asset_id = self.request.GET.get("asset")
@@ -202,6 +234,10 @@ class ComponentAllocationDeleteView(ObjectDeleteView):
     template_name = "generic/object_confirm_delete.html"
     success_url = reverse_lazy("inventory:component_list")
 
+    def form_valid(self, form):
+        checkin_component(self.object.pk, user=self.request.user)
+        return redirect(self.get_success_url())
+
 
 class ComponentStockAdjustView(StockAdjustView):
     permission_required = "inventory.change_componentstock"
@@ -216,7 +252,7 @@ class ComponentStockCreateModalView(StockCreateModalView):
 
 
 class ComponentCheckoutView(GenericTransactionView):
-    permission_required = ("inventory.change_component",)
+    permission_required = ("inventory.add_componentallocation",)
     queryset = Component.objects.all()
     model_form = forms.ComponentCheckoutForm
     service_callable = checkout_inventory_item
@@ -231,10 +267,31 @@ class ComponentCheckoutView(GenericTransactionView):
         "from_location": "source_location",
     }
 
+    def get_queryset(self):
+        queryset = super().get_queryset()
+        active_tenant = get_current_tenant()
+        if active_tenant is None:
+            return queryset.none()
+        shared_stock_ids = resolved_shared_stock_ids(
+            ComponentStock,
+            active_tenant,
+            self.request.user,
+            TenantResourceGrant.ACCESS_USE,
+            "inventory.add_componentallocation",
+        )
+        return (queryset | Component._base_manager.filter(stocks__pk__in=shared_stock_ids)).distinct()
+
+    def has_permission(self):
+        active_tenant = get_current_tenant()
+        return active_tenant is not None and self.request.user.has_perms(
+            self.get_permission_required(), obj=active_tenant
+        )
+
     def get_form_kwargs(self):
         kwargs = super().get_form_kwargs()
         del kwargs["instance"]
         kwargs["component"] = self.get_object()
+        kwargs["user"] = self.request.user
         if "initial" not in kwargs:
             kwargs["initial"] = {}
         for key in self.request.GET:

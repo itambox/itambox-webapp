@@ -28,30 +28,36 @@ at import time) into that edge. Import them by their full path:
 
 from .resource_access import (
     DENIED_INSUFFICIENT_LEVEL,
+    DENIED_INVALID_ACCESS_LEVEL,
     DENIED_NO_ACTIVE_TENANT,
     DENIED_NO_GRANT,
     DENIED_OWNER_UNRESOLVABLE,
     DENIED_RBAC,
+    DENIED_UNSUPPORTED_RESOURCE,
     REASON_DIRECT_GRANT,
     REASON_GROUP_GRANT,
     REASON_SAME_TENANT,
     ResourceAccessDecision,
     is_container_scoped_unfiltered,
     resolve_stock_access,
+    resolved_shared_stock_ids,
     visible_to_containers,
 )
 
 __all__ = [
+    "DENIED_INVALID_ACCESS_LEVEL",
     "DENIED_INSUFFICIENT_LEVEL",
     "DENIED_NO_ACTIVE_TENANT",
     "DENIED_NO_GRANT",
     "DENIED_OWNER_UNRESOLVABLE",
     "DENIED_RBAC",
+    "DENIED_UNSUPPORTED_RESOURCE",
     "REASON_DIRECT_GRANT",
     "REASON_GROUP_GRANT",
     "REASON_SAME_TENANT",
     "ResourceAccessDecision",
     "is_container_scoped_unfiltered",
     "resolve_stock_access",
+    "resolved_shared_stock_ids",
     "visible_to_containers",
 ]

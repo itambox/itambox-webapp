@@ -573,54 +573,6 @@
     },
     {
       "path": "itambox/assets/services.py",
-      "code": "B907",
-      "message": "'kit.name' is manually surrounded by quotes, consider using the `!r` conversion flag.",
-      "source": "AccessoryAssignment.objects.create(\n                    accessory=item.accessory,\n                    assigned_holder=holder,\n                    assigned_location=location,\n                    from_location=source_location,\n                    qty=item.qty,\n                    notes=f\"Checked out via Kit '{kit.name}'. {notes}\",\n                    # ADR-0001: a cross-tenant source pool needs a covering grant.\n                    resource_grant=resolve_grant_for_checkout(\n                        item.accessory,\n                        \"accessory\",\n                        AccessoryStock,\n                        AccessoryAssignment,\n                        source_location,\n                        user=user,\n                    ),\n                )",
-      "context": "Module:body/FunctionDef:checkout_kit:body/With:[(\"Call(func=Attribute(value=Name(id='transaction', ctx=Load()), attr='atomic', ctx=Load()), args=[], keywords=[])\", None)]:body/For:Name(id='item', ctx=Store()):Call(func=Attribute(value=Attribute(value=Name(id='kit', ctx=Load()), attr='items', ctx=Load()), attr='all', ctx=Load()), args=[], keywords=[]):body/If:Attribute(value=Name(id='item', ctx=Load()), attr='asset_type', ctx=Load()):orelse/If:Attribute(value=Name(id='item', ctx=Load()), attr='accessory', ctx=Load()):body",
-      "count": 1
-    },
-    {
-      "path": "itambox/assets/services.py",
-      "code": "B907",
-      "message": "'kit.name' is manually surrounded by quotes, consider using the `!r` conversion flag.",
-      "source": "ConsumableAssignment.objects.create(\n                    consumable=item.consumable,\n                    assigned_holder=holder,\n                    assigned_location=location,\n                    from_location=source_location,\n                    qty=item.qty,\n                    notes=f\"Checked out via Kit '{kit.name}'. {notes}\",\n                    resource_grant=resolve_grant_for_checkout(\n                        item.consumable,\n                        \"consumable\",\n                        ConsumableStock,\n                        ConsumableAssignment,\n                        source_location,\n                        user=user,\n                    ),\n                )",
-      "context": "Module:body/FunctionDef:checkout_kit:body/With:[(\"Call(func=Attribute(value=Name(id='transaction', ctx=Load()), attr='atomic', ctx=Load()), args=[], keywords=[])\", None)]:body/For:Name(id='item', ctx=Store()):Call(func=Attribute(value=Attribute(value=Name(id='kit', ctx=Load()), attr='items', ctx=Load()), attr='all', ctx=Load()), args=[], keywords=[]):body/If:Attribute(value=Name(id='item', ctx=Load()), attr='asset_type', ctx=Load()):orelse/If:Attribute(value=Name(id='item', ctx=Load()), attr='accessory', ctx=Load()):orelse/If:Attribute(value=Name(id='item', ctx=Load()), attr='consumable', ctx=Load()):body",
-      "count": 1
-    },
-    {
-      "path": "itambox/assets/services.py",
-      "code": "B907",
-      "message": "'kit.name' is manually surrounded by quotes, consider using the `!r` conversion flag.",
-      "source": "LicenseSeatAssignment.objects.create(\n                        license=item.license,\n                        asset=allocated_assets[0],\n                        notes=f\"Checked out via Kit '{kit.name}'. {notes}\",\n                    )",
-      "context": "Module:body/FunctionDef:checkout_kit:body/With:[(\"Call(func=Attribute(value=Name(id='transaction', ctx=Load()), attr='atomic', ctx=Load()), args=[], keywords=[])\", None)]:body/For:Name(id='item', ctx=Store()):Call(func=Attribute(value=Attribute(value=Name(id='kit', ctx=Load()), attr='items', ctx=Load()), attr='all', ctx=Load()), args=[], keywords=[]):body/If:Attribute(value=Name(id='item', ctx=Load()), attr='asset_type', ctx=Load()):orelse/If:Attribute(value=Name(id='item', ctx=Load()), attr='accessory', ctx=Load()):orelse/If:Attribute(value=Name(id='item', ctx=Load()), attr='consumable', ctx=Load()):orelse/If:Attribute(value=Name(id='item', ctx=Load()), attr='license', ctx=Load()):body/If:Name(id='holder', ctx=Load()):orelse/If:Name(id='allocated_assets', ctx=Load()):body",
-      "count": 1
-    },
-    {
-      "path": "itambox/assets/services.py",
-      "code": "B907",
-      "message": "'kit.name' is manually surrounded by quotes, consider using the `!r` conversion flag.",
-      "source": "LicenseSeatAssignment.objects.create(\n                        license=item.license, assigned_holder=holder, notes=f\"Checked out via Kit '{kit.name}'. {notes}\"\n                    )",
-      "context": "Module:body/FunctionDef:checkout_kit:body/With:[(\"Call(func=Attribute(value=Name(id='transaction', ctx=Load()), attr='atomic', ctx=Load()), args=[], keywords=[])\", None)]:body/For:Name(id='item', ctx=Store()):Call(func=Attribute(value=Attribute(value=Name(id='kit', ctx=Load()), attr='items', ctx=Load()), attr='all', ctx=Load()), args=[], keywords=[]):body/If:Attribute(value=Name(id='item', ctx=Load()), attr='asset_type', ctx=Load()):orelse/If:Attribute(value=Name(id='item', ctx=Load()), attr='accessory', ctx=Load()):orelse/If:Attribute(value=Name(id='item', ctx=Load()), attr='consumable', ctx=Load()):orelse/If:Attribute(value=Name(id='item', ctx=Load()), attr='license', ctx=Load()):body/If:Name(id='holder', ctx=Load()):body",
-      "count": 1
-    },
-    {
-      "path": "itambox/assets/services.py",
-      "code": "B907",
-      "message": "'kit.name' is manually surrounded by quotes, consider using the `!r` conversion flag.",
-      "source": "asset._changelog_message = f\"Checked out via Kit '{kit.name}'. {notes}\"",
-      "context": "Module:body/FunctionDef:checkout_kit:body/With:[(\"Call(func=Attribute(value=Name(id='transaction', ctx=Load()), attr='atomic', ctx=Load()), args=[], keywords=[])\", None)]:body/For:Name(id='item', ctx=Store()):Call(func=Attribute(value=Attribute(value=Name(id='kit', ctx=Load()), attr='items', ctx=Load()), attr='all', ctx=Load()), args=[], keywords=[]):body/If:Attribute(value=Name(id='item', ctx=Load()), attr='asset_type', ctx=Load()):body",
-      "count": 1
-    },
-    {
-      "path": "itambox/assets/services.py",
-      "code": "B907",
-      "message": "'kit.name' is manually surrounded by quotes, consider using the `!r` conversion flag.",
-      "source": "assignment_kwargs = {\n                    \"asset\": asset,\n                    \"checked_out_by\": user,\n                    \"notes\": f\"Checked out via Kit '{kit.name}'. {notes}\",\n                }",
-      "context": "Module:body/FunctionDef:checkout_kit:body/With:[(\"Call(func=Attribute(value=Name(id='transaction', ctx=Load()), attr='atomic', ctx=Load()), args=[], keywords=[])\", None)]:body/For:Name(id='item', ctx=Store()):Call(func=Attribute(value=Attribute(value=Name(id='kit', ctx=Load()), attr='items', ctx=Load()), attr='all', ctx=Load()), args=[], keywords=[]):body/If:Attribute(value=Name(id='item', ctx=Load()), attr='asset_type', ctx=Load()):body",
-      "count": 1
-    },
-    {
-      "path": "itambox/assets/services.py",
       "code": "C901",
       "message": "'checkin_asset' is too complex (13)",
       "source": "def checkin_asset(",
@@ -638,8 +590,8 @@
     {
       "path": "itambox/assets/services.py",
       "code": "C901",
-      "message": "'checkout_kit' is too complex (22)",
-      "source": "def checkout_kit(kit, holder=None, location=None, user=None, notes=\"\", source_location=None, request=None, **kwargs):",
+      "message": "'checkout_kit' is too complex (17)",
+      "source": "def checkout_kit(",
       "context": "Module:body/FunctionDef:checkout_kit:self",
       "count": 1
     },
@@ -2545,14 +2497,6 @@
       "message": "'RequestBulkReceiveView.post' is too complex (16)",
       "source": "    def post(self, request, *args, **kwargs):",
       "context": "Module:body/ClassDef:RequestBulkReceiveView:body/FunctionDef:post:self",
-      "count": 1
-    },
-    {
-      "path": "itambox/assets/views/request_views.py",
-      "code": "C901",
-      "message": "'RequestClaimView.perform_action' is too complex (12)",
-      "source": "    def perform_action(self, obj, request):",
-      "context": "Module:body/ClassDef:RequestClaimView:body/FunctionDef:perform_action:self",
       "count": 1
     },
     {
@@ -5304,14 +5248,6 @@
       "code": "F401",
       "message": "'datetime' imported but unused",
       "source": "import datetime",
-      "context": "Module:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/core/tests/test_import_snipeit.py",
-      "code": "F401",
-      "message": "'unittest.mock.MagicMock' imported but unused",
-      "source": "from unittest.mock import MagicMock, patch",
       "context": "Module:body",
       "count": 1
     },

@@ -22,6 +22,7 @@ from inventory.models import (
     ConsumableAssignment,
     ConsumableStock,
 )
+from inventory.tests.factories import create_assignment_fixture
 from inventory.views.accessory_views import AccessoryListView
 from inventory.views.consumable_views import ConsumableListView
 from organization.models import AssetHolder, Location, Site, Tenant
@@ -49,8 +50,8 @@ class AccessoryStockFanoutTests(TestCase):
         AccessoryStock.objects.create(accessory=self.accessory, location=self.loc_b, qty=20)
 
         # 2 assignments (no from_location => stock untouched): 3 + 4 = 7 checked out.
-        AccessoryAssignment.objects.create(accessory=self.accessory, assigned_holder=self.holder1, qty=3)
-        AccessoryAssignment.objects.create(accessory=self.accessory, assigned_holder=self.holder2, qty=4)
+        create_assignment_fixture(AccessoryAssignment, accessory=self.accessory, assigned_holder=self.holder1, qty=3)
+        create_assignment_fixture(AccessoryAssignment, accessory=self.accessory, assigned_holder=self.holder2, qty=4)
 
     def test_with_counts_annotation_not_inflated(self):
         acc = Accessory.objects.with_counts().get(pk=self.accessory.pk)
@@ -98,8 +99,8 @@ class ConsumableStockFanoutTests(TestCase):
         ConsumableStock.objects.create(consumable=self.consumable, location=self.loc_a, qty=10)
         ConsumableStock.objects.create(consumable=self.consumable, location=self.loc_b, qty=20)
 
-        ConsumableAssignment.objects.create(consumable=self.consumable, assigned_holder=self.holder1, qty=3)
-        ConsumableAssignment.objects.create(consumable=self.consumable, assigned_holder=self.holder2, qty=4)
+        create_assignment_fixture(ConsumableAssignment, consumable=self.consumable, assigned_holder=self.holder1, qty=3)
+        create_assignment_fixture(ConsumableAssignment, consumable=self.consumable, assigned_holder=self.holder2, qty=4)
 
     def test_with_counts_annotation_not_inflated(self):
         con = Consumable.objects.with_counts().get(pk=self.consumable.pk)

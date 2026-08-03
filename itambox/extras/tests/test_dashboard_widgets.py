@@ -402,6 +402,7 @@ class DashboardWidgetsMultiTenancyTests(TestCase):
             ConsumableAssignment,
             ConsumableStock,
         )
+        from inventory.tests.factories import create_assignment_fixture
 
         # 1. Create Accessory with min_qty=5 for Tenant A
         acc_a = Accessory.objects.create(name="Keyboard A", manufacturer=self.mfr, min_qty=5, tenant=self.tenant_a)
@@ -409,7 +410,7 @@ class DashboardWidgetsMultiTenancyTests(TestCase):
         AccessoryStock.objects.create(accessory=acc_a, location=self.loc_a, qty=10)
 
         # Checked out assignment: 8 units to holder_a (leaving 2 available, which is < min_qty of 5)
-        AccessoryAssignment.objects.create(accessory=acc_a, assigned_holder=self.holder_a, qty=8)
+        create_assignment_fixture(AccessoryAssignment, accessory=acc_a, assigned_holder=self.holder_a, qty=8)
 
         # 2. Create Accessory with min_qty=5 for Tenant B
         acc_b = Accessory.objects.create(name="Keyboard B", manufacturer=self.mfr, min_qty=5, tenant=self.tenant_b)
@@ -422,7 +423,7 @@ class DashboardWidgetsMultiTenancyTests(TestCase):
         ConsumableStock.objects.create(consumable=con_a, location=self.loc_a, qty=5)
 
         # Debited assignment: 4 units consumed (leaving 1 available, which is < min_qty of 3)
-        ConsumableAssignment.objects.create(consumable=con_a, assigned_holder=self.holder_a, qty=4)
+        create_assignment_fixture(ConsumableAssignment, consumable=con_a, assigned_holder=self.holder_a, qty=4)
 
         widget = LowStockWidget()
 

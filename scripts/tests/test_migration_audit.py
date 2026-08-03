@@ -543,12 +543,13 @@ class MigrationAuditTests(unittest.TestCase):
         self.assertEqual(inventory["summary"]["replacement_shards"], 62)
         self.assertEqual(inventory["summary"]["replacement_targets"], 262)
         self.assertEqual(inventory["summary"]["explicit_replacement_chain_edges"], 61)
-        self.assertEqual(inventory["summary"]["post_transition_migrations"], 5)
+        self.assertEqual(inventory["summary"]["post_transition_migrations"], 6)
         self.assertEqual(
             inventory["post_transition_migrations"],
             [
                 "extras.0101_issue88_drop_legacy_webhook_name_like",
                 "extras.0102_alter_event_action",
+                "inventory.0101_alter_accessoryassignment_options_and_more",
                 "organization.0101_membership_external_id_and_more",
                 "subscriptions.0101_remove_subscription_auto_renewal_and_more",
                 "users.0101_user_scim_id_usergroup_external_id_usergroup_scim_id_and_more",

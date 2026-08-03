@@ -1,4 +1,6 @@
+from django.db import transaction
 from django_filters.rest_framework import DjangoFilterBackend
+from rest_framework.exceptions import ValidationError
 
 from inventory.filters import (
     AccessoryAssignmentFilterSet,
@@ -26,7 +28,13 @@ from inventory.models import (
     Kit,
     KitItem,
 )
-from inventory.services import recipient_assignment_union, shared_stock_union
+from inventory.services import (
+    checkin_accessory,
+    checkin_component,
+    checkout_inventory_item,
+    recipient_assignment_union,
+    shared_stock_union,
+)
 from itambox.api.permissions import StrictTenantPermission, TokenPermissions
 from itambox.api.viewsets import ITAMBoxModelViewSet
 
@@ -86,7 +94,54 @@ class AccessoryStockViewSet(SharedStockVisibilityMixin, ITAMBoxModelViewSet):
     filterset_class = AccessoryStockFilterSet
 
 
-class AccessoryAssignmentViewSet(RecipientAssignmentVisibilityMixin, ITAMBoxModelViewSet):
+class AssignmentServiceCreateMixin:
+    item_field = None
+
+    def perform_create(self, serializer):
+        is_many = getattr(serializer, "many", False)
+        rows = serializer.validated_data if is_many else [serializer.validated_data]
+
+        with transaction.atomic():
+            instances = []
+            for validated_row in rows:
+                data = dict(validated_row)
+                item = data.pop(self.item_field)
+                instances.append(
+                    checkout_inventory_item(
+                        item,
+                        data.pop("qty", 1),
+                        holder=data.pop("assigned_holder", None),
+                        location=data.pop("assigned_location", None),
+                        asset=data.pop("assigned_asset", None),
+                        source_location=data.pop("from_location", None),
+                        user=self.request.user,
+                        notes=data.pop("notes", ""),
+                        assigned_date=data.pop("assigned_date", None),
+                        **data,
+                    )
+                )
+
+        serializer.instance = instances if is_many else instances[0]
+
+    def perform_update(self, serializer):
+        raise ValidationError("Assignments are immutable through the REST API; check in and create a replacement.")
+
+    def perform_destroy(self, instance):
+        if isinstance(instance, ConsumableAssignment):
+            raise ValidationError("Consumable assignments cannot be deleted through the REST API.")
+        checkin_service = {
+            AccessoryAssignment: checkin_accessory,
+            ComponentAllocation: checkin_component,
+        }[type(instance)]
+        checkin_service(instance.pk, user=self.request.user)
+
+
+class AccessoryAssignmentViewSet(
+    AssignmentServiceCreateMixin,
+    RecipientAssignmentVisibilityMixin,
+    ITAMBoxModelViewSet,
+):
+    item_field = "accessory"
     assignment_model = AccessoryAssignment
     permission_classes = [TokenPermissions, StrictTenantPermission]
     queryset = AccessoryAssignment.objects.select_related(
@@ -114,7 +169,12 @@ class ConsumableStockViewSet(SharedStockVisibilityMixin, ITAMBoxModelViewSet):
     filterset_class = ConsumableStockFilterSet
 
 
-class ConsumableAssignmentViewSet(RecipientAssignmentVisibilityMixin, ITAMBoxModelViewSet):
+class ConsumableAssignmentViewSet(
+    AssignmentServiceCreateMixin,
+    RecipientAssignmentVisibilityMixin,
+    ITAMBoxModelViewSet,
+):
+    item_field = "consumable"
     assignment_model = ConsumableAssignment
     permission_classes = [TokenPermissions, StrictTenantPermission]
     queryset = ConsumableAssignment.objects.select_related(
@@ -160,7 +220,12 @@ class ComponentStockViewSet(SharedStockVisibilityMixin, ITAMBoxModelViewSet):
     filterset_class = ComponentStockFilterSet
 
 
-class ComponentAllocationViewSet(RecipientAssignmentVisibilityMixin, ITAMBoxModelViewSet):
+class ComponentAllocationViewSet(
+    AssignmentServiceCreateMixin,
+    RecipientAssignmentVisibilityMixin,
+    ITAMBoxModelViewSet,
+):
+    item_field = "component"
     assignment_model = ComponentAllocation
     permission_classes = [TokenPermissions, StrictTenantPermission]
     queryset = ComponentAllocation.objects.select_related(
