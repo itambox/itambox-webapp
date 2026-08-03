@@ -1,24 +1,16 @@
 {% load i18n %}
 {# --- OOB Block: Page Title --- #}
-<span id="page-title-block" hx-swap-oob="true">
-    {{ title|default:_("List View") }} {% translate "- ITAMbox" %}
-</span>
-
+<span id="page-title-block" hx-swap-oob="true">{{ title|default:_("List View") }} {% translate "- ITAMbox" %}</span>
 {# --- OOB Block: Page Header --- #}
 <div id="page-header-block" hx-swap-oob="true">
-    <div class="page-pretitle">
-        {{ pretitle|default:_("Manage") }}
-    </div>
-    <h2 class="page-title">
-        {{ title|default:_("Objects") }}
-    </h2>
+  <div class="page-pretitle">{{ pretitle|default:_("Manage") }}</div>
+  <h2 class="page-title">{{ title|default:_("Objects") }}</h2>
 </div>
-
 {% comment %}
 OOB Block: Page Actions — single source: generic/includes/list_page_actions.html.
 The wrapper mirrors generic/object_list.html's #page-actions-block (nested btn-list) so the
 swap is a like-for-like replacement; extra_controls live outside it and persist.
 {% endcomment %}
 <div id="page-actions-block" class="btn-list" hx-swap-oob="true">
-    {% include 'generic/includes/list_page_actions.html' %}
+  {% include 'generic/includes/list_page_actions.html' %}
 </div>

@@ -3,6 +3,6 @@
 {% translate "Locations" as l_loc %}
 {% translate "Total Physical Assets" as l_assets %}
 <div class="row g-3 mb-4">
-    {% include "generic/includes/stat_card.html" with color="purple" icon="mdi mdi-map-marker-outline" label=l_loc value=locations_table.rows|length %}
-    {% include "generic/includes/stat_card.html" with color="green" icon="mdi mdi-laptop" label=l_assets value=assets_table.rows|length %}
+  {% include "generic/includes/stat_card.html" with color="purple" icon="mdi mdi-map-marker-outline" label=l_loc value=locations_table.rows|length %}
+  {% include "generic/includes/stat_card.html" with color="green" icon="mdi mdi-laptop" label=l_assets value=assets_table.rows|length %}
 </div>

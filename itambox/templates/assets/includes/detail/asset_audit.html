@@ -2,32 +2,29 @@
 {# Panel: Audit & Compliance Control #}
 {% load utility_tags %}
 <h4 class="card-title text-success mb-3 d-flex align-items-center">
-    <i class="mdi mdi-clipboard-check-outline me-2 text-success"></i>
-    {% translate "Audit &amp; Compliance Control" %}
+  <i class="mdi mdi-clipboard-check-outline me-2 text-success"></i>
+  {% translate "Audit &amp; Compliance Control" %}
 </h4>
-
 <div class="mb-3">
-    <span class="text-muted small d-block">{% translate "Physical Audit State" %}</span>
-    <div id="asset-audit-badge-container" class="mt-1">
-        {% include 'assets/includes/asset_audit_badge.html' with asset=object %}
-    </div>
+  <span class="text-muted small d-block">{% translate "Physical Audit State" %}</span>
+  <div id="asset-audit-badge-container" class="mt-1">
+    {% include 'assets/includes/asset_audit_badge.html' with asset=object %}
+  </div>
 </div>
-
 <div class="d-grid gap-2">
-    <button class="btn btn-success font-weight-bold shadow-sm"
-            hx-get="{% url 'assets:asset_audit' pk=object.pk %}"
-            hx-target="#modal-placeholder"
-            hx-swap="innerHTML"
-            id="audit-verify-btn">
-        <i class="mdi mdi-check me-1"></i>
-        {% translate "Verify Physical Presence" %}
-    </button>
-
-    <a href="{% url 'assets:asset_label_print' pk=object.pk %}"
-       target="_blank"
-       class="btn btn-outline-success font-weight-bold">
-        <i class="mdi mdi-crop-free me-1"></i>
-        {% translate "Print Asset Label" %}
-    </a>
+  <button class="btn btn-success font-weight-bold shadow-sm"
+          hx-get="{% url 'assets:asset_audit' pk=object.pk %}"
+          hx-target="#modal-placeholder"
+          hx-swap="innerHTML"
+          id="audit-verify-btn">
+    <i class="mdi mdi-check me-1"></i>
+    {% translate "Verify Physical Presence" %}
+  </button>
+  <a href="{% url 'assets:asset_label_print' pk=object.pk %}"
+     target="_blank"
+     class="btn btn-outline-success font-weight-bold">
+    <i class="mdi mdi-crop-free me-1"></i>
+    {% translate "Print Asset Label" %}
+  </a>
 </div>
 {# Tags are shown once in the right-column "Assigned Tags" card; no duplicate here. #}

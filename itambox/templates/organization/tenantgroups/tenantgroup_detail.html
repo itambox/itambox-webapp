@@ -2,65 +2,62 @@
 {% load render_table from django_tables2 %}
 {% load static %}
 {% load i18n %}
-
 {# --- Page Title --- #}
 {% block title %}{{ object.name }} {% translate "- Tenant Group Details - ITAMbox" %}{% endblock %}
-
 {# --- Page Header (from base) --- #}
-{% block page_pretitle %}{% translate "Organization / Tenant Groups" %}{% endblock %}
-
+{% block page_pretitle %}
+  {% translate "Organization / Tenant Groups" %}
+{% endblock %}
 {# --- Page Actions (from base) --- #}
-
 {# Object details rendered via panel layout #}
-
 {# --- Related Objects (Sidebar) --- #}
 {% block related_objects %}
-    {# Base template uses related_objects_list context variable #}
+  {# Base template uses related_objects_list context variable #}
 {% endblock related_objects %}
-
 {# --- Full Width Content (Tenants Table) --- #}
 {% block full_width_content %}
-    {# Render Tenants table #}
-    {% if tenants_table and tenants_table.rows %}
+  {# Render Tenants table #}
+  {% if tenants_table and tenants_table.rows %}
     <div class="card mb-4">
-        <div class="card-header"><h3 class="card-title">{% translate "Tenants in this Group (" %}{{ tenants_table.page.paginator.count }})</h3></div>
-        <div class="table-responsive">
-            {% render_table tenants_table %}
-        </div>
-        {% if tenants_table.page %}
-             {% include 'global_includes/pagination_links.html' with page_obj=tenants_table.page hx_push_url="false" %}
-         {% endif %}
+      <div class="card-header"><h3 class="card-title">{% translate "Tenants in this Group (" %}{{ tenants_table.page.paginator.count }})</h3></div>
+      <div class="table-responsive">{% render_table tenants_table %}</div>
+      {% if tenants_table.page %}
+        {% include 'global_includes/pagination_links.html' with page_obj=tenants_table.page hx_push_url="false" %}
+      {% endif %}
     </div>
-     {% elif tenants_table %}
-     <div class="card mb-4">
-        <div class="card-header"><h3 class="card-title">{% translate "Tenants in this Group (0)" %}</h3></div>
-         <div class="card-body">
-            <p class="text-muted">{% translate "No tenants found in this group." %}</p>
-         </div>
-    </div>
-    {% endif %}
-    {% if children_table and children_table.rows %}
+  {% elif tenants_table %}
     <div class="card mb-4">
-        <div class="card-header"><h3 class="card-title">{% translate "Child Groups (" %}{{ children_table.rows|length }})</h3></div>
-        <div class="table-responsive">
-            {% render_table children_table %}
-        </div>
+      <div class="card-header">
+        <h3 class="card-title">{% translate "Tenants in this Group (0)" %}</h3>
+      </div>
+      <div class="card-body">
+        <p class="text-muted">{% translate "No tenants found in this group." %}</p>
+      </div>
     </div>
-    {% endif %}
+  {% endif %}
+  {% if children_table and children_table.rows %}
+    <div class="card mb-4">
+      <div class="card-header"><h3 class="card-title">{% translate "Child Groups (" %}{{ children_table.rows|length }})</h3></div>
+      <div class="table-responsive">{% render_table children_table %}</div>
+    </div>
+  {% endif %}
 {% endblock full_width_content %}
-
 {% block extra_tabs %}
-    <li class="nav-item" role="presentation">
-        <a href="?tab=custody-policies" class="nav-link {% if request.GET.tab == 'custody-policies' %}active{% endif %}" data-bs-toggle="tab" hx-boost="false" data-bs-target="#custody-policies" role="tab" aria-selected="{% if request.GET.tab == 'custody-policies' %}true{% else %}false{% endif %}">
-            <i class="mdi mdi-file-sign me-1 text-green"></i>
-            {% translate "Custody EULAs &amp; Policies" %} <span class="badge bg-green-lt ms-2">{{ custody_templates_table.rows|length }}</span>
-        </a>
-    </li>
+  <li class="nav-item" role="presentation">
+    <a href="?tab=custody-policies"
+       class="nav-link {% if request.GET.tab == 'custody-policies' %}active{% endif %}"
+       data-bs-toggle="tab"
+       hx-boost="false"
+       data-bs-target="#custody-policies"
+       role="tab"
+       aria-selected="{% if request.GET.tab == 'custody-policies' %}true{% else %}false{% endif %}">
+      <i class="mdi mdi-file-sign me-1 text-green"></i>
+      {% translate "Custody EULAs &amp; Policies" %} <span class="badge bg-green-lt ms-2">{{ custody_templates_table.rows|length }}</span>
+    </a>
+  </li>
 {% endblock extra_tabs %}
-
 {% block extra_tab_panes %}
-    {% translate "Tenant-Scoped Custody Policies &amp; EULAs" as t_custody %}
-    {% translate "No custody policies or templates are currently registered for this tenant group." as e_custody %}
-    {% include 'generic/includes/related_table_tab.html' with tab="custody-policies" table=custody_templates_table title=t_custody empty=e_custody %}
+  {% translate "Tenant-Scoped Custody Policies &amp; EULAs" as t_custody %}
+  {% translate "No custody policies or templates are currently registered for this tenant group." as e_custody %}
+  {% include 'generic/includes/related_table_tab.html' with tab="custody-policies" table=custody_templates_table title=t_custody empty=e_custody %}
 {% endblock extra_tab_panes %}
- 

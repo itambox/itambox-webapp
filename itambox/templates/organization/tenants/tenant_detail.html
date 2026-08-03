@@ -2,235 +2,415 @@
 {% load i18n %}
 {% load render_table from django_tables2 %}
 {% load static %}
-
 {# --- Page Title --- #}
 {% block title %}{{ object.name }} {% translate "- Tenant Details - ITAMbox" %}{% endblock %}
-
 {# --- Page Header --- #}
-{% block page_pretitle %}{% translate "Organization / Tenants" %}{% endblock %}
-
+{% block page_pretitle %}
+  {% translate "Organization / Tenants" %}
+{% endblock %}
 {# --- Tabs Hook --- #}
 {% block extra_tabs %}
-    {% if object.is_provider %}
-    <li class="nav-item" role="presentation" data-bs-toggle="tooltip" data-bs-placement="top" title="{% translate 'Managed Tenants' %}">
-        <a href="?tab=managed-tenants" class="nav-link {% if request.GET.tab == 'managed-tenants' %}active{% endif %}" data-bs-toggle="tab" data-bs-target="#managed-tenants" role="tab" hx-boost="false"
-           hx-get="{% url 'organization:tenant_managed_tenants_tab' pk=object.pk %}" hx-target="#managed-tenants" hx-swap="innerHTML" hx-trigger="click once" hx-sync="#detail-tabs:replace" aria-selected="{% if request.GET.tab == 'managed-tenants' %}true{% else %}false{% endif %}">
-            <i class="mdi mdi-domain text-red"></i>
-            <span class="d-none d-xl-inline ms-1">{% translate "Managed Tenants" %}</span>
-            <span class="badge bg-red-lt ms-2">{{ tenant_managed_count }}</span>
-        </a>
+  {% if object.is_provider %}
+    <li class="nav-item"
+        role="presentation"
+        data-bs-toggle="tooltip"
+        data-bs-placement="top"
+        title="{% translate 'Managed Tenants' %}">
+      <a href="?tab=managed-tenants"
+         class="nav-link {% if request.GET.tab == 'managed-tenants' %}active{% endif %}"
+         data-bs-toggle="tab"
+         data-bs-target="#managed-tenants"
+         role="tab"
+         hx-boost="false"
+         hx-get="{% url 'organization:tenant_managed_tenants_tab' pk=object.pk %}"
+         hx-target="#managed-tenants"
+         hx-swap="innerHTML"
+         hx-trigger="click once"
+         hx-sync="#detail-tabs:replace"
+         aria-selected="{% if request.GET.tab == 'managed-tenants' %}true{% else %}false{% endif %}">
+        <i class="mdi mdi-domain text-red"></i>
+        <span class="d-none d-xl-inline ms-1">{% translate "Managed Tenants" %}</span>
+        <span class="badge bg-red-lt ms-2">{{ tenant_managed_count }}</span>
+      </a>
     </li>
-    {% endif %}
-    <li class="nav-item" role="presentation" data-bs-toggle="tooltip" data-bs-placement="top" title="{% translate 'Sites' %}">
-        <a href="?tab=sites" class="nav-link {% if request.GET.tab == 'sites' %}active{% endif %}" data-bs-toggle="tab" data-bs-target="#sites" role="tab"
-           hx-get="?tab=sites" hx-target="#sites" hx-swap="innerHTML" hx-trigger="click once" hx-sync="#detail-tabs:replace" aria-selected="{% if request.GET.tab == 'sites' %}true{% else %}false{% endif %}">
-            <i class="mdi mdi-office-building-outline text-purple"></i>
-            <span class="d-none d-xl-inline ms-1">{% translate "Sites" %}</span>
-            <span class="badge bg-purple-lt ms-2">{{ tenant_site_count }}</span>
-        </a>
-    </li>
-    <li class="nav-item" role="presentation" data-bs-toggle="tooltip" data-bs-placement="top" title="{% translate 'Locations' %}">
-        <a href="?tab=locations" class="nav-link {% if request.GET.tab == 'locations' %}active{% endif %}" data-bs-toggle="tab" data-bs-target="#locations" role="tab"
-           hx-get="?tab=locations" hx-target="#locations" hx-swap="innerHTML" hx-trigger="click once" hx-sync="#detail-tabs:replace" aria-selected="{% if request.GET.tab == 'locations' %}true{% else %}false{% endif %}">
-            <i class="mdi mdi-account-outline text-azure"></i>
-            <span class="d-none d-xl-inline ms-1">{% translate "Locations" %}</span>
-            <span class="badge bg-azure-lt ms-2">{{ tenant_location_count }}</span>
-        </a>
-    </li>
-    <li class="nav-item" role="presentation" data-bs-toggle="tooltip" data-bs-placement="top" title="{% translate 'Asset Holders' %}">
-        <a href="?tab=asset-holders" class="nav-link {% if request.GET.tab == 'asset-holders' %}active{% endif %}" data-bs-toggle="tab" data-bs-target="#asset-holders" role="tab"
-           hx-get="?tab=asset-holders" hx-target="#asset-holders" hx-swap="innerHTML" hx-trigger="click once" hx-sync="#detail-tabs:replace" aria-selected="{% if request.GET.tab == 'asset-holders' %}true{% else %}false{% endif %}">
-            <i class="mdi mdi-account-multiple-outline text-indigo"></i>
-            <span class="d-none d-xl-inline ms-1">{% translate "Asset Holders" %}</span>
-            <span class="badge bg-indigo-lt ms-2">{{ tenant_assetholder_count }}</span>
-        </a>
-    </li>
-    <li class="nav-item" role="presentation" data-bs-toggle="tooltip" data-bs-placement="top" title="{% translate 'Assets' %}">
-        <a href="?tab=assets" class="nav-link {% if request.GET.tab == 'assets' %}active{% endif %}" data-bs-toggle="tab" data-bs-target="#assets" role="tab"
-           hx-get="?tab=assets" hx-target="#assets" hx-swap="innerHTML" hx-trigger="click once" hx-sync="#detail-tabs:replace" aria-selected="{% if request.GET.tab == 'assets' %}true{% else %}false{% endif %}">
-            <i class="mdi mdi-presentation text-green"></i>
-            <span class="d-none d-xl-inline ms-1">{% translate "Assets" %}</span>
-            <span class="badge bg-green-lt ms-2">{{ tenant_asset_count }}</span>
-        </a>
-    </li>
-    <li class="nav-item" role="presentation" data-bs-toggle="tooltip" data-bs-placement="top" title="{% translate 'Accessories' %}">
-        <a href="?tab=accessories" class="nav-link {% if request.GET.tab == 'accessories' %}active{% endif %}" data-bs-toggle="tab" data-bs-target="#accessories" role="tab"
-           hx-get="?tab=accessories" hx-target="#accessories" hx-swap="innerHTML" hx-trigger="click once" hx-sync="#detail-tabs:replace" aria-selected="{% if request.GET.tab == 'accessories' %}true{% else %}false{% endif %}">
-            <i class="mdi mdi-server text-teal"></i>
-            <span class="d-none d-xl-inline ms-1">{% translate "Accessories" %}</span>
-            <span class="badge bg-teal-lt ms-2">{{ tenant_accessory_count }}</span>
-        </a>
-    </li>
-    <li class="nav-item" role="presentation" data-bs-toggle="tooltip" data-bs-placement="top" title="{% translate 'Consumables' %}">
-        <a href="?tab=consumables" class="nav-link {% if request.GET.tab == 'consumables' %}active{% endif %}" data-bs-toggle="tab" data-bs-target="#consumables" role="tab"
-           hx-get="?tab=consumables" hx-target="#consumables" hx-swap="innerHTML" hx-trigger="click once" hx-sync="#detail-tabs:replace" aria-selected="{% if request.GET.tab == 'consumables' %}true{% else %}false{% endif %}">
-            <i class="mdi mdi-water-outline text-cyan"></i>
-            <span class="d-none d-xl-inline ms-1">{% translate "Consumables" %}</span>
-            <span class="badge bg-cyan-lt ms-2">{{ tenant_consumable_count }}</span>
-        </a>
-    </li>
-    <li class="nav-item" role="presentation" data-bs-toggle="tooltip" data-bs-placement="top" title="{% translate 'Components' %}">
-        <a href="?tab=components" class="nav-link {% if request.GET.tab == 'components' %}active{% endif %}" data-bs-toggle="tab" data-bs-target="#components" role="tab"
-           hx-get="?tab=components" hx-target="#components" hx-swap="innerHTML" hx-trigger="click once" hx-sync="#detail-tabs:replace" aria-selected="{% if request.GET.tab == 'components' %}true{% else %}false{% endif %}">
-            <i class="mdi mdi-cpu text-orange me-1"></i>
-            <span class="d-none d-xl-inline ms-1">{% translate "Components" %}</span>
-            <span class="badge bg-orange-lt ms-2">{{ tenant_component_count }}</span>
-        </a>
-    </li>
-    <li class="nav-item" role="presentation" data-bs-toggle="tooltip" data-bs-placement="top" title="{% translate 'Licenses' %}">
-        <a href="?tab=licenses" class="nav-link {% if request.GET.tab == 'licenses' %}active{% endif %}" data-bs-toggle="tab" data-bs-target="#licenses" role="tab"
-           hx-get="?tab=licenses" hx-target="#licenses" hx-swap="innerHTML" hx-trigger="click once" hx-sync="#detail-tabs:replace" aria-selected="{% if request.GET.tab == 'licenses' %}true{% else %}false{% endif %}">
-            <i class="mdi mdi-magnify-plus-outline text-blue"></i>
-            <span class="d-none d-xl-inline ms-1">{% translate "Licenses" %}</span>
-            <span class="badge bg-blue-lt ms-2">{{ tenant_license_count }}</span>
-        </a>
-    </li>
-    <li class="nav-item" role="presentation" data-bs-toggle="tooltip" data-bs-placement="top" title="{% translate 'Kits' %}">
-        <a href="?tab=kits" class="nav-link {% if request.GET.tab == 'kits' %}active{% endif %}" data-bs-toggle="tab" data-bs-target="#kits" role="tab"
-           hx-get="?tab=kits" hx-target="#kits" hx-swap="innerHTML" hx-trigger="click once" hx-sync="#detail-tabs:replace" aria-selected="{% if request.GET.tab == 'kits' %}true{% else %}false{% endif %}">
-            <i class="mdi mdi-package-variant-closed text-orange"></i>
-            <span class="d-none d-xl-inline ms-1">{% translate "Kits" %}</span>
-            <span class="badge bg-orange-lt ms-2">{{ tenant_kit_count }}</span>
-        </a>
-    </li>
-    <li class="nav-item" role="presentation" data-bs-toggle="tooltip" data-bs-placement="top" title="{% translate 'Subscriptions' %}">
-        <a href="?tab=subscriptions" class="nav-link {% if request.GET.tab == 'subscriptions' %}active{% endif %}" data-bs-toggle="tab" data-bs-target="#subscriptions" role="tab"
-           hx-get="?tab=subscriptions" hx-target="#subscriptions" hx-swap="innerHTML" hx-trigger="click once" hx-sync="#detail-tabs:replace" aria-selected="{% if request.GET.tab == 'subscriptions' %}true{% else %}false{% endif %}">
-            <i class="mdi mdi-file-document-outline text-pink"></i>
-            <span class="d-none d-xl-inline ms-1">{% translate "Subscriptions" %}</span>
-            <span class="badge bg-pink-lt ms-2">{{ tenant_subscription_count }}</span>
-        </a>
-    </li>
-    <li class="nav-item" role="presentation" data-bs-toggle="tooltip" data-bs-placement="top" title="{% translate 'Custody Policies' %}">
-        <a href="?tab=custody-policies" class="nav-link {% if request.GET.tab == 'custody-policies' %}active{% endif %}" data-bs-toggle="tab" data-bs-target="#custody-policies" role="tab"
-           hx-get="?tab=custody-policies" hx-target="#custody-policies" hx-swap="innerHTML" hx-trigger="click once" hx-sync="#detail-tabs:replace" aria-selected="{% if request.GET.tab == 'custody-policies' %}true{% else %}false{% endif %}">
-            <i class="mdi mdi-file-sign text-green me-1"></i>
-            <span class="d-none d-xl-inline ms-1">{% translate "Custody Policies" %}</span>
-            <span class="badge bg-green-lt ms-2">{{ tenant_custody_count }}</span>
-        </a>
-    </li>
+  {% endif %}
+  <li class="nav-item"
+      role="presentation"
+      data-bs-toggle="tooltip"
+      data-bs-placement="top"
+      title="{% translate 'Sites' %}">
+    <a href="?tab=sites"
+       class="nav-link {% if request.GET.tab == 'sites' %}active{% endif %}"
+       data-bs-toggle="tab"
+       data-bs-target="#sites"
+       role="tab"
+       hx-get="?tab=sites"
+       hx-target="#sites"
+       hx-swap="innerHTML"
+       hx-trigger="click once"
+       hx-sync="#detail-tabs:replace"
+       aria-selected="{% if request.GET.tab == 'sites' %}true{% else %}false{% endif %}">
+      <i class="mdi mdi-office-building-outline text-purple"></i>
+      <span class="d-none d-xl-inline ms-1">{% translate "Sites" %}</span>
+      <span class="badge bg-purple-lt ms-2">{{ tenant_site_count }}</span>
+    </a>
+  </li>
+  <li class="nav-item"
+      role="presentation"
+      data-bs-toggle="tooltip"
+      data-bs-placement="top"
+      title="{% translate 'Locations' %}">
+    <a href="?tab=locations"
+       class="nav-link {% if request.GET.tab == 'locations' %}active{% endif %}"
+       data-bs-toggle="tab"
+       data-bs-target="#locations"
+       role="tab"
+       hx-get="?tab=locations"
+       hx-target="#locations"
+       hx-swap="innerHTML"
+       hx-trigger="click once"
+       hx-sync="#detail-tabs:replace"
+       aria-selected="{% if request.GET.tab == 'locations' %}true{% else %}false{% endif %}">
+      <i class="mdi mdi-account-outline text-azure"></i>
+      <span class="d-none d-xl-inline ms-1">{% translate "Locations" %}</span>
+      <span class="badge bg-azure-lt ms-2">{{ tenant_location_count }}</span>
+    </a>
+  </li>
+  <li class="nav-item"
+      role="presentation"
+      data-bs-toggle="tooltip"
+      data-bs-placement="top"
+      title="{% translate 'Asset Holders' %}">
+    <a href="?tab=asset-holders"
+       class="nav-link {% if request.GET.tab == 'asset-holders' %}active{% endif %}"
+       data-bs-toggle="tab"
+       data-bs-target="#asset-holders"
+       role="tab"
+       hx-get="?tab=asset-holders"
+       hx-target="#asset-holders"
+       hx-swap="innerHTML"
+       hx-trigger="click once"
+       hx-sync="#detail-tabs:replace"
+       aria-selected="{% if request.GET.tab == 'asset-holders' %}true{% else %}false{% endif %}">
+      <i class="mdi mdi-account-multiple-outline text-indigo"></i>
+      <span class="d-none d-xl-inline ms-1">{% translate "Asset Holders" %}</span>
+      <span class="badge bg-indigo-lt ms-2">{{ tenant_assetholder_count }}</span>
+    </a>
+  </li>
+  <li class="nav-item"
+      role="presentation"
+      data-bs-toggle="tooltip"
+      data-bs-placement="top"
+      title="{% translate 'Assets' %}">
+    <a href="?tab=assets"
+       class="nav-link {% if request.GET.tab == 'assets' %}active{% endif %}"
+       data-bs-toggle="tab"
+       data-bs-target="#assets"
+       role="tab"
+       hx-get="?tab=assets"
+       hx-target="#assets"
+       hx-swap="innerHTML"
+       hx-trigger="click once"
+       hx-sync="#detail-tabs:replace"
+       aria-selected="{% if request.GET.tab == 'assets' %}true{% else %}false{% endif %}">
+      <i class="mdi mdi-presentation text-green"></i>
+      <span class="d-none d-xl-inline ms-1">{% translate "Assets" %}</span>
+      <span class="badge bg-green-lt ms-2">{{ tenant_asset_count }}</span>
+    </a>
+  </li>
+  <li class="nav-item"
+      role="presentation"
+      data-bs-toggle="tooltip"
+      data-bs-placement="top"
+      title="{% translate 'Accessories' %}">
+    <a href="?tab=accessories"
+       class="nav-link {% if request.GET.tab == 'accessories' %}active{% endif %}"
+       data-bs-toggle="tab"
+       data-bs-target="#accessories"
+       role="tab"
+       hx-get="?tab=accessories"
+       hx-target="#accessories"
+       hx-swap="innerHTML"
+       hx-trigger="click once"
+       hx-sync="#detail-tabs:replace"
+       aria-selected="{% if request.GET.tab == 'accessories' %}true{% else %}false{% endif %}">
+      <i class="mdi mdi-server text-teal"></i>
+      <span class="d-none d-xl-inline ms-1">{% translate "Accessories" %}</span>
+      <span class="badge bg-teal-lt ms-2">{{ tenant_accessory_count }}</span>
+    </a>
+  </li>
+  <li class="nav-item"
+      role="presentation"
+      data-bs-toggle="tooltip"
+      data-bs-placement="top"
+      title="{% translate 'Consumables' %}">
+    <a href="?tab=consumables"
+       class="nav-link {% if request.GET.tab == 'consumables' %}active{% endif %}"
+       data-bs-toggle="tab"
+       data-bs-target="#consumables"
+       role="tab"
+       hx-get="?tab=consumables"
+       hx-target="#consumables"
+       hx-swap="innerHTML"
+       hx-trigger="click once"
+       hx-sync="#detail-tabs:replace"
+       aria-selected="{% if request.GET.tab == 'consumables' %}true{% else %}false{% endif %}">
+      <i class="mdi mdi-water-outline text-cyan"></i>
+      <span class="d-none d-xl-inline ms-1">{% translate "Consumables" %}</span>
+      <span class="badge bg-cyan-lt ms-2">{{ tenant_consumable_count }}</span>
+    </a>
+  </li>
+  <li class="nav-item"
+      role="presentation"
+      data-bs-toggle="tooltip"
+      data-bs-placement="top"
+      title="{% translate 'Components' %}">
+    <a href="?tab=components"
+       class="nav-link {% if request.GET.tab == 'components' %}active{% endif %}"
+       data-bs-toggle="tab"
+       data-bs-target="#components"
+       role="tab"
+       hx-get="?tab=components"
+       hx-target="#components"
+       hx-swap="innerHTML"
+       hx-trigger="click once"
+       hx-sync="#detail-tabs:replace"
+       aria-selected="{% if request.GET.tab == 'components' %}true{% else %}false{% endif %}">
+      <i class="mdi mdi-cpu text-orange me-1"></i>
+      <span class="d-none d-xl-inline ms-1">{% translate "Components" %}</span>
+      <span class="badge bg-orange-lt ms-2">{{ tenant_component_count }}</span>
+    </a>
+  </li>
+  <li class="nav-item"
+      role="presentation"
+      data-bs-toggle="tooltip"
+      data-bs-placement="top"
+      title="{% translate 'Licenses' %}">
+    <a href="?tab=licenses"
+       class="nav-link {% if request.GET.tab == 'licenses' %}active{% endif %}"
+       data-bs-toggle="tab"
+       data-bs-target="#licenses"
+       role="tab"
+       hx-get="?tab=licenses"
+       hx-target="#licenses"
+       hx-swap="innerHTML"
+       hx-trigger="click once"
+       hx-sync="#detail-tabs:replace"
+       aria-selected="{% if request.GET.tab == 'licenses' %}true{% else %}false{% endif %}">
+      <i class="mdi mdi-magnify-plus-outline text-blue"></i>
+      <span class="d-none d-xl-inline ms-1">{% translate "Licenses" %}</span>
+      <span class="badge bg-blue-lt ms-2">{{ tenant_license_count }}</span>
+    </a>
+  </li>
+  <li class="nav-item"
+      role="presentation"
+      data-bs-toggle="tooltip"
+      data-bs-placement="top"
+      title="{% translate 'Kits' %}">
+    <a href="?tab=kits"
+       class="nav-link {% if request.GET.tab == 'kits' %}active{% endif %}"
+       data-bs-toggle="tab"
+       data-bs-target="#kits"
+       role="tab"
+       hx-get="?tab=kits"
+       hx-target="#kits"
+       hx-swap="innerHTML"
+       hx-trigger="click once"
+       hx-sync="#detail-tabs:replace"
+       aria-selected="{% if request.GET.tab == 'kits' %}true{% else %}false{% endif %}">
+      <i class="mdi mdi-package-variant-closed text-orange"></i>
+      <span class="d-none d-xl-inline ms-1">{% translate "Kits" %}</span>
+      <span class="badge bg-orange-lt ms-2">{{ tenant_kit_count }}</span>
+    </a>
+  </li>
+  <li class="nav-item"
+      role="presentation"
+      data-bs-toggle="tooltip"
+      data-bs-placement="top"
+      title="{% translate 'Subscriptions' %}">
+    <a href="?tab=subscriptions"
+       class="nav-link {% if request.GET.tab == 'subscriptions' %}active{% endif %}"
+       data-bs-toggle="tab"
+       data-bs-target="#subscriptions"
+       role="tab"
+       hx-get="?tab=subscriptions"
+       hx-target="#subscriptions"
+       hx-swap="innerHTML"
+       hx-trigger="click once"
+       hx-sync="#detail-tabs:replace"
+       aria-selected="{% if request.GET.tab == 'subscriptions' %}true{% else %}false{% endif %}">
+      <i class="mdi mdi-file-document-outline text-pink"></i>
+      <span class="d-none d-xl-inline ms-1">{% translate "Subscriptions" %}</span>
+      <span class="badge bg-pink-lt ms-2">{{ tenant_subscription_count }}</span>
+    </a>
+  </li>
+  <li class="nav-item"
+      role="presentation"
+      data-bs-toggle="tooltip"
+      data-bs-placement="top"
+      title="{% translate 'Custody Policies' %}">
+    <a href="?tab=custody-policies"
+       class="nav-link {% if request.GET.tab == 'custody-policies' %}active{% endif %}"
+       data-bs-toggle="tab"
+       data-bs-target="#custody-policies"
+       role="tab"
+       hx-get="?tab=custody-policies"
+       hx-target="#custody-policies"
+       hx-swap="innerHTML"
+       hx-trigger="click once"
+       hx-sync="#detail-tabs:replace"
+       aria-selected="{% if request.GET.tab == 'custody-policies' %}true{% else %}false{% endif %}">
+      <i class="mdi mdi-file-sign text-green me-1"></i>
+      <span class="d-none d-xl-inline ms-1">{% translate "Custody Policies" %}</span>
+      <span class="badge bg-green-lt ms-2">{{ tenant_custody_count }}</span>
+    </a>
+  </li>
 {% endblock extra_tabs %}
-
 {# Object details rendered via panel layout #}
-
 {# --- Related Objects (Sidebar) --- #}
 {% block related_objects %}
-    {# Handled in the tabs #}
+  {# Handled in the tabs #}
 {% endblock related_objects %}
-
 {# --- Extra Tab Panes --- #}
 {% block extra_tab_panes %}
-    {% if object.is_provider %}
+  {% if object.is_provider %}
     {# Managed Tenants Tab Pane #}
-    <div class="tab-pane tab-pane--lazy fade {% if request.GET.tab == 'managed-tenants' %}show active{% endif %}" id="managed-tenants" role="tabpanel">
-        <div class="text-center py-5 text-muted">
-            <div class="spinner-border spinner-border-sm text-primary mb-2" role="status"></div>
-            <div>{% translate "Loading Managed Tenants..." %}</div>
-        </div>
+    <div class="tab-pane tab-pane--lazy fade {% if request.GET.tab == 'managed-tenants' %}show active{% endif %}"
+         id="managed-tenants"
+         role="tabpanel">
+      <div class="text-center py-5 text-muted">
+        <div class="spinner-border spinner-border-sm text-primary mb-2"
+             role="status"></div>
+        <div>{% translate "Loading Managed Tenants..." %}</div>
+      </div>
     </div>
-    {% endif %}
-
-    {# Sites Tab Pane #}
-    <div class="tab-pane tab-pane--lazy fade {% if request.GET.tab == 'sites' %}show active{% endif %}" id="sites" role="tabpanel">
-        <div class="text-center py-5 text-muted">
-            <div class="spinner-border spinner-border-sm text-primary mb-2" role="status"></div>
-            <div>{% translate "Loading Sites..." %}</div>
-        </div>
+  {% endif %}
+  {# Sites Tab Pane #}
+  <div class="tab-pane tab-pane--lazy fade {% if request.GET.tab == 'sites' %}show active{% endif %}"
+       id="sites"
+       role="tabpanel">
+    <div class="text-center py-5 text-muted">
+      <div class="spinner-border spinner-border-sm text-primary mb-2"
+           role="status"></div>
+      <div>{% translate "Loading Sites..." %}</div>
     </div>
-
-    {# Locations Tab Pane #}
-    <div class="tab-pane tab-pane--lazy fade {% if request.GET.tab == 'locations' %}show active{% endif %}" id="locations" role="tabpanel">
-        <div class="text-center py-5 text-muted">
-            <div class="spinner-border spinner-border-sm text-primary mb-2" role="status"></div>
-            <div>{% translate "Loading Locations..." %}</div>
-        </div>
+  </div>
+  {# Locations Tab Pane #}
+  <div class="tab-pane tab-pane--lazy fade {% if request.GET.tab == 'locations' %}show active{% endif %}"
+       id="locations"
+       role="tabpanel">
+    <div class="text-center py-5 text-muted">
+      <div class="spinner-border spinner-border-sm text-primary mb-2"
+           role="status"></div>
+      <div>{% translate "Loading Locations..." %}</div>
     </div>
-
-    {# Asset Holders Tab Pane #}
-    <div class="tab-pane tab-pane--lazy fade {% if request.GET.tab == 'asset-holders' %}show active{% endif %}" id="asset-holders" role="tabpanel">
-        <div class="text-center py-5 text-muted">
-            <div class="spinner-border spinner-border-sm text-primary mb-2" role="status"></div>
-            <div>{% translate "Loading Asset Holders..." %}</div>
-        </div>
+  </div>
+  {# Asset Holders Tab Pane #}
+  <div class="tab-pane tab-pane--lazy fade {% if request.GET.tab == 'asset-holders' %}show active{% endif %}"
+       id="asset-holders"
+       role="tabpanel">
+    <div class="text-center py-5 text-muted">
+      <div class="spinner-border spinner-border-sm text-primary mb-2"
+           role="status"></div>
+      <div>{% translate "Loading Asset Holders..." %}</div>
     </div>
-
-    {# Assets Tab Pane #}
-    <div class="tab-pane tab-pane--lazy fade {% if request.GET.tab == 'assets' %}show active{% endif %}" id="assets" role="tabpanel">
-        <div class="text-center py-5 text-muted">
-            <div class="spinner-border spinner-border-sm text-primary mb-2" role="status"></div>
-            <div>{% translate "Loading Assets..." %}</div>
-        </div>
+  </div>
+  {# Assets Tab Pane #}
+  <div class="tab-pane tab-pane--lazy fade {% if request.GET.tab == 'assets' %}show active{% endif %}"
+       id="assets"
+       role="tabpanel">
+    <div class="text-center py-5 text-muted">
+      <div class="spinner-border spinner-border-sm text-primary mb-2"
+           role="status"></div>
+      <div>{% translate "Loading Assets..." %}</div>
     </div>
-
-    {# Accessories Tab Pane #}
-    <div class="tab-pane tab-pane--lazy fade {% if request.GET.tab == 'accessories' %}show active{% endif %}" id="accessories" role="tabpanel">
-        <div class="text-center py-5 text-muted">
-            <div class="spinner-border spinner-border-sm text-primary mb-2" role="status"></div>
-            <div>{% translate "Loading Accessories..." %}</div>
-        </div>
+  </div>
+  {# Accessories Tab Pane #}
+  <div class="tab-pane tab-pane--lazy fade {% if request.GET.tab == 'accessories' %}show active{% endif %}"
+       id="accessories"
+       role="tabpanel">
+    <div class="text-center py-5 text-muted">
+      <div class="spinner-border spinner-border-sm text-primary mb-2"
+           role="status"></div>
+      <div>{% translate "Loading Accessories..." %}</div>
     </div>
-
-    {# Consumables Tab Pane #}
-    <div class="tab-pane tab-pane--lazy fade {% if request.GET.tab == 'consumables' %}show active{% endif %}" id="consumables" role="tabpanel">
-        <div class="text-center py-5 text-muted">
-            <div class="spinner-border spinner-border-sm text-primary mb-2" role="status"></div>
-            <div>{% translate "Loading Consumables..." %}</div>
-        </div>
+  </div>
+  {# Consumables Tab Pane #}
+  <div class="tab-pane tab-pane--lazy fade {% if request.GET.tab == 'consumables' %}show active{% endif %}"
+       id="consumables"
+       role="tabpanel">
+    <div class="text-center py-5 text-muted">
+      <div class="spinner-border spinner-border-sm text-primary mb-2"
+           role="status"></div>
+      <div>{% translate "Loading Consumables..." %}</div>
     </div>
-
-    {# Components Tab Pane #}
-    <div class="tab-pane tab-pane--lazy fade {% if request.GET.tab == 'components' %}show active{% endif %}" id="components" role="tabpanel">
-        <div class="text-center py-5 text-muted">
-            <div class="spinner-border spinner-border-sm text-primary mb-2" role="status"></div>
-            <div>{% translate "Loading Components..." %}</div>
-        </div>
+  </div>
+  {# Components Tab Pane #}
+  <div class="tab-pane tab-pane--lazy fade {% if request.GET.tab == 'components' %}show active{% endif %}"
+       id="components"
+       role="tabpanel">
+    <div class="text-center py-5 text-muted">
+      <div class="spinner-border spinner-border-sm text-primary mb-2"
+           role="status"></div>
+      <div>{% translate "Loading Components..." %}</div>
     </div>
-
-    {# Licenses Tab Pane #}
-    <div class="tab-pane tab-pane--lazy fade {% if request.GET.tab == 'licenses' %}show active{% endif %}" id="licenses" role="tabpanel">
-        <div class="text-center py-5 text-muted">
-            <div class="spinner-border spinner-border-sm text-primary mb-2" role="status"></div>
-            <div>{% translate "Loading Licenses..." %}</div>
-        </div>
+  </div>
+  {# Licenses Tab Pane #}
+  <div class="tab-pane tab-pane--lazy fade {% if request.GET.tab == 'licenses' %}show active{% endif %}"
+       id="licenses"
+       role="tabpanel">
+    <div class="text-center py-5 text-muted">
+      <div class="spinner-border spinner-border-sm text-primary mb-2"
+           role="status"></div>
+      <div>{% translate "Loading Licenses..." %}</div>
     </div>
-
-    {# Kits Tab Pane #}
-    <div class="tab-pane tab-pane--lazy fade {% if request.GET.tab == 'kits' %}show active{% endif %}" id="kits" role="tabpanel">
-        <div class="text-center py-5 text-muted">
-            <div class="spinner-border spinner-border-sm text-primary mb-2" role="status"></div>
-            <div>{% translate "Loading Kits..." %}</div>
-        </div>
+  </div>
+  {# Kits Tab Pane #}
+  <div class="tab-pane tab-pane--lazy fade {% if request.GET.tab == 'kits' %}show active{% endif %}"
+       id="kits"
+       role="tabpanel">
+    <div class="text-center py-5 text-muted">
+      <div class="spinner-border spinner-border-sm text-primary mb-2"
+           role="status"></div>
+      <div>{% translate "Loading Kits..." %}</div>
     </div>
-
-    {# Subscriptions Tab Pane #}
-    <div class="tab-pane tab-pane--lazy fade {% if request.GET.tab == 'subscriptions' %}show active{% endif %}" id="subscriptions" role="tabpanel">
-        <div class="text-center py-5 text-muted">
-            <div class="spinner-border spinner-border-sm text-primary mb-2" role="status"></div>
-            <div>{% translate "Loading Subscriptions..." %}</div>
-        </div>
+  </div>
+  {# Subscriptions Tab Pane #}
+  <div class="tab-pane tab-pane--lazy fade {% if request.GET.tab == 'subscriptions' %}show active{% endif %}"
+       id="subscriptions"
+       role="tabpanel">
+    <div class="text-center py-5 text-muted">
+      <div class="spinner-border spinner-border-sm text-primary mb-2"
+           role="status"></div>
+      <div>{% translate "Loading Subscriptions..." %}</div>
     </div>
-
-    {# Custody Policies Tab Pane #}
-    <div class="tab-pane tab-pane--lazy fade {% if request.GET.tab == 'custody-policies' %}show active{% endif %}" id="custody-policies" role="tabpanel">
-        <div class="text-center py-5 text-muted">
-            <div class="spinner-border spinner-border-sm text-primary mb-2" role="status"></div>
-            <div>{% translate "Loading Custody Policies..." %}</div>
-        </div>
+  </div>
+  {# Custody Policies Tab Pane #}
+  <div class="tab-pane tab-pane--lazy fade {% if request.GET.tab == 'custody-policies' %}show active{% endif %}"
+       id="custody-policies"
+       role="tabpanel">
+    <div class="text-center py-5 text-muted">
+      <div class="spinner-border spinner-border-sm text-primary mb-2"
+           role="status"></div>
+      <div>{% translate "Loading Custody Policies..." %}</div>
     </div>
+  </div>
 {% endblock extra_tab_panes %}
-
 {% block extra_page_actions %}
-    <a href="{% url 'organization:tenant_access' pk=object.pk %}" class="btn btn-ghost-secondary">
-        <i class="mdi mdi-account-key-outline me-1"></i>
-        {% translate "Who Has Access" %}
-    </a>
-    {% if has_ldap %}
-    <form method="post" action="{% url 'organization:tenant_ldap_sync' pk=object.pk %}" class="d-inline">
-        {% csrf_token %}
-        <button type="submit" class="btn btn-outline-primary">
-            <i class="mdi mdi-sync me-1"></i>
-            {% translate "Sync Directory Now" %}
-        </button>
+  <a href="{% url 'organization:tenant_access' pk=object.pk %}"
+     class="btn btn-ghost-secondary">
+    <i class="mdi mdi-account-key-outline me-1"></i>
+    {% translate "Who Has Access" %}
+  </a>
+  {% if has_ldap %}
+    <form method="post"
+          action="{% url 'organization:tenant_ldap_sync' pk=object.pk %}"
+          class="d-inline">
+      {% csrf_token %}
+      <button type="submit" class="btn btn-outline-primary">
+        <i class="mdi mdi-sync me-1"></i>
+        {% translate "Sync Directory Now" %}
+      </button>
     </form>
-    {% endif %}
+  {% endif %}
 {% endblock %}

@@ -71,6 +71,7 @@ dev = [
     "pycodestyle==2.11.1",
     "pyflakes==3.2.0",
     "pre-commit>=4.0,<5.0",
+    "djlint==1.43.2",
     "PyYAML>=6.0,<7.0",
     # Exact version: formatting/import-sort output must be reproducible across
     # contributors, pre-commit, and CI (see pyproject.toml [tool.ruff]).
@@ -193,3 +194,31 @@ line-ending = "lf"
 # those stay on the Flake8 identity baseline (scripts/flake8_baseline.json) so
 # this phase introduces no new semantic gate or rule weakening.
 select = ["I"]
+
+# Template lint policy (issue #94). The profile stays fail-closed for authored
+# template syntax, structure, and formatting. H005/H016/H030 cover the
+# accessibility/SEO scope owned by #101; H021 covers inline-style/CSP debt owned
+# by #24. These are explicit scope boundaries, not a debt baseline.
+[tool.djlint]
+profile = "django"
+use_gitignore = true
+ignore = "H005,H016,H021,H030"
+# django-template-partials uses the non-conventional startpartial/endpartial
+# pair. The formatter understands the opening shape; T038 is ignored only in
+# the exact 13 files using that third-party pair (see per-file-ignores below).
+custom_blocks = "{% startpartial %}...{% endpartial %}"
+
+[tool.djlint.per-file-ignores]
+"itambox/compliance/templates/compliance/audits/audit_session_flag_missing.html" = "T038"
+"itambox/inventory/templates/inventory/includes/accessory_checkout_modal.html" = "T038"
+"itambox/inventory/templates/inventory/includes/component_checkout_modal.html" = "T038"
+"itambox/inventory/templates/inventory/includes/consumable_checkout_modal.html" = "T038"
+"itambox/inventory/templates/inventory/includes/kit_checkout_modal.html" = "T038"
+"itambox/templates/assets/includes/asset_audit_modal.html" = "T038"
+"itambox/templates/assets/includes/asset_checkin_modal.html" = "T038"
+"itambox/templates/assets/includes/asset_checkout_modal.html" = "T038"
+"itambox/templates/generic/includes/add_stock_modal.html" = "T038"
+"itambox/templates/licenses/includes/license_checkout_modal.html" = "T038"
+"itambox/templates/subscriptions/includes/subscription_cancel_modal.html" = "T038"
+"itambox/templates/subscriptions/includes/subscription_checkout_modal.html" = "T038"
+"itambox/templates/subscriptions/includes/subscription_renew_modal.html" = "T038"

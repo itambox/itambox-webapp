@@ -1,17 +1,19 @@
 {% load i18n %}
 <dl class="row mb-0">
-    <dt class="col-sm-3">{% translate "Name:" %}</dt>
-    <dd class="col-sm-9">{{ object.name }}</dd>
-
-    <dt class="col-sm-3">{% translate "Slug:" %}</dt>
-    <dd class="col-sm-9">{{ object.slug }}</dd>
-
-    <dt class="col-sm-3">{% translate "Parent Region:" %}</dt>
-    <dd class="col-sm-9">
-        {% if object.parent %}
-            <a href="{% url 'organization:region_detail' pk=object.parent.pk %}">{{ object.parent }}</a>
-        {% else %}
-             <span class="text-muted"><i>{% translate "None" %}</i></span>
-        {% endif %}
-    </dd>
+  <dt class="col-sm-3">{% translate "Name:" %}</dt>
+  <dd class="col-sm-9">
+    {{ object.name }}
+  </dd>
+  <dt class="col-sm-3">{% translate "Slug:" %}</dt>
+  <dd class="col-sm-9">
+    {{ object.slug }}
+  </dd>
+  <dt class="col-sm-3">{% translate "Parent Region:" %}</dt>
+  <dd class="col-sm-9">
+    {% if object.parent %}
+      <a href="{% url 'organization:region_detail' pk=object.parent.pk %}">{{ object.parent }}</a>
+    {% else %}
+      <span class="text-muted"><i>{% translate "None" %}</i></span>
+    {% endif %}
+  </dd>
 </dl>

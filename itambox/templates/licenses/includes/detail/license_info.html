@@ -1,98 +1,87 @@
 {% load i18n money %}
 {% load utility_tags %}
-
 <dl class="row mb-0">
-    <dt class="col-sm-3">{% translate "Name:" %}</dt>
-    <dd class="col-sm-9"><strong>{{ object.name }}</strong></dd>
-
-    <dt class="col-sm-3">{% translate "Software Catalog:" %}</dt>
-    <dd class="col-sm-9">
-         {% if object.software %}
-            <a href="{% url 'software:software_detail' pk=object.software.pk %}">
-                <span class="badge bg-purple-lt">{{ object.software }}</span>
-            </a>
-         {% else %}
-             <span class="text-muted"><i>{% translate "None" %}</i></span>
-         {% endif %}
-    </dd>
-
-    <dt class="col-sm-3">{% translate "Version:" %}</dt>
-    <dd class="col-sm-9">{% if object.version %}<code>{{ object.version }}</code>{% else %}<span class="text-muted"><i>{% translate "Any / Unversioned" %}</i></span>{% endif %}</dd>
-
-    <dt class="col-sm-3">{% translate "License Type:" %}</dt>
-    <dd class="col-sm-9">
-        <span class="badge bg-blue-lt text-uppercase">{{ object.get_license_type_display }}</span>
-    </dd>
-
-    <dt class="col-sm-3">{% translate "Funding Subscription:" %}</dt>
-    <dd class="col-sm-9">
-        {% if object.subscription %}
-            <a href="{{ object.subscription.get_absolute_url }}">{{ object.subscription }}</a>
-        {% else %}
-            <span class="text-muted"><i>{% translate "None (perpetual / standalone)" %}</i></span>
-        {% endif %}
-    </dd>
-
-    <dt class="col-sm-3">{% translate "Assigned Tenant:" %}</dt>
-    <dd class="col-sm-9">
-        {% if object.tenant %}
-            <a href="{% url 'organization:tenant_detail' pk=object.tenant.pk %}"><strong>{{ object.tenant.name }}</strong></a>
-        {% else %}
-            <span class="text-muted"><i>{% translate "Global (No Tenant)" %}</i></span>
-        {% endif %}
-    </dd>
-    
-    <dt class="col-sm-3">{% translate "Supplier / Vendor:" %}</dt>
-    <dd class="col-sm-9">
-        {% if object.supplier %}
-            <a href="{% url 'assets:supplier_detail' pk=object.supplier.pk %}"><strong>{{ object.supplier.name }}</strong></a>
-        {% else %}
-            <span class="text-muted"><i>{% translate "Not Set" %}</i></span>
-        {% endif %}
-    </dd>
-
-    <dt class="col-sm-3">{% translate "Cost Center:" %}</dt>
-    <dd class="col-sm-9">
-        {% if object.cost_center %}
-            <a href="{% url 'organization:costcenter_detail' pk=object.cost_center.pk %}">{{ object.cost_center }}</a>
-        {% else %}
-            <span class="text-muted"><i>{% translate "Not Set" %}</i></span>
-        {% endif %}
-    </dd>
-
-    <dt class="col-sm-3">{% translate "Purchase Date:" %}</dt>
-    <dd class="col-sm-9 text-secondary">{% if object.purchase_date %}{{object.purchase_date|date:"Y-m-d"}}{% else %}<span class='text-muted'><i>Not Set</i></span>{% endif %}</dd>
-
-    <dt class="col-sm-3">{% translate "Purchase Cost:" %}</dt>
-    <dd class="col-sm-9 text-secondary">
-        {% if object.purchase_cost %}
-            {{ object.purchase_cost|money:object }}
-        {% else %}
-            <span class="text-muted"><i>{% translate "Not Set" %}</i></span>
-        {% endif %}
-    </dd>
-
-    <dt class="col-sm-3">{% translate "Order Number:" %}</dt>
-    <dd class="col-sm-9 text-secondary"><code>{% if object.order_number %}{{object.order_number}}{% else %}<span class='text-muted'><i>Not Set</i></span>{% endif %}</code></dd>
-
-    <dt class="col-sm-3">{% translate "Expiration Date:" %}</dt>
-    <dd class="col-sm-9 text-secondary">
-        {% if object.expiration_date %}
-            {{ object.expiration_date|date:"Y-m-d" }}
-        {% else %}
-            <span class="text-muted"><i>{% translate "Non-expiring / Perpetual" %}</i></span>
-        {% endif %}
-    </dd>
+  <dt class="col-sm-3">{% translate "Name:" %}</dt>
+  <dd class="col-sm-9">
+    <strong>{{ object.name }}</strong>
+  </dd>
+  <dt class="col-sm-3">{% translate "Software Catalog:" %}</dt>
+  <dd class="col-sm-9">
+    {% if object.software %}
+      <a href="{% url 'software:software_detail' pk=object.software.pk %}">
+        <span class="badge bg-purple-lt">{{ object.software }}</span>
+      </a>
+    {% else %}
+      <span class="text-muted"><i>{% translate "None" %}</i></span>
+    {% endif %}
+  </dd>
+  <dt class="col-sm-3">{% translate "Version:" %}</dt>
+  <dd class="col-sm-9">{% if object.version %}<code>{{ object.version }}</code>{% else %}<span class="text-muted"><i>{% translate "Any / Unversioned" %}</i></span>{% endif %}</dd>
+  <dt class="col-sm-3">{% translate "License Type:" %}</dt>
+  <dd class="col-sm-9">
+    <span class="badge bg-blue-lt text-uppercase">{{ object.get_license_type_display }}</span>
+  </dd>
+  <dt class="col-sm-3">{% translate "Funding Subscription:" %}</dt>
+  <dd class="col-sm-9">
+    {% if object.subscription %}
+      <a href="{{ object.subscription.get_absolute_url }}">{{ object.subscription }}</a>
+    {% else %}
+      <span class="text-muted"><i>{% translate "None (perpetual / standalone)" %}</i></span>
+    {% endif %}
+  </dd>
+  <dt class="col-sm-3">{% translate "Assigned Tenant:" %}</dt>
+  <dd class="col-sm-9">
+    {% if object.tenant %}
+      <a href="{% url 'organization:tenant_detail' pk=object.tenant.pk %}"><strong>{{ object.tenant.name }}</strong></a>
+    {% else %}
+      <span class="text-muted"><i>{% translate "Global (No Tenant)" %}</i></span>
+    {% endif %}
+  </dd>
+  <dt class="col-sm-3">{% translate "Supplier / Vendor:" %}</dt>
+  <dd class="col-sm-9">
+    {% if object.supplier %}
+      <a href="{% url 'assets:supplier_detail' pk=object.supplier.pk %}"><strong>{{ object.supplier.name }}</strong></a>
+    {% else %}
+      <span class="text-muted"><i>{% translate "Not Set" %}</i></span>
+    {% endif %}
+  </dd>
+  <dt class="col-sm-3">{% translate "Cost Center:" %}</dt>
+  <dd class="col-sm-9">
+    {% if object.cost_center %}
+      <a href="{% url 'organization:costcenter_detail' pk=object.cost_center.pk %}">{{ object.cost_center }}</a>
+    {% else %}
+      <span class="text-muted"><i>{% translate "Not Set" %}</i></span>
+    {% endif %}
+  </dd>
+  <dt class="col-sm-3">{% translate "Purchase Date:" %}</dt>
+  <dd class="col-sm-9 text-secondary">{% if object.purchase_date %}{{ object.purchase_date|date:"Y-m-d" }}{% else %}<span class="text-muted"><i>Not Set</i></span>{% endif %}</dd>
+  <dt class="col-sm-3">{% translate "Purchase Cost:" %}</dt>
+  <dd class="col-sm-9 text-secondary">
+    {% if object.purchase_cost %}
+      {{ object.purchase_cost|money:object }}
+    {% else %}
+      <span class="text-muted"><i>{% translate "Not Set" %}</i></span>
+    {% endif %}
+  </dd>
+  <dt class="col-sm-3">{% translate "Order Number:" %}</dt>
+  <dd class="col-sm-9 text-secondary"><code>{% if object.order_number %}{{ object.order_number }}{% else %}<span class="text-muted"><i>Not Set</i></span>{% endif %}</code></dd>
+  <dt class="col-sm-3">{% translate "Expiration Date:" %}</dt>
+  <dd class="col-sm-9 text-secondary">
+    {% if object.expiration_date %}
+      {{ object.expiration_date|date:"Y-m-d" }}
+    {% else %}
+      <span class="text-muted"><i>{% translate "Non-expiring / Perpetual" %}</i></span>
+    {% endif %}
+  </dd>
 </dl>
-
 {% if object.product_key %}
-<div class="card mt-4 border-0 specs-container shadow-none">
+  <div class="card mt-4 border-0 specs-container shadow-none">
     <div class="card-body">
-        <h4 class="card-title text-secondary mb-2 d-flex align-items-center">
-            <i class="mdi mdi-shield-key-outline me-2 text-primary"></i>
-            License Activation &amp; Product Key
-        </h4>
-        <pre class="specs-container border rounded p-3 mb-0 select-all"><code>{{ object.decrypted_product_key }}</code></pre>
+      <h4 class="card-title text-secondary mb-2 d-flex align-items-center">
+        <i class="mdi mdi-shield-key-outline me-2 text-primary"></i>
+        License Activation &amp; Product Key
+      </h4>
+      <pre class="specs-container border rounded p-3 mb-0 select-all"><code>{{ object.decrypted_product_key }}</code></pre>
     </div>
-</div>
+  </div>
 {% endif %}

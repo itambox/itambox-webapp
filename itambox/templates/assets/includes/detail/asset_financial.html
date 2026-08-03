@@ -1,106 +1,96 @@
 {% load i18n money %}
 {# Panel: Financial & Lifecycle details #}
 <dl class="row mb-0">
-    <dt class="col-sm-4">{% translate "Purchase Cost:" %}</dt>
-    <dd class="col-sm-8">
-        {% if object.purchase_cost %}
-            {{ object.purchase_cost|money:object }}
-        {% else %}
-            <span class="text-muted"><i>{% translate "Not Set" %}</i></span>
-        {% endif %}
-    </dd>
-
-    <dt class="col-sm-4">{% translate "Salvage Value:" %}</dt>
-    <dd class="col-sm-8">
-        {% if object.salvage_value %}
-            {{ object.salvage_value|money:object }}
-        {% else %}
-            <span class="text-muted"><i>{% translate "Not Set" %}</i></span>
-        {% endif %}
-    </dd>
-
-    <dt class="col-sm-4">{% translate "Cost Center:" %}</dt>
-    <dd class="col-sm-8">
-        {% if object.cost_center %}
-            <a href="{% url 'organization:costcenter_detail' pk=object.cost_center.pk %}">{{ object.cost_center }}</a>
-        {% else %}<span class="text-muted"><i>{% translate "Not Set" %}</i></span>{% endif %}
-    </dd>
-
-    <dt class="col-sm-4">{% translate "Purchase Order:" %}</dt>
-    <dd class="col-sm-8">
-        {% if object.purchase_order_line %}
-            <a href="{{ object.purchase_order_line.purchase_order.get_absolute_url }}">{{ object.purchase_order_line.purchase_order }}</a>
-        {% else %}<span class="text-muted"><i>{% translate "Not linked" %}</i></span>{% endif %}
-    </dd>
-
-    <dt class="col-sm-4">{% translate "Estimated value (indicative):" %}</dt>
-    <dd class="col-sm-8">
-        {% if object.disposed_at %}
-            <span class="h3 font-weight-bold text-secondary">
-                {{ object.disposal_value|money:object }}
-            </span>
-            <br>
-            <small class="text-muted">{% blocktranslate with d=object.disposed_at|date:"Y-m-d" %}Sign-off value (frozen at {{ d }}){% endblocktranslate %}</small>
-        {% elif object.current_value is not None %}
-            <span class="h3 font-weight-bold text-success">
-                {{ object.current_value|money:object }}
-            </span>
-            {% if resolved_depreciation_policy %}
-                <br>
-                <small class="text-muted">
-                    {{ resolved_depreciation_policy }}
-                    {% if resolved_depreciation_rung == 'override' %}
-                        <span class="badge bg-blue-lt ms-1">{% translate "asset override" %}</span>
-                    {% elif resolved_depreciation_rung == 'tenant' %}
-                        <span class="badge bg-secondary-lt ms-1">{% translate "tenant default" %}</span>
-                    {% elif resolved_depreciation_rung == 'type' %}
-                        <span class="badge bg-secondary-lt ms-1">{% translate "asset type" %}</span>
-                    {% endif %}
-                </small>
-            {% endif %}
-        {% else %}
-            <span class="text-muted"><i>{% translate "N/A (No Purchase Cost)" %}</i></span>
-        {% endif %}
+  <dt class="col-sm-4">{% translate "Purchase Cost:" %}</dt>
+  <dd class="col-sm-8">
+    {% if object.purchase_cost %}
+      {{ object.purchase_cost|money:object }}
+    {% else %}
+      <span class="text-muted"><i>{% translate "Not Set" %}</i></span>
+    {% endif %}
+  </dd>
+  <dt class="col-sm-4">{% translate "Salvage Value:" %}</dt>
+  <dd class="col-sm-8">
+    {% if object.salvage_value %}
+      {{ object.salvage_value|money:object }}
+    {% else %}
+      <span class="text-muted"><i>{% translate "Not Set" %}</i></span>
+    {% endif %}
+  </dd>
+  <dt class="col-sm-4">{% translate "Cost Center:" %}</dt>
+  <dd class="col-sm-8">
+    {% if object.cost_center %}
+      <a href="{% url 'organization:costcenter_detail' pk=object.cost_center.pk %}">{{ object.cost_center }}</a>
+    {% else %}
+      <span class="text-muted"><i>{% translate "Not Set" %}</i></span>
+    {% endif %}
+  </dd>
+  <dt class="col-sm-4">{% translate "Purchase Order:" %}</dt>
+  <dd class="col-sm-8">
+    {% if object.purchase_order_line %}
+      <a href="{{ object.purchase_order_line.purchase_order.get_absolute_url }}">{{ object.purchase_order_line.purchase_order }}</a>
+    {% else %}
+      <span class="text-muted"><i>{% translate "Not linked" %}</i></span>
+    {% endif %}
+  </dd>
+  <dt class="col-sm-4">{% translate "Estimated value (indicative):" %}</dt>
+  <dd class="col-sm-8">
+    {% if object.disposed_at %}
+      <span class="h3 font-weight-bold text-secondary">{{ object.disposal_value|money:object }}</span>
+      <br>
+      <small class="text-muted">{% blocktranslate with d=object.disposed_at|date:"Y-m-d" %}Sign-off value (frozen at {{ d }}){% endblocktranslate %}</small>
+    {% elif object.current_value is not None %}
+      <span class="h3 font-weight-bold text-success">{{ object.current_value|money:object }}</span>
+      {% if resolved_depreciation_policy %}
         <br>
-        <small class="text-muted fst-italic">{% translate "Indicative figure for IT asset management and budgeting — not a substitute for your accounting system." %}</small>
-    </dd>
-
-    <dt class="col-sm-4">{% translate "In-Service Date:" %}</dt>
-    <dd class="col-sm-8 text-secondary">
-        {% if object.in_service_date %}
-            {{ object.in_service_date|date:"Y-m-d" }}
-        {% else %}
-            <span class="text-muted"><i>{% translate "Not Set (uses purchase date)" %}</i></span>
-        {% endif %}
-    </dd>
-
-    <dt class="col-sm-4">{% translate "Estimated EOL Date:" %}</dt>
-    <dd class="col-sm-8">
-        {% if eol_date %}
-            {{ eol_date|date:"Y-m-d" }}
-            <span class="badge bg-secondary-lt ms-1">{{ object.asset_type.eol_months }} {% translate "months" %}</span>
-        {% else %}
-            <span class="text-muted"><i>{% translate "N/A" %}</i></span>
-        {% endif %}
-    </dd>
-
-    <dt class="col-sm-4">{% translate "Remaining Lifespan:" %}</dt>
-    <dd class="col-sm-8">
-        {% if time_to_eol == 'Expired' %}
-            <span class="badge bg-danger-lt text-danger font-weight-bold text-uppercase">{% translate "Expired (EOL Reached)" %}</span>
-        {% elif time_to_eol != '—' %}
-            <span class="badge bg-success-lt text-success font-weight-bold">{{ time_to_eol }}</span>
-        {% else %}
-            <span class="text-muted"><i>{% translate "N/A" %}</i></span>
-        {% endif %}
-    </dd>
-
-    <dt class="col-sm-4">{% translate "Total Cost of Ownership (TCO):" %}</dt>
-    <dd class="col-sm-8">
-        <span class="h3 font-weight-bold text-success">
-            {{ total_cost_of_ownership|money:object }}
-        </span>
-        <br>
-        <small class="text-muted">{% translate "Purchase +" %} {{ object.maintenances.count }} {% translate "repair/maintenance item" %}{{ object.maintenances.count|pluralize }}</small>
-    </dd>
+        <small class="text-muted">
+          {{ resolved_depreciation_policy }}
+          {% if resolved_depreciation_rung == 'override' %}
+            <span class="badge bg-blue-lt ms-1">{% translate "asset override" %}</span>
+          {% elif resolved_depreciation_rung == 'tenant' %}
+            <span class="badge bg-secondary-lt ms-1">{% translate "tenant default" %}</span>
+          {% elif resolved_depreciation_rung == 'type' %}
+            <span class="badge bg-secondary-lt ms-1">{% translate "asset type" %}</span>
+          {% endif %}
+        </small>
+      {% endif %}
+    {% else %}
+      <span class="text-muted"><i>{% translate "N/A (No Purchase Cost)" %}</i></span>
+    {% endif %}
+    <br>
+    <small class="text-muted fst-italic">{% translate "Indicative figure for IT asset management and budgeting — not a substitute for your accounting system." %}</small>
+  </dd>
+  <dt class="col-sm-4">{% translate "In-Service Date:" %}</dt>
+  <dd class="col-sm-8 text-secondary">
+    {% if object.in_service_date %}
+      {{ object.in_service_date|date:"Y-m-d" }}
+    {% else %}
+      <span class="text-muted"><i>{% translate "Not Set (uses purchase date)" %}</i></span>
+    {% endif %}
+  </dd>
+  <dt class="col-sm-4">{% translate "Estimated EOL Date:" %}</dt>
+  <dd class="col-sm-8">
+    {% if eol_date %}
+      {{ eol_date|date:"Y-m-d" }}
+      <span class="badge bg-secondary-lt ms-1">{{ object.asset_type.eol_months }} {% translate "months" %}</span>
+    {% else %}
+      <span class="text-muted"><i>{% translate "N/A" %}</i></span>
+    {% endif %}
+  </dd>
+  <dt class="col-sm-4">{% translate "Remaining Lifespan:" %}</dt>
+  <dd class="col-sm-8">
+    {% if time_to_eol == 'Expired' %}
+      <span class="badge bg-danger-lt text-danger font-weight-bold text-uppercase">{% translate "Expired (EOL Reached)" %}</span>
+    {% elif time_to_eol != '—' %}
+      <span class="badge bg-success-lt text-success font-weight-bold">{{ time_to_eol }}</span>
+    {% else %}
+      <span class="text-muted"><i>{% translate "N/A" %}</i></span>
+    {% endif %}
+  </dd>
+  <dt class="col-sm-4">{% translate "Total Cost of Ownership (TCO):" %}</dt>
+  <dd class="col-sm-8">
+    <span class="h3 font-weight-bold text-success">{{ total_cost_of_ownership|money:object }}</span>
+    <br>
+    <small class="text-muted">{% translate "Purchase +" %} {{ object.maintenances.count }} {% translate "repair/maintenance item" %}{{ object.maintenances.count|pluralize }}</small>
+  </dd>
 </dl>

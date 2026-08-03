@@ -32,8 +32,7 @@
     min-width: 0;
 }
 
-@media (max-width: 575.98px) {
-
+@media (width <= 575.98px) {
     // ---- Reclaim horizontal space: near edge-to-edge content ----
     .page-body > .container-fluid,
     .page-header > .container-fluid {
@@ -72,7 +71,6 @@
     // Attribute tables: give the label column less room on phones so values
     // (serials, mail addresses) keep readable width.
     .attr-table {
-
         th:first-child,
         td:first-child {
             width: 38%;
@@ -84,7 +82,6 @@
     .card pre.change-data,
     .card pre.change-diff {
         white-space: pre-wrap;
-        word-break: break-word;
     }
 
     // Pagination bar: the 3-up desktop row (per-page | count | page-nav) is too
@@ -145,10 +142,12 @@ $action-bar-fab-size: 56px;
     right: 0;
     z-index: 1040;          // above page content, below modals (Bootstrap modal is 1050+)
     background: var(--tblr-bg-surface, #fff);
-    border-top: 1px solid var(--tblr-border-color, rgba(0,0,0,.1));
-    box-shadow: 0 -2px 12px rgba(0,0,0,.08);
+    border-top: 1px solid var(--tblr-border-color, rgb(0 0 0 / 10%));
+    box-shadow: 0 -2px 12px rgb(0 0 0 / 8%);
+
     // Push above the safe area (iPhone home indicator)
     padding-bottom: env(safe-area-inset-bottom, 0);
+
     // Promote to its own compositor layer so the bar stays glued to the bottom
     // during momentum scrolling on mobile instead of lagging/jittering ("floating").
     transform: translateZ(0);
@@ -156,7 +155,7 @@ $action-bar-fab-size: 56px;
 
     [data-bs-theme="dark"] & {
         background: var(--tblr-bg-surface, #1e2433);
-        border-top-color: rgba(255,255,255,.1);
+        border-top-color: rgb(255 255 255 / 10%);
     }
 }
 
@@ -223,6 +222,7 @@ $action-bar-fab-size: 56px;
 // Elevated centre FAB (scanner button)
 .mobile-action-bar__btn--scanner {
     flex: 0 0 auto;
+
     // Extra bottom padding so the FAB visually "floats" above the bar
     padding-bottom: 12px;
     color: var(--tblr-primary);
@@ -240,9 +240,11 @@ $action-bar-fab-size: 56px;
     height: $action-bar-fab-size;
     border-radius: 50%;
     background: var(--tblr-primary);
+
     // primary-fg keeps contrast in dark mode (dark text on light-violet fill)
     color: var(--tblr-primary-fg, #fff);
-    box-shadow: 0 4px 14px rgba(0, 0, 0, .25);
+    box-shadow: 0 4px 14px rgb(0 0 0 / 25%);
+
     // Lift it above the bar baseline
     margin-top: -($action-bar-fab-size * 0.4);
     margin-bottom: 2px;
@@ -255,7 +257,7 @@ $action-bar-fab-size: 56px;
     .mobile-action-bar__btn--scanner:hover &,
     .mobile-action-bar__btn--scanner:focus & {
         transform: scale(1.08);
-        box-shadow: 0 6px 18px rgba(0, 0, 0, .35);
+        box-shadow: 0 6px 18px rgb(0 0 0 / 35%);
     }
 
     .mobile-action-bar__btn--scanner:active & {
@@ -265,7 +267,7 @@ $action-bar-fab-size: 56px;
 
 // Add bottom padding on mobile so page content isn't hidden behind the bar.
 // Applied on the same breakpoint the bar appears (< lg).
-@media (max-width: 991.98px) {
+@media (width <= 991.98px) {
     .page-body {
         padding-bottom: calc(#{$action-bar-height} + env(safe-area-inset-bottom, 0px) + 0.5rem);
     }

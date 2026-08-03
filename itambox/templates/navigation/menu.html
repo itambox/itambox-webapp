@@ -1,5 +1,4 @@
 {% load i18n %}
-
 <ul class="navbar-nav pt-lg-3">
   {# Dashboard - always visible #}
   <li class="nav-item">
@@ -10,11 +9,14 @@
       <span class="nav-link-title">{% translate "Home" %}</span>
     </a>
   </li>
-
   {% for menu, groups in nav_items %}
     <li class="nav-item dropdown">
-      <a class="nav-link dropdown-toggle" href="#"
-         data-bs-toggle="dropdown" data-bs-auto-close="false" role="button" aria-expanded="false">
+      <a class="nav-link dropdown-toggle"
+         href="#"
+         data-bs-toggle="dropdown"
+         data-bs-auto-close="false"
+         role="button"
+         aria-expanded="false">
         <span class="nav-link-icon d-md-none d-lg-inline-block">
           <i class="{{ menu.icon_class }}" aria-hidden="true"></i>
         </span>
@@ -26,17 +28,21 @@
             {% for group, items in groups %}
               <span class="dropdown-header text-info">{{ group.label }}{% if group.beta %} <span class="badge bg-yellow-lt ms-1">{% translate "Beta" %}</span>{% endif %}</span>
               {% for item, buttons in items %}
-                <div class="dropdown-item d-flex justify-content-between align-items-center ps-3 py-0 text-wrap" style="white-space: normal; min-height: 2.25rem;">
-                  <a href="{{ item.url }}" class="py-1 text-reset text-decoration-none flex-fill text-wrap lh-sm"
-                     style="min-width: 0; word-break: break-word;"
-                     {% if '/admin/' in item.url %}hx-boost="false"{% endif %}>
-                    {{ item.link_text }}
-                  </a>
+                <div class="dropdown-item d-flex justify-content-between align-items-center ps-3 py-0 text-wrap"
+                     style="white-space: normal;
+                            min-height: 2.25rem">
+                  <a href="{{ item.url }}"
+                     class="py-1 text-reset text-decoration-none flex-fill text-wrap lh-sm"
+                     style="min-width: 0;
+                            word-break: break-word"
+                     {% if '/admin/' in item.url %}hx-boost="false"{% endif %}>{{ item.link_text }}</a>
                   {% if buttons %}
                     <div class="btn-group ms-2 flex-shrink-0">
                       {% for button in buttons %}
-                        <a href="{{ button.url }}" class="btn btn-sm btn-{{ button.color|default:'outline text-primary' }} lh-1 px-2"
-                           title="{{ button.title }}" aria-label="{{ button.title }}">
+                        <a href="{{ button.url }}"
+                           class="btn btn-sm btn-{{ button.color|default:'outline text-primary' }} lh-1 px-2"
+                           title="{{ button.title }}"
+                           aria-label="{{ button.title }}">
                           <i class="{{ button.icon_class }}" aria-hidden="true"></i>
                         </a>
                       {% endfor %}

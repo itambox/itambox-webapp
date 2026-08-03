@@ -3,159 +3,183 @@
 {% load render_table from django_tables2 %}
 {% load static %}
 {% load utility_tags %}
-
 {# --- Page Title --- #}
 {% block title %}{{ object.name }} {% translate "- Category Details - ITAMbox" %}{% endblock %}
-
 {# --- Page Header --- #}
-{% block page_pretitle %}{% translate "Assets / Categories" %}{% endblock %}
-
+{% block page_pretitle %}
+  {% translate "Assets / Categories" %}
+{% endblock %}
 {# --- Tabs Hook --- #}
 {% block extra_tabs %}
-    <li class="nav-item" role="presentation">
-        <a href="?tab=asset-types" data-bs-target="#asset-types" class="nav-link {% if request.GET.tab == 'asset-types' %}active{% endif %}" data-bs-toggle="tab" hx-boost="false" role="tab">
-            <i class="mdi mdi-application-outline me-1 text-blue"></i>
-            {% translate "Asset Types" %} <span class="badge bg-blue-lt ms-2">{{ asset_types_table.rows|length }}</span>
-        </a>
-    </li>
-    <li class="nav-item" role="presentation">
-        <a href="?tab=components" data-bs-target="#components" class="nav-link {% if request.GET.tab == 'components' %}active{% endif %}" data-bs-toggle="tab" hx-boost="false" role="tab">
-            <i class="mdi mdi-cpu me-1 text-orange"></i>
-            {% translate "Components" %} <span class="badge bg-orange-lt ms-2">{{ components_table.rows|length }}</span>
-        </a>
-    </li>
-    <li class="nav-item" role="presentation">
-        <a href="?tab=accessories" data-bs-target="#accessories" class="nav-link {% if request.GET.tab == 'accessories' %}active{% endif %}" data-bs-toggle="tab" hx-boost="false" role="tab">
-            <i class="mdi mdi-cog-outline me-1 text-purple"></i>
-            {% translate "Accessories" %} <span class="badge bg-purple-lt ms-2">{{ accessories_table.rows|length }}</span>
-        </a>
-    </li>
-    <li class="nav-item" role="presentation">
-        <a href="?tab=consumables" data-bs-target="#consumables" class="nav-link {% if request.GET.tab == 'consumables' %}active{% endif %}" data-bs-toggle="tab" hx-boost="false" role="tab">
-            <i class="mdi mdi-layers-outline me-1 text-yellow"></i>
-            {% translate "Consumables" %} <span class="badge bg-yellow-lt ms-2">{{ consumables_table.rows|length }}</span>
-        </a>
-    </li>
-    <li class="nav-item" role="presentation">
-        <a href="?tab=custody-policies" data-bs-target="#custody-policies" class="nav-link {% if request.GET.tab == 'custody-policies' %}active{% endif %}" data-bs-toggle="tab" hx-boost="false" role="tab">
-            <i class="mdi mdi-hand-heart-outline me-1 text-green"></i>
-            {% translate "Custody EULAs &amp; Policies" %} <span class="badge bg-green-lt ms-2">{{ custody_templates|length }}</span>
-        </a>
-    </li>
+  <li class="nav-item" role="presentation">
+    <a href="?tab=asset-types"
+       data-bs-target="#asset-types"
+       class="nav-link {% if request.GET.tab == 'asset-types' %}active{% endif %}"
+       data-bs-toggle="tab"
+       hx-boost="false"
+       role="tab">
+      <i class="mdi mdi-application-outline me-1 text-blue"></i>
+      {% translate "Asset Types" %} <span class="badge bg-blue-lt ms-2">{{ asset_types_table.rows|length }}</span>
+    </a>
+  </li>
+  <li class="nav-item" role="presentation">
+    <a href="?tab=components"
+       data-bs-target="#components"
+       class="nav-link {% if request.GET.tab == 'components' %}active{% endif %}"
+       data-bs-toggle="tab"
+       hx-boost="false"
+       role="tab">
+      <i class="mdi mdi-cpu me-1 text-orange"></i>
+      {% translate "Components" %} <span class="badge bg-orange-lt ms-2">{{ components_table.rows|length }}</span>
+    </a>
+  </li>
+  <li class="nav-item" role="presentation">
+    <a href="?tab=accessories"
+       data-bs-target="#accessories"
+       class="nav-link {% if request.GET.tab == 'accessories' %}active{% endif %}"
+       data-bs-toggle="tab"
+       hx-boost="false"
+       role="tab">
+      <i class="mdi mdi-cog-outline me-1 text-purple"></i>
+      {% translate "Accessories" %} <span class="badge bg-purple-lt ms-2">{{ accessories_table.rows|length }}</span>
+    </a>
+  </li>
+  <li class="nav-item" role="presentation">
+    <a href="?tab=consumables"
+       data-bs-target="#consumables"
+       class="nav-link {% if request.GET.tab == 'consumables' %}active{% endif %}"
+       data-bs-toggle="tab"
+       hx-boost="false"
+       role="tab">
+      <i class="mdi mdi-layers-outline me-1 text-yellow"></i>
+      {% translate "Consumables" %} <span class="badge bg-yellow-lt ms-2">{{ consumables_table.rows|length }}</span>
+    </a>
+  </li>
+  <li class="nav-item" role="presentation">
+    <a href="?tab=custody-policies"
+       data-bs-target="#custody-policies"
+       class="nav-link {% if request.GET.tab == 'custody-policies' %}active{% endif %}"
+       data-bs-toggle="tab"
+       hx-boost="false"
+       role="tab">
+      <i class="mdi mdi-hand-heart-outline me-1 text-green"></i>
+      {% translate "Custody EULAs &amp; Policies" %} <span class="badge bg-green-lt ms-2">{{ custody_templates|length }}</span>
+    </a>
+  </li>
 {% endblock extra_tabs %}
-
 {# Sidebar elements #}
 {% block related_objects %}
 {% endblock related_objects %}
-
 {# --- Extra Tab Panes --- #}
 {% block extra_tab_panes %}
-    {# Asset Types Tab Pane #}
-    {% blocktranslate with name=object.name asvar t_types %}Asset Types / Models Categorized under {{ name }}{% endblocktranslate %}
-    {% translate "No asset types or models categorized under this section yet." as e_types %}
-    {% include 'generic/includes/related_table_tab.html' with tab="asset-types" table=asset_types_table title=t_types empty=e_types icon="mdi mdi-cog-outline" %}
-
-    {# Accessories Tab Pane #}
-    {% blocktranslate with name=object.name asvar t_accessories %}Accessories Monitored under {{ name }}{% endblocktranslate %}
-    {% translate "No accessories registered under this notification category yet." as e_accessories %}
-    {% include 'generic/includes/related_table_tab.html' with tab="accessories" table=accessories_table title=t_accessories empty=e_accessories icon="mdi mdi-puzzle-outline" %}
-
-    {# Components Tab Pane #}
-    {% blocktranslate with name=object.name asvar t_components %}Components Scoped under {{ name }}{% endblocktranslate %}
-    {% translate "No components registered under this category yet." as e_components %}
-    {% include 'generic/includes/related_table_tab.html' with tab="components" table=components_table title=t_components empty=e_components %}
-
-    {# Consumables Tab Pane #}
-    {% blocktranslate with name=object.name asvar t_consumables %}Consumables Scoped under {{ name }}{% endblocktranslate %}
-    {% translate "No consumables registered under this category yet." as e_consumables %}
-    {% include 'generic/includes/related_table_tab.html' with tab="consumables" table=consumables_table title=t_consumables empty=e_consumables %}
-
-    {# Custody EULAs & Policies Tab Pane #}
-    <div class="tab-pane fade {% if request.GET.tab == 'custody-policies' %}show active{% endif %}" id="custody-policies" role="tabpanel">
-        <div class="card border-0 shadow-sm">
-            <div class="card-header border-0 bg-transparent d-flex align-items-center justify-content-between">
-                <h3 class="card-title">{% translate "Tenant-Scoped Custody Policies &amp; EULAs" %}</h3>
-                <a href="{% url 'compliance:custodytemplate_create' %}?category={{ object.pk }}" class="btn btn-primary btn-sm">
-                    <i class="mdi mdi-plus me-1"></i>
-                    {% translate "Add Custody Policy" %}
-                </a>
-            </div>
-            {% if custody_templates %}
-                <div class="table-responsive">
-                    <table class="table table-vcenter card-table table-hover table-striped">
-                        <thead>
-                            <tr>
-                                <th>{% translate "Policy / EULA Name" %}</th>
-                                <th>{% translate "Tenant / Scope" %}</th>
-                                <th>{% translate "Require Acceptance" %}</th>
-                                <th>{% translate "Email Signature Request" %}</th>
-                                <th>{% translate "Signature Provider" %}</th>
-                                <th>{% translate "QMS Reference" %}</th>
-                                <th class="w-1"></th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {% for temp in custody_templates %}
-                                <tr>
-                                    <td>
-                                        <a href="{% url 'compliance:custodytemplate_detail' pk=temp.pk %}" class="font-weight-bold text-reset">
-                                            {{ temp.name }}
-                                        </a>
-                                    </td>
-                                    <td>
-                                        {% if temp.tenant %}
-                                            <span class="badge bg-blue-lt">{{ temp.tenant.name }}</span>
-                                        {% elif temp.tenant_group %}
-                                            <span class="badge bg-purple-lt">{% blocktranslate with group=temp.tenant_group.name %}Group: {{ group }}{% endblocktranslate %}</span>
-                                        {% else %}
-                                            <span class="badge bg-secondary-lt">{% translate "Global Default" %}</span>
-                                        {% endif %}
-                                    </td>
-                                    <td>
-                                        {% if temp.require_acceptance %}
-                                            <span class="badge bg-red-lt">{% translate "Yes (Required)" %}</span>
-                                        {% else %}
-                                            <span class="badge bg-secondary-lt">{% translate "No (Optional)" %}</span>
-                                        {% endif %}
-                                    </td>
-                                    <td>
-                                        {% if temp.email_signature_request %}
-                                            <span class="badge bg-green-lt">{% translate "Enabled" %}</span>
-                                        {% else %}
-                                            <span class="badge bg-secondary-lt">{% translate "Disabled" %}</span>
-                                        {% endif %}
-                                    </td>
-                                    <td>
-                                        <span class="badge bg-blue-lt text-uppercase">{{ temp.signature_provider }}</span>
-                                    </td>
-                                    <td>
-                                        {% if temp.qms_reference %}
-                                            <code>{{ temp.qms_reference }}</code>
-                                        {% else %}
-                                            <span class="text-muted">—</span>
-                                        {% endif %}
-                                    </td>
-                                    <td>
-                                        <div class="btn-list flex-nowrap">
-                                            <a href="{% url 'compliance:custodytemplate_update' pk=temp.pk %}" class="btn btn-outline-secondary btn-icon btn-sm" title="{% translate 'Edit' %}">
-                                                <i class="mdi mdi-pencil-outline"></i>
-                                            </a>
-                                            <a href="{% url 'compliance:custodytemplate_delete' pk=temp.pk %}" class="btn btn-outline-danger btn-icon btn-sm" title="{% translate 'Delete' %}">
-                                                <i class="mdi mdi-trash-can-outline"></i>
-                                            </a>
-                                        </div>
-                                    </td>
-                                </tr>
-                            {% endfor %}
-                        </tbody>
-                    </table>
-                </div>
-            {% else %}
-                <div class="card-body py-5 text-muted text-center">
-                    <i class="mdi mdi-hand-heart-outline fs-1 mb-3 text-muted"></i>
-                    <p class="mb-0">{% translate "No custody policies or templates are currently registered for this category." %}</p>
-                </div>
-            {% endif %}
+  {# Asset Types Tab Pane #}
+  {% blocktranslate with name=object.name asvar t_types %}Asset Types / Models Categorized under {{ name }}{% endblocktranslate %}
+  {% translate "No asset types or models categorized under this section yet." as e_types %}
+  {% include 'generic/includes/related_table_tab.html' with tab="asset-types" table=asset_types_table title=t_types empty=e_types icon="mdi mdi-cog-outline" %}
+  {# Accessories Tab Pane #}
+  {% blocktranslate with name=object.name asvar t_accessories %}Accessories Monitored under {{ name }}{% endblocktranslate %}
+  {% translate "No accessories registered under this notification category yet." as e_accessories %}
+  {% include 'generic/includes/related_table_tab.html' with tab="accessories" table=accessories_table title=t_accessories empty=e_accessories icon="mdi mdi-puzzle-outline" %}
+  {# Components Tab Pane #}
+  {% blocktranslate with name=object.name asvar t_components %}Components Scoped under {{ name }}{% endblocktranslate %}
+  {% translate "No components registered under this category yet." as e_components %}
+  {% include 'generic/includes/related_table_tab.html' with tab="components" table=components_table title=t_components empty=e_components %}
+  {# Consumables Tab Pane #}
+  {% blocktranslate with name=object.name asvar t_consumables %}Consumables Scoped under {{ name }}{% endblocktranslate %}
+  {% translate "No consumables registered under this category yet." as e_consumables %}
+  {% include 'generic/includes/related_table_tab.html' with tab="consumables" table=consumables_table title=t_consumables empty=e_consumables %}
+  {# Custody EULAs & Policies Tab Pane #}
+  <div class="tab-pane fade {% if request.GET.tab == 'custody-policies' %}show active{% endif %}"
+       id="custody-policies"
+       role="tabpanel">
+    <div class="card border-0 shadow-sm">
+      <div class="card-header border-0 bg-transparent d-flex align-items-center justify-content-between">
+        <h3 class="card-title">{% translate "Tenant-Scoped Custody Policies &amp; EULAs" %}</h3>
+        <a href="{% url 'compliance:custodytemplate_create' %}?category={{ object.pk }}"
+           class="btn btn-primary btn-sm">
+          <i class="mdi mdi-plus me-1"></i>
+          {% translate "Add Custody Policy" %}
+        </a>
+      </div>
+      {% if custody_templates %}
+        <div class="table-responsive">
+          <table class="table table-vcenter card-table table-hover table-striped">
+            <thead>
+              <tr>
+                <th>{% translate "Policy / EULA Name" %}</th>
+                <th>{% translate "Tenant / Scope" %}</th>
+                <th>{% translate "Require Acceptance" %}</th>
+                <th>{% translate "Email Signature Request" %}</th>
+                <th>{% translate "Signature Provider" %}</th>
+                <th>{% translate "QMS Reference" %}</th>
+                <th class="w-1"></th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for temp in custody_templates %}
+                <tr>
+                  <td>
+                    <a href="{% url 'compliance:custodytemplate_detail' pk=temp.pk %}"
+                       class="font-weight-bold text-reset">{{ temp.name }}</a>
+                  </td>
+                  <td>
+                    {% if temp.tenant %}
+                      <span class="badge bg-blue-lt">{{ temp.tenant.name }}</span>
+                    {% elif temp.tenant_group %}
+                      <span class="badge bg-purple-lt">{% blocktranslate with group=temp.tenant_group.name %}Group: {{ group }}{% endblocktranslate %}</span>
+                    {% else %}
+                      <span class="badge bg-secondary-lt">{% translate "Global Default" %}</span>
+                    {% endif %}
+                  </td>
+                  <td>
+                    {% if temp.require_acceptance %}
+                      <span class="badge bg-red-lt">{% translate "Yes (Required)" %}</span>
+                    {% else %}
+                      <span class="badge bg-secondary-lt">{% translate "No (Optional)" %}</span>
+                    {% endif %}
+                  </td>
+                  <td>
+                    {% if temp.email_signature_request %}
+                      <span class="badge bg-green-lt">{% translate "Enabled" %}</span>
+                    {% else %}
+                      <span class="badge bg-secondary-lt">{% translate "Disabled" %}</span>
+                    {% endif %}
+                  </td>
+                  <td>
+                    <span class="badge bg-blue-lt text-uppercase">{{ temp.signature_provider }}</span>
+                  </td>
+                  <td>
+                    {% if temp.qms_reference %}
+                      <code>{{ temp.qms_reference }}</code>
+                    {% else %}
+                      <span class="text-muted">—</span>
+                    {% endif %}
+                  </td>
+                  <td>
+                    <div class="btn-list flex-nowrap">
+                      <a href="{% url 'compliance:custodytemplate_update' pk=temp.pk %}"
+                         class="btn btn-outline-secondary btn-icon btn-sm"
+                         title="{% translate 'Edit' %}">
+                        <i class="mdi mdi-pencil-outline"></i>
+                      </a>
+                      <a href="{% url 'compliance:custodytemplate_delete' pk=temp.pk %}"
+                         class="btn btn-outline-danger btn-icon btn-sm"
+                         title="{% translate 'Delete' %}">
+                        <i class="mdi mdi-trash-can-outline"></i>
+                      </a>
+                    </div>
+                  </td>
+                </tr>
+              {% endfor %}
+            </tbody>
+          </table>
         </div>
+      {% else %}
+        <div class="card-body py-5 text-muted text-center">
+          <i class="mdi mdi-hand-heart-outline fs-1 mb-3 text-muted"></i>
+          <p class="mb-0">{% translate "No custody policies or templates are currently registered for this category." %}</p>
+        </div>
+      {% endif %}
     </div>
+  </div>
 {% endblock extra_tab_panes %}

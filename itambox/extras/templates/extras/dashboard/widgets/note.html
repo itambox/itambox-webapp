@@ -1,9 +1,9 @@
 {% load i18n %}
 {% if content_html %}
-<div class="markdown small widget-note-content">{{ content_html }}</div>
+  <div class="markdown small widget-note-content">{{ content_html }}</div>
 {% else %}
-<div class="text-muted text-center py-3">
+  <div class="text-muted text-center py-3">
     <i class="mdi mdi-note-text-outline mb-2"></i>
     <p class="small">{% translate 'No content yet. Click the gear icon to add notes.' %}</p>
-</div>
+  </div>
 {% endif %}

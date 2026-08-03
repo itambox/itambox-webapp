@@ -1,5 +1,5 @@
 {% load i18n %}
 {% translate "Active Assignments" as l_assign %}
 <div class="row g-3 mb-4">
-    {% include "generic/includes/stat_card.html" with col="col-12" color="purple" icon="mdi mdi-link-variant" label=l_assign value=assignments_table.rows|length %}
+  {% include "generic/includes/stat_card.html" with col="col-12" color="purple" icon="mdi mdi-link-variant" label=l_assign value=assignments_table.rows|length %}
 </div>

@@ -1,26 +1,20 @@
 {% extends 'generic/object_detail.html' %}
 {% load i18n %}
 {% load render_table from django_tables2 %}
-
 {# Object details rendered via panel layout #}
-
 {# Add the Sites table and Children table to the full_width_content block #}
 {% block full_width_content %}
-    {% if sites_table %}
+  {% if sites_table %}
     <div class="card mb-4">
-        <div class="card-header"><h3 class="card-title">{% translate "Sites in this Region (" %}{{ sites_table.rows|length }})</h3></div>
-        <div class="table-responsive">
-            {% render_table sites_table %}
-        </div>
-        {# Optional: Add pagination if needed later #}
+      <div class="card-header"><h3 class="card-title">{% translate "Sites in this Region (" %}{{ sites_table.rows|length }})</h3></div>
+      <div class="table-responsive">{% render_table sites_table %}</div>
+      {# Optional: Add pagination if needed later #}
     </div>
-    {% endif %}
-    {% if children_table and children_table.rows %}
+  {% endif %}
+  {% if children_table and children_table.rows %}
     <div class="card mb-4">
-        <div class="card-header"><h3 class="card-title">{% translate "Child Regions (" %}{{ children_table.rows|length }})</h3></div>
-        <div class="table-responsive">
-            {% render_table children_table %}
-        </div>
+      <div class="card-header"><h3 class="card-title">{% translate "Child Regions (" %}{{ children_table.rows|length }})</h3></div>
+      <div class="table-responsive">{% render_table children_table %}</div>
     </div>
-    {% endif %}
+  {% endif %}
 {% endblock full_width_content %}

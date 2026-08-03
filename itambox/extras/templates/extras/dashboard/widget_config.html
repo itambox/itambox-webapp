@@ -1,67 +1,74 @@
 {% load i18n %}
-<form method="post" action="{% url 'extras:dashboard_widget_config' dashboard_id=dashboard_id index=index %}" hx-post="{% url 'extras:dashboard_widget_config' dashboard_id=dashboard_id index=index %}" hx-target="#dashboard-modal-content">
-    {% csrf_token %}
-    <div class="modal-header">
-        <h5 class="modal-title">{% translate "Configure Widget" %}: {{ config.title }}</h5>
-        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="{% translate 'Close' %}"></button>
+<form method="post"
+      action="{% url 'extras:dashboard_widget_config' dashboard_id=dashboard_id index=index %}"
+      hx-post="{% url 'extras:dashboard_widget_config' dashboard_id=dashboard_id index=index %}"
+      hx-target="#dashboard-modal-content">
+  {% csrf_token %}
+  <div class="modal-header">
+    <h5 class="modal-title">{% translate "Configure Widget" %}: {{ config.title }}</h5>
+    <button type="button"
+            class="btn-close"
+            data-bs-dismiss="modal"
+            aria-label="{% translate 'Close' %}"></button>
+  </div>
+  <div class="modal-body">
+    <div class="mb-3">
+      <label class="form-label" for="{{ form.title.id_for_label }}">{% translate "Title" %}</label>
+      {{ form.title }}
     </div>
-    <div class="modal-body">
+    <div class="mb-3">
+      <div class="form-check form-switch">
+        {{ form.visible }}
+        <label class="form-check-label" for="{{ form.visible.id_for_label }}">{% translate "Visible" %}</label>
+      </div>
+    </div>
+    <div class="mb-3">
+      <label class="form-label" for="{{ form.style.id_for_label }}">{% translate "Header Color Style" %}</label>
+      {{ form.style }}
+    </div>
+    {% if widget_config_form and widget_config_form.fields %}
+      <hr class="my-3">
+      <h6 class="mb-3">{% translate "Widget Settings" %}</h6>
+      {% for field in widget_config_form %}
         <div class="mb-3">
-            <label class="form-label" for="{{ form.title.id_for_label }}">{% translate "Title" %}</label>
-            {{ form.title }}
-        </div>
-        <div class="mb-3">
-            <div class="form-check form-switch">
-                {{ form.visible }}
-                <label class="form-check-label" for="{{ form.visible.id_for_label }}">{% translate "Visible" %}</label>
+          {% if field.field.widget.input_type == 'checkbox' and field.field.widget.allow_multiple_selected %}
+            {# Any CheckboxSelectMultiple renders as a checkbox grid #}
+            <label class="form-label">{{ field.label }}</label>
+            <div class="row g-2">
+              {% for checkbox in field %}
+                <div class="col-6 col-md-4">
+                  <div class="form-check">
+                    {{ checkbox.tag }}
+                    <label class="form-check-label text-truncate"
+                           for="{{ checkbox.id_for_label }}"
+                           title="{{ checkbox.choice_label }}">{{ checkbox.choice_label }}</label>
+                  </div>
+                </div>
+              {% endfor %}
             </div>
-        </div>
-        <div class="mb-3">
-            <label class="form-label" for="{{ form.style.id_for_label }}">{% translate "Header Color Style" %}</label>
-            {{ form.style }}
-        </div>
-
-        {% if widget_config_form and widget_config_form.fields %}
-        <hr class="my-3">
-        <h6 class="mb-3">{% translate "Widget Settings" %}</h6>
-        {% for field in widget_config_form %}
-        <div class="mb-3">
-            {% if field.field.widget.input_type == 'checkbox' and field.field.widget.allow_multiple_selected %}
-                {# Any CheckboxSelectMultiple renders as a checkbox grid #}
-                <label class="form-label">{{ field.label }}</label>
-                <div class="row g-2">
-                    {% for checkbox in field %}
-                    <div class="col-6 col-md-4">
-                        <div class="form-check">
-                            {{ checkbox.tag }}
-                            <label class="form-check-label text-truncate" for="{{ checkbox.id_for_label }}" title="{{ checkbox.choice_label }}">
-                                {{ checkbox.choice_label }}
-                            </label>
-                        </div>
-                    </div>
-                    {% endfor %}
-                </div>
-            {% elif field.field.widget.input_type == 'checkbox' %}
-                <div class="form-check form-switch pt-2">
-                    {{ field }}
-                    <label class="form-check-label fw-semibold" for="{{ field.id_for_label }}">{{ field.label }}</label>
-                </div>
-            {% else %}
-                <label class="form-label" for="{{ field.id_for_label }}">{{ field.label }}</label>
-                {{ field }}
-            {% endif %}
-            {% if field.help_text %}
+          {% elif field.field.widget.input_type == 'checkbox' %}
+            <div class="form-check form-switch pt-2">
+              {{ field }}
+              <label class="form-check-label fw-semibold" for="{{ field.id_for_label }}">{{ field.label }}</label>
+            </div>
+          {% else %}
+            <label class="form-label" for="{{ field.id_for_label }}">{{ field.label }}</label>
+            {{ field }}
+          {% endif %}
+          {% if field.help_text %}
             <div class="form-text mt-1">{{ field.help_text }}</div>
-            {% endif %}
-            {% if field.errors %}
+          {% endif %}
+          {% if field.errors %}
             <div class="invalid-feedback d-block">{{ field.errors|join:", " }}</div>
-            {% endif %}
+          {% endif %}
         </div>
-        {% endfor %}
-        {% endif %}
-    </div>
-    <div class="modal-footer">
-        <button type="button" class="btn btn-link link-secondary" data-bs-dismiss="modal">{% translate "Cancel" %}</button>
-        <button type="submit" class="btn btn-primary ms-auto">{% translate "Save" %}</button>
-    </div>
+      {% endfor %}
+    {% endif %}
+  </div>
+  <div class="modal-footer">
+    <button type="button"
+            class="btn btn-link link-secondary"
+            data-bs-dismiss="modal">{% translate "Cancel" %}</button>
+    <button type="submit" class="btn btn-primary ms-auto">{% translate "Save" %}</button>
+  </div>
 </form>

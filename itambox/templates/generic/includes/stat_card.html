@@ -19,19 +19,19 @@ Translate labels/values at the call site (translate "…" as foo) so they
 remain extractable, then pass label=foo / value=foo.
 {% endcomment %}
 <div class="{{ col|default:'col-sm-6' }}">
-    <div class="card card-sm bg-{{ color|default:'blue' }}-lt border-0 shadow-none">
-        <div class="card-body{% if compact %} p-2{% endif %}">
-            <div class="row align-items-center">
-                <div class="col-auto">
-                    <span class="bg-{{ color|default:'blue' }} text-white avatar{% if compact %}-sm{% endif %} rounded shadow-sm">
-                        <i class="{{ icon|default:'mdi mdi-chart-box-outline' }}"></i>
-                    </span>
-                </div>
-                <div class="col">
-                    <div class="font-weight-medium text-{{ color|default:'blue' }} small uppercase font-sans">{{ label }}</div>
-                    <div class="text-{{ color|default:'blue' }} {{ size|default:'h1' }} mb-0 font-weight-bold">{{ value }}</div>
-                </div>
-            </div>
+  <div class="card card-sm bg-{{ color|default:'blue' }}-lt border-0 shadow-none">
+    <div class="card-body{% if compact %} p-2{% endif %}">
+      <div class="row align-items-center">
+        <div class="col-auto">
+          <span class="bg-{{ color|default:'blue' }} text-white avatar{% if compact %}-sm{% endif %} rounded shadow-sm">
+            <i class="{{ icon|default:'mdi mdi-chart-box-outline' }}"></i>
+          </span>
         </div>
+        <div class="col">
+          <div class="font-weight-medium text-{{ color|default:'blue' }} small uppercase font-sans">{{ label }}</div>
+          <div class="text-{{ color|default:'blue' }} {{ size|default:'h1' }} mb-0 font-weight-bold">{{ value }}</div>
+        </div>
+      </div>
     </div>
+  </div>
 </div>

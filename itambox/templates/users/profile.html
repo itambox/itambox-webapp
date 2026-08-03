@@ -2,78 +2,77 @@
 {% load i18n %}
 {% load crispy_forms_tags %}
 {% load render_table from django_tables2 %}
-
-{% block title_tab %}{% translate "Profile" %}{% endblock %}
-
+{% block title_tab %}
+  {% translate "Profile" %}
+{% endblock %}
 {% block content_tab %}
-<div class="row row-cards"> {# Row for top two cards #}
+  <div class="row row-cards">
+    {# Row for top two cards #}
     {# Profile Form Card #}
     <div class="col-md-6">
-        <div class="card">
-            <div class="card-header">
-                <h3 class="card-title">{% translate "Profile" %}</h3>
-            </div>
-            <div class="card-body">
-                <form method="post">
-                    {% csrf_token %}
-                    {{ form|crispy }}
-                    <div class="text-end mt-4">
-                        <button type="submit" class="btn btn-primary">{% translate "Save Changes" %}</button>
-                    </div>
-                </form>
-            </div>
+      <div class="card">
+        <div class="card-header">
+          <h3 class="card-title">{% translate "Profile" %}</h3>
         </div>
+        <div class="card-body">
+          <form method="post">
+            {% csrf_token %}
+            {{ form|crispy }}
+            <div class="text-end mt-4">
+              <button type="submit" class="btn btn-primary">{% translate "Save Changes" %}</button>
+            </div>
+          </form>
+        </div>
+      </div>
     </div>
-
     {# Tenant Memberships Card #}
     <div class="col-md-6">
-        <div class="card">
-            <div class="card-header">
-                <h3 class="card-title">{% translate "Tenant Memberships" %}</h3>
-            </div>
-            <div class="card-body">
-                {% if user_memberships %}
-                    <ul class="list-unstyled">
-                        {% for membership in user_memberships %}
-                            <li>
-                                <i class="mdi mdi-domain me-1"></i> <strong>{{ membership.tenant.name }}</strong>
-                                {% with grants=membership.role_grants.all %}
-                                {% if grants %}
-                                ({% for grant in grants %}{{ grant.role.name }}{% if not forloop.last %}, {% endif %}{% endfor %})
-                                {% else %}
-                                <span class="text-muted small">({% translate "no roles" %})</span>
-                                {% endif %}
-                                {% endwith %}
-                            </li>
-                        {% endfor %}
-                    </ul>
-                {% else %}
-                    <p class="text-muted">{% translate "User has no active tenant memberships." %}</p>
-                {% endif %}
-            </div>
+      <div class="card">
+        <div class="card-header">
+          <h3 class="card-title">{% translate "Tenant Memberships" %}</h3>
         </div>
+        <div class="card-body">
+          {% if user_memberships %}
+            <ul class="list-unstyled">
+              {% for membership in user_memberships %}
+                <li>
+                  <i class="mdi mdi-domain me-1"></i> <strong>{{ membership.tenant.name }}</strong>
+                  {% with grants=membership.role_grants.all %}
+                    {% if grants %}
+                      ({% for grant in grants %}{{ grant.role.name }}{% if not forloop.last %}, {% endif %}{% endfor %})
+                    {% else %}
+                      <span class="text-muted small">({% translate "no roles" %})</span>
+                    {% endif %}
+                  {% endwith %}
+                </li>
+              {% endfor %}
+            </ul>
+          {% else %}
+            <p class="text-muted">{% translate "User has no active tenant memberships." %}</p>
+          {% endif %}
+        </div>
+      </div>
     </div>
-</div> {# End row for top two cards #}
-
-{# Separate Card for Recent Activity (Below) #}
-<div class="card mt-4">
+  </div>
+  {# End row for top two cards #}
+  {# Separate Card for Recent Activity (Below) #}
+  <div class="card mt-4">
     <div class="card-header">
-        <h3 class="card-title">{% translate "Recent Activity" %}</h3>
+      <h3 class="card-title">{% translate "Recent Activity" %}</h3>
     </div>
     <div class="card-body p-0">
-        <div class="table-responsive">
-            {# Ensure activity_table exists in context #}
-            {% if activity_table %}
-                {% render_table activity_table %}
-            {% else %}
-                <div class="text-center p-4 text-muted">{% translate "No activity data available." %}</div>
-            {% endif %}
-        </div>
+      <div class="table-responsive">
+        {# Ensure activity_table exists in context #}
+        {% if activity_table %}
+          {% render_table activity_table %}
+        {% else %}
+          <div class="text-center p-4 text-muted">{% translate "No activity data available." %}</div>
+        {% endif %}
+      </div>
     </div>
     <div class="card-footer text-center">
-        <a href="{% url 'objectchange_list' %}?user={{ request.user.pk }}" class="btn btn-sm btn-outline-secondary">
-            {% translate "View All Activity" %}
-        </a>
+      <a href="{% url 'objectchange_list' %}?user={{ request.user.pk }}"
+         class="btn btn-sm btn-outline-secondary">{% translate "View All Activity" %}</a>
     </div>
-</div>
+  </div>
 {% endblock %}

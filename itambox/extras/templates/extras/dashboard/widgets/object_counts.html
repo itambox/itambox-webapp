@@ -1,23 +1,23 @@
 {% load i18n %}
 {% if has_data %}
-<div class="widget-count-list">
+  <div class="widget-count-list">
     {% for item in counts %}
-    {% if item.url %}
-    <a href="{{ item.url }}" class="widget-count-row">
-        <span class="widget-count-label">{{ item.label }}</span>
-        <span class="widget-count-value">{{ item.count }}</span>
-    </a>
-    {% else %}
-    <div class="widget-count-row">
-        <span class="widget-count-label">{{ item.label }}</span>
-        <span class="widget-count-value">{{ item.count }}</span>
-    </div>
-    {% endif %}
+      {% if item.url %}
+        <a href="{{ item.url }}" class="widget-count-row">
+          <span class="widget-count-label">{{ item.label }}</span>
+          <span class="widget-count-value">{{ item.count }}</span>
+        </a>
+      {% else %}
+        <div class="widget-count-row">
+          <span class="widget-count-label">{{ item.label }}</span>
+          <span class="widget-count-value">{{ item.count }}</span>
+        </div>
+      {% endif %}
     {% endfor %}
-</div>
+  </div>
 {% else %}
-<div class="text-muted text-center py-3">
+  <div class="text-muted text-center py-3">
     <i class="mdi mdi-chart-bar mb-2"></i>
     <p class="small">{% translate 'Configure this widget to select which object types to count.' %}</p>
-</div>
+  </div>
 {% endif %}

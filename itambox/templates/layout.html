@@ -3,223 +3,282 @@
 {% load i18n %}
 {% load utility_tags %}
 {% load navigation %}
-
 {% block layout %}
-<div class="page">
+  <div class="page">
     {# Sidebar #}
     <aside class="navbar navbar-vertical navbar-expand-lg">
-        <div class="container-fluid">
-            <button class="navbar-toggler" type="button" data-bs-toggle="offcanvas" data-bs-target="#sidebar-menu" aria-controls="sidebar-menu" aria-expanded="false" aria-label="{% translate 'Toggle navigation' %}">
-                <span class="navbar-toggler-icon"></span>
-            </button>
-            <h1 class="navbar-brand">
-                 <a href="{% url 'dashboard' %}" class="d-flex align-items-center">
-                      {% with brand_height="36px" %}{% include "global_includes/_brand_lockup.html" %}{% endwith %}
-                 </a>
-            </h1>
-
-            <!-- Mobile Unified Actions Header (visible on mobile only) -->
-            <div class="d-flex d-lg-none align-items-center gap-2 ms-auto me-2">
-                {# Language selection moved to user Preferences (applies app-wide). #}
-
-                {# Mobile Theme Switcher #}
-                <button class="nav-link px-0 color-mode-toggle hide-theme-dark" title="{% translate 'Enable dark mode' %}">
-                    <i class="mdi mdi-weather-night"></i>
-                </button>
-                <button class="nav-link px-0 color-mode-toggle hide-theme-light" title="{% translate 'Enable light mode' %}">
-                    <i class="mdi mdi-weather-sunny"></i>
-                </button>
-
-                {# Mobile Notifications Dropdown — opens as a full-width panel on mobile #}
-                <div class="nav-item dropdown">
-                    <a href="#" class="nav-link px-0" data-bs-toggle="dropdown" data-bs-display="static" aria-label="{% translate 'Show notifications' %}">
-                        <i class="mdi mdi-bell-outline"></i>
-                        {% if unread_notifications_count > 0 %}
-                            <span class="badge bg-red"></span>
-                        {% endif %}
-                    </a>
-                    <div class="dropdown-menu dropdown-menu-end dropdown-menu-card mobile-fullwidth-dropdown">
-                        <div class="card">
-                            <div class="card-header py-2">
-                                <h3 class="card-title text-reset fs-6">{% translate "Unread Alerts (" %}{{ unread_notifications_count }})</h3>
-                            </div>
-                            <div class="list-group list-group-flush">
-                                {% if recent_unread_notifications %}
-                                    {% for notif in recent_unread_notifications %}
-                                        <a href="{% url 'users:view_notification' pk=notif.pk %}" class="list-group-item list-group-item-action py-2">
-                                            <div class="d-flex align-items-center">
-                                                <span class="status-dot status-dot-animated {% if notif.level == 'danger' %}bg-red{% elif notif.level == 'warning' %}bg-warning{% else %}bg-blue{% endif %} me-2"></span>
-                                                <div class="text-truncate" style="max-width: 180px;">{{ notif.subject }}</div>
-                                            </div>
-                                        </a>
-                                    {% endfor %}
-                                {% else %}
-                                    <div class="list-group-item text-muted text-center py-3">{% translate "No unread notifications" %}</div>
-                                {% endif %}
-                            </div>
-                            <div class="card-footer text-center py-2">
-                                <a href="{% url 'users:user_notifications' %}" class="small font-weight-bold">{% translate "View Notification Center" %}</a>
-                            </div>
-                        </div>
-                    </div>
+      <div class="container-fluid">
+        <button class="navbar-toggler"
+                type="button"
+                data-bs-toggle="offcanvas"
+                data-bs-target="#sidebar-menu"
+                aria-controls="sidebar-menu"
+                aria-expanded="false"
+                aria-label="{% translate 'Toggle navigation' %}">
+          <span class="navbar-toggler-icon"></span>
+        </button>
+        <h1 class="navbar-brand">
+          <a href="{% url 'dashboard' %}" class="d-flex align-items-center">
+            {% with brand_height="36px" %}
+              {% include "global_includes/_brand_lockup.html" %}
+            {% endwith %}
+          </a>
+        </h1>
+        <!-- Mobile Unified Actions Header (visible on mobile only) -->
+        <div class="d-flex d-lg-none align-items-center gap-2 ms-auto me-2">
+          {# Language selection moved to user Preferences (applies app-wide). #}
+          {# Mobile Theme Switcher #}
+          <button class="nav-link px-0 color-mode-toggle hide-theme-dark"
+                  title="{% translate 'Enable dark mode' %}">
+            <i class="mdi mdi-weather-night"></i>
+          </button>
+          <button class="nav-link px-0 color-mode-toggle hide-theme-light"
+                  title="{% translate 'Enable light mode' %}">
+            <i class="mdi mdi-weather-sunny"></i>
+          </button>
+          {# Mobile Notifications Dropdown — opens as a full-width panel on mobile #}
+          <div class="nav-item dropdown">
+            <a href="#"
+               class="nav-link px-0"
+               data-bs-toggle="dropdown"
+               data-bs-display="static"
+               aria-label="{% translate 'Show notifications' %}">
+              <i class="mdi mdi-bell-outline"></i>
+              {% if unread_notifications_count > 0 %}
+                <span class="badge bg-red"></span>
+              {% endif %}
+            </a>
+            <div class="dropdown-menu dropdown-menu-end dropdown-menu-card mobile-fullwidth-dropdown">
+              <div class="card">
+                <div class="card-header py-2">
+                  <h3 class="card-title text-reset fs-6">{% translate "Unread Alerts (" %}{{ unread_notifications_count }})</h3>
                 </div>
-
-                {# Mobile User Profile Dropdown #}
-                <div class="nav-item dropdown">
-                    <a href="#" class="nav-link d-flex align-items-center lh-1 text-reset p-0" data-bs-toggle="dropdown" aria-label="{% translate 'Open user menu' %}">
-                        <div class="ps-1 text-end" style="max-width: 96px;">
-                            <div class="fw-bold text-truncate small">{% if user.is_authenticated %}{{ user.get_full_name|default:user.username }}{% else %}{% translate "Guest" %}{% endif %}</div>
-                            <div class="text-muted text-truncate" style="font-size: 0.65rem;">{% if user.is_staff %}{% translate "Admin" %}{% elif user.is_authenticated %}{% translate "User" %}{% else %}{% translate "Not Logged In" %}{% endif %}</div>
+                <div class="list-group list-group-flush">
+                  {% if recent_unread_notifications %}
+                    {% for notif in recent_unread_notifications %}
+                      <a href="{% url 'users:view_notification' pk=notif.pk %}"
+                         class="list-group-item list-group-item-action py-2">
+                        <div class="d-flex align-items-center">
+                          <span class="status-dot status-dot-animated {% if notif.level == 'danger' %}bg-red{% elif notif.level == 'warning' %}bg-warning{% else %}bg-blue{% endif %} me-2"></span>
+                          <div class="text-truncate" style="max-width: 180px;">{{ notif.subject }}</div>
                         </div>
-                    </a>
-                    <div class="dropdown-menu dropdown-menu-end dropdown-menu-arrow">
-                        {% if user.is_authenticated %}
-                            <div class="dropdown-header text-muted">{% translate "Signed in as" %} <strong class="text-reset">{{ user.get_full_name|default:user.username }}</strong></div>
-                            <a href="{% url 'users:user_profile' %}" class="dropdown-item">{% translate "Profile" %}</a>
-                            <a href="{% url 'users:user_preferences' %}" class="dropdown-item">{% translate "Preferences" %}</a>
-                            <div class="dropdown-divider"></div>
-                            <form action="{% url 'logout' %}" method="post" class="w-100" hx-boost="false">
-                                {% csrf_token %}
-                                <button type="submit" class="dropdown-item">{% translate "Logout" %}</button>
-                            </form>
-                        {% else %}
-                            <a href="{% url 'login' %}" class="dropdown-item">{% translate "Login" %}</a>
-                        {% endif %}
-                    </div>
+                      </a>
+                    {% endfor %}
+                  {% else %}
+                    <div class="list-group-item text-muted text-center py-3">{% translate "No unread notifications" %}</div>
+                  {% endif %}
                 </div>
+                <div class="card-footer text-center py-2">
+                  <a href="{% url 'users:user_notifications' %}"
+                     class="small font-weight-bold">{% translate "View Notification Center" %}</a>
+                </div>
+              </div>
             </div>
-
-            <div class="offcanvas-lg offcanvas-start" tabindex="-1" id="sidebar-menu" aria-labelledby="sidebar-menu-label">
-                <div class="offcanvas-header d-flex d-lg-none align-items-center justify-content-between px-3 py-2 border-bottom">
-                    <h5 class="offcanvas-title font-weight-bold mb-0" id="sidebar-menu-label">{% translate "Menu" %}</h5>
-                    <button type="button" class="btn-close text-reset" data-bs-dismiss="offcanvas" data-bs-target="#sidebar-menu" aria-label="{% translate 'Close' %}"></button>
+          </div>
+          {# Mobile User Profile Dropdown #}
+          <div class="nav-item dropdown">
+            <a href="#"
+               class="nav-link d-flex align-items-center lh-1 text-reset p-0"
+               data-bs-toggle="dropdown"
+               aria-label="{% translate 'Open user menu' %}">
+              <div class="ps-1 text-end" style="max-width: 96px;">
+                <div class="fw-bold text-truncate small">{% if user.is_authenticated %}{{ user.get_full_name|default:user.username }}{% else %}{% translate "Guest" %}{% endif %}</div>
+                <div class="text-muted text-truncate" style="font-size: 0.65rem;">
+                  {% if user.is_staff %}
+                    {% translate "Admin" %}
+                  {% elif user.is_authenticated %}
+                    {% translate "User" %}
+                  {% else %}
+                    {% translate "Not Logged In" %}
+                  {% endif %}
                 </div>
-                <div class="offcanvas-body p-0 d-flex flex-column">
-                    {# Scrollable navigation area — search + menu #}
-                    <div class="flex-grow-1 overflow-auto">
-                        <!-- Mobile Quick Search (inside collapse menu) -->
-                        <div class="d-flex d-lg-none px-3 py-2 border-bottom mb-2 w-100">
-                            <form hx-get="{% url 'search' %}" hx-target="#page-content-wrapper" hx-push-url="true" autocomplete="off" class="w-100">
-                                <div class="input-icon">
-                                    <span class="input-icon-addon">
-                                        <i class="mdi mdi-magnify"></i>
-                                    </span>
-                                    <input type="text" name="q" value="{{ request.GET.q|default:'' }}" class="form-control" placeholder="{% translate 'Search…' %}" aria-label="{% translate 'Search' %}">
-                                </div>
-                            </form>
-                        </div>
-                        {% nav %}
-                    </div>
-
-                    {# Workspace/Tenant switcher: mobile drawer only; hidden on desktop where the top navbar provides it. #}
-                    {% if request.user.is_authenticated %}
-                    <div class="mobile-tenant-switcher-wrap border-top flex-shrink-0 d-lg-none">
-                        <a class="d-flex align-items-center justify-content-between px-3 py-3 text-reset text-decoration-none"
-                           data-bs-toggle="collapse" href="#mobile-tenant-switcher" role="button" aria-expanded="false" aria-controls="mobile-tenant-switcher">
-                            <span class="d-flex align-items-center gap-2 text-truncate">
-                                <i class="mdi mdi-briefcase-outline fs-3"></i>
-                                <span class="text-truncate">
-                                    {% if request.active_tenant %}{{ request.active_tenant.name }}{% elif request.active_tenant_group %}{{ request.active_tenant_group.name }} {% translate "(Group)" %}{% else %}{% translate "All Tenants" %}{% endif %}
-                                </span>
-                            </span>
-                            <i class="mdi mdi-unfold-more-horizontal text-muted"></i>
-                        </a>
-                        <div class="collapse" id="mobile-tenant-switcher">
-                            <div class="list-group list-group-flush list-group-hoverable border-top" style="max-height: 45vh; overflow-y: auto;">
-                                {% include 'global_includes/_tenant_switcher_list.html' %}
-                            </div>
-                        </div>
-                    </div>
-                    {% endif %}
-                </div>
+              </div>
+            </a>
+            <div class="dropdown-menu dropdown-menu-end dropdown-menu-arrow">
+              {% if user.is_authenticated %}
+                <div class="dropdown-header text-muted">{% translate "Signed in as" %} <strong class="text-reset">{{ user.get_full_name|default:user.username }}</strong></div>
+                <a href="{% url 'users:user_profile' %}" class="dropdown-item">{% translate "Profile" %}</a>
+                <a href="{% url 'users:user_preferences' %}" class="dropdown-item">{% translate "Preferences" %}</a>
+                <div class="dropdown-divider"></div>
+                <form action="{% url 'logout' %}"
+                      method="post"
+                      class="w-100"
+                      hx-boost="false">
+                  {% csrf_token %}
+                  <button type="submit" class="dropdown-item">{% translate "Logout" %}</button>
+                </form>
+              {% else %}
+                <a href="{% url 'login' %}" class="dropdown-item">{% translate "Login" %}</a>
+              {% endif %}
             </div>
+          </div>
         </div>
+        <div class="offcanvas-lg offcanvas-start"
+             tabindex="-1"
+             id="sidebar-menu"
+             aria-labelledby="sidebar-menu-label">
+          <div class="offcanvas-header d-flex d-lg-none align-items-center justify-content-between px-3 py-2 border-bottom">
+            <h5 class="offcanvas-title font-weight-bold mb-0" id="sidebar-menu-label">{% translate "Menu" %}</h5>
+            <button type="button"
+                    class="btn-close text-reset"
+                    data-bs-dismiss="offcanvas"
+                    data-bs-target="#sidebar-menu"
+                    aria-label="{% translate 'Close' %}"></button>
+          </div>
+          <div class="offcanvas-body p-0 d-flex flex-column">
+            {# Scrollable navigation area — search + menu #}
+            <div class="flex-grow-1 overflow-auto">
+              <!-- Mobile Quick Search (inside collapse menu) -->
+              <div class="d-flex d-lg-none px-3 py-2 border-bottom mb-2 w-100">
+                <form hx-get="{% url 'search' %}"
+                      hx-target="#page-content-wrapper"
+                      hx-push-url="true"
+                      autocomplete="off"
+                      class="w-100">
+                  <div class="input-icon">
+                    <span class="input-icon-addon">
+                      <i class="mdi mdi-magnify"></i>
+                    </span>
+                    <input type="text"
+                           name="q"
+                           value="{{ request.GET.q|default:'' }}"
+                           class="form-control"
+                           placeholder="{% translate 'Search…' %}"
+                           aria-label="{% translate 'Search' %}">
+                  </div>
+                </form>
+              </div>
+              {% nav %}
+            </div>
+            {# Workspace/Tenant switcher: mobile drawer only; hidden on desktop where the top navbar provides it. #}
+            {% if request.user.is_authenticated %}
+              <div class="mobile-tenant-switcher-wrap border-top flex-shrink-0 d-lg-none">
+                <a class="d-flex align-items-center justify-content-between px-3 py-3 text-reset text-decoration-none"
+                   data-bs-toggle="collapse"
+                   href="#mobile-tenant-switcher"
+                   role="button"
+                   aria-expanded="false"
+                   aria-controls="mobile-tenant-switcher">
+                  <span class="d-flex align-items-center gap-2 text-truncate">
+                    <i class="mdi mdi-briefcase-outline fs-3"></i>
+                    <span class="text-truncate">
+                      {% if request.active_tenant %}{{ request.active_tenant.name }}{% elif request.active_tenant_group %}{{ request.active_tenant_group.name }} {% translate "(Group)" %}{% else %}{% translate "All Tenants" %}{% endif %}
+                    </span>
+                  </span>
+                  <i class="mdi mdi-unfold-more-horizontal text-muted"></i>
+                </a>
+                <div class="collapse" id="mobile-tenant-switcher">
+                  <div class="list-group list-group-flush list-group-hoverable border-top"
+                       style="max-height: 45vh;
+                              overflow-y: auto">{% include 'global_includes/_tenant_switcher_list.html' %}</div>
+                </div>
+              </div>
+            {% endif %}
+          </div>
+        </div>
+      </div>
     </aside>
-
     <div class="page-wrapper">
-
-        <div id="page-content-wrapper" hx-history-elt>
-
-            <!-- Top Navbar -->
-            {% include "global_includes/_topbar.html" %}
-
-            <!-- Page header -->
-            <div class="page-header d-print-none">
-                <div class="container-fluid">
-                    <div id="breadcrumbs-block">
-                        {% include 'global_includes/_breadcrumbs.html' %}
-                    </div>
-                    <div class="row g-2 align-items-center mt-2">
-                        <div class="col">
-                            {% block page_header %}
-                            <div id="page-header-block">
-                                <div class="page-pretitle">
-                                    {% translate "Overview" %}
-                                </div>
-                                <h2 class="page-title">
-                                    {% translate "Dashboard" %}
-                                </h2>
-                            </div>
-                            {% endblock %}
-                        </div>
-                        <div class="col-auto ms-auto d-print-none">
-                            {% block page_actions %}<div id="page-actions-block"></div>{% endblock %}
-                        </div>
-                    </div>
-                    <div id="tabs-block" class="mt-3">
-                        {% block tabs %}{% endblock %}
-                    </div>
-                </div>
+      <div id="page-content-wrapper" hx-history-elt>
+        <!-- Top Navbar -->
+        {% include "global_includes/_topbar.html" %}
+        <!-- Page header -->
+        <div class="page-header d-print-none">
+          <div class="container-fluid">
+            <div id="breadcrumbs-block">{% include 'global_includes/_breadcrumbs.html' %}</div>
+            <div class="row g-2 align-items-center mt-2">
+              <div class="col">
+                {% block page_header %}
+                  <div id="page-header-block">
+                    <div class="page-pretitle">{% translate "Overview" %}</div>
+                    <h2 class="page-title">{% translate "Dashboard" %}</h2>
+                  </div>
+                {% endblock %}
+              </div>
+              <div class="col-auto ms-auto d-print-none">
+                {% block page_actions %}<div id="page-actions-block"></div>{% endblock %}
+              </div>
             </div>
-
-            <!-- Page body -->
-            <main class="page-body" id="page-body-main" role="main">
-                <div class="container-fluid">
-                    {% block content %}
-                    <!-- Content here -->
-                    {% endblock %}
-                </div>
-            </main>
-
-            {% block page_modals %}{% endblock %}
-
-        </div> {# End #page-content-wrapper #}
-
-        {# Footer #}
-        <footer class="footer footer-transparent d-print-none py-2">
-            <div class="container-fluid d-flex justify-content-between align-items-center">
-                <ul class="list-inline mb-0 fs-2">
-                    <li class="list-inline-item">
-                      <a href="{% static 'docs/index.html' %}" target="_blank" class="link-secondary" rel="noopener" aria-label="{% translate "Docs" %}" title="{% translate "Docs" %}" data-bs-placement="top" data-bs-toggle="tooltip">
-                        <i class="mdi mdi-book-outline"></i>
-                      </a>
-                    </li>
-                    <li class="list-inline-item">
-                      <a href="{% url 'api:api-root' %}" target="_blank" class="link-secondary" rel="noopener" aria-label="{% translate "REST API" %}" title="{% translate "REST API" %}" data-bs-placement="top" data-bs-toggle="tooltip">
-                        <i class="mdi mdi-cloud-tags"></i>
-                      </a>
-                    </li>
-                     <li class="list-inline-item">
-                        <a href="{% url 'api:swagger-ui' %}" target="_blank" class="link-secondary" rel="noopener" aria-label="{% translate "API documentation" %}" title="{% translate "API documentation" %}" data-bs-placement="top" data-bs-toggle="tooltip">
-                            <i class="mdi mdi-file-code-outline"></i>
-                        </a>
-                    </li>
-                    <li class="list-inline-item">
-                      <a href="https://github.com/itambox/itambox-webapp" target="_blank" class="link-secondary" rel="noopener" aria-label="{% translate "Source Code" %}" title="{% translate "Source Code" %}" data-bs-placement="top" data-bs-toggle="tooltip">
-                        <i class="mdi mdi-github"></i>
-                      </a>
-                    </li>
-                </ul>
-                <ul class="list-inline list-inline-dots fs-5 mb-0" id="footer-stamp">
-                    <li class="list-inline-item">{% now 'Y-m-d H:i:s T' %}</li>
-                    <li class="list-inline-item">v{{ settings.VERSION }}</li>
-                    <li class="list-inline-item">
-                       {% translate "Theme by" %} <a href="https://tabler.io" class="link-secondary" rel="noopener">{% translate "Tabler" %}</a>
-                    </li>
-                </ul>
+            <div id="tabs-block" class="mt-3">
+              {% block tabs %}{% endblock %}
             </div>
-        </footer>
-
-    </div> {# End page-wrapper #}
-</div> {# End page #}
+          </div>
+        </div>
+        <!-- Page body -->
+        <main class="page-body" id="page-body-main" role="main">
+          <div class="container-fluid">
+            {% block content %}
+              <!-- Content here -->
+            {% endblock %}
+          </div>
+        </main>
+        {% block page_modals %}{% endblock %}
+      </div>
+      {# End #page-content-wrapper #}
+      {# Footer #}
+      <footer class="footer footer-transparent d-print-none py-2">
+        <div class="container-fluid d-flex justify-content-between align-items-center">
+          <ul class="list-inline mb-0 fs-2">
+            <li class="list-inline-item">
+              <a href="{% static 'docs/index.html' %}"
+                 target="_blank"
+                 class="link-secondary"
+                 rel="noopener"
+                 aria-label="{% translate "Docs" %}"
+                 title="{% translate "Docs" %}"
+                 data-bs-placement="top"
+                 data-bs-toggle="tooltip">
+                <i class="mdi mdi-book-outline"></i>
+              </a>
+            </li>
+            <li class="list-inline-item">
+              <a href="{% url 'api:api-root' %}"
+                 target="_blank"
+                 class="link-secondary"
+                 rel="noopener"
+                 aria-label="{% translate "REST API" %}"
+                 title="{% translate "REST API" %}"
+                 data-bs-placement="top"
+                 data-bs-toggle="tooltip">
+                <i class="mdi mdi-cloud-tags"></i>
+              </a>
+            </li>
+            <li class="list-inline-item">
+              <a href="{% url 'api:swagger-ui' %}"
+                 target="_blank"
+                 class="link-secondary"
+                 rel="noopener"
+                 aria-label="{% translate "API documentation" %}"
+                 title="{% translate "API documentation" %}"
+                 data-bs-placement="top"
+                 data-bs-toggle="tooltip">
+                <i class="mdi mdi-file-code-outline"></i>
+              </a>
+            </li>
+            <li class="list-inline-item">
+              <a href="https://github.com/itambox/itambox-webapp"
+                 target="_blank"
+                 class="link-secondary"
+                 rel="noopener"
+                 aria-label="{% translate "Source Code" %}"
+                 title="{% translate "Source Code" %}"
+                 data-bs-placement="top"
+                 data-bs-toggle="tooltip">
+                <i class="mdi mdi-github"></i>
+              </a>
+            </li>
+          </ul>
+          <ul class="list-inline list-inline-dots fs-5 mb-0" id="footer-stamp">
+            <li class="list-inline-item">{% now 'Y-m-d H:i:s T' %}</li>
+            <li class="list-inline-item">v{{ settings.VERSION }}</li>
+            <li class="list-inline-item">
+              {% translate "Theme by" %} <a href="https://tabler.io" class="link-secondary" rel="noopener">{% translate "Tabler" %}</a>
+            </li>
+          </ul>
+        </div>
+      </footer>
+    </div>
+    {# End page-wrapper #}
+  </div>
+  {# End page #}
 {% endblock %}

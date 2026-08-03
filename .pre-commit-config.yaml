@@ -71,3 +71,19 @@ repos:
         language_version: python3.12
         pass_filenames: false
         always_run: true
+      # Full-repository template gate. It is deliberately check-only: the
+      # separate make format-templates target owns intentional rewrites.
+      - id: djlint
+        name: djLint (blocking template gate)
+        entry: uv run --locked --group dev python scripts/lint_templates.py --check --lint --statistics
+        language: system
+        pass_filenames: false
+        always_run: true
+      # Full authored CSS/SCSS gate. Stylelint fixes are deliberately separate
+      # from the mandatory hook so commits cannot rewrite files implicitly.
+      - id: stylelint
+        name: Stylelint (blocking authored-style gate)
+        entry: bash -c 'cd itambox && npm run lint:styles'
+        language: system
+        pass_filenames: false
+        always_run: true

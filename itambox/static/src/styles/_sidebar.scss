@@ -7,7 +7,7 @@
 // (Tabler hardcodes 15rem on both .navbar-vertical and .page-wrapper — no var.)
 $itambox-sidebar-width: 18rem; // 288px — Tabler default is 15rem/240px (+48px)
 
-@media (min-width: 992px) {
+@media (width >= 992px) {
     .navbar-vertical.navbar-expand-lg {
         width: $itambox-sidebar-width;
     }
@@ -44,7 +44,7 @@ $itambox-sidebar-width: 18rem; // 288px — Tabler default is 15rem/240px (+48px
 
     // Keep the mobile header on one row and scale the brand before it can
     // overlap the right-hand actions (notifications / theme / profile).
-    @media (max-width: 991.98px) {
+    @media (width <= 991.98px) {
         > .container-fluid {
             flex-wrap: nowrap;
         }
@@ -65,7 +65,7 @@ $itambox-sidebar-width: 18rem; // 288px — Tabler default is 15rem/240px (+48px
         }
     }
 
-    @media (max-width: 360px) {
+    @media (width <= 360px) {
         .navbar-brand .navbar-brand-image {
             height: 22px !important;
         }
@@ -134,18 +134,18 @@ $itambox-sidebar-width: 18rem; // 288px — Tabler default is 15rem/240px (+48px
             font-size: 0.825rem;
             font-weight: 500;
             padding: 0.45rem 0.75rem;
-            color: var(--itambox-sidebar-color, rgba(var(--tblr-body-color-rgb), 0.65)) !important;
+            color: var(--itambox-sidebar-color, rgb(var(--tblr-body-color-rgb), 0.65)) !important;
             border-radius: var(--tblr-border-radius-sm);
             transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
 
             .nav-link-icon {
-                color: var(--itambox-sidebar-muted-color, rgba(var(--tblr-body-color-rgb), 0.45)) !important;
+                color: var(--itambox-sidebar-muted-color, rgb(var(--tblr-body-color-rgb), 0.45)) !important;
                 transition: color 0.2s ease;
                 margin-right: 0.5rem;
             }
 
             &:hover {
-                background-color: var(--itambox-sidebar-hover-bg, rgba(var(--tblr-primary-rgb), 0.06)) !important;
+                background-color: var(--itambox-sidebar-hover-bg, rgb(var(--tblr-primary-rgb), 0.06)) !important;
                 color: var(--itambox-sidebar-hover-color, var(--tblr-primary)) !important;
                 padding-left: 0.95rem; // Subtle organic slide-in animation
 
@@ -156,7 +156,7 @@ $itambox-sidebar-width: 18rem; // 288px — Tabler default is 15rem/240px (+48px
 
             &.active,
             &.show {
-                background-color: var(--itambox-sidebar-active-bg, rgba(var(--tblr-primary-rgb), 0.09)) !important;
+                background-color: var(--itambox-sidebar-active-bg, rgb(var(--tblr-primary-rgb), 0.09)) !important;
                 color: var(--itambox-sidebar-active-color, var(--tblr-primary)) !important;
                 font-weight: 600;
                 box-shadow: inset 2px 0 0 var(--tblr-primary);
@@ -180,13 +180,13 @@ $itambox-sidebar-width: 18rem; // 288px — Tabler default is 15rem/240px (+48px
                 font-size: 0.8rem;
                 font-weight: 500;
                 padding: 0.35rem 0.75rem;
-                color: var(--itambox-sidebar-color, rgba(var(--tblr-body-color-rgb), 0.6)) !important;
+                color: var(--itambox-sidebar-color, rgb(var(--tblr-body-color-rgb), 0.6)) !important;
                 border-left: 2px solid transparent;
                 border-radius: 0;
                 transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
 
                 &:hover {
-                    background-color: var(--itambox-sidebar-hover-bg, rgba(var(--tblr-primary-rgb), 0.05)) !important;
+                    background-color: var(--itambox-sidebar-hover-bg, rgb(var(--tblr-primary-rgb), 0.05)) !important;
                     color: var(--itambox-sidebar-hover-color, var(--tblr-primary)) !important;
                     border-left-color: var(--itambox-sidebar-hover-color, var(--tblr-primary)) !important;
                     padding-left: 0.95rem; // Micro-slide
@@ -194,7 +194,7 @@ $itambox-sidebar-width: 18rem; // 288px — Tabler default is 15rem/240px (+48px
 
                 &.active,
                 &:active {
-                    background-color: var(--itambox-sidebar-active-bg, rgba(var(--tblr-primary-rgb), 0.08)) !important;
+                    background-color: var(--itambox-sidebar-active-bg, rgb(var(--tblr-primary-rgb), 0.08)) !important;
                     color: var(--itambox-sidebar-active-color, var(--tblr-primary)) !important;
                     border-left-color: var(--itambox-sidebar-active-color, var(--tblr-primary)) !important;
                     font-weight: 600;
@@ -207,10 +207,11 @@ $itambox-sidebar-width: 18rem; // 288px — Tabler default is 15rem/240px (+48px
 // ============================================================
 //  Mobile Offcanvas Sidebar Styling (Slide-in Drawer)
 // ============================================================
-@media (max-width: 991.98px) {
+@media (width <= 991.98px) {
     #sidebar-menu.offcanvas-lg {
         background-color: var(--itambox-sidebar-bg, var(--tblr-bg-surface)) !important;
         border-right: 1px solid var(--itambox-sidebar-border, var(--tblr-border-color)) !important;
+
         // A touch wider for comfortable reading; capped so it never swallows the screen
         width: min(86vw, 320px) !important;
 
@@ -279,7 +280,7 @@ $itambox-sidebar-width: 18rem; // 288px — Tabler default is 15rem/240px (+48px
 // Full-width mobile dropdown panel (e.g. notifications): span the whole
 // viewport width instead of a narrow card that overflows off-screen.
 // Pairs with data-bs-display="static" on the toggle so Popper doesn't fight us.
-@media (max-width: 991.98px) {
+@media (width <= 991.98px) {
     .navbar-vertical .d-lg-none .dropdown-menu.mobile-fullwidth-dropdown {
         position: fixed !important;
         top: 3.5rem !important;

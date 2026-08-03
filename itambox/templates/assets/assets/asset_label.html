@@ -2,7 +2,7 @@
 {# templates/assets/assets/asset_label.html #}
 <!DOCTYPE html>
 <html lang="{{ LANGUAGE_CODE }}">
-<head>
+  <head>
     <meta charset="UTF-8">
     <title>{% translate "Print Asset Label:" %} {{ asset.asset_tag }}</title>
     <style>
@@ -14,7 +14,7 @@
             background: #fff;
             color: #000;
         }
-        
+
         .label-container {
             width: 2.25in;
             height: 1.25in;
@@ -85,7 +85,7 @@
             border-radius: 8px;
             background: #f9f9f9;
         }
-        
+
         .print-btn {
             background: #206bc4;
             color: #fff;
@@ -113,21 +113,18 @@
             }
         }
     </style>
-</head>
-<body>
-
+  </head>
+  <body>
     <div class="print-helper">
-        <h3>{% translate "Thermal Label Preview" %}</h3>
-        <p>{% translate "Pre-formatted for" %} <strong>2.25" x 1.25"</strong> {% translate "thermal rolls. Clicking print will launch the print settings modal." %}</p>
-        <button class="print-btn">{% translate "Print Label" %}</button>
-        <p style="font-size: 8pt; color: #777; margin-top: 10px;">{% translate 'Ensure margins are set to "None" in your print options.' %}</p>
+      <h3>{% translate "Thermal Label Preview" %}</h3>
+      <p>{% translate "Pre-formatted for" %} <strong>2.25" x 1.25"</strong> {% translate "thermal rolls. Clicking print will launch the print settings modal." %}</p>
+      <button class="print-btn">{% translate "Print Label" %}</button>
+      <p style="font-size: 8pt; color: #777; margin-top: 10px;">{% translate 'Ensure margins are set to "None" in your print options.' %}</p>
     </div>
-
     <div class="label-container">
-        {# Same label card the print engine renders — preview == printed output #}
-        {{ label_card|safe }}
+      {# Same label card the print engine renders — preview == printed output #}
+      {{ label_card|safe }}
     </div>
-
     <script nonce="{{ request.csp_nonce }}">
         document.addEventListener('DOMContentLoaded', function() {
             var btn = document.querySelector('.print-btn');
@@ -138,5 +135,5 @@
             }
         });
     </script>
-</body>
+  </body>
 </html>

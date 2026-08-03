@@ -10,35 +10,40 @@
     - additional_classes: (Optional) Extra CSS classes for the modal dialog.
     - include_footer: (Optional, default True) Whether to include the default footer with close/submit. Content template can provide its own footer.
 {% endcomment %}
-
-<div class="modal fade" id="{{ modal_id|default:'htmxModal' }}" tabindex="-1" aria-labelledby="htmxModalLabel" aria-hidden="true">
-    <div class="modal-dialog {{ additional_classes }}">
-        <div class="modal-content">
-            <form {% if form_url %}hx-post="{{ form_url }}"{% endif %}
-                  {% if form_id %}id="{{ form_id }}"{% endif %}
-                  {# Target the modal content itself for replacement on success/error #}
-                  hx-target="#{{ modal_id|default:'htmxModal' }} .modal-content" 
-                  hx-swap="outerHTML">
-                {% csrf_token %}
-                <div class="modal-header">
-                    <h5 class="modal-title" id="htmxModalLabel">{{ modal_title|default:_("Action") }}</h5>
-                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="{% translate 'Close' %}"></button>
-                </div>
-                <div class="modal-body">
-                    {% if content_template %}
-                        {% include content_template with object=object form=form only %}
-                    {% else %}
-                        <p>{% translate "Modal content missing." %}</p>
-                    {% endif %}
-                </div>
-                {% if include_footer|default:True %}
-                <div class="modal-footer">
-                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">{% translate "Cancel" %}</button>
-                    <button type="submit" class="btn btn-primary">{% translate "Submit" %}</button>
-                </div>
-                {% endif %}
-            </form>
+<div class="modal fade"
+     id="{{ modal_id|default:'htmxModal' }}"
+     tabindex="-1"
+     aria-labelledby="htmxModalLabel"
+     aria-hidden="true">
+  <div class="modal-dialog {{ additional_classes }}">
+    <div class="modal-content">
+      <form {% if form_url %}hx-post="{{ form_url }}"{% endif %}
+            {% if form_id %}id="{{ form_id }}"{% endif %}
+            {# Target the modal content itself for replacement on success/error #}
+            hx-target="#{{ modal_id|default:'htmxModal' }} .modal-content"
+            hx-swap="outerHTML">
+        {% csrf_token %}
+        <div class="modal-header">
+          <h5 class="modal-title" id="htmxModalLabel">{{ modal_title|default:_("Action") }}</h5>
+          <button type="button"
+                  class="btn-close"
+                  data-bs-dismiss="modal"
+                  aria-label="{% translate 'Close' %}"></button>
         </div>
+        <div class="modal-body">
+          {% if content_template %}
+            {% include content_template with object=object form=form only %}
+          {% else %}
+            <p>{% translate "Modal content missing." %}</p>
+          {% endif %}
+        </div>
+        {% if include_footer|default:True %}
+          <div class="modal-footer">
+            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">{% translate "Cancel" %}</button>
+            <button type="submit" class="btn btn-primary">{% translate "Submit" %}</button>
+          </div>
+        {% endif %}
+      </form>
     </div>
+  </div>
 </div>
- 

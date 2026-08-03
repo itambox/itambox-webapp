@@ -1,19 +1,19 @@
 {% load i18n %}
 <div class="card mb-3 shadow-sm">
-    {% if panel.display_label %}
+  {% if panel.display_label %}
     <div class="card-header border-0 bg-transparent pb-0">
-        <h3 class="card-title text-secondary">{{ panel.display_label }}</h3>
-        {% if panel.description %}
+      <h3 class="card-title text-secondary">{{ panel.display_label }}</h3>
+      {% if panel.description %}
         <div class="text-muted small">{{ panel.description }}</div>
-        {% endif %}
+      {% endif %}
     </div>
+  {% endif %}
+  <div class="card-body">
+    {% if panel_template %}
+      {% include panel_template %}
+    {% elif debug %}
+      {# Dev-only hint; in prod a misconfigured panel degrades to an empty card, not an error string. #}
+      <p class="text-muted"><em>{% translate 'No template found for panel "' %}{{ panel.name }}".</em></p>
     {% endif %}
-    <div class="card-body">
-        {% if panel_template %}
-            {% include panel_template %}
-        {% elif debug %}
-            {# Dev-only hint; in prod a misconfigured panel degrades to an empty card, not an error string. #}
-            <p class="text-muted"><em>{% translate 'No template found for panel "' %}{{ panel.name }}".</em></p>
-        {% endif %}
-    </div>
+  </div>
 </div>

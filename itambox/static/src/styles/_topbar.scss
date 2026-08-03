@@ -55,6 +55,7 @@
     display: inline-flex;
     align-items: center;
     gap: 0.5rem;
+
     // Roomier so longer German labels (e.g. "Alle Mandanten" + a long tenant
     // name) fit before the name ellipsises.
     max-width: 22rem;
@@ -66,7 +67,7 @@
 
     &:hover,
     &:focus-visible {
-        border-color: rgba(var(--tblr-primary-rgb), 0.45);
+        border-color: rgb(var(--tblr-primary-rgb), 0.45);
         background-color: var(--tblr-bg-surface);
         color: var(--tblr-body-color);
     }
@@ -79,7 +80,7 @@
         height: 1.5rem;
         flex: 0 0 auto;
         border-radius: 0.4rem;
-        background-color: rgba(var(--tblr-primary-rgb), 0.1);
+        background-color: rgb(var(--tblr-primary-rgb), 0.1);
         color: var(--tblr-primary);
 
         i {

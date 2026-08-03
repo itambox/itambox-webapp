@@ -1,7 +1,6 @@
 {% extends base_template|default:"layout.html" %}
 {% load i18n %}
 {% load crispy_forms_tags %}
-
 {% comment %}
 Bespoke create/edit screen for MembershipForm — the unified "Add member" grant
 flow (Who / This organization / Managed tenants), one of the three RBAC form
@@ -14,93 +13,90 @@ who-radio, managed-scope refinement toggles, and formset add/remove live in
 static/src/membership-form.ts (bundled globally). hx-boost="false" keeps the
 management form + nonce-free bundle behaviour predictable (mirrors bulk_receive).
 {% endcomment %}
-
 {% block title %}{{ title }} {% translate "- ITAMbox" %}{% endblock %}
-
 {% block page_header %}
-    <h2 class="page-title">
-        {{ title|default:_("Membership") }}
-    </h2>
+  <h2 class="page-title">{{ title|default:_("Membership") }}</h2>
 {% endblock %}
-
 {% block page_actions %}
-    {% if cancel_url %}
-    <a href="{{ cancel_url }}" class="btn btn-outline-secondary" data-no-dirty-track="true">
-        <i class="mdi mdi-arrow-left"></i>
-        {% translate "Cancel" %}
+  {% if cancel_url %}
+    <a href="{{ cancel_url }}"
+       class="btn btn-outline-secondary"
+       data-no-dirty-track="true">
+      <i class="mdi mdi-arrow-left"></i>
+      {% translate "Cancel" %}
     </a>
-    {% endif %}
+  {% endif %}
 {% endblock page_actions %}
-
 {% block content %}
-<div class="row justify-content-center">
+  <div class="row justify-content-center">
     <div class="col-lg-10 col-md-12">
-        <div class="card shadow-sm">
-            <div class="card-body">
-                <h4 class="card-title text-primary mb-2">
-                    {% if is_editing %}{% translate "Edit member" %}{% else %}{% translate "Add member" %}{% endif %}
-                </h4>
-                <p class="text-muted mb-4 small">
-                    {% translate "Pick who joins (an existing user, or a new one created by email), what they may do inside this organization (roles), and — on a managing (MSP) tenant — any roles that reach into its managed tenants (one grant per row)." %}
+      <div class="card shadow-sm">
+        <div class="card-body">
+          <h4 class="card-title text-primary mb-2">
+            {% if is_editing %}
+              {% translate "Edit member" %}
+            {% else %}
+              {% translate "Add member" %}
+            {% endif %}
+          </h4>
+          <p class="text-muted mb-4 small">
+            {% translate "Pick who joins (an existing user, or a new one created by email), what they may do inside this organization (roles), and — on a managing (MSP) tenant — any roles that reach into its managed tenants (one grant per row)." %}
+          </p>
+          <form method="post" hx-boost="false" novalidate>
+            {% csrf_token %}
+            {% if form.non_field_errors %}
+              <div class="alert alert-danger">{{ form.non_field_errors }}</div>
+            {% endif %}
+            {# The form's FormHelper (form_tag=False) renders the top fields only. #}
+            {% crispy form %}
+            {% if managed_formset %}
+              <fieldset class="mb-4" id="managed-grants" data-managed-formset>
+                <legend class="fs-4 text-primary">{% translate "Managed tenants" %}</legend>
+                <p class="text-muted small">
+                  {% translate "Roles that reach into the tenants this organization manages. Add one row per grant; each row has its own coverage." %}
                 </p>
-
-                <form method="post" hx-boost="false" novalidate>
-                    {% csrf_token %}
-                    {% if form.non_field_errors %}
-                    <div class="alert alert-danger">
-                        {{ form.non_field_errors }}
-                    </div>
-                    {% endif %}
-
-                    {# The form's FormHelper (form_tag=False) renders the top fields only. #}
-                    {% crispy form %}
-
-                    {% if managed_formset %}
-                    <fieldset class="mb-4" id="managed-grants" data-managed-formset>
-                        <legend class="fs-4 text-primary">{% translate "Managed tenants" %}</legend>
-                        <p class="text-muted small">
-                            {% translate "Roles that reach into the tenants this organization manages. Add one row per grant; each row has its own coverage." %}
-                        </p>
-                        {{ managed_formset.management_form }}
-                        {% if managed_formset.non_form_errors %}
-                        <div class="alert alert-danger">
-                            <ul class="mb-0">
-                                {% for error in managed_formset.non_form_errors %}
-                                <li>{{ error }}</li>
-                                {% endfor %}
-                            </ul>
-                        </div>
-                        {% endif %}
-
-                        <div id="managed-formset-rows">
-                            {% for mf in managed_formset %}
-                                {% include "organization/memberships/_managed_grant_row.html" with mf=mf %}
-                            {% endfor %}
-                        </div>
-
-                        {# Template cloned by membership-form.ts to add rows; __prefix__ is #}
-                        {# rewritten to the new index. Kept out of the POSTed form via <template>. #}
-                        <template id="managed-empty-form">
-                            {% include "organization/memberships/_managed_grant_row.html" with mf=managed_formset.empty_form is_empty_form=True %}
-                        </template>
-
-                        <button type="button" class="btn btn-outline-primary btn-sm mt-2" data-add-managed-row>
-                            <i class="mdi mdi-plus"></i>
-                            {% translate "Add managed grant" %}
-                        </button>
-                    </fieldset>
-                    {% endif %}
-
-                    <div class="mt-4"></div>
-                    <button type="submit" name="submit" class="btn btn-primary">
-                        {% if is_editing %}{% translate "Update" %}{% else %}{% translate "Create" %}{% endif %}
-                    </button>
-                    <a href="{{ cancel_url }}" class="btn btn-outline-secondary ms-2" data-no-dirty-track="true">
-                        {% translate "Cancel" %}
-                    </a>
-                </form>
-            </div>
+                {{ managed_formset.management_form }}
+                {% if managed_formset.non_form_errors %}
+                  <div class="alert alert-danger">
+                    <ul class="mb-0">
+                      {% for error in managed_formset.non_form_errors %}
+                        <li>{{ error }}</li>
+                      {% endfor %}
+                    </ul>
+                  </div>
+                {% endif %}
+                <div id="managed-formset-rows">
+                  {% for mf in managed_formset %}
+                    {% include "organization/memberships/_managed_grant_row.html" with mf=mf %}
+                  {% endfor %}
+                </div>
+                {# Template cloned by membership-form.ts to add rows; __prefix__ is #}
+                {# rewritten to the new index. Kept out of the POSTed form via <template>. #}
+                <template id="managed-empty-form">
+                  {% include "organization/memberships/_managed_grant_row.html" with mf=managed_formset.empty_form is_empty_form=True %}
+                </template>
+                <button type="button"
+                        class="btn btn-outline-primary btn-sm mt-2"
+                        data-add-managed-row>
+                  <i class="mdi mdi-plus"></i>
+                  {% translate "Add managed grant" %}
+                </button>
+              </fieldset>
+            {% endif %}
+            <div class="mt-4"></div>
+            <button type="submit" name="submit" class="btn btn-primary">
+              {% if is_editing %}
+                {% translate "Update" %}
+              {% else %}
+                {% translate "Create" %}
+              {% endif %}
+            </button>
+            <a href="{{ cancel_url }}"
+               class="btn btn-outline-secondary ms-2"
+               data-no-dirty-track="true">{% translate "Cancel" %}</a>
+          </form>
         </div>
+      </div>
     </div>
-</div>
+  </div>
 {% endblock content %}

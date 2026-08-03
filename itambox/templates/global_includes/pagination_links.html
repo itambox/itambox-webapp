@@ -1,64 +1,56 @@
 {% load utility_tags %}
 {% load i18n %}
-
 {% if page_obj %}
-{# 3-column grid (1fr auto 1fr): per-page on the left, page nav on the right, and #}
-{# the "showing X-Y of Z" count pinned to the centre — it stays centred even when #}
-{# the page nav isn't drawn (single page), because both side columns are 1fr. #}
-<div class="pagination-bar border-top p-2"
-     {% if hx_target %}
-     hx-target="{{ hx_target }}"
-     hx-swap="innerHTML"
-     hx-push-url="{% if hx_push_url is not None %}{{ hx_push_url }}{% else %}true{% endif %}"
-     {% endif %}>
-
+  {# 3-column grid (1fr auto 1fr): per-page on the left, page nav on the right, and #}
+  {# the "showing X-Y of Z" count pinned to the centre — it stays centred even when #}
+  {# the page nav isn't drawn (single page), because both side columns are 1fr. #}
+  <div class="pagination-bar border-top p-2" {% if hx_target %} hx-target="{{ hx_target }}" hx-swap="innerHTML" hx-push-url="{% if hx_push_url is not None %}{{ hx_push_url }}{% else %}true{% endif %}" {% endif %}>
     <div class="pagination-bar__per-page">
-        {% include 'global_includes/pagination_per_page.html' with paginator=page_obj.paginator hx_target=hx_target hx_push_url=hx_push_url tab=tab %}
+      {% include 'global_includes/pagination_per_page.html' with paginator=page_obj.paginator hx_target=hx_target hx_push_url=hx_push_url tab=tab %}
     </div>
-
     <small class="text-muted pagination-bar__count">
-        {% blocktranslate trimmed with start=page_obj.start_index end=page_obj.end_index total=page_obj.paginator.count %}
-            Showing {{ start }}-{{ end }} of {{ total }}
-        {% endblocktranslate %}
+      {% blocktranslate trimmed with start=page_obj.start_index end=page_obj.end_index total=page_obj.paginator.count %}
+        Showing {{ start }}-{{ end }} of {{ total }}
+      {% endblocktranslate %}
     </small>
-
     {% if page_obj.paginator.num_pages > 1 %}
-    <nav aria-label="{% translate "Page selection" %}" class="pagination-nav-scroll pagination-bar__nav">
+      <nav aria-label="{% translate "Page selection" %}"
+           class="pagination-nav-scroll pagination-bar__nav">
         <ul class="pagination flex-wrap mb-0">
-            {% if page_obj.has_previous %}
+          {% if page_obj.has_previous %}
             <li class="page-item">
-                <a {% if hx_target %}href="#" hx-get="{{ request.path }}{% update_querystring request page=page_obj.previous_page_number tab=tab %}"{% else %}href="{{ request.path }}{% update_querystring request page=page_obj.previous_page_number tab=tab %}"{% endif %}
-                   class="page-link" aria-label="{% translate "Previous page" %}">
-                    <i class="mdi mdi-chevron-left"></i>
-                </a>
+              <a {% if hx_target %}href="#" hx-get="{{ request.path }}{% update_querystring request page=page_obj.previous_page_number tab=tab %}"{% else %}href="{{ request.path }}{% update_querystring request page=page_obj.previous_page_number tab=tab %}"{% endif %}
+                 class="page-link"
+                 aria-label="{% translate "Previous page" %}">
+                <i class="mdi mdi-chevron-left"></i>
+              </a>
             </li>
-            {% endif %}
-
-            {% for p in page_obj.smart_pages|default:page_obj.paginator.page_range %}
+          {% endif %}
+          {% for p in page_obj.smart_pages|default:page_obj.paginator.page_range %}
             {# Mark the first/last page jumps and the ellipsis so the mobile CSS can keep #}
             {# them visible while trimming the inner window to the current page +/- 1. #}
-            <li class="page-item{% if page_obj.number == p %} active{% endif %}{% if not p %} page-item--gap{% elif p == 1 %} page-item--first{% elif p == page_obj.paginator.num_pages %} page-item--last{% endif %}"{% if page_obj.number == p %} aria-current="page"{% endif %}>
-                {% if p %}
+            <li class="page-item{% if page_obj.number == p %} active{% endif %}{% if not p %} page-item--gap{% elif p == 1 %} page-item--first{% elif p == page_obj.paginator.num_pages %} page-item--last{% endif %}"
+                {% if page_obj.number == p %} aria-current="page"{% endif %}>
+              {% if p %}
                 <a {% if hx_target %}href="#" hx-get="{{ request.path }}{% update_querystring request page=p tab=tab %}"{% else %}href="{{ request.path }}{% update_querystring request page=p tab=tab %}"{% endif %}
-                   class="page-link" aria-label="{% blocktranslate with num=p %}Page {{ num }}{% endblocktranslate %}">
-                    {{ p }}
-                </a>
-                {% else %}
-                <span class="page-link" disabled aria-hidden="true">&hellip;</span>
-                {% endif %}
+                   class="page-link"
+                   aria-label="{% blocktranslate with num=p %}Page {{ num }}{% endblocktranslate %}">{{ p }}</a>
+              {% else %}
+                <span class="page-link" disabled aria-hidden="true">…</span>
+              {% endif %}
             </li>
-            {% endfor %}
-
-            {% if page_obj.has_next %}
+          {% endfor %}
+          {% if page_obj.has_next %}
             <li class="page-item">
-                <a {% if hx_target %}href="#" hx-get="{{ request.path }}{% update_querystring request page=page_obj.next_page_number tab=tab %}"{% else %}href="{{ request.path }}{% update_querystring request page=page_obj.next_page_number tab=tab %}"{% endif %}
-                   class="page-link" aria-label="{% translate "Next page" %}">
-                    <i class="mdi mdi-chevron-right"></i>
-                </a>
+              <a {% if hx_target %}href="#" hx-get="{{ request.path }}{% update_querystring request page=page_obj.next_page_number tab=tab %}"{% else %}href="{{ request.path }}{% update_querystring request page=page_obj.next_page_number tab=tab %}"{% endif %}
+                 class="page-link"
+                 aria-label="{% translate "Next page" %}">
+                <i class="mdi mdi-chevron-right"></i>
+              </a>
             </li>
-            {% endif %}
+          {% endif %}
         </ul>
-    </nav>
+      </nav>
     {% endif %}
-</div>
+  </div>
 {% endif %}

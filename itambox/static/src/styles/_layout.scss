@@ -13,7 +13,6 @@ body {
 
 body.modal-open,
 body.offcanvas-open {
-
     .fixed-top,
     .fixed-bottom,
     .is-fixed,
@@ -50,7 +49,7 @@ html.itambox-filters-hidden #object-list-filter-col {
     display: none !important;
 }
 
-@media (min-width: 768px) {
+@media (width >= 768px) {
     html.itambox-filters-hidden #object-list-main-col {
         flex: 0 0 100% !important;
         width: 100% !important;
@@ -69,7 +68,6 @@ html.itambox-filters-hidden #object-list-filter-col {
 }
 
 @keyframes pulse {
-
     0%,
     100% {
         opacity: 1;
@@ -132,7 +130,7 @@ html {
 //  Premium details — selection color, thin dark scrollbars
 // ============================================================
 ::selection {
-    background: rgba(var(--tblr-primary-rgb), 0.3);
+    background: rgb(var(--tblr-primary-rgb), 0.3);
 }
 
 [data-bs-theme="dark"] {

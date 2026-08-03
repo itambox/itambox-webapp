@@ -1,5 +1,5 @@
 {% load i18n %}
 {% translate "Active Physical Assets of this Type" as l_active %}
 <div class="row g-3 mb-4">
-    {% include "generic/includes/stat_card.html" with col="col-12" color="purple" icon="mdi mdi-devices" label=l_active value=assets_table.rows|length %}
+  {% include "generic/includes/stat_card.html" with col="col-12" color="purple" icon="mdi mdi-devices" label=l_active value=assets_table.rows|length %}
 </div>

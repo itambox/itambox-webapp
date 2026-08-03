@@ -1,24 +1,24 @@
 {% load i18n %}
 <div class="text-muted small mb-2">{% blocktranslate %}Hardware Expiring within {{ days_horizon }} days{% endblocktranslate %}</div>
 {% if eol_alerts %}
-<div class="list-group list-group-flush" style="font-size: 0.80rem;">
+  <div class="list-group list-group-flush" style="font-size: 0.80rem;">
     {% for alert in eol_alerts|slice:":5" %}
-    <div class="list-group-item px-0 py-2 d-flex justify-content-between align-items-center">
+      <div class="list-group-item px-0 py-2 d-flex justify-content-between align-items-center">
         <div>
-            <div><a href="{% url 'assets:asset_detail' alert.asset.pk %}" class="text-reset">{{ alert.asset.name }}</a></div>
-            <div class="text-muted small">{% blocktranslate with asset_type=alert.asset.asset_type eol_date=alert.eol_date|date:"Y-m-d" %}{{ asset_type }} &middot; EOL: {{ eol_date }}{% endblocktranslate %}</div>
+          <div><a href="{% url 'assets:asset_detail' alert.asset.pk %}"
+   class="text-reset">{{ alert.asset.name }}</a></div>
+          <div class="text-muted small">{% blocktranslate with asset_type=alert.asset.asset_type eol_date=alert.eol_date|date:"Y-m-d" %}{{ asset_type }} &middot; EOL: {{ eol_date }}{% endblocktranslate %}</div>
         </div>
         <div>
-            {% if alert.days_left < 0 %}
+          {% if alert.days_left < 0 %}
             <span class="badge bg-red-lt text-red">{% translate "EXPIRED" %}</span>
-            {% else %}
+          {% else %}
             <span class="badge bg-yellow-lt text-yellow">{{ alert.days_left }} {% translate "Days Left" %}</span>
-            {% endif %}
+          {% endif %}
         </div>
-    </div>
+      </div>
     {% endfor %}
-</div>
+  </div>
 {% else %}
-<div class="text-muted text-center py-4">{% translate "No assets approaching EOL limit." %}</div>
+  <div class="text-muted text-center py-4">{% translate "No assets approaching EOL limit." %}</div>
 {% endif %}
-

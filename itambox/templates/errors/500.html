@@ -1,14 +1,15 @@
 {% comment %}Self-contained on purpose: a 500 may fire when the DB, tenant context, or a
    context processor is unavailable, so this page must not depend on extends/url tags,
-   static files, or any view/context-processor output.{% endcomment %}
-{% load i18n %}{% get_current_language as LANGUAGE_CODE %}
-<!doctype html>
+static files, or any view/context-processor output.{% endcomment %}
+{% load i18n %}
+{% get_current_language as LANGUAGE_CODE %}
+<!DOCTYPE html>
 <html lang="{{ LANGUAGE_CODE }}">
-<head>
-  <meta charset="utf-8"/>
-  <meta name="viewport" content="width=device-width, initial-scale=1"/>
-  <title>{% translate "Server error" %} · {% translate "ITAMbox" %}</title>
-  <style>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>{% translate "Server error" %} · {% translate "ITAMbox" %}</title>
+    <style>
     :root { color-scheme: dark; }
     body { margin:0; min-height:100vh; display:flex; align-items:center; justify-content:center;
            font-family: Inter, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
@@ -21,14 +22,14 @@
     a { display:inline-block; padding:.55rem 1.1rem; border-radius:.5rem; background:#7c6cff;
         color:#fff; text-decoration:none; font-weight:500; }
     a:hover { background:#6a59f0; }
-  </style>
-</head>
-<body>
-  <main>
-    <p class="code">500</p>
-    <h1>{% translate "Something went wrong on our end" %}</h1>
-    <p>{% translate "An unexpected error occurred while processing your request. It has been logged and the team will look into it. Please try again in a moment." %}</p>
-    <a href="/">{% translate "Back to ITAMbox" %}</a>
-  </main>
-</body>
+    </style>
+  </head>
+  <body>
+    <main>
+      <p class="code">500</p>
+      <h1>{% translate "Something went wrong on our end" %}</h1>
+      <p>{% translate "An unexpected error occurred while processing your request. It has been logged and the team will look into it. Please try again in a moment." %}</p>
+      <a href="/">{% translate "Back to ITAMbox" %}</a>
+    </main>
+  </body>
 </html>

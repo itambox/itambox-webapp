@@ -1,38 +1,41 @@
 {% load i18n %}
 {% load utility_tags %}
-
 {% if object.custom_fieldset and object.custom_fieldset.fields.exists %}
-<div class="card border-0 specs-container shadow-none">
+  <div class="card border-0 specs-container shadow-none">
     <div class="card-body">
-        <h4 class="card-title text-secondary mb-3 d-flex align-items-center">
-            <i class="mdi mdi-information-outline me-2 text-primary"></i>
-            {% translate "System Hardware Specifications" %}
-        </h4>
-        <div class="row g-3">
-            {% for field in object.custom_fieldset.fields.all %}
-                {% if field.is_asset_type_spec %}
-                    {% with val=object.custom_field_data|lookup:field.name %}
-                    {% if val is not None and val != "" %}
-                    <div class="col-md-6">
-                        <div class="d-flex align-items-center mb-1">
-                            <span class="badge bg-blue-lt me-2 p-1.5">
-                                <i class="mdi mdi-chip"></i>
-                            </span>
-                            <strong class="text-secondary small uppercase">{{ field.label }}</strong>
-                        </div>
-                        <div class="ms-7 font-weight-medium">
-                            {% if field.field_type == 'boolean' %}
-                                {% if val %}<span class="badge bg-green">{% translate "Yes" %}</span>{% else %}<span class="badge bg-secondary">{% translate "No" %}</span>{% endif %}
-                            {% else %}
-                                {{ val }}
-                            {% endif %}
-                        </div>
-                    </div>
+      <h4 class="card-title text-secondary mb-3 d-flex align-items-center">
+        <i class="mdi mdi-information-outline me-2 text-primary"></i>
+        {% translate "System Hardware Specifications" %}
+      </h4>
+      <div class="row g-3">
+        {% for field in object.custom_fieldset.fields.all %}
+          {% if field.is_asset_type_spec %}
+            {% with val=object.custom_field_data|lookup:field.name %}
+              {% if val is not None and val != "" %}
+                <div class="col-md-6">
+                  <div class="d-flex align-items-center mb-1">
+                    <span class="badge bg-blue-lt me-2 p-1.5">
+                      <i class="mdi mdi-chip"></i>
+                    </span>
+                    <strong class="text-secondary small uppercase">{{ field.label }}</strong>
+                  </div>
+                  <div class="ms-7 font-weight-medium">
+                    {% if field.field_type == 'boolean' %}
+                      {% if val %}
+                        <span class="badge bg-green">{% translate "Yes" %}</span>
+                      {% else %}
+                        <span class="badge bg-secondary">{% translate "No" %}</span>
+                      {% endif %}
+                    {% else %}
+                      {{ val }}
                     {% endif %}
-                {% endwith %}
-                {% endif %}
-            {% endfor %}
-        </div>
+                  </div>
+                </div>
+              {% endif %}
+            {% endwith %}
+          {% endif %}
+        {% endfor %}
+      </div>
     </div>
-</div>
+  </div>
 {% endif %}

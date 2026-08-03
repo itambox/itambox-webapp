@@ -114,7 +114,7 @@ input[type="email"],
 input[type="password"],
 select,
 textarea {
-    background-color: var(--tblr-input-bg, #ffffff) !important;
+    background-color: var(--tblr-input-bg, #fff) !important;
     border: 1px solid var(--tblr-input-border-color, #cbd5e1) !important;
     color: var(--tblr-input-color, #1c1917) !important;
     transition: border-color var(--itambox-duration, 150ms) var(--itambox-ease, ease-in-out),
@@ -126,17 +126,16 @@ textarea {
     }
 
     &:focus {
-        background-color: var(--tblr-input-focus-bg, #ffffff) !important;
+        background-color: var(--tblr-input-focus-bg, #fff) !important;
         border-color: var(--tblr-input-focus-border-color, var(--tblr-primary)) !important;
         color: var(--tblr-input-focus-color, #1c1917) !important;
-        box-shadow: 0 0 0 0.2rem rgba(var(--tblr-primary-rgb), 0.15) !important;
+        box-shadow: 0 0 0 0.2rem rgb(var(--tblr-primary-rgb), 0.15) !important;
         outline: 0 !important;
     }
 }
 
 // Ensure search/icon input text padding
 .input-icon {
-
     .form-control,
     input[type="text"],
     input[type="search"] {
@@ -146,7 +145,6 @@ textarea {
 
 // Style input-group-flat to ensure input and clear button merge seamlessly and center the icon
 .input-group-flat {
-
     .form-control,
     input[type="search"] {
         border-right: 0 !important;
@@ -158,7 +156,7 @@ textarea {
         border-left: 0 !important;
         border-top-left-radius: 0 !important;
         border-bottom-left-radius: 0 !important;
-        background-color: var(--tblr-input-bg, #ffffff) !important;
+        background-color: var(--tblr-input-bg, #fff) !important;
         border-color: var(--tblr-input-border-color, #cbd5e1) !important;
         display: inline-flex !important;
         align-items: center !important;
@@ -196,7 +194,6 @@ textarea {
 //  Dark mode form enforcement
 // ============================================================
 [data-bs-theme="dark"] {
-
     // Enforce form inputs & textareas formatting in dark mode
     .form-control,
     .form-select,
@@ -222,7 +219,7 @@ textarea {
             background-color: var(--tblr-input-focus-bg, #0c0a09) !important;
             border-color: var(--tblr-input-focus-border-color, #a8a29e) !important;
             color: var(--tblr-input-focus-color, #e7e5e4) !important;
-            box-shadow: 0 0 0 0.25rem rgba(var(--tblr-primary-rgb), 0.25) !important;
+            box-shadow: 0 0 0 0.25rem rgb(var(--tblr-primary-rgb), 0.25) !important;
             outline: 0 !important;
         }
 
@@ -247,7 +244,7 @@ textarea {
 
         &:focus {
             border-color: var(--tblr-primary) !important;
-            box-shadow: 0 0 0 0.25rem rgba(var(--tblr-primary-rgb), 0.25) !important;
+            box-shadow: 0 0 0 0.25rem rgb(var(--tblr-primary-rgb), 0.25) !important;
         }
     }
 

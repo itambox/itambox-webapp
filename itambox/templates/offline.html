@@ -1,34 +1,31 @@
 {% extends "base.html" %}
 {% load i18n %}
-
 {% block title %}{% translate "Offline" %} - ITAMbox{% endblock %}
-
 {% block layout %}
-<div class="page page-center">
-  <div class="container container-tight py-4">
-    <div class="empty">
-      <div class="empty-icon text-danger">
-        <i class="mdi mdi-wifi-off icon-tabler icon-tabler-wifi-off"></i>
-      </div>
-      <p class="empty-title">{% translate "You are offline" %}</p>
-      <p class="empty-subtitle text-muted">
-        {% translate "It seems you don't have an active internet connection. Please check your network cables or Wi-Fi settings." %}
-      </p>
-      <div class="empty-action">
-        <button id="retry-connection-btn" class="btn btn-primary">
-          <i class="mdi mdi-refresh"></i>
-          {% translate "Retry Connection" %}
-        </button>
+  <div class="page page-center">
+    <div class="container container-tight py-4">
+      <div class="empty">
+        <div class="empty-icon text-danger">
+          <i class="mdi mdi-wifi-off icon-tabler icon-tabler-wifi-off"></i>
+        </div>
+        <p class="empty-title">{% translate "You are offline" %}</p>
+        <p class="empty-subtitle text-muted">
+          {% translate "It seems you don't have an active internet connection. Please check your network cables or Wi-Fi settings." %}
+        </p>
+        <div class="empty-action">
+          <button id="retry-connection-btn" class="btn btn-primary">
+            <i class="mdi mdi-refresh"></i>
+            {% translate "Retry Connection" %}
+          </button>
+        </div>
       </div>
     </div>
   </div>
-</div>
 {% endblock %}
-
 {% block javascript %}
-<script nonce="{{ request.csp_nonce }}">
+  <script nonce="{{ request.csp_nonce }}">
   document.getElementById('retry-connection-btn').addEventListener('click', function() {
     window.location.reload();
   });
-</script>
+  </script>
 {% endblock javascript %}

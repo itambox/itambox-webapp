@@ -2,420 +2,470 @@
 {% load i18n %}
 {% load static %}
 {% load render_table from django_tables2 %}
-
 {# --- Page Title --- #}
 {% block title %}{{ object.name }} ({{ object.asset_tag }}{% translate ") - ITAMbox" %}{% endblock %}
-
 {# --- Page Header --- #}
-{% block page_pretitle %}{% translate "Asset Details" %}{% endblock %}
-
+{% block page_pretitle %}
+  {% translate "Asset Details" %}
+{% endblock %}
 {% block extra_page_actions %}
-    {# Check In Button (if assigned) #}
-    {% if assignment and assignment.is_active %}
-        {% if request.user.is_staff or perms.assets.change_asset %}
-            <button type="button" class="btn btn-soft-outline-success check-action"
-                    hx-get="{% url 'assets:asset_checkin' pk=object.pk %}"
-                    hx-target="#modal-placeholder"
-                    hx-swap="innerHTML">
-                 <i class="mdi mdi-download"></i>
-                {% translate "Check In..." %}
-            </button>
-        {% endif %}
-    {% else %}
-        {# Check Out Button (only visible if not checked out) #}
-        {% if request.user.is_staff or perms.assets.change_asset %}
-            <button type="button" class="btn btn-soft-success check-action"
-                    hx-get="{% url 'assets:asset_checkout_modal' pk=object.pk %}"
-                    hx-target="#modal-placeholder"
-                    hx-swap="innerHTML">
-                <i class="mdi mdi-upload"></i>
-                {% translate "Check Out..." %}
-            </button>
-        {% endif %}
+  {# Check In Button (if assigned) #}
+  {% if assignment and assignment.is_active %}
+    {% if request.user.is_staff or perms.assets.change_asset %}
+      <button type="button"
+              class="btn btn-soft-outline-success check-action"
+              hx-get="{% url 'assets:asset_checkin' pk=object.pk %}"
+              hx-target="#modal-placeholder"
+              hx-swap="innerHTML">
+        <i class="mdi mdi-download"></i>
+        {% translate "Check In..." %}
+      </button>
     {% endif %}
-
-    {# Claim Button (visible to requester/assignee/staff if there is an approved request for this asset) #}
-    {% if approved_request %}
-        <form method="post" action="{% url 'assets:request_claim' pk=approved_request.pk %}" class="d-inline">
-            {% csrf_token %}
-            <button type="submit" class="btn btn-soft-success" data-confirm="Are you sure you want to claim this asset and confirm pickup?">
-                <i class="mdi mdi-package-down"></i>
-                {% translate "Claim &amp; Confirm Pickup" %}
-            </button>
-        </form>
+  {% else %}
+    {# Check Out Button (only visible if not checked out) #}
+    {% if request.user.is_staff or perms.assets.change_asset %}
+      <button type="button"
+              class="btn btn-soft-success check-action"
+              hx-get="{% url 'assets:asset_checkout_modal' pk=object.pk %}"
+              hx-target="#modal-placeholder"
+              hx-swap="innerHTML">
+        <i class="mdi mdi-upload"></i>
+        {% translate "Check Out..." %}
+      </button>
     {% endif %}
+  {% endif %}
+  {# Claim Button (visible to requester/assignee/staff if there is an approved request for this asset) #}
+  {% if approved_request %}
+    <form method="post"
+          action="{% url 'assets:request_claim' pk=approved_request.pk %}"
+          class="d-inline">
+      {% csrf_token %}
+      <button type="submit"
+              class="btn btn-soft-success"
+              data-confirm="Are you sure you want to claim this asset and confirm pickup?">
+        <i class="mdi mdi-package-down"></i>
+        {% translate "Claim &amp; Confirm Pickup" %}
+      </button>
+    </form>
+  {% endif %}
 {% endblock extra_page_actions %}
-
 {# --- Tabs --- #}
 {% block extra_tabs %}
-    {% if object.is_modular %}
+  {% if object.is_modular %}
     <li class="nav-item" role="presentation">
-        <a href="?tab=components" data-bs-target="#components" class="nav-link {% if request.GET.tab == 'components' %}active{% endif %}" data-bs-toggle="tab" hx-boost="false" role="tab">
-            <i class="mdi mdi-chip me-1 text-teal"></i>
-            {% translate "Components" %} <span class="badge bg-teal-lt ms-2">{{ object.component_allocations.count }}</span>
-        </a>
+      <a href="?tab=components"
+         data-bs-target="#components"
+         class="nav-link {% if request.GET.tab == 'components' %}active{% endif %}"
+         data-bs-toggle="tab"
+         hx-boost="false"
+         role="tab">
+        <i class="mdi mdi-chip me-1 text-teal"></i>
+        {% translate "Components" %} <span class="badge bg-teal-lt ms-2">{{ object.component_allocations.count }}</span>
+      </a>
     </li>
-    {% endif %}
-    {% if accessory_table.rows %}
+  {% endif %}
+  {% if accessory_table.rows %}
     <li class="nav-item" role="presentation">
-        <a href="?tab=accessories" data-bs-target="#accessories" class="nav-link {% if request.GET.tab == 'accessories' %}active{% endif %}" data-bs-toggle="tab" hx-boost="false" role="tab">
-            <i class="mdi mdi-application-outline me-1 text-azure"></i>
-            {% translate "Accessories" %} <span class="badge bg-azure-lt ms-2">{{ accessory_table.rows|length }}</span>
-        </a>
+      <a href="?tab=accessories"
+         data-bs-target="#accessories"
+         class="nav-link {% if request.GET.tab == 'accessories' %}active{% endif %}"
+         data-bs-toggle="tab"
+         hx-boost="false"
+         role="tab">
+        <i class="mdi mdi-application-outline me-1 text-azure"></i>
+        {% translate "Accessories" %} <span class="badge bg-azure-lt ms-2">{{ accessory_table.rows|length }}</span>
+      </a>
     </li>
-    {% endif %}
-    {% if consumable_table.rows %}
+  {% endif %}
+  {% if consumable_table.rows %}
     <li class="nav-item" role="presentation">
-        <a href="?tab=consumables" data-bs-target="#consumables" class="nav-link {% if request.GET.tab == 'consumables' %}active{% endif %}" data-bs-toggle="tab" hx-boost="false" role="tab">
-            <i class="mdi mdi-package-variant-closed me-1 text-orange"></i>
-            {% translate "Consumables" %} <span class="badge bg-orange-lt ms-2">{{ consumable_table.rows|length }}</span>
-        </a>
+      <a href="?tab=consumables"
+         data-bs-target="#consumables"
+         class="nav-link {% if request.GET.tab == 'consumables' %}active{% endif %}"
+         data-bs-toggle="tab"
+         hx-boost="false"
+         role="tab">
+        <i class="mdi mdi-package-variant-closed me-1 text-orange"></i>
+        {% translate "Consumables" %} <span class="badge bg-orange-lt ms-2">{{ consumable_table.rows|length }}</span>
+      </a>
     </li>
-    {% endif %}
-    <li class="nav-item" role="presentation">
-        <a href="?tab=maintenances" data-bs-target="#maintenances" class="nav-link {% if request.GET.tab == 'maintenances' %}active{% endif %}" data-bs-toggle="tab" hx-boost="false" role="tab">
-            <i class="mdi mdi-tools me-1 text-red"></i>
-            {% translate "Maintenances" %} <span class="badge bg-red-lt ms-2">{{ object.maintenances.count }}</span>
-        </a>
-    </li>
-    <li class="nav-item" role="presentation">
-        <a href="?tab=software" data-bs-target="#software" class="nav-link {% if request.GET.tab == 'software' %}active{% endif %}" data-bs-toggle="tab" hx-boost="false" role="tab">
-            <i class="mdi mdi-application-outline me-1 text-purple"></i>
-            {% translate "Software" %} <span class="badge bg-purple-lt ms-2">{{ object.installed_software.count }}</span>
-        </a>
-    </li>
-    <li class="nav-item" role="presentation">
-        <a href="?tab=requests" data-bs-target="#requests" class="nav-link {% if request.GET.tab == 'requests' %}active{% endif %}" data-bs-toggle="tab" hx-boost="false" role="tab">
-            <i class="mdi mdi-clipboard-text-outline me-1 text-yellow"></i>
-            {% translate "Requests" %} <span class="badge bg-yellow-lt ms-2">{{ object.requests.count }}</span>
-        </a>
-    </li>
-    <li class="nav-item" role="presentation">
-        <a href="?tab=audits" data-bs-target="#audits" class="nav-link {% if request.GET.tab == 'audits' %}active{% endif %}" data-bs-toggle="tab" hx-boost="false" role="tab">
-            <i class="mdi mdi-checkbox-marked-circle-outline me-1 text-cyan"></i>
-            {% translate "Audits" %} <span class="badge bg-cyan-lt ms-2">{{ object.audits.count }}</span>
-        </a>
-    </li>
-    <li class="nav-item" role="presentation">
-        <a href="?tab=custody-receipts" data-bs-target="#custody-receipts" class="nav-link {% if request.GET.tab == 'custody-receipts' %}active{% endif %}" data-bs-toggle="tab" hx-boost="false" role="tab">
-            <i class="mdi mdi-file-document-edit me-1 text-indigo"></i>
-            {% translate "Custody Receipts" %} <span class="badge bg-indigo-lt ms-2">{{ object.custody_receipts.count }}</span>
-        </a>
-    </li>
-    <li class="nav-item" role="presentation">
-        <a href="?tab=license-seats" data-bs-target="#license-seats" class="nav-link {% if request.GET.tab == 'license-seats' %}active{% endif %}" data-bs-toggle="tab" hx-boost="false" role="tab">
-            <i class="mdi mdi-key-outline me-1 text-pink"></i>
-            {% translate "Licenses" %} <span class="badge bg-pink-lt ms-2">{{ object.license_assignments.count }}</span>
-        </a>
-    </li>
-    <li class="nav-item" role="presentation">
-        <a href="?tab=warranties" data-bs-target="#warranties" class="nav-link {% if request.GET.tab == 'warranties' %}active{% endif %}" data-bs-toggle="tab" hx-boost="false" role="tab">
-            <i class="mdi mdi-shield-check me-1 text-success"></i>
-            {% translate "Warranties" %} <span class="badge bg-success-lt ms-2">{{ object.warranties.count }}</span>
-        </a>
-    </li>
-    <li class="nav-item" role="presentation">
-        <a href="?tab=reservations" data-bs-target="#reservations" class="nav-link {% if request.GET.tab == 'reservations' %}active{% endif %}" data-bs-toggle="tab" hx-boost="false" role="tab">
-            <i class="mdi mdi-calendar-clock me-1 text-blue"></i>
-            {% translate "Reservations" %} <span class="badge bg-blue-lt ms-2">{{ object.reservations.count }}</span>
-        </a>
-    </li>
-    <li class="nav-item" role="presentation">
-        <a href="?tab=disposal" data-bs-target="#disposal" class="nav-link {% if request.GET.tab == 'disposal' %}active{% endif %}" data-bs-toggle="tab" hx-boost="false" role="tab">
-            <i class="mdi mdi-recycle me-1 text-secondary"></i>
-            {% translate "Disposal" %} <span class="badge bg-secondary-lt ms-2">{% if disposal_obj %}1{% else %}0{% endif %}</span>
-        </a>
-    </li>
+  {% endif %}
+  <li class="nav-item" role="presentation">
+    <a href="?tab=maintenances"
+       data-bs-target="#maintenances"
+       class="nav-link {% if request.GET.tab == 'maintenances' %}active{% endif %}"
+       data-bs-toggle="tab"
+       hx-boost="false"
+       role="tab">
+      <i class="mdi mdi-tools me-1 text-red"></i>
+      {% translate "Maintenances" %} <span class="badge bg-red-lt ms-2">{{ object.maintenances.count }}</span>
+    </a>
+  </li>
+  <li class="nav-item" role="presentation">
+    <a href="?tab=software"
+       data-bs-target="#software"
+       class="nav-link {% if request.GET.tab == 'software' %}active{% endif %}"
+       data-bs-toggle="tab"
+       hx-boost="false"
+       role="tab">
+      <i class="mdi mdi-application-outline me-1 text-purple"></i>
+      {% translate "Software" %} <span class="badge bg-purple-lt ms-2">{{ object.installed_software.count }}</span>
+    </a>
+  </li>
+  <li class="nav-item" role="presentation">
+    <a href="?tab=requests"
+       data-bs-target="#requests"
+       class="nav-link {% if request.GET.tab == 'requests' %}active{% endif %}"
+       data-bs-toggle="tab"
+       hx-boost="false"
+       role="tab">
+      <i class="mdi mdi-clipboard-text-outline me-1 text-yellow"></i>
+      {% translate "Requests" %} <span class="badge bg-yellow-lt ms-2">{{ object.requests.count }}</span>
+    </a>
+  </li>
+  <li class="nav-item" role="presentation">
+    <a href="?tab=audits"
+       data-bs-target="#audits"
+       class="nav-link {% if request.GET.tab == 'audits' %}active{% endif %}"
+       data-bs-toggle="tab"
+       hx-boost="false"
+       role="tab">
+      <i class="mdi mdi-checkbox-marked-circle-outline me-1 text-cyan"></i>
+      {% translate "Audits" %} <span class="badge bg-cyan-lt ms-2">{{ object.audits.count }}</span>
+    </a>
+  </li>
+  <li class="nav-item" role="presentation">
+    <a href="?tab=custody-receipts"
+       data-bs-target="#custody-receipts"
+       class="nav-link {% if request.GET.tab == 'custody-receipts' %}active{% endif %}"
+       data-bs-toggle="tab"
+       hx-boost="false"
+       role="tab">
+      <i class="mdi mdi-file-document-edit me-1 text-indigo"></i>
+      {% translate "Custody Receipts" %} <span class="badge bg-indigo-lt ms-2">{{ object.custody_receipts.count }}</span>
+    </a>
+  </li>
+  <li class="nav-item" role="presentation">
+    <a href="?tab=license-seats"
+       data-bs-target="#license-seats"
+       class="nav-link {% if request.GET.tab == 'license-seats' %}active{% endif %}"
+       data-bs-toggle="tab"
+       hx-boost="false"
+       role="tab">
+      <i class="mdi mdi-key-outline me-1 text-pink"></i>
+      {% translate "Licenses" %} <span class="badge bg-pink-lt ms-2">{{ object.license_assignments.count }}</span>
+    </a>
+  </li>
+  <li class="nav-item" role="presentation">
+    <a href="?tab=warranties"
+       data-bs-target="#warranties"
+       class="nav-link {% if request.GET.tab == 'warranties' %}active{% endif %}"
+       data-bs-toggle="tab"
+       hx-boost="false"
+       role="tab">
+      <i class="mdi mdi-shield-check me-1 text-success"></i>
+      {% translate "Warranties" %} <span class="badge bg-success-lt ms-2">{{ object.warranties.count }}</span>
+    </a>
+  </li>
+  <li class="nav-item" role="presentation">
+    <a href="?tab=reservations"
+       data-bs-target="#reservations"
+       class="nav-link {% if request.GET.tab == 'reservations' %}active{% endif %}"
+       data-bs-toggle="tab"
+       hx-boost="false"
+       role="tab">
+      <i class="mdi mdi-calendar-clock me-1 text-blue"></i>
+      {% translate "Reservations" %} <span class="badge bg-blue-lt ms-2">{{ object.reservations.count }}</span>
+    </a>
+  </li>
+  <li class="nav-item" role="presentation">
+    <a href="?tab=disposal"
+       data-bs-target="#disposal"
+       class="nav-link {% if request.GET.tab == 'disposal' %}active{% endif %}"
+       data-bs-toggle="tab"
+       hx-boost="false"
+       role="tab">
+      <i class="mdi mdi-recycle me-1 text-secondary"></i>
+      {% translate "Disposal" %} <span class="badge bg-secondary-lt ms-2">{% if disposal_obj %}1{% else %}0{% endif %}</span>
+    </a>
+  </li>
 {% endblock extra_tabs %}
-
 {% block details_tab %}
-    {# Asset overview metrics (assignment status + installed-software count) #}
-    {% include 'assets/includes/detail/asset_metrics.html' %}
-    <div class="row g-3">
-        {# --- Left Column: Main area (col-lg-8) --- #}
-        <div class="col-12 col-lg-8">
-            {# 1. Asset Details Card #}
-            <div class="card mb-3 shadow-sm">
-                <div class="card-header border-0 bg-transparent pb-0">
-                    <h3 class="card-title text-secondary">{% translate "Asset Details" %}</h3>
-                </div>
-                <div class="card-body">
-                    {% include 'assets/includes/detail/asset_asset_info.html' %}
-                </div>
-            </div>
-
-            {# 2. Deployment & Custody Card #}
-            <div class="card mb-3 shadow-sm">
-                <div class="card-header border-0 bg-transparent pb-0">
-                    <h3 class="card-title text-secondary">{% translate "Deployment &amp; Custody" %}</h3>
-                </div>
-                <div class="card-body">
-                    {% include 'assets/includes/detail/asset_assignment.html' %}
-                </div>
-            </div>
-
-            {# 3. Hardware Specifications Card (Conditional Check) #}
-            {% if object.asset_type and object.asset_type.custom_fieldset and object.asset_type.custom_fieldset.fields.exists or object.component_allocations.all %}
-            <div class="card mb-3 shadow-sm">
-                <div class="card-body">
-                    {% include 'assets/includes/detail/asset_specs.html' %}
-                </div>
-            </div>
-            {% endif %}
-
-            {# 4. Custom Specifications Card (Conditional Check) #}
-            {% if object.custom_field_data %}
-            <div class="card mb-3 shadow-sm">
-                <div class="card-body">
-                    {% include 'assets/includes/detail/asset_custom_fields.html' %}
-                </div>
-            </div>
-            {% endif %}
-
-            {# 5. Support & Warranty Details Card #}
-            <div class="card mb-3 shadow-sm">
-                <div class="card-header border-0 bg-transparent pb-0">
-                    <h3 class="card-title text-secondary">{% translate "Support &amp; Warranty Details" %}</h3>
-                </div>
-                <div class="card-body">
-                    {% include 'assets/includes/detail/asset_support.html' %}
-                </div>
-            </div>
-
-            {# 6. Comments, Notes, & Description Card (Stacked at bottom) --- #}
-            {% if object.notes %}
-            <div class="card mb-3 shadow-sm">
-                <div class="card-header border-0 bg-transparent">
-                    <h3 class="card-title text-secondary">{% translate "Notes" %}</h3>
-                </div>
-                <div class="card-body pt-0">{{ object.notes|linebreaksbr }}</div>
-            </div>
-            {% endif %}
-
-            {# Asset has no `comments` or `description` field (only `notes`, above); dead cards removed. #}
+  {# Asset overview metrics (assignment status + installed-software count) #}
+  {% include 'assets/includes/detail/asset_metrics.html' %}
+  <div class="row g-3">
+    {# --- Left Column: Main area (col-lg-8) --- #}
+    <div class="col-12 col-lg-8">
+      {# 1. Asset Details Card #}
+      <div class="card mb-3 shadow-sm">
+        <div class="card-header border-0 bg-transparent pb-0">
+          <h3 class="card-title text-secondary">{% translate "Asset Details" %}</h3>
         </div>
-
-        {# --- Right Column: Sidebar (col-lg-4) --- #}
-        <div class="col-12 col-lg-4">
-            {# 1. Metadata Details Card #}
-            {% if object.created_at or object.updated_at %}
-            <div class="card mb-3 shadow-sm">
-                <div class="card-body">
-                    <h3 class="card-title text-muted mb-2">{% translate "Metadata" %}</h3>
-                    <p class="text-secondary small mb-0">
-                        {% if object.created_at %}<strong>{% translate "Created:" %}</strong> {{ object.created_at|date:"Y-m-d H:i" }}<br>{% endif %}
-                        {% if object.updated_at %}<strong>{% translate "Updated:" %}</strong> {{ object.updated_at|date:"Y-m-d H:i" }}{% endif %}
-                    </p>
-                </div>
-            </div>
-            {% endif %}
-
-            {# 2. Assigned Tags Card #}
-            {% if object.tags.all %}
-            <div class="card mb-3 shadow-sm">
-                <div class="card-header border-0 bg-transparent">
-                    <h3 class="card-title text-secondary">{% translate "Assigned Tags" %}</h3>
-                </div>
-                <div class="card-body pt-0">
-                    {% for tag in object.tags.all %}
-                        {% include 'inc/tags.html' with tag=tag %}
-                    {% endfor %}
-                </div>
-            </div>
-            {% endif %}
-
-            {# 3. Financial & Lifecycle Card #}
-            <div class="card mb-3 shadow-sm">
-                <div class="card-header border-0 bg-transparent pb-0">
-                    <h3 class="card-title text-secondary">{% translate "Financial &amp; Lifecycle" %}</h3>
-                </div>
-                <div class="card-body">
-                    {% include 'assets/includes/detail/asset_financial.html' %}
-                </div>
-            </div>
-
-            {# 4. Audit & Compliance Card #}
-            <div class="card mb-3 shadow-sm">
-                <div class="card-body">
-                    {% include 'assets/includes/detail/asset_audit.html' %}
-                </div>
-            </div>
-
-            {# 5. Related Inventory Card #}
-            {% if related_objects_list %}
-            <div class="card mb-3 shadow-sm">
-                <div class="card-header border-0 bg-transparent">
-                    <h3 class="card-title text-secondary">{% translate "Related Inventory" %}</h3>
-                </div>
-                <div class="list-group list-group-flush">
-                    {% for item in related_objects_list %}
-                        <a href="{{ item.url }}" class="list-group-item list-group-item-action d-flex justify-content-between align-items-center">
-                            {{ item.label }}
-                            <span class="badge bg-primary-lt text-primary rounded-pill">{{ item.count }}</span>
-                        </a>
-                    {% endfor %}
-                </div>
-            </div>
-            {% endif %}
+        <div class="card-body">{% include 'assets/includes/detail/asset_asset_info.html' %}</div>
+      </div>
+      {# 2. Deployment & Custody Card #}
+      <div class="card mb-3 shadow-sm">
+        <div class="card-header border-0 bg-transparent pb-0">
+          <h3 class="card-title text-secondary">{% translate "Deployment &amp; Custody" %}</h3>
         </div>
+        <div class="card-body">{% include 'assets/includes/detail/asset_assignment.html' %}</div>
+      </div>
+      {# 3. Hardware Specifications Card (Conditional Check) #}
+      {% if object.asset_type and object.asset_type.custom_fieldset and object.asset_type.custom_fieldset.fields.exists or object.component_allocations.all %}
+        <div class="card mb-3 shadow-sm">
+          <div class="card-body">{% include 'assets/includes/detail/asset_specs.html' %}</div>
+        </div>
+      {% endif %}
+      {# 4. Custom Specifications Card (Conditional Check) #}
+      {% if object.custom_field_data %}
+        <div class="card mb-3 shadow-sm">
+          <div class="card-body">{% include 'assets/includes/detail/asset_custom_fields.html' %}</div>
+        </div>
+      {% endif %}
+      {# 5. Support & Warranty Details Card #}
+      <div class="card mb-3 shadow-sm">
+        <div class="card-header border-0 bg-transparent pb-0">
+          <h3 class="card-title text-secondary">{% translate "Support &amp; Warranty Details" %}</h3>
+        </div>
+        <div class="card-body">{% include 'assets/includes/detail/asset_support.html' %}</div>
+      </div>
+      {# 6. Comments, Notes, & Description Card (Stacked at bottom) --- #}
+      {% if object.notes %}
+        <div class="card mb-3 shadow-sm">
+          <div class="card-header border-0 bg-transparent">
+            <h3 class="card-title text-secondary">{% translate "Notes" %}</h3>
+          </div>
+          <div class="card-body pt-0">{{ object.notes|linebreaksbr }}</div>
+        </div>
+      {% endif %}
+      {# Asset has no `comments` or `description` field (only `notes`, above); dead cards removed. #}
     </div>
+    {# --- Right Column: Sidebar (col-lg-4) --- #}
+    <div class="col-12 col-lg-4">
+      {# 1. Metadata Details Card #}
+      {% if object.created_at or object.updated_at %}
+        <div class="card mb-3 shadow-sm">
+          <div class="card-body">
+            <h3 class="card-title text-muted mb-2">{% translate "Metadata" %}</h3>
+            <p class="text-secondary small mb-0">
+              {% if object.created_at %}<strong>{% translate "Created:" %}</strong> {{ object.created_at|date:"Y-m-d H:i" }}<br>{% endif %}
+              {% if object.updated_at %}<strong>{% translate "Updated:" %}</strong> {{ object.updated_at|date:"Y-m-d H:i" }}{% endif %}
+            </p>
+          </div>
+        </div>
+      {% endif %}
+      {# 2. Assigned Tags Card #}
+      {% if object.tags.all %}
+        <div class="card mb-3 shadow-sm">
+          <div class="card-header border-0 bg-transparent">
+            <h3 class="card-title text-secondary">{% translate "Assigned Tags" %}</h3>
+          </div>
+          <div class="card-body pt-0">
+            {% for tag in object.tags.all %}
+              {% include 'inc/tags.html' with tag=tag %}
+            {% endfor %}
+          </div>
+        </div>
+      {% endif %}
+      {# 3. Financial & Lifecycle Card #}
+      <div class="card mb-3 shadow-sm">
+        <div class="card-header border-0 bg-transparent pb-0">
+          <h3 class="card-title text-secondary">{% translate "Financial &amp; Lifecycle" %}</h3>
+        </div>
+        <div class="card-body">{% include 'assets/includes/detail/asset_financial.html' %}</div>
+      </div>
+      {# 4. Audit & Compliance Card #}
+      <div class="card mb-3 shadow-sm">
+        <div class="card-body">{% include 'assets/includes/detail/asset_audit.html' %}</div>
+      </div>
+      {# 5. Related Inventory Card #}
+      {% if related_objects_list %}
+        <div class="card mb-3 shadow-sm">
+          <div class="card-header border-0 bg-transparent">
+            <h3 class="card-title text-secondary">{% translate "Related Inventory" %}</h3>
+          </div>
+          <div class="list-group list-group-flush">
+            {% for item in related_objects_list %}
+              <a href="{{ item.url }}"
+                 class="list-group-item list-group-item-action d-flex justify-content-between align-items-center">
+                {{ item.label }}
+                <span class="badge bg-primary-lt text-primary rounded-pill">{{ item.count }}</span>
+              </a>
+            {% endfor %}
+          </div>
+        </div>
+      {% endif %}
+    </div>
+  </div>
 {% endblock details_tab %}
-
 {# Extra tab panes: Components, Maintenances, Software #}
 {% block extra_tab_panes %}
-    {% if object.is_modular %}
-    <div class="tab-pane fade {% if request.GET.tab == 'components' %}show active{% endif %}" id="components" role="tabpanel">
-        <div class="card border-0 shadow-sm">
-            <div class="card-header border-0 bg-transparent d-flex justify-content-between align-items-center">
-                <h3 class="card-title">{% translate "Installed Physical Modules / Components" %}</h3>
-                <button type="button" class="btn btn-sm btn-primary"
-                        hx-get="{% url 'inventory:componentallocation_create' %}?asset={{ object.pk }}&_quickadd=1"
-                        hx-target="#modal-placeholder">
-                    <i class="mdi mdi-plus"></i> {% translate "Add Component" %}
-                </button>
-            </div>
-            {% if components_table.rows %}
-                <div class="table-responsive">
-                    {% render_table components_table %}
-                </div>
-                {% include 'generic/includes/table_pagination.html' with table=components_table tab="components" %}
-            {% else %}
-                <div class="card-body py-5 text-muted text-center">
-                    <p class="mb-0">{% translate "No physical modules (like RAM, SSD, GPU) checked into this hardware asset." %}</p>
-                </div>
-            {% endif %}
+  {% if object.is_modular %}
+    <div class="tab-pane fade {% if request.GET.tab == 'components' %}show active{% endif %}"
+         id="components"
+         role="tabpanel">
+      <div class="card border-0 shadow-sm">
+        <div class="card-header border-0 bg-transparent d-flex justify-content-between align-items-center">
+          <h3 class="card-title">{% translate "Installed Physical Modules / Components" %}</h3>
+          <button type="button"
+                  class="btn btn-sm btn-primary"
+                  hx-get="{% url 'inventory:componentallocation_create' %}?asset={{ object.pk }}&_quickadd=1"
+                  hx-target="#modal-placeholder">
+            <i class="mdi mdi-plus"></i> {% translate "Add Component" %}
+          </button>
         </div>
+        {% if components_table.rows %}
+          <div class="table-responsive">{% render_table components_table %}</div>
+          {% include 'generic/includes/table_pagination.html' with table=components_table tab="components" %}
+        {% else %}
+          <div class="card-body py-5 text-muted text-center">
+            <p class="mb-0">{% translate "No physical modules (like RAM, SSD, GPU) checked into this hardware asset." %}</p>
+          </div>
+        {% endif %}
+      </div>
     </div>
-    {% endif %}
-
-    <div class="tab-pane fade {% if request.GET.tab == 'maintenances' %}show active{% endif %}" id="maintenances" role="tabpanel">
-        <div class="card border-0 shadow-sm">
-            <div class="card-header border-0 bg-transparent d-flex justify-content-between align-items-center">
-                <h3 class="card-title">{% translate "Asset Repair &amp; Upgrade History" %}</h3>
-                <button type="button" class="btn btn-sm btn-primary"
-                        hx-get="{% url 'assets:assetmaintenance_create' %}?asset={{ object.pk }}&_quickadd=1"
-                        hx-target="#modal-placeholder">
-                    <i class="mdi mdi-plus"></i> {% translate "Record Maintenance" %}
-                </button>
-            </div>
-            {% if maintenances_table.rows %}
-                <div class="table-responsive">
-                    {% render_table maintenances_table %}
-                </div>
-                {% include 'generic/includes/table_pagination.html' with table=maintenances_table tab="maintenances" %}
-            {% else %}
-                <div class="card-body py-5 text-muted text-center">
-                    <p class="mb-0">{% translate "No repair, calibration, or hardware maintenance logged for this asset." %}</p>
-                </div>
-            {% endif %}
+  {% endif %}
+  <div class="tab-pane fade {% if request.GET.tab == 'maintenances' %}show active{% endif %}"
+       id="maintenances"
+       role="tabpanel">
+    <div class="card border-0 shadow-sm">
+      <div class="card-header border-0 bg-transparent d-flex justify-content-between align-items-center">
+        <h3 class="card-title">{% translate "Asset Repair &amp; Upgrade History" %}</h3>
+        <button type="button"
+                class="btn btn-sm btn-primary"
+                hx-get="{% url 'assets:assetmaintenance_create' %}?asset={{ object.pk }}&_quickadd=1"
+                hx-target="#modal-placeholder">
+          <i class="mdi mdi-plus"></i> {% translate "Record Maintenance" %}
+        </button>
+      </div>
+      {% if maintenances_table.rows %}
+        <div class="table-responsive">{% render_table maintenances_table %}</div>
+        {% include 'generic/includes/table_pagination.html' with table=maintenances_table tab="maintenances" %}
+      {% else %}
+        <div class="card-body py-5 text-muted text-center">
+          <p class="mb-0">{% translate "No repair, calibration, or hardware maintenance logged for this asset." %}</p>
         </div>
+      {% endif %}
     </div>
-
-    {% translate "Installed Software Inventory" as t_software %}
-    {% translate "No catalog software items registered on this asset." as e_software %}
-    {% translate "Install Software" as t_add_software %}
-    {% url 'software:installedsoftware_create' as sw_add_base %}
-    {% with asset_pk=object.pk|stringformat:"s" %}
+  </div>
+  {% translate "Installed Software Inventory" as t_software %}
+  {% translate "No catalog software items registered on this asset." as e_software %}
+  {% translate "Install Software" as t_add_software %}
+  {% url 'software:installedsoftware_create' as sw_add_base %}
+  {% with asset_pk=object.pk|stringformat:"s" %}
     {% include 'generic/includes/related_table_tab.html' with tab="software" table=software_table title=t_software empty=e_software add_modal_url=sw_add_base|add:"?asset="|add:asset_pk|add:"&_quickadd=1" add_label=t_add_software %}
-    {% endwith %}
-
-    {% if accessory_table.rows %}
+  {% endwith %}
+  {% if accessory_table.rows %}
     {% translate "Assigned Accessories" as t_acc %}
     {% translate "No accessories assigned to this asset." as e_acc %}
     {% include 'generic/includes/related_table_tab.html' with tab="accessories" table=accessory_table title=t_acc empty=e_acc %}
-    {% endif %}
-
-    {% if consumable_table.rows %}
+  {% endif %}
+  {% if consumable_table.rows %}
     {% translate "Assigned Consumables" as t_cons %}
     {% translate "No consumables assigned to this asset." as e_cons %}
     {% include 'generic/includes/related_table_tab.html' with tab="consumables" table=consumable_table title=t_cons empty=e_cons %}
-    {% endif %}
-
-    {% translate "Asset Requests History" as t_requests %}
-    {% translate "No requests logged for this asset." as e_requests %}
-    {% include 'generic/includes/related_table_tab.html' with tab="requests" table=requests_table title=t_requests empty=e_requests %}
-
-    {% translate "Asset Verification &amp; Audits" as t_audits %}
-    {% translate "No verification audits logged for this asset." as e_audits %}
-    {% include 'generic/includes/related_table_tab.html' with tab="audits" table=audits_table title=t_audits empty=e_audits %}
-
-    {% translate "Signed Custody Receipts" as t_receipts %}
-    {% translate "No custody receipts generated for this asset." as e_receipts %}
-    {% include 'generic/includes/related_table_tab.html' with tab="custody-receipts" table=receipts_table title=t_receipts empty=e_receipts %}
-
-    {% translate "Allocated Software Licenses" as t_seats %}
-    {% translate "No software license seats allocated to this asset." as e_seats %}
-    {% translate "Assign License" as t_add_license %}
-    {% url 'licenses:licenseseatassignment_create' as lic_add_base %}
-    {% with asset_pk=object.pk|stringformat:"s" %}
+  {% endif %}
+  {% translate "Asset Requests History" as t_requests %}
+  {% translate "No requests logged for this asset." as e_requests %}
+  {% include 'generic/includes/related_table_tab.html' with tab="requests" table=requests_table title=t_requests empty=e_requests %}
+  {% translate "Asset Verification &amp; Audits" as t_audits %}
+  {% translate "No verification audits logged for this asset." as e_audits %}
+  {% include 'generic/includes/related_table_tab.html' with tab="audits" table=audits_table title=t_audits empty=e_audits %}
+  {% translate "Signed Custody Receipts" as t_receipts %}
+  {% translate "No custody receipts generated for this asset." as e_receipts %}
+  {% include 'generic/includes/related_table_tab.html' with tab="custody-receipts" table=receipts_table title=t_receipts empty=e_receipts %}
+  {% translate "Allocated Software Licenses" as t_seats %}
+  {% translate "No software license seats allocated to this asset." as e_seats %}
+  {% translate "Assign License" as t_add_license %}
+  {% url 'licenses:licenseseatassignment_create' as lic_add_base %}
+  {% with asset_pk=object.pk|stringformat:"s" %}
     {% include 'generic/includes/related_table_tab.html' with tab="license-seats" table=license_seats_table title=t_seats empty=e_seats add_modal_url=lic_add_base|add:"?asset="|add:asset_pk|add:"&_quickadd=1" add_label=t_add_license %}
-    {% endwith %}
-
-    <div class="tab-pane fade {% if request.GET.tab == 'warranties' %}show active{% endif %}" id="warranties" role="tabpanel">
-        <div class="card border-0 shadow-sm">
-            <div class="card-header border-0 bg-transparent d-flex justify-content-between align-items-center">
-                <h3 class="card-title">{% translate "Warranties" %}</h3>
-                <button type="button" class="btn btn-sm btn-primary"
-                        hx-get="{% url 'assets:warranty_create' %}?asset={{ object.pk }}&_quickadd=1"
-                        hx-target="#modal-placeholder">
-                    <i class="mdi mdi-plus"></i> {% translate "Add Warranty" %}
-                </button>
-            </div>
-            {% if warranties_table.rows %}
-                <div class="table-responsive">{% render_table warranties_table %}</div>
-                {% include 'generic/includes/table_pagination.html' with table=warranties_table tab="warranties" %}
-            {% else %}
-                <div class="card-body py-5 text-muted text-center"><p class="mb-0">{% translate "No warranties registered for this asset." %}</p></div>
-            {% endif %}
+  {% endwith %}
+  <div class="tab-pane fade {% if request.GET.tab == 'warranties' %}show active{% endif %}"
+       id="warranties"
+       role="tabpanel">
+    <div class="card border-0 shadow-sm">
+      <div class="card-header border-0 bg-transparent d-flex justify-content-between align-items-center">
+        <h3 class="card-title">{% translate "Warranties" %}</h3>
+        <button type="button"
+                class="btn btn-sm btn-primary"
+                hx-get="{% url 'assets:warranty_create' %}?asset={{ object.pk }}&_quickadd=1"
+                hx-target="#modal-placeholder">
+          <i class="mdi mdi-plus"></i> {% translate "Add Warranty" %}
+        </button>
+      </div>
+      {% if warranties_table.rows %}
+        <div class="table-responsive">{% render_table warranties_table %}</div>
+        {% include 'generic/includes/table_pagination.html' with table=warranties_table tab="warranties" %}
+      {% else %}
+        <div class="card-body py-5 text-muted text-center">
+          <p class="mb-0">{% translate "No warranties registered for this asset." %}</p>
         </div>
+      {% endif %}
     </div>
-
-    <div class="tab-pane fade {% if request.GET.tab == 'reservations' %}show active{% endif %}" id="reservations" role="tabpanel">
-        <div class="card border-0 shadow-sm">
-            <div class="card-header border-0 bg-transparent d-flex justify-content-between align-items-center">
-                <h3 class="card-title">{% translate "Reservations" %}</h3>
-                <button type="button" class="btn btn-sm btn-primary"
-                        hx-get="{% url 'assets:assetreservation_create' %}?asset={{ object.pk }}&_quickadd=1"
-                        hx-target="#modal-placeholder">
-                    <i class="mdi mdi-plus"></i> {% translate "Add Reservation" %}
-                </button>
-            </div>
-            {% if reservations_table.rows %}
-                <div class="table-responsive">{% render_table reservations_table %}</div>
-                {% include 'generic/includes/table_pagination.html' with table=reservations_table tab="reservations" %}
-            {% else %}
-                <div class="card-body py-5 text-muted text-center"><p class="mb-0">{% translate "No reservations for this asset." %}</p></div>
-            {% endif %}
+  </div>
+  <div class="tab-pane fade {% if request.GET.tab == 'reservations' %}show active{% endif %}"
+       id="reservations"
+       role="tabpanel">
+    <div class="card border-0 shadow-sm">
+      <div class="card-header border-0 bg-transparent d-flex justify-content-between align-items-center">
+        <h3 class="card-title">{% translate "Reservations" %}</h3>
+        <button type="button"
+                class="btn btn-sm btn-primary"
+                hx-get="{% url 'assets:assetreservation_create' %}?asset={{ object.pk }}&_quickadd=1"
+                hx-target="#modal-placeholder">
+          <i class="mdi mdi-plus"></i> {% translate "Add Reservation" %}
+        </button>
+      </div>
+      {% if reservations_table.rows %}
+        <div class="table-responsive">{% render_table reservations_table %}</div>
+        {% include 'generic/includes/table_pagination.html' with table=reservations_table tab="reservations" %}
+      {% else %}
+        <div class="card-body py-5 text-muted text-center">
+          <p class="mb-0">{% translate "No reservations for this asset." %}</p>
         </div>
+      {% endif %}
     </div>
-
-    <div class="tab-pane fade {% if request.GET.tab == 'disposal' %}show active{% endif %}" id="disposal" role="tabpanel">
-        <div class="card border-0 shadow-sm">
-            <div class="card-header border-0 bg-transparent d-flex justify-content-between align-items-center">
-                <h3 class="card-title">{% translate "Disposal" %}</h3>
-                {% if not disposal_obj %}
-                <button type="button" class="btn btn-sm btn-primary"
-                        hx-get="{% url 'assets:assetdisposal_create' %}?asset={{ object.pk }}&_quickadd=1"
-                        hx-target="#modal-placeholder">
-                    <i class="mdi mdi-plus"></i> {% translate "Record Disposal" %}
-                </button>
-                {% endif %}
-            </div>
-            {% if disposal_obj %}
-            <div class="card-body">
-                <dl class="row mb-0">
-                    <dt class="col-sm-4">{% translate "Method:" %}</dt>
-                    <dd class="col-sm-8">{{ disposal_obj.get_disposal_method_display }}</dd>
-                    <dt class="col-sm-4">{% translate "Disposal Date:" %}</dt>
-                    <dd class="col-sm-8">{{ disposal_obj.disposal_date|date:"Y-m-d" }}</dd>
-                    <dt class="col-sm-4">{% translate "Recipient:" %}</dt>
-                    <dd class="col-sm-8">{{ disposal_obj.recipient|default:"-" }}</dd>
-                </dl>
-                <a href="{{ disposal_obj.get_absolute_url }}" class="btn btn-sm btn-outline-secondary mt-3">{% translate "View / Edit Disposal" %}</a>
-            </div>
-            {% else %}
-            <div class="card-body py-5 text-muted text-center"><p class="mb-0">{% translate "No disposal record for this asset." %}</p></div>
-            {% endif %}
+  </div>
+  <div class="tab-pane fade {% if request.GET.tab == 'disposal' %}show active{% endif %}"
+       id="disposal"
+       role="tabpanel">
+    <div class="card border-0 shadow-sm">
+      <div class="card-header border-0 bg-transparent d-flex justify-content-between align-items-center">
+        <h3 class="card-title">{% translate "Disposal" %}</h3>
+        {% if not disposal_obj %}
+          <button type="button"
+                  class="btn btn-sm btn-primary"
+                  hx-get="{% url 'assets:assetdisposal_create' %}?asset={{ object.pk }}&_quickadd=1"
+                  hx-target="#modal-placeholder">
+            <i class="mdi mdi-plus"></i> {% translate "Record Disposal" %}
+          </button>
+        {% endif %}
+      </div>
+      {% if disposal_obj %}
+        <div class="card-body">
+          <dl class="row mb-0">
+            <dt class="col-sm-4">{% translate "Method:" %}</dt>
+            <dd class="col-sm-8">
+              {{ disposal_obj.get_disposal_method_display }}
+            </dd>
+            <dt class="col-sm-4">{% translate "Disposal Date:" %}</dt>
+            <dd class="col-sm-8">
+              {{ disposal_obj.disposal_date|date:"Y-m-d" }}
+            </dd>
+            <dt class="col-sm-4">{% translate "Recipient:" %}</dt>
+            <dd class="col-sm-8">
+              {{ disposal_obj.recipient|default:"-" }}
+            </dd>
+          </dl>
+          <a href="{{ disposal_obj.get_absolute_url }}"
+             class="btn btn-sm btn-outline-secondary mt-3">{% translate "View / Edit Disposal" %}</a>
         </div>
+      {% else %}
+        <div class="card-body py-5 text-muted text-center">
+          <p class="mb-0">{% translate "No disposal record for this asset." %}</p>
+        </div>
+      {% endif %}
     </div>
+  </div>
 {% endblock extra_tab_panes %}

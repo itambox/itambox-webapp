@@ -2,6 +2,6 @@
 {% translate "Asset Types" as l_types %}
 {% translate "Accessories" as l_acc %}
 <div class="row g-3 mb-4">
-    {% include "generic/includes/stat_card.html" with color="blue" icon="mdi mdi-cog-outline" label=l_types value=asset_types_table.rows|length %}
-    {% include "generic/includes/stat_card.html" with color="purple" icon="mdi mdi-puzzle-outline" label=l_acc value=accessories_table.rows|length %}
+  {% include "generic/includes/stat_card.html" with color="blue" icon="mdi mdi-cog-outline" label=l_types value=asset_types_table.rows|length %}
+  {% include "generic/includes/stat_card.html" with color="purple" icon="mdi mdi-puzzle-outline" label=l_acc value=accessories_table.rows|length %}
 </div>

@@ -1,33 +1,39 @@
 {% extends 'generic/object_detail.html' %}
 {% load i18n %}
 {% load render_table from django_tables2 %}
-
 {% block title %}{{ object.name }} {% translate "- Depreciation Rule - ITAMbox" %}{% endblock %}
-
-{% block page_pretitle %}{% translate "Assets / Depreciation Rules" %}{% endblock %}
-
+{% block page_pretitle %}
+  {% translate "Assets / Depreciation Rules" %}
+{% endblock %}
 {% block extra_tabs %}
-    <li class="nav-item" role="presentation">
-        <a href="?tab=asset-types" data-bs-target="#asset-types" class="nav-link {% if request.GET.tab == 'asset-types' %}active{% endif %}" data-bs-toggle="tab" hx-boost="false" role="tab">
-            <i class="mdi mdi-shape-outline me-1 text-purple"></i>
-            {% translate "Affected Asset Types" %} <span class="badge bg-purple-lt ms-2">{{ assettypes_table.rows|length }}</span>
-        </a>
-    </li>
-    <li class="nav-item" role="presentation">
-        <a href="?tab=assets" data-bs-target="#assets" class="nav-link {% if request.GET.tab == 'assets' %}active{% endif %}" data-bs-toggle="tab" hx-boost="false" role="tab">
-            <i class="mdi mdi-laptop me-1 text-blue"></i>
-            {% translate "Active Assets" %} <span class="badge bg-blue-lt ms-2">{{ assets_table.rows|length }}</span>
-        </a>
-    </li>
+  <li class="nav-item" role="presentation">
+    <a href="?tab=asset-types"
+       data-bs-target="#asset-types"
+       class="nav-link {% if request.GET.tab == 'asset-types' %}active{% endif %}"
+       data-bs-toggle="tab"
+       hx-boost="false"
+       role="tab">
+      <i class="mdi mdi-shape-outline me-1 text-purple"></i>
+      {% translate "Affected Asset Types" %} <span class="badge bg-purple-lt ms-2">{{ assettypes_table.rows|length }}</span>
+    </a>
+  </li>
+  <li class="nav-item" role="presentation">
+    <a href="?tab=assets"
+       data-bs-target="#assets"
+       class="nav-link {% if request.GET.tab == 'assets' %}active{% endif %}"
+       data-bs-toggle="tab"
+       hx-boost="false"
+       role="tab">
+      <i class="mdi mdi-laptop me-1 text-blue"></i>
+      {% translate "Active Assets" %} <span class="badge bg-blue-lt ms-2">{{ assets_table.rows|length }}</span>
+    </a>
+  </li>
 {% endblock extra_tabs %}
-
 {% block extra_tab_panes %}
-    {% translate "Affected Asset Types" as t_types %}
-    {% translate "No asset types associated with this depreciation rule." as e_types %}
-    {% include 'generic/includes/related_table_tab.html' with tab="asset-types" table=assettypes_table title=t_types empty=e_types %}
-
-    {% translate "Active Assets Amortization Schedule" as t_assets %}
-    {% translate "No active assets currently using this depreciation rule." as e_assets %}
-    {% include 'generic/includes/related_table_tab.html' with tab="assets" table=assets_table title=t_assets empty=e_assets %}
+  {% translate "Affected Asset Types" as t_types %}
+  {% translate "No asset types associated with this depreciation rule." as e_types %}
+  {% include 'generic/includes/related_table_tab.html' with tab="asset-types" table=assettypes_table title=t_types empty=e_types %}
+  {% translate "Active Assets Amortization Schedule" as t_assets %}
+  {% translate "No active assets currently using this depreciation rule." as e_assets %}
+  {% include 'generic/includes/related_table_tab.html' with tab="assets" table=assets_table title=t_assets empty=e_assets %}
 {% endblock extra_tab_panes %}
-
