@@ -10,7 +10,6 @@ from __future__ import annotations
 import subprocess
 import sys
 
-
 TEMPLATE_PATHS = (
     "itambox/**/templates/**/*.html",
     "itambox/**/templates/*.html",
