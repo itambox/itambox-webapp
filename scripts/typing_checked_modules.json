@@ -2,7 +2,7 @@
   "schema_version": 2,
   "canonical_python": "3.12",
   "next_sequence": 6,
-  "policy_sha256": "a7ccd7783f3091c083aa4b887d11bec35a5473eb4a7804e8fb9ecf442fdbe99a",
+  "policy_sha256": "5fa240f8d02b95c509abfdfb6cee2faf8e477ede9a2cbacc8374ec83234ccf53",
   "config": {
     "config_file": "pyproject.toml",
     "working_directory": "itambox",
@@ -65,10 +65,11 @@
       "path": "itambox/core/tasks/reports.py",
       "module": "core.tasks.reports",
       "issue": "#93",
-      "note": "Slice 4 symbol admission: the _ReportOutput scheduled-report result contract -- the rendered email body plus the optional attachment content, filename, and MIME type a renderer hands to the archive and delivery steps. The report renderer and task functions that produce and consume it, and the report-provider architecture behind compile_report_context, remain outside this slice; report-provider contracts stay owned by #83.",
+      "note": "Slice 4 symbol admission: the _ReportOutput scheduled-report result contract -- the rendered email body plus the optional attachment content, filename, and MIME type a renderer hands to the archive and delivery steps. Slice 5 adds generate_scheduled_report_task, the scheduled-report task entry envelope: the ScheduledReport id a worker is handed, and the bool | None outcome it reports back -- True or False for a report that was processed, None for a schedule with no resolvable tenant scope. The renderer and helper functions between the two, and the report-provider architecture behind compile_report_context, remain outside this slice; report-provider contracts stay owned by #83.",
       "scope": "symbols",
       "symbols": [
-        "_ReportOutput"
+        "_ReportOutput",
+        "generate_scheduled_report_task"
       ]
     },
     {

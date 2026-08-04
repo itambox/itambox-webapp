@@ -401,6 +401,16 @@ architecture behind `compile_report_context`, remain outside this slice; no
 annotation is added to a renderer function here, and report-provider ownership
 remains #83.
 
+Slice 5 adds `generate_scheduled_report_task` to the same entry, so
+`itambox/core/tasks/reports.py` now admits two symbols. It is the scheduled-report
+task entry envelope: a worker is handed a `ScheduledReport` id as `int` and the
+task answers `bool | None` — `True` or `False` for a schedule that was processed
+or failed, and `None` for one whose tenant scope could not be resolved, which is
+refused rather than compiled across tenants. Only the entry point is annotated;
+the renderer, archive, delivery, and scope helpers between it and `_ReportOutput`
+keep their existing untyped signatures, and report-provider ownership remains
+#83.
+
 Subsequent slices of issue #93 extend the list one bounded surface at a time:
 the remaining task payload/result families, organization service boundaries,
 report-provider contracts, and serializer return annotations. Nothing is claimed
