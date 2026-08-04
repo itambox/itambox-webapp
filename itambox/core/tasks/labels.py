@@ -3,8 +3,10 @@ import io
 import logging
 import os
 import zipfile
+from collections.abc import Iterator, Sequence
 from math import isfinite
 from pathlib import Path
+from typing import TypeVar
 
 from django.contrib.contenttypes.models import ContentType
 from django.core.files.base import ContentFile
@@ -21,13 +23,16 @@ from .utils import reverse_job_detail
 logger = logging.getLogger(__name__)
 _LABEL_PRINT_CSS_PATH = Path(__file__).resolve().parents[2] / "static" / "src" / "styles" / "_label-print.scss"
 
+# The element type ``chunk_list`` pages over; it never inspects an element.
+_ChunkItem = TypeVar("_ChunkItem")
 
-def _label_print_css():
+
+def _label_print_css() -> str:
     """Load the authored label CSS for the self-contained PDF document."""
     return _LABEL_PRINT_CSS_PATH.read_text(encoding="utf-8")
 
 
-def _safe_label_measurement(value, default):
+def _safe_label_measurement(value: object, default: float) -> str:
     """Return a bounded, CSS-safe inch measurement for a label dimension."""
     try:
         numeric = float(value)
@@ -38,7 +43,7 @@ def _safe_label_measurement(value, default):
     return f"{numeric:.3f}".rstrip("0").rstrip(".")
 
 
-def generate_single_label_graphic(asset, label_format):
+def generate_single_label_graphic(asset: object, label_format: str) -> bytes:
     """
     Renders QR code or Barcode PNG bytes for the given asset.
     """
@@ -63,7 +68,13 @@ def generate_single_label_graphic(asset, label_format):
     return buffer.getvalue()
 
 
-def generate_label_batch_task(job_id, asset_pks, label_format, user_id, tenant_id=None):
+def generate_label_batch_task(
+    job_id: int,
+    asset_pks: Sequence[int | str],
+    label_format: str,
+    user_id: int | None,
+    tenant_id: int | None = None,
+) -> None:
     """
     Asynchronously generates QR-codes/barcodes for selected assets,
     packages them into a ZIP archive, and attaches it directly to the Job.
@@ -133,7 +144,7 @@ def generate_label_batch_task(job_id, asset_pks, label_format, user_id, tenant_i
             logger.exception("Outer exception during label batch generation task")
 
 
-def generate_base64_barcode(asset, barcode_format):
+def generate_base64_barcode(asset: object, barcode_format: str | None) -> str:
     buffer = io.BytesIO()
 
     fmt = barcode_format.lower() if barcode_format else "code128"
@@ -249,7 +260,7 @@ def render_label_html(asset, label_template, barcode_data_uri):
         return _default_label_card(asset, barcode_data_uri)
 
 
-def chunk_list(lst, n):
+def chunk_list(lst: Sequence[_ChunkItem], n: int) -> Iterator[Sequence[_ChunkItem]]:
     """Yield successive n-sized chunks from lst."""
     for i in range(0, len(lst), n):
         yield lst[i : i + n]
@@ -401,7 +412,14 @@ def render_labels_pdf(assets, label_template, layout_mode="roll"):
     return _html_to_pdf_bytes(html_content)
 
 
-def generate_label_pdf_batch_task(job_id, asset_pks, template_id, layout_mode, user_id, tenant_id=None):
+def generate_label_pdf_batch_task(
+    job_id: int,
+    asset_pks: Sequence[int | str],
+    template_id: int,
+    layout_mode: str,
+    user_id: int | None,
+    tenant_id: int | None = None,
+) -> None:
     """
     Asynchronously generates a single compiled PDF of asset labels using the selected LabelTemplate
     and layout mode, and attaches it directly to the Job.

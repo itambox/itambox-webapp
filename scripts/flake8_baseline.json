@@ -4871,7 +4871,7 @@
       "path": "itambox/core/tasks/disposal.py",
       "code": "C901",
       "message": "'bulk_dispose_task' is too complex (14)",
-      "source": "def bulk_dispose_task(job_id, asset_pks, user_id, tenant_id=None, disposal_kwargs=None, proceeds_map=None):",
+      "source": "def bulk_dispose_task(",
       "context": "Module:body/FunctionDef:bulk_dispose_task:self",
       "count": 1
     },
@@ -4951,7 +4951,7 @@
       "path": "itambox/core/tasks/labels.py",
       "code": "C901",
       "message": "'generate_label_batch_task' is too complex (11)",
-      "source": "def generate_label_batch_task(job_id, asset_pks, label_format, user_id, tenant_id=None):",
+      "source": "def generate_label_batch_task(",
       "context": "Module:body/FunctionDef:generate_label_batch_task:self",
       "count": 1
     },
@@ -4959,7 +4959,7 @@
       "path": "itambox/core/tasks/labels.py",
       "code": "C901",
       "message": "'generate_label_pdf_batch_task' is too complex (14)",
-      "source": "def generate_label_pdf_batch_task(job_id, asset_pks, template_id, layout_mode, user_id, tenant_id=None):",
+      "source": "def generate_label_pdf_batch_task(",
       "context": "Module:body/FunctionDef:generate_label_pdf_batch_task:self",
       "count": 1
     },
@@ -7959,7 +7959,7 @@
       "path": "itambox/organization/access.py",
       "code": "C901",
       "message": "'tenant_access_report' is too complex (15)",
-      "source": "def tenant_access_report(tenant, external_only=False):",
+      "source": "def tenant_access_report(tenant: object, external_only: bool = False) -> list[dict[str, object]]:",
       "context": "Module:body/FunctionDef:tenant_access_report:self",
       "count": 1
     },
