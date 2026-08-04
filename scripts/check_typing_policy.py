@@ -22,11 +22,13 @@ against and always exits 0.
 An entry admits either a whole module (``scope = "module"``) or a named set of
 top-level definitions inside it (``scope = "symbols"``). A symbol scope is how a
 module that still carries untyped debt contributes a contract: only the selected
-definitions are scanned for markers, and mypy sees a temporary ``--shadow-file``
+definitions are scanned for markers, and mypy sees a temporary isolated input
 projection of the module containing those definitions, the imports and constants
 they read, and every signature with its body replaced by ``raise
 NotImplementedError``. The projection is written to a temporary directory and
-never into the repository.
+never into the repository; it is passed as the checker input rather than as a
+``--shadow-file`` over the original path, so an eager package initializer cannot
+pull unrelated unchecked modules into the admission.
 
 Three things are checked, in this order, and the checker only runs when the
 first two are clean:
@@ -83,7 +85,7 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 # declaration, not something the gate infers for it.
 LEGACY_SCHEMA_VERSION = 1
 SCHEMA_VERSION = 2
-PROJECTION_VERSION = 2
+PROJECTION_VERSION = 3
 SUPPORTED_SCHEMA_VERSIONS = (LEGACY_SCHEMA_VERSION, SCHEMA_VERSION)
 CANONICAL_PYTHON = (3, 12)
 
@@ -1052,24 +1054,24 @@ def write_shadow_projections(root, selections, directory):
         if source is None:
             continue
         nodes, _findings = _resolve_symbols(selection.path, tree, selection.symbols)
-        relative = to_working_directory_paths([selection.path])[0]
-        projection = Path(directory) / relative
+        source_path = to_working_directory_paths([selection.path])[0]
+        projection_name = source_path.replace("/", "__").removesuffix(".py")
+        projection = Path(directory) / f"{projection_name}.py"
         projection.parent.mkdir(parents=True, exist_ok=True)
         projection.write_text(project_symbols(source, tree, nodes), encoding="utf-8")
-        shadows.append((relative, str(projection)))
+        shadows.append((source_path, str(projection)))
     return shadows
 
 
-def mypy_command(root, checked_paths, shadows=()):
+def mypy_command(root, checked_paths, input_paths=None):
     """The exact checker invocation, so tests can assert it without mypy.
 
-    ``shadows`` is the ``(source, projection)`` pairs of the symbol-scope
-    entries; a record that admits whole modules only produces the same command
-    line it always has.
+    ``input_paths`` preserves the checked-entry order and may replace selected
+    repository-relative paths with temporary isolated projections. When omitted,
+    the command uses the repository-relative paths unchanged.
     """
-    shadow_arguments = []
-    for source, projection in shadows:
-        shadow_arguments.extend(["--shadow-file", source, str(projection)])
+    if input_paths is None:
+        input_paths = to_working_directory_paths(checked_paths)
     return [
         sys.executable,
         "-m",
@@ -1081,8 +1083,7 @@ def mypy_command(root, checked_paths, shadows=()):
         "--no-incremental",
         "--no-error-summary",
         "--show-error-codes",
-        *shadow_arguments,
-        *to_working_directory_paths(checked_paths),
+        *[str(path) for path in input_paths],
     ]
 
 
@@ -1144,7 +1145,15 @@ def run_checker(root, policy, checked, runner=None):
         runner = subprocess.run
     with tempfile.TemporaryDirectory(prefix="typing-policy-shadow-") as directory:
         shadows = write_shadow_projections(root, selections, directory)
-        command = mypy_command(root, [selection.path for selection in selections], shadows=shadows)
+        projections = {source: projection for source, projection in shadows}
+        input_paths = [
+            projections.get(
+                to_working_directory_paths([selection.path])[0],
+                to_working_directory_paths([selection.path])[0],
+            )
+            for selection in selections
+        ]
+        command = mypy_command(root, [selection.path for selection in selections], input_paths=input_paths)
         completed = runner(
             command,
             cwd=str((Path(root) / WORKING_DIRECTORY).resolve()),

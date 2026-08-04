@@ -349,21 +349,22 @@ class SymbolScopeTests(FixtureTestCase):
         with self.assertRaises(gate.PolicyError):
             self.fixture.check()
 
-    def test_symbol_scope_uses_a_temporary_shadow_file_for_mypy(self):
+    def test_symbol_scope_uses_a_temporary_projection_as_the_mypy_input(self):
         self._write_symbol_record()
+
+        test_case = self
 
         class ShadowInspectingRunner(_FakeRunner):
             def __call__(self, command, **kwargs):
-                shadow_index = command.index("--shadow-file")
-                self.shadow_source = Path(command[shadow_index + 1])
-                self.shadow_path = Path(command[shadow_index + 2])
-                self.shadow_exists_during_run = self.shadow_path.is_file()
+                test_case.assertNotIn("--shadow-file", command)
+                self.projection_path = Path(command[-1])
+                self.projection_exists_during_run = self.projection_path.is_file()
                 return super().__call__(command, **kwargs)
 
         runner = ShadowInspectingRunner()
         self.assertEqual(self.fixture.check(runner=runner), ())
-        self.assertTrue(runner.shadow_exists_during_run)
-        self.assertEqual(runner.shadow_source.name, "symbol.py")
+        self.assertTrue(runner.projection_exists_during_run)
+        self.assertEqual(runner.projection_path.name, "pkg__symbol.py")
 
     def test_a_whole_module_admission_is_invoked_without_a_shadow_file(self):
         """The module-scope command line is the one it has always been."""
@@ -373,20 +374,20 @@ class SymbolScopeTests(FixtureTestCase):
         ((command, _kwargs),) = runner.calls
         self.assertNotIn("--shadow-file", command)
 
-    def test_the_shadow_is_temporary_and_never_written_into_the_repository(self):
+    def test_the_projection_is_temporary_and_never_written_into_the_repository(self):
         self._write_symbol_record()
         before = {path for path in Path(self.directory).rglob("*") if path.is_file()}
 
         class ShadowInspectingRunner(_FakeRunner):
             def __call__(self, command, **kwargs):
-                self.shadow_path = Path(command[command.index("--shadow-file") + 2])
+                self.projection_path = Path(command[-1])
                 return super().__call__(command, **kwargs)
 
         runner = ShadowInspectingRunner()
         self.assertEqual(self.fixture.check(runner=runner), ())
 
-        self.assertFalse(runner.shadow_path.is_file())
-        self.assertFalse(runner.shadow_path.is_relative_to(Path(self.directory)))
+        self.assertFalse(runner.projection_path.is_file())
+        self.assertFalse(runner.projection_path.is_relative_to(Path(self.directory)))
         self.assertEqual({path for path in Path(self.directory).rglob("*") if path.is_file()}, before)
 
     def test_a_suppression_outside_the_admitted_symbols_is_not_scanned(self):
@@ -1008,11 +1009,12 @@ class CommittedRecordTests(unittest.TestCase):
     def test_the_committed_record_is_internally_consistent(self):
         self.assertEqual(gate.check_record(REPO_ROOT, self.policy, self.record), ())
 
-    def test_the_committed_record_lists_the_slice_zero_and_slice_one_admissions(self):
+    def test_the_committed_record_lists_the_slice_zero_slice_one_and_slice_three_admissions(self):
         self.assertEqual(
             [entry["path"] for entry in self.record["checked"]],
             [
                 "itambox/core/context.py",
+                "itambox/core/tasks/context.py",
                 "itambox/organization/access.py",
                 "itambox/users/api/scim/provider_patch.py",
             ],
@@ -1023,6 +1025,7 @@ class CommittedRecordTests(unittest.TestCase):
                 "itambox/core/context.py": ("symbols", ["SystemAuthorizationContext"]),
                 "itambox/organization/access.py": ("symbols", ["ResourceAccessDecision"]),
                 "itambox/users/api/scim/provider_patch.py": ("module", []),
+                "itambox/core/tasks/context.py": ("symbols", ["TaskContext"]),
             },
         )
 

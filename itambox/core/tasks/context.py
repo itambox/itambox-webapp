@@ -1,10 +1,15 @@
+from __future__ import annotations
+
 import logging
 import uuid
+from types import TracebackType
+from typing import Protocol, Self
 
-from django.contrib.auth import get_user_model
+from django.apps import apps
 from django.core.exceptions import PermissionDenied
 
 from core.context import (
+    SystemAuthorizationContext,
     _current_user,
     _issue_system_authorization,
     _issued_system_authorizations,
@@ -20,7 +25,6 @@ from core.context import (
     set_current_tenant,
     set_current_tenant_group,
 )
-from organization.models import Membership, Tenant
 
 logger = logging.getLogger(__name__)
 
@@ -42,14 +46,47 @@ class TaskContext:
     the request.
     """
 
-    def __init__(self, tenant_id=None, user_id=None):
+    # The explicit scope the caller asked for, and what it resolved to. Both
+    # identifiers are primary keys of ``BigAutoField`` models, so ``int``.
+    class _TaskTenant(Protocol):
+        pk: int
+
+    class _TaskUser(Protocol):
+        is_active: bool
+        is_superuser: bool
+        pk: int
+
+    tenant_id: int | None
+    user_id: int | None
+    tenant: _TaskTenant | None
+    user: _TaskUser | None
+    _entered: bool
+
+    # The context captured on entry, restored verbatim on exit. Declared here
+    # rather than initialised in ``__init__`` because they are bound by
+    # ``__enter__`` only -- an un-entered TaskContext deliberately has nothing
+    # to restore.
+    _prev_request_id: uuid.UUID | None
+    _prev_user: object | None
+    _prev_tenant: _TaskTenant | None
+    _prev_membership: object | None
+    _prev_tenant_group: object | None
+    _prev_all_accessible: bool
+    _prev_system_authorization_scope: object | None
+    _prev_issued_system_authorizations: tuple[SystemAuthorizationContext, ...]
+
+    # The identity that makes an authorization this scope's own: an opaque
+    # object compared by identity, never by value.
+    _system_authorization_issuer: object
+
+    def __init__(self, tenant_id: int | None = None, user_id: int | None = None) -> None:
         self.tenant_id = tenant_id
         self.user_id = user_id
         self.tenant = None
         self.user = None
         self._entered = False
 
-    def __enter__(self):
+    def __enter__(self) -> Self:
         # Capture the context active on entry so __exit__ can restore it.
         self._prev_request_id = _request_id.get()
         self._prev_user = _current_user.get()
@@ -79,7 +116,8 @@ class TaskContext:
             if self.tenant:
                 set_current_tenant(self.tenant)
                 if self.user:
-                    membership = Membership._base_manager.filter(
+                    membership_model = apps.get_model("organization", "Membership")
+                    membership = membership_model._base_manager.filter(
                         user=self.user,
                         tenant=self.tenant,
                         is_active=True,
@@ -98,7 +136,7 @@ class TaskContext:
 
         return self
 
-    def authorize_system(self, *, permission, operation, reason):
+    def authorize_system(self, *, permission: str, operation: str, reason: str) -> SystemAuthorizationContext:
         """Issue an explicit authorization bound to this actorless task.
 
         Actor-bound tasks must use the actor's normal RBAC path. Tenantless or
@@ -124,20 +162,21 @@ class TaskContext:
             issuer=self._system_authorization_issuer,
         )
 
-    def _resolve_principal_and_tenant(self):
+    def _resolve_principal_and_tenant(self) -> None:
         """Load and authorize the task's explicit scope via unscoped managers."""
         # Base managers are intentional bootstrap paths: an inline task may
         # target a tenant outside the wrapping request's scope. Explicit bad
         # identifiers are fatal; silently continuing would turn a scoped job
         # into a tenantless/global one.
         if self.tenant_id is not None:
-            self.tenant = Tenant._base_manager.get(
+            tenant_model = apps.get_model("organization", "Tenant")
+            self.tenant = tenant_model._base_manager.get(
                 pk=self.tenant_id,
                 deleted_at__isnull=True,
             )
         if self.user_id is not None:
-            User = get_user_model()
-            self.user = User._base_manager.get(pk=self.user_id)
+            user_model = apps.get_model("users", "User")
+            self.user = user_model._base_manager.get(pk=self.user_id)
             if not self.user.is_active:
                 raise PermissionDenied("Inactive task principal")
 
@@ -149,7 +188,7 @@ class TaskContext:
             if self.tenant.pk not in accessible_tenant_ids(self.user):
                 raise PermissionDenied("Task principal cannot access target tenant")
 
-    def _restore_context(self):
+    def _restore_context(self) -> None:
         _issued_system_authorizations.set(self._prev_issued_system_authorizations)
         _system_authorization_scope.set(self._prev_system_authorization_scope)
         _request_id.set(self._prev_request_id)
@@ -159,6 +198,11 @@ class TaskContext:
         set_current_membership(self._prev_membership)
         set_current_all_accessible(self._prev_all_accessible)
 
-    def __exit__(self, exc_type, exc_val, exc_tb):
+    def __exit__(
+        self,
+        exc_type: type[BaseException] | None,
+        exc_val: BaseException | None,
+        exc_tb: TracebackType | None,
+    ) -> None:
         self._entered = False
         self._restore_context()
