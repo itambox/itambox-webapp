@@ -2,8 +2,9 @@
 
 ITAMbox types its backend **gradually and monotonically**. There is no
 repository-wide type check and no diagnostic baseline. Instead there is an
-explicit, append-only list of modules that are required to check clean, and a
-blocking gate that proves they still do.
+explicit, append-only list of whole modules and bounded top-level symbol
+surfaces that are required to check clean, and a blocking gate that proves they
+still do.
 
 The gate is `scripts/check_typing_policy.py`. The record is
 `scripts/typing_checked_modules.json`. The checker configuration is the
@@ -40,11 +41,12 @@ deliberate and documented rather than hidden.
 ## Why an allowlist and not a baseline
 
 A diagnostic baseline exists to admit *dirty* modules and pay the debt down
-later. This policy admits none. A module enters the checked list only when it
-produces **zero** diagnostics under the flags below — clean at admission. That
-removes an entire class of failure where a module is "typed" on paper while its
-suppressed diagnostics quietly accumulate, and it means there is only one
-ratchet to keep in step instead of two.
+later. This policy admits none. A whole module, or a symbol-scoped projection,
+enters the checked list only when its admitted surface produces **zero**
+diagnostics under the flags below — clean at admission. That removes an entire
+class of failure where a surface is "typed" on paper while its suppressed
+diagnostics quietly accumulate, and it means there is only one ratchet to keep
+in step instead of two.
 
 The consequence is that a module which cannot reach zero diagnostics without a
 behaviour change is **withdrawn with a tombstone**, never forced in with
@@ -129,22 +131,29 @@ Settings load performs no database, network, or filesystem-mutating work.
 
 ## The record: `scripts/typing_checked_modules.json`
 
-Schema v1. Every top-level field is required and no others are permitted.
+Schema v2. Every top-level field is required and no others are permitted. The
+gate still reads a legacy schema-v1 record as whole-module admissions, but every
+new record and every narrowed admission uses schema v2 explicitly.
 
 | Field | Meaning |
 |---|---|
-| `schema_version` | `1`. |
+| `schema_version` | `2`. |
 | `canonical_python` | `"3.12"`. The gate refuses any other interpreter. |
 | `next_sequence` | One past the highest admission sequence issued. |
-| `policy_sha256` | Fingerprint over the effective policy and the module lists. |
+| `policy_sha256` | Fingerprint over the effective policy, module paths, scopes, and admitted symbols. |
 | `config` | Mirror of the effective configuration: config file, working directory, settings module, platform authority, checker versions, mypy flags, and overrides. |
-| `checked` | Modules that must produce zero diagnostics. Sorted by path. |
+| `checked` | Whole modules or symbol-scoped surfaces that must produce zero diagnostics. Sorted by path. |
 | `withdrawn` | Tombstones. Never deleted. |
 
-A `checked` entry carries exactly `sequence`, `path`, `module`, `issue`, and
-`note`. A `withdrawn` entry carries exactly `sequence`, `path`, `module`,
-`issue`, and `reason`, where the reason is at least 40 characters explaining
-what could not be typed, and the issue is the follow-up (`#93`).
+A schema-v2 `checked` entry carries exactly `sequence`, `path`, `module`,
+`issue`, `note`, `scope`, and `symbols`. `scope = "module"` requires
+`symbols = []` and retains the whole-module behavior. `scope = "symbols"`
+requires a non-empty, sorted list of existing top-level class or function
+names; a selected class includes its methods. A schema-v1 entry omits the last
+two fields and means `scope = "module"` for backwards compatibility. A
+`withdrawn` entry carries exactly `sequence`, `path`, `module`, `issue`, and
+`reason`, where the reason is at least 40 characters explaining what could not
+be typed, and the issue is the follow-up (`#93`).
 
 ### Monotonicity
 
@@ -170,8 +179,10 @@ recorded configuration (checker versions, every mypy flag, every override, the
 working directory, the config file, the platform authority), the normative flag
 set and required error codes, the top-level, override, and django-stubs
 allowlists, the marker and suppression grammars, the checked and withdrawn path
-lists, and the path-to-module mapping. It is verified twice: against the record's own
-`config` block, and against the effective policy read from `pyproject.toml`.
+lists, every checked scope and admitted symbol, the shadow-projection algorithm
+version, and the path-to-module mapping.
+It is verified twice: against the record's own `config` block, and against the
+effective policy read from `pyproject.toml`.
 The first catches a hand-edited record; the second catches configuration drift.
 
 ### There is no write mode
@@ -186,12 +197,37 @@ To admit a module: make it check clean, add a `checked` entry with the next
 sequence, bump `next_sequence`, and update `policy_sha256` (the gate prints the
 expected value when it disagrees).
 
+### Symbol-level admission and shadow projections
+
+`scope = "symbols"` is the bounded escape hatch for a module whose surrounding
+helpers are not ready for whole-module admission. The gate resolves each name
+against the module's top-level `class`/`def` declarations, scans explicit
+`Any` and suppression grammar only inside those definitions, and fails with
+`T-SYM1` if a renamed or deleted contract is still recorded.
+
+For mypy, the gate creates a temporary `--shadow-file` projection. It contains
+the selected definitions, the imports and module-level aliases needed by their
+signatures, and the selected method/function signatures with bodies replaced by
+`raise NotImplementedError`. Individual import aliases are filtered, so an
+admitted value object does not accidentally pull an unchecked helper into the
+projection. The shadow directory is deleted after the run and is never part of
+the repository. The command uses `--no-incremental`, so a previous projection
+cannot be reused for a different symbol selection. Whole-module entries retain
+the original command line and behavior apart from this cache-safety flag.
+
+This is deliberately an **interface admission**, not a claim that the
+surrounding module or the selected implementation bodies are fully typed. The
+fields, decorators, bases, and method/function signatures are checked now;
+implementation-body typing remains a later bounded slice. A selected symbol
+also may not rely on an unselected local definition merely because that
+definition happens to be present in the source file.
+
 ## Explicit `Any`
 
 `Any` is not banned in a checked module. **Unexplained** `Any` is.
 
-Every explicit `Any` — every `Name` or attribute reference, not merely the
-import — must be covered by a marker:
+Every explicit `Any` **inside an admitted scope** — every `Name` or attribute
+reference, not merely the import — must be covered by a marker:
 
 ```
 # typing: <category>: <reason>
@@ -213,8 +249,12 @@ resolved marker; this is the deliberately textual adjacency rule used by the
 gate. A marker on one function never covers the next.
 
 A marker carrying an **unrecognised category, or no reason, always fails and can
-never be recorded away** (`T-ANY2`). That is the same escape-proof rule the
+never be recorded away (`T-ANY2`). That is the same escape-proof rule the
 inline-import gate applies; see [Python import policy](python-import-policy.md).
+
+The gate resolves `Any` imported under an alias from `typing` or
+`typing_extensions` as explicit `Any` too; `typing.Any` attribute references
+are covered by the same rule. An import alone is not a use and needs no marker.
 
 Implicit `Any` is not governed by this grammar at all — it is governed by
 `disallow_untyped_defs`, `disallow_any_generics`, `disallow_any_unimported`, and
@@ -240,8 +280,8 @@ about untrusted input.
 ## Suppressions
 
 Bare `# type: ignore` is forbidden — by `enable_error_code =
-["ignore-without-code"]` in the checker, and by the gate's own scan of checked
-modules. The required form is a coded ignore plus a categorised reason:
+["ignore-without-code"]` in the checker, and by the gate's own scan of admitted
+scopes. The required form is a coded ignore plus a categorised reason:
 
 ```python
 x = thing()  # type: ignore[attr-defined]  # typing: third-party-untyped: dependency ships no usable stubs
@@ -279,13 +319,15 @@ useful; it is not proof that CI is green.
 |---|---|
 | `T-CFG2` | A normative flag or required error code is missing or relaxed in `pyproject.toml`. |
 | `T-CFG3` | An override relaxes anything for a checked module. |
+| `T-CFG4` | An admitted source file contains a file-level `# mypy:` directive. |
 | `T-CFG5` | The recorded `config` block no longer describes `pyproject.toml`. |
 | `T-REC2` | `policy_sha256` does not match the record's own contents, or the effective policy. |
 | `T-REC3` | Admission sequences have a gap or a duplicate, or `next_sequence` is wrong. |
 | `T-REC4` | A checked path does not exist, is admitted twice, or the list is unsorted. |
 | `T-REC5` | A tombstone has no follow-up issue or a reason shorter than 40 characters. |
 | `T-REC6` | A recorded module name contradicts its path. |
-| `T-ANY1` | An explicit `Any` in a checked module has no marker. |
+| `T-SYM1` | A symbol-scoped entry names no existing top-level class or function. |
+| `T-ANY1` | An explicit `Any` in an admitted scope has no marker. |
 | `T-ANY2` | A marker has an unrecognised category or no reason. |
 | `T-IGN1` | A suppression is uncoded, or has no categorised reason. |
 | `T-IGN2` | A suppression's category is unrecognised. |
@@ -324,12 +366,18 @@ exit 2, because the gate cannot produce a trustworthy result at all.
 ## Current scope
 
 The checked list is the authority; this section is orientation only. Slice 0
-admits one module — `itambox/users/api/scim/provider_patch.py`, the pure SCIM
-PATCH parser, which has no ORM, no request state, and no Django imports and is
-therefore clean without depending on model inference.
+admits `itambox/users/api/scim/provider_patch.py` as a whole module, the pure
+SCIM PATCH parser. Slice 1 admits two top-level value-object interfaces without
+claiming their surrounding modules:
+
+- `SystemAuthorizationContext` in `itambox/core/context.py`;
+- `ResourceAccessDecision` in `itambox/organization/access.py`.
+
+Both Slice-1 entries use `scope = "symbols"`; their selected fields and method
+signatures are clean under the recorded policy, while the surrounding request,
+tenant, and RBAC helpers remain outside the checked set.
 
 Subsequent slices of issue #93 extend the list one bounded surface at a time:
-the contract value objects (`ResourceAccessDecision`,
-`SystemAuthorizationContext`), the SCIM typed sentinel, `TaskContext`, the
-organization service boundaries, and serializer return annotations. Nothing is
-claimed as checked until it appears in the record.
+the SCIM typed sentinel, `TaskContext`, the organization service boundaries, and
+serializer return annotations. Nothing is claimed as checked until it appears
+in the record.
