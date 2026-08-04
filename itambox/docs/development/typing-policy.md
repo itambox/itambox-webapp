@@ -205,15 +205,17 @@ against the module's top-level `class`/`def` declarations, scans explicit
 `Any` and suppression grammar only inside those definitions, and fails with
 `T-SYM1` if a renamed or deleted contract is still recorded.
 
-For mypy, the gate creates a temporary `--shadow-file` projection. It contains
+For mypy, the gate creates a temporary isolated input projection. It contains
 the selected definitions, the imports and module-level aliases needed by their
 signatures, and the selected method/function signatures with bodies replaced by
 `raise NotImplementedError`. Individual import aliases are filtered, so an
 admitted value object does not accidentally pull an unchecked helper into the
-projection. The shadow directory is deleted after the run and is never part of
-the repository. The command uses `--no-incremental`, so a previous projection
-cannot be reused for a different symbol selection. Whole-module entries retain
-the original command line and behavior apart from this cache-safety flag.
+projection. The projection directory is deleted after the run and is never
+part of the repository. Symbol projections are passed as direct checker inputs,
+not through `--shadow-file`: an eager package initializer cannot pull unrelated
+unchecked modules into the admission. The command uses `--no-incremental`, so a
+previous projection cannot be reused for a different symbol selection.
+Whole-module entries retain the original command line and behavior.
 
 This is deliberately an **interface admission**, not a claim that the
 surrounding module or the selected implementation bodies are fully typed. The

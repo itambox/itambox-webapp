@@ -2,7 +2,7 @@
   "schema_version": 2,
   "canonical_python": "3.12",
   "next_sequence": 5,
-  "policy_sha256": "9bb2df622b1124bd44ad5d79d6dfe972570fcd0f4f3fbad2a146548ed80ecd88",
+  "policy_sha256": "e98db395a05ebd42ac970394e11415c8f26b015052cf721bebc015b4a479727f",
   "config": {
     "config_file": "pyproject.toml",
     "working_directory": "itambox",
