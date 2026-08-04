@@ -1,8 +1,8 @@
 {
-  "schema_version": 1,
+  "schema_version": 2,
   "canonical_python": "3.12",
-  "next_sequence": 2,
-  "policy_sha256": "d1c79ff6ac2126abf4e468ffbd21149f3ccf991e3b3f56e26a763ccbd37507fe",
+  "next_sequence": 4,
+  "policy_sha256": "2bf4790e6bfc46c4eaaa0d3653c060f4b42db12e710d6232fd7d7637145fa1d2",
   "config": {
     "config_file": "pyproject.toml",
     "working_directory": "itambox",
@@ -39,11 +39,35 @@
   },
   "checked": [
     {
+      "sequence": 2,
+      "path": "itambox/core/context.py",
+      "module": "core.context",
+      "issue": "#93",
+      "note": "Slice 1 symbol admission: SystemAuthorizationContext contract value object and validation signature; surrounding request-context helpers remain outside this slice.",
+      "scope": "symbols",
+      "symbols": [
+        "SystemAuthorizationContext"
+      ]
+    },
+    {
+      "sequence": 3,
+      "path": "itambox/organization/access.py",
+      "module": "organization.access",
+      "issue": "#93",
+      "note": "Slice 1 symbol admission: ResourceAccessDecision contract value object; surrounding tenant/RBAC access helpers remain outside this slice.",
+      "scope": "symbols",
+      "symbols": [
+        "ResourceAccessDecision"
+      ]
+    },
+    {
       "sequence": 1,
       "path": "itambox/users/api/scim/provider_patch.py",
       "module": "users.api.scim.provider_patch",
       "issue": "#93",
-      "note": "Slice-0 pilot. Pure SCIM PATCH parsing: no ORM, no request state, no Django imports, so it is clean under the normative flags without depending on django-stubs model inference. Its explicit Any values are the external-JSON boundary and the UNSET sentinel, both categorised in place."
+      "note": "Slice-0 pilot. Pure SCIM PATCH parsing: no ORM, no request state, no Django imports, so it is clean under the normative flags without depending on django-stubs model inference. Its explicit Any values are the external-JSON boundary and the UNSET sentinel, both categorised in place.",
+      "scope": "module",
+      "symbols": []
     }
   ],
   "withdrawn": []

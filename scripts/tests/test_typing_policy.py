@@ -16,8 +16,14 @@ tombstone with no reason, an override or a top-level key that relaxes a
 normative flag, an unexplained ``Any``, an uncoded suppression, a checker whose
 installed version is not the pinned one, or a run on the wrong interpreter or
 against the wrong configuration file.
+
+Symbol-scope admissions add their own: a scope shape the gate cannot read, a
+named symbol that no longer exists, a fingerprint blind to which symbols were
+admitted, and a projection that would let an admitted contract borrow the types
+of the debt it was carved out of.
 """
 
+import ast
 import contextlib
 import io
 import json
@@ -89,6 +95,52 @@ def parse(payload: Any) -> str:
     return str(payload)
 '''
 
+SYMBOL_MODULE = '''\
+"""A module with one admitted contract and unrelated untyped debt."""
+
+from typing import Any
+
+
+class Contract:
+    value: int
+
+    def accepts(self, value: int) -> bool:
+        return value == self.value
+
+
+def unrelated(payload: Any):
+    return payload
+'''
+
+PROJECTION_MODULE = '''\
+"""A module whose admitted contract sits among unrelated debt."""
+
+import json
+from decimal import Decimal
+from typing import Any
+
+LIMIT = 10
+_ENCODERS = [json.dumps]
+
+
+class Contract:
+    """The admitted contract."""
+
+    value: Decimal
+
+    def accepts(self, value: int) -> bool:
+        """A docstring, then a body the projection must not keep."""
+        scaled = value * LIMIT
+        return scaled == self.value
+
+
+def unrelated(payload: Any):
+    return payload
+
+
+FALLBACK = unrelated
+'''
+
 
 class _FakeRunner:
     """Stands in for ``subprocess.run`` so the gate's command line is assertable."""
@@ -102,14 +154,28 @@ class _FakeRunner:
         return type("Completed", (), {"returncode": self.returncode, "args": command})()
 
 
-def _checked_entry(sequence=1, path="itambox/pkg/checked.py", module="pkg.checked"):
+def _checked_entry(
+    sequence=1,
+    path="itambox/pkg/checked.py",
+    module="pkg.checked",
+    scope="module",
+    symbols=None,
+):
     return {
         "sequence": sequence,
         "path": path,
         "module": module,
         "issue": "#93",
         "note": "Pilot module: pure parsing, no ORM inference required.",
+        "scope": scope,
+        "symbols": [] if symbols is None else symbols,
     }
+
+
+def _legacy_entry(sequence=1, path="itambox/pkg/checked.py", module="pkg.checked"):
+    """A schema-v1 checked entry: no scope fields, so the whole module."""
+    entry = _checked_entry(sequence=sequence, path=path, module=module)
+    return {key: value for key, value in entry.items() if key not in ("scope", "symbols")}
 
 
 def _withdrawn_entry(sequence=2, path="itambox/pkg/gone.py", module="pkg.gone"):
@@ -199,6 +265,7 @@ class HappyPathTests(FixtureTestCase):
         self.assertIn("--config-file", command)
         config_argument = command[command.index("--config-file") + 1]
         self.assertEqual(Path(config_argument), (Path(self.directory) / "pyproject.toml").resolve())
+        self.assertIn("--no-incremental", command)
         self.assertEqual(Path(kwargs["cwd"]), (Path(self.directory) / "itambox").resolve())
         # Repo-relative in the record, working-directory-relative on the command
         # line: mypy resolves `pkg.checked` the way Django does only from itambox/.
@@ -219,6 +286,258 @@ class HappyPathTests(FixtureTestCase):
             with self.subTest(returncode=returncode), self.assertRaises(gate.PolicyError) as caught:
                 self.fixture.check(runner=_FakeRunner(returncode=returncode))
             self.assertIn(str(returncode), str(caught.exception))
+
+
+class SymbolScopeTests(FixtureTestCase):
+    def _write_symbol_record(self, symbols=("Contract",)):
+        self.fixture.write_module("itambox/pkg/symbol.py", SYMBOL_MODULE)
+        self.fixture.write_record(
+            checked=[
+                _checked_entry(
+                    path="itambox/pkg/symbol.py",
+                    module="pkg.symbol",
+                    scope="symbols",
+                    symbols=list(symbols),
+                )
+            ],
+            withdrawn=[],
+        )
+
+    def test_a_symbol_scope_can_admit_one_contract_while_unselected_debt_remains(self):
+        self._write_symbol_record()
+
+        self.assertEqual(self.fixture.check(), ())
+
+    def test_unselected_explicit_any_is_not_scanned(self):
+        self._write_symbol_record()
+
+        self.assertEqual(gate.check_markers(self.fixture.root, gate.load_record(self.fixture.root)), ())
+
+    def test_explicit_any_inside_a_selected_symbol_fails(self):
+        self.fixture.write_module("itambox/pkg/symbol.py", SYMBOL_MODULE.replace("value: int", "value: Any"))
+        self.fixture.write_record(
+            checked=[
+                _checked_entry(
+                    path="itambox/pkg/symbol.py",
+                    module="pkg.symbol",
+                    scope="symbols",
+                    symbols=["Contract"],
+                )
+            ],
+            withdrawn=[],
+        )
+
+        self.assertRules(self.fixture.check(), "T-ANY1")
+
+    def test_a_missing_top_level_symbol_fails(self):
+        self._write_symbol_record(symbols=("Missing",))
+
+        findings = self.fixture.check()
+
+        self.assertRules(findings, "T-SYM1")
+        self.assertIn("Missing", findings[0].detail)
+
+    def test_a_symbol_scope_requires_at_least_one_symbol(self):
+        self.fixture.write_record(checked=[_checked_entry(scope="symbols", symbols=[])], withdrawn=[])
+
+        with self.assertRaises(gate.PolicyError):
+            self.fixture.check()
+
+    def test_a_module_scope_cannot_name_symbols(self):
+        self.fixture.write_record(checked=[_checked_entry(scope="module", symbols=["Contract"])], withdrawn=[])
+
+        with self.assertRaises(gate.PolicyError):
+            self.fixture.check()
+
+    def test_symbol_scope_uses_a_temporary_shadow_file_for_mypy(self):
+        self._write_symbol_record()
+
+        class ShadowInspectingRunner(_FakeRunner):
+            def __call__(self, command, **kwargs):
+                shadow_index = command.index("--shadow-file")
+                self.shadow_source = Path(command[shadow_index + 1])
+                self.shadow_path = Path(command[shadow_index + 2])
+                self.shadow_exists_during_run = self.shadow_path.is_file()
+                return super().__call__(command, **kwargs)
+
+        runner = ShadowInspectingRunner()
+        self.assertEqual(self.fixture.check(runner=runner), ())
+        self.assertTrue(runner.shadow_exists_during_run)
+        self.assertEqual(runner.shadow_source.name, "symbol.py")
+
+    def test_a_whole_module_admission_is_invoked_without_a_shadow_file(self):
+        """The module-scope command line is the one it has always been."""
+        runner = _FakeRunner()
+        self.assertEqual(self.fixture.check(runner=runner), ())
+
+        ((command, _kwargs),) = runner.calls
+        self.assertNotIn("--shadow-file", command)
+
+    def test_the_shadow_is_temporary_and_never_written_into_the_repository(self):
+        self._write_symbol_record()
+        before = {path for path in Path(self.directory).rglob("*") if path.is_file()}
+
+        class ShadowInspectingRunner(_FakeRunner):
+            def __call__(self, command, **kwargs):
+                self.shadow_path = Path(command[command.index("--shadow-file") + 2])
+                return super().__call__(command, **kwargs)
+
+        runner = ShadowInspectingRunner()
+        self.assertEqual(self.fixture.check(runner=runner), ())
+
+        self.assertFalse(runner.shadow_path.is_file())
+        self.assertFalse(runner.shadow_path.is_relative_to(Path(self.directory)))
+        self.assertEqual({path for path in Path(self.directory).rglob("*") if path.is_file()}, before)
+
+    def test_a_suppression_outside_the_admitted_symbols_is_not_scanned(self):
+        self.fixture.write_module(
+            "itambox/pkg/symbol.py", SYMBOL_MODULE.replace("return payload", "return payload  # type: ignore")
+        )
+        self.fixture.write_record(
+            checked=[
+                _checked_entry(path="itambox/pkg/symbol.py", module="pkg.symbol", scope="symbols", symbols=["Contract"])
+            ],
+            withdrawn=[],
+        )
+
+        self.assertEqual(self.fixture.check(), ())
+
+    def test_a_suppression_inside_an_admitted_symbol_is_scanned(self):
+        self.fixture.write_module(
+            "itambox/pkg/symbol.py",
+            SYMBOL_MODULE.replace("return value == self.value", "return value == self.value  # type: ignore"),
+        )
+        self.fixture.write_record(
+            checked=[
+                _checked_entry(path="itambox/pkg/symbol.py", module="pkg.symbol", scope="symbols", symbols=["Contract"])
+            ],
+            withdrawn=[],
+        )
+
+        self.assertRules(self.fixture.check(), "T-IGN1")
+
+    def test_a_malformed_scope_or_symbol_shape_fails_closed(self):
+        """A scope the gate cannot read is never defaulted to "the whole module"."""
+        for scope, symbols in (
+            ("Symbols", ["Contract"]),
+            ("everything", []),
+            (gate.SYMBOL_SCOPE, "Contract"),
+            (gate.SYMBOL_SCOPE, ["Second", "First"]),
+            (gate.SYMBOL_SCOPE, ["First", "First"]),
+            (gate.SYMBOL_SCOPE, ["not an identifier"]),
+            (gate.SYMBOL_SCOPE, [None]),
+        ):
+            with self.subTest(scope=scope, symbols=symbols):
+                self.fixture.write_record(checked=[_checked_entry(scope=scope, symbols=symbols)], withdrawn=[])
+
+                with self.assertRaises(gate.PolicyError):
+                    self.fixture.check()
+
+    def test_a_record_at_the_current_schema_must_state_what_each_entry_admits(self):
+        self.fixture.write_record(checked=[_legacy_entry()], withdrawn=[])
+
+        with self.assertRaises(gate.PolicyError):
+            self.fixture.check()
+
+
+class SchemaVersionTests(FixtureTestCase):
+    """A v1 record admits whole modules and keeps working, unchanged and un-re-recorded."""
+
+    def test_a_legacy_record_still_passes_and_checks_the_whole_module(self):
+        self.fixture.write_record(checked=[_legacy_entry()], withdrawn=[], schema_version=gate.LEGACY_SCHEMA_VERSION)
+
+        self.assertEqual(self.fixture.check(), ())
+
+        self.fixture.write_module("itambox/pkg/checked.py", UNMARKED_MODULE)
+        self.assertRules(self.fixture.check(), "T-ANY1")
+
+    def test_a_legacy_record_may_not_declare_a_scope(self):
+        self.fixture.write_record(checked=[_checked_entry()], withdrawn=[], schema_version=gate.LEGACY_SCHEMA_VERSION)
+
+        with self.assertRaises(gate.PolicyError):
+            self.fixture.check()
+
+    def test_the_fingerprint_covers_the_scope_and_the_admitted_symbols(self):
+        policy = gate.load_effective_policy(self.fixture.root)
+        fingerprints = {
+            label: gate.compute_policy_fingerprint(policy, [entry], [])
+            for label, entry in {
+                "legacy": _legacy_entry(),
+                "module": _checked_entry(),
+                "one symbol": _checked_entry(scope="symbols", symbols=["Contract"]),
+                "two symbols": _checked_entry(scope="symbols", symbols=["Contract", "Second"]),
+            }.items()
+        }
+
+        self.assertEqual(len(set(fingerprints.values())), len(fingerprints), fingerprints)
+
+
+class ProjectionTests(unittest.TestCase):
+    """What mypy is handed for a symbol scope, and what it is deliberately not."""
+
+    def _project(self, source, symbols):
+        tree = ast.parse(source)
+        nodes, findings = gate._resolve_symbols("pkg/symbol.py", tree, symbols)
+        self.assertEqual(findings, [])
+        return gate.project_symbols(source, tree, nodes)
+
+    def test_the_projection_is_valid_python(self):
+        compile(self._project(PROJECTION_MODULE, ["Contract"]), "pkg/symbol.py", "exec")
+
+    def test_bodies_are_replaced_by_a_raise_and_signatures_are_kept(self):
+        projection = self._project(PROJECTION_MODULE, ["Contract"])
+
+        self.assertIn("def accepts(self, value: int) -> bool:", projection)
+        self.assertIn("raise NotImplementedError", projection)
+        self.assertNotIn("scaled = value * LIMIT", projection)
+        self.assertNotIn("A docstring", projection)
+
+    def test_imports_needed_by_a_signature_are_kept(self):
+        projection = self._project(PROJECTION_MODULE, ["Contract"])
+
+        self.assertIn("from decimal import Decimal", projection)
+        self.assertNotIn("import json", projection)
+        self.assertNotIn("from typing import Any", projection)
+        self.assertNotIn("LIMIT = 10", projection)
+        self.assertNotIn("_ENCODERS = [json.dumps]", projection)
+
+    def test_unadmitted_definitions_and_what_depends_on_them_are_dropped(self):
+        """An admitted symbol may not borrow an unadmitted neighbour's types."""
+        projection = self._project(PROJECTION_MODULE, ["Contract"])
+
+        self.assertNotIn("def unrelated", projection)
+        self.assertNotIn("FALLBACK", projection)
+
+    def test_line_numbers_are_preserved_so_a_diagnostic_points_at_the_real_line(self):
+        projection = self._project(PROJECTION_MODULE, ["Contract"])
+        source_lines = PROJECTION_MODULE.splitlines()
+        projected_lines = projection.splitlines()
+
+        self.assertEqual(len(projected_lines), len(source_lines))
+        index = source_lines.index("    def accepts(self, value: int) -> bool:")
+        self.assertEqual(projected_lines[index], source_lines[index])
+
+    def test_a_body_sharing_the_header_line_keeps_its_signature(self):
+        source = "class Contract:\n    def accepts(self) -> int: return 1\n"
+
+        projection = self._project(source, ["Contract"])
+
+        self.assertIn("def accepts(self) -> int: raise NotImplementedError", projection)
+        compile(projection, "pkg/symbol.py", "exec")
+
+    def test_a_type_checking_import_block_is_kept(self):
+        source = (
+            "from __future__ import annotations\n"
+            "from typing import TYPE_CHECKING\n\n"
+            "if TYPE_CHECKING:\n    from decimal import Decimal\n\n\n"
+            "def total() -> Decimal:\n    return Decimal(0)\n"
+        )
+
+        projection = self._project(source, ["total"])
+
+        self.assertIn("if TYPE_CHECKING:", projection)
+        self.assertIn("from decimal import Decimal", projection)
+        self.assertNotIn("return Decimal(0)", projection)
 
 
 class RecordIntegrityTests(FixtureTestCase):
@@ -576,6 +895,10 @@ class ExplicitAnyMarkerTests(FixtureTestCase):
         )
         self.assertRules(self.fixture.check(), "T-ANY1")
 
+    def test_any_imported_under_an_alias_is_detected(self):
+        self.fixture.write_module("itambox/pkg/checked.py", "from typing import Any as JSON\n\nvalue: JSON = None\n")
+        self.assertRules(self.fixture.check(), "T-ANY1")
+
     def test_unchecked_modules_are_not_scanned(self):
         self.fixture.write_module("itambox/pkg/unchecked.py", UNMARKED_MODULE)
         self.assertEqual(self.fixture.check(), ())
@@ -599,6 +922,10 @@ class SuppressionGrammarTests(FixtureTestCase):
             self._module_with("# type: ignore[attr-defined]  # typing: third-party-untyped: dependency ships no stubs"),
         )
         self.assertEqual(self.fixture.check(), ())
+
+    def test_a_file_level_mypy_directive_fails_closed(self):
+        self.fixture.write_module("itambox/pkg/checked.py", "# mypy: ignore-errors\n\nvalue = 1\n")
+        self.assertRules(self.fixture.check(), "T-CFG4")
 
     def test_the_reason_may_sit_on_the_preceding_line(self):
         source = (
@@ -681,10 +1008,22 @@ class CommittedRecordTests(unittest.TestCase):
     def test_the_committed_record_is_internally_consistent(self):
         self.assertEqual(gate.check_record(REPO_ROOT, self.policy, self.record), ())
 
-    def test_the_committed_pilot_is_the_scim_patch_parser(self):
+    def test_the_committed_record_lists_the_slice_zero_and_slice_one_admissions(self):
         self.assertEqual(
             [entry["path"] for entry in self.record["checked"]],
-            ["itambox/users/api/scim/provider_patch.py"],
+            [
+                "itambox/core/context.py",
+                "itambox/organization/access.py",
+                "itambox/users/api/scim/provider_patch.py",
+            ],
+        )
+        self.assertEqual(
+            {entry["path"]: (entry["scope"], entry["symbols"]) for entry in self.record["checked"]},
+            {
+                "itambox/core/context.py": ("symbols", ["SystemAuthorizationContext"]),
+                "itambox/organization/access.py": ("symbols", ["ResourceAccessDecision"]),
+                "itambox/users/api/scim/provider_patch.py": ("module", []),
+            },
         )
 
     def test_the_committed_pilot_satisfies_the_marker_and_suppression_grammars(self):

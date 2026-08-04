@@ -24,6 +24,7 @@ adding such a dependency would re-create the cycle this module exists to break.
 """
 
 import contextvars
+import uuid
 from contextlib import contextmanager
 from dataclasses import dataclass
 from typing import Any, Optional
@@ -106,10 +107,17 @@ class SystemAuthorizationContext:
     permission: str
     operation: str
     reason: str
-    request_id: Any
+    request_id: Optional[uuid.UUID]
     _issuer: object
 
-    def is_valid_for(self, *, tenant_id, permission, operation, request_id) -> bool:
+    def is_valid_for(
+        self,
+        *,
+        tenant_id: int,
+        permission: str,
+        operation: str,
+        request_id: Optional[uuid.UUID],
+    ) -> bool:
         active_scope = _system_authorization_scope.get()
         return (
             active_scope is not None
