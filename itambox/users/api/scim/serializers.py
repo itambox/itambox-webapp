@@ -1,5 +1,10 @@
+from datetime import datetime
+from typing import Protocol
+from uuid import UUID
+
 from django.contrib.auth import get_user_model
 from django.contrib.contenttypes.models import ContentType
+from django.db import models
 from django.db.models import Q
 from rest_framework import serializers
 
@@ -11,12 +16,34 @@ _UNSET = object()
 User = get_user_model()
 
 
+class _SCIMUserResource(Protocol):
+    scim_id: UUID
+    username: str
+    first_name: str
+    last_name: str
+    email: str
+    is_active: bool
+    date_joined: datetime | None
+
+
+class _SCIMMembershipResource(Protocol):
+    external_id: str | None
+    is_active: bool
+
+
+class _SCIMGroupResource(Protocol):
+    scim_id: UUID
+    name: str
+    created_at: datetime | None
+    updated_at: datetime | None
+
+
 def _scim_base_path(context):
     tenant_slug = context.get("tenant_slug", "")
     return context.get("scim_base_path") or (f"/api/tenants/{tenant_slug}/scim/v2" if tenant_slug else "")
 
 
-class SCIMUserSerializer(serializers.ModelSerializer):
+class SCIMUserSerializer(serializers.ModelSerializer[models.Model]):
     schemas = serializers.SerializerMethodField(read_only=True)
     id = serializers.UUIDField(source="scim_id", read_only=True)
     userName = serializers.CharField(source="username")
@@ -32,10 +59,10 @@ class SCIMUserSerializer(serializers.ModelSerializer):
         fields = ["schemas", "id", "externalId", "userName", "name", "emails", "active", "groups", "meta"]
         read_only_fields = ["id", "externalId", "schemas", "groups", "meta"]
 
-    def get_schemas(self, obj):
+    def get_schemas(self, obj: _SCIMUserResource) -> list[str]:
         return ["urn:ietf:params:scim:schemas:core:2.0:User"]
 
-    def _get_scim_membership(self, obj):
+    def _get_scim_membership(self, obj: _SCIMUserResource) -> _SCIMMembershipResource | None:
         cached = getattr(obj, "_scim_membership", _UNSET)
         if cached is not _UNSET:
             return cached
@@ -48,11 +75,11 @@ class SCIMUserSerializer(serializers.ModelSerializer):
         obj._scim_membership = membership
         return membership
 
-    def get_externalId(self, obj):
+    def get_externalId(self, obj: _SCIMUserResource) -> str | None:
         membership = self._get_scim_membership(obj)
         return membership.external_id if membership and membership.external_id else None
 
-    def get_active(self, obj):
+    def get_active(self, obj: _SCIMUserResource) -> bool:
         # SCIM is tenant-scoped: report the user's active state IN THIS TENANT, i.e. the
         # membership flag (so an IdP that de-provisioned this tenant via active=false sees
         # active=false), gated by the global flag (a globally disabled user is inactive
@@ -65,19 +92,19 @@ class SCIMUserSerializer(serializers.ModelSerializer):
         membership = self._get_scim_membership(obj)
         return bool(membership and membership.is_active)
 
-    def get_name(self, obj):
+    def get_name(self, obj: _SCIMUserResource) -> dict[str, str]:
         return {
             "givenName": obj.first_name or "",
             "familyName": obj.last_name or "",
             "formatted": f"{obj.first_name} {obj.last_name}".strip() or obj.username,
         }
 
-    def get_emails(self, obj):
+    def get_emails(self, obj: _SCIMUserResource) -> list[dict[str, str | bool]]:
         if obj.email:
             return [{"value": obj.email, "primary": True, "type": "work"}]
         return []
 
-    def get_groups(self, obj):
+    def get_groups(self, obj: _SCIMUserResource) -> list[dict[str, str]]:
         tenant = self.context.get("tenant")
         if not tenant:
             return []
@@ -99,7 +126,7 @@ class SCIMUserSerializer(serializers.ModelSerializer):
             for g in user_groups
         ]
 
-    def get_meta(self, obj):
+    def get_meta(self, obj: _SCIMUserResource) -> dict[str, str]:
         created_str = obj.date_joined.isoformat() if obj.date_joined else ""
         last_modified_str = self._get_last_modified(obj) or created_str
         base_path = _scim_base_path(self.context)
@@ -110,7 +137,7 @@ class SCIMUserSerializer(serializers.ModelSerializer):
             "location": f"{base_path}/Users/{obj.scim_id}" if base_path else "",
         }
 
-    def _get_last_modified(self, obj):
+    def _get_last_modified(self, obj: _SCIMUserResource) -> str | None:
         # inline import: app-registry: avoid AppRegistryNotReady at module-load time
         from core.models import ObjectChange
 
@@ -128,7 +155,7 @@ class SCIMUserSerializer(serializers.ModelSerializer):
         return last_change.isoformat() if last_change else None
 
 
-class SCIMGroupSerializer(serializers.ModelSerializer):
+class SCIMGroupSerializer(serializers.ModelSerializer[models.Model]):
     schemas = serializers.SerializerMethodField(read_only=True)
     id = serializers.UUIDField(source="scim_id", read_only=True)
     displayName = serializers.CharField(source="name")
@@ -141,10 +168,10 @@ class SCIMGroupSerializer(serializers.ModelSerializer):
         fields = ["schemas", "id", "externalId", "displayName", "members", "meta"]
         read_only_fields = ["id", "externalId", "schemas", "meta"]
 
-    def get_schemas(self, obj):
+    def get_schemas(self, obj: _SCIMGroupResource) -> list[str]:
         return ["urn:ietf:params:scim:schemas:core:2.0:Group"]
 
-    def get_members(self, obj):
+    def get_members(self, obj: _SCIMGroupResource) -> list[dict[str, str]]:
         # A group contains tenant Membership principals, never arbitrary global users.
         # The owner predicate is redundant for valid rows, but keeps serialization
         # fail-closed if pre-constraint data is ever imported.
@@ -162,7 +189,7 @@ class SCIMGroupSerializer(serializers.ModelSerializer):
             for group_membership in group_memberships
         ]
 
-    def get_meta(self, obj):
+    def get_meta(self, obj: _SCIMGroupResource) -> dict[str, str]:
         created_str = obj.created_at.isoformat() if hasattr(obj, "created_at") and obj.created_at else ""
         updated_str = obj.updated_at.isoformat() if hasattr(obj, "updated_at") and obj.updated_at else created_str
         base_path = _scim_base_path(self.context)

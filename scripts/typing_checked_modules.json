@@ -1,8 +1,8 @@
 {
   "schema_version": 2,
   "canonical_python": "3.12",
-  "next_sequence": 6,
-  "policy_sha256": "5fa240f8d02b95c509abfdfb6cee2faf8e477ede9a2cbacc8374ec83234ccf53",
+  "next_sequence": 11,
+  "policy_sha256": "ab3b5e6e0fe766e6fb6a885e67376aadeaf9cdbb6f6b4c4178179830260db7e5",
   "config": {
     "config_file": "pyproject.toml",
     "working_directory": "itambox",
@@ -84,6 +84,59 @@
       ]
     },
     {
+      "sequence": 6,
+      "path": "itambox/users/api/scim/authentication.py",
+      "module": "users.api.scim.authentication",
+      "issue": "#93",
+      "note": "Slice 6 symbol admission: the _SCIMAuthenticatedPrincipal protocol and SCIMBearerTokenAuthentication DRF authentication contract -- a Request in, the minimal authenticated-principal/credential pair or None out, and the WWW-Authenticate scheme it advertises. The protocol avoids importing project model classes into the bounded projection; tenant resolution, token validation, IP allowlist, has_perm authorization, and write-flag checks inside the method bodies are unchanged and remain outside this slice.",
+      "scope": "symbols",
+      "symbols": [
+        "SCIMBearerTokenAuthentication",
+        "_SCIMAuthenticatedPrincipal"
+      ]
+    },
+    {
+      "sequence": 7,
+      "path": "itambox/users/api/scim/filters.py",
+      "module": "users.api.scim.filters",
+      "issue": "#93",
+      "note": "Slice 6 symbol admission: the _SCIMQuery structural protocol plus every SCIM filter parser/helper function. The runtime values remain Django Q objects, but the checked signatures expose only their combinable query-expression algebra, so the projection does not import django.db.models or the application model graph. The parser functions read no request state and touch no ORM row; their bodies remain behaviorally unchanged.",
+      "scope": "symbols",
+      "symbols": [
+        "_SCIMQuery",
+        "_build_filter_query",
+        "_normalize_filter_value",
+        "_parse_id_filter",
+        "_reject_oversized_filter",
+        "parse_scim_filter",
+        "parse_scim_membership_filter"
+      ]
+    },
+    {
+      "sequence": 8,
+      "path": "itambox/users/api/scim/identifiers.py",
+      "module": "users.api.scim.identifiers",
+      "issue": "#93",
+      "note": "Slice 6 symbol admission: the two SCIM identifier-boundary functions of the 1.x dual-read window -- identifier_lookup, which answers the model lookup for a legacy integer or opaque UUID identifier, and identifier_lookup_or_none, which answers None instead of raising for an invalid member identifier. get_scim_object_or_404 is deliberately not admitted: it would pull the queryset it scopes into the admission, and queryset-generic typing is a later slice.",
+      "scope": "symbols",
+      "symbols": [
+        "identifier_lookup",
+        "identifier_lookup_or_none"
+      ]
+    },
+    {
+      "sequence": 9,
+      "path": "itambox/users/api/scim/provider_authentication.py",
+      "module": "users.api.scim.provider_authentication",
+      "issue": "#93",
+      "note": "Slice 6 symbol admission: the _SCIMAuthenticatedPrincipal protocol and SCIMProviderBearerTokenAuthentication DRF authentication contract for the provider-level SCIM mount -- a Request in, the minimal authenticated-principal/credential pair or None out, over the managing (is_provider) tenant. The protocol avoids importing project model classes into the bounded projection; provider resolution, provider-token scoping, has_perm authorization, and write-flag enforcement inside the method bodies are unchanged and remain outside this slice.",
+      "scope": "symbols",
+      "symbols": [
+        "SCIMProviderBearerTokenAuthentication",
+        "_SCIMAuthenticatedPrincipal"
+      ]
+    },
+    {
       "sequence": 1,
       "path": "itambox/users/api/scim/provider_patch.py",
       "module": "users.api.scim.provider_patch",
@@ -91,6 +144,21 @@
       "note": "Slice-0 pilot, hardened by Slice 2. Pure SCIM PATCH parsing: no ORM, no request state, no Django imports, so it is clean under the normative flags without depending on django-stubs model inference. Explicit Any values remain only at categorised external-JSON boundaries; absent patch fields use the typed _Unset sentinel.",
       "scope": "module",
       "symbols": []
+    },
+    {
+      "sequence": 10,
+      "path": "itambox/users/api/scim/serializers.py",
+      "module": "users.api.scim.serializers",
+      "issue": "#93",
+      "note": "Slice 6 symbol admission: the _SCIMUserResource, _SCIMMembershipResource, and _SCIMGroupResource structural protocols plus the tenant- and provider-shared SCIMUserSerializer and SCIMGroupSerializer resource contracts. Selected fields and SerializerMethodField return signatures describe the SCIM User/Group JSON boundary without importing application model classes into the bounded projection. The service-provider serializer, context helper, and surrounding ORM/mutation code remain outside this admission; serializer annotations are intended to improve later OpenAPI inference without claiming schema validation owned by #98.",
+      "scope": "symbols",
+      "symbols": [
+        "SCIMGroupSerializer",
+        "SCIMUserSerializer",
+        "_SCIMGroupResource",
+        "_SCIMMembershipResource",
+        "_SCIMUserResource"
+      ]
     }
   ],
   "withdrawn": []

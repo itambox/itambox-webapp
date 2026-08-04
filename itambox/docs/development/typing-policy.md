@@ -411,6 +411,33 @@ the renderer, archive, delivery, and scope helpers between it and `_ReportOutput
 keep their existing untyped signatures, and report-provider ownership remains
 #83.
 
+Slice 6 admits the independent SCIM boundary block:
+
+- `_SCIMQuery` and every parser/helper function in
+  `itambox/users/api/scim/filters.py`, covering the pure SCIM filter expression
+  boundary without importing Django's `Q` implementation into the projection;
+- `identifier_lookup` and `identifier_lookup_or_none` in
+  `itambox/users/api/scim/identifiers.py`, while the queryset-consuming
+  `get_scim_object_or_404` helper remains outside the admission;
+- `_SCIMAuthenticatedPrincipal` plus `SCIMBearerTokenAuthentication` and
+  `SCIMProviderBearerTokenAuthentication`, covering their DRF request/return
+  authentication contracts without importing project model classes into the
+  projections;
+- `_SCIMUserResource`, `_SCIMMembershipResource`, `_SCIMGroupResource`,
+  `SCIMUserSerializer`, and `SCIMGroupSerializer` in
+  `itambox/users/api/scim/serializers.py`, covering the selected fields and
+  `SerializerMethodField` return contracts for tenant- and provider-shared SCIM
+  resources through structural protocols.
+
+All Slice-6 entries use `scope = "symbols"`: their fields and signatures are
+checked through reviewed projections, while surrounding ORM, authentication,
+serializer context, and mutation helpers remain outside the checked set. The
+runtime filter values remain Django `Q` objects, and the runtime serializers
+still resolve their concrete models normally; the structural protocols keep
+those implementation details out of the bounded mypy import graph. This slice
+does not claim the complete SCIM operation surface, report-provider boundary
+(#83), or generated OpenAPI compatibility work (#98).
+
 Subsequent slices of issue #93 extend the list one bounded surface at a time:
 the remaining task payload/result families, organization service boundaries,
 report-provider contracts, and serializer return annotations. Nothing is claimed

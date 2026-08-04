@@ -8,7 +8,7 @@ from django.shortcuts import get_object_or_404
 MAX_LEGACY_PK = 2**63 - 1
 
 
-def identifier_lookup(identifier):
+def identifier_lookup(identifier: int | str) -> dict[str, int | UUID]:
     """Return the model lookup for a legacy integer or opaque SCIM identifier.
 
     Decimal path segments remain read-compatible throughout 1.x. Every other
@@ -31,7 +31,7 @@ def get_scim_object_or_404(queryset, identifier):
     return get_object_or_404(queryset, **identifier_lookup(identifier))
 
 
-def identifier_lookup_or_none(identifier):
+def identifier_lookup_or_none(identifier: int | str) -> dict[str, int | UUID] | None:
     """Return a dual-read lookup or ``None`` for an invalid member identifier."""
     try:
         return identifier_lookup(identifier)
