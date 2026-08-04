@@ -391,7 +391,17 @@ entry so the platform-service admission does not import a domain model graph at
 module load. Task payloads, task functions, and the surrounding task package
 remain outside this slice.
 
+Slice 4 admits `_ReportOutput` in `itambox/core/tasks/reports.py` as one symbol:
+the rendered email body plus the optional attachment content, filename, and MIME
+type that a scheduled-report renderer hands to the archive and delivery steps.
+It is the first existing named task result contract admitted — Slice 3 admitted
+the scope manager that wraps a task, this admits a value a task produces. The
+renderer and task functions that build and consume it, and the report-provider
+architecture behind `compile_report_context`, remain outside this slice; no
+annotation is added to a renderer function here, and report-provider ownership
+remains #83.
+
 Subsequent slices of issue #93 extend the list one bounded surface at a time:
-task payload/result families, organization service boundaries, report-provider
-contracts, and serializer return annotations. Nothing is claimed as checked
-until it appears in the record.
+the remaining task payload/result families, organization service boundaries,
+report-provider contracts, and serializer return annotations. Nothing is claimed
+as checked until it appears in the record.
