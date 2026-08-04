@@ -3,7 +3,7 @@ import logging
 logger = logging.getLogger(__name__)
 
 
-def reverse_job_detail(job_id):
+def reverse_job_detail(job_id: int) -> str:
     """
     Helper to resolve job detail URL safely.
     """

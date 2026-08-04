@@ -32,7 +32,7 @@ class JobLogStream:
             self.buffer = ""
 
 
-def sync_tenant_ldap_task(job_id, tenant_slug, user_id, tenant_id=None):
+def sync_tenant_ldap_task(job_id: int, tenant_slug: str, user_id: int | None, tenant_id: int | None = None) -> None:
     """
     Asynchronously executes tenant LDAP directory synchronization.
     Runs the 'sync_tenant_ldap' management command and streams output to Job logs.

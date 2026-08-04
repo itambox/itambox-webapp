@@ -4863,7 +4863,7 @@
       "path": "itambox/core/tasks/csv_import.py",
       "code": "C901",
       "message": "'import_csv_task' is too complex (12)",
-      "source": "def import_csv_task(job_id, rows_data, app_label, model_name, user_id, tenant_id=None):",
+      "source": "def import_csv_task(",
       "context": "Module:body/FunctionDef:import_csv_task:self",
       "count": 1
     },

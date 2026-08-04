@@ -1,4 +1,5 @@
 import logging
+from collections.abc import Mapping, Sequence
 
 from django.contrib.contenttypes.models import ContentType
 from django.core.exceptions import ValidationError
@@ -13,7 +14,14 @@ from .utils import reverse_job_detail
 logger = logging.getLogger(__name__)
 
 
-def import_csv_task(job_id, rows_data, app_label, model_name, user_id, tenant_id=None):
+def import_csv_task(
+    job_id: int,
+    rows_data: Sequence[Mapping[str, object]],
+    app_label: str,
+    model_name: str,
+    user_id: int | None,
+    tenant_id: int | None = None,
+) -> None:
     """
     Asynchronously imports parsed CSV/YAML rows into a target model
     using the dynamic BulkImportForm schema inside database transactions.

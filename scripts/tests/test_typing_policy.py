@@ -1009,17 +1009,24 @@ class CommittedRecordTests(unittest.TestCase):
     def test_the_committed_record_is_internally_consistent(self):
         self.assertEqual(gate.check_record(REPO_ROOT, self.policy, self.record), ())
 
-    def test_the_committed_record_lists_the_slice_zero_through_slice_seven_admissions(self):
+    def test_the_committed_record_lists_the_slice_zero_through_slice_eight_admissions(self):
         self.assertEqual(
             [entry["path"] for entry in self.record["checked"]],
             [
                 "itambox/core/context.py",
+                "itambox/core/tasks/alerts.py",
                 "itambox/core/tasks/checkin.py",
                 "itambox/core/tasks/checkout.py",
                 "itambox/core/tasks/context.py",
+                "itambox/core/tasks/csv_import.py",
+                "itambox/core/tasks/depreciation.py",
                 "itambox/core/tasks/disposal.py",
                 "itambox/core/tasks/labels.py",
+                "itambox/core/tasks/ldap.py",
                 "itambox/core/tasks/reports.py",
+                "itambox/core/tasks/retention.py",
+                "itambox/core/tasks/utils.py",
+                "itambox/core/tasks/webhooks.py",
                 "itambox/organization/access.py",
                 "itambox/users/api/scim/authentication.py",
                 "itambox/users/api/scim/filters.py",
@@ -1033,8 +1040,14 @@ class CommittedRecordTests(unittest.TestCase):
             {entry["path"]: (entry["scope"], entry["symbols"]) for entry in self.record["checked"]},
             {
                 "itambox/core/context.py": ("symbols", ["SystemAuthorizationContext"]),
+                "itambox/core/tasks/alerts.py": (
+                    "symbols",
+                    ["evaluate_alert_rules_task", "run_alert_rule_now"],
+                ),
                 "itambox/core/tasks/checkin.py": ("symbols", ["_parse_date", "bulk_checkin_task"]),
                 "itambox/core/tasks/checkout.py": ("symbols", ["_parse_date", "bulk_checkout_task"]),
+                "itambox/core/tasks/csv_import.py": ("symbols", ["import_csv_task"]),
+                "itambox/core/tasks/depreciation.py": ("symbols", ["calculate_depreciation"]),
                 "itambox/core/tasks/disposal.py": (
                     "symbols",
                     ["_parse_date", "_parse_proceeds", "bulk_dispose_task"],
@@ -1051,12 +1064,16 @@ class CommittedRecordTests(unittest.TestCase):
                         "generate_single_label_graphic",
                     ],
                 ),
+                "itambox/core/tasks/ldap.py": ("symbols", ["sync_tenant_ldap_task"]),
                 "itambox/users/api/scim/provider_patch.py": ("module", []),
                 "itambox/core/tasks/context.py": ("symbols", ["TaskContext"]),
                 "itambox/core/tasks/reports.py": (
                     "symbols",
                     ["_ReportOutput", "generate_scheduled_report_task"],
                 ),
+                "itambox/core/tasks/retention.py": ("symbols", ["prune_changelog_task"]),
+                "itambox/core/tasks/utils.py": ("symbols", ["reverse_job_detail"]),
+                "itambox/core/tasks/webhooks.py": ("symbols", ["send_webhook_task"]),
                 "itambox/organization/access.py": (
                     "symbols",
                     [

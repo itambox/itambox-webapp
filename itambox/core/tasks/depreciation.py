@@ -9,7 +9,7 @@ from core.tasks.context import TaskContext
 logger = logging.getLogger(__name__)
 
 
-def calculate_depreciation():
+def calculate_depreciation() -> int:
     """
     Nightly materialisation: write compute_book_value() into Asset.current_book_value.
     Only assets whose value actually changed are updated (the 2-dp quantise in
