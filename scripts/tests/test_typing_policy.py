@@ -1008,11 +1008,12 @@ class CommittedRecordTests(unittest.TestCase):
     def test_the_committed_record_is_internally_consistent(self):
         self.assertEqual(gate.check_record(REPO_ROOT, self.policy, self.record), ())
 
-    def test_the_committed_record_lists_the_slice_zero_and_slice_one_admissions(self):
+    def test_the_committed_record_lists_the_slice_zero_slice_one_and_slice_three_admissions(self):
         self.assertEqual(
             [entry["path"] for entry in self.record["checked"]],
             [
                 "itambox/core/context.py",
+                "itambox/core/tasks/context.py",
                 "itambox/organization/access.py",
                 "itambox/users/api/scim/provider_patch.py",
             ],
@@ -1023,6 +1024,7 @@ class CommittedRecordTests(unittest.TestCase):
                 "itambox/core/context.py": ("symbols", ["SystemAuthorizationContext"]),
                 "itambox/organization/access.py": ("symbols", ["ResourceAccessDecision"]),
                 "itambox/users/api/scim/provider_patch.py": ("module", []),
+                "itambox/core/tasks/context.py": ("symbols", ["TaskContext"]),
             },
         )
 

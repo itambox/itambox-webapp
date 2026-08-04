@@ -1,8 +1,8 @@
 {
   "schema_version": 2,
   "canonical_python": "3.12",
-  "next_sequence": 4,
-  "policy_sha256": "2bf4790e6bfc46c4eaaa0d3653c060f4b42db12e710d6232fd7d7637145fa1d2",
+  "next_sequence": 5,
+  "policy_sha256": "9bb2df622b1124bd44ad5d79d6dfe972570fcd0f4f3fbad2a146548ed80ecd88",
   "config": {
     "config_file": "pyproject.toml",
     "working_directory": "itambox",
@@ -47,6 +47,17 @@
       "scope": "symbols",
       "symbols": [
         "SystemAuthorizationContext"
+      ]
+    },
+    {
+      "sequence": 4,
+      "path": "itambox/core/tasks/context.py",
+      "module": "core.tasks.context",
+      "issue": "#93",
+      "note": "Slice 3 symbol admission: the TaskContext background-task scope manager -- its constructor, entry/exit protocol, captured-context attributes, principal/tenant resolution, and the system-authorization issuing signature. The surrounding task helpers in core.tasks.* and every task payload they carry remain outside this slice.",
+      "scope": "symbols",
+      "symbols": [
+        "TaskContext"
       ]
     },
     {

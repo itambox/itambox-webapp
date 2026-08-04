@@ -378,7 +378,18 @@ tenant, and RBAC helpers remain outside the checked set.
 
 Slice 2 hardens the already-admitted SCIM parser without changing its registry
 entry: the absent-field sentinel is now typed, while the surrounding external
-JSON boundary remains explicitly categorised. Subsequent slices of issue #93
-extend the list one bounded surface at a time: `TaskContext`, the organization
-service boundaries, and serializer return annotations. Nothing is claimed as
-checked until it appears in the record.
+JSON boundary remains explicitly categorised.
+
+Slice 3 admits `TaskContext` in `itambox/core/tasks/context.py` as one symbol:
+its constructor, context-manager entry/exit protocol, captured-context
+attributes, principal/tenant resolution, and system-authorization issuing
+signature. The contract uses small structural protocols for the resolved tenant
+and principal, and resolves Django models through `apps.get_model()` at task
+entry so the platform-service admission does not import a domain model graph at
+module load. Task payloads, task functions, and the surrounding task package
+remain outside this slice.
+
+Subsequent slices of issue #93 extend the list one bounded surface at a time:
+task payload/result families, organization service boundaries, report-provider
+contracts, and serializer return annotations. Nothing is claimed as checked
+until it appears in the record.

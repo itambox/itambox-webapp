@@ -1631,20 +1631,6 @@
       "accepted_reason": "Pre-existing at 66c74c4d when the architecture boundary gate was introduced."
     },
     {
-      "id": "R-S1|core.tasks.context|organization.models|module-top",
-      "rule": "R-S1",
-      "source": "core.tasks.context",
-      "source_layer": "platform-service",
-      "target": "organization.models",
-      "target_layer": "domain-model",
-      "kind": "module-top",
-      "count": 1,
-      "owner": "area:operations",
-      "removal_issue": 100,
-      "removal_direction": "Resolve organization.models lazily through apps.get_model(), or pass the model instance in as a task argument, so core.tasks.context carries no import edge into the organization domain.",
-      "accepted_reason": "Pre-existing at 66c74c4d when the architecture boundary gate was introduced."
-    },
-    {
       "id": "R-S1|core.tasks.depreciation|assets.models.__init__|module-top",
       "rule": "R-S1",
       "source": "core.tasks.depreciation",
