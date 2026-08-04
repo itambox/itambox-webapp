@@ -8,10 +8,24 @@ services can apply inside their own transactions.
 import re
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
-from typing import Any
+from enum import Enum
+from typing import Any, Final
 from uuid import UUID
 
-UNSET = object()
+
+class _Unset(Enum):
+    """The type of the absent-field sentinel.
+
+    A single-member enum is the narrowable form of the sentinel: ``value is UNSET``
+    keeps its identity semantics at runtime while a checker can eliminate the
+    sentinel from ``str | _Unset`` on the other side of the comparison, which a bare
+    ``object()`` never allowed.
+    """
+
+    UNSET = "UNSET"
+
+
+UNSET: Final = _Unset.UNSET
 
 
 class SCIMPatchError(ValueError):
@@ -23,15 +37,14 @@ class SCIMPatchError(ValueError):
         self.status_code = status_code
 
 
-# typing: sentinel: Any only because UNSET separates "absent" from an explicit null; no union expresses that yet
 @dataclass(frozen=True)
 class UserPatch:
-    username: Any = UNSET
-    email: Any = UNSET
-    first_name: Any = UNSET
-    last_name: Any = UNSET
-    active: Any = UNSET
-    external_id: Any = UNSET
+    username: str | _Unset = UNSET
+    email: str | _Unset = UNSET
+    first_name: str | _Unset = UNSET
+    last_name: str | _Unset = UNSET
+    active: bool | _Unset = UNSET
+    external_id: str | _Unset = UNSET
 
 
 @dataclass(frozen=True)
@@ -42,12 +55,11 @@ class GroupMemberOperation:
     clear_members: bool = False
 
 
-# typing: sentinel: Any only because UNSET separates "absent" from an explicit null; no union expresses that yet
 @dataclass(frozen=True)
 class GroupPatch:
-    display_name: Any = UNSET
+    display_name: str | _Unset = UNSET
     member_operations: tuple[GroupMemberOperation, ...] = ()
-    external_id: Any = UNSET
+    external_id: str | _Unset = UNSET
 
 
 _MEMBER_FILTER_RE = re.compile(
@@ -553,12 +565,12 @@ def parse_external_id(value: Any) -> str:
     return _external_id(value)
 
 
-# typing: external-json: an unvalidated SCIM fragment; each result is that value or the UNSET sentinel
+# typing: external-json: an unvalidated SCIM fragment, shape-checked before any value is returned
 def _parse_group_add_or_replace(
     operation_type: str,
     path: str,
     value: Any,
-) -> tuple[Any, Any, GroupMemberOperation | None]:
+) -> tuple[str | _Unset, str | _Unset, GroupMemberOperation | None]:
     normalized_path = path.lower()
     if normalized_path == "displayname":
         return _display_name(value), UNSET, None
@@ -590,10 +602,10 @@ def _parse_group_add_or_replace(
     return display_name, external_id, member_operation
 
 
-# typing: external-json: an unvalidated SCIM fragment; each result is that value or the UNSET sentinel
+# typing: external-json: an unvalidated SCIM fragment, shape-checked before any value is returned
 def _parse_group_operation(
     operation: Mapping[str, Any],
-) -> tuple[Any, Any, GroupMemberOperation | None]:
+) -> tuple[str | _Unset, str | _Unset, GroupMemberOperation | None]:
     operation_type = _operation_type(operation)
     path = _operation_path(operation)
     value = _operation_value(operation, operation_type)
@@ -607,8 +619,8 @@ def _parse_group_operation(
 # typing: external-json: an unvalidated SCIM PATCH/resource fragment, shape-checked in the body
 def parse_group_patch_operations(operations: Any) -> GroupPatch:
     """Parse provider ``/Groups/<id>`` PATCH operations without database access."""
-    display_name: Any = UNSET  # typing: sentinel: UNSET preserves absent displayName state
-    external_id: Any = UNSET  # typing: sentinel: UNSET preserves absent externalId state
+    display_name: str | _Unset = UNSET
+    external_id: str | _Unset = UNSET
     member_operations: list[GroupMemberOperation] = []
     unique_member_ids: set[int | str] = set()
     total_member_entries = 0
