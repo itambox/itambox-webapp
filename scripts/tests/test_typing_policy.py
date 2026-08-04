@@ -1027,7 +1027,10 @@ class CommittedRecordTests(unittest.TestCase):
                 "itambox/organization/access.py": ("symbols", ["ResourceAccessDecision"]),
                 "itambox/users/api/scim/provider_patch.py": ("module", []),
                 "itambox/core/tasks/context.py": ("symbols", ["TaskContext"]),
-                "itambox/core/tasks/reports.py": ("symbols", ["_ReportOutput"]),
+                "itambox/core/tasks/reports.py": (
+                    "symbols",
+                    ["_ReportOutput", "generate_scheduled_report_task"],
+                ),
             },
         )
 

@@ -212,7 +212,7 @@ def _process_scheduled_report(sched, active_tenant, filter_tenants):
         return False
 
 
-def generate_scheduled_report_task(scheduled_report_id):
+def generate_scheduled_report_task(scheduled_report_id: int) -> bool | None:
     """Compile and deliver one scheduled report inside a tenant-scoped task context."""
     try:
         sched = ScheduledReport.objects.get(pk=scheduled_report_id)
