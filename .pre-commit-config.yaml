@@ -71,6 +71,16 @@ repos:
         language_version: python3.12
         pass_filenames: false
         always_run: true
+      # The one hook that needs the full dev environment: the django-stubs mypy
+      # plugin imports the settings module. It is slower than the AST-only
+      # hooks above, and that cost is deliberate rather than hidden -- a typed
+      # module that stopped checking clean has to be caught before the commit.
+      - id: typing-policy
+        name: static typing (blocking policy gate)
+        entry: uv run --locked --group dev python scripts/check_typing_policy.py
+        language: system
+        pass_filenames: false
+        always_run: true
       - id: inline-style-policy
         name: CSP inline styles (blocking policy gate)
         entry: uv run --locked --group dev python scripts/check_inline_styles.py

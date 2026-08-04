@@ -141,6 +141,7 @@ make format-check
 uv run --locked --only-group dev python scripts/check_flake8_baseline.py
 uv run --locked --only-group dev python scripts/check_local_imports.py
 uv run --locked --only-group dev python scripts/check_architecture.py
+make typecheck
 ```
 
 Ruff is the canonical formatter and import sorter (`make format` applies it

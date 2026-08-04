@@ -41,6 +41,7 @@ on:
       - "scripts/coverage_baseline.json"
       - "scripts/openapi_diagnostics_baseline.json"
       - "scripts/suite_baseline.json"
+      - "scripts/typing_checked_modules.json"
   workflow_dispatch:
 
 permissions:
@@ -150,6 +151,16 @@ jobs:
         run: |
           uv run --locked --no-sync python -c "import ldap, magic; print(ldap.__version__); print(magic.from_buffer(b'ITAMbox'))"
           xmlsec1 --version
+
+      # Cheap and early: the checked-module allowlist is small, and a module
+      # that stopped type-checking clean should fail here rather than after the
+      # migrations and the ~40 minute suite. It needs the full dev environment
+      # installed above, because the django-stubs plugin imports the settings
+      # module -- which is why this is the first step after the install and the
+      # runtime-binding verification, not one of the bare-interpreter gates.
+      - name: Check the static typing policy gate
+        run: |
+          uv run --locked --no-sync python scripts/check_typing_policy.py
 
       - name: Check deterministic OpenAPI schema and diagnostics baseline
         id: openapi

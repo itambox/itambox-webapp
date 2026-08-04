@@ -351,6 +351,76 @@ class GateSuiteDiscoveryTests(unittest.TestCase):
         self.assertEqual(discovered, on_disk)
 
 
+class TypingPolicyWiringTests(unittest.TestCase):
+    """The typing gate must run the same way from CI, the Makefile, and pre-commit."""
+
+    GATE = "scripts/check_typing_policy.py"
+    STEP = "Check the static typing policy gate"
+
+    def setUp(self):
+        self.workflow_text = WORKFLOW_PATH.read_text(encoding="utf-8")
+        self.steps = load_steps()
+
+    def test_ci_runs_the_gate_after_installing_dependencies_and_before_the_suite(self):
+        """The plugin needs the dev environment; a failure must precede the slow work."""
+        step = step_named(self.steps, self.STEP)
+        self.assertIn(self.GATE, step.get("run", ""))
+
+        names = [step.get("name") for step in self.steps if step.get("name")]
+        self.assertLess(names.index("Install dependencies"), names.index(self.STEP))
+        self.assertLess(names.index(self.STEP), names.index("Run tests (complete serial suite, branch coverage)"))
+        self.assertLess(names.index(self.STEP), names.index("Apply migrations to a fresh database"))
+
+    def test_ci_does_not_wire_the_gate_in_its_read_only_mode(self):
+        """`--list` checks nothing and always exits 0; wiring it is a silent pass."""
+        self.assertNotIn("--list", step_named(self.steps, self.STEP).get("run", ""))
+        pre_commit = PRE_COMMIT_PATH.read_text(encoding="utf-8")
+        pre_commit_lines = pre_commit.splitlines()
+        hook_start = next(index for index, line in enumerate(pre_commit_lines) if line.strip() == "- id: typing-policy")
+        hook_end = next(
+            (
+                index
+                for index in range(hook_start + 1, len(pre_commit_lines))
+                if re.match(r"^\s*-\s+id:", pre_commit_lines[index])
+            ),
+        )
+        typing_hook = "\n".join(pre_commit_lines[hook_start:hook_end])
+        self.assertNotIn("--list", typing_hook)
+        self.assertNotIn(f"{self.GATE} --list", MAKEFILE_PATH.read_text(encoding="utf-8"))
+
+    def test_the_record_and_the_policy_document_trigger_ci(self):
+        self.assertIn('- "scripts/typing_checked_modules.json"', self.workflow_text)
+        for path in (
+            "scripts/typing_checked_modules.json",
+            "scripts/check_typing_policy.py",
+            "itambox/docs/development/typing-policy.md",
+            "pyproject.toml",
+            "uv.lock",
+        ):
+            with self.subTest(path=path):
+                self.assertTrue(triggers_ci(self.workflow_text, path))
+
+    def test_pre_commit_runs_the_same_gate_in_the_full_dev_environment(self):
+        config = PRE_COMMIT_PATH.read_text(encoding="utf-8")
+
+        self.assertIn("id: typing-policy", config)
+        self.assertIn(f"entry: uv run --locked --group dev python {self.GATE}", config)
+        self.assertNotIn(f"--only-group dev python {self.GATE}", config)
+
+    def test_the_makefile_exposes_the_typecheck_target(self):
+        makefile = MAKEFILE_PATH.read_text(encoding="utf-8")
+        phony = next(line for line in makefile.splitlines() if line.startswith(".PHONY:"))
+
+        self.assertIn("typecheck", phony)
+        self.assertIn("\ntypecheck:\n", makefile)
+        self.assertIn("make typecheck", makefile)
+
+    def test_the_typing_policy_document_is_reachable_in_the_mkdocs_nav(self):
+        navigation = (REPO_ROOT / "itambox" / "mkdocs.yml").read_text(encoding="utf-8")
+
+        self.assertIn("'development/typing-policy.md'", navigation)
+
+
 def _flatten(suite):
     for item in suite:
         if isinstance(item, unittest.TestSuite):
