@@ -168,6 +168,21 @@ debt. The gate refuses to run on any interpreter other than canonical Python
 3.12; there are no interpreter- or OS-specific exceptions. `make lint` /
 `pre-commit run --all-files` use the same managed policy.
 
+### Static typing (mypy policy gate)
+```bash
+# From the repository root -- blocking gate; Linux/Python 3.12 is authoritative:
+make typecheck
+
+# Direct equivalent, using the full dev environment:
+uv run --locked --group dev python scripts/check_typing_policy.py
+```
+The gate checks only modules admitted to `scripts/typing_checked_modules.json`;
+it has no write mode, and the record fingerprint must be updated in the same
+reviewed change as any deliberate policy or admission change. CI runs the same
+gate after dependency installation and pre-commit invokes it with the full dev
+group. A Windows run is useful for local feedback but is explicitly
+non-authoritative because Linux has the complete native dependency surface.
+
 ### Format and import order (Ruff)
 ```bash
 # From the repository root -- idempotent; import sort runs before formatting:

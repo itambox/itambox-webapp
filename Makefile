@@ -10,7 +10,7 @@
 UV := uv
 UV_DEV := $(UV) run --locked --group dev
 
-.PHONY: help setup run migrate seed test coverage coverage-diff coverage-baseline openapi-check openapi-write exception-check exception-baseline architecture-check architecture-baseline lint lint-templates lint-styles inline-style-check format format-check format-templates format-styles e2e clean
+.PHONY: help setup run migrate seed test coverage coverage-diff coverage-baseline openapi-check openapi-write exception-check exception-baseline architecture-check architecture-baseline typecheck lint lint-templates lint-styles inline-style-check format format-check format-templates format-styles e2e clean
 
 FORMAT_TARGETS := itambox scripts
 
@@ -43,6 +43,7 @@ help:
 	@echo "  make exception-baseline - Record reviewed exception-handler cleanup"
 	@echo "  make architecture-check - Verify the architecture boundary graph and baseline"
 	@echo "  make architecture-baseline - Record reviewed architecture-boundary cleanup"
+	@echo "  make typecheck     - Check the statically typed modules (mypy + django-stubs allowlist)"
 	@echo "  make lint          - Run pre-commit style and syntax checks on all files"
 	@echo "  make lint-templates - Check all authored Django templates with djLint"
 	@echo "  make lint-styles   - Check all authored CSS/SCSS with Stylelint"
@@ -113,6 +114,14 @@ architecture-check:
 # itambox/docs/development/architecture-policy.md for the bootstrap sequence.
 architecture-baseline:
 	PYTHONPATH= $(UV_DEV) python scripts/check_architecture.py --write-baseline
+
+# Needs the full dev environment, not --only-group dev: the django-stubs mypy
+# plugin imports the settings module, so Django itself must be installed. There
+# is no write mode -- admitting a module to scripts/typing_checked_modules.json
+# is a reviewed edit. Linux is the authority; the gate says so on other
+# platforms rather than presenting a local green run as CI parity.
+typecheck:
+	PYTHONPATH= $(UV_DEV) python scripts/check_typing_policy.py
 
 lint:
 	$(UV_DEV) pre-commit run --all-files

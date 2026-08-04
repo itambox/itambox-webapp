@@ -1,0 +1,701 @@
+"""Behavioural suite for the backend static-typing policy gate.
+
+The gate this suite covers (``scripts/check_typing_policy.py``) is the ratchet
+for issue #93: an append-only allowlist of modules that must type-check with
+zero diagnostics under an explicitly pinned checker. The suite is stdlib-only
+and never invokes mypy, because CI runs it on the bare interpreter before any
+dependency is installed -- a broken gate has to be caught before the ~40 minute
+suite, not after it. The one thing that genuinely needs mypy is the checker run
+itself, and the gate takes an injectable runner so its command line, working
+directory, and path translation are assertable without it.
+
+Every negative case below is a way the ratchet could silently stop ratcheting:
+a fingerprint that no longer describes the effective policy, a checked module
+dropped from the record while the admission high-water mark stays behind, a
+tombstone with no reason, an override or a top-level key that relaxes a
+normative flag, an unexplained ``Any``, an uncoded suppression, a checker whose
+installed version is not the pinned one, or a run on the wrong interpreter or
+against the wrong configuration file.
+"""
+
+import contextlib
+import io
+import json
+import shutil
+import tempfile
+import unittest
+from importlib.metadata import PackageNotFoundError
+from pathlib import Path
+from unittest import mock
+
+from scripts import check_typing_policy as gate
+
+REPO_ROOT = Path(__file__).resolve().parents[2]
+
+# The fixture repository's pyproject. Written out literally rather than
+# generated from the gate's own constants: a change to the normative flag set
+# has to break this file, which is exactly the review event it should be.
+FIXTURE_PYPROJECT = """\
+[project]
+name = "fixture"
+version = "0"
+
+[dependency-groups]
+dev = [
+    "mypy==2.3.0",
+    "django-stubs[compatible-mypy]==6.0.7",
+    "djangorestframework-stubs[compatible-mypy]==3.17.1",
+]
+
+[tool.mypy]
+python_version = "3.12"
+plugins = ["mypy_django_plugin.main"]
+follow_imports = "silent"
+disallow_untyped_defs = true
+disallow_incomplete_defs = true
+check_untyped_defs = true
+no_implicit_optional = true
+warn_return_any = true
+warn_unused_ignores = true
+warn_redundant_casts = true
+strict_equality = true
+disallow_any_generics = true
+disallow_any_unimported = true
+disallow_untyped_decorators = false
+enable_error_code = ["ignore-without-code", "possibly-undefined"]
+
+[tool.django-stubs]
+django_settings_module = "core.settings.dev"
+"""
+
+CLEAN_MODULE = '''\
+"""A checked fixture module."""
+
+from typing import Any
+
+
+# typing: external-json: the payload arrives as arbitrary parsed JSON and is validated below
+def parse(payload: Any) -> str:
+    return str(payload)
+'''
+
+UNMARKED_MODULE = '''\
+"""A checked fixture module with an unexplained Any."""
+
+from typing import Any
+
+
+def parse(payload: Any) -> str:
+    return str(payload)
+'''
+
+
+class _FakeRunner:
+    """Stands in for ``subprocess.run`` so the gate's command line is assertable."""
+
+    def __init__(self, returncode=0):
+        self.returncode = returncode
+        self.calls = []
+
+    def __call__(self, command, **kwargs):
+        self.calls.append((command, kwargs))
+        return type("Completed", (), {"returncode": self.returncode, "args": command})()
+
+
+def _checked_entry(sequence=1, path="itambox/pkg/checked.py", module="pkg.checked"):
+    return {
+        "sequence": sequence,
+        "path": path,
+        "module": module,
+        "issue": "#93",
+        "note": "Pilot module: pure parsing, no ORM inference required.",
+    }
+
+
+def _withdrawn_entry(sequence=2, path="itambox/pkg/gone.py", module="pkg.gone"):
+    return {
+        "sequence": sequence,
+        "path": path,
+        "module": module,
+        "issue": "#93",
+        "reason": "Withdrawn because a clean signature needs a behaviour change reviewed separately.",
+    }
+
+
+class PolicyFixture:
+    """A throwaway repository laid out the way the gate expects to find one."""
+
+    def __init__(self, root):
+        self.root = Path(root)
+        (self.root / "scripts").mkdir(parents=True, exist_ok=True)
+        (self.root / "itambox" / "pkg").mkdir(parents=True, exist_ok=True)
+        self.write_pyproject(FIXTURE_PYPROJECT)
+        self.write_module("itambox/pkg/checked.py", CLEAN_MODULE)
+        self.write_record(checked=[_checked_entry()], withdrawn=[])
+
+    @property
+    def record_path(self):
+        return self.root / "scripts" / "typing_checked_modules.json"
+
+    def write_pyproject(self, text):
+        (self.root / "pyproject.toml").write_text(text, encoding="utf-8")
+
+    def write_module(self, relative_path, text):
+        target = self.root / relative_path
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_text(text, encoding="utf-8")
+
+    def record(self):
+        return json.loads(self.record_path.read_text(encoding="utf-8"))
+
+    def write_record(self, checked=None, withdrawn=None, **overrides):
+        """Write a record that is internally consistent unless told otherwise."""
+        checked = [_checked_entry()] if checked is None else checked
+        withdrawn = [] if withdrawn is None else withdrawn
+        policy = gate.load_effective_policy(self.root)
+        document = {
+            "schema_version": gate.SCHEMA_VERSION,
+            "canonical_python": "3.12",
+            "next_sequence": max([entry["sequence"] for entry in [*checked, *withdrawn]] or [0]) + 1,
+            "policy_sha256": gate.compute_policy_fingerprint(policy, checked, withdrawn),
+            "config": gate.derived_config(policy),
+            "checked": checked,
+            "withdrawn": withdrawn,
+        }
+        document.update(overrides)
+        self.record_path.write_text(json.dumps(document, indent=2) + "\n", encoding="utf-8")
+        return document
+
+    def rewrite_record(self, mutate):
+        document = self.record()
+        mutate(document)
+        self.record_path.write_text(json.dumps(document, indent=2) + "\n", encoding="utf-8")
+
+    def check(self, runner=None):
+        """Run the whole gate against the fixture; returns (exit code, findings)."""
+        return gate.check_all(self.root, runner=runner or _FakeRunner())
+
+
+class FixtureTestCase(unittest.TestCase):
+    def setUp(self):
+        self.directory = tempfile.mkdtemp(prefix="typing-policy-")
+        self.addCleanup(shutil.rmtree, self.directory, ignore_errors=True)
+        self.fixture = PolicyFixture(self.directory)
+
+    def assertRules(self, findings, *rules):
+        self.assertEqual(sorted({finding.rule for finding in findings}), sorted(rules), findings)
+
+
+class HappyPathTests(FixtureTestCase):
+    def test_a_consistent_record_passes(self):
+        self.assertEqual(self.fixture.check(), ())
+
+    def test_the_checker_is_invoked_from_the_working_directory_with_the_root_config(self):
+        runner = _FakeRunner()
+        self.assertEqual(self.fixture.check(runner=runner), ())
+
+        ((command, kwargs),) = runner.calls
+        self.assertIn("mypy", command)
+        self.assertIn("--config-file", command)
+        config_argument = command[command.index("--config-file") + 1]
+        self.assertEqual(Path(config_argument), (Path(self.directory) / "pyproject.toml").resolve())
+        self.assertEqual(Path(kwargs["cwd"]), (Path(self.directory) / "itambox").resolve())
+        # Repo-relative in the record, working-directory-relative on the command
+        # line: mypy resolves `pkg.checked` the way Django does only from itambox/.
+        self.assertIn("pkg/checked.py", command)
+        self.assertNotIn("itambox/pkg/checked.py", command)
+        self.assertEqual(kwargs["env"]["ITAMBOX_ENV"], "dev")
+        self.assertEqual(kwargs["env"]["PYTHONPATH"], "")
+        self.assertEqual(kwargs["env"]["MYPYPATH"], "")
+
+    def test_checker_diagnostics_fail_the_gate(self):
+        """Exit 1 is mypy's "I checked, and the code has diagnostics"."""
+        findings = self.fixture.check(runner=_FakeRunner(returncode=1))
+        self.assertRules(findings, "T-RUN1")
+
+    def test_a_checker_that_could_not_run_is_not_reported_as_a_diagnostic(self):
+        """Exit >= 2 is a crash, a bad config, or a broken plugin -- not a result."""
+        for returncode in (2, 3):
+            with self.subTest(returncode=returncode), self.assertRaises(gate.PolicyError) as caught:
+                self.fixture.check(runner=_FakeRunner(returncode=returncode))
+            self.assertIn(str(returncode), str(caught.exception))
+
+
+class RecordIntegrityTests(FixtureTestCase):
+    def test_fingerprint_drift_fails(self):
+        self.fixture.rewrite_record(lambda document: document.update(policy_sha256="0" * 64))
+        self.assertRules(self.fixture.check(), "T-REC2")
+
+    def test_a_fingerprint_mismatch_publishes_the_expected_value(self):
+        """There is no write mode, so the reviewer needs the hash to paste in."""
+        policy = gate.load_effective_policy(self.fixture.root)
+        expected = gate.compute_policy_fingerprint(policy, [_checked_entry()], [])
+        self.fixture.rewrite_record(lambda document: document.update(policy_sha256="0" * 64))
+
+        findings = self.fixture.check()
+        self.assertRules(findings, "T-REC2")
+        self.assertTrue(all(expected in finding.detail for finding in findings), findings)
+
+    def test_relaxing_a_normative_flag_fails_even_when_the_record_is_re_recorded(self):
+        """Re-recording the fingerprint must not be a way to weaken the policy."""
+        self.fixture.write_pyproject(
+            FIXTURE_PYPROJECT.replace("disallow_untyped_defs = true", "disallow_untyped_defs = false")
+        )
+        self.fixture.write_record()
+
+        self.assertRules(self.fixture.check(), "T-CFG2")
+
+    def test_dropping_a_normative_flag_entirely_fails(self):
+        self.fixture.write_pyproject(FIXTURE_PYPROJECT.replace("strict_equality = true\n", ""))
+        self.fixture.write_record()
+
+        self.assertRules(self.fixture.check(), "T-CFG2")
+
+    def test_disallow_untyped_calls_is_not_part_of_the_first_ratchet(self):
+        self.assertNotIn("disallow_untyped_calls", gate.REQUIRED_FLAGS)
+
+    def test_the_required_error_codes_are_the_ones_pyproject_and_the_document_name(self):
+        self.assertEqual(sorted(gate.REQUIRED_ERROR_CODES), ["ignore-without-code", "possibly-undefined"])
+
+    def test_dropping_a_required_error_code_fails_even_when_the_record_is_re_recorded(self):
+        for code in ("ignore-without-code", "possibly-undefined"):
+            with self.subTest(code=code):
+                self.fixture.write_pyproject(FIXTURE_PYPROJECT.replace(json.dumps(code), '"redundant-expr"'))
+                self.fixture.write_record()
+
+                self.assertRules(self.fixture.check(), "T-CFG2")
+
+    def test_an_unpermitted_django_stubs_option_is_refused(self):
+        self.fixture.write_pyproject(
+            FIXTURE_PYPROJECT.replace(
+                "[tool.django-stubs]",
+                "[tool.django-stubs]\nstrict_settings = false",
+            )
+        )
+        with self.assertRaises(gate.PolicyError):
+            gate.load_effective_policy(self.fixture.root)
+
+    def test_a_top_level_key_outside_the_policy_fails_even_when_the_record_is_re_recorded(self):
+        """`[tool.mypy] ignore_errors = true` silences every checked module at once."""
+        for line in ("ignore_errors = true", 'disable_error_code = ["ignore-without-code"]'):
+            with self.subTest(line=line):
+                self.fixture.write_pyproject(
+                    FIXTURE_PYPROJECT.replace("[tool.django-stubs]", f"{line}\n\n[tool.django-stubs]")
+                )
+                self.fixture.write_record()
+
+                findings = self.fixture.check()
+                self.assertRules(findings, "T-CFG2")
+                self.assertIn(line.split(" =")[0], findings[0].detail)
+
+    def test_the_permitted_top_level_keys_are_the_normative_flags_and_nothing_else(self):
+        self.assertEqual(gate.PERMITTED_FLAG_KEYS, frozenset(gate.REQUIRED_FLAGS) | {"enable_error_code"})
+
+    def test_a_config_block_that_disagrees_with_pyproject_fails(self):
+        def stale_settings_module(document):
+            document["config"]["settings_module"] = "core.settings.prod"
+
+        self.fixture.rewrite_record(stale_settings_module)
+        self.assertRules(self.fixture.check(), "T-REC2", "T-CFG5")
+
+    def test_a_checker_version_bump_that_is_not_recorded_fails(self):
+        self.fixture.write_pyproject(FIXTURE_PYPROJECT.replace("mypy==2.3.0", "mypy==2.4.0"))
+        self.assertRules(self.fixture.check(), "T-REC2", "T-CFG5")
+
+    def test_an_unpinned_checker_dependency_fails(self):
+        self.fixture.write_pyproject(FIXTURE_PYPROJECT.replace("mypy==2.3.0", "mypy>=2.3,<3.0"))
+        with self.assertRaises(gate.PolicyError):
+            gate.load_effective_policy(self.fixture.root)
+
+    def _with_two_checked_modules(self):
+        self.fixture.write_module("itambox/pkg/second.py", CLEAN_MODULE)
+        self.fixture.write_record(
+            checked=[_checked_entry(), _checked_entry(sequence=2, path="itambox/pkg/second.py", module="pkg.second")]
+        )
+        self.assertEqual(self.fixture.check(), ())
+
+    def _keep_only(self, sequences, **overrides):
+        """Re-record the whole document around a subset of the checked rows."""
+        remaining = [entry for entry in self.fixture.record()["checked"] if entry["sequence"] in sequences]
+        policy = gate.load_effective_policy(self.fixture.root)
+        self.fixture.rewrite_record(
+            lambda document: document.update(
+                checked=remaining,
+                policy_sha256=gate.compute_policy_fingerprint(policy, remaining, []),
+                **overrides,
+            )
+        )
+
+    def test_removing_a_row_while_next_sequence_stays_stale_fails(self):
+        """The high-water mark is what the ledger detects a deletion by."""
+        self._with_two_checked_modules()
+        self._keep_only({1})
+
+        findings = self.fixture.check()
+        self.assertRules(findings, "T-REC3")
+        self.assertIn("next_sequence", findings[0].detail)
+
+    def test_removing_a_row_that_is_not_the_last_one_fails_on_the_gap(self):
+        """Rewinding next_sequence cannot close a hole in the middle of the run."""
+        self._with_two_checked_modules()
+        self._keep_only({2}, next_sequence=2)
+
+        self.assertRules(self.fixture.check(), "T-REC3")
+
+    def test_the_ledger_does_not_detect_a_rewound_terminal_row(self):
+        """A documented limitation, asserted so nobody claims otherwise.
+
+        Deleting the *last* admitted row, decrementing ``next_sequence``, and
+        re-recording the fingerprint leaves a self-consistent record. The gate
+        cannot see it without git history, and this policy deliberately does not
+        consult git history. What the ledger buys is that hiding a withdrawal
+        takes three coordinated edits to a reviewed file, all of them visible in
+        the diff -- not that it is impossible. See
+        itambox/docs/development/typing-policy.md, "Monotonicity".
+        """
+        self._with_two_checked_modules()
+        self._keep_only({1}, next_sequence=2)
+
+        self.assertEqual(self.fixture.check(), ())
+
+    def test_withdrawing_a_module_with_a_tombstone_passes(self):
+        self.fixture.write_record(
+            checked=[_checked_entry()],
+            withdrawn=[_withdrawn_entry(sequence=2, path="itambox/pkg/second.py", module="pkg.second")],
+        )
+        self.assertEqual(self.fixture.check(), ())
+
+    def test_a_tombstone_may_name_a_path_that_no_longer_exists(self):
+        """That is a tombstone's entire purpose; only `checked` paths must exist."""
+        self.fixture.write_record(
+            checked=[_checked_entry()],
+            withdrawn=[_withdrawn_entry(sequence=2, path="itambox/pkg/deleted.py", module="pkg.deleted")],
+        )
+        self.assertEqual(self.fixture.check(), ())
+
+    def test_a_tombstone_without_a_long_reason_fails(self):
+        entry = _withdrawn_entry(sequence=2)
+        entry["reason"] = "too short"
+        self.fixture.write_record(checked=[_checked_entry()], withdrawn=[entry])
+
+        self.assertRules(self.fixture.check(), "T-REC5")
+
+    def test_a_tombstone_without_an_issue_fails(self):
+        entry = _withdrawn_entry(sequence=2)
+        entry["issue"] = ""
+        self.fixture.write_record(checked=[_checked_entry()], withdrawn=[entry])
+
+        self.assertRules(self.fixture.check(), "T-REC5")
+
+    def test_a_missing_checked_path_fails(self):
+        (self.fixture.root / "itambox" / "pkg" / "checked.py").unlink()
+        self.assertRules(self.fixture.check(), "T-REC4")
+
+    def test_a_checked_entry_whose_module_contradicts_its_path_fails(self):
+        self.fixture.write_record(checked=[_checked_entry(module="pkg.something_else")])
+        self.assertRules(self.fixture.check(), "T-REC6")
+
+    def test_duplicate_sequences_fail(self):
+        self.fixture.write_module("itambox/pkg/second.py", CLEAN_MODULE)
+        self.fixture.write_record(
+            checked=[_checked_entry(), _checked_entry(sequence=1, path="itambox/pkg/second.py", module="pkg.second")],
+            next_sequence=2,
+        )
+        self.assertRules(self.fixture.check(), "T-REC3")
+
+    def test_an_unknown_schema_version_fails(self):
+        self.fixture.rewrite_record(lambda document: document.update(schema_version=99))
+        with self.assertRaises(gate.PolicyError):
+            self.fixture.check()
+
+    def test_there_is_no_write_mode(self):
+        """Admitting a module is a reviewed edit, so the gate cannot make one."""
+        parser = gate.build_parser()
+        for flag in ("--write-baseline", "--write-record", "--fix"):
+            with (
+                self.subTest(flag=flag),
+                contextlib.redirect_stderr(io.StringIO()),
+                self.assertRaises(SystemExit),
+            ):
+                parser.parse_args([flag])
+
+
+class InstalledCheckerTests(FixtureTestCase):
+    """The pinned triple decides what "clean" means, so it must be the one that runs."""
+
+    PINNED = {"mypy": "2.3.0", "django-stubs": "6.0.7", "djangorestframework-stubs": "3.17.1"}
+
+    def setUp(self):
+        super().setUp()
+        self.policy = gate.load_effective_policy(self.fixture.root)
+
+    def test_installed_versions_matching_the_pins_are_accepted(self):
+        self.assertIsNone(gate.verify_installed_checker(self.policy, version_lookup=self.PINNED.__getitem__))
+
+    def test_a_checker_distribution_that_is_not_installed_is_refused(self):
+        def lookup(distribution):
+            if distribution == "django-stubs":
+                raise PackageNotFoundError(distribution)
+            return self.PINNED[distribution]
+
+        with self.assertRaises(gate.PolicyError) as caught:
+            gate.verify_installed_checker(self.policy, version_lookup=lookup)
+        self.assertIn("django-stubs", str(caught.exception))
+
+    def test_an_installed_version_that_is_not_the_pinned_one_is_refused(self):
+        versions = {**self.PINNED, "mypy": "2.4.0"}
+
+        with self.assertRaises(gate.PolicyError) as caught:
+            gate.verify_installed_checker(self.policy, version_lookup=versions.__getitem__)
+        message = str(caught.exception)
+        self.assertIn("2.4.0", message)
+        self.assertIn("2.3.0", message)
+
+    def test_a_real_checker_run_verifies_the_installed_distributions_first(self):
+        verified = []
+        with (
+            mock.patch.object(gate, "verify_installed_checker", verified.append),
+            mock.patch.object(gate.subprocess, "run", _FakeRunner()),
+        ):
+            findings = gate.run_checker(self.fixture.root, self.policy, ["itambox/pkg/checked.py"])
+
+        self.assertEqual(findings, ())
+        self.assertEqual(verified, [self.policy])
+
+    def test_an_injected_runner_does_not_require_an_installed_checker(self):
+        """CI runs this suite on the bare interpreter, before mypy exists at all."""
+
+        def refuse(policy):
+            raise AssertionError("the installed checker must not be inspected when no checker is invoked")
+
+        with mock.patch.object(gate, "verify_installed_checker", refuse):
+            self.assertEqual(self.fixture.check(), ())
+
+
+class ListingTests(FixtureTestCase):
+    """``--list`` is how a reviewer finds the value to paste into the record."""
+
+    def _listing(self):
+        policy = gate.load_effective_policy(self.fixture.root)
+        record = gate.load_record(self.fixture.root)
+        output = io.StringIO()
+        with contextlib.redirect_stdout(output):
+            gate._print_listing(self.fixture.root, policy, record)
+        return output.getvalue()
+
+    def test_the_listing_publishes_the_recorded_and_the_expected_fingerprint(self):
+        policy = gate.load_effective_policy(self.fixture.root)
+        expected = gate.compute_policy_fingerprint(policy, [_checked_entry()], [])
+        self.fixture.rewrite_record(lambda document: document.update(policy_sha256="0" * 64))
+
+        listing = self._listing()
+        self.assertIn("0" * 64, listing)
+        self.assertIn(expected, listing)
+
+    def test_the_listing_names_the_checked_and_withdrawn_modules(self):
+        listing = self._listing()
+        self.assertIn("itambox/pkg/checked.py", listing)
+        self.assertIn("mypy==2.3.0", listing)
+
+
+class OverrideTests(FixtureTestCase):
+    def _with_override(self, body):
+        self.fixture.write_pyproject(FIXTURE_PYPROJECT + body)
+        self.fixture.write_record()
+
+    def test_ignore_errors_for_a_checked_module_fails(self):
+        self._with_override('\n[[tool.mypy.overrides]]\nmodule = ["pkg.checked"]\nignore_errors = true\n')
+        self.assertRules(self.fixture.check(), "T-CFG3")
+
+    def test_a_wildcard_override_that_captures_a_checked_module_fails(self):
+        self._with_override('\n[[tool.mypy.overrides]]\nmodule = ["pkg.*"]\ndisallow_untyped_defs = false\n')
+        self.assertRules(self.fixture.check(), "T-CFG3")
+
+    def test_a_missing_stub_override_for_a_third_party_module_is_allowed(self):
+        self._with_override(
+            '\n[[tool.mypy.overrides]]\nmodule = ["some_untyped_dependency.*"]\nignore_missing_imports = true\n'
+        )
+        self.assertEqual(self.fixture.check(), ())
+
+    def test_a_missing_stub_override_may_name_a_checked_module_without_relaxing_it(self):
+        self._with_override('\n[[tool.mypy.overrides]]\nmodule = ["pkg.checked"]\nignore_missing_imports = true\n')
+        self.assertEqual(self.fixture.check(), ())
+
+
+class ExplicitAnyMarkerTests(FixtureTestCase):
+    def test_an_unmarked_explicit_any_fails(self):
+        self.fixture.write_module("itambox/pkg/checked.py", UNMARKED_MODULE)
+        self.assertRules(self.fixture.check(), "T-ANY1")
+
+    def test_an_unrecognised_category_always_fails(self):
+        self.fixture.write_module(
+            "itambox/pkg/checked.py",
+            UNMARKED_MODULE.replace("def parse", "# typing: because-it-is-hard: no\ndef parse"),
+        )
+        self.assertRules(self.fixture.check(), "T-ANY2")
+
+    def test_a_marker_without_a_reason_fails(self):
+        self.fixture.write_module(
+            "itambox/pkg/checked.py",
+            UNMARKED_MODULE.replace("def parse", "# typing: external-json:\ndef parse"),
+        )
+        self.assertRules(self.fixture.check(), "T-ANY2")
+
+    def test_a_trailing_marker_on_the_annotation_line_is_accepted(self):
+        source = (
+            "from typing import Any\n\nvalue: Any = None  # typing: sentinel: absent-vs-null cannot be a union yet\n"
+        )
+        self.fixture.write_module("itambox/pkg/checked.py", source)
+        self.assertEqual(self.fixture.check(), ())
+
+    def test_a_class_marker_covers_the_fields_it_introduces(self):
+        source = (
+            "from typing import Any\n\n\n"
+            "# typing: sentinel: every field is Any only because the UNSET sentinel has no union form yet\n"
+            "class Patch:\n"
+            "    first: Any = None\n"
+            "    second: Any = None\n"
+        )
+        self.fixture.write_module("itambox/pkg/checked.py", source)
+        self.assertEqual(self.fixture.check(), ())
+
+    def test_a_marker_on_one_function_does_not_cover_the_next(self):
+        source = CLEAN_MODULE + "\n\ndef other(payload: Any) -> str:\n    return str(payload)\n"
+        self.fixture.write_module("itambox/pkg/checked.py", source)
+        findings = self.fixture.check()
+        self.assertRules(findings, "T-ANY1")
+        self.assertIn("other", findings[0].detail)
+
+    def test_importing_any_is_not_itself_an_explicit_any(self):
+        self.fixture.write_module("itambox/pkg/checked.py", "from typing import Any  # noqa: F401\n")
+        self.assertEqual(self.fixture.check(), ())
+
+    def test_qualified_typing_any_is_detected(self):
+        self.fixture.write_module(
+            "itambox/pkg/checked.py", "import typing\n\n\ndef f(x: typing.Any) -> None:\n    pass\n"
+        )
+        self.assertRules(self.fixture.check(), "T-ANY1")
+
+    def test_unchecked_modules_are_not_scanned(self):
+        self.fixture.write_module("itambox/pkg/unchecked.py", UNMARKED_MODULE)
+        self.assertEqual(self.fixture.check(), ())
+
+
+class SuppressionGrammarTests(FixtureTestCase):
+    def _module_with(self, comment):
+        return f"from typing import Any  # noqa: F401\n\nvalue = 1  {comment}\n"
+
+    def test_a_bare_ignore_fails(self):
+        self.fixture.write_module("itambox/pkg/checked.py", self._module_with("# type: ignore"))
+        self.assertRules(self.fixture.check(), "T-IGN1")
+
+    def test_a_coded_ignore_without_a_category_fails(self):
+        self.fixture.write_module("itambox/pkg/checked.py", self._module_with("# type: ignore[attr-defined]"))
+        self.assertRules(self.fixture.check(), "T-IGN1")
+
+    def test_a_coded_and_categorised_ignore_passes(self):
+        self.fixture.write_module(
+            "itambox/pkg/checked.py",
+            self._module_with("# type: ignore[attr-defined]  # typing: third-party-untyped: dependency ships no stubs"),
+        )
+        self.assertEqual(self.fixture.check(), ())
+
+    def test_the_reason_may_sit_on_the_preceding_line(self):
+        source = (
+            "from typing import Any  # noqa: F401\n\n"
+            "# typing: django-plugin-limit: the plugin cannot infer this manager's row type\n"
+            "value = 1  # type: ignore[attr-defined]\n"
+        )
+        self.fixture.write_module("itambox/pkg/checked.py", source)
+        self.assertEqual(self.fixture.check(), ())
+
+    def test_an_unrecognised_ignore_category_fails(self):
+        self.fixture.write_module(
+            "itambox/pkg/checked.py",
+            self._module_with("# type: ignore[attr-defined]  # typing: convenient: it was faster"),
+        )
+        self.assertRules(self.fixture.check(), "T-IGN2")
+
+
+class InterpreterAndConfigTests(unittest.TestCase):
+    def test_a_non_canonical_interpreter_is_refused(self):
+        self.assertIsNone(gate.refuse_non_canonical_interpreter((3, 12, 1)))
+        for version in ((3, 11, 9), (3, 13, 0)):
+            with self.subTest(version=version):
+                message = gate.refuse_non_canonical_interpreter(version)
+                self.assertIsNotNone(message)
+                self.assertIn("3.12", message)
+
+    def test_a_configuration_file_without_a_mypy_section_is_refused(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            (root / "pyproject.toml").write_text('[project]\nname = "x"\n', encoding="utf-8")
+            with self.assertRaises(gate.PolicyError):
+                gate.load_effective_policy(root)
+
+    def test_a_missing_configuration_file_is_refused(self):
+        with tempfile.TemporaryDirectory() as directory:
+            with self.assertRaises(gate.PolicyError):
+                gate.load_effective_policy(Path(directory))
+
+    def test_the_platform_banner_names_linux_as_the_authority(self):
+        self.assertIn("Linux", gate.platform_banner("Windows"))
+        self.assertIsNone(gate.platform_banner("Linux"))
+
+
+class PathTranslationTests(unittest.TestCase):
+    """The record is repo-relative; mypy runs from itambox/. Both must be true."""
+
+    def test_repo_relative_paths_translate_to_the_working_directory(self):
+        self.assertEqual(
+            gate.to_working_directory_paths(["itambox/users/api/scim/provider_patch.py"]),
+            ["users/api/scim/provider_patch.py"],
+        )
+
+    def test_a_path_outside_the_working_directory_is_refused(self):
+        with self.assertRaises(gate.PolicyError):
+            gate.to_working_directory_paths(["scripts/check_typing_policy.py"])
+
+    def test_a_windows_separator_in_the_record_is_refused(self):
+        with self.assertRaises(gate.PolicyError):
+            gate.to_working_directory_paths(["itambox\\users\\api.py"])
+
+    def test_module_names_are_derived_from_the_path(self):
+        self.assertEqual(
+            gate.module_for_path("itambox/users/api/scim/provider_patch.py"), "users.api.scim.provider_patch"
+        )
+        self.assertEqual(gate.module_for_path("itambox/core/__init__.py"), "core")
+
+    def test_the_working_directory_and_config_path_are_repository_relative_constants(self):
+        self.assertEqual(gate.WORKING_DIRECTORY, "itambox")
+        self.assertEqual(gate.CONFIG_FILE, "pyproject.toml")
+
+
+class CommittedRecordTests(unittest.TestCase):
+    """The record checked into this repository must satisfy its own policy."""
+
+    def setUp(self):
+        self.policy = gate.load_effective_policy(REPO_ROOT)
+        self.record = gate.load_record(REPO_ROOT)
+
+    def test_the_committed_record_is_internally_consistent(self):
+        self.assertEqual(gate.check_record(REPO_ROOT, self.policy, self.record), ())
+
+    def test_the_committed_pilot_is_the_scim_patch_parser(self):
+        self.assertEqual(
+            [entry["path"] for entry in self.record["checked"]],
+            ["itambox/users/api/scim/provider_patch.py"],
+        )
+
+    def test_the_committed_pilot_satisfies_the_marker_and_suppression_grammars(self):
+        self.assertEqual(gate.check_markers(REPO_ROOT, self.record), ())
+
+    def test_the_committed_record_pins_the_resolved_checker_triple(self):
+        self.assertEqual(
+            self.record["config"]["checker"],
+            {"mypy": "2.3.0", "django-stubs": "6.0.7", "djangorestframework-stubs": "3.17.1"},
+        )
+
+
+if __name__ == "__main__":
+    unittest.main()

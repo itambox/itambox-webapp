@@ -34,6 +34,7 @@ dependencies = [
     "djangosaml2>=1.12.0,<2.0",
     "mozilla-django-oidc>=5.0.2,<6.0.0",
     "pyOpenSSL>=24.3,<27",
+    "cryptography>=50.0.0,<51.0",
     "django-cors-headers>=4.9.0,<5.0",
     "requests>=2.31,<3.0",
     "gunicorn>=26.0.0,<27.0",
@@ -78,6 +79,15 @@ dev = [
     # Exact version: formatting/import-sort output must be reproducible across
     # contributors, pre-commit, and CI (see pyproject.toml [tool.ruff]).
     "ruff==0.15.20",
+    # Backend static typing (issue #93). Exact versions on purpose: what "clean"
+    # means for a checked module is decided by the checker and its stubs, so the
+    # triple below is part of the typing policy fingerprint recorded in
+    # scripts/typing_checked_modules.json. The `compatible-mypy` extras keep the
+    # stubs and the checker resolvable as one set rather than three independent
+    # pins that drift apart. See itambox/docs/development/typing-policy.md.
+    "mypy==2.3.0",
+    "django-stubs[compatible-mypy]==6.0.7",
+    "djangorestframework-stubs[compatible-mypy]==3.17.1",
 ]
 docs = [
     "mkdocs>=1.6.1,<2.0",
@@ -196,6 +206,59 @@ line-ending = "lf"
 # those stay on the Flake8 identity baseline (scripts/flake8_baseline.json) so
 # this phase introduces no new semantic gate or rule weakening.
 select = ["I"]
+
+# Backend static typing policy (issue #93). The flags below are written out one
+# by one rather than abbreviated to `strict = true`: `strict` is an alias whose
+# membership changes between mypy releases, so an upgrade could silently change
+# what "clean" means for every checked module. This exact table is fingerprinted
+# into scripts/typing_checked_modules.json, and scripts/check_typing_policy.py
+# refuses to run when the recorded policy and this section disagree.
+#
+# The checked set is the allowlist in scripts/typing_checked_modules.json and
+# nothing else -- deliberately no `files` key here, so the gate stays the single
+# authority on which modules must be clean.
+[tool.mypy]
+python_version = "3.12"
+plugins = ["mypy_django_plugin.main"]
+# Unchecked modules are read for their types but never reported. That is what
+# makes a bounded allowlist possible without a repository-wide clean-up first.
+follow_imports = "silent"
+disallow_untyped_defs = true
+disallow_incomplete_defs = true
+check_untyped_defs = true
+no_implicit_optional = true
+warn_return_any = true
+warn_unused_ignores = true
+warn_redundant_casts = true
+strict_equality = true
+disallow_any_generics = true
+disallow_any_unimported = true
+# DRF, graphene, and django-q decorators are untyped. Requiring them to be typed
+# would make third-party release timing decide whether this repository builds; a
+# decorated function still has to carry its own annotations, which
+# disallow_untyped_defs already enforces.
+disallow_untyped_decorators = false
+# `disallow_untyped_calls` is deliberately NOT in this first ratchet: with the
+# current annotation coverage it would pull the entire first-party callee
+# closure of every checked module into scope. It is a named later ratchet step,
+# taken once the checked set has enough typed callees (see
+# itambox/docs/development/typing-policy.md).
+#
+# `redundant-expr` is deliberately NOT enabled. Its judgement is made against
+# mypy's inferred type, which for a parser reading untrusted JSON is narrower
+# than what actually arrives at runtime: it reports the isinstance guards in the
+# SCIM PATCH parser as always-false and would push a contributor to delete
+# defensive validation of external input to make the gate green. `ignore-without-code`
+# and `possibly-undefined` have no such failure mode.
+enable_error_code = ["ignore-without-code", "possibly-undefined"]
+
+# The django-stubs mypy plugin needs a settings module to resolve model, manager,
+# and `settings.*` types. `core.settings.dev` is the checked-in development
+# configuration; it performs no database, network, or filesystem-mutating work at
+# import time, and the gate runs it with ITAMBOX_ENV=dev rather than inheriting a
+# developer environment.
+[tool.django-stubs]
+django_settings_module = "core.settings.dev"
 
 # Template lint policy (issue #94). The profile stays fail-closed for authored
 # template syntax, structure, and formatting. H005/H016/H030 cover the

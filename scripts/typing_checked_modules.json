@@ -1,0 +1,50 @@
+{
+  "schema_version": 1,
+  "canonical_python": "3.12",
+  "next_sequence": 2,
+  "policy_sha256": "d1c79ff6ac2126abf4e468ffbd21149f3ccf991e3b3f56e26a763ccbd37507fe",
+  "config": {
+    "config_file": "pyproject.toml",
+    "working_directory": "itambox",
+    "settings_module": "core.settings.dev",
+    "platform_authority": "linux",
+    "checker": {
+      "django-stubs": "6.0.7",
+      "djangorestframework-stubs": "3.17.1",
+      "mypy": "2.3.0"
+    },
+    "flags": {
+      "python_version": "3.12",
+      "plugins": [
+        "mypy_django_plugin.main"
+      ],
+      "follow_imports": "silent",
+      "disallow_untyped_defs": true,
+      "disallow_incomplete_defs": true,
+      "check_untyped_defs": true,
+      "no_implicit_optional": true,
+      "warn_return_any": true,
+      "warn_unused_ignores": true,
+      "warn_redundant_casts": true,
+      "strict_equality": true,
+      "disallow_any_generics": true,
+      "disallow_any_unimported": true,
+      "disallow_untyped_decorators": false,
+      "enable_error_code": [
+        "ignore-without-code",
+        "possibly-undefined"
+      ]
+    },
+    "overrides": []
+  },
+  "checked": [
+    {
+      "sequence": 1,
+      "path": "itambox/users/api/scim/provider_patch.py",
+      "module": "users.api.scim.provider_patch",
+      "issue": "#93",
+      "note": "Slice-0 pilot. Pure SCIM PATCH parsing: no ORM, no request state, no Django imports, so it is clean under the normative flags without depending on django-stubs model inference. Its explicit Any values are the external-JSON boundary and the UNSET sentinel, both categorised in place."
+    }
+  ],
+  "withdrawn": []
+}

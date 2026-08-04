@@ -77,6 +77,11 @@ node_modules/
 # Python package metadata
 *.egg-info/
 
+# mypy incremental cache. The gate writes it under the repository root so there
+# is one ignored location rather than one per working directory; nothing in it
+# is a source artifact (see itambox/docs/development/typing-policy.md).
+.mypy_cache/
+
 # Generated OpenAPI gate output. The reviewed snapshot (`itambox/schema.yaml`)
 # and diagnostics baseline are tracked; these transient comparison files are not.
 itambox/schema.generated.yaml

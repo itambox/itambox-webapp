@@ -17,12 +17,13 @@ UNSET = object()
 class SCIMPatchError(ValueError):
     """A client-correctable SCIM PATCH validation error."""
 
-    def __init__(self, detail: str, *, scim_type: str | None = None, status_code: int = 400):
+    def __init__(self, detail: str, *, scim_type: str | None = None, status_code: int = 400) -> None:
         super().__init__(detail)
         self.scim_type = scim_type
         self.status_code = status_code
 
 
+# typing: sentinel: Any only because UNSET separates "absent" from an explicit null; no union expresses that yet
 @dataclass(frozen=True)
 class UserPatch:
     username: Any = UNSET
@@ -41,6 +42,7 @@ class GroupMemberOperation:
     clear_members: bool = False
 
 
+# typing: sentinel: Any only because UNSET separates "absent" from an explicit null; no union expresses that yet
 @dataclass(frozen=True)
 class GroupPatch:
     display_name: Any = UNSET
@@ -119,6 +121,7 @@ def _is_unmanaged_user_path(path: str) -> bool:
     return normalized_path in _UNMANAGED_USER_PATHS or normalized_path.startswith(_UNMANAGED_USER_PATH_PREFIXES)
 
 
+# typing: external-json: an unvalidated SCIM PATCH/resource fragment, shape-checked in the body
 def _is_unmanaged_user_value(value: Any) -> bool:
     if not isinstance(value, Mapping) or not value:
         return False
@@ -138,6 +141,7 @@ def _is_unmanaged_user_value(value: Any) -> bool:
     return True
 
 
+# typing: external-json: an unvalidated SCIM PATCH/resource fragment, shape-checked in the body
 def _is_unmanaged_user_target(path: str, value: Any) -> bool:
     email_type = _email_filter_type(path)
     if email_type is not None:
@@ -157,6 +161,7 @@ def _is_unmanaged_user_target(path: str, value: Any) -> bool:
     )
 
 
+# typing: external-json: an unvalidated SCIM PATCH/resource fragment, shape-checked in the body
 def _iter_operations(operations: Any) -> Sequence[Mapping[str, Any]]:
     if not isinstance(operations, list):
         raise SCIMPatchError("Operations must be a list.")
@@ -174,6 +179,7 @@ def _iter_operations(operations: Any) -> Sequence[Mapping[str, Any]]:
     return parsed
 
 
+# typing: external-json: an unvalidated SCIM PATCH/resource fragment, shape-checked in the body
 def _coerce_member_id(value: Any) -> int | str:
     if isinstance(value, bool):
         raise SCIMPatchError("Invalid member ID")
@@ -198,6 +204,7 @@ def _coerce_member_id(value: Any) -> int | str:
     raise SCIMPatchError("Invalid member ID")
 
 
+# typing: external-json: an unvalidated SCIM PATCH/resource fragment, shape-checked in the body
 def _member_values(value: Any) -> tuple[int | str, ...]:
     if isinstance(value, Mapping) and "members" in value:
         unknown_keys = set(value) - {"members", "displayName"}
@@ -224,6 +231,7 @@ def _member_values(value: Any) -> tuple[int | str, ...]:
     return tuple(member_ids)
 
 
+# typing: external-json: an unvalidated SCIM PATCH/resource fragment, shape-checked in the body
 def parse_member_ids(value: Any) -> tuple[int | str, ...]:
     """Validate a complete SCIM ``members`` array without touching the database."""
     if not isinstance(value, list):
@@ -231,7 +239,7 @@ def parse_member_ids(value: Any) -> tuple[int | str, ...]:
     return _member_values(value)
 
 
-def _member_filter_id(path: str) -> int | None:
+def _member_filter_id(path: str) -> int | str | None:
     match = _MEMBER_FILTER_RE.fullmatch(path)
     if match is None:
         if path.lower().startswith("members["):
@@ -240,6 +248,7 @@ def _member_filter_id(path: str) -> int | None:
     return _coerce_member_id(next(group for group in match.groups() if group is not None).strip())
 
 
+# typing: external-json: an unvalidated SCIM PATCH/resource fragment, shape-checked in the body
 def _operation_type(operation: Mapping[str, Any]) -> str:
     operation_value = operation.get("op", "")
     if not isinstance(operation_value, str):
@@ -250,6 +259,7 @@ def _operation_type(operation: Mapping[str, Any]) -> str:
     return operation_type
 
 
+# typing: external-json: an unvalidated SCIM PATCH/resource fragment, shape-checked in the body
 def _operation_path(operation: Mapping[str, Any]) -> str:
     if "path" not in operation:
         return ""
@@ -261,6 +271,7 @@ def _operation_path(operation: Mapping[str, Any]) -> str:
     return path.strip()
 
 
+# typing: external-json: an unvalidated SCIM fragment returned for downstream validation
 def _operation_value(operation: Mapping[str, Any], operation_type: str) -> Any:
     if operation_type != "remove":
         if "value" not in operation or operation["value"] is None:
@@ -268,6 +279,7 @@ def _operation_value(operation: Mapping[str, Any], operation_type: str) -> Any:
     return operation.get("value")
 
 
+# typing: external-json: an unvalidated SCIM PATCH/resource fragment, shape-checked in the body
 def _active(value: Any) -> bool:
     if isinstance(value, bool):
         return value
@@ -281,6 +293,7 @@ def _reject_control_characters(value: str, field_name: str) -> None:
         raise SCIMPatchError(f"{field_name} contains control characters")
 
 
+# typing: external-json: an unvalidated SCIM PATCH/resource fragment, shape-checked in the body
 def _required_text(value: Any, field_name: str, max_length: int) -> str:
     if not isinstance(value, str):
         raise SCIMPatchError(f"{field_name} must be a string")
@@ -292,6 +305,7 @@ def _required_text(value: Any, field_name: str, max_length: int) -> str:
     return value
 
 
+# typing: external-json: an unvalidated SCIM PATCH/resource fragment, shape-checked in the body
 def _validate_email_item(item: Any) -> Mapping[str, Any]:
     if not isinstance(item, Mapping) or "value" not in item:
         raise SCIMPatchError("Email values must contain an object with value.")
@@ -305,6 +319,7 @@ def _validate_email_item(item: Any) -> Mapping[str, Any]:
     return item
 
 
+# typing: external-json: an unvalidated SCIM PATCH/resource fragment, shape-checked in the body
 def _email(value: Any) -> str:
     if value is None:
         raise SCIMPatchError("email must not be null")
@@ -320,6 +335,7 @@ def _email(value: Any) -> str:
     return _required_text(value, "email", EMAIL_MAX_LENGTH)
 
 
+# typing: external-json: an unvalidated SCIM PATCH/resource fragment, shape-checked in the body
 def _set_user_name_attributes(fields: dict[str, Any], value: Any) -> None:
     if not isinstance(value, Mapping):
         raise SCIMPatchError("name must be an object")
@@ -339,6 +355,7 @@ def _set_user_name_attributes(fields: dict[str, Any], value: Any) -> None:
         raise SCIMPatchError(f"Unsupported SCIM PATCH name keys: {sorted(unknown_keys)}")
 
 
+# typing: external-json: an unvalidated SCIM PATCH/resource fragment, shape-checked in the body
 def _set_user_attribute(fields: dict[str, Any], name: Any, value: Any) -> None:
     normalized_name = str(name).lower()
     if normalized_name == "active":
@@ -357,6 +374,7 @@ def _set_user_attribute(fields: dict[str, Any], name: Any, value: Any) -> None:
         raise SCIMPatchError(f"Unsupported SCIM PATCH path: {name}")
 
 
+# typing: external-json: an unvalidated SCIM PATCH/resource fragment, shape-checked in the body
 def _parse_user_path(fields: dict[str, Any], path: str, value: Any) -> None:
     normalized_path = path.lower()
     if normalized_path == "active":
@@ -380,6 +398,7 @@ def _parse_user_path(fields: dict[str, Any], path: str, value: Any) -> None:
         raise SCIMPatchError(f"Unsupported SCIM PATCH path: {target}")
 
 
+# typing: external-json: an unvalidated SCIM PATCH/resource fragment, shape-checked in the body
 def _parse_user_remove(fields: dict[str, Any], path: str) -> None:
     if not path:
         raise SCIMPatchError("remove operation requires a path", scim_type="noTarget")
@@ -399,6 +418,7 @@ def _parse_user_remove(fields: dict[str, Any], path: str) -> None:
         raise SCIMPatchError(f"Unsupported SCIM PATCH path: {path}")
 
 
+# typing: external-json: an unvalidated SCIM PATCH/resource fragment, shape-checked in the body
 def _parse_user_operation(operation: Mapping[str, Any]) -> dict[str, Any]:
     operation_type = _operation_type(operation)
     path = _operation_path(operation)
@@ -416,17 +436,20 @@ def _parse_user_operation(operation: Mapping[str, Any]) -> dict[str, Any]:
     return fields
 
 
+# typing: external-json: an unvalidated SCIM PATCH/resource fragment, shape-checked in the body
 def require_object_document(document: Any) -> Mapping[str, Any]:
     if not isinstance(document, Mapping):
         raise SCIMPatchError("SCIM document must be an object")
     return document
 
 
+# typing: external-json: an unvalidated SCIM document whose Operations value needs downstream validation
 def get_patch_operations(document: Any) -> Any:
     """Extract PATCH operations from an object-shaped SCIM document."""
     return require_object_document(document).get("Operations", [])
 
 
+# typing: external-json: an unvalidated SCIM PATCH/resource fragment, shape-checked in the body
 def parse_user_patch_operations(operations: Any) -> UserPatch:
     """Parse provider ``/Users/<id>`` PATCH operations without database access."""
     fields: dict[str, Any] = {}
@@ -435,6 +458,7 @@ def parse_user_patch_operations(operations: Any) -> UserPatch:
     return UserPatch(**fields)
 
 
+# typing: external-json: an unvalidated SCIM PATCH/resource fragment, shape-checked in the body
 def parse_user_resource(document: Any) -> UserPatch:
     """Parse a complete provider User resource for PUT without database access."""
     document = require_object_document(document)
@@ -473,6 +497,7 @@ def parse_user_resource(document: Any) -> UserPatch:
     )
 
 
+# typing: external-json: an unvalidated SCIM PATCH/resource fragment, shape-checked in the body
 def _display_name(value: Any) -> str:
     if not isinstance(value, str):
         raise SCIMPatchError("displayName must be a string.")
@@ -484,11 +509,13 @@ def _display_name(value: Any) -> str:
     return value
 
 
+# typing: external-json: an unvalidated SCIM PATCH/resource fragment, shape-checked in the body
 def validate_display_name(value: Any) -> str:
     """Validate a provider Group displayName without database access."""
     return _display_name(value)
 
 
+# typing: external-json: an unvalidated SCIM PATCH/resource fragment, shape-checked in the body
 def _parse_group_remove(path: str, value: Any, *, value_present: bool) -> GroupMemberOperation:
     if not path:
         raise SCIMPatchError("remove operation requires a path", scim_type="noTarget")
@@ -504,6 +531,7 @@ def _parse_group_remove(path: str, value: Any, *, value_present: bool) -> GroupM
     raise SCIMPatchError(f"Unsupported remove path: {path}")
 
 
+# typing: external-json: an unvalidated SCIM fragment; each result is that value or the UNSET sentinel
 def _nested_group_values(value: Any) -> tuple[Any, Any, Any]:
     if not isinstance(value, Mapping):
         return UNSET, UNSET, UNSET
@@ -513,16 +541,19 @@ def _nested_group_values(value: Any) -> tuple[Any, Any, Any]:
     return value.get("displayName", UNSET), value.get("externalId", UNSET), value.get("members", UNSET)
 
 
+# typing: external-json: an unvalidated SCIM PATCH/resource fragment, shape-checked in the body
 def _external_id(value: Any) -> str:
     return _required_text(value, "externalId", EXTERNAL_ID_MAX_LENGTH)
 
 
+# typing: external-json: an unvalidated SCIM PATCH/resource fragment, shape-checked in the body
 def parse_external_id(value: Any) -> str:
     if value is None or value == "":
         return ""
     return _external_id(value)
 
 
+# typing: external-json: an unvalidated SCIM fragment; each result is that value or the UNSET sentinel
 def _parse_group_add_or_replace(
     operation_type: str,
     path: str,
@@ -559,6 +590,7 @@ def _parse_group_add_or_replace(
     return display_name, external_id, member_operation
 
 
+# typing: external-json: an unvalidated SCIM fragment; each result is that value or the UNSET sentinel
 def _parse_group_operation(
     operation: Mapping[str, Any],
 ) -> tuple[Any, Any, GroupMemberOperation | None]:
@@ -572,10 +604,11 @@ def _parse_group_operation(
     return _parse_group_add_or_replace(operation_type, path, value)
 
 
+# typing: external-json: an unvalidated SCIM PATCH/resource fragment, shape-checked in the body
 def parse_group_patch_operations(operations: Any) -> GroupPatch:
     """Parse provider ``/Groups/<id>`` PATCH operations without database access."""
-    display_name: Any = UNSET
-    external_id: Any = UNSET
+    display_name: Any = UNSET  # typing: sentinel: UNSET preserves absent displayName state
+    external_id: Any = UNSET  # typing: sentinel: UNSET preserves absent externalId state
     member_operations: list[GroupMemberOperation] = []
     unique_member_ids: set[int | str] = set()
     total_member_entries = 0
