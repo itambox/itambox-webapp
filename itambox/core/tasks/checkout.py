@@ -1,5 +1,6 @@
 import datetime
 import logging
+from collections.abc import Sequence
 
 from django.contrib.contenttypes.models import ContentType
 from django.db import transaction
@@ -13,7 +14,7 @@ from .utils import reverse_job_detail
 logger = logging.getLogger(__name__)
 
 
-def _parse_date(value):
+def _parse_date(value: str | datetime.date | None) -> datetime.date | None:
     if not value:
         return None
     if isinstance(value, datetime.date):
@@ -25,17 +26,17 @@ def _parse_date(value):
 
 
 def bulk_checkout_task(
-    job_id,
-    asset_pks,
-    target_type_str,
-    target_pk,
-    user_id,
-    notes,
-    expected_checkin_date=None,
-    tenant_id=None,
-    status_id=None,
-    checkout_date=None,
-):
+    job_id: int,
+    asset_pks: Sequence[int | str],
+    target_type_str: str,
+    target_pk: int | str,
+    user_id: int | None,
+    notes: str,
+    expected_checkin_date: str | datetime.date | None = None,
+    tenant_id: int | None = None,
+    status_id: int | str | None = None,
+    checkout_date: str | datetime.date | None = None,
+) -> None:
     """
     Asynchronously executes bulk checkout operations on selected hardware Assets
     utilizing select_for_update row-level locking to prevent race anomalies.

@@ -1,8 +1,8 @@
 {
   "schema_version": 2,
   "canonical_python": "3.12",
-  "next_sequence": 11,
-  "policy_sha256": "ab3b5e6e0fe766e6fb6a885e67376aadeaf9cdbb6f6b4c4178179830260db7e5",
+  "next_sequence": 15,
+  "policy_sha256": "da05e8266a3e69c68fc86ee98765f237e7cdb94b2dfdcc2251b6ab37ba48dcbe",
   "config": {
     "config_file": "pyproject.toml",
     "working_directory": "itambox",
@@ -50,6 +50,30 @@
       ]
     },
     {
+      "sequence": 11,
+      "path": "itambox/core/tasks/checkin.py",
+      "module": "core.tasks.checkin",
+      "issue": "#93",
+      "note": "Slice 7 symbol admission: the bulk check-in task entry envelope and its date parser -- the Job id, the asset pk list, the acting user/tenant, the optional status/location overrides, the check-in date, and the notes a scanner submits, plus the implicit None outcome the worker reports. Asset pks and status/location ids stay int | str because the enqueuing view forwards raw POST values; the ORM lookups, the checkin_asset service call, and the notification bodies remain outside this slice.",
+      "scope": "symbols",
+      "symbols": [
+        "_parse_date",
+        "bulk_checkin_task"
+      ]
+    },
+    {
+      "sequence": 12,
+      "path": "itambox/core/tasks/checkout.py",
+      "module": "core.tasks.checkout",
+      "issue": "#93",
+      "note": "Slice 7 symbol admission: the bulk checkout task entry envelope and its date parser -- the Job id, the asset pk list, the target discriminator and target pk, the acting user/tenant, notes, optional status override, and the expected-check-in/checkout dates, plus the implicit None outcome. Target and status ids stay int | str because the enqueuing view forwards raw POST values; ContentType resolution, row locking, and the checkout_asset service call remain outside this slice.",
+      "scope": "symbols",
+      "symbols": [
+        "_parse_date",
+        "bulk_checkout_task"
+      ]
+    },
+    {
       "sequence": 4,
       "path": "itambox/core/tasks/context.py",
       "module": "core.tasks.context",
@@ -58,6 +82,36 @@
       "scope": "symbols",
       "symbols": [
         "TaskContext"
+      ]
+    },
+    {
+      "sequence": 13,
+      "path": "itambox/core/tasks/disposal.py",
+      "module": "core.tasks.disposal",
+      "issue": "#93",
+      "note": "Slice 7 symbol admission: the bulk disposal task entry envelope and its two pure parsers -- the Job id, the asset pk list, the acting user/tenant, the shared disposal payload, and the per-asset proceeds map, plus the implicit None outcome. Both JSON-ish maps are declared as Mapping[str, object] because they arrive as a serialised task payload; _parse_proceeds therefore takes object and answers a non-negative Decimal or None. Narrowing the payload values, the already-disposed skip rule, and the dispose_asset service call remain outside this slice.",
+      "scope": "symbols",
+      "symbols": [
+        "_parse_date",
+        "_parse_proceeds",
+        "bulk_dispose_task"
+      ]
+    },
+    {
+      "sequence": 14,
+      "path": "itambox/core/tasks/labels.py",
+      "module": "core.tasks.labels",
+      "issue": "#93",
+      "note": "Slice 7 symbol admission: the label generation boundary -- the authored print CSS loader, the bounded CSS measurement helper, the PNG-bytes and base64 data-URI barcode producers, the generic chunk_list pager, and the two label batch task entry envelopes with their implicit None outcomes. Asset instances are typed as object so the projection does not import the asset model graph; the HTML card renderer, the Jinja2 sandbox, the document builder, and the xhtml2pdf emitters remain outside this slice.",
+      "scope": "symbols",
+      "symbols": [
+        "_label_print_css",
+        "_safe_label_measurement",
+        "chunk_list",
+        "generate_base64_barcode",
+        "generate_label_batch_task",
+        "generate_label_pdf_batch_task",
+        "generate_single_label_graphic"
       ]
     },
     {
@@ -77,10 +131,21 @@
       "path": "itambox/organization/access.py",
       "module": "organization.access",
       "issue": "#93",
-      "note": "Slice 1 symbol admission: ResourceAccessDecision contract value object; surrounding tenant/RBAC access helpers remain outside this slice.",
+      "note": "Slice 1 symbol admission: ResourceAccessDecision contract value object; surrounding tenant/RBAC access helpers remain outside this slice. Slice 7 adds the module's public access boundaries: the tenant-group topology walks, the shared-resource preselector, the canonical stock-access resolver and its facades, the tenant-operation authorization, the accessible-tenant memo with its clock-based expiry, and the tenant access report. Users, tenants, stock rows, and grants are typed as object (model classes as type[object]) so the projection admits no ORM implementation, and shared_resource_ids publishes Iterable[int] rather than its QuerySet; SystemAuthorizationContext is the already-admitted contract for actorless authorization. The private resolver, batch evidence, grant search, and RBAC helpers remain outside this slice.",
       "scope": "symbols",
       "symbols": [
-        "ResourceAccessDecision"
+        "ResourceAccessDecision",
+        "accessible_tenant_ids",
+        "accessible_tenant_ids_with_expiry",
+        "authorize_tenant_operation",
+        "get_ancestor_tenant_group_ids",
+        "get_descendant_tenant_group_ids",
+        "managed_accessible_tenant_ids",
+        "resolve_stock_access",
+        "resolved_shared_stock_ids",
+        "shared_resource_ids",
+        "shared_stock_read_allowed",
+        "tenant_access_report"
       ]
     },
     {

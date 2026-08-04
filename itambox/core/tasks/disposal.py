@@ -10,6 +10,7 @@ book value.
 
 import datetime
 import logging
+from collections.abc import Mapping, Sequence
 from decimal import Decimal, InvalidOperation
 
 from django.db import transaction
@@ -23,7 +24,7 @@ from .utils import reverse_job_detail
 logger = logging.getLogger(__name__)
 
 
-def _parse_date(value):
+def _parse_date(value: str | datetime.date | None) -> datetime.date | None:
     if not value:
         return None
     if isinstance(value, datetime.date):
@@ -34,7 +35,7 @@ def _parse_date(value):
         return None
 
 
-def _parse_proceeds(value):
+def _parse_proceeds(value: object) -> Decimal | None:
     if value in (None, ""):
         return None
     try:
@@ -45,7 +46,14 @@ def _parse_proceeds(value):
     return parsed if parsed >= 0 else None
 
 
-def bulk_dispose_task(job_id, asset_pks, user_id, tenant_id=None, disposal_kwargs=None, proceeds_map=None):
+def bulk_dispose_task(
+    job_id: int,
+    asset_pks: Sequence[int | str],
+    user_id: int | None,
+    tenant_id: int | None = None,
+    disposal_kwargs: Mapping[str, object] | None = None,
+    proceeds_map: Mapping[str, object] | None = None,
+) -> None:
     """Asynchronously dispose selected hardware assets."""
     disposal_kwargs = disposal_kwargs or {}
     proceeds_map = proceeds_map or {}

@@ -1,6 +1,8 @@
 """Canonical tenant, RBAC, and explicitly shared-resource access helpers."""
 
 import contextvars
+import datetime
+from collections.abc import Iterable
 from dataclasses import dataclass
 from typing import Optional
 
@@ -19,7 +21,7 @@ _descendant_group_ids_cache = contextvars.ContextVar(
 )
 
 
-def get_descendant_tenant_group_ids(group_id, live_only=False):
+def get_descendant_tenant_group_ids(group_id: int | None, live_only: bool = False) -> set[int]:
     if group_id is None:
         return set()
     cache = _descendant_group_ids_cache.get()
@@ -59,7 +61,7 @@ def get_descendant_tenant_group_ids(group_id, live_only=False):
     return ids
 
 
-def get_ancestor_tenant_group_ids(group_id, live_only=False):
+def get_ancestor_tenant_group_ids(group_id: int | None, live_only: bool = False) -> set[int]:
     if group_id is None:
         return set()
     # inline import: app-registry: avoids organization model import during app initialization.
@@ -82,7 +84,7 @@ def get_ancestor_tenant_group_ids(group_id, live_only=False):
     return seen if node is None else set()
 
 
-def shared_resource_ids(model, tenant):
+def shared_resource_ids(model: type[object], tenant: object | None) -> Iterable[int]:
     """Pool ids of ``model`` explicitly shared to ``tenant``."""
     # inline imports: app-registry: ContentType and organization models are not
     # loadable while Django is still loading apps, and this module is imported
@@ -141,15 +143,15 @@ class _BatchResolverEvidence:
 
 
 def resolve_stock_access(
-    user,
-    stock,
-    access_level,
-    perm,
-    active_tenant=None,
-    system_authorization=None,
-    system_operation=None,
-    lock_grant=False,
-):
+    user: object | None,
+    stock: object,
+    access_level: str,
+    perm: str,
+    active_tenant: object | None = None,
+    system_authorization: SystemAuthorizationContext | None = None,
+    system_operation: str | None = None,
+    lock_grant: bool = False,
+) -> ResourceAccessDecision:
     """Return the canonical stock-pool authorization decision.
 
     Batch evidence is deliberately absent from this public signature. Only the
@@ -228,13 +230,13 @@ def _resolve_stock_access(
 
 
 def authorize_tenant_operation(
-    user,
-    active_tenant,
-    perm,
+    user: object | None,
+    active_tenant: object | None,
+    perm: str,
     *,
-    system_authorization=None,
-    system_operation=None,
-):
+    system_authorization: SystemAuthorizationContext | None = None,
+    system_operation: str | None = None,
+) -> bool:
     """Authorize one actor or issued-system operation in a live tenant."""
     # inline import: app-registry: this module is imported while Django loads apps.
     from organization.models import Tenant
@@ -258,14 +260,14 @@ def authorize_tenant_operation(
 
 
 def resolved_shared_stock_ids(
-    stock_model,
-    active_tenant,
-    user,
-    access_level,
-    perm,
-    system_authorization=None,
-    system_operation=None,
-):
+    stock_model: type[object],
+    active_tenant: object | None,
+    user: object | None,
+    access_level: str,
+    perm: str,
+    system_authorization: SystemAuthorizationContext | None = None,
+    system_operation: str | None = None,
+) -> list[int]:
     """Batch DB evidence, then project every candidate through the resolver."""
     # inline imports: app-registry: this module is imported while Django loads apps.
     from django.contrib.contenttypes.models import ContentType
@@ -353,7 +355,12 @@ def resolved_shared_stock_ids(
     ]
 
 
-def shared_stock_read_allowed(obj, active_tenant, user, perm=None):
+def shared_stock_read_allowed(
+    obj: object,
+    active_tenant: object | None,
+    user: object | None,
+    perm: str | None = None,
+) -> bool:
     """Framework-facing facade for canonical shared-stock read decisions."""
     # inline import: app-registry: this module is imported while Django loads apps.
     from organization.models import TenantResourceGrant
@@ -572,7 +579,7 @@ def _find_covering_grant(owner_tenant_id, active_tenant, stock, resource_type, e
     return None, None
 
 
-def accessible_tenant_ids_with_expiry(user):
+def accessible_tenant_ids_with_expiry(user: object | None) -> tuple[frozenset[int], datetime.datetime | None]:
     """``(frozenset(tenant_ids), valid_until)`` — see ``accessible_tenant_ids``
     for the memoization contract this adds to. ``valid_until`` is the earliest
     time the memo can go stale purely from the clock: a ``RoleGrant.valid_until``
@@ -620,12 +627,12 @@ def accessible_tenant_ids_with_expiry(user):
     return result, valid_until
 
 
-def accessible_tenant_ids(user):
+def accessible_tenant_ids(user: object | None) -> set[int]:
     # Copy out so a caller mutating the set can't corrupt the memo.
     return set(accessible_tenant_ids_with_expiry(user)[0])
 
 
-def managed_accessible_tenant_ids(user):
+def managed_accessible_tenant_ids(user: object | None) -> set[int]:
     if user is None or not getattr(user, "is_authenticated", False):
         return set()
     # inline import: cycle: avoids organization.access <-> organization.rbac at load time.
@@ -637,7 +644,7 @@ def managed_accessible_tenant_ids(user):
     return tenant_ids
 
 
-def tenant_access_report(tenant, external_only=False):
+def tenant_access_report(tenant: object, external_only: bool = False) -> list[dict[str, object]]:
     """Return users who can access ``tenant`` with native grant provenance."""
     # inline import: app-registry: organization models are not loadable while
     # Django is still loading apps, and this module is imported during app setup.

@@ -1009,12 +1009,16 @@ class CommittedRecordTests(unittest.TestCase):
     def test_the_committed_record_is_internally_consistent(self):
         self.assertEqual(gate.check_record(REPO_ROOT, self.policy, self.record), ())
 
-    def test_the_committed_record_lists_the_slice_zero_through_slice_six_admissions(self):
+    def test_the_committed_record_lists_the_slice_zero_through_slice_seven_admissions(self):
         self.assertEqual(
             [entry["path"] for entry in self.record["checked"]],
             [
                 "itambox/core/context.py",
+                "itambox/core/tasks/checkin.py",
+                "itambox/core/tasks/checkout.py",
                 "itambox/core/tasks/context.py",
+                "itambox/core/tasks/disposal.py",
+                "itambox/core/tasks/labels.py",
                 "itambox/core/tasks/reports.py",
                 "itambox/organization/access.py",
                 "itambox/users/api/scim/authentication.py",
@@ -1029,12 +1033,46 @@ class CommittedRecordTests(unittest.TestCase):
             {entry["path"]: (entry["scope"], entry["symbols"]) for entry in self.record["checked"]},
             {
                 "itambox/core/context.py": ("symbols", ["SystemAuthorizationContext"]),
-                "itambox/organization/access.py": ("symbols", ["ResourceAccessDecision"]),
+                "itambox/core/tasks/checkin.py": ("symbols", ["_parse_date", "bulk_checkin_task"]),
+                "itambox/core/tasks/checkout.py": ("symbols", ["_parse_date", "bulk_checkout_task"]),
+                "itambox/core/tasks/disposal.py": (
+                    "symbols",
+                    ["_parse_date", "_parse_proceeds", "bulk_dispose_task"],
+                ),
+                "itambox/core/tasks/labels.py": (
+                    "symbols",
+                    [
+                        "_label_print_css",
+                        "_safe_label_measurement",
+                        "chunk_list",
+                        "generate_base64_barcode",
+                        "generate_label_batch_task",
+                        "generate_label_pdf_batch_task",
+                        "generate_single_label_graphic",
+                    ],
+                ),
                 "itambox/users/api/scim/provider_patch.py": ("module", []),
                 "itambox/core/tasks/context.py": ("symbols", ["TaskContext"]),
                 "itambox/core/tasks/reports.py": (
                     "symbols",
                     ["_ReportOutput", "generate_scheduled_report_task"],
+                ),
+                "itambox/organization/access.py": (
+                    "symbols",
+                    [
+                        "ResourceAccessDecision",
+                        "accessible_tenant_ids",
+                        "accessible_tenant_ids_with_expiry",
+                        "authorize_tenant_operation",
+                        "get_ancestor_tenant_group_ids",
+                        "get_descendant_tenant_group_ids",
+                        "managed_accessible_tenant_ids",
+                        "resolve_stock_access",
+                        "resolved_shared_stock_ids",
+                        "shared_resource_ids",
+                        "shared_stock_read_allowed",
+                        "tenant_access_report",
+                    ],
                 ),
                 "itambox/users/api/scim/authentication.py": (
                     "symbols",

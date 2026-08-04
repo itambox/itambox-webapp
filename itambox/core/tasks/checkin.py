@@ -8,6 +8,7 @@ so single and bulk check-in stay behaviourally identical.
 
 import datetime
 import logging
+from collections.abc import Sequence
 
 from django.db import transaction
 from django.utils.translation import gettext as _
@@ -20,7 +21,7 @@ from .utils import reverse_job_detail
 logger = logging.getLogger(__name__)
 
 
-def _parse_date(value):
+def _parse_date(value: str | datetime.date | None) -> datetime.date | None:
     if not value:
         return None
     if isinstance(value, datetime.date):
@@ -32,8 +33,15 @@ def _parse_date(value):
 
 
 def bulk_checkin_task(
-    job_id, asset_pks, user_id, tenant_id=None, status_id=None, location_id=None, checkin_date=None, notes=""
-):
+    job_id: int,
+    asset_pks: Sequence[int | str],
+    user_id: int | None,
+    tenant_id: int | None = None,
+    status_id: int | str | None = None,
+    location_id: int | str | None = None,
+    checkin_date: str | datetime.date | None = None,
+    notes: str = "",
+) -> None:
     """Asynchronously check in selected hardware assets.
 
     Assets with no active assignment (and no location) are a no-op in

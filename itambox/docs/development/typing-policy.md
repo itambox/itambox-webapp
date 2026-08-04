@@ -438,6 +438,27 @@ those implementation details out of the bounded mypy import graph. This slice
 does not claim the complete SCIM operation surface, report-provider boundary
 (#83), or generated OpenAPI compatibility work (#98).
 
+Slice 7 adds two larger public-boundary families:
+
+- the bulk check-in, checkout, disposal, and label task entry envelopes in
+  `core.tasks.*`, together with their date/proceeds/measurement/chunking and
+  barcode helpers. IDs and JSON task payloads are typed at the enqueue boundary;
+  the existing task bodies, ORM lookups, service calls, and notification
+  results remain outside the projection;
+- the public access boundaries in `organization.access`: tenant-group topology
+  walks, shared-resource selection, stock authorization and its facades,
+  tenant-operation authorization, accessible-tenant memoization, and the tenant
+  access report. Model instances are represented as `object`/`type[object]` at
+  this boundary, while the already-admitted `ResourceAccessDecision` and
+  `SystemAuthorizationContext` contracts remain concrete.
+
+All Slice-7 entries are symbol-scoped. The task and access implementations are
+not whole-module admissions: private ORM evidence, RBAC traversal, task
+serialization, and renderer/PDF internals remain untyped until a later bounded
+slice. This slice does not claim the remaining task families, complete SCIM
+operation surface, report-provider boundary (#83), or generated OpenAPI
+compatibility work (#98).
+
 Subsequent slices of issue #93 extend the list one bounded surface at a time:
 the remaining task payload/result families, organization service boundaries,
 report-provider contracts, and serializer return annotations. Nothing is claimed
