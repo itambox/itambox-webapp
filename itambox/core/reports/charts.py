@@ -1,7 +1,22 @@
 import math
+import re
+from pathlib import Path
 
-from django.utils.html import escape
+from django.utils.html import escape, format_html
 from django.utils.translation import gettext as _
+
+from core.context import get_current_csp_nonce
+
+_CHART_CSS_PATH = Path(__file__).resolve().parents[2] / "static" / "src" / "styles" / "_report-output.scss"
+_SAFE_NONCE = re.compile(r"^[A-Za-z0-9+/_=-]{1,256}$")
+
+
+def _chart_style_block():
+    css = _CHART_CSS_PATH.read_text(encoding="utf-8")
+    nonce = get_current_csp_nonce()
+    if nonce and _SAFE_NONCE.fullmatch(nonce):
+        return format_html('<style nonce="{}">{}</style>', nonce, css)
+    return ""
 
 
 def generate_doughnut_chart(data, title=""):
@@ -12,12 +27,17 @@ def generate_doughnut_chart(data, title=""):
     # Filter out zero or negative values
     data = [item for item in data if item.get("value", 0) > 0]
     if not data:
-        return f"""
-        <svg viewBox="0 0 480 220" width="100%" height="220" xmlns="http://www.w3.org/2000/svg" style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;">
-            <rect width="480" height="220" rx="12" fill="#f8fafc" stroke="#e2e8f0" stroke-width="1"/>
-            <text x="240" y="115" text-anchor="middle" font-size="13" fill="#64748b" font-weight="500">{_("No data available for charting")}</text>
-        </svg>
-        """
+        return "\n".join(
+            [
+                _chart_style_block(),
+                '<svg class="report-chart report-chart-empty" viewBox="0 0 480 220" '
+                'width="100%" height="220" xmlns="http://www.w3.org/2000/svg">',
+                '<rect width="480" height="220" rx="12" fill="#f8fafc" stroke="#e2e8f0" stroke-width="1"/>',
+                f'<text x="240" y="115" text-anchor="middle" font-size="13" fill="#64748b" '
+                f'font-weight="500">{_("No data available for charting")}</text>',
+                "</svg>",
+            ]
+        )
 
     total = sum(item["value"] for item in data)
     r = 60
@@ -37,8 +57,10 @@ def generate_doughnut_chart(data, title=""):
     ]
 
     svg_parts = []
+    svg_parts.append(_chart_style_block())
     svg_parts.append(
-        '<svg viewBox="0 0 480 220" width="100%" height="220" xmlns="http://www.w3.org/2000/svg" style="font-family: -apple-system, BlinkMacSystemFont, \'Segoe UI\', Roboto, sans-serif; background: #ffffff; border-radius: 12px; border: 1px solid #e2e8f0; box-shadow: 0 1px 3px rgba(0,0,0,0.05);">'
+        '<svg class="report-chart report-chart-doughnut" viewBox="0 0 480 220" '
+        'width="100%" height="220" xmlns="http://www.w3.org/2000/svg">'
     )
 
     if title:
@@ -120,12 +142,17 @@ def generate_bar_chart(data, title=""):
     # Filter out zero or negative values
     data = [item for item in data if item.get("value", 0) > 0]
     if not data:
-        return f"""
-        <svg viewBox="0 0 480 220" width="100%" height="220" xmlns="http://www.w3.org/2000/svg" style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;">
-            <rect width="480" height="220" rx="12" fill="#f8fafc" stroke="#e2e8f0" stroke-width="1"/>
-            <text x="240" y="115" text-anchor="middle" font-size="13" fill="#64748b" font-weight="500">{_("No data available for charting")}</text>
-        </svg>
-        """
+        return "\n".join(
+            [
+                _chart_style_block(),
+                '<svg class="report-chart report-chart-empty" viewBox="0 0 480 220" '
+                'width="100%" height="220" xmlns="http://www.w3.org/2000/svg">',
+                '<rect width="480" height="220" rx="12" fill="#f8fafc" stroke="#e2e8f0" stroke-width="1"/>',
+                f'<text x="240" y="115" text-anchor="middle" font-size="13" fill="#64748b" '
+                f'font-weight="500">{_("No data available for charting")}</text>',
+                "</svg>",
+            ]
+        )
 
     # Keep top 5 items
     data = sorted(data, key=lambda x: x["value"], reverse=True)[:5]
@@ -134,8 +161,10 @@ def generate_bar_chart(data, title=""):
     colors = ["#206bc4", "#4263eb", "#2fb344", "#f76707", "#0ca678"]
 
     svg_parts = []
+    svg_parts.append(_chart_style_block())
     svg_parts.append(
-        '<svg viewBox="0 0 480 220" width="100%" height="220" xmlns="http://www.w3.org/2000/svg" style="font-family: -apple-system, BlinkMacSystemFont, \'Segoe UI\', Roboto, sans-serif; background: #ffffff; border-radius: 12px; border: 1px solid #e2e8f0; box-shadow: 0 1px 3px rgba(0,0,0,0.05);">'
+        '<svg class="report-chart report-chart-bar" viewBox="0 0 480 220" '
+        'width="100%" height="220" xmlns="http://www.w3.org/2000/svg">'
     )
 
     if title:

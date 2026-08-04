@@ -809,12 +809,6 @@ class ReportTemplate(ChangeLoggingMixin, SoftDeleteMixin, BaseModel):
             ("minimal", _("Minimal (Clean)")),
         ],
     )
-    advanced_mode = models.BooleanField(
-        default=False, verbose_name=_("Advanced Mode"), help_text=_("Enable custom Jinja2/HTML template code override.")
-    )
-    template_content = models.TextField(
-        blank=True, verbose_name=_("Template Content"), help_text=_("Optional Jinja2 custom HTML override template")
-    )
 
     class Meta:
         ordering = ["name"]
@@ -831,18 +825,6 @@ class ReportTemplate(ChangeLoggingMixin, SoftDeleteMixin, BaseModel):
 
     def get_absolute_url(self):
         return reverse("extras:reporttemplate_detail", kwargs={"pk": self.pk})
-
-    def clean(self):
-        super().clean()
-        if self.template_content and self.template_content.strip():
-            try:
-                from jinja2 import Environment
-
-                Environment().parse(self.template_content)
-            except Exception as e:
-                raise ValidationError(
-                    {"template_content": _("Jinja2 template compilation failed: %(error)s") % {"error": str(e)}}
-                ) from None
 
 
 class ScheduledReport(ChangeLoggingMixin, BaseModel):

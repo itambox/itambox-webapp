@@ -22,6 +22,7 @@
       {% endblock %}
     </title>
     <meta name="csrf-token" content="{{ csrf_token }}">
+    <meta name="csp-nonce" content="{{ request.csp_nonce }}">
     {% include "includes/pwa_head.html" %}
     <link rel="icon"
           type="image/svg+xml"
@@ -52,7 +53,7 @@
     <link href="{% static 'dist/itambox.css' %}?v=1.2.2" rel="stylesheet" />
     {# Skip-nav: fixed + off-screen until keyboard focus, then slides in. Self-contained because #}
     {# Tabler's CSS does not ship Bootstrap's .visually-hidden-focusable utility. #}
-    <style>
+    <style nonce="{{ request.csp_nonce }}">
         .skip-link {
             position: fixed;
             top: -100px;
@@ -66,6 +67,14 @@
     {# scrollIntoViewOnBoost off: a boosted navigation must NOT auto-scroll the swapped #}
     {# target into view — on mobile that jolts the persistent topbar out of view. Keep it fixed. #}
     <meta name="htmx-config" content='{"scrollIntoViewOnBoost": false}'>
+    <script nonce="{{ request.csp_nonce }}">
+      document.addEventListener('htmx:configRequest', function (event) {
+        var nonceMeta = document.querySelector('meta[name="csp-nonce"]');
+        if (nonceMeta && nonceMeta.content) {
+          event.detail.headers['X-CSP-Nonce'] = nonceMeta.content;
+        }
+      });
+    </script>
     {# HTMX (in head for early hx-* processing) #}
     <script src="{% static 'dist/vendor/htmx.min.js' %}"></script>
     <script src="{% static 'dist/vendor/apexcharts.min.js' %}"></script>
@@ -84,16 +93,9 @@
     <a href="#page-body-main" class="skip-link btn btn-primary">{% translate "Skip to main content" %}</a>
     {# Global loading indicator #}
     <div id="htmx-loading-indicator"
-         class="htmx-indicator"
-         style="position:fixed;
-                top:0;
-                left:0;
-                width:100%;
-                z-index:9999;
-                pointer-events:none">
-      <div class="progress" style="height:3px;background:transparent;">
-        <div class="progress-bar progress-bar-animated progress-bar-striped bg-primary"
-             style="width:100%"></div>
+         class="htmx-indicator csp-style-f000ba256eb0">
+      <div class="progress csp-style-589a3310b3a6">
+        <div class="progress-bar progress-bar-animated progress-bar-striped bg-primary csp-style-b7aa1ec0049d"></div>
       </div>
     </div>
     {% block layout %}{% endblock %}
@@ -104,8 +106,7 @@
     {% include "includes/mobile_action_bar.html" %}
     {# Toast Messages Container #}
     <div id="django-messages"
-         class="toast-container position-fixed bottom-0 end-0 p-3"
-         style="z-index: 1100">
+         class="toast-container position-fixed bottom-0 end-0 p-3 csp-style-60b3148504b3">
       {% if messages %}
         {% for message in messages %}
           {% include "global_includes/_toast.html" with status=message.level_tag|status_from_tag message=message %}
@@ -124,7 +125,7 @@
     {% block javascript %}
     {% endblock javascript %}
     {# Standalone OOB target for dynamic title swaps #}
-    <span id="page-title-block" style="display:none" aria-hidden="true">{% translate "ITAMbox" %}</span>
+    <span class="d-none"  id="page-title-block" aria-hidden="true">{% translate "ITAMbox" %}</span>
     {% include "includes/pwa_service_worker.html" %}
   </body>
 </html>

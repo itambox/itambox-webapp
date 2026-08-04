@@ -8,7 +8,7 @@
     </div>
     {% if chart_format == 'list' %}
       <!-- Simple List View -->
-      <div class="d-flex flex-wrap gap-2" style="font-size: 0.75rem;">
+      <div class="d-flex flex-wrap gap-2 csp-style-8b511f076fb1">
         <span class="d-inline-flex align-items-center gap-1"><span class="badge badge-dot bg-success"></span>&lt;1y <span class="text-muted fw-bold">{{ age_buckets.lt1y }}</span></span>
         <span class="d-inline-flex align-items-center gap-1"><span class="badge badge-dot bg-blue"></span>1-3y <span class="text-muted fw-bold">{{ age_buckets.1_3y }}</span></span>
         <span class="d-inline-flex align-items-center gap-1"><span class="badge badge-dot bg-yellow"></span>3-5y <span class="text-muted fw-bold">{{ age_buckets.3_5y }}</span></span>
@@ -17,11 +17,10 @@
       </div>
     {% else %}
       <!-- ApexCharts Chart -->
-      <div class="itambox-asset-age-chart"
+      <div class="itambox-asset-age-chart csp-style-02928d28f739"
            id="chart-asset-age-{{ widget.index }}"
            data-chart-format="{{ chart_format }}"
-           data-chart-data="{{ chart_data_json }}"
-           style="min-height: 200px"></div>
+           data-chart-data="{{ chart_data_json }}"></div>
     {% endif %}
   {% endwith %}
 {% else %}

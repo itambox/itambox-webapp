@@ -62,9 +62,7 @@
                 <tr>
                   <td colspan="2" class="border-top pt-2">
                     <strong>{% translate "Result" %}</strong>
-                    <pre class="border rounded p-2 mt-2 mb-0"
-                         style="white-space: pre-wrap;
-                                word-break: break-word">{{ object.result|pretty_json }}</pre>
+                    <pre class="border rounded p-2 mt-2 mb-0 csp-style-c1fdc31c36f8">{{ object.result|pretty_json }}</pre>
                   </td>
                 </tr>
               {% endif %}
@@ -101,12 +99,7 @@
             {% endif %}
           </div>
           <div class="card-body p-0">
-            <pre class="border-0 rounded-0 p-3 mb-0 font-monospace"
-                 style="min-height: 250px;
-                        max-height: 500px;
-                        overflow-y: auto;
-                        white-space: pre-wrap;
-                        word-break: break-word">{% if object.logs %}{{ object.logs }}{% else %}{% translate "No log output yet." %}{% endif %}</pre>
+            <pre class="border-0 rounded-0 p-3 mb-0 font-monospace csp-style-50cef13b9112">{% if object.logs %}{{ object.logs }}{% else %}{% translate "No log output yet." %}{% endif %}</pre>
           </div>
         </div>
       </div>

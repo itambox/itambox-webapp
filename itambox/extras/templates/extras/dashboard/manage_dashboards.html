@@ -11,9 +11,7 @@
   <h6 class="mb-3">{% translate "Your Dashboards" %}</h6>
   <div class="list-group mb-4 shadow-sm border-0 rounded-3 overflow-hidden">
     {% for db in dashboards %}
-      <div class="list-group-item list-group-item-action d-flex align-items-center justify-content-between p-3"
-           style="background-color: var(--tblr-bg-surface-secondary, #f8f9fa);
-                  border-color: var(--tblr-border-color, #e6e8eb)">
+      <div class="list-group-item list-group-item-action d-flex align-items-center justify-content-between p-3 csp-style-9e4dfaa45d33">
         <div class="d-flex align-items-center gap-2 flex-grow-1">
           <!-- Editable Name Inline Form -->
           <form hx-post="{% url 'extras:dashboard_rename_dashboard' pk=db.pk %}"
@@ -23,14 +21,11 @@
             <input type="text"
                    name="name"
                    value="{{ db.name }}"
-                   class="form-control form-control-sm border-0 bg-transparent fw-semibold p-0 fs-3 text-body"
-                   style="box-shadow: none"
+                   class="form-control form-control-sm border-0 bg-transparent fw-semibold p-0 fs-3 text-body csp-style-2d4578f85c73"
                    title="{% translate 'Click to rename' %}">
             <button type="submit"
-                    class="btn btn-icon btn-sm btn-ghost-secondary border-0 p-0 d-none rename-save-btn"
-                    title="{% translate 'Save Name' %}"
-                    style="width: 24px;
-                           height: 24px">
+                    class="btn btn-icon btn-sm btn-ghost-secondary border-0 p-0 d-none rename-save-btn csp-style-b2b5743efc2d"
+                    title="{% translate 'Save Name' %}">
               <i class="mdi mdi-check text-success"></i>
             </button>
           </form>

@@ -108,7 +108,7 @@ function initAuditBasket(): void {
     if (countEl) countEl.textContent = String(count);
     const overlayCount = document.getElementById('basket-scanner-count');
     if (overlayCount) overlayCount.textContent = String(count);
-    if (emptyEl) emptyEl.style.display = count === 0 ? '' : 'none';
+    if (emptyEl) emptyEl.classList.toggle('d-none', count !== 0);
     if (clearBtn) clearBtn.disabled = count === 0;
     if (submitBtn) submitBtn.disabled = count === 0;
   }

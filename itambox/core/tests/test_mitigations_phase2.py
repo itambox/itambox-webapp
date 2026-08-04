@@ -61,6 +61,26 @@ class MitigationsPhase2Tests(TestCase):
         self.assertIn("script-src", directives)
         self.assertNotIn("'unsafe-inline'", directives["script-src"])
 
+    def test_csp_middleware_blocks_inline_style_attributes(self):
+        def get_response(req):
+            return HttpResponse("Hello")
+
+        middleware = CSPMiddleware(get_response)
+        request = RequestFactory().get("/")
+        response = middleware(request)
+
+        csp_header = response["Content-Security-Policy"]
+        directives = {}
+        for directive in csp_header.split("; "):
+            parts = directive.strip().split(" ", 1)
+            if len(parts) == 2:
+                directives[parts[0]] = parts[1]
+
+        self.assertNotIn("'unsafe-inline'", csp_header)
+        self.assertIn("'nonce-{}'".format(request.csp_nonce), directives["style-src"])
+        self.assertEqual(directives["style-src-attr"], "'none'")
+        self.assertIn("'nonce-{}'".format(request.csp_nonce), directives["style-src-elem"])
+
     def test_base_filter_set_scopes_choices(self):
         # Create Tenants
         tenant_a = baker.make(Tenant, name="Tenant A", slug="tenant-a")

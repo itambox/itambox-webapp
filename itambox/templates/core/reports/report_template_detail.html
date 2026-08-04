@@ -46,20 +46,18 @@
           <h3 class="card-title">{% translate "Template Information" %}</h3>
         </div>
         <div class="card-body p-0">
-          <table class="table table-transparent table-vcenter card-table"
-                 style="table-layout: fixed;
-                        width: 100%">
+          <table class="table table-transparent table-vcenter card-table csp-style-722cb708126b">
             <tbody>
               <tr>
-                <td class="text-secondary fw-bold" style="width: 30%;">{% translate "Name" %}</td>
+                <td class="text-secondary fw-bold csp-style-e60746439b49">{% translate "Name" %}</td>
                 <td class="text-wrap text-break">{{ object.name }}</td>
               </tr>
               <tr>
-                <td class="text-secondary fw-bold" style="width: 30%;">{% translate "Description" %}</td>
+                <td class="text-secondary fw-bold csp-style-e60746439b49">{% translate "Description" %}</td>
                 <td class="text-wrap text-break">{{ object.description|default:"&mdash;" }}</td>
               </tr>
               <tr>
-                <td class="text-secondary fw-bold" style="width: 30%;">{% translate "Report Type" %}</td>
+                <td class="text-secondary fw-bold csp-style-e60746439b49">{% translate "Report Type" %}</td>
                 <td class="text-wrap text-break">
                   <span class="badge bg-blue-lt">{{ object.get_report_type_display }}</span>
                 </td>
@@ -74,14 +72,12 @@
           <h3 class="card-title">{% translate "Active Schedules" %}</h3>
         </div>
         <div class="card-body p-0">
-          <table class="table table-transparent table-vcenter card-table"
-                 style="table-layout: fixed;
-                        width: 100%">
+          <table class="table table-transparent table-vcenter card-table csp-style-722cb708126b">
             <thead>
               <tr>
-                <th style="width: 55%;">{% translate "Schedule" %}</th>
-                <th style="width: 25%;">{% translate "Format" %}</th>
-                <th style="width: 20%;">{% translate "Active" %}</th>
+                <th class="csp-style-51376b3fae7e">{% translate "Schedule" %}</th>
+                <th class="csp-style-84a0e8c4b0db">{% translate "Format" %}</th>
+                <th class="csp-style-00e2b68de3ff">{% translate "Active" %}</th>
               </tr>
             </thead>
             <tbody>
@@ -111,115 +107,92 @@
         </div>
       </div>
     </div>
-    <!-- Right Column: Code content or Visual Settings -->
+    <!-- Right Column: Visual Settings -->
     <div class="col-md-7">
-      {% if object.advanced_mode %}
-        <div class="card mb-3">
-          <div class="card-header d-flex justify-content-between align-items-center">
-            <h3 class="card-title">{% translate "Jinja2 HTML Override Code" %}</h3>
-            <span class="badge bg-warning text-warning-fg">{% translate "Advanced Code Active" %}</span>
-          </div>
-          <div class="card-body p-0">
-            {% if object.template_content %}
-              <pre class="m-0 p-3 bg-dark text-light rounded-bottom"
-                   style="font-family: monospace;
-                          font-size: 11px;
-                          max-height: 500px;
-                          overflow-y: auto"><code>{{ object.template_content }}</code></pre>
-            {% else %}
-              <div class="p-4 text-center text-muted">
-                <i class="mdi mdi-information-outline mb-2"></i>
-                <p class="mb-0">{% translate "Advanced mode enabled, but template content is empty. Falling back to default layout." %}</p>
-              </div>
-            {% endif %}
-          </div>
+      <div class="card mb-3">
+        <div class="card-header d-flex justify-content-between align-items-center bg-transparent">
+          <h3 class="card-title">{% translate "Visual Designer Parameters" %}</h3>
+          <span class="badge bg-success text-success-fg">{% translate "No-Code Designer Active" %}</span>
         </div>
-      {% else %}
-        <div class="card mb-3">
-          <div class="card-header d-flex justify-content-between align-items-center bg-transparent">
-            <h3 class="card-title">{% translate "Visual Designer Parameters" %}</h3>
-            <span class="badge bg-success text-success-fg">{% translate "No-Code Designer Active" %}</span>
-          </div>
-          <div class="card-body">
-            <div class="row g-3">
-              <div class="col-sm-6">
-                <div class="text-secondary small fw-bold mb-1">{% translate "LAYOUT PRESET" %}</div>
-                <div class="d-flex align-items-center">
-                  <span class="badge bg-primary-lt px-2 py-1 fs-4">
-                    <i class="mdi mdi-view-dashboard-outline me-1"></i>
-                    {{ object.get_style_preset_display }}
+        <div class="card-body">
+          <div class="row g-3">
+            <div class="col-sm-6">
+              <div class="text-secondary small fw-bold mb-1">{% translate "LAYOUT PRESET" %}</div>
+              <div class="d-flex align-items-center">
+                <span class="badge bg-primary-lt px-2 py-1 fs-4">
+                  <i class="mdi mdi-view-dashboard-outline me-1"></i>
+                  {{ object.get_style_preset_display }}
+                </span>
+              </div>
+            </div>
+            <div class="col-sm-6">
+              <div class="text-secondary small fw-bold mb-1">{% translate "GROUP BY FIELD" %}</div>
+              <div>
+                {% if object.group_by_field %}
+                  <span class="badge bg-purple-lt px-2 py-1">
+                    <i class="mdi mdi-view-column-outline me-1"></i>
+                    <code>{{ object.group_by_field }}</code>
                   </span>
-                </div>
+                {% else %}
+                  <span class="text-muted small italic">{% translate "No row grouping configured" %}</span>
+                {% endif %}
               </div>
-              <div class="col-sm-6">
-                <div class="text-secondary small fw-bold mb-1">{% translate "GROUP BY FIELD" %}</div>
-                <div>
-                  {% if object.group_by_field %}
-                    <span class="badge bg-purple-lt px-2 py-1">
-                      <i class="mdi mdi-view-column-outline me-1"></i>
-                      <code>{{ object.group_by_field }}</code>
-                    </span>
-                  {% else %}
-                    <span class="text-muted small italic">{% translate "No row grouping configured" %}</span>
-                  {% endif %}
-                </div>
-              </div>
-              <div class="col-12">
-                <hr class="my-2">
-              </div>
-              <div class="col-12">
-                <div class="text-secondary small fw-bold mb-2">{% translate "VISUAL SECTIONS" %}</div>
-                <div class="row g-2">
-                  <div class="col-sm-6">
-                    <div class="card card-sm border-0 bg-body-secondary p-2 d-flex flex-row align-items-center">
-                      {% if object.include_summary_cards %}
-                        <span class="text-success me-2">
-                          <i class="mdi mdi-check-circle"></i>
-                        </span>
-                      {% else %}
-                        <span class="text-secondary me-2">
-                          <i class="mdi mdi-close-circle"></i>
-                        </span>
-                      {% endif %}
-                      <div class="small fw-semibold">{% translate "Summary Cards Total Summary" %}</div>
-                    </div>
+            </div>
+            <div class="col-12">
+              <hr class="my-2">
+            </div>
+            <div class="col-12">
+              <div class="text-secondary small fw-bold mb-2">{% translate "VISUAL SECTIONS" %}</div>
+              <div class="row g-2">
+                <div class="col-sm-6">
+                  <div class="card card-sm border-0 bg-body-secondary p-2 d-flex flex-row align-items-center">
+                    {% if object.include_summary_cards %}
+                      <span class="text-success me-2">
+                        <i class="mdi mdi-check-circle"></i>
+                      </span>
+                    {% else %}
+                      <span class="text-secondary me-2">
+                        <i class="mdi mdi-close-circle"></i>
+                      </span>
+                    {% endif %}
+                    <div class="small fw-semibold">{% translate "Summary Cards Total Summary" %}</div>
                   </div>
-                  <div class="col-sm-6">
-                    <div class="card card-sm border-0 bg-body-secondary p-2 d-flex flex-row align-items-center">
-                      {% if object.include_distribution_chart %}
-                        <span class="text-success me-2">
-                          <i class="mdi mdi-check-circle"></i>
-                        </span>
-                      {% else %}
-                        <span class="text-secondary me-2">
-                          <i class="mdi mdi-close-circle"></i>
-                        </span>
-                      {% endif %}
-                      <div class="small fw-semibold">{% translate "Spend Distribution Chart" %}</div>
-                    </div>
+                </div>
+                <div class="col-sm-6">
+                  <div class="card card-sm border-0 bg-body-secondary p-2 d-flex flex-row align-items-center">
+                    {% if object.include_distribution_chart %}
+                      <span class="text-success me-2">
+                        <i class="mdi mdi-check-circle"></i>
+                      </span>
+                    {% else %}
+                      <span class="text-secondary me-2">
+                        <i class="mdi mdi-close-circle"></i>
+                      </span>
+                    {% endif %}
+                    <div class="small fw-semibold">{% translate "Spend Distribution Chart" %}</div>
                   </div>
                 </div>
               </div>
-              <div class="col-12">
-                <hr class="my-2">
-              </div>
-              <div class="col-12">
-                <div class="text-secondary small fw-bold mb-2">{% translate "GRID COLUMNS COMPOSITION" %}</div>
-                <div class="d-flex flex-wrap gap-2">
-                  {% for col in object.included_columns %}
-                    <span class="badge bg-indigo-lt px-2 py-1 fs-5">
-                      <i class="mdi mdi-table"></i>
-                      {{ col|title }}
-                    </span>
-                  {% empty %}
-                    <span class="badge bg-secondary-lt px-2 py-1">{% translate "All Standard Columns" %}</span>
-                  {% endfor %}
-                </div>
+            </div>
+            <div class="col-12">
+              <hr class="my-2">
+            </div>
+            <div class="col-12">
+              <div class="text-secondary small fw-bold mb-2">{% translate "GRID COLUMNS COMPOSITION" %}</div>
+              <div class="d-flex flex-wrap gap-2">
+                {% for col in object.included_columns %}
+                  <span class="badge bg-indigo-lt px-2 py-1 fs-5">
+                    <i class="mdi mdi-table"></i>
+                    {{ col|title }}
+                  </span>
+                {% empty %}
+                  <span class="badge bg-secondary-lt px-2 py-1">{% translate "All Standard Columns" %}</span>
+                {% endfor %}
               </div>
             </div>
           </div>
         </div>
-      {% endif %}
+      </div>
     </div>
   </div>
 {% endblock %}

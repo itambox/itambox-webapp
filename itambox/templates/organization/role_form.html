@@ -27,15 +27,11 @@
             <div class="col-md-4 mb-3">
               <label class="form-label">{% translate "Tenant" %}</label>
               <input type="text"
-                     class="form-control"
+                     class="form-control csp-style-6f35bc2732c6"
                      value="{{ form.owner_tenant.name|default:"—" }}"
                      disabled
-                     readonly
-                     style="background-color: var(--tblr-bg-surface-secondary, #f6f8fb);
-                            opacity: 0.8">
-              <small class="form-hint text-muted mt-1"
-                     style="display: block;
-                            font-size: 0.75rem">
+                     readonly>
+              <small class="form-hint text-muted mt-1 csp-style-6131b67a6494">
                 {% translate "A role belongs to the tenant it is created in and cannot be moved afterwards." %}
               </small>
             </div>
@@ -79,69 +75,56 @@
             <table class="table table-hover align-middle border mb-4">
               <thead class="table-light">
                 <tr>
-                  <th style="width: 35%;">{% translate "Object / Model" %}</th>
-                  <th class="text-center" style="width: 13%;">
+                  <th class="csp-style-b8b699ddacaf">{% translate "Object / Model" %}</th>
+                  <th class="text-center csp-style-99ef5965e15e">
                     <div class="text-uppercase tracking-wider fw-bold mb-1 fs-6">{% translate "Read" %}</div>
                     <div class="d-inline-block">
                       <input type="checkbox"
-                             class="form-check-input col-toggle"
+                             class="form-check-input col-toggle csp-style-36cbdc90a6a6"
                              id="toggle-col-read"
                              data-action="read"
-                             title="{% translate 'Toggle all Read' %}"
-                             style="position: static;
-                                    margin: 0;
-                                    cursor: pointer">
+                             title="{% translate 'Toggle all Read' %}">
                     </div>
                   </th>
-                  <th class="text-center" style="width: 13%;">
+                  <th class="text-center csp-style-99ef5965e15e">
                     <div class="text-uppercase tracking-wider fw-bold mb-1 fs-6">{% translate "Create" %}</div>
                     <div class="d-inline-block">
                       <input type="checkbox"
-                             class="form-check-input col-toggle"
+                             class="form-check-input col-toggle csp-style-36cbdc90a6a6"
                              id="toggle-col-create"
                              data-action="create"
-                             title="{% translate 'Toggle all Create' %}"
-                             style="position: static;
-                                    margin: 0;
-                                    cursor: pointer">
+                             title="{% translate 'Toggle all Create' %}">
                     </div>
                   </th>
-                  <th class="text-center" style="width: 13%;">
+                  <th class="text-center csp-style-99ef5965e15e">
                     <div class="text-uppercase tracking-wider fw-bold mb-1 fs-6">{% translate "Edit" %}</div>
                     <div class="d-inline-block">
                       <input type="checkbox"
-                             class="form-check-input col-toggle"
+                             class="form-check-input col-toggle csp-style-36cbdc90a6a6"
                              id="toggle-col-edit"
                              data-action="edit"
-                             title="{% translate 'Toggle all Edit' %}"
-                             style="position: static;
-                                    margin: 0;
-                                    cursor: pointer">
+                             title="{% translate 'Toggle all Edit' %}">
                     </div>
                   </th>
-                  <th class="text-center" style="width: 13%;">
+                  <th class="text-center csp-style-99ef5965e15e">
                     <div class="text-uppercase tracking-wider fw-bold mb-1 fs-6">{% translate "Delete" %}</div>
                     <div class="d-inline-block">
                       <input type="checkbox"
-                             class="form-check-input col-toggle"
+                             class="form-check-input col-toggle csp-style-36cbdc90a6a6"
                              id="toggle-col-delete"
                              data-action="delete"
-                             title="{% translate 'Toggle all Delete' %}"
-                             style="position: static;
-                                    margin: 0;
-                                    cursor: pointer">
+                             title="{% translate 'Toggle all Delete' %}">
                     </div>
                   </th>
-                  <th class="text-center" style="width: 13%;">
+                  <th class="text-center csp-style-99ef5965e15e">
                     <div class="text-uppercase tracking-wider fw-bold mb-1 fs-6">{% translate "Row All" %}</div>
-                    <div style="height: 16px;"></div>
+                    <div class="csp-style-048e9971e577"></div>
                   </th>
                 </tr>
               </thead>
               <tbody>
                 {% for group_name, items in form.matrix_grouped_items.items %}
-                  <tr style="background-color: var(--tblr-bg-surface-secondary, #f6f8fb);
-                             color: var(--tblr-body-color)">
+                  <tr class="csp-style-201c3fefb035">
                     <td colspan="5" class="fw-bold ps-3">{{ group_name }}</td>
                     <td class="text-center">
                       <button type="button"
@@ -171,11 +154,8 @@
                       <td class="text-center">
                         <div class="d-inline-block">
                           <input type="checkbox"
-                                 class="form-check-input row-toggle-check"
-                                 title="{% translate 'Toggle all in row' %}"
-                                 style="position: static;
-                                        margin: 0;
-                                        cursor: pointer">
+                                 class="form-check-input row-toggle-check csp-style-36cbdc90a6a6"
+                                 title="{% translate 'Toggle all in row' %}">
                         </div>
                       </td>
                     </tr>

@@ -53,19 +53,13 @@
   {% if object.conditions %}
     <dt class="col-sm-3">{% translate "Matching Conditions:" %}</dt>
     <dd class="col-sm-9">
-      <pre class="bg-dark text-light p-3 rounded font-monospace"
-           style="max-height: 150px;
-                  overflow-y: auto;
-                  font-size: 8.5pt">{{ object.conditions }}</pre>
+      <pre class="bg-dark text-light p-3 rounded font-monospace csp-style-ec1ffaf1ff16">{{ object.conditions }}</pre>
     </dd>
   {% endif %}
   {% if object.action_config %}
     <dt class="col-sm-3">{% translate "Action Configuration:" %}</dt>
     <dd class="col-sm-9">
-      <pre class="bg-dark text-light p-3 rounded font-monospace"
-           style="max-height: 200px;
-                  overflow-y: auto;
-                  font-size: 8.5pt">{{ object.action_config }}</pre>
+      <pre class="bg-dark text-light p-3 rounded font-monospace csp-style-f7945b333c07">{{ object.action_config }}</pre>
     </dd>
   {% endif %}
 </dl>

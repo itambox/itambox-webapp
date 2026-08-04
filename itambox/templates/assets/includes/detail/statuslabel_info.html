@@ -1,4 +1,4 @@
-{% load i18n %}
+{% load i18n utility_tags %}
 <dl class="row mb-0">
   <dt class="col-sm-3">{% translate "Name:" %}</dt>
   <dd class="col-sm-9">
@@ -15,7 +15,9 @@
   <dt class="col-sm-3">{% translate "Color Badge:" %}</dt>
   <dd class="col-sm-9">
     {% if object.color %}
-      <span class="badge" style="background-color: #{{ object.color }};">&nbsp;</span> #{{ object.color }}
+      {% csp_color_style object.color "chip" as color_style %}
+      {{ color_style.style_block|safe }}
+      <span class="badge {{ color_style.class_name }}">&nbsp;</span> #{{ object.color }}
     {% else %}
       —
     {% endif %}

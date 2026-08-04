@@ -8,15 +8,14 @@
   {% endblock %}
 </title>
 {# 2. Page Title (hidden span target — uses same value via context) #}
-<span id="page-title-block"
+<span class="d-none"
+      id="page-title-block"
       hx-swap-oob="true"
-      style="display:none"
       aria-hidden="true">{{ title|default:"ITAMbox" }}</span>
 {# 2. Django Messages / Toasts #}
 <div id="django-messages"
      hx-swap-oob="true"
-     class="toast-container position-fixed bottom-0 end-0 p-3"
-     style="z-index: 1100">
+     class="toast-container position-fixed bottom-0 end-0 p-3 csp-style-60b3148504b3">
   {% if messages %}
     {% for message in messages %}
       {% include "global_includes/_toast.html" with status=message.level_tag|status_from_tag message=message %}

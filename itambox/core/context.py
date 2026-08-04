@@ -39,6 +39,7 @@ _current_all_accessible = contextvars.ContextVar("current_all_accessible", defau
 _descendant_group_ids_cache = contextvars.ContextVar("descendant_group_ids_cache", default=None)
 _current_user = contextvars.ContextVar("current_user", default=None)
 _request_id = contextvars.ContextVar("request_id", default=None)
+_csp_nonce = contextvars.ContextVar("csp_nonce", default=None)
 _system_authorization_scope = contextvars.ContextVar("system_authorization_scope", default=None)
 _issued_system_authorizations = contextvars.ContextVar("issued_system_authorizations", default=())
 _deletion_cascade_permit = contextvars.ContextVar("deletion_cascade_permit", default=None)
@@ -154,6 +155,18 @@ def set_current_tenant(tenant: Optional[Any]) -> None:
 
 def get_current_tenant() -> Optional[Any]:
     return _current_tenant.get()
+
+
+def set_current_csp_nonce(nonce: Optional[str]):
+    return _csp_nonce.set(nonce)
+
+
+def get_current_csp_nonce() -> Optional[str]:
+    return _csp_nonce.get()
+
+
+def reset_current_csp_nonce(token) -> None:
+    _csp_nonce.reset(token)
 
 
 def set_current_tenant_group(group: Optional[Any]) -> None:

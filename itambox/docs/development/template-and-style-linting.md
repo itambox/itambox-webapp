@@ -11,6 +11,7 @@ Run the check-only gates from the repository root:
 ```bash
 make lint-templates
 make lint-styles
+make inline-style-check
 ```
 
 `make lint` also runs both gates through the mandatory full-repository pre-commit
@@ -33,6 +34,11 @@ npm run lint:styles:fix
 
 The `:fix` command is for a deliberate local cleanup only. CI invokes only
 `npm run lint:styles`.
+
+The CSP/inline-style gate is documented separately in
+[CSP and inline-style policy](csp-inline-style-policy.md). It is check-only;
+there is no automatic rewrite command because dynamic values require a reviewed
+CSS/HTML boundary.
 
 ## Template gate
 
@@ -82,7 +88,7 @@ selectors or properties. New exceptions must be narrowly scoped and documented.
 ## Dependencies and CI
 
 `uv.lock` and `itambox/package-lock.json` are committed. CI uses locked installs
-and Python 3.12/Node.js 20. The `template-lint` and `stylelint` jobs run the full
+and Python 3.12/Node.js 20. The `template-lint`, `stylelint`, and `inline-style` jobs run the full
 allowed source inventories; the pull-request path filters only decide whether the
 workflow starts. Template, SCSS/CSS, configuration, lockfile, Makefile, and
 pre-commit changes all trigger the workflow.

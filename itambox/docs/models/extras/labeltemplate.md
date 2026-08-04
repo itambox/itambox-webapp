@@ -17,3 +17,8 @@ A **Label Template** defines the printable layout and dimensions for physical as
 
 * **Print Preview**: Generates print sheets scaled to label dimensions.
 * **Dynamic Content**: Injects asset details like tag sequence numbers, categories, and serial numbers directly into the barcode layout.
+
+Custom label code is a Beta print-layout feature. Only superusers can create or
+edit the global templates; rendering exposes a scalar asset DTO rather than the
+Django model, uses an immutable autoescaping Jinja sandbox, and sanitizes the
+resulting HTML/CSS/resources before PDF generation.

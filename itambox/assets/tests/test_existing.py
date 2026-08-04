@@ -1273,5 +1273,5 @@ class CategoryTestCase(_SeededStatusLabelsMixin, TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "Laptop Category")
         # Check that the color hex is displayed, and the badge span contains the background-color style
-        self.assertContains(response, "background-color: #ff0000")
+        self.assertContains(response, "background-color:#ff0000")
         self.assertContains(response, "#ff0000")

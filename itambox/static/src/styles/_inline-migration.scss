@@ -1,0 +1,431 @@
+// Centralized authored classes for the #24 inline-style migration.
+// The source templates keep semantic classes where behavior is dynamic; these
+// stable utility classes cover legacy static declarations during the migration.
+
+.csp-style-00e2b68de3ff {
+  width: 20%;
+}
+
+.csp-style-02928d28f739 {
+  min-height: 200px;
+}
+
+.csp-style-048e9971e577 {
+  height: 16px;
+}
+
+.csp-style-05fdc6fe4835 {
+  grid-column: span 3;
+}
+
+.csp-style-061aae1ab3fc {
+  font-size: 0.65rem;
+}
+
+.csp-style-0b342f935f33 {
+  min-height: 220px;
+}
+
+.csp-style-0c5e419543f9 {
+  font-size: 0.80rem;
+}
+
+.csp-style-111e2c1bce4e {
+  max-height: 80px;
+  border: 1px solid #ddd;
+  padding: 5px;
+  border-radius: 4px;
+  background: white;
+}
+
+.csp-style-13590be1c63c {
+  font-size: 8pt;
+  line-height: 1.3;
+}
+
+.csp-style-147af99167b5 {
+  max-width: 200px;
+}
+
+.csp-style-1599881f178d {
+  font-size: 0.72rem;
+  line-height: 1.5;
+}
+
+.csp-style-1821d596bdea {
+  max-height: 280px;
+  overflow-y: auto;
+}
+
+.csp-style-1b93e586f25c {
+  font-size: 0.78rem;
+}
+
+.csp-style-1e5172f54813 {
+  width: 13%;
+}
+
+.csp-style-201c3fefb035 {
+  background-color: var(--tblr-bg-surface-secondary, #f6f8fb);
+  color: var(--tblr-body-color);
+}
+
+.csp-style-20fa8c266a10 {
+  min-width: 1200px;
+}
+
+.csp-style-22e445681534 {
+  width: 9rem;
+}
+
+.csp-style-2d4578f85c73 {
+  box-shadow: none;
+}
+
+.csp-style-2d9383cfc6e2 {
+  width: 7%;
+}
+
+.csp-style-300e17994aa9 {
+  font-size: 1.25rem;
+}
+
+.csp-style-33e94a5a2c44 {
+  max-width: 450px;
+}
+
+.csp-style-36577e76c936 {
+  width: 14%;
+  font-family: var(--tblr-font-monospace);
+  font-size: 0.72rem;
+}
+
+.csp-style-36cbdc90a6a6 {
+  position: static;
+  margin: 0;
+  cursor: pointer;
+}
+
+.csp-style-392c68093a4d {
+  width: 12%;
+}
+
+.csp-style-3b8a53a9afec {
+  width: 10px;
+  height: 10px;
+}
+
+.csp-style-3d694704dd1b {
+  width: 100px;
+}
+
+.csp-style-3d8f225b32ca {
+  width: 10%;
+}
+
+.csp-style-3e808d2c8045 {
+  padding: 0.5rem 1.25rem;
+}
+
+.csp-style-41a4df5eab0d {
+  font-size: 1.5rem;
+}
+
+.csp-style-461f8510d808 {
+  letter-spacing: 0.05em;
+  font-size: 0.7rem !important;
+  padding-left: 1.5rem !important;
+}
+
+.csp-style-485f6ada56c0 {
+  width: 80px;
+}
+
+.csp-style-4908cb0a1366 {
+  font-size: 0.85rem;
+}
+
+.csp-style-4bb8b5887ce6 {
+  letter-spacing: 0.05em;
+}
+
+.csp-style-50ad24378a83 {
+  max-height: 250px;
+  overflow-y: auto;
+  font-size: 9.5pt;
+  line-height: 1.5;
+}
+
+.csp-style-50cef13b9112 {
+  min-height: 250px;
+  max-height: 500px;
+  overflow-y: auto;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.csp-style-51376b3fae7e {
+  width: 55%;
+}
+
+.csp-style-589a3310b3a6 {
+  height: 3px;
+  background: transparent;
+}
+
+.csp-style-5966c0f29435 {
+  width: 8%;
+}
+
+.csp-style-59e43b640b5a {
+  max-height: 400px;
+  overflow-y: auto;
+}
+
+.csp-style-5b5527df7235 {
+  width: 180px;
+}
+
+.csp-style-5eda5d14526f {
+  max-height: 40px;
+  border-radius: 4px;
+  background: white;
+  padding: 2px;
+}
+
+.csp-style-60b3148504b3 {
+  z-index: 1100;
+}
+
+.csp-style-6131b67a6494 {
+  display: block;
+  font-size: 0.75rem;
+}
+
+.csp-style-66a2d7a4026c {
+  border-left: 4px solid #f59f00;
+}
+
+.csp-style-6910897c45f7 {
+  letter-spacing: 0.05em;
+  font-size: 0.7rem !important;
+}
+
+.csp-style-6aa34d7432e7 {
+  display: none;
+}
+
+.csp-style-6f35bc2732c6 {
+  background-color: var(--tblr-bg-surface-secondary, #f6f8fb);
+  opacity: 0.8;
+}
+
+.csp-style-702fb6bfde7e {
+  letter-spacing: 0.05em;
+  font-size: 0.7rem !important;
+  cursor: pointer;
+  text-decoration: none;
+  padding-left: 1.5rem !important;
+}
+
+.csp-style-722cb708126b {
+  table-layout: fixed;
+  width: 100%;
+}
+
+.csp-style-773936ad3916 {
+  max-height: 200px;
+  overflow-y: auto;
+}
+
+.csp-style-78092e90d7aa {
+  display: none!important;
+}
+
+.csp-style-7ef9446763d9 {
+  max-width: 180px;
+}
+
+.csp-style-84a0e8c4b0db {
+  width: 25%;
+}
+
+.csp-style-87ae4f90fc31 {
+  white-space: normal;
+  min-height: 2.25rem;
+}
+
+.csp-style-89d4177716d5 {
+  width: 6%;
+}
+
+.csp-style-8b511f076fb1 {
+  font-size: 0.75rem;
+}
+
+.csp-style-932e018c8821 {
+  font-size: 0.75rem;
+}
+
+.csp-style-96357471f114 {
+  height: 150px;
+  overflow-y: auto;
+  font-size: 8.5pt;
+  line-height: 1.4;
+}
+
+.csp-style-99ef5965e15e {
+  width: 13%;
+}
+
+.csp-style-9e4dfaa45d33 {
+  background-color: var(--tblr-bg-surface-secondary, #f8f9fa);
+  border-color: var(--tblr-border-color, #e6e8eb);
+}
+
+.csp-style-a15f84255590 {
+  max-height: 150px;
+  object-fit: cover;
+}
+
+.csp-style-a6c62bdf9337 {
+  font-size: 0.65rem;
+}
+
+.csp-style-adad3d83de12 {
+  width: 9%;
+}
+
+.csp-style-afe90a4e8f75 {
+  width: 50px;
+}
+
+.csp-style-b2b5743efc2d {
+  width: 24px;
+  height: 24px;
+}
+
+.csp-style-b4738e7da8fe {
+  width: 12%;
+  font-family: var(--tblr-font-monospace);
+  font-size: 0.75rem;
+}
+
+.csp-style-b5ad8c8a7c27 {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.csp-style-b676192d2b77 {
+  font-size: 2rem;
+  display: block;
+}
+
+.csp-style-b7aa1ec0049d {
+  width: 100%;
+}
+
+.csp-style-b7ef83b20586 {
+  max-width: 96px;
+}
+
+.csp-style-b8b699ddacaf {
+  width: 35%;
+}
+
+.csp-style-bfa562e8fb39 {
+  flex-grow: 1;
+  max-width: 320px;
+  margin-right: 1rem;
+}
+
+.csp-style-c1fdc31c36f8 {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.csp-style-c4fe67cd4c97 {
+  letter-spacing: 0.05em;
+  font-size: 0.7rem !important;
+  cursor: pointer;
+  text-decoration: none;
+}
+
+.csp-style-c5510aee071a {
+  font-size: 2rem;
+}
+
+.csp-style-c83eb75e87e3 {
+  min-width: 22rem;
+}
+
+.csp-style-ccfdc6c8bf37 {
+  font-size: 2rem;
+}
+
+.csp-style-d10550e0061d {
+  font-variant-numeric: tabular-nums;
+}
+
+.csp-style-d2a3243f098c {
+  font-size: 0.65rem;
+  letter-spacing: 0.05em;
+}
+
+.csp-style-d574d0f6d3c1 {
+  font-size: 2.5rem;
+}
+
+.csp-style-e04aaf3f844a {
+  max-width: 340px;
+}
+
+.csp-style-e592dfc6c0f2 {
+  max-height: 45vh;
+  overflow-y: auto;
+}
+
+.csp-style-e60746439b49 {
+  width: 30%;
+}
+
+.csp-style-ea01e09be4f6 {
+  font-size: 3rem;
+}
+
+.csp-style-eb899c490557 {
+  width: 40%;
+}
+
+.csp-style-ec1ffaf1ff16 {
+  max-height: 150px;
+  overflow-y: auto;
+  font-size: 8.5pt;
+}
+
+.csp-style-ee488c67b751 {
+  white-space: pre-wrap;
+}
+
+.csp-style-f000ba256eb0 {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  z-index: 9999;
+  pointer-events: none;
+}
+
+.csp-style-f5680493984c {
+  font-size: 0.7rem;
+}
+
+.csp-style-f7945b333c07 {
+  max-height: 200px;
+  overflow-y: auto;
+  font-size: 8.5pt;
+}
+
+.csp-style-f7f760e2a15c {
+  width: 15%;
+}

@@ -23,10 +23,8 @@
     // Store original contents to restore on completion/error
     const originalText = submitBtn instanceof HTMLInputElement ? submitBtn.value : submitBtn.innerHTML;
     (submitBtn as any)._originalContent = originalText;
-    (submitBtn as any)._originalPointerEvents = submitBtn.style.pointerEvents;
-
     // Prevent pointer events to block double clicking, and add disabled styling
-    submitBtn.style.pointerEvents = 'none';
+    submitBtn.classList.add('pointer-events-none');
     submitBtn.classList.add('disabled');
     form.dataset.submitting = 'true';
 
@@ -61,8 +59,7 @@
       }
     }
 
-    const originalPointerEvents = (submitBtn as any)._originalPointerEvents;
-    submitBtn.style.pointerEvents = originalPointerEvents !== undefined ? originalPointerEvents : '';
+    submitBtn.classList.remove('pointer-events-none');
     submitBtn.classList.remove('disabled');
     delete form.dataset.submitting;
 

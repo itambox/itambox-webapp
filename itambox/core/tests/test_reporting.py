@@ -1,3 +1,4 @@
+from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
 
 from django.contrib.auth import get_user_model
@@ -6,6 +7,13 @@ from django.test import TestCase, override_settings
 from django.urls import reverse
 from django_q.models import Schedule
 
+from core.tasks.reports import (
+    _archive_report_output,
+    _deliver_report_email,
+    _render_report_output,
+    _ReportOutput,
+    _resolve_report_scope,
+)
 from extras.models import NotificationChannel, ReportGenerationArchive, ReportTemplate, ScheduledReport
 
 User = get_user_model()
@@ -176,7 +184,6 @@ class ScheduledReportingAndAlertsTests(TestCase):
             "included_columns": self.template.included_columns,
             "include_summary_cards": "true",
             "include_distribution_chart": "true",
-            "advanced_mode": "false",
         }
         response = self.client.post(url, data)
         self.assertEqual(response.status_code, 200)
@@ -268,6 +275,107 @@ class ScheduledReportingAndAlertsTests(TestCase):
         sched.refresh_from_db()
         self.assertEqual(sched.last_status, "failed: SYNTHETIC: compiler failure")
         self.assertEqual(ReportGenerationArchive.objects.filter(scheduled_report=sched).count(), 0)
+
+    def test_report_output_helpers_cover_all_attachment_formats(self):
+        template = SimpleNamespace(name="Helper Report")
+        context_data = {"report": "context"}
+
+        with patch("core.tasks.reports._render_report_html", return_value="<html>report</html>"):
+            html_output = _render_report_output(
+                SimpleNamespace(format=ScheduledReport.FORMAT_HTML),
+                template,
+                [],
+                [],
+                context_data,
+            )
+        self.assertEqual(html_output.email_body, "<html>report</html>")
+
+        with (
+            patch("core.tasks.reports._render_report_html", return_value="<html>pdf</html>"),
+            patch("core.reports.exporters.report_pdf_bytes", return_value=b"pdf-bytes"),
+        ):
+            pdf_output = _render_report_output(
+                SimpleNamespace(format=ScheduledReport.FORMAT_PDF), template, [], [], context_data
+            )
+        self.assertEqual(pdf_output.attachment_content, b"pdf-bytes")
+        self.assertTrue(pdf_output.attachment_filename.endswith(".pdf"))
+
+        with patch("core.reports.exporters.report_xlsx_bytes", return_value=b"xlsx-bytes"):
+            xlsx_output = _render_report_output(
+                SimpleNamespace(format=ScheduledReport.FORMAT_XLSX), template, ["Name"], [], context_data
+            )
+        self.assertEqual(xlsx_output.attachment_content, b"xlsx-bytes")
+        self.assertTrue(xlsx_output.attachment_filename.endswith(".xlsx"))
+
+        csv_output = _render_report_output(
+            SimpleNamespace(format=ScheduledReport.FORMAT_CSV),
+            template,
+            ["Name"],
+            [{"Name": "Asset, one"}],
+            context_data,
+        )
+        self.assertIn('"Asset, one"', csv_output.attachment_content)
+        self.assertTrue(csv_output.attachment_filename.endswith(".csv"))
+
+        with self.assertRaises(ValueError):
+            _render_report_output(SimpleNamespace(format="unknown"), template, [], [], context_data)
+
+    def test_report_archive_and_email_helpers_cover_attachment_paths(self):
+        sched = ScheduledReport.objects.create(
+            name="CSV archive helper",
+            report=self.template,
+            tenant=self.tenant,
+            frequency="once",
+            format=ScheduledReport.FORMAT_CSV,
+            save_to_archive=True,
+        )
+        output = _ReportOutput(
+            email_body="CSV body",
+            attachment_content="Name\nAsset\n",
+            attachment_filename="helper.csv",
+            attachment_mime="text/csv",
+        )
+
+        archive = _archive_report_output(sched, self.template, output, self.tenant)
+        self.assertEqual(archive.status, "success")
+        self.assertEqual(archive.file.mime_type, "text/csv")
+
+        email_config = SimpleNamespace(enabled=True, from_address="from@example.com")
+        with (
+            patch("core.tasks.reports.EmailSettings.load", return_value=email_config),
+            patch("core.tasks.reports.EmailMessage") as email_factory,
+        ):
+            sched.recipients = " recipient@example.com, "
+            _deliver_report_email(sched, self.template, output)
+
+        email = email_factory.return_value
+        email.attach.assert_called_once_with("helper.csv", "Name\nAsset\n", "text/csv")
+        email.send.assert_called_once_with(fail_silently=False)
+
+        sched.format = ScheduledReport.FORMAT_HTML
+        html_output = _ReportOutput(email_body="<html>body</html>")
+        with (
+            patch("core.tasks.reports.EmailSettings.load", return_value=email_config),
+            patch("core.tasks.reports.EmailMessage") as email_factory,
+        ):
+            _deliver_report_email(sched, self.template, html_output)
+        self.assertEqual(email_factory.return_value.content_subtype, "html")
+
+        with patch("core.tasks.reports.EmailSettings.load", return_value=None):
+            with self.assertRaises(ValidationError):
+                _deliver_report_email(sched, self.template, html_output)
+
+    def test_report_scope_refuses_unscoped_schedules(self):
+        empty_relation = MagicMock()
+        empty_relation.all.return_value = []
+        sched = SimpleNamespace(
+            tenant=None,
+            report=SimpleNamespace(tenant=None, filter_tenants=empty_relation),
+            filter_tenants=empty_relation,
+            name="Unscoped helper",
+        )
+
+        self.assertIsNone(_resolve_report_scope(sched))
 
 
 class ReportCrossTenantPermissionTests(TestCase):

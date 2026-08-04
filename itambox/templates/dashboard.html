@@ -56,7 +56,7 @@
   </div>
 {% endblock %}
 {% block page_actions %}
-  <style>
+  <style nonce="{{ request.csp_nonce }}">
     #dashboard-locked-controls, #dashboard-unlocked-controls {
         display: inline-flex;
         align-items: center;
@@ -73,7 +73,7 @@
         <span class="d-none d-sm-inline ms-1">{% translate 'Unlock' %}</span>
       </button>
     </span>
-    <span id="dashboard-unlocked-controls" style="display:none">
+    <span class="d-none"  id="dashboard-unlocked-controls">
       <button id="save-dashboard"
               class="btn btn-primary d-flex align-items-center"
               title="{% translate 'Save layout' %}">
@@ -155,13 +155,10 @@
           <div class="card-body overflow-auto">{% render_widget entry.config entry.index %}</div>
           {% get_widget_footer_links entry.config entry.index as footer_links %}
           {% if footer_links %}
-            <div class="card-footer bg-surface-secondary d-flex justify-content-end align-items-center flex-wrap gap-2"
-                 style="padding: 0.5rem 1.25rem">
+            <div class="card-footer bg-surface-secondary d-flex justify-content-end align-items-center flex-wrap gap-2 csp-style-3e808d2c8045">
               {% for link in footer_links %}
                 <a href="{{ link.url }}"
-                   class="btn btn-sm p-0 px-2 btn-ghost-secondary"
-                   style="font-size: 0.72rem;
-                          line-height: 1.5">
+                   class="btn btn-sm p-0 px-2 btn-ghost-secondary csp-style-1599881f178d">
                   {{ link.label }} <i class="mdi mdi-chevron-right ms-1"></i>
                 </a>
               {% endfor %}

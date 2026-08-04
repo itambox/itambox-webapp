@@ -33,7 +33,7 @@ HTMX_RELOAD_ATTRS = {
 # passed to format_html() as an argument so it is escaped.
 QUICK_ADD_LABEL_FORMAT = (
     '{} <button type="button" class="btn btn-link p-0 ms-1 align-baseline border-0 bg-transparent'
-    ' text-primary" style="font-size: 1.1rem; line-height: 1;" title="{}" hx-get="{}"'
+    ' text-primary quick-add-icon" title="{}" hx-get="{}"'
     ' hx-target="#modal-placeholder"><i class="mdi mdi-plus-circle-outline"></i></button>'
 )
 

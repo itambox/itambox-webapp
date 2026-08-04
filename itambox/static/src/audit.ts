@@ -47,13 +47,12 @@
     // Spring tactile animation on the verify button
     const btn = document.getElementById('audit-verify-btn');
     if (btn) {
-      btn.style.transform = 'scale(0.95)';
-      setTimeout(function () {
-        btn.style.transform = 'scale(1.05)';
-        setTimeout(function () {
-          btn.style.transform = 'scale(1)';
-        }, 100);
-      }, 80);
+      btn.classList.remove('audit-verify-btn--success');
+      void btn.clientWidth;
+      btn.classList.add('audit-verify-btn--success');
+      window.setTimeout(function () {
+        btn.classList.remove('audit-verify-btn--success');
+      }, 300);
     }
   }
 

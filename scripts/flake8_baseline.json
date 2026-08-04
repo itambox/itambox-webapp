@@ -646,22 +646,6 @@
     {
       "path": "itambox/assets/tables.py",
       "code": "B907",
-      "message": "'checkin_url' is manually surrounded by quotes, consider using the `!r` conversion flag.",
-      "source": "html += (\n                    '<a class=\"btn btn-sm btn-soft-outline-success check-action\" role=\"button\" style=\"cursor: pointer\" '\n                    f'hx-get=\"{checkin_url}\" hx-target=\"#modal-placeholder\" hx-swap=\"innerHTML\" '\n                    'title=\"Check-in\" aria-label=\"Check-in\"><i class=\"mdi mdi-login me-1\"></i>Check-in</a>'\n                )",
-      "context": "Module:body/ClassDef:AssetTable:body/FunctionDef:render_actions:body/If:Name(id='can_edit', ctx=Load()):body/If:Attribute(value=Name(id='record', ctx=Load()), attr='active_assignment', ctx=Load()):body",
-      "count": 1
-    },
-    {
-      "path": "itambox/assets/tables.py",
-      "code": "B907",
-      "message": "'checkout_url' is manually surrounded by quotes, consider using the `!r` conversion flag.",
-      "source": "html += (\n                    '<a class=\"btn btn-sm btn-soft-success check-action\" role=\"button\" style=\"cursor: pointer\" '\n                    f'hx-get=\"{checkout_url}\" hx-target=\"#modal-placeholder\" hx-swap=\"innerHTML\" '\n                    'title=\"Check-out\" aria-label=\"Check-out\"><i class=\"mdi mdi-logout me-1\"></i>Check-out</a>'\n                )",
-      "context": "Module:body/ClassDef:AssetTable:body/FunctionDef:render_actions:body/If:Name(id='can_edit', ctx=Load()):body/If:Attribute(value=Name(id='record', ctx=Load()), attr='active_assignment', ctx=Load()):orelse",
-      "count": 1
-    },
-    {
-      "path": "itambox/assets/tables.py",
-      "code": "B907",
       "message": "'clone_url' is manually surrounded by quotes, consider using the `!r` conversion flag.",
       "source": "html += f'<a class=\"btn btn-sm btn-action\" href=\"{clone_url}\" title=\"Copy/Clone\"><i class=\"mdi mdi-content-copy\"></i></a>'",
       "context": "Module:body/ClassDef:AssetTable:body/FunctionDef:render_actions:body/If:Name(id='can_clone', ctx=Load()):body",
@@ -4102,22 +4086,6 @@
     {
       "path": "itambox/core/reports/charts.py",
       "code": "B950",
-      "message": "line too long (147 > 120 characters)",
-      "source": "            <text x=\"240\" y=\"115\" text-anchor=\"middle\" font-size=\"13\" fill=\"#64748b\" font-weight=\"500\">{_(\"No data available for charting\")}</text>",
-      "context": "Module:body/FunctionDef:generate_bar_chart:body/If:UnaryOp(op=Not(), operand=Name(id='data', ctx=Load())):body",
-      "count": 1
-    },
-    {
-      "path": "itambox/core/reports/charts.py",
-      "code": "B950",
-      "message": "line too long (147 > 120 characters)",
-      "source": "            <text x=\"240\" y=\"115\" text-anchor=\"middle\" font-size=\"13\" fill=\"#64748b\" font-weight=\"500\">{_(\"No data available for charting\")}</text>",
-      "context": "Module:body/FunctionDef:generate_doughnut_chart:body/If:UnaryOp(op=Not(), operand=Name(id='data', ctx=Load())):body",
-      "count": 1
-    },
-    {
-      "path": "itambox/core/reports/charts.py",
-      "code": "B950",
       "message": "line too long (152 > 120 characters)",
       "source": "            f'<text x=\"{145 + bar_width}\" y=\"{y_pos + 12}\" font-size=\"11\" font-weight=\"700\" fill=\"#0f172a\" text-anchor=\"start\">{escape(val_str)}</text>'",
       "context": "Module:body/FunctionDef:generate_bar_chart:body/For:Tuple(elts=[Name(id='idx', ctx=Store()), Name(id='item', ctx=Store())], ctx=Store()):Call(func=Name(id='enumerate', ctx=Load()), args=[Name(id='data', ctx=Load())], keywords=[]):body",
@@ -4128,38 +4096,6 @@
       "code": "B950",
       "message": "line too long (170 > 120 characters)",
       "source": "        f'<text x=\"110\" y=\"132\" text-anchor=\"middle\" font-size=\"9\" font-weight=\"600\" fill=\"#64748b\" text-transform=\"uppercase\" letter-spacing=\"0.5px\">{_(\"Total\")}</text>'",
-      "context": "Module:body/FunctionDef:generate_doughnut_chart:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/core/reports/charts.py",
-      "code": "B950",
-      "message": "line too long (184 > 120 characters)",
-      "source": "        <svg viewBox=\"0 0 480 220\" width=\"100%\" height=\"220\" xmlns=\"http://www.w3.org/2000/svg\" style=\"font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;\">",
-      "context": "Module:body/FunctionDef:generate_bar_chart:body/If:UnaryOp(op=Not(), operand=Name(id='data', ctx=Load())):body",
-      "count": 1
-    },
-    {
-      "path": "itambox/core/reports/charts.py",
-      "code": "B950",
-      "message": "line too long (184 > 120 characters)",
-      "source": "        <svg viewBox=\"0 0 480 220\" width=\"100%\" height=\"220\" xmlns=\"http://www.w3.org/2000/svg\" style=\"font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;\">",
-      "context": "Module:body/FunctionDef:generate_doughnut_chart:body/If:UnaryOp(op=Not(), operand=Name(id='data', ctx=Load())):body",
-      "count": 1
-    },
-    {
-      "path": "itambox/core/reports/charts.py",
-      "code": "B950",
-      "message": "line too long (297 > 120 characters)",
-      "source": "        '<svg viewBox=\"0 0 480 220\" width=\"100%\" height=\"220\" xmlns=\"http://www.w3.org/2000/svg\" style=\"font-family: -apple-system, BlinkMacSystemFont, \\'Segoe UI\\', Roboto, sans-serif; background: #ffffff; border-radius: 12px; border: 1px solid #e2e8f0; box-shadow: 0 1px 3px rgba(0,0,0,0.05);\">'",
-      "context": "Module:body/FunctionDef:generate_bar_chart:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/core/reports/charts.py",
-      "code": "B950",
-      "message": "line too long (297 > 120 characters)",
-      "source": "        '<svg viewBox=\"0 0 480 220\" width=\"100%\" height=\"220\" xmlns=\"http://www.w3.org/2000/svg\" style=\"font-family: -apple-system, BlinkMacSystemFont, \\'Segoe UI\\', Roboto, sans-serif; background: #ffffff; border-radius: 12px; border: 1px solid #e2e8f0; box-shadow: 0 1px 3px rgba(0,0,0,0.05);\">'",
       "context": "Module:body/FunctionDef:generate_doughnut_chart:body",
       "count": 1
     },
@@ -5013,54 +4949,6 @@
     },
     {
       "path": "itambox/core/tasks/labels.py",
-      "code": "B907",
-      "message": "'barcode_data_uri' is manually surrounded by quotes, consider using the `!r` conversion flag.",
-      "source": "context = {\n            \"obj\": asset,\n            \"asset\": asset,\n            \"barcode_data_uri\": barcode_data_uri,\n            \"barcode_img\": f'<img src=\"{barcode_data_uri}\" style=\"width: 0.9in; height: 0.9in; background: #fff;\" />',\n            \"barcode_format\": label_template.barcode_format,\n        }",
-      "context": "Module:body/FunctionDef:render_label_html:body/Try:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/core/tasks/labels.py",
-      "code": "B907",
-      "message": "'barcode_data_uri' is manually surrounded by quotes, consider using the `!r` conversion flag.",
-      "source": "return f\"\"\"\n    <table style=\"width: 100%; border-collapse: collapse; margin: 0; padding: 0;\">\n        <tr>\n            <td style=\"width: 55%; vertical-align: middle; text-align: left; padding: 2px;\">\n                <div style=\"font-family: Helvetica, Arial, sans-serif; font-size: 8pt; font-weight: bold; color: #000; line-height: 1.1;\">\n                    <div style=\"font-size: 9.5pt; margin-bottom: 3px; max-height: 24pt; overflow: hidden;\">{name}</div>\n                    <div style=\"font-size: 8pt; font-family: monospace; background-color: #000; color: #fff; padding: 1px 3px; display: inline-block; border-radius: 2px; margin-bottom: 4px;\">\n                        {asset_tag}\n                    </div>\n                    {serial_html}\n                </div>\n            </td>\n            <td style=\"width: 45%; vertical-align: middle; text-align: right; padding: 2px;\">\n                <img src=\"{barcode_data_uri}\" style=\"width: 0.95in; height: 0.95in; display: block; margin-left: auto;\" />\n            </td>\n        </tr>\n    </table>\n    \"\"\"",
-      "context": "Module:body/FunctionDef:_default_label_card:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/core/tasks/labels.py",
-      "code": "B907",
-      "message": "'page_break' is manually surrounded by quotes, consider using the `!r` conversion flag.",
-      "source": "cards_block += f'<div class=\"label-card\" style=\"{page_break}\">{card}</div>\\n'",
-      "context": "Module:body/FunctionDef:_build_labels_document:body/For:Tuple(elts=[Name(id='idx', ctx=Store()), Name(id='card', ctx=Store())], ctx=Store()):Call(func=Name(id='enumerate', ctx=Load()), args=[Name(id='rendered_cards', ctx=Load())], keywords=[]):body",
-      "count": 1
-    },
-    {
-      "path": "itambox/core/tasks/labels.py",
-      "code": "B907",
-      "message": "'page_break' is manually surrounded by quotes, consider using the `!r` conversion flag.",
-      "source": "pages_block += f'<table class=\"grid-table\" style=\"{page_break}\">\\n{rows_block}</table>\\n'",
-      "context": "Module:body/FunctionDef:_build_labels_document:body/If:Compare(left=Name(id='layout_mode', ctx=Load()), ops=[In()], comparators=[Tuple(elts=[Constant(value='a4_grid'), Constant(value='letter_grid')], ctx=Load())]):body/For:Tuple(elts=[Name(id='page_idx', ctx=Store()), Name(id='page', ctx=Store())], ctx=Store()):Call(func=Name(id='enumerate', ctx=Load()), args=[Name(id='pages', ctx=Load())], keywords=[]):body",
-      "count": 1
-    },
-    {
-      "path": "itambox/core/tasks/labels.py",
-      "code": "B950",
-      "message": "line too long (138 > 120 characters)",
-      "source": "                <div style=\"font-family: Helvetica, Arial, sans-serif; font-size: 8pt; font-weight: bold; color: #000; line-height: 1.1;\">",
-      "context": "Module:body/FunctionDef:_default_label_card:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/core/tasks/labels.py",
-      "code": "B950",
-      "message": "line too long (191 > 120 characters)",
-      "source": "                    <div style=\"font-size: 8pt; font-family: monospace; background-color: #000; color: #fff; padding: 1px 3px; display: inline-block; border-radius: 2px; margin-bottom: 4px;\">",
-      "context": "Module:body/FunctionDef:_default_label_card:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/core/tasks/labels.py",
       "code": "C901",
       "message": "'generate_label_batch_task' is too complex (11)",
       "source": "def generate_label_batch_task(job_id, asset_pks, label_format, user_id, tenant_id=None):",
@@ -5073,30 +4961,6 @@
       "message": "'generate_label_pdf_batch_task' is too complex (14)",
       "source": "def generate_label_pdf_batch_task(job_id, asset_pks, template_id, layout_mode, user_id, tenant_id=None):",
       "context": "Module:body/FunctionDef:generate_label_pdf_batch_task:self",
-      "count": 1
-    },
-    {
-      "path": "itambox/core/tasks/reports.py",
-      "code": "B907",
-      "message": "'sched.name' is manually surrounded by quotes, consider using the `!r` conversion flag.",
-      "source": "logger.exception(f\"Error generating scheduled report '{sched.name}'\")",
-      "context": "Module:body/FunctionDef:generate_scheduled_report_task:body/With:[(\"Call(func=Name(id='TaskContext', ctx=Load()), args=[], keywords=[keyword(arg='tenant_id', value=IfExp(test=Name(id='active_tenant', ctx=Load()), body=Attribute(value=Name(id='active_tenant', ctx=Load()), attr='id', ctx=Load()), orelse=Constant(value=None))), keyword(arg='user_id', value=Constant(value=None))])\", None)]:body/Try:handlers/ExceptHandler:Name(id='Exception', ctx=Load()):e:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/core/tasks/reports.py",
-      "code": "B907",
-      "message": "'sched.name' is manually surrounded by quotes, consider using the `!r` conversion flag.",
-      "source": "logger.info(f\"Scheduled report '{sched.name}' successfully processed.\")",
-      "context": "Module:body/FunctionDef:generate_scheduled_report_task:body/With:[(\"Call(func=Name(id='TaskContext', ctx=Load()), args=[], keywords=[keyword(arg='tenant_id', value=IfExp(test=Name(id='active_tenant', ctx=Load()), body=Attribute(value=Name(id='active_tenant', ctx=Load()), attr='id', ctx=Load()), orelse=Constant(value=None))), keyword(arg='user_id', value=Constant(value=None))])\", None)]:body/Try:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/core/tasks/reports.py",
-      "code": "C901",
-      "message": "'generate_scheduled_report_task' is too complex (38)",
-      "source": "def generate_scheduled_report_task(scheduled_report_id):",
-      "context": "Module:body/FunctionDef:generate_scheduled_report_task:self",
       "count": 1
     },
     {
@@ -6289,14 +6153,6 @@
       "message": "'rule.name' is manually surrounded by quotes, consider using the `!r` conversion flag.",
       "source": "return {\"message\": f\"Evaluation queued for '{rule.name}'. New alerts will appear shortly.\"}",
       "context": "Module:body/ClassDef:AlertRuleRunNowView:body/FunctionDef:perform_action:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/extras/views.py",
-      "code": "C901",
-      "message": "'ReportTemplateDownloadView.get' is too complex (11)",
-      "source": "    def get(self, request, pk, *args, **kwargs):",
-      "context": "Module:body/ClassDef:ReportTemplateDownloadView:body/FunctionDef:get:self",
       "count": 1
     },
     {

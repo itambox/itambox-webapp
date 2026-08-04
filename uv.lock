@@ -970,6 +970,7 @@ dependencies = [
     { name = "graphene" },
     { name = "graphene-django" },
     { name = "gunicorn" },
+    { name = "html5lib" },
     { name = "jinja2" },
     { name = "markdown" },
     { name = "mozilla-django-oidc" },
@@ -985,6 +986,7 @@ dependencies = [
     { name = "segno" },
     { name = "sqlparse" },
     { name = "svglib" },
+    { name = "tinycss2" },
     { name = "whitenoise" },
     { name = "xhtml2pdf" },
 ]
@@ -1036,6 +1038,7 @@ requires-dist = [
     { name = "graphene", specifier = ">=3.3,<4.0" },
     { name = "graphene-django", specifier = ">=3.2,<3.3" },
     { name = "gunicorn", specifier = ">=26.0.0,<27.0" },
+    { name = "html5lib", specifier = ">=1.1,<2.0" },
     { name = "jinja2", specifier = ">=3.1,<4.0" },
     { name = "markdown", specifier = ">=3.10,<3.11" },
     { name = "mozilla-django-oidc", specifier = ">=5.0.2,<6.0.0" },
@@ -1051,6 +1054,7 @@ requires-dist = [
     { name = "segno", specifier = ">=1.6,<2.0" },
     { name = "sqlparse", specifier = ">=0.5.4,<0.6.0" },
     { name = "svglib", specifier = ">=2.0.2,<2.1" },
+    { name = "tinycss2", specifier = ">=1.5,<2.0" },
     { name = "whitenoise", specifier = ">=6.6,<7.0" },
     { name = "xhtml2pdf", specifier = ">=0.2.17,<0.3" },
 ]

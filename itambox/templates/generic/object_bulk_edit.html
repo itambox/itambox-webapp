@@ -22,9 +22,7 @@
             <h3 class="card-title">{% translate "Selected Objects (" %}{{ objects|length }})</h3>
           </div>
           <div class="card-body">
-            <ul class="list-group list-group-flush mb-0"
-                style="max-height:200px;
-                       overflow-y:auto">
+            <ul class="list-group list-group-flush mb-0 csp-style-773936ad3916">
               {% for obj in objects %}
                 <li class="list-group-item py-1">{{ obj }}</li>
               {% endfor %}
@@ -51,9 +49,7 @@
                         <label class="form-check-label fw-bold" for="select_{{ field.name }}">{{ field.label }}</label>
                       </div>
                     </div>
-                    <div class="col-sm-9"
-                         id="field_container_{{ field.name }}"
-                         style="display:none">
+                    <div class="col-sm-9 d-none" id="field_container_{{ field.name }}">
                       {{ field }}
                       {% if field.help_text %}
                         <div class="form-text">{{ field.help_text }}</div>

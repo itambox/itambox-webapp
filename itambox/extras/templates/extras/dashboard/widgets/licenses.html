@@ -1,4 +1,5 @@
 {% load i18n %}
+{% load utility_tags %}
 <div class="text-muted small mb-2">{% translate "Highest Utilization Rates" %}</div>
 {% for item in license_stats %}
   <div class="mb-2">
@@ -8,8 +9,10 @@
       <span class="text-muted">{% blocktranslate with allocated=item.allocated total=item.total pct=item.util_pct %}{{ allocated }}/{{ total }} seats ({{ pct }}%){% endblocktranslate %}</span>
     </div>
     <div class="progress progress-xs">
-      <div class="progress-bar {% if item.util_pct >= 90 %}bg-danger{% elif item.util_pct >= 70 %}bg-warning{% else %}bg-green{% endif %}"
-           style="width: {{ item.util_pct }}%"></div>
+      {% csp_percentage_style item.util_pct "license-width" as license_style %}
+      {{ license_style.style_block|safe }}
+      <div class="progress-bar {{ license_style.class_name }} {% if item.util_pct >= 90 %}bg-danger{% elif item.util_pct >= 70 %}bg-warning{% else %}bg-green{% endif %}">
+      </div>
     </div>
   </div>
 {% empty %}

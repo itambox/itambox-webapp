@@ -222,7 +222,7 @@ class ReportTemplateFilterSet(django_filters.FilterSet):
 
     class Meta:
         model = ReportTemplate
-        fields = ["report_type", "style_preset", "advanced_mode"]
+        fields = ["report_type", "style_preset"]
 
     def search(self, queryset, name, value):
         if not value.strip():

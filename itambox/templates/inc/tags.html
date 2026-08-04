@@ -1,9 +1,7 @@
+{% load utility_tags %}
 {% if tag %}
-  <span class="badge shadow-sm"
-        style="background-color: #{{ tag.color|default:'6c757d' }};
-               color: {% if tag.color == 'ffffff' or tag.color == 'FFFFFF' %}#1d273b{% else %}#ffffff{% endif %};
-               {% if tag.color == 'ffffff' or tag.color == 'FFFFFF' %}border: 1px solid #e6e8e9;
-               {% endif %} margin-right: 0.25rem;
-               font-weight: 600"
+  {% csp_color_style tag.color|default:'6c757d' "chip" as tag_style %}
+  {{ tag_style.style_block|safe }}
+  <span class="badge shadow-sm tag-chip {{ tag_style.class_name }} {% if tag.color == 'ffffff' or tag.color == 'FFFFFF' %}color-chip-text-dark tag-chip-light{% else %}color-chip-text-light{% endif %}"
         title="{{ tag.description|default:tag.name }}">{{ tag.name }}</span>
 {% endif %}

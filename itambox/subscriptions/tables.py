@@ -4,6 +4,7 @@ from django.utils.html import format_html
 from django.utils.translation import gettext_lazy as _
 from django_tables2.utils import A
 
+from core.html_styles import status_color_class
 from core.tables import ActionsColumn, BaseTable, CountLinkColumn, ToggleColumn
 from extras.tables import TagColumn
 
@@ -85,10 +86,11 @@ class SubscriptionTable(BaseTable):
 
             display = record.get_status_display()
             color = get_status_color(record.status)
+            color_class, style_block = status_color_class(color)
             return format_html(
-                '<span class="badge badge-status" style="--status-color: #{};">'
-                '<span class="badge-status-dot"></span>{}</span>',
-                color,
+                '{}<span class="badge badge-status {}"><span class="badge-status-dot"></span>{}</span>',
+                style_block,
+                color_class,
                 display,
             )
         return "—"

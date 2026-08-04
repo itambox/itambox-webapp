@@ -1,5 +1,6 @@
 import base64
 import os
+import re
 import uuid
 
 # The user/request-id contextvars and their accessors live in the leaf module
@@ -13,12 +14,15 @@ from core.context import (  # noqa: F401 -- re-exported for existing importers
     _current_user,
     _request_id,
     get_current_all_accessible,
+    get_current_csp_nonce,
     get_current_membership,
     get_current_request_id,
     get_current_tenant,
     get_current_tenant_group,
     get_current_user,
+    reset_current_csp_nonce,
     set_current_all_accessible,
+    set_current_csp_nonce,
     set_current_membership,
     set_current_tenant,
     set_current_tenant_group,
@@ -83,6 +87,7 @@ class CurrentUserMiddleware:
 
 
 _SAML_HTTPS_FORM_ACTION = "_itambox_saml_https_form_action"
+_CSP_NONCE_PATTERN = re.compile(r"^[A-Za-z0-9+/_=-]{1,128}$")
 
 
 def allow_saml_https_form_action(response):
@@ -95,32 +100,37 @@ class CSPMiddleware:
     """
     Adds Content-Security-Policy headers to all responses.
 
-    Uses a cryptographically secure random nonce for inline scripts to eliminate
-    the need for 'unsafe-inline' in script-src.
+    Uses a cryptographically secure random base64 nonce for inline scripts and
+    nonce-authorized style elements. Inline style attributes are always blocked.
     """
 
     def __init__(self, get_response=None):
         self.get_response = get_response
 
     def __call__(self, request):
-        # Generate a cryptographically secure random base64 nonce for this request
-        request.csp_nonce = base64.b64encode(os.urandom(16)).decode("utf-8")
-        response = self.get_response(request)
-        return self.process_response(request, response)
+        headers = getattr(request, "headers", {})
+        parent_nonce = headers.get("X-CSP-Nonce") if headers.get("HX-Request") else ""
+        if not parent_nonce or not _CSP_NONCE_PATTERN.fullmatch(parent_nonce):
+            parent_nonce = base64.b64encode(os.urandom(16)).decode("utf-8")
+        request.csp_nonce = parent_nonce
+        nonce_token = set_current_csp_nonce(request.csp_nonce)
+        try:
+            response = self.get_response(request)
+            return self.process_response(request, response)
+        finally:
+            reset_current_csp_nonce(nonce_token)
 
     def process_response(self, request, response):
         nonce = getattr(request, "csp_nonce", "")
         form_action = "'self' https:" if getattr(response, _SAML_HTTPS_FORM_ACTION, False) else "'self'"
+        style_nonce = f" 'nonce-{nonce}'" if nonce else ""
         if nonce:
             response["Content-Security-Policy"] = (
                 "default-src 'self'; "
                 f"script-src 'self' 'nonce-{nonce}'; "
-                # 'unsafe-inline' is retained in style-src as tracked tech-debt:
-                # ~675 inline style= attributes across templates can't carry a
-                # CSP nonce, so removing it would break layout. Full removal needs
-                # a templates CSS refactor (move inline styles to classes). Scripts
-                # are already nonce'd and do NOT rely on 'unsafe-inline'.
-                "style-src 'self' 'unsafe-inline' https://rsms.me; "
+                f"style-src 'self'{style_nonce} https://rsms.me; "
+                f"style-src-elem 'self'{style_nonce} https://rsms.me; "
+                "style-src-attr 'none'; "
                 "img-src 'self' data:; "
                 "font-src 'self'; "
                 "media-src 'self' data:; "
@@ -134,11 +144,9 @@ class CSPMiddleware:
             response["Content-Security-Policy"] = (
                 "default-src 'self'; "
                 "script-src 'self'; "
-                # 'unsafe-inline' is retained in style-src as tracked tech-debt:
-                # ~675 inline style= attributes across templates can't carry a
-                # CSP nonce, so removing it would break layout. Full removal needs
-                # a templates CSS refactor (move inline styles to classes).
-                "style-src 'self' 'unsafe-inline' https://rsms.me; "
+                "style-src 'self' https://rsms.me; "
+                "style-src-elem 'self' https://rsms.me; "
+                "style-src-attr 'none'; "
                 "img-src 'self' data:; "
                 "font-src 'self'; "
                 "media-src 'self' data:; "

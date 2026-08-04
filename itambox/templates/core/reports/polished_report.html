@@ -15,7 +15,7 @@ clients strip CSS variables).
 <html>
   <head>
     <meta charset="utf-8">
-    <style>
+    <style nonce="{{ request.csp_nonce }}">
         body {
             font-family: 'Inter Variable', Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
             color: #1c1917;
@@ -74,6 +74,10 @@ clients strip CSS variables).
             color: #78716c; border-top: 1px solid #e7e5e4; background: #fafaf9;
         }
         .empty { text-align: center; color: #78716c; padding: 20px; }
+        .report-chart { width: 100%; height: 220px; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
+        .report-chart-doughnut, .report-chart-bar { border: 1px solid #e2e8f0; border-radius: 12px; background: #fff; box-shadow: 0 1px 3px rgba(0,0,0,0.05); }
+        .report-chart-empty { background: #f8fafc; }
+        .report-print-link { color: #4f46e5; text-decoration: none; font-weight: 600; }
 
         {% if style_preset == 'compact' %}
         /* Compact — dense rows, zebra striping, restrained chrome for audit/ops lists. */
@@ -145,11 +149,7 @@ clients strip CSS variables).
         <div class="meta">
           {% blocktranslate with gen=generated_at|date:"Y-m-d H:i" %}Generated {{ gen }} UTC{% endblocktranslate %}
           <span class="no-print"> ·
-            <a href="?print=true"
-               data-action="print"
-               style="color: #4f46e5;
-                      text-decoration: none;
-                      font-weight: 600">{% translate "Print / Save as PDF" %}</a>
+            <a href="?print=true" data-action="print" class="report-print-link">{% translate "Print / Save as PDF" %}</a>
           </span>
         </div>
         {% if summary_cards %}

@@ -873,13 +873,10 @@ class ReportTemplateForm(forms.ModelForm):
             "include_distribution_chart",
             "group_by_field",
             "style_preset",
-            "advanced_mode",
-            "template_content",
             "tenant",
             "filter_tenants",
         ]
         widgets = {
-            "template_content": forms.Textarea(attrs={"rows": 15, "style": "font-family: monospace;"}),
             "tenant": forms.Select(attrs={"class": "form-select"}),
             "filter_tenants": forms.SelectMultiple(attrs={"class": "form-select", "data-tom-select": ""}),
         }
