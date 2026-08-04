@@ -459,6 +459,41 @@ slice. This slice does not claim the remaining task families, complete SCIM
 operation surface, report-provider boundary (#83), or generated OpenAPI
 compatibility work (#98).
 
+Slice 8 completes the `core.tasks` entry-point family that Slice 7 began. Seven
+more task modules are admitted, each symbol-scoped to its public entry points:
+
+- `evaluate_alert_rules_task` and `run_alert_rule_now` in
+  `itambox/core/tasks/alerts.py` — the scheduled sweep and the single-rule
+  "Run now" action, both answering the count of freshly triggered alerts;
+- `import_csv_task` in `itambox/core/tasks/csv_import.py` — the Job id, the
+  parsed rows, the target `app_label`/`model_name` pair, and the acting
+  user/tenant of a bulk import;
+- `calculate_depreciation` in `itambox/core/tasks/depreciation.py` — the
+  nightly materialisation, answering the number of assets actually rewritten;
+- `sync_tenant_ldap_task` in `itambox/core/tasks/ldap.py` — the Job id, tenant
+  slug, and acting user/tenant of a directory sync;
+- `prune_changelog_task` in `itambox/core/tasks/retention.py` — the argument-free
+  nightly prune;
+- `reverse_job_detail` in `itambox/core/tasks/utils.py` — the job-detail URL
+  helper every task notification routes through;
+- `send_webhook_task` in `itambox/core/tasks/webhooks.py` — the dispatch
+  envelope: target URL and method, headers, optional secret, the event
+  action/model/object/timestamp fields, the JSON event data, the attempt and
+  retry/backoff counters, and the optional `WebhookEndpoint` pk.
+
+The exclusions are the same shape as Slice 7's and are stated rather than
+implied. `rows_data` is `Sequence[Mapping[str, object]]` and webhook
+`headers`/`event_data` are `Mapping`s because both arrive as serialised task
+payloads; `event_object_id` stays `int | str` because the event envelope carries
+whatever pk type the source model uses. Nothing behind the entry points is
+claimed: the dynamic `BulkImportForm` resolution and its `import_data` contract,
+alert rule matching and channel dispatch, the depreciation query and
+`compute_book_value`, the `JobLogStream` command adapter, the `prune_changelog`
+management command, and the SSRF-guarded send with its retry re-enqueue all
+remain untyped. `core.tasks.reports` also keeps its two-symbol Slice-4/5
+admission unchanged, so the task package as a whole is still not a whole-module
+admission.
+
 Subsequent slices of issue #93 extend the list one bounded surface at a time:
 the remaining task payload/result families, organization service boundaries,
 report-provider contracts, and serializer return annotations. Nothing is claimed

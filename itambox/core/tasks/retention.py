@@ -5,7 +5,7 @@ from django.core.management import call_command
 logger = logging.getLogger(__name__)
 
 
-def prune_changelog_task():
+def prune_changelog_task() -> None:
     """Scheduled daily task: prune aged changelog/operational-data rows.
 
     Registered as a daily django-q2 Schedule by

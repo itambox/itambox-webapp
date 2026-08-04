@@ -3,6 +3,7 @@ import hashlib
 import hmac
 import json
 import logging
+from collections.abc import Mapping
 
 import requests
 from django.utils import timezone
@@ -13,21 +14,21 @@ logger = logging.getLogger(__name__)
 
 
 def send_webhook_task(
-    url,
-    method,
-    headers,
-    secret,
-    event_action,
-    event_model_app_label,
-    event_model_name,
-    event_object_id,
-    event_timestamp_iso,
-    event_data,
-    attempt=0,
-    retry_count=3,
-    retry_backoff=60,
-    webhook_endpoint_id=None,
-):
+    url: str,
+    method: str,
+    headers: Mapping[str, str],
+    secret: str | None,
+    event_action: str,
+    event_model_app_label: str,
+    event_model_name: str,
+    event_object_id: int | str,
+    event_timestamp_iso: str,
+    event_data: Mapping[str, object],
+    attempt: int = 0,
+    retry_count: int = 3,
+    retry_backoff: int = 60,
+    webhook_endpoint_id: int | None = None,
+) -> None:
     """Dispatch a webhook event. Retries on 5xx and connection errors; 4xx are final."""
     from django.core.exceptions import ValidationError
 

@@ -12,7 +12,7 @@ from extras.models import AlertLog, AlertRule
 logger = logging.getLogger(__name__)
 
 
-def evaluate_alert_rules_task():
+def evaluate_alert_rules_task() -> int:
     """
     Scheduled daily task: evaluate all active AlertRules, create AlertLogs for
     new matches, auto-resolve logs whose conditions have cleared, re-notify
@@ -54,7 +54,7 @@ def evaluate_alert_rules_task():
     return alerts_triggered_count
 
 
-def run_alert_rule_now(rule_id):
+def run_alert_rule_now(rule_id: int) -> int:
     """Evaluate a single AlertRule immediately (used by the 'Run now' UI action).
 
     Runs as a system context: the tenant, membership and current-user

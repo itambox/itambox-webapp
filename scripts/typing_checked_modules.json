@@ -1,8 +1,8 @@
 {
   "schema_version": 2,
   "canonical_python": "3.12",
-  "next_sequence": 15,
-  "policy_sha256": "da05e8266a3e69c68fc86ee98765f237e7cdb94b2dfdcc2251b6ab37ba48dcbe",
+  "next_sequence": 22,
+  "policy_sha256": "abbb14c9dce929284219b561bcd026fb15cb6d9c7c25a8e1d08171cff1e0f044",
   "config": {
     "config_file": "pyproject.toml",
     "working_directory": "itambox",
@@ -50,6 +50,18 @@
       ]
     },
     {
+      "sequence": 15,
+      "path": "itambox/core/tasks/alerts.py",
+      "module": "core.tasks.alerts",
+      "issue": "#93",
+      "note": "Slice 8 symbol admission: the two alert-evaluation task entry points -- the scheduled sweep over every active rule and the single-rule 'Run now' action, both answering the count of freshly triggered alerts as int, and the AlertRule pk the action is handed. Rule matching, the open-log dedup prefetch, channel dispatch, and auto-resolution helpers remain outside this slice.",
+      "scope": "symbols",
+      "symbols": [
+        "evaluate_alert_rules_task",
+        "run_alert_rule_now"
+      ]
+    },
+    {
       "sequence": 11,
       "path": "itambox/core/tasks/checkin.py",
       "module": "core.tasks.checkin",
@@ -85,6 +97,28 @@
       ]
     },
     {
+      "sequence": 16,
+      "path": "itambox/core/tasks/csv_import.py",
+      "module": "core.tasks.csv_import",
+      "issue": "#93",
+      "note": "Slice 8 symbol admission: the CSV/YAML bulk-import task entry envelope -- the Job id, the parsed rows the enqueuing view stored in the session, the target app_label/model_name pair, the acting user/tenant, and the implicit None outcome. Rows are Sequence[Mapping[str, object]] because they arrive as a serialised task payload of parsed cells; the dynamic BulkImportForm resolution, its import_data contract, and the notification bodies remain outside this slice.",
+      "scope": "symbols",
+      "symbols": [
+        "import_csv_task"
+      ]
+    },
+    {
+      "sequence": 17,
+      "path": "itambox/core/tasks/depreciation.py",
+      "module": "core.tasks.depreciation",
+      "issue": "#93",
+      "note": "Slice 8 symbol admission: the nightly depreciation materialisation task entry point -- no arguments, and the count of assets whose book value actually changed as int. The cross-tenant asset query, compute_book_value, and the bulk_update write remain outside this slice.",
+      "scope": "symbols",
+      "symbols": [
+        "calculate_depreciation"
+      ]
+    },
+    {
       "sequence": 13,
       "path": "itambox/core/tasks/disposal.py",
       "module": "core.tasks.disposal",
@@ -115,6 +149,17 @@
       ]
     },
     {
+      "sequence": 18,
+      "path": "itambox/core/tasks/ldap.py",
+      "module": "core.tasks.ldap",
+      "issue": "#93",
+      "note": "Slice 8 symbol admission: the tenant LDAP directory-sync task entry envelope -- the Job id, the tenant slug the management command is invoked for, the acting user/tenant, and the implicit None outcome. The JobLogStream adapter that pipes command output into the Job log, the call_command invocation, and the notification bodies remain outside this slice.",
+      "scope": "symbols",
+      "symbols": [
+        "sync_tenant_ldap_task"
+      ]
+    },
+    {
       "sequence": 5,
       "path": "itambox/core/tasks/reports.py",
       "module": "core.tasks.reports",
@@ -124,6 +169,39 @@
       "symbols": [
         "_ReportOutput",
         "generate_scheduled_report_task"
+      ]
+    },
+    {
+      "sequence": 19,
+      "path": "itambox/core/tasks/retention.py",
+      "module": "core.tasks.retention",
+      "issue": "#93",
+      "note": "Slice 8 symbol admission: the scheduled changelog-prune task entry point -- no arguments and the implicit None outcome, with exceptions still propagating so django-q2 records a Failure row. The prune_changelog management command it delegates to remains outside this slice.",
+      "scope": "symbols",
+      "symbols": [
+        "prune_changelog_task"
+      ]
+    },
+    {
+      "sequence": 20,
+      "path": "itambox/core/tasks/utils.py",
+      "module": "core.tasks.utils",
+      "issue": "#93",
+      "note": "Slice 8 symbol admission: the shared job-detail URL helper every task notification uses -- a Job id in, a URL string out, including the hand-built fallback path when reverse() fails.",
+      "scope": "symbols",
+      "symbols": [
+        "reverse_job_detail"
+      ]
+    },
+    {
+      "sequence": 21,
+      "path": "itambox/core/tasks/webhooks.py",
+      "module": "core.tasks.webhooks",
+      "issue": "#93",
+      "note": "Slice 8 symbol admission: the webhook dispatch task entry envelope -- the target URL and HTTP method, the request headers, the optional shared secret (empty for an endpoint-linked send that re-derives it), the event action/model/object/timestamp fields of the published envelope, the JSON event data, the attempt and retry/backoff counters, the optional WebhookEndpoint pk, and the implicit None outcome. event_object_id stays int | str because the event payload carries whatever pk type the source model uses; headers and event data are Mappings because they arrive as a serialised task payload. The SSRF-guarded send, the signature computation, and the retry Schedule/async_task re-enqueue remain outside this slice.",
+      "scope": "symbols",
+      "symbols": [
+        "send_webhook_task"
       ]
     },
     {
