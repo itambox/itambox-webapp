@@ -65,7 +65,7 @@
       "path": "itambox/users/api/scim/provider_patch.py",
       "module": "users.api.scim.provider_patch",
       "issue": "#93",
-      "note": "Slice-0 pilot. Pure SCIM PATCH parsing: no ORM, no request state, no Django imports, so it is clean under the normative flags without depending on django-stubs model inference. Its explicit Any values are the external-JSON boundary and the UNSET sentinel, both categorised in place.",
+      "note": "Slice-0 pilot, hardened by Slice 2. Pure SCIM PATCH parsing: no ORM, no request state, no Django imports, so it is clean under the normative flags without depending on django-stubs model inference. Explicit Any values remain only at categorised external-JSON boundaries; absent patch fields use the typed _Unset sentinel.",
       "scope": "module",
       "symbols": []
     }

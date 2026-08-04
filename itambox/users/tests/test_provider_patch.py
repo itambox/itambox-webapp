@@ -1,8 +1,13 @@
+from typing import Any, get_args, get_type_hints
+
 from django.test import SimpleTestCase
 
 from users.api.scim.provider_patch import (
     UNSET,
+    GroupPatch,
     SCIMPatchError,
+    UserPatch,
+    _Unset,
     get_patch_operations,
     parse_group_patch_operations,
     parse_member_ids,
@@ -251,6 +256,24 @@ class ProviderPatchParserTests(SimpleTestCase):
         self.assertIs(patch.last_name, UNSET)
         self.assertIs(patch.active, UNSET)
         self.assertEqual(patch.external_id, "external-1")
+
+
+class ProviderPatchTypingTests(SimpleTestCase):
+    def test_patch_fields_use_a_typed_absent_sentinel_instead_of_any(self):
+        user_hints = get_type_hints(UserPatch)
+        group_hints = get_type_hints(GroupPatch)
+
+        self.assertIsInstance(UNSET, _Unset)
+        self.assertIs(UserPatch().username, UNSET)
+        self.assertIs(GroupPatch().display_name, UNSET)
+        self.assertNotIn(Any, user_hints.values())
+        self.assertNotIn(Any, group_hints.values())
+        self.assertIn(_Unset, get_args(user_hints["username"]))
+        self.assertIn(str, get_args(user_hints["username"]))
+        self.assertIn(_Unset, get_args(user_hints["active"]))
+        self.assertIn(bool, get_args(user_hints["active"]))
+        self.assertIn(_Unset, get_args(group_hints["display_name"]))
+        self.assertIn(str, get_args(group_hints["display_name"]))
 
     def test_parser_bounds_documents_operations_and_member_arrays(self):
         with self.assertRaisesRegex(SCIMPatchError, "SCIM document must be an object"):

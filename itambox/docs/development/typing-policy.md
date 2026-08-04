@@ -263,19 +263,18 @@ this one does not pretend to be.
 
 ### The SCIM sentinel, stated honestly
 
-`UNSET = object()` in `users/api/scim/provider_patch.py` is not sloppiness. It
-encodes SCIM's three-state PATCH semantics — absent, explicit null, present
-value — which `Optional[T]` genuinely cannot express. The dataclass fields are
-`Any` *because of the sentinel*, not because of the payload, and they are marked
-`sentinel` for exactly that reason.
+`UNSET = _Unset.UNSET` in `users/api/scim/provider_patch.py` distinguishes an
+absent PATCH attribute from a validated value. The enum singleton preserves the
+existing `value is UNSET` identity checks while giving the dataclass fields a
+real union: string fields use `str | _Unset`, and `active` uses `bool | _Unset`.
 
-Replacing the sentinel with a typed union (`str | _Unset`, ...) is a later,
-separately reviewed change: it alters the sentinel's runtime type and `repr` and
-changes `dataclasses.fields()[i].type` for every touched field. Slice 0
-deliberately does not make it. The *separate* `Any` on helpers that accept
-parsed JSON stays `Any` and stays `external-json`: narrowing a genuinely
-arbitrary parsed-JSON parameter to a structural type would be a false claim
-about untrusted input.
+The parser still rejects explicit `null` for add/replace operations and retains
+the established empty-string semantics for removals. This is intentionally not
+an `Optional[T]` claim: `None` is not a valid parsed update value on this
+boundary. The typed sentinel and its identity semantics are covered by a
+dedicated test; the separate `Any` on helpers that accept parsed JSON stays
+`Any` and stays `external-json`, because narrowing genuinely arbitrary input to
+a structural type would be a false claim about untrusted data.
 
 ## Suppressions
 
@@ -377,7 +376,9 @@ Both Slice-1 entries use `scope = "symbols"`; their selected fields and method
 signatures are clean under the recorded policy, while the surrounding request,
 tenant, and RBAC helpers remain outside the checked set.
 
-Subsequent slices of issue #93 extend the list one bounded surface at a time:
-the SCIM typed sentinel, `TaskContext`, the organization service boundaries, and
-serializer return annotations. Nothing is claimed as checked until it appears
-in the record.
+Slice 2 hardens the already-admitted SCIM parser without changing its registry
+entry: the absent-field sentinel is now typed, while the surrounding external
+JSON boundary remains explicitly categorised. Subsequent slices of issue #93
+extend the list one bounded surface at a time: `TaskContext`, the organization
+service boundaries, and serializer return annotations. Nothing is claimed as
+checked until it appears in the record.
