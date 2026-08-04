@@ -157,6 +157,13 @@ class AbstractAssignment(JournalingMixin, TaggableMixin, SoftDeleteMixin, Change
     _item_attr = None
     _stock_model_label = None
 
+    # Concrete assignment models replace these abstract fallbacks with their
+    # tenant-aware soft-delete managers. The declarations keep Django's
+    # default/base-manager metadata resolvable while django-stubs processes this
+    # abstract class before those concrete overrides are registered.
+    objects = models.Manager()
+    base_objects = models.Manager()
+
     assigned_holder = models.ForeignKey(
         "organization.AssetHolder",
         on_delete=models.SET_NULL,

@@ -1009,7 +1009,7 @@ class CommittedRecordTests(unittest.TestCase):
     def test_the_committed_record_is_internally_consistent(self):
         self.assertEqual(gate.check_record(REPO_ROOT, self.policy, self.record), ())
 
-    def test_the_committed_record_lists_the_slice_zero_through_slice_four_admissions(self):
+    def test_the_committed_record_lists_the_slice_zero_through_slice_six_admissions(self):
         self.assertEqual(
             [entry["path"] for entry in self.record["checked"]],
             [
@@ -1017,7 +1017,12 @@ class CommittedRecordTests(unittest.TestCase):
                 "itambox/core/tasks/context.py",
                 "itambox/core/tasks/reports.py",
                 "itambox/organization/access.py",
+                "itambox/users/api/scim/authentication.py",
+                "itambox/users/api/scim/filters.py",
+                "itambox/users/api/scim/identifiers.py",
+                "itambox/users/api/scim/provider_authentication.py",
                 "itambox/users/api/scim/provider_patch.py",
+                "itambox/users/api/scim/serializers.py",
             ],
         )
         self.assertEqual(
@@ -1030,6 +1035,40 @@ class CommittedRecordTests(unittest.TestCase):
                 "itambox/core/tasks/reports.py": (
                     "symbols",
                     ["_ReportOutput", "generate_scheduled_report_task"],
+                ),
+                "itambox/users/api/scim/authentication.py": (
+                    "symbols",
+                    ["SCIMBearerTokenAuthentication", "_SCIMAuthenticatedPrincipal"],
+                ),
+                "itambox/users/api/scim/filters.py": (
+                    "symbols",
+                    [
+                        "_SCIMQuery",
+                        "_build_filter_query",
+                        "_normalize_filter_value",
+                        "_parse_id_filter",
+                        "_reject_oversized_filter",
+                        "parse_scim_filter",
+                        "parse_scim_membership_filter",
+                    ],
+                ),
+                "itambox/users/api/scim/identifiers.py": (
+                    "symbols",
+                    ["identifier_lookup", "identifier_lookup_or_none"],
+                ),
+                "itambox/users/api/scim/provider_authentication.py": (
+                    "symbols",
+                    ["SCIMProviderBearerTokenAuthentication", "_SCIMAuthenticatedPrincipal"],
+                ),
+                "itambox/users/api/scim/serializers.py": (
+                    "symbols",
+                    [
+                        "SCIMGroupSerializer",
+                        "SCIMUserSerializer",
+                        "_SCIMGroupResource",
+                        "_SCIMMembershipResource",
+                        "_SCIMUserResource",
+                    ],
                 ),
             },
         )

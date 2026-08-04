@@ -9903,7 +9903,7 @@
       "path": "itambox/users/api/scim/authentication.py",
       "code": "C901",
       "message": "'SCIMBearerTokenAuthentication.authenticate' is too complex (20)",
-      "source": "    def authenticate(self, request):",
+      "source": "    def authenticate(self, request: Request) -> _SCIMAuthenticationResult:",
       "context": "Module:body/ClassDef:SCIMBearerTokenAuthentication:body/FunctionDef:authenticate:self",
       "count": 1
     },
@@ -9919,7 +9919,7 @@
       "path": "itambox/users/api/scim/filters.py",
       "code": "C901",
       "message": "'parse_scim_filter' is too complex (19)",
-      "source": "def parse_scim_filter(filter_str, model_type=\"user\"):",
+      "source": "def parse_scim_filter(filter_str: str | None, model_type: str = \"user\") -> _SCIMQuery:",
       "context": "Module:body/FunctionDef:parse_scim_filter:self",
       "count": 1
     },
@@ -9927,7 +9927,7 @@
       "path": "itambox/users/api/scim/provider_authentication.py",
       "code": "C901",
       "message": "'SCIMProviderBearerTokenAuthentication.authenticate' is too complex (20)",
-      "source": "    def authenticate(self, request):",
+      "source": "    def authenticate(self, request: Request) -> _SCIMAuthenticationResult:",
       "context": "Module:body/ClassDef:SCIMProviderBearerTokenAuthentication:body/FunctionDef:authenticate:self",
       "count": 1
     },

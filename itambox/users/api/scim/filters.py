@@ -1,4 +1,5 @@
 import re
+from typing import Protocol, Self
 from uuid import UUID
 
 from django.db.models import Q
@@ -12,19 +13,44 @@ class SCIMFilterError(ValueError):
     pass
 
 
+class _SCIMQuery(Protocol):
+    """What a parsed SCIM filter answers with: a combinable query expression.
+
+    The runtime value is a Django ``Q``, and the parser bodies below build it
+    exactly as they always have. The admitted signatures name this protocol
+    instead so the checked contract is the query algebra a caller actually uses
+    -- conjunction, disjunction, negation -- rather than the ORM class that
+    implements it. That is the honest boundary here: this module maps SCIM
+    filter syntax onto a query expression and never executes one.
+
+    Django's ``Q`` satisfies this structurally; the ``Self`` bound is what makes
+    the combining operators describe "another expression of my own kind" rather
+    than a widening to this protocol.
+    """
+
+    def __and__(self, other: Self, /) -> Self:
+        pass
+
+    def __or__(self, other: Self, /) -> Self:
+        pass
+
+    def __invert__(self) -> Self:
+        pass
+
+
 # Upper bound on a SCIM filter expression before it reaches the parser regex.
 # The grammar has adjacent whitespace groups (\s+ ... \s*) that backtrack
 # polynomially on long crafted inputs (ReDoS); real filters are short.
 MAX_SCIM_FILTER_LENGTH = 512
 
 
-def _reject_oversized_filter(filter_str):
+def _reject_oversized_filter(filter_str: str) -> None:
     """Raise SCIMFilterError if the expression exceeds the ReDoS length bound."""
     if len(filter_str) > MAX_SCIM_FILTER_LENGTH:
         raise SCIMFilterError("SCIM filter expression is too long.")
 
 
-def _normalize_filter_value(val, attr_lower):
+def _normalize_filter_value(val: str | None, attr_lower: str) -> str | bool | None:
     if val is None or attr_lower == "externalid":
         return val
     val_lower = val.lower()
@@ -37,7 +63,7 @@ def _normalize_filter_value(val, attr_lower):
     return val
 
 
-def _parse_id_filter(op, val):
+def _parse_id_filter(op: str, val: str | bool | None) -> _SCIMQuery:
     if op == "pr":
         return Q(scim_id__isnull=False)
     if op not in {"eq", "ne"} or not isinstance(val, str):
@@ -55,7 +81,7 @@ def _parse_id_filter(op, val):
     return opaque_query if op == "eq" else ~opaque_query
 
 
-def _build_filter_query(field_name, op, val):
+def _build_filter_query(field_name: str, op: str, val: str | bool | None) -> _SCIMQuery:
     if op == "eq":
         if val is True or val is False or val is None:
             return Q(**{field_name: val})
@@ -92,7 +118,7 @@ _SCOPED_FILTER_RE = re.compile(
 )
 
 
-def parse_scim_membership_filter(filter_str):
+def parse_scim_membership_filter(filter_str: str | None) -> _SCIMQuery | None:
     """Return a Membership-local Q for tenant-scoped User filters, if applicable."""
     if not filter_str:
         return None
@@ -110,7 +136,7 @@ def parse_scim_membership_filter(filter_str):
     return _build_filter_query(field_name, op, val)
 
 
-def parse_scim_filter(filter_str, model_type="user"):
+def parse_scim_filter(filter_str: str | None, model_type: str = "user") -> _SCIMQuery:
     if not filter_str:
         return Q()
 
@@ -164,7 +190,7 @@ def parse_scim_filter(filter_str, model_type="user"):
     attr_lower = attr.lower()
 
     # Map SCIM attributes to Django model fields
-    field_name = None
+    field_name: str | None = None
     if model_type == "user":
         if attr_lower == "username":
             field_name = "username"

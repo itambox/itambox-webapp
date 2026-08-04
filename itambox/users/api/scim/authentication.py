@@ -1,9 +1,11 @@
 import logging
 import re
+from typing import Protocol
 
 from django.utils import timezone
 from rest_framework import exceptions
 from rest_framework.authentication import BaseAuthentication, get_authorization_header
+from rest_framework.request import Request
 
 from organization.models import Tenant
 from users.models import Token
@@ -11,8 +13,17 @@ from users.models import Token
 logger = logging.getLogger("itambox.scim.auth")
 
 
+class _SCIMAuthenticatedPrincipal(Protocol):
+    """Minimal principal contract returned by DRF authentication."""
+
+    is_authenticated: bool
+
+
+_SCIMAuthenticationResult = tuple[_SCIMAuthenticatedPrincipal, object] | None
+
+
 class SCIMBearerTokenAuthentication(BaseAuthentication):
-    def authenticate(self, request):
+    def authenticate(self, request: Request) -> _SCIMAuthenticationResult:
         # 1. Resolve tenant from URL path
         tenant_slug = None
         if request.resolver_match and "tenant_slug" in request.resolver_match.kwargs:
@@ -96,5 +107,5 @@ class SCIMBearerTokenAuthentication(BaseAuthentication):
 
         return None
 
-    def authenticate_header(self, request):
+    def authenticate_header(self, request: Request) -> str:
         return "Bearer"
