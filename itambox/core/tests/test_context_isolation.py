@@ -29,6 +29,7 @@ from core.context import (
 from core.managers import get_current_membership, get_current_tenant
 from core.models import _user_validation_cache
 from core.navigation.menu import get_menus
+from core.settings import base as base_settings
 from core.tests.mixins import TenantTestMixin
 from organization.access import _descendant_group_ids_cache as _access_descendant_group_ids_cache
 
@@ -44,6 +45,17 @@ class TenantContextIsolationTests(TenantTestMixin, SimpleTestCase):
 
     def test_django_q_tasks_run_inline_in_every_pytest_worker(self):
         self.assertTrue(settings.Q_CLUSTER["sync"])
+
+    def test_test_settings_configuration_is_a_noop_outside_testing(self):
+        q_sync = base_settings.Q_CLUSTER["sync"]
+        conn_max_age = base_settings.DATABASES["default"]["CONN_MAX_AGE"]
+        database_options = base_settings.DATABASES["default"]["OPTIONS"]["options"]
+
+        base_settings._configure_test_environment(False)
+
+        self.assertEqual(base_settings.Q_CLUSTER["sync"], q_sync)
+        self.assertEqual(base_settings.DATABASES["default"]["CONN_MAX_AGE"], conn_max_age)
+        self.assertEqual(base_settings.DATABASES["default"]["OPTIONS"]["options"], database_options)
 
     def test_node_id_manifest_writer_is_serial_only_and_deterministic(self):
         previous_manifest = os.environ.get("ITAMBOX_NODE_ID_MANIFEST")

@@ -1,5 +1,7 @@
 import io
 import os
+import sys
+from types import SimpleNamespace
 from unittest.mock import patch
 
 from django.contrib.auth import get_user_model
@@ -101,6 +103,16 @@ class SecurityHardeningTests(TestCase):
         with patch.dict(os.environ, {"PYTEST_XDIST_WORKER": "gw0"}, clear=False):
             with self.assertRaises(ValidationError):
                 validate_image_attachment(invalid_image)
+
+    def test_image_validation_falls_back_to_pillow_when_magic_fails(self):
+        def unavailable_magic(_chunk, _mime):
+            raise RuntimeError("libmagic unavailable")
+
+        fake_magic = SimpleNamespace(from_buffer=unavailable_magic)
+        with patch.dict(sys.modules, {"magic": fake_magic}):
+            validate_image_attachment(SimpleUploadedFile("image.png", _valid_png_bytes()))
+            with self.assertRaises(ValidationError):
+                validate_image_attachment(SimpleUploadedFile("image.png", b"not-an-image"))
 
     @override_settings(RATELIMIT_LIMIT=3, RATELIMIT_PERIOD=60)
     def test_rate_limiting_middleware(self):

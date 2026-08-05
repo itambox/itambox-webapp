@@ -475,7 +475,11 @@ def _is_test_invocation():
 
 _TEST_INVOCATION = _is_test_invocation()
 
-if _TEST_INVOCATION:
+
+def _configure_test_environment(is_test_invocation):
+    if not is_test_invocation:
+        return
+
     Q_CLUSTER["sync"] = True
 
     # --- Test-suite DB hardening (guards against an unbounded, order-dependent
@@ -494,6 +498,8 @@ if _TEST_INVOCATION:
     DATABASES["default"]["CONN_MAX_AGE"] = 0
     DATABASES["default"]["OPTIONS"]["options"] = "-c lock_timeout=30000 -c statement_timeout=600000"
 
+
+_configure_test_environment(_TEST_INVOCATION)
 
 # ==============================================================================
 # Data Retention (changelog / operational-data pruning)
