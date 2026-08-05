@@ -183,7 +183,19 @@ PYTHONPATH=itambox uv run --locked --group dev python -m pytest -q -p no:cachepr
   scripts/tests/test_inline_style_workflow_policy.py \
   scripts/tests/test_inline_styles.py \
   scripts/tests/test_migration_audit.py \
-  scripts/tests/test_typing_policy.py
+  scripts/tests/test_typing_policy.py \
+  itambox/assets/tests/test_audit_ws6_10.py \
+  itambox/assets/tests/test_tag_sequence_concurrency.py \
+  itambox/core/tests/test_context_isolation.py \
+  itambox/core/tests/test_management_commands.py \
+  itambox/core/tests/test_media_isolation.py \
+  itambox/core/tests/test_multi_tenant_auth.py \
+  itambox/itambox/tests/test_capability_surfaces.py \
+  itambox/procurement/tests/test_concurrency.py \
+  itambox/subscriptions/tests/test_migrations.py \
+  itambox/subscriptions/tests/test_models.py \
+  itambox/users/tests/test_scim_migrations.py \
+  scripts/tests/test_check_test_report.py
 ```
 
 Run the contract-policy checks from the repository root:

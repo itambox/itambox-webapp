@@ -1,6 +1,7 @@
 import datetime
 import threading
 
+import pytest
 from django.contrib.auth import get_user_model
 from django.contrib.contenttypes.models import ContentType
 from django.core.exceptions import ValidationError
@@ -518,6 +519,7 @@ class SubscriptionExplicitExpiryTests(TestCase):
         self.assertEqual(sub.status, SubscriptionStatusChoices.ACTIVE)
 
 
+@pytest.mark.serial_only
 class SubscriptionConcurrencyTests(TransactionTestCase):
     def _post_teardown(self):
         super()._post_teardown()

@@ -1,9 +1,11 @@
+import pytest
 from django.db import connection
 from django.db.migrations.executor import MigrationExecutor
 from django.test import TransactionTestCase
 from django.utils import timezone
 
 
+@pytest.mark.serial_only
 class SCIMIdentityMigrationTests(TransactionTestCase):
     migrate_from = [
         ("organization", "0100_issue88_shard_61_organization_relations"),

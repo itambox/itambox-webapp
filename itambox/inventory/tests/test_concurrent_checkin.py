@@ -3,6 +3,7 @@
 import queue
 import threading
 
+import pytest
 from django.contrib.auth import get_user_model
 from django.db import connections
 from django.http import Http404
@@ -24,6 +25,7 @@ from organization.models import AssetHolder, Location, Site, Tenant
 User = get_user_model()
 
 
+@pytest.mark.serial_only
 class ConcurrentCheckinTests(TransactionTestCase):
     def setUp(self):
         self.tenant = Tenant.objects.create(name="Concurrent Tenant", slug="concurrent-tenant")

@@ -4,7 +4,7 @@ from datetime import timedelta
 from django.contrib.auth import get_user_model
 from django.utils import timezone
 
-from core.managers import set_current_membership, set_current_tenant
+from core.managers import get_current_membership, get_current_tenant, set_current_membership, set_current_tenant
 from core.mfa import role_is_privileged
 from organization.models import Membership, Role, RoleGrant, RoleGrantScope, Tenant
 
@@ -95,8 +95,10 @@ class TenantTestMixin:
 
     @contextmanager
     def tenant_context(self, tenant, membership=None):
-        old_tenant = set_current_tenant(tenant)
-        old_membership = set_current_membership(membership)
+        old_tenant = get_current_tenant()
+        old_membership = get_current_membership()
+        set_current_tenant(tenant)
+        set_current_membership(membership)
         try:
             yield
         finally:

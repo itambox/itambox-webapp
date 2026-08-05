@@ -1,0 +1,171 @@
+"""Regression tests for request/tenant context isolation under repeated execution."""
+
+import os
+from pathlib import Path
+from types import SimpleNamespace
+
+import pytest
+from django.conf import settings
+from django.core.cache import cache
+from django.test import SimpleTestCase
+
+import conftest
+from core.auth.cache import _request_invalidation_state
+from core.context import (
+    _csp_nonce,
+    _current_all_accessible,
+    _current_membership,
+    _current_tenant,
+    _current_tenant_group,
+    _current_user,
+    _deletion_cascade_permit,
+    _descendant_group_ids_cache,
+    _issued_system_authorizations,
+    _request_id,
+    _system_authorization_scope,
+)
+from core.managers import get_current_membership, get_current_tenant
+from core.navigation.menu import get_menus
+from core.tests.mixins import TenantTestMixin
+
+
+class TenantContextIsolationTests(TenantTestMixin, SimpleTestCase):
+    def test_test_fixture_exposes_an_explicit_context_reset(self):
+        self.assertTrue(callable(getattr(conftest, "_reset_test_context", None)))
+        self.assertTrue(callable(getattr(conftest, "_write_node_id_manifest", None)))
+        self.assertEqual(
+            conftest._canonical_junit_node_id("itambox/core/tests/test_context.py::Case::test_one[param]"),
+            "itambox.core.tests.test_context.Case::test_one[param]",
+        )
+
+    def test_django_q_tasks_run_inline_in_every_pytest_worker(self):
+        self.assertTrue(settings.Q_CLUSTER["sync"])
+
+    def test_node_id_manifest_writer_is_serial_only_and_deterministic(self):
+        manifest_path = Path(self._testMethodName + ".nodeids")
+        previous_manifest = os.environ.get("ITAMBOX_NODE_ID_MANIFEST")
+        previous_write = os.environ.get("ITAMBOX_NODE_ID_MANIFEST_WRITE")
+        previous_worker = os.environ.get("PYTEST_XDIST_WORKER")
+        previous_worker_count = os.environ.get("PYTEST_XDIST_WORKER_COUNT")
+        try:
+            os.environ["ITAMBOX_NODE_ID_MANIFEST"] = str(manifest_path)
+            os.environ["ITAMBOX_NODE_ID_MANIFEST_WRITE"] = "1"
+            os.environ.pop("PYTEST_XDIST_WORKER", None)
+            os.environ.pop("PYTEST_XDIST_WORKER_COUNT", None)
+            conftest._write_node_id_manifest([SimpleNamespace(nodeid="z::test"), SimpleNamespace(nodeid="a::test")])
+            self.assertEqual(manifest_path.read_text(encoding="utf-8"), "a::test\nz::test\n")
+
+            manifest_path.write_text("sentinel\n", encoding="utf-8")
+            os.environ["PYTEST_XDIST_WORKER"] = "gw0"
+            conftest._write_node_id_manifest([SimpleNamespace(nodeid="different::test")])
+            self.assertEqual(manifest_path.read_text(encoding="utf-8"), "sentinel\n")
+        finally:
+            manifest_path.unlink(missing_ok=True)
+            if previous_manifest is None:
+                os.environ.pop("ITAMBOX_NODE_ID_MANIFEST", None)
+            else:
+                os.environ["ITAMBOX_NODE_ID_MANIFEST"] = previous_manifest
+            if previous_write is None:
+                os.environ.pop("ITAMBOX_NODE_ID_MANIFEST_WRITE", None)
+            else:
+                os.environ["ITAMBOX_NODE_ID_MANIFEST_WRITE"] = previous_write
+            if previous_worker is None:
+                os.environ.pop("PYTEST_XDIST_WORKER", None)
+            else:
+                os.environ["PYTEST_XDIST_WORKER"] = previous_worker
+            if previous_worker_count is None:
+                os.environ.pop("PYTEST_XDIST_WORKER_COUNT", None)
+            else:
+                os.environ["PYTEST_XDIST_WORKER_COUNT"] = previous_worker_count
+
+    def test_test_fixture_reset_clears_every_request_and_task_contextvar(self):
+        values = (
+            (_current_tenant, object()),
+            (_current_tenant_group, object()),
+            (_current_membership, object()),
+            (_current_all_accessible, True),
+            (_descendant_group_ids_cache, {1, 2}),
+            (_current_user, object()),
+            (_request_id, object()),
+            (_csp_nonce, "nonce"),
+            (_system_authorization_scope, object()),
+            (_issued_system_authorizations, (object(),)),
+            (_deletion_cascade_permit, {"deletes": {}}),
+            (_request_invalidation_state, (object(), {}, 1)),
+        )
+        for variable, value in values:
+            variable.set(value)
+
+        conftest._reset_test_context()
+
+        self.assertIsNone(_current_tenant.get())
+        self.assertIsNone(_current_tenant_group.get())
+        self.assertIsNone(_current_membership.get())
+        self.assertFalse(_current_all_accessible.get())
+        self.assertIsNone(_descendant_group_ids_cache.get())
+        self.assertIsNone(_current_user.get())
+        self.assertIsNone(_request_id.get())
+        self.assertIsNone(_csp_nonce.get())
+        self.assertIsNone(_system_authorization_scope.get())
+        self.assertEqual(_issued_system_authorizations.get(), ())
+        self.assertIsNone(_deletion_cascade_permit.get())
+        self.assertIsNone(_request_invalidation_state.get())
+
+    def test_test_fixture_reset_reports_a_failed_contextvar_reset(self):
+        import core.context
+
+        original = core.context._current_tenant
+
+        class BrokenContextVar:
+            def set(self, _value):
+                raise RuntimeError("reset failed")
+
+        core.context._current_tenant = BrokenContextVar()
+        try:
+            with pytest.raises(AssertionError, match="current_tenant.*reset failed"):
+                conftest._reset_test_context()
+        finally:
+            core.context._current_tenant = original
+
+    def test_global_mockers_register_failure_safe_cleanup(self):
+        source = Path(__file__).with_name("test_multi_tenant_auth.py").read_text(encoding="utf-8")
+
+        self.assertIn("self.addCleanup(self.xmlsec_patcher.stop)", source)
+        self.assertIn("self.addCleanup(self.requests_patcher.stop)", source)
+        self.assertIn("self.addCleanup(self.open_patcher.stop)", source)
+
+    def test_test_fixture_reset_clears_global_navigation_menu_cache(self):
+        get_menus()
+        self.assertGreater(get_menus.cache_info().currsize, 0)
+
+        conftest._reset_test_context()
+
+        self.assertEqual(get_menus.cache_info().currsize, 0)
+
+    def test_test_fixture_reset_clears_django_cache_aliases(self):
+        cache.set("issue21-context-isolation", "leak", timeout=None)
+        self.assertEqual(cache.get("issue21-context-isolation"), "leak")
+
+        conftest._reset_test_context()
+
+        self.assertIsNone(cache.get("issue21-context-isolation"))
+
+    def test_nested_tenant_context_restores_enclosing_context(self):
+        outer_tenant = object()
+        outer_membership = object()
+        inner_tenant = object()
+        inner_membership = object()
+
+        with self.tenant_context(outer_tenant, outer_membership):
+            self.assertIs(get_current_tenant(), outer_tenant)
+            self.assertIs(get_current_membership(), outer_membership)
+
+            with self.tenant_context(inner_tenant, inner_membership):
+                self.assertIs(get_current_tenant(), inner_tenant)
+                self.assertIs(get_current_membership(), inner_membership)
+
+            self.assertIs(get_current_tenant(), outer_tenant)
+            self.assertIs(get_current_membership(), outer_membership)
+
+        self.assertIsNone(get_current_tenant())
+        self.assertIsNone(get_current_membership())

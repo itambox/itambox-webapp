@@ -463,7 +463,13 @@ Q_CLUSTER = {
 
 import sys
 
-if "test" in sys.argv or any("test" in arg or "pytest" in arg for arg in sys.argv):
+if (
+    "test" in sys.argv
+    or any("test" in arg or "pytest" in arg for arg in sys.argv)
+    or os.environ.get("PYTEST_XDIST_WORKER")
+    or os.environ.get("PYTEST_XDIST_WORKER_COUNT")
+    or os.environ.get("PYTEST_XDIST_TESTRUNUID")
+):
     Q_CLUSTER["sync"] = True
 
     # --- Test-suite DB hardening (guards against an unbounded, order-dependent
@@ -542,7 +548,13 @@ else:
 #   Example: ITAMBOX_PLUGINS=itambox_esign
 PLUGINS = [p.strip() for p in os.environ.get("ITAMBOX_PLUGINS", "").split(",") if p.strip()]
 
-IS_TESTING = "test" in sys.argv or any("test" in arg or "pytest" in arg for arg in sys.argv)
+IS_TESTING = (
+    "test" in sys.argv
+    or any("test" in arg or "pytest" in arg for arg in sys.argv)
+    or os.environ.get("PYTEST_XDIST_WORKER")
+    or os.environ.get("PYTEST_XDIST_WORKER_COUNT")
+    or os.environ.get("PYTEST_XDIST_TESTRUNUID")
+)
 
 PLUGINS_CONFIG = {
     "itambox_esign": {

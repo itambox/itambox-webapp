@@ -114,6 +114,7 @@ python_files = ["tests.py", "test_*.py"]
 # (per-worker MEDIA_ROOT, etc.) add `-n auto` here. Until then run `-n auto` ad hoc when
 # you know the targeted subset is parallel-clean.
 addopts = ["--tb=short", "-p", "no:warnings", "--reuse-db", "--no-cov-on-fail"]
+markers = ["serial_only: test requires an isolated serial lane (races, migrations, or global seed state)"]
 norecursedirs = [".venv", "scratch", "node_modules", ".git", ".agents", ".*"]
 
 [tool.coverage.run]

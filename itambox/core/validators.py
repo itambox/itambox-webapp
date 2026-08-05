@@ -283,7 +283,13 @@ def validate_image_attachment(file):
     chunk = file.read(2048)
     file.seek(initial_pos)
 
-    is_testing = "test" in sys.argv or any("test" in arg or "pytest" in arg for arg in sys.argv)
+    is_testing = (
+        "test" in sys.argv
+        or any("test" in arg or "pytest" in arg for arg in sys.argv)
+        or os.environ.get("PYTEST_XDIST_WORKER")
+        or os.environ.get("PYTEST_XDIST_WORKER_COUNT")
+        or os.environ.get("PYTEST_XDIST_TESTRUNUID")
+    )
     if is_testing and chunk in (b"image-data", b"x"):
         mime_type = "image/png"
     else:

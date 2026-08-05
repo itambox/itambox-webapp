@@ -187,6 +187,7 @@ class TestOpenAPIMaturity:
         assert {operation.get("x-itambox-maturity") for operation in operations} == {BETA}
 
 
+@pytest.mark.serial_only
 class TestNavigationMaturity:
     def test_procurement_navigation_is_not_marked_beta(self):
         from core.navigation.menu import OPERATIONS_MENU
