@@ -463,13 +463,19 @@ Q_CLUSTER = {
 
 import sys
 
-if (
-    "test" in sys.argv
-    or any("test" in arg or "pytest" in arg for arg in sys.argv)
-    or os.environ.get("PYTEST_XDIST_WORKER")
-    or os.environ.get("PYTEST_XDIST_WORKER_COUNT")
-    or os.environ.get("PYTEST_XDIST_TESTRUNUID")
-):
+
+def _is_test_invocation():
+    argv_identifies_tests = "test" in sys.argv or any("test" in arg or "pytest" in arg for arg in sys.argv)
+    xdist_identifies_tests = any(os.environ.get(name) for name in ("PYTEST_XDIST_WORKER", "PYTEST_XDIST_TESTRUNUID"))
+    explicit_non_production = (
+        os.environ.get("ITAMBOX_ENV") == "dev" or os.environ.get("DJANGO_SETTINGS_MODULE") == "core.settings.dev"
+    )
+    return argv_identifies_tests or (explicit_non_production and xdist_identifies_tests)
+
+
+_TEST_INVOCATION = _is_test_invocation()
+
+if _TEST_INVOCATION:
     Q_CLUSTER["sync"] = True
 
     # --- Test-suite DB hardening (guards against an unbounded, order-dependent
@@ -548,13 +554,7 @@ else:
 #   Example: ITAMBOX_PLUGINS=itambox_esign
 PLUGINS = [p.strip() for p in os.environ.get("ITAMBOX_PLUGINS", "").split(",") if p.strip()]
 
-IS_TESTING = (
-    "test" in sys.argv
-    or any("test" in arg or "pytest" in arg for arg in sys.argv)
-    or os.environ.get("PYTEST_XDIST_WORKER")
-    or os.environ.get("PYTEST_XDIST_WORKER_COUNT")
-    or os.environ.get("PYTEST_XDIST_TESTRUNUID")
-)
+IS_TESTING = _TEST_INVOCATION
 
 PLUGINS_CONFIG = {
     "itambox_esign": {
@@ -572,7 +572,6 @@ PLUGINS_CONFIG = {
 }
 
 # Load and validate plugins dynamically
-import sys
 
 from itambox.plugins.utils import load_plugins
 

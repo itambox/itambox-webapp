@@ -1,3 +1,7 @@
+import io
+import os
+from unittest.mock import patch
+
 from django.contrib.auth import get_user_model
 from django.contrib.contenttypes.models import ContentType
 from django.core.cache import cache
@@ -6,10 +10,17 @@ from django.core.files.uploadedfile import SimpleUploadedFile
 from django.test import TestCase, override_settings
 from django.urls import reverse
 from model_bakery import baker
+from PIL import Image
 
 from core.validators import validate_file_attachment, validate_image_attachment
 
 User = get_user_model()
+
+
+def _valid_png_bytes():
+    buffer = io.BytesIO()
+    Image.new("RGBA", (1, 1), (0, 0, 0, 0)).save(buffer, format="PNG")
+    return buffer.getvalue()
 
 
 class MockUploadedFile(SimpleUploadedFile):
@@ -68,13 +79,13 @@ class SecurityHardeningTests(TestCase):
         self.assertIn("Image size must not exceed 5 MB", str(ctx.exception))
 
         # 5 MB should pass
-        valid_size_image = MockUploadedFile("image.png", b"x", 5 * 1024 * 1024)
+        valid_size_image = MockUploadedFile("image.png", _valid_png_bytes(), 5 * 1024 * 1024)
         validate_image_attachment(valid_size_image)
 
     def test_image_attachment_format_whitelist(self):
         allowed = [".png", ".jpg", ".jpeg", ".gif", ".bmp", ".webp"]
         for ext in allowed:
-            valid_image = SimpleUploadedFile(f"image{ext}", b"image-data")
+            valid_image = SimpleUploadedFile(f"image{ext}", _valid_png_bytes())
             validate_image_attachment(valid_image)
 
         # SVG or txt or other formats should fail
@@ -84,6 +95,12 @@ class SecurityHardeningTests(TestCase):
             with self.assertRaises(ValidationError) as ctx:
                 validate_image_attachment(invalid_image)
             self.assertIn("is not supported", str(ctx.exception))
+
+    def test_image_validation_does_not_trust_xdist_environment(self):
+        invalid_image = SimpleUploadedFile("image.png", b"image-data")
+        with patch.dict(os.environ, {"PYTEST_XDIST_WORKER": "gw0"}, clear=False):
+            with self.assertRaises(ValidationError):
+                validate_image_attachment(invalid_image)
 
     @override_settings(RATELIMIT_LIMIT=3, RATELIMIT_PERIOD=60)
     def test_rate_limiting_middleware(self):

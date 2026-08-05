@@ -162,18 +162,18 @@ class ShardedReportTests(unittest.TestCase):
             with self.assertRaisesRegex(PolicyError, "duplicate test-case node ID"):
                 report_gate.load_reports([first, second])
 
-    def test_cli_accepts_repeated_report_arguments(self):
+    def test_cli_requires_a_manifest_for_repeated_report_arguments(self):
         with tempfile.TemporaryDirectory() as temporary_directory:
             first = write_report(temporary_directory, [testcase("test_first")], name="junit-gw0.xml")
             second = write_report(temporary_directory, [testcase("test_second")], name="junit-gw1.xml")
 
-            status, stdout, stderr = run_main(
+            status, _stdout, stderr = run_main(
                 ["--report", str(first), "--report", str(second)],
                 baseline_tests=2,
             )
 
-            self.assertEqual(status, 0, stderr)
-            self.assertIn("2 test(s), 2 passed", stdout)
+            self.assertEqual(status, 2)
+            self.assertIn("require --expected-node-ids", stderr)
 
     def test_cli_requires_aggregated_reports_to_match_the_control_manifest(self):
         with tempfile.TemporaryDirectory() as temporary_directory:

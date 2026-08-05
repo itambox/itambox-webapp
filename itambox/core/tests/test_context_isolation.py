@@ -1,8 +1,10 @@
 """Regression tests for request/tenant context isolation under repeated execution."""
 
 import os
+import tempfile
 from pathlib import Path
 from types import SimpleNamespace
+from unittest.mock import patch
 
 import pytest
 from django.conf import settings
@@ -25,8 +27,10 @@ from core.context import (
     _system_authorization_scope,
 )
 from core.managers import get_current_membership, get_current_tenant
+from core.models import _user_validation_cache
 from core.navigation.menu import get_menus
 from core.tests.mixins import TenantTestMixin
+from organization.access import _descendant_group_ids_cache as _access_descendant_group_ids_cache
 
 
 class TenantContextIsolationTests(TenantTestMixin, SimpleTestCase):
@@ -42,41 +46,41 @@ class TenantContextIsolationTests(TenantTestMixin, SimpleTestCase):
         self.assertTrue(settings.Q_CLUSTER["sync"])
 
     def test_node_id_manifest_writer_is_serial_only_and_deterministic(self):
-        manifest_path = Path(self._testMethodName + ".nodeids")
         previous_manifest = os.environ.get("ITAMBOX_NODE_ID_MANIFEST")
         previous_write = os.environ.get("ITAMBOX_NODE_ID_MANIFEST_WRITE")
         previous_worker = os.environ.get("PYTEST_XDIST_WORKER")
         previous_worker_count = os.environ.get("PYTEST_XDIST_WORKER_COUNT")
-        try:
-            os.environ["ITAMBOX_NODE_ID_MANIFEST"] = str(manifest_path)
-            os.environ["ITAMBOX_NODE_ID_MANIFEST_WRITE"] = "1"
-            os.environ.pop("PYTEST_XDIST_WORKER", None)
-            os.environ.pop("PYTEST_XDIST_WORKER_COUNT", None)
-            conftest._write_node_id_manifest([SimpleNamespace(nodeid="z::test"), SimpleNamespace(nodeid="a::test")])
-            self.assertEqual(manifest_path.read_text(encoding="utf-8"), "a::test\nz::test\n")
-
-            manifest_path.write_text("sentinel\n", encoding="utf-8")
-            os.environ["PYTEST_XDIST_WORKER"] = "gw0"
-            conftest._write_node_id_manifest([SimpleNamespace(nodeid="different::test")])
-            self.assertEqual(manifest_path.read_text(encoding="utf-8"), "sentinel\n")
-        finally:
-            manifest_path.unlink(missing_ok=True)
-            if previous_manifest is None:
-                os.environ.pop("ITAMBOX_NODE_ID_MANIFEST", None)
-            else:
-                os.environ["ITAMBOX_NODE_ID_MANIFEST"] = previous_manifest
-            if previous_write is None:
-                os.environ.pop("ITAMBOX_NODE_ID_MANIFEST_WRITE", None)
-            else:
-                os.environ["ITAMBOX_NODE_ID_MANIFEST_WRITE"] = previous_write
-            if previous_worker is None:
+        with tempfile.TemporaryDirectory() as temporary_directory:
+            manifest_path = Path(temporary_directory) / "nodeids.txt"
+            try:
+                os.environ["ITAMBOX_NODE_ID_MANIFEST"] = str(manifest_path)
+                os.environ["ITAMBOX_NODE_ID_MANIFEST_WRITE"] = "1"
                 os.environ.pop("PYTEST_XDIST_WORKER", None)
-            else:
-                os.environ["PYTEST_XDIST_WORKER"] = previous_worker
-            if previous_worker_count is None:
                 os.environ.pop("PYTEST_XDIST_WORKER_COUNT", None)
-            else:
-                os.environ["PYTEST_XDIST_WORKER_COUNT"] = previous_worker_count
+                conftest._write_node_id_manifest([SimpleNamespace(nodeid="z::test"), SimpleNamespace(nodeid="a::test")])
+                self.assertEqual(manifest_path.read_text(encoding="utf-8"), "a::test\nz::test\n")
+
+                manifest_path.write_text("sentinel\n", encoding="utf-8")
+                os.environ["PYTEST_XDIST_WORKER"] = "gw0"
+                conftest._write_node_id_manifest([SimpleNamespace(nodeid="different::test")])
+                self.assertEqual(manifest_path.read_text(encoding="utf-8"), "sentinel\n")
+            finally:
+                if previous_manifest is None:
+                    os.environ.pop("ITAMBOX_NODE_ID_MANIFEST", None)
+                else:
+                    os.environ["ITAMBOX_NODE_ID_MANIFEST"] = previous_manifest
+                if previous_write is None:
+                    os.environ.pop("ITAMBOX_NODE_ID_MANIFEST_WRITE", None)
+                else:
+                    os.environ["ITAMBOX_NODE_ID_MANIFEST_WRITE"] = previous_write
+                if previous_worker is None:
+                    os.environ.pop("PYTEST_XDIST_WORKER", None)
+                else:
+                    os.environ["PYTEST_XDIST_WORKER"] = previous_worker
+                if previous_worker_count is None:
+                    os.environ.pop("PYTEST_XDIST_WORKER_COUNT", None)
+                else:
+                    os.environ["PYTEST_XDIST_WORKER_COUNT"] = previous_worker_count
 
     def test_test_fixture_reset_clears_every_request_and_task_contextvar(self):
         values = (
@@ -85,6 +89,7 @@ class TenantContextIsolationTests(TenantTestMixin, SimpleTestCase):
             (_current_membership, object()),
             (_current_all_accessible, True),
             (_descendant_group_ids_cache, {1, 2}),
+            (_access_descendant_group_ids_cache, {3, 4}),
             (_current_user, object()),
             (_request_id, object()),
             (_csp_nonce, "nonce"),
@@ -92,6 +97,7 @@ class TenantContextIsolationTests(TenantTestMixin, SimpleTestCase):
             (_issued_system_authorizations, (object(),)),
             (_deletion_cascade_permit, {"deletes": {}}),
             (_request_invalidation_state, (object(), {}, 1)),
+            (_user_validation_cache, ("request", {1})),
         )
         for variable, value in values:
             variable.set(value)
@@ -103,6 +109,7 @@ class TenantContextIsolationTests(TenantTestMixin, SimpleTestCase):
         self.assertIsNone(_current_membership.get())
         self.assertFalse(_current_all_accessible.get())
         self.assertIsNone(_descendant_group_ids_cache.get())
+        self.assertIsNone(_access_descendant_group_ids_cache.get())
         self.assertIsNone(_current_user.get())
         self.assertIsNone(_request_id.get())
         self.assertIsNone(_csp_nonce.get())
@@ -110,6 +117,7 @@ class TenantContextIsolationTests(TenantTestMixin, SimpleTestCase):
         self.assertEqual(_issued_system_authorizations.get(), ())
         self.assertIsNone(_deletion_cascade_permit.get())
         self.assertIsNone(_request_invalidation_state.get())
+        self.assertIsNone(_user_validation_cache.get())
 
     def test_test_fixture_reset_reports_a_failed_contextvar_reset(self):
         import core.context
@@ -149,6 +157,50 @@ class TenantContextIsolationTests(TenantTestMixin, SimpleTestCase):
         conftest._reset_test_context()
 
         self.assertIsNone(cache.get("issue21-context-isolation"))
+
+    def test_local_cache_cleanup_never_calls_external_backend(self):
+        class RecordingCache:
+            def __init__(self):
+                self.cleared = False
+
+            def clear(self):
+                self.cleared = True
+
+        local_cache = RecordingCache()
+        external_cache = RecordingCache()
+        conftest._clear_local_test_caches(
+            {"local": local_cache, "external": external_cache},
+            {
+                "local": {"BACKEND": "django.core.cache.backends.locmem.LocMemCache"},
+                "external": {"BACKEND": "django_redis.cache.RedisCache"},
+            },
+        )
+
+        self.assertTrue(local_cache.cleared)
+        self.assertFalse(external_cache.cleared)
+
+    def test_xdist_database_name_is_run_specific_without_explicit_override(self):
+        previous = os.environ.pop("TEST_DATABASE_NAME", None)
+        config = SimpleNamespace(option=SimpleNamespace(numprocesses=2, dist="loadscope"))
+        try:
+            selected = conftest._select_database_name(
+                config,
+                env_var="TEST_DATABASE_NAME",
+                stable_name="challenger2_testing",
+            )
+            self.assertRegex(selected, r"^challenger2_testing_pid\d+$")
+            self.assertEqual(os.environ["TEST_DATABASE_NAME"], selected)
+        finally:
+            if previous is None:
+                os.environ.pop("TEST_DATABASE_NAME", None)
+            else:
+                os.environ["TEST_DATABASE_NAME"] = previous
+
+    def test_xdist_rejects_runs_without_parallel_marker_selector(self):
+        config = SimpleNamespace(option=SimpleNamespace(numprocesses=2, dist="loadscope", markexpr=""))
+        with patch.dict(os.environ, {"PYTEST_XDIST_WORKER": ""}, clear=False):
+            with pytest.raises(pytest.UsageError, match="serial_only"):
+                conftest._validate_xdist_marker_selection(config)
 
     def test_nested_tenant_context_restores_enclosing_context(self):
         outer_tenant = object()

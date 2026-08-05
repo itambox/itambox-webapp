@@ -177,7 +177,11 @@ def verify_node_id_manifest(cases, manifest_path):
 
 
 def load_and_validate_reports(report_paths, expected_node_ids=None):
-    """Load reports and, when requested, compare them with the serial control manifest."""
+    """Load reports and require a complete manifest for every multi-report run."""
+    if len(report_paths) > 1 and expected_node_ids is None:
+        raise PolicyError(
+            "multiple test reports require --expected-node-ids; numeric suite counts cannot prove shard completeness"
+        )
     cases = load_reports(report_paths)
     if expected_node_ids is not None:
         verify_node_id_manifest(cases, expected_node_ids)

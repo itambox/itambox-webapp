@@ -190,6 +190,7 @@ PYTHONPATH=itambox uv run --locked --group dev python -m pytest -q -p no:cachepr
   itambox/core/tests/test_management_commands.py \
   itambox/core/tests/test_media_isolation.py \
   itambox/core/tests/test_multi_tenant_auth.py \
+  itambox/core/tests/test_security.py \
   itambox/itambox/tests/test_capability_surfaces.py \
   itambox/procurement/tests/test_concurrency.py \
   itambox/subscriptions/tests/test_migrations.py \
