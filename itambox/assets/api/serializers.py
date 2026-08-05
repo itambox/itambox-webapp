@@ -1,6 +1,8 @@
 from django.contrib.auth import get_user_model
 from django.db import models
 from django.utils.translation import gettext_lazy as _
+from drf_spectacular.types import OpenApiTypes
+from drf_spectacular.utils import extend_schema_field
 from rest_framework import serializers
 
 from assets.models import (
@@ -349,6 +351,7 @@ class AssetAssignmentSerializer(BaseModelSerializer):
         ]
         brief_fields = ["id", "asset", "assigned_to_name", "is_active"]
 
+    @extend_schema_field(OpenApiTypes.STR)
     def get_assigned_to_name(self, obj: AssetAssignment) -> str | None:
         try:
             return str(obj.assigned_to)
