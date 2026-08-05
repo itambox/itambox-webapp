@@ -1183,12 +1183,6 @@
     {
       "severity": "warning",
       "location": "itambox/assets/api/serializers.py",
-      "breadcrumb": "AssetAssignmentViewSet > AssetAssignmentSerializer",
-      "message": "unable to resolve type hint for function \"get_assigned_to_name\". Consider using a type hint or @extend_schema_field. Defaulting to string."
-    },
-    {
-      "severity": "warning",
-      "location": "itambox/assets/api/serializers.py",
       "breadcrumb": "AssetViewSet > AssetSerializer",
       "message": "Encountered 2 components with identical names \"AssetRequest\" and different identities <class 'assets.api.serializers.AssetSerializer'> and <class 'assets.api.serializers.AssetRequestSerializer'>. This will very likely result in an incorrect schema. Try renaming one."
     },

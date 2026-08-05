@@ -40,7 +40,9 @@ class NestedSiteGroupSerializer(BaseModelSerializer):
 
 
 class NestedTenantSerializer(BaseModelSerializer):
-    url = serializers.HyperlinkedIdentityField(view_name="api:organization_api:tenant-detail")
+    url: serializers.HyperlinkedIdentityField = serializers.HyperlinkedIdentityField(
+        view_name="api:organization_api:tenant-detail"
+    )
 
     class Meta:
         model = Tenant
@@ -49,7 +51,9 @@ class NestedTenantSerializer(BaseModelSerializer):
 
 
 class NestedTenantGroupSerializer(BaseModelSerializer):
-    url = serializers.HyperlinkedIdentityField(view_name="api:organization_api:tenantgroup-detail")
+    url: serializers.HyperlinkedIdentityField = serializers.HyperlinkedIdentityField(
+        view_name="api:organization_api:tenantgroup-detail"
+    )
 
     class Meta:
         model = TenantGroup
@@ -223,11 +227,11 @@ class TenantGroupSerializer(BaseModelSerializer):
 class TenantSerializer(BaseModelSerializer):
     url = serializers.HyperlinkedIdentityField(view_name="api:organization_api:tenant-detail")
     group = NestedTenantGroupSerializer(read_only=True)
-    group_id = serializers.PrimaryKeyRelatedField(
+    group_id: serializers.PrimaryKeyRelatedField[TenantGroup] = serializers.PrimaryKeyRelatedField(
         queryset=TenantGroup.objects, source="group", write_only=True, required=False, allow_null=True
     )
 
-    def validate(self, attrs):
+    def validate(self, attrs: dict[str, object]) -> dict[str, object]:
         request = self.context.get("request")
         if "group" in attrs and request is not None and not request.user.is_superuser:
             raise serializers.ValidationError(
@@ -317,12 +321,14 @@ class ContactRoleSerializer(BaseModelSerializer):
 
 
 class ContactSerializer(BaseModelSerializer):
-    url = serializers.HyperlinkedIdentityField(view_name="api:organization_api:contact-detail")
-    tags = TagSerializer(many=True, read_only=True)
+    url: serializers.HyperlinkedIdentityField = serializers.HyperlinkedIdentityField(
+        view_name="api:organization_api:contact-detail"
+    )
+    tags: TagSerializer = TagSerializer(many=True, read_only=True)
     # tenant=None → global/shared contact (visible to all tenants); a set tenant
     # makes it private to that tenant. Optional on write.
     tenant = NestedTenantSerializer(read_only=True)
-    tenant_id = serializers.PrimaryKeyRelatedField(
+    tenant_id: serializers.PrimaryKeyRelatedField[Tenant] = serializers.PrimaryKeyRelatedField(
         queryset=Tenant.objects, source="tenant", write_only=True, required=False, allow_null=True
     )
 
@@ -350,9 +356,13 @@ class ContactSerializer(BaseModelSerializer):
 class ContactAssignmentSerializer(BaseModelSerializer):
     url = serializers.HyperlinkedIdentityField(view_name="api:organization_api:contactassignment-detail")
     contact = ContactSerializer(read_only=True)
-    contact_id = serializers.PrimaryKeyRelatedField(queryset=Contact.objects, source="contact", write_only=True)
+    contact_id: serializers.PrimaryKeyRelatedField[Contact] = serializers.PrimaryKeyRelatedField(
+        queryset=Contact.objects, source="contact", write_only=True
+    )
     role = ContactRoleSerializer(read_only=True)
-    role_id = serializers.PrimaryKeyRelatedField(queryset=ContactRole.objects.all(), source="role", write_only=True)
+    role_id: serializers.PrimaryKeyRelatedField[ContactRole] = serializers.PrimaryKeyRelatedField(
+        queryset=ContactRole.objects.all(), source="role", write_only=True
+    )
     # `source='content_type'` maps this API alias to the GFK's actual model field;
     # without it, read serialization does getattr(obj, 'assigned_object_type') and
     # raises AttributeError (the list/detail endpoints 500'd). validate() already
@@ -378,7 +388,7 @@ class ContactAssignmentSerializer(BaseModelSerializer):
         ]
         brief_fields = ["id", "url", "contact", "role"]
 
-    def validate(self, attrs):
+    def validate(self, attrs: dict[str, object]) -> dict[str, object]:
         attrs = super().validate(attrs)
         # Enforce that the generic-FK target lives in the current tenant. The
         # content-type may arrive under either the serializer field name or the

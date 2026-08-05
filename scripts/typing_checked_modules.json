@@ -1,8 +1,8 @@
 {
   "schema_version": 2,
   "canonical_python": "3.12",
-  "next_sequence": 22,
-  "policy_sha256": "abbb14c9dce929284219b561bcd026fb15cb6d9c7c25a8e1d08171cff1e0f044",
+  "next_sequence": 29,
+  "policy_sha256": "2039e953dac86e1cd3a9935d1fe479e62d3f2c071c3161d8f9ec43947d460ff1",
   "config": {
     "config_file": "pyproject.toml",
     "working_directory": "itambox",
@@ -38,6 +38,20 @@
     "overrides": []
   },
   "checked": [
+    {
+      "sequence": 22,
+      "path": "itambox/assets/api/serializers.py",
+      "module": "assets.api.serializers",
+      "issue": "#93",
+      "note": "Slice 9 symbol admission: explicit method signatures for the asset API serializer fields, assignment display, and checkout validation boundary. Serializer behavior, model fields, and ORM access remain unchanged; generated-schema validation remains owned by #98.",
+      "scope": "symbols",
+      "symbols": [
+        "AssetAssignmentSerializer",
+        "AssetCheckOutAPISerializer",
+        "AssetSerializer",
+        "StatusLabelSerializer"
+      ]
+    },
     {
       "sequence": 2,
       "path": "itambox/core/context.py",
@@ -205,6 +219,49 @@
       ]
     },
     {
+      "sequence": 23,
+      "path": "itambox/extras/api/serializers.py",
+      "module": "extras.api.serializers",
+      "issue": "#93",
+      "note": "Slice 9 symbol admission: explicit method signatures for webhook URL validation, event vocabulary validation, notification representation/config handling, and journal validation. Existing security and tenant-boundary behavior remains unchanged; generated-schema validation remains owned by #98.",
+      "scope": "symbols",
+      "symbols": [
+        "EventRuleSerializer",
+        "JournalEntrySerializer",
+        "NotificationChannelSerializer",
+        "WebhookEndpointSerializer"
+      ]
+    },
+    {
+      "sequence": 24,
+      "path": "itambox/inventory/api/serializers.py",
+      "module": "inventory.api.serializers",
+      "issue": "#93",
+      "note": "Slice 9 symbol admission: explicit method signatures for assignment availability create/update and accessory, consumable, and component category representations. Stock guards, transaction boundaries, and ORM behavior remain unchanged; generated-schema validation remains owned by #98.",
+      "scope": "symbols",
+      "symbols": [
+        "AccessorySerializer",
+        "ComponentSerializer",
+        "ConsumableSerializer",
+        "_AssignmentAvailabilityMixin",
+        "_accessory_category_queryset",
+        "_component_category_queryset",
+        "_consumable_category_queryset"
+      ]
+    },
+    {
+      "sequence": 25,
+      "path": "itambox/licenses/api/serializers.py",
+      "module": "licenses.api.serializers",
+      "issue": "#93",
+      "note": "Slice 9 symbol admission: explicit license validation and license-seat create/update method signatures. Seat-capacity, checkout, transfer, and audit behavior remain unchanged; generated-schema validation remains owned by #98.",
+      "scope": "symbols",
+      "symbols": [
+        "LicenseSeatAssignmentSerializer",
+        "LicenseSerializer"
+      ]
+    },
+    {
       "sequence": 3,
       "path": "itambox/organization/access.py",
       "module": "organization.access",
@@ -224,6 +281,50 @@
         "shared_resource_ids",
         "shared_stock_read_allowed",
         "tenant_access_report"
+      ]
+    },
+    {
+      "sequence": 26,
+      "path": "itambox/organization/api/serializers.py",
+      "module": "organization.api.serializers",
+      "issue": "#93",
+      "note": "Slice 9 symbol admission: explicit tenant and contact-assignment validation method signatures. Generic-target tenant isolation and superuser group restrictions remain unchanged; generated-schema validation remains owned by #98.",
+      "scope": "symbols",
+      "symbols": [
+        "ContactAssignmentSerializer",
+        "ContactRoleSerializer",
+        "ContactSerializer",
+        "NestedTenantGroupSerializer",
+        "NestedTenantSerializer",
+        "TenantSerializer"
+      ]
+    },
+    {
+      "sequence": 27,
+      "path": "itambox/procurement/api/serializers.py",
+      "module": "procurement.api.serializers",
+      "issue": "#93",
+      "note": "Slice 9 symbol admission: explicit procurement display, validation, receive-payload, and action-boundary method signatures. Purchase-order lifecycle and quantity guards remain unchanged; generated-schema validation remains owned by #98.",
+      "scope": "symbols",
+      "symbols": [
+        "ContractSerializer",
+        "NestedSupplierSerializer",
+        "PurchaseOrderLineSerializer",
+        "PurchaseOrderReceiveSerializer",
+        "PurchaseOrderSerializer"
+      ]
+    },
+    {
+      "sequence": 28,
+      "path": "itambox/subscriptions/api/serializers.py",
+      "module": "subscriptions.api.serializers",
+      "issue": "#93",
+      "note": "Slice 9 symbol admission: explicit subscription and subscription-assignment initialization, validation, representation, update, and assigned-object method signatures. Tenant scoping and lifecycle behavior remain unchanged; generated-schema validation remains owned by #98.",
+      "scope": "symbols",
+      "symbols": [
+        "ProviderSerializer",
+        "SubscriptionAssignmentSerializer",
+        "SubscriptionSerializer"
       ]
     },
     {

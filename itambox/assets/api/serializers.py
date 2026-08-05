@@ -1,5 +1,8 @@
 from django.contrib.auth import get_user_model
+from django.db import models
 from django.utils.translation import gettext_lazy as _
+from drf_spectacular.types import OpenApiTypes
+from drf_spectacular.utils import extend_schema_field
 from rest_framework import serializers
 
 from assets.models import (
@@ -58,8 +61,8 @@ class ManufacturerSerializer(BaseModelSerializer):
 
 
 class StatusLabelSerializer(BaseModelSerializer):
-    type_display = serializers.CharField(source="get_type_display", read_only=True)
-    tags = TagSerializer(many=True, read_only=True)
+    type_display: serializers.CharField = serializers.CharField(source="get_type_display", read_only=True)
+    tags: TagSerializer = TagSerializer(many=True, read_only=True)
 
     class Meta:
         model = StatusLabel
@@ -148,14 +151,14 @@ class AssetSerializer(BaseModelSerializer):
         queryset=AssetRole.objects.all(), source="asset_role", write_only=True, required=False, allow_null=True
     )
     location = NestedLocationSerializer(read_only=True)
-    location_id = serializers.PrimaryKeyRelatedField(
+    location_id: serializers.PrimaryKeyRelatedField[Location] = serializers.PrimaryKeyRelatedField(
         queryset=Location.objects, source="location", write_only=True, required=False, allow_null=True
     )
     tenant = NestedTenantSerializer(read_only=True)
-    tenant_id = serializers.PrimaryKeyRelatedField(
+    tenant_id: serializers.PrimaryKeyRelatedField[Tenant] = serializers.PrimaryKeyRelatedField(
         queryset=Tenant.objects, source="tenant", write_only=True, required=False, allow_null=True
     )
-    supplier = serializers.StringRelatedField(read_only=True)
+    supplier: serializers.StringRelatedField[Supplier] = serializers.StringRelatedField(read_only=True)
     supplier_id = serializers.PrimaryKeyRelatedField(
         queryset=Supplier.objects.all(), source="supplier", write_only=True, required=False, allow_null=True
     )
@@ -163,10 +166,10 @@ class AssetSerializer(BaseModelSerializer):
     status_id = serializers.PrimaryKeyRelatedField(
         queryset=StatusLabel.objects.all(), source="status", write_only=True, required=False, allow_null=True
     )
-    last_audited_by = serializers.StringRelatedField(read_only=True)
+    last_audited_by: serializers.StringRelatedField[models.Model] = serializers.StringRelatedField(read_only=True)
     tags = TagSerializer(many=True, read_only=True)
     assigned_to = serializers.SerializerMethodField()
-    cost_center = serializers.StringRelatedField(read_only=True)
+    cost_center: serializers.StringRelatedField[models.Model] = serializers.StringRelatedField(read_only=True)
 
     class Meta:
         model = Asset
@@ -206,7 +209,7 @@ class AssetSerializer(BaseModelSerializer):
         ]
         brief_fields = ["id", "name", "asset_tag", "serial_number", "status"]
 
-    def get_fields(self):
+    def get_fields(self) -> dict[str, serializers.Field[object, object, object, object]]:
         fields = super().get_fields()
         from organization.models import CostCenter
 
@@ -219,7 +222,7 @@ class AssetSerializer(BaseModelSerializer):
         )
         return fields
 
-    def get_assigned_to(self, obj):
+    def get_assigned_to(self, obj: Asset) -> dict[str, object] | None:
         cached = getattr(obj, "_active_assignments", None)
         if cached is not None:
             active = cached[0] if cached else None
@@ -317,7 +320,9 @@ class AssetTagSequenceSerializer(BaseModelSerializer):
 
 class AssetAssignmentSerializer(BaseModelSerializer):
     asset = NestedAssetSerializer(read_only=True)
-    asset_id = serializers.PrimaryKeyRelatedField(queryset=Asset.objects, source="asset", write_only=True)
+    asset_id: serializers.PrimaryKeyRelatedField[Asset] = serializers.PrimaryKeyRelatedField(
+        queryset=Asset.objects, source="asset", write_only=True
+    )
     assigned_to_type = serializers.CharField(read_only=True)
     assigned_to_name = serializers.SerializerMethodField()
     checked_out_by_name = serializers.CharField(source="checked_out_by.username", read_only=True)
@@ -346,7 +351,8 @@ class AssetAssignmentSerializer(BaseModelSerializer):
         ]
         brief_fields = ["id", "asset", "assigned_to_name", "is_active"]
 
-    def get_assigned_to_name(self, obj):
+    @extend_schema_field(OpenApiTypes.STR)
+    def get_assigned_to_name(self, obj: AssetAssignment) -> str | None:
         try:
             return str(obj.assigned_to)
         except Exception:
@@ -474,7 +480,7 @@ class AssetReservationSerializer(BaseModelSerializer):
         brief_fields = ["id", "asset", "reserved_for", "status", "start_date", "end_date"]
 
 
-class AssetCheckOutAPISerializer(serializers.Serializer):
+class AssetCheckOutAPISerializer(serializers.Serializer[object]):
     holder_id = serializers.IntegerField(required=False, allow_null=True)
     location_id = serializers.IntegerField(required=False, allow_null=True)
     asset_target_id = serializers.IntegerField(required=False, allow_null=True)
@@ -484,7 +490,7 @@ class AssetCheckOutAPISerializer(serializers.Serializer):
     expected_checkin = serializers.DateField(required=False, allow_null=True)
     notes = serializers.CharField(required=False, default="", allow_blank=True)
 
-    def validate(self, data):
+    def validate(self, data: dict[str, object]) -> dict[str, object]:
         holder_id = data.get("holder_id")
         location_id = data.get("location_id")
         asset_target_id = data.get("asset_target_id")

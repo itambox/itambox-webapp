@@ -7,7 +7,7 @@
       "path": "itambox/assets/api/serializers.py",
       "code": "C901",
       "message": "'AssetCheckOutAPISerializer.validate' is too complex (12)",
-      "source": "    def validate(self, data):",
+      "source": "    def validate(self, data: dict[str, object]) -> dict[str, object]:",
       "context": "Module:body/ClassDef:AssetCheckOutAPISerializer:body/FunctionDef:validate:self",
       "count": 1
     },

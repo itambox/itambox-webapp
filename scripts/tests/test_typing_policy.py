@@ -1009,10 +1009,11 @@ class CommittedRecordTests(unittest.TestCase):
     def test_the_committed_record_is_internally_consistent(self):
         self.assertEqual(gate.check_record(REPO_ROOT, self.policy, self.record), ())
 
-    def test_the_committed_record_lists_the_slice_zero_through_slice_eight_admissions(self):
+    def test_the_committed_record_lists_the_slice_zero_through_slice_nine_admissions(self):
         self.assertEqual(
             [entry["path"] for entry in self.record["checked"]],
             [
+                "itambox/assets/api/serializers.py",
                 "itambox/core/context.py",
                 "itambox/core/tasks/alerts.py",
                 "itambox/core/tasks/checkin.py",
@@ -1027,7 +1028,13 @@ class CommittedRecordTests(unittest.TestCase):
                 "itambox/core/tasks/retention.py",
                 "itambox/core/tasks/utils.py",
                 "itambox/core/tasks/webhooks.py",
+                "itambox/extras/api/serializers.py",
+                "itambox/inventory/api/serializers.py",
+                "itambox/licenses/api/serializers.py",
                 "itambox/organization/access.py",
+                "itambox/organization/api/serializers.py",
+                "itambox/procurement/api/serializers.py",
+                "itambox/subscriptions/api/serializers.py",
                 "itambox/users/api/scim/authentication.py",
                 "itambox/users/api/scim/filters.py",
                 "itambox/users/api/scim/identifiers.py",
@@ -1039,6 +1046,15 @@ class CommittedRecordTests(unittest.TestCase):
         self.assertEqual(
             {entry["path"]: (entry["scope"], entry["symbols"]) for entry in self.record["checked"]},
             {
+                "itambox/assets/api/serializers.py": (
+                    "symbols",
+                    [
+                        "AssetAssignmentSerializer",
+                        "AssetCheckOutAPISerializer",
+                        "AssetSerializer",
+                        "StatusLabelSerializer",
+                    ],
+                ),
                 "itambox/core/context.py": ("symbols", ["SystemAuthorizationContext"]),
                 "itambox/core/tasks/alerts.py": (
                     "symbols",
@@ -1074,6 +1090,31 @@ class CommittedRecordTests(unittest.TestCase):
                 "itambox/core/tasks/retention.py": ("symbols", ["prune_changelog_task"]),
                 "itambox/core/tasks/utils.py": ("symbols", ["reverse_job_detail"]),
                 "itambox/core/tasks/webhooks.py": ("symbols", ["send_webhook_task"]),
+                "itambox/extras/api/serializers.py": (
+                    "symbols",
+                    [
+                        "EventRuleSerializer",
+                        "JournalEntrySerializer",
+                        "NotificationChannelSerializer",
+                        "WebhookEndpointSerializer",
+                    ],
+                ),
+                "itambox/inventory/api/serializers.py": (
+                    "symbols",
+                    [
+                        "AccessorySerializer",
+                        "ComponentSerializer",
+                        "ConsumableSerializer",
+                        "_AssignmentAvailabilityMixin",
+                        "_accessory_category_queryset",
+                        "_component_category_queryset",
+                        "_consumable_category_queryset",
+                    ],
+                ),
+                "itambox/licenses/api/serializers.py": (
+                    "symbols",
+                    ["LicenseSeatAssignmentSerializer", "LicenseSerializer"],
+                ),
                 "itambox/organization/access.py": (
                     "symbols",
                     [
@@ -1090,6 +1131,31 @@ class CommittedRecordTests(unittest.TestCase):
                         "shared_stock_read_allowed",
                         "tenant_access_report",
                     ],
+                ),
+                "itambox/organization/api/serializers.py": (
+                    "symbols",
+                    [
+                        "ContactAssignmentSerializer",
+                        "ContactRoleSerializer",
+                        "ContactSerializer",
+                        "NestedTenantGroupSerializer",
+                        "NestedTenantSerializer",
+                        "TenantSerializer",
+                    ],
+                ),
+                "itambox/procurement/api/serializers.py": (
+                    "symbols",
+                    [
+                        "ContractSerializer",
+                        "NestedSupplierSerializer",
+                        "PurchaseOrderLineSerializer",
+                        "PurchaseOrderReceiveSerializer",
+                        "PurchaseOrderSerializer",
+                    ],
+                ),
+                "itambox/subscriptions/api/serializers.py": (
+                    "symbols",
+                    ["ProviderSerializer", "SubscriptionAssignmentSerializer", "SubscriptionSerializer"],
                 ),
                 "itambox/users/api/scim/authentication.py": (
                     "symbols",
