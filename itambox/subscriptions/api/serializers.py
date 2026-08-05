@@ -1,5 +1,6 @@
 from django.contrib.auth import get_user_model
 from django.contrib.contenttypes.models import ContentType
+from django.db import models
 from rest_framework import serializers
 
 from extras.api.serializers import TagSerializer
@@ -34,15 +35,15 @@ def _tenant_member_user_queryset():
 
 
 class ProviderSerializer(BaseModelSerializer):
-    tags = TagSerializer(many=True, read_only=True)
-    subscription_count = serializers.IntegerField(read_only=True)
-    slug = serializers.SlugField(required=False, allow_blank=True)
-    tenant = NestedTenantSerializer(read_only=True)
-    tenant_id = serializers.PrimaryKeyRelatedField(
+    tags: TagSerializer = TagSerializer(many=True, read_only=True)
+    subscription_count: serializers.IntegerField = serializers.IntegerField(read_only=True)
+    slug: serializers.SlugField = serializers.SlugField(required=False, allow_blank=True)
+    tenant: NestedTenantSerializer = NestedTenantSerializer(read_only=True)
+    tenant_id: serializers.PrimaryKeyRelatedField[Tenant] = serializers.PrimaryKeyRelatedField(
         queryset=Tenant.objects, source="tenant", write_only=True, required=False, allow_null=True
     )
     tenant_group = NestedTenantGroupSerializer(read_only=True)
-    tenant_group_id = serializers.PrimaryKeyRelatedField(
+    tenant_group_id: serializers.PrimaryKeyRelatedField[TenantGroup] = serializers.PrimaryKeyRelatedField(
         queryset=TenantGroup.objects, source="tenant_group", write_only=True, required=False, allow_null=True
     )
     contacts = ContactAssignmentSerializer(many=True, read_only=True)
@@ -69,18 +70,20 @@ class ProviderSerializer(BaseModelSerializer):
         )
         read_only_fields = ("created_at", "updated_at")
         brief_fields = ("id", "name", "slug", "is_active", "subscription_count")
-        validators = []
+        validators: list[object] = []
 
 
 class SubscriptionSerializer(BaseModelSerializer):
     auto_renewal = serializers.BooleanField(required=False)
     provider = ProviderSerializer(read_only=True)
-    provider_id = serializers.PrimaryKeyRelatedField(queryset=Provider.objects, source="provider", write_only=True)
+    provider_id: serializers.PrimaryKeyRelatedField[Provider] = serializers.PrimaryKeyRelatedField(
+        queryset=Provider.objects, source="provider", write_only=True
+    )
     tenant = NestedTenantSerializer(read_only=True)
-    tenant_id = serializers.PrimaryKeyRelatedField(
+    tenant_id: serializers.PrimaryKeyRelatedField[Tenant] = serializers.PrimaryKeyRelatedField(
         queryset=Tenant.objects, source="tenant", write_only=True, required=False, allow_null=True
     )
-    owner = serializers.StringRelatedField(read_only=True)
+    owner: serializers.StringRelatedField[models.Model] = serializers.StringRelatedField(read_only=True)
     owner_id = serializers.PrimaryKeyRelatedField(
         queryset=User.objects.all(), source="owner", write_only=True, required=False, allow_null=True
     )
@@ -90,8 +93,8 @@ class SubscriptionSerializer(BaseModelSerializer):
     billing_cycle_display = serializers.CharField(source="get_billing_cycle_display", read_only=True)
     days_until_renewal = serializers.IntegerField(read_only=True)
     annual_cost = serializers.DecimalField(max_digits=12, decimal_places=2, read_only=True)
-    cost_center = serializers.StringRelatedField(read_only=True)
-    cost_center_id = serializers.PrimaryKeyRelatedField(
+    cost_center: serializers.StringRelatedField[CostCenter] = serializers.StringRelatedField(read_only=True)
+    cost_center_id: serializers.PrimaryKeyRelatedField[CostCenter] = serializers.PrimaryKeyRelatedField(
         source="cost_center",
         queryset=CostCenter.objects,
         write_only=True,
@@ -147,12 +150,12 @@ class SubscriptionSerializer(BaseModelSerializer):
         )
         brief_fields = ("id", "name", "slug", "provider", "status", "status_display", "days_until_renewal")
 
-    def __init__(self, *args, **kwargs):
+    def __init__(self, *args: object, **kwargs: object) -> None:
         super().__init__(*args, **kwargs)
         if "owner_id" in self.fields:
             self.fields["owner_id"].queryset = _tenant_member_user_queryset()
 
-    def validate(self, attrs):
+    def validate(self, attrs: dict[str, object]) -> dict[str, object]:
         lifecycle_errors = {}
         current_status = self.instance.status if self.instance else SubscriptionStatusChoices.ACTIVE
         if "status" in self.initial_data and self.initial_data["status"] != current_status:
@@ -173,12 +176,12 @@ class SubscriptionSerializer(BaseModelSerializer):
             attrs["vendor_contract_auto_renews"] = legacy_value
         return super().validate(attrs)
 
-    def to_representation(self, instance):
+    def to_representation(self, instance: Subscription) -> dict[str, object]:
         data = super().to_representation(instance)
         data["auto_renewal"] = instance.vendor_contract_auto_renews
         return data
 
-    def update(self, instance, validated_data):
+    def update(self, instance: Subscription, validated_data: dict[str, object]) -> Subscription:
         if not validated_data:
             return instance
         return super().update(instance, validated_data)
@@ -186,11 +189,11 @@ class SubscriptionSerializer(BaseModelSerializer):
 
 class SubscriptionAssignmentSerializer(BaseModelSerializer):
     subscription = SubscriptionSerializer(read_only=True)
-    subscription_id = serializers.PrimaryKeyRelatedField(
+    subscription_id: serializers.PrimaryKeyRelatedField[Subscription] = serializers.PrimaryKeyRelatedField(
         queryset=Subscription.objects, source="subscription", write_only=True
     )
     assigned_object = serializers.SerializerMethodField(read_only=True)
-    assigned_by = serializers.StringRelatedField(read_only=True)
+    assigned_by: serializers.StringRelatedField[models.Model] = serializers.StringRelatedField(read_only=True)
     assigned_by_id = serializers.PrimaryKeyRelatedField(
         queryset=User.objects.all(), source="assigned_by", write_only=True, required=False, allow_null=True
     )
@@ -214,12 +217,12 @@ class SubscriptionAssignmentSerializer(BaseModelSerializer):
         read_only_fields = ("created_at", "updated_at", "assigned_date")
         brief_fields = ("id", "subscription", "assigned_object")
 
-    def __init__(self, *args, **kwargs):
+    def __init__(self, *args: object, **kwargs: object) -> None:
         super().__init__(*args, **kwargs)
         if "assigned_by_id" in self.fields:
             self.fields["assigned_by_id"].queryset = _tenant_member_user_queryset()
 
-    def validate(self, attrs):
+    def validate(self, attrs: dict[str, object]) -> dict[str, object]:
         attrs = super().validate(attrs)
         content_type = attrs.get("content_type")
         object_id = attrs.get("object_id")
@@ -230,7 +233,7 @@ class SubscriptionAssignmentSerializer(BaseModelSerializer):
         validate_gfk_target_tenant(content_type, object_id)
         return attrs
 
-    def get_assigned_object(self, obj):
+    def get_assigned_object(self, obj: SubscriptionAssignment) -> dict[str, object] | None:
         target = obj.tenant_safe_assigned_object
         if target:
             return {

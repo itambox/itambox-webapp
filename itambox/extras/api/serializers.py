@@ -1,4 +1,5 @@
 from django.contrib.contenttypes.models import ContentType
+from django.db import models
 from rest_framework import serializers
 
 from extras.models import (
@@ -108,7 +109,7 @@ class WebhookEndpointSerializer(BaseModelSerializer):
         ]
         brief_fields = ["id", "url", "name", "enabled"]
 
-    def validate_target_url(self, value):
+    def validate_target_url(self, value: str) -> str:
         # SSRF guard at the API write boundary (BaseModelSerializer does not run full_clean,
         # so WebhookEndpoint.clean() would not fire otherwise). Reject internal targets at
         # create/update instead of only at dispatch time.
@@ -131,7 +132,7 @@ class EventRuleSerializer(BaseModelSerializer):
     # WebhookEndpoint.objects is the tenant-scoped manager, so a rule can only
     # point at a same-tenant (or system-wide) webhook; this mirrors
     # EventRule.clean()'s same-tenant guard at the write boundary.
-    webhook_id = serializers.PrimaryKeyRelatedField(
+    webhook_id: serializers.PrimaryKeyRelatedField[WebhookEndpoint] = serializers.PrimaryKeyRelatedField(
         queryset=WebhookEndpoint.objects,
         source="webhook",
         write_only=True,
@@ -139,7 +140,7 @@ class EventRuleSerializer(BaseModelSerializer):
         allow_null=True,
     )
 
-    def validate_events(self, value):
+    def validate_events(self, value: list[str]) -> list[str]:
         """Reject unsupported event action values (WP-16a — closed vocabulary)."""
         valid = {choice[0] for choice in Event.ACTION_CHOICES}
         if not isinstance(value, list):
@@ -194,7 +195,7 @@ class NotificationChannelSerializer(BaseModelSerializer):
         ]
         brief_fields = ["id", "url", "name", "channel_type", "enabled"]
 
-    def to_representation(self, instance):
+    def to_representation(self, instance: object) -> dict[str, object]:
         data = super().to_representation(instance)
         cfg = data.get("config")
         if isinstance(cfg, dict):
@@ -204,7 +205,7 @@ class NotificationChannelSerializer(BaseModelSerializer):
             }
         return data
 
-    def validate_config(self, value):
+    def validate_config(self, value: object) -> object:
         # Restore redacted secrets from the stored config so a read-modify-write
         # round-trip (which echoes back the placeholder) does not overwrite the real
         # value; drop the placeholder entirely when there is nothing to restore.
@@ -278,7 +279,9 @@ class JournalEntrySerializer(BaseModelSerializer):
     model = ContentTypeField(queryset=ContentType.objects.all())
     # Author is read-only: stamped from the request on create (see validate) and
     # immutable thereafter — journal entries are an audit trail.
-    user_display = serializers.StringRelatedField(source="user", read_only=True)
+    user_display: serializers.StringRelatedField[models.Model] = serializers.StringRelatedField(
+        source="user", read_only=True
+    )
 
     class Meta:
         model = JournalEntry
@@ -295,7 +298,7 @@ class JournalEntrySerializer(BaseModelSerializer):
         ]
         brief_fields = ["id", "url", "model", "object_id"]
 
-    def validate(self, attrs):
+    def validate(self, attrs: dict[str, object]) -> dict[str, object]:
         if self.instance is None:
             # Create: stamp the author and verify the journaled object is visible
             # within the active tenant. validate_gfk_target_tenant resolves via

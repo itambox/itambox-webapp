@@ -494,7 +494,33 @@ remain untyped. `core.tasks.reports` also keeps its two-symbol Slice-4/5
 admission unchanged, so the task package as a whole is still not a whole-module
 admission.
 
+Slice 9 admits the selected serializer-method boundary across seven API modules:
+
+- asset serializer fields, assignment display, and checkout validation in
+  `itambox/assets/api/serializers.py`;
+- webhook URL validation, event/config validation, notification representation,
+  and journal validation in `itambox/extras/api/serializers.py`;
+- inventory assignment availability create/update and category representations
+  in `itambox/inventory/api/serializers.py`;
+- license validation and license-seat create/update in
+  `itambox/licenses/api/serializers.py`;
+- tenant and contact-assignment validation in
+  `itambox/organization/api/serializers.py`;
+- procurement display, validation, receive-payload, and action-boundary methods
+  in `itambox/procurement/api/serializers.py`;
+- subscription and subscription-assignment initialization, validation,
+  representation, update, and assigned-object methods in
+  `itambox/subscriptions/api/serializers.py`.
+
+The selected methods now carry explicit parameter and return annotations while
+serializer behavior, tenant/security checks, lifecycle guards, and ORM access
+remain unchanged. This is an interface admission: generated OpenAPI schema
+validation, operation/component stability, and generated-client compatibility
+remain owned by #98. The complete SCIM operation surface, remaining task
+payload/result families, organization service boundaries, and report-provider
+contracts remain outside this slice.
+
 Subsequent slices of issue #93 extend the list one bounded surface at a time:
 the remaining task payload/result families, organization service boundaries,
-report-provider contracts, and serializer return annotations. Nothing is claimed
+report-provider contracts, and generated OpenAPI validation. Nothing is claimed
 as checked until it appears in the record.

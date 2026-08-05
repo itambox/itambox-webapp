@@ -30,7 +30,7 @@ class ContractSerializer(BaseModelSerializer):
     url = serializers.HyperlinkedIdentityField(view_name="api:procurement_api:contract-detail")
 
     tenant = NestedTenantSerializer(read_only=True)
-    tenant_id = serializers.PrimaryKeyRelatedField(
+    tenant_id: serializers.PrimaryKeyRelatedField[Tenant] = serializers.PrimaryKeyRelatedField(
         source="tenant",
         write_only=True,
         required=False,
@@ -39,7 +39,7 @@ class ContractSerializer(BaseModelSerializer):
     )
 
     supplier = NestedSupplierSerializer(read_only=True)
-    supplier_id = serializers.PrimaryKeyRelatedField(
+    supplier_id: serializers.PrimaryKeyRelatedField[Supplier] = serializers.PrimaryKeyRelatedField(
         source="supplier",
         write_only=True,
         required=False,
@@ -48,7 +48,7 @@ class ContractSerializer(BaseModelSerializer):
     )
 
     cost_center_display = serializers.SerializerMethodField(read_only=True)
-    cost_center_id = serializers.PrimaryKeyRelatedField(
+    cost_center_id: serializers.PrimaryKeyRelatedField[CostCenter] = serializers.PrimaryKeyRelatedField(
         source="cost_center",
         queryset=CostCenter.objects,
         write_only=True,
@@ -57,7 +57,7 @@ class ContractSerializer(BaseModelSerializer):
     )
 
     assets = NestedAssetSerializer(many=True, read_only=True)
-    assets_ids = serializers.PrimaryKeyRelatedField(
+    assets_ids: serializers.PrimaryKeyRelatedField[Asset] = serializers.PrimaryKeyRelatedField(
         source="assets",
         many=True,
         write_only=True,
@@ -119,7 +119,7 @@ class ContractSerializer(BaseModelSerializer):
             "end_date",
         ]
 
-    def get_cost_center_display(self, obj):
+    def get_cost_center_display(self, obj: Contract) -> dict[str, object] | None:
         cc = obj.cost_center
         if cc is None:
             return None
@@ -131,7 +131,7 @@ class PurchaseOrderLineSerializer(BaseModelSerializer):
     qty_received = serializers.IntegerField(read_only=True)
 
     tenant = NestedTenantSerializer(read_only=True)
-    tenant_id = serializers.PrimaryKeyRelatedField(
+    tenant_id: serializers.PrimaryKeyRelatedField[Tenant] = serializers.PrimaryKeyRelatedField(
         source="tenant",
         write_only=True,
         required=False,
@@ -139,15 +139,17 @@ class PurchaseOrderLineSerializer(BaseModelSerializer):
         queryset=Tenant.objects,
     )
 
-    purchase_order = serializers.PrimaryKeyRelatedField(read_only=True)
-    purchase_order_id = serializers.PrimaryKeyRelatedField(
+    purchase_order: serializers.PrimaryKeyRelatedField[PurchaseOrder] = serializers.PrimaryKeyRelatedField(
+        read_only=True
+    )
+    purchase_order_id: serializers.PrimaryKeyRelatedField[PurchaseOrder] = serializers.PrimaryKeyRelatedField(
         source="purchase_order",
         write_only=True,
         queryset=PurchaseOrder.objects,
     )
 
     asset_type = NestedAssetTypeSerializer(read_only=True)
-    asset_type_id = serializers.PrimaryKeyRelatedField(
+    asset_type_id: serializers.PrimaryKeyRelatedField[AssetType] = serializers.PrimaryKeyRelatedField(
         source="asset_type",
         queryset=AssetType.objects,
         write_only=True,
@@ -156,7 +158,7 @@ class PurchaseOrderLineSerializer(BaseModelSerializer):
     )
 
     component = NestedComponentSerializer(read_only=True)
-    component_id = serializers.PrimaryKeyRelatedField(
+    component_id: serializers.PrimaryKeyRelatedField[Component] = serializers.PrimaryKeyRelatedField(
         source="component",
         queryset=Component.objects,
         write_only=True,
@@ -165,7 +167,7 @@ class PurchaseOrderLineSerializer(BaseModelSerializer):
     )
 
     accessory = NestedAccessorySerializer(read_only=True)
-    accessory_id = serializers.PrimaryKeyRelatedField(
+    accessory_id: serializers.PrimaryKeyRelatedField[Accessory] = serializers.PrimaryKeyRelatedField(
         source="accessory",
         queryset=Accessory.objects,
         write_only=True,
@@ -174,7 +176,7 @@ class PurchaseOrderLineSerializer(BaseModelSerializer):
     )
 
     consumable = NestedConsumableSerializer(read_only=True)
-    consumable_id = serializers.PrimaryKeyRelatedField(
+    consumable_id: serializers.PrimaryKeyRelatedField[Consumable] = serializers.PrimaryKeyRelatedField(
         source="consumable",
         queryset=Consumable.objects,
         write_only=True,
@@ -183,7 +185,7 @@ class PurchaseOrderLineSerializer(BaseModelSerializer):
     )
 
     license_display = serializers.SerializerMethodField(read_only=True)
-    license_id = serializers.PrimaryKeyRelatedField(
+    license_id: serializers.PrimaryKeyRelatedField[License] = serializers.PrimaryKeyRelatedField(
         source="license",
         queryset=License.objects,
         write_only=True,
@@ -232,13 +234,13 @@ class PurchaseOrderLineSerializer(BaseModelSerializer):
             "qty_received",
         ]
 
-    def get_license_display(self, obj):
+    def get_license_display(self, obj: PurchaseOrderLine) -> dict[str, object] | None:
         lic = obj.license
         if lic is None:
             return None
         return {"id": lic.pk, "name": str(lic)}
 
-    def validate(self, attrs):
+    def validate(self, attrs: dict[str, object]) -> dict[str, object]:
         attrs = super().validate(attrs)
         if "qty_received" not in self.initial_data:
             return attrs
@@ -255,17 +257,17 @@ class PurchaseOrderLineSerializer(BaseModelSerializer):
         return attrs
 
 
-class PurchaseOrderReceiveSerializer(serializers.Serializer):
+class PurchaseOrderReceiveSerializer(serializers.Serializer[object]):
     line_quantities = serializers.DictField(child=serializers.IntegerField(min_value=0))
 
-    def __init__(self, *args, **kwargs):
+    def __init__(self, *args: object, **kwargs: object) -> None:
         # Sparse-field controls apply to model response serializers, not this
         # action's fixed request payload.
         kwargs.pop("fields", None)
         kwargs.pop("omit", None)
         super().__init__(*args, **kwargs)
 
-    def validate_line_quantities(self, value):
+    def validate_line_quantities(self, value: dict[str, int]) -> dict[int, int]:
         if any(not re.fullmatch(r"[1-9][0-9]*", line_id) for line_id in value):
             raise serializers.ValidationError("Line IDs must be canonical positive decimal integers.")
         quantities = {int(line_id): quantity for line_id, quantity in value.items()}
@@ -292,7 +294,7 @@ class PurchaseOrderSerializer(BaseModelSerializer):
     status = serializers.ChoiceField(choices=PurchaseOrder.STATUS_CHOICES, read_only=True)
 
     tenant = NestedTenantSerializer(read_only=True)
-    tenant_id = serializers.PrimaryKeyRelatedField(
+    tenant_id: serializers.PrimaryKeyRelatedField[Tenant] = serializers.PrimaryKeyRelatedField(
         source="tenant",
         write_only=True,
         required=False,
@@ -308,7 +310,7 @@ class PurchaseOrderSerializer(BaseModelSerializer):
     )
 
     destination_location = NestedLocationSerializer(read_only=True)
-    destination_location_id = serializers.PrimaryKeyRelatedField(
+    destination_location_id: serializers.PrimaryKeyRelatedField[Location] = serializers.PrimaryKeyRelatedField(
         source="destination_location",
         write_only=True,
         queryset=Location.objects,
@@ -352,13 +354,13 @@ class PurchaseOrderSerializer(BaseModelSerializer):
             "status",
         ]
 
-    def get_created_by_display(self, obj):
+    def get_created_by_display(self, obj: PurchaseOrder) -> dict[str, object] | None:
         user = obj.created_by
         if user is None:
             return None
         return {"id": user.pk, "name": str(user)}
 
-    def validate(self, attrs):
+    def validate(self, attrs: dict[str, object]) -> dict[str, object]:
         attrs = super().validate(attrs)
         if "status" not in self.initial_data:
             return attrs

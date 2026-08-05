@@ -1,4 +1,4 @@
-from django.db import transaction
+from django.db import models, transaction
 from django.utils.translation import gettext_lazy as _
 from rest_framework import serializers
 
@@ -18,7 +18,7 @@ class _AssignmentAvailabilityMixin:
 
     item_source_field = None  # 'accessory' | 'consumable' | 'component'
 
-    def create(self, validated_data):
+    def create(self, validated_data: dict[str, object]) -> object:
         item = validated_data.get(self.item_source_field)
         # Use the effective qty: what was supplied, or the model-field default (1).
         # The previous `or 0` falsy-coercion caused the availability guard to be
@@ -41,7 +41,7 @@ class _AssignmentAvailabilityMixin:
                 return super().create(validated_data)
         return super().create(validated_data)
 
-    def update(self, instance, validated_data):
+    def update(self, instance: object, validated_data: dict[str, object]) -> object:
         # D5-1: create() re-checks availability under a row lock, but the default
         # ModelSerializer.update() bypassed it entirely — a PATCH/PUT (or bulk-update,
         # which calls perform_update per row) could raise qty (or repoint the item FK)
@@ -106,11 +106,11 @@ from itambox.api.nested_serializers import (
 from organization.api.serializers import AssetHolderSerializer, NestedLocationSerializer, NestedTenantSerializer
 
 
-def _accessory_category_queryset():
+def _accessory_category_queryset() -> models.QuerySet[Category]:
     return Category.objects.filter(applies_to__accessory=True)
 
 
-def _consumable_category_queryset():
+def _consumable_category_queryset() -> models.QuerySet[Category]:
     return Category.objects.filter(applies_to__consumable=True)
 
 
@@ -127,11 +127,11 @@ class AccessorySerializer(BaseModelSerializer):
         queryset=NestedManufacturerSerializer.Meta.model.objects.all(), source="manufacturer", write_only=True
     )
     category = serializers.SerializerMethodField(read_only=True)
-    category_id = serializers.PrimaryKeyRelatedField(
+    category_id: serializers.PrimaryKeyRelatedField[Category] = serializers.PrimaryKeyRelatedField(
         queryset=_accessory_category_queryset(), source="category", write_only=True, required=False, allow_null=True
     )
     tenant = NestedTenantSerializer(read_only=True)
-    tenant_id = serializers.PrimaryKeyRelatedField(
+    tenant_id: serializers.PrimaryKeyRelatedField[models.Model] = serializers.PrimaryKeyRelatedField(
         queryset=NestedTenantSerializer.Meta.model.objects,
         source="tenant",
         write_only=True,
@@ -168,7 +168,7 @@ class AccessorySerializer(BaseModelSerializer):
         ]
         brief_fields = ["id", "name", "manufacturer", "category", "available"]
 
-    def get_category(self, obj):
+    def get_category(self, obj: Accessory) -> dict[str, object] | None:
         if obj.category:
             return {"id": obj.category.pk, "name": obj.category.name, "slug": obj.category.slug}
         return None
@@ -251,11 +251,11 @@ class ConsumableSerializer(BaseModelSerializer):
         queryset=NestedManufacturerSerializer.Meta.model.objects.all(), source="manufacturer", write_only=True
     )
     category = serializers.SerializerMethodField(read_only=True)
-    category_id = serializers.PrimaryKeyRelatedField(
+    category_id: serializers.PrimaryKeyRelatedField[Category] = serializers.PrimaryKeyRelatedField(
         queryset=_consumable_category_queryset(), source="category", write_only=True, required=False, allow_null=True
     )
     tenant = NestedTenantSerializer(read_only=True)
-    tenant_id = serializers.PrimaryKeyRelatedField(
+    tenant_id: serializers.PrimaryKeyRelatedField[models.Model] = serializers.PrimaryKeyRelatedField(
         queryset=NestedTenantSerializer.Meta.model.objects,
         source="tenant",
         write_only=True,
@@ -292,7 +292,7 @@ class ConsumableSerializer(BaseModelSerializer):
         ]
         brief_fields = ["id", "name", "manufacturer", "category", "available"]
 
-    def get_category(self, obj):
+    def get_category(self, obj: Consumable) -> dict[str, object] | None:
         if obj.category:
             return {"id": obj.category.pk, "name": obj.category.name, "slug": obj.category.slug}
         return None
@@ -415,7 +415,7 @@ class KitSerializer(BaseModelSerializer):
         brief_fields = ["id", "name", "description"]
 
 
-def _component_category_queryset():
+def _component_category_queryset() -> models.QuerySet[Category]:
     return Category.objects.filter(applies_to__component=True)
 
 
@@ -432,11 +432,11 @@ class ComponentSerializer(BaseModelSerializer):
         queryset=NestedManufacturerSerializer.Meta.model.objects.all(), source="manufacturer", write_only=True
     )
     category = serializers.SerializerMethodField(read_only=True)
-    category_id = serializers.PrimaryKeyRelatedField(
+    category_id: serializers.PrimaryKeyRelatedField[Category] = serializers.PrimaryKeyRelatedField(
         queryset=_component_category_queryset(), source="category", write_only=True, required=False, allow_null=True
     )
     tenant = NestedTenantSerializer(read_only=True)
-    tenant_id = serializers.PrimaryKeyRelatedField(
+    tenant_id: serializers.PrimaryKeyRelatedField[models.Model] = serializers.PrimaryKeyRelatedField(
         queryset=NestedTenantSerializer.Meta.model.objects,
         source="tenant",
         write_only=True,
@@ -474,7 +474,7 @@ class ComponentSerializer(BaseModelSerializer):
         ]
         brief_fields = ["id", "name", "manufacturer", "part_number"]
 
-    def get_category(self, obj):
+    def get_category(self, obj: Component) -> dict[str, object] | None:
         if obj.category:
             return {"id": obj.category.pk, "name": obj.category.name, "slug": obj.category.slug}
         return None

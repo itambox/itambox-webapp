@@ -17,22 +17,24 @@ from subscriptions.models import Subscription
 
 class LicenseSerializer(BaseModelSerializer):
     software = SoftwareSerializer(read_only=True)
-    software_id = serializers.PrimaryKeyRelatedField(queryset=Software.objects, source="software", write_only=True)
+    software_id: serializers.PrimaryKeyRelatedField[Software] = serializers.PrimaryKeyRelatedField(
+        queryset=Software.objects, source="software", write_only=True
+    )
     tags = TagSerializer(many=True, read_only=True)
     available_seats = serializers.IntegerField(read_only=True)
     license_type_display = serializers.CharField(source="get_license_type_display", read_only=True)
     tenant = NestedTenantSerializer(read_only=True)
-    tenant_id = serializers.PrimaryKeyRelatedField(
+    tenant_id: serializers.PrimaryKeyRelatedField[Tenant] = serializers.PrimaryKeyRelatedField(
         queryset=Tenant.objects, source="tenant", write_only=True, required=False, allow_null=True
     )
-    subscription = serializers.StringRelatedField(read_only=True)
+    subscription: serializers.StringRelatedField[Subscription] = serializers.StringRelatedField(read_only=True)
     # Subscription.objects is tenant-scoped, so a license cannot be funded by
     # another tenant's subscription.
-    subscription_id = serializers.PrimaryKeyRelatedField(
+    subscription_id: serializers.PrimaryKeyRelatedField[Subscription] = serializers.PrimaryKeyRelatedField(
         queryset=Subscription.objects, source="subscription", write_only=True, required=False, allow_null=True
     )
-    cost_center = serializers.StringRelatedField(read_only=True)
-    cost_center_id = serializers.PrimaryKeyRelatedField(
+    cost_center: serializers.StringRelatedField[CostCenter] = serializers.StringRelatedField(read_only=True)
+    cost_center_id: serializers.PrimaryKeyRelatedField[CostCenter] = serializers.PrimaryKeyRelatedField(
         source="cost_center",
         queryset=CostCenter.objects,
         write_only=True,
@@ -70,7 +72,7 @@ class LicenseSerializer(BaseModelSerializer):
         )
         brief_fields = ["id", "name", "software", "license_type", "seats", "available_seats"]
 
-    def validate(self, data):
+    def validate(self, data: dict[str, object]) -> dict[str, object]:
         # Enforce the seat-capacity invariant on PATCH/PUT: seats cannot be reduced below
         # the number of currently-active assignments.  License.clean() holds the same rule
         # for the form/admin path; BaseModelSerializer never calls full_clean, so we call
@@ -87,19 +89,23 @@ class LicenseSerializer(BaseModelSerializer):
 
 class LicenseSeatAssignmentSerializer(BaseModelSerializer):
     license = LicenseSerializer(read_only=True)
-    license_id = serializers.PrimaryKeyRelatedField(queryset=License.objects, source="license", write_only=True)
+    license_id: serializers.PrimaryKeyRelatedField[License] = serializers.PrimaryKeyRelatedField(
+        queryset=License.objects, source="license", write_only=True
+    )
     asset = NestedAssetSerializer(read_only=True)
-    asset_id = serializers.PrimaryKeyRelatedField(
+    asset_id: serializers.PrimaryKeyRelatedField[Asset] = serializers.PrimaryKeyRelatedField(
         queryset=Asset.objects, source="asset", write_only=True, required=False, allow_null=True
     )
     assigned_holder = AssetHolderSerializer(read_only=True)
-    assigned_holder_id = serializers.PrimaryKeyRelatedField(
+    assigned_holder_id: serializers.PrimaryKeyRelatedField[AssetHolder] = serializers.PrimaryKeyRelatedField(
         queryset=AssetHolder.objects, source="assigned_holder", write_only=True, required=False, allow_null=True
     )
     # Optional precise install link (seat-level SAM).  Read: nested string repr;
     # write: bare PK via installed_software_id.
-    installed_software = serializers.StringRelatedField(read_only=True)
-    installed_software_id = serializers.PrimaryKeyRelatedField(
+    installed_software: serializers.StringRelatedField[InstalledSoftware] = serializers.StringRelatedField(
+        read_only=True
+    )
+    installed_software_id: serializers.PrimaryKeyRelatedField[InstalledSoftware] = serializers.PrimaryKeyRelatedField(
         queryset=InstalledSoftware.objects,
         source="installed_software",
         write_only=True,
@@ -126,7 +132,7 @@ class LicenseSeatAssignmentSerializer(BaseModelSerializer):
         )
         brief_fields = ["id", "license", "asset"]
 
-    def create(self, validated_data):
+    def create(self, validated_data: dict[str, object]) -> LicenseSeatAssignment:
         # Delegate to checkout_license() so the parent-License changelog entry
         # ("Checked out seat to …") is recorded on the API path just as on the UI
         # path.  The service also holds the seat-availability lock + duplicate guard,
@@ -153,7 +159,7 @@ class LicenseSeatAssignmentSerializer(BaseModelSerializer):
             assignment.save(update_fields=["installed_software"])
         return assignment
 
-    def update(self, instance, validated_data):
+    def update(self, instance: LicenseSeatAssignment, validated_data: dict[str, object]) -> LicenseSeatAssignment:
         # D5-1: the default ModelSerializer.update() would just reassign `license`
         # and save — no seat-capacity check at all — letting a PATCH that repoints
         # license_id at a different License silently over-fill it. Delegate to
