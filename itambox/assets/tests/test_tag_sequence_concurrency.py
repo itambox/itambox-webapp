@@ -13,6 +13,7 @@ from assets.models import AssetTagSequence
 
 
 @pytest.mark.django_db(transaction=True)
+@pytest.mark.serial_only
 def test_next_tag_is_unique_under_concurrent_claims():
     seq = AssetTagSequence.all_objects.create(prefix="CONC-", next_value=1, zero_padding=4)
 

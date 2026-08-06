@@ -2,6 +2,7 @@ from concurrent.futures import ThreadPoolExecutor
 from threading import Barrier, Event, Lock
 from unittest.mock import patch
 
+import pytest
 from django.contrib.auth import get_user_model
 from django.core.exceptions import ValidationError
 from django.db import close_old_connections, connections
@@ -16,6 +17,7 @@ from procurement.services import approve_purchase_order, receive_purchase_order
 User = get_user_model()
 
 
+@pytest.mark.serial_only
 class PurchaseOrderConcurrencyTests(TransactionTestCase):
     def setUp(self):
         self.tenant = Tenant.objects.create(name="PO Race Tenant", slug="po-race-tenant")

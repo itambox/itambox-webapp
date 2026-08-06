@@ -104,8 +104,9 @@ required-version = "==0.11.31"
 [tool.pytest.ini_options]
 DJANGO_SETTINGS_MODULE = "core.settings"
 python_files = ["tests.py", "test_*.py"]
-# Fast by default: reuse the test DB across runs (stable name set in conftest), so the
-# ~200 migrations aren't rebuilt every run. Coverage is NOT measured by default (it
+# Fast by default: serial runs reuse the test DB across runs (stable name set in
+# conftest); xdist runs receive a process-specific base name so concurrent runs
+# cannot collide. Coverage is NOT measured by default (it
 # ~3x's a run); pass `--cov=. --cov-report=html` explicitly, or run the CI job.
 #
 # pytest-xdist is installed but NOT enabled by default: the suite is not yet xdist-safe
@@ -114,6 +115,7 @@ python_files = ["tests.py", "test_*.py"]
 # (per-worker MEDIA_ROOT, etc.) add `-n auto` here. Until then run `-n auto` ad hoc when
 # you know the targeted subset is parallel-clean.
 addopts = ["--tb=short", "-p", "no:warnings", "--reuse-db", "--no-cov-on-fail"]
+markers = ["serial_only: test requires an isolated serial lane (races, migrations, or global seed state)"]
 norecursedirs = [".venv", "scratch", "node_modules", ".git", ".agents", ".*"]
 
 [tool.coverage.run]

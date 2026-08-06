@@ -1,8 +1,10 @@
+import pytest
 from django.db import connection
 from django.db.migrations.executor import MigrationExecutor
 from django.test import TransactionTestCase
 
 
+@pytest.mark.serial_only
 class SubscriptionVocabularyMigrationTests(TransactionTestCase):
     migrate_from = ("subscriptions", "0100_issue88_shard_47_subscriptions_relations")
     migrate_to = ("subscriptions", "0101_remove_subscription_auto_renewal_and_more")

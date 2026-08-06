@@ -6,6 +6,7 @@ from contextlib import redirect_stderr, redirect_stdout
 from pathlib import Path
 from unittest.mock import patch
 
+import scripts.check_test_report as report_gate
 from scripts.check_test_report import (
     MAX_SKIPPED_TESTS,
     SLOW_TEST_SECONDS,
@@ -131,6 +132,89 @@ class ReportParsingTests(unittest.TestCase):
             self.assertEqual(counts["failed"], 1)
             self.assertEqual(counts["skipped"], 1)
             self.assertEqual(counts["wall_seconds"], 2.25)
+
+
+class ShardedReportTests(unittest.TestCase):
+    def test_the_gate_exposes_a_shard_report_aggregator(self):
+        self.assertTrue(callable(getattr(report_gate, "load_reports", None)))
+        self.assertTrue(callable(getattr(report_gate, "verify_node_id_manifest", None)))
+
+    def test_shard_reports_are_combined_by_unique_node_id(self):
+        with tempfile.TemporaryDirectory() as temporary_directory:
+            first = write_report(temporary_directory, [testcase("test_first")], name="junit-gw0.xml")
+            second = write_report(temporary_directory, [testcase("test_second")], name="junit-gw1.xml")
+
+            cases = report_gate.load_reports([first, second])
+
+            self.assertEqual(
+                [case.label for case in cases],
+                [
+                    "assets.tests.test_api.TestAssets::test_first",
+                    "assets.tests.test_api.TestAssets::test_second",
+                ],
+            )
+
+    def test_duplicate_node_ids_across_shards_fail_closed(self):
+        with tempfile.TemporaryDirectory() as temporary_directory:
+            first = write_report(temporary_directory, [testcase("test_duplicate")], name="junit-gw0.xml")
+            second = write_report(temporary_directory, [testcase("test_duplicate")], name="junit-gw1.xml")
+
+            with self.assertRaisesRegex(PolicyError, "duplicate test-case node ID"):
+                report_gate.load_reports([first, second])
+
+    def test_cli_requires_a_manifest_for_repeated_report_arguments(self):
+        with tempfile.TemporaryDirectory() as temporary_directory:
+            first = write_report(temporary_directory, [testcase("test_first")], name="junit-gw0.xml")
+            second = write_report(temporary_directory, [testcase("test_second")], name="junit-gw1.xml")
+
+            status, _stdout, stderr = run_main(
+                ["--report", str(first), "--report", str(second)],
+                baseline_tests=2,
+            )
+
+            self.assertEqual(status, 2)
+            self.assertIn("require --expected-node-ids", stderr)
+
+    def test_cli_requires_aggregated_reports_to_match_the_control_manifest(self):
+        with tempfile.TemporaryDirectory() as temporary_directory:
+            first = write_report(temporary_directory, [testcase("test_first")], name="junit-gw0.xml")
+            second = write_report(temporary_directory, [testcase("test_second")], name="junit-gw1.xml")
+            manifest = Path(temporary_directory) / "serial-node-ids.txt"
+            manifest.write_text(
+                "assets.tests.test_api.TestAssets::test_first\nassets.tests.test_api.TestAssets::test_second\n",
+                encoding="utf-8",
+            )
+
+            status, stdout, stderr = run_main(
+                [
+                    "--report",
+                    str(first),
+                    "--report",
+                    str(second),
+                    "--expected-node-ids",
+                    str(manifest),
+                ],
+                baseline_tests=2,
+            )
+
+            self.assertEqual(status, 0, stderr)
+            self.assertIn("2 test(s), 2 passed", stdout)
+
+            manifest.write_text("assets.tests.test_api.TestAssets::test_missing\n", encoding="utf-8")
+            status, _, stderr = run_main(
+                [
+                    "--report",
+                    str(first),
+                    "--report",
+                    str(second),
+                    "--expected-node-ids",
+                    str(manifest),
+                ],
+                baseline_tests=2,
+            )
+
+            self.assertEqual(status, 2)
+            self.assertIn("do not match the serial control manifest", stderr)
 
 
 class FailClosedTests(unittest.TestCase):

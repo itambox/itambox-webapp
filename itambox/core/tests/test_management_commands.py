@@ -2,6 +2,7 @@ import io
 from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
 
+import pytest
 from django.contrib.auth import get_user_model
 from django.core.management import CommandError, call_command
 from django.test import SimpleTestCase, TransactionTestCase, override_settings
@@ -15,6 +16,7 @@ from subscriptions.models import SubscriptionAssignment
 User = get_user_model()
 
 
+@pytest.mark.serial_only
 class ManagementCommandsTestCase(TransactionTestCase):
     def setUp(self):
         super().setUp()

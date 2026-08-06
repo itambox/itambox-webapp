@@ -463,7 +463,23 @@ Q_CLUSTER = {
 
 import sys
 
-if "test" in sys.argv or any("test" in arg or "pytest" in arg for arg in sys.argv):
+
+def _is_test_invocation():
+    argv_identifies_tests = "test" in sys.argv or any("test" in arg or "pytest" in arg for arg in sys.argv)
+    xdist_identifies_tests = any(os.environ.get(name) for name in ("PYTEST_XDIST_WORKER", "PYTEST_XDIST_TESTRUNUID"))
+    explicit_non_production = (
+        os.environ.get("ITAMBOX_ENV") == "dev" or os.environ.get("DJANGO_SETTINGS_MODULE") == "core.settings.dev"
+    )
+    return argv_identifies_tests or (explicit_non_production and xdist_identifies_tests)
+
+
+_TEST_INVOCATION = _is_test_invocation()
+
+
+def _configure_test_environment(is_test_invocation):
+    if not is_test_invocation:
+        return
+
     Q_CLUSTER["sync"] = True
 
     # --- Test-suite DB hardening (guards against an unbounded, order-dependent
@@ -482,6 +498,8 @@ if "test" in sys.argv or any("test" in arg or "pytest" in arg for arg in sys.arg
     DATABASES["default"]["CONN_MAX_AGE"] = 0
     DATABASES["default"]["OPTIONS"]["options"] = "-c lock_timeout=30000 -c statement_timeout=600000"
 
+
+_configure_test_environment(_TEST_INVOCATION)
 
 # ==============================================================================
 # Data Retention (changelog / operational-data pruning)
@@ -542,7 +560,7 @@ else:
 #   Example: ITAMBOX_PLUGINS=itambox_esign
 PLUGINS = [p.strip() for p in os.environ.get("ITAMBOX_PLUGINS", "").split(",") if p.strip()]
 
-IS_TESTING = "test" in sys.argv or any("test" in arg or "pytest" in arg for arg in sys.argv)
+IS_TESTING = _TEST_INVOCATION
 
 PLUGINS_CONFIG = {
     "itambox_esign": {
@@ -560,7 +578,6 @@ PLUGINS_CONFIG = {
 }
 
 # Load and validate plugins dynamically
-import sys
 
 from itambox.plugins.utils import load_plugins
 

@@ -41,6 +41,7 @@ def test_first_ever_global_tag_generation_is_race_safe():
 
 
 @pytest.mark.django_db(transaction=True)
+@pytest.mark.serial_only
 def test_concurrent_first_ever_global_default_does_not_integrityerror():
     """Concurrent first-ever global-default creations must not surface an
     IntegrityError from the unique_global_prefix constraint; the loser of the

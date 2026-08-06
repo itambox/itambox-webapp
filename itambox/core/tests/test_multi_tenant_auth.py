@@ -62,10 +62,12 @@ class MultiTenantAuthTestCase(TestCase):
 
         self.xmlsec_patcher = patch("saml2.sigver.get_xmlsec_binary", return_value=sys.executable)
         self.xmlsec_patcher.start()
+        self.addCleanup(self.xmlsec_patcher.stop)
 
         # Patch requests.request to return dummy metadata XML
         self.requests_patcher = patch("requests.request")
         self.mock_request = self.requests_patcher.start()
+        self.addCleanup(self.requests_patcher.stop)
 
         mock_resp = MagicMock()
         mock_resp.status_code = 200
@@ -90,12 +92,10 @@ class MultiTenantAuthTestCase(TestCase):
 
         self.open_patcher = patch("builtins.open", mock_open_file)
         self.open_patcher.start()
+        self.addCleanup(self.open_patcher.stop)
 
     def tearDown(self):
         set_current_tenant(None)
-        self.xmlsec_patcher.stop()
-        self.requests_patcher.stop()
-        self.open_patcher.stop()
 
     def test_ldap_settings_routing(self):
         """Test that TenantLDAPSettings dynamically route settings based on the active tenant context."""

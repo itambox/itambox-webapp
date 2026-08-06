@@ -4249,7 +4249,7 @@
       "message": "module level import not at top of file",
       "source": "import sys",
       "context": "Module:body",
-      "count": 2
+      "count": 1
     },
     {
       "path": "itambox/core/settings/dev.py",

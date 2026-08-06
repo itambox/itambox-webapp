@@ -2,7 +2,6 @@ import ipaddress
 import os
 import re
 import socket
-import sys
 from urllib.parse import urlsplit
 
 from django.core.exceptions import ValidationError
@@ -283,38 +282,34 @@ def validate_image_attachment(file):
     chunk = file.read(2048)
     file.seek(initial_pos)
 
-    is_testing = "test" in sys.argv or any("test" in arg or "pytest" in arg for arg in sys.argv)
-    if is_testing and chunk in (b"image-data", b"x"):
-        mime_type = "image/png"
-    else:
+    try:
+        # inline import: optional-dependency: python-magic is excluded on native
+        # Windows; the except branch is the documented Pillow fallback.
+        import magic
+
+        mime_type = magic.from_buffer(chunk, mime=True).lower()
+    except Exception:
+        # libmagic unavailable: verify the bytes are a real image with Pillow
+        # rather than trusting the client-supplied Content-Type (which an
+        # attacker controls). Anything Pillow can't decode fails closed.
         try:
-            # inline import: optional-dependency: python-magic is excluded on native
-            # Windows; the except branch is the documented Pillow fallback.
-            import magic
+            from PIL import Image
 
-            mime_type = magic.from_buffer(chunk, mime=True).lower()
+            file.seek(0)
+            with Image.open(file) as img:
+                img.verify()
+                pil_format = (img.format or "").lower()
+            file.seek(initial_pos)
+            mime_type = {
+                "png": "image/png",
+                "jpeg": "image/jpeg",
+                "gif": "image/gif",
+                "bmp": "image/bmp",
+                "webp": "image/webp",
+            }.get(pil_format, "")
         except Exception:
-            # libmagic unavailable: verify the bytes are a real image with Pillow
-            # rather than trusting the client-supplied Content-Type (which an
-            # attacker controls). Anything Pillow can't decode fails closed.
-            try:
-                from PIL import Image
-
-                file.seek(0)
-                with Image.open(file) as img:
-                    img.verify()
-                    pil_format = (img.format or "").lower()
-                file.seek(initial_pos)
-                mime_type = {
-                    "png": "image/png",
-                    "jpeg": "image/jpeg",
-                    "gif": "image/gif",
-                    "bmp": "image/bmp",
-                    "webp": "image/webp",
-                }.get(pil_format, "")
-            except Exception:
-                file.seek(initial_pos)
-                mime_type = ""
+            file.seek(initial_pos)
+            mime_type = ""
 
     allowed_mimes = {"image/png", "image/jpeg", "image/gif", "image/bmp", "image/x-ms-bmp", "image/webp"}
     if mime_type not in allowed_mimes:

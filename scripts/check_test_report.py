@@ -127,6 +127,67 @@ def load_report(report_path):
     return cases
 
 
+def load_reports(report_paths):
+    """Load and combine one or more JUnit reports without accepting duplicate node IDs."""
+    if not report_paths:
+        raise PolicyError("no test reports were supplied; the gate cannot certify an unseen run")
+
+    cases = []
+    seen = set()
+    for report_path in report_paths:
+        for case in load_report(report_path):
+            if case.label in seen:
+                raise PolicyError(f"duplicate test-case node ID across reports: {case.label}")
+            seen.add(case.label)
+            cases.append(case)
+    return cases
+
+
+def read_node_id_manifest(manifest_path):
+    """Read a canonical pytest node-ID manifest, refusing ambiguity or emptiness."""
+    path = Path(manifest_path)
+    try:
+        lines = path.read_text(encoding="utf-8").splitlines()
+    except FileNotFoundError as exc:
+        raise PolicyError(f"no expected node-ID manifest at {path}") from exc
+    except (OSError, UnicodeError) as exc:
+        raise PolicyError(f"cannot read expected node-ID manifest {path}: {exc}") from exc
+
+    node_ids = [line.strip() for line in lines if line.strip()]
+    if not node_ids:
+        raise PolicyError(f"expected node-ID manifest {path} is empty")
+    if len(node_ids) != len(set(node_ids)):
+        raise PolicyError(f"expected node-ID manifest {path} contains duplicate node IDs")
+    return set(node_ids)
+
+
+def verify_node_id_manifest(cases, manifest_path):
+    """Require the aggregated reports to equal the serial control node-ID set."""
+    expected = read_node_id_manifest(manifest_path)
+    actual = {case.label for case in cases}
+    missing = sorted(expected - actual)
+    unexpected = sorted(actual - expected)
+    if missing or unexpected:
+        details = []
+        if missing:
+            details.append(f"missing {len(missing)} node ID(s): {', '.join(missing[:10])}")
+        if unexpected:
+            details.append(f"unexpected {len(unexpected)} node ID(s): {', '.join(unexpected[:10])}")
+        raise PolicyError("aggregated JUnit node IDs do not match the serial control manifest; " + "; ".join(details))
+
+
+def load_and_validate_reports(report_paths, expected_node_ids=None):
+    """Load reports and require a complete manifest for every multi-report run."""
+    if len(report_paths) > 1 and expected_node_ids is None:
+        raise PolicyError(
+            "multiple test reports require --expected-node-ids; numeric suite counts cannot prove shard completeness"
+        )
+    cases = load_reports(report_paths)
+    if expected_node_ids is not None:
+        verify_node_id_manifest(cases, expected_node_ids)
+    return cases
+
+
 def read_suite_baseline(baseline_path):
     """Load the reviewed suite size, failing closed on anything unusable."""
     path = Path(baseline_path)
@@ -266,7 +327,19 @@ def parse_args(argv):
         description=__doc__,
         formatter_class=argparse.RawDescriptionHelpFormatter,
     )
-    parser.add_argument("--report", type=Path, default=DEFAULT_REPORT, help="Path to the pytest JUnit XML report.")
+    parser.add_argument(
+        "--report",
+        type=Path,
+        action="append",
+        default=None,
+        help="Path to a pytest JUnit XML report; repeat for sharded reports.",
+    )
+    parser.add_argument(
+        "--expected-node-ids",
+        type=Path,
+        default=None,
+        help="Serial-control node-ID manifest that the aggregated reports must match exactly.",
+    )
     parser.add_argument(
         "--suite-baseline",
         type=Path,
@@ -290,13 +363,16 @@ def parse_args(argv):
     )
     parser.add_argument("--slowest", type=int, default=DEFAULT_SLOWEST, help="How many slow tests to publish.")
     parser.add_argument("--summary-file", type=Path, default=None)
-    return parser.parse_args(argv)
+    args = parser.parse_args(argv)
+    if args.report is None:
+        args.report = [DEFAULT_REPORT]
+    return args
 
 
 def main(argv=None):
     args = parse_args(argv)
     try:
-        cases = load_report(args.report)
+        cases = load_and_validate_reports(args.report, args.expected_node_ids)
         counts = summarise(cases)
         if args.write_baseline:
             verify_baseline_write_environment()
