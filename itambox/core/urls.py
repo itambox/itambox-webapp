@@ -15,8 +15,10 @@ Including another URLconf
     2. Add a URL to urlpatterns:  path('blog/', include('blog.urls'))
 """
 
+import importlib
 import mimetypes
 
+from django.apps import apps
 from django.conf import settings  # Import settings
 from django.conf.urls.static import static  # Import static
 from django.contrib import admin
@@ -31,6 +33,7 @@ from core.schema import schema
 from core.views.auth import ITAMboxLoginView, TenantSamlAcsView, TenantSamlLoginView
 from core.views.graphql import PrivateGraphQLView
 from extras.dashboard import views as dashboard_views
+from itambox.plugins.utils import is_plugin_active, record_plugin_failure
 from itambox.views.features import (
     FileAttachmentDeleteView,
     FileAttachmentDownloadView,
@@ -273,24 +276,27 @@ urlpatterns = [
 ]
 
 # Dynamically register plugin UI URLconfs
-import importlib
-
-from django.apps import apps
-
 plugin_ui_patterns = []
 for plugin_name in getattr(settings, "PLUGINS", []):
+    if not is_plugin_active(plugin_name):
+        continue
     try:
         plugin_config = apps.get_app_config(plugin_name)
         base_url = getattr(plugin_config, "base_url", None) or plugin_name
+        url_module_name = f"{plugin_name}.urls"
         try:
-            importlib.import_module(f"{plugin_name}.urls")
-            plugin_ui_patterns.append(
-                path(f"{base_url}/", include((f"{plugin_name}.urls", plugin_name), namespace=plugin_name))
-            )
-        except ImportError:
-            pass
+            importlib.import_module(url_module_name)
+        except ModuleNotFoundError as exc:
+            if exc.name == url_module_name:
+                continue
+            raise
+        plugin_ui_patterns.append(
+            path(f"{base_url}/", include((f"{plugin_name}.urls", plugin_name), namespace=plugin_name))
+        )
     except LookupError:
-        pass
+        continue
+    except Exception as exc:  # broad except: boundary-isolation: one plugin URLconf must not abort core URL startup
+        record_plugin_failure(plugin_name, exc, stage="urls")
 
 if plugin_ui_patterns:
     urlpatterns.append(path("plugins/", include((plugin_ui_patterns, "plugins"), namespace="plugins")))

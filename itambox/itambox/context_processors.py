@@ -1,5 +1,6 @@
 from collections import defaultdict
 
+from itambox.plugins.utils import get_plugin_diagnostics
 from itambox.release import VERSION
 
 
@@ -161,3 +162,8 @@ def base_template_processor(request):
             base_template = "base_htmx.html"
 
     return {"base_template": base_template}
+
+
+def plugin_diagnostics_processor(request):
+    """Expose safe startup-failure rows for the in-product operator notice."""
+    return {"plugin_diagnostics": get_plugin_diagnostics()}

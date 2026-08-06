@@ -1,0 +1,28 @@
+<section id="plugin-api-experimental-warning"
+         class="alert alert-warning mx-3 mt-3"
+         role="alert"
+         aria-labelledby="plugin-api-experimental-warning-title">
+  <h2 id="plugin-api-experimental-warning-title" class="h4">Experimental plugin API</h2>
+  <p class="mb-0">Plugins are opt-in, operator-controlled, trusted in-process Python code. Experimental interfaces may change in any release.</p>
+</section>
+{% if plugin_diagnostics %}
+  <section id="plugin-startup-diagnostics"
+           class="alert alert-danger mx-3 mt-3"
+           role="alert"
+           aria-labelledby="plugin-startup-diagnostics-title">
+    <h2 id="plugin-startup-diagnostics-title" class="h4">Plugin startup diagnostics</h2>
+    <p>One or more configured Experimental plugins were disabled. Stable ITAMbox core remains available.</p>
+    {% for diagnostic in plugin_diagnostics %}
+      <article class="mb-2">
+        <strong>{{ diagnostic.plugin }}</strong>
+        <span>is {{ diagnostic.activation_state }}.</span>
+        <span>Activation source: {{ diagnostic.activation_source }}.</span>
+        <span>Failure class: {{ diagnostic.failure_class }}.</span>
+        <span>Stage: {{ diagnostic.stage }}.</span>
+        <span>Configured value present: {{ diagnostic.value_present|yesno:"yes,no" }}.</span>
+        <span>Compatibility: {{ diagnostic.compatibility }}.</span>
+        {% if diagnostic.error %}<div>Error: <code>{{ diagnostic.error }}</code></div>{% endif %}
+      </article>
+    {% endfor %}
+  </section>
+{% endif %}

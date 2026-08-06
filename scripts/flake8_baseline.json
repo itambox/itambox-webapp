@@ -5645,22 +5645,6 @@
     },
     {
       "path": "itambox/core/urls.py",
-      "code": "E402",
-      "message": "module level import not at top of file",
-      "source": "from django.apps import apps",
-      "context": "Module:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/core/urls.py",
-      "code": "E402",
-      "message": "module level import not at top of file",
-      "source": "import importlib",
-      "context": "Module:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/core/urls.py",
       "code": "F401",
       "message": "'assets.views as asset_views' imported but unused",
       "source": "from assets import views as asset_views  # Import the assets views",
@@ -7280,14 +7264,6 @@
       "code": "F401",
       "message": "'typing.Optional' imported but unused",
       "source": "from typing import Callable, Optional",
-      "context": "Module:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/itambox/plugins/utils.py",
-      "code": "F401",
-      "message": "'sys' imported but unused",
-      "source": "import sys",
       "context": "Module:body",
       "count": 1
     },

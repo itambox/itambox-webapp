@@ -152,6 +152,7 @@ TEMPLATES = [
                 "itambox.context_processors.notifications_processor",
                 "itambox.context_processors.tenant_switcher_processor",
                 "itambox.context_processors.base_template_processor",
+                "itambox.context_processors.plugin_diagnostics_processor",
             ],
             "loaders": partial_loaders,
             "libraries": {
@@ -554,9 +555,9 @@ else:
 # ==============================================================================
 # Plugins are optional Django apps loaded at settings time (see
 # itambox/plugins/utils.py). They are configured via a comma-separated env var
-# so the core image boots without bundling any plugin. A missing/uninstalled
-# plugin listed here raises ImproperlyConfigured at startup, so do not hardcode
-# plugins that are not guaranteed to be installed.
+# so the core image boots without bundling any plugin. A missing, incompatible,
+# or malformed plugin is disabled with an operator-visible diagnostic; it does
+# not abort Stable core startup.
 #   Example: ITAMBOX_PLUGINS=itambox_esign
 PLUGINS = [p.strip() for p in os.environ.get("ITAMBOX_PLUGINS", "").split(",") if p.strip()]
 

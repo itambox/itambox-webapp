@@ -1,75 +1,120 @@
-# ITAMbox Plugins API Reference
+# ITAMbox Plugin API Reference
 
-!!! warning "Status: Beta"
-    The plugin API is under active development. Interfaces documented here may change between minor releases.
+!!! warning "Status: Experimental"
+    Plugins are opt-in through `settings.PLUGINS` and are not part of the Stable 1.0 compatibility promise. The API below is the bounded Experimental API for plugin API version **1.0**. Pin the ITAMbox revision and the plugin revision together; Experimental interfaces may change in any release.
 
-This document provides a detailed reference for all base classes and registry utilities available to plugin developers.
+This page is normative. A symbol, attribute, module, or hook not listed here is private/unstable and may be renamed, moved, or removed without a deprecation period.
 
----
+## Activation and configuration
 
-## PluginConfig
+Only deployment operators activate plugins by placing an importable package name in `settings.PLUGINS` (normally through the comma-separated `ITAMBOX_PLUGINS` environment variable). Per-plugin values belong in `settings.PLUGINS_CONFIG` and are deep-merged with `default_settings`.
 
-`PluginConfig` subclasses Django's `AppConfig` and must be defined in the plugin's `__init__.py` (assigned to the variable `config`).
+A plugin that cannot be imported, is malformed, fails compatibility checks, or raises during startup is disabled. ITAMbox continues starting and publishes a diagnostic; the failed plugin contributes no middleware, URL, REST router, GraphQL schema, menu, or template hook.
 
-### Configuration Attributes
+## `PluginConfig`
 
-- `default_settings` (dict): A dictionary of default configuration settings for the plugin.
-- `required_settings` (list): A list of settings keys that the user *must* configure in `settings.PLUGINS_CONFIG`.
-- `middleware` (list): Django middleware class strings to dynamically inject into settings `MIDDLEWARE`.
-- `django_apps` (list): Additional third-party or local Django apps that must be prepended to `INSTALLED_APPS` (e.g. dependencies).
+A plugin package's `__init__.py` must expose a class assigned to `config` that subclasses `itambox.plugins.PluginConfig`.
 
-### Metadata Attributes
+The following metadata and configuration attributes are supported:
 
-- `version` (str): The current version string of the plugin.
-- `author` (str): Author's name.
-- `author_email` (str): Author's email address.
-- `base_url` (str): Custom base routing slug for web/REST API endpoints. Defaults to the plugin name.
-- `min_version` (str): Minimum required ITAMbox version (e.g. `'1.0.0'`). Checked at startup.
-- `max_version` (str): Maximum supported ITAMbox version. Checked at startup.
-- `graphql_schema` (str): Dotted path to the python module exporting Query and Mutation classes to extend the GraphQL schema (e.g., `'itambox_esign.graphql.schema'`).
+| Attribute | Type | Meaning |
+|---|---|---|
+| `name` | `str` | Django app name. Set this to the plugin package name. |
+| `verbose_name` | `str` | Human-readable Django app name. |
+| `default_settings` | `dict` | Safe defaults merged with the operator's `PLUGINS_CONFIG` entry. Do not put secrets in source-controlled defaults. |
+| `required_settings` | `list[str]` | Keys that must be present and non-`None` after merging. |
+| `middleware` | `list[str]` | Importable Django middleware class paths. They are added during startup and removed when this plugin is disabled. |
+| `django_apps` | `list[str]` | Additional Django apps required by the plugin. |
+| `version` | `str` | Plugin's own release/version identifier. It is not the ITAMbox product version and is not used for host compatibility. |
+| `author` | `str` | Plugin author/vendor metadata. |
+| `author_email` | `str` | Plugin maintainer contact metadata. |
+| `base_url` | `str` or `None` | URL slug for the plugin's optional UI URLconf. Defaults to the package name. |
+| `min_version` | `str` or `None` | **ITAMbox product** minimum version. Existing product-version semantics are unchanged. |
+| `max_version` | `str` or `None` | **ITAMbox product** maximum version. Existing product-version semantics are unchanged. |
+| `min_plugin_api_version` | `str` | Minimum ITAMbox plugin API version supported by the plugin. Required for activation. |
+| `max_plugin_api_version` | `str` | Maximum ITAMbox plugin API version supported by the plugin. Required for activation. |
+| `graphql_schema` | `str` or `None` | Dotted module path containing optional Graphene `Query` and/or `Mutation` object types. |
 
----
+`ready()` is the startup composition hook. It may use only the extension points listed below. A failure from `ready()` disables this plugin and is isolated from other plugins and Stable core.
 
-## PluginModel
+### Version and compatibility matrix
 
-`PluginModel` is an abstract Django base model that plugins should subclass instead of standard `models.Model`.
+The host publishes one independent API version constant, `itambox.plugins.PLUGIN_API_VERSION`, currently `1.0`. A plugin must declare both `min_plugin_api_version` and `max_plugin_api_version`; omission is a documented Experimental compatibility failure, not an implicit wildcard.
+
+| ITAMbox product | Host plugin API | Plugin metadata | Result |
+|---|---|---|---|
+| 1.0.x | 1.0 | Product bounds include 1.0.x; API bounds include 1.0 | **Enabled** |
+| 1.0.x | 1.0 | Product bounds exclude 1.0.x | **Disabled** as `incompatible-product` |
+| 1.0.x | 1.0 | API bounds exclude 1.0 | **Disabled** as `incompatible-plugin-api` |
+| 1.0.x | 1.0 | Either API bound is missing or invalid | **Disabled** as `missing-plugin-api` or `invalid-plugin-api` |
+| future product | 1.0 | Product bounds use the existing `min_version/max_version` semantics | **Enabled/disabled** according to product bounds |
+| any supported product | future API | API bounds do not include the host API | **Disabled**; no product-version inference is performed |
+
+The product fields are deliberately not aliases for the API fields. A plugin that supports ITAMbox 1.0 but only plugin API 2.0 is not compatible, and a plugin that supports plugin API 1.0 does not automatically support a different ITAMbox product release.
+
+Example:
 
 ```python
-from itambox.plugins.models import PluginModel
+from itambox.plugins import PluginConfig
 
-class MyPluginModel(PluginModel):
-    # Field definitions...
+
+class ExamplePluginConfig(PluginConfig):
+    name = "example_plugin"
+    verbose_name = "Example plugin"
+    version = "2.4.0"
+    author = "Example GmbH"
+    author_email = "plugins@example.invalid"
+
+    # Product compatibility: these remain product-version fields.
+    min_version = "1.0.0"
+    max_version = "1.99.99"
+
+    # Plugin API compatibility: independent from the product version.
+    min_plugin_api_version = "1.0"
+    max_plugin_api_version = "1.0"
+
+
+config = ExamplePluginConfig
 ```
 
-By inheriting from `PluginModel`, your models automatically gain support for:
-- **Tenant Scoping**: Native scoping under tenant instances.
-- **Journaling**: Attaching timeline notes and user logs.
-- **Tagging**: Support for custom metadata tags.
-- **Changelogging**: Built-in tracking of database modifications.
-- **Cloning & Exporting**: Support for the template export system.
+## Supported registry extension points
 
----
-
-## Registry Singleton
-
-`itambox.registry.registry` is a central in-memory store for plugin extensions. The following methods are commonly used inside the `ready()` method of your `PluginConfig`:
+Use the singleton `itambox.registry.registry` from `ready()`. Only these four `register_plugin_*` methods are supported:
 
 ### `register_plugin_template_content(model, content_class)`
-Injects custom template UI blocks.
-- `model` (str): The low-cased label of the model to target (e.g. `'assets.asset'`).
-- `content_class` (type): A subclass of `PluginTemplateContent`.
 
-### `register_plugin_viewset(plugin_name, prefix, viewset, basename)`
-Registers a REST API endpoint.
-- `plugin_name` (str): Name of the registering plugin.
-- `prefix` (str): API route path.
-- `viewset` (ViewSet/str): Viewset class or importable dotted string path.
-- `basename` (str): Basename for URL reversing.
+Registers a `PluginTemplateContent` subclass for a model label such as `assets.asset`. The class may implement the documented rendering positions (`head`, `navbar`, `alerts`, `buttons`, `left_panel`, `right_panel`, and `full_width_panel`). Its returned content is plugin-authored HTML and must follow ITAMbox's escaping/CSP rules.
 
 ### `register_plugin_menu(menu_cls)`
-Registers sidebar menu structures.
-- `menu_cls` (type): A subclass of `PluginNavigationMenu`.
+
+Registers a `PluginNavigationMenu` subclass. Menu classes provide the documented `label`, `icon_class`, and `groups` attributes.
 
 ### `register_plugin_menu_item(item_cls)`
-Registers a standalone sidebar item.
-- `item_cls` (type): A subclass of `PluginNavigationItem`.
+
+Registers a `PluginNavigationItem` subclass for a standalone plugin navigation item. The supported attributes are `link`, `link_text`, `permissions`, `auth_required`, `staff_only`, and `buttons`.
+
+### `register_plugin_viewset(plugin_name, prefix, viewset, basename=None)`
+
+Registers a Django REST Framework viewset class or importable dotted class path. The route is mounted below `/api/plugins/<plugin_name>/`; `prefix` is the route suffix and `basename` is the DRF route basename.
+
+A malformed registration raises during plugin composition, so startup isolation can disable the plugin before the bad contribution is exposed.
+
+A plugin package may also expose an optional `urls.py` module when `base_url` is set (or when it accepts the package-name default). ITAMbox mounts that URLconf below `/plugins/<base_url>/`. The module's `urlpatterns` is the complete supported contract; URLconf helpers and view internals remain plugin-owned. A URL import failure disables the plugin and removes its other registered contributions.
+
+## GraphQL extension
+
+Set `PluginConfig.graphql_schema` to a module path. The module may export a Graphene `Query` class, a `Mutation` class, or both. ITAMbox composes those types into the existing schema. Plugin schema fields remain subject to the normal authentication, tenant middleware, permission, query-complexity, and zero-diagnostics contracts.
+
+## Private and unstable surface
+
+Everything not explicitly listed in this document is private/unstable, including:
+
+- other modules and names below `itambox.*`, all `core.*` names, and all domain-app internals;
+- `Registry` storage attributes, getters, reset/transaction helpers, and registration ownership internals;
+- direct mutation of registries, settings, URL patterns, GraphQL root types, or Django app registries;
+- undocumented plugin lifecycle ordering, install/uninstall/upgrade orchestration, runtime enable/disable, and per-tenant activation;
+- `PluginModel` and any model mixins unless a future API version lists them explicitly;
+- undocumented template context, navigation internals, API router internals, and middleware ordering beyond the declared `middleware` list;
+- package management, migration automation, orphan-data cleanup, sandboxing, capability restrictions, and signature verification.
+
+The Experimental label is intentional: this list is the compatibility boundary, not a promise that plugin behavior is Stable.
