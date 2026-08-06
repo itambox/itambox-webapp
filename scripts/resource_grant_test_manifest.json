@@ -57,7 +57,8 @@
     "itambox/subscriptions/tests/test_migrations.py",
     "itambox/subscriptions/tests/test_models.py",
     "itambox/users/tests/test_scim_migrations.py",
-    "scripts/tests/test_check_test_report.py"
+    "scripts/tests/test_check_test_report.py",
+    "scripts/tests/test_check_xdist_matrix.py"
   ],
   "baseline_tests": [
     "itambox/inventory/tests/test_stock_action_permissions.py",
@@ -121,7 +122,8 @@
     "itambox/subscriptions/tests/test_migrations.py",
     "itambox/subscriptions/tests/test_models.py",
     "itambox/users/tests/test_scim_migrations.py",
-    "scripts/tests/test_check_test_report.py"
+    "scripts/tests/test_check_test_report.py",
+    "scripts/tests/test_check_xdist_matrix.py"
   ],
   "supporting_files": [
     "itambox/inventory/tests/factories.py",
