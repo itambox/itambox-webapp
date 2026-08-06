@@ -41,6 +41,8 @@ class MatrixError(Exception):
 
 
 class TestCase:
+    __slots__ = ("label", "outcome", "message")
+
     def __init__(self, label, outcome, message=""):
         self.label = label
         self.outcome = outcome  # passed | failed | error | skipped
@@ -86,10 +88,9 @@ def summarize(reports):
     return summary
 
 
-def collect_violations(reports, xdist_paths, serial_paths):
-    """Return a list of human-readable findings; empty means the matrix passes."""
+def _outcome_violations(reports):
+    """Find failed, errored, or skipped cases in every report."""
     violations = []
-
     for path, cases in reports.items():
         for case in cases:
             if case.outcome == "failed":
@@ -98,9 +99,18 @@ def collect_violations(reports, xdist_paths, serial_paths):
                 violations.append(f"{path}: test {case.label!r} errored: {case.message[:200]}")
             elif case.outcome == "skipped":
                 violations.append(f"{path}: test {case.label!r} was skipped (the suite must run complete)")
+    return violations
 
-    xdist_sets = {str(path): {case.label for case in cases} for path, cases in reports.items() if path in xdist_paths}
+
+def _lane_sets(reports, lane_paths):
+    """Node-ID set per report path, restricted to one lane."""
+    return {str(path): {case.label for case in cases} for path, cases in reports.items() if path in lane_paths}
+
+
+def _parity_violations(xdist_sets):
+    """Find iterations whose node-ID membership differs from the first one."""
     first_path, first_set = next(iter(xdist_sets.items()))
+    violations = []
     for path, node_ids in xdist_sets.items():
         if node_ids == first_set:
             continue
@@ -112,17 +122,26 @@ def collect_violations(reports, xdist_paths, serial_paths):
         if added:
             detail.append(f"added {len(node_ids - first_set)} node ID(s), e.g. {added}")
         violations.append(f"{path}: iteration membership differs from {first_path}; " + "; ".join(detail))
+    return violations, first_set
 
-    if serial_paths:
-        serial_cases = [case for path, cases in reports.items() if path in serial_paths for case in cases]
-        serial_ids = {case.label for case in serial_cases}
-        overlap = sorted(first_set & serial_ids)[:5]
-        if overlap:
-            violations.append(
-                f"serial-only lane overlaps the parallel lane in {len(first_set & serial_ids)} node ID(s), "
-                f"e.g. {overlap}"
-            )
 
+def _overlap_violations(serial_sets, first_set):
+    """Find serial-only node IDs that also ran in the parallel lane."""
+    serial_ids = {label for node_ids in serial_sets.values() for label in node_ids}
+    overlap = sorted(first_set & serial_ids)[:5]
+    if not overlap:
+        return []
+    return [f"serial-only lane overlaps the parallel lane in {len(first_set & serial_ids)} node ID(s), e.g. {overlap}"]
+
+
+def collect_violations(reports, xdist_paths, serial_paths):
+    """Return a list of human-readable findings; empty means the matrix passes."""
+    violations = _outcome_violations(reports)
+    parity_violations, first_set = _parity_violations(_lane_sets(reports, xdist_paths))
+    violations.extend(parity_violations)
+    serial_sets = _lane_sets(reports, serial_paths)
+    if serial_sets:
+        violations.extend(_overlap_violations(serial_sets, first_set))
     return violations
 
 
