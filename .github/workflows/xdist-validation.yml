@@ -1,0 +1,260 @@
+name: xdist validation matrix
+
+# Authoritative Linux/Python-3.12 evidence for issue #21: the parallel lane
+# (`pytest -n auto -m 'not serial_only'`) must survive repeated clean runs
+# before CI is allowed to switch away from the serial suite. Run on demand;
+# this workflow deliberately triggers nothing on push or pull_request, so a
+# validation run is an explicit, reviewable act.
+#
+# What one run proves:
+#   * Every parallel iteration exits green with the identical set of node IDs
+#     (a worker crash that shrinks the report would otherwise read as a green,
+#     smaller run) -- checked per iteration by check_test_report.py (failures,
+#     errors, skips, executed-count ratchet) and across iterations by
+#     scripts/check_xdist_matrix.py.
+#   * The serial-only lane (`-m serial_only`) runs complete and is disjoint
+#     from the parallel partition: no test races in one run and is excluded in
+#     the next.
+#   * Coverage is measured on the first parallel iteration and the serial-only
+#     lane, combined, and checked against the global ratchet -- the parallel
+#     split must not silently shrink what the ratchet protects.
+#
+# Coverage is deliberately measured once, not in every iteration: coverage
+# measurement roughly triples a run, and the matrix's question is stability,
+# not per-iteration coverage noise. The combined lane coverage answers the
+# ratchet question once.
+
+on:
+  workflow_dispatch:
+    inputs:
+      iterations:
+        description: "Repetitions of the parallel lane"
+        required: false
+        default: "20"
+      workers:
+        description: "pytest -n value: 'auto' or a fixed worker count"
+        required: false
+        default: "auto"
+      dist_mode:
+        description: "pytest --dist scheduling mode"
+        required: false
+        default: "loadscope"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: xdist-validation
+  cancel-in-progress: false
+
+jobs:
+  matrix:
+    runs-on: ubuntu-latest
+    timeout-minutes: 240
+
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_DB: itambox_ci
+          POSTGRES_USER: itambox_ci
+          POSTGRES_PASSWORD: itambox_ci
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd=pg_isready
+          --health-interval=2s
+          --health-timeout=2s
+          --health-retries=30
+
+    env:
+      ITAMBOX_ENV: dev
+      ITAMBOX_DB_NAME: itambox_ci
+      ITAMBOX_DB_USER: itambox_ci
+      ITAMBOX_DB_PASSWORD: itambox_ci
+      ITAMBOX_DB_HOST: localhost
+      ITAMBOX_DB_PORT: "5432"
+      ITAMBOX_DB_SSLMODE: disable
+
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.12"
+
+      - name: Set up uv
+        uses: astral-sh/setup-uv@c771a70e6277c0a99b617c7a806ffedaca235ff9 # v9.0.0
+        with:
+          version: "0.11.31"
+          enable-cache: true
+          cache-dependency-glob: uv.lock
+
+      # python-ldap (pulled by django-auth-ldap) needs libldap2/sasl headers for
+      # source builds. ubuntu-latest images can miss these under transient updates.
+      - name: Install system deps for python-ldap
+        run: |
+          if command -v apt-get >/dev/null; then
+            if [ "$(id -u)" -eq 0 ]; then
+              apt-get update
+              apt-get install -y --no-install-recommends \
+                gcc \
+                libmagic1 \
+                libldap2-dev \
+                libsasl2-dev \
+                libssl-dev \
+                xmlsec1
+            else
+              sudo apt-get update
+              sudo apt-get install -y --no-install-recommends \
+                gcc \
+                libmagic1 \
+                libldap2-dev \
+                libsasl2-dev \
+                libssl-dev \
+                xmlsec1
+            fi
+          fi
+
+      - name: Install dependencies
+        run: |
+          uv lock --check
+          uv sync --locked --group dev
+
+      - name: Verify native runtime bindings
+        run: |
+          uv run --locked --no-sync python -c "import ldap, magic; print(ldap.__version__); print(magic.from_buffer(b'ITAMbox'))"
+          xmlsec1 --version
+
+      - name: Check for missing migrations
+        working-directory: ./itambox
+        run: |
+          uv run --locked --no-sync python manage.py makemigrations --check --dry-run
+
+      - name: Apply migrations to a fresh database
+        working-directory: ./itambox
+        run: |
+          uv run --locked --no-sync python manage.py migrate --noinput
+
+      # The parallel lane: `-m 'not serial_only'` is mandatory -- conftest.py
+      # refuses to run an xdist session that does not state the selection
+      # explicitly, so a future edit that silently drops the marker fails here
+      # instead of racing the serial_only tests. Every iteration uses
+      # --create-db like the CI gate run: a fresh database per repetition, the
+      # same conditions a switched-over CI job would see, not a warmed reuse.
+      # Coverage (which roughly triples a run) is measured on the first
+      # iteration only; the remaining iterations are the stability evidence.
+      - name: Run the parallel lane repeatedly
+        id: parallel
+        working-directory: ./itambox
+        env:
+          ITERATIONS: ${{ inputs.iterations }}
+          WORKERS: ${{ inputs.workers }}
+          DIST_MODE: ${{ inputs.dist_mode }}
+        run: |
+          set -Eeuo pipefail
+          mkdir -p ../artifacts
+          for i in $(seq 1 "${ITERATIONS}"); do
+            echo "== parallel lane iteration ${i}/${ITERATIONS} (workers=${WORKERS}, dist=${DIST_MODE}) =="
+            if [ "${i}" -eq 1 ]; then
+              COV_FLAGS="--cov=. --cov-config=../pyproject.toml --cov-report=term-missing:skip-covered --cov-report=json:../artifacts/coverage-xdist-1.json"
+              export COVERAGE_FILE=../artifacts/.coverage.xdist1
+            else
+              COV_FLAGS=""
+              unset COVERAGE_FILE
+            fi
+            # shellcheck disable=SC2086 -- COV_FLAGS is a deliberate word split
+            uv run --locked --no-sync pytest \
+              -o addopts="--tb=short -p no:warnings" \
+              --create-db \
+              -n "${WORKERS}" --dist="${DIST_MODE}" \
+              -m 'not serial_only' \
+              --junitxml="../artifacts/junit-xdist-${i}.xml" \
+              ${COV_FLAGS}
+          done
+
+      # The serial-only lane runs without xdist and carries the coverage of the
+      # tests the parallel lane is not allowed to touch. Its report is smaller
+      # than the executed-count ratchet in check_test_report.py, so it is
+      # certified by the combined matrix gate instead, not by that script.
+      - name: Run the serial-only lane
+        id: serial
+        working-directory: ./itambox
+        run: |
+          set -Eeuo pipefail
+          # COVERAGE_FILE must be visible to pytest-cov before the run starts;
+          # otherwise the coverage data lands in itambox/.coverage and the
+          # combined-ratchet step below cannot find it.
+          export COVERAGE_FILE=../artifacts/.coverage.serial
+          uv run --locked --no-sync pytest \
+            -o addopts="--tb=short -p no:warnings" \
+            --create-db \
+            -m serial_only \
+            --cov=. \
+            --cov-config=../pyproject.toml \
+            --cov-report=term-missing:skip-covered \
+            --cov-report=json:../artifacts/coverage-serial-only.json \
+            --junitxml=../artifacts/junit-serial-only.xml
+
+      # Every parallel iteration is certified against the same rules as the CI
+      # gate run: no failures, no errors, no skips, executed count at or above
+      # the suite baseline (growth is free, a fall is a finding). Durations of
+      # the first iteration are published to the job summary; the per-iteration
+      # wall clock is the number that will justify the CI switch.
+      - name: Certify every parallel iteration
+        if: always() && steps.parallel.conclusion != 'skipped'
+        run: |
+          set -Eeuo pipefail
+          for report in artifacts/junit-xdist-*.xml; do
+            if [ "${report}" = "artifacts/junit-xdist-1.xml" ]; then
+              python scripts/check_test_report.py --report "${report}" --summary-file "$GITHUB_STEP_SUMMARY"
+            else
+              python scripts/check_test_report.py --report "${report}"
+            fi
+          done
+
+      # The combined matrix gate: identical node-ID sets across all parallel
+      # iterations, and the serial-only lane disjoint from the parallel
+      # partition. This is the check that makes "ran N times without
+      # intermittent failures" a statement about the suite, not about pytest's
+      # exit code.
+      - name: Check the combined matrix gate
+        if: always() && steps.parallel.conclusion != 'skipped' && steps.serial.conclusion != 'skipped'
+        run: |
+          set -Eeuo pipefail
+          XDIST_ARGS=()
+          for report in artifacts/junit-xdist-*.xml; do
+            XDIST_ARGS+=(--xdist "${report}")
+          done
+          python scripts/check_xdist_matrix.py "${XDIST_ARGS[@]}" --serial artifacts/junit-serial-only.xml
+
+      # Coverage is measured on the first parallel iteration and the serial-only
+      # lane; the two are combined and checked against the global ratchet, so
+      # the parallel split is proven not to shrink what the ratchet protects.
+      # The coverage.py data files live in artifacts/ via COVERAGE_FILE; the
+      # combine and JSON export run from the repository root so the
+      # [tool.coverage.run] configuration in pyproject.toml applies.
+      - name: Check the combined coverage ratchet
+        if: always() && steps.parallel.conclusion == 'success' && steps.serial.conclusion == 'success'
+        run: |
+          set -Eeuo pipefail
+          uv run --locked --no-sync coverage combine --rcfile=pyproject.toml artifacts/.coverage.xdist1 artifacts/.coverage.serial
+          uv run --locked --no-sync coverage json --rcfile=pyproject.toml -o artifacts/coverage-combined.json
+          python scripts/check_coverage_baseline.py --coverage-json artifacts/coverage-combined.json --summary-file "$GITHUB_STEP_SUMMARY"
+
+      # Published even when the matrix failed: the JUnit reports of a failing
+      # iteration and the coverage data are exactly the artifacts needed to
+      # diagnose it. Not published when the parallel lane never ran -- there is
+      # no report at all, and `if-no-files-found: error` would report a missing
+      # artifact as the failure instead of the one that actually happened.
+      - name: Upload validation artifacts
+        if: always() && steps.parallel.conclusion != 'skipped'
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: xdist-validation
+          path: |
+            artifacts/junit-*.xml
+            artifacts/coverage-*.json
+          if-no-files-found: error
+          retention-days: 30
