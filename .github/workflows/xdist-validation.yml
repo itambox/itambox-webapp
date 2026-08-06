@@ -237,16 +237,20 @@ jobs:
       # Coverage is measured on the first parallel iteration and the serial-only
       # lane; the two are combined and checked against the global ratchet, so
       # the parallel split is proven not to shrink what the ratchet protects.
-      # The coverage.py data files live in artifacts/ via COVERAGE_FILE; the
-      # combine and JSON export run from the repository root so the
-      # [tool.coverage.run] configuration in pyproject.toml applies.
+      # `coverage combine` is CWD-agnostic (verified), but coverage.py resolves
+      # relative_files=true paths at report time against the report command's
+      # CWD: running `coverage json` from the repository root yields
+      # "No source for code" and an unusable report. This step therefore runs
+      # from itambox/ so the combined JSON keeps COVERAGE_ROOT-shaped paths
+      # (see ci-switch-design.md §2, "Verified finding").
       - name: Check the combined coverage ratchet
         if: always() && steps.parallel.conclusion == 'success' && steps.serial.conclusion == 'success'
+        working-directory: ./itambox
         run: |
           set -Eeuo pipefail
-          uv run --locked --no-sync coverage combine --rcfile=pyproject.toml artifacts/.coverage.xdist1 artifacts/.coverage.serial
-          uv run --locked --no-sync coverage json --rcfile=pyproject.toml -o artifacts/coverage-combined.json
-          python scripts/check_coverage_baseline.py --coverage-json artifacts/coverage-combined.json --summary-file "$GITHUB_STEP_SUMMARY"
+          uv run --locked --no-sync coverage combine --rcfile=../pyproject.toml ../artifacts/.coverage.xdist1 ../artifacts/.coverage.serial
+          uv run --locked --no-sync coverage json --rcfile=../pyproject.toml -o ../artifacts/coverage-combined.json
+          python ../scripts/check_coverage_baseline.py --coverage-json ../artifacts/coverage-combined.json --summary-file "$GITHUB_STEP_SUMMARY"
 
       # Published even when the matrix failed: the JUnit reports of a failing
       # iteration and the coverage data are exactly the artifacts needed to
