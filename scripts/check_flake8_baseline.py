@@ -40,11 +40,11 @@ DEFAULT_TARGETS = ["itambox", "scripts"]
 BASELINE_SCHEMA_VERSION = 3
 CANONICAL_PYTHON = (3, 12)
 REQUIRED_TOOL_VERSIONS = {
-    "flake8": "7.0.0",
+    "flake8": "7.3.0",
     "flake8-bugbear": "24.12.12",
     "mccabe": "0.7.0",
-    "pycodestyle": "2.11.1",
-    "pyflakes": "3.2.0",
+    "pycodestyle": "2.14.0",
+    "pyflakes": "3.4.0",
 }
 
 
