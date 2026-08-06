@@ -836,22 +836,6 @@
       "count": 1
     },
     {
-      "path": "itambox/core/urls.py",
-      "scope": "",
-      "handler_type": "ImportError",
-      "classification": "pass-only",
-      "body_sha256": "5c04595997820c90159baeb6d4411d9a479f4dc26f1ac532dd740dcb011f3e23",
-      "count": 1
-    },
-    {
-      "path": "itambox/core/urls.py",
-      "scope": "",
-      "handler_type": "LookupError",
-      "classification": "pass-only",
-      "body_sha256": "5c04595997820c90159baeb6d4411d9a479f4dc26f1ac532dd740dcb011f3e23",
-      "count": 1
-    },
-    {
       "path": "itambox/core/validators.py",
       "scope": "FunctionDef:_json_pattern_error",
       "handler_type": "re.error",

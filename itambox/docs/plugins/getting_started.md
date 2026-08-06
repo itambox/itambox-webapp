@@ -1,28 +1,23 @@
 # Getting Started with ITAMbox Plugins
 
-!!! warning "Status: Beta"
-    The plugin system is under active development. APIs may change between minor releases.
-    There is no stable production compatibility contract yet. Pin both ITAMbox and plugin revisions, and test each combination in a non-production environment before deployment.
+!!! warning "Status: Experimental"
+    Plugins are opt-in and trusted in-process Python code. They are not covered by the Stable 1.0 compatibility promise. Pin both ITAMbox and plugin revisions, and test each combination in a non-production environment before deployment.
 
-ITAMbox features a powerful, extensible plugin system modeled after **NetBox**. This allows developers to extend the core functionality of ITAMbox without modifying the core codebase.
+ITAMbox has a bounded Experimental plugin system modeled after **NetBox**. The supported API is intentionally small; read the [API Reference](api_reference.md) before writing a plugin. Anything not listed there is private/unstable.
 
 ---
 
 ## What Can Plugins Do?
 
-Plugins can hook into several parts of the ITAMbox application:
+The supported ITAMbox-owned surface is intentionally small:
 
-- **Custom Models**: Create database models with built-in auditing, tagging, and journaling.
-- **Web UI & API Endpoints**: Add custom views, routes, and REST API/GraphQL endpoints.
-- **Sidebar & Menus**: Inject items into the main sidebar menu.
-- **Template Injection**: Dynamically inject custom HTML cards, buttons, or assets into core detail pages.
-- **Middleware**: Inject custom middlewares into the request/response lifecycle.
+- **Plugin metadata and settings** through the documented `PluginConfig` attributes.
+- **UI routes** through the optional package `urls.py` URLconf mounted below the plugin base URL.
+- **REST viewsets, menus, menu items, and template content** through the four documented registry extension points.
+- **GraphQL** through `PluginConfig.graphql_schema`.
+- **Middleware and auxiliary Django apps** through the documented configuration attributes.
 
----
-
-## Anatomy of a Plugin
-
-An ITAMbox plugin is a standard Python package containing a Django app, with a few custom hooks. Here is the minimal structure of a plugin named `itambox_esign`:
+A plugin may contain other Django/Python code, including models, but those internals are not additional ITAMbox API guarantees. The package layout below is illustrative; only the symbols and paths named in the [API Reference](api_reference.md) are supported.
 
 ```text
 itambox_esign/
@@ -57,6 +52,9 @@ class EsignPluginConfig(PluginConfig):
     author = 'DocuSign Dev Team'
     author_email = 'dev@docusign.com'
     min_version = '1.0.0-alpha'  # Version constraint checks
+    max_version = '1.99.99'      # Product version, not plugin API version
+    min_plugin_api_version = '1.0'
+    max_plugin_api_version = '1.0'
     graphql_schema = 'itambox_esign.graphql.schema'  # Optional GraphQL hook
 
     required_settings = ['DOCUSIGN_API_KEY']
@@ -102,3 +100,24 @@ PLUGINS_CONFIG = {
 ```
 
 These settings are deep-merged with your plugin's `default_settings` and made available at runtime via `settings.PLUGINS_RESOLVED_CONFIG['itambox_esign']`.
+
+## Trust and failure behavior
+
+Plugins are trusted, unsandboxed, in-process Django code. They have the same
+Python process and database privileges as ITAMbox and may inject middleware.
+Installing or enabling a plugin is therefore equivalent to installing trusted
+Python code. There is no capability sandbox, signature verification, or
+per-tenant activation.
+
+Activation happens only at startup. If a configured plugin is missing,
+incompatible, malformed, or raises while composing its hooks, ITAMbox disables
+that plugin, keeps Stable core and other valid plugins running, and publishes a
+redacted diagnostic in the UI and through `python manage.py plugins`. A failed
+plugin contributes no routes, middleware, REST router, GraphQL schema, menu, or
+template hook.
+
+Removal and reinstall are manual operations. Removing a name from
+`PLUGINS`/`ITAMBOX_PLUGINS` does not remove database tables, ContentTypes,
+changelog rows, or referencing configuration. ITAMbox 1.0 deliberately does
+not automate orphan-data cleanup. Follow the [plugin removal and recovery
+runbook](../operations/plugin-runbook.md).

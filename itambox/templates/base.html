@@ -113,6 +113,7 @@
         {% endfor %}
       {% endif %}
     </div>
+    {% include "global_includes/_plugin_diagnostics.html" %}
     {# Vendor JS (preserves global assignments — bootstrap, GridStack, TomSelect) #}
     <script src="{% static 'dist/vendor/bootstrap.bundle.min.js' %}"></script>
     <script src="{% static 'dist/vendor/gridstack-all.js' %}"></script>

@@ -1,7 +1,7 @@
 # ITAMbox Plugin Extension Hooks
 
-!!! warning "Status: Beta"
-    The plugin extension hook API is under active development and may change between minor releases.
+!!! warning "Status: Experimental"
+    Only the four registry methods and `PluginConfig.graphql_schema` documented here are supported for plugin API version 1.0. Other hooks and internals are private/unstable and may change without notice.
 
 This document details the developer hooks available to extend the web UI, menus, REST API, and GraphQL schema.
 

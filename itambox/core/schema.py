@@ -10,6 +10,7 @@ import inventory.schema
 import licenses.schema
 import software.schema
 import subscriptions.schema
+from itambox.plugins.utils import is_plugin_active, record_plugin_failure
 
 logger = logging.getLogger(__name__)
 
@@ -31,6 +32,8 @@ mutation_bases = [
 
 # Dynamically import plugin schemas
 for plugin_name in getattr(settings, "PLUGINS", []):
+    if not is_plugin_active(plugin_name):
+        continue
     try:
         plugin_config = apps.get_app_config(plugin_name)
         graphql_schema_path = getattr(plugin_config, "graphql_schema", None)
@@ -40,8 +43,9 @@ for plugin_name in getattr(settings, "PLUGINS", []):
                 query_bases.append(getattr(schema_module, "Query"))
             if hasattr(schema_module, "Mutation"):
                 mutation_bases.append(getattr(schema_module, "Mutation"))
-    except (LookupError, ImportError) as e:
-        logger.warning("Failed to load GraphQL schema for plugin %s: %s", plugin_name, e)
+    except Exception as exc:  # broad except: boundary-isolation: one plugin schema must not abort core schema startup
+        record_plugin_failure(plugin_name, exc, stage="graphql")
+        logger.warning("GraphQL contribution disabled for plugin %s (%s)", plugin_name, type(exc).__name__)
 
 query_bases.append(graphene.ObjectType)
 mutation_bases.append(graphene.ObjectType)

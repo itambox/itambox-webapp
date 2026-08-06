@@ -166,6 +166,7 @@ nav:
       - Extension Hooks: 'plugins/hooks.md'
   - Operations:
       - Installation: 'operations/installation.md'
+      - Plugin Removal and Recovery: 'operations/plugin-runbook.md'
       - Upgrades: 'operations/upgrades.md'
       - Backup & Restore: 'operations/backup-restore.md'
       - Recovery Qualification Drill: 'operations/recovery-drill.md'
