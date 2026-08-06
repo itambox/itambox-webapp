@@ -300,7 +300,8 @@ CAPABILITY_LIMITATIONS = {
     "organization.role_grants": (),
     "organization.resource_grants": (),
     "platform.plugins": (
-        "Lifecycle hooks are still being defined; a plugin that loads today may need changes to keep loading.",
+        "Only the bounded extension points documented for plugin API 1.0 are supported; "
+        "Experimental interfaces may change in any release.",
         "Plugin code runs in-process with full database access and is not sandboxed.",
     ),
     "procurement.core": (),
