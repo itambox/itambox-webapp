@@ -1816,108 +1816,6 @@
       "count": 1
     },
     {
-      "path": "itambox/core/reports/compiler.py",
-      "context": "FunctionDef:_format_per_currency",
-      "statement": "from extras.templatetags.money import money as _money_fmt",
-      "count": 1
-    },
-    {
-      "path": "itambox/core/reports/compiler.py",
-      "context": "FunctionDef:_money",
-      "statement": "from extras.templatetags.money import money as _money_fmt",
-      "count": 1
-    },
-    {
-      "path": "itambox/core/reports/compiler.py",
-      "context": "FunctionDef:_record_currency",
-      "statement": "from django.conf import settings as _settings",
-      "count": 1
-    },
-    {
-      "path": "itambox/core/reports/compiler.py",
-      "context": "FunctionDef:compile_report_context",
-      "statement": "from assets.models import Asset",
-      "count": 2
-    },
-    {
-      "path": "itambox/core/reports/compiler.py",
-      "context": "FunctionDef:compile_report_context",
-      "statement": "from assets.models import AssetMaintenance",
-      "count": 1
-    },
-    {
-      "path": "itambox/core/reports/compiler.py",
-      "context": "FunctionDef:compile_report_context",
-      "statement": "from assets.models.lifecycle import AssetDisposal",
-      "count": 1
-    },
-    {
-      "path": "itambox/core/reports/compiler.py",
-      "context": "FunctionDef:compile_report_context",
-      "statement": "from assets.models.lifecycle import Warranty",
-      "count": 1
-    },
-    {
-      "path": "itambox/core/reports/compiler.py",
-      "context": "FunctionDef:compile_report_context",
-      "statement": "from compliance.models import CustodyReceipt",
-      "count": 1
-    },
-    {
-      "path": "itambox/core/reports/compiler.py",
-      "context": "FunctionDef:compile_report_context",
-      "statement": "from django.conf import settings as _settings",
-      "count": 2
-    },
-    {
-      "path": "itambox/core/reports/compiler.py",
-      "context": "FunctionDef:compile_report_context",
-      "statement": "from extras.models import ReportTemplate",
-      "count": 1
-    },
-    {
-      "path": "itambox/core/reports/compiler.py",
-      "context": "FunctionDef:compile_report_context",
-      "statement": "from extras.templatetags.money import money as _money_fmt",
-      "count": 1
-    },
-    {
-      "path": "itambox/core/reports/compiler.py",
-      "context": "FunctionDef:compile_report_context",
-      "statement": "from inventory.models import Accessory, Component, Consumable",
-      "count": 1
-    },
-    {
-      "path": "itambox/core/reports/compiler.py",
-      "context": "FunctionDef:compile_report_context",
-      "statement": "from licenses.models import License",
-      "count": 1
-    },
-    {
-      "path": "itambox/core/reports/compiler.py",
-      "context": "FunctionDef:compile_report_context",
-      "statement": "from procurement.models import Contract",
-      "count": 1
-    },
-    {
-      "path": "itambox/core/reports/compiler.py",
-      "context": "FunctionDef:compile_report_context",
-      "statement": "from software.models import Software",
-      "count": 1
-    },
-    {
-      "path": "itambox/core/reports/compiler.py",
-      "context": "FunctionDef:compile_report_context",
-      "statement": "from subscriptions.models import Subscription",
-      "count": 1
-    },
-    {
-      "path": "itambox/core/reports/compiler.py",
-      "context": "FunctionDef:compile_report_context/FunctionDef:_resolve_currency",
-      "statement": "from django.conf import settings as _settings",
-      "count": 1
-    },
-    {
       "path": "itambox/core/reports/exporters.py",
       "context": "FunctionDef:report_xlsx_bytes",
       "statement": "from openpyxl import Workbook",
@@ -2664,7 +2562,7 @@
     {
       "path": "itambox/extras/views.py",
       "context": "ClassDef:ReportTemplateDownloadView/FunctionDef:get",
-      "statement": "from core.reports import compile_report_context, get_polished_system_html_template",
+      "statement": "from core.reports import build_report_context, get_polished_system_html_template",
       "count": 1
     },
     {
@@ -2694,7 +2592,7 @@
     {
       "path": "itambox/extras/views.py",
       "context": "ClassDef:ReportTemplatePreviewView/FunctionDef:post",
-      "statement": "from core.reports import compile_report_context, get_polished_system_html_template",
+      "statement": "from core.reports import build_report_context, get_polished_system_html_template",
       "count": 1
     },
     {

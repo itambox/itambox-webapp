@@ -1,7 +1,7 @@
 import csv
 import io
 import logging
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 from django.core.exceptions import ValidationError
 from django.core.files.base import ContentFile
@@ -13,7 +13,7 @@ from django.utils.translation import gettext as _
 from core.csv_utils import csv_safe, safe_csv_filename
 from core.events import send_notification_to_channel
 from core.models import EmailSettings
-from core.reports import compile_report_context, get_polished_system_html_template
+from core.reports import build_report_context, get_polished_system_html_template
 from core.tasks.context import TaskContext
 from extras.models import FileAttachment, ReportGenerationArchive, ScheduledReport
 
@@ -26,6 +26,32 @@ class _ReportOutput:
     attachment_content: bytes | str | None = None
     attachment_filename: str = ""
     attachment_mime: str = ""
+
+
+@dataclass
+class _DeliveryOutcome:
+    attempted: int = 0
+    succeeded: int = 0
+    failures: list[str] = field(default_factory=list)
+
+    @property
+    def status(self):
+        if not self.failures:
+            return "success"
+        return "partial" if self.succeeded else "failed"
+
+    def record_success(self):
+        self.attempted += 1
+        self.succeeded += 1
+
+    def record_failure(self, failure):
+        self.attempted += 1
+        self.failures.append(str(failure))
+
+    def merge(self, other):
+        self.attempted += other.attempted
+        self.succeeded += other.succeeded
+        self.failures.extend(other.failures)
 
 
 def _report_filename(template, extension):
@@ -124,17 +150,18 @@ def _archive_report_output(sched, template, output, active_tenant):
     return archive_entry
 
 
-def _deliver_report_email(sched, template, output):
-    if not sched.recipients:
-        return
+def _resolve_report_recipients(sched):
+    return [recipient.strip() for recipient in sched.recipients.split(",") if recipient.strip()]
+
+
+def _deliver_report_email(sched, template, output, recipient_list=None):
+    recipient_list = _resolve_report_recipients(sched) if recipient_list is None else recipient_list
+    if not recipient_list:
+        return False
 
     email_config = EmailSettings.load()
     if not email_config or not email_config.enabled:
         raise ValidationError(_("SMTP Outbound Email is disabled in settings."))
-
-    recipient_list = [recipient.strip() for recipient in sched.recipients.split(",") if recipient.strip()]
-    if not recipient_list:
-        return
 
     email = EmailMessage(
         subject=_("[Scheduled Report] %(name)s") % {"name": sched.name},
@@ -147,9 +174,10 @@ def _deliver_report_email(sched, template, output):
     elif output.attachment_content:
         email.attach(output.attachment_filename, output.attachment_content, output.attachment_mime)
     email.send(fail_silently=False)
+    return True
 
 
-def _notify_report_channels(sched, summary_cards, total_rows):
+def _deliver_report_channels(sched, summary_cards, total_rows):
     report_subject = _("[Scheduled Report] %(name)s") % {"name": sched.name}
     card_lines = "\n".join("%s: %s" % (card.get("label"), card.get("value")) for card in (summary_cards or [])) or (
         _("Rows: %(n)s") % {"n": total_rows}
@@ -162,9 +190,23 @@ def _notify_report_channels(sched, summary_cards, total_rows):
         "format": sched.format.upper(),
         "summary": card_lines,
     }
+    outcome = _DeliveryOutcome()
     for channel in sched.channels.all():
-        if channel.enabled:
-            send_notification_to_channel(channel, report_subject, report_body)
+        if not channel.enabled:
+            continue
+        try:
+            delivered = send_notification_to_channel(channel, report_subject, report_body)
+        # broad except: boundary-isolation: channel integrations may raise implementation-specific failures
+        except Exception as error:
+            logger.exception("Scheduled report channel '%s' raised during delivery.", channel.name)
+            outcome.record_failure(f"{channel.name}: {error}")
+        else:
+            if delivered:
+                outcome.record_success()
+            else:
+                logger.warning("Scheduled report channel '%s' reported delivery failure.", channel.name)
+                outcome.record_failure(f"{channel.name}: delivery returned false")
+    return outcome
 
 
 def _resolve_report_scope(sched):
@@ -186,7 +228,7 @@ def _process_scheduled_report(sched, active_tenant, filter_tenants):
     archive_entry = None
     try:
         template = sched.report
-        headers, rows, summary_cards, _grouped_data, _chart_svg, context_data = compile_report_context(
+        headers, rows, summary_cards, _grouped_data, _chart_svg, context_data = build_report_context(
             template,
             active_tenant=active_tenant,
             filter_tenants=filter_tenants,
@@ -194,22 +236,56 @@ def _process_scheduled_report(sched, active_tenant, filter_tenants):
         context_data["scheduled_report"] = sched
         output = _render_report_output(sched, template, headers, rows, context_data)
         archive_entry = _archive_report_output(sched, template, output, active_tenant)
-        _deliver_report_email(sched, template, output)
-        _notify_report_channels(sched, summary_cards, len(rows))
-        sched.last_status = "success"
-        sched.save()
-        logger.info("Scheduled report '%s' successfully processed.", sched.name)
-        return True
     # broad except: task-isolation: one scheduled report failure must not abort the worker batch
     except Exception as error:
         logger.exception("Error generating scheduled report '%s'", sched.name)
-        sched.last_status = f"failed: {error}"
+        sched.last_status = f"failed: {error}"[:50]
         sched.save()
         if archive_entry:
             archive_entry.status = "failed"
             archive_entry.error_message = str(error)
             archive_entry.save()
         return False
+
+    delivery = _DeliveryOutcome()
+    recipients = _resolve_report_recipients(sched)
+    if recipients:
+        try:
+            delivered = _deliver_report_email(sched, template, output, recipients)
+        # broad except: boundary-isolation: SMTP providers expose implementation-specific delivery failures
+        except Exception as error:
+            logger.exception("Scheduled report email delivery failed for '%s'.", sched.name)
+            delivery.record_failure(f"email: {error}")
+        else:
+            if delivered:
+                delivery.record_success()
+            else:
+                delivery.record_failure("email: delivery returned false")
+
+    delivery.merge(_deliver_report_channels(sched, summary_cards, len(rows)))
+    if delivery.failures:
+        delivery_detail = "\n".join(delivery.failures)
+        if archive_entry:
+            archive_entry.error_message = delivery_detail
+            archive_entry.save(update_fields=["error_message"])
+            sched.last_status = delivery.status
+        else:
+            sched.last_status = f"delivery_{delivery.status}: {delivery_detail}"[:50]
+        sched.save()
+        logger.warning(
+            "Scheduled report '%s' completed with delivery status '%s': %s",
+            sched.name,
+            delivery.status,
+            "; ".join(delivery.failures),
+        )
+        # Generation and archival completed.  Do not signal a task retry here:
+        # retrying after a partial fan-out could duplicate already successful deliveries.
+        return delivery.status != "failed"
+
+    sched.last_status = "success"
+    sched.save()
+    logger.info("Scheduled report '%s' successfully processed.", sched.name)
+    return True
 
 
 def generate_scheduled_report_task(scheduled_report_id: int) -> bool | None:

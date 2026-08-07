@@ -2,16 +2,22 @@ from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
 
 from django.contrib.auth import get_user_model
+from django.contrib.messages import get_messages
 from django.core.exceptions import ValidationError
 from django.test import TestCase, override_settings
 from django.urls import reverse
+from django.utils import translation
 from django_q.models import Schedule
 
 from core.tasks.reports import (
     _archive_report_output,
+    _deliver_report_channels,
     _deliver_report_email,
+    _DeliveryOutcome,
+    _process_scheduled_report,
     _render_report_output,
     _ReportOutput,
+    _resolve_report_recipients,
     _resolve_report_scope,
 )
 from extras.models import NotificationChannel, ReportGenerationArchive, ReportTemplate, ScheduledReport
@@ -146,6 +152,97 @@ class ScheduledReportingAndAlertsTests(TestCase):
         # Verify Slack channel was called
         mock_request_pinned.assert_called_once()
 
+    def test_delivery_failure_is_partial_and_later_channels_are_attempted(self):
+        """One channel failure is persisted without hiding later delivery success."""
+        failed_channel = NotificationChannel.objects.create(
+            name="Failing Report Channel",
+            channel_type=NotificationChannel.TYPE_SLACK,
+            enabled=True,
+            tenant=self.tenant,
+        )
+        healthy_channel = NotificationChannel.objects.create(
+            name="Healthy Report Channel",
+            channel_type=NotificationChannel.TYPE_TEAMS,
+            enabled=True,
+            tenant=self.tenant,
+        )
+        sched = ScheduledReport.objects.create(
+            name="Partial Delivery Schedule",
+            report=self.template,
+            tenant=self.tenant,
+            frequency="once",
+            format=ScheduledReport.FORMAT_HTML,
+            save_to_archive=True,
+        )
+        sched.channels.add(failed_channel, healthy_channel)
+
+        with patch("core.tasks.reports.send_notification_to_channel", side_effect=[False, True]) as send_channel:
+            from core.tasks import generate_scheduled_report_task
+
+            self.assertTrue(generate_scheduled_report_task(sched.pk))
+
+        sched.refresh_from_db()
+        self.assertEqual(sched.last_status, "partial")
+        self.assertEqual(send_channel.call_count, 2)
+        archive = ReportGenerationArchive.objects.get(scheduled_report=sched)
+        self.assertEqual(archive.status, "success")
+        self.assertIn("Failing Report Channel", archive.error_message)
+
+    def test_delivery_outcome_marks_all_failures_as_failed(self):
+        outcome = _DeliveryOutcome()
+        outcome.record_failure("first")
+        outcome.record_failure("second")
+
+        self.assertEqual(outcome.status, "failed")
+        self.assertEqual(outcome.attempted, 2)
+        self.assertEqual(outcome.succeeded, 0)
+
+    def test_delivery_outcome_tracks_success_and_partial(self):
+        outcome = _DeliveryOutcome()
+        self.assertEqual(outcome.status, "success")
+        outcome.record_success()
+        outcome.record_failure("one channel failed")
+        self.assertEqual(outcome.status, "partial")
+        self.assertEqual(outcome.attempted, 2)
+        self.assertEqual(outcome.succeeded, 1)
+
+        merged = _DeliveryOutcome()
+        merged.merge(outcome)
+        self.assertEqual(merged.status, "partial")
+        self.assertEqual(merged.attempted, 2)
+
+    def test_deliver_report_email_returns_false_without_recipients(self):
+        sched = ScheduledReport.objects.create(
+            name="No Recipient Schedule",
+            report=self.template,
+            tenant=self.tenant,
+            frequency="once",
+            format=ScheduledReport.FORMAT_HTML,
+            save_to_archive=False,
+        )
+        self.assertEqual(_resolve_report_recipients(sched), [])
+        self.assertFalse(_deliver_report_email(sched, self.template, _ReportOutput(email_body="body")))
+
+    def test_deliver_report_channels_skips_disabled_channels(self):
+        disabled_channel = NotificationChannel.objects.create(
+            name="Disabled Report Channel",
+            channel_type=NotificationChannel.TYPE_SLACK,
+            enabled=False,
+            tenant=self.tenant,
+        )
+        sched = ScheduledReport.objects.create(
+            name="Disabled Channel Schedule",
+            report=self.template,
+            tenant=self.tenant,
+            frequency="once",
+            format=ScheduledReport.FORMAT_HTML,
+        )
+        sched.channels.add(disabled_channel)
+        with patch("core.tasks.reports.send_notification_to_channel") as send_channel:
+            outcome = _deliver_report_channels(sched, [], 0)
+            send_channel.assert_not_called()
+        self.assertEqual(outcome.status, "success")
+
     @override_settings(REPORT_DESIGNER_ENABLED=True)
     def test_report_preview_compilation_and_view(self):
         """Test report template context compilation and preview endpoint rendering without ValueError."""
@@ -166,11 +263,12 @@ class ScheduledReportingAndAlertsTests(TestCase):
         )
 
         # Test direct compilation of context
-        from core.reports import compile_report_context
+        from core.reports import build_report_context
 
-        headers, rows, summary_cards, grouped_data, chart_svg, context_data = compile_report_context(
-            self.template, active_tenant=self.tenant
-        )
+        with translation.override("en"):
+            headers, rows, summary_cards, grouped_data, chart_svg, context_data = build_report_context(
+                self.template, active_tenant=self.tenant
+            )
 
         self.assertIn("Total Hardware Assets", [c["label"] for c in summary_cards])
         self.assertIn("$1,200.00", [c["value"] for c in summary_cards])
@@ -203,9 +301,30 @@ class ScheduledReportingAndAlertsTests(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, reverse("extras:reporttemplate_list"))
 
+    @patch("core.tasks.generate_scheduled_report_task", return_value=False)
+    def test_trigger_reports_delivery_failure_after_successful_generation(self, mock_generate):
+        sched = ScheduledReport.objects.create(
+            name="Delivery Failure UI",
+            report=self.template,
+            tenant=self.tenant,
+            frequency="once",
+            format=ScheduledReport.FORMAT_HTML,
+            save_to_archive=False,
+        )
+        sched.last_status = "delivery_failed: slack down"
+        sched.save(update_fields=["last_status"])
+        self.client.force_login(self.user)
+
+        response = self.client.post(reverse("extras:scheduledreport_trigger", kwargs={"pk": sched.pk}))
+
+        self.assertEqual(response.status_code, 302)
+        self.assertTrue(mock_generate.called)
+        rendered_messages = [str(message) for message in get_messages(response.wsgi_request)]
+        self.assertTrue(any("all deliveries failed" in message for message in rendered_messages))
+
     def test_new_report_types_compilation(self):
         """Test that the new report types compile context and preview successfully."""
-        from core.reports import compile_report_context
+        from core.reports import build_report_context
 
         # 1. Test asset_depreciation
         deprec_template = ReportTemplate.objects.create(
@@ -222,7 +341,7 @@ class ScheduledReportingAndAlertsTests(TestCase):
             include_summary_cards=True,
             include_distribution_chart=True,
         )
-        headers, rows, summary_cards, grouped_data, chart_svg, context_data = compile_report_context(
+        headers, rows, summary_cards, grouped_data, chart_svg, context_data = build_report_context(
             deprec_template, active_tenant=self.tenant
         )
         self.assertIn("Total Depreciable Assets", [c["label"] for c in summary_cards])
@@ -244,15 +363,15 @@ class ScheduledReportingAndAlertsTests(TestCase):
             include_summary_cards=True,
             include_distribution_chart=True,
         )
-        headers, rows, summary_cards, grouped_data, chart_svg, context_data = compile_report_context(
+        headers, rows, summary_cards, grouped_data, chart_svg, context_data = build_report_context(
             software_template, active_tenant=self.tenant
         )
         self.assertIn("Total Software Products", [c["label"] for c in summary_cards])
         self.assertIsNotNone(chart_svg)
 
-    @patch("core.tasks.reports.compile_report_context")
+    @patch("core.tasks.reports.build_report_context")
     def test_pre_archive_failure_preserves_status(self, mock_compile):
-        """compile_report_context raising before archive_entry is assigned must
+        """build_report_context raising before archive_entry is assigned must
         preserve the original failure — no UnboundLocalError."""
         from core.tasks import generate_scheduled_report_task
         from organization.models import Tenant
@@ -377,6 +496,75 @@ class ScheduledReportingAndAlertsTests(TestCase):
 
         self.assertIsNone(_resolve_report_scope(sched))
 
+    def test_channel_delivery_reports_partial_failures_and_skips_disabled_channels(self):
+        channels = [
+            SimpleNamespace(name="email", enabled=True),
+            SimpleNamespace(name="disabled", enabled=False),
+            SimpleNamespace(name="webhook", enabled=True),
+            SimpleNamespace(name="slack", enabled=True),
+        ]
+        sched = SimpleNamespace(
+            name="Channel report",
+            format=ScheduledReport.FORMAT_HTML,
+            channels=SimpleNamespace(all=lambda: channels),
+        )
+        with patch(
+            "core.tasks.reports.send_notification_to_channel",
+            side_effect=[True, RuntimeError("webhook down"), False],
+        ):
+            outcome = _deliver_report_channels(sched, [{"label": "Rows", "value": "2"}], 2)
+
+        self.assertEqual(outcome.attempted, 3)
+        self.assertEqual(outcome.succeeded, 1)
+        self.assertEqual(outcome.status, "partial")
+        self.assertEqual(len(outcome.failures), 2)
+
+    def test_scheduled_delivery_email_exception_is_observable(self):
+        sched = SimpleNamespace(
+            name="Email failure",
+            report=self.template,
+            last_status="",
+            save=MagicMock(),
+        )
+        archive = MagicMock()
+        output = _ReportOutput(email_body="body")
+        with (
+            patch("core.tasks.reports.build_report_context", return_value=([], [], [], {}, "", {})),
+            patch("core.tasks.reports._render_report_output", return_value=output),
+            patch("core.tasks.reports._archive_report_output", return_value=archive),
+            patch("core.tasks.reports._resolve_report_recipients", return_value=["a@example.com"]),
+            patch("core.tasks.reports._deliver_report_email", side_effect=RuntimeError("smtp down")),
+            patch("core.tasks.reports._deliver_report_channels", return_value=_DeliveryOutcome()),
+        ):
+            success = _process_scheduled_report(sched, self.tenant, [])
+
+        self.assertFalse(success)
+        self.assertEqual(sched.last_status, "failed")
+        self.assertIn("smtp down", archive.error_message)
+
+    def test_scheduled_delivery_false_email_is_observable(self):
+        sched = SimpleNamespace(
+            name="False email delivery",
+            report=self.template,
+            last_status="",
+            save=MagicMock(),
+        )
+        archive = None
+        output = _ReportOutput(email_body="body")
+        with (
+            patch("core.tasks.reports.build_report_context", return_value=([], [], [], {}, "", {})),
+            patch("core.tasks.reports._render_report_output", return_value=output),
+            patch("core.tasks.reports._archive_report_output", return_value=archive),
+            patch("core.tasks.reports._resolve_report_recipients", return_value=["a@example.com"]),
+            patch("core.tasks.reports._deliver_report_email", return_value=False),
+            patch("core.tasks.reports._deliver_report_channels", return_value=_DeliveryOutcome()),
+        ):
+            success = _process_scheduled_report(sched, self.tenant, [])
+
+        self.assertFalse(success)
+        self.assertTrue(sched.last_status.startswith("delivery_failed:"))
+        self.assertIn("delivery returned false", sched.last_status)
+
 
 class ReportCrossTenantPermissionTests(TestCase):
     """RBAC matrix from WP-9a: permission gate for cross-tenant report aggregation."""
@@ -404,10 +592,10 @@ class ReportCrossTenantPermissionTests(TestCase):
 
     def test_no_active_tenant_without_permission_raises_permission_denied(self):
         """Non-holder + empty filter_tenants + no active_tenant → PermissionDenied."""
-        from core.reports import compile_report_context
+        from core.reports import build_report_context
 
         with self.assertRaises(PermissionError):
-            compile_report_context(self.template, active_tenant=None, filter_tenants=None)
+            build_report_context(self.template, active_tenant=None, filter_tenants=None)
 
     def test_non_holder_with_active_tenant_falls_back_to_single_tenant(self):
         """Non-holder + empty filter_tenants + active_tenant → single-tenant."""
@@ -415,7 +603,7 @@ class ReportCrossTenantPermissionTests(TestCase):
         # lacks the cross-tenant permission and active_tenant is present.
         filter_tenants = None
         active_tenant = self.tenant_a
-        # Simulate what compile_report_context does with those inputs
+        # Simulate what build_report_context does with those inputs
         if not filter_tenants:
             user = self.user
             if user is not None and user.has_perm("reports.view_cross_tenant_reports"):

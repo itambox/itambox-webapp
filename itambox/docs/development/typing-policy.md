@@ -397,7 +397,7 @@ type that a scheduled-report renderer hands to the archive and delivery steps.
 It is the first existing named task result contract admitted — Slice 3 admitted
 the scope manager that wraps a task, this admits a value a task produces. The
 renderer and task functions that build and consume it, and the report-provider
-architecture behind `compile_report_context`, remain outside this slice; no
+architecture behind `build_report_context`, remain outside this slice; no
 annotation is added to a renderer function here, and report-provider ownership
 remains #83.
 

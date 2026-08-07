@@ -159,6 +159,8 @@ Navigate to **Extras → Report Templates** and click **Add**:
 | **Filter Tenants** | Limit data to selected tenants (blank = global aggregate) |
 | **Description** | Optional notes |
 
+Report providers declare the model-level view permissions relevant to their domain as contract metadata for auditing and future authorization surfaces. The current preview and download boundary remains the existing `extras.view_reporttemplate` permission plus report-designer capability; provider metadata does not silently revoke access from existing roles. Scheduled reports run in the trusted task context and retain their configured tenant scope.
+
 ### Available Report Types
 
 | Report Type | Slug | What It Contains |

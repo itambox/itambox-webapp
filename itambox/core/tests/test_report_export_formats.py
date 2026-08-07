@@ -37,7 +37,7 @@ class ReportExportIntegrationTests(TenantTestMixin, TestCase):
 
     def test_compile_then_xlsx_contains_real_asset(self):
         from assets.models import Asset, AssetRole, StatusLabel
-        from core.reports import compile_report_context
+        from core.reports import build_report_context
         from extras.models import ReportTemplate
 
         status = StatusLabel.objects.create(name="Deployed Exp", slug="deployed-exp", type="deployed", color="28a745")
@@ -58,7 +58,7 @@ class ReportExportIntegrationTests(TenantTestMixin, TestCase):
             tenant=self.tenant,
             included_columns=["asset_tag", "name", "purchase_cost"],
         )
-        headers, rows, *_ = compile_report_context(tpl, active_tenant=self.tenant)
+        headers, rows, *_ = build_report_context(tpl, active_tenant=self.tenant)
 
         data = report_xlsx_bytes(headers, rows, sheet_title=tpl.name)
         from openpyxl import load_workbook

@@ -145,6 +145,11 @@ LAYER_KEYWORDS = {
     "model": "domain-model",
     "models": "domain-model",
     "reconciliation": "domain-service",
+    # A domain application's report providers: they read that domain's models
+    # and hand rows back to core.reports, which renders them. No presentation
+    # segment precedes it in any module name, so ``views.reports`` -- were one
+    # ever written -- still reads as presentation on its earlier segment.
+    "reports": "domain-service",
     "schema": "presentation",
     "search": "presentation",
     "serializers": "presentation",

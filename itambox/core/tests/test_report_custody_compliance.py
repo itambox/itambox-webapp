@@ -6,7 +6,7 @@ from model_bakery import baker
 
 from assets.models import Asset, StatusLabel
 from compliance.models import CustodyReceipt
-from core.reports import compile_report_context
+from core.reports import build_report_context
 from core.tests.mixins import TenantTestMixin
 from extras.models import ReportTemplate
 from organization.models import AssetHolder, Tenant
@@ -71,7 +71,7 @@ class CustodyComplianceReportTests(TenantTestMixin, TestCase):
     def test_row_content_and_tenant_isolation(self):
         """Rows are scoped to the active tenant; tenant B's receipt is excluded."""
         self.clear_tenant_context()
-        _, rows, summary_cards, *_ = compile_report_context(self.template, active_tenant=self.tenant)
+        _, rows, summary_cards, *_ = build_report_context(self.template, active_tenant=self.tenant)
         # Only 2 rows (the 2 tenant-A receipts), not 3
         self.assertEqual(len(rows), 2)
 
@@ -90,7 +90,7 @@ class CustodyComplianceReportTests(TenantTestMixin, TestCase):
     def test_summary_cards(self):
         """Summary cards show correct totals for the scoped tenant."""
         self.clear_tenant_context()
-        _, _, summary_cards, *_ = compile_report_context(self.template, active_tenant=self.tenant)
+        _, _, summary_cards, *_ = build_report_context(self.template, active_tenant=self.tenant)
         self.assertEqual(_summary(summary_cards, "Total Receipts"), "2")
         self.assertEqual(_summary(summary_cards, "Pending Sign-offs"), "1")
         self.assertEqual(_summary(summary_cards, "Acceptance Rate"), "50.0%")
@@ -98,7 +98,7 @@ class CustodyComplianceReportTests(TenantTestMixin, TestCase):
     def test_no_money_cell_starts_with_dollar(self):
         """Custody compliance has no monetary columns; no cell should start with '$'."""
         self.clear_tenant_context()
-        _, rows, summary_cards, *_ = compile_report_context(self.template, active_tenant=self.tenant)
+        _, rows, summary_cards, *_ = build_report_context(self.template, active_tenant=self.tenant)
         for row in rows:
             for key, val in row.items():
                 if key == "_group_by":
@@ -113,7 +113,7 @@ class CustodyComplianceReportTests(TenantTestMixin, TestCase):
     def test_filter_tenants_scoping(self):
         """filter_tenants parameter correctly scopes to the specified tenants."""
         self.clear_tenant_context()
-        _, rows, summary_cards, *_ = compile_report_context(self.template, filter_tenants=[self.tenant])
+        _, rows, summary_cards, *_ = build_report_context(self.template, filter_tenants=[self.tenant])
         self.assertEqual(len(rows), 2)
         self.assertEqual(_summary(summary_cards, "Total Receipts"), "2")
 
@@ -121,7 +121,7 @@ class CustodyComplianceReportTests(TenantTestMixin, TestCase):
         """When the tenant has no receipts, the mock fallback row is returned."""
         empty_tenant = Tenant.objects.create(name="Empty Tenant", slug="custody-empty")
         self.clear_tenant_context()
-        _, rows, summary_cards, *_ = compile_report_context(self.template, active_tenant=empty_tenant)
+        _, rows, summary_cards, *_ = build_report_context(self.template, active_tenant=empty_tenant)
         self.assertEqual(len(rows), 1)
         # Mock row should not contain real receipt identifiers
         mock_status = rows[0].get("Acceptance Status")

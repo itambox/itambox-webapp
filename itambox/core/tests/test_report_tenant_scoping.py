@@ -14,7 +14,7 @@ from django.utils import timezone
 from model_bakery import baker
 
 from assets.models import Asset, StatusLabel
-from core.reports import compile_report_context
+from core.reports import build_report_context
 from core.tests.mixins import TenantTestMixin
 from extras.models import ReportTemplate
 from licenses.models import License, LicenseSeatAssignment
@@ -45,7 +45,7 @@ class LicenseUtilizationReportTests(TenantTestMixin, TestCase):
 
     def test_assigned_seats_excludes_soft_deleted(self):
         self.clear_tenant_context()
-        _, rows, *_ = compile_report_context(self.template, active_tenant=self.tenant)
+        _, rows, *_ = build_report_context(self.template, active_tenant=self.tenant)
         row = next(r for r in rows if r.get("License Name") == "Acme EA")
         self.assertEqual(row["Assigned Seats"], "2")  # not 3
         self.assertEqual(row["Available Seats"], "8")  # 10 - 2
@@ -77,7 +77,7 @@ class SoftwareInventoryReportTests(TenantTestMixin, TestCase):
 
     def test_inventory_scoped_to_report_tenant(self):
         self.clear_tenant_context()
-        _, rows, summary_cards, *_ = compile_report_context(self.template, active_tenant=self.tenant)
+        _, rows, summary_cards, *_ = build_report_context(self.template, active_tenant=self.tenant)
         names = [r.get("Software Product") for r in rows]
         self.assertIn("SoftA", names)
         self.assertNotIn("SoftB", names)

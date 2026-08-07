@@ -3916,22 +3916,6 @@
       "count": 1
     },
     {
-      "path": "itambox/core/reports/__init__.py",
-      "code": "F401",
-      "message": "'.compiler.compile_report_context' imported but unused",
-      "source": "from .compiler import compile_report_context",
-      "context": "Module:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/core/reports/__init__.py",
-      "code": "F401",
-      "message": "'.templates.get_polished_system_html_template' imported but unused",
-      "source": "from .templates import get_polished_system_html_template",
-      "context": "Module:body",
-      "count": 1
-    },
-    {
       "path": "itambox/core/reports/charts.py",
       "code": "B907",
       "message": "'145 + bar_width' is manually surrounded by quotes, consider using the `!r` conversion flag.",
@@ -4097,22 +4081,6 @@
       "message": "line too long (170 > 120 characters)",
       "source": "        f'<text x=\"110\" y=\"132\" text-anchor=\"middle\" font-size=\"9\" font-weight=\"600\" fill=\"#64748b\" text-transform=\"uppercase\" letter-spacing=\"0.5px\">{_(\"Total\")}</text>'",
       "context": "Module:body/FunctionDef:generate_doughnut_chart:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/core/reports/compiler.py",
-      "code": "C901",
-      "message": "'compile_report_context' is too complex (388)",
-      "source": "def compile_report_context(template, active_tenant=None, filter_tenants=None):",
-      "context": "Module:body/FunctionDef:compile_report_context:self",
-      "count": 1
-    },
-    {
-      "path": "itambox/core/reports/compiler.py",
-      "code": "F401",
-      "message": "'django.contrib.contenttypes.models.ContentType' imported but unused",
-      "source": "from django.contrib.contenttypes.models import ContentType",
-      "context": "Module:body",
       "count": 1
     },
     {
@@ -5359,7 +5327,7 @@
       "path": "itambox/core/tests/test_report_hardware_inventory.py",
       "code": "E402",
       "message": "module level import not at top of file",
-      "source": "from core.reports import compile_report_context",
+      "source": "from core.reports import build_report_context",
       "context": "Module:body",
       "count": 1
     },
