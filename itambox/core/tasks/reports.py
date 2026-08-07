@@ -257,6 +257,7 @@ def _process_scheduled_report(sched, active_tenant, filter_tenants):
     if recipients:
         try:
             delivered = _deliver_report_email(sched, template, output, recipients)
+        # broad except: boundary-isolation: SMTP providers expose implementation-specific delivery failures
         except Exception as error:
             logger.exception("Scheduled report email delivery failed for '%s'.", sched.name)
             delivery.record_failure(f"email: {error}")

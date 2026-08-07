@@ -194,6 +194,7 @@ PLATFORM_LAYER_PREFIXES = {
 # an override map that absorbs rule defects rots into a lookup table.
 MODULE_LAYER_OVERRIDES = {
     "assets.depreciation": "domain-service",
+    "assets.reports": "domain-service",
     "assets.scanning": "domain-service",
     "compliance.providers": "domain-service",
     "compliance.registry": "domain-service",

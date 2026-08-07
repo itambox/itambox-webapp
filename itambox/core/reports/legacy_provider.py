@@ -6,7 +6,6 @@ behind the provider contract while each domain is moved independently.
 
 from .contracts import PUBLIC_REPORT_TYPES, ReportDefinition, ReportResult
 from .legacy import compile_legacy_report_context
-from .registry import register_report_provider
 
 
 class LegacyReportProvider(ReportDefinition):
@@ -25,7 +24,3 @@ class LegacyReportProvider(ReportDefinition):
             chart_svg=chart_svg,
             is_sample=any("Mock" in str(value) for row in rows for value in row.values()),
         )
-
-
-def register_legacy_report_provider():
-    register_report_provider(LegacyReportProvider())

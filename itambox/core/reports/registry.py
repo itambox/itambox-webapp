@@ -39,9 +39,9 @@ def discover_report_providers():
         if _discovered:
             return
 
-        from .legacy_provider import register_legacy_report_provider
+        from .legacy_provider import LegacyReportProvider
 
-        register_legacy_report_provider()
+        register_report_provider(LegacyReportProvider())
         autodiscover_modules("reports")
 
         missing = set(PUBLIC_REPORT_TYPES) - set(_registry)
