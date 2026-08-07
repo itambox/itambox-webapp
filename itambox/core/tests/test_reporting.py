@@ -174,7 +174,7 @@ class ScheduledReportingAndAlertsTests(TestCase):
         with patch("core.tasks.reports.send_notification_to_channel", side_effect=[False, True]) as send_channel:
             from core.tasks import generate_scheduled_report_task
 
-            self.assertFalse(generate_scheduled_report_task(sched.pk))
+            self.assertTrue(generate_scheduled_report_task(sched.pk))
 
         sched.refresh_from_db()
         self.assertEqual(sched.last_status, "partial")

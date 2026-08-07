@@ -39,6 +39,7 @@ def discover_report_providers():
         if _discovered:
             return
 
+        # inline import: app-registry: discover compatibility providers after Django app loading
         from .legacy_provider import LegacyReportProvider
 
         register_report_provider(LegacyReportProvider())

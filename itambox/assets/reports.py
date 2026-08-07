@@ -183,7 +183,6 @@ class AssetSummaryReportProvider(ReportDefinition):
             rows=rows,
             summary_cards=list(self.build_summary(queryset, request)),
             chart_svg=self.build_chart(queryset, request),
-            is_sample=not queryset.exists(),
         )
 
 

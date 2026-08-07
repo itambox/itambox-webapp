@@ -1,7 +1,7 @@
 import datetime
 from datetime import timedelta
+from types import SimpleNamespace
 
-from django.contrib.contenttypes.models import ContentType
 from django.db.models import Count, Q, Sum
 from django.utils import timezone
 from django.utils.translation import gettext as _
@@ -26,6 +26,7 @@ def compile_legacy_report_context(template, active_tenant=None, filter_tenants=N
     models that opt in via allow_global_tenant (Software, inventory items) additionally
     include Q(tenant__isnull=True) so their global rows appear in every tenant's report.
     """
+    # inline import: app-registry: compatibility provider loads report metadata after Django app loading
     from extras.models import ReportTemplate
 
     # Permission gate for cross-tenant report aggregation (WP-9a).
@@ -224,6 +225,7 @@ def compile_legacy_report_context(template, active_tenant=None, filter_tenants=N
     headers = [headers_map[col] for col in active_cols if col in headers_map]
 
     if template.report_type == ReportTemplate.REPORT_TYPE_ASSET_SUMMARY:
+        # inline import: app-registry: compatibility provider loads domain models after Django app loading
         from assets.models import Asset
 
         assets_qs = Asset.objects.filter(deleted_at__isnull=True)
@@ -381,6 +383,7 @@ def compile_legacy_report_context(template, active_tenant=None, filter_tenants=N
             chart_svg = generate_doughnut_chart(chart_data, title=_("Asset Status Distribution"))
 
     elif template.report_type == ReportTemplate.REPORT_TYPE_LICENSE_UTILIZATION:
+        # inline import: app-registry: compatibility provider loads domain models after Django app loading
         from licenses.models import License
 
         # Count only *active* seat assignments. A bare Count('assignments') also
@@ -459,6 +462,7 @@ def compile_legacy_report_context(template, active_tenant=None, filter_tenants=N
             chart_svg = generate_doughnut_chart(chart_data, title=_("License Seat Utilization"))
 
     elif template.report_type == ReportTemplate.REPORT_TYPE_SUBSCRIPTION_RENEWALS:
+        # inline import: app-registry: compatibility provider loads domain models after Django app loading
         from subscriptions.models import Subscription
 
         # 'tenant' is select_related because _resolve_currency() reads sub.tenant
@@ -477,9 +481,11 @@ def compile_legacy_report_context(template, active_tenant=None, filter_tenants=N
         # source — never sum monthly spend into one combined number. Bucket the
         # amortized monthly equivalent by the subscription's currency (blank =>
         # the owning tenant's currency) and render one figure per currency.
+        # inline import: heavy-import: load the presentation formatter only for financial reports
         from extras.templatetags.money import money as _money_fmt
 
         def _resolve_currency(sub):
+            # inline import: app-registry: read settings only while compiling the compatibility report
             from django.conf import settings as _settings
 
             if sub.currency:
@@ -572,6 +578,7 @@ def compile_legacy_report_context(template, active_tenant=None, filter_tenants=N
                     {"label": _("Active Subscriptions"), "value": "1 (Mock)"},
                     {"label": _("Est. Monthly Spend"), "value": "$1,200.00"},
                 ]
+            # inline import: app-registry: read settings only while compiling the compatibility report
             from django.conf import settings as _settings
 
             _mock_currency = (getattr(_settings, "ITAMBOX_DEFAULT_CURRENCY", "EUR") or "EUR").upper()
@@ -596,6 +603,7 @@ def compile_legacy_report_context(template, active_tenant=None, filter_tenants=N
             chart_svg = generate_bar_chart(chart_data, title=_("Monthly Spend by Provider"))
 
     elif template.report_type == ReportTemplate.REPORT_TYPE_ASSET_MAINTENANCE:
+        # inline import: app-registry: compatibility provider loads domain models after Django app loading
         from assets.models import AssetMaintenance
 
         maint_qs = AssetMaintenance.objects.filter(deleted_at__isnull=True).select_related("asset", "supplier")
@@ -692,6 +700,7 @@ def compile_legacy_report_context(template, active_tenant=None, filter_tenants=N
             chart_svg = generate_doughnut_chart(chart_data, title=_("Maintenance Type Distribution"))
 
     elif template.report_type == ReportTemplate.REPORT_TYPE_ASSET_DEPRECIATION:
+        # inline import: app-registry: compatibility provider loads domain models after Django app loading
         from assets.models import Asset
 
         assets_qs = Asset.objects.filter(deleted_at__isnull=True)
@@ -795,6 +804,7 @@ def compile_legacy_report_context(template, active_tenant=None, filter_tenants=N
             chart_svg = generate_doughnut_chart(deprec_data, title=_("Asset Value Depreciation"))
 
     elif template.report_type == ReportTemplate.REPORT_TYPE_SOFTWARE_INVENTORY:
+        # inline import: app-registry: compatibility provider loads domain models after Django app loading
         from software.models import Software
 
         software_qs = Software.objects.all().select_related("manufacturer")
@@ -922,6 +932,7 @@ def compile_legacy_report_context(template, active_tenant=None, filter_tenants=N
             chart_svg = generate_doughnut_chart(chart_data, title=_("Software Category Distribution"))
 
     elif template.report_type == ReportTemplate.REPORT_TYPE_CONTRACT_RENEWALS:
+        # inline import: app-registry: compatibility provider loads domain models after Django app loading
         from procurement.models import Contract
 
         # select_related 'tenant' avoids N+1 in _record_currency when the
@@ -1090,6 +1101,7 @@ def compile_legacy_report_context(template, active_tenant=None, filter_tenants=N
             )
             rows.append(row)
             if template.include_summary_cards:
+                # inline import: app-registry: read settings only while compiling the compatibility report
                 from django.conf import settings as _settings
 
                 _mock_currency = (getattr(_settings, "ITAMBOX_DEFAULT_CURRENCY", "EUR") or "EUR").upper()
@@ -1115,6 +1127,7 @@ def compile_legacy_report_context(template, active_tenant=None, filter_tenants=N
         if template.include_distribution_chart:
             chart_svg = generate_bar_chart(chart_data, title=_("Annual Spend by Supplier"))
     elif template.report_type == ReportTemplate.REPORT_TYPE_WARRANTY_EXPIRATION:
+        # inline import: app-registry: compatibility provider loads domain models after Django app loading
         from assets.models.lifecycle import Warranty
 
         today = datetime.date.today()
@@ -1238,6 +1251,7 @@ def compile_legacy_report_context(template, active_tenant=None, filter_tenants=N
         if template.include_distribution_chart:
             chart_svg = generate_doughnut_chart(chart_data, title=_("Warranty Status Distribution"))
     elif template.report_type == ReportTemplate.REPORT_TYPE_ASSET_DISPOSAL_EOL:
+        # inline import: app-registry: compatibility provider loads domain models after Django app loading
         from assets.models.lifecycle import AssetDisposal
 
         disposal_qs = AssetDisposal.objects.filter(deleted_at__isnull=True).select_related("asset", "asset__tenant")
@@ -1351,6 +1365,7 @@ def compile_legacy_report_context(template, active_tenant=None, filter_tenants=N
         # shared-catalogue item visible to every tenant -- include it like software).
         # Stock figures come from each model's total_stock/available properties
         # (per-item aggregate of stock rows); with the [:500] cap this is a bounded N+1.
+        # inline import: app-registry: compatibility provider loads domain models after Django app loading
         from inventory.models import Accessory, Component, Consumable
 
         def _hw_scope(qs):
@@ -1464,6 +1479,7 @@ def compile_legacy_report_context(template, active_tenant=None, filter_tenants=N
         if template.include_distribution_chart:
             chart_svg = generate_doughnut_chart(chart_data, title=_("Hardware Inventory by Type"))
     elif template.report_type == ReportTemplate.REPORT_TYPE_CUSTODY_COMPLIANCE:
+        # inline import: app-registry: compatibility provider loads domain models after Django app loading
         from compliance.models import CustodyReceipt
 
         # CustodyReceipt has no tenant FK of its own; scope via asset__tenant.

@@ -280,7 +280,9 @@ def _process_scheduled_report(sched, active_tenant, filter_tenants):
             delivery.status,
             "; ".join(delivery.failures),
         )
-        return False
+        # Generation and archival completed.  Do not signal a task retry here:
+        # retrying after a partial fan-out could duplicate already successful deliveries.
+        return True
 
     sched.last_status = "success"
     sched.save()

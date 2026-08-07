@@ -6,11 +6,15 @@ baseline for provider extraction: identifiers, default columns, summary-card
 labels, fallback rows, grouping, and chart output must not drift.
 """
 
+from datetime import date
+from decimal import Decimal
+
 from django.test import TestCase
 
 from core.reports import compile_report_context
 from core.tests.mixins import TenantTestMixin
 from extras.models import ReportTemplate
+from subscriptions.models import Provider, Subscription
 
 REPORT_CHARACTERIZATIONS = {
     ReportTemplate.REPORT_TYPE_ASSET_SUMMARY: {
@@ -215,3 +219,30 @@ class ReportCompilerCharacterizationTests(TenantTestMixin, TestCase):
                 self.assertEqual(context_data["headers"], headers)
                 self.assertEqual(context_data["grouped_data"], grouped_data)
                 self.assertEqual(context_data["summary_cards"], summary_cards)
+
+    def test_subscription_currency_summary_handles_real_rows(self):
+        provider = Provider.objects.create(name="Characterization Provider", tenant=self.tenant)
+        Subscription.objects.create(
+            name="Characterization Subscription",
+            provider=provider,
+            tenant=self.tenant,
+            renewal_date=date.today(),
+            renewal_cost=Decimal("120.00"),
+            currency="EUR",
+            billing_cycle="monthly",
+        )
+        template = ReportTemplate(
+            name="Characterization subscription with data",
+            report_type=ReportTemplate.REPORT_TYPE_SUBSCRIPTION_RENEWALS,
+            included_columns=[],
+            include_summary_cards=True,
+            include_distribution_chart=True,
+        )
+
+        with self.tenant_context(self.tenant):
+            _headers, _rows, summary_cards, _grouped, _chart, _context = compile_report_context(
+                template, active_tenant=self.tenant
+            )
+
+        self.assertEqual(summary_cards[0]["value"], "1")
+        self.assertIn("120", str(summary_cards[1]["value"]))

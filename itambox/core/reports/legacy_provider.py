@@ -22,5 +22,4 @@ class LegacyReportProvider(ReportDefinition):
             rows=rows,
             summary_cards=summary_cards,
             chart_svg=chart_svg,
-            is_sample=any("Mock" in str(value) for row in rows for value in row.values()),
         )
