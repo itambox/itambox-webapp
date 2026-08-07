@@ -13,6 +13,7 @@ from core.tasks.reports import (
     _deliver_report_channels,
     _deliver_report_email,
     _DeliveryOutcome,
+    _process_scheduled_report,
     _render_report_output,
     _ReportOutput,
     _resolve_report_recipients,
@@ -495,6 +496,52 @@ class ScheduledReportingAndAlertsTests(TestCase):
         self.assertEqual(outcome.succeeded, 1)
         self.assertEqual(outcome.status, "partial")
         self.assertEqual(len(outcome.failures), 2)
+
+    def test_scheduled_delivery_email_exception_is_observable(self):
+        sched = SimpleNamespace(
+            name="Email failure",
+            report=self.template,
+            last_status="",
+            save=MagicMock(),
+        )
+        archive = MagicMock()
+        output = _ReportOutput(email_body="body")
+        with (
+            patch("core.tasks.reports.build_report_context", return_value=([], [], [], {}, "", {})),
+            patch("core.tasks.reports._render_report_output", return_value=output),
+            patch("core.tasks.reports._archive_report_output", return_value=archive),
+            patch("core.tasks.reports._resolve_report_recipients", return_value=["a@example.com"]),
+            patch("core.tasks.reports._deliver_report_email", side_effect=RuntimeError("smtp down")),
+            patch("core.tasks.reports._deliver_report_channels", return_value=_DeliveryOutcome()),
+        ):
+            success = _process_scheduled_report(sched, self.tenant, [])
+
+        self.assertFalse(success)
+        self.assertEqual(sched.last_status, "failed")
+        self.assertIn("smtp down", archive.error_message)
+
+    def test_scheduled_delivery_false_email_is_observable(self):
+        sched = SimpleNamespace(
+            name="False email delivery",
+            report=self.template,
+            last_status="",
+            save=MagicMock(),
+        )
+        archive = MagicMock()
+        output = _ReportOutput(email_body="body")
+        with (
+            patch("core.tasks.reports.build_report_context", return_value=([], [], [], {}, "", {})),
+            patch("core.tasks.reports._render_report_output", return_value=output),
+            patch("core.tasks.reports._archive_report_output", return_value=archive),
+            patch("core.tasks.reports._resolve_report_recipients", return_value=["a@example.com"]),
+            patch("core.tasks.reports._deliver_report_email", return_value=False),
+            patch("core.tasks.reports._deliver_report_channels", return_value=_DeliveryOutcome()),
+        ):
+            success = _process_scheduled_report(sched, self.tenant, [])
+
+        self.assertFalse(success)
+        self.assertEqual(sched.last_status, "failed")
+        self.assertIn("delivery returned false", archive.error_message)
 
 
 class ReportCrossTenantPermissionTests(TestCase):

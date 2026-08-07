@@ -81,6 +81,31 @@ class ReportProviderContractTests(SimpleTestCase):
             with self.assertRaises(ImproperlyConfigured):
                 registry.discover_report_providers()
 
+    def test_base_contract_defaults_are_safe(self):
+        provider = ReportDefinition()
+        self.assertEqual(provider.build_chart(None, None, None), "")
+        self.assertEqual(provider.build_sample_summary(None), [])
+        self.assertEqual(provider.build_sample_chart(None), "")
+
+    def test_scope_to_tenants_uses_active_tenant_when_no_filter_is_pinned(self):
+        provider = get_report_provider("asset_summary")
+        template = ReportTemplate(
+            name="Active tenant scope",
+            report_type="asset_summary",
+            included_columns=list(provider.default_columns),
+        )
+        request = ReportRequest(
+            template=template,
+            active_tenant=object(),
+            filter_tenants=(),
+            columns=tuple(provider.default_columns),
+            user=None,
+            as_of=datetime.datetime(2026, 1, 1, tzinfo=datetime.timezone.utc),
+        )
+        queryset = MagicMock()
+        provider.scope_to_tenants(queryset, request)
+        queryset.filter.assert_called_once()
+
     def test_registry_rejects_duplicate_registration(self):
         get_registered_report_types()
 
