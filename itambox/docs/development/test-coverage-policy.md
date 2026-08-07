@@ -205,14 +205,24 @@ step prevented the suite from starting, there is no misleading empty artifact.
 Job summaries carry the same numbers inline — global coverage against baseline,
 the differential result with the uncovered lines named, and the slowest tests.
 
-## The serial suite is the source of truth
+## The combined two-lane suite is the source of truth
 
-pytest-xdist is installed but deliberately not enabled. The suite is not yet
-parallel-safe (shared `MEDIA_ROOT`, `requests-mock` and django-q timing — see
-issue #21), and a flaky parallel run is a weaker signal than a slow serial one,
-not a stronger one. Every gate here measures the complete serial suite. When #21
-proves safe parallel execution, this policy is what the parallel run must
-reproduce before it can replace it.
+The suite runs on two lanes. The parallel lane executes every test that is
+safe under xdist (`pytest -n auto --dist=loadscope -m 'not serial_only'`);
+the serial-only lane runs the tests marked `serial_only` — those that race,
+mutate global or seed state, exercise migrations, or are timing-sensitive,
+and therefore need serial semantics. Every gate here measures the combined
+run: both lanes carry coverage, the reports are combined, and the ratchet
+reads the union. The certification gate enforces exact set equality against
+the serial collection manifest, so a test dropped from both lanes, or run in
+both, fails closed. The complete serial suite remains available as a control
+run through the `xdist-validation` dispatch workflow — run it at least once
+before any xdist-sensitive change (pytest-xdist bumps, new `serial_only`
+candidates, isolation changes).
+
+A test that races, mutates global/seed state, exercises migrations, or is
+timing-sensitive must be marked `serial_only` — with the review burden that
+implies: the marker is the contract that keeps it off the parallel lane.
 
 ## When a gate fails
 
