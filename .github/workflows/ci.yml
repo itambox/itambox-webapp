@@ -228,6 +228,7 @@ jobs:
         id: collect
         working-directory: ./itambox
         run: |
+          mkdir -p ../artifacts
           uv run --locked --no-sync pytest --collect-only -q \
             -o addopts="--tb=short -p no:warnings" 2>/dev/null \
             | grep -E '::' > ../artifacts/node-ids.txt
