@@ -2,7 +2,7 @@
   "schema_version": 2,
   "canonical_python": "3.12",
   "next_sequence": 39,
-  "policy_sha256": "15bd32a327eb45400e919d364a87895658e537e03dd1507867f5aefadac8c7f7",
+  "policy_sha256": "869702bd511d13f923b704d19b0dee48da0d9c84ddee42ffe597372e81077058",
   "config": {
     "config_file": "pyproject.toml",
     "working_directory": "itambox",
@@ -156,6 +156,8 @@
         "IntuneAppPayload",
         "IntuneDevicePayload",
         "IntuneSyncResult",
+        "_IntuneAsset",
+        "_IntuneTenant",
         "_create_asset",
         "_run_sync",
         "_slugify",

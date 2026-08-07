@@ -1084,6 +1084,8 @@ class CommittedRecordTests(unittest.TestCase):
                         "IntuneAppPayload",
                         "IntuneDevicePayload",
                         "IntuneSyncResult",
+                        "_IntuneAsset",
+                        "_IntuneTenant",
                         "_create_asset",
                         "_run_sync",
                         "_slugify",
