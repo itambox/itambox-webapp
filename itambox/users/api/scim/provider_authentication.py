@@ -3,6 +3,7 @@ import re
 from typing import Protocol
 
 from django.utils import timezone
+from drf_spectacular.extensions import OpenApiAuthenticationExtension
 from rest_framework import exceptions
 from rest_framework.authentication import BaseAuthentication, get_authorization_header
 from rest_framework.request import Request
@@ -123,3 +124,16 @@ class SCIMProviderBearerTokenAuthentication(BaseAuthentication):
 
     def authenticate_header(self, request: Request) -> str:
         return "Bearer"
+
+
+class SCIMProviderBearerTokenAuthenticationScheme(OpenApiAuthenticationExtension):
+    target_class = SCIMProviderBearerTokenAuthentication
+    name = "SCIMProviderBearerAuth"
+
+    def get_security_definition(self, auto_schema):
+        return {
+            "type": "http",
+            "scheme": "bearer",
+            "bearerFormat": "opaque SCIM token",
+            "description": "SCIM provider authentication using the Bearer HTTP authorization scheme.",
+        }

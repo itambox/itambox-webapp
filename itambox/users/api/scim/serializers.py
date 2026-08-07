@@ -6,6 +6,8 @@ from django.contrib.auth import get_user_model
 from django.contrib.contenttypes.models import ContentType
 from django.db import models
 from django.db.models import Q
+from drf_spectacular.types import OpenApiTypes
+from drf_spectacular.utils import extend_schema_field, extend_schema_serializer
 from rest_framework import serializers
 
 from organization.models import Membership
@@ -14,6 +16,105 @@ from users.models import GroupMembership, UserGroup
 _UNSET = object()
 
 User = get_user_model()
+
+
+@extend_schema_serializer(component_name="SCIMName")
+class SCIMNameSerializer(serializers.Serializer[dict[str, object]]):
+    givenName = serializers.CharField(required=False, allow_blank=True, max_length=150)
+    familyName = serializers.CharField(required=False, allow_blank=True, max_length=150)
+    formatted = serializers.CharField(required=False, allow_blank=True, max_length=301)
+
+
+@extend_schema_serializer(component_name="SCIMEmail")
+class SCIMEmailSerializer(serializers.Serializer[dict[str, object]]):
+    value = serializers.EmailField(max_length=254)
+    primary = serializers.BooleanField(required=False)
+    type = serializers.CharField(required=False, allow_blank=True, max_length=50)
+
+
+@extend_schema_serializer(component_name="SCIMGroupReference")
+class SCIMGroupReferenceSerializer(serializers.Serializer[dict[str, object]]):
+    value = serializers.CharField()
+    display = serializers.CharField(required=False, allow_blank=True)
+    ref = serializers.CharField(required=False, allow_blank=True)
+
+    def __init__(self, *args: object, **kwargs: object) -> None:
+        super().__init__(*args, **kwargs)
+        self.fields["$ref"] = self.fields.pop("ref")
+
+
+@extend_schema_serializer(component_name="SCIMMeta")
+class SCIMMetaSerializer(serializers.Serializer[dict[str, object]]):
+    resourceType = serializers.CharField()
+    created = serializers.CharField(required=False, allow_blank=True)
+    lastModified = serializers.CharField(required=False, allow_blank=True)
+    location = serializers.CharField(required=False, allow_blank=True, allow_null=True)
+
+
+@extend_schema_serializer(component_name="SCIMError")
+class SCIMErrorSerializer(serializers.Serializer):
+    schemas = serializers.ListField(child=serializers.CharField(), min_length=1)
+    status = serializers.CharField()
+    detail = serializers.CharField()
+    scimType = serializers.CharField(required=False, allow_blank=True)
+
+
+@extend_schema_serializer(component_name="SCIMUserInput")
+class SCIMUserRequestSerializer(serializers.Serializer):
+    schemas = serializers.ListField(child=serializers.CharField(), required=False, min_length=1)
+    externalId = serializers.CharField(required=False, allow_blank=True, allow_null=True, max_length=255)
+    userName = serializers.CharField(max_length=150)
+    name = SCIMNameSerializer(required=False)
+    emails = SCIMEmailSerializer(many=True, required=False)
+    active = serializers.BooleanField(required=False, default=True)
+
+
+@extend_schema_serializer(component_name="SCIMPatchOperation")
+class SCIMPatchOperationSerializer(serializers.Serializer):
+    op = serializers.ChoiceField(choices=["add", "replace", "remove"])
+    path = serializers.CharField(required=False, allow_blank=True)
+    value = serializers.JSONField(required=False)
+
+
+@extend_schema_serializer(component_name="SCIMPatchInput")
+class SCIMPatchRequestSerializer(serializers.Serializer):
+    schemas = serializers.ListField(child=serializers.CharField(), required=False, min_length=1)
+    Operations = SCIMPatchOperationSerializer(many=True)
+
+
+@extend_schema_serializer(component_name="SCIMGroupInput")
+class SCIMGroupRequestSerializer(serializers.Serializer):
+    schemas = serializers.ListField(child=serializers.CharField(), required=False, min_length=1)
+    externalId = serializers.CharField(required=False, allow_blank=True, allow_null=True, max_length=255)
+    displayName = serializers.CharField(max_length=255)
+    members = SCIMGroupReferenceSerializer(many=True, required=False)
+
+
+class SCIMServiceProviderFeatureSerializer(serializers.Serializer):
+    supported = serializers.BooleanField()
+    maxOperations = serializers.IntegerField(required=False, min_value=0)
+    maxPayloadSize = serializers.IntegerField(required=False, min_value=0)
+    maxResults = serializers.IntegerField(required=False, min_value=0)
+
+
+class SCIMAuthenticationSchemeSerializer(serializers.Serializer):
+    name = serializers.CharField()
+    description = serializers.CharField()
+    specUri = serializers.URLField()
+    type = serializers.CharField()
+    primary = serializers.BooleanField(required=False)
+
+
+@extend_schema_serializer(component_name="SCIMServiceProviderConfig")
+class SCIMServiceProviderConfigSerializer(serializers.Serializer):
+    schemas = serializers.ListField(child=serializers.CharField(), min_length=1)
+    patch = SCIMServiceProviderFeatureSerializer()
+    bulk = SCIMServiceProviderFeatureSerializer()
+    filter = SCIMServiceProviderFeatureSerializer()
+    changePassword = SCIMServiceProviderFeatureSerializer()
+    sort = SCIMServiceProviderFeatureSerializer()
+    etag = SCIMServiceProviderFeatureSerializer()
+    authenticationSchemes = SCIMAuthenticationSchemeSerializer(many=True)
 
 
 class _SCIMUserResource(Protocol):
@@ -43,11 +144,12 @@ def _scim_base_path(context):
     return context.get("scim_base_path") or (f"/api/tenants/{tenant_slug}/scim/v2" if tenant_slug else "")
 
 
+@extend_schema_serializer(component_name="SCIMUser")
 class SCIMUserSerializer(serializers.ModelSerializer[models.Model]):
     schemas = serializers.SerializerMethodField(read_only=True)
     id = serializers.UUIDField(source="scim_id", read_only=True)
     userName = serializers.CharField(source="username")
-    externalId = serializers.SerializerMethodField()
+    externalId = serializers.SerializerMethodField(allow_null=True)
     name = serializers.SerializerMethodField(required=False)
     emails = serializers.SerializerMethodField(required=False)
     active = serializers.SerializerMethodField()
@@ -59,6 +161,7 @@ class SCIMUserSerializer(serializers.ModelSerializer[models.Model]):
         fields = ["schemas", "id", "externalId", "userName", "name", "emails", "active", "groups", "meta"]
         read_only_fields = ["id", "externalId", "schemas", "groups", "meta"]
 
+    @extend_schema_field(serializers.ListField(child=serializers.CharField()))
     def get_schemas(self, obj: _SCIMUserResource) -> list[str]:
         return ["urn:ietf:params:scim:schemas:core:2.0:User"]
 
@@ -75,6 +178,7 @@ class SCIMUserSerializer(serializers.ModelSerializer[models.Model]):
         obj._scim_membership = membership
         return membership
 
+    @extend_schema_field(OpenApiTypes.STR)
     def get_externalId(self, obj: _SCIMUserResource) -> str | None:
         membership = self._get_scim_membership(obj)
         return membership.external_id if membership and membership.external_id else None
@@ -92,6 +196,7 @@ class SCIMUserSerializer(serializers.ModelSerializer[models.Model]):
         membership = self._get_scim_membership(obj)
         return bool(membership and membership.is_active)
 
+    @extend_schema_field(SCIMNameSerializer)
     def get_name(self, obj: _SCIMUserResource) -> dict[str, str]:
         return {
             "givenName": obj.first_name or "",
@@ -99,11 +204,13 @@ class SCIMUserSerializer(serializers.ModelSerializer[models.Model]):
             "formatted": f"{obj.first_name} {obj.last_name}".strip() or obj.username,
         }
 
+    @extend_schema_field(SCIMEmailSerializer(many=True))
     def get_emails(self, obj: _SCIMUserResource) -> list[dict[str, str | bool]]:
         if obj.email:
             return [{"value": obj.email, "primary": True, "type": "work"}]
         return []
 
+    @extend_schema_field(SCIMGroupReferenceSerializer(many=True))
     def get_groups(self, obj: _SCIMUserResource) -> list[dict[str, str]]:
         tenant = self.context.get("tenant")
         if not tenant:
@@ -126,6 +233,7 @@ class SCIMUserSerializer(serializers.ModelSerializer[models.Model]):
             for g in user_groups
         ]
 
+    @extend_schema_field(SCIMMetaSerializer)
     def get_meta(self, obj: _SCIMUserResource) -> dict[str, str]:
         created_str = obj.date_joined.isoformat() if obj.date_joined else ""
         last_modified_str = self._get_last_modified(obj) or created_str
@@ -155,11 +263,12 @@ class SCIMUserSerializer(serializers.ModelSerializer[models.Model]):
         return last_change.isoformat() if last_change else None
 
 
+@extend_schema_serializer(component_name="SCIMGroup")
 class SCIMGroupSerializer(serializers.ModelSerializer[models.Model]):
     schemas = serializers.SerializerMethodField(read_only=True)
     id = serializers.UUIDField(source="scim_id", read_only=True)
     displayName = serializers.CharField(source="name")
-    externalId = serializers.CharField(source="external_id", read_only=True)
+    externalId = serializers.CharField(source="external_id", read_only=True, allow_null=True)
     members = serializers.SerializerMethodField(required=False)
     meta = serializers.SerializerMethodField(read_only=True)
 
@@ -168,9 +277,11 @@ class SCIMGroupSerializer(serializers.ModelSerializer[models.Model]):
         fields = ["schemas", "id", "externalId", "displayName", "members", "meta"]
         read_only_fields = ["id", "externalId", "schemas", "meta"]
 
+    @extend_schema_field(serializers.ListField(child=serializers.CharField()))
     def get_schemas(self, obj: _SCIMGroupResource) -> list[str]:
         return ["urn:ietf:params:scim:schemas:core:2.0:Group"]
 
+    @extend_schema_field(SCIMGroupReferenceSerializer(many=True))
     def get_members(self, obj: _SCIMGroupResource) -> list[dict[str, str]]:
         # A group contains tenant Membership principals, never arbitrary global users.
         # The owner predicate is redundant for valid rows, but keeps serialization
@@ -189,6 +300,7 @@ class SCIMGroupSerializer(serializers.ModelSerializer[models.Model]):
             for group_membership in group_memberships
         ]
 
+    @extend_schema_field(SCIMMetaSerializer)
     def get_meta(self, obj: _SCIMGroupResource) -> dict[str, str]:
         created_str = obj.created_at.isoformat() if hasattr(obj, "created_at") and obj.created_at else ""
         updated_str = obj.updated_at.isoformat() if hasattr(obj, "updated_at") and obj.updated_at else created_str
@@ -201,12 +313,19 @@ class SCIMGroupSerializer(serializers.ModelSerializer[models.Model]):
         }
 
 
-class SCIMServiceProviderConfigSerializer(serializers.Serializer):
-    schemas = serializers.ListField(child=serializers.CharField())
-    patch = serializers.DictField()
-    bulk = serializers.DictField()
-    filter = serializers.DictField()
-    changePassword = serializers.DictField()
-    sort = serializers.DictField()
-    etag = serializers.DictField()
-    authenticationSchemes = serializers.ListField(child=serializers.DictField())
+@extend_schema_serializer(component_name="SCIMUserListResponse")
+class SCIMUserListResponseSerializer(serializers.Serializer):
+    schemas = serializers.ListField(child=serializers.CharField(), min_length=1)
+    totalResults = serializers.IntegerField(min_value=0)
+    itemsPerPage = serializers.IntegerField(min_value=0)
+    startIndex = serializers.IntegerField(min_value=1)
+    Resources = SCIMUserSerializer(many=True)
+
+
+@extend_schema_serializer(component_name="SCIMGroupListResponse")
+class SCIMGroupListResponseSerializer(serializers.Serializer):
+    schemas = serializers.ListField(child=serializers.CharField(), min_length=1)
+    totalResults = serializers.IntegerField(min_value=0)
+    itemsPerPage = serializers.IntegerField(min_value=0)
+    startIndex = serializers.IntegerField(min_value=1)
+    Resources = SCIMGroupSerializer(many=True)

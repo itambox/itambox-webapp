@@ -15,12 +15,24 @@ because the schema describes the software, not the deployment.
 """
 
 from drf_spectacular.openapi import AutoSchema
+from drf_spectacular.utils import extend_schema_serializer
+from rest_framework import serializers
+from rest_framework.permissions import AllowAny
 
 from itambox.capabilities import registry
 
 #: The specification extension key. ``x-`` prefixed, so it validates as a
 #: vendor extension anywhere an OpenAPI operation object is allowed.
 MATURITY_EXTENSION = "x-itambox-maturity"
+
+
+@extend_schema_serializer(component_name="APIError")
+class APIErrorSerializer(serializers.Serializer):
+    """Stable envelope for validation and authorization failures."""
+
+    detail = serializers.CharField()
+    code = serializers.CharField(required=False)
+    fieldErrors = serializers.DictField(required=False, child=serializers.ListField(child=serializers.CharField()))
 
 
 class CapabilityAwareAutoSchema(AutoSchema):
@@ -30,7 +42,59 @@ class CapabilityAwareAutoSchema(AutoSchema):
         operation = super().get_operation(*args, **kwargs)
         if operation is not None:
             self.annotate_capability_maturity(operation)
+            self.add_error_responses(operation)
         return operation
+
+    def get_operation_id(self):
+        """Keep collection mutations distinct from item operations.
+
+        drf-spectacular's default IDs are deterministic, but custom list routes
+        that mutate a collection otherwise share the same semantic namespace as
+        item updates in several client generators. The suffix is deliberately
+        limited to collection mutations so ordinary CRUD IDs remain unchanged.
+        """
+        operation_id = super().get_operation_id()
+        if self.method in {"DELETE", "PATCH", "PUT"} and "{" not in self.path and not operation_id.endswith("_bulk"):
+            return f"{operation_id}_bulk"
+        return operation_id
+
+    def add_error_responses(self, operation):
+        """Publish common REST errors without overriding explicit responses."""
+        error_component = self.resolve_serializer(APIErrorSerializer(), direction="response")
+        if not error_component:
+            return operation
+
+        status_codes = {"400"}
+        if "{" in self.path:
+            status_codes.add("404")
+        if self.method in {"POST", "PUT", "PATCH"}:
+            status_codes.add("409")
+            if "/scim/" not in self.path:
+                status_codes.update({"412", "428"})
+        elif self.method == "DELETE" and "/scim/" not in self.path:
+            status_codes.update({"412", "428"})
+
+        view = getattr(self, "_view", None)
+        permission_classes = getattr(view, "permission_classes", ())
+        if permission_classes and not any(self._is_allow_any(permission) for permission in permission_classes):
+            status_codes.update({"401", "403"})
+
+        for status_code in sorted(status_codes):
+            operation.setdefault("responses", {}).setdefault(
+                status_code,
+                {
+                    "description": "The request could not be completed.",
+                    "content": {"application/json": {"schema": error_component.ref}},
+                },
+            )
+        return operation
+
+    @staticmethod
+    def _is_allow_any(permission):
+        try:
+            return issubclass(permission, AllowAny)
+        except TypeError:
+            return False
 
     def annotate_capability_maturity(self, operation):
         """Add the declared grade to ``operation``, or leave it untouched."""

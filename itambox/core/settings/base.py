@@ -287,6 +287,19 @@ SPECTACULAR_SETTINGS = {
     "VERSION": VERSION,
     "COMPONENT_SPLIT_REQUEST": True,  # Critical for clean client gen
     "ENUM_ADD_EXPLICIT_BLANK_NULL_CHOICE": False,
+    # ``status`` is used by several models with different choice sets. Keep
+    # the asset-request values under an explicit, reviewable identity instead
+    # of accepting drf-spectacular's hash-suffixed collision name.
+    "ENUM_NAME_OVERRIDES": {
+        "AssetRequestStatusEnum": [
+            ("pending", "Pending"),
+            ("approved", "Approved"),
+            ("procurement", "Awaiting Procurement"),
+            ("denied", "Denied"),
+            ("fulfilled", "Fulfilled"),
+            ("cancelled", "Cancelled"),
+        ],
+    },
     "SCHEMA_PATH_PREFIX": r"/api/",
     "SWAGGER_UI_DIST": "SIDECAR",
     "SWAGGER_UI_FAVICON_HREF": "SIDECAR",

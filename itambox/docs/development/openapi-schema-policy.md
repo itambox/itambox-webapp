@@ -32,6 +32,38 @@ A successful run proves all of the following:
 The checked-in schema is the reviewable API contract. Runtime Swagger and ReDoc
 remain generated from the deployed revision.
 
+## External-client compatibility
+
+`itambox/schema.yaml` is an external contract, not an internal description. REST
+and SCIM consumers may generate clients from it. Consequently, paths, methods,
+`operationId` values, component names, security schemes, parameters, response
+status codes, and enum values are reviewed as compatibility surfaces. Within
+1.x, an identity rename is a removal plus an addition and must follow the
+deprecation and removal rules in [the compatibility policy](compatibility-policy.md).
+
+The repository's supported generated-client path is deliberately small and
+reviewable:
+
+```bash
+cd itambox
+npm ci
+npm run openapi-client-smoke
+```
+
+`openapi-typescript` generates `tests/openapi_client/schema.d.ts` from the
+tracked schema and `openapi-fetch` supplies the typed fetch client. The E2E
+workflow runs the resulting client against the seeded Django server and covers
+token authentication, paginated listing, a validation failure, and a complete
+create/read/update/delete path. Both npm packages are pinned in `package.json` and the
+lockfile; the transitive `undici` dependency is overridden to the fixed 6.27.0
+release because the generator's historical 5.x range contains blocked advisories;
+no alternate generator is an implicit part of the compatibility contract.
+
+Schema validation is fail-closed: zero drf-spectacular errors is required, and
+the warning identity baseline may only shrink through a reviewed source fix.
+Updating the baseline to hide a new warning is not an accepted compatibility
+workflow.
+
 ## Diagnostic identities
 
 A diagnostic identity contains:
