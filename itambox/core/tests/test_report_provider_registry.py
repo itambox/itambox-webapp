@@ -73,8 +73,6 @@ class ReportCurrencyFormattingTests(SimpleTestCase):
         self.assertEqual(_money(None, "EUR", None), "-")
 
     def test_format_per_currency_renders_each_currency_and_empty_fallback(self):
-        from types import SimpleNamespace
-
         self.assertIn("0", _format_per_currency({}))
         formatted = _format_per_currency({"EUR": Decimal("42.00")})
         self.assertIn("42", formatted)
