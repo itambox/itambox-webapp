@@ -17,6 +17,7 @@ REPORT_CHARACTERIZATIONS = {
         "columns": ["asset_tag", "name", "status", "location", "assigned_to"],
         "headers": ["Asset Tag", "Asset Name", "Status Label", "Location", "Asset Holder"],
         "summary": ["Total Hardware Assets", "Total Acquisition Sum"],
+        "summary_values": ["1 (Mock)", "$3,499.00"],
     },
     ReportTemplate.REPORT_TYPE_LICENSE_UTILIZATION: {
         "columns": [
@@ -29,16 +30,19 @@ REPORT_CHARACTERIZATIONS = {
         ],
         "headers": ["License Name", "Software", "Total Seats", "Assigned Seats", "Available Seats", "Utilization Rate"],
         "summary": ["Total License Products"],
+        "summary_values": ["1 (Mock)"],
     },
     ReportTemplate.REPORT_TYPE_SUBSCRIPTION_RENEWALS: {
         "columns": ["subscription_name", "provider", "billing_cycle", "cost", "end_date"],
         "headers": ["Subscription Name", "Provider", "Billing Cycle", "Cost", "End Date"],
         "summary": ["Active Subscriptions", "Est. Monthly Spend"],
+        "summary_values": ["1 (Mock)", "$1,200.00"],
     },
     ReportTemplate.REPORT_TYPE_ASSET_MAINTENANCE: {
         "columns": ["maintenance_asset", "maintenance_type", "maintenance_status", "maintenance_cost"],
         "headers": ["Asset", "Type", "Status", "Cost"],
         "summary": ["Total Maintenances", "Total Maintenance Cost"],
+        "summary_values": ["1 (Mock)", "$250.00"],
     },
     ReportTemplate.REPORT_TYPE_ASSET_DEPRECIATION: {
         "columns": [
@@ -58,6 +62,7 @@ REPORT_CHARACTERIZATIONS = {
             "Depreciated Value",
         ],
         "summary": ["Total Depreciable Assets", "Total Acquisition Cost", "Total Current Book Value"],
+        "summary_values": ["1 (Mock)", "$2,500.00", "$1,450.00"],
     },
     ReportTemplate.REPORT_TYPE_SOFTWARE_INVENTORY: {
         "columns": [
@@ -79,6 +84,7 @@ REPORT_CHARACTERIZATIONS = {
             "License Count",
         ],
         "summary": ["Total Software Products"],
+        "summary_values": ["1 (Mock)"],
     },
     ReportTemplate.REPORT_TYPE_CONTRACT_RENEWALS: {
         "columns": [
@@ -102,6 +108,7 @@ REPORT_CHARACTERIZATIONS = {
             "Contract Cost",
         ],
         "summary": ["Active Contracts", "Expiring Within 30 Days", "Est. Annual Spend"],
+        "summary_values": ["1 (Mock)", "0 (Mock)", "currency"],
     },
     ReportTemplate.REPORT_TYPE_WARRANTY_EXPIRATION: {
         "columns": [
@@ -114,6 +121,7 @@ REPORT_CHARACTERIZATIONS = {
         ],
         "headers": ["Asset", "Warranty Type", "Provider", "End Date", "Days Remaining", "Status"],
         "summary": ["Total Warranties", "Expiring Within 30 Days", "Already Expired", "Total Warranty Cost"],
+        "summary_values": ["1 (Mock)", "0 (Mock)", "0 (Mock)", "€299.00"],
     },
     ReportTemplate.REPORT_TYPE_ASSET_DISPOSAL_EOL: {
         "columns": [
@@ -133,6 +141,7 @@ REPORT_CHARACTERIZATIONS = {
             "Proceeds",
         ],
         "summary": ["Total Disposals", "WEEE Compliant", "Total Proceeds"],
+        "summary_values": ["1 (Mock)", "1 (Mock)", "150,00\u00a0€"],
     },
     ReportTemplate.REPORT_TYPE_HARDWARE_INVENTORY: {
         "columns": [
@@ -146,6 +155,7 @@ REPORT_CHARACTERIZATIONS = {
         ],
         "headers": ["Item Type", "Name", "Manufacturer", "Category", "Total Stock", "Available", "Stock Status"],
         "summary": ["Accessory SKUs", "Consumable SKUs", "Component SKUs", "Items at Zero Stock"],
+        "summary_values": ["1 (Mock)", "0", "0", "0"],
     },
     ReportTemplate.REPORT_TYPE_CUSTODY_COMPLIANCE: {
         "columns": [
@@ -158,6 +168,7 @@ REPORT_CHARACTERIZATIONS = {
         ],
         "headers": ["Asset", "Holder", "Acceptance Status", "Accepted Date", "EULA Version", "Signature Provider"],
         "summary": ["Total Receipts", "Pending Sign-offs", "Acceptance Rate"],
+        "summary_values": ["1 (Mock)", "0 (Mock)", "100.0% (Mock)"],
     },
 }
 
@@ -192,7 +203,12 @@ class ReportCompilerCharacterizationTests(TenantTestMixin, TestCase):
                     [card["label"] for card in summary_cards],
                     expected["summary"],
                 )
-                self.assertTrue(all("Mock" in str(card["value"]) for card in summary_cards))
+                for card, expected_value in zip(summary_cards, expected["summary_values"]):
+                    if expected_value == "currency":
+                        self.assertIn("12", str(card["value"]))
+                        self.assertIn("€", str(card["value"]))
+                    else:
+                        self.assertEqual(card["value"], expected_value)
                 self.assertEqual(list(grouped_data), ["General"])
                 self.assertEqual(grouped_data["General"], rows)
                 self.assertIn("<svg", chart_svg)
