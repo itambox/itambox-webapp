@@ -121,23 +121,36 @@ class HardwareInventoryReportProvider(ReportDefinition):
         catalogues = self.get_queryset(request)
         # Each catalogue carries its own cap: one oversized catalogue must not
         # crowd the other two out of the report entirely.
-        records = [
-            StockedItem.of(item, type_label)
-            for type_label, queryset in catalogues
-            for item in queryset[: self.row_limit]
-        ]
+        records = self._catalogue_records(catalogues)
         rows = list(self.build_rows(records, request))
         if not rows:
             return self.build_sample(request)
-        sku_counts = {type_label: queryset.count() for type_label, queryset in catalogues}
+        sku_counts = self._sku_counts(catalogues)
         return ReportResult(
             rows=rows,
             summary_cards=self._summary_cards(sku_counts, records, request),
             chart_svg=self._chart(sku_counts, request),
         )
 
+    def _catalogue_records(self, catalogues):
+        return [
+            StockedItem.of(item, type_label)
+            for type_label, queryset in catalogues
+            for item in queryset[: self.row_limit]
+        ]
+
+    def _sku_counts(self, catalogues):
+        return {type_label: queryset.count() for type_label, queryset in catalogues}
+
     def build_rows(self, records, request: ReportRequest):
         return [self.row_for(entry, request) for entry in records]
+
+    def build_summary(self, queryset, request: ReportRequest):
+        catalogues = tuple(queryset)
+        return self._summary_cards(self._sku_counts(catalogues), self._catalogue_records(catalogues), request)
+
+    def build_chart(self, queryset, records, request: ReportRequest):
+        return self._chart(self._sku_counts(tuple(queryset)), request)
 
     def group_key(self, record, request: ReportRequest):
         # Without a supported grouping the rows fall back to their own

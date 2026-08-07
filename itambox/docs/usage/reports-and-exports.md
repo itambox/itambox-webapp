@@ -159,7 +159,7 @@ Navigate to **Extras → Report Templates** and click **Add**:
 | **Filter Tenants** | Limit data to selected tenants (blank = global aggregate) |
 | **Description** | Optional notes |
 
-Report preview and download additionally require the model-level view permission declared by the selected report provider (for example, `assets.view_asset` or the relevant inventory catalogue permission). The existing `extras.view_reporttemplate` permission and report-designer capability remain required; these checks are additive. Scheduled reports run in the trusted task context and retain their configured tenant scope.
+Report providers declare the model-level view permissions relevant to their domain as contract metadata for auditing and future authorization surfaces. The current preview and download boundary remains the existing `extras.view_reporttemplate` permission plus report-designer capability; provider metadata does not silently revoke access from existing roles. Scheduled reports run in the trusted task context and retain their configured tenant scope.
 
 ### Available Report Types
 

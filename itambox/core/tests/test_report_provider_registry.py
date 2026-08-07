@@ -136,19 +136,9 @@ class ReportProviderContractTests(SimpleTestCase):
         with self.assertRaises(ValueError):
             get_report_provider("no_such_report")
 
-    def test_report_provider_permission_is_enforced(self):
-        class UserWithoutReportPermission:
-            def has_perm(self, permission):
-                return False
-
-        template = ReportTemplate(
-            name="Unauthorized report",
-            report_type=ReportTemplate.REPORT_TYPE_ASSET_SUMMARY,
-            included_columns=[],
-        )
-        with patch("core.reports.orchestration.get_current_user", return_value=UserWithoutReportPermission()):
-            with self.assertRaises(PermissionError):
-                build_report_context(template, active_tenant=object())
+    def test_report_provider_declares_permission_metadata(self):
+        provider = get_report_provider(ReportTemplate.REPORT_TYPE_ASSET_SUMMARY)
+        self.assertEqual(provider.required_permissions(), ("assets.view_asset",))
 
     def test_build_report_context_rejects_unknown_report_type(self):
         template = ReportTemplate(

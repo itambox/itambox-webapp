@@ -65,10 +65,6 @@ def build_report_context(template, active_tenant=None, filter_tenants=None):
         user=get_current_user(),
         as_of=timezone.now(),
     )
-    if request.user is not None and not all(
-        request.user.has_perm(permission) for permission in provider.required_permissions()
-    ):
-        raise PermissionError(f"The current user may not view the {template.report_type!r} report.")
     result = provider.build(request)
     headers = headers_for(request.columns)
     grouped_data = _group_rows(result.rows, template.group_by_field)
