@@ -1,8 +1,8 @@
 {
   "schema_version": 2,
   "canonical_python": "3.12",
-  "next_sequence": 30,
-  "policy_sha256": "c91bc2a972bb34e2df33153cb419772c9bf8061f25d9887fff6385112dc873ad",
+  "next_sequence": 31,
+  "policy_sha256": "a30ebac5584b17ab73506d4ea8177286372e42cbde111477d4250c1cabda1570",
   "config": {
     "config_file": "pyproject.toml",
     "working_directory": "itambox",
@@ -315,6 +315,15 @@
         "NestedTenantSerializer",
         "TenantSerializer"
       ]
+    },
+    {
+      "sequence": 30,
+      "path": "itambox/organization/services/errors.py",
+      "module": "organization.services.errors",
+      "issue": "#93",
+      "note": "Slice 10 organization-service admission: typed, field-mappable service-error contract. ValidationError compatibility and message-disclosure ordering remain unchanged.",
+      "scope": "module",
+      "symbols": []
     },
     {
       "sequence": 27,

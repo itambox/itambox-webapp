@@ -1034,6 +1034,7 @@ class CommittedRecordTests(unittest.TestCase):
                 "itambox/licenses/api/serializers.py",
                 "itambox/organization/access.py",
                 "itambox/organization/api/serializers.py",
+                "itambox/organization/services/errors.py",
                 "itambox/procurement/api/serializers.py",
                 "itambox/subscriptions/api/serializers.py",
                 "itambox/users/api/scim/authentication.py",
@@ -1045,7 +1046,7 @@ class CommittedRecordTests(unittest.TestCase):
             ],
         )
         self.assertEqual(
-            {entry["path"]: (entry["scope"], entry["symbols"]) for entry in self.record["checked"]},
+            {entry["path"]: (entry["scope"], entry.get("symbols", [])) for entry in self.record["checked"]},
             {
                 "itambox/assets/api/serializers.py": (
                     "symbols",
@@ -1156,6 +1157,7 @@ class CommittedRecordTests(unittest.TestCase):
                         "TenantSerializer",
                     ],
                 ),
+                "itambox/organization/services/errors.py": ("module", []),
                 "itambox/procurement/api/serializers.py": (
                     "symbols",
                     [

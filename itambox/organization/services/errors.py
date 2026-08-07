@@ -45,12 +45,19 @@ class MembershipServiceError(ValidationError):
 
     default_code = "membership_service_error"
 
-    def __init__(self, errors: Sequence[ServiceError]):
+    def __init__(self, errors: Sequence[ServiceError]) -> None:
         self.errors: tuple[ServiceError, ...] = tuple(errors)
         super().__init__([e.message for e in self.errors])
 
     @classmethod
-    def single(cls, message: str, *, code: str = "", field=None, row_index=None) -> "MembershipServiceError":
+    def single(
+        cls,
+        message: str,
+        *,
+        code: str = "",
+        field: str | None = None,
+        row_index: int | None = None,
+    ) -> "MembershipServiceError":
         """One-message shorthand; defaults ``code`` to the subclass's own."""
         return cls([ServiceError(message, code or cls.default_code, field, row_index)])
 
