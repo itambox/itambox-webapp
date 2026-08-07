@@ -219,7 +219,8 @@ class AssetSummaryReportProviderTests(TenantTestMixin, TestCase):
 
 class ReportRequestContractTests(SimpleTestCase):
     def test_report_request_contract_fields(self):
-        from datetime import datetime, timezone as tz
+        from datetime import datetime
+        from datetime import timezone as tz
 
         template = ReportTemplate(
             name="Contract Template",
