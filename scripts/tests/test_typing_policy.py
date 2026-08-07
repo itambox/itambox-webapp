@@ -1184,7 +1184,11 @@ class CommittedRecordTests(unittest.TestCase):
                 "itambox/users/api/scim/serializers.py": (
                     "symbols",
                     [
+                        "SCIMEmailSerializer",
+                        "SCIMGroupReferenceSerializer",
                         "SCIMGroupSerializer",
+                        "SCIMMetaSerializer",
+                        "SCIMNameSerializer",
                         "SCIMUserSerializer",
                         "_SCIMGroupResource",
                         "_SCIMMembershipResource",

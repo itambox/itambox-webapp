@@ -5,6 +5,7 @@ from collections.abc import Mapping
 from django.contrib.auth import get_user_model
 from django.db import IntegrityError, transaction
 from django.db.models import Exists, OuterRef, Prefetch, Q
+from drf_spectacular.utils import extend_schema_view
 from rest_framework import exceptions, status
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
@@ -13,6 +14,7 @@ from rest_framework.views import APIView
 from core.managers import set_current_tenant
 from itambox.middleware import set_current_user
 from organization.models import AssetHolder, Membership, Tenant
+from users.api.scim import schema as scim_schema
 from users.api.scim.authentication import SCIMBearerTokenAuthentication
 from users.api.scim.filters import SCIMFilterError, parse_scim_filter, parse_scim_membership_filter
 from users.api.scim.identifiers import get_scim_object_or_404
@@ -169,6 +171,7 @@ class SCIMTenantMixin:
         _request_id.set(str(uuid.uuid4()))
 
 
+@extend_schema_view(get=scim_schema.SCIM_TENANT_SERVICE_PROVIDER_CONFIG)
 class ServiceProviderConfigView(SCIMTenantMixin, APIView):
     def get(self, request, *args, **kwargs):
         config_data = {
@@ -194,6 +197,10 @@ class ServiceProviderConfigView(SCIMTenantMixin, APIView):
         return Response(serializer.data, status=status.HTTP_200_OK)
 
 
+@extend_schema_view(
+    get=scim_schema.SCIM_TENANT_USER_LIST,
+    post=scim_schema.SCIM_TENANT_USER_CREATE,
+)
 class SCIMUserListView(SCIMTenantMixin, APIView):
     def get(self, request, *args, **kwargs):
         filter_str = request.query_params.get("filter")
@@ -414,6 +421,12 @@ class SCIMUserListView(SCIMTenantMixin, APIView):
         return Response(serializer.data, status=response_status)
 
 
+@extend_schema_view(
+    get=scim_schema.SCIM_TENANT_USER_DETAIL,
+    put=scim_schema.SCIM_TENANT_USER_REPLACE,
+    patch=scim_schema.SCIM_TENANT_USER_UPDATE,
+    delete=scim_schema.SCIM_TENANT_USER_DELETE,
+)
 class SCIMUserDetailView(SCIMTenantMixin, APIView):
     def get(self, request, pk, *args, **kwargs):
         user = get_scim_object_or_404(User.objects.filter(memberships__tenant=self.tenant).distinct(), pk)
@@ -683,6 +696,10 @@ class SCIMUserDetailView(SCIMTenantMixin, APIView):
         return Response(status=status.HTTP_204_NO_CONTENT)
 
 
+@extend_schema_view(
+    get=scim_schema.SCIM_TENANT_GROUP_LIST,
+    post=scim_schema.SCIM_TENANT_GROUP_CREATE,
+)
 class SCIMGroupListView(SCIMTenantMixin, APIView):
     def get(self, request, *args, **kwargs):
         filter_str = request.query_params.get("filter")
@@ -749,6 +766,12 @@ class SCIMGroupListView(SCIMTenantMixin, APIView):
         )
 
 
+@extend_schema_view(
+    get=scim_schema.SCIM_TENANT_GROUP_DETAIL,
+    put=scim_schema.SCIM_TENANT_GROUP_REPLACE,
+    patch=scim_schema.SCIM_TENANT_GROUP_UPDATE,
+    delete=scim_schema.SCIM_TENANT_GROUP_DELETE,
+)
 class SCIMGroupDetailView(SCIMTenantMixin, APIView):
     def get(self, request, pk, *args, **kwargs):
         group = get_scim_object_or_404(

@@ -4,3 +4,4 @@ staticfiles/
 *.css.map
 *.js.map
 static/docs/
+tests/openapi_client/.build/

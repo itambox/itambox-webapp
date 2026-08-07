@@ -2,6 +2,9 @@
   "name": "itambox",
   "version": "0.1.0",
   "private": true,
+  "overrides": {
+    "undici": "6.27.0"
+  },
   "description": "IT Asset Management System — static assets build pipeline",
   "scripts": {
     "build:scss": "sass static/src/styles/itambox.scss static/dist/itambox.css && postcss static/dist/itambox.css -o static/dist/itambox.css",
@@ -10,6 +13,8 @@
     "build:all": "npm run build:scss && npm run build:vendor && npm run build",
     "lint:styles": "stylelint \"static/src/**/*.{css,scss}\"",
     "lint:styles:fix": "stylelint \"static/src/**/*.{css,scss}\" --fix",
+    "openapi:generate": "openapi-typescript schema.yaml -o tests/openapi_client/schema.d.ts",
+    "openapi-client-smoke": "npm run openapi:generate && tsc -p tests/openapi_client/tsconfig.json && node tests/openapi_client/.build/smoke.js",
     "typecheck": "tsc --noEmit",
     "watch": "node bundle.mjs --watch",
     "watch:css": "sass --watch static/src/styles/itambox.scss:static/dist/itambox.css"
@@ -23,6 +28,8 @@
     "esbuild": "^0.28.1",
     "eslint": "^10.8.0",
     "globals": "^17.7.0",
+    "openapi-fetch": "0.17.0",
+    "openapi-typescript": "6.7.6",
     "postcss": "^8.5.23",
     "postcss-cli": "^11.0.1",
     "sass": "^1.80.0",

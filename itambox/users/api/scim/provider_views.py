@@ -3,6 +3,7 @@ import uuid
 from django.contrib.auth import get_user_model
 from django.db import IntegrityError, transaction
 from django.db.models import Exists, OuterRef, Prefetch, Q
+from drf_spectacular.utils import extend_schema_view
 from rest_framework import exceptions, status
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
@@ -11,6 +12,7 @@ from rest_framework.views import APIView
 from core.managers import set_current_tenant
 from itambox.middleware import set_current_user
 from organization.models import Membership, Tenant
+from users.api.scim import schema as scim_schema
 from users.api.scim.filters import SCIMFilterError, parse_scim_filter, parse_scim_membership_filter
 from users.api.scim.identifiers import get_scim_object_or_404
 from users.api.scim.provider_authentication import SCIMProviderBearerTokenAuthentication
@@ -106,6 +108,7 @@ class SCIMProviderMixin:
         _request_id.set(str(uuid.uuid4()))
 
 
+@extend_schema_view(get=scim_schema.SCIM_PROVIDER_SERVICE_PROVIDER_CONFIG)
 class ProviderServiceProviderConfigView(SCIMProviderMixin, APIView):
     def get(self, request, *args, **kwargs):
         config_data = {
@@ -131,6 +134,10 @@ class ProviderServiceProviderConfigView(SCIMProviderMixin, APIView):
         return Response(serializer.data, status=status.HTTP_200_OK)
 
 
+@extend_schema_view(
+    get=scim_schema.SCIM_PROVIDER_USER_LIST,
+    post=scim_schema.SCIM_PROVIDER_USER_CREATE,
+)
 class SCIMProviderUserListView(SCIMProviderMixin, APIView):
     def _retry_correlated_user(self, username, external_id):
         if not external_id:
@@ -313,6 +320,12 @@ class SCIMProviderUserListView(SCIMProviderMixin, APIView):
         return Response(serializer.data, status=response_status)
 
 
+@extend_schema_view(
+    get=scim_schema.SCIM_PROVIDER_USER_DETAIL,
+    put=scim_schema.SCIM_PROVIDER_USER_REPLACE,
+    patch=scim_schema.SCIM_PROVIDER_USER_UPDATE,
+    delete=scim_schema.SCIM_PROVIDER_USER_DELETE,
+)
 class SCIMProviderUserDetailView(SCIMProviderMixin, APIView):
     def _staff_queryset(self):
         return User.objects.filter(memberships__tenant=self.tenant).distinct()
@@ -381,6 +394,10 @@ class SCIMProviderUserDetailView(SCIMProviderMixin, APIView):
         return Response(status=status.HTTP_204_NO_CONTENT)
 
 
+@extend_schema_view(
+    get=scim_schema.SCIM_PROVIDER_GROUP_LIST,
+    post=scim_schema.SCIM_PROVIDER_GROUP_CREATE,
+)
 class SCIMProviderGroupListView(SCIMProviderMixin, APIView):
     def get(self, request, *args, **kwargs):
         self.require_group_permission(request, "users.view_usergroup")
@@ -497,6 +514,12 @@ class SCIMProviderGroupListView(SCIMProviderMixin, APIView):
         return Response(serializer.data, status=status.HTTP_201_CREATED)
 
 
+@extend_schema_view(
+    get=scim_schema.SCIM_PROVIDER_GROUP_DETAIL,
+    put=scim_schema.SCIM_PROVIDER_GROUP_REPLACE,
+    patch=scim_schema.SCIM_PROVIDER_GROUP_UPDATE,
+    delete=scim_schema.SCIM_PROVIDER_GROUP_DELETE,
+)
 class SCIMProviderGroupDetailView(SCIMProviderMixin, APIView):
     def get(self, request, pk, *args, **kwargs):
         self.require_group_permission(request, "users.view_usergroup")

@@ -2,7 +2,7 @@ from django.contrib.auth import get_user_model
 from django.db import models
 from django.utils.translation import gettext_lazy as _
 from drf_spectacular.types import OpenApiTypes
-from drf_spectacular.utils import extend_schema_field
+from drf_spectacular.utils import extend_schema_field, extend_schema_serializer
 from rest_framework import serializers
 
 from assets.models import (
@@ -141,6 +141,7 @@ class AssetTypeSerializer(BaseModelSerializer):
         brief_fields = ["id", "model", "slug", "manufacturer"]
 
 
+@extend_schema_serializer(component_name="AssetResource")
 class AssetSerializer(BaseModelSerializer):
     asset_type = NestedAssetTypeSerializer(read_only=True)
     asset_type_id = serializers.PrimaryKeyRelatedField(
@@ -222,6 +223,7 @@ class AssetSerializer(BaseModelSerializer):
         )
         return fields
 
+    @extend_schema_field(OpenApiTypes.OBJECT)
     def get_assigned_to(self, obj: Asset) -> dict[str, object] | None:
         cached = getattr(obj, "_active_assignments", None)
         if cached is not None:
@@ -262,6 +264,7 @@ class CategorySerializer(BaseModelSerializer):
         brief_fields = ["id", "name", "slug", "color"]
 
 
+@extend_schema_serializer(component_name="AssetRequest")
 class AssetRequestSerializer(BaseModelSerializer):
     requester = serializers.StringRelatedField(read_only=True)
     requester_id = serializers.PrimaryKeyRelatedField(queryset=User.objects.all(), source="requester", write_only=True)

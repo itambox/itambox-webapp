@@ -209,6 +209,12 @@ jobs:
         run: npm test
         timeout-minutes: 15
 
+      - name: Run generated OpenAPI client smoke test
+        if: always()
+        working-directory: ./itambox
+        run: npm run openapi-client-smoke && git diff --exit-code -- tests/openapi_client/schema.d.ts
+        timeout-minutes: 5
+
       - name: Stop Django dev server
         if: always()
         working-directory: ./itambox

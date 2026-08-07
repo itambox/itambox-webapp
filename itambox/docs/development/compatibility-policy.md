@@ -302,6 +302,33 @@ performed, scheduled, or implied here, and **no `/api/v1/` migration is
 performed** — moving the existing tree under a version segment would itself be
 the breaking change the convention exists to avoid.
 
+### OpenAPI is an external contract
+
+The checked-in `itambox/schema.yaml` is the normative OpenAPI document for the
+generation-1 REST and SCIM surfaces. It is not an internal documentation view:
+integrators may generate clients from it, and `operationId` values, component
+names, paths, methods, parameter names, response status codes, security schemes,
+and enum values are compatibility surfaces. A schema change is therefore an API
+change even when the Django implementation change appears internal.
+
+- Every release candidate runs `manage.py spectacular --validate` with zero
+  errors and the deterministic `make openapi-check` gate.
+- Generated-client compatibility is exercised by the TypeScript client smoke
+  test in the E2E workflow. The generator and runtime are pinned in
+  `itambox/package.json`; generated types are committed so the client diff is
+  reviewable.
+- Existing operation IDs and component identities are stable within 1.x. A
+  rename is treated as a removal plus an addition and follows the Stable removal
+  notice rule above, even if the endpoint URL is unchanged.
+- REST and SCIM error envelopes, authentication schemes, pagination parameters,
+  and validation responses are part of the published contract. Implementations
+  must not silently replace them with an undocumented generic response.
+
+The schema is generated from the candidate revision, not from a deployed
+environment. Consumers should pin the schema revision they validated against;
+the application release and any independently versioned SCIM wire identifiers
+remain separate from the OpenAPI document identity.
+
 ### Outbound wires as they stand
 
 **External wires carry versions independent of the application release.** That
