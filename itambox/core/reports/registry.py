@@ -5,14 +5,14 @@ from threading import RLock
 from django.core.exceptions import ImproperlyConfigured
 from django.utils.module_loading import autodiscover_modules
 
-from .contracts import PUBLIC_REPORT_TYPES
+from core.reports.contracts import PUBLIC_REPORT_TYPES, ReportDefinition
 
-_registry = {}
+_registry: dict[str, ReportDefinition] = {}
 _discovery_lock = RLock()
 _discovered = False
 
 
-def register_report_provider(provider):
+def register_report_provider(provider: ReportDefinition) -> None:
     """Register one provider for each stable report identifier it supports."""
     report_types = getattr(provider, "report_types", None)
     if report_types is None:
@@ -27,7 +27,7 @@ def register_report_provider(provider):
             _registry[report_type] = provider
 
 
-def discover_report_providers():
+def discover_report_providers() -> None:
     """Import every installed application's ``reports`` module.
 
     Discovery is lazy so importing ``core.reports`` remains safe during Django
@@ -49,7 +49,7 @@ def discover_report_providers():
         _discovered = True
 
 
-def get_report_provider(report_type):
+def get_report_provider(report_type: str) -> ReportDefinition:
     discover_report_providers()
     try:
         return _registry[report_type]
@@ -57,6 +57,6 @@ def get_report_provider(report_type):
         raise ValueError(f"Unsupported report type: {report_type}") from error
 
 
-def get_registered_report_types():
+def get_registered_report_types() -> tuple[str, ...]:
     discover_report_providers()
     return tuple(_registry)

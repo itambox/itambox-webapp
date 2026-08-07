@@ -1009,12 +1009,15 @@ class CommittedRecordTests(unittest.TestCase):
     def test_the_committed_record_is_internally_consistent(self):
         self.assertEqual(gate.check_record(REPO_ROOT, self.policy, self.record), ())
 
-    def test_the_committed_record_lists_the_slice_zero_through_slice_ten_admissions(self):
+    def test_the_committed_record_lists_the_slice_zero_through_slice_eleven_admissions(self):
         self.assertEqual(
             [entry["path"] for entry in self.record["checked"]],
             [
                 "itambox/assets/api/serializers.py",
                 "itambox/core/context.py",
+                "itambox/core/reports/contracts.py",
+                "itambox/core/reports/orchestration.py",
+                "itambox/core/reports/registry.py",
                 "itambox/core/tasks/alerts.py",
                 "itambox/core/tasks/checkin.py",
                 "itambox/core/tasks/checkout.py",
@@ -1066,6 +1069,23 @@ class CommittedRecordTests(unittest.TestCase):
                     ],
                 ),
                 "itambox/core/context.py": ("symbols", ["SystemAuthorizationContext"]),
+                "itambox/core/reports/contracts.py": (
+                    "symbols",
+                    ["ReportDefinition", "ReportRequest", "ReportResult"],
+                ),
+                "itambox/core/reports/orchestration.py": (
+                    "symbols",
+                    ["_group_rows", "_resolve_report_scope", "build_report_context"],
+                ),
+                "itambox/core/reports/registry.py": (
+                    "symbols",
+                    [
+                        "discover_report_providers",
+                        "get_registered_report_types",
+                        "get_report_provider",
+                        "register_report_provider",
+                    ],
+                ),
                 "itambox/core/tasks/alerts.py": (
                     "symbols",
                     ["evaluate_alert_rules_task", "run_alert_rule_now"],
@@ -1290,6 +1310,33 @@ class CommittedRecordTests(unittest.TestCase):
                     ],
                 ),
             },
+        )
+
+    def test_the_committed_record_admits_the_report_provider_contract_slice(self):
+        entries = {entry["path"]: entry for entry in self.record["checked"]}
+
+        expected = {
+            "itambox/core/reports/contracts.py": [
+                "ReportDefinition",
+                "ReportRequest",
+                "ReportResult",
+            ],
+            "itambox/core/reports/orchestration.py": [
+                "_group_rows",
+                "_resolve_report_scope",
+                "build_report_context",
+            ],
+            "itambox/core/reports/registry.py": [
+                "discover_report_providers",
+                "get_registered_report_types",
+                "get_report_provider",
+                "register_report_provider",
+            ],
+        }
+
+        self.assertEqual(
+            {path: (entries[path]["scope"], entries[path]["symbols"]) for path in expected},
+            {path: ("symbols", symbols) for path, symbols in expected.items()},
         )
 
     def test_the_committed_pilot_satisfies_the_marker_and_suppression_grammars(self):
