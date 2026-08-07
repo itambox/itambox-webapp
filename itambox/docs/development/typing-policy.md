@@ -554,8 +554,13 @@ boundary; serializer and field representations have explicit concrete return
 types. `BindingDict`, `PKOnlyObject`, and generic DRF base parameters follow the
 pinned djangorestframework-stubs contracts.
 
+Slice 10 also completes the bounded SCIM identifier and OpenAPI authentication
+extension contracts: `get_scim_object_or_404` preserves the concrete model type
+through a tenant-scoped QuerySet, and the SCIM bearer security definition returns
+an explicit string map. The parser/filter, shared User/Group serializer, and
+bearer-authenticator contracts were already admitted by earlier slices.
+
 The report-provider seam remains deliberately outside Slice 10: PR #249 on
 `issue/83-report-providers` is not merged into `main`, and this slice does not
-anticipate its provider contracts or delivery result types. The remaining SCIM
-operation/value-object surfaces are subsequent bounded slices. Nothing is
-claimed as checked until it appears in the record.
+anticipate its provider contracts or delivery result types. Nothing is claimed
+as checked until it appears in the record.

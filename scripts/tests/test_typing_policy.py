@@ -1239,7 +1239,11 @@ class CommittedRecordTests(unittest.TestCase):
                 ),
                 "itambox/users/api/scim/authentication.py": (
                     "symbols",
-                    ["SCIMBearerTokenAuthentication", "_SCIMAuthenticatedPrincipal"],
+                    [
+                        "SCIMBearerTokenAuthentication",
+                        "SCIMBearerTokenAuthenticationScheme",
+                        "_SCIMAuthenticatedPrincipal",
+                    ],
                 ),
                 "itambox/users/api/scim/filters.py": (
                     "symbols",
@@ -1259,7 +1263,7 @@ class CommittedRecordTests(unittest.TestCase):
                 ),
                 "itambox/users/api/scim/identifiers.py": (
                     "symbols",
-                    ["identifier_lookup", "identifier_lookup_or_none"],
+                    ["get_scim_object_or_404", "identifier_lookup", "identifier_lookup_or_none"],
                 ),
                 "itambox/users/api/scim/provider_authentication.py": (
                     "symbols",

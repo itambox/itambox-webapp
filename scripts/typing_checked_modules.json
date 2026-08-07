@@ -2,7 +2,7 @@
   "schema_version": 2,
   "canonical_python": "3.12",
   "next_sequence": 39,
-  "policy_sha256": "75a3bb182f392e6bf4edf049e6f834d0705c5b909e224b52eee542119d70e6a1",
+  "policy_sha256": "69e07591029f1c73f9da0e4fda330026ddc651c832aeb79dfa93a919e6ec8430",
   "config": {
     "config_file": "pyproject.toml",
     "working_directory": "itambox",
@@ -474,10 +474,11 @@
       "path": "itambox/users/api/scim/authentication.py",
       "module": "users.api.scim.authentication",
       "issue": "#93",
-      "note": "Slice 6 symbol admission: the _SCIMAuthenticatedPrincipal protocol and SCIMBearerTokenAuthentication DRF authentication contract -- a Request in, the minimal authenticated-principal/credential pair or None out, and the WWW-Authenticate scheme it advertises. The protocol avoids importing project model classes into the bounded projection; tenant resolution, token validation, IP allowlist, has_perm authorization, and write-flag checks inside the method bodies are unchanged and remain outside this slice.",
+      "note": "Slice 10 extension of the existing SCIM authentication contract: SCIMBearerTokenAuthenticationScheme now exposes its OpenAPI security-definition return shape as dict[str, str], while the previously admitted authenticator and principal protocol remain unchanged.",
       "scope": "symbols",
       "symbols": [
         "SCIMBearerTokenAuthentication",
+        "SCIMBearerTokenAuthenticationScheme",
         "_SCIMAuthenticatedPrincipal"
       ]
     },
@@ -503,9 +504,10 @@
       "path": "itambox/users/api/scim/identifiers.py",
       "module": "users.api.scim.identifiers",
       "issue": "#93",
-      "note": "Slice 6 symbol admission: the two SCIM identifier-boundary functions of the 1.x dual-read window -- identifier_lookup, which answers the model lookup for a legacy integer or opaque UUID identifier, and identifier_lookup_or_none, which answers None instead of raising for an invalid member identifier. get_scim_object_or_404 is deliberately not admitted: it would pull the queryset it scopes into the admission, and queryset-generic typing is a later slice.",
+      "note": "Slice 10 extension of the existing SCIM identifier contract: get_scim_object_or_404 preserves the concrete model type across a tenant-scoped QuerySet, while the dual-read integer/UUID lookup functions remain unchanged.",
       "scope": "symbols",
       "symbols": [
+        "get_scim_object_or_404",
         "identifier_lookup",
         "identifier_lookup_or_none"
       ]
