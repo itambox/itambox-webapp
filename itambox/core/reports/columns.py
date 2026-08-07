@@ -102,4 +102,10 @@ _COLUMN_LABELS = {
 
 
 def headers_for(columns):
-    return [_COLUMN_LABELS[column] for column in columns if column in _COLUMN_LABELS]
+    """Resolve column keys to display labels in the caller's active language.
+
+    Labels are stored as lazy translations so the worker's active language is
+    honoured; resolving here keeps every consumer (HTML, CSV, XLSX, PDF) on
+    plain strings, exactly like the pre-provider compiler.
+    """
+    return [str(_COLUMN_LABELS[column]) for column in columns if column in _COLUMN_LABELS]
