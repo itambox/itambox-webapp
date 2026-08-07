@@ -192,6 +192,11 @@ class IntuneSyncMatchUpdateTest(TenantTestMixin, TransactionTestCase):
         # Counts reported correctly
         self.assertEqual(job.result["matched"], 1)
         self.assertEqual(job.result["created"], 0)
+        self.assertEqual(
+            set(job.result),
+            {"devices_total", "matched", "updated", "created", "skipped", "apps_upserted"},
+        )
+        self.assertTrue(all(isinstance(value, int) for value in job.result.values()))
 
 
 class IntuneSyncCreateMissingTest(TenantTestMixin, TransactionTestCase):

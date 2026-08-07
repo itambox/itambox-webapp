@@ -520,7 +520,20 @@ remain owned by #98. The complete SCIM operation surface, remaining task
 payload/result families, organization service boundaries, and report-provider
 contracts remain outside this slice.
 
-Subsequent slices of issue #93 extend the list one bounded surface at a time:
-the remaining task payload/result families, organization service boundaries,
-report-provider contracts, and generated OpenAPI validation. Nothing is claimed
-as checked until it appears in the record.
+Slice 10 admits the remaining complex task family that is present on `main`:
+`itambox/core/tasks/intune_sync.py`. `IntuneSyncResult` is a named `TypedDict`
+for the six integer counts persisted in `Job.result` (`devices_total`,
+`matched`, `updated`, `created`, `skipped`, and `apps_upserted`). The task entry
+point and its discovery, asset-creation, software-sync, and slugification
+boundaries are admitted alongside that result contract. Device and application
+records from Microsoft Graph remain `Mapping[str, object]` at the documented
+external-JSON boundary; tenant/model/client internals and the implementation
+body remain outside the projection. A characterization assertion pins the
+persisted key set and integer values without changing task behavior.
+
+The report-provider seam remains deliberately outside Slice 10: PR #249 on
+`issue/83-report-providers` is not merged into `main`, and this slice does not
+anticipate its provider contracts or delivery result types. The remaining SCIM
+operation/value-object surfaces, organization service boundaries, and
+OpenAPI-facing serializer methods are subsequent bounded slices. Nothing is
+claimed as checked until it appears in the record.

@@ -1009,7 +1009,7 @@ class CommittedRecordTests(unittest.TestCase):
     def test_the_committed_record_is_internally_consistent(self):
         self.assertEqual(gate.check_record(REPO_ROOT, self.policy, self.record), ())
 
-    def test_the_committed_record_lists_the_slice_zero_through_slice_nine_admissions(self):
+    def test_the_committed_record_lists_the_slice_zero_through_slice_ten_admissions(self):
         self.assertEqual(
             [entry["path"] for entry in self.record["checked"]],
             [
@@ -1022,6 +1022,7 @@ class CommittedRecordTests(unittest.TestCase):
                 "itambox/core/tasks/csv_import.py",
                 "itambox/core/tasks/depreciation.py",
                 "itambox/core/tasks/disposal.py",
+                "itambox/core/tasks/intune_sync.py",
                 "itambox/core/tasks/labels.py",
                 "itambox/core/tasks/ldap.py",
                 "itambox/core/tasks/reports.py",
@@ -1067,6 +1068,18 @@ class CommittedRecordTests(unittest.TestCase):
                 "itambox/core/tasks/disposal.py": (
                     "symbols",
                     ["_parse_date", "_parse_proceeds", "bulk_dispose_task"],
+                ),
+                "itambox/core/tasks/intune_sync.py": (
+                    "symbols",
+                    [
+                        "IntuneSyncResult",
+                        "_create_asset",
+                        "_run_sync",
+                        "_slugify",
+                        "_stamp_discovery_facts",
+                        "_sync_device_software",
+                        "sync_tenant_intune",
+                    ],
                 ),
                 "itambox/core/tasks/labels.py": (
                     "symbols",

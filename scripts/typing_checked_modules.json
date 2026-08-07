@@ -1,8 +1,8 @@
 {
   "schema_version": 2,
   "canonical_python": "3.12",
-  "next_sequence": 29,
-  "policy_sha256": "3a52623ce8efafebd1ef251b01b3fd6b31194478c409a4c25253a0db0979f686",
+  "next_sequence": 30,
+  "policy_sha256": "c91bc2a972bb34e2df33153cb419772c9bf8061f25d9887fff6385112dc873ad",
   "config": {
     "config_file": "pyproject.toml",
     "working_directory": "itambox",
@@ -143,6 +143,23 @@
         "_parse_date",
         "_parse_proceeds",
         "bulk_dispose_task"
+      ]
+    },
+    {
+      "sequence": 29,
+      "path": "itambox/core/tasks/intune_sync.py",
+      "module": "core.tasks.intune_sync",
+      "issue": "#93",
+      "note": "Slice 10 symbol admission: the Intune discovery task's named persisted result contract and its task/service boundaries. IntuneSyncResult fixes the six integer count keys Job.result stores after a run; Graph device/app payloads are Mapping[str, object] at the documented external-JSON boundary; tenant, asset, and service internals remain outside the projection.",
+      "scope": "symbols",
+      "symbols": [
+        "IntuneSyncResult",
+        "_create_asset",
+        "_run_sync",
+        "_slugify",
+        "_stamp_discovery_facts",
+        "_sync_device_software",
+        "sync_tenant_intune"
       ]
     },
     {
