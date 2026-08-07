@@ -5,6 +5,7 @@ from django.contrib.auth import get_user_model
 from django.core.exceptions import ValidationError
 from django.test import TestCase, override_settings
 from django.urls import reverse
+from django.utils import translation
 from django_q.models import Schedule
 
 from core.tasks.reports import (
@@ -276,9 +277,10 @@ class ScheduledReportingAndAlertsTests(TestCase):
         # Test direct compilation of context
         from core.reports import compile_report_context
 
-        headers, rows, summary_cards, grouped_data, chart_svg, context_data = compile_report_context(
-            self.template, active_tenant=self.tenant
-        )
+        with translation.override("en"):
+            headers, rows, summary_cards, grouped_data, chart_svg, context_data = compile_report_context(
+                self.template, active_tenant=self.tenant
+            )
 
         self.assertIn("Total Hardware Assets", [c["label"] for c in summary_cards])
         self.assertIn("$1,200.00", [c["value"] for c in summary_cards])

@@ -5,6 +5,7 @@ from decimal import Decimal
 
 from django.core.exceptions import ImproperlyConfigured
 from django.test import SimpleTestCase, TestCase
+from django.utils import translation
 
 from assets.models import Asset, AssetAssignment, AssetType, Manufacturer, StatusLabel
 from assets.models.lifecycle import Warranty
@@ -137,7 +138,7 @@ class AssetSummaryReportProviderTests(TenantTestMixin, TestCase):
             include_distribution_chart=True,
         )
 
-        with self.tenant_context(self.tenant):
+        with self.tenant_context(self.tenant), translation.override("en"):
             headers, rows, summary_cards, _grouped, chart_svg, _context = compile_report_context(
                 template, active_tenant=self.tenant
             )
@@ -170,7 +171,7 @@ class AssetSummaryReportProviderTests(TenantTestMixin, TestCase):
             include_distribution_chart=False,
             group_by_field="status",
         )
-        with self.tenant_context(self.tenant):
+        with self.tenant_context(self.tenant), translation.override("en"):
             _headers, rows, summary_cards, grouped_data, chart_svg, _context = compile_report_context(
                 template, active_tenant=self.tenant
             )
@@ -181,7 +182,7 @@ class AssetSummaryReportProviderTests(TenantTestMixin, TestCase):
         self.assertEqual(len(rows), 2)
 
         template.group_by_field = "location"
-        with self.tenant_context(self.tenant):
+        with self.tenant_context(self.tenant), translation.override("en"):
             _headers, _rows, _cards, grouped_by_location, _chart, _context = compile_report_context(
                 template, active_tenant=self.tenant
             )
@@ -209,9 +210,10 @@ class AssetSummaryReportProviderTests(TenantTestMixin, TestCase):
             included_columns=["asset_tag"],
         )
         self.clear_tenant_context()
-        _headers, rows, _cards, _grouped, _chart, _context = compile_report_context(
-            template, active_tenant=None, filter_tenants=[other_tenant]
-        )
+        with translation.override("en"):
+            _headers, rows, _cards, _grouped, _chart, _context = compile_report_context(
+                template, active_tenant=None, filter_tenants=[other_tenant]
+            )
         self.assertEqual([row["Asset Tag"] for row in rows], ["SCOPE-OTHER"])
 
 

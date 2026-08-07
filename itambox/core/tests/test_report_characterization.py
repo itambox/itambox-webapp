@@ -10,6 +10,7 @@ from datetime import date
 from decimal import Decimal
 
 from django.test import TestCase
+from django.utils import translation
 
 from core.reports import compile_report_context
 from core.tests.mixins import TenantTestMixin
@@ -197,9 +198,10 @@ class ReportCompilerCharacterizationTests(TenantTestMixin, TestCase):
                     include_summary_cards=True,
                     include_distribution_chart=True,
                 )
-                headers, rows, summary_cards, grouped_data, chart_svg, context_data = compile_report_context(
-                    template, active_tenant=self.tenant
-                )
+                with translation.override("en"):
+                    headers, rows, summary_cards, grouped_data, chart_svg, context_data = compile_report_context(
+                        template, active_tenant=self.tenant
+                    )
 
                 self.assertEqual(headers, expected["headers"])
                 self.assertEqual(list(rows[0]), expected["headers"] + ["_group_by"])
@@ -239,7 +241,7 @@ class ReportCompilerCharacterizationTests(TenantTestMixin, TestCase):
             include_distribution_chart=True,
         )
 
-        with self.tenant_context(self.tenant):
+        with self.tenant_context(self.tenant), translation.override("en"):
             _headers, _rows, summary_cards, _grouped, _chart, _context = compile_report_context(
                 template, active_tenant=self.tenant
             )
