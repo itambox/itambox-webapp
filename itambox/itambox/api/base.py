@@ -1,18 +1,31 @@
+from collections.abc import Iterator, Sequence
 from functools import cached_property
+from typing import Any
 
+from django.db.models import Manager
 from drf_spectacular.types import OpenApiTypes
 from drf_spectacular.utils import extend_schema_field
 from rest_framework import serializers
+from rest_framework.utils.serializer_helpers import BindingDict
 
 from itambox.api.exceptions import SerializerNotFound
 from itambox.api.related import get_related_object_by_attrs
 
 
-class BaseModelSerializer(serializers.ModelSerializer):
+# typing: third-party-untyped: DRF base serializer intentionally remains open over concrete child models
+class BaseModelSerializer(serializers.ModelSerializer[Any]):
     url = serializers.HyperlinkedIdentityField(view_name="")
     display = serializers.SerializerMethodField(read_only=True)
 
-    def __init__(self, *args, nested=False, fields=None, omit=None, **kwargs):
+    # typing: third-party-untyped: DRF constructor accepts parser-native and many-mode kwargs
+    def __init__(
+        self,
+        *args: Any,
+        nested: bool = False,
+        fields: Sequence[str] | None = None,
+        omit: Sequence[str] | None = None,
+        **kwargs: Any,
+    ) -> None:
         self.nested = nested
         self._include_fields = fields or []
         self._omit_fields = omit or []
@@ -25,14 +38,15 @@ class BaseModelSerializer(serializers.ModelSerializer):
 
         super().__init__(*args, **kwargs)
 
-    def to_internal_value(self, data):
+    # typing: third-party-untyped: DRF passes parser-native input before serializer validation
+    def to_internal_value(self, data: Any) -> object:
         if self.nested:
             queryset = self.Meta.model.objects.all()
             return get_related_object_by_attrs(queryset, data)
         return super().to_internal_value(data)
 
     @cached_property
-    def fields(self):
+    def fields(self) -> BindingDict:
         fields = super().fields
 
         if self._include_fields:
@@ -45,15 +59,17 @@ class BaseModelSerializer(serializers.ModelSerializer):
         return fields
 
     @extend_schema_field(OpenApiTypes.STR)
-    def get_display(self, obj):
+    # typing: third-party-untyped: DRF model serializer hooks accept each concrete child model
+    def get_display(self, obj: Any) -> str:
         return str(obj)
 
 
 class ValidatedModelSerializer(BaseModelSerializer):
-    def get_unique_together_constraints(self, model):
-        return []
+    # typing: third-party-untyped: DRF supplies model metadata through an unparameterized hook
+    def get_unique_together_constraints(self, model: Any) -> Iterator[tuple[set[tuple[str, ...]], Manager[Any]]]:
+        return iter(())
 
-    def validate(self, data):
+    def validate(self, data: dict[str, object]) -> dict[str, object]:
         if self.nested:
             return data
 

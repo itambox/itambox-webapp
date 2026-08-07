@@ -149,6 +149,7 @@ PYTHONPATH=itambox uv run --locked --group dev python -m pytest -q -p no:cachepr
   itambox/core/tests/test_html_styles.py \
   itambox/core/tests/test_import_snipeit.py \
   itambox/core/tests/test_integrity_report.py \
+  itambox/core/tests/test_intune_sync.py \
   itambox/core/tests/test_label_renderer_html.py \
   itambox/core/tests/test_mitigations_phase2.py \
   itambox/core/tests/test_plugins.py \

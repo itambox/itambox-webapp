@@ -1,8 +1,8 @@
 {
   "schema_version": 2,
   "canonical_python": "3.12",
-  "next_sequence": 29,
-  "policy_sha256": "3a52623ce8efafebd1ef251b01b3fd6b31194478c409a4c25253a0db0979f686",
+  "next_sequence": 39,
+  "policy_sha256": "869702bd511d13f923b704d19b0dee48da0d9c84ddee42ffe597372e81077058",
   "config": {
     "config_file": "pyproject.toml",
     "working_directory": "itambox",
@@ -146,6 +146,27 @@
       ]
     },
     {
+      "sequence": 29,
+      "path": "itambox/core/tasks/intune_sync.py",
+      "module": "core.tasks.intune_sync",
+      "issue": "#93",
+      "note": "Slice 10 symbol admission: the Intune discovery task's named Graph payload and persisted result contracts and its task/service boundaries. IntuneDevicePayload and IntuneAppPayload describe the selected string fields consumed from the external Graph JSON; IntuneSyncResult fixes the six integer count keys Job.result stores after a run; tenant, asset, and service internals remain outside the projection.",
+      "scope": "symbols",
+      "symbols": [
+        "IntuneAppPayload",
+        "IntuneDevicePayload",
+        "IntuneSyncResult",
+        "_IntuneAsset",
+        "_IntuneTenant",
+        "_create_asset",
+        "_run_sync",
+        "_slugify",
+        "_stamp_discovery_facts",
+        "_sync_device_software",
+        "sync_tenant_intune"
+      ]
+    },
+    {
       "sequence": 14,
       "path": "itambox/core/tasks/labels.py",
       "module": "core.tasks.labels",
@@ -250,6 +271,46 @@
       ]
     },
     {
+      "sequence": 35,
+      "path": "itambox/itambox/api/base.py",
+      "module": "itambox.api.base",
+      "issue": "#93",
+      "note": "Slice 10 AC14 admission: explicit DRF base serializer hook and OpenAPI display contracts. Framework inbound hooks use the documented DRF Any boundary; fields and representation results remain concrete.",
+      "scope": "symbols",
+      "symbols": [
+        "BaseModelSerializer",
+        "ValidatedModelSerializer"
+      ]
+    },
+    {
+      "sequence": 36,
+      "path": "itambox/itambox/api/fields.py",
+      "module": "itambox.api.fields",
+      "issue": "#93",
+      "note": "Slice 10 AC14 admission: custom field conversion/representation and generic-FK validation contracts used by OpenAPI serializers. Parser-native inputs remain at the DRF Any boundary.",
+      "scope": "symbols",
+      "symbols": [
+        "ChoiceField",
+        "ContentTypeField",
+        "RelatedObjectCountField",
+        "SerializedPKRelatedField",
+        "validate_gfk_target_tenant"
+      ]
+    },
+    {
+      "sequence": 37,
+      "path": "itambox/itambox/api/serializers/__init__.py",
+      "module": "itambox.api.serializers",
+      "issue": "#93",
+      "note": "Slice 10 AC14 admission: generic-object conversion and ObjectChange SerializerMethodField return contracts.",
+      "scope": "symbols",
+      "symbols": [
+        "GenericObjectSerializer",
+        "NestedUserSerializer",
+        "ObjectChangeSerializer"
+      ]
+    },
+    {
       "sequence": 25,
       "path": "itambox/licenses/api/serializers.py",
       "module": "licenses.api.serializers",
@@ -300,6 +361,83 @@
       ]
     },
     {
+      "sequence": 34,
+      "path": "itambox/organization/services/__init__.py",
+      "module": "organization.services",
+      "issue": "#93",
+      "note": "Slice 10 organization-service admission: compatibility facade that re-exports the typed resource-access boundary without importing membership or rolegrant services.",
+      "scope": "module",
+      "symbols": []
+    },
+    {
+      "sequence": 30,
+      "path": "itambox/organization/services/errors.py",
+      "module": "organization.services.errors",
+      "issue": "#93",
+      "note": "Slice 10 organization-service admission: typed, field-mappable service-error contract. ValidationError compatibility and message-disclosure ordering remain unchanged.",
+      "scope": "module",
+      "symbols": []
+    },
+    {
+      "sequence": 31,
+      "path": "itambox/organization/services/membership.py",
+      "module": "organization.services.membership",
+      "issue": "#93",
+      "note": "Slice 10 organization-service admission: typed membership intent/plan/result contracts and the public authorization, planning, identity, and write entry points. Private ORM orchestration remains outside the projection.",
+      "scope": "symbols",
+      "symbols": [
+        "MembershipIntent",
+        "MembershipWritePlan",
+        "MembershipWriteResult",
+        "NewIdentitySpec",
+        "_MembershipActor",
+        "_MembershipUser",
+        "apply_membership_grants",
+        "authorize_membership_write",
+        "execute_membership_write",
+        "may_manage_memberships",
+        "plan_membership_write",
+        "resolve_identity"
+      ]
+    },
+    {
+      "sequence": 32,
+      "path": "itambox/organization/services/resource_access.py",
+      "module": "organization.services.resource_access",
+      "issue": "#93",
+      "note": "Slice 10 organization-service admission: generic QuerySet/model container-visibility boundaries. Generic model identity is preserved with a bounded TypeVar; authorization and filtering behavior remain unchanged.",
+      "scope": "symbols",
+      "symbols": [
+        "_ContainerPermissionActor",
+        "is_container_scoped_unfiltered",
+        "visible_to_containers"
+      ]
+    },
+    {
+      "sequence": 33,
+      "path": "itambox/organization/services/rolegrants.py",
+      "module": "organization.services.rolegrants",
+      "issue": "#93",
+      "note": "Slice 10 organization-service admission: named grant specs/plans/validated-token/change/result contracts, query helpers, validation, assignability, and the validated-only write entry point. Private ORM/reconciliation bodies remain outside the projection.",
+      "scope": "symbols",
+      "symbols": [
+        "GrantChange",
+        "GrantPlan",
+        "GrantSyncResult",
+        "ManagedGrantSpec",
+        "OwnGrantSpec",
+        "ValidatedGrantPlan",
+        "assignable_roles_qs",
+        "live_managed_grants",
+        "live_own_grants",
+        "managed_target_tenants_qs",
+        "requested_tenant_ids_for",
+        "role_assignable_in",
+        "sync_membership_grants",
+        "validate_grant_plan"
+      ]
+    },
+    {
       "sequence": 27,
       "path": "itambox/procurement/api/serializers.py",
       "module": "procurement.api.serializers",
@@ -328,14 +466,26 @@
       ]
     },
     {
+      "sequence": 38,
+      "path": "itambox/subscriptions/api/views.py",
+      "module": "subscriptions.api.views",
+      "issue": "#93",
+      "note": "Slice 10 AC14 admission: explicit return contract for the compatibility serializer referenced directly by extend_schema(request=...).",
+      "scope": "symbols",
+      "symbols": [
+        "SubscriptionStatusCompatibilitySerializer"
+      ]
+    },
+    {
       "sequence": 6,
       "path": "itambox/users/api/scim/authentication.py",
       "module": "users.api.scim.authentication",
       "issue": "#93",
-      "note": "Slice 6 symbol admission: the _SCIMAuthenticatedPrincipal protocol and SCIMBearerTokenAuthentication DRF authentication contract -- a Request in, the minimal authenticated-principal/credential pair or None out, and the WWW-Authenticate scheme it advertises. The protocol avoids importing project model classes into the bounded projection; tenant resolution, token validation, IP allowlist, has_perm authorization, and write-flag checks inside the method bodies are unchanged and remain outside this slice.",
+      "note": "Slice 6 symbol admission: the _SCIMAuthenticatedPrincipal protocol and SCIMBearerTokenAuthentication DRF authentication contract -- a Request in, the minimal authenticated-principal/credential pair or None out, and the WWW-Authenticate scheme it advertises. The protocol avoids importing project model classes into the bounded projection; tenant resolution, token validation, IP allowlist, has_perm authorization, and write-flag checks inside the method bodies are unchanged and remain outside this slice. Slice 10 extends the same contract with SCIMBearerTokenAuthenticationScheme's explicit dict[str, str] OpenAPI security definition.",
       "scope": "symbols",
       "symbols": [
         "SCIMBearerTokenAuthentication",
+        "SCIMBearerTokenAuthenticationScheme",
         "_SCIMAuthenticatedPrincipal"
       ]
     },
@@ -361,9 +511,10 @@
       "path": "itambox/users/api/scim/identifiers.py",
       "module": "users.api.scim.identifiers",
       "issue": "#93",
-      "note": "Slice 6 symbol admission: the two SCIM identifier-boundary functions of the 1.x dual-read window -- identifier_lookup, which answers the model lookup for a legacy integer or opaque UUID identifier, and identifier_lookup_or_none, which answers None instead of raising for an invalid member identifier. get_scim_object_or_404 is deliberately not admitted: it would pull the queryset it scopes into the admission, and queryset-generic typing is a later slice.",
+      "note": "Slice 6 symbol admission: the two SCIM identifier-boundary functions of the 1.x dual-read window -- identifier_lookup, which answers the model lookup for a legacy integer or opaque UUID identifier, and identifier_lookup_or_none, which answers None instead of raising for an invalid member identifier. Slice 10 extends this bounded contract with get_scim_object_or_404, preserving the concrete model type across a tenant-scoped QuerySet; the lookup body remains unchanged.",
       "scope": "symbols",
       "symbols": [
+        "get_scim_object_or_404",
         "identifier_lookup",
         "identifier_lookup_or_none"
       ]

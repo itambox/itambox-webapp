@@ -1,5 +1,9 @@
+import builtins
+from typing import Any
+
 from django.contrib.auth import get_user_model
 from django.contrib.contenttypes.models import ContentType
+from django.db.models import Model
 from rest_framework import serializers
 
 from core.choices import ObjectChangeActionChoices
@@ -25,17 +29,18 @@ __all__ = (
 )
 
 
-class GenericObjectSerializer(serializers.Serializer):
+class GenericObjectSerializer(serializers.Serializer[Model]):
     object_type = ContentTypeField(queryset=ContentType.objects.all())
     object_id = serializers.IntegerField()
     object = GFKSerializerField(read_only=True)
 
-    def to_internal_value(self, data):
+    # typing: third-party-untyped: DRF passes parser-native generic-object input
+    def to_internal_value(self, data: Any) -> Model:
         data = super().to_internal_value(data)
         model = data["object_type"].model_class()
         return model.objects.get(pk=data["object_id"])
 
-    def to_representation(self, instance):
+    def to_representation(self, instance: Model) -> dict[str, builtins.object]:
         ct = ContentType.objects.get_for_model(instance)
         return {
             "object_type": f"{ct.app_label}.{ct.model}",
@@ -92,12 +97,12 @@ class ObjectChangeSerializer(BaseModelSerializer):
         ]
         brief_fields = ["id", "url", "display", "time", "user", "action", "object_repr"]
 
-    def get_display(self, obj):
+    def get_display(self, obj: ObjectChange) -> str:
         action_label = obj.get_action_display()
         user_display = obj.user.username if obj.user else obj.user_name
         return f"{obj.object_type_repr or obj.changed_object_type}: {obj.object_repr} {action_label} by {user_display}"
 
-    def get_changed_object(self, obj):
+    def get_changed_object(self, obj: ObjectChange) -> dict[str, object] | None:
         if obj.changed_object is None:
             return None
         return {

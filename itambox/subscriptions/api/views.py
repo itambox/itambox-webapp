@@ -27,10 +27,10 @@ class SubscriptionCancelSerializer(drf_serializers.Serializer):
     reason = drf_serializers.CharField(required=False, allow_blank=True, default="")
 
 
-class SubscriptionStatusCompatibilitySerializer(drf_serializers.Serializer):
+class SubscriptionStatusCompatibilitySerializer(drf_serializers.Serializer[dict[str, object]]):
     status = drf_serializers.CharField()
 
-    def validate_status(self, value):
+    def validate_status(self, value: str) -> str:
         if value not in SubscriptionStatusChoices.values:
             raise drf_serializers.ValidationError("Unknown subscription status.")
         return value

@@ -1,35 +1,45 @@
 from collections import OrderedDict
+from collections.abc import Iterable
+from typing import Any, cast
 
 from django.contrib.contenttypes.models import ContentType
 from django.core.exceptions import ObjectDoesNotExist
+from django.db.models import Model
 from django.utils.translation import gettext_lazy as _
 from drf_spectacular.types import OpenApiTypes
 from drf_spectacular.utils import extend_schema_field
 from rest_framework import serializers
 from rest_framework.exceptions import ValidationError
-from rest_framework.relations import PrimaryKeyRelatedField, RelatedField
+from rest_framework.relations import PKOnlyObject, PrimaryKeyRelatedField, RelatedField
 
 
-class ChoiceField(serializers.Field):
+class ChoiceField(serializers.Field[object, object, dict[str, object] | None, object]):
     """
     Represent a ChoiceField as {'value': <DB value>, 'label': <string>}. Accepts a single value on write.
     """
 
-    def __init__(self, choices, allow_blank=False, **kwargs):
-        self.choiceset = choices
+    # typing: third-party-untyped: DRF field constructors accept extensible keyword options
+    def __init__(
+        self,
+        choices: Iterable[tuple[object, object]],
+        allow_blank: bool = False,
+        **kwargs: Any,
+    ) -> None:
+        self.choiceset = tuple(choices)
         self.allow_blank = allow_blank
         self._choices = dict(list(self.choiceset))
 
         super().__init__(**kwargs)
 
-    def validate_empty_values(self, data):
+    # typing: third-party-untyped: DRF passes empty sentinels and parser-native values
+    def validate_empty_values(self, data: Any) -> tuple[bool, Any]:
         if data is None:
             if self.allow_null:
                 return True, None
             data = ""
         return super().validate_empty_values(data)
 
-    def to_representation(self, obj):
+    def to_representation(self, obj: object) -> dict[str, object] | None:
         if obj != "":
             return {
                 "value": obj,
@@ -37,7 +47,8 @@ class ChoiceField(serializers.Field):
             }
         return None
 
-    def to_internal_value(self, data):
+    # typing: third-party-untyped: DRF passes parser-native choice values
+    def to_internal_value(self, data: Any) -> object:
         if data == "":
             if self.allow_blank:
                 return data
@@ -68,11 +79,11 @@ class ChoiceField(serializers.Field):
         raise ValidationError(_("{value} is not a valid choice.").format(value=data))
 
     @property
-    def choices(self):
+    def choices(self) -> dict[object, object]:
         return self._choices
 
 
-def validate_gfk_target_tenant(content_type, object_id):
+def validate_gfk_target_tenant(content_type: ContentType | None, object_id: object | None) -> object | None:
     """Validate that a generic-FK write ``(content_type, object_id)`` targets an
     object visible within the current tenant, and return the resolved object.
 
@@ -103,7 +114,7 @@ def validate_gfk_target_tenant(content_type, object_id):
 
 
 @extend_schema_field(OpenApiTypes.STR)
-class ContentTypeField(RelatedField):
+class ContentTypeField(RelatedField[ContentType, object, str]):
     """
     Represent a ContentType as '<app_label>.<model>'
     """
@@ -113,7 +124,8 @@ class ContentTypeField(RelatedField):
         "invalid": _("Invalid value. Specify a content type as '<app_label>.<model_name>'."),
     }
 
-    def to_internal_value(self, data):
+    # typing: third-party-untyped: DRF passes parser-native content-type values
+    def to_internal_value(self, data: Any) -> ContentType:
         try:
             app_label, model = data.split(".")
             return ContentType.objects.get_by_natural_key(app_label=app_label, model=model)
@@ -122,22 +134,26 @@ class ContentTypeField(RelatedField):
         except (AttributeError, TypeError, ValueError):
             self.fail("invalid")
 
-    def to_representation(self, obj):
+    def to_representation(self, obj: ContentType | PKOnlyObject) -> str:
+        obj = cast(ContentType, obj)
         return f"{obj.app_label}.{obj.model}"
 
 
-class SerializedPKRelatedField(PrimaryKeyRelatedField):
+class SerializedPKRelatedField(PrimaryKeyRelatedField[Model]):
     """
     Extends PrimaryKeyRelatedField to return a serialized object on read.
     """
 
-    def __init__(self, serializer, nested=False, **kwargs):
+    # typing: third-party-untyped: DRF field constructors accept extensible keyword options
+    # typing: third-party-untyped: nested serializer classes have heterogeneous model parameters
+    def __init__(self, serializer: type[serializers.Serializer[Any]], nested: bool = False, **kwargs: Any) -> None:
         self.serializer = serializer
         self.nested = nested
         self.pk_field = kwargs.pop("pk_field", None)
         super().__init__(**kwargs)
 
-    def to_representation(self, value):
+    # typing: third-party-untyped: DRF relation hooks may receive a PK-only proxy or arbitrary model value
+    def to_representation(self, value: Model | PKOnlyObject) -> object:
         return self.serializer(value, nested=self.nested, context={"request": self.context["request"]}).data
 
 
@@ -147,6 +163,7 @@ class RelatedObjectCountField(serializers.ReadOnlyField):
     Represents a read-only integer count of related objects.
     """
 
-    def __init__(self, relation, **kwargs):
+    # typing: third-party-untyped: DRF field constructors accept extensible keyword options
+    def __init__(self, relation: str, **kwargs: Any) -> None:
         self.relation = relation
         super().__init__(**kwargs)

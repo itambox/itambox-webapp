@@ -116,7 +116,7 @@ class SCIMBearerTokenAuthenticationScheme(OpenApiAuthenticationExtension):
     target_class = SCIMBearerTokenAuthentication
     name = "SCIMBearerAuth"
 
-    def get_security_definition(self, auto_schema):
+    def get_security_definition(self, auto_schema: object) -> dict[str, str]:
         return {
             "type": "http",
             "scheme": "bearer",

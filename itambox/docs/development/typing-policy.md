@@ -516,11 +516,50 @@ The selected methods now carry explicit parameter and return annotations while
 serializer behavior, tenant/security checks, lifecycle guards, and ORM access
 remain unchanged. This is an interface admission: generated OpenAPI schema
 validation, operation/component stability, and generated-client compatibility
-remain owned by #98. The complete SCIM operation surface, remaining task
-payload/result families, organization service boundaries, and report-provider
-contracts remain outside this slice.
+remain owned by #98; the Slice-10 AC14 additions below complete the annotation
+surface without changing the tracked schema.
 
-Subsequent slices of issue #93 extend the list one bounded surface at a time:
-the remaining task payload/result families, organization service boundaries,
-report-provider contracts, and generated OpenAPI validation. Nothing is claimed
+Slice 10 admits the remaining complex task family that is present on `main`:
+`itambox/core/tasks/intune_sync.py`. `IntuneDevicePayload` and
+`IntuneAppPayload` are named, bounded contracts for the selected string fields
+from Microsoft Graph; `IntuneSyncResult` is a named `TypedDict` for the six
+integer counts persisted in `Job.result` (`devices_total`, `matched`, `updated`,
+`created`, `skipped`, and `apps_upserted`). The task entry point and its
+discovery, asset-creation, software-sync, and slugification boundaries are
+admitted alongside those contracts. Tenant/model/client internals remain
+outside the projection. A characterization assertion pins the persisted key
+set and integer values without changing task behavior.
+
+Slice 10 also admits the organization service boundary. The compatibility
+facade and the resource-access helpers preserve generic model identity with a
+bounded `QuerySet[_ModelT]`; the service-error module preserves its
+`ValidationError` compatibility while exposing field/row-located errors. The
+membership service exposes typed identity, intent, plan, and result contracts
+plus its authorization/planning/write entry points. The RoleGrant service
+exposes typed own/managed grant specs, plans, validated write tokens, change
+records, query helpers, validation, and the validated-only sync entry point.
+Existing adversarial service tests continue to characterize authorization
+ordering, cross-tenant rejection, atomicity, replay, and race behavior; this
+slice changes signatures and projection scope only. Private ORM and
+reconciliation bodies remain outside the symbol projections.
+
+For AC14, Slice 10 admits the remaining OpenAPI-facing serializer contracts:
+the `BaseModelSerializer`/`ValidatedModelSerializer` hooks, custom choice,
+content-type, serialized-relation, and related-count fields, generic-object and
+`ObjectChange` SerializerMethodField methods, and the subscription status
+compatibility request serializer referenced by `extend_schema`. DRF parser and
+constructor inputs use only the documented, marker-coded third-party `Any`
+boundary; serializer and field representations have explicit concrete return
+types. `BindingDict`, `PKOnlyObject`, and generic DRF base parameters follow the
+pinned djangorestframework-stubs contracts.
+
+Slice 10 also completes the bounded SCIM identifier and OpenAPI authentication
+extension contracts: `get_scim_object_or_404` preserves the concrete model type
+through a tenant-scoped QuerySet, and the SCIM bearer security definition returns
+an explicit string map. The parser/filter, shared User/Group serializer, and
+bearer-authenticator contracts were already admitted by earlier slices.
+
+The report-provider seam remains deliberately outside Slice 10: PR #249 on
+`issue/83-report-providers` is not merged into `main`, and this slice does not
+anticipate its provider contracts or delivery result types. Nothing is claimed
 as checked until it appears in the record.

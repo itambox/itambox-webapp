@@ -1009,7 +1009,7 @@ class CommittedRecordTests(unittest.TestCase):
     def test_the_committed_record_is_internally_consistent(self):
         self.assertEqual(gate.check_record(REPO_ROOT, self.policy, self.record), ())
 
-    def test_the_committed_record_lists_the_slice_zero_through_slice_nine_admissions(self):
+    def test_the_committed_record_lists_the_slice_zero_through_slice_ten_admissions(self):
         self.assertEqual(
             [entry["path"] for entry in self.record["checked"]],
             [
@@ -1022,6 +1022,7 @@ class CommittedRecordTests(unittest.TestCase):
                 "itambox/core/tasks/csv_import.py",
                 "itambox/core/tasks/depreciation.py",
                 "itambox/core/tasks/disposal.py",
+                "itambox/core/tasks/intune_sync.py",
                 "itambox/core/tasks/labels.py",
                 "itambox/core/tasks/ldap.py",
                 "itambox/core/tasks/reports.py",
@@ -1030,11 +1031,20 @@ class CommittedRecordTests(unittest.TestCase):
                 "itambox/core/tasks/webhooks.py",
                 "itambox/extras/api/serializers.py",
                 "itambox/inventory/api/serializers.py",
+                "itambox/itambox/api/base.py",
+                "itambox/itambox/api/fields.py",
+                "itambox/itambox/api/serializers/__init__.py",
                 "itambox/licenses/api/serializers.py",
                 "itambox/organization/access.py",
                 "itambox/organization/api/serializers.py",
+                "itambox/organization/services/__init__.py",
+                "itambox/organization/services/errors.py",
+                "itambox/organization/services/membership.py",
+                "itambox/organization/services/resource_access.py",
+                "itambox/organization/services/rolegrants.py",
                 "itambox/procurement/api/serializers.py",
                 "itambox/subscriptions/api/serializers.py",
+                "itambox/subscriptions/api/views.py",
                 "itambox/users/api/scim/authentication.py",
                 "itambox/users/api/scim/filters.py",
                 "itambox/users/api/scim/identifiers.py",
@@ -1067,6 +1077,22 @@ class CommittedRecordTests(unittest.TestCase):
                 "itambox/core/tasks/disposal.py": (
                     "symbols",
                     ["_parse_date", "_parse_proceeds", "bulk_dispose_task"],
+                ),
+                "itambox/core/tasks/intune_sync.py": (
+                    "symbols",
+                    [
+                        "IntuneAppPayload",
+                        "IntuneDevicePayload",
+                        "IntuneSyncResult",
+                        "_IntuneAsset",
+                        "_IntuneTenant",
+                        "_create_asset",
+                        "_run_sync",
+                        "_slugify",
+                        "_stamp_discovery_facts",
+                        "_sync_device_software",
+                        "sync_tenant_intune",
+                    ],
                 ),
                 "itambox/core/tasks/labels.py": (
                     "symbols",
@@ -1111,6 +1137,24 @@ class CommittedRecordTests(unittest.TestCase):
                         "_consumable_category_queryset",
                     ],
                 ),
+                "itambox/itambox/api/base.py": (
+                    "symbols",
+                    ["BaseModelSerializer", "ValidatedModelSerializer"],
+                ),
+                "itambox/itambox/api/fields.py": (
+                    "symbols",
+                    [
+                        "ChoiceField",
+                        "ContentTypeField",
+                        "RelatedObjectCountField",
+                        "SerializedPKRelatedField",
+                        "validate_gfk_target_tenant",
+                    ],
+                ),
+                "itambox/itambox/api/serializers/__init__.py": (
+                    "symbols",
+                    ["GenericObjectSerializer", "NestedUserSerializer", "ObjectChangeSerializer"],
+                ),
                 "itambox/licenses/api/serializers.py": (
                     "symbols",
                     ["LicenseSeatAssignmentSerializer", "LicenseSerializer"],
@@ -1143,6 +1187,48 @@ class CommittedRecordTests(unittest.TestCase):
                         "TenantSerializer",
                     ],
                 ),
+                "itambox/organization/services/__init__.py": ("module", []),
+                "itambox/organization/services/errors.py": ("module", []),
+                "itambox/organization/services/membership.py": (
+                    "symbols",
+                    [
+                        "MembershipIntent",
+                        "MembershipWritePlan",
+                        "MembershipWriteResult",
+                        "NewIdentitySpec",
+                        "_MembershipActor",
+                        "_MembershipUser",
+                        "apply_membership_grants",
+                        "authorize_membership_write",
+                        "execute_membership_write",
+                        "may_manage_memberships",
+                        "plan_membership_write",
+                        "resolve_identity",
+                    ],
+                ),
+                "itambox/organization/services/resource_access.py": (
+                    "symbols",
+                    ["_ContainerPermissionActor", "is_container_scoped_unfiltered", "visible_to_containers"],
+                ),
+                "itambox/organization/services/rolegrants.py": (
+                    "symbols",
+                    [
+                        "GrantChange",
+                        "GrantPlan",
+                        "GrantSyncResult",
+                        "ManagedGrantSpec",
+                        "OwnGrantSpec",
+                        "ValidatedGrantPlan",
+                        "assignable_roles_qs",
+                        "live_managed_grants",
+                        "live_own_grants",
+                        "managed_target_tenants_qs",
+                        "requested_tenant_ids_for",
+                        "role_assignable_in",
+                        "sync_membership_grants",
+                        "validate_grant_plan",
+                    ],
+                ),
                 "itambox/procurement/api/serializers.py": (
                     "symbols",
                     [
@@ -1159,7 +1245,11 @@ class CommittedRecordTests(unittest.TestCase):
                 ),
                 "itambox/users/api/scim/authentication.py": (
                     "symbols",
-                    ["SCIMBearerTokenAuthentication", "_SCIMAuthenticatedPrincipal"],
+                    [
+                        "SCIMBearerTokenAuthentication",
+                        "SCIMBearerTokenAuthenticationScheme",
+                        "_SCIMAuthenticatedPrincipal",
+                    ],
                 ),
                 "itambox/users/api/scim/filters.py": (
                     "symbols",
@@ -1173,9 +1263,13 @@ class CommittedRecordTests(unittest.TestCase):
                         "parse_scim_membership_filter",
                     ],
                 ),
+                "itambox/subscriptions/api/views.py": (
+                    "symbols",
+                    ["SubscriptionStatusCompatibilitySerializer"],
+                ),
                 "itambox/users/api/scim/identifiers.py": (
                     "symbols",
-                    ["identifier_lookup", "identifier_lookup_or_none"],
+                    ["get_scim_object_or_404", "identifier_lookup", "identifier_lookup_or_none"],
                 ),
                 "itambox/users/api/scim/provider_authentication.py": (
                     "symbols",

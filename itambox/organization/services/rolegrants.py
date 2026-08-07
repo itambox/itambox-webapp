@@ -21,7 +21,7 @@ from typing import Literal, Optional
 
 from django.core.exceptions import ValidationError
 from django.db import transaction
-from django.db.models import Q
+from django.db.models import Q, QuerySet
 from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
 
@@ -38,15 +38,15 @@ from organization.services.errors import (
     ServiceError,
 )
 
+ManagedScope = Literal["explicit", "tenant_group", "all_managed"]
+GrantAction = Literal["created", "updated", "revoked", "unchanged"]
+
 #: Wire value accepted for a managed row covering named tenants. ``explicit`` is
 #: the UI's value for "specific tenants"; it maps to ``RoleGrantScope
 #: .SCOPE_TENANT`` children. ``core.auth.guards.validate_role_grant`` treats
 #: "explicit" and "tenant" identically (neither is in its dynamic-scope tuple),
 #: so normalising on it is behaviour-preserving.
-SCOPE_EXPLICIT = "explicit"
-
-ManagedScope = Literal["explicit", "tenant_group", "all_managed"]
-GrantAction = Literal["created", "updated", "revoked", "unchanged"]
+SCOPE_EXPLICIT: ManagedScope = "explicit"
 
 #: The scope types that make a RoleGrant aggregate a *managed-reach* row.
 MANAGED_SCOPE_TYPES = (
@@ -141,8 +141,8 @@ class ValidatedGrantPlan:
     plan: GrantPlan
     actor: Optional[object]
     revalidate_inherited_groups: bool
-    existing_own_role_ids: frozenset
-    existing_managed_grant_ids: frozenset
+    existing_own_role_ids: frozenset[int]
+    existing_managed_grant_ids: frozenset[int]
 
 
 @dataclass(frozen=True)
@@ -179,7 +179,7 @@ def role_assignable_in(role: Role, tenant: Tenant) -> bool:
     return bool(role.shared_with_managed and role.tenant.is_provider and tenant.managed_by_id == role.tenant_id)
 
 
-def assignable_roles_qs(tenant: Optional[Tenant]):
+def assignable_roles_qs(tenant: Optional[Tenant]) -> QuerySet[Role]:
     """Queryset of roles assignable in ``tenant`` (own + shared-down).
 
     An unknown tenant (context-free GET) falls back to every live role; the plan
@@ -199,7 +199,7 @@ def assignable_roles_qs(tenant: Optional[Tenant]):
     return qs.order_by("name")
 
 
-def managed_target_tenants_qs(tenant: Optional[Tenant]):
+def managed_target_tenants_qs(tenant: Optional[Tenant]) -> QuerySet[Tenant]:
     """Tenants a managed-reach row may explicitly target from ``tenant``.
 
     An unknown tenant falls back to every live tenant for rendering only —
@@ -219,7 +219,7 @@ def _live() -> Q:
     return Q(valid_until__isnull=True) | Q(valid_until__gt=timezone.now())
 
 
-def live_own_grants(membership: Membership):
+def live_own_grants(membership: Membership) -> QuerySet[RoleGrant]:
     """Live own-reach aggregates of ``membership``, scope children prefetched."""
     return (
         RoleGrant.objects.filter(
@@ -233,7 +233,7 @@ def live_own_grants(membership: Membership):
     )
 
 
-def live_managed_grants(membership: Membership):
+def live_managed_grants(membership: Membership) -> QuerySet[RoleGrant]:
     """Live managed-reach aggregates of ``membership``, scope children prefetched."""
     return (
         RoleGrant.objects.filter(
@@ -299,7 +299,7 @@ def _group_expansion(principal_tenant: Tenant, group: TenantGroup) -> set:
     )
 
 
-def requested_tenant_ids_for(principal_tenant: Tenant, spec: ManagedGrantSpec):
+def requested_tenant_ids_for(principal_tenant: Tenant, spec: ManagedGrantSpec) -> set[int] | None:
     """The coverage ``core.auth.guards.validate_role_grant`` should reason about.
 
     ``None`` for the dynamic scopes, which the guard resolves from the actor's
@@ -519,7 +519,7 @@ def _validate_retained_groups(rejections, actor, membership):
 
 def validate_grant_plan(
     *,
-    actor,
+    actor: object | None,
     principal_tenant: Tenant,
     plan: GrantPlan,
     membership: Optional[Membership] = None,
