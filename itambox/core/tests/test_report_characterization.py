@@ -207,7 +207,7 @@ class ReportCompilerCharacterizationTests(TenantTestMixin, TestCase):
                     [card["label"] for card in summary_cards],
                     expected["summary"],
                 )
-                for card, expected_value in zip(summary_cards, expected["summary_values"]):
+                for card, expected_value in zip(summary_cards, expected["summary_values"], strict=False):
                     if expected_value == "currency":
                         self.assertIn("12", str(card["value"]))
                         self.assertIn("€", str(card["value"]))

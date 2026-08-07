@@ -22,7 +22,7 @@ def register_report_provider(provider):
         for report_type in report_types:
             existing = _registry.get(report_type)
             if existing is not None and existing is not provider:
-                raise ImproperlyConfigured(f"Duplicate report provider for '{report_type}'.")
+                raise ImproperlyConfigured(f"Duplicate report provider for {report_type!r}.")
             _registry[report_type] = provider
 
 
