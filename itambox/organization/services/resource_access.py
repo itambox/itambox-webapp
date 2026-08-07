@@ -28,7 +28,8 @@ _ModelT = TypeVar("_ModelT", bound=Model)
 class _ContainerPermissionActor(Protocol):
     is_superuser: bool
 
-    def has_perm(self, perm: str, obj: object | None = None) -> bool: ...
+    def has_perm(self, perm: str, obj: object | None = None) -> bool:
+        pass
 
 
 # Access-control models whose default manager is deliberately unscoped (their

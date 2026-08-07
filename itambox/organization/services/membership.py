@@ -42,7 +42,8 @@ from users.services import AmbiguousEmailError, resolve_existing_user, resolve_o
 class _MembershipActor(Protocol):
     is_superuser: bool
 
-    def has_perm(self, perm: str, obj: object | None = None) -> bool: ...
+    def has_perm(self, perm: str, obj: object | None = None) -> bool:
+        pass
 
 
 class _MembershipUser(Protocol):
