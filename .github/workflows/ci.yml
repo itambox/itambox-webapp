@@ -199,11 +199,15 @@ jobs:
         run: |
           uv run --locked --no-sync python manage.py check
 
-      # The complete serial suite against the database migrated from scratch
-      # above. It stays the correctness source of truth: pytest-xdist is
-      # installed but deliberately not used here, because the suite is not yet
-      # parallel-safe (see issue #21) and a flaky parallel run would be a weaker
-      # signal than a slow serial one, not a stronger one.
+      # The suite runs on two lanes. The parallel lane carries every test that
+      # is safe under xdist (`-n auto --dist=loadscope -m 'not serial_only'`,
+      # ~3480 tests); the serial-only lane runs the tests that require serial
+      # semantics (races, migrations, global seed state, timing — the
+      # `serial_only` marker, ~23 tests). The two lanes together are the
+      # correctness source of truth, exactly matching the serial collection:
+      # the manifest step below records that collection and the certification
+      # gate enforces set equality against it, so a test dropped from both
+      # lanes, or run in both, fails closed here.
       #
       # `addopts` is overridden rather than extended: the repository defaults
       # (`--reuse-db`, `--no-cov-on-fail`) are the wrong policy for the gate run.
@@ -214,42 +218,96 @@ jobs:
       # configuration in the *current* directory, and pytest runs from itambox/,
       # so without this the root pyproject.toml is silently ignored: no branch
       # measurement, and migrations and test files counted as covered source.
-      - name: Run tests (complete serial suite, branch coverage)
-        id: suite
+      #
+      # `--cov-fail-under=0` on both lanes: fail_under=70 from [tool.coverage]
+      # applies per pytest invocation, but a lane is not the whole suite (the
+      # serial-only lane alone measures ~37%). The whole-suite threshold is
+      # enforced by the combined-ratchet gate below, which reads the union of
+      # both lanes' measurements.
+      - name: Collect the serial node IDs for the completeness manifest
+        id: collect
         working-directory: ./itambox
         run: |
+          uv run --locked --no-sync pytest --collect-only -q \
+            -o addopts="--tb=short -p no:warnings" 2>/dev/null \
+            | grep -E '::' > ../artifacts/node-ids.txt
+          wc -l ../artifacts/node-ids.txt
+
+      - name: Run the parallel lane
+        id: parallel
+        working-directory: ./itambox
+        run: |
+          set -Eeuo pipefail
+          export COVERAGE_FILE=../artifacts/.coverage.parallel
           uv run --locked --no-sync pytest \
             -o addopts="--tb=short -p no:warnings" \
             --create-db \
-            --cov=. \
+            -n auto --dist=loadscope -m 'not serial_only' \
+            --cov=. --cov-fail-under=0 \
             --cov-config=../pyproject.toml \
             --cov-report=term-missing:skip-covered \
-            --cov-report=xml:coverage.xml \
-            --cov-report=json:coverage.json \
-            --cov-report=html:htmlcov \
-            --junitxml=junit.xml \
+            --cov-report=json:../artifacts/coverage-parallel.json \
+            --junitxml=../artifacts/junit-parallel.xml \
             --durations=25
 
-      # Published even when the suite failed: the durations and partial coverage
+      - name: Run the serial-only lane
+        id: serial
+        working-directory: ./itambox
+        run: |
+          set -Eeuo pipefail
+          export COVERAGE_FILE=../artifacts/.coverage.serial
+          uv run --locked --no-sync pytest \
+            -o addopts="--tb=short -p no:warnings" \
+            --create-db \
+            -m serial_only \
+            --cov=. --cov-fail-under=0 \
+            --cov-config=../pyproject.toml \
+            --cov-report=term-missing:skip-covered \
+            --cov-report=json:../artifacts/coverage-serial-only.json \
+            --junitxml=../artifacts/junit-serial-only.xml \
+            --durations=25
+
+      # coverage.py resolves relative_files=true paths at report time against
+      # the report command's CWD, so the JSON report (and only it) must be
+      # generated from itambox/; the combine step's CWD is irrelevant.
+      - name: Combine the lane coverage reports
+        if: always() && steps.parallel.conclusion == 'success' && steps.serial.conclusion == 'success'
+        working-directory: ./itambox
+        run: |
+          uv run --locked --no-sync coverage combine \
+            --rcfile=../pyproject.toml \
+            --data-file=../artifacts/.coverage.combined \
+            ../artifacts/.coverage.parallel \
+            ../artifacts/.coverage.serial
+          uv run --locked --no-sync coverage json \
+            --rcfile=../pyproject.toml \
+            --data-file=../artifacts/.coverage.combined \
+            -o ../artifacts/coverage-combined.json
+
+      # Published even when the lanes failed: the durations and partial coverage
       # of a failing run are the data you need to act on it. Not published when
-      # the suite was never attempted -- an earlier step failed, so there is no
+      # the lanes were never attempted -- an earlier step failed, so there is no
       # report at all and `if-no-files-found: error` would report a missing
       # artifact as the failure instead of the one that actually happened.
+      # The combined JSON is not uploaded: it is derived from the two lane
+      # JSONs, and excluding it keeps this step correct even when a lane failed
+      # and no combined report exists.
       - name: Upload coverage and duration artifacts
-        if: always() && steps.suite.conclusion != 'skipped'
+        if: always() && (steps.parallel.conclusion != 'skipped' || steps.serial.conclusion != 'skipped')
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: coverage-and-durations-py${{ matrix.python-version }}
           path: |
-            itambox/coverage.xml
-            itambox/coverage.json
-            itambox/junit.xml
-            itambox/htmlcov/
+            itambox/artifacts/junit-parallel.xml
+            itambox/artifacts/junit-serial-only.xml
+            itambox/artifacts/node-ids.txt
+            itambox/artifacts/coverage-parallel.json
+            itambox/artifacts/coverage-serial-only.json
           if-no-files-found: error
           retention-days: 30
 
-      # The three gates below are conditioned on the suite having produced a
-      # report, not on each other. They answer independent questions, so one
+      # The four gates below are conditioned on both lanes having produced
+      # reports, not on each other. They answer independent questions, so one
       # failing must not skip the next and hide its finding: a run that both
       # regressed globally and left new code untested has to report both.
       #
@@ -257,31 +315,45 @@ jobs:
       # condition that does not call a status function -- inherits `success()`,
       # so a failing gate (or a failing artifact upload) would silently skip
       # every step after it and the run would report one finding instead of
-      # three. The explicit `steps.suite.conclusion` test then supplies the real
-      # precondition: these gates read files the suite writes.
+      # four. The explicit `steps.parallel`/`steps.serial` tests then supply
+      # the real precondition: these gates read files the lanes write.
+      #
+      # Within a single CI run the matrix gate's parity check is vacuous (one
+      # iteration); what it enforces here is disjointness of the two lanes.
+      # Cross-run parity is the 20-iteration dispatch matrix's job
+      # (xdist-validation.yml), not this gate's.
+      - name: Check the lane matrix gate
+        if: always() && steps.parallel.conclusion == 'success' && steps.serial.conclusion == 'success'
+        run: |
+          python scripts/check_xdist_matrix.py \
+            --xdist itambox/artifacts/junit-parallel.xml \
+            --serial itambox/artifacts/junit-serial-only.xml
+
       - name: Certify the run and publish durations
-        if: always() && steps.suite.conclusion == 'success'
+        if: always() && steps.parallel.conclusion == 'success' && steps.serial.conclusion == 'success'
         run: |
           python scripts/check_test_report.py \
-            --report itambox/junit.xml \
+            --report itambox/artifacts/junit-parallel.xml \
+            --report itambox/artifacts/junit-serial-only.xml \
+            --expected-node-ids itambox/artifacts/node-ids.txt \
             --summary-file "$GITHUB_STEP_SUMMARY"
 
       - name: Check the global coverage ratchet
-        if: always() && steps.suite.conclusion == 'success'
+        if: always() && steps.parallel.conclusion == 'success' && steps.serial.conclusion == 'success'
         run: |
           python scripts/check_coverage_baseline.py \
-            --coverage-json itambox/coverage.json \
+            --coverage-json itambox/artifacts/coverage-combined.json \
             --summary-file "$GITHUB_STEP_SUMMARY"
 
       # Pull requests only: on a push to a protected branch there is no
       # meaningful "changed code" range to hold to the differential target.
       - name: Check differential coverage for changed production code
-        if: always() && steps.suite.conclusion == 'success' && github.event_name == 'pull_request'
+        if: always() && steps.parallel.conclusion == 'success' && steps.serial.conclusion == 'success' && github.event_name == 'pull_request'
         run: |
           python scripts/check_diff_coverage.py \
             --base-ref "${{ github.event.pull_request.base.sha }}" \
             --head-ref HEAD \
-            --coverage-json itambox/coverage.json \
+            --coverage-json itambox/artifacts/coverage-combined.json \
             --summary-file "$GITHUB_STEP_SUMMARY"
 
   lint:

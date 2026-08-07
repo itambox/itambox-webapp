@@ -109,11 +109,11 @@ python_files = ["tests.py", "test_*.py"]
 # cannot collide. Coverage is NOT measured by default (it
 # ~3x's a run); pass `--cov=. --cov-report=html` explicitly, or run the CI job.
 #
-# pytest-xdist is installed but NOT enabled by default: the suite is not yet xdist-safe
-# (cross-test shared state — MEDIA_ROOT, requests-mock + django-q timing — makes a
-# handful of tests fail non-deterministically under `-n auto`). Once those are isolated
-# (per-worker MEDIA_ROOT, etc.) add `-n auto` here. Until then run `-n auto` ad hoc when
-# you know the targeted subset is parallel-clean.
+# pytest-xdist is enabled for the parallel lane: run the full suite as
+# `-n auto -m 'not serial_only'` (CI does exactly this). Tests that race,
+# mutate global/seed state, exercise migrations, or are timing-sensitive must
+# carry the `serial_only` marker so they stay on the serial lane. Plain
+# `-n auto` over the whole suite remains banned.
 addopts = ["--tb=short", "-p", "no:warnings", "--reuse-db", "--no-cov-on-fail"]
 markers = ["serial_only: test requires an isolated serial lane (races, migrations, or global seed state)"]
 norecursedirs = [".venv", "scratch", "node_modules", ".git", ".agents", ".*"]

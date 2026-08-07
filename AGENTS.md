@@ -63,7 +63,7 @@ Django + PostgreSQL (SQLite is rejected at settings load). Beyond Django itself:
 - **Frontend interactivity** — HTMX (django-htmx); TypeScript + SCSS compiled via npm into `static/dist/`.
 - **Background jobs** — django-q2 (NOT Celery); worker via `manage.py qcluster`.
 - **Cache / queue broker** — Valkey/Redis in prod, locmem in dev.
-- **Tests** — pytest-django + model_bakery. pytest-xdist is installed but NOT enabled: the suite isn't xdist-safe yet (cross-test shared state — MEDIA_ROOT, requests-mock + django-q timing).
+- **Tests** — pytest-django + model_bakery. The full suite runs on two lanes: pytest-xdist with `-n auto --dist=loadscope -m 'not serial_only'` for the parallel lane, plus a serial-only lane for tests that require serial semantics (races, migrations, global seed state — the `serial_only` marker).
 - **Docs** — MkDocs.
 
 Direct dependency policy lives in `pyproject.toml`; exact cross-platform versions live in `uv.lock`. Use uv `0.11.31` with `--locked` rather than installing ad hoc packages.
@@ -119,7 +119,7 @@ make coverage-diff   # differential coverage of the branch against origin/main
 | Differential | `scripts/check_diff_coverage.py` | 85% of the executable lines a change touches must be covered — executed **and** not the origin of an untaken branch. An unmeasured changed production file fails closed. |
 | Run certification | `scripts/check_test_report.py` | No failures, no errors, and no skipped tests (`MAX_SKIPPED_TESTS = 0`). Durations are published, never gated. |
 
-The measurement policy is declared once in `scripts/coverage_policy.py` and mirrored in `pyproject.toml`; the gates refuse to run when the two disagree, so an `omit` entry cannot be added silently, and `# pragma: no cover` cannot be used to retire a hard-to-test branch because the excluded-line count is itself ratcheted. pytest-xdist stays disabled — the complete serial suite is the correctness source of truth until #21 proves safe parallel execution.
+The measurement policy is declared once in `scripts/coverage_policy.py` and mirrored in `pyproject.toml`; the gates refuse to run when the two disagree, so an `omit` entry cannot be added silently, and `# pragma: no cover` cannot be used to retire a hard-to-test branch because the excluded-line count is itself ratcheted. The combined two-lane run (parallel `-n auto -m 'not serial_only'` + `serial_only` lane) is the correctness source of truth; both lanes are certified against the serial collection manifest, so a test dropped from both lanes, or run in both, fails closed. The complete serial suite remains available as a control run via the `xdist-validation` dispatch workflow.
 
 Full policy: `itambox/docs/development/test-coverage-policy.md`. What tests for tenancy, RBAC, tokens, encryption, imports, SCIM, task context, and destructive operations must assert: `itambox/docs/development/security-test-expectations.md` — coverage proves a line ran, not that the test asserted anything about the boundary it crosses.
 

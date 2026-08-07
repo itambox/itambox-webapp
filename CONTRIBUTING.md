@@ -131,7 +131,7 @@ Use `!` or a `BREAKING CHANGE:` footer when a change breaks an API, route, confi
 
 ## Run the checks
 
-Run targeted tests while developing, then run the relevant full gates before opening a pull request. The Python suite is not xdist-safe yet, so do not use `pytest -n auto` for the full suite.
+Run targeted tests while developing, then run the relevant full gates before opening a pull request. The full suite runs on two lanes: `pytest -n auto -m 'not serial_only'` for the parallel lane plus the `serial_only` lane. Plain `pytest -n auto` without the marker selection stays banned — the marker split is enforced by the workflow and by `conftest.py`. A test that races, mutates global/seed state, exercises migrations, or is timing-sensitive must carry the `serial_only` marker.
 
 From the repository root:
 

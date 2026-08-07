@@ -33,14 +33,17 @@ STEP_START = "      - "
 FIELD_INDENT = "        "
 BLOCK_INDENT = "          "
 
-# The gates that run after the suite, and the script each one invokes.
+# The gates that run after the lanes, and the script each one invokes.
 POST_SUITE_GATES = {
+    "Check the lane matrix gate": "scripts/check_xdist_matrix.py",
     "Certify the run and publish durations": "scripts/check_test_report.py",
     "Check the global coverage ratchet": "scripts/check_coverage_baseline.py",
     "Check differential coverage for changed production code": "scripts/check_diff_coverage.py",
 }
 
-SUITE_SUCCEEDED = "steps.suite.conclusion == 'success'"
+# Both lanes must have succeeded: the gates read files the lanes write, and
+# the combined coverage report exists only when both lanes ran.
+LANES_SUCCEEDED = "steps.parallel.conclusion == 'success' && steps.serial.conclusion == 'success'"
 
 
 def _assign_field(step, body):
@@ -156,7 +159,7 @@ class PostSuiteGateIndependenceTests(unittest.TestCase):
                     condition,
                     "without always() this gate inherits success() and is skipped by any earlier failure",
                 )
-                self.assertIn(SUITE_SUCCEEDED, condition)
+                self.assertIn(LANES_SUCCEEDED, condition)
 
     def test_only_the_differential_gate_is_restricted_to_pull_requests(self):
         """On a push to a protected branch there is no "changed code" range."""
@@ -172,10 +175,33 @@ class PostSuiteGateIndependenceTests(unittest.TestCase):
         condition = step.get("if", "")
         self.assertIn("always()", condition)
         self.assertIn(
-            "steps.suite.conclusion != 'skipped'",
+            "steps.parallel.conclusion != 'skipped' || steps.serial.conclusion != 'skipped'",
             condition,
-            "a suite that never ran wrote no report; uploading is an error, not a missing artifact",
+            "lanes that never ran wrote no report; uploading is an error, not a missing artifact",
         )
+
+    def test_the_manifest_step_precedes_both_lanes(self):
+        """The completeness manifest must be recorded before the lanes run."""
+        names = [step.get("name") for step in self.steps if step.get("name")]
+        collect = names.index("Collect the serial node IDs for the completeness manifest")
+        self.assertLess(collect, names.index("Run the parallel lane"))
+        self.assertLess(collect, names.index("Run the serial-only lane"))
+
+    def test_the_lanes_use_the_marker_split(self):
+        """The xdist marker selection is enforced in the workflow, not just conftest."""
+        parallel = step_named(self.steps, "Run the parallel lane").get("run", "")
+        serial = step_named(self.steps, "Run the serial-only lane").get("run", "")
+        self.assertIn("-n auto", parallel)
+        self.assertIn("-m 'not serial_only'", parallel)
+        self.assertIn("-m serial_only", serial)
+        self.assertNotIn("-n auto", serial)
+
+    def test_the_matrix_gate_reads_both_lane_reports(self):
+        """Disjointness can only be checked against both lane reports."""
+        gate = step_named(self.steps, "Check the lane matrix gate")
+        run = gate.get("run", "")
+        self.assertIn("--xdist itambox/artifacts/junit-parallel.xml", run)
+        self.assertIn("--serial itambox/artifacts/junit-serial-only.xml", run)
 
 
 class GateSuiteDiscoveryTests(unittest.TestCase):
@@ -368,7 +394,9 @@ class TypingPolicyWiringTests(unittest.TestCase):
 
         names = [step.get("name") for step in self.steps if step.get("name")]
         self.assertLess(names.index("Install dependencies"), names.index(self.STEP))
-        self.assertLess(names.index(self.STEP), names.index("Run tests (complete serial suite, branch coverage)"))
+        self.assertLess(
+            names.index(self.STEP), names.index("Collect the serial node IDs for the completeness manifest")
+        )
         self.assertLess(names.index(self.STEP), names.index("Apply migrations to a fresh database"))
 
     def test_ci_does_not_wire_the_gate_in_its_read_only_mode(self):
