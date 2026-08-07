@@ -915,7 +915,11 @@ class ReportTriggerImmediateView(PermissionRequiredMixin, LoginRequiredMixin, Vi
         success = generate_scheduled_report_task(sched.pk)
         sched.refresh_from_db()
         archive = sched.archives.first()
-        delivery_detail = (archive.error_message if archive else "") or sched.last_status or _("Check logs.")
+        status = sched.last_status or ""
+        if status.startswith("failed:"):
+            delivery_detail = status
+        else:
+            delivery_detail = (archive.error_message if archive else "") or status or _("Check logs.")
         if success and sched.last_status == "partial":
             messages.warning(
                 request,
