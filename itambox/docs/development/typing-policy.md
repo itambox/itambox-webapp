@@ -517,8 +517,8 @@ serializer behavior, tenant/security checks, lifecycle guards, and ORM access
 remain unchanged. This is an interface admission: generated OpenAPI schema
 validation, operation/component stability, and generated-client compatibility
 remain owned by #98. The complete SCIM operation surface, remaining task
-payload/result families, organization service boundaries, and report-provider
-contracts remain outside this slice.
+payload/result families, and report-provider contracts remain outside this
+slice.
 
 Slice 10 admits the remaining complex task family that is present on `main`:
 `itambox/core/tasks/intune_sync.py`. `IntuneSyncResult` is a named `TypedDict`
@@ -530,6 +530,19 @@ records from Microsoft Graph remain `Mapping[str, object]` at the documented
 external-JSON boundary; tenant/model/client internals and the implementation
 body remain outside the projection. A characterization assertion pins the
 persisted key set and integer values without changing task behavior.
+
+Slice 10 also admits the organization service boundary. The compatibility
+facade and the resource-access helpers preserve generic model identity with a
+bounded `QuerySet[_ModelT]`; the service-error module preserves its
+`ValidationError` compatibility while exposing field/row-located errors. The
+membership service exposes typed identity, intent, plan, and result contracts
+plus its authorization/planning/write entry points. The RoleGrant service
+exposes typed own/managed grant specs, plans, validated write tokens, change
+records, query helpers, validation, and the validated-only sync entry point.
+Existing adversarial service tests continue to characterize authorization
+ordering, cross-tenant rejection, atomicity, replay, and race behavior; this
+slice changes signatures and projection scope only. Private ORM and
+reconciliation bodies remain outside the symbol projections.
 
 The report-provider seam remains deliberately outside Slice 10: PR #249 on
 `issue/83-report-providers` is not merged into `main`, and this slice does not

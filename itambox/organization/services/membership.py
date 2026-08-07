@@ -90,7 +90,7 @@ class MembershipWriteResult:
 # ---------------------------------------------------------------------------
 # Authorization (matrix A1-A3)
 # ---------------------------------------------------------------------------
-def may_manage_memberships(*, actor, tenant: Tenant, creating: bool) -> bool:
+def may_manage_memberships(*, actor: object | None, tenant: Tenant, creating: bool) -> bool:
     """Whether ``actor`` may add/change memberships in ``tenant``.
 
     An absent actor (system/programmatic contexts — seeds, management commands,
@@ -105,7 +105,7 @@ def may_manage_memberships(*, actor, tenant: Tenant, creating: bool) -> bool:
     return bool(actor.has_perm(perm, obj=tenant))
 
 
-def authorize_membership_write(*, actor, tenant: Tenant, creating: bool) -> None:
+def authorize_membership_write(*, actor: object | None, tenant: Tenant, creating: bool) -> None:
     """Object-level gate at the SERVICE boundary — not only in the form/view.
 
     Raises :class:`ActorNotAuthorized`. The message deliberately does not name
@@ -120,7 +120,7 @@ def authorize_membership_write(*, actor, tenant: Tenant, creating: bool) -> None
 # ---------------------------------------------------------------------------
 # Identity
 # ---------------------------------------------------------------------------
-def resolve_identity(*, spec: NewIdentitySpec):
+def resolve_identity(*, spec: NewIdentitySpec) -> object | None:
     """Resolve-only (never create) via ``users.services.resolve_existing_user``.
 
     Raises :class:`AmbiguousIdentity` when more than one account matches: email
@@ -156,7 +156,7 @@ def _membership_exists(user, tenant: Tenant) -> bool:
 # ---------------------------------------------------------------------------
 def plan_membership_write(
     *,
-    actor,
+    actor: object | None,
     intent: MembershipIntent,
     membership: Optional[Membership] = None,
     revalidate_inherited_groups: bool = False,
@@ -307,7 +307,7 @@ def _apply(plan: MembershipWritePlan) -> MembershipWriteResult:
 
 def execute_membership_write(
     *,
-    actor,
+    actor: object | None,
     intent: MembershipIntent,
     membership: Optional[Membership] = None,
 ) -> MembershipWriteResult:
@@ -340,7 +340,7 @@ def execute_membership_write(
 
 def apply_membership_grants(
     *,
-    actor,
+    actor: object | None,
     membership: Membership,
     plan: GrantPlan,
     previous_is_active: Optional[bool] = None,

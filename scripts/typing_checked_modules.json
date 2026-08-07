@@ -1,8 +1,8 @@
 {
   "schema_version": 2,
   "canonical_python": "3.12",
-  "next_sequence": 31,
-  "policy_sha256": "a30ebac5584b17ab73506d4ea8177286372e42cbde111477d4250c1cabda1570",
+  "next_sequence": 35,
+  "policy_sha256": "97d82bd0138506e62582ab11d46c12a11e7547a1cd96c494fa42a48ab123abb0",
   "config": {
     "config_file": "pyproject.toml",
     "working_directory": "itambox",
@@ -317,6 +317,15 @@
       ]
     },
     {
+      "sequence": 34,
+      "path": "itambox/organization/services/__init__.py",
+      "module": "organization.services",
+      "issue": "#93",
+      "note": "Slice 10 organization-service admission: compatibility facade that re-exports the typed resource-access boundary without importing membership or rolegrant services.",
+      "scope": "module",
+      "symbols": []
+    },
+    {
       "sequence": 30,
       "path": "itambox/organization/services/errors.py",
       "module": "organization.services.errors",
@@ -324,6 +333,62 @@
       "note": "Slice 10 organization-service admission: typed, field-mappable service-error contract. ValidationError compatibility and message-disclosure ordering remain unchanged.",
       "scope": "module",
       "symbols": []
+    },
+    {
+      "sequence": 31,
+      "path": "itambox/organization/services/membership.py",
+      "module": "organization.services.membership",
+      "issue": "#93",
+      "note": "Slice 10 organization-service admission: typed membership intent/plan/result contracts and the public authorization, planning, identity, and write entry points. Private ORM orchestration remains outside the projection.",
+      "scope": "symbols",
+      "symbols": [
+        "MembershipIntent",
+        "MembershipWritePlan",
+        "MembershipWriteResult",
+        "NewIdentitySpec",
+        "apply_membership_grants",
+        "authorize_membership_write",
+        "execute_membership_write",
+        "may_manage_memberships",
+        "plan_membership_write",
+        "resolve_identity"
+      ]
+    },
+    {
+      "sequence": 32,
+      "path": "itambox/organization/services/resource_access.py",
+      "module": "organization.services.resource_access",
+      "issue": "#93",
+      "note": "Slice 10 organization-service admission: generic QuerySet/model container-visibility boundaries. Generic model identity is preserved with a bounded TypeVar; authorization and filtering behavior remain unchanged.",
+      "scope": "symbols",
+      "symbols": [
+        "is_container_scoped_unfiltered",
+        "visible_to_containers"
+      ]
+    },
+    {
+      "sequence": 33,
+      "path": "itambox/organization/services/rolegrants.py",
+      "module": "organization.services.rolegrants",
+      "issue": "#93",
+      "note": "Slice 10 organization-service admission: named grant specs/plans/validated-token/change/result contracts, query helpers, validation, assignability, and the validated-only write entry point. Private ORM/reconciliation bodies remain outside the projection.",
+      "scope": "symbols",
+      "symbols": [
+        "GrantChange",
+        "GrantPlan",
+        "GrantSyncResult",
+        "ManagedGrantSpec",
+        "OwnGrantSpec",
+        "ValidatedGrantPlan",
+        "assignable_roles_qs",
+        "live_managed_grants",
+        "live_own_grants",
+        "managed_target_tenants_qs",
+        "requested_tenant_ids_for",
+        "role_assignable_in",
+        "sync_membership_grants",
+        "validate_grant_plan"
+      ]
     },
     {
       "sequence": 27,
