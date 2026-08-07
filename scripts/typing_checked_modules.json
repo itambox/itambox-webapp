@@ -1,8 +1,8 @@
 {
   "schema_version": 2,
   "canonical_python": "3.12",
-  "next_sequence": 35,
-  "policy_sha256": "97d82bd0138506e62582ab11d46c12a11e7547a1cd96c494fa42a48ab123abb0",
+  "next_sequence": 39,
+  "policy_sha256": "75a3bb182f392e6bf4edf049e6f834d0705c5b909e224b52eee542119d70e6a1",
   "config": {
     "config_file": "pyproject.toml",
     "working_directory": "itambox",
@@ -267,6 +267,46 @@
       ]
     },
     {
+      "sequence": 35,
+      "path": "itambox/itambox/api/base.py",
+      "module": "itambox.api.base",
+      "issue": "#93",
+      "note": "Slice 10 AC14 admission: explicit DRF base serializer hook and OpenAPI display contracts. Framework inbound hooks use the documented DRF Any boundary; fields and representation results remain concrete.",
+      "scope": "symbols",
+      "symbols": [
+        "BaseModelSerializer",
+        "ValidatedModelSerializer"
+      ]
+    },
+    {
+      "sequence": 36,
+      "path": "itambox/itambox/api/fields.py",
+      "module": "itambox.api.fields",
+      "issue": "#93",
+      "note": "Slice 10 AC14 admission: custom field conversion/representation and generic-FK validation contracts used by OpenAPI serializers. Parser-native inputs remain at the DRF Any boundary.",
+      "scope": "symbols",
+      "symbols": [
+        "ChoiceField",
+        "ContentTypeField",
+        "RelatedObjectCountField",
+        "SerializedPKRelatedField",
+        "validate_gfk_target_tenant"
+      ]
+    },
+    {
+      "sequence": 37,
+      "path": "itambox/itambox/api/serializers/__init__.py",
+      "module": "itambox.api.serializers",
+      "issue": "#93",
+      "note": "Slice 10 AC14 admission: generic-object conversion and ObjectChange SerializerMethodField return contracts.",
+      "scope": "symbols",
+      "symbols": [
+        "GenericObjectSerializer",
+        "NestedUserSerializer",
+        "ObjectChangeSerializer"
+      ]
+    },
+    {
       "sequence": 25,
       "path": "itambox/licenses/api/serializers.py",
       "module": "licenses.api.serializers",
@@ -416,6 +456,17 @@
         "ProviderSerializer",
         "SubscriptionAssignmentSerializer",
         "SubscriptionSerializer"
+      ]
+    },
+    {
+      "sequence": 38,
+      "path": "itambox/subscriptions/api/views.py",
+      "module": "subscriptions.api.views",
+      "issue": "#93",
+      "note": "Slice 10 AC14 admission: explicit return contract for the compatibility serializer referenced directly by extend_schema(request=...).",
+      "scope": "symbols",
+      "symbols": [
+        "SubscriptionStatusCompatibilitySerializer"
       ]
     },
     {

@@ -7167,7 +7167,7 @@
       "path": "itambox/itambox/api/fields.py",
       "code": "C901",
       "message": "'ChoiceField.to_internal_value' is too complex (12)",
-      "source": "    def to_internal_value(self, data):",
+      "source": "    def to_internal_value(self, data: Any) -> object:",
       "context": "Module:body/ClassDef:ChoiceField:body/FunctionDef:to_internal_value:self",
       "count": 1
     },

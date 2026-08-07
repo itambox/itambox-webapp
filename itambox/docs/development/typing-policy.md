@@ -544,9 +544,18 @@ ordering, cross-tenant rejection, atomicity, replay, and race behavior; this
 slice changes signatures and projection scope only. Private ORM and
 reconciliation bodies remain outside the symbol projections.
 
+For AC14, Slice 10 admits the remaining OpenAPI-facing serializer contracts:
+the `BaseModelSerializer`/`ValidatedModelSerializer` hooks, custom choice,
+content-type, serialized-relation, and related-count fields, generic-object and
+`ObjectChange` SerializerMethodField methods, and the subscription status
+compatibility request serializer referenced by `extend_schema`. DRF parser and
+constructor inputs use only the documented, marker-coded third-party `Any`
+boundary; serializer and field representations have explicit concrete return
+types. `BindingDict`, `PKOnlyObject`, and generic DRF base parameters follow the
+pinned djangorestframework-stubs contracts.
+
 The report-provider seam remains deliberately outside Slice 10: PR #249 on
 `issue/83-report-providers` is not merged into `main`, and this slice does not
 anticipate its provider contracts or delivery result types. The remaining SCIM
-operation/value-object surfaces, organization service boundaries, and
-OpenAPI-facing serializer methods are subsequent bounded slices. Nothing is
+operation/value-object surfaces are subsequent bounded slices. Nothing is
 claimed as checked until it appears in the record.

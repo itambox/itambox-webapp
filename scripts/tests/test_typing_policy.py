@@ -1031,6 +1031,9 @@ class CommittedRecordTests(unittest.TestCase):
                 "itambox/core/tasks/webhooks.py",
                 "itambox/extras/api/serializers.py",
                 "itambox/inventory/api/serializers.py",
+                "itambox/itambox/api/base.py",
+                "itambox/itambox/api/fields.py",
+                "itambox/itambox/api/serializers/__init__.py",
                 "itambox/licenses/api/serializers.py",
                 "itambox/organization/access.py",
                 "itambox/organization/api/serializers.py",
@@ -1041,6 +1044,7 @@ class CommittedRecordTests(unittest.TestCase):
                 "itambox/organization/services/rolegrants.py",
                 "itambox/procurement/api/serializers.py",
                 "itambox/subscriptions/api/serializers.py",
+                "itambox/subscriptions/api/views.py",
                 "itambox/users/api/scim/authentication.py",
                 "itambox/users/api/scim/filters.py",
                 "itambox/users/api/scim/identifiers.py",
@@ -1128,6 +1132,24 @@ class CommittedRecordTests(unittest.TestCase):
                         "_component_category_queryset",
                         "_consumable_category_queryset",
                     ],
+                ),
+                "itambox/itambox/api/base.py": (
+                    "symbols",
+                    ["BaseModelSerializer", "ValidatedModelSerializer"],
+                ),
+                "itambox/itambox/api/fields.py": (
+                    "symbols",
+                    [
+                        "ChoiceField",
+                        "ContentTypeField",
+                        "RelatedObjectCountField",
+                        "SerializedPKRelatedField",
+                        "validate_gfk_target_tenant",
+                    ],
+                ),
+                "itambox/itambox/api/serializers/__init__.py": (
+                    "symbols",
+                    ["GenericObjectSerializer", "NestedUserSerializer", "ObjectChangeSerializer"],
                 ),
                 "itambox/licenses/api/serializers.py": (
                     "symbols",
@@ -1230,6 +1252,10 @@ class CommittedRecordTests(unittest.TestCase):
                         "parse_scim_filter",
                         "parse_scim_membership_filter",
                     ],
+                ),
+                "itambox/subscriptions/api/views.py": (
+                    "symbols",
+                    ["SubscriptionStatusCompatibilitySerializer"],
                 ),
                 "itambox/users/api/scim/identifiers.py": (
                     "symbols",

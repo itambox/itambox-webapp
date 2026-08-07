@@ -55,12 +55,6 @@
     {
       "severity": "warning",
       "location": "itambox/itambox/api/serializers/__init__.py",
-      "breadcrumb": "ObjectChangeViewSet > ObjectChangeSerializer",
-      "message": "unable to resolve type hint for function \"get_display\". Consider using a type hint or @extend_schema_field. Defaulting to string."
-    },
-    {
-      "severity": "warning",
-      "location": "itambox/itambox/api/serializers/__init__.py",
       "breadcrumb": "SupplierViewSet > SupplierSerializer > ContactAssignmentSerializer > GenericObjectSerializer",
       "message": "could not resolve serializer field \"GFKSerializerField(read_only=True)\". Defaulting to \"string\""
     },
