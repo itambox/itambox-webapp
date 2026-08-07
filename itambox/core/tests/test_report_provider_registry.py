@@ -2,7 +2,7 @@
 
 import datetime
 from decimal import Decimal
-from unittest.mock import patch
+from unittest.mock import MagicMock, patch
 
 from django.core.exceptions import ImproperlyConfigured
 from django.test import SimpleTestCase, TestCase
@@ -56,6 +56,30 @@ class ReportProviderContractTests(SimpleTestCase):
                 self.assertTrue(result.rows)
                 self.assertTrue(result.summary_cards)
                 self.assertIsInstance(result.chart_svg, str)
+                self.assertTrue(provider.required_permissions())
+
+                scoped_queryset = MagicMock()
+                scoped_request = ReportRequest(
+                    template=template,
+                    active_tenant=None,
+                    filter_tenants=(object(),),
+                    columns=columns,
+                    user=None,
+                    as_of=request.as_of,
+                )
+                provider.scope_to_tenants(scoped_queryset, scoped_request)
+                scoped_queryset.filter.assert_called_once()
+
+    def test_registry_discovery_fails_when_a_public_provider_is_missing(self):
+        import core.reports.registry as registry
+
+        with (
+            patch.object(registry, "_registry", {}),
+            patch.object(registry, "_discovered", False),
+            patch.object(registry, "autodiscover_modules"),
+        ):
+            with self.assertRaises(ImproperlyConfigured):
+                registry.discover_report_providers()
 
     def test_registry_rejects_duplicate_registration(self):
         get_registered_report_types()
@@ -122,6 +146,7 @@ class ReportCurrencyFormattingTests(SimpleTestCase):
 
         record = "usd"
         self.assertEqual(_record_currency(record, None), "USD")
+        self.assertEqual(_record_currency("", type("Tenant", (), {"currency": "GBP"})()), "GBP")
         self.assertEqual(_record_currency("", None), "EUR")
         with override_settings(ITAMBOX_DEFAULT_CURRENCY="CHF"):
             self.assertEqual(_record_currency("", None), "CHF")

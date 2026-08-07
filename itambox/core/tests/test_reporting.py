@@ -473,6 +473,29 @@ class ScheduledReportingAndAlertsTests(TestCase):
 
         self.assertIsNone(_resolve_report_scope(sched))
 
+    def test_channel_delivery_reports_partial_failures_and_skips_disabled_channels(self):
+        channels = [
+            SimpleNamespace(name="email", enabled=True),
+            SimpleNamespace(name="disabled", enabled=False),
+            SimpleNamespace(name="webhook", enabled=True),
+            SimpleNamespace(name="slack", enabled=True),
+        ]
+        sched = SimpleNamespace(
+            name="Channel report",
+            format=ScheduledReport.FORMAT_HTML,
+            channels=SimpleNamespace(all=lambda: channels),
+        )
+        with patch(
+            "core.tasks.reports.send_notification_to_channel",
+            side_effect=[True, RuntimeError("webhook down"), False],
+        ):
+            outcome = _deliver_report_channels(sched, [{"label": "Rows", "value": "2"}], 2)
+
+        self.assertEqual(outcome.attempted, 3)
+        self.assertEqual(outcome.succeeded, 1)
+        self.assertEqual(outcome.status, "partial")
+        self.assertEqual(len(outcome.failures), 2)
+
 
 class ReportCrossTenantPermissionTests(TestCase):
     """RBAC matrix from WP-9a: permission gate for cross-tenant report aggregation."""
