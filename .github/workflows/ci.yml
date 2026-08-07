@@ -229,9 +229,16 @@ jobs:
         working-directory: ./itambox
         run: |
           mkdir -p ../artifacts
+          # pytest --collect-only prints file-path node IDs
+          # (itambox/assets/tests/test_api.py::Class::test) while the JUnit
+          # reports carry module-dotted labels
+          # (itambox.assets.tests.test_api.Class::test). Convert only the file
+          # prefix (drop .py, slash to dot); the separator becomes a dot when a
+          # class follows (NF >= 3) and stays "::" for module-level tests.
           uv run --locked --no-sync pytest --collect-only -q \
             -o addopts="--tb=short -p no:warnings" 2>/dev/null \
-            | grep -E '::' > ../artifacts/node-ids.txt
+            | awk -F'::' 'NF >= 2 { sub(/\.py$/, "", $1); gsub(/\//, ".", $1); if (NF == 2) { line = $1 "::" $2 } else { line = $1 "." $2; for (i = 3; i <= NF; i++) line = line "::" $i } print line }' \
+              > ../artifacts/node-ids.txt
           wc -l ../artifacts/node-ids.txt
 
       - name: Run the parallel lane
