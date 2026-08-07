@@ -10,6 +10,7 @@ from django_q.models import Schedule
 from core.tasks.reports import (
     _archive_report_output,
     _deliver_report_email,
+    _DeliveryOutcome,
     _render_report_output,
     _ReportOutput,
     _resolve_report_scope,
@@ -145,6 +146,51 @@ class ScheduledReportingAndAlertsTests(TestCase):
 
         # Verify Slack channel was called
         mock_request_pinned.assert_called_once()
+
+    def test_delivery_failure_is_partial_and_later_channels_are_attempted(self):
+        """One channel failure is persisted without hiding later delivery success."""
+        failed_channel = NotificationChannel.objects.create(
+            name="Failing Report Channel",
+            channel_type=NotificationChannel.TYPE_SLACK,
+            enabled=True,
+            tenant=self.tenant,
+        )
+        healthy_channel = NotificationChannel.objects.create(
+            name="Healthy Report Channel",
+            channel_type=NotificationChannel.TYPE_TEAMS,
+            enabled=True,
+            tenant=self.tenant,
+        )
+        sched = ScheduledReport.objects.create(
+            name="Partial Delivery Schedule",
+            report=self.template,
+            tenant=self.tenant,
+            frequency="once",
+            format=ScheduledReport.FORMAT_HTML,
+            save_to_archive=True,
+        )
+        sched.channels.add(failed_channel, healthy_channel)
+
+        with patch("core.tasks.reports.send_notification_to_channel", side_effect=[False, True]) as send_channel:
+            from core.tasks import generate_scheduled_report_task
+
+            self.assertFalse(generate_scheduled_report_task(sched.pk))
+
+        sched.refresh_from_db()
+        self.assertEqual(sched.last_status, "partial")
+        self.assertEqual(send_channel.call_count, 2)
+        archive = ReportGenerationArchive.objects.get(scheduled_report=sched)
+        self.assertEqual(archive.status, "success")
+        self.assertIn("Failing Report Channel", archive.error_message)
+
+    def test_delivery_outcome_marks_all_failures_as_failed(self):
+        outcome = _DeliveryOutcome()
+        outcome.record_failure("first")
+        outcome.record_failure("second")
+
+        self.assertEqual(outcome.status, "failed")
+        self.assertEqual(outcome.attempted, 2)
+        self.assertEqual(outcome.succeeded, 0)
 
     @override_settings(REPORT_DESIGNER_ENABLED=True)
     def test_report_preview_compilation_and_view(self):
