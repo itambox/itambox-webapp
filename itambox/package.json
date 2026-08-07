@@ -29,7 +29,7 @@
     "eslint": "^10.8.0",
     "globals": "^17.7.0",
     "openapi-fetch": "0.17.0",
-    "openapi-typescript": "6.7.6",
+    "openapi-typescript": "7.13.0",
     "postcss": "^8.5.23",
     "postcss-cli": "^11.0.1",
     "sass": "^1.80.0",
