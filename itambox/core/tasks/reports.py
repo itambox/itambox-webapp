@@ -239,7 +239,7 @@ def _process_scheduled_report(sched, active_tenant, filter_tenants):
     # broad except: task-isolation: one scheduled report failure must not abort the worker batch
     except Exception as error:
         logger.exception("Error generating scheduled report '%s'", sched.name)
-        sched.last_status = f"failed: {error}"
+        sched.last_status = f"failed: {error}"[:50]
         sched.save()
         if archive_entry:
             archive_entry.status = "failed"
