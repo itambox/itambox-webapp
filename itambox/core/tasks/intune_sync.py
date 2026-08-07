@@ -10,10 +10,11 @@ in custom_field_data as intune_primary_user rather than triggering an
 automatic checkout, because assignment carries compliance side-effects.
 """
 
+from __future__ import annotations
+
 import logging
 import re
-from collections.abc import Mapping
-from typing import TypedDict
+from typing import TYPE_CHECKING, TypedDict
 
 from django.conf import settings
 from django.utils import timezone
@@ -22,7 +23,32 @@ from core.integrations.intune import IntuneClient
 from core.models import Job
 from core.tasks.context import TaskContext
 
+if TYPE_CHECKING:
+    from assets.models import Asset
+    from organization.models import Tenant
+
 logger = logging.getLogger(__name__)
+
+
+class IntuneDevicePayload(TypedDict, total=False):
+    """Selected string fields returned by the Graph managed-device endpoint."""
+
+    id: str
+    deviceName: str
+    serialNumber: str
+    manufacturer: str
+    model: str
+    osVersion: str
+    userPrincipalName: str
+    lastSyncDateTime: str
+
+
+class IntuneAppPayload(TypedDict, total=False):
+    """Selected string fields returned by the Graph detected-app endpoint."""
+
+    displayName: str
+    publisher: str
+    version: str
 
 
 class IntuneSyncResult(TypedDict):
@@ -64,7 +90,7 @@ def sync_tenant_intune(
             job.mark_failed(str(exc))
 
 
-def _run_sync(tenant: object, dry_run: bool, job: Job) -> IntuneSyncResult:
+def _run_sync(tenant: Tenant, dry_run: bool, job: Job) -> IntuneSyncResult:
     from django.conf import settings as _settings
 
     from assets.models import Asset, AssetType, Manufacturer, StatusLabel
@@ -85,10 +111,10 @@ def _run_sync(tenant: object, dry_run: bool, job: Job) -> IntuneSyncResult:
     client = IntuneClient(azure_tenant_id, client_id, client_secret)
 
     job.append_log("Fetching managed devices from Graph API…")
-    devices = client.get_managed_devices()
+    devices: list[IntuneDevicePayload] = client.get_managed_devices()
     job.append_log(f"Retrieved {len(devices)} managed device(s).")
 
-    counts = {
+    counts: IntuneSyncResult = {
         "devices_total": len(devices),
         "matched": 0,
         "updated": 0,
@@ -137,9 +163,9 @@ def _run_sync(tenant: object, dry_run: bool, job: Job) -> IntuneSyncResult:
 
 
 def _stamp_discovery_facts(
-    asset: object,
-    device: Mapping[str, object],
-    tenant: object,
+    asset: Asset,
+    device: IntuneDevicePayload,
+    tenant: Tenant,
     dry_run: bool,
 ) -> None:
     """Write Intune discovery metadata into custom_field_data."""
@@ -166,11 +192,11 @@ def _stamp_discovery_facts(
 
 
 def _create_asset(
-    device: Mapping[str, object],
-    tenant: object,
+    device: IntuneDevicePayload,
+    tenant: Tenant,
     default_status_slug: str,
     dry_run: bool,
-) -> object | None:
+) -> Asset | None:
     """Create a Manufacturer, AssetType (get_or_create), and Asset for a new device."""
     from assets.models import Asset, AssetType, Manufacturer, StatusLabel
 
@@ -215,8 +241,8 @@ def _create_asset(
 
 def _sync_device_software(
     client: IntuneClient,
-    device: Mapping[str, object],
-    asset: object,
+    device: IntuneDevicePayload,
+    asset: Asset,
     dry_run: bool,
 ) -> int:
     """Upsert InstalledSoftware records for all detected apps on a device."""
@@ -228,7 +254,7 @@ def _sync_device_software(
         return 0
 
     try:
-        apps = client.get_detected_apps(device_id)
+        apps: list[IntuneAppPayload] = client.get_detected_apps(device_id)
     except Exception as exc:
         logger.warning("Could not fetch apps for device %s: %s", device_id, exc)
         return 0

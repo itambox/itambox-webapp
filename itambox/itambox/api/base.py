@@ -67,7 +67,7 @@ class BaseModelSerializer(serializers.ModelSerializer[Any]):
 class ValidatedModelSerializer(BaseModelSerializer):
     # typing: third-party-untyped: DRF supplies model metadata through an unparameterized hook
     def get_unique_together_constraints(self, model: Any) -> Iterator[tuple[set[tuple[str, ...]], Manager[Any]]]:
-        return []
+        return iter(())
 
     def validate(self, data: dict[str, object]) -> dict[str, object]:
         if self.nested:

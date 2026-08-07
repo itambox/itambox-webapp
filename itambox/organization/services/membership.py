@@ -16,7 +16,7 @@ or their membership and grant changes go unlogged.
 
 import dataclasses
 from dataclasses import dataclass
-from typing import Optional
+from typing import Optional, Protocol
 
 from django.db import IntegrityError, transaction
 from django.utils.translation import gettext_lazy as _
@@ -39,6 +39,16 @@ from organization.services.rolegrants import (
 from users.services import AmbiguousEmailError, resolve_existing_user, resolve_or_create_user
 
 
+class _MembershipActor(Protocol):
+    is_superuser: bool
+
+    def has_perm(self, perm: str, obj: object | None = None) -> bool: ...
+
+
+class _MembershipUser(Protocol):
+    pk: int
+
+
 @dataclass(frozen=True)
 class NewIdentitySpec:
     """The who=new block. ``email`` is normalised by the service."""
@@ -58,7 +68,7 @@ class MembershipIntent:
 
     tenant: Tenant
     is_active: bool = True
-    user: Optional[object] = None
+    user: _MembershipUser | None = None
     new_identity: Optional[NewIdentitySpec] = None
     own_roles: tuple[OwnGrantSpec, ...] = ()
     managed_grants: tuple[ManagedGrantSpec, ...] = ()
@@ -72,9 +82,9 @@ class MembershipWritePlan:
     """Read-only outcome of planning; carries the ``ValidatedGrantPlan`` token."""
 
     intent: MembershipIntent
-    actor: Optional[object]
+    actor: _MembershipActor | None
     membership: Optional[Membership]  # None on create
-    resolved_user: Optional[object]  # None => identity must be created on apply
+    resolved_user: _MembershipUser | None  # None => identity must be created on apply
     will_create_identity: bool
     validated_grants: ValidatedGrantPlan
 
@@ -90,7 +100,7 @@ class MembershipWriteResult:
 # ---------------------------------------------------------------------------
 # Authorization (matrix A1-A3)
 # ---------------------------------------------------------------------------
-def may_manage_memberships(*, actor: object | None, tenant: Tenant, creating: bool) -> bool:
+def may_manage_memberships(*, actor: _MembershipActor | None, tenant: Tenant, creating: bool) -> bool:
     """Whether ``actor`` may add/change memberships in ``tenant``.
 
     An absent actor (system/programmatic contexts — seeds, management commands,
@@ -105,7 +115,7 @@ def may_manage_memberships(*, actor: object | None, tenant: Tenant, creating: bo
     return bool(actor.has_perm(perm, obj=tenant))
 
 
-def authorize_membership_write(*, actor: object | None, tenant: Tenant, creating: bool) -> None:
+def authorize_membership_write(*, actor: _MembershipActor | None, tenant: Tenant, creating: bool) -> None:
     """Object-level gate at the SERVICE boundary — not only in the form/view.
 
     Raises :class:`ActorNotAuthorized`. The message deliberately does not name
@@ -120,7 +130,7 @@ def authorize_membership_write(*, actor: object | None, tenant: Tenant, creating
 # ---------------------------------------------------------------------------
 # Identity
 # ---------------------------------------------------------------------------
-def resolve_identity(*, spec: NewIdentitySpec) -> object | None:
+def resolve_identity(*, spec: NewIdentitySpec) -> _MembershipUser | None:
     """Resolve-only (never create) via ``users.services.resolve_existing_user``.
 
     Raises :class:`AmbiguousIdentity` when more than one account matches: email
@@ -156,7 +166,7 @@ def _membership_exists(user, tenant: Tenant) -> bool:
 # ---------------------------------------------------------------------------
 def plan_membership_write(
     *,
-    actor: object | None,
+    actor: _MembershipActor | None,
     intent: MembershipIntent,
     membership: Optional[Membership] = None,
     revalidate_inherited_groups: bool = False,
@@ -307,7 +317,7 @@ def _apply(plan: MembershipWritePlan) -> MembershipWriteResult:
 
 def execute_membership_write(
     *,
-    actor: object | None,
+    actor: _MembershipActor | None,
     intent: MembershipIntent,
     membership: Optional[Membership] = None,
 ) -> MembershipWriteResult:
@@ -340,7 +350,7 @@ def execute_membership_write(
 
 def apply_membership_grants(
     *,
-    actor: object | None,
+    actor: _MembershipActor | None,
     membership: Membership,
     plan: GrantPlan,
     previous_is_active: Optional[bool] = None,

@@ -3,6 +3,7 @@ from typing import Any
 
 from django.contrib.auth import get_user_model
 from django.contrib.contenttypes.models import ContentType
+from django.db.models import Model
 from rest_framework import serializers
 
 from core.choices import ObjectChangeActionChoices
@@ -28,18 +29,18 @@ __all__ = (
 )
 
 
-class GenericObjectSerializer(serializers.Serializer[dict[str, object]]):
+class GenericObjectSerializer(serializers.Serializer[Model]):
     object_type = ContentTypeField(queryset=ContentType.objects.all())
     object_id = serializers.IntegerField()
     object = GFKSerializerField(read_only=True)
 
     # typing: third-party-untyped: DRF passes parser-native generic-object input
-    def to_internal_value(self, data: Any) -> builtins.object:
+    def to_internal_value(self, data: Any) -> Model:
         data = super().to_internal_value(data)
         model = data["object_type"].model_class()
         return model.objects.get(pk=data["object_id"])
 
-    def to_representation(self, instance: builtins.object) -> dict[str, builtins.object]:
+    def to_representation(self, instance: Model) -> dict[str, builtins.object]:
         ct = ContentType.objects.get_for_model(instance)
         return {
             "object_type": f"{ct.app_label}.{ct.model}",

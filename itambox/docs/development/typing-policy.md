@@ -516,20 +516,19 @@ The selected methods now carry explicit parameter and return annotations while
 serializer behavior, tenant/security checks, lifecycle guards, and ORM access
 remain unchanged. This is an interface admission: generated OpenAPI schema
 validation, operation/component stability, and generated-client compatibility
-remain owned by #98. The complete SCIM operation surface, remaining task
-payload/result families, and report-provider contracts remain outside this
-slice.
+remain owned by #98; the Slice-10 AC14 additions below complete the annotation
+surface without changing the tracked schema.
 
 Slice 10 admits the remaining complex task family that is present on `main`:
-`itambox/core/tasks/intune_sync.py`. `IntuneSyncResult` is a named `TypedDict`
-for the six integer counts persisted in `Job.result` (`devices_total`,
-`matched`, `updated`, `created`, `skipped`, and `apps_upserted`). The task entry
-point and its discovery, asset-creation, software-sync, and slugification
-boundaries are admitted alongside that result contract. Device and application
-records from Microsoft Graph remain `Mapping[str, object]` at the documented
-external-JSON boundary; tenant/model/client internals and the implementation
-body remain outside the projection. A characterization assertion pins the
-persisted key set and integer values without changing task behavior.
+`itambox/core/tasks/intune_sync.py`. `IntuneDevicePayload` and
+`IntuneAppPayload` are named, bounded contracts for the selected string fields
+from Microsoft Graph; `IntuneSyncResult` is a named `TypedDict` for the six
+integer counts persisted in `Job.result` (`devices_total`, `matched`, `updated`,
+`created`, `skipped`, and `apps_upserted`). The task entry point and its
+discovery, asset-creation, software-sync, and slugification boundaries are
+admitted alongside those contracts. Tenant/model/client internals remain
+outside the projection. A characterization assertion pins the persisted key
+set and integer values without changing task behavior.
 
 Slice 10 also admits the organization service boundary. The compatibility
 facade and the resource-access helpers preserve generic model identity with a

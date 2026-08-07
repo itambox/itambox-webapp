@@ -1054,7 +1054,7 @@ class CommittedRecordTests(unittest.TestCase):
             ],
         )
         self.assertEqual(
-            {entry["path"]: (entry["scope"], entry.get("symbols", [])) for entry in self.record["checked"]},
+            {entry["path"]: (entry["scope"], entry["symbols"]) for entry in self.record["checked"]},
             {
                 "itambox/assets/api/serializers.py": (
                     "symbols",
@@ -1081,6 +1081,8 @@ class CommittedRecordTests(unittest.TestCase):
                 "itambox/core/tasks/intune_sync.py": (
                     "symbols",
                     [
+                        "IntuneAppPayload",
+                        "IntuneDevicePayload",
                         "IntuneSyncResult",
                         "_create_asset",
                         "_run_sync",
@@ -1192,6 +1194,8 @@ class CommittedRecordTests(unittest.TestCase):
                         "MembershipWritePlan",
                         "MembershipWriteResult",
                         "NewIdentitySpec",
+                        "_MembershipActor",
+                        "_MembershipUser",
                         "apply_membership_grants",
                         "authorize_membership_write",
                         "execute_membership_write",
@@ -1202,7 +1206,7 @@ class CommittedRecordTests(unittest.TestCase):
                 ),
                 "itambox/organization/services/resource_access.py": (
                     "symbols",
-                    ["is_container_scoped_unfiltered", "visible_to_containers"],
+                    ["_ContainerPermissionActor", "is_container_scoped_unfiltered", "visible_to_containers"],
                 ),
                 "itambox/organization/services/rolegrants.py": (
                     "symbols",

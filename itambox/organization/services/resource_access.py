@@ -1,6 +1,6 @@
 """Organization service compatibility exports and container visibility helpers."""
 
-from typing import TypeVar
+from typing import Protocol, TypeVar
 
 from django.db.models import Model, Q, QuerySet
 
@@ -24,6 +24,13 @@ from ..models import Tenant
 
 _ModelT = TypeVar("_ModelT", bound=Model)
 
+
+class _ContainerPermissionActor(Protocol):
+    is_superuser: bool
+
+    def has_perm(self, perm: str, obj: object | None = None) -> bool: ...
+
+
 # Access-control models whose default manager is deliberately unscoped (their
 # tenant resolution is itself an input to tenant scoping). Generic,
 # model-agnostic code must apply ``visible_to_containers`` to these instead.
@@ -35,7 +42,11 @@ _UNFILTERED_CONTAINER_MODELS = {
 }
 
 
-def visible_to_containers(user: object, qs: QuerySet[_ModelT], perm: str) -> QuerySet[_ModelT]:
+def visible_to_containers(
+    user: _ContainerPermissionActor,
+    qs: QuerySet[_ModelT],
+    perm: str,
+) -> QuerySet[_ModelT]:
     """Restrict unscoped tenant-anchored rows to authorized containers."""
     if user.is_superuser:
         return qs

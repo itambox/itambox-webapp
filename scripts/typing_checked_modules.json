@@ -2,7 +2,7 @@
   "schema_version": 2,
   "canonical_python": "3.12",
   "next_sequence": 39,
-  "policy_sha256": "69e07591029f1c73f9da0e4fda330026ddc651c832aeb79dfa93a919e6ec8430",
+  "policy_sha256": "15bd32a327eb45400e919d364a87895658e537e03dd1507867f5aefadac8c7f7",
   "config": {
     "config_file": "pyproject.toml",
     "working_directory": "itambox",
@@ -150,9 +150,11 @@
       "path": "itambox/core/tasks/intune_sync.py",
       "module": "core.tasks.intune_sync",
       "issue": "#93",
-      "note": "Slice 10 symbol admission: the Intune discovery task's named persisted result contract and its task/service boundaries. IntuneSyncResult fixes the six integer count keys Job.result stores after a run; Graph device/app payloads are Mapping[str, object] at the documented external-JSON boundary; tenant, asset, and service internals remain outside the projection.",
+      "note": "Slice 10 symbol admission: the Intune discovery task's named Graph payload and persisted result contracts and its task/service boundaries. IntuneDevicePayload and IntuneAppPayload describe the selected string fields consumed from the external Graph JSON; IntuneSyncResult fixes the six integer count keys Job.result stores after a run; tenant, asset, and service internals remain outside the projection.",
       "scope": "symbols",
       "symbols": [
+        "IntuneAppPayload",
+        "IntuneDevicePayload",
         "IntuneSyncResult",
         "_create_asset",
         "_run_sync",
@@ -386,6 +388,8 @@
         "MembershipWritePlan",
         "MembershipWriteResult",
         "NewIdentitySpec",
+        "_MembershipActor",
+        "_MembershipUser",
         "apply_membership_grants",
         "authorize_membership_write",
         "execute_membership_write",
@@ -402,6 +406,7 @@
       "note": "Slice 10 organization-service admission: generic QuerySet/model container-visibility boundaries. Generic model identity is preserved with a bounded TypeVar; authorization and filtering behavior remain unchanged.",
       "scope": "symbols",
       "symbols": [
+        "_ContainerPermissionActor",
         "is_container_scoped_unfiltered",
         "visible_to_containers"
       ]
@@ -474,7 +479,7 @@
       "path": "itambox/users/api/scim/authentication.py",
       "module": "users.api.scim.authentication",
       "issue": "#93",
-      "note": "Slice 10 extension of the existing SCIM authentication contract: SCIMBearerTokenAuthenticationScheme now exposes its OpenAPI security-definition return shape as dict[str, str], while the previously admitted authenticator and principal protocol remain unchanged.",
+      "note": "Slice 6 symbol admission: the _SCIMAuthenticatedPrincipal protocol and SCIMBearerTokenAuthentication DRF authentication contract -- a Request in, the minimal authenticated-principal/credential pair or None out, and the WWW-Authenticate scheme it advertises. The protocol avoids importing project model classes into the bounded projection; tenant resolution, token validation, IP allowlist, has_perm authorization, and write-flag checks inside the method bodies are unchanged and remain outside this slice. Slice 10 extends the same contract with SCIMBearerTokenAuthenticationScheme's explicit dict[str, str] OpenAPI security definition.",
       "scope": "symbols",
       "symbols": [
         "SCIMBearerTokenAuthentication",
@@ -504,7 +509,7 @@
       "path": "itambox/users/api/scim/identifiers.py",
       "module": "users.api.scim.identifiers",
       "issue": "#93",
-      "note": "Slice 10 extension of the existing SCIM identifier contract: get_scim_object_or_404 preserves the concrete model type across a tenant-scoped QuerySet, while the dual-read integer/UUID lookup functions remain unchanged.",
+      "note": "Slice 6 symbol admission: the two SCIM identifier-boundary functions of the 1.x dual-read window -- identifier_lookup, which answers the model lookup for a legacy integer or opaque UUID identifier, and identifier_lookup_or_none, which answers None instead of raising for an invalid member identifier. Slice 10 extends this bounded contract with get_scim_object_or_404, preserving the concrete model type across a tenant-scoped QuerySet; the lookup body remains unchanged.",
       "scope": "symbols",
       "symbols": [
         "get_scim_object_or_404",

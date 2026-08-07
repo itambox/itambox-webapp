@@ -1,6 +1,6 @@
 from collections import OrderedDict
 from collections.abc import Iterable
-from typing import Any
+from typing import Any, cast
 
 from django.contrib.contenttypes.models import ContentType
 from django.core.exceptions import ObjectDoesNotExist
@@ -25,7 +25,7 @@ class ChoiceField(serializers.Field[object, object, dict[str, object] | None, ob
         allow_blank: bool = False,
         **kwargs: Any,
     ) -> None:
-        self.choiceset = choices
+        self.choiceset = tuple(choices)
         self.allow_blank = allow_blank
         self._choices = dict(list(self.choiceset))
 
@@ -135,6 +135,7 @@ class ContentTypeField(RelatedField[ContentType, object, str]):
             self.fail("invalid")
 
     def to_representation(self, obj: ContentType | PKOnlyObject) -> str:
+        obj = cast(ContentType, obj)
         return f"{obj.app_label}.{obj.model}"
 
 
@@ -152,7 +153,7 @@ class SerializedPKRelatedField(PrimaryKeyRelatedField[Model]):
         super().__init__(**kwargs)
 
     # typing: third-party-untyped: DRF relation hooks may receive a PK-only proxy or arbitrary model value
-    def to_representation(self, value: Any | PKOnlyObject) -> object:
+    def to_representation(self, value: Model | PKOnlyObject) -> object:
         return self.serializer(value, nested=self.nested, context={"request": self.context["request"]}).data
 
 
