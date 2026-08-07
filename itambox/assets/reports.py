@@ -16,7 +16,7 @@ from django.utils.translation import gettext as _
 from assets.models import Asset, AssetMaintenance
 from assets.models.lifecycle import AssetDisposal, Warranty
 from core.reports.charts import generate_doughnut_chart
-from core.reports.contracts import ReportDefinition, ReportRequest
+from core.reports.contracts import ReportDefinition, ReportRequest, ReportResult
 from core.reports.formatting import _format_per_currency, _money, _record_currency
 from core.reports.registry import register_report_provider
 
@@ -369,24 +369,16 @@ class AssetDepreciationReportProvider(ReportDefinition):
     def build_rows(self, records, request: ReportRequest):
         return [self.row_for(asset, request) for asset in records]
 
-    def build_summary(self, queryset, request: ReportRequest):
-        if not request.template.include_summary_cards:
-            return []
-        _purchase_total, _value_total, purchase_by_currency, value_by_currency = _depreciation_totals(
-            queryset, request.active_tenant
-        )
+    def _summary_from_totals(self, queryset, request: ReportRequest, totals):
+        _purchase_total, _value_total, purchase_by_currency, value_by_currency = totals
         return [
             {"label": _("Total Depreciable Assets"), "value": str(queryset.count())},
             {"label": _("Total Acquisition Cost"), "value": _format_per_currency(purchase_by_currency)},
             {"label": _("Total Current Book Value"), "value": _format_per_currency(value_by_currency)},
         ]
 
-    def build_chart(self, queryset, records, request: ReportRequest):
-        if not request.template.include_distribution_chart:
-            return ""
-        purchase_total, value_total, _purchase_by_currency, _value_by_currency = _depreciation_totals(
-            queryset, request.active_tenant
-        )
+    def _chart_from_totals(self, request: ReportRequest, totals):
+        purchase_total, value_total, _purchase_by_currency, _value_by_currency = totals
         # Assets can be in scope without a recorded acquisition cost; the split
         # is meaningless then, so the illustrative one is shown instead.
         if purchase_total > 0:
@@ -397,6 +389,33 @@ class AssetDepreciationReportProvider(ReportDefinition):
         else:
             chart_data = _sample_depreciation_chart_data()
         return generate_doughnut_chart(chart_data, title=_("Asset Value Depreciation"))
+
+    def build(self, request: ReportRequest) -> ReportResult:
+        queryset = self.get_queryset(request)
+        records = list(queryset[: self.row_limit])
+        rows = list(self.build_rows(records, request))
+        if not rows:
+            return self.build_sample(request)
+        totals = None
+        if request.template.include_summary_cards or request.template.include_distribution_chart:
+            totals = _depreciation_totals(queryset, request.active_tenant)
+        return ReportResult(
+            rows=rows,
+            summary_cards=self._summary_from_totals(queryset, request, totals)
+            if request.template.include_summary_cards
+            else [],
+            chart_svg=self._chart_from_totals(request, totals) if request.template.include_distribution_chart else "",
+        )
+
+    def build_summary(self, queryset, request: ReportRequest):
+        if not request.template.include_summary_cards:
+            return []
+        return self._summary_from_totals(queryset, request, _depreciation_totals(queryset, request.active_tenant))
+
+    def build_chart(self, queryset, records, request: ReportRequest):
+        if not request.template.include_distribution_chart:
+            return ""
+        return self._chart_from_totals(request, _depreciation_totals(queryset, request.active_tenant))
 
     def build_sample_summary(self, request: ReportRequest):
         if not request.template.include_summary_cards:
@@ -430,7 +449,7 @@ def _warranty_state(warranty, request):
     """``(days_remaining, status_label)`` for one warranty at the report's clock."""
     if warranty.end_date is None:
         return "-", _("Unknown")
-    delta = (warranty.end_date - request.as_of.date()).days
+    delta = (warranty.end_date - timezone.localdate(request.as_of)).days
     if delta < 0:
         return str(delta), _("Expired")
     if delta <= WARRANTY_SOON_DAYS:

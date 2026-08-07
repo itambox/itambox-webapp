@@ -17,7 +17,7 @@ from core.reports import (
     register_report_provider,
 )
 from core.reports.columns import headers_for
-from core.reports.contracts import ReportDefinition, ReportRequest, ReportResult
+from core.reports.contracts import PUBLIC_REPORT_TYPES, ReportDefinition, ReportRequest, ReportResult
 from core.reports.formatting import _format_per_currency, _money, _record_currency
 from core.tests.mixins import TenantTestMixin
 from extras.models import ReportTemplate
@@ -26,13 +26,15 @@ from organization.models import Location, Site
 
 class ReportProviderContractTests(SimpleTestCase):
     def test_registry_exposes_every_public_report_identifier(self):
-        self.assertEqual(len(get_registered_report_types()), 11)
+        self.assertTrue(set(PUBLIC_REPORT_TYPES).issubset(get_registered_report_types()))
 
     def test_registry_lookup_returns_provider_per_identifier(self):
         provider = get_report_provider("asset_summary")
         self.assertIsInstance(provider, ReportDefinition)
 
     def test_registry_rejects_duplicate_registration(self):
+        get_registered_report_types()
+
         class DuplicateProvider(ReportDefinition):
             report_type = "asset_summary"
 
@@ -43,6 +45,8 @@ class ReportProviderContractTests(SimpleTestCase):
             register_report_provider(DuplicateProvider())
 
     def test_registry_does_not_partially_register_a_multi_type_provider(self):
+        get_registered_report_types()
+
         class PartialDuplicateProvider(ReportDefinition):
             report_types = ("uncommitted_report", "asset_summary")
 

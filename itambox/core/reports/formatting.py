@@ -2,6 +2,8 @@
 
 from types import SimpleNamespace
 
+from django.conf import settings
+
 
 def _record_currency(record_currency, active_tenant):
     """Resolve a money record's currency using record, tenant, then settings."""
@@ -10,10 +12,7 @@ def _record_currency(record_currency, active_tenant):
         return code
     if active_tenant is not None and getattr(active_tenant, "currency", None):
         return active_tenant.currency.upper()
-    # inline import: app-registry: read settings only when formatting a report value
-    from django.conf import settings as _settings
-
-    return (getattr(_settings, "ITAMBOX_DEFAULT_CURRENCY", "EUR") or "EUR").upper()
+    return (getattr(settings, "ITAMBOX_DEFAULT_CURRENCY", "EUR") or "EUR").upper()
 
 
 def _format_per_currency(amount_by_currency):

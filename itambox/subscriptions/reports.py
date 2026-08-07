@@ -3,7 +3,7 @@
 from django.utils.translation import gettext as _
 
 from core.reports.charts import generate_bar_chart
-from core.reports.contracts import ReportDefinition, ReportRequest
+from core.reports.contracts import ReportDefinition, ReportRequest, ReportResult
 from core.reports.formatting import _format_per_currency, _money, _record_currency
 from core.reports.registry import register_report_provider
 from core.reports.rows import DEFAULT_GROUP
@@ -105,20 +105,43 @@ class SubscriptionRenewalsReportProvider(ReportDefinition):
     def build_rows(self, records, request: ReportRequest):
         return [self.row_for(record, request) for record in records]
 
-    def build_summary(self, queryset, request: ReportRequest):
-        if not request.template.include_summary_cards:
-            return []
-        by_currency, _by_provider = _monthly_spend(queryset, request)
+    def _summary_from_spend(self, queryset, by_currency):
         return [
             {"label": _("Active Subscriptions"), "value": str(queryset.count())},
             {"label": _("Est. Monthly Spend"), "value": _format_per_currency(by_currency)},
         ]
 
+    def _chart_from_spend(self, by_provider, request: ReportRequest):
+        return _spend_chart(by_provider, request)
+
+    def build(self, request: ReportRequest) -> ReportResult:
+        queryset = self.get_queryset(request)
+        records = list(queryset[: self.row_limit])
+        rows = list(self.build_rows(records, request))
+        if not rows:
+            return self.build_sample(request)
+        spend = None
+        if request.template.include_summary_cards or request.template.include_distribution_chart:
+            spend = _monthly_spend(queryset, request)
+        return ReportResult(
+            rows=rows,
+            summary_cards=self._summary_from_spend(queryset, spend[0])
+            if request.template.include_summary_cards
+            else [],
+            chart_svg=self._chart_from_spend(spend[1], request) if request.template.include_distribution_chart else "",
+        )
+
+    def build_summary(self, queryset, request: ReportRequest):
+        if not request.template.include_summary_cards:
+            return []
+        by_currency, _by_provider = _monthly_spend(queryset, request)
+        return self._summary_from_spend(queryset, by_currency)
+
     def build_chart(self, queryset, records, request: ReportRequest):
         if not request.template.include_distribution_chart:
             return ""
         _by_currency, by_provider = _monthly_spend(queryset, request)
-        return _spend_chart(by_provider, request)
+        return self._chart_from_spend(by_provider, request)
 
     def build_sample_summary(self, request: ReportRequest):
         if not request.template.include_summary_cards:

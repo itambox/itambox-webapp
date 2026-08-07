@@ -10,7 +10,7 @@
     "num_branches": 11192,
     "covered_branches": 7383,
     "branch_rate": 65.97,
-    "excluded_lines": 29,
+    "excluded_lines": 32,
     "measured_files": 472
   }
 }

@@ -913,17 +913,24 @@ class ReportTriggerImmediateView(PermissionRequiredMixin, LoginRequiredMixin, Vi
         from core.tasks import generate_scheduled_report_task
 
         success = generate_scheduled_report_task(sched.pk)
-        if success:
+        sched.refresh_from_db()
+        archive = sched.archives.first()
+        delivery_detail = (archive.error_message if archive else "") or sched.last_status or _("Check logs.")
+        if success and sched.last_status == "partial":
+            messages.warning(
+                request,
+                _("Scheduled report '%(name)s' was generated but delivered only partially: %(error)s")
+                % {"name": sched.name, "error": delivery_detail},
+            )
+        elif success:
             messages.success(
                 request, _("Scheduled report '%(name)s' generated and sent successfully.") % {"name": sched.name}
             )
         else:
-            sched.refresh_from_db()
-            error_msg = sched.last_status or _("Check logs.")
             messages.error(
                 request,
                 _("Failed to generate scheduled report '%(name)s': %(error)s")
-                % {"name": sched.name, "error": error_msg},
+                % {"name": sched.name, "error": delivery_detail},
             )
 
         return redirect(
@@ -998,6 +1005,8 @@ class ReportTemplatePreviewView(CapabilityRequiredMixin, PermissionRequiredMixin
             rendered_html = django_template.render(Context(context_data))
 
             return HttpResponse(rendered_html)
+        except PermissionError:
+            return HttpResponse(gettext("You may not view this report's data."), status=403)
         except Exception:
             # Full detail (with traceback) goes to the server log; the client gets a
             # generic message so exception text is never reflected in the response.
@@ -1087,6 +1096,8 @@ class ReportTemplateDownloadView(CapabilityRequiredMixin, PermissionRequiredMixi
             disposition = "inline" if request.GET.get("print") == "true" else "attachment"
             response["Content-Disposition"] = f'{disposition}; filename="{safe_name}_{stamp}.html"'
             return response
+        except PermissionError:
+            return HttpResponse(gettext("You may not view this report's data."), status=403)
         except Exception:
             # Full detail (with traceback) goes to the server log; the client gets a
             # generic message so exception text is never reflected in the response.

@@ -241,20 +241,6 @@ class ScheduledReportingAndAlertsTests(TestCase):
             send_channel.assert_not_called()
         self.assertEqual(outcome.status, "success")
 
-    def test_notify_report_channels_alias_stays_compatible(self):
-        sched = ScheduledReport.objects.create(
-            name="Alias Schedule",
-            report=self.template,
-            tenant=self.tenant,
-            frequency="once",
-            format=ScheduledReport.FORMAT_HTML,
-        )
-        with patch("core.tasks.reports.send_notification_to_channel", return_value=True):
-            from core.tasks.reports import _notify_report_channels
-
-            outcome = _notify_report_channels(sched, [], 0)
-        self.assertEqual(outcome.status, "success")
-
     @override_settings(REPORT_DESIGNER_ENABLED=True)
     def test_report_preview_compilation_and_view(self):
         """Test report template context compilation and preview endpoint rendering without ValueError."""

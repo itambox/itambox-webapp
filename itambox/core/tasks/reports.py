@@ -209,11 +209,6 @@ def _deliver_report_channels(sched, summary_cards, total_rows):
     return outcome
 
 
-# Compatibility alias for integrations importing the former helper name.
-def _notify_report_channels(sched, summary_cards, total_rows):
-    return _deliver_report_channels(sched, summary_cards, total_rows)
-
-
 def _resolve_report_scope(sched):
     active_tenant = sched.tenant or (sched.report.tenant if sched.report else None)
     filter_tenants = list(sched.filter_tenants.all())
