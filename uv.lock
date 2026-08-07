@@ -1178,7 +1178,7 @@ dev = [
     { name = "pycodestyle", specifier = "==2.14.0" },
     { name = "pyflakes", specifier = "==3.4.0" },
     { name = "pytest", specifier = ">=9.0.3,<10.0" },
-    { name = "pytest-cov", specifier = ">=5.0,<6.0" },
+    { name = "pytest-cov", specifier = ">=5.0,<8.0" },
     { name = "pytest-django", specifier = ">=4.8,<5.0" },
     { name = "pytest-xdist", specifier = ">=3.5,<4.0" },
     { name = "pyyaml", specifier = ">=6.0,<7.0" },
