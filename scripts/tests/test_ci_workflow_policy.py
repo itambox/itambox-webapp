@@ -200,8 +200,8 @@ class PostSuiteGateIndependenceTests(unittest.TestCase):
         """Disjointness can only be checked against both lane reports."""
         gate = step_named(self.steps, "Check the lane matrix gate")
         run = gate.get("run", "")
-        self.assertIn("--xdist itambox/artifacts/junit-parallel.xml", run)
-        self.assertIn("--serial itambox/artifacts/junit-serial-only.xml", run)
+        self.assertIn("--xdist artifacts/junit-parallel.xml", run)
+        self.assertIn("--serial artifacts/junit-serial-only.xml", run)
 
 
 class GateSuiteDiscoveryTests(unittest.TestCase):
