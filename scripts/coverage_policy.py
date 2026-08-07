@@ -100,12 +100,6 @@ DIFF_COVERAGE_EXEMPTIONS = (
         "itambox/static/*",
         "compiled and vendored frontend assets, type-checked and linted by the frontend job",
     ),
-    (
-        "itambox/core/reports/legacy.py",
-        "temporary compatibility provider moved ~95% verbatim from core/reports/compiler.py "
-        "by issue #83; covered by the existing per-report integration suites "
-        "(core/tests/test_report_*.py) and the report-characterization matrix, both part of the test job",
-    ),
 )
 
 # Downward jitter allowed before a rate change is treated as a regression. Not

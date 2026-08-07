@@ -178,7 +178,7 @@
       "path": "itambox/core/tasks/reports.py",
       "module": "core.tasks.reports",
       "issue": "#93",
-      "note": "Slice 4 symbol admission: the _ReportOutput scheduled-report result contract -- the rendered email body plus the optional attachment content, filename, and MIME type a renderer hands to the archive and delivery steps. Slice 5 adds generate_scheduled_report_task, the scheduled-report task entry envelope: the ScheduledReport id a worker is handed, and the bool | None outcome it reports back -- True or False for a report that was processed, None for a schedule with no resolvable tenant scope. The renderer and helper functions between the two, and the report-provider architecture behind compile_report_context, remain outside this slice; report-provider contracts stay owned by #83.",
+      "note": "Slice 4 symbol admission: the _ReportOutput scheduled-report result contract -- the rendered email body plus the optional attachment content, filename, and MIME type a renderer hands to the archive and delivery steps. Slice 5 adds generate_scheduled_report_task, the scheduled-report task entry envelope: the ScheduledReport id a worker is handed, and the bool | None outcome it reports back -- True or False for a report that was processed, None for a schedule with no resolvable tenant scope. The renderer and helper functions between the two, and the report-provider architecture behind build_report_context, remain outside this slice; report-provider contracts stay owned by #83.",
       "scope": "symbols",
       "symbols": [
         "_ReportOutput",

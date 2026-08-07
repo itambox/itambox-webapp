@@ -2562,7 +2562,7 @@
     {
       "path": "itambox/extras/views.py",
       "context": "ClassDef:ReportTemplateDownloadView/FunctionDef:get",
-      "statement": "from core.reports import compile_report_context, get_polished_system_html_template",
+      "statement": "from core.reports import build_report_context, get_polished_system_html_template",
       "count": 1
     },
     {
@@ -2592,7 +2592,7 @@
     {
       "path": "itambox/extras/views.py",
       "context": "ClassDef:ReportTemplatePreviewView/FunctionDef:post",
-      "statement": "from core.reports import compile_report_context, get_polished_system_html_template",
+      "statement": "from core.reports import build_report_context, get_polished_system_html_template",
       "count": 1
     },
     {

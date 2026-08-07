@@ -2,6 +2,7 @@
 
 import datetime
 from decimal import Decimal
+from unittest.mock import patch
 
 from django.core.exceptions import ImproperlyConfigured
 from django.test import SimpleTestCase, TestCase
@@ -10,7 +11,7 @@ from django.utils import translation
 from assets.models import Asset, AssetAssignment, AssetType, Manufacturer, StatusLabel
 from assets.models.lifecycle import Warranty
 from core.reports import (
-    compile_report_context,
+    build_report_context,
     get_registered_report_types,
     get_report_provider,
     register_report_provider,
@@ -41,18 +42,44 @@ class ReportProviderContractTests(SimpleTestCase):
         with self.assertRaises(ImproperlyConfigured):
             register_report_provider(DuplicateProvider())
 
+    def test_registry_does_not_partially_register_a_multi_type_provider(self):
+        class PartialDuplicateProvider(ReportDefinition):
+            report_types = ("uncommitted_report", "asset_summary")
+
+            def build(self, request):
+                return ReportResult(rows=[], summary_cards=[], chart_svg="")
+
+        with self.assertRaises(ImproperlyConfigured):
+            register_report_provider(PartialDuplicateProvider())
+        with self.assertRaises(ValueError):
+            get_report_provider("uncommitted_report")
+
     def test_registry_lookup_unknown_identifier_raises(self):
         with self.assertRaises(ValueError):
             get_report_provider("no_such_report")
 
-    def test_compile_report_context_rejects_unknown_report_type(self):
+    def test_report_provider_permission_is_enforced(self):
+        class UserWithoutReportPermission:
+            def has_perm(self, permission):
+                return False
+
+        template = ReportTemplate(
+            name="Unauthorized report",
+            report_type=ReportTemplate.REPORT_TYPE_ASSET_SUMMARY,
+            included_columns=[],
+        )
+        with patch("core.reports.orchestration.get_current_user", return_value=UserWithoutReportPermission()):
+            with self.assertRaises(PermissionError):
+                build_report_context(template, active_tenant=object())
+
+    def test_build_report_context_rejects_unknown_report_type(self):
         template = ReportTemplate(
             name="Unknown Type",
             report_type="no_such_report",
             included_columns=[],
         )
         with self.assertRaises(ValueError):
-            compile_report_context(template, active_tenant=object())
+            build_report_context(template, active_tenant=object())
 
     def test_headers_for_resolves_lazy_labels_to_plain_strings(self):
         headers = headers_for(["asset_tag", "name", "not_a_column"])
@@ -139,7 +166,7 @@ class AssetSummaryReportProviderTests(TenantTestMixin, TestCase):
         )
 
         with self.tenant_context(self.tenant), translation.override("en"):
-            headers, rows, summary_cards, _grouped, chart_svg, _context = compile_report_context(
+            headers, rows, summary_cards, _grouped, chart_svg, _context = build_report_context(
                 template, active_tenant=self.tenant
             )
 
@@ -172,7 +199,7 @@ class AssetSummaryReportProviderTests(TenantTestMixin, TestCase):
             group_by_field="status",
         )
         with self.tenant_context(self.tenant), translation.override("en"):
-            _headers, rows, summary_cards, grouped_data, chart_svg, _context = compile_report_context(
+            _headers, rows, summary_cards, grouped_data, chart_svg, _context = build_report_context(
                 template, active_tenant=self.tenant
             )
 
@@ -183,7 +210,7 @@ class AssetSummaryReportProviderTests(TenantTestMixin, TestCase):
 
         template.group_by_field = "location"
         with self.tenant_context(self.tenant), translation.override("en"):
-            _headers, _rows, _cards, grouped_by_location, _chart, _context = compile_report_context(
+            _headers, _rows, _cards, grouped_by_location, _chart, _context = build_report_context(
                 template, active_tenant=self.tenant
             )
         self.assertEqual(set(grouped_by_location), {"Group HQ", "Unassigned"})
@@ -211,7 +238,7 @@ class AssetSummaryReportProviderTests(TenantTestMixin, TestCase):
         )
         self.clear_tenant_context()
         with translation.override("en"):
-            _headers, rows, _cards, _grouped, _chart, _context = compile_report_context(
+            _headers, rows, _cards, _grouped, _chart, _context = build_report_context(
                 template, active_tenant=None, filter_tenants=[other_tenant]
             )
         self.assertEqual([row["Asset Tag"] for row in rows], ["SCOPE-OTHER"])

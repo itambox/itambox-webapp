@@ -5,7 +5,7 @@ from django.test import TestCase
 from model_bakery import baker
 
 from assets.models import Asset, AssetMaintenance, StatusLabel
-from core.reports import compile_report_context
+from core.reports import build_report_context
 from core.tests.mixins import TenantTestMixin
 from extras.models import ReportTemplate
 from organization.models import Tenant
@@ -47,7 +47,7 @@ class MixedCurrencyReportTests(TenantTestMixin, TestCase):
             name=f"{report_type} report", report_type=report_type, included_columns=columns, include_summary_cards=True
         )
         self.clear_tenant_context()
-        return compile_report_context(template, active_tenant=self.tenant)
+        return build_report_context(template, active_tenant=self.tenant)
 
     def _assert_per_currency(self, value):
         self.assertIn("$", value)

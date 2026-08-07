@@ -101,11 +101,20 @@ _COLUMN_LABELS = {
 }
 
 
+def label_for(column):
+    """Resolve one column key to its display label in the active language.
+
+    A report row is keyed by the same label its header carries, so providers
+    and the header list must never resolve a column independently.
+    """
+    return str(_COLUMN_LABELS[column])
+
+
 def headers_for(columns):
     """Resolve column keys to display labels in the caller's active language.
 
     Labels are stored as lazy translations so the worker's active language is
     honoured; resolving here keeps every consumer (HTML, CSV, XLSX, PDF) on
-    plain strings, exactly like the pre-provider compiler.
+    plain strings.
     """
-    return [str(_COLUMN_LABELS[column]) for column in columns if column in _COLUMN_LABELS]
+    return [label_for(column) for column in columns if column in _COLUMN_LABELS]

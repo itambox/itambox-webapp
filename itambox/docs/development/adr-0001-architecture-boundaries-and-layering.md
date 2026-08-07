@@ -37,7 +37,7 @@ reviewed debt with an owner and a removal direction; do not pay it down here.
 | `platform-service` | Cross-cutting runtime services | `core.tasks.*`, `core.events`, `core.reports.*`, `core.schedules` |
 | `integration` | Adapters for systems outside ITAMbox | `core.auth.*`, `core.importers.*`, `core.integrations.*` |
 | `domain-model` | Persistent state of one application | `assets.models.*`, `organization.models`, `inventory.abstract_models` |
-| `domain-service` | Behaviour over one application's models | `assets.services`, `inventory.stock`, `organization.access` |
+| `domain-service` | Behaviour over one application's models | `assets.services`, `assets.reports`, `inventory.stock`, `organization.access` |
 | `presentation` | Forms, tables, filters, views, serializers, templatetags | `assets.forms.*`, `itambox.views.*`, `core.tables.*` |
 | `composition` | Wiring: URLconfs, app configs, admin, settings, the ASGI/WSGI entry points | `core.urls`, `core.settings.*`, `assets.apps` |
 

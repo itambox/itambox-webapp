@@ -14,7 +14,7 @@ from model_bakery import baker
 from assets.models import Asset, StatusLabel
 from assets.models.choices import DataSanitizationMethodChoices, DisposalMethodChoices
 from assets.models.lifecycle import AssetDisposal
-from core.reports import compile_report_context
+from core.reports import build_report_context
 from core.tests.mixins import TenantTestMixin
 from extras.models import ReportTemplate
 from organization.models import Tenant
@@ -107,7 +107,7 @@ class AssetDisposalEolReportTests(TenantTestMixin, TestCase):
     def test_row_content_correct(self):
         """Real disposal rows contain expected field values."""
         self.clear_tenant_context()
-        _, rows, *_ = compile_report_context(self.template, active_tenant=self.tenant)
+        _, rows, *_ = build_report_context(self.template, active_tenant=self.tenant)
 
         # Asset.__str__ returns "name (asset_tag)" — use substring match.
         asset_cells = [r.get("Asset") or "" for r in rows]
@@ -136,7 +136,7 @@ class AssetDisposalEolReportTests(TenantTestMixin, TestCase):
     def test_proceeds_non_usd_not_dollar_prefixed(self):
         """EUR proceeds cell must not start with '$'."""
         self.clear_tenant_context()
-        _, rows, *_ = compile_report_context(self.template, active_tenant=self.tenant)
+        _, rows, *_ = build_report_context(self.template, active_tenant=self.tenant)
         row_a = next(r for r in rows if "Lenovo ThinkPad X1" in (r.get("Asset") or ""))
         proceeds_cell = row_a.get("Proceeds", "")
         self.assertNotEqual(proceeds_cell, "-", "Proceeds should be rendered, not dash")
@@ -150,7 +150,7 @@ class AssetDisposalEolReportTests(TenantTestMixin, TestCase):
     def test_tenant_isolation(self):
         """Tenant-B disposal must not appear in a tenant-A report."""
         self.clear_tenant_context()
-        _, rows, *_ = compile_report_context(self.template, active_tenant=self.tenant)
+        _, rows, *_ = build_report_context(self.template, active_tenant=self.tenant)
         asset_cells = [r.get("Asset") or "" for r in rows]
         self.assertFalse(
             any("Apple MacBook Air" in cell for cell in asset_cells),
@@ -160,7 +160,7 @@ class AssetDisposalEolReportTests(TenantTestMixin, TestCase):
     def test_summary_cards_correct(self):
         """Summary cards show correct total, WEEE count, and proceeds."""
         self.clear_tenant_context()
-        _, _rows, summary_cards, *_ = compile_report_context(self.template, active_tenant=self.tenant)
+        _, _rows, summary_cards, *_ = build_report_context(self.template, active_tenant=self.tenant)
 
         card_labels = [c["label"] for c in summary_cards]
         self.assertIn("Total Disposals", card_labels)
@@ -181,7 +181,7 @@ class AssetDisposalEolReportTests(TenantTestMixin, TestCase):
     def test_distribution_chart_rendered(self):
         """include_distribution_chart=True produces a non-empty SVG string."""
         self.clear_tenant_context()
-        _headers, _rows, _cards, _grouped, chart_svg, _ctx = compile_report_context(
+        _headers, _rows, _cards, _grouped, chart_svg, _ctx = build_report_context(
             self.template, active_tenant=self.tenant
         )
         self.assertTrue(chart_svg, "chart_svg should be non-empty when include_distribution_chart=True")
@@ -190,7 +190,7 @@ class AssetDisposalEolReportTests(TenantTestMixin, TestCase):
     def test_filter_tenants_scoping(self):
         """filter_tenants=[tenant_b] excludes tenant-A disposals."""
         self.clear_tenant_context()
-        _, rows, summary_cards, *_ = compile_report_context(self.template, filter_tenants=[self.tenant_b])
+        _, rows, summary_cards, *_ = build_report_context(self.template, filter_tenants=[self.tenant_b])
         asset_cells = [r.get("Asset") or "" for r in rows]
         self.assertTrue(
             any("Apple MacBook Air" in cell for cell in asset_cells),

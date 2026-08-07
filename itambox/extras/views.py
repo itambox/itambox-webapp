@@ -985,10 +985,10 @@ class ReportTemplatePreviewView(CapabilityRequiredMixin, PermissionRequiredMixin
             style_preset=style_preset,
         )
 
-        from core.reports import compile_report_context, get_polished_system_html_template
+        from core.reports import build_report_context, get_polished_system_html_template
 
         try:
-            _headers, _rows, _summary_cards, _grouped_data, _chart_svg, context_data = compile_report_context(
+            _headers, _rows, _summary_cards, _grouped_data, _chart_svg, context_data = build_report_context(
                 template_instance, active_tenant=active_tenant, filter_tenants=filter_tenants
             )
 
@@ -1034,10 +1034,10 @@ class ReportTemplateDownloadView(CapabilityRequiredMixin, PermissionRequiredMixi
         # Enforce sandboxed constellation
         filter_tenants = list(template.filter_tenants.all())
 
-        from core.reports import compile_report_context, get_polished_system_html_template
+        from core.reports import build_report_context, get_polished_system_html_template
 
         try:
-            headers, rows, _summary_cards, _grouped_data, _chart_svg, context_data = compile_report_context(
+            headers, rows, _summary_cards, _grouped_data, _chart_svg, context_data = build_report_context(
                 template, active_tenant=active_tenant, filter_tenants=filter_tenants
             )
 

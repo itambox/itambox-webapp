@@ -12,7 +12,7 @@ from decimal import Decimal
 from django.test import TestCase
 from django.utils import translation
 
-from core.reports import compile_report_context
+from core.reports import build_report_context
 from core.tests.mixins import TenantTestMixin
 from extras.models import ReportTemplate
 from subscriptions.models import Provider, Subscription
@@ -199,7 +199,7 @@ class ReportCompilerCharacterizationTests(TenantTestMixin, TestCase):
                     include_distribution_chart=True,
                 )
                 with translation.override("en"):
-                    headers, rows, summary_cards, grouped_data, chart_svg, context_data = compile_report_context(
+                    headers, rows, summary_cards, grouped_data, chart_svg, context_data = build_report_context(
                         template, active_tenant=self.tenant
                     )
 
@@ -242,7 +242,7 @@ class ReportCompilerCharacterizationTests(TenantTestMixin, TestCase):
         )
 
         with self.tenant_context(self.tenant), translation.override("en"):
-            _headers, _rows, summary_cards, _grouped, _chart, _context = compile_report_context(
+            _headers, _rows, summary_cards, _grouped, _chart, _context = build_report_context(
                 template, active_tenant=self.tenant
             )
 

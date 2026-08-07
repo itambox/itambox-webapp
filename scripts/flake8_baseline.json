@@ -572,14 +572,6 @@
       "count": 1
     },
     {
-      "path": "itambox/assets/reports.py",
-      "code": "C901",
-      "message": "'AssetSummaryReportProvider.build_rows' is too complex (30)",
-      "source": "    def build_rows(self, queryset, request: ReportRequest):",
-      "context": "Module:body/ClassDef:AssetSummaryReportProvider:body/FunctionDef:build_rows:self",
-      "count": 1
-    },
-    {
       "path": "itambox/assets/services.py",
       "code": "C901",
       "message": "'checkin_asset' is too complex (13)",
@@ -4092,14 +4084,6 @@
       "count": 1
     },
     {
-      "path": "itambox/core/reports/legacy.py",
-      "code": "C901",
-      "message": "'compile_legacy_report_context' is too complex (388)",
-      "source": "def compile_legacy_report_context(template, active_tenant=None, filter_tenants=None):",
-      "context": "Module:body/FunctionDef:compile_legacy_report_context:self",
-      "count": 1
-    },
-    {
       "path": "itambox/core/schema.py",
       "code": "B009",
       "message": "Do not call getattr with a constant attribute value, it is not any safer than normal property access.",
@@ -5343,7 +5327,7 @@
       "path": "itambox/core/tests/test_report_hardware_inventory.py",
       "code": "E402",
       "message": "module level import not at top of file",
-      "source": "from core.reports import compile_report_context",
+      "source": "from core.reports import build_report_context",
       "context": "Module:body",
       "count": 1
     },

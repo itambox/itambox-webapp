@@ -13,7 +13,7 @@ from django.utils.translation import gettext as _
 from core.csv_utils import csv_safe, safe_csv_filename
 from core.events import send_notification_to_channel
 from core.models import EmailSettings
-from core.reports import compile_report_context, get_polished_system_html_template
+from core.reports import build_report_context, get_polished_system_html_template
 from core.tasks.context import TaskContext
 from extras.models import FileAttachment, ReportGenerationArchive, ScheduledReport
 
@@ -233,7 +233,7 @@ def _process_scheduled_report(sched, active_tenant, filter_tenants):
     archive_entry = None
     try:
         template = sched.report
-        headers, rows, summary_cards, _grouped_data, _chart_svg, context_data = compile_report_context(
+        headers, rows, summary_cards, _grouped_data, _chart_svg, context_data = build_report_context(
             template,
             active_tenant=active_tenant,
             filter_tenants=filter_tenants,
@@ -282,7 +282,7 @@ def _process_scheduled_report(sched, active_tenant, filter_tenants):
         )
         # Generation and archival completed.  Do not signal a task retry here:
         # retrying after a partial fan-out could duplicate already successful deliveries.
-        return True
+        return delivery.status != "failed"
 
     sched.last_status = "success"
     sched.save()

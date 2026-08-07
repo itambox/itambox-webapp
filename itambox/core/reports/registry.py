@@ -23,26 +23,23 @@ def register_report_provider(provider):
             existing = _registry.get(report_type)
             if existing is not None and existing is not provider:
                 raise ImproperlyConfigured(f"Duplicate report provider for {report_type!r}.")
+        for report_type in report_types:
             _registry[report_type] = provider
 
 
 def discover_report_providers():
-    """Import legacy compatibility code and optional ``<app>.reports`` modules.
+    """Import every installed application's ``reports`` module.
 
     Discovery is lazy so importing ``core.reports`` remains safe during Django
-    app loading, but it is idempotent and fails loudly on import/registration
-    errors at the first real compilation rather than silently rendering the
-    wrong report.
+    app loading, but it is idempotent and fails loudly on an import,
+    registration, or coverage error at the first real compilation rather than
+    silently rendering the wrong report.
     """
     global _discovered
     with _discovery_lock:
         if _discovered:
             return
 
-        # inline import: app-registry: discover compatibility providers after Django app loading
-        from .legacy_provider import LegacyReportProvider
-
-        register_report_provider(LegacyReportProvider())
         autodiscover_modules("reports")
 
         missing = set(PUBLIC_REPORT_TYPES) - set(_registry)

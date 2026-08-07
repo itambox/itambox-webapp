@@ -275,10 +275,10 @@ class ScheduledReportingAndAlertsTests(TestCase):
         )
 
         # Test direct compilation of context
-        from core.reports import compile_report_context
+        from core.reports import build_report_context
 
         with translation.override("en"):
-            headers, rows, summary_cards, grouped_data, chart_svg, context_data = compile_report_context(
+            headers, rows, summary_cards, grouped_data, chart_svg, context_data = build_report_context(
                 self.template, active_tenant=self.tenant
             )
 
@@ -315,7 +315,7 @@ class ScheduledReportingAndAlertsTests(TestCase):
 
     def test_new_report_types_compilation(self):
         """Test that the new report types compile context and preview successfully."""
-        from core.reports import compile_report_context
+        from core.reports import build_report_context
 
         # 1. Test asset_depreciation
         deprec_template = ReportTemplate.objects.create(
@@ -332,7 +332,7 @@ class ScheduledReportingAndAlertsTests(TestCase):
             include_summary_cards=True,
             include_distribution_chart=True,
         )
-        headers, rows, summary_cards, grouped_data, chart_svg, context_data = compile_report_context(
+        headers, rows, summary_cards, grouped_data, chart_svg, context_data = build_report_context(
             deprec_template, active_tenant=self.tenant
         )
         self.assertIn("Total Depreciable Assets", [c["label"] for c in summary_cards])
@@ -354,15 +354,15 @@ class ScheduledReportingAndAlertsTests(TestCase):
             include_summary_cards=True,
             include_distribution_chart=True,
         )
-        headers, rows, summary_cards, grouped_data, chart_svg, context_data = compile_report_context(
+        headers, rows, summary_cards, grouped_data, chart_svg, context_data = build_report_context(
             software_template, active_tenant=self.tenant
         )
         self.assertIn("Total Software Products", [c["label"] for c in summary_cards])
         self.assertIsNotNone(chart_svg)
 
-    @patch("core.tasks.reports.compile_report_context")
+    @patch("core.tasks.reports.build_report_context")
     def test_pre_archive_failure_preserves_status(self, mock_compile):
-        """compile_report_context raising before archive_entry is assigned must
+        """build_report_context raising before archive_entry is assigned must
         preserve the original failure — no UnboundLocalError."""
         from core.tasks import generate_scheduled_report_task
         from organization.models import Tenant
@@ -514,10 +514,10 @@ class ReportCrossTenantPermissionTests(TestCase):
 
     def test_no_active_tenant_without_permission_raises_permission_denied(self):
         """Non-holder + empty filter_tenants + no active_tenant → PermissionDenied."""
-        from core.reports import compile_report_context
+        from core.reports import build_report_context
 
         with self.assertRaises(PermissionError):
-            compile_report_context(self.template, active_tenant=None, filter_tenants=None)
+            build_report_context(self.template, active_tenant=None, filter_tenants=None)
 
     def test_non_holder_with_active_tenant_falls_back_to_single_tenant(self):
         """Non-holder + empty filter_tenants + active_tenant → single-tenant."""
@@ -525,7 +525,7 @@ class ReportCrossTenantPermissionTests(TestCase):
         # lacks the cross-tenant permission and active_tenant is present.
         filter_tenants = None
         active_tenant = self.tenant_a
-        # Simulate what compile_report_context does with those inputs
+        # Simulate what build_report_context does with those inputs
         if not filter_tenants:
             user = self.user
             if user is not None and user.has_perm("reports.view_cross_tenant_reports"):

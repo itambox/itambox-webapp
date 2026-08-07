@@ -3,7 +3,7 @@
 Mirrors the conventions in core/tests/test_report_tenant_scoping.py:
   - TenantTestMixin for tenant setup
   - model_bakery for object creation
-  - compile_report_context called with explicit active_tenant (ambient context cleared)
+  - build_report_context called with explicit active_tenant (ambient context cleared)
   - asserts on row content, summary card values, and that a non-USD money cell
     does NOT start with '$'
 """
@@ -16,7 +16,7 @@ from model_bakery import baker
 
 from assets.models import Asset, StatusLabel
 from assets.models.catalog import Supplier
-from core.reports import compile_report_context
+from core.reports import build_report_context
 from core.tests.mixins import TenantTestMixin
 from extras.models import ReportTemplate
 from organization.models import Tenant
@@ -104,7 +104,7 @@ class ContractRenewalsReportTests(TenantTestMixin, TestCase):
     def test_row_content_and_tenant_isolation(self):
         """Rows contain only the active tenant's contracts; row fields match model data."""
         self.clear_tenant_context()
-        _, rows, summary_cards, grouped_data, chart_svg, context_data = compile_report_context(
+        _, rows, summary_cards, grouped_data, chart_svg, context_data = build_report_context(
             self.template, active_tenant=self.tenant
         )
 
@@ -125,7 +125,7 @@ class ContractRenewalsReportTests(TenantTestMixin, TestCase):
     def test_money_cell_not_dollar_prefixed_for_eur(self):
         """A EUR contract cost must NOT start with '$'."""
         self.clear_tenant_context()
-        _, rows, *_ = compile_report_context(self.template, active_tenant=self.tenant)
+        _, rows, *_ = build_report_context(self.template, active_tenant=self.tenant)
 
         row_001 = next(r for r in rows if r.get("Contract #") == "CTR-001")
         cost_value = row_001.get("Contract Cost", "")
@@ -137,7 +137,7 @@ class ContractRenewalsReportTests(TenantTestMixin, TestCase):
     def test_summary_cards_active_and_expiring_counts(self):
         """Summary cards reflect total active contracts and the expiring-soon count."""
         self.clear_tenant_context()
-        _, _, summary_cards, *_ = compile_report_context(self.template, active_tenant=self.tenant)
+        _, _, summary_cards, *_ = build_report_context(self.template, active_tenant=self.tenant)
 
         labels = {c["label"]: c["value"] for c in summary_cards}
         self.assertIn("Active Contracts", labels)
@@ -152,7 +152,7 @@ class ContractRenewalsReportTests(TenantTestMixin, TestCase):
     def test_annual_spend_card_not_dollar_for_eur(self):
         """The Est. Annual Spend summary card must not start with '$' for EUR-only data."""
         self.clear_tenant_context()
-        _, _, summary_cards, *_ = compile_report_context(self.template, active_tenant=self.tenant)
+        _, _, summary_cards, *_ = build_report_context(self.template, active_tenant=self.tenant)
         labels = {c["label"]: c["value"] for c in summary_cards}
         spend_value = labels.get("Est. Annual Spend", "")
         self.assertNotEqual(spend_value, "", "Annual spend card must have a value")
@@ -163,13 +163,13 @@ class ContractRenewalsReportTests(TenantTestMixin, TestCase):
     def test_chart_svg_generated(self):
         """A distribution chart is produced when include_distribution_chart is True."""
         self.clear_tenant_context()
-        _, _, _, _, chart_svg, _ = compile_report_context(self.template, active_tenant=self.tenant)
+        _, _, _, _, chart_svg, _ = build_report_context(self.template, active_tenant=self.tenant)
         self.assertTrue(chart_svg and len(chart_svg) > 0, "Expected a non-empty chart SVG string")
 
     def test_mock_fallback_when_no_contracts(self):
         """When no contracts match the tenant the mock fallback row is returned."""
         empty_tenant = Tenant.objects.create(name="EmptyTenant", slug="contract-empty")
-        _, rows, summary_cards, *_ = compile_report_context(self.template, active_tenant=empty_tenant)
+        _, rows, summary_cards, *_ = build_report_context(self.template, active_tenant=empty_tenant)
         self.assertEqual(len(rows), 1)
         # Mock row sentinel value.
         self.assertEqual(rows[0].get("Contract #"), "CTR-MOCK-001")
