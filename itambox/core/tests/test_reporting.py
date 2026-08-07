@@ -9,10 +9,12 @@ from django_q.models import Schedule
 
 from core.tasks.reports import (
     _archive_report_output,
+    _deliver_report_channels,
     _deliver_report_email,
     _DeliveryOutcome,
     _render_report_output,
     _ReportOutput,
+    _resolve_report_recipients,
     _resolve_report_scope,
 )
 from extras.models import NotificationChannel, ReportGenerationArchive, ReportTemplate, ScheduledReport
@@ -191,6 +193,66 @@ class ScheduledReportingAndAlertsTests(TestCase):
         self.assertEqual(outcome.status, "failed")
         self.assertEqual(outcome.attempted, 2)
         self.assertEqual(outcome.succeeded, 0)
+
+    def test_delivery_outcome_tracks_success_and_partial(self):
+        outcome = _DeliveryOutcome()
+        self.assertEqual(outcome.status, "success")
+        outcome.record_success()
+        outcome.record_failure("one channel failed")
+        self.assertEqual(outcome.status, "partial")
+        self.assertEqual(outcome.attempted, 2)
+        self.assertEqual(outcome.succeeded, 1)
+
+        merged = _DeliveryOutcome()
+        merged.merge(outcome)
+        self.assertEqual(merged.status, "partial")
+        self.assertEqual(merged.attempted, 2)
+
+    def test_deliver_report_email_returns_false_without_recipients(self):
+        sched = ScheduledReport.objects.create(
+            name="No Recipient Schedule",
+            report=self.template,
+            tenant=self.tenant,
+            frequency="once",
+            format=ScheduledReport.FORMAT_HTML,
+            save_to_archive=False,
+        )
+        self.assertEqual(_resolve_report_recipients(sched), [])
+        self.assertFalse(_deliver_report_email(sched, self.template, _ReportOutput(email_body="body")))
+
+    def test_deliver_report_channels_skips_disabled_channels(self):
+        disabled_channel = NotificationChannel.objects.create(
+            name="Disabled Report Channel",
+            channel_type=NotificationChannel.TYPE_SLACK,
+            enabled=False,
+            tenant=self.tenant,
+        )
+        sched = ScheduledReport.objects.create(
+            name="Disabled Channel Schedule",
+            report=self.template,
+            tenant=self.tenant,
+            frequency="once",
+            format=ScheduledReport.FORMAT_HTML,
+        )
+        sched.channels.add(disabled_channel)
+        with patch("core.tasks.reports.send_notification_to_channel") as send_channel:
+            outcome = _deliver_report_channels(sched, [], 0)
+            send_channel.assert_not_called()
+        self.assertEqual(outcome.status, "success")
+
+    def test_notify_report_channels_alias_stays_compatible(self):
+        sched = ScheduledReport.objects.create(
+            name="Alias Schedule",
+            report=self.template,
+            tenant=self.tenant,
+            frequency="once",
+            format=ScheduledReport.FORMAT_HTML,
+        )
+        with patch("core.tasks.reports.send_notification_to_channel", return_value=True):
+            from core.tasks.reports import _notify_report_channels
+
+            outcome = _notify_report_channels(sched, [], 0)
+        self.assertEqual(outcome.status, "success")
 
     @override_settings(REPORT_DESIGNER_ENABLED=True)
     def test_report_preview_compilation_and_view(self):
