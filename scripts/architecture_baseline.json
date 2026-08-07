@@ -1656,7 +1656,7 @@
       "owner": "area:operations",
       "removal_issue": 83,
       "removal_direction": "Move currency formatting behind a non-presentation report formatting service during the remaining provider extraction.",
-      "accepted_reason": "Temporary compatibility provider for issue #83; extract the remaining domain branches into app-owned providers."
+      "accepted_reason": "Currency formatting remains a deliberate platform-to-presentation dependency until the shared money template filter is moved behind a platform-owned formatting boundary."
     },
     {
       "id": "R-S2|core.tasks.csv_import|itambox.views.__init__|function-body",

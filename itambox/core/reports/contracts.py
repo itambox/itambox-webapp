@@ -63,8 +63,8 @@ class ReportDefinition:
 
     A provider owns one report identifier end to end: which records it reads,
     how a row and a summary card render, and what the report shows while its
-    scope is still empty.  Every declaration here is used — ``permission``
-    names the model permission the report's data belongs to, ``tenant_field``
+    scope is still empty. Permission declarations are retained as domain
+    metadata for audit and future authorization surfaces; ``tenant_field``
     and ``allow_global_tenant`` are the tenant policy :meth:`scope_to_tenants`
     applies, and ``cells`` is both a row's content and its column order.
 
@@ -111,7 +111,7 @@ class ReportDefinition:
         return tuple(template.included_columns or self.default_columns)
 
     def required_permissions(self) -> tuple[str, ...]:
-        """Return the permissions a caller must hold to read this report."""
+        """Return the permissions declared by this provider's metadata."""
         if isinstance(self.permission, str):
             return (self.permission,)
         return tuple(self.permission)

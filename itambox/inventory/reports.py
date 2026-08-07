@@ -83,7 +83,6 @@ class HardwareInventoryReportProvider(ReportDefinition):
     }
 
     sample_cells = {
-        "hw_item_type": _("Accessory"),
         "hw_name": "USB-C Dock (Mock)",
         "hw_manufacturer": "Dell",
         "hw_category": "Docking",
@@ -145,12 +144,12 @@ class HardwareInventoryReportProvider(ReportDefinition):
     def build_rows(self, records, request: ReportRequest):
         return [self.row_for(entry, request) for entry in records]
 
-    def build_summary(self, queryset, request: ReportRequest):
-        catalogues = tuple(queryset)
+    def build_summary(self, catalogues, request: ReportRequest):
+        catalogues = tuple(catalogues)
         return self._summary_cards(self._sku_counts(catalogues), self._catalogue_records(catalogues), request)
 
-    def build_chart(self, queryset, records, request: ReportRequest):
-        return self._chart(self._sku_counts(tuple(queryset)), request)
+    def build_chart(self, catalogues, records, request: ReportRequest):
+        return self._chart(self._sku_counts(tuple(catalogues)), request)
 
     def group_key(self, record, request: ReportRequest):
         # Without a supported grouping the rows fall back to their own
@@ -166,7 +165,8 @@ class HardwareInventoryReportProvider(ReportDefinition):
     def sample_row(self, request: ReportRequest):
         # The sample is one accessory, so it groups under that catalogue
         # whichever grouping the template selected.
-        return sample_report_row(self.sample_cells, request.columns, _("Accessory"))
+        cells = {**self.sample_cells, "hw_item_type": _("Accessory")}
+        return sample_report_row(cells, request.columns, _("Accessory"))
 
     def _summary_cards(self, sku_counts, records, request: ReportRequest):
         if not request.template.include_summary_cards:
