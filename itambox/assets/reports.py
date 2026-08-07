@@ -6,7 +6,7 @@ from django.utils.translation import gettext as _
 from assets.models import Asset
 from core.reports.charts import generate_doughnut_chart
 from core.reports.contracts import ReportDefinition, ReportRequest, ReportResult
-from core.reports.legacy import _format_per_currency, _money, _record_currency
+from core.reports.formatting import _format_per_currency, _money, _record_currency
 from core.reports.registry import register_report_provider
 
 

@@ -1,6 +1,5 @@
 import datetime
 from datetime import timedelta
-from types import SimpleNamespace
 
 from django.contrib.contenttypes.models import ContentType
 from django.db.models import Count, Q, Sum
@@ -10,43 +9,7 @@ from django.utils.translation import gettext as _
 from itambox.middleware import get_current_user
 
 from .charts import generate_bar_chart, generate_doughnut_chart
-
-
-def _record_currency(record_currency, active_tenant):
-    """Resolve a money record's currency: its own currency, else the active tenant's, else
-    the configured default. Mirrors the subscription-renewals branch's _resolve_currency."""
-    code = (record_currency or "").upper()
-    if code:
-        return code
-    if active_tenant is not None and getattr(active_tenant, "currency", None):
-        return active_tenant.currency.upper()
-    from django.conf import settings as _settings
-
-    return (getattr(_settings, "ITAMBOX_DEFAULT_CURRENCY", "EUR") or "EUR").upper()
-
-
-def _format_per_currency(amount_by_currency):
-    """Render a {currency: amount} mapping as ONE money figure per currency joined with
-    ' · '. There is no FX source, so amounts in different currencies are NEVER summed into a
-    single (meaningless) total. Mirrors the subscription-renewals spend card."""
-    from extras.templatetags.money import money as _money_fmt
-
-    items = sorted(amount_by_currency.items(), key=lambda kv: kv[1], reverse=True)
-    return " · ".join(_money_fmt(amount, SimpleNamespace(currency=cur)) for cur, amount in items) or _money_fmt(0, None)
-
-
-def _money(amount, currency_value, active_tenant):
-    """Render ONE money grid cell in the record's resolved currency (its own
-    currency, else the active tenant's, else the configured default) via the
-    money templatetag — never a hardcoded '$'. Returns '-' for a missing amount.
-    Mirrors the per-currency summary-card path (_record_currency/_format_per_currency)."""
-    if amount is None:
-        return "-"
-
-    from extras.templatetags.money import money as _money_fmt
-
-    code = _record_currency(currency_value, active_tenant)
-    return _money_fmt(amount, SimpleNamespace(currency=code))
+from .formatting import _format_per_currency, _money, _record_currency
 
 
 def compile_legacy_report_context(template, active_tenant=None, filter_tenants=None):
