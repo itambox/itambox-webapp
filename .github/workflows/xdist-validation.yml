@@ -183,6 +183,10 @@ jobs:
       # tests the parallel lane is not allowed to touch. Its report is smaller
       # than the executed-count ratchet in check_test_report.py, so it is
       # certified by the combined matrix gate instead, not by that script.
+      # --cov-fail-under=0: the fail_under=70 from [tool.coverage] applies per
+      # pytest invocation, and this 23-test lane alone can never reach it
+      # (~37% measured on the 20-iteration run); the combined-ratchet step
+      # below checks the whole-suite coverage instead.
       - name: Run the serial-only lane
         id: serial
         working-directory: ./itambox
@@ -197,6 +201,7 @@ jobs:
             --create-db \
             -m serial_only \
             --cov=. \
+            --cov-fail-under=0 \
             --cov-config=../pyproject.toml \
             --cov-report=term-missing:skip-covered \
             --cov-report=json:../artifacts/coverage-serial-only.json \
