@@ -135,6 +135,29 @@ class ReportCurrencyFormattingTests(SimpleTestCase):
         self.assertIn("42", formatted)
 
 
+class ReportProviderEmptyScopeTests(TenantTestMixin, TestCase):
+    def setUp(self):
+        self.setup_tenant_context(name="Empty Provider Tenant", slug="empty-provider-tenant")
+
+    def test_every_provider_handles_an_empty_tenant_scope(self):
+        for report_type in PUBLIC_REPORT_TYPES:
+            with self.subTest(report_type=report_type):
+                provider = get_report_provider(report_type)
+                template = ReportTemplate(
+                    name=f"Empty {report_type}",
+                    report_type=report_type,
+                    included_columns=list(provider.default_columns),
+                    include_summary_cards=True,
+                    include_distribution_chart=True,
+                )
+                with self.tenant_context(self.tenant):
+                    _headers, rows, summary_cards, _grouped, _chart, _context = build_report_context(
+                        template, active_tenant=self.tenant
+                    )
+                self.assertTrue(rows)
+                self.assertTrue(summary_cards)
+
+
 class AssetSummaryReportProviderTests(TenantTestMixin, TestCase):
     def setUp(self):
         self.setup_tenant_context(name="Provider Tenant", slug="provider-tenant")
