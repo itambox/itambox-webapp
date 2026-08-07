@@ -32,6 +32,31 @@ class ReportProviderContractTests(SimpleTestCase):
         provider = get_report_provider("asset_summary")
         self.assertIsInstance(provider, ReportDefinition)
 
+    def test_every_provider_builds_a_complete_sample_result(self):
+        for report_type in PUBLIC_REPORT_TYPES:
+            with self.subTest(report_type=report_type):
+                provider = get_report_provider(report_type)
+                columns = tuple(provider.default_columns)
+                template = ReportTemplate(
+                    name=f"Sample {report_type}",
+                    report_type=report_type,
+                    included_columns=list(columns),
+                    include_summary_cards=True,
+                    include_distribution_chart=True,
+                )
+                request = ReportRequest(
+                    template=template,
+                    active_tenant=None,
+                    filter_tenants=(),
+                    columns=columns,
+                    user=None,
+                    as_of=datetime.datetime(2026, 1, 1, tzinfo=datetime.timezone.utc),
+                )
+                result = provider.build_sample(request)
+                self.assertTrue(result.rows)
+                self.assertTrue(result.summary_cards)
+                self.assertIsInstance(result.chart_svg, str)
+
     def test_registry_rejects_duplicate_registration(self):
         get_registered_report_types()
 
