@@ -264,10 +264,13 @@ def _process_scheduled_report(sched, active_tenant, filter_tenants):
 
     delivery.merge(_deliver_report_channels(sched, summary_cards, len(rows)))
     if delivery.failures:
+        delivery_detail = "\n".join(delivery.failures)
         if archive_entry:
-            archive_entry.error_message = "\n".join(delivery.failures)
+            archive_entry.error_message = delivery_detail
             archive_entry.save(update_fields=["error_message"])
-        sched.last_status = delivery.status
+            sched.last_status = delivery.status
+        else:
+            sched.last_status = f"delivery_{delivery.status}: {delivery_detail}"[:50]
         sched.save()
         logger.warning(
             "Scheduled report '%s' completed with delivery status '%s': %s",

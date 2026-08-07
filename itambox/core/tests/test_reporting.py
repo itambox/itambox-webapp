@@ -2,6 +2,7 @@ from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
 
 from django.contrib.auth import get_user_model
+from django.contrib.messages import get_messages
 from django.core.exceptions import ValidationError
 from django.test import TestCase, override_settings
 from django.urls import reverse
@@ -300,6 +301,27 @@ class ScheduledReportingAndAlertsTests(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, reverse("extras:reporttemplate_list"))
 
+    @patch("core.tasks.generate_scheduled_report_task", return_value=False)
+    def test_trigger_reports_delivery_failure_after_successful_generation(self, mock_generate):
+        sched = ScheduledReport.objects.create(
+            name="Delivery Failure UI",
+            report=self.template,
+            tenant=self.tenant,
+            frequency="once",
+            format=ScheduledReport.FORMAT_HTML,
+            save_to_archive=False,
+        )
+        sched.last_status = "delivery_failed: slack down"
+        sched.save(update_fields=["last_status"])
+        self.client.force_login(self.user)
+
+        response = self.client.post(reverse("extras:scheduledreport_trigger", kwargs={"pk": sched.pk}))
+
+        self.assertEqual(response.status_code, 302)
+        self.assertTrue(mock_generate.called)
+        rendered_messages = [str(message) for message in get_messages(response.wsgi_request)]
+        self.assertTrue(any("all deliveries failed" in message for message in rendered_messages))
+
     def test_new_report_types_compilation(self):
         """Test that the new report types compile context and preview successfully."""
         from core.reports import build_report_context
@@ -527,7 +549,7 @@ class ScheduledReportingAndAlertsTests(TestCase):
             last_status="",
             save=MagicMock(),
         )
-        archive = MagicMock()
+        archive = None
         output = _ReportOutput(email_body="body")
         with (
             patch("core.tasks.reports.build_report_context", return_value=([], [], [], {}, "", {})),
@@ -540,8 +562,8 @@ class ScheduledReportingAndAlertsTests(TestCase):
             success = _process_scheduled_report(sched, self.tenant, [])
 
         self.assertFalse(success)
-        self.assertEqual(sched.last_status, "failed")
-        self.assertIn("delivery returned false", archive.error_message)
+        self.assertTrue(sched.last_status.startswith("delivery_failed:"))
+        self.assertIn("delivery returned false", sched.last_status)
 
 
 class ReportCrossTenantPermissionTests(TestCase):

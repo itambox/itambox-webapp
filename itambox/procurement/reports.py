@@ -2,6 +2,7 @@
 
 from datetime import timedelta
 
+from django.utils import timezone
 from django.utils.translation import gettext as _
 
 from core.reports.charts import generate_bar_chart
@@ -93,7 +94,9 @@ class ContractRenewalsReportProvider(ReportDefinition):
         "contract_renewal_date": lambda record, request: (
             record.renewal_date.strftime("%Y-%m-%d") if record.renewal_date else "-"
         ),
-        "contract_days_until_expiry": lambda record, request: str(record.days_until_expiry),
+        "contract_days_until_expiry": lambda record, request: (
+            str((record.end_date - timezone.localdate(request.as_of)).days) if record.end_date else "-"
+        ),
         "contract_cost": lambda record, request: _money(
             record.cost, getattr(record, "currency", None), request.active_tenant
         ),
@@ -150,7 +153,7 @@ class ContractRenewalsReportProvider(ReportDefinition):
         return [self.row_for(record, request) for record in records]
 
     def _summary_from_spend(self, queryset, request: ReportRequest, by_currency):
-        today = request.as_of.date()
+        today = timezone.localdate(request.as_of)
         active_contracts = queryset.filter(status="active")
         expiring_soon = active_contracts.filter(
             end_date__gte=today, end_date__lte=today + timedelta(days=CONTRACT_SOON_DAYS)

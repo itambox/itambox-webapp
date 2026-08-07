@@ -83,7 +83,7 @@ class HardwareInventoryReportProvider(ReportDefinition):
     }
 
     sample_cells = {
-        "hw_item_type": "Accessory",
+        "hw_item_type": _("Accessory"),
         "hw_name": "USB-C Dock (Mock)",
         "hw_manufacturer": "Dell",
         "hw_category": "Docking",
@@ -153,7 +153,7 @@ class HardwareInventoryReportProvider(ReportDefinition):
     def sample_row(self, request: ReportRequest):
         # The sample is one accessory, so it groups under that catalogue
         # whichever grouping the template selected.
-        return sample_report_row(self.sample_cells, request.columns, "Accessory")
+        return sample_report_row(self.sample_cells, request.columns, _("Accessory"))
 
     def _summary_cards(self, sku_counts, records, request: ReportRequest):
         if not request.template.include_summary_cards:

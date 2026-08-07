@@ -916,14 +916,24 @@ class ReportTriggerImmediateView(PermissionRequiredMixin, LoginRequiredMixin, Vi
         sched.refresh_from_db()
         archive = sched.archives.first()
         status = sched.last_status or ""
-        if status.startswith("failed:"):
+        _status_kind, _separator, status_detail = status.partition(":")
+        status_detail = status_detail.strip()
+        if status.startswith("delivery_") and status_detail:
+            delivery_detail = status_detail
+        elif status.startswith("failed:"):
             delivery_detail = status
         else:
             delivery_detail = (archive.error_message if archive else "") or status or _("Check logs.")
-        if success and sched.last_status == "partial":
+        if status == "partial" or status.startswith("delivery_partial:"):
             messages.warning(
                 request,
                 _("Scheduled report '%(name)s' was generated but delivered only partially: %(error)s")
+                % {"name": sched.name, "error": delivery_detail},
+            )
+        elif status == "failed" or status.startswith("delivery_failed:"):
+            messages.error(
+                request,
+                _("Scheduled report '%(name)s' was generated but all deliveries failed: %(error)s")
                 % {"name": sched.name, "error": delivery_detail},
             )
         elif success:
