@@ -165,10 +165,13 @@ class IntuneTransportContractTests(TestCase):
     def test_next_link_cannot_redirect_bearer_to_another_host(self, mock_get):
         mock_get.return_value = response(
             200,
-            json_data={"value": [], "@odata.nextLink": "https://evil.example/steal"},
+            json_data={"value": [], "@odata.nextLink": "https://user:secret@evil.example/steal"},
         )
 
-        with pytest.raises(IntegrationUntrustedNextLinkError):
+        with (
+            patch("core.integrations.intune.logger.error") as log_error,
+            pytest.raises(IntegrationUntrustedNextLinkError),
+        ):
             _graph_get_paginated(
                 "https://graph.microsoft.com/v1.0/devices",
                 {"Authorization": "Bearer secret"},
@@ -176,6 +179,8 @@ class IntuneTransportContractTests(TestCase):
             )
 
         assert mock_get.call_count == 1
+        assert "secret" not in str(log_error.call_args)
+        assert log_error.call_args.kwargs["extra"]["integration"]["object_id"] == "evil.example"
 
     @patch("core.integrations.intune.time.sleep")
     @patch("core.integrations.intune.requests.get")
