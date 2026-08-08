@@ -25,3 +25,38 @@ test('scanner camera errors are assertive live regions', () => {
     assert.match(source, /scanner-error[\s\S]*?role="alert"[\s\S]*?aria-live="assertive"[\s\S]*?aria-atomic="true"/, relativePath);
   }
 });
+
+const basketScannerContracts = [
+  {
+    path: 'static/src/scan-basket.ts',
+    readerId: 'basket-scanner-reader',
+    modalId: 'basket-scanner-modal',
+    openId: 'basket-open-scanner-btn',
+    closeId: 'basket-close-scanner-btn',
+    torchId: 'basket-toggle-torch-btn',
+  },
+  {
+    path: 'static/src/audit-basket.ts',
+    readerId: 'audit-scanner-reader',
+    modalId: 'audit-scanner-modal',
+    openId: 'audit-open-scanner-btn',
+    closeId: 'audit-close-scanner-btn',
+    torchId: 'audit-toggle-torch-btn',
+  },
+];
+
+test('basket entrypoints wire camera and keyboard paths separately', () => {
+  for (const contract of basketScannerContracts) {
+    const source = readFileSync(resolve(itamboxRoot, contract.path), 'utf8');
+    assert.match(source, /import \{ AssetScanner \} from ['"]\.\/scanner['"];?/, contract.path);
+    assert.match(source, /new AssetScanner\(\{/, contract.path);
+    assert.match(source, new RegExp(`readerId: '${contract.readerId}'`), contract.path);
+    assert.match(source, new RegExp(`modalId: '${contract.modalId}'`), contract.path);
+    assert.match(source, new RegExp(`openBtnId: '${contract.openId}'`), contract.path);
+    assert.match(source, new RegExp(`closeBtnId: '${contract.closeId}'`), contract.path);
+    assert.match(source, new RegExp(`torchId: '${contract.torchId}'`), contract.path);
+    assert.match(source, /onResult\(code: string\)[\s\S]*?return addByCode\(code\);/, contract.path);
+    assert.match(source, /addEventListener\('keydown'/, contract.path);
+    assert.match(source, /event\.key !== 'Enter'/, contract.path);
+  }
+});
