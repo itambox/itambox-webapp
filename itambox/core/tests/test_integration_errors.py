@@ -6,7 +6,6 @@ import pytest
 from core.errors import (
     FailureDisposition,
     IntegrationAuthenticationError,
-    IntegrationConfigurationError,
     IntegrationContext,
     IntegrationContractError,
     IntegrationRateLimitedError,
@@ -102,11 +101,29 @@ class IntuneTransportContractTests(TestCase):
         mock_get.return_value = response(403, json_data={"error": {"message": "sensitive provider detail"}})
 
         with pytest.raises(IntegrationAuthenticationError) as raised:
-            _graph_get_paginated("https://graph.example/devices", {"Authorization": "Bearer secret"}, context=CONTEXT)
+            _graph_get_paginated(
+                "https://graph.microsoft.com/v1.0/devices", {"Authorization": "Bearer secret"}, context=CONTEXT
+            )
 
         assert raised.value.disposition is FailureDisposition.TERMINAL
         assert "sensitive provider detail" not in str(raised.value)
         assert "Bearer secret" not in str(raised.value)
+
+    @patch("core.integrations.intune.requests.get")
+    def test_next_link_cannot_redirect_bearer_to_another_host(self, mock_get):
+        mock_get.return_value = response(
+            200,
+            json_data={"value": [], "@odata.nextLink": "https://evil.example/steal"},
+        )
+
+        with pytest.raises(IntegrationContractError):
+            _graph_get_paginated(
+                "https://graph.microsoft.com/v1.0/devices",
+                {"Authorization": "Bearer secret"},
+                context=CONTEXT,
+            )
+
+        assert mock_get.call_count == 1
 
     @patch("core.integrations.intune.time.sleep")
     @patch("core.integrations.intune.requests.get")
@@ -120,7 +137,7 @@ class IntuneTransportContractTests(TestCase):
 
         with pytest.raises(IntegrationRetryBudgetExceededError) as raised:
             _graph_get_paginated(
-                "https://graph.example/devices",
+                "https://graph.microsoft.com/v1.0/devices",
                 {"Authorization": "Bearer secret"},
                 context=CONTEXT,
                 budget=budget,
@@ -137,7 +154,7 @@ class IntuneTransportContractTests(TestCase):
         mock_get.side_effect = requests.ConnectionError("Bearer secret and response payload")
 
         with pytest.raises(IntegrationUnavailableError) as raised:
-            _graph_get_paginated("https://graph.example/devices", {}, context=CONTEXT)
+            _graph_get_paginated("https://graph.microsoft.com/v1.0/devices", {}, context=CONTEXT)
 
         assert raised.value.disposition is FailureDisposition.RETRYABLE
         assert "Bearer secret" not in str(raised.value)
@@ -149,7 +166,7 @@ class IntuneTransportContractTests(TestCase):
 
         with pytest.raises(IntegrationRateLimitedError) as raised:
             _graph_get_paginated(
-                "https://graph.example/devices",
+                "https://graph.microsoft.com/v1.0/devices",
                 {},
                 context=CONTEXT,
                 budget=budget,
@@ -167,14 +184,14 @@ class IntuneTransportContractTests(TestCase):
 
         assert raised.value.disposition is FailureDisposition.RETRYABLE
         assert raised.value.user_visible is False
-        assert raised.value.retry_after == 3600
+        assert raised.value.retry_after == 300
 
     @patch("core.integrations.intune.requests.get")
     def test_graph_server_failure_is_retryable(self, mock_get):
         mock_get.return_value = response(503, json_data={"error": {"message": "do-not-leak"}})
 
         with pytest.raises(IntegrationUnavailableError) as raised:
-            _graph_get_paginated("https://graph.example/devices", {}, context=CONTEXT)
+            _graph_get_paginated("https://graph.microsoft.com/v1.0/devices", {}, context=CONTEXT)
 
         assert raised.value.disposition is FailureDisposition.RETRYABLE
         assert "do-not-leak" not in str(raised.value)
@@ -190,18 +207,25 @@ class IntuneTransportContractTests(TestCase):
         ]
         budget = RetryBudget(max_attempts=1, max_elapsed_seconds=60, max_delay_seconds=30)
 
-        assert _graph_get_paginated("https://graph.example/one", {}, context=CONTEXT, budget=budget) == []
+        assert _graph_get_paginated("https://graph.microsoft.com/v1.0/one", {}, context=CONTEXT, budget=budget) == []
         with pytest.raises(IntegrationRetryBudgetExceededError):
-            _graph_get_paginated("https://graph.example/two", {}, context=CONTEXT, budget=budget)
+            _graph_get_paginated("https://graph.microsoft.com/v1.0/two", {}, context=CONTEXT, budget=budget)
 
         assert mock_get.call_count == 3
         assert [call.args[0] for call in mock_sleep.call_args_list] == [1]
 
     @patch("core.integrations.intune._graph_get_paginated", return_value=[])
     @patch.object(IntuneClient, "_headers", return_value={})
-    def test_client_passes_operation_context_and_shared_budget(self, mock_headers, mock_graph):
-        budget = RetryBudget(max_attempts=2)
-        client = IntuneClient("azure-tenant", "client-id", "client-secret", context=CONTEXT, retry_budget=budget)
+    def test_client_uses_an_operation_scoped_budget(self, mock_headers, mock_graph):
+        budgets = [RetryBudget(max_attempts=2), RetryBudget(max_attempts=2)]
+        budget_factory = MagicMock(side_effect=budgets)
+        client = IntuneClient(
+            "azure-tenant",
+            "client-id",
+            "client-secret",
+            context=CONTEXT,
+            retry_budget_factory=budget_factory,
+        )
 
         client.get_managed_devices()
         client.get_detected_apps("device-1")
@@ -210,8 +234,9 @@ class IntuneTransportContractTests(TestCase):
         second_context = mock_graph.call_args_list[1].kwargs["context"]
         assert first_context.operation == "devices.list"
         assert second_context.operation == "device_apps.list"
-        assert mock_graph.call_args_list[0].kwargs["budget"] is budget
-        assert mock_graph.call_args_list[1].kwargs["budget"] is budget
+        assert mock_graph.call_args_list[0].kwargs["budget"] is budgets[0]
+        assert mock_graph.call_args_list[1].kwargs["budget"] is budgets[1]
+        assert budget_factory.call_count == 2
         mock_headers.assert_called()
 
     @patch("core.integrations.intune._graph_get_paginated")

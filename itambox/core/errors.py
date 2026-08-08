@@ -7,9 +7,12 @@ provider SDK or inspecting remote exception text.
 
 from __future__ import annotations
 
+import math
 from dataclasses import dataclass
 from enum import StrEnum
 from typing import Any
+
+MAX_RETRY_AFTER_SECONDS = 300.0
 
 
 class FailureDisposition(StrEnum):
@@ -60,6 +63,8 @@ class RetryBudget:
             delay = float(delay)
         except (TypeError, ValueError):
             delay = self.default_delay_seconds
+        if not math.isfinite(delay):
+            delay = self.default_delay_seconds
         delay = max(0.0, min(delay, self.max_delay_seconds, remaining_seconds))
         self.attempts += 1
         return delay
@@ -82,7 +87,15 @@ class IntegrationError(Exception):
     ) -> None:
         self.context = context
         self.status_code = status_code
-        self.retry_after = retry_after
+        try:
+            safe_retry_after = float(retry_after) if retry_after is not None else None
+        except (TypeError, ValueError):
+            safe_retry_after = None
+        self.retry_after = (
+            max(0.0, min(safe_retry_after, MAX_RETRY_AFTER_SECONDS))
+            if safe_retry_after is not None and math.isfinite(safe_retry_after)
+            else None
+        )
         # The sole Exception argument is a constant safe message.  Remote
         # URLs, headers, payloads and exception strings never enter __str__.
         super().__init__(self.user_message)

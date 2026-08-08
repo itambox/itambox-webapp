@@ -26,7 +26,8 @@ The shared types live in the dependency-free `core.errors` module:
 - `IntegrationAuthenticationError` — terminal provider authentication;
 - `IntegrationConfigurationError` — terminal local/provider configuration;
 - `IntegrationUnavailableError` — retryable transport/5xx failure;
-- `IntegrationRateLimitedError` — retryable in-budget rate limiting;
+- `IntegrationRateLimitedError` — retryable in-budget rate limiting; its
+  provider delay is finite, non-negative and capped at 300 seconds;
 - `IntegrationRetryBudgetExceededError` — terminal for the current bounded
   invocation after rate-limit budget exhaustion;
 - `IntegrationContractError` — terminal malformed/unexpected success response;
@@ -45,10 +46,12 @@ string.
 
 The Microsoft Graph adapter retries only transport failures/5xx as classified
 retryable for the caller and handles HTTP 429 with a finite per-operation
-`RetryBudget`. Both retry count and elapsed wall-clock time are bounded, and
-provider `Retry-After` is parsed defensively and clamped before sleeping. The
-adapter does not re-enqueue a django-q job in this slice; queue re-enqueue is a
-separate follow-up decision.
+`RetryBudget` (not shared across devices). Both retry count and elapsed wall-clock
+time are bounded, and provider `Retry-After` is parsed defensively, made finite,
+and clamped before sleeping. Graph pagination accepts only HTTPS
+`graph.microsoft.com/v1.0/...` next links, so provider-controlled redirects
+cannot receive the bearer header. The adapter does not re-enqueue a django-q job
+in this slice; queue re-enqueue is a separate follow-up decision.
 
 HTTP 401/403, 404 and other 4xx responses are terminal. A successful response
 without valid JSON/value or an OAuth response without a non-empty
@@ -63,10 +66,12 @@ does not use `logger.exception` while provider credential locals may still be
 present. OAuth and Graph request frames are marked with Django's
 `sensitive_variables()` and transport exceptions are chained from `None` so a
 credential-bearing requests frame is not retained as the public cause. The
-optional detected-app endpoint is intentionally non-critical:
-asset discovery remains available when that endpoint fails, but the typed
-failure is logged with the `device_apps.list` operation and tested. This is a
-capability fallback, not permission/authentication fallback.
+The optional detected-app endpoint is intentionally non-critical:
+asset discovery remains available when an ordinary retryable provider failure
+hits that endpoint, but authentication and configuration failures are re-raised
+and fail the sync. A 401 evicts only the affected Azure tenant's cached token.
+The typed failure is logged with the `device_apps.list` operation and tested.
+This is a capability fallback, not permission/authentication fallback.
 
 ## Follow-up boundaries
 

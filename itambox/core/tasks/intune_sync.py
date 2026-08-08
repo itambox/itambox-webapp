@@ -21,17 +21,27 @@ from django.utils import timezone
 
 from core.context import get_current_request_id
 from core.errors import (
+    IntegrationAuthenticationError,
     IntegrationConfigurationError,
     IntegrationContext,
     IntegrationError,
     IntegrationUnexpectedError,
-    RetryBudget,
 )
 from core.integrations.intune import IntuneClient
 from core.models import Job
 from core.tasks.context import TaskContext
 
 logger = logging.getLogger(__name__)
+
+
+def _record_integration_failure(job: Job, error: IntegrationError) -> None:
+    context = error.context
+    job.append_log(
+        "Integration failure: "
+        f"code={error.code}; disposition={error.disposition.value}; "
+        f"provider={context.provider}; operation={context.operation}; "
+        f"tenant_id={context.tenant_id}; actor_id={context.actor_id}; request_id={context.request_id}"
+    )
 
 
 class _IntuneTenant(Protocol):
@@ -109,10 +119,13 @@ def sync_tenant_intune(
             counts = _run_sync(ctx.tenant, dry_run, job, integration_context)
             job.mark_completed(result=counts)
         except IntegrationError as exc:
+            log_extra = exc.log_extra(cause_type=type(exc.__cause__).__name__ if exc.__cause__ else None)
             logger.error(
-                "Intune sync failed at an external integration boundary",
-                extra=exc.log_extra(cause_type=type(exc.__cause__).__name__ if exc.__cause__ else None),
+                "Intune sync failed at an external integration boundary integration=%s",
+                log_extra["integration"],
+                extra=log_extra,
             )
+            _record_integration_failure(job, exc)
             job.mark_failed(exc.display_message())
         # broad except: task-isolation: unknown task failures must leave a safe recorded failure
         except Exception as exc:
@@ -134,8 +147,30 @@ def sync_tenant_intune(
                 source_file=traceback.tb_frame.f_code.co_filename if traceback else None,
                 source_line=traceback.tb_lineno if traceback else None,
             )
-            logger.error("Intune sync failed unexpectedly at the task boundary", extra=extra)
+            logger.error(
+                "Intune sync failed unexpectedly at the task boundary integration=%s",
+                extra["integration"],
+                extra=extra,
+            )
+            _record_integration_failure(job, unexpected)
             job.mark_failed(unexpected.display_message())
+
+
+def _read_intune_config(config: object, *, context: IntegrationContext) -> tuple[str, str, str, bool, str, bool]:
+    try:
+        azure_tenant_id = config["azure_tenant_id"]
+        client_id = config["client_id"]
+        client_secret = config["client_secret"]
+        create_missing = bool(config.get("create_missing", False))
+        default_status_slug = config.get("default_status", "deployable")
+        sync_software = bool(config.get("sync_software", True))
+    except (AttributeError, KeyError, TypeError) as exc:
+        raise IntegrationConfigurationError(context=context) from exc
+    if any(not isinstance(value, str) or not value.strip() for value in (azure_tenant_id, client_id, client_secret)):
+        raise IntegrationConfigurationError(context=context) from None
+    if not isinstance(default_status_slug, str) or not default_status_slug.strip():
+        raise IntegrationConfigurationError(context=context) from None
+    return azure_tenant_id, client_id, client_secret, create_missing, default_status_slug, sync_software
 
 
 def _run_sync(
@@ -159,22 +194,20 @@ def _run_sync(
     if not config:
         raise IntegrationConfigurationError(context=integration_context) from None
 
-    try:
-        azure_tenant_id = config["azure_tenant_id"]
-        client_id = config["client_id"]
-        client_secret = config["client_secret"]
-        create_missing = bool(config.get("create_missing", False))
-        default_status_slug = config.get("default_status", "deployable")
-        sync_software = bool(config.get("sync_software", True))
-    except (AttributeError, KeyError, TypeError) as exc:
-        raise IntegrationConfigurationError(context=integration_context) from exc
+    (
+        azure_tenant_id,
+        client_id,
+        client_secret,
+        create_missing,
+        default_status_slug,
+        sync_software,
+    ) = _read_intune_config(config, context=integration_context)
 
     client = IntuneClient(
         azure_tenant_id,
         client_id,
         client_secret,
         context=integration_context,
-        retry_budget=RetryBudget(),
     )
 
     job.append_log("Fetching managed devices from Graph API…")
@@ -306,31 +339,25 @@ def _create_asset(
     return asset
 
 
-def _sync_device_software(
-    client: IntuneClient,
-    device: IntuneDevicePayload,
-    asset: _IntuneAsset,
-    dry_run: bool,
-) -> int:
-    """Upsert InstalledSoftware records for all detected apps on a device."""
-    from assets.models import Manufacturer
-    from software.models import InstalledSoftware, Software
-
-    device_id = device.get("id")
-    if not device_id:
-        return 0
-
+def _get_detected_apps_or_degrade(client: IntuneClient, device_id: str) -> list[IntuneAppPayload] | None:
     try:
-        apps: list[IntuneAppPayload] = client.get_detected_apps(device_id)
+        return client.get_detected_apps(device_id)
+    except (IntegrationAuthenticationError, IntegrationConfigurationError):
+        raise
     except IntegrationError as exc:
         extra = exc.log_extra(object_id=device_id)
-        logger.warning("Optional detected-app integration degraded", extra=extra)
-        return 0
+        logger.warning(
+            "Optional detected-app integration degraded integration=%s",
+            extra["integration"],
+            extra=extra,
+        )
+        return None
     # broad except: boundary-isolation: optional detected-app discovery may fail without invalidating asset sync
     except Exception as exc:
+        client_context = getattr(client, "context", None)
         base_context = (
-            client.context
-            if isinstance(client.context, IntegrationContext)
+            client_context
+            if isinstance(client_context, IntegrationContext)
             else IntegrationContext(
                 provider="microsoft-graph",
                 operation="device_apps.list",
@@ -345,7 +372,30 @@ def _sync_device_software(
         )
         unexpected = IntegrationUnexpectedError(context=optional_context)
         extra = unexpected.log_extra(object_id=device_id, exception_type=type(exc).__name__)
-        logger.warning("Optional detected-app integration degraded unexpectedly", extra=extra)
+        logger.warning(
+            "Optional detected-app integration degraded unexpectedly integration=%s",
+            extra["integration"],
+            extra=extra,
+        )
+        return None
+
+
+def _sync_device_software(
+    client: IntuneClient,
+    device: IntuneDevicePayload,
+    asset: _IntuneAsset,
+    dry_run: bool,
+) -> int:
+    """Upsert InstalledSoftware records for all detected apps on a device."""
+    from assets.models import Manufacturer
+    from software.models import InstalledSoftware, Software
+
+    device_id = device.get("id")
+    if not device_id:
+        return 0
+
+    apps = _get_detected_apps_or_degrade(client, device_id)
+    if apps is None:
         return 0
 
     count = 0
