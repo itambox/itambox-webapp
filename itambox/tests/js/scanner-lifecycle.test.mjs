@@ -86,6 +86,8 @@ globalThis.fetch = () => Promise.resolve({ ok: false });
 
 const readers = [];
 const stopResolvers = [];
+const startResolvers = [];
+let deferNextStart = false;
 
 class FakeHtml5Qrcode {
   constructor(readerId) {
@@ -96,8 +98,17 @@ class FakeHtml5Qrcode {
   }
 
   start(_camera, _config, onSuccess) {
-    this.isScanning = true;
     this.onSuccess = onSuccess;
+    if (deferNextStart) {
+      deferNextStart = false;
+      return new Promise((resolve) => {
+        startResolvers.push(() => {
+          this.isScanning = true;
+          resolve();
+        });
+      });
+    }
+    this.isScanning = true;
     return Promise.resolve();
   }
 
@@ -150,6 +161,33 @@ test('a stale reader stop callback cannot clear a replacement scanner', async ()
 
   assert.equal(readers[0].cleared, true, 'the stopped reader is cleaned up');
   assert.equal(readers[1].cleared, false, 'the replacement reader remains active');
+});
+
+test('a stale pending start cannot mutate the replacement scanner generation', async () => {
+  readers.length = 0;
+  stopResolvers.length = 0;
+  startResolvers.length = 0;
+  deferNextStart = true;
+  const results = [];
+  const scanner = new AssetScanner(config((code) => results.push(code)));
+
+  const staleStart = scanner.start();
+  scanner.stop();
+  await scanner.start();
+  assert.equal(readers.length, 2);
+  assert.equal(startResolvers.length, 1);
+
+  startResolvers[0]();
+  await staleStart;
+  await new Promise((resolve) => setImmediate(resolve));
+  assert.equal(stopResolvers.length, 1, 'the stale reader is cleaned up');
+  stopResolvers[0]();
+  await new Promise((resolve) => setImmediate(resolve));
+
+  readers[0].onSuccess('STALE');
+  readers[1].onSuccess('LIVE');
+  await new Promise((resolve) => setImmediate(resolve));
+  assert.deepEqual(results, ['LIVE']);
 });
 
 test('audit scanner entrypoint opens the rendered audit overlay', async () => {

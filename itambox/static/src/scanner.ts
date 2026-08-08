@@ -102,11 +102,14 @@ export class AssetScanner {
       return;
     }
 
+    let scanner: Html5Qrcode | undefined;
     try {
-      this.html5QrcodeScanner = new Html5Qrcode(this.config.readerId, {
+      scanner = new Html5Qrcode(this.config.readerId, {
         verbose: false,
         useBarCodeDetectorIfSupported: true,
       });
+      this.html5QrcodeScanner = scanner;
+      const activeScanner = scanner;
 
       const config = {
         fps: 15,
@@ -116,10 +119,13 @@ export class AssetScanner {
         },
       };
 
-      await this.html5QrcodeScanner.start(
+      await activeScanner.start(
         { facingMode: 'environment' },
         config,
         (decodedText: string) => {
+          // A reader whose start promise settled after close/reopen belongs to
+          // an old generation and must never feed the replacement dispatcher.
+          if (this.html5QrcodeScanner !== activeScanner) return;
           let raw = decodedText.trim();
           // Strip surrounding quotes
           if (raw.startsWith('"') && raw.endsWith('"')) {
@@ -152,9 +158,13 @@ export class AssetScanner {
         }
       );
 
+      if (this.html5QrcodeScanner !== activeScanner) {
+        this.cleanupReader(activeScanner);
+        return;
+      }
 
       try {
-        const capabilities = this.html5QrcodeScanner.getRunningTrackCapabilities();
+        const capabilities = activeScanner.getRunningTrackCapabilities();
         if (capabilities && (capabilities as any).torch && this.torchBtn) {
           this.torchBtn.classList.remove('d-none');
           this.isTorchOn = false;
@@ -164,6 +174,12 @@ export class AssetScanner {
       }
 
     } catch (err: any) {
+      if (scanner && this.html5QrcodeScanner !== scanner) {
+        // A rejected start from a closed generation must not surface its error
+        // in the replacement overlay.
+        this.cleanupReader(scanner);
+        return;
+      }
       console.error('Camera/Scanner initialization failed:', err);
       const isPermissionDenied =
         err?.name === 'NotAllowedError' ||
@@ -189,6 +205,16 @@ export class AssetScanner {
     }
   }
 
+  private cleanupReader(scanner: Html5Qrcode): void {
+    if (scanner.isScanning) {
+      scanner.stop()
+        .then(() => scanner.clear())
+        .catch(err => {
+          console.error('Error stopping scanner:', err);
+        });
+    }
+  }
+
   public stop(): void {
     if (this.modal) {
       this.modal.classList.remove('is-open');
@@ -206,13 +232,7 @@ export class AssetScanner {
       // clear or null the replacement stored on this field.
       const scanner = this.html5QrcodeScanner;
       this.html5QrcodeScanner = null;
-      if (scanner.isScanning) {
-        scanner.stop()
-          .then(() => scanner.clear())
-          .catch(err => {
-            console.error('Error stopping scanner:', err);
-          });
-      }
+      this.cleanupReader(scanner);
     }
   }
 }
