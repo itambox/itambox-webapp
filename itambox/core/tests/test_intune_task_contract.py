@@ -1,10 +1,14 @@
 from unittest import TestCase
 from unittest.mock import MagicMock, patch
 
+from django.test import override_settings
+
 from core.errors import (
     FailureDisposition,
     IntegrationAuthenticationError,
+    IntegrationConfigurationError,
     IntegrationContext,
+    IntegrationRateLimitedError,
     IntegrationUnavailableError,
 )
 
@@ -70,7 +74,51 @@ class IntuneTaskBoundaryContractTests(TestCase):
             FailureDisposition.RETRYABLE.value,
         )
 
-    def test_unknown_failure_is_not_persisted_or_logged_with_exception_text(self):
+    def test_rate_limited_internal_signal_gets_safe_user_fallback(self):
+        error = IntegrationRateLimitedError(
+            context=IntegrationContext(
+                provider="microsoft-graph",
+                operation="oauth.token",
+                tenant_id=17,
+                actor_id=23,
+                request_id="request-123",
+            ),
+            status_code=429,
+            retry_after=3600,
+        )
+
+        log_error = self._run_task_with_error(error)
+
+        self.job.mark_failed.assert_called_once()
+        self.assertNotIn("rate-limited", self.job.mark_failed.call_args.args[0])
+        self.assertEqual(
+            log_error.call_args.kwargs["extra"]["integration"]["disposition"],
+            FailureDisposition.RETRYABLE.value,
+        )
+        self.assertEqual(log_error.call_args.kwargs["extra"]["integration"]["retry_after"], 3600)
+
+    @override_settings(ITAMBOX_TENANT_INTUNE_CONFIGS={})
+    def test_missing_tenant_configuration_is_terminal_and_typed(self):
+        from core.tasks.intune_sync import _run_sync
+
+        tenant = MagicMock(slug="missing", pk=17)
+        with self.assertRaises(IntegrationConfigurationError) as raised:
+            _run_sync(tenant, dry_run=True, job=MagicMock())
+
+        self.assertEqual(raised.exception.disposition, FailureDisposition.TERMINAL)
+        self.assertEqual(raised.exception.context.tenant_id, 17)
+
+    @override_settings(ITAMBOX_TENANT_INTUNE_CONFIGS={"tenant-a": {"azure_tenant_id": "azure-tenant"}})
+    def test_incomplete_tenant_configuration_is_terminal_and_typed(self):
+        from core.tasks.intune_sync import _run_sync
+
+        tenant = MagicMock(slug="tenant-a", pk=17)
+        with self.assertRaises(IntegrationConfigurationError) as raised:
+            _run_sync(tenant, dry_run=True, job=MagicMock())
+
+        self.assertEqual(raised.exception.disposition, FailureDisposition.TERMINAL)
+        self.assertEqual(raised.exception.context.tenant_id, 17)
+
         from core.tasks import intune_sync
 
         with (

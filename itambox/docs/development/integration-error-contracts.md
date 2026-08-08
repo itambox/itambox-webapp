@@ -31,7 +31,9 @@ The shared types live in the dependency-free `core.errors` module:
   invocation after rate-limit budget exhaustion;
 - `IntegrationContractError` — terminal malformed/unexpected success response;
 - `IntegrationRequestError` and `IntegrationNotFoundError` — terminal 4xx
-  request/resource failures.
+  request/resource failures;
+- `IntegrationUnexpectedError` — terminal task-isolation fallback for an
+  otherwise unknown failure, with no provider exception text persisted.
 
 `IntegrationContext` is an allowlist containing only provider, stable operation,
 tenant ID, actor ID and request/correlation ID. `IntegrationError.log_extra()`
@@ -53,10 +55,15 @@ without valid JSON/value or an OAuth response without a non-empty
 `access_token` is a terminal contract error.
 
 The Intune task catches `IntegrationError` explicitly, logs only the structured
-allowlist, and persists the stable `user_message`. Its last-resort unknown
-failure boundary records only the exception type and a safe generic message;
-it does not use `logger.exception` while provider credential locals may still
-be present. The optional detected-app endpoint is intentionally non-critical:
+allowlist, and persists `display_message()`. The in-loop rate-limit signal is
+not user-visible; the task maps it to the generic safe message. Its last-resort
+unknown failure boundary records only the exception type and traceback source
+location (never the traceback text) and persists a safe generic message. It
+does not use `logger.exception` while provider credential locals may still be
+present. OAuth and Graph request frames are marked with Django's
+`sensitive_variables()` and transport exceptions are chained from `None` so a
+credential-bearing requests frame is not retained as the public cause. The
+optional detected-app endpoint is intentionally non-critical:
 asset discovery remains available when that endpoint fails, but the typed
 failure is logged with the `device_apps.list` operation and tested. This is a
 capability fallback, not permission/authentication fallback.
