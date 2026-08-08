@@ -19,6 +19,8 @@ from typing import Protocol, TypedDict
 from django.conf import settings
 from django.utils import timezone
 
+from core.context import get_current_request_id
+from core.errors import IntegrationContext, IntegrationError
 from core.integrations.intune import IntuneClient
 from core.models import Job
 from core.tasks.context import TaskContext
@@ -90,32 +92,75 @@ def sync_tenant_intune(
             job.append_log("[dry-run] No writes will be performed.")
 
         try:
-            counts = _run_sync(ctx.tenant, dry_run, job)
+            integration_context = IntegrationContext(
+                provider="microsoft-graph",
+                operation="sync",
+                tenant_id=tenant_id,
+                actor_id=user_id,
+                request_id=str(get_current_request_id()) if get_current_request_id() else None,
+            )
+            counts = _run_sync(ctx.tenant, dry_run, job, integration_context)
             job.mark_completed(result=counts)
+        except IntegrationError as exc:
+            logger.error("Intune sync failed at an external integration boundary", extra=exc.log_extra())
+            job.mark_failed(exc.user_message)
+        # broad except: task-isolation: unknown task failures must leave a safe recorded failure
         except Exception as exc:
-            logger.exception("Intune sync failed for tenant %s", tenant_id)
-            job.mark_failed(str(exc))
+            unexpected = IntegrationError(
+                context=IntegrationContext(
+                    provider="microsoft-graph",
+                    operation="sync",
+                    tenant_id=tenant_id,
+                    actor_id=user_id,
+                    request_id=str(get_current_request_id()) if get_current_request_id() else None,
+                )
+            )
+            extra = unexpected.log_extra()
+            extra["integration"]["error_code"] = "integration.unexpected"
+            extra["integration"]["exception_type"] = type(exc).__name__
+            logger.error("Intune sync failed unexpectedly at the task boundary", extra=extra)
+            job.mark_failed(unexpected.user_message)
 
 
-def _run_sync(tenant: _IntuneTenant, dry_run: bool, job: Job) -> IntuneSyncResult:
+def _run_sync(
+    tenant: _IntuneTenant,
+    dry_run: bool,
+    job: Job,
+    integration_context: IntegrationContext | None = None,
+) -> IntuneSyncResult:
     from django.conf import settings as _settings
 
     from assets.models import Asset, AssetType, Manufacturer, StatusLabel
     from organization.models import AssetHolder, Tenant
 
+    integration_context = integration_context or IntegrationContext(
+        provider="microsoft-graph",
+        operation="sync",
+        tenant_id=getattr(tenant, "pk", None),
+    )
     tenant_configs = getattr(_settings, "ITAMBOX_TENANT_INTUNE_CONFIGS", {})
     config = tenant_configs.get(tenant.slug)
     if not config:
-        raise ValueError(f"No ITAMBOX_TENANT_INTUNE_CONFIGS entry for tenant '{tenant.slug}'.")
+        raise IntegrationConfigurationError(context=integration_context) from ValueError(
+            "missing Intune tenant configuration"
+        )
 
-    azure_tenant_id = config["azure_tenant_id"]
-    client_id = config["client_id"]
-    client_secret = config["client_secret"]
-    create_missing = bool(config.get("create_missing", False))
-    default_status_slug = config.get("default_status", "deployable")
-    sync_software = bool(config.get("sync_software", True))
+    try:
+        azure_tenant_id = config["azure_tenant_id"]
+        client_id = config["client_id"]
+        client_secret = config["client_secret"]
+        create_missing = bool(config.get("create_missing", False))
+        default_status_slug = config.get("default_status", "deployable")
+        sync_software = bool(config.get("sync_software", True))
+    except (AttributeError, KeyError, TypeError) as exc:
+        raise IntegrationConfigurationError(context=integration_context) from exc
 
-    client = IntuneClient(azure_tenant_id, client_id, client_secret)
+    client = IntuneClient(
+        azure_tenant_id,
+        client_id,
+        client_secret,
+        context=integration_context,
+    )
 
     job.append_log("Fetching managed devices from Graph API…")
     devices: list[IntuneDevicePayload] = client.get_managed_devices()
@@ -262,8 +307,34 @@ def _sync_device_software(
 
     try:
         apps: list[IntuneAppPayload] = client.get_detected_apps(device_id)
+    except IntegrationError as exc:
+        extra = exc.log_extra()
+        extra["integration"]["object_id"] = device_id
+        logger.warning("Optional detected-app integration degraded", extra=extra)
+        return 0
+    # broad except: boundary-isolation: optional detected-app discovery may fail without invalidating asset sync
     except Exception as exc:
-        logger.warning("Could not fetch apps for device %s: %s", device_id, exc)
+        base_context = (
+            client.context
+            if isinstance(client.context, IntegrationContext)
+            else IntegrationContext(
+                provider="microsoft-graph",
+                operation="device_apps.list",
+            )
+        )
+        optional_context = IntegrationContext(
+            provider=base_context.provider,
+            operation="device_apps.list",
+            tenant_id=base_context.tenant_id,
+            actor_id=base_context.actor_id,
+            request_id=base_context.request_id,
+        )
+        unexpected = IntegrationError(context=optional_context)
+        extra = unexpected.log_extra()
+        extra["integration"]["error_code"] = "integration.optional_unexpected"
+        extra["integration"]["exception_type"] = type(exc).__name__
+        extra["integration"]["object_id"] = device_id
+        logger.warning("Optional detected-app integration degraded unexpectedly", extra=extra)
         return 0
 
     count = 0
