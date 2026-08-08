@@ -1009,7 +1009,7 @@ class CommittedRecordTests(unittest.TestCase):
     def test_the_committed_record_is_internally_consistent(self):
         self.assertEqual(gate.check_record(REPO_ROOT, self.policy, self.record), ())
 
-    def test_the_committed_record_lists_the_slice_zero_through_slice_eleven_admissions(self):
+    def test_the_committed_record_lists_the_slice_zero_through_slice_twelve_admissions(self):
         self.assertEqual(
             [entry["path"] for entry in self.record["checked"]],
             [
@@ -1053,6 +1053,7 @@ class CommittedRecordTests(unittest.TestCase):
                 "itambox/users/api/scim/identifiers.py",
                 "itambox/users/api/scim/provider_authentication.py",
                 "itambox/users/api/scim/provider_patch.py",
+                "itambox/users/api/scim/provider_services.py",
                 "itambox/users/api/scim/serializers.py",
             ],
         )
@@ -1295,6 +1296,18 @@ class CommittedRecordTests(unittest.TestCase):
                     "symbols",
                     ["SCIMProviderBearerTokenAuthentication", "_SCIMAuthenticatedPrincipal"],
                 ),
+                "itambox/users/api/scim/provider_services.py": (
+                    "symbols",
+                    [
+                        "apply_provider_group_patch",
+                        "apply_provider_user_patch",
+                        "create_provider_group",
+                        "ensure_provider_group_external_id_available",
+                        "ensure_provider_group_name_available",
+                        "save_provider_group",
+                        "sync_provider_group_members",
+                    ],
+                ),
                 "itambox/users/api/scim/serializers.py": (
                     "symbols",
                     [
@@ -1338,6 +1351,22 @@ class CommittedRecordTests(unittest.TestCase):
             {path: (entries[path]["scope"], entries[path]["symbols"]) for path in expected},
             {path: ("symbols", symbols) for path, symbols in expected.items()},
         )
+
+    def test_the_committed_record_admits_the_scim_provider_mutation_service_slice(self):
+        entries = {entry["path"]: entry for entry in self.record["checked"]}
+        path = "itambox/users/api/scim/provider_services.py"
+        expected = [
+            "apply_provider_group_patch",
+            "apply_provider_user_patch",
+            "create_provider_group",
+            "ensure_provider_group_external_id_available",
+            "ensure_provider_group_name_available",
+            "save_provider_group",
+            "sync_provider_group_members",
+        ]
+
+        self.assertEqual(entries[path]["scope"], "symbols")
+        self.assertEqual(entries[path]["symbols"], expected)
 
     def test_the_committed_pilot_satisfies_the_marker_and_suppression_grammars(self):
         self.assertEqual(gate.check_markers(REPO_ROOT, self.record), ())
