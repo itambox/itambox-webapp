@@ -1,19 +1,17 @@
 {% extends "generic/object_list.html" %}
 {% load i18n %}
 {% block extra_controls %}
-  {% if report_designer_active %}
-    <a href="{% url 'extras:reporttemplate_list' %}"
-       class="btn btn-outline-secondary">
-      <i class="mdi mdi-file-document-outline me-1"></i>
-      {% translate "Manage Templates" %}
-    </a>
-  {% endif %}
+  <a href="{% url 'extras:reporttemplate_list' %}"
+     class="btn btn-outline-secondary">
+    <i class="mdi mdi-file-document-outline me-1"></i>
+    {% translate "Manage Templates" %}
+  </a>
 {% endblock %}
 {% block content %}
   {% include "generic/includes/beta_banner.html" %}
   <div class="row g-3 mb-3">
     <!-- Active Schedules Count -->
-    <div class="col-sm-6 {% if report_designer_active %}col-lg-6{% else %}col-lg-12{% endif %}">
+    <div class="col-sm-6 col-lg-6">
       <div class="card card-sm">
         <div class="card-body">
           <div class="row align-items-center">
@@ -30,31 +28,29 @@
         </div>
       </div>
     </div>
-    {% if report_designer_active %}
-      <!-- Report Templates Count -->
-      <div class="col-sm-6 col-lg-6">
-        <div class="card card-sm bg-purple-lt">
-          <div class="card-body">
-            <div class="row align-items-center">
-              <div class="col-auto">
-                <span class="bg-purple text-white avatar">
-                  <i class="mdi mdi-view-dashboard-outline"></i>
-                </span>
+    <!-- Report Templates Count -->
+    <div class="col-sm-6 col-lg-6">
+      <div class="card card-sm bg-purple-lt">
+        <div class="card-body">
+          <div class="row align-items-center">
+            <div class="col-auto">
+              <span class="bg-purple text-white avatar">
+                <i class="mdi mdi-view-dashboard-outline"></i>
+              </span>
+            </div>
+            <div class="col">
+              <div class="font-weight-medium">
+                <a href="{% url 'extras:reporttemplate_list' %}"
+                   class="text-purple fw-bold">
+                  {{ templates.count|default:"3" }} {% translate "Report Templates Available" %}
+                </a>
               </div>
-              <div class="col">
-                <div class="font-weight-medium">
-                  <a href="{% url 'extras:reporttemplate_list' %}"
-                     class="text-purple fw-bold">
-                    {{ templates.count|default:"3" }} {% translate "Report Templates Available" %}
-                  </a>
-                </div>
-                <div class="text-secondary">{% translate "Asset summary, license allocation &amp; renewals" %}</div>
-              </div>
+              <div class="text-secondary">{% translate "Asset summary, license allocation &amp; renewals" %}</div>
             </div>
           </div>
         </div>
       </div>
-    {% endif %}
+    </div>
   </div>
   {{ block.super }}
 {% endblock %}

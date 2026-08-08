@@ -69,6 +69,7 @@ class ScheduledReportingAndAlertsTests(TestCase):
         )
         report_valid.full_clean()
 
+    @override_settings(REPORT_DESIGNER_ENABLED=True)
     def test_schedule_creation_in_view(self):
         """Test that Schedule is created or updated in ScheduledReport form_valid views."""
         self.client.force_login(self.user)
@@ -95,6 +96,7 @@ class ScheduledReportingAndAlertsTests(TestCase):
         self.assertEqual(sched.schedule.next_run.time().hour, 9)
         self.assertEqual(sched.schedule.next_run.time().minute, 30)
 
+    @override_settings(REPORT_DESIGNER_ENABLED=True)
     @patch("django.core.mail.EmailMessage")
     @patch("core.http.request_pinned")
     def test_generate_report_task_success(self, mock_request_pinned, mock_email_message):
@@ -152,6 +154,7 @@ class ScheduledReportingAndAlertsTests(TestCase):
         # Verify Slack channel was called
         mock_request_pinned.assert_called_once()
 
+    @override_settings(REPORT_DESIGNER_ENABLED=True)
     def test_delivery_failure_is_partial_and_later_channels_are_attempted(self):
         """One channel failure is persisted without hiding later delivery success."""
         failed_channel = NotificationChannel.objects.create(
@@ -288,11 +291,109 @@ class ScheduledReportingAndAlertsTests(TestCase):
         self.assertIn(b"Asset Inventory Test Report", response.content)
 
     @override_settings(REPORT_DESIGNER_ENABLED=False)
-    def test_scheduled_report_list_hides_inactive_designer_links(self):
+    def test_scheduled_report_routes_are_closed_when_designer_is_inactive(self):
         self.client.force_login(self.user)
         response = self.client.get(reverse("extras:scheduledreport_list"))
-        self.assertEqual(response.status_code, 200)
-        self.assertNotContains(response, reverse("extras:reporttemplate_list"))
+        self.assertEqual(response.status_code, 404)
+
+    @override_settings(REPORT_DESIGNER_ENABLED=False)
+    def test_disabled_designer_does_not_register_schedule_from_internal_helper(self):
+        sched = ScheduledReport.objects.create(
+            name="Helper Paused Schedule",
+            report=self.template,
+            tenant=self.tenant,
+            frequency="weekly",
+            is_active=True,
+        )
+
+        from extras.views import handle_report_scheduling
+
+        handle_report_scheduling(sched)
+        sched.refresh_from_db()
+        self.assertIsNone(sched.schedule_id)
+        self.assertFalse(Schedule.objects.filter(name=f"scheduled_report_{sched.pk}").exists())
+
+    @override_settings(REPORT_DESIGNER_ENABLED=False)
+    @patch("core.tasks.reports._process_scheduled_report")
+    def test_disabled_designer_skips_existing_scheduled_report_task(self, mock_process):
+        sched = ScheduledReport.objects.create(
+            name="Paused Schedule",
+            report=self.template,
+            tenant=self.tenant,
+            frequency="once",
+            format=ScheduledReport.FORMAT_HTML,
+            is_active=True,
+        )
+
+        q_schedule = Schedule.objects.create(
+            name=f"scheduled_report_{sched.pk}",
+            func="core.tasks.generate_scheduled_report_task",
+            schedule_type=Schedule.ONCE,
+            repeats=-1,
+        )
+        sched.schedule = q_schedule
+        sched.save(update_fields=["schedule"])
+
+        from core.tasks import generate_scheduled_report_task
+
+        self.assertFalse(generate_scheduled_report_task(sched.pk))
+        mock_process.assert_not_called()
+        sched.refresh_from_db()
+        self.assertIsNone(sched.last_run)
+        self.assertEqual(ReportGenerationArchive.objects.filter(scheduled_report=sched).count(), 0)
+        self.assertEqual(sched.schedule_id, q_schedule.pk)
+        self.assertEqual(sched.schedule.schedule_type, Schedule.ONCE)
+        self.assertIsNone(sched.schedule.cron)
+        self.assertEqual(sched.schedule.repeats, -1)
+
+    @override_settings(REPORT_DESIGNER_ENABLED=False)
+    @patch("core.tasks.reports._process_scheduled_report")
+    def test_disabled_designer_preserves_existing_recurring_schedule(self, mock_process):
+        sched = ScheduledReport.objects.create(
+            name="Paused Recurring Schedule",
+            report=self.template,
+            tenant=self.tenant,
+            frequency="weekly",
+            is_active=True,
+        )
+        q_schedule = Schedule.objects.create(
+            name=f"scheduled_report_{sched.pk}",
+            func="core.tasks.generate_scheduled_report_task",
+            schedule_type=Schedule.WEEKLY,
+            repeats=-1,
+        )
+        sched.schedule = q_schedule
+        sched.save(update_fields=["schedule"])
+
+        from core.tasks import generate_scheduled_report_task
+
+        self.assertFalse(generate_scheduled_report_task(sched.pk))
+        mock_process.assert_not_called()
+        sched.refresh_from_db()
+        q_schedule.refresh_from_db()
+        self.assertEqual(sched.schedule_id, q_schedule.pk)
+        self.assertEqual(q_schedule.schedule_type, Schedule.WEEKLY)
+        self.assertEqual(q_schedule.repeats, -1)
+
+    @override_settings(REPORT_DESIGNER_ENABLED=True)
+    def test_once_schedule_uses_django_q_once_semantics(self):
+        sched = ScheduledReport.objects.create(
+            name="Once Schedule",
+            report=self.template,
+            tenant=self.tenant,
+            frequency="once",
+            format=ScheduledReport.FORMAT_HTML,
+            is_active=True,
+        )
+
+        from extras.views import handle_report_scheduling
+
+        handle_report_scheduling(sched)
+        sched.refresh_from_db()
+        self.assertIsNotNone(sched.schedule_id)
+        self.assertEqual(sched.schedule.schedule_type, Schedule.ONCE)
+        self.assertEqual(sched.schedule.repeats, -1)
+        self.assertEqual(sched.schedule.cron, "")
 
     @override_settings(REPORT_DESIGNER_ENABLED=True)
     def test_scheduled_report_list_shows_active_designer_links(self):
@@ -301,6 +402,7 @@ class ScheduledReportingAndAlertsTests(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, reverse("extras:reporttemplate_list"))
 
+    @override_settings(REPORT_DESIGNER_ENABLED=True)
     @patch("core.tasks.generate_scheduled_report_task", return_value=False)
     def test_trigger_reports_delivery_failure_after_successful_generation(self, mock_generate):
         sched = ScheduledReport.objects.create(
@@ -369,6 +471,7 @@ class ScheduledReportingAndAlertsTests(TestCase):
         self.assertIn("Total Software Products", [c["label"] for c in summary_cards])
         self.assertIsNotNone(chart_svg)
 
+    @override_settings(REPORT_DESIGNER_ENABLED=True)
     @patch("core.tasks.reports.build_report_context")
     def test_pre_archive_failure_preserves_status(self, mock_compile):
         """build_report_context raising before archive_entry is assigned must

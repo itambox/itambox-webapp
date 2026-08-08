@@ -16,6 +16,7 @@ from core.models import EmailSettings
 from core.reports import build_report_context, get_polished_system_html_template
 from core.tasks.context import TaskContext
 from extras.models import FileAttachment, ReportGenerationArchive, ScheduledReport
+from itambox.capabilities import registry
 
 logger = logging.getLogger(__name__)
 
@@ -294,6 +295,10 @@ def generate_scheduled_report_task(scheduled_report_id: int) -> bool | None:
         sched = ScheduledReport.objects.get(pk=scheduled_report_id)
     except ScheduledReport.DoesNotExist:
         logger.error("ScheduledReport %s not found.", scheduled_report_id)
+        return False
+
+    if not registry.is_active("reporting.designer"):
+        logger.warning("Report designer capability is inactive. Skipping %s.", sched.name)
         return False
 
     if not sched.is_active:
