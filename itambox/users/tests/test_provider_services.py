@@ -1,5 +1,5 @@
 import importlib
-from collections.abc import Collection
+from collections.abc import Collection, Sequence
 from inspect import Parameter, signature
 from types import SimpleNamespace
 from typing import get_origin, get_type_hints
@@ -56,7 +56,10 @@ class ProviderServiceGuardTests(SimpleTestCase):
 
 class ProviderViewSignatureTests(SimpleTestCase):
     def test_provider_framework_and_config_signatures_are_typed(self):
+        # Warm up the first-party API package to avoid its DRF default-authentication import cycle.
         importlib.import_module("itambox.api")
+        from rest_framework.authentication import BaseAuthentication
+        from rest_framework.permissions import BasePermission, OperandHolder, SingleOperandHolder
         from rest_framework.request import Request
         from rest_framework.response import Response
 
@@ -105,7 +108,15 @@ class ProviderViewSignatureTests(SimpleTestCase):
                     [(name, parameter.kind) for name, parameter in signature(method).parameters.items()],
                     expected_parameters,
                 )
-                self.assertEqual(
-                    {name: get_type_hints(method)[name] for name in expected_annotations},
-                    expected_annotations,
-                )
+                self.assertEqual(get_type_hints(method), expected_annotations)
+
+        expected_mixin_annotations = {
+            "authentication_classes": Sequence[type[BaseAuthentication]],
+            "permission_classes": Sequence[type[BasePermission] | OperandHolder | SingleOperandHolder],
+        }
+        self.assertEqual(set(SCIMProviderMixin.__annotations__), set(expected_mixin_annotations))
+        mixin_hints = get_type_hints(SCIMProviderMixin)
+        self.assertEqual(
+            {name: mixin_hints[name] for name in SCIMProviderMixin.__annotations__},
+            expected_mixin_annotations,
+        )
