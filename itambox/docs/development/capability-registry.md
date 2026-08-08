@@ -68,7 +68,7 @@ and only its exception *type* is ever published.
 | `procurement.requisition_seam` | Asset Request Procurement Seam | Beta | enabled | configured | area:procurement |
 | `reporting.curated` | Curated Reports | Stable | always-on | always | area:operations |
 | `reporting.designer` | Report Designer | Beta | opt-in | operator-flag | area:operations |
-| `reporting.scheduled` | Scheduled Reports | Beta | enabled | object-enabled | area:operations |
+| `reporting.scheduled` | Scheduled Reports | Beta | opt-in | operator-flag | area:operations |
 | `subscriptions.tracking` | SaaS Subscriptions | Stable | always-on | always | area:subscriptions |
 | `users.scim_provisioning` | SCIM Provisioning | Beta | opt-in | object-enabled | area:auth-rbac |
 
@@ -110,9 +110,18 @@ decides behaviour and do not add another authorization or execution gate:
   `REQUISITION_AUTO_APPROVAL_THRESHOLDS` name remains a 1.x fallback and emits
   a startup deprecation warning. The seam remains Beta: partial receipts can
   still require manual reconciliation.
-* `reporting.scheduled`, `alerting.rules`, and `automation.webhooks` count
-  enabled rows. A deployment that already has an enabled event rule keeps
-  reporting active; nothing new switches off.
+* `alerting.rules` and `automation.webhooks` count enabled rows. A deployment
+  that already has an enabled event rule keeps those capabilities active;
+  nothing new switches them off.
+* `reporting.scheduled` combines the `ITAMBOX_REPORT_DESIGNER_ENABLED` operator
+  flag with enabled schedule rows. Its menu and every schedule route use the
+  designer gate, and the background task checks the designer gate plus the
+  schedule's own active state before delivery. With the flag off, scheduled
+  delivery is paused without deleting saved `ScheduledReport` rows; setting the
+  flag back to `True` exposes the surfaces and allows normal schedule
+  registration again. Existing recurring Q schedules continue normally; a
+  one-shot Q schedule already consumed while disabled must be registered again
+  from the saved row.
 * `platform.plugins` reads `PLUGINS`, which is genuinely empty by default.
 * `users.scim_provisioning` observes the tenant-bound API tokens that the SCIM
   authenticators already require. It reports active when at least one token is
@@ -120,13 +129,13 @@ decides behaviour and do not add another authorization or execution gate:
   non-deleted tenant. The probe exposes only presence booleans and does not gate
   the SCIM endpoints.
 
-`reporting.designer` is deliberately enforced. The operator flag
-`ITAMBOX_REPORT_DESIGNER_ENABLED` defaults to `False`; while inactive, designer
-navigation is hidden and its eight routes return 404. Set the flag to `True` to
-retain or enable access to saved report templates. The Stable curated-report
-catalogue is unaffected. Scheduled delivery of existing report templates
-continues, but a fresh deployment must enable the designer to author a template
-before it can create a scheduled report.
+`reporting.designer` and `reporting.scheduled` are deliberately enforced by
+the same operator boundary. The operator flag `ITAMBOX_REPORT_DESIGNER_ENABLED`
+defaults to `False`; while inactive, designer and scheduled-report navigation
+is hidden, their routes return 404, and scheduled delivery of existing report
+templates is paused. Set the flag to `True` to retain or enable access to saved
+report templates and their schedules. Saved schedules are retained while the
+flag is off. The Stable curated-report catalogue is unaffected.
 
 ## Where the grade shows up
 

@@ -117,7 +117,7 @@ source.
 
 ### `ScheduledReport` frequency — closed
 
-An explicit Stable-graded carve-out inside the Beta enabled
+An explicit Stable-graded carve-out inside the Beta opt-in
 `reporting.scheduled` capability: these nine strings are persisted on schedule
 rows that outlive the capability's own churn. The carve-out covers the frequency
 values only.
@@ -529,7 +529,7 @@ not publish.
 | `procurement.requisition_seam` | `beta-enabled` | enabled | Asset Request fulfillment links | The asset-request to purchase-order-line reservation flow is incomplete; partial fulfilment may need manual reconciliation.<br>Auto-approval thresholds are process-wide, not per tenant. |
 | `reporting.curated` | `stable` | always-on | Curated report catalogue | none |
 | `reporting.designer` | `beta-opt-in` | opt-in | Saved report templates | Column, filter, and grouping model is expected to change; saved templates may need rebuilding |
-| `reporting.scheduled` | `beta-enabled` | enabled | Scheduled reports and generation archive | Delivery depends on a running worker; archive retention is not per-schedule configurable |
+| `reporting.scheduled` | `beta-opt-in` | opt-in | Scheduled reports and generation archive | Requires `ITAMBOX_REPORT_DESIGNER_ENABLED=True` and at least one enabled schedule row; false pauses delivery and hides/routes-closes the schedule surfaces without deleting saved schedules; delivery also depends on a running worker |
 | `subscriptions.tracking` | `stable` | always-on | Providers, subscriptions, assignments | none |
 | `users.scim_provisioning` | `beta-opt-in` | opt-in | Tenant- and provider-scoped SCIM mounts | PATCH semantics and filtering are partial; the tenant mount provisions Users and exposes Groups read-only, only provider mounts provision Groups |
 

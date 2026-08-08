@@ -47,7 +47,7 @@ DECLARED = {
     "procurement.requisition_seam": (BETA, "enabled", SOURCE_CONFIGURED),
     "reporting.curated": (STABLE, ALWAYS_ON, SOURCE_ALWAYS),
     "reporting.designer": (BETA, OPT_IN, SOURCE_OPERATOR_FLAG),
-    "reporting.scheduled": (BETA, "enabled", SOURCE_OBJECT_ENABLED),
+    "reporting.scheduled": (BETA, OPT_IN, SOURCE_OPERATOR_FLAG),
     "alerting.inbox": (STABLE, ALWAYS_ON, SOURCE_ALWAYS),
     "alerting.rules": (BETA, "enabled", SOURCE_OBJECT_ENABLED),
     "organization.role_grants": (STABLE, ALWAYS_ON, SOURCE_ALWAYS),
@@ -310,6 +310,30 @@ class TestExistingDeploymentCompatibility:
         baker.make("extras.EventRule", enabled=True).soft_delete()
         baker.make("extras.EventRule", enabled=True)
         state = registry.state("automation.webhooks")
+        assert (state.active, state.value_present) == (True, True)
+
+    @override_settings(REPORT_DESIGNER_ENABLED=False)
+    def test_scheduled_reports_are_inactive_when_the_designer_flag_is_off(self, db):
+        template = baker.make("extras.ReportTemplate")
+        baker.make("extras.ScheduledReport", report=template, is_active=True)
+
+        state = registry.state("reporting.scheduled")
+
+        assert (state.active, state.value_present) == (False, True)
+
+    @override_settings(REPORT_DESIGNER_ENABLED=True)
+    def test_scheduled_reports_report_the_flag_but_wait_for_an_enabled_row(self, db):
+        state = registry.state("reporting.scheduled")
+
+        assert (state.active, state.value_present) == (False, True)
+
+    @override_settings(REPORT_DESIGNER_ENABLED=True)
+    def test_scheduled_reports_are_active_when_the_flag_and_a_row_are_enabled(self, db):
+        template = baker.make("extras.ReportTemplate")
+        baker.make("extras.ScheduledReport", report=template, is_active=True)
+
+        state = registry.state("reporting.scheduled")
+
         assert (state.active, state.value_present) == (True, True)
 
 

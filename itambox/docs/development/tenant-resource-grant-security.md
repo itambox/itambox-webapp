@@ -166,6 +166,7 @@ PYTHONPATH=itambox uv run --locked --group dev python -m pytest -q -p no:cachepr
   itambox/core/tests/test_report_provider_registry.py \
   itambox/core/tests/test_report_tenant_scoping.py \
   itambox/core/tests/test_report_warranty_expiration.py \
+  itambox/core/tests/test_phase3_task_audit.py \
   itambox/core/tests/test_reporting.py \
   itambox/extras/tests/test_dashboard_all_accessible.py \
   itambox/extras/tests/test_dashboard_widgets.py \

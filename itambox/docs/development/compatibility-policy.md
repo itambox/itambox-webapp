@@ -357,7 +357,7 @@ Which is which is recorded per enum in the
 
 The **nine `ScheduledReport` frequency values** are an explicit Stable-graded
 carve-out inside a surrounding Beta capability: `reporting.scheduled` is Beta
-enabled and may change, but the persisted frequency vocabulary is closed and
+opt-in and may change, but the persisted frequency vocabulary is closed and
 frozen for 1.x, because those nine strings are written into rows that outlive
 the capability's own churn. The carve-out is deliberate and narrow — it covers
 the frequency values only, not the schedule model, the delivery behaviour, or
