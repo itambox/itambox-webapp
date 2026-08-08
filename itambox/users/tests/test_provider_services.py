@@ -1,10 +1,17 @@
+from collections.abc import Collection
+from inspect import signature
 from types import SimpleNamespace
+from typing import get_origin
 from unittest.mock import Mock
 
 from django.test import SimpleTestCase
 
 from users.api.scim.provider_patch import SCIMPatchError
-from users.api.scim.provider_services import _require_provider_actor
+from users.api.scim.provider_services import (
+    _require_provider_actor,
+    create_provider_group,
+    sync_provider_group_members,
+)
 
 
 class ProviderServiceGuardTests(SimpleTestCase):
@@ -39,3 +46,8 @@ class ProviderServiceGuardTests(SimpleTestCase):
 
         superuser = SimpleNamespace(is_authenticated=True, is_superuser=True)
         _require_provider_actor(tenant, superuser, permission="organization.change_membership")
+
+    def test_group_member_service_contract_accepts_set_like_collections(self):
+        for service in (create_provider_group, sync_provider_group_members):
+            annotation = signature(service).parameters["member_ids"].annotation
+            self.assertIs(get_origin(annotation), Collection)

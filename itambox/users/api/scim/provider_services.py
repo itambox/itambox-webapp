@@ -1,6 +1,7 @@
 """Atomic mutation services for provider SCIM PATCH operations."""
 
 import logging
+from collections.abc import Collection
 
 from django.db import IntegrityError, transaction
 from django.db.models import Q
@@ -134,7 +135,13 @@ def _sync_provider_group_members(tenant, group, member_ids, *, actor):
 
 
 @transaction.atomic
-def sync_provider_group_members(tenant, group, member_ids, *, actor):
+def sync_provider_group_members(
+    tenant: object,
+    group: UserGroup,
+    member_ids: Collection[int | str],
+    *,
+    actor: object,
+) -> None:
     """Update an existing provider group with SCIM-owned memberships."""
     _require_provider_actor(tenant, actor, permission="users.change_usergroup")
     return _sync_provider_group_members(tenant, group, member_ids, actor=actor)
@@ -193,7 +200,7 @@ def _save_provider_user_identity(user, patch: UserPatch) -> None:
         ) from exc
 
 
-def apply_provider_user_patch(user, tenant, patch: UserPatch, *, actor):
+def apply_provider_user_patch(user: User, tenant: object, patch: UserPatch, *, actor: object) -> User:
     """Apply a parsed provider-user update in one transaction."""
     _require_provider_actor(tenant, actor, permission="organization.change_membership")
     with transaction.atomic():
@@ -223,7 +230,12 @@ def apply_provider_user_patch(user, tenant, patch: UserPatch, *, actor):
         return user
 
 
-def ensure_provider_group_external_id_available(tenant, external_id, *, exclude_pk=None) -> None:
+def ensure_provider_group_external_id_available(
+    tenant: object,
+    external_id: str,
+    *,
+    exclude_pk: int | None = None,
+) -> None:
     if not external_id:
         return
     queryset = UserGroup.objects.filter(tenant=tenant, external_id=external_id)
@@ -233,7 +245,12 @@ def ensure_provider_group_external_id_available(tenant, external_id, *, exclude_
         raise SCIMPatchError("Group externalId already exists", scim_type="uniqueness", status_code=409)
 
 
-def ensure_provider_group_name_available(tenant, name, *, exclude_pk=None) -> None:
+def ensure_provider_group_name_available(
+    tenant: object,
+    name: str,
+    *,
+    exclude_pk: int | None = None,
+) -> None:
     queryset = UserGroup.objects.filter(tenant=tenant, name=name)
     if exclude_pk is not None:
         queryset = queryset.exclude(pk=exclude_pk)
@@ -242,7 +259,14 @@ def ensure_provider_group_name_available(tenant, name, *, exclude_pk=None) -> No
 
 
 @transaction.atomic
-def create_provider_group(tenant, name, member_ids, *, actor, external_id=""):
+def create_provider_group(
+    tenant: object,
+    name: str,
+    member_ids: Collection[int | str],
+    *,
+    actor: object,
+    external_id: str = "",
+) -> UserGroup:
     _require_provider_actor(tenant, actor, permission="users.add_usergroup")
     ensure_provider_group_external_id_available(tenant, external_id)
     try:
@@ -253,7 +277,7 @@ def create_provider_group(tenant, name, member_ids, *, actor, external_id=""):
     return group
 
 
-def save_provider_group(group, tenant, *, actor) -> None:
+def save_provider_group(group: UserGroup, tenant: object, *, actor: object) -> None:
     _require_provider_actor(tenant, actor, permission="users.change_usergroup")
     _save_group_or_raise(group, translate_integrity=True)
 
@@ -316,7 +340,13 @@ def _save_group_or_raise(group, *, translate_integrity: bool) -> None:
         ) from exc
 
 
-def apply_provider_group_patch(tenant, group, patch: GroupPatch, *, actor):
+def apply_provider_group_patch(
+    tenant: object,
+    group: UserGroup,
+    patch: GroupPatch,
+    *,
+    actor: object,
+) -> UserGroup:
     """Apply a parsed provider-group update and reconcile memberships atomically."""
     _require_provider_actor(tenant, actor, permission="users.change_usergroup")
     with transaction.atomic():

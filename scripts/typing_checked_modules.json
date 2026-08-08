@@ -1,8 +1,8 @@
 {
   "schema_version": 2,
   "canonical_python": "3.12",
-  "next_sequence": 42,
-  "policy_sha256": "2850146d032a8728399d79c9764915d86efbb45dbbca1b33750a27c874f96d9e",
+  "next_sequence": 43,
+  "policy_sha256": "b6d2093a9f7158f497587ca4cb32d962a6981cecf43b07f58dc14469568884b7",
   "config": {
     "config_file": "pyproject.toml",
     "working_directory": "itambox",
@@ -579,6 +579,23 @@
       "note": "Slice-0 pilot, hardened by Slice 2. Pure SCIM PATCH parsing: no ORM, no request state, no Django imports, so it is clean under the normative flags without depending on django-stubs model inference. Explicit Any values remain only at categorised external-JSON boundaries; absent patch fields use the typed _Unset sentinel.",
       "scope": "module",
       "symbols": []
+    },
+    {
+      "sequence": 42,
+      "path": "itambox/users/api/scim/provider_services.py",
+      "module": "users.api.scim.provider_services",
+      "issue": "#93",
+      "note": "Slice 12 symbol admission: the public SCIM provider mutation-service boundaries for user patches, group patches, group creation, uniqueness checks, persistence, and membership reconciliation. Private ORM helpers and endpoint views remain outside this projection; runtime mutation behavior is unchanged.",
+      "scope": "symbols",
+      "symbols": [
+        "apply_provider_group_patch",
+        "apply_provider_user_patch",
+        "create_provider_group",
+        "ensure_provider_group_external_id_available",
+        "ensure_provider_group_name_available",
+        "save_provider_group",
+        "sync_provider_group_members"
+      ]
     },
     {
       "sequence": 10,
