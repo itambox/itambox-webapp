@@ -68,18 +68,18 @@ without valid JSON/value or an OAuth response without a non-empty
 
 The Intune task catches `IntegrationError` explicitly, logs only the structured
 allowlist, and persists `display_message()`. The structured Job append-log line
-is deliberately operator-facing triage; `mark_failed()` remains the generic,
-user-safe message. Optional software degradation is
+is deliberately tenant-scoped operational triage; `mark_failed()` remains the
+generic, user-safe message appended separately. Optional software degradation is
 counted as `software_degraded` in the completed job result and summary log, so it
 is not confused with a tenant that has no detected software. The in-loop
 rate-limit signal is
 not user-visible; the task maps it to the generic safe message. Its last-resort
 unknown failure boundary records only the exception type and traceback source
 location (never the traceback text) and persists a safe generic message. It
-does not use `logger.exception` while provider credential locals may still be
-present. OAuth and Graph request frames are marked with Django's
+avoids `logger.exception` so raw provider exception text and URL-bearing request
+diagnostics cannot enter logs. OAuth and Graph request frames are marked with Django's
 `sensitive_variables()` and transport exceptions are chained from `None` so a
-credential-bearing requests frame is not retained as the public cause. The
+credential-bearing requests frame is not surfaced as the reported cause. The
 optional detected-app endpoint is intentionally non-critical:
 asset discovery remains available when an ordinary retryable provider failure
 hits that endpoint, but authentication, configuration and untrusted-next-link
