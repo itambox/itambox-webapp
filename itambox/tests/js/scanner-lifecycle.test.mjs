@@ -201,6 +201,18 @@ test('audit scanner entrypoint opens the rendered audit overlay', async () => {
   assert.equal(typeof readers.at(-1).onSuccess, 'function');
 });
 
+test('audit scanner entrypoint defers when the audit basket owns the overlay', () => {
+  const openButton = elements.get('audit-open-scanner-btn');
+  openButton.listeners.clear();
+  delete openButton.dataset.scannerInitialized;
+  elements.set('audit-basket-root', new FakeElement('audit-basket-root'));
+
+  document.listeners.get('DOMContentLoaded')();
+
+  assert.equal(openButton.listeners.size, 0);
+  elements.delete('audit-basket-root');
+});
+
 test('global scanner errors stay in the open overlay live region', async () => {
   document.listeners.get('DOMContentLoaded')();
   const openHandler = elements.get('global-open-scanner-btn').listeners.get('click');

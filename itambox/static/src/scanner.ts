@@ -240,6 +240,7 @@ export class AssetScanner {
 // ─── Audit page scanner (fills #barcode-scan-input, submits via HTMX form) ─────
 
 function initAuditScanner(): void {
+  if (document.getElementById('audit-basket-root')) return;
   const openBtn = document.getElementById('audit-open-scanner-btn');
   if (!openBtn || openBtn.dataset.scannerInitialized) return;
   openBtn.dataset.scannerInitialized = 'true';
