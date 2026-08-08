@@ -204,6 +204,7 @@ class IntuneSyncMatchUpdateTest(TenantTestMixin, TransactionTestCase):
                 "created": 0,
                 "skipped": 0,
                 "apps_upserted": 0,
+                "software_degraded": 0,
             },
         )
 

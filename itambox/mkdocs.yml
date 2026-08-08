@@ -178,6 +178,7 @@ nav:
       - Architecture Policy: 'development/architecture-policy.md'
       - Python Import Policy: 'development/python-import-policy.md'
       - Exception Policy: 'development/exception-policy.md'
+      - External Integration Error Contracts: 'development/integration-error-contracts.md'
       - Static Typing Policy: 'development/typing-policy.md'
       - Test Coverage Policy: 'development/test-coverage-policy.md'
       - OpenAPI Schema Policy: 'development/openapi-schema-policy.md'
