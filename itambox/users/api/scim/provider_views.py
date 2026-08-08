@@ -1,11 +1,14 @@
 import uuid
+from collections.abc import Sequence
 
 from django.contrib.auth import get_user_model
 from django.db import IntegrityError, transaction
 from django.db.models import Exists, OuterRef, Prefetch, Q
 from drf_spectacular.utils import extend_schema_view
 from rest_framework import exceptions, status
-from rest_framework.permissions import IsAuthenticated
+from rest_framework.authentication import BaseAuthentication
+from rest_framework.permissions import BasePermission, IsAuthenticated, OperandHolder, SingleOperandHolder
+from rest_framework.request import Request
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
@@ -43,15 +46,15 @@ User = get_user_model()
 
 
 class SCIMProviderMixin:
-    authentication_classes = [SCIMProviderBearerTokenAuthentication]
-    permission_classes = [IsAuthenticated]
+    authentication_classes: Sequence[type[BaseAuthentication]] = [SCIMProviderBearerTokenAuthentication]
+    permission_classes: Sequence[type[BasePermission] | OperandHolder | SingleOperandHolder] = [IsAuthenticated]
 
-    def require_group_permission(self, request, permission):
+    def require_group_permission(self, request: Request, permission: str) -> None:
         """Enforce the method-specific UserGroup permission in the provider tenant."""
         if not request.user.has_perm(permission, obj=self.tenant):
             raise exceptions.PermissionDenied(f"{permission} is required for this provider SCIM group operation.")
 
-    def handle_exception(self, exc):
+    def handle_exception(self, exc: Exception) -> Response:
         from django.core.exceptions import FieldError as DjangoFieldError
         from django.core.exceptions import ValidationError as DjangoValidationError
 
@@ -77,7 +80,7 @@ class SCIMProviderMixin:
                 response.data["scimType"] = scim_type
         return response
 
-    def initial(self, request, *args, **kwargs):
+    def initial(self, request: Request, *args: object, **kwargs: object) -> None:
         super().initial(request, *args, **kwargs)
         provider_slug = self.kwargs.get("provider_slug")
         if not provider_slug:
@@ -110,7 +113,7 @@ class SCIMProviderMixin:
 
 @extend_schema_view(get=scim_schema.SCIM_PROVIDER_SERVICE_PROVIDER_CONFIG)
 class ProviderServiceProviderConfigView(SCIMProviderMixin, APIView):
-    def get(self, request, *args, **kwargs):
+    def get(self, request: Request, *args: object, **kwargs: object) -> Response:
         config_data = {
             "schemas": ["urn:ietf:params:scim:schemas:core:2.0:ServiceProviderConfig"],
             "patch": {"supported": True},

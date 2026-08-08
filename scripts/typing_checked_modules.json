@@ -1,8 +1,8 @@
 {
   "schema_version": 2,
   "canonical_python": "3.12",
-  "next_sequence": 43,
-  "policy_sha256": "b6d2093a9f7158f497587ca4cb32d962a6981cecf43b07f58dc14469568884b7",
+  "next_sequence": 44,
+  "policy_sha256": "a888b8aedbd44d0374b0068f09c90372d7f6afe8b57ce088b5af989cd3bde0f5",
   "config": {
     "config_file": "pyproject.toml",
     "working_directory": "itambox",
@@ -595,6 +595,18 @@
         "ensure_provider_group_name_available",
         "save_provider_group",
         "sync_provider_group_members"
+      ]
+    },
+    {
+      "sequence": 43,
+      "path": "itambox/users/api/scim/provider_views.py",
+      "module": "users.api.scim.provider_views",
+      "issue": "#93",
+      "note": "Slice 13 symbol admission: the mutation-free SCIM provider framework and service-provider-config view classes. User/group list and detail view classes remain outside this slice because class admission includes their out-of-scope mutation handlers; runtime bodies remain unchanged.",
+      "scope": "symbols",
+      "symbols": [
+        "ProviderServiceProviderConfigView",
+        "SCIMProviderMixin"
       ]
     },
     {
