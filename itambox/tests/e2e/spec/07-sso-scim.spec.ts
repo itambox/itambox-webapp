@@ -9,23 +9,81 @@ function requiredEnv(name: string): string {
 }
 
 const scimTenantSlug = requiredEnv('E2E_TENANT_SLUG');
+const isolationTenantSlug = requiredEnv('E2E_ISOLATION_TENANT_SLUG');
+const tenantGroupName = requiredEnv('E2E_TENANT_GROUP_NAME');
 const scimToken = requiredEnv('E2E_SCIM_TOKEN');
+const baseURL = process.env.E2E_BASE_URL || 'http://localhost:8000';
 const scimHeaders = { Authorization: `Bearer ${scimToken}` };
 const scimUrl = (path: string) => `/api/tenants/${scimTenantSlug}/scim/v2/${path}`;
 
-async function expectAssetHolder(
-  request: APIRequestContext,
-  username: string,
-  email: string,
-) {
-  const response = await request.get(
-    `/api/organization/asset-holders/?q=${encodeURIComponent(username)}`,
-  );
-  expect(response.status()).toBe(200);
+const scimErrorSchema = 'urn:ietf:params:scim:api:messages:2.0:Error';
+const scimListSchema = 'urn:ietf:params:scim:api:messages:2.0:ListResponse';
+const scimUserSchema = 'urn:ietf:params:scim:schemas:core:2.0:User';
+const scimGroupSchema = 'urn:ietf:params:scim:schemas:core:2.0:Group';
+
+type ScimUserFixture = {
+  id: string;
+  userName: string;
+  email: string;
+  externalId: string;
+};
+
+async function expectScimError(response: Awaited<ReturnType<APIRequestContext['get']>>, status: number) {
+  expect(response.status()).toBe(status);
   const body = await response.json();
-  expect(body.results).toEqual(
-    expect.arrayContaining([expect.objectContaining({ upn: email, email })]),
-  );
+  expect(body).toMatchObject({
+    schemas: [scimErrorSchema],
+    status: String(status),
+  });
+  expect(body.detail).toEqual(expect.any(String));
+  return body;
+}
+
+async function createScimUser(request: APIRequestContext, label: string): Promise<ScimUserFixture> {
+  const suffix = `${Date.now()}-${label}`;
+  const user = {
+    userName: `e2e.scim.${suffix}`,
+    email: `e2e.scim.${suffix}@example.com`,
+    externalId: `e2e-external-${suffix}`,
+  };
+  const response = await request.post(scimUrl('Users'), {
+    data: {
+      schemas: [scimUserSchema],
+      externalId: user.externalId,
+      userName: user.userName,
+      name: { givenName: 'E2E', familyName: label },
+      emails: [{ value: user.email, primary: true, type: 'work' }],
+      active: true,
+    },
+  });
+
+  expect(response.status()).toBe(201);
+  const body = await response.json();
+  expect(body).toMatchObject({
+    schemas: [scimUserSchema],
+    userName: user.userName,
+    externalId: user.externalId,
+    name: { givenName: 'E2E', familyName: label },
+    emails: expect.arrayContaining([expect.objectContaining({ value: user.email, primary: true })]),
+    active: true,
+    meta: {
+      resourceType: 'User',
+      location: expect.stringContaining('/Users/'),
+    },
+  });
+  expect(body.id).toMatch(/^[0-9a-f-]{36}$/i);
+
+  return { ...user, id: body.id };
+}
+
+function expectScimListBody(body: Record<string, unknown>) {
+  expect(body).toMatchObject({
+    schemas: [scimListSchema],
+    totalResults: expect.any(Number),
+    itemsPerPage: expect.any(Number),
+    startIndex: 1,
+    Resources: expect.any(Array),
+  });
 }
 
 test.describe('SSO and SCIM 2.0 Provisioning Specs', () => {
@@ -33,7 +91,7 @@ test.describe('SSO and SCIM 2.0 Provisioning Specs', () => {
 
   test.beforeAll(async ({ playwright }) => {
     scimRequest = await playwright.request.newContext({
-      baseURL: process.env.E2E_BASE_URL || 'http://localhost:8000',
+      baseURL,
       extraHTTPHeaders: scimHeaders,
     });
   });
@@ -53,101 +111,262 @@ test.describe('SSO and SCIM 2.0 Provisioning Specs', () => {
     });
   });
 
-  // TIER 1: Feature Coverage (>= 5 tests)
-
   test('1. OIDC login initiation rejects an unknown tenant', async ({ request }) => {
     const response = await request.get('/oidc/authenticate/e2e-missing-tenant/', {
       maxRedirects: 0,
     });
+
     expect(response.status()).toBe(404);
   });
 
-  test('2. OIDC callback without initiation fails closed', async ({ playwright }) => {
+  test('2. OIDC callback without initiation fails closed at the login boundary', async ({ playwright }) => {
     const callbackContext = await playwright.request.newContext({
-      baseURL: process.env.E2E_BASE_URL || 'http://localhost:8000',
+      baseURL,
       storageState: { cookies: [], origins: [] },
     });
     try {
-      const response = await callbackContext.get(
-        '/oidc/callback/?code=mockcode123&state=mockstate123',
+      const callback = await callbackContext.get(
+        '/oidc/callback/?code=uninitiated-code&state=uninitiated-state',
         { maxRedirects: 0 },
       );
-      expect(response.status()).toBe(302);
-      expect(response.headers()['location']).toBe('/');
+      expect(callback.status()).toBe(302);
+      expect(callback.headers()['location']).toBe('/');
 
-      const permissionsRes = await callbackContext.get('/api/users/config/');
-      expect(permissionsRes.status()).toBe(401);
+      const dashboard = await callbackContext.get('/', { maxRedirects: 0 });
+      expect(dashboard.status()).toBe(302);
+      expect(dashboard.headers()['location']).toMatch(/^\/accounts\/login\//);
     } finally {
       await callbackContext.dispose();
     }
   });
 
-  test('3. SCIM User Provisioning creates a user in the configured tenant', async () => {
-    const uniqueUser = `scim.test.user.${Date.now()}`;
-    const scimUserPayload = {
-      schemas: ["urn:ietf:params:scim:schemas:core:2.0:User"],
-      userName: uniqueUser,
-      name: {
-        givenName: "Scim",
-        familyName: "Test"
+  test('3. Tenant SCIM ServiceProviderConfig advertises the supported contract', async () => {
+    const response = await scimRequest.get(scimUrl('ServiceProviderConfig'));
+
+    expect(response.status()).toBe(200);
+    const body = await response.json();
+    expect(body).toMatchObject({
+      schemas: ['urn:ietf:params:scim:schemas:core:2.0:ServiceProviderConfig'],
+      patch: { supported: true },
+      bulk: { supported: false },
+      filter: { supported: true, maxResults: 200 },
+      changePassword: { supported: false },
+      sort: { supported: false },
+      etag: { supported: false },
+      authenticationSchemes: [expect.objectContaining({ type: 'oauthbearertoken', primary: true })],
+    });
+  });
+
+  test('4. Tenant SCIM User create persists and is readable through list and detail APIs', async () => {
+    const user = await createScimUser(scimRequest, 'Create');
+
+    const detail = await scimRequest.get(scimUrl(`Users/${user.id}`));
+    expect(detail.status()).toBe(200);
+    const detailBody = await detail.json();
+    expect(detailBody).toMatchObject({
+      schemas: [scimUserSchema],
+      id: user.id,
+      userName: user.userName,
+      externalId: user.externalId,
+      active: true,
+      emails: expect.arrayContaining([expect.objectContaining({ value: user.email })]),
+      meta: { location: scimUrl(`Users/${user.id}`) },
+    });
+
+    const list = await scimRequest.get(
+      `${scimUrl('Users')}?filter=${encodeURIComponent(`userName eq "${user.userName}"`)}`,
+    );
+    expect(list.status()).toBe(200);
+    const listBody = await list.json();
+    expectScimListBody(listBody);
+    expect(listBody.totalResults).toBe(1);
+    expect(listBody.Resources).toEqual(
+      expect.arrayContaining([expect.objectContaining({ id: user.id, userName: user.userName })]),
+    );
+  });
+
+  test('5. Tenant SCIM User PATCH updates identity and tenant active state', async () => {
+    const user = await createScimUser(scimRequest, 'Patch');
+    const replacementExternalId = `${user.externalId}-updated`;
+
+    const response = await scimRequest.patch(scimUrl(`Users/${user.id}`), {
+      data: {
+        schemas: ['urn:ietf:params:scim:api:messages:2.0:PatchOp'],
+        Operations: [
+          { op: 'replace', path: 'name.givenName', value: 'Patched' },
+          { op: 'replace', path: 'active', value: false },
+          { op: 'replace', path: 'externalId', value: replacementExternalId },
+        ],
       },
-      emails: [{
-        value: `${uniqueUser}@example.com`,
-        primary: true
-      }],
-      active: true
-    };
-
-    const response = await scimRequest.post(scimUrl('Users'), {
-      data: scimUserPayload
     });
 
-    expect(response.status()).toBe(201);
-    const json = await response.json();
-    expect(json.userName).toBe(uniqueUser);
-    expect(json.id).toBeDefined();
-  });
-
-  test('4. SCIM User profile sync: Syncing a user via SCIM provisions matching AssetHolder', async ({ request }) => {
-    // Verify that syncing a user automatically creates an AssetHolder in organization
-    const uniqueUser = `scim.holder.sync.${Date.now()}`;
-    const email = `${uniqueUser}@example.com`;
-    const payload = {
-      schemas: ["urn:ietf:params:scim:schemas:core:2.0:User"],
-      userName: uniqueUser,
-      name: { givenName: "Holder", familyName: "Sync" },
-      emails: [{ value: email, primary: true }]
-    };
-
-    const response = await scimRequest.post(scimUrl('Users'), { data: payload });
-    expect(response.status()).toBe(201);
-    await expectAssetHolder(request, uniqueUser, email);
-  });
-
-  test('5. Tenant SCIM group creation is rejected by the read-only contract', async ({ request }) => {
-    const scimGroupPayload = {
-      schemas: ["urn:ietf:params:scim:schemas:core:2.0:Group"],
-      displayName: "IT-Admins",
-      members: []
-    };
-
-    const response = await scimRequest.post(scimUrl('Groups'), {
-      data: scimGroupPayload
+    expect(response.status()).toBe(200);
+    const body = await response.json();
+    expect(body).toMatchObject({
+      schemas: [scimUserSchema],
+      id: user.id,
+      userName: user.userName,
+      externalId: replacementExternalId,
+      name: { givenName: 'Patched' },
+      active: false,
     });
 
-    expect(response.status()).toBe(403);
+    const persisted = await scimRequest.get(scimUrl(`Users/${user.id}`));
+    expect(persisted.status()).toBe(200);
+    expect(await persisted.json()).toMatchObject({
+      id: user.id,
+      externalId: replacementExternalId,
+      name: { givenName: 'Patched' },
+      active: false,
+    });
   });
 
-  // TIER 2: Boundary & Corner Cases (>= 5 tests)
+  test('6. Tenant SCIM User PUT replaces the supported identity fields', async () => {
+    const user = await createScimUser(scimRequest, 'Put');
+    const replacement = {
+      userName: `${user.userName}.replaced`,
+      email: `${user.userName}.replaced@example.com`,
+      externalId: `${user.externalId}-replaced`,
+    };
 
-  test('6. OIDC provider errors terminate an existing session', async ({ browser }) => {
-    // Use an isolated, unauthenticated context. browser.newContext() inherits
-    // the project's authenticated storageState (see playwright.config.ts `use`),
-    // so '/' would render the dashboard with no login form and the fill() below
-    // would hang until the test times out. This scenario must establish its own
-    // session so it can then observe that session being terminated.
+    const response = await scimRequest.put(scimUrl(`Users/${user.id}`), {
+      data: {
+        schemas: [scimUserSchema],
+        externalId: replacement.externalId,
+        userName: replacement.userName,
+        name: { givenName: 'Replaced', familyName: 'Identity' },
+        emails: [{ value: replacement.email, primary: true }],
+        active: true,
+      },
+    });
+
+    expect(response.status()).toBe(200);
+    const body = await response.json();
+    expect(body).toMatchObject({
+      schemas: [scimUserSchema],
+      id: user.id,
+      userName: replacement.userName,
+      externalId: replacement.externalId,
+      name: { givenName: 'Replaced', familyName: 'Identity' },
+      emails: expect.arrayContaining([expect.objectContaining({ value: replacement.email })]),
+      active: true,
+    });
+  });
+
+  test('7. Tenant SCIM User DELETE removes the tenant membership and resource visibility', async () => {
+    const user = await createScimUser(scimRequest, 'Delete');
+
+    const deleted = await scimRequest.delete(scimUrl(`Users/${user.id}`));
+    expect(deleted.status()).toBe(204);
+
+    await expectScimError(await scimRequest.get(scimUrl(`Users/${user.id}`)), 404);
+    const list = await scimRequest.get(
+      `${scimUrl('Users')}?filter=${encodeURIComponent(`userName eq "${user.userName}"`)}`,
+    );
+    expect(list.status()).toBe(200);
+    const body = await list.json();
+    expectScimListBody(body);
+    expect(body.totalResults).toBe(0);
+  });
+
+  test('8. Tenant SCIM duplicate username returns a typed 409 uniqueness error', async () => {
+    const user = await createScimUser(scimRequest, 'Duplicate');
+    const duplicate = await scimRequest.post(scimUrl('Users'), {
+      data: {
+        schemas: [scimUserSchema],
+        externalId: `${user.externalId}-second`,
+        userName: user.userName,
+        name: { givenName: 'Duplicate', familyName: 'User' },
+        emails: [{ value: `${user.userName}.second@example.com`, primary: true }],
+        active: true,
+      },
+    });
+
+    const body = await expectScimError(duplicate, 409);
+    expect(body.scimType).toBe('uniqueness');
+  });
+
+  test('9. Tenant SCIM malformed User resource IDs return a typed 404', async () => {
+    const response = await scimRequest.patch(scimUrl('Users/not-a-resource-id'), {
+      data: {
+        schemas: ['urn:ietf:params:scim:api:messages:2.0:PatchOp'],
+        Operations: [{ op: 'replace', path: 'active', value: false }],
+      },
+    });
+
+    await expectScimError(response, 404);
+  });
+
+  test('10. Tenant SCIM Groups remain read-only and expose tenant-owned data only', async () => {
+    const filter = encodeURIComponent(`displayName eq "${tenantGroupName}"`);
+    const list = await scimRequest.get(`${scimUrl('Groups')}?filter=${filter}`);
+    expect(list.status()).toBe(200);
+    const listBody = await list.json();
+    expectScimListBody(listBody);
+    expect(listBody.totalResults).toBe(1);
+    expect(listBody.Resources).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          schemas: [scimGroupSchema],
+          displayName: tenantGroupName,
+          members: [],
+          meta: expect.objectContaining({ resourceType: 'Group' }),
+        }),
+      ]),
+    );
+
+    const group = listBody.Resources[0];
+    expect(group.id).toMatch(/^[0-9a-f-]{36}$/i);
+    const detailUrl = scimUrl(`Groups/${group.id}`);
+    const detail = await scimRequest.get(detailUrl);
+    expect(detail.status()).toBe(200);
+    expect(await detail.json()).toMatchObject({
+      schemas: [scimGroupSchema],
+      id: group.id,
+      displayName: tenantGroupName,
+      members: [],
+      meta: expect.objectContaining({ location: detailUrl }),
+    });
+
+    const create = await scimRequest.post(scimUrl('Groups'), {
+      data: { schemas: [scimGroupSchema], displayName: `${tenantGroupName} create-attempt`, members: [] },
+    });
+    await expectScimError(create, 403);
+
+    const replace = await scimRequest.put(detailUrl, {
+      data: { schemas: [scimGroupSchema], displayName: `${tenantGroupName} replace-attempt`, members: [] },
+    });
+    await expectScimError(replace, 403);
+
+    const patch = await scimRequest.patch(detailUrl, {
+      data: {
+        schemas: ['urn:ietf:params:scim:api:messages:2.0:PatchOp'],
+        Operations: [{ op: 'replace', path: 'displayName', value: `${tenantGroupName} patch-attempt` }],
+      },
+    });
+    await expectScimError(patch, 403);
+
+    const remove = await scimRequest.delete(detailUrl);
+    await expectScimError(remove, 403);
+
+    const unchanged = await scimRequest.get(detailUrl);
+    expect(unchanged.status()).toBe(200);
+    expect(await unchanged.json()).toMatchObject({ displayName: tenantGroupName, members: [] });
+  });
+
+  test('11. Tenant-scoped bearer auth rejects another tenant and anonymous unknown tenants without disclosure', async ({ request }) => {
+    const foreignTenant = await scimRequest.get(`/api/tenants/${isolationTenantSlug}/scim/v2/Users`);
+    await expectScimError(foreignTenant, 401);
+
+    const anonymousUnknown = await request.get('/api/tenants/e2e-missing-tenant/scim/v2/Users');
+    const body = await expectScimError(anonymousUnknown, 401);
+    expect(body.detail.toLowerCase()).not.toContain('not found');
+    expect(body.detail.toLowerCase()).not.toContain('e2e-missing-tenant');
+  });
+
+  test('12. OIDC provider errors terminate an existing authenticated UI session', async ({ browser }) => {
     const authenticatedContext = await browser.newContext({
-      baseURL: process.env.E2E_BASE_URL || 'http://localhost:8000',
+      baseURL,
       storageState: { cookies: [], origins: [] },
     });
     try {
@@ -156,158 +375,25 @@ test.describe('SSO and SCIM 2.0 Provisioning Specs', () => {
       await page.fill('input[name="username"]', requiredEnv('E2E_USERNAME'));
       await page.fill('input[name="password"]', requiredEnv('E2E_PASSWORD'));
       await Promise.all([
-        // Wait for the post-login document 'load' rather than 'networkidle':
-        // the authenticated dashboard registers a service worker and lazy-loads
-        // HTMX panels, so the network never goes idle and 'networkidle' hangs
-        // until the test timeout. 'load' is deterministic and sufficient — the
-        // session cookie is set by the login redirect before the page loads.
         page.waitForNavigation({ waitUntil: 'load' }),
         page.click('button[type="submit"]'),
       ]);
 
-      const beforeLogout = await authenticatedContext.request.get('/api/users/config/');
+      const beforeLogout = await authenticatedContext.request.get('/', { maxRedirects: 0 });
       expect(beforeLogout.status()).toBe(200);
 
-      const response = await authenticatedContext.request.get(
+      const callback = await authenticatedContext.request.get(
         '/oidc/callback/?error=access_denied&state=expired_state',
         { maxRedirects: 0 },
       );
-      expect(response.status()).toBe(302);
-      expect(response.headers()['location']).toBe('/');
+      expect(callback.status()).toBe(302);
+      expect(callback.headers()['location']).toBe('/');
 
-      const permissionsRes = await authenticatedContext.request.get('/api/users/config/');
-      expect(permissionsRes.status()).toBe(401);
+      const afterLogout = await authenticatedContext.request.get('/', { maxRedirects: 0 });
+      expect(afterLogout.status()).toBe(302);
+      expect(afterLogout.headers()['location']).toMatch(/^\/accounts\/login\//);
     } finally {
       await authenticatedContext.close();
     }
   });
-
-  test('7. SCIM User creation with duplicate username returns 409 Conflict', async () => {
-    const duplicateUser = `duplicate.user.${Date.now()}`;
-    const payload = {
-      schemas: ["urn:ietf:params:scim:schemas:core:2.0:User"],
-      userName: duplicateUser,
-      name: { givenName: "Dup", familyName: "User" },
-      emails: [{ value: `${duplicateUser}@example.com`, primary: true }]
-    };
-
-    const firstResponse = await scimRequest.post(scimUrl('Users'), { data: payload });
-    expect(firstResponse.status()).toBe(201);
-
-    const duplicateResponse = await scimRequest.post(scimUrl('Users'), { data: payload });
-    expect(duplicateResponse.status()).toBe(409);
-  });
-
-  test('8. Unauthenticated SCIM request targeting a non-existent tenant fails closed', async ({ request }) => {
-    const response = await request.get('/api/tenants/non-existent-tenant-999/scim/v2/Users');
-    // Authentication runs before tenant disclosure, so an anonymous caller must
-    // not be able to enumerate which tenant slugs exist.
-    expect(response.status()).toBe(401);
-  });
-
-  test('9. SCIM User patch with a malformed resource ID returns 404 without crashing', async () => {
-    const response = await scimRequest.patch(scimUrl('Users/some-user-id'), {
-      data: {
-        schemas: ["urn:ietf:params:scim:api:messages:2.0:PatchOp"],
-        Operations: [{ op: "replace", path: "active", value: false }]
-      }
-    });
-    // Detail routes dual-read opaque UUIDs and legacy integer IDs. An identifier
-    // matching neither shape must fail closed without reaching a resource.
-    expect(response.status()).toBe(404);
-  });
-
-  test('10. Tenant SCIM group updates are rejected by the read-only contract', async () => {
-    const groupPatchPayload = {
-      schemas: ["urn:ietf:params:scim:api:messages:2.0:PatchOp"],
-      Operations: [{
-        op: "add",
-        path: "members",
-        value: [{ value: "non-existent-user-uuid" }]
-      }]
-    };
-
-    const groupPatchResponse = await scimRequest.patch(scimUrl('Groups/2147483647'), {
-      data: groupPatchPayload
-    });
-    expect(groupPatchResponse.status()).toBe(403);
-  });
-
-  // TIER 3: Cross-Feature Combinations (combo 2)
-
-  test('11. SCIM group writes and failed OIDC callbacks do not grant permissions', async ({ playwright }) => {
-    const uniqueUser = `scim.combo.${Date.now()}`;
-    const userPayload = {
-      schemas: ["urn:ietf:params:scim:schemas:core:2.0:User"],
-      userName: uniqueUser,
-      name: { givenName: "Combo", familyName: "User" },
-      emails: [{ value: `${uniqueUser}@example.com`, primary: true }]
-    };
-
-    const userRes = await scimRequest.post(scimUrl('Users'), { data: userPayload });
-    expect(userRes.status()).toBe(201);
-    const userJson = await userRes.json();
-
-    const groupRes = await scimRequest.post(scimUrl('Groups'), {
-      data: {
-        schemas: ["urn:ietf:params:scim:schemas:core:2.0:Group"],
-        displayName: "IT-Admins",
-        members: [{ value: userJson.id, display: uniqueUser }]
-      }
-    });
-    expect(groupRes.status()).toBe(403);
-
-    const callbackContext = await playwright.request.newContext({
-      baseURL: process.env.E2E_BASE_URL || 'http://localhost:8000',
-      storageState: { cookies: [], origins: [] },
-    });
-    try {
-      await callbackContext.get(
-        `/oidc/callback/?code=combo_code&state=combo_state&username=${uniqueUser}`,
-        { maxRedirects: 0 },
-      );
-
-      const permissionsRes = await callbackContext.get('/api/users/config/');
-      expect(permissionsRes.status()).toBe(401);
-    } finally {
-      await callbackContext.dispose();
-    }
-  });
-
-  // TIER 4: Real-World Scenarios (workload 2)
-
-  test('12. Enterprise SCIM provisioning creates holders while groups stay read-only', async ({ request }) => {
-    const suffix = Date.now();
-    const users = [`scim.ent.1.${suffix}`, `scim.ent.2.${suffix}`];
-    const createdUsers: Array<{ id: string; username: string; email: string }> = [];
-
-    for (const username of users) {
-      const email = `${username}@enterprise.com`;
-      const response = await scimRequest.post(scimUrl('Users'), {
-        data: {
-          schemas: ["urn:ietf:params:scim:schemas:core:2.0:User"],
-          userName: username,
-          name: { givenName: username, familyName: "Enterprise" },
-          emails: [{ value: email, primary: true }]
-        }
-      });
-      expect(response.status()).toBe(201);
-      const body = await response.json();
-      createdUsers.push({ id: body.id, username, email });
-    }
-
-    const groupRes = await scimRequest.post(scimUrl('Groups'), {
-      data: {
-        schemas: ["urn:ietf:params:scim:schemas:core:2.0:Group"],
-        displayName: "Enterprise-Staff",
-        members: createdUsers.map(user => ({ value: user.id }))
-      }
-    });
-    expect(groupRes.status()).toBe(403);
-
-    for (const user of createdUsers) {
-      await expectAssetHolder(request, user.username, user.email);
-    }
-  });
-
 });

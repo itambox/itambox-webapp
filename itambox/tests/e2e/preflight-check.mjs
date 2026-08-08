@@ -7,7 +7,8 @@
  * with `node preflight-check.mjs` for a standalone prerequisite report.
  *
  * Checks:
- *   1. E2E_USERNAME / E2E_PASSWORD / E2E_TENANT_SLUG / E2E_SCIM_TOKEN are set
+ *   1. E2E_USERNAME / E2E_PASSWORD / E2E_TENANT_SLUG / E2E_ISOLATION_TENANT_SLUG /
+ *      E2E_TENANT_GROUP_NAME / E2E_SCIM_TOKEN are set
  *   2. Python virtual environment exists
  *   3. Django system checks pass
  *   4. Database migrations are applied
@@ -75,6 +76,18 @@ if (process.env.E2E_TENANT_SLUG) {
   ok(`E2E_TENANT_SLUG = ${process.env.E2E_TENANT_SLUG}`);
 } else {
   fail('E2E_TENANT_SLUG is not set');
+}
+
+if (process.env.E2E_ISOLATION_TENANT_SLUG) {
+  ok(`E2E_ISOLATION_TENANT_SLUG = ${process.env.E2E_ISOLATION_TENANT_SLUG}`);
+} else {
+  fail('E2E_ISOLATION_TENANT_SLUG is not set');
+}
+
+if (process.env.E2E_TENANT_GROUP_NAME) {
+  ok('E2E_TENANT_GROUP_NAME is set');
+} else {
+  fail('E2E_TENANT_GROUP_NAME is not set');
 }
 
 if (process.env.E2E_SCIM_TOKEN) {
@@ -154,6 +167,8 @@ if (errors === 0) {
   console.error('  export E2E_USERNAME=admin');
   console.error('  export E2E_PASSWORD=admin123');
   console.error('  export E2E_TENANT_SLUG=northwind-internal-it');
+  console.error('  export E2E_ISOLATION_TENANT_SLUG=e2e-isolation-tenant');
+  console.error('  export E2E_TENANT_GROUP_NAME="E2E Tenant Read-Only Group"');
   console.error('  export E2E_SCIM_TOKEN=<tenant-scoped-write-token>');
   console.error('  make seed          # ensure seed data exists');
   console.error('  make migrate       # ensure migrations are applied');

@@ -44,6 +44,8 @@ jobs:
       DJANGO_SUPERUSER_EMAIL: e2e@itambox.local
       E2E_USERNAME: e2e-admin
       E2E_TENANT_SLUG: helix-rnd
+      E2E_ISOLATION_TENANT_SLUG: e2e-isolation-tenant
+      E2E_TENANT_GROUP_NAME: E2E Tenant Read-Only Group
       E2E_BASE_URL: http://localhost:8000
       # Playwright's webServer config uses a venv path; in CI we manage the server
       # ourselves for reliability and to avoid venv path assumptions.
@@ -153,7 +155,7 @@ jobs:
 
           from django.contrib.auth import get_user_model
           from organization.models import Tenant
-          from users.models import Token
+          from users.models import Token, UserGroup
 
           User = get_user_model()
           user, _ = User.objects.get_or_create(
@@ -171,6 +173,16 @@ jobs:
               slug=os.environ["E2E_TENANT_SLUG"],
               is_provider=False,
               deleted_at__isnull=True,
+          )
+          isolation_tenant, _ = Tenant._base_manager.get_or_create(
+              slug=os.environ["E2E_ISOLATION_TENANT_SLUG"],
+              defaults={"name": "E2E Isolation Tenant", "is_provider": False},
+          )
+          if isolation_tenant.is_provider or isolation_tenant.deleted_at is not None:
+              raise RuntimeError("E2E isolation fixture tenant must be a live non-provider tenant")
+          UserGroup._base_manager.get_or_create(
+              tenant=tenant,
+              name=os.environ["E2E_TENANT_GROUP_NAME"],
           )
           Token.objects.filter(user=user, description="GitHub Actions E2E SCIM").delete()
           token = Token.objects.create(
