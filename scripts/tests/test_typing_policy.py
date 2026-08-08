@@ -1009,7 +1009,7 @@ class CommittedRecordTests(unittest.TestCase):
     def test_the_committed_record_is_internally_consistent(self):
         self.assertEqual(gate.check_record(REPO_ROOT, self.policy, self.record), ())
 
-    def test_the_committed_record_lists_the_slice_zero_through_slice_thirteen_admissions(self):
+    def test_the_committed_record_lists_the_slice_zero_through_slice_fourteen_admissions(self):
         self.assertEqual(
             [entry["path"] for entry in self.record["checked"]],
             [
@@ -1311,7 +1311,14 @@ class CommittedRecordTests(unittest.TestCase):
                 ),
                 "itambox/users/api/scim/provider_views.py": (
                     "symbols",
-                    ["ProviderServiceProviderConfigView", "SCIMProviderMixin"],
+                    [
+                        "ProviderServiceProviderConfigView",
+                        "SCIMProviderGroupDetailView",
+                        "SCIMProviderGroupListView",
+                        "SCIMProviderMixin",
+                        "SCIMProviderUserDetailView",
+                        "SCIMProviderUserListView",
+                    ],
                 ),
                 "itambox/users/api/scim/serializers.py": (
                     "symbols",
@@ -1373,12 +1380,22 @@ class CommittedRecordTests(unittest.TestCase):
         self.assertEqual(entries[path]["scope"], "symbols")
         self.assertEqual(entries[path]["symbols"], expected)
 
-    def test_the_committed_record_admits_only_the_mutation_free_provider_view_classes(self):
+    def test_the_committed_record_admits_the_provider_framework_and_user_view_classes(self):
         entries = {entry["path"]: entry for entry in self.record["checked"]}
         path = "itambox/users/api/scim/provider_views.py"
 
         self.assertEqual(entries[path]["scope"], "symbols")
-        self.assertEqual(entries[path]["symbols"], ["ProviderServiceProviderConfigView", "SCIMProviderMixin"])
+        self.assertEqual(
+            entries[path]["symbols"],
+            [
+                "ProviderServiceProviderConfigView",
+                "SCIMProviderGroupDetailView",
+                "SCIMProviderGroupListView",
+                "SCIMProviderMixin",
+                "SCIMProviderUserDetailView",
+                "SCIMProviderUserListView",
+            ],
+        )
 
     def test_the_committed_pilot_satisfies_the_marker_and_suppression_grammars(self):
         self.assertEqual(gate.check_markers(REPO_ROOT, self.record), ())

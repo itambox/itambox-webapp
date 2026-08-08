@@ -119,3 +119,116 @@ class ProviderViewSignatureTests(SimpleTestCase):
             {name: mixin_hints[name] for name in expected_mixin_annotations},
             expected_mixin_annotations,
         )
+
+    def test_provider_user_mutation_signatures_are_typed(self):
+        importlib.import_module("itambox.api")
+        from django.db.models import QuerySet
+        from rest_framework.request import Request
+        from rest_framework.response import Response
+
+        from users.api.scim.provider_views import SCIMProviderUserDetailView, SCIMProviderUserListView
+
+        user_model = importlib.import_module("users.models").User
+        contracts = (
+            (
+                SCIMProviderUserListView._retry_correlated_user,
+                [
+                    ("self", Parameter.POSITIONAL_OR_KEYWORD),
+                    ("username", Parameter.POSITIONAL_OR_KEYWORD),
+                    ("external_id", Parameter.POSITIONAL_OR_KEYWORD),
+                ],
+                {"username": str, "external_id": str, "return": user_model},
+            ),
+            (
+                SCIMProviderUserListView.get,
+                [
+                    ("self", Parameter.POSITIONAL_OR_KEYWORD),
+                    ("request", Parameter.POSITIONAL_OR_KEYWORD),
+                    ("args", Parameter.VAR_POSITIONAL),
+                    ("kwargs", Parameter.VAR_KEYWORD),
+                ],
+                {"request": Request, "args": object, "kwargs": object, "return": Response},
+            ),
+            (
+                SCIMProviderUserListView.post,
+                [
+                    ("self", Parameter.POSITIONAL_OR_KEYWORD),
+                    ("request", Parameter.POSITIONAL_OR_KEYWORD),
+                    ("args", Parameter.VAR_POSITIONAL),
+                    ("kwargs", Parameter.VAR_KEYWORD),
+                ],
+                {"request": Request, "args": object, "kwargs": object, "return": Response},
+            ),
+            (
+                SCIMProviderUserDetailView._staff_queryset,
+                [("self", Parameter.POSITIONAL_OR_KEYWORD)],
+                {"return": QuerySet[user_model]},
+            ),
+            *(
+                (
+                    getattr(SCIMProviderUserDetailView, method_name),
+                    [
+                        ("self", Parameter.POSITIONAL_OR_KEYWORD),
+                        ("request", Parameter.POSITIONAL_OR_KEYWORD),
+                        ("pk", Parameter.POSITIONAL_OR_KEYWORD),
+                        ("args", Parameter.VAR_POSITIONAL),
+                        ("kwargs", Parameter.VAR_KEYWORD),
+                    ],
+                    {"request": Request, "pk": str, "args": object, "kwargs": object, "return": Response},
+                )
+                for method_name in ("get", "put", "patch", "delete")
+            ),
+        )
+
+        for method, expected_parameters, expected_annotations in contracts:
+            with self.subTest(method=method.__qualname__):
+                self.assertEqual(
+                    [(name, parameter.kind) for name, parameter in signature(method).parameters.items()],
+                    expected_parameters,
+                )
+                self.assertEqual(get_type_hints(method), expected_annotations)
+
+    def test_provider_group_mutation_signatures_are_typed(self):
+        importlib.import_module("itambox.api")
+        from rest_framework.request import Request
+        from rest_framework.response import Response
+
+        from users.api.scim.provider_views import SCIMProviderGroupDetailView, SCIMProviderGroupListView
+
+        contracts = (
+            *(
+                (
+                    getattr(SCIMProviderGroupListView, method_name),
+                    [
+                        ("self", Parameter.POSITIONAL_OR_KEYWORD),
+                        ("request", Parameter.POSITIONAL_OR_KEYWORD),
+                        ("args", Parameter.VAR_POSITIONAL),
+                        ("kwargs", Parameter.VAR_KEYWORD),
+                    ],
+                    {"request": Request, "args": object, "kwargs": object, "return": Response},
+                )
+                for method_name in ("get", "post")
+            ),
+            *(
+                (
+                    getattr(SCIMProviderGroupDetailView, method_name),
+                    [
+                        ("self", Parameter.POSITIONAL_OR_KEYWORD),
+                        ("request", Parameter.POSITIONAL_OR_KEYWORD),
+                        ("pk", Parameter.POSITIONAL_OR_KEYWORD),
+                        ("args", Parameter.VAR_POSITIONAL),
+                        ("kwargs", Parameter.VAR_KEYWORD),
+                    ],
+                    {"request": Request, "pk": str, "args": object, "kwargs": object, "return": Response},
+                )
+                for method_name in ("get", "put", "patch", "delete")
+            ),
+        )
+
+        for method, expected_parameters, expected_annotations in contracts:
+            with self.subTest(method=method.__qualname__):
+                self.assertEqual(
+                    [(name, parameter.kind) for name, parameter in signature(method).parameters.items()],
+                    expected_parameters,
+                )
+                self.assertEqual(get_type_hints(method), expected_annotations)
