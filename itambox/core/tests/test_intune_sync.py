@@ -95,7 +95,7 @@ class IntuneTokenRefreshTest(TransactionTestCase):
 
         from core.integrations.intune import _TOKEN_CACHE, _get_token
 
-        _TOKEN_CACHE["tenant-y"] = {"token": "old-tok", "expires_at": time.monotonic() - 1}
+        _TOKEN_CACHE[("tenant-y", "cid")] = {"token": "old-tok", "expires_at": time.monotonic() - 1}
 
         with patch("core.integrations.intune.requests.post") as mock_post:
             mock_post.return_value = MagicMock(
@@ -118,13 +118,16 @@ class IntunePaginationTest(TransactionTestCase):
 
         call_count = 0
 
-        def fake_get(url, headers, timeout):
+        def fake_get(url, headers, timeout, allow_redirects):
             nonlocal call_count
             call_count += 1
             if call_count == 1:
                 r = MagicMock()
                 r.status_code = 200
-                r.json.return_value = {"value": [{"id": "d1"}], "@odata.nextLink": "https://graph/page2"}
+                r.json.return_value = {
+                    "value": [{"id": "d1"}],
+                    "@odata.nextLink": "https://graph.microsoft.com/v1.0/page2",
+                }
                 r.raise_for_status = MagicMock()
                 return r
             r = MagicMock()
@@ -134,7 +137,7 @@ class IntunePaginationTest(TransactionTestCase):
             return r
 
         with patch.object(intune_mod.requests, "get", side_effect=fake_get):
-            items = intune_mod._graph_get_paginated("https://graph/page1", {})
+            items = intune_mod._graph_get_paginated("https://graph.microsoft.com/v1.0/page1", {})
 
         self.assertEqual([i["id"] for i in items], ["d1", "d2"])
         self.assertEqual(call_count, 2)
@@ -201,6 +204,7 @@ class IntuneSyncMatchUpdateTest(TenantTestMixin, TransactionTestCase):
                 "created": 0,
                 "skipped": 0,
                 "apps_upserted": 0,
+                "software_degraded": 0,
             },
         )
 

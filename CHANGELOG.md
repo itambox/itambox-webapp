@@ -8,12 +8,14 @@ This changelog follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) 
 
 ### Added
 
+- Added a shared typed external-integration error contract with retryable/terminal classification, safe user messages, bounded Graph retry handling, structured tenant/actor/request context, and documented follow-up boundaries for other adapters.
 - Published the 1.x compatibility, deprecation, and support policy together with a bounded external-contract inventory covering REST/GraphQL/SCIM surfaces, the webhook envelope, persisted choice values, contract-bearing settings, permission codenames, UI URL namespaces, and each capability's contract class and exclusions. A stdlib gate derives every enumerated surface from source and fails when the published contract and the code disagree.
 - Added explicit Purchase Order lifecycle endpoints at `/api/procurement/purchase-orders/{id}/approve/`, `/order/`, `/receive/`, `/cancel/`, and `/reopen/`.
 - Published the bounded procurement Stable qualification matrix, including existing UI, REST, service, tenant, permission, audit, currency, and PostgreSQL concurrency guarantees plus the deliberately absent surfaces.
 
 ### Changed
 
+- Intune discovery now records typed integration failures with safe user-facing messages and structured tenant-scoped job-log context; optional detected-software degradation is explicit in the completed result as `software_degraded`.
 - Qualified the four-state Subscription lifecycle as Stable across model, UI, REST, GraphQL, import/export, assignment, seat-accounting, and daily-task boundaries, including idempotent retries and model-level tenant validation.
 - Subscription status is now a closed four-state lifecycle (`active`, `suspended`, `cancelled`, `expired`) driven by explicit UI, REST, GraphQL, admin, and background actions. The canonical renewal-term field is `vendor_contract_auto_renews`; `auto_renewal` remains a 1.x read/write API compatibility alias.
 - Purchase Order `status` and Purchase Order Line `qty_received` are read-only in the REST schema. API clients must use the corresponding lifecycle endpoint: differing direct writes now return HTTP 400 with sanctioned-action guidance, while identical values remain accepted and ignored for full-representation PUT compatibility. Existing rows require no migration.
@@ -26,6 +28,7 @@ This changelog follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) 
 
 ### Security
 
+- Hardened the Intune Graph boundary against cross-registration token-cache reuse, bearer forwarding through redirects or untrusted `@odata.nextLink` hosts, provider-controlled device-ID path pivots, stale token lifetimes, and credential/payload leakage in exception and job logs.
 - Added cross-tenant read/write matrices for contracts, Purchase Orders, and Purchase Order lines together with real two-connection receipt and approval race tests.
 - Centralized Asset Request-to-Purchase Order linking in a tenant-locked, permission-checked, idempotent service and made failed UI linking roll back the new purchase order.
 - Removed the unused global pip installation and ensurepip bootstrap from the production runtime image, with build-time checks that the copied runtime environment remains pip-free, while preserving locked uv-based dependency resolution in the builder.

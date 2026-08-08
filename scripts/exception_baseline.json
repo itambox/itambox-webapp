@@ -724,30 +724,6 @@
       "count": 1
     },
     {
-      "path": "itambox/core/tasks/intune_sync.py",
-      "scope": "FunctionDef:_sync_device_software",
-      "handler_type": "Exception",
-      "classification": "log-only",
-      "body_sha256": "09d7bb24c1ddadd8155cfc566c89a827c64f3f410d9c6db39d96e9fb88f713d4",
-      "count": 1
-    },
-    {
-      "path": "itambox/core/tasks/intune_sync.py",
-      "scope": "FunctionDef:_sync_device_software",
-      "handler_type": "Exception",
-      "classification": "log-only",
-      "body_sha256": "6a95d650ee8f4abdfb61dc5bbe382659c375dcdea36db4da85fe1ca35f6f59db",
-      "count": 1
-    },
-    {
-      "path": "itambox/core/tasks/intune_sync.py",
-      "scope": "FunctionDef:sync_tenant_intune",
-      "handler_type": "Exception",
-      "classification": "log-only",
-      "body_sha256": "be9fb4d6a3a016d9a1215cdf58a6d662d14b1b20521c87de828c54b53758085b",
-      "count": 1
-    },
-    {
       "path": "itambox/core/tasks/labels.py",
       "scope": "FunctionDef:generate_label_batch_task",
       "handler_type": "Exception",

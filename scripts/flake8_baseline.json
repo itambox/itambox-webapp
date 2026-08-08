@@ -4853,22 +4853,6 @@
     },
     {
       "path": "itambox/core/tasks/intune_sync.py",
-      "code": "B907",
-      "message": "'tenant.slug' is manually surrounded by quotes, consider using the `!r` conversion flag.",
-      "source": "raise ValueError(f\"No ITAMBOX_TENANT_INTUNE_CONFIGS entry for tenant '{tenant.slug}'.\")",
-      "context": "Module:body/FunctionDef:_run_sync:body/If:UnaryOp(op=Not(), operand=Name(id='config', ctx=Load())):body",
-      "count": 1
-    },
-    {
-      "path": "itambox/core/tasks/intune_sync.py",
-      "code": "C901",
-      "message": "'_sync_device_software' is too complex (11)",
-      "source": "def _sync_device_software(",
-      "context": "Module:body/FunctionDef:_sync_device_software:self",
-      "count": 1
-    },
-    {
-      "path": "itambox/core/tasks/intune_sync.py",
       "code": "F401",
       "message": "'assets.models.AssetType' imported but unused",
       "source": "    from assets.models import Asset, AssetType, Manufacturer, StatusLabel",

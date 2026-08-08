@@ -190,7 +190,7 @@
       "path": "itambox/core/tasks/intune_sync.py",
       "module": "core.tasks.intune_sync",
       "issue": "#93",
-      "note": "Slice 10 symbol admission: the Intune discovery task's named Graph payload and persisted result contracts and its task/service boundaries. IntuneDevicePayload and IntuneAppPayload describe the selected string fields consumed from the external Graph JSON; IntuneSyncResult fixes the six integer count keys Job.result stores after a run; tenant, asset, and service internals remain outside the projection.",
+      "note": "Slice 10 symbol admission: the Intune discovery task's named Graph payload and persisted result contracts and its task/service boundaries. IntuneDevicePayload and IntuneAppPayload describe the selected string fields consumed from the external Graph JSON; IntuneSyncResult fixes the seven integer count keys Job.result stores after a run; tenant, asset, and service internals remain outside the projection.",
       "scope": "symbols",
       "symbols": [
         "IntuneAppPayload",
