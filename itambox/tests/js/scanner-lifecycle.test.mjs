@@ -50,7 +50,7 @@ const ids = [
   'torch',
   'open',
   'close',
-  'open-scanner-btn',
+  'audit-open-scanner-btn',
   'audit-scanner-reader',
   'audit-scanner-modal',
   'audit-toggle-torch-btn',
@@ -192,7 +192,7 @@ test('a stale pending start cannot mutate the replacement scanner generation', a
 
 test('audit scanner entrypoint opens the rendered audit overlay', async () => {
   document.listeners.get('DOMContentLoaded')();
-  const openHandler = elements.get('open-scanner-btn').listeners.get('click');
+  const openHandler = elements.get('audit-open-scanner-btn').listeners.get('click');
   assert.equal(typeof openHandler, 'function');
   openHandler();
   await new Promise((resolve) => setImmediate(resolve));
