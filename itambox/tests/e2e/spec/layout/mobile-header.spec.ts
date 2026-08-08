@@ -8,8 +8,20 @@ const tablerCssPath = path.join(repoRoot, 'itambox/static/dist/vendor/tabler/css
 const itamboxCssPath = path.join(repoRoot, 'itambox/static/dist/itambox.css');
 
 function renderedBrand(): string {
-  return fs.readFileSync(brandTemplatePath, 'utf8')
-    .replace("{{ brand_height|default:'36px' }}", '36px');
+  const template = fs.readFileSync(brandTemplatePath, 'utf8');
+  const svgStart = template.indexOf('<svg');
+  const svgEnd = template.indexOf('</svg>', svgStart);
+
+  if (svgStart < 0 || svgEnd < 0) {
+    throw new Error('Brand template does not contain a complete SVG lockup.');
+  }
+
+  // The browser fixture cannot execute Django template tags. Mount the actual
+  // server-rendered SVG payload, rather than leaving {% ... %}/{{ ... }} source
+  // text inside the flex anchor where it changes the measured layout.
+  return template
+    .slice(svgStart, svgEnd + '</svg>'.length)
+    .replace(/\s+\{\{\s*brand_style\.class_name\s*\}\}/, '');
 }
 
 async function mountMobileHeader(page: import('@playwright/test').Page, width: number) {
