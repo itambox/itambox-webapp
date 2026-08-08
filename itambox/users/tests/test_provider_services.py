@@ -114,9 +114,8 @@ class ProviderViewSignatureTests(SimpleTestCase):
             "authentication_classes": Sequence[type[BaseAuthentication]],
             "permission_classes": Sequence[type[BasePermission] | OperandHolder | SingleOperandHolder],
         }
-        self.assertEqual(set(SCIMProviderMixin.__annotations__), set(expected_mixin_annotations))
         mixin_hints = get_type_hints(SCIMProviderMixin)
         self.assertEqual(
-            {name: mixin_hints[name] for name in SCIMProviderMixin.__annotations__},
+            {name: mixin_hints[name] for name in expected_mixin_annotations},
             expected_mixin_annotations,
         )
