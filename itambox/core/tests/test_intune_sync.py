@@ -118,7 +118,7 @@ class IntunePaginationTest(TransactionTestCase):
 
         call_count = 0
 
-        def fake_get(url, headers, timeout):
+        def fake_get(url, headers, timeout, allow_redirects):
             nonlocal call_count
             call_count += 1
             if call_count == 1:

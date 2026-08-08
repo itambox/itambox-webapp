@@ -107,7 +107,7 @@ def _get_token(
     if cached and cached["expires_at"] - 60 > time.monotonic():
         return cached["token"]
 
-    url = f"https://login.microsoftonline.com/{azure_tenant_id}/oauth2/v2.0/token"
+    url = f"https://login.microsoftonline.com/{quote(azure_tenant_id, safe='')}/oauth2/v2.0/token"
     try:
         resp = requests.post(
             url,
@@ -118,6 +118,7 @@ def _get_token(
                 "scope": "https://graph.microsoft.com/.default",
             },
             timeout=30,
+            allow_redirects=False,
         )
     except (
         requests_exceptions.SSLError,
@@ -133,18 +134,26 @@ def _get_token(
     try:
         data = resp.json()
     except (TypeError, ValueError) as exc:
-        raise IntegrationContractError(context=context, status_code=resp.status_code) from exc
+        raise IntegrationContractError(
+            context=context,
+            status_code=resp.status_code,
+            cause_type=type(exc).__name__,
+        ) from None
     if not isinstance(data, dict) or not isinstance(data.get("access_token"), str) or not data["access_token"]:
         raise IntegrationContractError(context=context, status_code=resp.status_code)
     try:
         expires_in = int(data.get("expires_in", 3600))
     except (TypeError, ValueError) as exc:
-        raise IntegrationContractError(context=context, status_code=resp.status_code) from exc
+        raise IntegrationContractError(
+            context=context,
+            status_code=resp.status_code,
+            cause_type=type(exc).__name__,
+        ) from None
 
     token = data["access_token"]
     _TOKEN_CACHE[cache_key] = {
         "token": token,
-        "expires_at": time.monotonic() + max(0, expires_in),
+        "expires_at": time.monotonic() + min(max(0, expires_in), 86400),
     }
     return token
 
@@ -159,7 +168,7 @@ def _get_graph_response(
 ) -> requests.Response:
     while True:
         try:
-            resp = requests.get(url, headers=headers, timeout=60)
+            resp = requests.get(url, headers=headers, timeout=60, allow_redirects=False)
         except (
             requests_exceptions.SSLError,
             requests_exceptions.InvalidURL,
@@ -203,7 +212,11 @@ def _parse_graph_page(resp: requests.Response, *, context: IntegrationContext) -
     try:
         data = resp.json()
     except (TypeError, ValueError) as exc:
-        raise IntegrationContractError(context=context, status_code=resp.status_code) from exc
+        raise IntegrationContractError(
+            context=context,
+            status_code=resp.status_code,
+            cause_type=type(exc).__name__,
+        ) from None
     if not isinstance(data, dict) or not isinstance(data.get("value"), list):
         raise IntegrationContractError(context=context, status_code=resp.status_code)
     next_url = data.get("@odata.nextLink")
@@ -233,7 +246,8 @@ def _graph_get_paginated(
             raise IntegrationContractError(context=context)
         if not _is_graph_url(url):
             error = IntegrationUntrustedNextLinkError(context=context)
-            log_extra = error.log_extra(object_id=urlsplit(url).netloc)
+            safe_host = urlsplit(url).hostname or "<invalid>"
+            log_extra = error.log_extra(object_id=safe_host)
             logger.error(
                 "Rejected untrusted Graph next link integration=%s",
                 log_extra["integration"],

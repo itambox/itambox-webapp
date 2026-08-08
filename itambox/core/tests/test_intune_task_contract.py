@@ -268,3 +268,47 @@ class IntuneTaskBoundaryContractTests(TestCase):
             log_warning.call_args.kwargs["extra"]["integration"]["operation"],
             "device_apps.persist",
         )
+
+    @override_settings(
+        ITAMBOX_TENANT_INTUNE_CONFIGS={
+            "tenant-a": {
+                "azure_tenant_id": "azure-tenant",
+                "client_id": "client-id",
+                "client_secret": "client-secret",
+                "sync_software": True,
+            }
+        }
+    )
+    def test_run_sync_persists_nonzero_software_degradation(self):
+        from core.tasks import intune_sync
+
+        tenant = MagicMock(slug="tenant-a", pk=17)
+        job = MagicMock()
+        asset = MagicMock(custom_field_data={})
+        asset.objects = MagicMock()
+
+        with (
+            patch("assets.models.Asset") as asset_model,
+            patch("core.tasks.intune_sync.IntuneClient") as client_model,
+            patch.object(intune_sync, "_sync_device_software", return_value=(0, True)),
+        ):
+            asset_model.objects.filter.return_value.select_related.return_value.first.return_value = asset
+            client_model.return_value.get_managed_devices.return_value = [
+                {"id": "device-17", "serialNumber": "serial-17"}
+            ]
+
+            result = intune_sync._run_sync(
+                tenant,
+                dry_run=True,
+                job=job,
+                integration_context=IntegrationContext(
+                    provider="microsoft-graph",
+                    operation="sync",
+                    tenant_id=17,
+                    actor_id=23,
+                    request_id="request-123",
+                ),
+            )
+
+        self.assertEqual(result["software_degraded"], 1)
+        self.assertTrue(any("software_degraded=1" in call.args[0] for call in job.append_log.call_args_list))
