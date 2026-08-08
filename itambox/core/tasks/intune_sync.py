@@ -20,7 +20,13 @@ from django.conf import settings
 from django.utils import timezone
 
 from core.context import get_current_request_id
-from core.errors import IntegrationContext, IntegrationError
+from core.errors import (
+    IntegrationConfigurationError,
+    IntegrationContext,
+    IntegrationError,
+    IntegrationUnexpectedError,
+    RetryBudget,
+)
 from core.integrations.intune import IntuneClient
 from core.models import Job
 from core.tasks.context import TaskContext
@@ -92,34 +98,44 @@ def sync_tenant_intune(
             job.append_log("[dry-run] No writes will be performed.")
 
         try:
+            request_id = get_current_request_id()
             integration_context = IntegrationContext(
                 provider="microsoft-graph",
                 operation="sync",
                 tenant_id=tenant_id,
                 actor_id=user_id,
-                request_id=str(get_current_request_id()) if get_current_request_id() else None,
+                request_id=str(request_id) if request_id else None,
             )
             counts = _run_sync(ctx.tenant, dry_run, job, integration_context)
             job.mark_completed(result=counts)
         except IntegrationError as exc:
-            logger.error("Intune sync failed at an external integration boundary", extra=exc.log_extra())
-            job.mark_failed(exc.user_message)
+            logger.error(
+                "Intune sync failed at an external integration boundary",
+                extra=exc.log_extra(cause_type=type(exc.__cause__).__name__ if exc.__cause__ else None),
+            )
+            job.mark_failed(exc.display_message())
         # broad except: task-isolation: unknown task failures must leave a safe recorded failure
         except Exception as exc:
-            unexpected = IntegrationError(
+            request_id = get_current_request_id()
+            unexpected = IntegrationUnexpectedError(
                 context=IntegrationContext(
                     provider="microsoft-graph",
                     operation="sync",
                     tenant_id=tenant_id,
                     actor_id=user_id,
-                    request_id=str(get_current_request_id()) if get_current_request_id() else None,
+                    request_id=str(request_id) if request_id else None,
                 )
             )
-            extra = unexpected.log_extra()
-            extra["integration"]["error_code"] = "integration.unexpected"
-            extra["integration"]["exception_type"] = type(exc).__name__
+            traceback = exc.__traceback__
+            while traceback and traceback.tb_next:
+                traceback = traceback.tb_next
+            extra = unexpected.log_extra(
+                exception_type=type(exc).__name__,
+                source_file=traceback.tb_frame.f_code.co_filename if traceback else None,
+                source_line=traceback.tb_lineno if traceback else None,
+            )
             logger.error("Intune sync failed unexpectedly at the task boundary", extra=extra)
-            job.mark_failed(unexpected.user_message)
+            job.mark_failed(unexpected.display_message())
 
 
 def _run_sync(
@@ -141,9 +157,7 @@ def _run_sync(
     tenant_configs = getattr(_settings, "ITAMBOX_TENANT_INTUNE_CONFIGS", {})
     config = tenant_configs.get(tenant.slug)
     if not config:
-        raise IntegrationConfigurationError(context=integration_context) from ValueError(
-            "missing Intune tenant configuration"
-        )
+        raise IntegrationConfigurationError(context=integration_context) from None
 
     try:
         azure_tenant_id = config["azure_tenant_id"]
@@ -160,6 +174,7 @@ def _run_sync(
         client_id,
         client_secret,
         context=integration_context,
+        retry_budget=RetryBudget(),
     )
 
     job.append_log("Fetching managed devices from Graph API…")
@@ -308,8 +323,7 @@ def _sync_device_software(
     try:
         apps: list[IntuneAppPayload] = client.get_detected_apps(device_id)
     except IntegrationError as exc:
-        extra = exc.log_extra()
-        extra["integration"]["object_id"] = device_id
+        extra = exc.log_extra(object_id=device_id)
         logger.warning("Optional detected-app integration degraded", extra=extra)
         return 0
     # broad except: boundary-isolation: optional detected-app discovery may fail without invalidating asset sync
@@ -329,11 +343,8 @@ def _sync_device_software(
             actor_id=base_context.actor_id,
             request_id=base_context.request_id,
         )
-        unexpected = IntegrationError(context=optional_context)
-        extra = unexpected.log_extra()
-        extra["integration"]["error_code"] = "integration.optional_unexpected"
-        extra["integration"]["exception_type"] = type(exc).__name__
-        extra["integration"]["object_id"] = device_id
+        unexpected = IntegrationUnexpectedError(context=optional_context)
+        extra = unexpected.log_extra(object_id=device_id, exception_type=type(exc).__name__)
         logger.warning("Optional detected-app integration degraded unexpectedly", extra=extra)
         return 0
 

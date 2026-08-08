@@ -17,7 +17,6 @@ from django.views.decorators.debug import sensitive_variables
 
 from core.errors import (
     IntegrationAuthenticationError,
-    IntegrationConfigurationError,
     IntegrationContext,
     IntegrationContractError,
     IntegrationNotFoundError,
@@ -53,6 +52,12 @@ def _raise_response_error(response: Any, *, context: IntegrationContext) -> None
         return
     if status_code in (401, 403):
         raise IntegrationAuthenticationError(context=context, status_code=status_code)
+    if status_code == 429:
+        raise IntegrationRateLimitedError(
+            context=context,
+            status_code=status_code,
+            retry_after=_parse_retry_after(response.headers),
+        )
     if status_code == 404:
         raise IntegrationNotFoundError(context=context, status_code=status_code)
     if status_code >= 500:
@@ -70,7 +75,7 @@ def _parse_retry_after(headers: Any) -> float | None:
         return None
 
 
-@sensitive_variables("client_secret")
+@sensitive_variables()
 def _get_token(
     azure_tenant_id: str,
     client_id: str,
@@ -97,8 +102,8 @@ def _get_token(
             },
             timeout=30,
         )
-    except requests.RequestException as exc:
-        raise IntegrationUnavailableError(context=context) from exc
+    except requests.RequestException:
+        raise IntegrationUnavailableError(context=context) from None
 
     _raise_response_error(resp, context=context)
     try:
@@ -133,12 +138,11 @@ def _graph_get_paginated(
     context = _context_or_default(context, "graph.collection.get")
     budget = budget or RetryBudget()
     items = []
-    started_at = time.monotonic()
     while url:
         try:
             resp = requests.get(url, headers=headers, timeout=60)
-        except requests.RequestException as exc:
-            raise IntegrationUnavailableError(context=context) from exc
+        except requests.RequestException:
+            raise IntegrationUnavailableError(context=context) from None
         if resp.status_code == 429:
             retry_after = _parse_retry_after(resp.headers)
             rate_limited = IntegrationRateLimitedError(
@@ -146,10 +150,7 @@ def _graph_get_paginated(
                 status_code=resp.status_code,
                 retry_after=retry_after,
             )
-            delay = budget.next_delay(
-                retry_after,
-                elapsed_seconds=time.monotonic() - started_at,
-            )
+            delay = budget.next_delay(retry_after, now=time.monotonic())
             if delay is None:
                 if budget.attempts == 0:
                     raise rate_limited
@@ -157,8 +158,10 @@ def _graph_get_paginated(
                     context=context,
                     status_code=resp.status_code,
                 ) from rate_limited
-            log_extra = rate_limited.log_extra()
-            log_extra["integration"]["retry_count"] = budget.attempts
+            log_extra = rate_limited.log_extra(
+                retry_count=budget.attempts,
+                retry_delay=delay,
+            )
             logger.warning("External integration request is rate-limited; retrying", extra=log_extra)
             time.sleep(delay)
             continue
@@ -188,11 +191,13 @@ class IntuneClient:
         client_secret: str,
         *,
         context: IntegrationContext | None = None,
+        retry_budget: RetryBudget | None = None,
     ):
         self.azure_tenant_id = azure_tenant_id
         self.client_id = client_id
         self.client_secret = client_secret
         self.context = context or IntegrationContext(provider="microsoft-graph", operation="sync")
+        self.retry_budget = retry_budget or RetryBudget()
 
     def _operation_context(self, operation: str) -> IntegrationContext:
         return _context_or_default(self.context, operation)
@@ -214,17 +219,27 @@ class IntuneClient:
             "operatingSystem,osVersion,userPrincipalName,"
             "lastSyncDateTime,totalStorageSpaceInBytes"
         )
-        return _graph_get_paginated(
-            url,
-            self._headers(),
-            context=self._operation_context("devices.list"),
-        )
+        try:
+            return _graph_get_paginated(
+                url,
+                self._headers(),
+                context=self._operation_context("devices.list"),
+                budget=self.retry_budget,
+            )
+        except IntegrationAuthenticationError:
+            _TOKEN_CACHE.pop(self.azure_tenant_id, None)
+            raise
 
     def get_detected_apps(self, device_id: str) -> list:
         """Return detected apps for a single managed device."""
         url = f"{GRAPH_BASE}/deviceManagement/managedDevices/{device_id}/detectedApps"
-        return _graph_get_paginated(
-            url,
-            self._headers(),
-            context=self._operation_context("device_apps.list"),
-        )
+        try:
+            return _graph_get_paginated(
+                url,
+                self._headers(),
+                context=self._operation_context("device_apps.list"),
+                budget=self.retry_budget,
+            )
+        except IntegrationAuthenticationError:
+            _TOKEN_CACHE.pop(self.azure_tenant_id, None)
+            raise

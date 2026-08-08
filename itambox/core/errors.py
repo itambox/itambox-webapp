@@ -44,10 +44,14 @@ class RetryBudget:
     max_delay_seconds: float = 30.0
     default_delay_seconds: float = 1.0
     attempts: int = 0
+    started_at: float | None = None
 
-    def next_delay(self, requested_delay: float | None, *, elapsed_seconds: float) -> float | None:
+    def next_delay(self, requested_delay: float | None, *, now: float) -> float | None:
         """Return a safe delay and consume one retry, or return ``None``."""
 
+        if self.started_at is None:
+            self.started_at = now
+        elapsed_seconds = max(0.0, now - self.started_at)
         if self.attempts >= self.max_attempts or elapsed_seconds >= self.max_elapsed_seconds:
             return None
         remaining_seconds = self.max_elapsed_seconds - max(0.0, elapsed_seconds)
@@ -83,21 +87,47 @@ class IntegrationError(Exception):
         # URLs, headers, payloads and exception strings never enter __str__.
         super().__init__(self.user_message)
 
-    def log_extra(self) -> dict[str, dict[str, Any]]:
-        """Return only the allowlisted structured fields for ``logging.extra``."""
+    def display_message(self) -> str:
+        """Return the safe message a caller may persist or show to a user."""
 
-        return {
-            "integration": {
-                "provider": self.context.provider,
-                "operation": self.context.operation,
-                "tenant_id": self.context.tenant_id,
-                "actor_id": self.context.actor_id,
-                "request_id": self.context.request_id,
-                "error_code": self.code,
-                "disposition": self.disposition.value,
-                "status_code": self.status_code,
-            }
+        return self.user_message if self.user_visible else IntegrationError.user_message
+
+    def log_extra(
+        self,
+        *,
+        object_id: str | None = None,
+        exception_type: str | None = None,
+        cause_type: str | None = None,
+        source_file: str | None = None,
+        source_line: int | None = None,
+        retry_count: int | None = None,
+        retry_delay: float | None = None,
+    ) -> dict[str, dict[str, Any]]:
+        """Return only allowlisted structured fields for ``logging.extra``."""
+
+        integration = {
+            "provider": self.context.provider,
+            "operation": self.context.operation,
+            "tenant_id": self.context.tenant_id,
+            "actor_id": self.context.actor_id,
+            "request_id": self.context.request_id,
+            "error_code": self.code,
+            "disposition": self.disposition.value,
+            "status_code": self.status_code,
         }
+        for name, value in {
+            "object_id": object_id,
+            "exception_type": exception_type,
+            "cause_type": cause_type,
+            "source_file": source_file,
+            "source_line": source_line,
+            "retry_count": retry_count,
+            "retry_delay": retry_delay,
+            "retry_after": self.retry_after,
+        }.items():
+            if value is not None:
+                integration[name] = value
+        return {"integration": integration}
 
 
 class IntegrationAuthenticationError(IntegrationError):
@@ -141,3 +171,8 @@ class IntegrationRequestError(IntegrationError):
 class IntegrationNotFoundError(IntegrationRequestError):
     code = "integration.not_found"
     user_message = "The requested external resource was not found."
+
+
+class IntegrationUnexpectedError(IntegrationError):
+    code = "integration.unexpected"
+    user_message = "The integration task failed unexpectedly; check the task logs."

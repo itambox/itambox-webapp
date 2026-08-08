@@ -14,7 +14,7 @@ from core.errors import (
     IntegrationUnavailableError,
     RetryBudget,
 )
-from core.integrations.intune import _get_token, _graph_get_paginated
+from core.integrations.intune import IntuneClient, _get_token, _graph_get_paginated
 
 CONTEXT = IntegrationContext(
     provider="microsoft-graph",
@@ -63,14 +63,15 @@ class IntegrationErrorContractTests(TestCase):
     def test_retry_budget_clamps_provider_delay_and_bounds_attempts(self):
         budget = RetryBudget(max_attempts=2, max_elapsed_seconds=20, max_delay_seconds=5)
 
-        assert budget.next_delay(60, elapsed_seconds=0) == 5
-        assert budget.next_delay(3, elapsed_seconds=5) == 3
-        assert budget.next_delay(1, elapsed_seconds=10) is None
+        assert budget.next_delay(60, now=0) == 5
+        assert budget.next_delay(3, now=5) == 3
+        assert budget.next_delay(1, now=10) is None
 
     def test_retry_budget_stops_when_wall_clock_budget_is_exhausted(self):
         budget = RetryBudget(max_attempts=10, max_elapsed_seconds=20, max_delay_seconds=5)
 
-        assert budget.next_delay(1, elapsed_seconds=20) is None
+        assert budget.next_delay(1, now=0) == 1
+        assert budget.next_delay(1, now=20) is None
 
 
 class IntuneTransportContractTests(TestCase):
@@ -155,3 +156,74 @@ class IntuneTransportContractTests(TestCase):
             )
 
         assert raised.value.disposition is FailureDisposition.RETRYABLE
+        assert raised.value.user_visible is False
+
+    @patch("core.integrations.intune.requests.post")
+    def test_token_rate_limit_is_retryable_and_redacts_retry_header(self, mock_post):
+        mock_post.return_value = response(429, headers={"Retry-After": "3600"})
+
+        with pytest.raises(IntegrationRateLimitedError) as raised:
+            _get_token("azure-tenant", "client-id", "client-secret", context=CONTEXT)
+
+        assert raised.value.disposition is FailureDisposition.RETRYABLE
+        assert raised.value.user_visible is False
+        assert raised.value.retry_after == 3600
+
+    @patch("core.integrations.intune.requests.get")
+    def test_graph_server_failure_is_retryable(self, mock_get):
+        mock_get.return_value = response(503, json_data={"error": {"message": "do-not-leak"}})
+
+        with pytest.raises(IntegrationUnavailableError) as raised:
+            _graph_get_paginated("https://graph.example/devices", {}, context=CONTEXT)
+
+        assert raised.value.disposition is FailureDisposition.RETRYABLE
+        assert "do-not-leak" not in str(raised.value)
+        assert raised.value.__cause__ is None
+
+    @patch("core.integrations.intune.time.sleep")
+    @patch("core.integrations.intune.requests.get")
+    def test_one_budget_bounds_rate_limits_across_multiple_calls(self, mock_get, mock_sleep):
+        mock_get.side_effect = [
+            response(429, headers={"Retry-After": "1"}),
+            response(200, json_data={"value": []}),
+            response(429, headers={"Retry-After": "1"}),
+        ]
+        budget = RetryBudget(max_attempts=1, max_elapsed_seconds=60, max_delay_seconds=30)
+
+        assert _graph_get_paginated("https://graph.example/one", {}, context=CONTEXT, budget=budget) == []
+        with pytest.raises(IntegrationRetryBudgetExceededError):
+            _graph_get_paginated("https://graph.example/two", {}, context=CONTEXT, budget=budget)
+
+        assert mock_get.call_count == 3
+        assert [call.args[0] for call in mock_sleep.call_args_list] == [1]
+
+    @patch("core.integrations.intune._graph_get_paginated", return_value=[])
+    @patch.object(IntuneClient, "_headers", return_value={})
+    def test_client_passes_operation_context_and_shared_budget(self, mock_headers, mock_graph):
+        budget = RetryBudget(max_attempts=2)
+        client = IntuneClient("azure-tenant", "client-id", "client-secret", context=CONTEXT, retry_budget=budget)
+
+        client.get_managed_devices()
+        client.get_detected_apps("device-1")
+
+        first_context = mock_graph.call_args_list[0].kwargs["context"]
+        second_context = mock_graph.call_args_list[1].kwargs["context"]
+        assert first_context.operation == "devices.list"
+        assert second_context.operation == "device_apps.list"
+        assert mock_graph.call_args_list[0].kwargs["budget"] is budget
+        assert mock_graph.call_args_list[1].kwargs["budget"] is budget
+        mock_headers.assert_called()
+
+    @patch("core.integrations.intune._graph_get_paginated")
+    @patch.object(IntuneClient, "_headers", return_value={})
+    def test_graph_authentication_failure_invalidates_cached_token(self, mock_headers, mock_graph):
+        from core.integrations.intune import _TOKEN_CACHE
+
+        _TOKEN_CACHE["azure-tenant"] = {"token": "expired", "expires_at": 9999999999}
+        mock_graph.side_effect = IntegrationAuthenticationError(context=CONTEXT, status_code=401)
+        client = IntuneClient("azure-tenant", "client-id", "client-secret", context=CONTEXT)
+
+        with pytest.raises(IntegrationAuthenticationError):
+            client.get_managed_devices()
+
+        assert "azure-tenant" not in _TOKEN_CACHE
