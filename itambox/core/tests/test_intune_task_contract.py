@@ -174,6 +174,7 @@ class IntuneTaskBoundaryContractTests(TestCase):
         with self.assertRaises(IntegrationAuthenticationError):
             intune_sync._sync_device_software(client, {"id": "device-17"}, MagicMock(), dry_run=False)
 
+    def test_retryable_optional_detected_apps_failure_is_reported_as_degradation(self):
         from core.tasks import intune_sync
 
         client = MagicMock()
@@ -202,7 +203,7 @@ class IntuneTaskBoundaryContractTests(TestCase):
                 dry_run=False,
             )
 
-        self.assertEqual(result, 0)
+        self.assertEqual(result, (0, True))
         extra = log_warning.call_args.kwargs["extra"]["integration"]
         self.assertEqual(extra["operation"], "device_apps.list")
         self.assertEqual(extra["object_id"], "device-17")

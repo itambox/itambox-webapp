@@ -14,7 +14,8 @@ from __future__ import annotations
 
 import logging
 import re
-from typing import Protocol, TypedDict
+from collections.abc import Mapping
+from typing import Any, Protocol, TypedDict
 
 from django.conf import settings
 from django.utils import timezone
@@ -85,6 +86,7 @@ class IntuneSyncResult(TypedDict):
     created: int
     skipped: int
     apps_upserted: int
+    software_degraded: int
 
 
 def sync_tenant_intune(
@@ -156,7 +158,9 @@ def sync_tenant_intune(
             job.mark_failed(unexpected.display_message())
 
 
-def _read_intune_config(config: object, *, context: IntegrationContext) -> tuple[str, str, str, bool, str, bool]:
+def _read_intune_config(
+    config: Mapping[str, Any], *, context: IntegrationContext
+) -> tuple[str, str, str, bool, str, bool]:
     try:
         azure_tenant_id = config["azure_tenant_id"]
         client_id = config["client_id"]
@@ -221,6 +225,7 @@ def _run_sync(
         "created": 0,
         "skipped": 0,
         "apps_upserted": 0,
+        "software_degraded": 0,
     }
 
     for device in devices:
@@ -251,13 +256,14 @@ def _run_sync(
             continue
 
         if asset and sync_software:
-            n = _sync_device_software(client, device, asset, dry_run)
+            n, degraded = _sync_device_software(client, device, asset, dry_run)
             counts["apps_upserted"] += n
+            counts["software_degraded"] += int(degraded)
 
     job.append_log(
         f"Done. matched={counts['matched']} updated={counts['updated']} "
         f"created={counts['created']} skipped={counts['skipped']} "
-        f"apps={counts['apps_upserted']}"
+        f"apps={counts['apps_upserted']} software_degraded={counts['software_degraded']}"
     )
     return counts
 
@@ -339,9 +345,9 @@ def _create_asset(
     return asset
 
 
-def _get_detected_apps_or_degrade(client: IntuneClient, device_id: str) -> list[IntuneAppPayload] | None:
+def _get_detected_apps_or_degrade(client: IntuneClient, device_id: str) -> tuple[list[IntuneAppPayload] | None, bool]:
     try:
-        return client.get_detected_apps(device_id)
+        return client.get_detected_apps(device_id), False
     except (IntegrationAuthenticationError, IntegrationConfigurationError):
         raise
     except IntegrationError as exc:
@@ -351,7 +357,7 @@ def _get_detected_apps_or_degrade(client: IntuneClient, device_id: str) -> list[
             extra["integration"],
             extra=extra,
         )
-        return None
+        return None, True
     # broad except: boundary-isolation: optional detected-app discovery may fail without invalidating asset sync
     except Exception as exc:
         client_context = getattr(client, "context", None)
@@ -377,7 +383,7 @@ def _get_detected_apps_or_degrade(client: IntuneClient, device_id: str) -> list[
             extra["integration"],
             extra=extra,
         )
-        return None
+        return None, True
 
 
 def _sync_device_software(
@@ -385,18 +391,18 @@ def _sync_device_software(
     device: IntuneDevicePayload,
     asset: _IntuneAsset,
     dry_run: bool,
-) -> int:
+) -> tuple[int, bool]:
     """Upsert InstalledSoftware records for all detected apps on a device."""
     from assets.models import Manufacturer
     from software.models import InstalledSoftware, Software
 
     device_id = device.get("id")
     if not device_id:
-        return 0
+        return 0, False
 
-    apps = _get_detected_apps_or_degrade(client, device_id)
+    apps, degraded = _get_detected_apps_or_degrade(client, device_id)
     if apps is None:
-        return 0
+        return 0, degraded
 
     count = 0
     now = timezone.now()
@@ -451,7 +457,7 @@ def _sync_device_software(
         except Exception as exc:
             logger.warning("InstalledSoftware upsert failed (%s, %s, %s): %s", asset, software, version, exc)
 
-    return count
+    return count, degraded
 
 
 def _slugify(value: str) -> str:
