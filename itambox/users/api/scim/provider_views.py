@@ -40,7 +40,8 @@ from users.api.scim.provider_services import (
     sync_provider_group_members,
 )
 from users.api.scim.serializers import SCIMGroupSerializer, SCIMServiceProviderConfigSerializer, SCIMUserSerializer
-from users.models import User as UserModel, UserGroup
+from users.models import User as UserModel
+from users.models import UserGroup
 
 User = get_user_model()
 
