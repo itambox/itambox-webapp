@@ -9,13 +9,17 @@ Required Azure app permission (application, admin-consented):
 """
 
 import logging
+import math
 import time
+from collections.abc import Callable
 from typing import Any
+from urllib.parse import urlsplit
 
 import requests
 from django.views.decorators.debug import sensitive_variables
 
 from core.errors import (
+    MAX_RETRY_AFTER_SECONDS,
     IntegrationAuthenticationError,
     IntegrationContext,
     IntegrationContractError,
@@ -32,6 +36,11 @@ logger = logging.getLogger(__name__)
 _TOKEN_CACHE: dict = {}  # keyed by azure_tenant_id
 
 GRAPH_BASE = "https://graph.microsoft.com/v1.0"
+
+
+def _is_graph_url(url: str) -> bool:
+    parsed = urlsplit(url)
+    return parsed.scheme == "https" and parsed.netloc == "graph.microsoft.com" and parsed.path.startswith("/v1.0/")
 
 
 def _context_or_default(context: IntegrationContext | None, operation: str) -> IntegrationContext:
@@ -70,9 +79,12 @@ def _parse_retry_after(headers: Any) -> float | None:
 
     value = headers.get("Retry-After")
     try:
-        return max(0.0, float(value))
+        parsed = float(value)
     except (TypeError, ValueError):
         return None
+    if not math.isfinite(parsed):
+        return None
+    return max(0.0, min(parsed, MAX_RETRY_AFTER_SECONDS))
 
 
 @sensitive_variables()
@@ -126,6 +138,61 @@ def _get_token(
 
 
 @sensitive_variables("headers")
+def _get_graph_response(
+    url: str,
+    headers: dict,
+    *,
+    context: IntegrationContext,
+    budget: RetryBudget,
+):
+    while True:
+        try:
+            resp = requests.get(url, headers=headers, timeout=60)
+        except requests.RequestException:
+            raise IntegrationUnavailableError(context=context) from None
+        if resp.status_code != 429:
+            return resp
+
+        retry_after = _parse_retry_after(resp.headers)
+        rate_limited = IntegrationRateLimitedError(
+            context=context,
+            status_code=resp.status_code,
+            retry_after=retry_after,
+        )
+        delay = budget.next_delay(retry_after, now=time.monotonic())
+        if delay is None:
+            if budget.attempts == 0:
+                raise rate_limited
+            raise IntegrationRetryBudgetExceededError(
+                context=context,
+                status_code=resp.status_code,
+            ) from rate_limited
+        log_extra = rate_limited.log_extra(
+            retry_count=budget.attempts,
+            retry_delay=delay,
+        )
+        logger.warning(
+            "External integration request is rate-limited; retrying integration=%s",
+            log_extra["integration"],
+            extra=log_extra,
+        )
+        time.sleep(delay)
+
+
+def _parse_graph_page(resp, *, context: IntegrationContext) -> tuple[list, str | None]:
+    try:
+        data = resp.json()
+    except (TypeError, ValueError) as exc:
+        raise IntegrationContractError(context=context, status_code=resp.status_code) from exc
+    if not isinstance(data, dict) or not isinstance(data.get("value"), list):
+        raise IntegrationContractError(context=context, status_code=resp.status_code)
+    next_url = data.get("@odata.nextLink")
+    if next_url is not None and not isinstance(next_url, str):
+        raise IntegrationContractError(context=context, status_code=resp.status_code)
+    return data["value"], next_url
+
+
+@sensitive_variables("headers")
 def _graph_get_paginated(
     url: str,
     headers: dict,
@@ -139,45 +206,12 @@ def _graph_get_paginated(
     budget = budget or RetryBudget()
     items = []
     while url:
-        try:
-            resp = requests.get(url, headers=headers, timeout=60)
-        except requests.RequestException:
-            raise IntegrationUnavailableError(context=context) from None
-        if resp.status_code == 429:
-            retry_after = _parse_retry_after(resp.headers)
-            rate_limited = IntegrationRateLimitedError(
-                context=context,
-                status_code=resp.status_code,
-                retry_after=retry_after,
-            )
-            delay = budget.next_delay(retry_after, now=time.monotonic())
-            if delay is None:
-                if budget.attempts == 0:
-                    raise rate_limited
-                raise IntegrationRetryBudgetExceededError(
-                    context=context,
-                    status_code=resp.status_code,
-                ) from rate_limited
-            log_extra = rate_limited.log_extra(
-                retry_count=budget.attempts,
-                retry_delay=delay,
-            )
-            logger.warning("External integration request is rate-limited; retrying", extra=log_extra)
-            time.sleep(delay)
-            continue
-
+        if not _is_graph_url(url):
+            raise IntegrationContractError(context=context)
+        resp = _get_graph_response(url, headers, context=context, budget=budget)
         _raise_response_error(resp, context=context)
-        try:
-            data = resp.json()
-        except (TypeError, ValueError) as exc:
-            raise IntegrationContractError(context=context, status_code=resp.status_code) from exc
-        if not isinstance(data, dict) or not isinstance(data.get("value"), list):
-            raise IntegrationContractError(context=context, status_code=resp.status_code)
-        items.extend(data["value"])
-        next_url = data.get("@odata.nextLink")
-        if next_url is not None and not isinstance(next_url, str):
-            raise IntegrationContractError(context=context, status_code=resp.status_code)
-        url = next_url
+        page_items, url = _parse_graph_page(resp, context=context)
+        items.extend(page_items)
     return items
 
 
@@ -191,13 +225,13 @@ class IntuneClient:
         client_secret: str,
         *,
         context: IntegrationContext | None = None,
-        retry_budget: RetryBudget | None = None,
+        retry_budget_factory: Callable[[], RetryBudget] | None = None,
     ):
         self.azure_tenant_id = azure_tenant_id
         self.client_id = client_id
         self.client_secret = client_secret
         self.context = context or IntegrationContext(provider="microsoft-graph", operation="sync")
-        self.retry_budget = retry_budget or RetryBudget()
+        self.retry_budget_factory = retry_budget_factory or RetryBudget
 
     def _operation_context(self, operation: str) -> IntegrationContext:
         return _context_or_default(self.context, operation)
@@ -224,10 +258,11 @@ class IntuneClient:
                 url,
                 self._headers(),
                 context=self._operation_context("devices.list"),
-                budget=self.retry_budget,
+                budget=self.retry_budget_factory(),
             )
-        except IntegrationAuthenticationError:
-            _TOKEN_CACHE.pop(self.azure_tenant_id, None)
+        except IntegrationAuthenticationError as exc:
+            if exc.status_code == 401:
+                _TOKEN_CACHE.pop(self.azure_tenant_id, None)
             raise
 
     def get_detected_apps(self, device_id: str) -> list:
@@ -238,8 +273,9 @@ class IntuneClient:
                 url,
                 self._headers(),
                 context=self._operation_context("device_apps.list"),
-                budget=self.retry_budget,
+                budget=self.retry_budget_factory(),
             )
-        except IntegrationAuthenticationError:
-            _TOKEN_CACHE.pop(self.azure_tenant_id, None)
+        except IntegrationAuthenticationError as exc:
+            if exc.status_code == 401:
+                _TOKEN_CACHE.pop(self.azure_tenant_id, None)
             raise

@@ -48,6 +48,8 @@ class IntuneTaskBoundaryContractTests(TestCase):
         log_error = self._run_task_with_error(error)
 
         self.job.mark_failed.assert_called_once_with(error.user_message)
+        self.assertIn("integration=%s", log_error.call_args.args[0])
+        self.assertIn("code=integration.authentication", self.job.append_log.call_args.args[0])
         extra = log_error.call_args.kwargs["extra"]["integration"]
         self.assertEqual(extra["disposition"], FailureDisposition.TERMINAL.value)
         self.assertEqual(extra["tenant_id"], 17)
@@ -84,7 +86,7 @@ class IntuneTaskBoundaryContractTests(TestCase):
                 request_id="request-123",
             ),
             status_code=429,
-            retry_after=3600,
+            retry_after=300,
         )
 
         log_error = self._run_task_with_error(error)
@@ -95,7 +97,7 @@ class IntuneTaskBoundaryContractTests(TestCase):
             log_error.call_args.kwargs["extra"]["integration"]["disposition"],
             FailureDisposition.RETRYABLE.value,
         )
-        self.assertEqual(log_error.call_args.kwargs["extra"]["integration"]["retry_after"], 3600)
+        self.assertEqual(log_error.call_args.kwargs["extra"]["integration"]["retry_after"], 300.0)
 
     @override_settings(ITAMBOX_TENANT_INTUNE_CONFIGS={})
     def test_missing_tenant_configuration_is_terminal_and_typed(self):
@@ -119,6 +121,25 @@ class IntuneTaskBoundaryContractTests(TestCase):
         self.assertEqual(raised.exception.disposition, FailureDisposition.TERMINAL)
         self.assertEqual(raised.exception.context.tenant_id, 17)
 
+    @override_settings(
+        ITAMBOX_TENANT_INTUNE_CONFIGS={
+            "tenant-a": {
+                "azure_tenant_id": "azure-tenant",
+                "client_id": "client-id",
+                "client_secret": " ",
+            }
+        }
+    )
+    def test_blank_credential_configuration_is_terminal_and_typed(self):
+        from core.tasks.intune_sync import _run_sync
+
+        tenant = MagicMock(slug="tenant-a", pk=17)
+        with self.assertRaises(IntegrationConfigurationError) as raised:
+            _run_sync(tenant, dry_run=True, job=MagicMock())
+
+        self.assertEqual(raised.exception.disposition, FailureDisposition.TERMINAL)
+
+    def test_unknown_failure_is_not_persisted_or_logged_with_exception_text(self):
         from core.tasks import intune_sync
 
         with (
@@ -137,7 +158,22 @@ class IntuneTaskBoundaryContractTests(TestCase):
             "RuntimeError",
         )
 
-    def test_optional_detected_apps_failure_preserves_asset_sync_degradation(self):
+    def test_optional_authentication_failure_is_not_silently_degraded(self):
+        from core.tasks import intune_sync
+
+        client = MagicMock()
+        client.get_detected_apps.side_effect = IntegrationAuthenticationError(
+            context=IntegrationContext(
+                provider="microsoft-graph",
+                operation="device_apps.list",
+                tenant_id=17,
+            ),
+            status_code=403,
+        )
+
+        with self.assertRaises(IntegrationAuthenticationError):
+            intune_sync._sync_device_software(client, {"id": "device-17"}, MagicMock(), dry_run=False)
+
         from core.tasks import intune_sync
 
         client = MagicMock()

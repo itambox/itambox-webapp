@@ -124,7 +124,10 @@ class IntunePaginationTest(TransactionTestCase):
             if call_count == 1:
                 r = MagicMock()
                 r.status_code = 200
-                r.json.return_value = {"value": [{"id": "d1"}], "@odata.nextLink": "https://graph/page2"}
+                r.json.return_value = {
+                    "value": [{"id": "d1"}],
+                    "@odata.nextLink": "https://graph.microsoft.com/v1.0/page2",
+                }
                 r.raise_for_status = MagicMock()
                 return r
             r = MagicMock()
@@ -134,7 +137,7 @@ class IntunePaginationTest(TransactionTestCase):
             return r
 
         with patch.object(intune_mod.requests, "get", side_effect=fake_get):
-            items = intune_mod._graph_get_paginated("https://graph/page1", {})
+            items = intune_mod._graph_get_paginated("https://graph.microsoft.com/v1.0/page1", {})
 
         self.assertEqual([i["id"] for i in items], ["d1", "d2"])
         self.assertEqual(call_count, 2)
