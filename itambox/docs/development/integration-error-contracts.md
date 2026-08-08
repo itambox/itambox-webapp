@@ -28,9 +28,10 @@ The shared types live in the dependency-free `core.errors` module:
 - `IntegrationUnavailableError` — retryable transport/5xx failure;
 - `IntegrationRateLimitedError` — retryable in-budget rate limiting; its
   provider delay is finite, non-negative and capped at 300 seconds;
-- `IntegrationRetryBudgetExceededError` — terminal for the current bounded
-  invocation after rate-limit budget exhaustion;
+- `IntegrationRetryBudgetExceededError` — retryable for a later caller after
+  the current invocation exhausts its local rate-limit budget;
 - `IntegrationContractError` — terminal malformed/unexpected success response;
+- `IntegrationUntrustedNextLinkError` — terminal provider redirect attempt;
 - `IntegrationRequestError` and `IntegrationNotFoundError` — terminal 4xx
   request/resource failures;
 - `IntegrationUnexpectedError` — terminal task-isolation fallback for an

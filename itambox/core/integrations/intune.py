@@ -30,6 +30,7 @@ from core.errors import (
     IntegrationRequestError,
     IntegrationRetryBudgetExceededError,
     IntegrationUnavailableError,
+    IntegrationUntrustedNextLinkError,
     RetryBudget,
 )
 
@@ -231,7 +232,14 @@ def _graph_get_paginated(
         if pages > max_pages:
             raise IntegrationContractError(context=context)
         if not _is_graph_url(url):
-            raise IntegrationContractError(context=context)
+            error = IntegrationUntrustedNextLinkError(context=context)
+            log_extra = error.log_extra(object_id=urlsplit(url).netloc)
+            logger.error(
+                "Rejected untrusted Graph next link integration=%s",
+                log_extra["integration"],
+                extra=log_extra,
+            )
+            raise error
         resp = _get_graph_response(url, headers, context=context, budget=budget)
         _raise_response_error(resp, context=context)
         page_items, url = _parse_graph_page(resp, context=context)

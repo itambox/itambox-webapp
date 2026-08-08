@@ -75,6 +75,7 @@ class IntegrationError(Exception):
 
     code = "integration.error"
     disposition = FailureDisposition.TERMINAL
+    retry_exhausted = False
     user_message = "The external integration could not complete the operation."
     user_visible = True
 
@@ -128,6 +129,7 @@ class IntegrationError(Exception):
             "request_id": self.context.request_id,
             "error_code": self.code,
             "disposition": self.disposition.value,
+            "retry_exhausted": self.retry_exhausted,
             "status_code": self.status_code,
         }
         for name, value in {
@@ -170,11 +172,18 @@ class IntegrationRateLimitedError(IntegrationError):
 
 class IntegrationRetryBudgetExceededError(IntegrationError):
     code = "integration.retry_budget_exhausted"
+    disposition = FailureDisposition.RETRYABLE
+    retry_exhausted = True
     user_message = "The external integration remained unavailable; retry the operation later."
 
 
 class IntegrationContractError(IntegrationError):
     code = "integration.invalid_response"
+    user_message = "The external integration returned an invalid response."
+
+
+class IntegrationUntrustedNextLinkError(IntegrationContractError):
+    code = "integration.untrusted_next_link"
     user_message = "The external integration returned an invalid response."
 
 

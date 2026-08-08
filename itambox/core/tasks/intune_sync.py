@@ -27,6 +27,7 @@ from core.errors import (
     IntegrationContext,
     IntegrationError,
     IntegrationUnexpectedError,
+    IntegrationUntrustedNextLinkError,
 )
 from core.integrations.intune import IntuneClient
 from core.models import Job
@@ -349,7 +350,11 @@ def _create_asset(
 def _get_detected_apps_or_degrade(client: IntuneClient, device_id: str) -> tuple[list[IntuneAppPayload] | None, bool]:
     try:
         return client.get_detected_apps(device_id), False
-    except (IntegrationAuthenticationError, IntegrationConfigurationError):
+    except (
+        IntegrationAuthenticationError,
+        IntegrationConfigurationError,
+        IntegrationUntrustedNextLinkError,
+    ):
         raise
     except IntegrationError as exc:
         extra = exc.log_extra(object_id=device_id)

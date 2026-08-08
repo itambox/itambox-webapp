@@ -229,3 +229,42 @@ class IntuneTaskBoundaryContractTests(TestCase):
         self.assertEqual(extra["operation"], "device_apps.list")
         self.assertEqual(extra["object_id"], "device-17")
         self.assertEqual(extra["disposition"], FailureDisposition.RETRYABLE.value)
+
+    def test_persistence_degradation_is_counted_and_redacted(self):
+        from core.tasks import intune_sync
+
+        client = MagicMock()
+        client.context = IntegrationContext(
+            provider="microsoft-graph",
+            operation="sync",
+            tenant_id=17,
+            actor_id=23,
+            request_id="request-123",
+        )
+        client.get_detected_apps.return_value = [
+            {"displayName": "Sensitive App", "publisher": "Publisher", "version": "1"}
+        ]
+
+        with (
+            patch("assets.models.Manufacturer") as manufacturer_model,
+            patch("software.models.Software") as software_model,
+            patch("software.models.InstalledSoftware") as installed_model,
+            patch.object(intune_sync.logger, "warning") as log_warning,
+        ):
+            manufacturer_model.objects.get_or_create.return_value = (MagicMock(), False)
+            software_model.objects.get_or_create.return_value = (MagicMock(), False)
+            installed_model.objects.update_or_create.side_effect = RuntimeError("client_secret=do-not-log")
+
+            result = intune_sync._sync_device_software(
+                client,
+                {"id": "device-17"},
+                MagicMock(),
+                dry_run=False,
+            )
+
+        self.assertEqual(result, (0, True))
+        self.assertNotIn("client_secret", str(log_warning.call_args))
+        self.assertEqual(
+            log_warning.call_args.kwargs["extra"]["integration"]["operation"],
+            "device_apps.persist",
+        )
