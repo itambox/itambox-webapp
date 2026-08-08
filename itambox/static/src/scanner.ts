@@ -201,18 +201,17 @@ export class AssetScanner {
     this.dispatcher.reset();
 
     if (this.html5QrcodeScanner) {
-      if (this.html5QrcodeScanner.isScanning) {
-        this.html5QrcodeScanner.stop().then(() => {
-          if (this.html5QrcodeScanner) {
-            this.html5QrcodeScanner.clear();
-            this.html5QrcodeScanner = null;
-          }
-        }).catch(err => {
-          console.error('Error stopping scanner:', err);
-          this.html5QrcodeScanner = null;
-        });
-      } else {
-        this.html5QrcodeScanner = null;
+      // Capture the instance before awaiting stop(). A new scan may be opened
+      // while the old camera promise is pending; the old callback must never
+      // clear or null the replacement stored on this field.
+      const scanner = this.html5QrcodeScanner;
+      this.html5QrcodeScanner = null;
+      if (scanner.isScanning) {
+        scanner.stop()
+          .then(() => scanner.clear())
+          .catch(err => {
+            console.error('Error stopping scanner:', err);
+          });
       }
     }
   }
