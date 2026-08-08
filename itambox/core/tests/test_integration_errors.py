@@ -129,9 +129,19 @@ class IntuneTransportContractTests(TestCase):
             _get_token("azure-tenant", "client-id", "client-secret", context=CONTEXT)
 
     @patch("core.integrations.intune.requests.get")
+    def test_graph_url_allowlist_rejects_http_and_suffix_hosts(self, mock_get):
+        for url in (
+            "http://graph.microsoft.com/v1.0/devices",
+            "https://graph.microsoft.com.evil.com/v1.0/devices",
+        ):
+            with self.subTest(url=url), pytest.raises(IntegrationUntrustedNextLinkError):
+                _graph_get_paginated(url, {"Authorization": "Bearer secret"}, context=CONTEXT)
+
+        mock_get.assert_not_called()
+
+    @patch("core.integrations.intune.requests.get")
     def test_graph_forbidden_is_terminal_without_response_payload(self, mock_get):
         mock_get.return_value = response(403, json_data={"error": {"message": "sensitive provider detail"}})
-
         with pytest.raises(IntegrationAuthenticationError) as raised:
             _graph_get_paginated(
                 "https://graph.microsoft.com/v1.0/devices", {"Authorization": "Bearer secret"}, context=CONTEXT
@@ -287,6 +297,17 @@ class IntuneTransportContractTests(TestCase):
         assert _get_token("azure-tenant", "client-b", "secret-b", context=CONTEXT) == "token-b"
         assert mock_post.call_count == 2
         _TOKEN_CACHE.clear()
+
+    @patch("core.integrations.intune._graph_get_paginated", return_value=[])
+    @patch.object(IntuneClient, "_headers", return_value={})
+    def test_device_id_is_quoted_before_graph_path_construction(self, mock_headers, mock_graph):
+        client = IntuneClient("azure-tenant", "client-id", "client-secret", context=CONTEXT)
+
+        client.get_detected_apps("../../users?select=mail")
+
+        url = mock_graph.call_args.args[0]
+        assert "/../" not in url
+        assert "..%2F..%2F" in url
 
     @patch("core.integrations.intune._graph_get_paginated", return_value=[])
     @patch.object(IntuneClient, "_headers", return_value={})

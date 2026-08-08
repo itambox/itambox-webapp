@@ -62,7 +62,9 @@ without valid JSON/value or an OAuth response without a non-empty
 `access_token` is a terminal contract error.
 
 The Intune task catches `IntegrationError` explicitly, logs only the structured
-allowlist, and persists `display_message()`. Optional software degradation is
+allowlist, and persists `display_message()`. The structured Job append-log line
+is deliberately operator-facing triage; `mark_failed()` remains the generic,
+user-safe message. Optional software degradation is
 counted as `software_degraded` in the completed job result and summary log, so it
 is not confused with a tenant that has no detected software. The in-loop
 rate-limit signal is
@@ -86,8 +88,10 @@ Snipe-IT, LDAP/OIDC, mail and webhook delivery must consume these shared types
 in bounded follow-up slices. They must preserve their current explicit retry,
 4xx, authentication and optional-dependency semantics. The Intune slice bounds
 one Graph operation and its pagination, but does not impose a sync-wide deadline
-across a large device fleet; that is a separate queue/worker-timeout policy
-follow-up. WP-13/WP-16 own the
+across a large device fleet. The current base settings provide a 600-second
+Django-Q worker timeout and 660-second retry interval as an interim containment,
+but the queue/worker-timeout policy must be verified for deployment overrides in
+that follow-up. WP-13/WP-16 own the
 consumer work for alert/webhook delivery and must not introduce a competing
 error taxonomy. SCIM capability detection follows the same optional-capability
 form under WP-18.
