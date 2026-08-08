@@ -225,12 +225,12 @@ function initAuditScanner(): void {
   openBtn.dataset.scannerInitialized = 'true';
   const searchField = document.getElementById('barcode-scan-input') as HTMLInputElement | null;
   const instance = new AssetScanner({
-    readerId: 'scanner-reader',
-    modalId: 'scanner-modal',
-    torchId: 'toggle-torch-btn',
+    readerId: 'audit-scanner-reader',
+    modalId: 'audit-scanner-modal',
+    torchId: 'audit-toggle-torch-btn',
     openBtnId: 'open-scanner-btn',
-    closeBtnId: 'close-scanner-btn',
-    errorDivId: 'scanner-error',
+    closeBtnId: 'audit-close-scanner-btn',
+    errorDivId: 'audit-scanner-error',
     onResult(code: string) {
       if (searchField) {
         searchField.value = code;

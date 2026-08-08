@@ -50,6 +50,13 @@ const ids = [
   'torch',
   'open',
   'close',
+  'open-scanner-btn',
+  'audit-scanner-reader',
+  'audit-scanner-modal',
+  'audit-toggle-torch-btn',
+  'audit-close-scanner-btn',
+  'audit-scanner-error',
+  'barcode-scan-input',
   'global-scanner-reader',
   'global-scanner-modal',
   'global-toggle-torch-btn',
@@ -143,6 +150,17 @@ test('a stale reader stop callback cannot clear a replacement scanner', async ()
 
   assert.equal(readers[0].cleared, true, 'the stopped reader is cleaned up');
   assert.equal(readers[1].cleared, false, 'the replacement reader remains active');
+});
+
+test('audit scanner entrypoint opens the rendered audit overlay', async () => {
+  document.listeners.get('DOMContentLoaded')();
+  const openHandler = elements.get('open-scanner-btn').listeners.get('click');
+  assert.equal(typeof openHandler, 'function');
+  openHandler();
+  await new Promise((resolve) => setImmediate(resolve));
+
+  assert.equal(elements.get('audit-scanner-modal').classList.contains('is-open'), true);
+  assert.equal(typeof readers.at(-1).onSuccess, 'function');
 });
 
 test('global scanner errors stay in the open overlay live region', async () => {
