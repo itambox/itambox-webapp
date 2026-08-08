@@ -281,7 +281,29 @@ function initGlobalScanner(): void {
   });
 }
 
+let globalScanFeedbackTimer: number | undefined;
+
 function showGlobalScanToast(message: string): void {
+  const overlayFeedback = document.getElementById('global-scanner-feedback');
+  if (overlayFeedback) {
+    if (globalScanFeedbackTimer !== undefined) {
+      clearTimeout(globalScanFeedbackTimer);
+    }
+    overlayFeedback.setAttribute('role', 'alert');
+    overlayFeedback.setAttribute('aria-live', 'assertive');
+    overlayFeedback.setAttribute('aria-atomic', 'true');
+    overlayFeedback.textContent = message;
+    overlayFeedback.classList.remove('is-ok', 'is-fail');
+    overlayFeedback.classList.add('is-visible', 'is-warn');
+    globalScanFeedbackTimer = setTimeout(() => {
+      overlayFeedback.classList.remove('is-visible', 'is-warn');
+      overlayFeedback.textContent = '';
+      globalScanFeedbackTimer = undefined;
+    }, 4000);
+    return;
+  }
+
+  // Keep the global toast fallback for pages that do not render the scanner overlay.
   const container = document.getElementById('django-messages');
   if (!container) return;
 

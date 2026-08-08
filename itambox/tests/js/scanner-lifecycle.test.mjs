@@ -23,10 +23,20 @@ class FakeElement {
     this.classList = new FakeClassList();
     this.dataset = {};
     this.listeners = new Map();
+    this.attributes = new Map();
+    this.textContent = '';
   }
 
   addEventListener(name, handler) {
     this.listeners.set(name, handler);
+  }
+
+  setAttribute(name, value) {
+    this.attributes.set(name, value);
+  }
+
+  getAttribute(name) {
+    return this.attributes.get(name) ?? null;
   }
 
   querySelector() {
@@ -40,20 +50,32 @@ const ids = [
   'torch',
   'open',
   'close',
+  'global-scanner-reader',
+  'global-scanner-modal',
+  'global-toggle-torch-btn',
+  'global-open-scanner-btn',
+  'global-close-scanner-btn',
+  'global-scanner-error',
+  'global-scanner-feedback',
 ];
 const elements = new Map(ids.map((id) => [id, new FakeElement(id)]));
 const body = new FakeElement('body');
 
 globalThis.document = {
   body,
-  addEventListener() {},
+  listeners: new Map(),
+  addEventListener(name, handler) {
+    this.listeners.set(name, handler);
+  },
+  dispatchEvent() {},
   getElementById(id) {
     return elements.get(id) || null;
   },
 };
-globalThis.window = { isSecureContext: true };
+globalThis.window = { isSecureContext: true, location: {}, setTimeout, clearTimeout };
 globalThis.gettext = (message) => message;
-globalThis.interpolate = (message) => message;
+globalThis.interpolate = (message, context) => message.replace('%(code)s', context.code);
+globalThis.fetch = () => Promise.resolve({ ok: false });
 
 const readers = [];
 const stopResolvers = [];
@@ -66,8 +88,9 @@ class FakeHtml5Qrcode {
     readers.push(this);
   }
 
-  start(_camera, _config, _onSuccess) {
+  start(_camera, _config, onSuccess) {
     this.isScanning = true;
+    this.onSuccess = onSuccess;
     return Promise.resolve();
   }
 
@@ -120,4 +143,24 @@ test('a stale reader stop callback cannot clear a replacement scanner', async ()
 
   assert.equal(readers[0].cleared, true, 'the stopped reader is cleaned up');
   assert.equal(readers[1].cleared, false, 'the replacement reader remains active');
+});
+
+test('global scanner errors stay in the open overlay live region', async () => {
+  document.listeners.get('DOMContentLoaded')();
+  const openHandler = elements.get('global-open-scanner-btn').listeners.get('click');
+  assert.equal(typeof openHandler, 'function');
+  openHandler();
+  await new Promise((resolve) => setImmediate(resolve));
+
+  const reader = readers.at(-1);
+  assert.equal(typeof reader.onSuccess, 'function');
+  reader.onSuccess('TAG-404');
+  await new Promise((resolve) => setImmediate(resolve));
+  await new Promise((resolve) => setImmediate(resolve));
+
+  const feedback = elements.get('global-scanner-feedback');
+  assert.equal(feedback.textContent, 'No asset matches: TAG-404');
+  assert.equal(feedback.classList.contains('is-visible'), true);
+  assert.equal(feedback.getAttribute('role'), 'alert');
+  assert.equal(feedback.getAttribute('aria-live'), 'assertive');
 });
