@@ -3,7 +3,8 @@
   "version": "0.1.0",
   "private": true,
   "overrides": {
-    "undici": "6.27.0"
+    "nanoid": "3.3.17",
+    "undici": "6.28.0"
   },
   "description": "IT Asset Management System — static assets build pipeline",
   "scripts": {
