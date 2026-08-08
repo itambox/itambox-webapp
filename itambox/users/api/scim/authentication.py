@@ -43,7 +43,8 @@ class SCIMBearerTokenAuthentication(BaseAuthentication):
             deleted_at__isnull=True,
         ).first()
         if tenant is None:
-            raise exceptions.AuthenticationFailed("Tenant not found.")
+            # Do not disclose whether a tenant slug exists to anonymous callers.
+            raise exceptions.AuthenticationFailed("Authentication credentials were not provided.")
 
         auth = get_authorization_header(request).split()
 

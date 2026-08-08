@@ -53,12 +53,14 @@ def test_preflight_parses_marked_superuser_count_despite_noisy_django_output():
 def test_scim_negative_paths_match_authentication_and_url_routing_contracts():
     spec = SCIM_SPEC_PATH.read_text(encoding="utf-8")
 
-    assert "Unauthenticated SCIM request targeting a non-existent tenant fails closed" in spec
-    assert "expect(response.status()).toBe(401);" in spec
-    assert "SCIM User patch with a malformed resource ID returns 404" in spec
-    assert 'Operations: [{ op: "replace", path: "active", value: false }]' in spec
+    assert "Tenant-scoped bearer auth rejects another tenant and anonymous unknown tenants without disclosure" in spec
+    assert "Tenant SCIM malformed User resource IDs return a typed 404" in spec
+    assert "not-a-resource-id" in spec
+    assert "expect(body.detail.toLowerCase()).not.toContain('not found');" in spec
     assert 'data: "{invalid json payload"' not in spec
-    assert "expect(response.status()).toBe(404);" in spec
+    assert "/api/v1/" not in spec
+    assert "/api/organization/asset-holders/" not in spec
+    assert "/api/users/config/" not in spec
 
 
 def test_e2e_workflow_provisions_full_demo_and_masked_scim_credentials():
@@ -82,27 +84,29 @@ def test_scim_e2e_uses_bearer_auth_and_preserves_tenant_anti_harvesting():
 
     assert "E2E_SCIM_TOKEN" in preflight
     assert "E2E_TENANT_SLUG" in preflight
+    assert "E2E_ISOLATION_TENANT_SLUG" in preflight
+    assert "E2E_TENANT_GROUP_NAME" in preflight
     assert "Authorization: `Bearer ${scimToken}`" in spec
-    assert "Unauthenticated SCIM request targeting a non-existent tenant fails closed" in spec
-    assert "expect(response.status()).toBe(401);" in spec
-    assert "expect(groupRes.status()).toBe(403);" in spec
-    assert "expect(permissionsRes.status()).toBe(401);" in spec
+    assert "Tenant SCIM Groups remain read-only and expose tenant-owned data only" in spec
+    assert "expectScimError(create, 403);" in spec
+    assert "expectScimError(foreignTenant, 401);" in spec
+    assert "expect(body.detail.toLowerCase()).not.toContain('e2e-missing-tenant');" in spec
     assert "expect(response.status()).toBeDefined();" not in spec
     assert "if (response.status() === 302)" not in spec
     assert "OIDC login initiation rejects an unknown tenant" in spec
-    assert "OIDC callback without initiation fails closed" in spec
-    assert "OIDC provider errors terminate an existing session" in spec
-    assert "expect(response.headers()['location']).toBe('/');" in spec
+    assert "OIDC callback without initiation fails closed at the login boundary" in spec
+    assert "OIDC provider errors terminate an existing authenticated UI session" in spec
+    assert "expect(callback.headers()['location']).toBe('/');" in spec
     assert "storageState: { cookies: [], origins: [] }" in spec
-    assert "storageState: await request.storageState()" not in spec
     assert "const authenticatedContext = await browser.newContext" in spec
     assert "expect(beforeLogout.status()).toBe(200);" in spec
-    assert "const uniqueUser = `scim.test.user.${Date.now()}`;" in spec
-    assert "const duplicateUser = `duplicate.user.${Date.now()}`;" in spec
-    assert "expect(firstResponse.status()).toBe(201);" in spec
-    assert "expect(duplicateResponse.status()).toBe(409);" in spec
-    assert "expect(groupPatchResponse.status()).toBe(403);" in spec
+    assert "Tenant SCIM User create persists and is readable through list and detail APIs" in spec
+    assert "Tenant SCIM duplicate username returns a typed 409 uniqueness error" in spec
+    assert "await expectScimError(patch, 403);" in spec
     assert "playwright.request.newContext()" not in spec
     assert "/api/v1/" not in spec
-    assert "/api/organization/asset-holders/?q=${encodeURIComponent(" in spec
-    assert "/api/users/config/" in spec
+    assert "/api/organization/asset-holders/" not in spec
+    assert "/api/users/config/" not in spec
+    assert "mockcode" not in spec
+    assert "mockstate" not in spec
+    assert "combo_code" not in spec
