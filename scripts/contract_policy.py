@@ -316,6 +316,8 @@ CAPABILITY_LIMITATIONS = {
         "saved templates may need to be rebuilt.",
     ),
     "reporting.scheduled": (
+        "The scheduled capability requires the operator flag ITAMBOX_REPORT_DESIGNER_ENABLED and an active "
+        "schedule row; disabling the flag pauses delivery without deleting saved schedules.",
         "Delivery depends on a running qcluster worker; a stopped worker silently skips runs.",
         "Archive retention is not yet configurable per schedule.",
     ),

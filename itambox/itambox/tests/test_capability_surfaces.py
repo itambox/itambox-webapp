@@ -201,8 +201,11 @@ class TestNavigationMaturity:
 
         reporting = next(group for group in MONITORING_MENU.groups if str(group.label) == "Reporting")
         designer = next(item for item in reporting.items if str(item.link_text) == "Report Templates")
+        scheduled = next(item for item in reporting.items if str(item.link_text) == "Scheduled Reports")
         assert designer.condition is not None
         assert designer.condition(None) is False
+        assert scheduled.condition is not None
+        assert scheduled.condition(None) is False
 
     @override_settings(REPORT_DESIGNER_ENABLED=True)
     def test_report_designer_navigation_is_visible_when_active(self):
@@ -210,7 +213,9 @@ class TestNavigationMaturity:
 
         reporting = next(group for group in MONITORING_MENU.groups if str(group.label) == "Reporting")
         designer = next(item for item in reporting.items if str(item.link_text) == "Report Templates")
+        scheduled = next(item for item in reporting.items if str(item.link_text) == "Scheduled Reports")
         assert designer.condition(None) is True
+        assert scheduled.condition(None) is True
 
 
 DESIGNER_VIEWS = (
@@ -228,6 +233,15 @@ DESIGNER_VIEWS = (
 #: would 404 on a missing row as well, so an open gate is only unambiguous on
 #: these two; the closed direction is proven for all eight.
 UNAMBIGUOUS_DESIGNER_VIEWS = ("ReportTemplateListView", "ReportTemplateBulkDeleteView")
+
+SCHEDULED_REPORT_VIEWS = (
+    "ScheduledReportListView",
+    "ScheduledReportCreateView",
+    "ScheduledReportUpdateView",
+    "ScheduledReportDeleteView",
+    "ScheduledReportBulkDeleteView",
+    "ReportTriggerImmediateView",
+)
 
 
 @pytest.mark.django_db
@@ -283,6 +297,24 @@ class TestReportDesignerOptIn:
     def test_the_curated_report_catalogue_is_untouched_by_the_designer_flag(self):
         """The Stable report path is a different capability and stays on."""
         assert registry.is_active("reporting.curated") is True
+
+
+@pytest.mark.django_db
+class TestScheduledReportsFollowDesignerOptIn:
+    """Scheduled reports share the designer's operator activation boundary."""
+
+    @pytest.mark.parametrize("view_name", SCHEDULED_REPORT_VIEWS)
+    def test_every_scheduled_report_route_names_the_designer_capability(self, view_name):
+        assert _designer_view(view_name).capability_key == "reporting.designer"
+
+    @pytest.mark.parametrize("view_name", SCHEDULED_REPORT_VIEWS)
+    def test_every_scheduled_report_route_is_closed_when_the_designer_is_off(self, view_name):
+        assert _gate_outcome(view_name) == "Http404"
+
+    @override_settings(REPORT_DESIGNER_ENABLED=True)
+    @pytest.mark.parametrize("view_name", ("ScheduledReportListView", "ScheduledReportBulkDeleteView"))
+    def test_enabled_designer_keeps_unambiguous_scheduled_routes_open(self, view_name):
+        assert _gate_outcome(view_name) != "Http404"
 
 
 def _designer_view(view_name):

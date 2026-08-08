@@ -11,11 +11,22 @@ from itambox.capabilities import (
     SOURCE_OBJECT_ENABLED,
     SOURCE_OPERATOR_FLAG,
     STABLE,
+    ActivationState,
     Capability,
     registry,
 )
 
 DOCS = "development/capability-registry.md"
+
+
+def _scheduled_reports_probe():
+    """Report schedules only when the designer gate and a live row agree."""
+    designer = settings_probe("REPORT_DESIGNER_ENABLED")()
+    scheduled = object_enabled_probe("extras", "ScheduledReport", "is_active")()
+    return ActivationState(
+        active=designer.active and scheduled.active,
+        value_present=designer.value_present or scheduled.value_present,
+    )
 
 
 class ExtrasConfig(AppConfig):
@@ -81,12 +92,14 @@ class ExtrasConfig(AppConfig):
                 owning_area="area:operations",
                 maturity=BETA,
                 security_critical=False,
-                activation=ENABLED,
-                activation_probe=object_enabled_probe("extras", "ScheduledReport", "is_active"),
-                activation_source=SOURCE_OBJECT_ENABLED,
+                activation=OPT_IN,
+                activation_probe=_scheduled_reports_probe,
+                activation_source=SOURCE_OPERATOR_FLAG,
                 owns=("extras.ReportGenerationArchive", "extras.ScheduledReport"),
                 docs_url=DOCS,
                 limitations=(
+                    "The scheduled capability requires the operator flag ITAMBOX_REPORT_DESIGNER_ENABLED and an active "
+                    "schedule row; disabling the flag pauses delivery without deleting saved schedules.",
                     "Delivery depends on a running qcluster worker; a stopped worker silently skips runs.",
                     "Archive retention is not yet configurable per schedule.",
                 ),

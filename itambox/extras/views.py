@@ -692,11 +692,10 @@ class NotificationChannelTestView(SimplePostView):
 # =============================================================================
 
 #: The report designer is opt-in (ITAMBOX_REPORT_DESIGNER_ENABLED). Every route
-#: below that edits, previews, or renders a ReportTemplate is closed while the
-#: capability is inactive, so the flag an operator sets and the routes a
-#: deployment serves cannot drift apart. The Stable curated report catalogue
-#: (`reporting.curated`) and the scheduled-report views are separate
-#: capabilities and are deliberately not gated here.
+#: below that edits, previews, renders, or schedules a ReportTemplate is closed
+#: while the capability is inactive, so the flag an operator sets and the routes
+#: or background delivery a deployment serves cannot drift apart. The Stable
+#: curated report catalogue (`reporting.curated`) remains independent.
 REPORT_DESIGNER_CAPABILITY = "reporting.designer"
 
 
@@ -773,7 +772,8 @@ class ReportTemplateBulkDeleteView(CapabilityRequiredMixin, ObjectBulkDeleteView
 
 
 @method_decorator(login_required, name="dispatch")
-class ScheduledReportListView(ObjectListView):
+class ScheduledReportListView(CapabilityRequiredMixin, ObjectListView):
+    capability_key = REPORT_DESIGNER_CAPABILITY
     queryset = ScheduledReport.objects.select_related("report")
     filterset = ScheduledReportFilterSet
     filterset_form = ScheduledReportFilterForm
@@ -788,7 +788,6 @@ class ScheduledReportListView(ObjectListView):
         context = super().get_context_data(**kwargs)
         context["title"] = _("Scheduled Reports")
         context["templates"] = ReportTemplate.objects.all()
-        context["report_designer_active"] = registry.is_active(REPORT_DESIGNER_CAPABILITY)
         context["is_beta_module"] = True
         return context
 
@@ -798,6 +797,8 @@ def handle_report_scheduling(sched_report):
     from django_q.models import Schedule
 
     if sched_report.is_active:
+        if not registry.is_active(REPORT_DESIGNER_CAPABILITY):
+            return
         # Map frequency choice to django-q Schedule type
         freq_mapping = {
             "once": Schedule.ONCE,
@@ -851,7 +852,8 @@ def handle_report_scheduling(sched_report):
 
 
 @method_decorator(login_required, name="dispatch")
-class ScheduledReportCreateView(ObjectEditView):
+class ScheduledReportCreateView(CapabilityRequiredMixin, ObjectEditView):
+    capability_key = REPORT_DESIGNER_CAPABILITY
     queryset = ScheduledReport.objects.all()
     model_form = ScheduledReportForm
     template_name = "core/reports/report_schedule_form.html"
@@ -868,7 +870,8 @@ class ScheduledReportCreateView(ObjectEditView):
 
 
 @method_decorator(login_required, name="dispatch")
-class ScheduledReportUpdateView(ObjectEditView):
+class ScheduledReportUpdateView(CapabilityRequiredMixin, ObjectEditView):
+    capability_key = REPORT_DESIGNER_CAPABILITY
     queryset = ScheduledReport.objects.all()
     model_form = ScheduledReportForm
     template_name = "core/reports/report_schedule_form.html"
@@ -885,17 +888,20 @@ class ScheduledReportUpdateView(ObjectEditView):
 
 
 @method_decorator(login_required, name="dispatch")
-class ScheduledReportDeleteView(ObjectDeleteView):
+class ScheduledReportDeleteView(CapabilityRequiredMixin, ObjectDeleteView):
+    capability_key = REPORT_DESIGNER_CAPABILITY
     queryset = ScheduledReport.objects.all()
     template_name = "core/reports/report_schedule_confirm_delete.html"
 
 
-class ScheduledReportBulkDeleteView(ObjectBulkDeleteView):
+class ScheduledReportBulkDeleteView(CapabilityRequiredMixin, ObjectBulkDeleteView):
+    capability_key = REPORT_DESIGNER_CAPABILITY
     queryset = ScheduledReport.objects.all()
 
 
 @method_decorator(login_required, name="dispatch")
-class ReportTriggerImmediateView(PermissionRequiredMixin, LoginRequiredMixin, View):
+class ReportTriggerImmediateView(CapabilityRequiredMixin, PermissionRequiredMixin, LoginRequiredMixin, View):
+    capability_key = REPORT_DESIGNER_CAPABILITY
     permission_required = ("extras.view_scheduledreport",)
 
     def has_permission(self):
