@@ -6,11 +6,13 @@ import pytest
 from core.errors import (
     FailureDisposition,
     IntegrationAuthenticationError,
+    IntegrationConfigurationError,
     IntegrationContext,
     IntegrationContractError,
     IntegrationRateLimitedError,
     IntegrationRetryBudgetExceededError,
     IntegrationUnavailableError,
+    IntegrationUntrustedNextLinkError,
     RetryBudget,
 )
 from core.integrations.intune import IntuneClient, _get_token, _graph_get_paginated
@@ -49,6 +51,7 @@ class IntegrationErrorContractTests(TestCase):
                 "request_id": "request-123",
                 "error_code": "integration.authentication",
                 "disposition": "terminal",
+                "retry_exhausted": False,
                 "status_code": 401,
             }
         }
@@ -88,6 +91,35 @@ class IntuneTransportContractTests(TestCase):
         assert error.disposition is FailureDisposition.TERMINAL
         assert "client-secret" not in str(error)
         assert "do-not-leak" not in str(error)
+
+    @patch("core.integrations.intune.requests.post")
+    def test_token_tls_failure_is_terminal_and_typed(self, mock_post):
+        import requests
+
+        mock_post.side_effect = requests.exceptions.SSLError("certificate detail")
+
+        with pytest.raises(IntegrationConfigurationError) as raised:
+            _get_token("azure-tenant", "client-id", "client-secret", context=CONTEXT)
+
+        assert raised.value.disposition is FailureDisposition.TERMINAL
+        assert raised.value.cause_type == "SSLError"
+        assert "certificate detail" not in str(raised.value)
+
+    @patch("core.integrations.intune.requests.get")
+    def test_graph_tls_failure_is_terminal_and_typed(self, mock_get):
+        import requests
+
+        mock_get.side_effect = requests.exceptions.SSLError("certificate detail")
+
+        with pytest.raises(IntegrationConfigurationError) as raised:
+            _graph_get_paginated(
+                "https://graph.microsoft.com/v1.0/devices",
+                {},
+                context=CONTEXT,
+            )
+
+        assert raised.value.disposition is FailureDisposition.TERMINAL
+        assert raised.value.cause_type == "SSLError"
 
     @patch("core.integrations.intune.requests.post")
     def test_token_success_payload_is_validated(self, mock_post):
@@ -136,7 +168,7 @@ class IntuneTransportContractTests(TestCase):
             json_data={"value": [], "@odata.nextLink": "https://evil.example/steal"},
         )
 
-        with pytest.raises(IntegrationContractError):
+        with pytest.raises(IntegrationUntrustedNextLinkError):
             _graph_get_paginated(
                 "https://graph.microsoft.com/v1.0/devices",
                 {"Authorization": "Bearer secret"},
@@ -163,7 +195,8 @@ class IntuneTransportContractTests(TestCase):
                 budget=budget,
             )
 
-        assert raised.value.disposition is FailureDisposition.TERMINAL
+        assert raised.value.disposition is FailureDisposition.RETRYABLE
+        assert raised.value.retry_exhausted is True
         assert mock_get.call_count == 3
         assert [call.args[0] for call in mock_sleep.call_args_list] == [30, 30]
 
