@@ -11,6 +11,7 @@ from core.errors import (
     IntegrationContext,
     IntegrationRateLimitedError,
     IntegrationUnavailableError,
+    IntegrationUntrustedNextLinkError,
 )
 
 
@@ -195,6 +196,32 @@ class IntuneTaskBoundaryContractTests(TestCase):
         with self.assertRaises(IntegrationAuthenticationError):
             intune_sync._sync_device_software(client, {"id": "device-17"}, MagicMock(), dry_run=False)
 
+    def test_optional_configuration_and_untrusted_link_failures_are_not_degraded(self):
+        from core.tasks import intune_sync
+
+        errors = (
+            IntegrationConfigurationError(
+                context=IntegrationContext(
+                    provider="microsoft-graph",
+                    operation="device_apps.list",
+                    tenant_id=17,
+                )
+            ),
+            IntegrationUntrustedNextLinkError(
+                context=IntegrationContext(
+                    provider="microsoft-graph",
+                    operation="device_apps.list",
+                    tenant_id=17,
+                )
+            ),
+        )
+        for error in errors:
+            with self.subTest(error=type(error).__name__):
+                client = MagicMock()
+                client.get_detected_apps.side_effect = error
+                with self.assertRaises(type(error)):
+                    intune_sync._sync_device_software(client, {"id": "device-17"}, MagicMock(), dry_run=False)
+
     def test_retryable_optional_detected_apps_failure_is_reported_as_degradation(self):
         from core.tasks import intune_sync
 
@@ -264,6 +291,7 @@ class IntuneTaskBoundaryContractTests(TestCase):
 
         self.assertEqual(result, (0, True))
         self.assertNotIn("client_secret", str(log_warning.call_args))
+        self.assertNotIn("Sensitive App", str(log_warning.call_args))
         self.assertEqual(
             log_warning.call_args.kwargs["extra"]["integration"]["operation"],
             "device_apps.persist",

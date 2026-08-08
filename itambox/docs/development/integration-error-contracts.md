@@ -12,7 +12,8 @@ how their protocol maps into it.
   transport failure, HTTP 5xx, or an in-budget HTTP 429);
 - `terminal`: retrying the same operation without an external/configuration
   change is not useful (for example invalid credentials, a non-retryable 4xx,
-  an invalid success payload, or an exhausted local retry budget).
+  or an invalid success payload). A local retry-budget exhaustion remains
+  `retryable` for a later caller and is marked `retry_exhausted`.
 
 `IntegrationError.user_visible` and its `user_message` are a separate channel.
 A retryable outage can still have a stable user-facing job message, and a
@@ -39,9 +40,11 @@ The shared types live in the dependency-free `core.errors` module:
 
 `IntegrationContext` is an allowlist containing only provider, stable operation,
 tenant ID, actor ID and request/correlation ID. `IntegrationError.log_extra()`
-returns these fields plus code, disposition and HTTP status for `logging.extra`.
-It never includes a request URL, headers, payload, response body or exception
-string.
+returns these fields plus `error_code`, `disposition`, `retry_exhausted`,
+`status_code`, and only the explicit optional fields `object_id`,
+`exception_type`, `cause_type`, `source_file`, `source_line`, `retry_count`,
+`retry_delay` and `retry_after` for `logging.extra`. It never includes a request
+URL, headers, payload or response body; exception text is never included.
 
 ## Retry rules in the Intune slice
 
@@ -57,7 +60,9 @@ local budget. The adapter does not
 retry transport/5xx failures in-process or re-enqueue a django-q job in this
 slice; queue re-enqueue is a separate follow-up decision.
 
-HTTP 401/403, 404 and other 4xx responses are terminal. A successful response
+HTTP 401/403, 404 and other 4xx responses are terminal. TLS, URL-shape and
+redirect-loop transport failures are also terminal; timeouts and connection
+failures remain retryable. A successful response
 without valid JSON/value or an OAuth response without a non-empty
 `access_token` is a terminal contract error.
 
@@ -77,7 +82,8 @@ present. OAuth and Graph request frames are marked with Django's
 credential-bearing requests frame is not retained as the public cause. The
 optional detected-app endpoint is intentionally non-critical:
 asset discovery remains available when an ordinary retryable provider failure
-hits that endpoint, but authentication and configuration failures are re-raised
+hits that endpoint, but authentication, configuration and untrusted-next-link
+failures are re-raised
 and fail the sync. A 401 evicts only the affected Azure tenant's cached token.
 The typed failure is logged with the `device_apps.list` operation and tested.
 This is a capability fallback, not permission/authentication fallback.

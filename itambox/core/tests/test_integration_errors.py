@@ -133,6 +133,7 @@ class IntuneTransportContractTests(TestCase):
         for url in (
             "http://graph.microsoft.com/v1.0/devices",
             "https://graph.microsoft.com.evil.com/v1.0/devices",
+            "https://[bad",
         ):
             with self.subTest(url=url), pytest.raises(IntegrationUntrustedNextLinkError):
                 _graph_get_paginated(url, {"Authorization": "Bearer secret"}, context=CONTEXT)

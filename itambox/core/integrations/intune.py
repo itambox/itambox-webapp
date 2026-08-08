@@ -43,8 +43,18 @@ MAX_GRAPH_PAGES = 1000
 
 
 def _is_graph_url(url: str) -> bool:
-    parsed = urlsplit(url)
+    try:
+        parsed = urlsplit(url)
+    except ValueError:
+        return False
     return parsed.scheme == "https" and parsed.netloc == "graph.microsoft.com" and parsed.path.startswith("/v1.0/")
+
+
+def _safe_url_hostname(url: str) -> str:
+    try:
+        return urlsplit(url).hostname or "<invalid>"
+    except ValueError:
+        return "<invalid>"
 
 
 def _context_or_default(context: IntegrationContext | None, operation: str) -> IntegrationContext:
@@ -246,7 +256,7 @@ def _graph_get_paginated(
             raise IntegrationContractError(context=context)
         if not _is_graph_url(url):
             error = IntegrationUntrustedNextLinkError(context=context)
-            safe_host = urlsplit(url).hostname or "<invalid>"
+            safe_host = _safe_url_hostname(url)
             log_extra = error.log_extra(object_id=safe_host)
             logger.error(
                 "Rejected untrusted Graph next link integration=%s",
