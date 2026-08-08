@@ -1,3 +1,4 @@
+import uuid
 from unittest import TestCase
 from unittest.mock import MagicMock, patch
 
@@ -50,6 +51,7 @@ class IntuneTaskBoundaryContractTests(TestCase):
         self.job.mark_failed.assert_called_once_with(error.user_message)
         self.assertIn("integration=%s", log_error.call_args.args[0])
         self.assertIn("code=integration.authentication", self.job.append_log.call_args.args[0])
+        self.assertIn("status_code=401", self.job.append_log.call_args.args[0])
         extra = log_error.call_args.kwargs["extra"]["integration"]
         self.assertEqual(extra["disposition"], FailureDisposition.TERMINAL.value)
         self.assertEqual(extra["tenant_id"], 17)
@@ -157,6 +159,25 @@ class IntuneTaskBoundaryContractTests(TestCase):
             log_error.call_args.kwargs["extra"]["integration"]["exception_type"],
             "RuntimeError",
         )
+
+    def test_task_propagates_actor_tenant_and_request_context(self):
+        from core.tasks import intune_sync
+
+        request_id = uuid.uuid4()
+        with (
+            patch.object(intune_sync, "TaskContext", return_value=self.context_manager),
+            patch.object(intune_sync.Job.objects, "get", return_value=self.job),
+            patch.object(intune_sync, "_run_sync", return_value={}) as run_sync,
+            patch.object(intune_sync, "get_current_request_id", return_value=request_id),
+        ):
+            intune_sync.sync_tenant_intune(17, 23, 91)
+
+        context = run_sync.call_args.args[3]
+        self.assertEqual(context.provider, "microsoft-graph")
+        self.assertEqual(context.operation, "sync")
+        self.assertEqual(context.tenant_id, 17)
+        self.assertEqual(context.actor_id, 23)
+        self.assertEqual(context.request_id, str(request_id))
 
     def test_optional_authentication_failure_is_not_silently_degraded(self):
         from core.tasks import intune_sync

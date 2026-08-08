@@ -110,6 +110,26 @@ class IntuneTransportContractTests(TestCase):
         assert "Bearer secret" not in str(raised.value)
 
     @patch("core.integrations.intune.requests.get")
+    def test_graph_pagination_has_a_page_ceiling(self, mock_get):
+        mock_get.return_value = response(
+            200,
+            json_data={
+                "value": [],
+                "@odata.nextLink": "https://graph.microsoft.com/v1.0/page2",
+            },
+        )
+
+        with pytest.raises(IntegrationContractError):
+            _graph_get_paginated(
+                "https://graph.microsoft.com/v1.0/page1",
+                {},
+                context=CONTEXT,
+                max_pages=1,
+            )
+
+        assert mock_get.call_count == 1
+
+    @patch("core.integrations.intune.requests.get")
     def test_next_link_cannot_redirect_bearer_to_another_host(self, mock_get):
         mock_get.return_value = response(
             200,
@@ -157,6 +177,7 @@ class IntuneTransportContractTests(TestCase):
             _graph_get_paginated("https://graph.microsoft.com/v1.0/devices", {}, context=CONTEXT)
 
         assert raised.value.disposition is FailureDisposition.RETRYABLE
+        assert raised.value.cause_type == "ConnectionError"
         assert "Bearer secret" not in str(raised.value)
 
     @patch("core.integrations.intune.requests.get")

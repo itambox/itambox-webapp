@@ -41,7 +41,8 @@ def _record_integration_failure(job: Job, error: IntegrationError) -> None:
         "Integration failure: "
         f"code={error.code}; disposition={error.disposition.value}; "
         f"provider={context.provider}; operation={context.operation}; "
-        f"tenant_id={context.tenant_id}; actor_id={context.actor_id}; request_id={context.request_id}"
+        f"tenant_id={context.tenant_id}; actor_id={context.actor_id}; request_id={context.request_id}; "
+        f"status_code={error.status_code}"
     )
 
 
@@ -386,6 +387,29 @@ def _get_detected_apps_or_degrade(client: IntuneClient, device_id: str) -> tuple
         return None, True
 
 
+def _log_software_persistence_failure(client: IntuneClient, device_id: str, exc: Exception) -> None:
+    client_context = getattr(client, "context", None)
+    base_context = (
+        client_context
+        if isinstance(client_context, IntegrationContext)
+        else IntegrationContext(provider="microsoft-graph", operation="device_apps.persist")
+    )
+    context = IntegrationContext(
+        provider=base_context.provider,
+        operation="device_apps.persist",
+        tenant_id=base_context.tenant_id,
+        actor_id=base_context.actor_id,
+        request_id=base_context.request_id,
+    )
+    unexpected = IntegrationUnexpectedError(context=context, cause_type=type(exc).__name__)
+    extra = unexpected.log_extra(object_id=device_id)
+    logger.warning(
+        "Optional detected-app persistence degraded integration=%s",
+        extra["integration"],
+        extra=extra,
+    )
+
+
 def _sync_device_software(
     client: IntuneClient,
     device: IntuneDevicePayload,
@@ -454,8 +478,10 @@ def _sync_device_software(
                 },
             )
             count += 1
+        # broad except: boundary-isolation: optional software persistence may degrade without invalidating asset sync
         except Exception as exc:
-            logger.warning("InstalledSoftware upsert failed (%s, %s, %s): %s", asset, software, version, exc)
+            _log_software_persistence_failure(client, device_id, exc)
+            degraded = True
 
     return count, degraded
 

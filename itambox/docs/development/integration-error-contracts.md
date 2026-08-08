@@ -49,9 +49,10 @@ caller and handles HTTP 429 with a finite per-operation `RetryBudget` (not
 shared across devices). Both retry count and elapsed wall-clock time are bounded,
 and provider `Retry-After` is parsed defensively, made finite, and clamped before
 sleeping. Graph pagination accepts only HTTPS `graph.microsoft.com/v1.0/...`
-next links and never sends the bearer header to an arbitrary provider-controlled
-next-link host. OAuth 429 responses produce a bounded retryable signal, while
-Graph collection 429 responses consume the local budget. The adapter does not
+next links, never sends the bearer header to an arbitrary provider-controlled
+next-link host, and stops after a fixed page ceiling. OAuth 429 responses produce
+a bounded retryable signal, while Graph collection 429 responses consume the
+local budget. The adapter does not
 retry transport/5xx failures in-process or re-enqueue a django-q job in this
 slice; queue re-enqueue is a separate follow-up decision.
 
@@ -82,7 +83,10 @@ This is a capability fallback, not permission/authentication fallback.
 
 Snipe-IT, LDAP/OIDC, mail and webhook delivery must consume these shared types
 in bounded follow-up slices. They must preserve their current explicit retry,
-4xx, authentication and optional-dependency semantics. WP-13/WP-16 own the
+4xx, authentication and optional-dependency semantics. The Intune slice bounds
+one Graph operation and its pagination, but does not impose a sync-wide deadline
+across a large device fleet; that is a separate queue/worker-timeout policy
+follow-up. WP-13/WP-16 own the
 consumer work for alert/webhook delivery and must not introduce a competing
 error taxonomy. SCIM capability detection follows the same optional-capability
 form under WP-18.
