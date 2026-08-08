@@ -84,6 +84,7 @@ class IntegrationError(Exception):
         context: IntegrationContext,
         status_code: int | None = None,
         retry_after: float | None = None,
+        cause_type: str | None = None,
     ) -> None:
         self.context = context
         self.status_code = status_code
@@ -96,6 +97,7 @@ class IntegrationError(Exception):
             if safe_retry_after is not None and math.isfinite(safe_retry_after)
             else None
         )
+        self.cause_type = cause_type
         # The sole Exception argument is a constant safe message.  Remote
         # URLs, headers, payloads and exception strings never enter __str__.
         super().__init__(self.display_message())
@@ -131,7 +133,7 @@ class IntegrationError(Exception):
         for name, value in {
             "object_id": object_id,
             "exception_type": exception_type,
-            "cause_type": cause_type,
+            "cause_type": cause_type or self.cause_type,
             "source_file": source_file,
             "source_line": source_line,
             "retry_count": retry_count,

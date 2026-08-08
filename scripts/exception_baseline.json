@@ -724,14 +724,6 @@
       "count": 1
     },
     {
-      "path": "itambox/core/tasks/intune_sync.py",
-      "scope": "FunctionDef:_sync_device_software",
-      "handler_type": "Exception",
-      "classification": "log-only",
-      "body_sha256": "6a95d650ee8f4abdfb61dc5bbe382659c375dcdea36db4da85fe1ca35f6f59db",
-      "count": 1
-    },
-    {
       "path": "itambox/core/tasks/labels.py",
       "scope": "FunctionDef:generate_label_batch_task",
       "handler_type": "Exception",

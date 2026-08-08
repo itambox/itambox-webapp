@@ -17,10 +17,12 @@ from urllib.parse import quote, urlsplit
 
 import requests
 from django.views.decorators.debug import sensitive_variables
+from requests import exceptions as requests_exceptions
 
 from core.errors import (
     MAX_RETRY_AFTER_SECONDS,
     IntegrationAuthenticationError,
+    IntegrationConfigurationError,
     IntegrationContext,
     IntegrationContractError,
     IntegrationNotFoundError,
@@ -36,6 +38,7 @@ logger = logging.getLogger(__name__)
 _TOKEN_CACHE: dict[tuple[str, str], dict[str, Any]] = {}  # keyed by Azure tenant and app client
 
 GRAPH_BASE = "https://graph.microsoft.com/v1.0"
+MAX_GRAPH_PAGES = 1000
 
 
 def _is_graph_url(url: str) -> bool:
@@ -115,8 +118,15 @@ def _get_token(
             },
             timeout=30,
         )
-    except requests.RequestException:
-        raise IntegrationUnavailableError(context=context) from None
+    except (
+        requests_exceptions.SSLError,
+        requests_exceptions.InvalidURL,
+        requests_exceptions.MissingSchema,
+        requests_exceptions.TooManyRedirects,
+    ) as exc:
+        raise IntegrationConfigurationError(context=context, cause_type=type(exc).__name__) from None
+    except requests_exceptions.RequestException as exc:
+        raise IntegrationUnavailableError(context=context, cause_type=type(exc).__name__) from None
 
     _raise_response_error(resp, context=context)
     try:
@@ -149,8 +159,15 @@ def _get_graph_response(
     while True:
         try:
             resp = requests.get(url, headers=headers, timeout=60)
-        except requests.RequestException:
-            raise IntegrationUnavailableError(context=context) from None
+        except (
+            requests_exceptions.SSLError,
+            requests_exceptions.InvalidURL,
+            requests_exceptions.MissingSchema,
+            requests_exceptions.TooManyRedirects,
+        ) as exc:
+            raise IntegrationConfigurationError(context=context, cause_type=type(exc).__name__) from None
+        except requests_exceptions.RequestException as exc:
+            raise IntegrationUnavailableError(context=context, cause_type=type(exc).__name__) from None
         if resp.status_code != 429:
             return resp
 
@@ -201,13 +218,18 @@ def _graph_get_paginated(
     *,
     context: IntegrationContext | None = None,
     budget: RetryBudget | None = None,
+    max_pages: int = MAX_GRAPH_PAGES,
 ) -> list:
     """Follow @odata.nextLink pagination with a finite, safe retry budget."""
 
     context = _context_or_default(context, "graph.collection.get")
     budget = budget or RetryBudget()
     items = []
+    pages = 0
     while url:
+        pages += 1
+        if pages > max_pages:
+            raise IntegrationContractError(context=context)
         if not _is_graph_url(url):
             raise IntegrationContractError(context=context)
         resp = _get_graph_response(url, headers, context=context, budget=budget)
