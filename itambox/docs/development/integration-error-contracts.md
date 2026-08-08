@@ -44,21 +44,26 @@ string.
 
 ## Retry rules in the Intune slice
 
-The Microsoft Graph adapter retries only transport failures/5xx as classified
-retryable for the caller and handles HTTP 429 with a finite per-operation
-`RetryBudget` (not shared across devices). Both retry count and elapsed wall-clock
-time are bounded, and provider `Retry-After` is parsed defensively, made finite,
-and clamped before sleeping. Graph pagination accepts only HTTPS
-`graph.microsoft.com/v1.0/...` next links, so provider-controlled redirects
-cannot receive the bearer header. The adapter does not re-enqueue a django-q job
-in this slice; queue re-enqueue is a separate follow-up decision.
+The Microsoft Graph adapter classifies transport failures/5xx as retryable for the
+caller and handles HTTP 429 with a finite per-operation `RetryBudget` (not
+shared across devices). Both retry count and elapsed wall-clock time are bounded,
+and provider `Retry-After` is parsed defensively, made finite, and clamped before
+sleeping. Graph pagination accepts only HTTPS `graph.microsoft.com/v1.0/...`
+next links and never sends the bearer header to an arbitrary provider-controlled
+next-link host. OAuth 429 responses produce a bounded retryable signal, while
+Graph collection 429 responses consume the local budget. The adapter does not
+retry transport/5xx failures in-process or re-enqueue a django-q job in this
+slice; queue re-enqueue is a separate follow-up decision.
 
 HTTP 401/403, 404 and other 4xx responses are terminal. A successful response
 without valid JSON/value or an OAuth response without a non-empty
 `access_token` is a terminal contract error.
 
 The Intune task catches `IntegrationError` explicitly, logs only the structured
-allowlist, and persists `display_message()`. The in-loop rate-limit signal is
+allowlist, and persists `display_message()`. Optional software degradation is
+counted as `software_degraded` in the completed job result and summary log, so it
+is not confused with a tenant that has no detected software. The in-loop
+rate-limit signal is
 not user-visible; the task maps it to the generic safe message. Its last-resort
 unknown failure boundary records only the exception type and traceback source
 location (never the traceback text) and persists a safe generic message. It
@@ -66,7 +71,7 @@ does not use `logger.exception` while provider credential locals may still be
 present. OAuth and Graph request frames are marked with Django's
 `sensitive_variables()` and transport exceptions are chained from `None` so a
 credential-bearing requests frame is not retained as the public cause. The
-The optional detected-app endpoint is intentionally non-critical:
+optional detected-app endpoint is intentionally non-critical:
 asset discovery remains available when an ordinary retryable provider failure
 hits that endpoint, but authentication and configuration failures are re-raised
 and fail the sync. A 401 evicts only the affected Azure tenant's cached token.

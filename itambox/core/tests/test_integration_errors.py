@@ -214,6 +214,21 @@ class IntuneTransportContractTests(TestCase):
         assert mock_get.call_count == 3
         assert [call.args[0] for call in mock_sleep.call_args_list] == [1]
 
+    @patch("core.integrations.intune.requests.post")
+    def test_token_cache_isolated_by_client_registration(self, mock_post):
+        from core.integrations.intune import _TOKEN_CACHE
+
+        _TOKEN_CACHE.clear()
+        mock_post.side_effect = [
+            response(200, json_data={"access_token": "token-a", "expires_in": 3600}),
+            response(200, json_data={"access_token": "token-b", "expires_in": 3600}),
+        ]
+
+        assert _get_token("azure-tenant", "client-a", "secret-a", context=CONTEXT) == "token-a"
+        assert _get_token("azure-tenant", "client-b", "secret-b", context=CONTEXT) == "token-b"
+        assert mock_post.call_count == 2
+        _TOKEN_CACHE.clear()
+
     @patch("core.integrations.intune._graph_get_paginated", return_value=[])
     @patch.object(IntuneClient, "_headers", return_value={})
     def test_client_uses_an_operation_scoped_budget(self, mock_headers, mock_graph):
@@ -244,11 +259,11 @@ class IntuneTransportContractTests(TestCase):
     def test_graph_authentication_failure_invalidates_cached_token(self, mock_headers, mock_graph):
         from core.integrations.intune import _TOKEN_CACHE
 
-        _TOKEN_CACHE["azure-tenant"] = {"token": "expired", "expires_at": 9999999999}
+        _TOKEN_CACHE[("azure-tenant", "client-id")] = {"token": "expired", "expires_at": 9999999999}
         mock_graph.side_effect = IntegrationAuthenticationError(context=CONTEXT, status_code=401)
         client = IntuneClient("azure-tenant", "client-id", "client-secret", context=CONTEXT)
 
         with pytest.raises(IntegrationAuthenticationError):
             client.get_managed_devices()
 
-        assert "azure-tenant" not in _TOKEN_CACHE
+        assert ("azure-tenant", "client-id") not in _TOKEN_CACHE

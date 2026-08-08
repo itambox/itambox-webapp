@@ -95,7 +95,7 @@ class IntuneTokenRefreshTest(TransactionTestCase):
 
         from core.integrations.intune import _TOKEN_CACHE, _get_token
 
-        _TOKEN_CACHE["tenant-y"] = {"token": "old-tok", "expires_at": time.monotonic() - 1}
+        _TOKEN_CACHE[("tenant-y", "cid")] = {"token": "old-tok", "expires_at": time.monotonic() - 1}
 
         with patch("core.integrations.intune.requests.post") as mock_post:
             mock_post.return_value = MagicMock(

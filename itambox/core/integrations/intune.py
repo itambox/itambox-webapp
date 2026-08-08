@@ -13,7 +13,7 @@ import math
 import time
 from collections.abc import Callable
 from typing import Any
-from urllib.parse import urlsplit
+from urllib.parse import quote, urlsplit
 
 import requests
 from django.views.decorators.debug import sensitive_variables
@@ -33,7 +33,7 @@ from core.errors import (
 
 logger = logging.getLogger(__name__)
 
-_TOKEN_CACHE: dict = {}  # keyed by azure_tenant_id
+_TOKEN_CACHE: dict[tuple[str, str], dict[str, Any]] = {}  # keyed by Azure tenant and app client
 
 GRAPH_BASE = "https://graph.microsoft.com/v1.0"
 
@@ -98,7 +98,8 @@ def _get_token(
     """Return a valid access token, refreshing when within 60 s of expiry."""
 
     context = _context_or_default(context, "oauth.token")
-    cached = _TOKEN_CACHE.get(azure_tenant_id)
+    cache_key = (azure_tenant_id, client_id)
+    cached = _TOKEN_CACHE.get(cache_key)
     if cached and cached["expires_at"] - 60 > time.monotonic():
         return cached["token"]
 
@@ -130,7 +131,7 @@ def _get_token(
         raise IntegrationContractError(context=context, status_code=resp.status_code) from exc
 
     token = data["access_token"]
-    _TOKEN_CACHE[azure_tenant_id] = {
+    _TOKEN_CACHE[cache_key] = {
         "token": token,
         "expires_at": time.monotonic() + max(0, expires_in),
     }
@@ -144,7 +145,7 @@ def _get_graph_response(
     *,
     context: IntegrationContext,
     budget: RetryBudget,
-):
+) -> requests.Response:
     while True:
         try:
             resp = requests.get(url, headers=headers, timeout=60)
@@ -166,6 +167,7 @@ def _get_graph_response(
             raise IntegrationRetryBudgetExceededError(
                 context=context,
                 status_code=resp.status_code,
+                retry_after=rate_limited.retry_after,
             ) from rate_limited
         log_extra = rate_limited.log_extra(
             retry_count=budget.attempts,
@@ -179,7 +181,7 @@ def _get_graph_response(
         time.sleep(delay)
 
 
-def _parse_graph_page(resp, *, context: IntegrationContext) -> tuple[list, str | None]:
+def _parse_graph_page(resp: requests.Response, *, context: IntegrationContext) -> tuple[list, str | None]:
     try:
         data = resp.json()
     except (TypeError, ValueError) as exc:
@@ -262,12 +264,12 @@ class IntuneClient:
             )
         except IntegrationAuthenticationError as exc:
             if exc.status_code == 401:
-                _TOKEN_CACHE.pop(self.azure_tenant_id, None)
+                _TOKEN_CACHE.pop((self.azure_tenant_id, self.client_id), None)
             raise
 
     def get_detected_apps(self, device_id: str) -> list:
         """Return detected apps for a single managed device."""
-        url = f"{GRAPH_BASE}/deviceManagement/managedDevices/{device_id}/detectedApps"
+        url = f"{GRAPH_BASE}/deviceManagement/managedDevices/{quote(device_id, safe='')}/detectedApps"
         try:
             return _graph_get_paginated(
                 url,
@@ -277,5 +279,5 @@ class IntuneClient:
             )
         except IntegrationAuthenticationError as exc:
             if exc.status_code == 401:
-                _TOKEN_CACHE.pop(self.azure_tenant_id, None)
+                _TOKEN_CACHE.pop((self.azure_tenant_id, self.client_id), None)
             raise

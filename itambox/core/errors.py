@@ -98,7 +98,7 @@ class IntegrationError(Exception):
         )
         # The sole Exception argument is a constant safe message.  Remote
         # URLs, headers, payloads and exception strings never enter __str__.
-        super().__init__(self.user_message)
+        super().__init__(self.display_message())
 
     def display_message(self) -> str:
         """Return the safe message a caller may persist or show to a user."""
@@ -183,7 +183,7 @@ class IntegrationRequestError(IntegrationError):
 
 class IntegrationNotFoundError(IntegrationRequestError):
     code = "integration.not_found"
-    user_message = "The requested external resource was not found."
+    user_message = "The external integration could not complete the operation."
 
 
 class IntegrationUnexpectedError(IntegrationError):
