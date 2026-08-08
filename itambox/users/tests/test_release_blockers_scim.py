@@ -69,6 +69,24 @@ class SCIMTokenTenantScopeTests(TestCase):
         response = self.client.get(url, **self.headers_a)
         self.assertEqual(response.status_code, status.HTTP_200_OK)
 
+    def test_anonymous_unknown_tenant_does_not_disclose_tenant_existence(self):
+        existing_url = reverse(
+            "api:scim:service-provider-config",
+            kwargs={"tenant_slug": self.tenant_a.slug},
+        )
+        missing_url = reverse(
+            "api:scim:service-provider-config",
+            kwargs={"tenant_slug": "missing-tenant"},
+        )
+
+        existing_response = self.client.get(existing_url)
+        missing_response = self.client.get(missing_url)
+
+        self.assertEqual(existing_response.status_code, status.HTTP_401_UNAUTHORIZED)
+        self.assertEqual(missing_response.status_code, status.HTTP_401_UNAUTHORIZED)
+        self.assertEqual(existing_response.json(), missing_response.json())
+        self.assertNotIn("not found", missing_response.json()["detail"].lower())
+
 
 class SCIMRolePermissionAuthorizationTests(TestCase):
     """D2-2: authorization must be permission-based, not Role.name-based."""
