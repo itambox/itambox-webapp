@@ -98,10 +98,18 @@ function isThenable(value: unknown): value is PromiseLike<unknown> {
  * duplicate frames cannot start the same action twice; a rejected promise
  * re-arms the gate exactly like a fulfilled one, which is what makes a failed
  * scan retryable.
+ *
+ * `reset()` opens a new *generation*. An action started before the reset — the
+ * user closed the overlay mid-lookup — still settles eventually, but its release
+ * is bound to the generation it started in and is discarded once that generation
+ * is gone. Without that binding a stale round-trip would clear the busy flag of
+ * the scanner session that replaced it, letting duplicate frames start a second
+ * action while the first is still running.
  */
 export class ThrottledScanDispatcher {
   private readonly handler: ScanHandler;
   private readonly gate: ScanGate;
+  private generation = 0;
 
   constructor(handler: ScanHandler, options: ScanGateOptions = {}) {
     this.handler = handler;
@@ -118,28 +126,34 @@ export class ThrottledScanDispatcher {
     if (!cleaned) return;
     if (!this.gate.accept(cleaned)) return;
 
+    const generation = this.generation;
+    const release = () => {
+      // Ignore a settlement that belongs to a scanner session already closed.
+      if (generation === this.generation) this.gate.settle();
+    };
+
     let result: unknown;
     try {
       result = this.handler(cleaned);
     } catch (err) {
       // Release before propagating: a handler bug must not wedge the scanner.
-      this.gate.settle();
+      release();
       throw err;
     }
 
     if (isThenable(result)) {
-      const release = () => this.gate.settle();
       // Both arms release. The rejection is absorbed here on purpose — handlers
       // own their own error reporting, and an unhandled rejection from a camera
       // frame is noise, not a signal.
       result.then(release, release);
       return;
     }
-    this.gate.settle();
+    release();
   }
 
-  /** Forget everything; used when the scanner is (re)opened. */
+  /** Forget everything; used when the scanner is (re)opened or closed. */
   public reset(): void {
+    this.generation += 1;
     this.gate.reset();
   }
 }

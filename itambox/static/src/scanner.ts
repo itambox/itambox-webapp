@@ -1,3 +1,5 @@
+import { ThrottledScanDispatcher } from './scan-gate';
+
 interface AssetScannerConfig {
   /** ID of the div that html5-qrcode renders into */
   readerId: string;
@@ -11,8 +13,14 @@ interface AssetScannerConfig {
   closeBtnId: string;
   /** ID of a div where a camera-error message can be shown (optional) */
   errorDivId?: string;
-  /** Called with the decoded string when a scan succeeds */
-  onResult: (code: string) => void;
+  /**
+   * Called with the decoded string when a scan succeeds. Return the promise of
+   * the domain action it starts: the scanner keeps the gate closed until that
+   * promise settles, so duplicate frames cannot start the same action twice.
+   */
+  onResult: (code: string) => unknown;
+  /** Override the quiet period before the same payload may fire again. */
+  duplicateWindowMs?: number;
 }
 
 export class AssetScanner {
@@ -23,6 +31,13 @@ export class AssetScanner {
   private errorDiv: HTMLElement | null = null;
   private html5QrcodeScanner: Html5Qrcode | null = null;
   private isTorchOn: boolean = false;
+  /**
+   * Throttles raw camera detections down to one domain action per scan. It lives
+   * here, on the shared scanner, so every caller — global lookup, audit page and
+   * both baskets — is gated once and identically. Manual and USB (keyboard-wedge)
+   * entry never reaches this path and stays ungated.
+   */
+  private dispatcher: ThrottledScanDispatcher;
 
   constructor(config: AssetScannerConfig) {
     this.config = config;
@@ -30,6 +45,10 @@ export class AssetScanner {
     this.modal = document.getElementById(config.modalId);
     this.torchBtn = document.getElementById(config.torchId);
     this.errorDiv = config.errorDivId ? document.getElementById(config.errorDivId) : null;
+    this.dispatcher = new ThrottledScanDispatcher(
+      (code: string) => this.config.onResult(code),
+      { duplicateWindowMs: config.duplicateWindowMs },
+    );
     this.initEventListeners();
   }
 
@@ -70,6 +89,9 @@ export class AssetScanner {
 
     this.modal.classList.add('is-open');
     this.hideError();
+    // A re-opened scanner starts clean: no wedged in-flight flag from a previous
+    // session, and the payload scanned last time may be read again immediately.
+    this.dispatcher.reset();
 
     // iOS WebKit only grants getUserMedia on HTTPS or literal localhost (not 127.0.0.1).
     // Detect this before calling .start() so the user sees a clear message.
@@ -112,7 +134,7 @@ export class AssetScanner {
 
           // Deep link: keep itambox://asset/<pk> intact for backend resolution
           if (raw.toLowerCase().startsWith('itambox://asset/')) {
-            this.config.onResult(raw);
+            this.dispatcher.dispatch(raw);
             return;
           }
 
@@ -121,7 +143,9 @@ export class AssetScanner {
           } else if (raw.toLowerCase().startsWith('itambox:')) {
             raw = raw.slice(8).replace(/^\/+|\/+$/g, '').trim();
           }
-          this.config.onResult(raw);
+          // Throttled: the decoder re-reports a payload that stays in view on
+          // every frame, and each of those must not start its own action.
+          this.dispatcher.dispatch(raw);
         },
         (_errorMessage: string) => {
           // Frame failures are normal while no code is in view — suppress
@@ -173,6 +197,8 @@ export class AssetScanner {
       this.torchBtn.classList.add('d-none');
     }
     this.isTorchOn = false;
+    // Closing mid-action must not leave the gate busy for the next session.
+    this.dispatcher.reset();
 
     if (this.html5QrcodeScanner) {
       if (this.html5QrcodeScanner.isScanning) {
@@ -232,7 +258,8 @@ function initGlobalScanner(): void {
     closeBtnId: 'global-close-scanner-btn',
     errorDivId: 'global-scanner-error',
     onResult(code: string) {
-      fetch('/scan/resolve/?code=' + encodeURIComponent(code))
+      // Returned so the scanner holds the gate until the lookup settles.
+      return fetch('/scan/resolve/?code=' + encodeURIComponent(code))
         .then(res => {
           if (!res.ok) throw new Error('not_found');
           return res.json();

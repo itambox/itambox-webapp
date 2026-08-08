@@ -238,6 +238,58 @@ test('dispatcher interleaves duplicate and distinct payloads deterministically',
 });
 
 
+test('a settlement from a closed scanner generation cannot release the next one', async () => {
+  const { calls, settlers, handler } = deferredHandler();
+
+  await withFakeClock(async () => {
+    const dispatcher = new ThrottledScanDispatcher(handler);
+
+    // Generation 0: a scan is still in flight when the user closes the overlay.
+    dispatcher.dispatch('ASSET-001');
+    assert.deepEqual(calls, ['ASSET-001']);
+
+    dispatcher.reset(); // scanner closed and re-opened
+
+    // Generation 1: the same payload is legitimately re-read straight away.
+    dispatcher.dispatch('ASSET-001');
+    assert.deepEqual(calls, ['ASSET-001', 'ASSET-001']);
+    assert.equal(dispatcher.isBusy, true);
+
+    // The abandoned generation-0 round-trip now lands. It must not touch the
+    // gate that generation 1 is holding.
+    settlers[0].resolve({ found: true });
+    await Promise.resolve();
+    await Promise.resolve();
+
+    assert.equal(dispatcher.isBusy, true, 'stale settlement released a live gate');
+    dispatcher.dispatch('ASSET-001');
+    assert.deepEqual(calls, ['ASSET-001', 'ASSET-001'], 'in-flight scan started twice');
+  });
+});
+
+
+test('a stale rejection cannot re-arm the gate of the next scanner generation', async () => {
+  const { calls, settlers, handler } = deferredHandler();
+
+  await withFakeClock(async () => {
+    const dispatcher = new ThrottledScanDispatcher(handler);
+
+    dispatcher.dispatch('MISSING-001');
+    dispatcher.reset();
+    dispatcher.dispatch('MISSING-001');
+    assert.deepEqual(calls, ['MISSING-001', 'MISSING-001']);
+
+    settlers[0].reject(new Error('not_found'));
+    await Promise.resolve();
+    await Promise.resolve();
+
+    assert.equal(dispatcher.isBusy, true);
+    dispatcher.dispatch('OTHER-002');
+    assert.deepEqual(calls, ['MISSING-001', 'MISSING-001'], 'distinct code bypassed an in-flight scan');
+  });
+});
+
+
 test('dispatcher releases the gate when the handler throws synchronously', async () => {
   await withFakeClock((tick) => {
     const calls = [];

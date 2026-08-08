@@ -55,8 +55,6 @@ function showToast(message: string, variant: 'warning' | 'danger' = 'warning'): 
 }
 
 let feedbackTimer = 0;
-const CAMERA_SCAN_COOLDOWN_MS = 800;
-const SAME_CODE_GAP_MS = 1500;
 
 function scannerOverlayOpen(): boolean {
   const m = document.getElementById('audit-scanner-modal');
@@ -99,9 +97,6 @@ function initAuditBasket(): void {
   if (!form || !tbody || !template) return;
 
   const basket = new Set<number>();
-  let lastCode = '';
-  let lastScanAt = 0;
-  let lastSeenAt = 0;
 
   function updateState(): void {
     const count = basket.size;
@@ -162,24 +157,17 @@ function initAuditBasket(): void {
     tbody!.appendChild(tr);
   }
 
-  function addByCode(code: string, fromCamera = false): void {
+  /**
+   * Validate one code and fold it into the basket. Returns the round-trip so the
+   * camera scanner can hold its gate open until this settles; USB and manual
+   * entry ignore the result and stay ungated — one deliberate event per code.
+   */
+  function addByCode(code: string): Promise<void> {
     const cleaned = (code || '').trim();
-    if (!cleaned) return;
-
-    if (fromCamera) {
-      const now = Date.now();
-      if (cleaned === lastCode && now - lastSeenAt < SAME_CODE_GAP_MS) {
-        lastSeenAt = now;
-        return;
-      }
-      if (now - lastScanAt < CAMERA_SCAN_COOLDOWN_MS) return;
-      lastScanAt = now;
-      lastCode = cleaned;
-      lastSeenAt = now;
-    }
+    if (!cleaned) return Promise.resolve();
 
     const url = `${validateUrl}?code=${encodeURIComponent(cleaned)}`;
-    fetch(url, { headers: { 'X-Requested-With': 'XMLHttpRequest' } })
+    return fetch(url, { headers: { 'X-Requested-With': 'XMLHttpRequest' } })
       .then((res) => {
         if (res.status === 403) throw new Error('forbidden');
         if (!res.ok) throw new Error('not_found');
@@ -239,7 +227,7 @@ function initAuditBasket(): void {
       closeBtnId: 'audit-close-scanner-btn',
       errorDivId: 'audit-scanner-error',
       onResult(code: string) {
-        addByCode(code, true);
+        return addByCode(code);
       },
     });
   }

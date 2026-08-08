@@ -59,12 +59,6 @@ function showToast(message: string, variant: 'warning' | 'danger' = 'warning'): 
 
 let feedbackTimer = 0;
 
-// Camera throttle — the lens fires ~15 frames/s, so without these gates a single
-// in-view barcode (or a sweep across labels) machine-guns scans. USB scanners and
-// manual entry are one deliberate event each and bypass these gates entirely.
-const CAMERA_SCAN_COOLDOWN_MS = 800; // min gap between two accepted camera scans (any code)
-const SAME_CODE_GAP_MS = 1500;       // a barcode must leave the lens this long before it re-fires
-
 function scannerOverlayOpen(): boolean {
   const m = document.getElementById('basket-scanner-modal');
   return !!m && getComputedStyle(m).display !== 'none';
@@ -117,9 +111,6 @@ function initScanBasket(): void {
   if (!form || !tbody || !template) return;
 
   const basket = new Set<number>();
-  let lastCode = '';
-  let lastScanAt = 0;
-  let lastSeenAt = 0;
 
   function updateState(): void {
     const count = basket.size;
@@ -180,27 +171,17 @@ function initScanBasket(): void {
     tbody!.appendChild(tr);
   }
 
-  function addByCode(code: string, fromCamera = false): void {
+  /**
+   * Resolve one code and fold it into the basket. Returns the round-trip so the
+   * camera scanner can hold its gate open until this settles; USB and manual
+   * entry ignore the result and stay ungated — one deliberate event per code.
+   */
+  function addByCode(code: string): Promise<void> {
     const cleaned = (code || '').trim();
-    if (!cleaned) return;
-
-    // Camera-only throttle; USB scanners and manual entry pass straight through.
-    if (fromCamera) {
-      const now = Date.now();
-      // Same barcode still in front of the lens → keep suppressing, don't re-fire.
-      if (cleaned === lastCode && now - lastSeenAt < SAME_CODE_GAP_MS) {
-        lastSeenAt = now;
-        return;
-      }
-      // Global cooldown so a fast sweep across labels doesn't burst-fire.
-      if (now - lastScanAt < CAMERA_SCAN_COOLDOWN_MS) return;
-      lastScanAt = now;
-      lastCode = cleaned;
-      lastSeenAt = now;
-    }
+    if (!cleaned) return Promise.resolve();
 
     const url = `${resolveUrl}?code=${encodeURIComponent(cleaned)}&mode=${encodeURIComponent(mode)}`;
-    fetch(url, { headers: { 'X-Requested-With': 'XMLHttpRequest' } })
+    return fetch(url, { headers: { 'X-Requested-With': 'XMLHttpRequest' } })
       .then((res) => {
         if (res.status === 403) throw new Error('forbidden');
         if (!res.ok) throw new Error('not_found');
@@ -224,8 +205,9 @@ function initScanBasket(): void {
         );
       })
       .catch((err: Error) => {
-        // A held unknown barcode fails once then stays quiet (same-code gap);
-        // USB/manual retries are ungated, so no re-arm is needed here.
+        // Resolves rather than re-throws: the failure is reported here, and the
+        // camera gate re-arms on settle so the code can be presented again once
+        // its duplicate window has passed. USB/manual retries are ungated.
         beepFail();
         if (err.message === 'forbidden') {
           notify(gettext('You do not have permission to do this.'), 'fail');
@@ -257,7 +239,7 @@ function initScanBasket(): void {
       closeBtnId: 'basket-close-scanner-btn',
       errorDivId: 'basket-scanner-error',
       onResult(code: string) {
-        addByCode(code, true);
+        return addByCode(code);
       },
     });
   }
