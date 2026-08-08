@@ -3,7 +3,7 @@ from collections.abc import Sequence
 
 from django.contrib.auth import get_user_model
 from django.db import IntegrityError, transaction
-from django.db.models import Exists, OuterRef, Prefetch, Q
+from django.db.models import Exists, OuterRef, Prefetch, Q, QuerySet
 from drf_spectacular.utils import extend_schema_view
 from rest_framework import exceptions, status
 from rest_framework.authentication import BaseAuthentication
@@ -40,7 +40,7 @@ from users.api.scim.provider_services import (
     sync_provider_group_members,
 )
 from users.api.scim.serializers import SCIMGroupSerializer, SCIMServiceProviderConfigSerializer, SCIMUserSerializer
-from users.models import UserGroup
+from users.models import User as UserModel, UserGroup
 
 User = get_user_model()
 
@@ -142,7 +142,7 @@ class ProviderServiceProviderConfigView(SCIMProviderMixin, APIView):
     post=scim_schema.SCIM_PROVIDER_USER_CREATE,
 )
 class SCIMProviderUserListView(SCIMProviderMixin, APIView):
-    def _retry_correlated_user(self, username, external_id):
+    def _retry_correlated_user(self, username: str, external_id: str) -> UserModel:
         if not external_id:
             raise SCIMPatchError("User already exists", scim_type="uniqueness", status_code=409)
         correlated = (
@@ -160,7 +160,7 @@ class SCIMProviderUserListView(SCIMProviderMixin, APIView):
             )
         return correlated.user
 
-    def get(self, request, *args, **kwargs):
+    def get(self, request: Request, *args: object, **kwargs: object) -> Response:
         try:
             q_obj = parse_scim_filter(request.query_params.get("filter"), "user")
         except SCIMFilterError:
@@ -226,7 +226,7 @@ class SCIMProviderUserListView(SCIMProviderMixin, APIView):
             status=status.HTTP_200_OK,
         )
 
-    def post(self, request, *args, **kwargs):
+    def post(self, request: Request, *args: object, **kwargs: object) -> Response:
         document = require_object_document(request.data)
         patch = parse_user_resource(document)
         username = patch.username
@@ -330,10 +330,10 @@ class SCIMProviderUserListView(SCIMProviderMixin, APIView):
     delete=scim_schema.SCIM_PROVIDER_USER_DELETE,
 )
 class SCIMProviderUserDetailView(SCIMProviderMixin, APIView):
-    def _staff_queryset(self):
+    def _staff_queryset(self) -> QuerySet[UserModel]:
         return User.objects.filter(memberships__tenant=self.tenant).distinct()
 
-    def get(self, request, pk, *args, **kwargs):
+    def get(self, request: Request, pk: str, *args: object, **kwargs: object) -> Response:
         user = get_scim_object_or_404(self._staff_queryset(), pk)
         serializer = SCIMUserSerializer(
             user,
@@ -346,7 +346,7 @@ class SCIMProviderUserDetailView(SCIMProviderMixin, APIView):
         )
         return Response(serializer.data, status=status.HTTP_200_OK)
 
-    def put(self, request, pk, *args, **kwargs):
+    def put(self, request: Request, pk: str, *args: object, **kwargs: object) -> Response:
         document = require_object_document(request.data)
         user = get_scim_object_or_404(self._staff_queryset(), pk)
         patch = parse_user_resource(document)
@@ -363,7 +363,7 @@ class SCIMProviderUserDetailView(SCIMProviderMixin, APIView):
         )
         return Response(serializer.data, status=status.HTTP_200_OK)
 
-    def patch(self, request, pk, *args, **kwargs):
+    def patch(self, request: Request, pk: str, *args: object, **kwargs: object) -> Response:
         user = get_scim_object_or_404(self._staff_queryset(), pk)
 
         patch = parse_user_patch_operations(get_patch_operations(request.data))
@@ -380,7 +380,7 @@ class SCIMProviderUserDetailView(SCIMProviderMixin, APIView):
         )
         return Response(serializer.data, status=status.HTTP_200_OK)
 
-    def delete(self, request, pk, *args, **kwargs):
+    def delete(self, request: Request, pk: str, *args: object, **kwargs: object) -> Response:
         user = get_scim_object_or_404(self._staff_queryset(), pk)
         with transaction.atomic():
             # Remove only the membership at this managing tenant. Delete per-instance so
