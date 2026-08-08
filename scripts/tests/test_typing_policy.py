@@ -1313,6 +1313,8 @@ class CommittedRecordTests(unittest.TestCase):
                     "symbols",
                     [
                         "ProviderServiceProviderConfigView",
+                        "SCIMProviderGroupDetailView",
+                        "SCIMProviderGroupListView",
                         "SCIMProviderMixin",
                         "SCIMProviderUserDetailView",
                         "SCIMProviderUserListView",
@@ -1387,6 +1389,8 @@ class CommittedRecordTests(unittest.TestCase):
             entries[path]["symbols"],
             [
                 "ProviderServiceProviderConfigView",
+                "SCIMProviderGroupDetailView",
+                "SCIMProviderGroupListView",
                 "SCIMProviderMixin",
                 "SCIMProviderUserDetailView",
                 "SCIMProviderUserListView",

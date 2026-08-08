@@ -187,3 +187,48 @@ class ProviderViewSignatureTests(SimpleTestCase):
                     expected_parameters,
                 )
                 self.assertEqual(get_type_hints(method), expected_annotations)
+
+    def test_provider_group_mutation_signatures_are_typed(self):
+        importlib.import_module("itambox.api")
+        from rest_framework.request import Request
+        from rest_framework.response import Response
+
+        from users.api.scim.provider_views import SCIMProviderGroupDetailView, SCIMProviderGroupListView
+
+        contracts = (
+            *(
+                (
+                    getattr(SCIMProviderGroupListView, method_name),
+                    [
+                        ("self", Parameter.POSITIONAL_OR_KEYWORD),
+                        ("request", Parameter.POSITIONAL_OR_KEYWORD),
+                        ("args", Parameter.VAR_POSITIONAL),
+                        ("kwargs", Parameter.VAR_KEYWORD),
+                    ],
+                    {"request": Request, "args": object, "kwargs": object, "return": Response},
+                )
+                for method_name in ("get", "post")
+            ),
+            *(
+                (
+                    getattr(SCIMProviderGroupDetailView, method_name),
+                    [
+                        ("self", Parameter.POSITIONAL_OR_KEYWORD),
+                        ("request", Parameter.POSITIONAL_OR_KEYWORD),
+                        ("pk", Parameter.POSITIONAL_OR_KEYWORD),
+                        ("args", Parameter.VAR_POSITIONAL),
+                        ("kwargs", Parameter.VAR_KEYWORD),
+                    ],
+                    {"request": Request, "pk": str, "args": object, "kwargs": object, "return": Response},
+                )
+                for method_name in ("get", "put", "patch", "delete")
+            ),
+        )
+
+        for method, expected_parameters, expected_annotations in contracts:
+            with self.subTest(method=method.__qualname__):
+                self.assertEqual(
+                    [(name, parameter.kind) for name, parameter in signature(method).parameters.items()],
+                    expected_parameters,
+                )
+                self.assertEqual(get_type_hints(method), expected_annotations)

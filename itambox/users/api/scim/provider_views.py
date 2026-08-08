@@ -402,7 +402,7 @@ class SCIMProviderUserDetailView(SCIMProviderMixin, APIView):
     post=scim_schema.SCIM_PROVIDER_GROUP_CREATE,
 )
 class SCIMProviderGroupListView(SCIMProviderMixin, APIView):
-    def get(self, request, *args, **kwargs):
+    def get(self, request: Request, *args: object, **kwargs: object) -> Response:
         self.require_group_permission(request, "users.view_usergroup")
         queryset = UserGroup.objects.filter(tenant=self.tenant)
         try:
@@ -454,7 +454,7 @@ class SCIMProviderGroupListView(SCIMProviderMixin, APIView):
             status=status.HTTP_200_OK,
         )
 
-    def post(self, request, *args, **kwargs):
+    def post(self, request: Request, *args: object, **kwargs: object) -> Response:
         self.require_group_permission(request, "users.add_usergroup")
         document = require_object_document(request.data)
         name = document.get("displayName")
@@ -524,7 +524,7 @@ class SCIMProviderGroupListView(SCIMProviderMixin, APIView):
     delete=scim_schema.SCIM_PROVIDER_GROUP_DELETE,
 )
 class SCIMProviderGroupDetailView(SCIMProviderMixin, APIView):
-    def get(self, request, pk, *args, **kwargs):
+    def get(self, request: Request, pk: str, *args: object, **kwargs: object) -> Response:
         self.require_group_permission(request, "users.view_usergroup")
         group = get_scim_object_or_404(UserGroup.objects.filter(tenant=self.tenant), pk)
         serializer = SCIMGroupSerializer(
@@ -537,7 +537,7 @@ class SCIMProviderGroupDetailView(SCIMProviderMixin, APIView):
         )
         return Response(serializer.data, status=status.HTTP_200_OK)
 
-    def put(self, request, pk, *args, **kwargs):
+    def put(self, request: Request, pk: str, *args: object, **kwargs: object) -> Response:
         self.require_group_permission(request, "users.change_usergroup")
         document = require_object_document(request.data)
         name = document.get("displayName")
@@ -582,7 +582,7 @@ class SCIMProviderGroupDetailView(SCIMProviderMixin, APIView):
         )
         return Response(serializer.data, status=status.HTTP_200_OK)
 
-    def patch(self, request, pk, *args, **kwargs):
+    def patch(self, request: Request, pk: str, *args: object, **kwargs: object) -> Response:
         self.require_group_permission(request, "users.change_usergroup")
         group = get_scim_object_or_404(UserGroup.objects.filter(tenant=self.tenant), pk)
 
@@ -604,7 +604,7 @@ class SCIMProviderGroupDetailView(SCIMProviderMixin, APIView):
         )
         return Response(serializer.data, status=status.HTTP_200_OK)
 
-    def delete(self, request, pk, *args, **kwargs):
+    def delete(self, request: Request, pk: str, *args: object, **kwargs: object) -> Response:
         self.require_group_permission(request, "users.delete_usergroup")
         group = get_scim_object_or_404(UserGroup.objects.filter(tenant=self.tenant), pk)
         with transaction.atomic():

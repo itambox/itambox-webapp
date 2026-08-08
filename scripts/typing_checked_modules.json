@@ -2,7 +2,7 @@
   "schema_version": 2,
   "canonical_python": "3.12",
   "next_sequence": 44,
-  "policy_sha256": "0c21b0ea3ca2e72887892d5c6e06e7626e72bd9d575b8843098180f7c0902937",
+  "policy_sha256": "f1bcda3a364fa9e0e1d9b2fd0ecc5f96f949b37270d0c05c6a4ad3476375dcae",
   "config": {
     "config_file": "pyproject.toml",
     "working_directory": "itambox",
@@ -602,10 +602,12 @@
       "path": "itambox/users/api/scim/provider_views.py",
       "module": "users.api.scim.provider_views",
       "issue": "#93",
-      "note": "Slice 14 user endpoint-view admission: the User list/detail classes, including POST/PUT/PATCH/DELETE contracts and the class-visible staff/correlation helpers. Existing provider mutations, membership synchronization, response/error contracts, and runtime bodies remain unchanged; Group endpoint classes remain a separate vertical boundary in this slice.",
+      "note": "Slice 14 provider endpoint-view admission: the User and Group list/detail classes, including POST/PUT/PATCH/DELETE contracts and class-visible helpers. Existing provider mutations, membership synchronization, response/error contracts, and runtime bodies remain unchanged.",
       "scope": "symbols",
       "symbols": [
         "ProviderServiceProviderConfigView",
+        "SCIMProviderGroupDetailView",
+        "SCIMProviderGroupListView",
         "SCIMProviderMixin",
         "SCIMProviderUserDetailView",
         "SCIMProviderUserListView"
