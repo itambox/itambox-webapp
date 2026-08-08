@@ -1,8 +1,8 @@
 {
   "schema_version": 2,
   "canonical_python": "3.12",
-  "next_sequence": 39,
-  "policy_sha256": "869702bd511d13f923b704d19b0dee48da0d9c84ddee42ffe597372e81077058",
+  "next_sequence": 42,
+  "policy_sha256": "2850146d032a8728399d79c9764915d86efbb45dbbca1b33750a27c874f96d9e",
   "config": {
     "config_file": "pyproject.toml",
     "working_directory": "itambox",
@@ -61,6 +61,46 @@
       "scope": "symbols",
       "symbols": [
         "SystemAuthorizationContext"
+      ]
+    },
+    {
+      "sequence": 39,
+      "path": "itambox/core/reports/contracts.py",
+      "module": "core.reports.contracts",
+      "issue": "#93",
+      "note": "Slice 11 symbol admission: the immutable report request/result value objects and the ReportDefinition provider contract, including tenant scope, row/summary/chart hooks, and sample fallback signatures. Domain provider bodies and ORM implementations remain outside this projection.",
+      "scope": "symbols",
+      "symbols": [
+        "ReportDefinition",
+        "ReportRequest",
+        "ReportResult"
+      ]
+    },
+    {
+      "sequence": 40,
+      "path": "itambox/core/reports/orchestration.py",
+      "module": "core.reports.orchestration",
+      "issue": "#93",
+      "note": "Slice 11 symbol admission: report scope resolution, common row grouping, and the six-part build_report_context return boundary. Permission checks, provider dispatch, and historical context assembly behavior remain unchanged.",
+      "scope": "symbols",
+      "symbols": [
+        "_group_rows",
+        "_resolve_report_scope",
+        "build_report_context"
+      ]
+    },
+    {
+      "sequence": 41,
+      "path": "itambox/core/reports/registry.py",
+      "module": "core.reports.registry",
+      "issue": "#93",
+      "note": "Slice 11 symbol admission: the report-provider registration, lazy discovery, typed lookup, and registered-identifier boundaries. Duplicate detection, discovery locking, and missing-provider failures remain unchanged.",
+      "scope": "symbols",
+      "symbols": [
+        "discover_report_providers",
+        "get_registered_report_types",
+        "get_report_provider",
+        "register_report_provider"
       ]
     },
     {

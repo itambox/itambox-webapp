@@ -1,8 +1,8 @@
 """Contracts shared by the report orchestration and the domain providers."""
 
+from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass, field
 from datetime import datetime
-from typing import Any, Callable, Mapping, Sequence
 
 from django.db.models import Q
 
@@ -35,25 +35,31 @@ class ReportRequest:
     cannot accidentally mutate the scope used by another stage.
     """
 
-    template: Any
-    active_tenant: Any | None
-    filter_tenants: tuple[Any, ...]
+    template: object
+    active_tenant: object | None
+    filter_tenants: tuple[object, ...]
     columns: tuple[str, ...]
-    user: Any | None
+    user: object | None
     as_of: datetime
+
+
+ReportRow = Mapping[str, object]
+ReportSummary = Mapping[str, object]
+ReportCellRenderer = Callable[..., object]
+ReportGroupResolver = Callable[..., str]
 
 
 @dataclass
 class ReportResult:
     """Materialized domain output consumed by common grouping and rendering."""
 
-    rows: list[Mapping[str, Any]] = field(default_factory=list)
-    summary_cards: list[Mapping[str, Any]] = field(default_factory=list)
+    rows: list[ReportRow] = field(default_factory=list)
+    summary_cards: list[ReportSummary] = field(default_factory=list)
     chart_svg: str = ""
     #: True when the scope held no data and the report shows its sample instead.
     is_sample: bool = False
 
-    def __post_init__(self):
+    def __post_init__(self) -> None:
         self.rows = list(self.rows)
         self.summary_cards = list(self.summary_cards)
 
@@ -94,20 +100,20 @@ class ReportDefinition:
     row_limit: int = ROW_LIMIT
 
     #: Column key -> ``renderer(record, request)``, in row order.
-    cells: Mapping[str, Callable] = {}
+    cells: Mapping[str, ReportCellRenderer] = {}
 
     #: Column key -> the value the sample row shows for it.
     sample_cells: Mapping[str, str] = {}
 
     #: ``group_by_field`` -> ``resolver(record, request)`` for a row's group key.
-    group_resolvers: Mapping[str, Callable] = {}
+    group_resolvers: Mapping[str, ReportGroupResolver] = {}
 
     #: ``group_by_field`` -> the grouping key the sample row carries.
     sample_group_keys: Mapping[str, str] = {}
 
     # -- metadata-driven helpers ------------------------------------------
 
-    def build_columns(self, template) -> tuple[str, ...]:
+    def build_columns(self, template: object) -> tuple[str, ...]:
         return tuple(template.included_columns or self.default_columns)
 
     def required_permissions(self) -> tuple[str, ...]:
@@ -116,7 +122,12 @@ class ReportDefinition:
             return (self.permission,)
         return tuple(self.permission)
 
-    def scope_to_tenants(self, queryset, request: ReportRequest, tenant_field=None):
+    def scope_to_tenants(
+        self,
+        queryset: object,
+        request: ReportRequest,
+        tenant_field: str | None = None,
+    ) -> object:
         """Restrict a queryset to the report's tenant scope.
 
         ``filter_tenants`` wins when the template pins a constellation,
@@ -134,7 +145,12 @@ class ReportDefinition:
             criteria |= Q(**{f"{field_path}__isnull": True})
         return queryset.filter(criteria)
 
-    def row_for(self, record, request: ReportRequest, cells=None):
+    def row_for(
+        self,
+        record: object,
+        request: ReportRequest,
+        cells: Mapping[str, ReportCellRenderer] | None = None,
+    ) -> ReportRow:
         """One rendered row, keyed by header label and grouped by this provider."""
         return report_row(
             self.cells if cells is None else cells,
@@ -144,10 +160,10 @@ class ReportDefinition:
             self.group_key(record, request),
         )
 
-    def group_key(self, record, request: ReportRequest):
+    def group_key(self, record: object, request: ReportRequest) -> str:
         return group_key_for(request.template.group_by_field, self.group_resolvers, record, request)
 
-    def sample_row(self, request: ReportRequest):
+    def sample_row(self, request: ReportRequest) -> ReportRow:
         return sample_report_row(
             self.sample_cells,
             request.columns,
@@ -156,23 +172,23 @@ class ReportDefinition:
 
     # -- domain hooks ------------------------------------------------------
 
-    def get_queryset(self, request: ReportRequest):
+    def get_queryset(self, request: ReportRequest) -> object:
         """The tenant-scoped records this report reads."""
         raise NotImplementedError
 
-    def build_rows(self, records, request: ReportRequest) -> Sequence[Mapping[str, Any]]:
+    def build_rows(self, records: Sequence[object], request: ReportRequest) -> Sequence[ReportRow]:
         """Render the capped record window into report rows."""
         raise NotImplementedError
 
-    def build_summary(self, queryset, request: ReportRequest) -> Sequence[Mapping[str, Any]]:
+    def build_summary(self, queryset: object, request: ReportRequest) -> Sequence[ReportSummary]:
         """Summary cards for the whole scope, not just the rendered window."""
         raise NotImplementedError
 
-    def build_chart(self, queryset, records, request: ReportRequest) -> str:
+    def build_chart(self, queryset: object, records: Sequence[object], request: ReportRequest) -> str:
         """The distribution chart, from the whole scope or the rendered window."""
         return ""
 
-    def build_sample_summary(self, request: ReportRequest) -> Sequence[Mapping[str, Any]]:
+    def build_sample_summary(self, request: ReportRequest) -> Sequence[ReportSummary]:
         return []
 
     def build_sample_chart(self, request: ReportRequest) -> str:

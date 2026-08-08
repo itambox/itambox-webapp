@@ -7,17 +7,22 @@ back.  Every decision about *what* a report contains belongs to the provider in
 the owning domain application.
 """
 
+from collections.abc import Sequence
+
 from django.utils import timezone
 
+from core.reports.contracts import ReportRequest, ReportRow, ReportSummary
 from itambox.middleware import get_current_user
 
 from .columns import headers_for
-from .contracts import ReportRequest
 from .registry import get_report_provider
 from .rows import DEFAULT_GROUP, GROUP_FIELD
 
 
-def _resolve_report_scope(active_tenant, filter_tenants):
+def _resolve_report_scope(
+    active_tenant: object | None,
+    filter_tenants: Sequence[object] | None,
+) -> Sequence[object] | None:
     """Apply the cross-tenant permission gate without domain imports.
 
     An empty ``filter_tenants`` signals "global aggregation".  Without the
@@ -37,7 +42,10 @@ def _resolve_report_scope(active_tenant, filter_tenants):
     )
 
 
-def _group_rows(rows, group_by_field):
+def _group_rows(
+    rows: Sequence[ReportRow],
+    group_by_field: str | None,
+) -> dict[str, list[ReportRow]]:
     grouped_data = {}
     if group_by_field:
         for row in rows:
@@ -48,7 +56,18 @@ def _group_rows(rows, group_by_field):
     return grouped_data
 
 
-def build_report_context(template, active_tenant=None, filter_tenants=None):
+def build_report_context(
+    template: object,
+    active_tenant: object | None = None,
+    filter_tenants: Sequence[object] | None = None,
+) -> tuple[
+    list[str],
+    list[ReportRow],
+    list[ReportSummary],
+    dict[str, list[ReportRow]],
+    str,
+    dict[str, object],
+]:
     """Build one report through the provider that owns its identifier.
 
     The return shape is the historical six-tuple because preview, download,
