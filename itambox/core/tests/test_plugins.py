@@ -392,7 +392,7 @@ class PluginDiagnosticsSurfaceTest(SimpleTestCase):
             rendered = render_to_string("global_includes/_plugin_diagnostics.html", context)
 
         self.assertIn("unsafe_plugin", rendered)
-        self.assertIn("plugin-api-experimental-warning", rendered)
+        self.assertNotIn("plugin-api-experimental-warning", rendered)
         self.assertIn("ValueError", rendered)
         self.assertIn("settings.PLUGINS", rendered)
         self.assertIn("disabled", rendered)
