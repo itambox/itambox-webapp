@@ -7,7 +7,14 @@ from django.core.management.base import BaseCommand, CommandError
 from django.db.models import Q
 from django.utils import timezone
 
-from core.auth.ldap import django_auth_ldap_installed, ldap
+from core.auth.ldap import (
+    LDAPConfigurationError,
+    classify_ldap_error,
+    django_auth_ldap_installed,
+    ldap,
+)
+from core.context import get_current_request_id
+from core.errors import IntegrationContext
 from core.mfa import role_is_privileged
 from core.tasks.context import TaskContext
 from itambox.middleware import get_current_user
@@ -15,9 +22,32 @@ from organization.models import Membership, Role, RoleGrant, RoleGrantScope, Ten
 
 logger = logging.getLogger("django_auth_ldap")
 User = get_user_model()
+_LDAP_PROVIDER_ERROR = ldap.LDAPError
 
 LDAP_GRANT_REASON = "LDAP directory synchronization"
 LDAP_PRIVILEGED_GRANT_LIFETIME = timedelta(days=1)
+
+
+def _ldap_context(tenant, operation):
+    actor = get_current_user()
+    request_id = get_current_request_id()
+    return IntegrationContext(
+        provider="ldap",
+        operation=operation,
+        tenant_id=getattr(tenant, "pk", None),
+        actor_id=getattr(actor, "pk", None),
+        request_id=str(request_id) if request_id else None,
+    )
+
+
+def _initialize_connection(server_uri, tenant):
+    try:
+        connection = ldap.initialize(server_uri)
+        connection.set_option(ldap.OPT_REFERRALS, 0)
+        connection.set_option(ldap.OPT_PROTOCOL_VERSION, 3)
+        return connection
+    except _LDAP_PROVIDER_ERROR as exc:
+        raise classify_ldap_error(exc, context=_ldap_context(tenant, "sync.connect")) from exc
 
 
 def _require_real_ldap_backend():
@@ -113,7 +143,7 @@ class Command(BaseCommand):
         config = tenant_configs.get(tenant.slug)
 
         if not config:
-            raise CommandError(f"No LDAP configuration found for tenant slug '{tenant.slug}' in settings.")
+            raise LDAPConfigurationError(context=_ldap_context(tenant, "sync.configure"))
 
         server_uri = config.get("SERVER_URI") or config.get("server_uri")
         bind_dn = config.get("BIND_DN") or config.get("bind_dn")
@@ -135,29 +165,24 @@ class Command(BaseCommand):
         require_group = config.get("REQUIRE_GROUP") or config.get("require_group")
 
         if not server_uri or not bind_dn:
-            raise CommandError("LDAP server_uri and bind_dn are required in the configuration.")
+            raise LDAPConfigurationError(context=_ldap_context(tenant, "sync.configure"))
 
         if not user_search_base:
-            raise CommandError("LDAP user_search_base is required in the configuration.")
+            raise LDAPConfigurationError(context=_ldap_context(tenant, "sync.configure"))
 
         try:
             _require_real_ldap_backend()
         except ImportError:
-            raise CommandError(
-                "django-auth-ldap is unavailable. Use the locked Linux/WSL or Docker environment; "
-                "native Windows does not support LDAP synchronization."
-            ) from None
+            raise LDAPConfigurationError(context=_ldap_context(tenant, "sync.dependency")) from None
 
-        self.stdout.write(f"Connecting to LDAP server: {server_uri}...")
-        conn = ldap.initialize(server_uri)
-        conn.set_option(ldap.OPT_REFERRALS, 0)
-        conn.set_option(ldap.OPT_PROTOCOL_VERSION, 3)
+        self.stdout.write("Connecting to configured LDAP server...")
+        conn = _initialize_connection(server_uri, tenant)
 
         try:
             conn.simple_bind_s(bind_dn, bind_password)
             self.stdout.write(self.style.SUCCESS("LDAP bind successful."))
-        except ldap.LDAPError as e:
-            raise CommandError(f"LDAP bind failed: {e}") from e
+        except _LDAP_PROVIDER_ERROR as exc:
+            raise classify_ldap_error(exc, context=_ldap_context(tenant, "sync.bind")) from exc
 
         # Resolve wildcards for bulk synchronization search
         search_filter = user_search_filter
@@ -281,8 +306,8 @@ class Command(BaseCommand):
                 )
             )
 
-        except ldap.LDAPError as e:
-            raise CommandError(f"LDAP search failed: {e}") from e
+        except _LDAP_PROVIDER_ERROR as exc:
+            raise classify_ldap_error(exc, context=_ldap_context(tenant, "sync.search")) from exc
         finally:
             # Tenant context cleanup is handled by TaskContext.__exit__; do NOT
             # call set_current_tenant(None) here as it would fire before TaskContext
