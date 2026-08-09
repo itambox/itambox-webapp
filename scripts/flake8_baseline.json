@@ -3374,7 +3374,7 @@
     {
       "path": "itambox/core/management/commands/_seed/access.py",
       "code": "C901",
-      "message": "'SeedAccessMixin._seed_access' is too complex (31)",
+      "message": "'SeedAccessMixin._seed_access' is too complex (30)",
       "source": "    def _seed_access(self):",
       "context": "Module:body/ClassDef:SeedAccessMixin:body/FunctionDef:_seed_access:self",
       "count": 1

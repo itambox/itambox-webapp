@@ -1,4 +1,5 @@
 from django.contrib.auth import get_user_model
+from django.contrib.auth.models import Permission
 from django.test import TestCase
 from django.urls import reverse
 from django.utils import timezone
@@ -6,6 +7,7 @@ from model_bakery import baker
 
 from assets.models import Asset, AssetAssignment
 from compliance.models import CustodyReceipt, CustodyTemplate
+from core.management.commands._seed.access import _technician_permissions
 from core.tests.mixins import TenantTestMixin
 from organization.models import AssetHolder, Tenant
 
@@ -203,3 +205,26 @@ class CustodyReceiptInternalViewTests(TenantTestMixin, TestCase):
             self.assertNotContains(
                 response, reverse("compliance:custodyreceipt_detail", kwargs={"pk": self.receipt.pk})
             )
+
+
+class CustodyPermissionPolicyTests(TestCase):
+    def test_receipt_action_permissions_are_explicit_and_do_not_delegate_consent(self):
+        codenames = {codename for codename, _label in CustodyReceipt._meta.permissions}
+
+        self.assertEqual(codenames, {"prepare_custodyreceipt", "export_custodyreceipt"})
+        self.assertFalse(any(codename.startswith("sign_") for codename in codenames))
+
+    def test_seeded_technician_permissions_match_the_custody_role_matrix(self):
+        permissions = list(Permission.objects.select_related("content_type"))
+        technician_permissions = set(_technician_permissions(permissions, {"compliance"}))
+
+        self.assertIn("compliance.view_custodytemplate", technician_permissions)
+        self.assertIn("compliance.view_custodyreceipt", technician_permissions)
+        self.assertIn("compliance.prepare_custodyreceipt", technician_permissions)
+        self.assertNotIn("compliance.export_custodyreceipt", technician_permissions)
+        self.assertNotIn("compliance.add_custodytemplate", technician_permissions)
+        self.assertNotIn("compliance.change_custodytemplate", technician_permissions)
+        self.assertNotIn("compliance.delete_custodytemplate", technician_permissions)
+        self.assertNotIn("compliance.add_custodyreceipt", technician_permissions)
+        self.assertNotIn("compliance.change_custodyreceipt", technician_permissions)
+        self.assertFalse(any(permission.startswith("compliance.sign_") for permission in technician_permissions))

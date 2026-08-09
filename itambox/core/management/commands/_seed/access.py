@@ -33,6 +33,44 @@ User = get_user_model()
 
 SEED_PASSWORD = "itambox2026"
 
+TECHNICIAN_CUSTODY_DENIED_PERMISSIONS = frozenset(
+    {
+        "compliance.add_custodyreceipt",
+        "compliance.change_custodyreceipt",
+        "compliance.delete_custodyreceipt",
+        "compliance.add_custodytemplate",
+        "compliance.change_custodytemplate",
+        "compliance.delete_custodytemplate",
+        "compliance.export_custodyreceipt",
+    }
+)
+TECHNICIAN_CUSTODY_REQUIRED_PERMISSIONS = (
+    "compliance.view_custodytemplate",
+    "compliance.view_custodyreceipt",
+    "compliance.prepare_custodyreceipt",
+)
+
+
+def _permission_name(permission):
+    return f"{permission.content_type.app_label}.{permission.codename}"
+
+
+def _technician_permissions(all_permissions, operational_apps):
+    available = {_permission_name(permission) for permission in all_permissions}
+    permissions = [
+        _permission_name(permission)
+        for permission in all_permissions
+        if permission.content_type.app_label in operational_apps
+        and not permission.codename.startswith("delete_")
+        and _permission_name(permission) not in TECHNICIAN_CUSTODY_DENIED_PERMISSIONS
+    ]
+    permissions.extend(
+        permission
+        for permission in TECHNICIAN_CUSTODY_REQUIRED_PERMISSIONS
+        if permission in available and permission not in permissions
+    )
+    return permissions
+
 
 class SeedAccessMixin:
     """Mixin for Command(BaseCommand).  Reads/writes self._ registries."""
@@ -110,9 +148,6 @@ class SeedAccessMixin:
             if permission.content_type.model_class() is not None
         ]
 
-        def perm_str(p):
-            return f"{p.content_type.app_label}.{p.codename}"
-
         op_apps = {
             "assets",
             "inventory",
@@ -125,30 +160,28 @@ class SeedAccessMixin:
             "extras",
             "core",
         }
-        ADMIN = [perm_str(p) for p in all_perms]
-        TECH = [
-            perm_str(p)
-            for p in all_perms
-            if p.content_type.app_label in op_apps and not p.codename.startswith("delete_")
-        ]
+        ADMIN = [_permission_name(p) for p in all_perms]
+        TECH = _technician_permissions(all_perms, op_apps)
         ASSETMGR = [
-            perm_str(p)
+            _permission_name(p)
             for p in all_perms
             if p.content_type.app_label in {"assets", "inventory", "compliance", "organization", "procurement"}
             and p.codename.split("_")[0] in {"view", "add", "change"}
         ]
-        READONLY = [perm_str(p) for p in all_perms if p.codename.startswith("view_")]
+        READONLY = [_permission_name(p) for p in all_perms if p.codename.startswith("view_")]
         ROLE_PERMS = {"Administrator": ADMIN, "Technician": TECH, "Asset Manager": ASSETMGR, "Read-Only": READONLY}
 
         # Per-tenant local roles: every tenant owns its own four role definitions.
         self._roles = {}  # (tenant_slug, role_name) -> Role
         for slug, tenant in self._tenants.items():
             for role_name, perms in ROLE_PERMS.items():
-                role, _ = Role.objects.get_or_create(
+                role, _created = Role.objects.get_or_create(
                     tenant=tenant,
                     name=role_name,
                     defaults={"permissions": perms, "description": f"{role_name} role for {tenant.name}"},
                 )
+                role.permissions = perms
+                role.save(update_fields=["permissions"])
                 self._roles[(slug, role_name)] = role
 
         # MSP-owned shared roles. The managing tenant additionally owns "MSP Technician"
@@ -168,6 +201,8 @@ class SeedAccessMixin:
                 "managed tenants may assign it, only the MSP edits it.",
             },
         )
+        msp_tech_role.permissions = TECH
+        msp_tech_role.save(update_fields=["permissions"])
         self._roles[(msp_slug, "MSP Technician")] = msp_tech_role
         shared_readonly_role = self._roles[(msp_slug, "Read-Only")]
         for shared_role in (msp_tech_role, shared_readonly_role):

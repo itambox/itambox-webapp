@@ -389,6 +389,8 @@ derivable from a model name — are enumerated here.
 | `assets.add_delegated_assetrequest` | Request assets on behalf of others |
 | `assets.approve_assetrequest` | Approve asset requests |
 | `assets.fulfill_assetrequest` | Fulfill or claim asset requests |
+| `compliance.prepare_custodyreceipt` | Prepare recipient custody-signing sessions |
+| `compliance.export_custodyreceipt` | Export custody receipts |
 | `core.view_recyclebin` | View the Recycle Bin |
 | `core.change_recyclebin` | Restore from the Recycle Bin |
 | `core.delete_recyclebin` | Purge from the Recycle Bin |

@@ -195,6 +195,10 @@ class CustodyReceipt(ChangeLoggingMixin, BaseModel):
         ordering = ("-signed_at",)
         verbose_name = _("Custody Receipt")
         verbose_name_plural = _("Custody Receipts")
+        permissions = (
+            ("prepare_custodyreceipt", _("Can prepare custody receipt signing sessions")),
+            ("export_custodyreceipt", _("Can export custody receipts")),
+        )
 
     def __str__(self):
         return f"Custody Receipt for {self.asset} assigned to {self.holder} ({self.get_acceptance_status_display()})"
