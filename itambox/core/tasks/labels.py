@@ -18,7 +18,7 @@ from core.models import Job, Notification
 from extras.models import FileAttachment
 
 from .context import TaskContext
-from .utils import TaskResult, TaskStatus, classify_task_error, reverse_job_detail
+from core.tasks.utils import TaskResult, TaskStatus, classify_task_error, reverse_job_detail
 
 logger = logging.getLogger(__name__)
 _LABEL_PRINT_CSS_PATH = Path(__file__).resolve().parents[2] / "static" / "src" / "styles" / "_label-print.scss"

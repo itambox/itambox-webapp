@@ -9,7 +9,7 @@ from django.utils.translation import gettext_lazy as _
 from core.models import Job, Notification
 
 from .context import TaskContext
-from .utils import TaskResult, TaskStatus, classify_task_error, reverse_job_detail
+from core.tasks.utils import TaskResult, TaskStatus, classify_task_error, reverse_job_detail
 
 logger = logging.getLogger(__name__)
 

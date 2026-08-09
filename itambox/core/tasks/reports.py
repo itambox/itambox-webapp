@@ -229,7 +229,7 @@ def _resolve_report_scope(sched):
     if active_tenant is None and not filter_tenants:
         logger.error(
             "Scheduled report has no tenant scope; refusing cross-tenant compilation",
-            extra={"operation": "reports.scope", "scheduled_report_id": sched.pk},
+            extra={"operation": "reports.scope", "scheduled_report_id": getattr(sched, "pk", None)},
         )
         return None
     return active_tenant, filter_tenants
