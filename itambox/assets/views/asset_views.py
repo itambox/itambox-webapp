@@ -100,7 +100,6 @@ class AssetDetailView(ObjectDetailView):
     )
 
     layout = (
-        ((Panel("metrics", _("Asset Overview")),),),
         (
             (
                 Panel("asset_info", _("Asset Details")),
