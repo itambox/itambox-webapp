@@ -1,0 +1,45 @@
+{% load i18n %}
+{% if user.is_authenticated %}
+  <div class="dropdown-header text-muted">
+    {% translate "Signed in as" %}
+    <strong class="text-reset">{{ user.get_full_name|default:user.username }}</strong>
+  </div>
+  <a href="{% url 'users:user_profile' %}" class="dropdown-item">
+    <i class="mdi mdi-account-circle-outline dropdown-item-icon"
+       aria-hidden="true"></i>
+    {% translate "Profile" %}
+  </a>
+  <a href="{% url 'users:user_notifications' %}" class="dropdown-item">
+    <i class="mdi mdi-bell-outline dropdown-item-icon" aria-hidden="true"></i>
+    {% translate "Notifications" %}
+    {% if unread_notifications_count > 0 %}
+      <span class="badge bg-red-lt ms-auto">{{ unread_notifications_count }}</span>
+    {% endif %}
+  </a>
+  <a href="{% url 'users:user_subscriptions' %}" class="dropdown-item">
+    <i class="mdi mdi-bookmark-outline dropdown-item-icon"
+       aria-hidden="true"></i>
+    {% translate "Subscriptions" %}
+  </a>
+  <a href="{% url 'users:user_preferences' %}" class="dropdown-item">
+    <i class="mdi mdi-cog-outline dropdown-item-icon" aria-hidden="true"></i>
+    {% translate "Preferences" %}
+  </a>
+  <a href="{% url 'users:user_api_tokens' %}" class="dropdown-item">
+    <i class="mdi mdi-key-outline dropdown-item-icon" aria-hidden="true"></i>
+    {% translate "API Tokens" %}
+  </a>
+  <div class="dropdown-divider"></div>
+  <form action="{% url 'logout' %}"
+        method="post"
+        class="d-inline w-100"
+        hx-boost="false">
+    {% csrf_token %}
+    <button type="submit" class="dropdown-item">
+      <i class="mdi mdi-logout dropdown-item-icon" aria-hidden="true"></i>
+      {% translate "Logout" %}
+    </button>
+  </form>
+{% else %}
+  <a href="{% url 'login' %}" class="dropdown-item">{% translate "Login" %}</a>
+{% endif %}

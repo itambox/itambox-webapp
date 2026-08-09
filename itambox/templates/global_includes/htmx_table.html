@@ -2,8 +2,8 @@
 {% load i18n %}
 {% load utility_tags %}
 {% load helpers %}
+{% bulk_action_context table as bulk %}
 {% if table.embed_bulk_bar %}
-  {% bulk_action_context table as bulk %}
   <div class="js-selection-scope">
     {% if bulk.selectable and bulk.can_change and bulk.bulk_edit_url or bulk.selectable and bulk.can_delete and bulk.bulk_delete_url %}
       <div class="batch-actions-bar d-none">
@@ -40,6 +40,20 @@
         </div>
       </div>
     {% endif %}
+{% endif %}
+{% if bulk.selectable and bulk.card_layout %}
+  <div class="mobile-select-all d-sm-none border rounded bg-body-tertiary px-3 py-2 mb-2"
+       role="group"
+       aria-label="{% translate 'Table row selection' %}">
+    <label class="mobile-select-all__label d-flex align-items-center gap-2 mb-0">
+      <input type="checkbox"
+             class="form-check-input mobile-select-all__checkbox"
+             data-select-all="true"
+             aria-label="{% translate 'Select all on this page' %}"
+             title="{% translate 'Select all on this page' %}">
+      <span>{% translate "Select all on this page" %}</span>
+    </label>
+  </div>
 {% endif %}
 <div class="htmx-container">
   <table{% if table.attrs %} {{ table.attrs.as_html }}{% endif %}>

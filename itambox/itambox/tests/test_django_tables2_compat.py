@@ -26,6 +26,52 @@ class DjangoTables2TemplateCompatibilityTests(unittest.TestCase):
 
         engine.from_string("{% load django_tables2 %}\n" + sort_link)
 
+    def test_issue260_mobile_select_all_contract_is_declared(self):
+        template_root = Path(__file__).resolve().parents[2]
+        table_template = (template_root / "templates" / "global_includes" / "htmx_table.html").read_text(
+            encoding="utf-8"
+        )
+        column_source = (template_root / "core" / "tables" / "columns.py").read_text(encoding="utf-8")
+        batch_source = (template_root / "static" / "src" / "batch-actions.ts").read_text(encoding="utf-8")
+        table_styles = (template_root / "static" / "src" / "styles" / "_tables.scss").read_text(encoding="utf-8")
+
+        self.assertIn("bulk.card_layout", table_template)
+        self.assertIn('data-select-all="true"', table_template)
+        self.assertIn('data-select-all="true"', column_source)
+        self.assertIn("querySelectorAll<HTMLInputElement>('[data-select-all]')", batch_source)
+        self.assertIn("selectAllCb.indeterminate", batch_source)
+        self.assertIn("selectAllCb.disabled", batch_source)
+        self.assertIn(".mobile-select-all__label", table_styles)
+
+    def test_issue260_responsive_shell_contract_is_declared(self):
+        template_root = Path(__file__).resolve().parents[2]
+        layout = (template_root / "templates" / "layout.html").read_text(encoding="utf-8")
+        topbar = (template_root / "templates" / "global_includes" / "_topbar.html").read_text(encoding="utf-8")
+        user_menu = (template_root / "templates" / "global_includes" / "_user_menu.html").read_text(encoding="utf-8")
+        mobile_styles = (template_root / "static" / "src" / "styles" / "_mobile.scss").read_text(encoding="utf-8")
+
+        self.assertIn('{% include "global_includes/_user_menu.html" %}', layout)
+        self.assertIn('{% include "global_includes/_user_menu.html" %}', topbar)
+        self.assertIn("{% url 'graphql' %}", layout)
+        self.assertIn("mobile-topbar-actions", layout)
+        self.assertIn("safe-area-inset-bottom", mobile_styles)
+        self.assertIn("detail-edit-action__label", mobile_styles)
+        self.assertIn(".mobile-topbar-actions {", mobile_styles)
+        self.assertIn(".nav-link:hover", mobile_styles)
+        self.assertIn("focus-visible", mobile_styles)
+
+        menu_tokens = [
+            "users:user_profile",
+            "users:user_notifications",
+            "users:user_subscriptions",
+            "users:user_preferences",
+            "users:user_api_tokens",
+            "logout",
+        ]
+        positions = [user_menu.index(token) for token in menu_tokens]
+        self.assertEqual(positions, sorted(positions))
+        self.assertIn("Signed in as", user_menu)
+
 
 if __name__ == "__main__":
     unittest.main()

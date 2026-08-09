@@ -3,6 +3,8 @@
   "provenance": "All Python test modules changed by WP-21, issue #24, the gradual-typing policy gate (#93), and CI parallelism/readiness work (#21) relative to base_commit, plus unchanged security baseline suites.",
   "changed_tests": [
     "itambox/assets/tests/test_existing.py",
+    "itambox/assets/tests/test_issue260_asset_detail_responsive.py",
+    "itambox/itambox/tests/test_django_tables2_compat.py",
     "itambox/assets/tests/test_requests.py",
     "itambox/assets/tests/test_tables_category.py",
     "itambox/core/tests/test_csp_nonce_context.py",
@@ -84,6 +86,8 @@
   ],
   "mandatory_tests": [
     "itambox/assets/tests/test_existing.py",
+    "itambox/assets/tests/test_issue260_asset_detail_responsive.py",
+    "itambox/itambox/tests/test_django_tables2_compat.py",
     "itambox/assets/tests/test_tables_category.py",
     "itambox/assets/tests/test_requests.py",
     "itambox/core/tests/test_import_boundaries.py",

@@ -30,7 +30,6 @@
       <div class="card-body">
         <label for="scan-basket-input" class="form-label fw-bold">{% translate "Scan or enter an asset" %}</label>
         <div class="input-group input-group-lg">
-          <span class="input-group-text"><i class="mdi mdi-barcode-scan"></i></span>
           <input type="text"
                  id="scan-basket-input"
                  class="form-control"
@@ -39,8 +38,15 @@
                  autocorrect="off"
                  spellcheck="false"
                  placeholder="{% translate 'Scan barcode / QR, or type asset tag or serial, then press Enter' %}">
-          <button type="button" class="btn btn-primary" id="basket-open-scanner-btn">
-            <i class="mdi mdi-camera me-1"></i>{% translate "Camera" %}
+          <button type="button"
+                  class="btn btn-primary scan-basket-camera"
+                  id="basket-open-scanner-btn"
+                  aria-label="{% translate 'Camera' %}"
+                  title="{% translate 'Camera' %}"
+                  data-bs-toggle="tooltip"
+                  data-bs-placement="top">
+            <i class="mdi mdi-camera" aria-hidden="true"></i>
+            <span class="visually-hidden">{% translate "Camera" %}</span>
           </button>
         </div>
         <div class="form-text">
