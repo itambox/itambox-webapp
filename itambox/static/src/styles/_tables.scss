@@ -320,6 +320,18 @@
 //  Card-mode tables (≤ 575.98px) — stack row columns into cards
 // ============================================================
 @media (width <= 575.98px) {
+    .mobile-select-all__label {
+        min-height: 3rem;
+        cursor: pointer;
+    }
+
+    .mobile-select-all__checkbox {
+        width: 1.25rem;
+        height: 1.25rem;
+        margin-top: 0;
+        flex: 0 0 auto;
+    }
+
     .card-table {
         display: block;
         width: 100%;

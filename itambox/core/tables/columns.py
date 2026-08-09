@@ -128,7 +128,8 @@ class ToggleColumn(tables.CheckBoxColumn):
     def header(self):
         title_text = _("Toggle all")
         return format_html(
-            '<input type="checkbox" class="toggle form-check-input" name="select_all" title="{}" aria-label="{}" />',
+            '<input type="checkbox" class="toggle form-check-input" name="select_all" '
+            'data-select-all="true" title="{}" aria-label="{}" />',
             title_text,
             title_text,
         )

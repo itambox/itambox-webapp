@@ -272,6 +272,46 @@ $action-bar-fab-size: 56px;
         padding-bottom: calc(#{$action-bar-height} + env(safe-area-inset-bottom, 0px) + 0.5rem);
     }
 
+    .detail-edit-action {
+        min-width: 3rem;
+        min-height: 3rem;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+    }
+
+    .detail-edit-action__label {
+        display: none;
+    }
+
+    .footer {
+        // The footer sits outside .page-body, so it needs its own reserve above
+        // the fixed action bar and the device home-indicator inset.
+        padding-bottom: calc(#{$action-bar-height} + env(safe-area-inset-bottom, 0px) + 0.5rem) !important;
+    }
+
+    .mobile-topbar-actions {
+        .nav-link:hover,
+        .nav-link:active {
+            background-color: transparent !important;
+            box-shadow: none !important;
+        }
+
+        .nav-link:focus-visible {
+            outline: 2px solid var(--tblr-primary);
+            outline-offset: 2px;
+            border-radius: var(--tblr-border-radius);
+        }
+
+        .nav-item.show > .nav-link,
+        .nav-item > .nav-link[aria-expanded="true"],
+        .nav-link.active {
+            background-color: var(--tblr-primary-lt) !important;
+            color: var(--tblr-primary) !important;
+            border-radius: var(--tblr-border-radius);
+        }
+    }
+
     // Toasts must sit above the action bar
     #django-messages {
         bottom: calc(#{$action-bar-height} + env(safe-area-inset-bottom, 0px) + 0.5rem) !important;

@@ -22,6 +22,16 @@
     display: flex;
 }
 
+// The scan-basket camera control is icon-only at every breakpoint. Keep the
+// control comfortably tappable after removing the visible text label.
+.scan-basket-camera {
+    min-width: 3rem;
+    min-height: 3rem;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+}
+
 .scanner-viewfinder {
     position: relative;
     width: 280px;

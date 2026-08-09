@@ -3,7 +3,7 @@
  *
  * Selection is scoped to the nearest `.js-selection-scope` ancestor, so the same
  * logic drives the main object list and any table embedded in a detail-view tab.
- * Within a scope, `select_all` toggles every `pk` checkbox, the batch bar shows a
+ * Within a scope, `[data-select-all]` toggles every `pk` checkbox, the batch bar shows a
  * live count, and bulk action buttons collect the checked pks into their form.
  */
 (function () {
@@ -41,12 +41,13 @@
       btn.setAttribute('aria-disabled', none ? 'true' : 'false');
     });
 
-    const selectAllCb = scope.querySelector<HTMLInputElement>(
-      'input[type="checkbox"][name="select_all"]',
-    );
-    if (selectAllCb) {
+    const selectAllCbs = scope.querySelectorAll<HTMLInputElement>('[data-select-all]');
+    selectAllCbs.forEach(function (selectAllCb) {
       selectAllCb.checked = boxes.length > 0 && count === boxes.length;
-    }
+      selectAllCb.indeterminate = count > 0 && count < boxes.length;
+      selectAllCb.disabled = boxes.length === 0;
+      selectAllCb.setAttribute('aria-disabled', boxes.length === 0 ? 'true' : 'false');
+    });
   }
 
   function updateAllScopes(): void {
@@ -106,7 +107,7 @@
 
     if (target.name === 'pk') {
       updateScope(scope);
-    } else if (target.name === 'select_all') {
+    } else if (target.matches('[data-select-all]') || target.name === 'select_all') {
       pkCheckboxes(scope).forEach(function (cb) {
         cb.checked = target.checked;
       });

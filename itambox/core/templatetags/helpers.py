@@ -91,6 +91,7 @@ def bulk_action_context(context, table):
         "can_delete": False,
         "can_change": False,
         "selectable": False,
+        "card_layout": False,
         "return_url": "",
     }
 
@@ -101,6 +102,9 @@ def bulk_action_context(context, table):
     app_label = model._meta.app_label
     model_name = model._meta.model_name
     result["model_name_str"] = f"{app_label}.{model_name}"
+    table_attrs = getattr(table, "attrs", {}) or {}
+    table_classes = table_attrs.get("class", "") if hasattr(table_attrs, "get") else ""
+    result["card_layout"] = "card-table" in str(table_classes).split()
 
     for action, key in (("bulk_delete", "bulk_delete_url"), ("bulk_edit", "bulk_edit_url")):
         try:
