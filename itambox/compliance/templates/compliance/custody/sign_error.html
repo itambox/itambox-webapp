@@ -7,7 +7,7 @@
     <meta charset="utf-8" />
     <meta name="viewport"
           content="width=device-width, initial-scale=1, viewport-fit=cover" />
-    <title>{% translate "Link Validation Failure - ITAMbox" %}</title>
+    <title>{{ error_title|default:_("Custody Link Unavailable") }} - {% translate "ITAMbox" %}</title>
     <link href="{% static 'dist/vendor/tabler/css/tabler.min.css' %}"
           rel="stylesheet" />
     <style nonce="{{ request.csp_nonce }}">
@@ -26,17 +26,19 @@
         }
     </style>
   </head>
-  <body>
+  <body data-custody-error="{{ error_code|default:'custody_error' }}">
     <div class="card error-card">
       <div class="card-body p-5 text-center">
         <span class="avatar avatar-xl bg-danger-lt text-danger rounded-circle mb-4">
           <i class="mdi mdi-alert-outline"></i>
         </span>
-        <h2 class="text-danger mb-2">{% translate "Custody Signoff Failed" %}</h2>
-        <p class="text-muted">{{ error|default:_("The EULA checkout link is invalid or has expired.") }}</p>
-        <div class="mt-4">
-          <p class="text-muted small">{% translate "EULA custody links expire automatically after 7 days to preserve organizational security. Please contact your IT administrator to request a fresh transfer link." %}</p>
-        </div>
+        <h2 class="text-danger mb-2">{{ error_title|default:_("Custody Link Unavailable") }}</h2>
+        <p class="text-muted">{{ error|default:_("The requested custody link is unavailable.") }}</p>
+        {% if error_code == "custody_link_expired" %}
+          <div class="mt-4">
+            <p class="text-muted small">{% translate "Custody links expire automatically after 7 days. Please contact your IT administrator to request a fresh transfer link." %}</p>
+          </div>
+        {% endif %}
       </div>
     </div>
   </body>

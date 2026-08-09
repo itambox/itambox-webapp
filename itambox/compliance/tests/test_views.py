@@ -5,8 +5,8 @@ from django.test import TestCase, override_settings
 from django.urls import reverse
 from model_bakery import baker
 
-from assets.models import Asset, AssetMaintenance, Supplier
-from organization.models import AssetHolder
+from assets.models import Asset, AssetMaintenance, AssetTagSequence, Supplier
+from organization.models import AssetHolder, Tenant
 
 from ..models import CustodyReceipt
 
@@ -114,13 +114,25 @@ class AssetMaintenanceViewTests(TestCase):
 @override_settings(REQUIRE_CUSTODY_SIGNIN=False)
 class CustodyReceiptViewTests(TestCase):
     def setUp(self):
-        self.asset = baker.make(Asset, name="LT-02", asset_tag="TAG-LT-02", tenant=None)
-        self.holder = baker.make(AssetHolder, first_name="Evelyn", last_name="Carter", email="evelyn@test.com")
+        self.recipient = baker.make(User, username="recipient@example.test", email="recipient@example.test")
+        self.tenant = baker.make(Tenant, name="Recipient Tenant")
+        baker.make(AssetTagSequence, tenant=self.tenant, category=None, prefix="CUST-")
+        self.asset = baker.make(Asset, name="LT-02", asset_tag="TAG-LT-02", tenant=self.tenant)
+        self.holder = baker.make(
+            AssetHolder,
+            first_name="Evelyn",
+            last_name="Carter",
+            email="recipient@example.test",
+            upn="recipient@example.test",
+            user=self.recipient,
+            tenant=self.tenant,
+        )
         self.receipt = baker.make(
             CustodyReceipt,
             asset=self.asset,
             holder=self.holder,
         )
+        self.client.force_login(self.recipient)
 
     def test_sign_portal_get(self):
         url = reverse("compliance:custody_eula_sign", kwargs={"token": self.receipt.token})
@@ -145,6 +157,7 @@ class CustodyReceiptViewTests(TestCase):
         self.receipt.refresh_from_db()
         self.assertEqual(self.receipt.acceptance_status, CustodyReceipt.STATUS_DECLINED)
         self.assertFalse(self.receipt.accepted)
+        self.assertIsNone(self.receipt.signed_at)
 
     def test_sign_portal_post_success(self):
         url = reverse("compliance:custody_eula_sign", kwargs={"token": self.receipt.token})
@@ -157,6 +170,7 @@ class CustodyReceiptViewTests(TestCase):
         self.assertEqual(self.receipt.acceptance_status, CustodyReceipt.STATUS_ACCEPTED)
         self.assertEqual(self.receipt.signature_data, sig_data)
         self.assertIsNotNone(self.receipt.signature_hash)
+        self.assertEqual(self.receipt.signed_at, self.receipt.accepted_date)
 
     def test_sign_post_locks_receipt_row(self):
         """WS6-5: the sign-off POST must hold a row lock (SELECT ... FOR UPDATE) so two
@@ -175,7 +189,11 @@ class CustodyReceiptViewTests(TestCase):
         self.assertEqual(self.receipt.acceptance_status, CustodyReceipt.STATUS_ACCEPTED)
 
     def test_sign_portal_already_accepted(self):
+        from django.utils import timezone
+
+        self.receipt.accepted = True
         self.receipt.acceptance_status = CustodyReceipt.STATUS_ACCEPTED
+        self.receipt.signed_at = timezone.now()
         self.receipt.save()
         url = reverse("compliance:custody_eula_sign", kwargs={"token": self.receipt.token})
         response = self.client.get(url)
@@ -196,9 +214,14 @@ class CustodyReceiptViewTests(TestCase):
         # set created_date to older than 7 days using update (auto_now_add is immutable on direct save)
         CustodyReceipt.objects.filter(pk=self.receipt.pk).update(created_date=timezone.now() - timedelta(days=8))
         url = reverse("compliance:custody_eula_sign", kwargs={"token": self.receipt.token})
-        response = self.client.get(url)
-        self.assertEqual(response.status_code, 200)
-        self.assertContains(response, "expired")
+        self.client.logout()
+        with override_settings(REQUIRE_CUSTODY_SIGNIN=True):
+            response = self.client.get(url)
+        self.assertEqual(response.status_code, 410)
+        self.assertEqual(response.context["error_code"], "custody_link_expired")
+        self.assertContains(response, "expired", status_code=410)
+        self.assertNotContains(response, self.asset.name, status_code=410)
+        self.assertNotContains(response, self.holder.first_name, status_code=410)
 
     def test_sign_portal_redirect_when_signin_required_unauthenticated(self):
         from django.test import override_settings
@@ -214,11 +237,103 @@ class CustodyReceiptViewTests(TestCase):
         from django.test import override_settings
 
         with override_settings(REQUIRE_CUSTODY_SIGNIN=True):
-            user = baker.make(User)
-            self.client.force_login(user)
+            self.client.force_login(self.recipient)
             url = reverse("compliance:custody_eula_sign", kwargs={"token": self.receipt.token})
             response = self.client.get(url)
             self.assertEqual(response.status_code, 200)
+
+    def test_invalid_and_unknown_tokens_return_neutral_404_before_login_redirect(self):
+        self.client.logout()
+
+        with override_settings(REQUIRE_CUSTODY_SIGNIN=True):
+            for token in ("invalid-token", "x" * 64):
+                with self.subTest(token_length=len(token)):
+                    response = self.client.get(reverse("compliance:custody_eula_sign", kwargs={"token": token}))
+
+                    self.assertEqual(response.status_code, 404)
+                    self.assertEqual(response.context["error_code"], "custody_link_unavailable")
+                    self.assertNotContains(response, self.asset.name, status_code=404)
+                    self.assertNotContains(response, self.holder.first_name, status_code=404)
+
+    def test_authenticated_wrong_recipient_gets_403_without_receipt_payload_or_mutation(self):
+        wrong_recipient = baker.make(User, username="wrong-recipient@example.test")
+        self.client.force_login(wrong_recipient)
+
+        response = self.client.post(
+            reverse("compliance:custody_eula_sign", kwargs={"token": self.receipt.token}),
+            {"action": "accept", "signature_canvas": "data:image/png;base64,VEVTVA=="},
+        )
+
+        self.assertEqual(response.status_code, 403)
+        self.assertEqual(response.context["error_code"], "wrong_recipient")
+        self.assertNotContains(response, self.asset.name, status_code=403)
+        self.assertNotContains(response, self.holder.first_name, status_code=403)
+        self.receipt.refresh_from_db()
+        self.assertEqual(self.receipt.acceptance_status, CustodyReceipt.STATUS_PENDING)
+        self.assertIsNone(self.receipt.signed_at)
+
+    def test_anonymous_consent_is_rejected_when_signin_setting_is_optional(self):
+        self.client.logout()
+
+        response = self.client.post(
+            reverse("compliance:custody_eula_sign", kwargs={"token": self.receipt.token}),
+            {"action": "accept", "signature_canvas": "data:image/png;base64,VEVTVA=="},
+        )
+
+        self.assertEqual(response.status_code, 403)
+        self.assertEqual(response.context["error_code"], "recipient_authentication_required")
+        self.assertNotContains(response, self.asset.name, status_code=403)
+        self.receipt.refresh_from_db()
+        self.assertEqual(self.receipt.acceptance_status, CustodyReceipt.STATUS_PENDING)
+        self.assertIsNone(self.receipt.signed_at)
+
+    def test_completed_receipt_is_not_rendered_to_wrong_recipient(self):
+        from django.utils import timezone
+
+        self.receipt.accepted = True
+        self.receipt.acceptance_status = CustodyReceipt.STATUS_ACCEPTED
+        self.receipt.signed_at = timezone.now()
+        self.receipt.verification_hash = "completed-test-verification-hash"
+        self.receipt.save()
+        self.client.force_login(baker.make(User, username="other-recipient@example.test"))
+
+        response = self.client.get(reverse("compliance:custody_eula_sign", kwargs={"token": self.receipt.token}))
+
+        self.assertEqual(response.status_code, 403)
+        self.assertEqual(response.context["error_code"], "wrong_recipient")
+        self.assertNotContains(response, self.asset.name, status_code=403)
+        self.assertNotContains(response, self.receipt.verification_hash, status_code=403)
+
+    def test_expired_completed_receipt_returns_410_instead_of_success_payload(self):
+        from django.utils import timezone
+
+        self.receipt.accepted = True
+        self.receipt.acceptance_status = CustodyReceipt.STATUS_ACCEPTED
+        self.receipt.signed_at = timezone.now()
+        self.receipt.save()
+        CustodyReceipt.objects.filter(pk=self.receipt.pk).update(created_date=timezone.now() - timedelta(days=8))
+
+        response = self.client.get(reverse("compliance:custody_eula_sign", kwargs={"token": self.receipt.token}))
+
+        self.assertEqual(response.status_code, 410)
+        self.assertEqual(response.context["error_code"], "custody_link_expired")
+        self.assertNotContains(response, self.asset.name, status_code=410)
+
+    def test_wrong_recipient_is_rejected_before_external_provider_redirect(self):
+        from unittest.mock import patch
+
+        signature_providers.register(MockSignatureProvider)
+        provider = signature_providers.get(MockSignatureProvider.name)
+        self.receipt.signature_provider = MockSignatureProvider.name
+        self.receipt.save(update_fields=["signature_provider", "updated_at"])
+        self.client.force_login(baker.make(User, username="external-wrong-recipient@example.test"))
+
+        with patch.object(provider, "initiate_signature", wraps=provider.initiate_signature) as initiate_signature:
+            response = self.client.get(reverse("compliance:custody_eula_sign", kwargs={"token": self.receipt.token}))
+
+        self.assertEqual(response.status_code, 403)
+        self.assertEqual(response.context["error_code"], "wrong_recipient")
+        initiate_signature.assert_not_called()
 
 
 from compliance.providers import BaseSignatureProvider
