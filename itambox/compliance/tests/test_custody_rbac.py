@@ -27,8 +27,8 @@ from organization.models import AssetHolder, Role, RoleGrant, Tenant
 
 User = get_user_model()
 
-DUMMY_TOKEN_A = "dummy-custody-token-a"
-DUMMY_TOKEN_B = "dummy-custody-token-b"
+DUMMY_TOKEN_A = "a" * 64
+DUMMY_TOKEN_B = "b" * 64
 DUMMY_SIGNATURE = "dummy-signature-payload"
 DUMMY_EULA = "dummy-eula-marker"
 DUMMY_PASSWORD = "dummy-test-password"
