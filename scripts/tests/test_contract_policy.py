@@ -191,6 +191,8 @@ class DerivationSurfaceTests(unittest.TestCase):
                 "delete_recyclebin",
                 "receive_purchaseorder",
                 "approve_purchaseorder",
+                "prepare_custodyreceipt",
+                "export_custodyreceipt",
             },
         )
 

@@ -12,6 +12,7 @@ class Migration(migrations.Migration):
 
     dependencies = [
         ('compliance', '0101_alter_custodyreceipt_signed_at'),
+        ('users', '0100_issue88_shard_62_users_relations'),
     ]
 
     operations = [

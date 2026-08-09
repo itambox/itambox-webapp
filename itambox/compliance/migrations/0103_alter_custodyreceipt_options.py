@@ -7,6 +7,7 @@ class Migration(migrations.Migration):
 
     dependencies = [
         ('compliance', '0102_clear_unsigned_receipt_timestamps'),
+        ('users', '0100_issue88_shard_62_users_relations'),
     ]
 
     operations = [

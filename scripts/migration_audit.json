@@ -6975,6 +6975,129 @@
     },
     {
       "dependencies": [
+        "compliance.0100_issue88_shard_44_compliance_relations",
+        "users.0100_issue88_shard_62_users_relations"
+      ],
+      "id": "compliance.0101_alter_custodyreceipt_signed_at",
+      "is_replacement": false,
+      "operations": {
+        "BtreeGistExtension": {
+          "count": 0
+        },
+        "RunPython": {
+          "with_noop_reverse": 0,
+          "with_reverse": 0,
+          "without_reverse": 0
+        },
+        "RunSQL": {
+          "with_noop_reverse": 0,
+          "with_reverse": 0,
+          "without_reverse": 0
+        },
+        "SeparateDatabaseAndState": {
+          "count": 0
+        }
+      },
+      "path": "itambox/compliance/migrations/0101_alter_custodyreceipt_signed_at.py",
+      "replaces": [],
+      "reviewed_disposition": null,
+      "run_before": [],
+      "special_users_bootstrap": false,
+      "swappable_user_dependency": false,
+      "syntactic_facts": {
+        "has_custom_operations": {
+          "BtreeGistExtension": false,
+          "RunPython": false,
+          "RunSQL": false,
+          "SeparateDatabaseAndState": false
+        }
+      }
+    },
+    {
+      "dependencies": [
+        "compliance.0101_alter_custodyreceipt_signed_at",
+        "users.0100_issue88_shard_62_users_relations"
+      ],
+      "id": "compliance.0102_clear_unsigned_receipt_timestamps",
+      "is_replacement": false,
+      "operations": {
+        "BtreeGistExtension": {
+          "count": 0
+        },
+        "RunPython": {
+          "with_noop_reverse": 1,
+          "with_reverse": 0,
+          "without_reverse": 0
+        },
+        "RunSQL": {
+          "with_noop_reverse": 0,
+          "with_reverse": 0,
+          "without_reverse": 0
+        },
+        "SeparateDatabaseAndState": {
+          "count": 0
+        }
+      },
+      "path": "itambox/compliance/migrations/0102_clear_unsigned_receipt_timestamps.py",
+      "replaces": [],
+      "reviewed_disposition": {
+        "disposition": "upgrade-only",
+        "rationale": "Clears misleading signed_at timestamps on non-accepted custody receipts during 1.0 upgrade; pending receipts must not carry a signature timestamp."
+      },
+      "run_before": [],
+      "special_users_bootstrap": false,
+      "swappable_user_dependency": false,
+      "syntactic_facts": {
+        "has_custom_operations": {
+          "BtreeGistExtension": false,
+          "RunPython": true,
+          "RunSQL": false,
+          "SeparateDatabaseAndState": false
+        }
+      }
+    },
+    {
+      "dependencies": [
+        "compliance.0102_clear_unsigned_receipt_timestamps",
+        "users.0100_issue88_shard_62_users_relations"
+      ],
+      "id": "compliance.0103_alter_custodyreceipt_options",
+      "is_replacement": false,
+      "operations": {
+        "BtreeGistExtension": {
+          "count": 0
+        },
+        "RunPython": {
+          "with_noop_reverse": 0,
+          "with_reverse": 0,
+          "without_reverse": 0
+        },
+        "RunSQL": {
+          "with_noop_reverse": 0,
+          "with_reverse": 0,
+          "without_reverse": 0
+        },
+        "SeparateDatabaseAndState": {
+          "count": 0
+        }
+      },
+      "path": "itambox/compliance/migrations/0103_alter_custodyreceipt_options.py",
+      "replaces": [],
+      "reviewed_disposition": null,
+      "run_before": [],
+      "special_users_bootstrap": false,
+      "swappable_user_dependency": false,
+      "syntactic_facts": {
+        "has_custom_operations": {
+          "BtreeGistExtension": false,
+          "RunPython": false,
+          "RunSQL": false,
+          "SeparateDatabaseAndState": false
+        }
+      }
+    },
+    {
+      "dependencies": [
         "contenttypes.0002_remove_content_type_name"
       ],
       "id": "core.0001_initial",
@@ -17184,6 +17307,9 @@
     }
   ],
   "post_transition_migrations": [
+    "compliance.0101_alter_custodyreceipt_signed_at",
+    "compliance.0102_clear_unsigned_receipt_timestamps",
+    "compliance.0103_alter_custodyreceipt_options",
     "extras.0101_issue88_drop_legacy_webhook_name_like",
     "extras.0102_alter_event_action",
     "extras.0103_remove_reporttemplate_advanced_mode_and_more",
@@ -17238,6 +17364,7 @@
       "compliance.0010_repoint_audit_contenttypes",
       "compliance.0012_null_to_empty_strings",
       "compliance.0014_auditsession_tenant",
+      "compliance.0102_clear_unsigned_receipt_timestamps",
       "core.0028_encrypt_emailsettings_smtp_password",
       "core.0029_null_to_empty_strings",
       "extras.0003_alter_dashboard_options_dashboard_is_default_and_more",
@@ -17455,7 +17582,7 @@
         ]
       }
     },
-    "post_transition_migrations": 7,
+    "post_transition_migrations": 10,
     "replacement_shards": 62,
     "replacement_targets": 262
   }
