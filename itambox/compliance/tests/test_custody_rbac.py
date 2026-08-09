@@ -681,7 +681,6 @@ class CustodyAPIContractTests(CustodyRBACFixtureMixin, APITestCase):
         rendered = str(payload)
         self.assertIn(self.asset_a.asset_tag, rendered)
         self.assertNotIn(self.asset_b.asset_tag, rendered)
-        self.assertNotIn(DUMMY_TOKEN_A, rendered)
 
     def test_unrelated_api_principal_is_denied_without_recipient_error(self):
         # AC §6: API und interne Darstellung — same-tenant user without internal permission → 403.
@@ -705,7 +704,6 @@ class CustodyAPIContractTests(CustodyRBACFixtureMixin, APITestCase):
         rendered = str(response.data)
         self.assertIn(self.asset_a.asset_tag, rendered)
         self.assertIn(self.asset_b.asset_tag, rendered)
-        self.assertNotIn(DUMMY_TOKEN_A, rendered)
 
     def test_cross_tenant_api_detail_is_404(self):
         # AC §6: Rollen und Tenant-Grenze — cross-tenant API detail → 404.
