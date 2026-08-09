@@ -13,6 +13,7 @@ from django.contrib.auth.models import Permission
 from django.contrib.contenttypes.models import ContentType
 from django.test import TestCase, TransactionTestCase, override_settings
 from django.urls import NoReverseMatch, reverse
+from django.utils import timezone
 from model_bakery import baker
 from rest_framework.test import APITestCase
 
