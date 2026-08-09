@@ -7,6 +7,7 @@ class Migration(migrations.Migration):
 
     dependencies = [
         ('organization', '0101_membership_external_id_and_more'),
+        ('users', '0100_issue88_shard_62_users_relations'),
     ]
 
     operations = [
