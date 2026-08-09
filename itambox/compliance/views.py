@@ -303,6 +303,7 @@ class CustodyTemplateListView(ObjectListView):
 
 class CustodyTemplateDetailView(ObjectDetailView):
     queryset = CustodyTemplate.objects.select_related("tenant", "tenant_group").prefetch_related("tags")
+    related_object_exclusions = ("compliance.custodyreceipt",)
     template_name = "compliance/custodytemplates/custodytemplate_detail.html"
 
     def get_context_data(self, **kwargs):

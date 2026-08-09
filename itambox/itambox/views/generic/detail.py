@@ -49,6 +49,10 @@ class ObjectDetailView(
     # loop entirely (10-15 COUNTs/page) and supply an empty list. Default False
     # preserves identical behavior for every existing detail view.
     disable_related_objects_list = False
+    # Sensitive or specially scoped reverse relations can opt out before the
+    # provider constructs its count query. Labels use Django's lower-case
+    # ``app_label.model_name`` form.
+    related_object_exclusions = ()
 
     def render_to_response(self, context, **response_kwargs):
         # Tables shown in detail-view tabs opt into the shared batch-action bar
@@ -123,6 +127,8 @@ class ObjectDetailView(
     def _build_related_objects_list(self, obj):
         """Build the "Related Objects" sidebar list (label/count/url per reverse
         relation) for ``obj``."""
+        if self.related_object_exclusions:
+            return RelatedObjectProvider(obj, excluded_model_labels=self.related_object_exclusions).build()
         return RelatedObjectProvider(obj).build()
 
     def get_context_data(self, **kwargs):

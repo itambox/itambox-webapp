@@ -97,6 +97,16 @@ class RelatedObjectProviderTests(TenantTestMixin, TestCase):
         build.assert_called_once_with()
         self.assertEqual(result, sentinel)
 
+    def test_detail_view_excludes_sensitive_reverse_relations_before_counting(self):
+        self._asset("Prov excluded GVC", "PROV-EXCLUDED-GVC", self.tenant)
+        view = ObjectDetailView()
+        view.related_object_exclusions = ("assets.asset",)
+
+        with self.tenant_context(self.tenant, self.tenant_membership):
+            rows = view._build_related_objects_list(self.asset_type)
+
+        self.assertFalse(any(row["label"] == "Assets" for row in rows))
+
     def test_distinct_detection_is_shared_with_the_view(self):
         """Models carrying a ``filter_tenants`` M2M keep the legacy per-relation
         ``.count()`` because a plain FK subquery would count the join fan-out."""

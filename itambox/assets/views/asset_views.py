@@ -100,6 +100,7 @@ class AssetDetailView(ObjectDetailView):
         "component_allocations__component",
         "component_allocations__component__manufacturer",
     )
+    related_object_exclusions = ("compliance.custodyreceipt",)
 
     layout = (
         (

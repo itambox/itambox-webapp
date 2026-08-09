@@ -50,6 +50,7 @@ class AssetHolderDetailView(ObjectDetailView):
     queryset = AssetHolder.objects.select_related("tenant", "user").prefetch_related(
         "asset_assignments__asset", "asset_assignments__asset__status", "tags"
     )
+    related_object_exclusions = ("compliance.custodyreceipt",)
 
     layout = (((Panel("info", _("Asset Holder Details")),),),)
 
