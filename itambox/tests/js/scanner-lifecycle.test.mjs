@@ -172,6 +172,29 @@ test('a stale reader stop callback cannot clear a replacement scanner', async ()
   assert.equal(elements.get('reader').innerHTML, 'reader-2', 'stale cleanup must not clear the replacement DOM');
 });
 
+test('a stale reader from another scanner instance cannot clear replacement DOM', async () => {
+  readers.length = 0;
+  stopResolvers.length = 0;
+  const staleScanner = new AssetScanner(config());
+  const replacementScanner = new AssetScanner(config());
+
+  await staleScanner.start();
+  staleScanner.stop();
+  await replacementScanner.start();
+  assert.equal(readers.length, 2);
+  assert.equal(stopResolvers.length, 1);
+
+  // The old instance settles after the independent replacement has claimed the
+  // same reader ID. Ownership must therefore be shared across instances.
+  stopResolvers[0]();
+  await new Promise((resolve) => setImmediate(resolve));
+
+  assert.equal(readers[0].stopCalls, 1, 'the stale reader is stopped');
+  assert.equal(readers[0].cleared, false, 'an old instance must not clear the replacement');
+  assert.equal(readers[1].cleared, false, 'the replacement reader remains active');
+  assert.equal(elements.get('reader').innerHTML, 'reader-2', 'cross-instance cleanup must preserve replacement DOM');
+});
+
 test('a stale pending start cannot mutate the replacement scanner generation', async () => {
   readers.length = 0;
   stopResolvers.length = 0;

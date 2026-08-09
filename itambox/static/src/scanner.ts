@@ -24,6 +24,7 @@ interface AssetScannerConfig {
 }
 
 export class AssetScanner {
+  private static readonly readerOwners = new Map<string, Html5Qrcode>();
   private config: AssetScannerConfig;
   private readerElement: HTMLElement | null = null;
   private modal: HTMLElement | null = null;
@@ -111,6 +112,7 @@ export class AssetScanner {
         useBarCodeDetectorIfSupported: true,
       });
       this.html5QrcodeScanner = scanner;
+      AssetScanner.readerOwners.set(this.config.readerId, scanner);
       const activeScanner = scanner;
 
       const config = {
@@ -212,10 +214,12 @@ export class AssetScanner {
       scanner.stop()
         .then(() => {
           // html5-qrcode clears by element ID, not by reader instance. If a
-          // replacement scanner owns that element now, clearing the stale
-          // reader would erase the replacement's live DOM.
-          if (this.html5QrcodeScanner === null) return scanner.clear();
-          return undefined;
+          // replacement scanner (including one from another AssetScanner
+          // instance) owns that ID now, clearing the stale reader would erase
+          // the replacement's live DOM.
+          if (AssetScanner.readerOwners.get(this.config.readerId) !== scanner) return;
+          AssetScanner.readerOwners.delete(this.config.readerId);
+          return scanner.clear();
         })
         .catch(err => {
           console.error('Error stopping scanner:', err);
