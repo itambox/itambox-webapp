@@ -9,6 +9,7 @@ from django.utils import timezone
 
 from core.auth.ldap import (
     LDAPConfigurationError,
+    LDAPDependencyUnavailableError,
     classify_ldap_error,
     django_auth_ldap_installed,
     ldap,
@@ -173,7 +174,7 @@ class Command(BaseCommand):
         try:
             _require_real_ldap_backend()
         except ImportError:
-            raise LDAPConfigurationError(context=_ldap_context(tenant, "sync.dependency")) from None
+            raise LDAPDependencyUnavailableError(context=_ldap_context(tenant, "sync.dependency")) from None
 
         self.stdout.write("Connecting to configured LDAP server...")
         conn = _initialize_connection(server_uri, tenant)

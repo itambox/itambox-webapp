@@ -107,6 +107,14 @@ class LDAPConfigurationError(IntegrationConfigurationError, CommandError):
     user_message = "LDAP configuration is incomplete or invalid."
 
 
+class LDAPDependencyUnavailableError(LDAPConfigurationError):
+    code = "ldap.dependency_unavailable"
+    user_message = (
+        "django-auth-ldap is unavailable. Use the locked Linux/WSL or Docker "
+        "environment; native Windows does not support LDAP synchronization."
+    )
+
+
 class LDAPAuthenticationError(IntegrationAuthenticationError, CommandError):
     code = "ldap.authentication"
     user_message = "LDAP authentication or authorization failed."
