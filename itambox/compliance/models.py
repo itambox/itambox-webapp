@@ -4,7 +4,6 @@ from django.conf import settings
 from django.contrib.auth import get_user_model
 from django.db import models
 from django.urls import reverse
-from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
 
 from compliance.choices import AuditSessionStatusChoices, AuditVerificationMethodChoices
@@ -186,7 +185,7 @@ class CustodyReceipt(ChangeLoggingMixin, BaseModel):
     signature_canvas = models.TextField(
         blank=True, verbose_name=_("Signature Canvas"), help_text=_("Base64 canvas stroke vector string representation")
     )
-    signed_at = models.DateTimeField(default=timezone.now, verbose_name=_("Signed At"))
+    signed_at = models.DateTimeField(null=True, blank=True, verbose_name=_("Signed At"))
     eula_version = models.CharField(max_length=10, default="1.0", verbose_name=_("EULA Version"))
     created_date = models.DateTimeField(auto_now_add=True, null=True)
     ip_address = models.GenericIPAddressField(null=True, blank=True, verbose_name=_("IP Address"))
@@ -198,7 +197,7 @@ class CustodyReceipt(ChangeLoggingMixin, BaseModel):
         verbose_name_plural = _("Custody Receipts")
 
     def __str__(self):
-        return f"Custody Receipt for {self.asset} signed by {self.holder} (EULA v{self.eula_version})"
+        return f"Custody Receipt for {self.asset} assigned to {self.holder} ({self.get_acceptance_status_display()})"
 
 
 User = get_user_model()

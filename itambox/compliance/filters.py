@@ -12,7 +12,7 @@ from .models import AssetAudit, AuditSession, CustodyReceipt
 
 class CustodyReceiptFilterSet(BaseFilterSet):
     q = django_filters.CharFilter(
-        method="search", label=_("Search"), widget=forms.TextInput(attrs={"placeholder": "Asset, Holder, Token..."})
+        method="search", label=_("Search"), widget=forms.TextInput(attrs={"placeholder": "Asset or Holder..."})
     )
     asset = django_filters.ModelChoiceFilter(
         queryset=Asset.objects.all(), label=_("Asset"), widget=forms.Select(attrs={"class": "form-select"})
@@ -38,8 +38,7 @@ class CustodyReceiptFilterSet(BaseFilterSet):
         if not value.strip():
             return queryset
         return queryset.filter(
-            Q(token__icontains=value)
-            | Q(asset__name__icontains=value)
+            Q(asset__name__icontains=value)
             | Q(holder__first_name__icontains=value)
             | Q(holder__last_name__icontains=value)
             | Q(holder__upn__icontains=value)

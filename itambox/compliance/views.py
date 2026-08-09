@@ -5,18 +5,23 @@ from urllib.parse import parse_qsl, urlencode, urlparse, urlunparse
 from django.contrib.auth.decorators import login_required, permission_required
 from django.db import transaction
 from django.shortcuts import get_object_or_404, redirect, render
-from django.urls import reverse_lazy
+from django.urls import reverse, reverse_lazy
 from django.utils import timezone
 
 from itambox.panels import Panel
 from itambox.views.generic import ObjectCloneView, ObjectDeleteView, ObjectDetailView, ObjectEditView, ObjectListView
 
+from .filters import CustodyReceiptFilterSet
 from .forms import CustodyTemplateForm
+from .forms_filter import CustodyReceiptFilterForm
 from .models import CustodyReceipt, CustodyTemplate
 from .registry import signature_providers
-from .tables import CustodyTemplateTable
+from .services import scope_custody_receipts
+from .tables import CustodyReceiptTable, CustodyTemplateTable
 
 logger = logging.getLogger(__name__)
+
+VIEW_CUSTODY_RECEIPT_PERMISSION = "compliance.view_custodyreceipt"
 
 
 def _authenticated_user_is_holder(user, holder):
@@ -227,11 +232,75 @@ class CustodyTemplateDetailView(ObjectDetailView):
 
         from .tables import CustodyReceiptTable
 
-        receipts_qs = template.receipts.all().select_related("asset", "holder", "custody_template")
-        receipts_table = CustodyReceiptTable(receipts_qs, request=self.request)
-        RequestConfig(self.request, paginate={"per_page": get_paginate_count(self.request)}).configure(receipts_table)
-        context["receipts_table"] = receipts_table
+        can_view_receipts = self.request.user.has_perm(VIEW_CUSTODY_RECEIPT_PERMISSION)
+        context["can_view_custody_receipts"] = can_view_receipts
+        if can_view_receipts:
+            receipts_qs = scope_custody_receipts(
+                template.receipts.all().select_related("asset", "holder", "custody_template"),
+                user=self.request.user,
+                permission=VIEW_CUSTODY_RECEIPT_PERMISSION,
+            )
+            receipts_table = CustodyReceiptTable(receipts_qs, request=self.request)
+            RequestConfig(self.request, paginate={"per_page": get_paginate_count(self.request)}).configure(
+                receipts_table
+            )
+            context["receipts_table"] = receipts_table
 
+        receipt_list_url = reverse("compliance:custodyreceipt_list")
+        context["related_objects_list"] = [
+            item for item in context.get("related_objects_list", []) if not item["url"].startswith(receipt_list_url)
+        ]
+
+        return context
+
+
+class InternalCustodyPermissionMixin:
+    """Render a custody-specific 403 for authenticated internal users."""
+
+    def handle_no_permission(self):
+        if not self.request.user.is_authenticated:
+            return super().handle_no_permission()
+        return render(
+            self.request,
+            "compliance/custody/internal_permission_error.html",
+            {"error_code": "internal_custody_permission_required"},
+            status=403,
+        )
+
+
+class CustodyReceiptListView(InternalCustodyPermissionMixin, ObjectListView):
+    queryset = CustodyReceipt.objects.select_related("asset", "holder", "custody_template")
+    filterset = CustodyReceiptFilterSet
+    filterset_form = CustodyReceiptFilterForm
+    table = CustodyReceiptTable
+    action_buttons = ()
+
+    def get_queryset(self):
+        return scope_custody_receipts(
+            super().get_queryset(),
+            user=self.request.user,
+            permission=VIEW_CUSTODY_RECEIPT_PERMISSION,
+        )
+
+
+class CustodyReceiptDetailView(InternalCustodyPermissionMixin, ObjectDetailView):
+    queryset = CustodyReceipt.objects.select_related("asset", "asset__tenant", "holder", "custody_template")
+    template_name = "compliance/custodyreceipts/custodyreceipt_detail.html"
+
+    def get_queryset(self):
+        return scope_custody_receipts(super().get_queryset(), user=self.request.user)
+
+    def has_permission(self):
+        if not self.request.user.is_authenticated:
+            return False
+        receipt = self.get_object()
+        return self.request.user.has_perm(VIEW_CUSTODY_RECEIPT_PERMISSION, obj=receipt.asset)
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        signature = self.object.signature_canvas
+        if signature.startswith("data:image/png;base64,"):
+            context["signature_image"] = signature
         return context
 
 

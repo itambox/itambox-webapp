@@ -134,17 +134,19 @@
       {% translate "Audits" %} <span class="badge bg-cyan-lt ms-2">{{ object.audits.count }}</span>
     </a>
   </li>
-  <li class="nav-item" role="presentation">
-    <a href="?tab=custody-receipts"
-       data-bs-target="#custody-receipts"
-       class="nav-link {% if request.GET.tab == 'custody-receipts' %}active{% endif %}"
-       data-bs-toggle="tab"
-       hx-boost="false"
-       role="tab">
-      <i class="mdi mdi-file-document-edit me-1 text-indigo"></i>
-      {% translate "Custody Receipts" %} <span class="badge bg-indigo-lt ms-2">{{ object.custody_receipts.count }}</span>
-    </a>
-  </li>
+  {% if can_view_custody_receipts %}
+    <li class="nav-item" role="presentation">
+      <a href="?tab=custody-receipts"
+         data-bs-target="#custody-receipts"
+         class="nav-link {% if request.GET.tab == 'custody-receipts' %}active{% endif %}"
+         data-bs-toggle="tab"
+         hx-boost="false"
+         role="tab">
+        <i class="mdi mdi-file-document-edit me-1 text-indigo"></i>
+        {% translate "Custody Receipts" %} <span class="badge bg-indigo-lt ms-2">{{ receipts_table.rows|length }}</span>
+      </a>
+    </li>
+  {% endif %}
   <li class="nav-item" role="presentation">
     <a href="?tab=license-seats"
        data-bs-target="#license-seats"
@@ -369,9 +371,11 @@
   {% translate "Asset Verification &amp; Audits" as t_audits %}
   {% translate "No verification audits logged for this asset." as e_audits %}
   {% include 'generic/includes/related_table_tab.html' with tab="audits" table=audits_table title=t_audits empty=e_audits %}
-  {% translate "Signed Custody Receipts" as t_receipts %}
-  {% translate "No custody receipts generated for this asset." as e_receipts %}
-  {% include 'generic/includes/related_table_tab.html' with tab="custody-receipts" table=receipts_table title=t_receipts empty=e_receipts %}
+  {% if can_view_custody_receipts %}
+    {% translate "Custody Receipts" as t_receipts %}
+    {% translate "No custody receipts generated for this asset." as e_receipts %}
+    {% include 'generic/includes/related_table_tab.html' with tab="custody-receipts" table=receipts_table title=t_receipts empty=e_receipts %}
+  {% endif %}
   {% translate "Allocated Software Licenses" as t_seats %}
   {% translate "No software license seats allocated to this asset." as e_seats %}
   {% translate "Assign License" as t_add_license %}

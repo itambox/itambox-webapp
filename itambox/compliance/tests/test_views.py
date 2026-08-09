@@ -392,9 +392,11 @@ class CustodyUXAndPreviewTests(TestCase):
         self.user.save()
         self.client.login(username=self.user.username, password="testpassword")
 
+        self.tenant = baker.make("organization.Tenant", name="Custody UX Tenant", slug="custody-ux")
         self.category = baker.make("assets.Category", name="Laptops", slug="laptops")
         self.template = baker.make(
             CustodyTemplate,
+            tenant=self.tenant,
             category=self.category,
             require_acceptance=True,
             email_signature_request=True,
@@ -405,8 +407,20 @@ class CustodyUXAndPreviewTests(TestCase):
             qms_reference="QMS-LT-001",
         )
         self.asset_type = baker.make("assets.AssetType", model="ThinkPad", slug="thinkpad", category=self.category)
-        self.asset = baker.make(Asset, name="Developer Laptop 01", asset_tag="TAG-DEV-01", asset_type=self.asset_type)
-        self.holder = baker.make(AssetHolder, first_name="Alex", last_name="Staff", email="alex@staff.com")
+        self.asset = baker.make(
+            Asset,
+            tenant=self.tenant,
+            name="Developer Laptop 01",
+            asset_tag="TAG-DEV-01",
+            asset_type=self.asset_type,
+        )
+        self.holder = baker.make(
+            AssetHolder,
+            tenant=self.tenant,
+            first_name="Alex",
+            last_name="Staff",
+            email="alex@staff.com",
+        )
 
     def test_asset_detail_shows_pending_eula_status(self):
         from assets.services import checkout_asset
@@ -423,8 +437,11 @@ class CustodyUXAndPreviewTests(TestCase):
 
         # Assert correct UX elements render for pending state
         self.assertContains(response, "Pending EULA Acceptance")
-        self.assertContains(response, "Sign Custody (On-Site)...")
-        self.assertContains(response, "Copy Link")
+        receipt = CustodyReceipt.objects.get(asset=self.asset, holder=self.holder)
+        self.assertContains(response, reverse("compliance:custodyreceipt_detail", kwargs={"pk": receipt.pk}))
+        self.assertNotContains(response, "Sign Custody (On-Site)...")
+        self.assertNotContains(response, "Copy Link")
+        self.assertNotContains(response, receipt.token)
         self.assertNotContains(response, "Custody Secured")
 
     def test_asset_detail_shows_secured_custody_status(self):
@@ -439,6 +456,7 @@ class CustodyUXAndPreviewTests(TestCase):
         receipt = CustodyReceipt.objects.filter(asset=self.asset, holder=self.holder).first()
         receipt.accepted = True
         receipt.acceptance_status = CustodyReceipt.STATUS_ACCEPTED
+        receipt.signed_at = timezone.now()
         receipt.save()
 
         # Retrieve asset details page
@@ -449,6 +467,8 @@ class CustodyUXAndPreviewTests(TestCase):
         # Assert correct UX elements render for secured state
         self.assertContains(response, "Custody Secured")
         self.assertContains(response, "View Signed Receipt")
+        self.assertContains(response, reverse("compliance:custodyreceipt_detail", kwargs={"pk": receipt.pk}))
+        self.assertNotContains(response, receipt.token)
         self.assertNotContains(response, "Pending EULA Acceptance")
         self.assertNotContains(response, "Sign Custody (On-Site)...")
 

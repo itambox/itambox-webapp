@@ -58,18 +58,20 @@
       {% translate "Licenses" %} <span class="badge bg-blue-lt ms-2">{{ license_assignments_table.rows|length }}</span>
     </a>
   </li>
-  <li class="nav-item" role="presentation">
-    <a href="?tab=custody"
-       class="nav-link {% if request.GET.tab == 'custody' %}active{% endif %}"
-       data-bs-toggle="tab"
-       hx-boost="false"
-       data-bs-target="#custody"
-       role="tab"
-       aria-selected="{% if request.GET.tab == 'custody' %}true{% else %}false{% endif %}">
-      <i class="mdi mdi-file-sign me-1 text-green"></i>
-      {% translate "Custody EULAs" %} <span class="badge bg-green-lt ms-2">{{ custody_receipts_table.rows|length }}</span>
-    </a>
-  </li>
+  {% if can_view_custody_receipts %}
+    <li class="nav-item" role="presentation">
+      <a href="?tab=custody"
+         class="nav-link {% if request.GET.tab == 'custody' %}active{% endif %}"
+         data-bs-toggle="tab"
+         hx-boost="false"
+         data-bs-target="#custody"
+         role="tab"
+         aria-selected="{% if request.GET.tab == 'custody' %}true{% else %}false{% endif %}">
+        <i class="mdi mdi-file-sign me-1 text-green"></i>
+        {% translate "Custody Receipts" %} <span class="badge bg-green-lt ms-2">{{ custody_receipts_table.rows|length }}</span>
+      </a>
+    </li>
+  {% endif %}
 {% endblock extra_tabs %}
 {# Object details rendered via panel layout #}
 {# Leave related_objects empty for the sidebar #}
@@ -93,8 +95,10 @@
   {% translate "Software Licenses" as t_lic %}
   {% translate "No software license seats assigned to this holder." as e_lic %}
   {% include 'generic/includes/related_table_tab.html' with tab="licenses" table=license_assignments_table title=t_lic empty=e_lic %}
-  {# Custody Tab Pane #}
-  {% translate "Signed Custody EULAs" as t_custody %}
-  {% translate "No electronic custody receipts logged for this holder." as e_custody %}
-  {% include 'generic/includes/related_table_tab.html' with tab="custody" table=custody_receipts_table title=t_custody empty=e_custody %}
+  {% if can_view_custody_receipts %}
+    {# Custody Tab Pane #}
+    {% translate "Custody Receipts" as t_custody %}
+    {% translate "No electronic custody receipts logged for this holder." as e_custody %}
+    {% include 'generic/includes/related_table_tab.html' with tab="custody" table=custody_receipts_table title=t_custody empty=e_custody %}
+  {% endif %}
 {% endblock extra_tab_panes %}

@@ -1,0 +1,83 @@
+{% extends "generic/object_detail.html" %}
+{% load i18n %}
+{% block title %}{% translate "Custody Receipt" %} #{{ object.pk }} {% translate "- ITAMbox" %}{% endblock %}
+{% block object_details %}
+  <dl class="row mb-0">
+    <dt class="col-sm-4">{% translate "Asset" %}</dt>
+    <dd class="col-sm-8">
+      <a href="{{ object.asset.get_absolute_url }}">{{ object.asset }}</a>
+    </dd>
+    <dt class="col-sm-4">{% translate "Holder" %}</dt>
+    <dd class="col-sm-8">
+      <a href="{{ object.holder.get_absolute_url }}">{{ object.holder }}</a>
+    </dd>
+    <dt class="col-sm-4">{% translate "Template" %}</dt>
+    <dd class="col-sm-8">
+      {% if object.custody_template %}
+        <a href="{{ object.custody_template.get_absolute_url }}">{{ object.custody_template }}</a>
+      {% else %}
+        <span class="text-secondary">{% translate "None" %}</span>
+      {% endif %}
+    </dd>
+    <dt class="col-sm-4">{% translate "Status" %}</dt>
+    <dd class="col-sm-8">
+      {% if object.acceptance_status == "accepted" %}
+        <span class="badge bg-success text-success-fg">{% translate "Accepted" %}</span>
+      {% elif object.acceptance_status == "declined" %}
+        <span class="badge bg-danger text-danger-fg">{% translate "Declined" %}</span>
+      {% else %}
+        <span class="badge bg-warning text-warning-fg">{% translate "Pending" %}</span>
+      {% endif %}
+    </dd>
+    <dt class="col-sm-4">{% translate "Created" %}</dt>
+    <dd class="col-sm-8">
+      {{ object.created_date|date:"Y-m-d H:i:s T"|default:"-" }}
+    </dd>
+  </dl>
+  {% if object.acceptance_status == "accepted" %}
+    <hr>
+    <h4>{% translate "Verification" %}</h4>
+    <dl class="row mb-0">
+      <dt class="col-sm-4">{% translate "Signed at" %}</dt>
+      <dd class="col-sm-8">
+        {{ object.signed_at|date:"Y-m-d H:i:s T"|default:"-" }}
+      </dd>
+      <dt class="col-sm-4">{% translate "Method" %}</dt>
+      <dd class="col-sm-8">
+        {{ object.get_acceptance_method_display|default:"-" }}
+      </dd>
+      <dt class="col-sm-4">{% translate "Verification hash" %}</dt>
+      <dd class="col-sm-8 text-break font-monospace">
+        {{ object.verification_hash|default:"-" }}
+      </dd>
+      <dt class="col-sm-4">{% translate "EULA version" %}</dt>
+      <dd class="col-sm-8">
+        {{ object.eula_version|default:"-" }}
+      </dd>
+      <dt class="col-sm-4">{% translate "IP address" %}</dt>
+      <dd class="col-sm-8">
+        {{ object.ip_address|default:"-" }}
+      </dd>
+      <dt class="col-sm-4">{% translate "User agent" %}</dt>
+      <dd class="col-sm-8 text-break">
+        {{ object.user_agent|default:"-" }}
+      </dd>
+    </dl>
+    <h4 class="mt-3">{% translate "Signature" %}</h4>
+    {% if signature_image %}
+      <img src="{{ signature_image }}"
+           alt="{% translate 'Captured recipient signature' %}"
+           class="img-fluid border rounded p-2">
+    {% else %}
+      <p class="text-secondary mb-0">{% translate "No renderable signature image is stored." %}</p>
+    {% endif %}
+  {% elif object.acceptance_status == "declined" %}
+    <div class="alert alert-danger mt-3 mb-0" role="alert">
+      {% translate "The recipient declined this custody transfer." %}
+    </div>
+  {% else %}
+    <div class="alert alert-info mt-3 mb-0" role="alert">
+      {% translate "This custody receipt is awaiting the recipient's decision." %}
+    </div>
+  {% endif %}
+{% endblock object_details %}
