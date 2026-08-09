@@ -162,7 +162,21 @@ class DerivationSurfaceTests(unittest.TestCase):
 
     def test_the_webhook_envelope_fields_are_read_from_the_task(self):
         envelope = policy.derived_webhook_envelope(REPO_ROOT)
-        self.assertEqual(envelope.fields, ("event", "model", "object_id", "timestamp", "data"))
+        self.assertEqual(
+            envelope.fields,
+            (
+                "schema_version",
+                "event_id",
+                "delivery_id",
+                "attempt",
+                "tenant",
+                "event",
+                "model",
+                "object_id",
+                "timestamp",
+                "data",
+            ),
+        )
         self.assertEqual(envelope.signature_header, "X-Hub-Signature-256")
 
     def test_both_scim_mounts_route_on_string_compatible_dual_read_identifiers(self):
