@@ -3,6 +3,16 @@
 // ============================================================
 
 // ---- Changelog diff styles ----
+// Tabler's bare `pre` default is a dark surface (--tblr-bg-surface-dark with
+// light text). The changelog panels must follow the active theme instead:
+// token-driven background/text that flips with [data-bs-theme].
+
+pre.change-data,
+pre.change-diff {
+    background-color: var(--tblr-bg-surface-secondary);
+    color: var(--tblr-body-color);
+    border: 1px solid var(--tblr-border-color);
+}
 
 pre.change-data {
     border-radius: 0;
@@ -20,8 +30,8 @@ pre.change-data {
     }
 
     >span.removed {
-        background-color: rgb(214 57 57 / 10%);
-        color: #d63939;
+        background-color: rgb(var(--tblr-danger-rgb), 0.1);
+        color: var(--tblr-danger);
     }
 }
 
@@ -39,9 +49,9 @@ pre.change-diff {
     }
 
     &.change-removed {
-        background-color: rgb(214 57 57 / 8%);
-        color: #d63939;
-        border: 1px solid rgb(214 57 57 / 15%);
+        background-color: rgb(var(--tblr-danger-rgb), 0.08);
+        color: var(--tblr-danger);
+        border: 1px solid rgb(var(--tblr-danger-rgb), 0.15);
     }
 }
 
