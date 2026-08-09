@@ -547,6 +547,10 @@ jobs:
         working-directory: ./itambox
         run: npm ci
 
+      - name: Run frontend unit tests
+        working-directory: ./itambox
+        run: npm run test:unit
+
       - name: Build frontend assets
         working-directory: ./itambox
         run: npm run build:all

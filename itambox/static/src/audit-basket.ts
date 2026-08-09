@@ -55,8 +55,6 @@ function showToast(message: string, variant: 'warning' | 'danger' = 'warning'): 
 }
 
 let feedbackTimer = 0;
-const CAMERA_SCAN_COOLDOWN_MS = 800;
-const SAME_CODE_GAP_MS = 1500;
 
 function scannerOverlayOpen(): boolean {
   const m = document.getElementById('audit-scanner-modal');
@@ -99,14 +97,11 @@ function initAuditBasket(): void {
   if (!form || !tbody || !template) return;
 
   const basket = new Set<number>();
-  let lastCode = '';
-  let lastScanAt = 0;
-  let lastSeenAt = 0;
 
   function updateState(): void {
     const count = basket.size;
     if (countEl) countEl.textContent = String(count);
-    const overlayCount = document.getElementById('basket-scanner-count');
+    const overlayCount = document.getElementById('audit-scanner-count');
     if (overlayCount) overlayCount.textContent = String(count);
     if (emptyEl) emptyEl.classList.toggle('d-none', count !== 0);
     if (clearBtn) clearBtn.disabled = count === 0;
@@ -162,30 +157,31 @@ function initAuditBasket(): void {
     tbody!.appendChild(tr);
   }
 
-  function addByCode(code: string, fromCamera = false): void {
-    const cleaned = (code || '').trim();
-    if (!cleaned) return;
+  let cameraScanner: AssetScanner | null = null;
 
-    if (fromCamera) {
-      const now = Date.now();
-      if (cleaned === lastCode && now - lastSeenAt < SAME_CODE_GAP_MS) {
-        lastSeenAt = now;
-        return;
-      }
-      if (now - lastScanAt < CAMERA_SCAN_COOLDOWN_MS) return;
-      lastScanAt = now;
-      lastCode = cleaned;
-      lastSeenAt = now;
-    }
+  function isCurrentCameraAction(sessionGeneration: number | undefined): boolean {
+    return sessionGeneration === undefined
+      || (cameraScanner !== null && cameraScanner.isSessionCurrent(sessionGeneration));
+  }
+
+  /**
+   * Validate one code and fold it into the basket. Returns the round-trip so the
+   * camera scanner can hold its gate open until this settles; USB and manual
+   * entry ignore the result and stay ungated — one deliberate event per code.
+   */
+  function addByCode(code: string, sessionGeneration?: number): Promise<void> {
+    const cleaned = (code || '').trim();
+    if (!cleaned) return Promise.resolve();
 
     const url = `${validateUrl}?code=${encodeURIComponent(cleaned)}`;
-    fetch(url, { headers: { 'X-Requested-With': 'XMLHttpRequest' } })
+    return fetch(url, { headers: { 'X-Requested-With': 'XMLHttpRequest' } })
       .then((res) => {
         if (res.status === 403) throw new Error('forbidden');
         if (!res.ok) throw new Error('not_found');
         return res.json();
       })
       .then((data: AuditScanPayload) => {
+        if (!isCurrentCameraAction(sessionGeneration)) return;
         if (!data.found) throw new Error('not_found');
         if (basket.has(data.pk)) {
           beepFail();
@@ -210,6 +206,7 @@ function initAuditBasket(): void {
         );
       })
       .catch((err: Error) => {
+        if (!isCurrentCameraAction(sessionGeneration)) return;
         beepFail();
         if (err.message === 'forbidden') {
           notify(gettext('You do not have permission to do this.'), 'fail');
@@ -230,16 +227,15 @@ function initAuditBasket(): void {
   }
 
   if (document.getElementById('audit-open-scanner-btn')) {
-    // eslint-disable-next-line no-new
-    new AssetScanner({
+    cameraScanner = new AssetScanner({
       readerId: 'audit-scanner-reader',
       modalId: 'audit-scanner-modal',
       torchId: 'audit-toggle-torch-btn',
       openBtnId: 'audit-open-scanner-btn',
       closeBtnId: 'audit-close-scanner-btn',
       errorDivId: 'audit-scanner-error',
-      onResult(code: string) {
-        addByCode(code, true);
+      onResult(code: string, sessionGeneration: number) {
+        return addByCode(code, sessionGeneration);
       },
     });
   }

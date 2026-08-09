@@ -199,7 +199,7 @@
 {% endblock content %}
 {% block page_modals %}
   {# ── Camera scanner overlay (distinct IDs from audit / global scanners) ── #}
-  <div id="basket-scanner-modal" class="scanner-overlay d-none">
+  <div id="basket-scanner-modal" class="scanner-overlay">
     <div class="text-center mb-3">
       <h3 class="text-white mb-1">
         {% if mode == 'dispose' %}
@@ -222,7 +222,11 @@
          class="scanner-feedback"
          role="status"
          aria-live="polite"></div>
-    <div id="basket-scanner-error" class="alert alert-warning mt-3 d-none">
+    <div id="basket-scanner-error"
+         class="alert alert-warning mt-3 d-none"
+         role="alert"
+         aria-live="assertive"
+         aria-atomic="true">
       <i class="mdi mdi-alert-outline me-2"></i>
       <span data-scanner-error-msg>{% translate "Camera unavailable. On iPhone/iPad this requires HTTPS and camera permission — check Settings › Safari › Camera, or use a hardware scanner." %}</span>
     </div>

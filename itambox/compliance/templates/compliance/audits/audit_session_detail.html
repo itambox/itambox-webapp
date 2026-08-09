@@ -240,12 +240,12 @@
               </div>
             </form>
             {# ── Camera scanner overlay (distinct IDs from bulk / global scanners) ── #}
-            <div id="audit-scanner-modal" class="scanner-overlay d-none">
+            <div id="audit-scanner-modal" class="scanner-overlay">
               <div class="text-center mb-3">
                 <h3 class="text-white mb-1">{% translate "Scan Asset Code" %}</h3>
                 <p class="text-secondary small mb-0">{% translate "Point camera at a barcode or QR code" %}</p>
                 <p class="scanner-basket-count text-secondary small mb-0 mt-1">
-                  {% translate "In basket:" %} <span id="basket-scanner-count">0</span>
+                  {% translate "In basket:" %} <span id="audit-scanner-count">0</span>
                 </p>
               </div>
               <div class="scanner-viewfinder" id="audit-scanner-reader">
@@ -255,7 +255,11 @@
                    class="scanner-feedback"
                    role="status"
                    aria-live="polite"></div>
-              <div id="audit-scanner-error" class="alert alert-warning mt-3 d-none">
+              <div id="audit-scanner-error"
+                   class="alert alert-warning mt-3 d-none"
+                   role="alert"
+                   aria-live="assertive"
+                   aria-atomic="true">
                 <i class="mdi mdi-alert-outline me-2"></i>
                 <span data-scanner-error-msg>{% translate "Camera unavailable. On iPhone/iPad this requires HTTPS and camera permission — check Settings › Safari › Camera, or use a hardware scanner." %}</span>
               </div>

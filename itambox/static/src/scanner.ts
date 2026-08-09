@@ -1,3 +1,5 @@
+import { ThrottledScanDispatcher } from './scan-gate';
+
 interface AssetScannerConfig {
   /** ID of the div that html5-qrcode renders into */
   readerId: string;
@@ -11,11 +13,18 @@ interface AssetScannerConfig {
   closeBtnId: string;
   /** ID of a div where a camera-error message can be shown (optional) */
   errorDivId?: string;
-  /** Called with the decoded string when a scan succeeds */
-  onResult: (code: string) => void;
+  /**
+   * Called with the decoded string when a scan succeeds. Return the promise of
+   * the domain action it starts: the scanner keeps the gate closed until that
+   * promise settles, so duplicate frames cannot start the same action twice.
+   */
+  onResult: (code: string, sessionGeneration: number) => unknown;
+  /** Override the quiet period before the same payload may fire again. */
+  duplicateWindowMs?: number;
 }
 
 export class AssetScanner {
+  private static readonly readerOwners = new Map<string, Html5Qrcode>();
   private config: AssetScannerConfig;
   private readerElement: HTMLElement | null = null;
   private modal: HTMLElement | null = null;
@@ -23,6 +32,14 @@ export class AssetScanner {
   private errorDiv: HTMLElement | null = null;
   private html5QrcodeScanner: Html5Qrcode | null = null;
   private isTorchOn: boolean = false;
+  private sessionGeneration = 0;
+  /**
+   * Throttles raw camera detections down to one domain action per scan. It lives
+   * here, on the shared scanner, so every caller — global lookup, audit page and
+   * both baskets — is gated once and identically. Manual and USB (keyboard-wedge)
+   * entry never reaches this path and stays ungated.
+   */
+  private dispatcher: ThrottledScanDispatcher;
 
   constructor(config: AssetScannerConfig) {
     this.config = config;
@@ -30,6 +47,10 @@ export class AssetScanner {
     this.modal = document.getElementById(config.modalId);
     this.torchBtn = document.getElementById(config.torchId);
     this.errorDiv = config.errorDivId ? document.getElementById(config.errorDivId) : null;
+    this.dispatcher = new ThrottledScanDispatcher(
+      (code: string) => this.config.onResult(code, this.sessionGeneration),
+      { duplicateWindowMs: config.duplicateWindowMs },
+    );
     this.initEventListeners();
   }
 
@@ -68,8 +89,12 @@ export class AssetScanner {
       return;
     }
 
+    this.sessionGeneration += 1;
     this.modal.classList.add('is-open');
     this.hideError();
+    // A re-opened scanner starts clean: no wedged in-flight flag from a previous
+    // session, and the payload scanned last time may be read again immediately.
+    this.dispatcher.reset();
 
     // iOS WebKit only grants getUserMedia on HTTPS or literal localhost (not 127.0.0.1).
     // Detect this before calling .start() so the user sees a clear message.
@@ -80,11 +105,15 @@ export class AssetScanner {
       return;
     }
 
+    let scanner: Html5Qrcode | undefined;
     try {
-      this.html5QrcodeScanner = new Html5Qrcode(this.config.readerId, {
+      scanner = new Html5Qrcode(this.config.readerId, {
         verbose: false,
         useBarCodeDetectorIfSupported: true,
       });
+      this.html5QrcodeScanner = scanner;
+      AssetScanner.readerOwners.set(this.config.readerId, scanner);
+      const activeScanner = scanner;
 
       const config = {
         fps: 15,
@@ -94,10 +123,13 @@ export class AssetScanner {
         },
       };
 
-      await this.html5QrcodeScanner.start(
+      await activeScanner.start(
         { facingMode: 'environment' },
         config,
         (decodedText: string) => {
+          // A reader whose start promise settled after close/reopen belongs to
+          // an old generation and must never feed the replacement dispatcher.
+          if (!this.isCurrentReader(activeScanner)) return;
           let raw = decodedText.trim();
           // Strip surrounding quotes
           if (raw.startsWith('"') && raw.endsWith('"')) {
@@ -112,7 +144,7 @@ export class AssetScanner {
 
           // Deep link: keep itambox://asset/<pk> intact for backend resolution
           if (raw.toLowerCase().startsWith('itambox://asset/')) {
-            this.config.onResult(raw);
+            this.dispatcher.dispatch(raw);
             return;
           }
 
@@ -121,16 +153,22 @@ export class AssetScanner {
           } else if (raw.toLowerCase().startsWith('itambox:')) {
             raw = raw.slice(8).replace(/^\/+|\/+$/g, '').trim();
           }
-          this.config.onResult(raw);
+          // Throttled: the decoder re-reports a payload that stays in view on
+          // every frame, and each of those must not start its own action.
+          this.dispatcher.dispatch(raw);
         },
         (_errorMessage: string) => {
           // Frame failures are normal while no code is in view — suppress
         }
       );
 
+      if (!this.isCurrentReader(activeScanner)) {
+        this.cleanupReader(activeScanner);
+        return;
+      }
 
       try {
-        const capabilities = this.html5QrcodeScanner.getRunningTrackCapabilities();
+        const capabilities = activeScanner.getRunningTrackCapabilities();
         if (capabilities && (capabilities as any).torch && this.torchBtn) {
           this.torchBtn.classList.remove('d-none');
           this.isTorchOn = false;
@@ -140,6 +178,12 @@ export class AssetScanner {
       }
 
     } catch (err: any) {
+      if (scanner && !this.isCurrentReader(scanner)) {
+        // A rejected start from a closed generation or replaced instance must
+        // not surface its error in the replacement overlay.
+        this.cleanupReader(scanner);
+        return;
+      }
       console.error('Camera/Scanner initialization failed:', err);
       const isPermissionDenied =
         err?.name === 'NotAllowedError' ||
@@ -165,7 +209,31 @@ export class AssetScanner {
     }
   }
 
+  private isCurrentReader(scanner: Html5Qrcode): boolean {
+    return this.html5QrcodeScanner === scanner
+      && AssetScanner.readerOwners.get(this.config.readerId) === scanner;
+  }
+
+  private cleanupReader(scanner: Html5Qrcode): void {
+    if (scanner.isScanning) {
+      scanner.stop()
+        .then(() => {
+          // html5-qrcode clears by element ID, not by reader instance. If a
+          // replacement scanner (including one from another AssetScanner
+          // instance) owns that ID now, clearing the stale reader would erase
+          // the replacement's live DOM.
+          if (AssetScanner.readerOwners.get(this.config.readerId) !== scanner) return;
+          AssetScanner.readerOwners.delete(this.config.readerId);
+          return scanner.clear();
+        })
+        .catch(err => {
+          console.error('Error stopping scanner:', err);
+        });
+    }
+  }
+
   public stop(): void {
+    this.sessionGeneration += 1;
     if (this.modal) {
       this.modal.classList.remove('is-open');
     }
@@ -173,39 +241,41 @@ export class AssetScanner {
       this.torchBtn.classList.add('d-none');
     }
     this.isTorchOn = false;
+    // Closing mid-action must not leave the gate busy for the next session.
+    this.dispatcher.reset();
 
     if (this.html5QrcodeScanner) {
-      if (this.html5QrcodeScanner.isScanning) {
-        this.html5QrcodeScanner.stop().then(() => {
-          if (this.html5QrcodeScanner) {
-            this.html5QrcodeScanner.clear();
-            this.html5QrcodeScanner = null;
-          }
-        }).catch(err => {
-          console.error('Error stopping scanner:', err);
-          this.html5QrcodeScanner = null;
-        });
-      } else {
-        this.html5QrcodeScanner = null;
-      }
+      // Capture the instance before awaiting stop(). A new scan may be opened
+      // while the old camera promise is pending; the old callback must never
+      // clear or null the replacement stored on this field.
+      const scanner = this.html5QrcodeScanner;
+      this.html5QrcodeScanner = null;
+      this.cleanupReader(scanner);
     }
+  }
+
+  public isSessionCurrent(sessionGeneration: number): boolean {
+    return sessionGeneration === this.sessionGeneration
+      && this.html5QrcodeScanner !== null
+      && AssetScanner.readerOwners.get(this.config.readerId) === this.html5QrcodeScanner;
   }
 }
 
 // ─── Audit page scanner (fills #barcode-scan-input, submits via HTMX form) ─────
 
 function initAuditScanner(): void {
-  const openBtn = document.getElementById('open-scanner-btn');
+  if (document.getElementById('audit-basket-root')) return;
+  const openBtn = document.getElementById('audit-open-scanner-btn');
   if (!openBtn || openBtn.dataset.scannerInitialized) return;
   openBtn.dataset.scannerInitialized = 'true';
   const searchField = document.getElementById('barcode-scan-input') as HTMLInputElement | null;
   const instance = new AssetScanner({
-    readerId: 'scanner-reader',
-    modalId: 'scanner-modal',
-    torchId: 'toggle-torch-btn',
-    openBtnId: 'open-scanner-btn',
-    closeBtnId: 'close-scanner-btn',
-    errorDivId: 'scanner-error',
+    readerId: 'audit-scanner-reader',
+    modalId: 'audit-scanner-modal',
+    torchId: 'audit-toggle-torch-btn',
+    openBtnId: 'audit-open-scanner-btn',
+    closeBtnId: 'audit-close-scanner-btn',
+    errorDivId: 'audit-scanner-error',
     onResult(code: string) {
       if (searchField) {
         searchField.value = code;
@@ -231,13 +301,15 @@ function initGlobalScanner(): void {
     openBtnId: 'global-open-scanner-btn',
     closeBtnId: 'global-close-scanner-btn',
     errorDivId: 'global-scanner-error',
-    onResult(code: string) {
-      fetch('/scan/resolve/?code=' + encodeURIComponent(code))
+    onResult(code: string, sessionGeneration: number) {
+      // Returned so the scanner holds the gate until the lookup settles.
+      return fetch('/scan/resolve/?code=' + encodeURIComponent(code))
         .then(res => {
           if (!res.ok) throw new Error('not_found');
           return res.json();
         })
         .then((data: { found: boolean; url?: string; label?: string }) => {
+          if (!instance.isSessionCurrent(sessionGeneration)) return;
           if (data.found && data.url) {
             instance.stop();
             document.dispatchEvent(new Event('playAuditSound'));
@@ -248,6 +320,7 @@ function initGlobalScanner(): void {
           }
         })
         .catch(() => {
+          if (!instance.isSessionCurrent(sessionGeneration)) return;
           document.dispatchEvent(new Event('playAuditFailSound'));
           showGlobalScanToast(interpolate(gettext('No asset matches: %(code)s'), { code }, true));
         });
@@ -255,7 +328,29 @@ function initGlobalScanner(): void {
   });
 }
 
+let globalScanFeedbackTimer: number | undefined;
+
 function showGlobalScanToast(message: string): void {
+  const overlayFeedback = document.getElementById('global-scanner-feedback');
+  if (overlayFeedback) {
+    if (globalScanFeedbackTimer !== undefined) {
+      clearTimeout(globalScanFeedbackTimer);
+    }
+    overlayFeedback.setAttribute('role', 'alert');
+    overlayFeedback.setAttribute('aria-live', 'assertive');
+    overlayFeedback.setAttribute('aria-atomic', 'true');
+    overlayFeedback.textContent = message;
+    overlayFeedback.classList.remove('is-ok', 'is-fail');
+    overlayFeedback.classList.add('is-visible', 'is-warn');
+    globalScanFeedbackTimer = setTimeout(() => {
+      overlayFeedback.classList.remove('is-visible', 'is-warn');
+      overlayFeedback.textContent = '';
+      globalScanFeedbackTimer = undefined;
+    }, 4000);
+    return;
+  }
+
+  // Keep the global toast fallback for pages that do not render the scanner overlay.
   const container = document.getElementById('django-messages');
   if (!container) return;
 

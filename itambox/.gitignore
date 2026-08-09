@@ -5,3 +5,4 @@ staticfiles/
 *.js.map
 static/docs/
 tests/openapi_client/.build/
+tests/js/.build/
