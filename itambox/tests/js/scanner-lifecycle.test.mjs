@@ -25,6 +25,7 @@ class FakeElement {
     this.listeners = new Map();
     this.attributes = new Map();
     this.textContent = '';
+    this.innerHTML = '';
   }
 
   addEventListener(name, handler) {
@@ -94,7 +95,10 @@ class FakeHtml5Qrcode {
     this.readerId = readerId;
     this.isScanning = false;
     this.cleared = false;
+    this.stopCalls = 0;
     readers.push(this);
+    const readerElement = elements.get(readerId);
+    if (readerElement) readerElement.innerHTML = `reader-${readers.length}`;
   }
 
   start(_camera, _config, onSuccess) {
@@ -117,6 +121,7 @@ class FakeHtml5Qrcode {
   }
 
   stop() {
+    this.stopCalls += 1;
     return new Promise((resolve) => {
       stopResolvers.push(() => {
         this.isScanning = false;
@@ -127,6 +132,8 @@ class FakeHtml5Qrcode {
 
   clear() {
     this.cleared = true;
+    const readerElement = elements.get(this.readerId);
+    if (readerElement) readerElement.innerHTML = '';
   }
 }
 
@@ -159,8 +166,10 @@ test('a stale reader stop callback cannot clear a replacement scanner', async ()
   stopResolvers[0]();
   await new Promise((resolve) => setImmediate(resolve));
 
-  assert.equal(readers[0].cleared, true, 'the stopped reader is cleaned up');
+  assert.equal(readers[0].stopCalls, 1, 'the stale reader is stopped');
+  assert.equal(readers[0].cleared, false, 'stale cleanup must not clear shared replacement DOM');
   assert.equal(readers[1].cleared, false, 'the replacement reader remains active');
+  assert.equal(elements.get('reader').innerHTML, 'reader-2', 'stale cleanup must not clear the replacement DOM');
 });
 
 test('a stale pending start cannot mutate the replacement scanner generation', async () => {
@@ -231,4 +240,57 @@ test('global scanner errors stay in the open overlay live region', async () => {
   assert.equal(feedback.classList.contains('is-visible'), true);
   assert.equal(feedback.getAttribute('role'), 'alert');
   assert.equal(feedback.getAttribute('aria-live'), 'assertive');
+});
+
+test('a stale global lookup cannot stop or navigate the replacement scanner', async () => {
+  readers.length = 0;
+  stopResolvers.length = 0;
+  startResolvers.length = 0;
+  deferNextStart = false;
+
+  const pendingResponses = [];
+  const previousFetch = globalThis.fetch;
+  const feedback = elements.get('global-scanner-feedback');
+  feedback.textContent = '';
+  feedback.classList.remove('is-visible');
+  delete window.location.href;
+  globalThis.fetch = () => new Promise((resolve) => pendingResponses.push(resolve));
+
+  try {
+    const openHandler = elements.get('global-open-scanner-btn').listeners.get('click');
+    const closeHandler = elements.get('global-close-scanner-btn').listeners.get('click');
+    assert.equal(typeof openHandler, 'function');
+    assert.equal(typeof closeHandler, 'function');
+
+    openHandler();
+    await new Promise((resolve) => setImmediate(resolve));
+    const staleReader = readers.at(-1);
+    staleReader.onSuccess('STALE-TAG');
+    assert.equal(pendingResponses.length, 1);
+
+    closeHandler();
+    openHandler();
+    await new Promise((resolve) => setImmediate(resolve));
+    const replacementReader = readers.at(-1);
+    assert.notEqual(replacementReader, staleReader);
+
+    // Finish the old camera stop while the replacement reader is active.
+    assert.equal(stopResolvers.length, 1);
+    stopResolvers[0]();
+    await new Promise((resolve) => setImmediate(resolve));
+
+    pendingResponses[0]({
+      ok: true,
+      json: () => Promise.resolve({ found: true, url: '/stale-target' }),
+    });
+    await new Promise((resolve) => setImmediate(resolve));
+    await new Promise((resolve) => setImmediate(resolve));
+
+    assert.equal(replacementReader.isScanning, true, 'stale lookup must not stop the replacement');
+    assert.equal(replacementReader.cleared, false, 'stale lookup must not clear the replacement');
+    assert.equal(window.location.href, undefined, 'stale lookup must not navigate');
+    assert.equal(feedback.textContent, '', 'stale lookup must not write replacement feedback');
+  } finally {
+    globalThis.fetch = previousFetch;
+  }
 });
