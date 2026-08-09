@@ -269,10 +269,12 @@ class CustodyRecipientConsentTests(CustodyRBACFixtureMixin, TestCase):
         # AC §6: Token, Ablauf und Fehler — invalid token → 404.
         self._login_to_tenant(self.recipient, self.tenant_a)
 
-        response = self.client.get(self._sign_url("invalid-dummy-token"))
+        for token in ("invalid-dummy-token", "x" * 64):
+            with self.subTest(token_length=len(token)):
+                response = self.client.get(self._sign_url(token))
 
-        self.assertEqual(response.status_code, 404)
-        self._assert_no_receipt_payload(response, self.receipt_a)
+                self.assertEqual(response.status_code, 404)
+                self._assert_no_receipt_payload(response, self.receipt_a)
 
     def test_expired_token_is_410_without_payload(self):
         # AC §6: Token, Ablauf und Fehler — expired token → 410 without payload.
