@@ -59,6 +59,8 @@ class PurchaseOrder(BaseModel, ChangeLoggingMixin, SoftDeleteMixin, TaggableMixi
     )
 
     class Meta:
+        verbose_name = _("Purchase Order")
+        verbose_name_plural = _("Purchase Orders")
         permissions = [
             ("receive_purchaseorder", _("Can receive stock from a purchase order")),
             ("approve_purchaseorder", _("Can approve/submit a purchase order")),

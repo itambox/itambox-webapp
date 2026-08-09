@@ -14329,6 +14329,46 @@
     },
     {
       "dependencies": [
+        "organization.0101_membership_external_id_and_more",
+        "users.0100_issue88_shard_62_users_relations"
+      ],
+      "id": "organization.0102_alter_tenantresourcegrant_options",
+      "is_replacement": false,
+      "operations": {
+        "BtreeGistExtension": {
+          "count": 0
+        },
+        "RunPython": {
+          "with_noop_reverse": 0,
+          "with_reverse": 0,
+          "without_reverse": 0
+        },
+        "RunSQL": {
+          "with_noop_reverse": 0,
+          "with_reverse": 0,
+          "without_reverse": 0
+        },
+        "SeparateDatabaseAndState": {
+          "count": 0
+        }
+      },
+      "path": "itambox/organization/migrations/0102_alter_tenantresourcegrant_options.py",
+      "replaces": [],
+      "reviewed_disposition": null,
+      "run_before": [],
+      "special_users_bootstrap": false,
+      "swappable_user_dependency": false,
+      "syntactic_facts": {
+        "has_custom_operations": {
+          "BtreeGistExtension": false,
+          "RunPython": false,
+          "RunSQL": false,
+          "SeparateDatabaseAndState": false
+        }
+      }
+    },
+    {
+      "dependencies": [
         "assets.0025_assetrequest_is_group_assetrequest_parent",
         "inventory.0003_alter_component_tags_alter_component_tenant_and_more",
         "organization.0010_assetholder_deleted_at_contact_deleted_at_and_more"
@@ -14976,6 +15016,46 @@
       "replaces": [
         "procurement.0012_alter_contract_contract_number_and_more"
       ],
+      "reviewed_disposition": null,
+      "run_before": [],
+      "special_users_bootstrap": false,
+      "swappable_user_dependency": false,
+      "syntactic_facts": {
+        "has_custom_operations": {
+          "BtreeGistExtension": false,
+          "RunPython": false,
+          "RunSQL": false,
+          "SeparateDatabaseAndState": false
+        }
+      }
+    },
+    {
+      "dependencies": [
+        "procurement.0100_issue88_shard_57_procurement_relations",
+        "users.0100_issue88_shard_62_users_relations"
+      ],
+      "id": "procurement.0101_alter_purchaseorder_options",
+      "is_replacement": false,
+      "operations": {
+        "BtreeGistExtension": {
+          "count": 0
+        },
+        "RunPython": {
+          "with_noop_reverse": 0,
+          "with_reverse": 0,
+          "without_reverse": 0
+        },
+        "RunSQL": {
+          "with_noop_reverse": 0,
+          "with_reverse": 0,
+          "without_reverse": 0
+        },
+        "SeparateDatabaseAndState": {
+          "count": 0
+        }
+      },
+      "path": "itambox/procurement/migrations/0101_alter_purchaseorder_options.py",
+      "replaces": [],
       "reviewed_disposition": null,
       "run_before": [],
       "special_users_bootstrap": false,
@@ -17189,6 +17269,8 @@
     "extras.0103_remove_reporttemplate_advanced_mode_and_more",
     "inventory.0101_alter_accessoryassignment_options_and_more",
     "organization.0101_membership_external_id_and_more",
+    "organization.0102_alter_tenantresourcegrant_options",
+    "procurement.0101_alter_purchaseorder_options",
     "subscriptions.0101_remove_subscription_auto_renewal_and_more",
     "users.0101_user_scim_id_usergroup_external_id_usergroup_scim_id_and_more"
   ],
@@ -17455,7 +17537,7 @@
         ]
       }
     },
-    "post_transition_migrations": 7,
+    "post_transition_migrations": 9,
     "replacement_shards": 62,
     "replacement_targets": 262
   }
