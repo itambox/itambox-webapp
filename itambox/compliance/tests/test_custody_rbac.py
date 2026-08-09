@@ -33,7 +33,8 @@ DUMMY_TOKEN_B = "b" * 64
 DUMMY_SIGNATURE = "dummy-signature-payload"
 DUMMY_EULA = "dummy-eula-marker"
 DUMMY_PASSWORD = "dummy-test-password"
-WRONG_RECIPIENT_MESSAGE = "wrong-recipient"
+WRONG_RECIPIENT_MESSAGE = "not the intended recipient"
+WRONG_RECIPIENT_CODES = ("wrong-recipient", "wrong_recipient")
 
 
 class CustodyRBACFixtureMixin(TenantTestMixin):
@@ -191,6 +192,11 @@ class CustodyRBACFixtureMixin(TenantTestMixin):
     def _assert_body_not_contains(self, response, text):
         self.assertNotIn(text, response.content.decode("utf-8", errors="replace"))
 
+    def _assert_wrong_recipient(self, response):
+        body = response.content.decode("utf-8", errors="replace")
+        self.assertIn(WRONG_RECIPIENT_MESSAGE, body)
+        self.assertTrue(any(code in body for code in WRONG_RECIPIENT_CODES))
+
 
 @override_settings(REQUIRE_CUSTODY_SIGNIN=True)
 class CustodyRecipientConsentTests(CustodyRBACFixtureMixin, TestCase):
@@ -245,7 +251,7 @@ class CustodyRecipientConsentTests(CustodyRBACFixtureMixin, TestCase):
         )
 
         self.assertEqual(response.status_code, 403)
-        self._assert_body_contains(response, WRONG_RECIPIENT_MESSAGE)
+        self._assert_wrong_recipient(response)
         self._assert_no_receipt_payload(response, self.receipt_a)
         self.receipt_a.refresh_from_db()
         self.assertEqual(self.receipt_a.acceptance_status, CustodyReceipt.STATUS_PENDING)
@@ -260,7 +266,7 @@ class CustodyRecipientConsentTests(CustodyRBACFixtureMixin, TestCase):
         )
 
         self.assertEqual(response.status_code, 403)
-        self._assert_body_contains(response, WRONG_RECIPIENT_MESSAGE)
+        self._assert_wrong_recipient(response)
         self._assert_body_not_contains(response, "internal custody permission")
         self._assert_no_receipt_payload(response, self.receipt_a)
         self.receipt_a.refresh_from_db()
@@ -358,7 +364,7 @@ class CustodyRecipientConsentTests(CustodyRBACFixtureMixin, TestCase):
         )
 
         self.assertEqual(response.status_code, 403)
-        self._assert_body_contains(response, WRONG_RECIPIENT_MESSAGE)
+        self._assert_wrong_recipient(response)
         self._assert_no_receipt_payload(response, self.receipt_a)
         self.receipt_a.refresh_from_db()
         self.assertEqual(self.receipt_a.acceptance_status, CustodyReceipt.STATUS_PENDING)
