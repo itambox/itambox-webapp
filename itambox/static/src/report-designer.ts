@@ -18,6 +18,10 @@
   }
 
   function initReportTemplateForm() {
+    const reportEditor = document.getElementById('report-template-editor');
+    const previewModal = document.getElementById('previewModal');
+    if (!reportEditor || !previewModal) return;
+
     const colsContainer = document.getElementById('div_id_included_columns');
     if (colsContainer) {
       const formChecks = Array.from(colsContainer.querySelectorAll('.form-check')) as HTMLElement[];
@@ -236,7 +240,7 @@
     }
 
     // Live Preview Button Setup
-    const submitBtn = document.querySelector('input[name="submit"]') || document.querySelector('button[type="submit"]') || document.querySelector('.btn-primary');
+    const submitBtn = reportEditor.querySelector('input[name="submit"], button[type="submit"]');
     const existingPreviewBtn = document.getElementById('btn-preview-report');
 
     if (submitBtn && !existingPreviewBtn) {
