@@ -208,6 +208,8 @@ The exact effective permission set is still resolved by membership, role grants,
 
 The matrix below describes effective permissions in the active/effective tenant scope. A “yes” in the recipient column always means **only when the principal is itself the intended holder**. It never means “an administrator may sign for somebody else”.
 
+Each positive cell names the permission codename that makes the capability available. “No” means that the role has no such capability, not that a surrounding page may leak the underlying receipt. “Own/effective tenant” includes only the tenants reached by the membership grant and its scope; it is not a shortcut to global access. The recipient-signing cells are the sole exception to an internal permission requirement and are still bound to the intended holder, a valid token/session, and the consent state machine.
+
 | Role / principal | See template | Manage templates in own permitted scope | Internal receipt list/detail | Prepare session | Recipient sign/consent | See finished receipt internally | Export |
 | --- | --- | --- | --- | --- | --- | --- | --- |
 | **Superadmin** (`is_superuser`) | **Yes** — `compliance.view_custodytemplate`; global and tenant-scoped templates | **Yes** — `add_custodytemplate`, `change_custodytemplate`, `delete_custodytemplate`; global/tenant/group scope as allowed | **Yes** — `compliance.view_custodyreceipt`; all tenants through the privileged internal scope | **Yes** — `compliance.prepare_custodyreceipt`; all authorized tenants | **Only if self is the intended holder**; no admin override and no operator signer substitution | **Yes** — `compliance.view_custodyreceipt` | **Yes** — `compliance.export_custodyreceipt` |
