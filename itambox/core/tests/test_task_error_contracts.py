@@ -1,3 +1,4 @@
+import pickle
 from unittest.mock import patch
 
 from django.db import InterfaceError, OperationalError
@@ -31,8 +32,20 @@ class TaskResultContractTests(SimpleTestCase):
         with self.assertRaises(TypeError):
             result.counts["processed"] = 3
 
+    def test_result_is_serializable_by_a_task_backend(self):
+        result = TaskResult(status=TaskStatus.PARTIAL, code="task.partial", counts={"processed": 2})
+
+        restored = pickle.loads(pickle.dumps(result))
+
+        self.assertEqual(restored, result)
+
     def test_classifier_has_a_narrow_transient_allowlist(self):
-        for error in (OperationalError("secret"), InterfaceError("secret"), TimeoutError("secret"), ConnectionError("secret")):
+        for error in (
+            OperationalError("secret"),
+            InterfaceError("secret"),
+            TimeoutError("secret"),
+            ConnectionError("secret"),
+        ):
             with self.subTest(error=type(error).__name__):
                 self.assertEqual(classify_task_error(error), TaskStatus.RETRYABLE)
 

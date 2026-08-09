@@ -1,12 +1,30 @@
 from __future__ import annotations
 
+from collections.abc import Iterator, Mapping
 from dataclasses import dataclass, field
 from enum import StrEnum
-from types import MappingProxyType
-from typing import Mapping
 
 from django.db import InterfaceError, OperationalError
 from django.urls import NoReverseMatch, reverse
+
+
+@dataclass(frozen=True)
+class FrozenCounts(Mapping[str, int]):
+    """Small immutable and pickle-safe mapping for task result counters."""
+
+    items: tuple[tuple[str, int], ...] = ()
+
+    def __getitem__(self, key: str) -> int:
+        for item_key, value in self.items:
+            if item_key == key:
+                return value
+        raise KeyError(key)
+
+    def __iter__(self) -> Iterator[str]:
+        return (key for key, _value in self.items)
+
+    def __len__(self) -> int:
+        return len(self.items)
 
 
 class TaskStatus(StrEnum):
@@ -28,7 +46,8 @@ class TaskResult:
     user_visible: bool = False
 
     def __post_init__(self) -> None:
-        object.__setattr__(self, "counts", MappingProxyType(dict(self.counts)))
+        if not isinstance(self.counts, FrozenCounts):
+            object.__setattr__(self, "counts", FrozenCounts(tuple(dict(self.counts).items())))
 
     def __bool__(self) -> bool:
         """Keep legacy truth-value callers compatible with typed outcomes."""

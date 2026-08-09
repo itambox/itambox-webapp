@@ -16,7 +16,7 @@ from django.utils.translation import gettext as _
 from core.models import Job, Notification
 
 from .context import TaskContext
-from .utils import reverse_job_detail
+from .utils import TaskResult, TaskStatus, classify_task_error, reverse_job_detail
 
 logger = logging.getLogger(__name__)
 
@@ -41,23 +41,24 @@ def bulk_checkin_task(
     location_id: int | str | None = None,
     checkin_date: str | datetime.date | None = None,
     notes: str = "",
-) -> None:
+) -> TaskResult:
     """Asynchronously check in selected hardware assets.
 
     Assets with no active assignment (and no location) are a no-op in
     ``checkin_asset`` — they are counted as *skipped* rather than failed.
     """
-    with TaskContext(tenant_id=tenant_id, user_id=user_id) as ctx:
+    with TaskContext(tenant_id=tenant_id, user_id=user_id, operation="assets.bulk_checkin") as ctx:
+        log_extra = {**ctx.log_context, "job_id": job_id}
         try:
             try:
                 job = Job.objects.get(pk=job_id)
             except Job.DoesNotExist:
-                logger.error("Job %s not found during async check-in.", job_id)
-                return
+                logger.error("Bulk check-in job not found", extra=log_extra)
+                return TaskResult(TaskStatus.TERMINAL, "checkin.job_not_found")
 
             if not job.mark_running():
                 logger.info("Job %s is no longer pending (cancelled?); skipping check-in.", job_id)
-                return
+                return TaskResult(TaskStatus.SKIPPED, "checkin.job_not_pending")
             job.append_log("Initializing asynchronous bulk check-in pipeline...")
             job.append_log(f"Assets to process: {len(asset_pks)}")
 
@@ -92,10 +93,15 @@ def bulk_checkin_task(
                             job.append_log(f" - Asset PK {pk} skipped (not checked out).")
                         else:
                             success_count += 1
-                            job.append_log(f" - Asset {asset.asset_tag} ({asset.name}): {result}")
+                            job.append_log(f" - Asset PK {pk} checked in successfully.")
+                    # broad except: boundary-isolation: one asset failure must not abort the requested batch
                     except Exception as ex:
                         failure_count += 1
-                        job.append_log(f" - Failed to check in Asset PK {pk}: {ex}")
+                        job.append_log(f" - Asset PK {pk} failed [checkin.item_failed].")
+                        logger.warning(
+                            "Bulk check-in item failed",
+                            extra={**log_extra, "object_id": pk, "exception_type": type(ex).__name__},
+                        )
 
                 job.append_log(
                     f"Bulk check-in finished. Checked in: {success_count} | "
@@ -111,7 +117,13 @@ def bulk_checkin_task(
                         level=Notification.LEVEL_DANGER,
                         target_url=reverse_job_detail(job.pk),
                     )
-                    return
+                    return TaskResult(
+                        TaskStatus.TERMINAL,
+                        "checkin.all_failed",
+                        {"failed": failure_count, "total": len(asset_pks)},
+                        "All asset check-ins failed.",
+                        True,
+                    )
 
                 job.mark_completed(
                     result={
@@ -128,16 +140,27 @@ def bulk_checkin_task(
                     level=Notification.LEVEL_SUCCESS,
                     target_url=reverse_job_detail(job.pk),
                 )
+                return TaskResult(
+                    TaskStatus.PARTIAL if failure_count else TaskStatus.SUCCESS,
+                    "checkin.partial" if failure_count else "checkin.completed",
+                    {"checked_in": success_count, "skipped": skipped_count, "failed": failure_count},
+                    user_visible=True,
+                )
 
+            # broad except: task-isolation: record a safe typed task-boundary failure
             except Exception as e:
-                logger.exception("Exception during bulk check-in task")
-                job.mark_failed(str(e))
+                status = classify_task_error(e)
+                logger.error("Bulk check-in task failed", extra={**log_extra, "exception_type": type(e).__name__})
+                job.mark_failed(f"[{status.value}] checkin.boundary_failed")
                 Notification.objects.create(
                     user=ctx.user,
                     subject=_("Bulk Check-in Error"),
-                    message=_("A system exception occurred during check-in: %(error)s") % {"error": str(e)},
+                    message=_("The bulk check-in could not be completed. Code: checkin.boundary_failed"),
                     level=Notification.LEVEL_DANGER,
                     target_url=reverse_job_detail(job.pk),
                 )
-        except Exception:
-            logger.exception("Outer exception during bulk check-in task")
+                return TaskResult(status, "checkin.boundary_failed", user_visible=True)
+        # broad except: task-isolation: failures before Job resolution remain observable to the queue caller
+        except Exception as exc:
+            logger.error("Bulk check-in entry failed", extra={**log_extra, "exception_type": type(exc).__name__})
+            return TaskResult(classify_task_error(exc), "checkin.entry_failed")

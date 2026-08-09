@@ -189,7 +189,7 @@ class ScheduledReportingAndAlertsTests(TestCase):
         self.assertEqual(send_channel.call_count, 2)
         archive = ReportGenerationArchive.objects.get(scheduled_report=sched)
         self.assertEqual(archive.status, "success")
-        self.assertIn("Failing Report Channel", archive.error_message)
+        self.assertEqual(archive.error_message, "channel.delivery_rejected")
 
     def test_delivery_outcome_marks_all_failures_as_failed(self):
         outcome = _DeliveryOutcome()
@@ -495,7 +495,7 @@ class ScheduledReportingAndAlertsTests(TestCase):
 
         self.assertFalse(success)
         sched.refresh_from_db()
-        self.assertEqual(sched.last_status, "failed: SYNTHETIC: compiler failure")
+        self.assertEqual(sched.last_status, "terminal: report.generation_failed")
         self.assertEqual(ReportGenerationArchive.objects.filter(scheduled_report=sched).count(), 0)
 
     def test_report_output_helpers_cover_all_attachment_formats(self):
@@ -643,7 +643,7 @@ class ScheduledReportingAndAlertsTests(TestCase):
 
         self.assertFalse(success)
         self.assertEqual(sched.last_status, "failed")
-        self.assertIn("smtp down", archive.error_message)
+        self.assertEqual(archive.error_message, "email.delivery_failed")
 
     def test_scheduled_delivery_false_email_is_observable(self):
         sched = SimpleNamespace(
@@ -665,8 +665,7 @@ class ScheduledReportingAndAlertsTests(TestCase):
             success = _process_scheduled_report(sched, self.tenant, [])
 
         self.assertFalse(success)
-        self.assertTrue(sched.last_status.startswith("delivery_failed:"))
-        self.assertIn("delivery returned false", sched.last_status)
+        self.assertEqual(sched.last_status, "delivery_failed: email.delivery_rejected")
 
 
 class ReportCrossTenantPermissionTests(TestCase):
