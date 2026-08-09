@@ -175,9 +175,16 @@ class CustodyRBACFixtureMixin(TenantTestMixin):
         return reverse("compliance:custody_eula_sign", kwargs={"token": token})
 
     def _assert_no_receipt_payload(self, response, receipt):
-        self.assertNotContains(response, receipt.asset.asset_tag)
-        self.assertNotContains(response, str(receipt.holder))
-        self.assertNotContains(response, DUMMY_EULA)
+        body = response.content.decode("utf-8", errors="replace")
+        self.assertNotIn(receipt.asset.asset_tag, body)
+        self.assertNotIn(str(receipt.holder), body)
+        self.assertNotIn(DUMMY_EULA, body)
+
+    def _assert_body_contains(self, response, text):
+        self.assertIn(text, response.content.decode("utf-8", errors="replace"))
+
+    def _assert_body_not_contains(self, response, text):
+        self.assertNotIn(text, response.content.decode("utf-8", errors="replace"))
 
 
 @override_settings(REQUIRE_CUSTODY_SIGNIN=True)
@@ -208,7 +215,7 @@ class CustodyRecipientConsentTests(CustodyRBACFixtureMixin, TestCase):
         )
 
         self.assertEqual(response.status_code, 403)
-        self.assertContains(response, WRONG_RECIPIENT_MESSAGE)
+        self._assert_body_contains(response, WRONG_RECIPIENT_MESSAGE)
         self._assert_no_receipt_payload(response, self.receipt_a)
         self.receipt_a.refresh_from_db()
         self.assertEqual(self.receipt_a.acceptance_status, CustodyReceipt.STATUS_PENDING)
@@ -223,8 +230,8 @@ class CustodyRecipientConsentTests(CustodyRBACFixtureMixin, TestCase):
         )
 
         self.assertEqual(response.status_code, 403)
-        self.assertContains(response, WRONG_RECIPIENT_MESSAGE)
-        self.assertNotContains(response, "internal custody permission")
+        self._assert_body_contains(response, WRONG_RECIPIENT_MESSAGE)
+        self._assert_body_not_contains(response, "internal custody permission")
         self._assert_no_receipt_payload(response, self.receipt_a)
         self.receipt_a.refresh_from_db()
         self.assertEqual(self.receipt_a.acceptance_status, CustodyReceipt.STATUS_PENDING)
@@ -260,7 +267,7 @@ class CustodyRecipientConsentTests(CustodyRBACFixtureMixin, TestCase):
         )
 
         self.assertEqual(response.status_code, 200)
-        self.assertContains(response, "valid signature")
+        self._assert_body_contains(response, "valid signature")
         self.receipt_a.refresh_from_db()
         self.assertEqual(self.receipt_a.acceptance_status, CustodyReceipt.STATUS_PENDING)
         self.assertFalse(self.receipt_a.accepted)
@@ -289,7 +296,7 @@ class CustodyRecipientConsentTests(CustodyRBACFixtureMixin, TestCase):
         )
 
         self.assertEqual(response.status_code, 200)
-        self.assertNotContains(response, "valid signature")
+        self._assert_body_not_contains(response, "valid signature")
         self.receipt_a.refresh_from_db()
         self.assertEqual(self.receipt_a.acceptance_status, CustodyReceipt.STATUS_ACCEPTED)
 
@@ -319,7 +326,7 @@ class CustodyRecipientConsentTests(CustodyRBACFixtureMixin, TestCase):
         )
 
         self.assertEqual(response.status_code, 403)
-        self.assertContains(response, WRONG_RECIPIENT_MESSAGE)
+        self._assert_body_contains(response, WRONG_RECIPIENT_MESSAGE)
         self._assert_no_receipt_payload(response, self.receipt_a)
         self.receipt_a.refresh_from_db()
         self.assertEqual(self.receipt_a.acceptance_status, CustodyReceipt.STATUS_PENDING)
@@ -345,15 +352,37 @@ class CustodyPermissionMetadataTests(TestCase):
             slug="seed-customer",
             managed_by=provider,
         )
+        customer_b = Tenant.objects.create(
+            name="Seed Customer B",
+            slug="seed-customer-b",
+            managed_by=provider,
+        )
+        customer_c = Tenant.objects.create(
+            name="Seed Customer C",
+            slug="seed-customer-c",
+            managed_by=provider,
+        )
 
         command = SeedAccessMixin()
         command.stdout = StringIO()
-        command._tenants = {"seed-provider": provider, "seed-customer": customer}
+        command._tenants = {
+            "seed-provider": provider,
+            "seed-customer": customer,
+            "seed-customer-b": customer_b,
+            "seed-customer-c": customer_c,
+        }
         command._tenant_meta = {
             "seed-provider": {"kind": "msp", "group_slug": "seed"},
-            "seed-customer": {"kind": "customer", "group_slug": "seed"},
+            "seed-customer": {"kind": "customer", "group_slug": "helix-biopharma"},
+            "seed-customer-b": {"kind": "customer", "group_slug": "sterling-am"},
+            "seed-customer-c": {"kind": "customer", "group_slug": "meridian-bank"},
         }
-        command._tenant_holders = {"seed-provider": [], "seed-customer": []}
+        command._tenant_holders = {
+            "seed-provider": [],
+            "seed-customer": [],
+            "seed-customer-b": [],
+            "seed-customer-c": [],
+        }
         command._provider_tenant = provider
         command._orgs = []
 
@@ -489,10 +518,10 @@ class CustodyInternalRouteTests(CustodyRBACFixtureMixin, TestCase):
         response = self.client.get(url)
 
         self.assertEqual(response.status_code, 200)
-        self.assertContains(response, self.asset_a.asset_tag)
-        self.assertContains(response, self.asset_b.asset_tag)
-        self.assertNotContains(response, DUMMY_TOKEN_A)
-        self.assertNotContains(response, DUMMY_TOKEN_B)
+        self._assert_body_contains(response, self.asset_a.asset_tag)
+        self._assert_body_contains(response, self.asset_b.asset_tag)
+        self._assert_body_not_contains(response, DUMMY_TOKEN_A)
+        self._assert_body_not_contains(response, DUMMY_TOKEN_B)
 
     def test_tenant_admin_sees_own_tenant_and_foreign_detail_is_404(self):
         # AC §6: Rollen und Tenant-Grenze — Tenant Admin is own-tenant only; foreign detail → 404.
@@ -511,8 +540,8 @@ class CustodyInternalRouteTests(CustodyRBACFixtureMixin, TestCase):
         detail_response = self.client.get(foreign_detail_url)
 
         self.assertEqual(list_response.status_code, 200)
-        self.assertContains(list_response, self.asset_a.asset_tag)
-        self.assertNotContains(list_response, self.asset_b.asset_tag)
+        self._assert_body_contains(list_response, self.asset_a.asset_tag)
+        self._assert_body_not_contains(list_response, self.asset_b.asset_tag)
         self.assertEqual(detail_response.status_code, 404)
         self._assert_no_receipt_payload(detail_response, self.receipt_b)
 
@@ -524,8 +553,8 @@ class CustodyInternalRouteTests(CustodyRBACFixtureMixin, TestCase):
         response = self.client.get(url)
 
         self.assertEqual(response.status_code, 404)
-        self.assertNotContains(response, self.template_b.name)
-        self.assertNotContains(response, DUMMY_EULA)
+        self._assert_body_not_contains(response, self.template_b.name)
+        self._assert_body_not_contains(response, DUMMY_EULA)
 
     def test_technician_can_list_and_detail_but_raw_token_is_not_rendered(self):
         # AC §6: Rollen und Tenant-Grenze — Technician gets internal view/detail only.
@@ -538,9 +567,9 @@ class CustodyInternalRouteTests(CustodyRBACFixtureMixin, TestCase):
 
         self.assertEqual(list_response.status_code, 200)
         self.assertEqual(detail_response.status_code, 200)
-        self.assertContains(detail_response, self.asset_a.asset_tag)
-        self.assertNotContains(list_response, DUMMY_TOKEN_A)
-        self.assertNotContains(detail_response, DUMMY_TOKEN_A)
+        self._assert_body_contains(detail_response, self.asset_a.asset_tag)
+        self._assert_body_not_contains(list_response, DUMMY_TOKEN_A)
+        self._assert_body_not_contains(detail_response, DUMMY_TOKEN_A)
 
     def test_internal_route_without_permission_is_403_not_recipient_error(self):
         # AC §6: Token, Ablauf und Fehler — missing internal permission → internal 403.
@@ -561,8 +590,8 @@ class CustodyInternalRouteTests(CustodyRBACFixtureMixin, TestCase):
         response = self.client.get(url)
 
         self.assertEqual(response.status_code, 200)
-        self.assertNotContains(response, DUMMY_TOKEN_A)
-        self.assertNotContains(response, "custody_eula_sign")
+        self._assert_body_not_contains(response, DUMMY_TOKEN_A)
+        self._assert_body_not_contains(response, "custody_eula_sign")
 
     def test_template_detail_hides_receipts_without_receipt_permission(self):
         # AC §6: Inventar-Surfaces — Template detail must not embed receipt rows without view permission.
@@ -572,8 +601,8 @@ class CustodyInternalRouteTests(CustodyRBACFixtureMixin, TestCase):
         response = self.client.get(url)
 
         self.assertEqual(response.status_code, 200)
-        self.assertNotContains(response, self.asset_a.asset_tag)
-        self.assertNotContains(response, DUMMY_TOKEN_A)
+        self._assert_body_not_contains(response, self.asset_a.asset_tag)
+        self._assert_body_not_contains(response, DUMMY_TOKEN_A)
 
     def test_holder_detail_does_not_expose_bearer_token(self):
         # AC §6: Inventar-Surfaces — holder detail must not expose a receipt token.
@@ -583,7 +612,7 @@ class CustodyInternalRouteTests(CustodyRBACFixtureMixin, TestCase):
         response = self.client.get(url)
 
         self.assertEqual(response.status_code, 200)
-        self.assertNotContains(response, DUMMY_TOKEN_A)
+        self._assert_body_not_contains(response, DUMMY_TOKEN_A)
 
     def test_cross_tenant_internal_detail_is_404_without_payload(self):
         # AC §6: Rollen und Tenant-Grenze — cross-tenant UI detail → 404.
