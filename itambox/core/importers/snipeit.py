@@ -147,10 +147,15 @@ class SnipeITClient:
     ) -> dict:
         url = f"{self.base_url}{endpoint}"
         context = self._operation_context(operation)
-        budget = budget or RetryBudget()
+        response = self._request(url, params=params, context=context, budget=budget or RetryBudget())
+        self._raise_response_error(response, context=context)
+        return self._parse_response(response, context=context)
+
+    @sensitive_variables()
+    def _request(self, url: str, *, params: dict | None, context: IntegrationContext, budget: RetryBudget):
         while True:
             try:
-                resp = self._session.get(url, params=params, timeout=30, allow_redirects=False)
+                response = self._session.get(url, params=params, timeout=30, allow_redirects=False)
             except (
                 requests_exceptions.SSLError,
                 requests_exceptions.InvalidURL,
@@ -160,13 +165,13 @@ class SnipeITClient:
                 raise IntegrationConfigurationError(context=context, cause_type=type(exc).__name__) from None
             except requests_exceptions.RequestException as exc:
                 raise IntegrationUnavailableError(context=context, cause_type=type(exc).__name__) from None
-            if resp.status_code != 429:
-                break
+            if response.status_code != 429:
+                return response
 
-            retry_after = self._parse_retry_after(resp.headers)
+            retry_after = self._parse_retry_after(response.headers)
             rate_limited = IntegrationRateLimitedError(
                 context=context,
-                status_code=resp.status_code,
+                status_code=response.status_code,
                 retry_after=retry_after,
             )
             delay = budget.next_delay(retry_after, now=time.monotonic())
@@ -175,7 +180,7 @@ class SnipeITClient:
                     raise rate_limited
                 raise IntegrationRetryBudgetExceededError(
                     context=context,
-                    status_code=resp.status_code,
+                    status_code=response.status_code,
                     retry_after=rate_limited.retry_after,
                 ) from rate_limited
             log_extra = rate_limited.log_extra(retry_count=budget.attempts, retry_delay=delay)
@@ -186,7 +191,9 @@ class SnipeITClient:
             )
             time.sleep(delay)
 
-        status_code = resp.status_code
+    @staticmethod
+    def _raise_response_error(response, *, context: IntegrationContext) -> None:
+        status_code = response.status_code
         if status_code in (401, 403):
             raise IntegrationAuthenticationError(context=context, status_code=status_code)
         if status_code == 404:
@@ -196,16 +203,18 @@ class SnipeITClient:
         if status_code >= 400:
             raise IntegrationRequestError(context=context, status_code=status_code)
 
+    @staticmethod
+    def _parse_response(response, *, context: IntegrationContext) -> dict:
         try:
-            data = resp.json()
+            data = response.json()
         except (TypeError, ValueError) as exc:
             raise IntegrationContractError(
                 context=context,
-                status_code=status_code,
+                status_code=response.status_code,
                 cause_type=type(exc).__name__,
             ) from None
         if not isinstance(data, dict):
-            raise IntegrationContractError(context=context, status_code=status_code)
+            raise IntegrationContractError(context=context, status_code=response.status_code)
         return data
 
 

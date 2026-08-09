@@ -2909,26 +2909,10 @@
     },
     {
       "path": "itambox/core/forms/import_forms.py",
-      "code": "C901",
-      "message": "'BulkImportForm.import_data' is too complex (14)",
-      "source": "    def import_data(self, request=None):",
-      "context": "Module:body/ClassDef:BulkImportForm:body/FunctionDef:import_data:self",
-      "count": 1
-    },
-    {
-      "path": "itambox/core/forms/import_forms.py",
       "code": "F401",
       "message": "'django.db.models as _models' imported but unused",
       "source": "        from django.db import models as _models",
       "context": "Module:body/ClassDef:BulkImportForm:body/FunctionDef:map_row:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/core/forms/import_forms.py",
-      "code": "F401",
-      "message": "'django.db.transaction' imported but unused",
-      "source": "        from django.db import transaction",
-      "context": "Module:body/ClassDef:BulkImportForm:body/FunctionDef:import_data:body",
       "count": 1
     },
     {
@@ -3065,118 +3049,6 @@
       "message": "Loop control variable 'cf_label' not used within the loop body. If this is intended, start the name with an underscore.",
       "source": "            for cf_label, cf_info in (row.get(\"custom_fields\") or {}).items():",
       "context": "Module:body/ClassDef:SnipeITImporter:body/FunctionDef:_import_hardware:body/For:Name(id='row', ctx=Store()):Call(func=Attribute(value=Attribute(value=Name(id='self', ctx=Load()), attr='client', ctx=Load()), attr='get_all', ctx=Load()), args=[Constant(value='/api/v1/hardware')], keywords=[]):body/For:Tuple(elts=[Name(id='cf_label', ctx=Store()), Name(id='cf_info', ctx=Store())], ctx=Store()):Call(func=Attribute(value=BoolOp(op=Or(), values=[Call(func=Attribute(value=Name(id='row', ctx=Load()), attr='get', ctx=Load()), args=[Constant(value='custom_fields')], keywords=[]), Dict(keys=[], values=[])]), attr='items', ctx=Load()), args=[], keywords=[]):self",
-      "count": 1
-    },
-    {
-      "path": "itambox/core/importers/snipeit.py",
-      "code": "B907",
-      "message": "'asset_tag' is manually surrounded by quotes, consider using the `!r` conversion flag.",
-      "source": "self._log(f\"  ! asset {sid} '{asset_tag}': {exc}\")",
-      "context": "Module:body/ClassDef:SnipeITImporter:body/FunctionDef:_import_hardware:body/For:Name(id='row', ctx=Store()):Call(func=Attribute(value=Attribute(value=Name(id='self', ctx=Load()), attr='client', ctx=Load()), attr='get_all', ctx=Load()), args=[Constant(value='/api/v1/hardware')], keywords=[]):body/Try#1:handlers/ExceptHandler:Name(id='Exception', ctx=Load()):exc:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/core/importers/snipeit.py",
-      "code": "B907",
-      "message": "'model_name' is manually surrounded by quotes, consider using the `!r` conversion flag.",
-      "source": "self._log(f\"  ! model {sid} '{model_name}': {exc}\")",
-      "context": "Module:body/ClassDef:SnipeITImporter:body/FunctionDef:_import_models:body/For:Name(id='row', ctx=Store()):Call(func=Attribute(value=Attribute(value=Name(id='self', ctx=Load()), attr='client', ctx=Load()), attr='get_all', ctx=Load()), args=[Constant(value='/api/v1/models')], keywords=[]):body/Try:handlers/ExceptHandler:Name(id='Exception', ctx=Load()):exc:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/core/importers/snipeit.py",
-      "code": "B907",
-      "message": "'name' is manually surrounded by quotes, consider using the `!r` conversion flag.",
-      "source": "self._log(f\"  ! accessory {sid} '{name}': {exc}\")",
-      "context": "Module:body/ClassDef:SnipeITImporter:body/FunctionDef:_import_accessories:body/For:Name(id='row', ctx=Store()):Call(func=Attribute(value=Attribute(value=Name(id='self', ctx=Load()), attr='client', ctx=Load()), attr='get_all', ctx=Load()), args=[Constant(value='/api/v1/accessories')], keywords=[]):body/Try:handlers/ExceptHandler:Name(id='Exception', ctx=Load()):exc:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/core/importers/snipeit.py",
-      "code": "B907",
-      "message": "'name' is manually surrounded by quotes, consider using the `!r` conversion flag.",
-      "source": "self._log(f\"  ! category {sid} '{name}': {exc}\")",
-      "context": "Module:body/ClassDef:SnipeITImporter:body/FunctionDef:_import_categories:body/For:Name(id='row', ctx=Store()):Call(func=Attribute(value=Attribute(value=Name(id='self', ctx=Load()), attr='client', ctx=Load()), attr='get_all', ctx=Load()), args=[Constant(value='/api/v1/categories')], keywords=[]):body/Try:handlers/ExceptHandler:Name(id='Exception', ctx=Load()):exc:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/core/importers/snipeit.py",
-      "code": "B907",
-      "message": "'name' is manually surrounded by quotes, consider using the `!r` conversion flag.",
-      "source": "self._log(f\"  ! company {sid} '{name}': {exc}\")",
-      "context": "Module:body/ClassDef:SnipeITImporter:body/FunctionDef:_import_companies:body/For:Name(id='row', ctx=Store()):Call(func=Attribute(value=Attribute(value=Name(id='self', ctx=Load()), attr='client', ctx=Load()), attr='get_all', ctx=Load()), args=[Constant(value='/api/v1/companies')], keywords=[]):body/Try:handlers/ExceptHandler:Name(id='Exception', ctx=Load()):exc:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/core/importers/snipeit.py",
-      "code": "B907",
-      "message": "'name' is manually surrounded by quotes, consider using the `!r` conversion flag.",
-      "source": "self._log(f\"  ! component {sid} '{name}': {exc}\")",
-      "context": "Module:body/ClassDef:SnipeITImporter:body/FunctionDef:_import_components:body/For:Name(id='row', ctx=Store()):Call(func=Attribute(value=Attribute(value=Name(id='self', ctx=Load()), attr='client', ctx=Load()), attr='get_all', ctx=Load()), args=[Constant(value='/api/v1/components')], keywords=[]):body/Try:handlers/ExceptHandler:Name(id='Exception', ctx=Load()):exc:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/core/importers/snipeit.py",
-      "code": "B907",
-      "message": "'name' is manually surrounded by quotes, consider using the `!r` conversion flag.",
-      "source": "self._log(f\"  ! consumable {sid} '{name}': {exc}\")",
-      "context": "Module:body/ClassDef:SnipeITImporter:body/FunctionDef:_import_consumables:body/For:Name(id='row', ctx=Store()):Call(func=Attribute(value=Attribute(value=Name(id='self', ctx=Load()), attr='client', ctx=Load()), attr='get_all', ctx=Load()), args=[Constant(value='/api/v1/consumables')], keywords=[]):body/Try:handlers/ExceptHandler:Name(id='Exception', ctx=Load()):exc:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/core/importers/snipeit.py",
-      "code": "B907",
-      "message": "'name' is manually surrounded by quotes, consider using the `!r` conversion flag.",
-      "source": "self._log(f\"  ! fieldset {sid} '{name}': {exc}\")",
-      "context": "Module:body/ClassDef:SnipeITImporter:body/FunctionDef:_import_fieldsets:body/For:Name(id='row', ctx=Store()):Call(func=Attribute(value=Attribute(value=Name(id='self', ctx=Load()), attr='client', ctx=Load()), attr='get_all', ctx=Load()), args=[Constant(value='/api/v1/fieldsets')], keywords=[]):body/Try:handlers/ExceptHandler:Name(id='Exception', ctx=Load()):exc:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/core/importers/snipeit.py",
-      "code": "B907",
-      "message": "'name' is manually surrounded by quotes, consider using the `!r` conversion flag.",
-      "source": "self._log(f\"  ! license {sid} '{name}': {exc}\")",
-      "context": "Module:body/ClassDef:SnipeITImporter:body/FunctionDef:_import_licenses:body/For:Name(id='row', ctx=Store()):Call(func=Attribute(value=Attribute(value=Name(id='self', ctx=Load()), attr='client', ctx=Load()), attr='get_all', ctx=Load()), args=[Constant(value='/api/v1/licenses')], keywords=[]):body/Try:handlers/ExceptHandler:Name(id='Exception', ctx=Load()):exc:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/core/importers/snipeit.py",
-      "code": "B907",
-      "message": "'name' is manually surrounded by quotes, consider using the `!r` conversion flag.",
-      "source": "self._log(f\"  ! manufacturer {sid} '{name}': {exc}\")",
-      "context": "Module:body/ClassDef:SnipeITImporter:body/FunctionDef:_import_manufacturers:body/For:Name(id='row', ctx=Store()):Call(func=Attribute(value=Attribute(value=Name(id='self', ctx=Load()), attr='client', ctx=Load()), attr='get_all', ctx=Load()), args=[Constant(value='/api/v1/manufacturers')], keywords=[]):body/Try:handlers/ExceptHandler:Name(id='Exception', ctx=Load()):exc:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/core/importers/snipeit.py",
-      "code": "B907",
-      "message": "'name' is manually surrounded by quotes, consider using the `!r` conversion flag.",
-      "source": "self._log(f\"  ! statuslabel {sid} '{name}': {exc}\")",
-      "context": "Module:body/ClassDef:SnipeITImporter:body/FunctionDef:_import_status_labels:body/For:Name(id='row', ctx=Store()):Name(id='rows', ctx=Load()):body/Try:handlers/ExceptHandler:Name(id='Exception', ctx=Load()):exc:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/core/importers/snipeit.py",
-      "code": "B907",
-      "message": "'name' is manually surrounded by quotes, consider using the `!r` conversion flag.",
-      "source": "self._log(f\"  ! supplier {sid} '{name}': {exc}\")",
-      "context": "Module:body/ClassDef:SnipeITImporter:body/FunctionDef:_import_suppliers:body/For:Name(id='row', ctx=Store()):Call(func=Attribute(value=Attribute(value=Name(id='self', ctx=Load()), attr='client', ctx=Load()), attr='get_all', ctx=Load()), args=[Constant(value='/api/v1/suppliers')], keywords=[]):body/Try:handlers/ExceptHandler:Name(id='Exception', ctx=Load()):exc:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/core/importers/snipeit.py",
-      "code": "B907",
-      "message": "'raw_name' is manually surrounded by quotes, consider using the `!r` conversion flag.",
-      "source": "self._log(f\"  ! field {sid} '{raw_name}': {exc}\")",
-      "context": "Module:body/ClassDef:SnipeITImporter:body/FunctionDef:_import_fields:body/For:Name(id='row', ctx=Store()):Call(func=Attribute(value=Attribute(value=Name(id='self', ctx=Load()), attr='client', ctx=Load()), attr='get_all', ctx=Load()), args=[Constant(value='/api/v1/fields')], keywords=[]):body/Try:handlers/ExceptHandler:Name(id='Exception', ctx=Load()):exc:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/core/importers/snipeit.py",
-      "code": "B907",
-      "message": "'upn' is manually surrounded by quotes, consider using the `!r` conversion flag.",
-      "source": "self._log(f\"  ! user {sid} '{upn}': {exc}\")",
-      "context": "Module:body/ClassDef:SnipeITImporter:body/FunctionDef:_import_users:body/For:Name(id='row', ctx=Store()):Call(func=Attribute(value=Attribute(value=Name(id='self', ctx=Load()), attr='client', ctx=Load()), attr='get_all', ctx=Load()), args=[Constant(value='/api/v1/users')], keywords=[]):body/Try:handlers/ExceptHandler:Name(id='Exception', ctx=Load()):exc:body",
       "count": 1
     },
     {
