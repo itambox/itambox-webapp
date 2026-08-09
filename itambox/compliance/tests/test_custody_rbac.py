@@ -6,6 +6,7 @@ bearer credentials, signature payloads, or production EULA content.
 
 from concurrent.futures import ThreadPoolExecutor
 from datetime import timedelta
+from io import StringIO
 
 from django.contrib.auth import get_user_model
 from django.contrib.auth.models import Permission
@@ -17,6 +18,7 @@ from rest_framework.test import APITestCase
 
 from assets.models import Asset
 from compliance.models import CustodyReceipt, CustodyTemplate
+from core.management.commands._seed.access import SeedAccessMixin
 from core.tests.mixins import TenantTestMixin, grant
 from organization.models import AssetHolder, Role, Tenant
 
@@ -334,6 +336,37 @@ class CustodyPermissionMetadataTests(TestCase):
 
         self.assertIn("prepare_custodyreceipt", codenames)
         self.assertIn("export_custodyreceipt", codenames)
+
+    def test_seed_technician_role_is_narrow_and_has_no_export(self):
+        # AC §6: Rollen und Tenant-Grenze — seeded Technician has view+prepare, not export or template policy writes.
+        provider = Tenant.objects.create(name="Seed Provider", slug="seed-provider", is_provider=True)
+        customer = Tenant.objects.create(
+            name="Seed Customer",
+            slug="seed-customer",
+            managed_by=provider,
+        )
+
+        command = SeedAccessMixin()
+        command.stdout = StringIO()
+        command._tenants = {"seed-provider": provider, "seed-customer": customer}
+        command._tenant_meta = {
+            "seed-provider": {"kind": "msp", "group_slug": "seed"},
+            "seed-customer": {"kind": "customer", "group_slug": "seed"},
+        }
+        command._tenant_holders = {"seed-provider": [], "seed-customer": []}
+        command._provider_tenant = provider
+        command._orgs = []
+
+        command._seed_access()
+
+        technician = Role.objects.get(tenant=customer, name="Technician")
+        permissions = set(technician.permissions)
+        self.assertIn("compliance.view_custodyreceipt", permissions)
+        self.assertIn("compliance.prepare_custodyreceipt", permissions)
+        self.assertNotIn("compliance.export_custodyreceipt", permissions)
+        self.assertNotIn("compliance.add_custodytemplate", permissions)
+        self.assertNotIn("compliance.change_custodytemplate", permissions)
+        self.assertNotIn("compliance.delete_custodytemplate", permissions)
 
 
 @override_settings(REQUIRE_CUSTODY_SIGNIN=False)
