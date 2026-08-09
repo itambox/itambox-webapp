@@ -8,6 +8,8 @@ from concurrent.futures import ThreadPoolExecutor
 from datetime import timedelta
 
 from django.contrib.auth import get_user_model
+from django.contrib.auth.models import Permission
+from django.contrib.contenttypes.models import ContentType
 from django.test import TestCase, TransactionTestCase, override_settings
 from django.urls import NoReverseMatch, reverse
 from model_bakery import baker
@@ -67,6 +69,15 @@ class CustodyRBACFixtureMixin(TenantTestMixin):
             "custody-cross-tenant",
             self.tenant_b,
             {"compliance.view_custodyreceipt"},
+        )
+        self._add_permissions(
+            self.unrelated,
+            self.tenant_a,
+            {
+                "assets.view_asset",
+                "compliance.view_custodytemplate",
+                "organization.view_assetholder",
+            },
         )
 
         self.recipient_holder = AssetHolder.objects.create(
@@ -145,6 +156,15 @@ class CustodyRBACFixtureMixin(TenantTestMixin):
         )
         grant(user, tenant, role)
         return user
+
+    @staticmethod
+    def _add_permissions(user, tenant, permissions):
+        role = Role.objects.create(
+            tenant=tenant,
+            name=f"{user.username} surface role",
+            permissions=sorted(permissions),
+        )
+        grant(user, tenant, role)
 
     def _login_to_tenant(self, user, tenant):
         self.client_login_to_tenant(user, tenant)
@@ -301,6 +321,19 @@ class CustodyRecipientConsentTests(CustodyRBACFixtureMixin, TestCase):
         self._assert_no_receipt_payload(response, self.receipt_a)
         self.receipt_a.refresh_from_db()
         self.assertEqual(self.receipt_a.acceptance_status, CustodyReceipt.STATUS_PENDING)
+
+
+class CustodyPermissionMetadataTests(TestCase):
+    def test_prepare_and_export_permissions_are_published_model_permissions(self):
+        # AC §6: Rollen und Tenant-Grenze — prepare/export are stable model codenames.
+        content_type = ContentType.objects.get(app_label="compliance", model="custodyreceipt")
+
+        codenames = set(
+            Permission.objects.filter(content_type=content_type).values_list("codename", flat=True)
+        )
+
+        self.assertIn("prepare_custodyreceipt", codenames)
+        self.assertIn("export_custodyreceipt", codenames)
 
 
 @override_settings(REQUIRE_CUSTODY_SIGNIN=False)
@@ -476,6 +509,38 @@ class CustodyInternalRouteTests(CustodyRBACFixtureMixin, TestCase):
         self._assert_internal_denial(response)
         self._assert_no_receipt_payload(response, self.receipt_a)
 
+    def test_asset_detail_hides_custody_surface_without_receipt_permission(self):
+        # AC §6: Inventar-Surfaces — asset detail must not expose bearer token or signing action.
+        url = reverse("assets:asset_detail", kwargs={"pk": self.asset_a.pk})
+        self._login_to_tenant(self.unrelated, self.tenant_a)
+
+        response = self.client.get(url)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertNotContains(response, DUMMY_TOKEN_A)
+        self.assertNotContains(response, "custody_eula_sign")
+
+    def test_template_detail_hides_receipts_without_receipt_permission(self):
+        # AC §6: Inventar-Surfaces — Template detail must not embed receipt rows without view permission.
+        url = reverse("compliance:custodytemplate_detail", kwargs={"pk": self.template_a.pk})
+        self._login_to_tenant(self.unrelated, self.tenant_a)
+
+        response = self.client.get(url)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertNotContains(response, self.asset_a.asset_tag)
+        self.assertNotContains(response, DUMMY_TOKEN_A)
+
+    def test_holder_detail_does_not_expose_bearer_token(self):
+        # AC §6: Inventar-Surfaces — holder detail must not expose a receipt token.
+        url = reverse("organization:assetholder_detail", kwargs={"pk": self.recipient_holder.pk})
+        self._login_to_tenant(self.unrelated, self.tenant_a)
+
+        response = self.client.get(url)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertNotContains(response, DUMMY_TOKEN_A)
+
     def test_cross_tenant_internal_detail_is_404_without_payload(self):
         # AC §6: Rollen und Tenant-Grenze — cross-tenant UI detail → 404.
         url = self._require_url(self.internal_detail_url, "internal receipt detail")
@@ -542,6 +607,30 @@ class CustodyAPIContractTests(CustodyRBACFixtureMixin, APITestCase):
         rendered = str(payload)
         self.assertIn(self.asset_a.asset_tag, rendered)
         self.assertNotIn(self.asset_b.asset_tag, rendered)
+        self.assertNotIn(DUMMY_TOKEN_A, rendered)
+
+    def test_unrelated_api_principal_is_denied_without_recipient_error(self):
+        # AC §6: API und interne Darstellung — same-tenant user without internal permission → 403.
+        self._api_login_to_tenant(self.unrelated, self.tenant_a)
+
+        response = self.client.get(self._api_url("list"))
+
+        self.assertEqual(response.status_code, 403)
+        rendered = str(response.data).lower()
+        self.assertIn("permission", rendered)
+        self.assertNotIn(WRONG_RECIPIENT_MESSAGE, rendered)
+        self.assertNotIn(DUMMY_TOKEN_A, rendered)
+
+    def test_superadmin_api_list_is_global_without_active_tenant(self):
+        # AC §6: Rollen und Tenant-Grenze — superadmin API list is global when no tenant is selected.
+        self.client.force_login(self.superadmin)
+
+        response = self.client.get(self._api_url("list"))
+
+        self.assertEqual(response.status_code, 200)
+        rendered = str(response.data)
+        self.assertIn(self.asset_a.asset_tag, rendered)
+        self.assertIn(self.asset_b.asset_tag, rendered)
         self.assertNotIn(DUMMY_TOKEN_A, rendered)
 
     def test_cross_tenant_api_detail_is_404(self):
