@@ -9,6 +9,7 @@ This changelog follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) 
 ### Added
 
 - Added a shared typed external-integration error contract with retryable/terminal classification, safe user messages, bounded Graph retry handling, structured tenant/actor/request context, and documented follow-up boundaries for other adapters.
+- Added the versioned webhook envelope v1 with additive `schema_version`, `event_id`, `delivery_id`, `attempt`, and owning-`tenant` fields across generic, Slack, and Teams payloads; strict additional-property validators must update their schemas.
 - Published the 1.x compatibility, deprecation, and support policy together with a bounded external-contract inventory covering REST/GraphQL/SCIM surfaces, the webhook envelope, persisted choice values, contract-bearing settings, permission codenames, UI URL namespaces, and each capability's contract class and exclusions. A stdlib gate derives every enumerated surface from source and fails when the published contract and the code disagree.
 - Added explicit Purchase Order lifecycle endpoints at `/api/procurement/purchase-orders/{id}/approve/`, `/order/`, `/receive/`, `/cancel/`, and `/reopen/`.
 - Published the bounded procurement Stable qualification matrix, including existing UI, REST, service, tenant, permission, audit, currency, and PostgreSQL concurrency guarantees plus the deliberately absent surfaces.
