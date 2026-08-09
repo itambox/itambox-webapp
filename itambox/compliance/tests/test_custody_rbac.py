@@ -368,9 +368,7 @@ class CustodyPermissionMetadataTests(TestCase):
         # AC §6: Rollen und Tenant-Grenze — prepare/export are stable model codenames.
         content_type = ContentType.objects.get(app_label="compliance", model="custodyreceipt")
 
-        codenames = set(
-            Permission.objects.filter(content_type=content_type).values_list("codename", flat=True)
-        )
+        codenames = set(Permission.objects.filter(content_type=content_type).values_list("codename", flat=True))
 
         self.assertIn("prepare_custodyreceipt", codenames)
         self.assertIn("export_custodyreceipt", codenames)
