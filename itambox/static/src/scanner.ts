@@ -129,7 +129,7 @@ export class AssetScanner {
         (decodedText: string) => {
           // A reader whose start promise settled after close/reopen belongs to
           // an old generation and must never feed the replacement dispatcher.
-          if (this.html5QrcodeScanner !== activeScanner) return;
+          if (!this.isCurrentReader(activeScanner)) return;
           let raw = decodedText.trim();
           // Strip surrounding quotes
           if (raw.startsWith('"') && raw.endsWith('"')) {
@@ -162,7 +162,7 @@ export class AssetScanner {
         }
       );
 
-      if (this.html5QrcodeScanner !== activeScanner) {
+      if (!this.isCurrentReader(activeScanner)) {
         this.cleanupReader(activeScanner);
         return;
       }
@@ -178,9 +178,9 @@ export class AssetScanner {
       }
 
     } catch (err: any) {
-      if (scanner && this.html5QrcodeScanner !== scanner) {
-        // A rejected start from a closed generation must not surface its error
-        // in the replacement overlay.
+      if (scanner && !this.isCurrentReader(scanner)) {
+        // A rejected start from a closed generation or replaced instance must
+        // not surface its error in the replacement overlay.
         this.cleanupReader(scanner);
         return;
       }
@@ -207,6 +207,11 @@ export class AssetScanner {
         console.warn('Torch toggle failed:', err);
       }
     }
+  }
+
+  private isCurrentReader(scanner: Html5Qrcode): boolean {
+    return this.html5QrcodeScanner === scanner
+      && AssetScanner.readerOwners.get(this.config.readerId) === scanner;
   }
 
   private cleanupReader(scanner: Html5Qrcode): void {
@@ -250,7 +255,9 @@ export class AssetScanner {
   }
 
   public isSessionCurrent(sessionGeneration: number): boolean {
-    return sessionGeneration === this.sessionGeneration;
+    return sessionGeneration === this.sessionGeneration
+      && this.html5QrcodeScanner !== null
+      && AssetScanner.readerOwners.get(this.config.readerId) === this.html5QrcodeScanner;
   }
 }
 
