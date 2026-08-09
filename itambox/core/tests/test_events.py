@@ -251,9 +251,34 @@ class EventsSystemTestCase(TransactionTestCase):
             self.assertEqual(payload["attempt"], 1)
             self.assertEqual(payload["tenant"], 200 + index)
             if index == 1:
-                self.assertEqual(payload["text"], "Event: create on manufacturer (ID: 1)")
+                self.assertEqual(
+                    payload,
+                    {
+                        "schema_version": 1,
+                        "event_id": 101,
+                        "delivery_id": "delivery-1",
+                        "attempt": 1,
+                        "tenant": 201,
+                        "text": "Event: create on manufacturer (ID: 1)",
+                    },
+                )
             else:
-                self.assertEqual(payload["title"], "ITAMbox Notification")
+                self.assertEqual(
+                    payload,
+                    {
+                        "schema_version": 1,
+                        "event_id": 102,
+                        "delivery_id": "delivery-2",
+                        "attempt": 1,
+                        "tenant": 202,
+                        "@type": "MessageCard",
+                        "@context": "https://schema.org/extensions",
+                        "summary": "Event: create on manufacturer (ID: 2)",
+                        "themeColor": "0076D7",
+                        "title": "ITAMbox Notification",
+                        "text": "Event: create on manufacturer (ID: 2)",
+                    },
+                )
 
     @patch("core.http.request_pinned")
     def test_webhook_tenant_comes_from_object_not_ambient_context(self, mock_request_pinned):
