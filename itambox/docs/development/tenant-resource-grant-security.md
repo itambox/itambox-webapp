@@ -192,6 +192,7 @@ PYTHONPATH=itambox uv run --locked --group dev python -m pytest -q -p no:cachepr
   itambox/inventory/tests/test_stock_action_permissions.py \
   itambox/inventory/tests/test_stock_fanout.py \
   itambox/inventory/tests/test_tenant_resource_grant_security.py \
+  itambox/itambox/tests/test_capabilities.py \
   itambox/itambox/tests/test_capability_slices.py \
   itambox/organization/tests/test_resource_access.py \
   itambox/organization/tests/test_resource_grant_views.py \
