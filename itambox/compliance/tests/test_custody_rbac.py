@@ -461,6 +461,17 @@ class CustodyConcurrentConsentTests(CustodyRBACFixtureMixin, TransactionTestCase
             {"action": "accept", "signature_canvas": signature},
         )
 
+    def _post_action_from_independent_client(self, action, signature=None):
+        client = self.client_class()
+        client.force_login(self.recipient)
+        session = client.session
+        session["active_tenant_id"] = self.tenant_a.pk
+        session.save()
+        data = {"action": action}
+        if signature is not None:
+            data["signature_canvas"] = signature
+        return client.post(self._sign_url(DUMMY_TOKEN_A), data)
+
     def test_concurrent_accept_posts_have_one_terminal_transition(self):
         # AC §6: Prepare- und Consent-Semantik — concurrent POSTs are serialized by select_for_update().
         with ThreadPoolExecutor(max_workers=2) as executor:
@@ -474,6 +485,28 @@ class CustodyConcurrentConsentTests(CustodyRBACFixtureMixin, TransactionTestCase
         self.assertEqual(self.receipt_a.acceptance_status, CustodyReceipt.STATUS_ACCEPTED)
         self.assertEqual(sum(response.status_code == 200 for response in responses), 2)
         self.assertEqual(CustodyReceipt.objects.filter(pk=self.receipt_a.pk, accepted=True).count(), 1)
+
+    def test_concurrent_accept_and_decline_have_one_terminal_state(self):
+        # AC §6: Prepare- und Consent-Semantik — concurrent Accept/Decline posts serialize to one terminal state.
+        with ThreadPoolExecutor(max_workers=2) as executor:
+            futures = [
+                executor.submit(self._post_action_from_independent_client, "accept", "dummy-accept-signature"),
+                executor.submit(self._post_action_from_independent_client, "decline"),
+            ]
+            responses = [future.result() for future in futures]
+
+        self.receipt_a.refresh_from_db()
+        self.assertEqual(sum(response.status_code == 200 for response in responses), 2)
+        self.assertIn(
+            self.receipt_a.acceptance_status,
+            (CustodyReceipt.STATUS_ACCEPTED, CustodyReceipt.STATUS_DECLINED),
+        )
+        if self.receipt_a.acceptance_status == CustodyReceipt.STATUS_ACCEPTED:
+            self.assertTrue(self.receipt_a.accepted)
+            self.assertIsNotNone(self.receipt_a.signed_at)
+        else:
+            self.assertFalse(self.receipt_a.accepted)
+            self.assertIsNone(self.receipt_a.signed_at)
 
     def test_sign_post_contains_row_lock(self):
         # AC §6: Prepare- und Consent-Semantik — receipt POST must use a row lock.
