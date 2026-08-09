@@ -431,7 +431,7 @@ class CustodyPermissionMetadataTests(TestCase):
 class CustodyBearerPolicyTests(CustodyRBACFixtureMixin, TestCase):
     """Explicit non-login mode remains covered without creating an operator path."""
 
-    def test_dummy_bearer_token_can_use_explicit_non_login_recipient_flow(self):
+    def test_anonymous_consent_is_rejected_when_signin_setting_is_optional(self):
         # AC §6: Token, Ablauf und Fehler — REQUIRE_CUSTODY_SIGNIN=False is explicit and tested.
         self.client.logout()
 
@@ -440,9 +440,11 @@ class CustodyBearerPolicyTests(CustodyRBACFixtureMixin, TestCase):
             {"action": "accept", "signature_canvas": DUMMY_SIGNATURE},
         )
 
-        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.status_code, 403)
+        self._assert_no_receipt_payload(response, self.receipt_a)
         self.receipt_a.refresh_from_db()
-        self.assertEqual(self.receipt_a.acceptance_status, CustodyReceipt.STATUS_ACCEPTED)
+        self.assertEqual(self.receipt_a.acceptance_status, CustodyReceipt.STATUS_PENDING)
+        self.assertIsNone(self.receipt_a.signed_at)
 
 
 class CustodyConcurrentConsentTests(CustodyRBACFixtureMixin, TransactionTestCase):
