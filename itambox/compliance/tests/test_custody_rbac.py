@@ -516,6 +516,17 @@ class CustodyInternalRouteTests(CustodyRBACFixtureMixin, TestCase):
         self.assertEqual(detail_response.status_code, 404)
         self._assert_no_receipt_payload(detail_response, self.receipt_b)
 
+    def test_tenant_admin_cannot_open_foreign_template_detail(self):
+        # AC §6: Rollen und Tenant-Grenze — Tenant Admin cannot view a foreign template.
+        url = reverse("compliance:custodytemplate_detail", kwargs={"pk": self.template_b.pk})
+        self._login_to_tenant(self.tenant_admin, self.tenant_a)
+
+        response = self.client.get(url)
+
+        self.assertEqual(response.status_code, 404)
+        self.assertNotContains(response, self.template_b.name)
+        self.assertNotContains(response, DUMMY_EULA)
+
     def test_technician_can_list_and_detail_but_raw_token_is_not_rendered(self):
         # AC §6: Rollen und Tenant-Grenze — Technician gets internal view/detail only.
         list_url = self._require_url(self.internal_list_url, "internal receipt list")
