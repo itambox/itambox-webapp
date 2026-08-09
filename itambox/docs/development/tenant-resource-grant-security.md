@@ -195,6 +195,7 @@ PYTHONPATH=itambox uv run --locked --group dev python -m pytest -q -p no:cachepr
   itambox/organization/tests/test_resource_access.py \
   itambox/organization/tests/test_resource_grant_views.py \
   itambox/organization/tests/test_resource_grants.py \
+  itambox/organization/tests/test_localization.py \
   itambox/users/tests/test_provider_patch.py \
   itambox/users/tests/test_provider_services.py \
   itambox/users/tests/test_release_blockers_scim.py \
@@ -213,6 +214,7 @@ PYTHONPATH=itambox uv run --locked --group dev python -m pytest -q -p no:cachepr
   itambox/core/tests/test_security.py \
   itambox/itambox/tests/test_capability_surfaces.py \
   itambox/procurement/tests/test_concurrency.py \
+  itambox/procurement/tests/test_localization.py \
   itambox/subscriptions/tests/test_migrations.py \
   itambox/subscriptions/tests/test_models.py \
   itambox/users/tests/test_scim_migrations.py \
