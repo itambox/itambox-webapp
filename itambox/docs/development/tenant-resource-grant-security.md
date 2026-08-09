@@ -140,6 +140,7 @@ Run the Django selector from the repository root:
 ```bash
 PYTHONPATH=itambox uv run --locked --group dev python -m pytest -q -p no:cacheprovider \
   itambox/assets/tests/test_existing.py \
+  itambox/assets/tests/test_issue260_asset_detail_responsive.py \
   itambox/assets/tests/test_tables_category.py \
   itambox/assets/tests/test_requests.py \
   itambox/core/tests/test_import_boundaries.py \
