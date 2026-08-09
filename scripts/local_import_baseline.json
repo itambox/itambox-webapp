@@ -1080,19 +1080,7 @@
     {
       "path": "itambox/core/events.py",
       "context": "FunctionDef:send_notification_to_channel",
-      "statement": "from core.models import EmailSettings",
-      "count": 1
-    },
-    {
-      "path": "itambox/core/events.py",
-      "context": "FunctionDef:send_notification_to_channel",
       "statement": "from core.models import Notification",
-      "count": 1
-    },
-    {
-      "path": "itambox/core/events.py",
-      "context": "FunctionDef:send_notification_to_channel",
-      "statement": "from django.core.mail import EmailMessage, get_connection",
       "count": 1
     },
     {

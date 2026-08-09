@@ -2,19 +2,64 @@ import hashlib
 import hmac
 import json
 import logging
+import smtplib
+from dataclasses import dataclass
+from enum import StrEnum
 from types import SimpleNamespace
+from urllib.parse import urlsplit
 from uuid import uuid4
 
 import requests
 from django.contrib.auth import get_user_model
 from django.contrib.contenttypes.models import ContentType
+from django.core.mail import EmailMessage, get_connection
 from django.db.models import Q
 from django.utils.translation import gettext_lazy as _
 
-from core.models import ChangeLoggingMixin
+from core.context import get_current_request_id, get_current_tenant, get_current_user
+from core.models import ChangeLoggingMixin, EmailSettings
 from extras.models import Event, EventRule, NotificationChannel, WebhookEndpoint
 
 logger = logging.getLogger(__name__)
+
+
+class DeliveryDisposition(StrEnum):
+    SUCCESS = "success"
+    RETRYABLE = "retryable"
+    TERMINAL = "terminal"
+    NOOP = "noop"
+
+
+@dataclass(frozen=True, slots=True)
+class DeliveryResult:
+    operation: str
+    disposition: DeliveryDisposition
+    user_visible: bool = False
+    user_message: str = ""
+
+    def __bool__(self):
+        return self.disposition == DeliveryDisposition.SUCCESS
+
+
+def delivery_log_context(operation, *, tenant_id=None, actor_id=None, request_id=None, endpoint=None):
+    """Build non-sensitive correlation fields for delivery-boundary logs."""
+    user = get_current_user()
+    tenant = get_current_tenant()
+    parsed = urlsplit(endpoint) if endpoint else None
+    return {
+        "operation": operation,
+        "actor_id": actor_id if actor_id is not None else getattr(user, "pk", None),
+        "tenant_id": tenant_id if tenant_id is not None else getattr(tenant, "pk", None),
+        "request_id": request_id if request_id is not None else get_current_request_id(),
+        "endpoint": f"{parsed.scheme}://{parsed.netloc}" if parsed else "",
+    }
+
+
+def delivery_log_message(context):
+    return (
+        "operation=%(operation)s actor_id=%(actor_id)s tenant_id=%(tenant_id)s "
+        "request_id=%(request_id)s endpoint=%(endpoint)s"
+    ) % context
 
 
 def _resolve_instance_tenant_id(instance):
@@ -243,6 +288,9 @@ def _send_webhook(rule, event, instance_tenant_id=None):
         event_data=event.data,
         retry_count=retry_count,
         retry_backoff=retry_backoff,
+        tenant_id=rule.tenant_id,
+        actor_id=getattr(get_current_user(), "pk", None),
+        request_id=str(get_current_request_id()) if get_current_request_id() is not None else None,
     )
 
     if getattr(settings, "Q_CLUSTER", {}).get("sync", False):
@@ -347,12 +395,13 @@ def _post_pinned(webhook_url, payload):
 
     try:
         return request_pinned("POST", webhook_url, json=payload, timeout=10)
-    except ValidationError as exc:
-        logger.error("Outbound notification to %s blocked by SSRF guard: %s", webhook_url, exc)
+    except ValidationError:
         return None
 
 
 def _send_slack_notification(webhook_url, message_text, title=None):
+    operation = "slack.deliver"
+    context = delivery_log_context(operation, endpoint=webhook_url)
     payload = {
         "text": message_text,
     }
@@ -364,16 +413,26 @@ def _send_slack_notification(webhook_url, message_text, title=None):
     try:
         response = _post_pinned(webhook_url, payload)
         if response is None:
-            return False
+            logger.error("%s disposition=terminal reason=invalid_target", delivery_log_message(context))
+            return DeliveryResult(
+                operation, DeliveryDisposition.TERMINAL, True, str(_("Invalid webhook configuration."))
+            )
+        if 400 <= response.status_code < 500:
+            logger.warning("%s disposition=terminal reason=http_4xx", delivery_log_message(context))
+            return DeliveryResult(
+                operation, DeliveryDisposition.TERMINAL, True, str(_("Notification delivery was rejected."))
+            )
         response.raise_for_status()
-        logger.info("Slack notification sent — status %s", response.status_code)
-        return True
-    except requests.RequestException as e:
-        logger.error("Slack notification failed: %s", e)
-        return False
+        logger.info("%s disposition=success", delivery_log_message(context))
+        return DeliveryResult(operation, DeliveryDisposition.SUCCESS)
+    except requests.RequestException:
+        logger.warning("%s disposition=retryable reason=transport_or_5xx", delivery_log_message(context))
+        return DeliveryResult(operation, DeliveryDisposition.RETRYABLE)
 
 
 def _send_teams_notification(webhook_url, message_text, title=None):
+    operation = "teams.deliver"
+    context = delivery_log_context(operation, endpoint=webhook_url)
     payload = {
         "@type": "MessageCard",
         "@context": "https://schema.org/extensions",
@@ -385,13 +444,66 @@ def _send_teams_notification(webhook_url, message_text, title=None):
     try:
         response = _post_pinned(webhook_url, payload)
         if response is None:
-            return False
+            logger.error("%s disposition=terminal reason=invalid_target", delivery_log_message(context))
+            return DeliveryResult(
+                operation, DeliveryDisposition.TERMINAL, True, str(_("Invalid webhook configuration."))
+            )
+        if 400 <= response.status_code < 500:
+            logger.warning("%s disposition=terminal reason=http_4xx", delivery_log_message(context))
+            return DeliveryResult(
+                operation, DeliveryDisposition.TERMINAL, True, str(_("Notification delivery was rejected."))
+            )
         response.raise_for_status()
-        logger.info("Teams notification sent — status %s", response.status_code)
-        return True
-    except requests.RequestException as e:
-        logger.error("Teams notification failed: %s", e)
-        return False
+        logger.info("%s disposition=success", delivery_log_message(context))
+        return DeliveryResult(operation, DeliveryDisposition.SUCCESS)
+    except requests.RequestException:
+        logger.warning("%s disposition=retryable reason=transport_or_5xx", delivery_log_message(context))
+        return DeliveryResult(operation, DeliveryDisposition.RETRYABLE)
+
+
+def _send_email_notification(channel, subject, body):
+    operation = "email.deliver"
+    context = delivery_log_context(operation, tenant_id=channel.tenant_id)
+    email_config = EmailSettings.load()
+    if not email_config or not email_config.enabled:
+        logger.warning("%s disposition=terminal reason=disabled", delivery_log_message(context))
+        return DeliveryResult(operation, DeliveryDisposition.TERMINAL, True, str(_("Email is not configured.")))
+
+    recipients = channel.config.get("recipients", [])
+    if not recipients:
+        logger.warning("%s disposition=terminal reason=no_recipients", delivery_log_message(context))
+        return DeliveryResult(
+            operation, DeliveryDisposition.TERMINAL, True, str(_("No email recipients are configured."))
+        )
+
+    try:
+        connection = get_connection(
+            backend="django.core.mail.backends.smtp.EmailBackend",
+            host=email_config.smtp_host,
+            port=email_config.smtp_port,
+            username=email_config.smtp_username or "",
+            password=email_config.smtp_password_decrypted or "",
+            use_tls=email_config.smtp_use_tls,
+            fail_silently=False,
+        )
+        msg = EmailMessage(
+            subject=subject,
+            body=body,
+            from_email=f"{email_config.from_name} <{email_config.from_address}>",
+            to=recipients,
+            connection=connection,
+        )
+        msg.send()
+        return DeliveryResult(operation, DeliveryDisposition.SUCCESS)
+    except smtplib.SMTPAuthenticationError:
+        logger.error("%s disposition=terminal reason=authentication", delivery_log_message(context))
+        return DeliveryResult(operation, DeliveryDisposition.TERMINAL, True, str(_("Email authentication failed.")))
+    except (TimeoutError, ConnectionError, smtplib.SMTPServerDisconnected):
+        logger.warning("%s disposition=retryable reason=transport", delivery_log_message(context))
+        return DeliveryResult(operation, DeliveryDisposition.RETRYABLE)
+    except (smtplib.SMTPRecipientsRefused, smtplib.SMTPSenderRefused, smtplib.SMTPDataError, smtplib.SMTPException):
+        logger.error("%s disposition=terminal reason=smtp_rejected", delivery_log_message(context))
+        return DeliveryResult(operation, DeliveryDisposition.TERMINAL, True, str(_("Email delivery was rejected.")))
 
 
 def send_notification_to_channel(channel, subject, body):
@@ -399,7 +511,7 @@ def send_notification_to_channel(channel, subject, body):
 
     Supported channel types: email, in_app, slack, teams.
     Webhooks are NOT an alert-delivery channel; they belong to the EventRule system.
-    Returns True on success, False on failure.
+    Returns a typed result whose truth value preserves the historical success contract.
     """
     if channel.channel_type == NotificationChannel.TYPE_SLACK:
         return _send_slack_notification(
@@ -416,45 +528,7 @@ def send_notification_to_channel(channel, subject, body):
         )
 
     elif channel.channel_type == NotificationChannel.TYPE_EMAIL:
-        from django.core.mail import EmailMessage, get_connection
-
-        from core.models import EmailSettings
-
-        email_config = EmailSettings.load()
-        if not email_config or not email_config.enabled:
-            logger.warning(
-                "Email channel '%s': system EmailSettings disabled or not configured.",
-                channel.name,
-            )
-            return False
-
-        recipients = channel.config.get("recipients", [])
-        if not recipients:
-            logger.warning("Email channel '%s': no recipients configured in config.", channel.name)
-            return False
-
-        try:
-            connection = get_connection(
-                backend="django.core.mail.backends.smtp.EmailBackend",
-                host=email_config.smtp_host,
-                port=email_config.smtp_port,
-                username=email_config.smtp_username or "",
-                password=email_config.smtp_password_decrypted or "",
-                use_tls=email_config.smtp_use_tls,
-                fail_silently=False,
-            )
-            msg = EmailMessage(
-                subject=subject,
-                body=body,
-                from_email=f"{email_config.from_name} <{email_config.from_address}>",
-                to=recipients,
-                connection=connection,
-            )
-            msg.send()
-            return True
-        except Exception as exc:
-            logger.error("Email delivery via channel '%s' failed: %s", channel.name, exc)
-            return False
+        return _send_email_notification(channel, subject, body)
 
     elif channel.channel_type == NotificationChannel.TYPE_IN_APP:
         from core.models import Notification
@@ -480,10 +554,14 @@ def send_notification_to_channel(channel, subject, body):
 
         if not users:
             logger.warning("In-App channel '%s': no recipients found — notifications not sent.", channel.name)
-            return False
+            return DeliveryResult(
+                "in_app.deliver", DeliveryDisposition.TERMINAL, True, str(_("No notification recipients were found."))
+            )
 
         Notification.objects.bulk_create([Notification(user=user, subject=subject, message=body) for user in users])
-        return True
+        return DeliveryResult("in_app.deliver", DeliveryDisposition.SUCCESS)
 
     logger.warning("send_notification_to_channel: unhandled channel type '%s'.", channel.channel_type)
-    return False
+    return DeliveryResult(
+        "channel.deliver", DeliveryDisposition.TERMINAL, True, str(_("Unsupported notification channel."))
+    )
