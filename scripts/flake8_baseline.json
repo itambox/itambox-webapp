@@ -3775,14 +3775,6 @@
       "path": "itambox/core/management/commands/sync_tenant_ldap.py",
       "code": "B907",
       "message": "'tenant.slug' is manually surrounded by quotes, consider using the `!r` conversion flag.",
-      "source": "raise CommandError(f\"No LDAP configuration found for tenant slug '{tenant.slug}' in settings.\")",
-      "context": "Module:body/ClassDef:Command:body/FunctionDef:_run_sync:body/If:UnaryOp(op=Not(), operand=Name(id='config', ctx=Load())):body",
-      "count": 1
-    },
-    {
-      "path": "itambox/core/management/commands/sync_tenant_ldap.py",
-      "code": "B907",
-      "message": "'tenant.slug' is manually surrounded by quotes, consider using the `!r` conversion flag.",
       "source": "self.stdout.write(\n                self.style.SUCCESS(\n                    f\"LDAP sync complete for tenant '{tenant.slug}'. Created: {created_count}, Updated: {updated_count}\"\n                )\n            )",
       "context": "Module:body/ClassDef:Command:body/FunctionDef:_run_sync:body/Try#3:body",
       "count": 1
