@@ -11,10 +11,13 @@ from __future__ import annotations
 
 import datetime
 import logging
+import math
 import re
 import time
+from collections.abc import Callable
 from decimal import Decimal, InvalidOperation
 from typing import Iterator
+from urllib.parse import urlsplit, urlunsplit
 
 import requests
 from dateutil.relativedelta import relativedelta
@@ -22,7 +25,23 @@ from django.contrib.contenttypes.models import ContentType
 from django.db import transaction
 from django.utils import timezone
 from django.utils.text import slugify
+from django.views.decorators.debug import sensitive_variables
+from requests import exceptions as requests_exceptions
 
+from core.errors import (
+    MAX_RETRY_AFTER_SECONDS,
+    IntegrationAuthenticationError,
+    IntegrationConfigurationError,
+    IntegrationContext,
+    IntegrationContractError,
+    IntegrationError,
+    IntegrationNotFoundError,
+    IntegrationRateLimitedError,
+    IntegrationRequestError,
+    IntegrationRetryBudgetExceededError,
+    IntegrationUnavailableError,
+    RetryBudget,
+)
 from core.tasks.context import TaskContext
 
 logger = logging.getLogger(__name__)
@@ -35,8 +54,7 @@ IMPORT_NOTE = "Imported from Snipe-IT"
 # ---------------------------------------------------------------------------
 
 
-class SnipeITError(Exception):
-    pass
+SnipeITError = IntegrationError
 
 
 # ---------------------------------------------------------------------------
@@ -49,8 +67,19 @@ class SnipeITClient:
 
     PAGE_SIZE = 500
 
-    def __init__(self, base_url: str, token: str):
-        self.base_url = base_url.rstrip("/")
+    @sensitive_variables("token")
+    def __init__(
+        self,
+        base_url: str,
+        token: str,
+        *,
+        context: IntegrationContext | None = None,
+        retry_budget_factory: Callable[[], RetryBudget] | None = None,
+    ):
+        parsed = urlsplit(base_url)
+        self.base_url = urlunsplit((parsed.scheme, parsed.netloc, parsed.path.rstrip("/"), "", ""))
+        self.context = context or IntegrationContext(provider="snipe-it", operation="import")
+        self.retry_budget_factory = retry_budget_factory or RetryBudget
         self._session = requests.Session()
         self._session.headers.update(
             {
@@ -62,39 +91,120 @@ class SnipeITClient:
     def get_all(self, endpoint: str, params: dict | None = None) -> Iterator[dict]:
         """Yield every row from a paginated list endpoint."""
         offset = 0
+        budget = self.retry_budget_factory()
         while True:
-            data = self._get(endpoint, {**(params or {}), "limit": self.PAGE_SIZE, "offset": offset})
-            rows = data.get("rows") or []
+            data = self._get(
+                endpoint,
+                {**(params or {}), "limit": self.PAGE_SIZE, "offset": offset},
+                budget=budget,
+                operation="collection.list",
+            )
+            rows = data.get("rows")
+            total = data.get("total")
+            if not isinstance(rows, list) or any(not isinstance(row, dict) for row in rows):
+                raise IntegrationContractError(context=self._operation_context("collection.list"))
+            if not isinstance(total, int) or isinstance(total, bool) or total < 0:
+                raise IntegrationContractError(context=self._operation_context("collection.list"))
             yield from rows
             offset += len(rows)
-            if offset >= (data.get("total") or 0) or not rows:
+            if offset >= total or not rows:
                 break
 
     def get_detail(self, endpoint: str) -> dict:
         """GET a single resource."""
-        return self._get(endpoint)
+        return self._get(endpoint, budget=self.retry_budget_factory(), operation="detail.get")
 
-    def _get(self, endpoint: str, params: dict | None = None, _retries: int = 0) -> dict:
+    def _operation_context(self, operation: str) -> IntegrationContext:
+        return IntegrationContext(
+            provider=self.context.provider,
+            operation=operation,
+            tenant_id=self.context.tenant_id,
+            actor_id=self.context.actor_id,
+            request_id=self.context.request_id,
+        )
+
+    @staticmethod
+    def _parse_retry_after(headers) -> float | None:
+        value = headers.get("Retry-After")
+        try:
+            parsed = float(value)
+        except (TypeError, ValueError):
+            return None
+        if not math.isfinite(parsed):
+            return None
+        return max(0.0, min(parsed, MAX_RETRY_AFTER_SECONDS))
+
+    @sensitive_variables()
+    def _get(
+        self,
+        endpoint: str,
+        params: dict | None = None,
+        *,
+        budget: RetryBudget | None = None,
+        operation: str = "request.get",
+    ) -> dict:
         url = f"{self.base_url}{endpoint}"
+        context = self._operation_context(operation)
+        budget = budget or RetryBudget()
+        while True:
+            try:
+                resp = self._session.get(url, params=params, timeout=30, allow_redirects=False)
+            except (
+                requests_exceptions.SSLError,
+                requests_exceptions.InvalidURL,
+                requests_exceptions.MissingSchema,
+                requests_exceptions.TooManyRedirects,
+            ) as exc:
+                raise IntegrationConfigurationError(context=context, cause_type=type(exc).__name__) from None
+            except requests_exceptions.RequestException as exc:
+                raise IntegrationUnavailableError(context=context, cause_type=type(exc).__name__) from None
+            if resp.status_code != 429:
+                break
+
+            retry_after = self._parse_retry_after(resp.headers)
+            rate_limited = IntegrationRateLimitedError(
+                context=context,
+                status_code=resp.status_code,
+                retry_after=retry_after,
+            )
+            delay = budget.next_delay(retry_after, now=time.monotonic())
+            if delay is None:
+                if budget.attempts == 0:
+                    raise rate_limited
+                raise IntegrationRetryBudgetExceededError(
+                    context=context,
+                    status_code=resp.status_code,
+                    retry_after=rate_limited.retry_after,
+                ) from rate_limited
+            log_extra = rate_limited.log_extra(retry_count=budget.attempts, retry_delay=delay)
+            logger.warning(
+                "Snipe-IT request rate-limited; retrying integration=%s",
+                log_extra["integration"],
+                extra=log_extra,
+            )
+            time.sleep(delay)
+
+        status_code = resp.status_code
+        if status_code in (401, 403):
+            raise IntegrationAuthenticationError(context=context, status_code=status_code)
+        if status_code == 404:
+            raise IntegrationNotFoundError(context=context, status_code=status_code)
+        if status_code >= 500:
+            raise IntegrationUnavailableError(context=context, status_code=status_code)
+        if status_code >= 400:
+            raise IntegrationRequestError(context=context, status_code=status_code)
+
         try:
-            resp = self._session.get(url, params=params, timeout=30)
-        except requests.RequestException as exc:
-            raise SnipeITError(f"Network error fetching {url}: {exc}") from exc
-
-        if resp.status_code == 429:
-            wait = int(resp.headers.get("Retry-After", 30))
-            if _retries < 5:
-                logger.warning("Snipe-IT rate-limited — sleeping %ds (retry %d)", wait, _retries + 1)
-                time.sleep(wait)
-                return self._get(endpoint, params=params, _retries=_retries + 1)
-            raise SnipeITError(f"Rate-limited after 5 retries on {url}")
-
-        try:
-            resp.raise_for_status()
-        except requests.HTTPError as exc:
-            raise SnipeITError(f"HTTP {resp.status_code} from {url}: {exc}") from exc
-
-        return resp.json()
+            data = resp.json()
+        except (TypeError, ValueError) as exc:
+            raise IntegrationContractError(
+                context=context,
+                status_code=status_code,
+                cause_type=type(exc).__name__,
+            ) from None
+        if not isinstance(data, dict):
+            raise IntegrationContractError(context=context, status_code=status_code)
+        return data
 
 
 # ---------------------------------------------------------------------------

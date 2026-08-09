@@ -14,6 +14,7 @@ from unittest.mock import MagicMock, patch
 import pytest
 from django.contrib.auth import get_user_model
 
+from core.errors import IntegrationContext, RetryBudget
 from core.importers.snipeit import IMPORT_NOTE, SnipeITClient, SnipeITImporter, _clean_field_name
 from core.tests.mixins import TenantTestMixin
 from inventory.services import checkout_inventory_item, create_component_allocation
@@ -207,8 +208,10 @@ def _make_client_mock(pages: dict | None = None) -> SnipeITClient:
     client = SnipeITClient.__new__(SnipeITClient)
     client.base_url = "https://snipe.example"
     client.PAGE_SIZE = 500
+    client.context = IntegrationContext(provider="snipe-it", operation="test")
+    client.retry_budget_factory = RetryBudget
 
-    def fake_get(endpoint, params=None, _retries=0):
+    def fake_get(endpoint, params=None, **kwargs):
         path = endpoint.split("?")[0]
         for prefix, data in defaults.items():
             if path == prefix or path.startswith(prefix + "/"):
@@ -460,7 +463,7 @@ class TestSnipeITImporter(TenantTestMixin):
             ],
         }
 
-        def fake_get(endpoint, params=None, _retries=0):
+        def fake_get(endpoint, params=None, **kwargs):
             if endpoint == "/api/v1/statuslabels":
                 if (params or {}).get("offset", 0) == 0:
                     return two_page_labels
@@ -472,6 +475,8 @@ class TestSnipeITImporter(TenantTestMixin):
         client = SnipeITClient.__new__(SnipeITClient)
         client.base_url = "https://snipe.example"
         client.PAGE_SIZE = 2
+        client.context = IntegrationContext(provider="snipe-it", operation="test")
+        client.retry_budget_factory = RetryBudget
         client._get = fake_get
 
         with TaskContext(tenant_id=self.tenant.pk, user_id=self.admin.pk):
