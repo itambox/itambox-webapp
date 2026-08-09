@@ -242,7 +242,7 @@ The existing recipient implementation already uses a transaction and `select_for
 - concurrent accept/decline submissions result in exactly one successful terminal transition under the row lock; and
 - the REST API cannot write acceptance or signature fields directly because the serializer keeps them read-only.
 
-`REQUIRE_CUSTODY_SIGNIN=True` is the production default. Tests also exercise the explicit `False` setting. Whichever authentication mode is active, the implementation must preserve the distinction between the operator who prepares a session and the intended recipient who consents.
+`REQUIRE_CUSTODY_SIGNIN=True` is the production default. Tests also exercise the explicit `False` setting. In the safe `False` mode, disabling the login redirect does not authorize an anonymous consent POST: a bearer-link visitor still receives `403 recipient_authentication_required` unless authenticated as the intended holder. Whichever authentication mode is active, the implementation must preserve the distinction between the operator who prepares a session and the intended recipient who consents.
 
 ## 8. Decision log
 
