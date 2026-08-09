@@ -10,7 +10,8 @@ from django.contrib.auth import get_user_model
 from django.test import TestCase
 from django.urls import reverse
 
-from organization.models import Tenant
+from core.tests.mixins import grant
+from organization.models import Role, Tenant
 
 User = get_user_model()
 
@@ -22,10 +23,6 @@ class ResourceGrantLocalizationTests(TestCase):
 
     def _login(self, permissions=("organization.view_tenantresourcegrant",)):
         user = User.objects.create_user(username="rgl-localization", password="x")
-        from core.tests.mixins import grant
-
-        from organization.models import Role
-
         role = Role.objects.create(
             tenant=self.tenant,
             name="RGL localization reader",
