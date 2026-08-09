@@ -79,7 +79,8 @@ class SnipeITClient:
         retry_budget_factory: Callable[[], RetryBudget] | None = None,
     ):
         parsed = urlsplit(base_url)
-        self.base_url = urlunsplit((parsed.scheme, parsed.netloc, parsed.path.rstrip("/"), "", ""))
+        safe_netloc = parsed.netloc.rsplit("@", 1)[-1]
+        self.base_url = urlunsplit((parsed.scheme, safe_netloc, parsed.path.rstrip("/"), "", ""))
         self.context = context or IntegrationContext(provider="snipe-it", operation="import")
         self.retry_budget_factory = retry_budget_factory or RetryBudget
         self._session = requests.Session()

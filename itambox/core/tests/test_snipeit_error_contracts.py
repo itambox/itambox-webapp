@@ -27,7 +27,7 @@ def _response(status_code=200, *, payload=None, headers=None):
 
 def _client(*, budget=None):
     client = SnipeITClient(
-        "https://snipe.example?api_key=url-secret",
+        "https://url-user:url-password@snipe.example?api_key=url-secret",
         "bearer-secret",
         context=IntegrationContext(
             provider="snipe-it",
@@ -156,6 +156,10 @@ def test_client_disables_redirects_for_bearer_requests():
     client.get_detail("/api/v1/hardware/1")
 
     assert client._session.get.call_args.kwargs["allow_redirects"] is False
+    requested_url = client._session.get.call_args.args[0]
+    assert "url-user" not in requested_url
+    assert "url-password" not in requested_url
+    assert "api_key" not in requested_url
 
 
 def test_importer_row_failure_log_redacts_payload_identity_and_exception_text(caplog):
