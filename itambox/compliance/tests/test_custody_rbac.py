@@ -28,6 +28,7 @@ DUMMY_TOKEN_A = "dummy-custody-token-a"
 DUMMY_TOKEN_B = "dummy-custody-token-b"
 DUMMY_SIGNATURE = "dummy-signature-payload"
 DUMMY_EULA = "dummy-eula-marker"
+DUMMY_PASSWORD = "dummy-test-password"
 WRONG_RECIPIENT_MESSAGE = "wrong-recipient"
 
 
@@ -41,7 +42,7 @@ class CustodyRBACFixtureMixin(TenantTestMixin):
         self.superadmin = User.objects.create_superuser(
             username="custody-superadmin",
             email="custody-superadmin@example.test",
-            password="password",
+            password=DUMMY_PASSWORD,
         )
         self.tenant_admin = self._make_member(
             "custody-admin",
@@ -149,7 +150,7 @@ class CustodyRBACFixtureMixin(TenantTestMixin):
         user = User.objects.create_user(
             username=username,
             email=f"{username}@example.test",
-            password="password",
+            password=DUMMY_PASSWORD,
         )
         role = Role.objects.create(
             tenant=tenant,
