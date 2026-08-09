@@ -113,14 +113,16 @@ test('basket entrypoints wire camera and keyboard paths separately', () => {
   for (const contract of basketScannerContracts) {
     const source = readFileSync(resolve(itamboxRoot, contract.path), 'utf8');
     assert.match(source, /import \{ AssetScanner \} from ['"]\.\/scanner['"];?/, contract.path);
-    assert.match(source, /new AssetScanner\(\{/, contract.path);
+    assert.match(source, /cameraScanner\s*=\s*new AssetScanner\(\{/, contract.path);
     assert.match(source, new RegExp(`readerId: '${contract.readerId}'`), contract.path);
     assert.match(source, new RegExp(`modalId: '${contract.modalId}'`), contract.path);
     assert.match(source, new RegExp(`openBtnId: '${contract.openId}'`), contract.path);
     assert.match(source, new RegExp(`closeBtnId: '${contract.closeId}'`), contract.path);
     assert.match(source, new RegExp(`torchId: '${contract.torchId}'`), contract.path);
-    assert.match(source, /onResult\(code: string\)[\s\S]*?return addByCode\(code\);/, contract.path);
+    assert.match(source, /onResult\(code: string, sessionGeneration: number\)[\s\S]*?return addByCode\(code, sessionGeneration\);/, contract.path);
     assert.match(source, /addEventListener\('keydown'/, contract.path);
     assert.match(source, /event\.key !== 'Enter'/, contract.path);
+    assert.match(source, /addByCode\(value\);/, contract.path);
+    assert.match(source, /isCurrentCameraAction\(sessionGeneration\)/, contract.path);
   }
 });

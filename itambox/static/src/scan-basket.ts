@@ -171,12 +171,19 @@ function initScanBasket(): void {
     tbody!.appendChild(tr);
   }
 
+  let cameraScanner: AssetScanner | null = null;
+
+  function isCurrentCameraAction(sessionGeneration: number | undefined): boolean {
+    return sessionGeneration === undefined
+      || (cameraScanner !== null && cameraScanner.isSessionCurrent(sessionGeneration));
+  }
+
   /**
    * Resolve one code and fold it into the basket. Returns the round-trip so the
    * camera scanner can hold its gate open until this settles; USB and manual
    * entry ignore the result and stay ungated — one deliberate event per code.
    */
-  function addByCode(code: string): Promise<void> {
+  function addByCode(code: string, sessionGeneration?: number): Promise<void> {
     const cleaned = (code || '').trim();
     if (!cleaned) return Promise.resolve();
 
@@ -188,6 +195,7 @@ function initScanBasket(): void {
         return res.json();
       })
       .then((data: ScanPayload) => {
+        if (!isCurrentCameraAction(sessionGeneration)) return;
         if (!data.found) throw new Error('not_found');
         if (basket.has(data.pk)) {
           beepFail();
@@ -205,6 +213,7 @@ function initScanBasket(): void {
         );
       })
       .catch((err: Error) => {
+        if (!isCurrentCameraAction(sessionGeneration)) return;
         // Resolves rather than re-throws: the failure is reported here, and the
         // camera gate re-arms on settle so the code can be presented again once
         // its duplicate window has passed. USB/manual retries are ungated.
@@ -230,16 +239,15 @@ function initScanBasket(): void {
 
   // ── Camera scanner (kept open for rapid multi-scan) ──
   if (document.getElementById('basket-open-scanner-btn')) {
-    // eslint-disable-next-line no-new
-    new AssetScanner({
+    cameraScanner = new AssetScanner({
       readerId: 'basket-scanner-reader',
       modalId: 'basket-scanner-modal',
       torchId: 'basket-toggle-torch-btn',
       openBtnId: 'basket-open-scanner-btn',
       closeBtnId: 'basket-close-scanner-btn',
       errorDivId: 'basket-scanner-error',
-      onResult(code: string) {
-        return addByCode(code);
+      onResult(code: string, sessionGeneration: number) {
+        return addByCode(code, sessionGeneration);
       },
     });
   }

@@ -157,12 +157,19 @@ function initAuditBasket(): void {
     tbody!.appendChild(tr);
   }
 
+  let cameraScanner: AssetScanner | null = null;
+
+  function isCurrentCameraAction(sessionGeneration: number | undefined): boolean {
+    return sessionGeneration === undefined
+      || (cameraScanner !== null && cameraScanner.isSessionCurrent(sessionGeneration));
+  }
+
   /**
    * Validate one code and fold it into the basket. Returns the round-trip so the
    * camera scanner can hold its gate open until this settles; USB and manual
    * entry ignore the result and stay ungated — one deliberate event per code.
    */
-  function addByCode(code: string): Promise<void> {
+  function addByCode(code: string, sessionGeneration?: number): Promise<void> {
     const cleaned = (code || '').trim();
     if (!cleaned) return Promise.resolve();
 
@@ -174,6 +181,7 @@ function initAuditBasket(): void {
         return res.json();
       })
       .then((data: AuditScanPayload) => {
+        if (!isCurrentCameraAction(sessionGeneration)) return;
         if (!data.found) throw new Error('not_found');
         if (basket.has(data.pk)) {
           beepFail();
@@ -198,6 +206,7 @@ function initAuditBasket(): void {
         );
       })
       .catch((err: Error) => {
+        if (!isCurrentCameraAction(sessionGeneration)) return;
         beepFail();
         if (err.message === 'forbidden') {
           notify(gettext('You do not have permission to do this.'), 'fail');
@@ -218,16 +227,15 @@ function initAuditBasket(): void {
   }
 
   if (document.getElementById('audit-open-scanner-btn')) {
-    // eslint-disable-next-line no-new
-    new AssetScanner({
+    cameraScanner = new AssetScanner({
       readerId: 'audit-scanner-reader',
       modalId: 'audit-scanner-modal',
       torchId: 'audit-toggle-torch-btn',
       openBtnId: 'audit-open-scanner-btn',
       closeBtnId: 'audit-close-scanner-btn',
       errorDivId: 'audit-scanner-error',
-      onResult(code: string) {
-        return addByCode(code);
+      onResult(code: string, sessionGeneration: number) {
+        return addByCode(code, sessionGeneration);
       },
     });
   }

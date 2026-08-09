@@ -126,6 +126,7 @@ function makeDom(kind) {
   const modalId = kind === 'audit' ? 'audit-scanner-modal' : 'basket-scanner-modal';
   const readerId = kind === 'audit' ? 'audit-scanner-reader' : 'basket-scanner-reader';
   const feedbackId = kind === 'audit' ? 'audit-scan-feedback' : 'basket-scan-feedback';
+  const overlayCountId = kind === 'audit' ? 'audit-scanner-count' : 'basket-scanner-count';
   const closeId = kind === 'audit' ? 'audit-close-scanner-btn' : 'basket-close-scanner-btn';
   const torchId = kind === 'audit' ? 'audit-toggle-torch-btn' : 'basket-toggle-torch-btn';
   const errorId = kind === 'audit' ? 'audit-scanner-error' : 'basket-scanner-error';
@@ -146,6 +147,7 @@ function makeDom(kind) {
     modalId,
     readerId,
     feedbackId,
+    overlayCountId,
     closeId,
     torchId,
     errorId,
@@ -156,9 +158,13 @@ function makeDom(kind) {
   root.dataset.validateUrl = '/validate';
   root.dataset.resolveUrl = '/resolve';
   root.dataset.mode = 'checkin';
-  document.getElementById(templateId).content = { cloneNode: () => ({ querySelector: () => null }) };
+  document.getElementById(templateId).content = {
+    cloneNode: () => ({
+      querySelector: (selector) => selector === 'tr' ? new FakeElement('tr') : null,
+    }),
+  };
   document.getElementById(formId).submit = () => {};
-  return { document, ids: { inputId, modalId, openId, readerId, feedbackId } };
+  return { document, ids: { inputId, modalId, openId, readerId, feedbackId, overlayCountId, closeId } };
 }
 
 function installGlobals(dom, readers, fetchImpl) {
@@ -260,6 +266,88 @@ test('real bulk and audit entrypoints keep manual input ungated and camera feedb
 
       assert.match(feedback.textContent, /No asset matches: CAMERA-404/);
       assert.equal(messages.children.length, 0, `${kind} open-overlay feedback is not hidden below the overlay`);
+    }
+  } finally {
+    globalThis.setTimeout = originalTimers.setTimeout;
+    globalThis.clearTimeout = originalTimers.clearTimeout;
+  }
+});
+
+test('stale camera promise settlement cannot mutate the replacement bulk or audit basket', async () => {
+  const originalTimers = { setTimeout: globalThis.setTimeout, clearTimeout: globalThis.clearTimeout };
+  const bundleNames = { audit: 'audit-basket.mjs', bulk: 'scan-basket.mjs' };
+  const payloadFor = (kind, pk) => kind === 'audit'
+    ? {
+      found: true,
+      pk,
+      label: `Audit asset ${pk}`,
+      asset_tag: `AUDIT-${pk}`,
+      serial: `SERIAL-${pk}`,
+      status: 'deployed',
+      classification: 'matched',
+      observed_location: '',
+      eligible: true,
+      warning: null,
+    }
+    : {
+      found: true,
+      pk,
+      label: `Bulk asset ${pk}`,
+      asset_tag: `BULK-${pk}`,
+      serial: `SERIAL-${pk}`,
+      status: 'deployed',
+      assigned_to: '',
+      book_value: null,
+      eligible: true,
+      warning: null,
+    };
+
+  try {
+    for (const kind of ['audit', 'bulk']) {
+      const dom = makeDom(kind);
+      const readers = [];
+      const pending = [];
+      installGlobals(dom, readers, (url) => new Promise((resolvePromise) => pending.push({ url, resolvePromise })));
+      const bundleUrl = pathToFileURL(resolve(itamboxRoot, `tests/js/.build/${bundleNames[kind]}`)).href;
+      await import(`${bundleUrl}?stale-session=${kind}-${Date.now()}`);
+      dom.document.dispatchEvent({ type: 'DOMContentLoaded' });
+
+      const openButton = dom.document.getElementById(dom.ids.openId);
+      const closeButton = dom.document.getElementById(dom.ids.closeId);
+      const count = dom.document.getElementById(dom.ids.overlayCountId);
+      const feedback = dom.document.getElementById(dom.ids.feedbackId);
+
+      openButton.listeners.get('click')();
+      await flush();
+      const staleReader = readers.at(-1);
+      staleReader.onSuccess('STALE-CAMERA');
+      assert.equal(pending.length, 1, `${kind} stale camera action is pending`);
+
+      closeButton.listeners.get('click')();
+      openButton.listeners.get('click')();
+      await flush();
+      const replacementReader = readers.at(-1);
+      assert.notEqual(replacementReader, staleReader, `${kind} reopened scanner has a replacement reader`);
+      replacementReader.onSuccess('LIVE-CAMERA');
+      assert.equal(pending.length, 2, `${kind} replacement camera action is pending`);
+
+      pending[0].resolvePromise({
+        ok: true,
+        status: 200,
+        json: () => Promise.resolve(payloadFor(kind, 1)),
+      });
+      await flush();
+      assert.equal(count.textContent, '0', `${kind} stale settlement must not add to the replacement basket`);
+      assert.equal(feedback.textContent, '', `${kind} stale settlement must not write replacement feedback`);
+
+      pending[1].resolvePromise({
+        ok: true,
+        status: 200,
+        json: () => Promise.resolve(payloadFor(kind, 2)),
+      });
+      await flush();
+      assert.equal(count.textContent, '1', `${kind} live settlement adds exactly one asset`);
+      assert.match(feedback.textContent, /Added:/, `${kind} live settlement still reports success`);
     }
   } finally {
     globalThis.setTimeout = originalTimers.setTimeout;
