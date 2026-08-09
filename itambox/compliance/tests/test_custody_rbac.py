@@ -11,6 +11,7 @@ from django.contrib.auth import get_user_model
 from django.test import TestCase, TransactionTestCase, override_settings
 from django.urls import NoReverseMatch, reverse
 from model_bakery import baker
+from rest_framework.test import APITestCase
 
 from assets.models import Asset
 from compliance.models import CustodyReceipt, CustodyTemplate
@@ -370,12 +371,7 @@ class CustodyConcurrentConsentTests(CustodyRBACFixtureMixin, TransactionTestCase
 
 
 def reverse_if_available(*names, kwargs=None):
-    """Resolve the first route name present in the target implementation.
-
-    This helper is used only by the internal-route blocks below. A missing target
-    route is reported as a skipped Slice-D test rather than hiding a failure in
-    the already-implemented token/error contract.
-    """
+    """Resolve the first compatible route spelling in the target implementation."""
     for name in names:
         try:
             return reverse(name, kwargs=kwargs or {})
@@ -385,7 +381,7 @@ def reverse_if_available(*names, kwargs=None):
 
 
 class CustodyInternalRouteTests(CustodyRBACFixtureMixin, TestCase):
-    """Internal list/detail/prepare/export tests are added against the SOL routes."""
+    """Authenticated internal receipt views are separate from recipient consent."""
 
     def setUp(self):
         super().setUp()
@@ -409,15 +405,170 @@ class CustodyInternalRouteTests(CustodyRBACFixtureMixin, TestCase):
             kwargs={"pk": self.receipt_a.pk},
         )
 
-    def test_placeholder(self):
-        # AC §6: Inventar und Permission Surface — internal route assertions are
-        # activated once SOL's concrete route names are available.
-        self.skipTest("Awaiting SOL internal route names; Slice A-C verification follows the remote implementation.")
+    def _require_url(self, url, surface):
+        self.assertIsNotNone(url, f"SOL must expose the {surface} route")
+        return url
+
+    def _assert_internal_denial(self, response):
+        body = response.content.decode("utf-8", errors="replace").lower()
+        self.assertNotIn("wrong-recipient", body)
+        self.assertNotIn("not the intended recipient", body)
+        self.assertTrue("internal" in body or "custody" in body)
+
+    def test_superadmin_sees_global_internal_receipt_list(self):
+        # AC §6: Rollen und Tenant-Grenze — superadmin sees receipts globally on the internal path.
+        url = self._require_url(self.internal_list_url, "internal receipt list")
+        self.client.force_login(self.superadmin)
+
+        response = self.client.get(url)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, self.asset_a.asset_tag)
+        self.assertContains(response, self.asset_b.asset_tag)
+        self.assertNotContains(response, DUMMY_TOKEN_A)
+        self.assertNotContains(response, DUMMY_TOKEN_B)
+
+    def test_tenant_admin_sees_own_tenant_and_foreign_detail_is_404(self):
+        # AC §6: Rollen und Tenant-Grenze — Tenant Admin is own-tenant only; foreign detail → 404.
+        list_url = self._require_url(self.internal_list_url, "internal receipt list")
+        foreign_detail_url = self._require_url(
+            reverse_if_available(
+                "compliance:custodyreceipt_detail",
+                "compliance:custodyreceipt-detail",
+                kwargs={"pk": self.receipt_b.pk},
+            ),
+            "internal receipt detail",
+        )
+        self._login_to_tenant(self.tenant_admin, self.tenant_a)
+
+        list_response = self.client.get(list_url)
+        detail_response = self.client.get(foreign_detail_url)
+
+        self.assertEqual(list_response.status_code, 200)
+        self.assertContains(list_response, self.asset_a.asset_tag)
+        self.assertNotContains(list_response, self.asset_b.asset_tag)
+        self.assertEqual(detail_response.status_code, 404)
+        self._assert_no_receipt_payload(detail_response, self.receipt_b)
+
+    def test_technician_can_list_and_detail_but_raw_token_is_not_rendered(self):
+        # AC §6: Rollen und Tenant-Grenze — Technician gets internal view/detail only.
+        list_url = self._require_url(self.internal_list_url, "internal receipt list")
+        detail_url = self._require_url(self.internal_detail_url, "internal receipt detail")
+        self._login_to_tenant(self.technician, self.tenant_a)
+
+        list_response = self.client.get(list_url)
+        detail_response = self.client.get(detail_url)
+
+        self.assertEqual(list_response.status_code, 200)
+        self.assertEqual(detail_response.status_code, 200)
+        self.assertContains(detail_response, self.asset_a.asset_tag)
+        self.assertNotContains(list_response, DUMMY_TOKEN_A)
+        self.assertNotContains(detail_response, DUMMY_TOKEN_A)
+
+    def test_internal_route_without_permission_is_403_not_recipient_error(self):
+        # AC §6: Token, Ablauf und Fehler — missing internal permission → internal 403.
+        url = self._require_url(self.internal_list_url, "internal receipt list")
+        self._login_to_tenant(self.unrelated, self.tenant_a)
+
+        response = self.client.get(url)
+
+        self.assertEqual(response.status_code, 403)
+        self._assert_internal_denial(response)
+        self._assert_no_receipt_payload(response, self.receipt_a)
+
+    def test_cross_tenant_internal_detail_is_404_without_payload(self):
+        # AC §6: Rollen und Tenant-Grenze — cross-tenant UI detail → 404.
+        url = self._require_url(self.internal_detail_url, "internal receipt detail")
+        self._login_to_tenant(self.cross_tenant_user, self.tenant_b)
+
+        response = self.client.get(url)
+
+        self.assertEqual(response.status_code, 404)
+        self._assert_no_receipt_payload(response, self.receipt_a)
+
+    def test_technician_cannot_change_template_policy(self):
+        # AC §6: Rollen und Tenant-Grenze — Technician template policy is not mutable.
+        url = reverse("compliance:custodytemplate_update", kwargs={"pk": self.template_a.pk})
+        self._login_to_tenant(self.technician, self.tenant_a)
+
+        response = self.client.get(url)
+
+        self.assertEqual(response.status_code, 403)
+        self.assertEqual(CustodyTemplate.objects.get(pk=self.template_a.pk).eula_text, DUMMY_EULA)
+
+    def test_technician_export_is_denied_by_default(self):
+        # AC §6: API und interne Darstellung — Technician has no export capability by default.
+        url = self._require_url(self.export_url, "receipt export")
+        self._login_to_tenant(self.technician, self.tenant_a)
+
+        response = self.client.get(url)
+
+        self.assertEqual(response.status_code, 403)
+        self._assert_no_receipt_payload(response, self.receipt_a)
+
+    def test_prepare_route_is_explicitly_skipped_when_slice_d_is_absent(self):
+        # AC §6: Prepare- und Consent-Semantik — Slice D is optional until SOL publishes it.
+        if self.prepare_url is None:
+            self.skipTest("Slice D prepare-session route is not present on SOL yet")
+        self._login_to_tenant(self.technician, self.tenant_a)
+        response = self.client.post(self.prepare_url, {"holder_id": self.unrelated_holder.pk})
+        self.assertIn(response.status_code, (200, 201, 202, 204))
+        self.receipt_a.refresh_from_db()
+        self.assertEqual(self.receipt_a.holder_id, self.recipient_holder.pk)
 
 
-class CustodyAPIContractTests(CustodyRBACFixtureMixin, TestCase):
-    """API tests are filled against the unchanged router names after SOL push."""
+class CustodyAPIContractTests(CustodyRBACFixtureMixin, APITestCase):
+    """REST API tenant scope and read-only consent state."""
 
-    def test_placeholder(self):
-        # AC §6: API und interne Darstellung — API boundary block is pending SOL route inspection.
-        self.skipTest("Awaiting SOL API authorization implementation and route inspection.")
+    def _api_login_to_tenant(self, user, tenant):
+        self.client.force_login(user)
+        session = self.client.session
+        session["active_tenant_id"] = tenant.pk
+        session.save()
+
+    def _api_url(self, name, pk=None):
+        kwargs = {"pk": pk} if pk is not None else {}
+        return reverse(f"api:compliance_api:custodyreceipt-{name}", kwargs=kwargs)
+
+    def test_technician_api_list_is_tenant_scoped(self):
+        # AC §6: API und interne Darstellung — receipt API list is tenant-scoped.
+        self._api_login_to_tenant(self.technician, self.tenant_a)
+
+        response = self.client.get(self._api_url("list"))
+
+        self.assertEqual(response.status_code, 200)
+        payload = response.data.get("results", response.data)
+        rendered = str(payload)
+        self.assertIn(self.asset_a.asset_tag, rendered)
+        self.assertNotIn(self.asset_b.asset_tag, rendered)
+        self.assertNotIn(DUMMY_TOKEN_A, rendered)
+
+    def test_cross_tenant_api_detail_is_404(self):
+        # AC §6: Rollen und Tenant-Grenze — cross-tenant API detail → 404.
+        self._api_login_to_tenant(self.cross_tenant_user, self.tenant_b)
+
+        response = self.client.get(self._api_url("detail", self.receipt_a.pk))
+
+        self.assertEqual(response.status_code, 404)
+        self.assertNotIn(self.asset_a.asset_tag, str(response.data))
+        self.assertNotIn(DUMMY_EULA, str(response.data))
+
+    def test_api_patch_cannot_forge_acceptance(self):
+        # AC §6: Prepare- und Consent-Semantik — API PATCH cannot forge acceptance.
+        self._api_login_to_tenant(self.tenant_admin, self.tenant_a)
+
+        response = self.client.patch(
+            self._api_url("detail", self.receipt_a.pk),
+            {
+                "accepted": True,
+                "acceptance_status": CustodyReceipt.STATUS_ACCEPTED,
+                "signature_data": DUMMY_SIGNATURE,
+                "signature_hash": "dummy-signature-hash",
+            },
+            format="json",
+        )
+
+        self.assertIn(response.status_code, (200, 400, 403))
+        self.receipt_a.refresh_from_db()
+        self.assertFalse(self.receipt_a.accepted)
+        self.assertEqual(self.receipt_a.acceptance_status, CustodyReceipt.STATUS_PENDING)
