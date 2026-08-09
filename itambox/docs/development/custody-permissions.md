@@ -7,7 +7,7 @@ It deliberately separates:
 - the behaviour present on `origin/main` at the start of this change; and
 - the target contract for the issue implementation.
 
-The target contract is based on [`issue-259-readiness.md`](../../../issue-259-readiness.md), §5.3 and §5.5, and the decisions recorded in the decision log below. The readiness file is a local, uncommitted design reference and is not part of the product documentation or implementation change.
+The target contract is based on the local design reference `issue-259-readiness.md`, §5.3 and §5.5, and the decisions recorded in the decision log below. The readiness file is a local, uncommitted design reference and is not part of the product documentation or implementation change.
 
 No bearer token, signature payload, credential, or complete EULA is reproduced in this document.
 
