@@ -12,6 +12,7 @@ from io import StringIO
 from django.contrib.auth import get_user_model
 from django.contrib.auth.models import Permission
 from django.contrib.contenttypes.models import ContentType
+from django.db import close_old_connections
 from django.test import TestCase, TransactionTestCase, override_settings
 from django.urls import NoReverseMatch, reverse
 from django.utils import timezone
@@ -451,26 +452,34 @@ class CustodyConcurrentConsentTests(CustodyRBACFixtureMixin, TransactionTestCase
     reset_sequences = True
 
     def _post_from_independent_client(self, signature):
-        client = self.client_class()
-        client.force_login(self.recipient)
-        session = client.session
-        session["active_tenant_id"] = self.tenant_a.pk
-        session.save()
-        return client.post(
-            self._sign_url(DUMMY_TOKEN_A),
-            {"action": "accept", "signature_canvas": signature},
-        )
+        close_old_connections()
+        try:
+            client = self.client_class()
+            client.force_login(self.recipient)
+            session = client.session
+            session["active_tenant_id"] = self.tenant_a.pk
+            session.save()
+            return client.post(
+                self._sign_url(DUMMY_TOKEN_A),
+                {"action": "accept", "signature_canvas": signature},
+            )
+        finally:
+            close_old_connections()
 
     def _post_action_from_independent_client(self, action, signature=None):
-        client = self.client_class()
-        client.force_login(self.recipient)
-        session = client.session
-        session["active_tenant_id"] = self.tenant_a.pk
-        session.save()
-        data = {"action": action}
-        if signature is not None:
-            data["signature_canvas"] = signature
-        return client.post(self._sign_url(DUMMY_TOKEN_A), data)
+        close_old_connections()
+        try:
+            client = self.client_class()
+            client.force_login(self.recipient)
+            session = client.session
+            session["active_tenant_id"] = self.tenant_a.pk
+            session.save()
+            data = {"action": action}
+            if signature is not None:
+                data["signature_canvas"] = signature
+            return client.post(self._sign_url(DUMMY_TOKEN_A), data)
+        finally:
+            close_old_connections()
 
     def test_concurrent_accept_posts_have_one_terminal_transition(self):
         # AC §6: Prepare- und Consent-Semantik — concurrent POSTs are serialized by select_for_update().
