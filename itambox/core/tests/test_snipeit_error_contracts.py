@@ -156,3 +156,38 @@ def test_client_disables_redirects_for_bearer_requests():
     client.get_detail("/api/v1/hardware/1")
 
     assert client._session.get.call_args.kwargs["allow_redirects"] is False
+
+
+def test_importer_row_failure_log_redacts_payload_identity_and_exception_text(caplog):
+    from core.importers.snipeit import SnipeITImporter
+
+    stdout = MagicMock()
+    job = MagicMock()
+    importer = SnipeITImporter(
+        client=_client(),
+        tenant=MagicMock(pk=7),
+        user=MagicMock(pk=11),
+        stdout=stdout,
+        job=job,
+        checkout_inventory_item=MagicMock(),
+        create_component_allocation=MagicMock(),
+    )
+    counter = {"failed": 0}
+
+    importer._record_failure(
+        "assets.persist",
+        424242,
+        RuntimeError("asset-tag SECRET-ASSET customer@example.test bearer-secret"),
+        counter,
+    )
+
+    assert counter["failed"] == 1
+    record = next(record for record in caplog.records if hasattr(record, "integration"))
+    assert record.integration["operation"] == "assets.persist"
+    assert record.integration["tenant_id"] == 7
+    assert record.integration["actor_id"] == 11
+    combined = caplog.text + str(stdout.write.call_args) + str(job.append_log.call_args)
+    assert "SECRET-ASSET" not in combined
+    assert "customer@example.test" not in combined
+    assert "bearer-secret" not in combined
+    assert "424242" not in combined

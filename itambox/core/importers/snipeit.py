@@ -28,6 +28,7 @@ from django.utils.text import slugify
 from django.views.decorators.debug import sensitive_variables
 from requests import exceptions as requests_exceptions
 
+from core.context import get_current_request_id
 from core.errors import (
     MAX_RETRY_AFTER_SECONDS,
     IntegrationAuthenticationError,
@@ -40,6 +41,7 @@ from core.errors import (
     IntegrationRequestError,
     IntegrationRetryBudgetExceededError,
     IntegrationUnavailableError,
+    IntegrationUnexpectedError,
     RetryBudget,
 )
 from core.tasks.context import TaskContext
@@ -429,6 +431,34 @@ class SnipeITImporter:
             self.job.append_log(msg)
         logger.info(msg)
 
+    def _record_failure(self, operation: str, object_id: int, exc: Exception, counter: dict | None = None) -> None:
+        """Record a safe row/subresource failure without payload or exception text."""
+        request_id = get_current_request_id()
+        context = IntegrationContext(
+            provider="snipe-it",
+            operation=operation,
+            tenant_id=getattr(self.default_tenant, "pk", None),
+            actor_id=getattr(self.user, "pk", None),
+            request_id=str(request_id) if request_id else None,
+        )
+        error = (
+            exc
+            if isinstance(exc, IntegrationError)
+            else IntegrationUnexpectedError(
+                context=context,
+                cause_type=type(exc).__name__,
+            )
+        )
+        extra = error.log_extra(cause_type=None if isinstance(exc, IntegrationError) else type(exc).__name__)
+        logger.warning("Snipe-IT import item degraded integration=%s", extra["integration"], extra=extra)
+        message = f"  ! {operation}: one item could not be imported"
+        if self._stdout:
+            self._stdout.write(message)
+        if self.job:
+            self.job.append_log(message)
+        if counter is not None:
+            counter["failed"] += 1
+
     def _counter(self, key: str) -> dict:
         if key not in self.counts:
             self.counts[key] = {"created": 0, "updated": 0, "skipped": 0, "failed": 0}
@@ -489,8 +519,8 @@ class SnipeITImporter:
                     c["created"] += 1
                     self._status_map[sid] = obj
             except Exception as exc:
-                self._log(f"  ! statuslabel {sid} '{name}': {exc}")
-                c["failed"] += 1
+                # broad except: task-isolation: one remote row must not abort the reviewed import batch
+                self._record_failure("statuslabels.persist", sid, exc, c)
         self._finish(key)
 
     # ------------------------------------------------------------------
@@ -525,8 +555,8 @@ class SnipeITImporter:
                     c["created" if created else "skipped"] += 1
                     self._manufacturer_map[sid] = obj
             except Exception as exc:
-                self._log(f"  ! manufacturer {sid} '{name}': {exc}")
-                c["failed"] += 1
+                # broad except: task-isolation: one remote row must not abort the reviewed import batch
+                self._record_failure("manufacturers.persist", sid, exc, c)
         self._finish(key)
 
     # ------------------------------------------------------------------
@@ -565,8 +595,8 @@ class SnipeITImporter:
                     c["created"] += 1
                     self._category_map[sid] = obj
             except Exception as exc:
-                self._log(f"  ! category {sid} '{name}': {exc}")
-                c["failed"] += 1
+                # broad except: task-isolation: one remote row must not abort the reviewed import batch
+                self._record_failure("categories.persist", sid, exc, c)
         self._finish(key)
 
     # ------------------------------------------------------------------
@@ -637,8 +667,8 @@ class SnipeITImporter:
                     c["created"] += 1
                     self._supplier_map[sid] = obj
             except Exception as exc:
-                self._log(f"  ! supplier {sid} '{name}': {exc}")
-                c["failed"] += 1
+                # broad except: task-isolation: one remote row must not abort the reviewed import batch
+                self._record_failure("suppliers.persist", sid, exc, c)
         self._finish(key)
 
     # ------------------------------------------------------------------
@@ -671,8 +701,8 @@ class SnipeITImporter:
                     c["created"] += 1
                     self._tenant_map[sid] = obj
             except Exception as exc:
-                self._log(f"  ! company {sid} '{name}': {exc}")
-                c["failed"] += 1
+                # broad except: task-isolation: one remote row must not abort the reviewed import batch
+                self._record_failure("companies.persist", sid, exc, c)
         self._finish(key)
 
     # ------------------------------------------------------------------
@@ -751,16 +781,16 @@ class SnipeITImporter:
                 try:
                     _upsert_location(row)
                 except Exception as exc:
-                    self._log(f"  ! location {row['id']} (pass 1): {exc}")
-                    c["failed"] += 1
+                    # broad except: task-isolation: one remote row must not abort the reviewed import batch
+                    self._record_failure("locations.pass1", row["id"], exc, c)
 
         for row in rows:
             if _nested_id(row.get("parent")):
                 try:
                     _upsert_location(row)
                 except Exception as exc:
-                    self._log(f"  ! location {row['id']} (pass 2): {exc}")
-                    c["failed"] += 1
+                    # broad except: task-isolation: one remote row must not abort the reviewed import batch
+                    self._record_failure("locations.pass2", row["id"], exc, c)
 
         self._finish(key)
 
@@ -814,8 +844,8 @@ class SnipeITImporter:
                     c["created"] += 1
                     self._holder_map[sid] = obj
             except Exception as exc:
-                self._log(f"  ! user {sid} '{upn}': {exc}")
-                c["failed"] += 1
+                # broad except: task-isolation: one remote row must not abort the reviewed import batch
+                self._record_failure("users.persist", sid, exc, c)
         self._finish(key)
 
     # ------------------------------------------------------------------
@@ -865,8 +895,8 @@ class SnipeITImporter:
                     c["created"] += 1
                     self._field_map[db_col] = obj
             except Exception as exc:
-                self._log(f"  ! field {sid} '{raw_name}': {exc}")
-                c["failed"] += 1
+                # broad except: task-isolation: one remote row must not abort the reviewed import batch
+                self._record_failure("fields.persist", sid, exc, c)
         self._finish(key)
 
     # ------------------------------------------------------------------
@@ -907,8 +937,8 @@ class SnipeITImporter:
                     c["created"] += 1
                     self._fieldset_map[sid] = obj
             except Exception as exc:
-                self._log(f"  ! fieldset {sid} '{name}': {exc}")
-                c["failed"] += 1
+                # broad except: task-isolation: one remote row must not abort the reviewed import batch
+                self._record_failure("fieldsets.persist", sid, exc, c)
         self._finish(key)
 
     # ------------------------------------------------------------------
@@ -962,8 +992,8 @@ class SnipeITImporter:
                     c["created"] += 1
                     self._model_map[sid] = obj
             except Exception as exc:
-                self._log(f"  ! model {sid} '{model_name}': {exc}")
-                c["failed"] += 1
+                # broad except: task-isolation: one remote row must not abort the reviewed import batch
+                self._record_failure("models.persist", sid, exc, c)
         self._finish(key)
 
     # ------------------------------------------------------------------
@@ -1102,8 +1132,8 @@ class SnipeITImporter:
                     self._asset_map[sid] = obj
 
             except Exception as exc:
-                self._log(f"  ! asset {sid} '{asset_tag}': {exc}")
-                c["failed"] += 1
+                # broad except: task-isolation: one remote row must not abort the reviewed import batch
+                self._record_failure("assets.persist", sid, exc, c)
                 continue
 
             # Handle checkout / assignment
@@ -1145,7 +1175,8 @@ class SnipeITImporter:
                                 notes="Imported from Snipe-IT",
                             )
             except Exception as exc:
-                self._log(f"  ! checkout asset {sid}: {exc}")
+                # broad except: boundary-isolation: optional checkout failure must not discard the asset
+                self._record_failure("assets.checkout", sid, exc)
 
         self._finish(key)
 
@@ -1215,8 +1246,8 @@ class SnipeITImporter:
                     c["created"] += 1
 
             except Exception as exc:
-                self._log(f"  ! accessory {sid} '{name}': {exc}")
-                c["failed"] += 1
+                # broad except: task-isolation: one remote row must not abort the reviewed import batch
+                self._record_failure("accessories.persist", sid, exc, c)
 
         self._finish(key)
 
@@ -1263,7 +1294,8 @@ class SnipeITImporter:
                     continue
                 self._import_assignment(accessory, qty, holder=holder)
         except Exception as exc:
-            logger.warning("Could not import checkouts for accessory %s: %s", snipe_id, exc)
+            # broad except: boundary-isolation: optional checkouts may degrade without discarding the parent item
+            self._record_failure("accessories.checkouts", snipe_id, exc)
 
     # ------------------------------------------------------------------
     # Consumables
@@ -1321,8 +1353,8 @@ class SnipeITImporter:
                     c["created"] += 1
 
             except Exception as exc:
-                self._log(f"  ! consumable {sid} '{name}': {exc}")
-                c["failed"] += 1
+                # broad except: task-isolation: one remote row must not abort the reviewed import batch
+                self._record_failure("consumables.persist", sid, exc, c)
 
         self._finish(key)
 
@@ -1384,8 +1416,8 @@ class SnipeITImporter:
                     c["created"] += 1
 
             except Exception as exc:
-                self._log(f"  ! component {sid} '{name}': {exc}")
-                c["failed"] += 1
+                # broad except: task-isolation: one remote row must not abort the reviewed import batch
+                self._record_failure("components.persist", sid, exc, c)
 
         self._finish(key)
 
@@ -1412,7 +1444,8 @@ class SnipeITImporter:
                     continue
                 self._import_assignment(component, qty, asset=asset)
         except Exception as exc:
-            logger.warning("Could not import allocations for component %s: %s", snipe_id, exc)
+            # broad except: boundary-isolation: optional allocations may degrade without discarding the component
+            self._record_failure("components.allocations", snipe_id, exc)
 
     # ------------------------------------------------------------------
     # Licenses + seat assignments
@@ -1515,8 +1548,8 @@ class SnipeITImporter:
                     c["created"] += 1
 
             except Exception as exc:
-                self._log(f"  ! license {sid} '{name}': {exc}")
-                c["failed"] += 1
+                # broad except: task-isolation: one remote row must not abort the reviewed import batch
+                self._record_failure("licenses.persist", sid, exc, c)
 
         self._finish(key)
 
@@ -1548,7 +1581,8 @@ class SnipeITImporter:
                         defaults={"notes": "Imported from Snipe-IT"},
                     )
         except Exception as exc:
-            logger.warning("Could not import seats for license %s: %s", snipe_id, exc)
+            # broad except: boundary-isolation: optional seats may degrade without discarding the license
+            self._record_failure("licenses.seats", snipe_id, exc)
 
     # ------------------------------------------------------------------
     # Maintenances
@@ -1617,7 +1651,7 @@ class SnipeITImporter:
                     c["created"] += 1
 
             except Exception as exc:
-                self._log(f"  ! maintenance {sid} (asset {asset_id}): {exc}")
-                c["failed"] += 1
+                # broad except: task-isolation: one remote row must not abort the reviewed import batch
+                self._record_failure("maintenances.persist", sid, exc, c)
 
         self._finish(key)

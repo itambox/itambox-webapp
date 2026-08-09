@@ -5,14 +5,43 @@
 import csv
 import io
 import logging
+from typing import NamedTuple
 
 import yaml
 from django import forms
 from django.conf import settings
-from django.core.exceptions import ValidationError
+from django.core.exceptions import FieldDoesNotExist, ValidationError
+from django.db import transaction
 from django.utils.translation import gettext_lazy as _
 
+from core.context import get_current_request_id, get_current_tenant, get_current_user
+
 logger = logging.getLogger(__name__)
+
+
+class ImportResult(NamedTuple):
+    """Tuple-compatible result that distinguishes row failures from file/task failures."""
+
+    imported_count: int
+    errors: list[str]
+
+
+def _import_log_extra(*, operation, row_number=None, exception_type=None):
+    tenant = get_current_tenant()
+    user = get_current_user()
+    request_id = get_current_request_id()
+    context = {
+        "operation": operation,
+        "tenant_id": getattr(tenant, "pk", None),
+        "actor_id": getattr(user, "pk", None),
+        "request_id": str(request_id) if request_id else None,
+    }
+    if row_number is not None:
+        context["row_number"] = row_number
+    if exception_type is not None:
+        context["exception_type"] = exception_type
+    return {"import_context": context}
+
 
 # Upper bound on rows accepted in a single bulk import. Beyond this, the request
 # is rejected so a single submission can't exhaust memory / hold a transaction
@@ -113,8 +142,10 @@ def get_registered_import_form(model):
         try:
             # inline import: cycle: core.forms.import_forms <-> assets.forms.import_forms
             import assets.forms.import_forms  # noqa: F401
-        except Exception:
-            logger.exception("Failed to load curated import forms")
+        except Exception as exc:
+            # broad except: availability-tradeoff: dynamic imports remain usable if curated forms fail to load
+            extra = _import_log_extra(operation="curated_forms.load", exception_type=type(exc).__name__)
+            logger.error("Curated import forms unavailable import_context=%s", extra["import_context"], extra=extra)
     return _IMPORT_FORM_REGISTRY.get(model)
 
 
@@ -124,7 +155,7 @@ def _model_has_concrete_field(model, name):
     try:
         model._meta.get_field(name)
         return True
-    except Exception:
+    except FieldDoesNotExist:
         return False
 
 
@@ -237,7 +268,7 @@ class BulkImportForm(forms.Form):
                 try:
                     csv_file.seek(0)
                     raw_data = csv_file.read().decode("latin-1")
-                except Exception as exc:
+                except (AttributeError, UnicodeDecodeError) as exc:
                     raise ValidationError(
                         _("Unable to decode file. Please upload a valid text-based CSV or YAML file.")
                     ) from exc
@@ -251,8 +282,8 @@ class BulkImportForm(forms.Form):
             try:
                 reader = csv.DictReader(io.StringIO(raw_data), delimiter=delimiter)
                 rows = list(reader)
-            except Exception as e:
-                raise ValidationError(_("Failed to parse CSV data: {error}").format(error=str(e))) from None
+            except csv.Error:
+                raise ValidationError(_("Failed to parse CSV data.")) from None
 
             if not rows:
                 raise ValidationError(_("CSV data is empty."))
@@ -280,8 +311,8 @@ class BulkImportForm(forms.Form):
         elif import_format == "yaml":
             try:
                 parsed_yaml = yaml.safe_load(raw_data)
-            except Exception as e:
-                raise ValidationError(_("Failed to parse YAML data: {error}").format(error=str(e))) from None
+            except yaml.YAMLError:
+                raise ValidationError(_("Failed to parse YAML data.")) from None
 
             if not parsed_yaml:
                 raise ValidationError(_("YAML document is empty."))
@@ -327,59 +358,58 @@ class BulkImportForm(forms.Form):
         return cleaned_data
 
     def import_data(self, request=None):
-        from django.db import transaction
-
         if not self.model:
             raise NotImplementedError("BulkImportForm subclass must define a `model` attribute.")
 
         if not self._rows_data:
-            return 0, [_("No data to import.")]
+            return ImportResult(0, [_("No data to import.")])
 
         imported = 0
         errors = []
 
         for i, row in enumerate(self._rows_data, start=2):
             try:
-                mapped = self.map_row(row)
-                self._validate_row(mapped, i)
-
-                # Check for primary key to perform UPSERT (in-place update)
-                pk_name = self.model._meta.pk.name
-                pk_val = mapped.get(pk_name)
-
-                if pk_val:
-                    try:
-                        instance = self.model.objects.get(pk=pk_val)
-                        # Capture the pre-update state so ChangeLoggingMixin logs an
-                        # accurate diff instead of re-fetching the row per import row.
-                        if hasattr(instance, "snapshot"):
-                            instance.snapshot()
-                        # Perform in-place field updates
-                        for key, val in mapped.items():
-                            if key != pk_name:
-                                setattr(instance, key, val)
-                    except self.model.DoesNotExist:
-                        # Raise ValidationError matching NetBox gold standard
-                        raise ValidationError(_("Object with ID {id} does not exist").format(id=pk_val)) from None
-                else:
-                    instance = self._create_instance(mapped)
-
-                if hasattr(instance, "full_clean"):
-                    instance.full_clean()
-                instance.save()
+                with transaction.atomic():
+                    self._import_row(row, i)
                 imported += 1
             except ValidationError as e:
                 errors.append(f"Row {i}: {'; '.join(e.messages if hasattr(e, 'messages') else [str(e)])}")
-            except Exception:
-                # Keep the driver/exception detail (which can leak SQL fragments,
-                # column names, or other internals) in the server log only; show
-                # the user a generic, non-revealing per-row message.
-                logger.exception(f"Import error row {i}")
+            except Exception as exc:
+                # broad except: task-isolation: one malformed import row must not abort the reviewed batch
+                extra = _import_log_extra(
+                    operation="row.persist",
+                    row_number=i,
+                    exception_type=type(exc).__name__,
+                )
+                logger.error("Import row failed import_context=%s", extra["import_context"], extra=extra)
                 errors.append(str(_("Row %(row)s: could not be imported due to an unexpected error.") % {"row": i}))
 
         self.imported_count = imported
         self.errors_list = errors
-        return imported, errors
+        return ImportResult(imported, errors)
+
+    def _import_row(self, row, row_number):
+        mapped = self.map_row(row)
+        self._validate_row(mapped, row_number)
+
+        pk_name = self.model._meta.pk.name
+        pk_val = mapped.get(pk_name)
+        if pk_val:
+            try:
+                instance = self.model.objects.get(pk=pk_val)
+                if hasattr(instance, "snapshot"):
+                    instance.snapshot()
+                for key, val in mapped.items():
+                    if key != pk_name:
+                        setattr(instance, key, val)
+            except self.model.DoesNotExist:
+                raise ValidationError(_("Object with ID {id} does not exist").format(id=pk_val)) from None
+        else:
+            instance = self._create_instance(mapped)
+
+        if hasattr(instance, "full_clean"):
+            instance.full_clean()
+        instance.save()
 
     def map_row(self, row):
         """Map an import row dict to model field values.
@@ -408,7 +438,7 @@ class BulkImportForm(forms.Form):
                 continue
             try:
                 field = self.model._meta.get_field(k)
-            except Exception:
+            except FieldDoesNotExist:
                 # Not a real field on this model — skip rather than crash on save.
                 continue
             if field.is_relation and field.many_to_one:
