@@ -20,7 +20,7 @@ from assets.models import Asset
 from compliance.models import CustodyReceipt, CustodyTemplate
 from core.management.commands._seed.access import SeedAccessMixin
 from core.tests.mixins import TenantTestMixin, grant
-from organization.models import AssetHolder, Role, Tenant
+from organization.models import AssetHolder, Role, RoleGrant, Tenant
 
 User = get_user_model()
 
@@ -581,6 +581,19 @@ class CustodyInternalRouteTests(CustodyRBACFixtureMixin, TestCase):
 
         self.assertEqual(response.status_code, 403)
         self._assert_internal_denial(response)
+        self._assert_no_receipt_payload(response, self.receipt_a)
+
+    def test_expired_role_grant_is_denied_closed(self):
+        # AC §6: Rollen und Tenant-Grenze — expired RoleGrant scope cannot read internal receipts.
+        RoleGrant.objects.filter(membership__user=self.technician, role__tenant=self.tenant_a).update(
+            valid_until=timezone.now() - timedelta(minutes=1)
+        )
+        self._login_to_tenant(self.technician, self.tenant_a)
+
+        response = self.client.get(self.internal_list_url)
+
+        self.assertEqual(response.status_code, 403)
+        self._assert_body_not_contains(response, WRONG_RECIPIENT_MESSAGE)
         self._assert_no_receipt_payload(response, self.receipt_a)
 
     def test_asset_detail_hides_custody_surface_without_receipt_permission(self):
