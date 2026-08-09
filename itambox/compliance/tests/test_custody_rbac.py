@@ -4,6 +4,7 @@ The fixture values in this module are deliberately dummy values. They are not
 bearer credentials, signature payloads, or production EULA content.
 """
 
+import json
 from concurrent.futures import ThreadPoolExecutor
 from datetime import timedelta
 from io import StringIO
@@ -20,6 +21,7 @@ from rest_framework.test import APITestCase
 from assets.models import Asset
 from compliance.models import CustodyReceipt, CustodyTemplate
 from core.management.commands._seed.access import SeedAccessMixin
+from core.models import ObjectChange
 from core.tests.mixins import TenantTestMixin, grant
 from organization.models import AssetHolder, Role, RoleGrant, Tenant
 
@@ -206,6 +208,31 @@ class CustodyRecipientConsentTests(CustodyRBACFixtureMixin, TestCase):
         self.receipt_a.refresh_from_db()
         self.assertEqual(self.receipt_a.acceptance_status, CustodyReceipt.STATUS_ACCEPTED)
         self.assertTrue(self.receipt_a.accepted)
+
+    def test_authenticated_consent_audit_attributes_recipient_and_excludes_secrets(self):
+        # AC §6: Audit — authenticated consent records the user/tenant without token or signature payload.
+        self._login_to_tenant(self.recipient, self.tenant_a)
+        self.client.post(
+            self._sign_url(DUMMY_TOKEN_A),
+            {"action": "accept", "signature_canvas": DUMMY_SIGNATURE},
+        )
+
+        content_type = ContentType.objects.get_for_model(CustodyReceipt)
+        change = (
+            ObjectChange._base_manager.filter(
+                changed_object_type=content_type,
+                changed_object_id=self.receipt_a.pk,
+            )
+            .order_by("-time")
+            .first()
+        )
+
+        self.assertIsNotNone(change)
+        self.assertEqual(change.user_id, self.recipient.pk)
+        self.assertEqual(change.tenant_id, self.tenant_a.pk)
+        audit_data = json.dumps({"pre": change.prechange_data, "post": change.postchange_data})
+        self.assertNotIn(DUMMY_TOKEN_A, audit_data)
+        self.assertNotIn(DUMMY_SIGNATURE, audit_data)
 
     def test_superadmin_cannot_override_recipient_binding(self):
         # AC §6: Rollen und Tenant-Grenze — superadmin has global internal power but no Recipient override.
