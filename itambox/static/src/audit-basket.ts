@@ -101,7 +101,7 @@ function initAuditBasket(): void {
   function updateState(): void {
     const count = basket.size;
     if (countEl) countEl.textContent = String(count);
-    const overlayCount = document.getElementById('basket-scanner-count');
+    const overlayCount = document.getElementById('audit-scanner-count');
     if (overlayCount) overlayCount.textContent = String(count);
     if (emptyEl) emptyEl.classList.toggle('d-none', count !== 0);
     if (clearBtn) clearBtn.disabled = count === 0;

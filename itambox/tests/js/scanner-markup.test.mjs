@@ -26,6 +26,70 @@ test('scanner camera errors are assertive live regions', () => {
   }
 });
 
+const scannerMarkupContracts = [
+  {
+    path: 'templates/includes/mobile_action_bar.html',
+    ids: [
+      'global-open-scanner-btn',
+      'global-scanner-modal',
+      'global-scanner-reader',
+      'global-toggle-torch-btn',
+      'global-close-scanner-btn',
+      'global-scanner-error',
+      'global-scanner-feedback',
+    ],
+  },
+  {
+    path: 'templates/assets/bulk_scan.html',
+    ids: [
+      'basket-open-scanner-btn',
+      'basket-scanner-modal',
+      'basket-scanner-reader',
+      'basket-toggle-torch-btn',
+      'basket-close-scanner-btn',
+      'basket-scanner-error',
+      'basket-scan-feedback',
+      'basket-scanner-count',
+    ],
+  },
+  {
+    path: 'compliance/templates/compliance/audits/audit_session_detail.html',
+    ids: [
+      'audit-open-scanner-btn',
+      'audit-scanner-modal',
+      'audit-scanner-reader',
+      'audit-toggle-torch-btn',
+      'audit-close-scanner-btn',
+      'audit-scanner-error',
+      'audit-scan-feedback',
+      'audit-scanner-count',
+    ],
+  },
+];
+
+test('rendered scanner markup keeps global, bulk, and audit IDs distinct', () => {
+  const owners = new Map();
+  for (const contract of scannerMarkupContracts) {
+    const source = readFileSync(resolve(itamboxRoot, contract.path), 'utf8');
+    for (const id of contract.ids) {
+      assert.match(source, new RegExp(`id="${id}"`), `${contract.path} is missing ${id}`);
+      assert.equal(owners.has(id), false, `${id} is shared by ${owners.get(id)} and ${contract.path}`);
+      owners.set(id, contract.path);
+    }
+  }
+});
+
+test('basket keyboard handlers pass Enter values directly to addByCode', () => {
+  for (const contract of basketScannerContracts) {
+    const source = readFileSync(resolve(itamboxRoot, contract.path), 'utf8');
+    const enterHandler = source.match(/input\.addEventListener\('keydown',[\s\S]*?\n\s*}\);/);
+    assert.ok(enterHandler, `${contract.path} is missing its keyboard handler`);
+    assert.match(enterHandler[0], /const value = input\.value;/, contract.path);
+    assert.match(enterHandler[0], /addByCode\(value\);/, contract.path);
+    assert.doesNotMatch(enterHandler[0], /dispatcher\./, contract.path);
+  }
+});
+
 const basketScannerContracts = [
   {
     path: 'static/src/scan-basket.ts',
