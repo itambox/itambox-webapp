@@ -194,3 +194,4 @@ registry lands. Use `registry.owner_of("<app_label>.<Model>")` instead.
 - [Module Maturity](module-maturity.md)
 - [ADR 0001 — Architecture Boundaries and Layering](adr-0001-architecture-boundaries-and-layering.md)
 - [OpenAPI Schema Policy](openapi-schema-policy.md)
+- [Optional Capability Fallbacks](capability-fallbacks.md)

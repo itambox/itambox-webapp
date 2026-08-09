@@ -6,6 +6,7 @@ defect in the substrate and a defect in a domain declaration never look alike.
 """
 
 from dataclasses import FrozenInstanceError
+from unittest.mock import patch
 
 import pytest
 
@@ -319,6 +320,18 @@ class TestOwnership:
         unresolved = registry.unresolved_references()
         assert [(row.key, row.reference) for row in unresolved] == [("demo.core", "nowhere.NotAModel")]
         assert unresolved[0].reason
+
+    def test_a_resolver_failure_publishes_only_its_type(self):
+        registry = CapabilityRegistry()
+        registry.register(make_capability(owns=("extras.Tag",)))
+
+        with patch("itambox.capabilities.resolve_reference", side_effect=RuntimeError("credential=secret")):
+            unresolved = registry.unresolved_references()
+
+        assert [(row.key, row.reference, row.reason) for row in unresolved] == [
+            ("demo.core", "extras.Tag", "RuntimeError")
+        ]
+        assert "credential=secret" not in repr(unresolved)
 
     def test_a_resolvable_model_reference_is_not_reported(self):
         registry = CapabilityRegistry()

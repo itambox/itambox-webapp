@@ -114,6 +114,16 @@ class SecurityHardeningTests(TestCase):
             with self.assertRaises(ValidationError):
                 validate_image_attachment(SimpleUploadedFile("image.png", b"not-an-image"))
 
+    def test_file_magic_fallback_does_not_trust_client_content_type(self):
+        def unavailable_magic(_chunk, _mime):
+            raise RuntimeError("libmagic unavailable")
+
+        fake_magic = SimpleNamespace(from_buffer=unavailable_magic)
+        file_with_spoofed_type = SimpleUploadedFile("notes.txt", b"unknown bytes", content_type="text/html")
+
+        with patch.dict(sys.modules, {"magic": fake_magic}):
+            validate_file_attachment(file_with_spoofed_type)
+
     @override_settings(RATELIMIT_LIMIT=3, RATELIMIT_PERIOD=60)
     def test_rate_limiting_middleware(self):
         login_url = reverse("login")
