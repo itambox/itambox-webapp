@@ -8,6 +8,7 @@ import json
 from concurrent.futures import ThreadPoolExecutor
 from datetime import timedelta
 from io import StringIO
+from unittest.mock import patch
 
 from django.contrib.auth import get_user_model
 from django.contrib.auth.models import Permission
@@ -21,6 +22,7 @@ from rest_framework.test import APITestCase
 
 from assets.models import Asset
 from compliance.models import CustodyReceipt, CustodySigningSession, CustodyTemplate
+from compliance.views import CustodyReceiptPrepareView
 from core.management.commands._seed.access import SeedAccessMixin
 from core.models import ObjectChange
 from core.tests.mixins import TenantTestMixin, grant
@@ -911,6 +913,18 @@ class CustodySigningSessionPrepareTests(CustodyRBACFixtureMixin, TestCase):
 
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "Only pending custody receipts")
+        self.assertFalse(CustodySigningSession._base_manager.filter(receipt=self.receipt_a).exists())
+
+    def test_holderless_pending_receipt_is_rejected_without_creating_session(self):
+        holderless_receipt = self.receipt_a
+        holderless_receipt.holder_id = None
+        self._login_to_tenant(self.technician, self.tenant_a)
+
+        with patch.object(CustodyReceiptPrepareView, "get_object", return_value=holderless_receipt):
+            response = self.client.post(self._prepare_url(), follow=True)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "requires an intended holder")
         self.assertFalse(CustodySigningSession._base_manager.filter(receipt=self.receipt_a).exists())
 
 
