@@ -1,5 +1,5 @@
 """
-Tests for the Snipe-IT importer (core/importers/snipeit.py).
+Tests for the Snipe-IT importer (core/importers/snipeit/).
 
 No network access: all HTTP calls are intercepted via unittest.mock.patch on
 SnipeITClient._get, which backs every paginated get_all() call.
@@ -516,8 +516,8 @@ class TestSnipeITImporter(TenantTestMixin):
         holder = SimpleNamespace(tenant_id=self.tenant.pk)
         asset = SimpleNamespace(tenant_id=self.tenant.pk)
 
-        importer._import_assignment(item, 2, holder=holder)
-        importer._import_assignment(item, 3, asset=asset)
+        importer._inventory_assignments.assign(item, 2, holder=holder)
+        importer._inventory_assignments.assign(item, 3, asset=asset)
 
         checkout.assert_called_once_with(item, 2, holder=holder, user=self.admin, notes=IMPORT_NOTE)
         allocate.assert_called_once_with(item, 3, asset=asset, user=self.admin, notes=IMPORT_NOTE)
@@ -527,6 +527,19 @@ class TestSnipeITImporter(TenantTestMixin):
         # own, so omitting either callable fails at construction, not mid-import.
         with pytest.raises(TypeError):
             SnipeITImporter(client=_make_client_mock(), tenant=self.tenant, user=self.admin)
+
+    def test_checkout_asset_falls_back_to_canonical_service(self):
+        from django.utils.module_loading import import_string
+
+        importer = SnipeITImporter(
+            client=_make_client_mock(),
+            tenant=self.tenant,
+            user=self.admin,
+            checkout_inventory_item=MagicMock(),
+            create_component_allocation=MagicMock(),
+        )
+
+        assert importer.checkout_asset is import_string("assets.services.checkout_asset")
 
     @pytest.mark.parametrize("abort_during_import", [False, True])
     def test_management_command_reports_safe_integration_failures(self, abort_during_import, monkeypatch, caplog):

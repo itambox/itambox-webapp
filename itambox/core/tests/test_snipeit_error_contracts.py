@@ -1,3 +1,4 @@
+from io import StringIO
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -16,6 +17,7 @@ from core.errors import (
     RetryBudget,
 )
 from core.importers.snipeit import SnipeITClient
+from core.importers.snipeit.contracts import StageReporter, StageResult
 
 
 def _response(status_code=200, *, payload=None, headers=None):
@@ -101,7 +103,7 @@ def test_rate_limit_retries_with_a_bounded_budget_and_structured_log(caplog):
     ]
 
     with (
-        patch("core.importers.snipeit.time.sleep") as sleep,
+        patch("core.importers.snipeit.client.time.sleep") as sleep,
         pytest.raises(IntegrationRetryBudgetExceededError) as raised,
     ):
         client.get_detail("/api/v1/hardware?token=query-secret")
@@ -122,7 +124,7 @@ def test_zero_retry_budget_surfaces_rate_limit_without_sleeping():
     client = _client(budget=budget)
     client._session.get.return_value = _response(429)
 
-    with patch("core.importers.snipeit.time.sleep") as sleep, pytest.raises(IntegrationRateLimitedError):
+    with patch("core.importers.snipeit.client.time.sleep") as sleep, pytest.raises(IntegrationRateLimitedError):
         client.get_detail("/api/v1/hardware")
 
     sleep.assert_not_called()
@@ -169,53 +171,36 @@ def test_client_disables_redirects_for_bearer_requests():
     assert "api_key" not in requested_url
 
 
-def test_importer_row_failure_log_redacts_payload_identity_and_exception_text(caplog):
-    from core.importers.snipeit import SnipeITImporter
+def test_stage_reporter_row_failure_log_redacts_payload_identity_and_exception_text(caplog):
+    tenant = MagicMock(pk=7)
+    user = MagicMock(pk=11)
+    stdout = StringIO()
+    reporter = StageReporter(stdout=stdout, job=None, default_tenant=tenant, user=user)
+    result = StageResult("assets")
 
-    stdout = MagicMock()
-    job = MagicMock()
-    importer = SnipeITImporter(
-        client=_client(),
-        tenant=MagicMock(pk=7),
-        user=MagicMock(pk=11),
-        stdout=stdout,
-        job=job,
-        checkout_inventory_item=MagicMock(),
-        create_component_allocation=MagicMock(),
-    )
-    counter = {"failed": 0}
-
-    importer._record_failure(
+    reporter.row_failure(
+        result,
         "assets.persist",
-        424242,
         RuntimeError("asset-tag SECRET-ASSET customer@example.test bearer-secret"),
-        counter,
     )
 
-    assert counter["failed"] == 1
+    assert result.counts.failed == 1
     record = next(record for record in caplog.records if hasattr(record, "integration"))
     assert record.integration["operation"] == "assets.persist"
     assert record.integration["tenant_id"] == 7
     assert record.integration["actor_id"] == 11
-    combined = caplog.text + str(stdout.write.call_args) + str(job.append_log.call_args)
+    combined = caplog.text + stdout.getvalue()
     assert "SECRET-ASSET" not in combined
     assert "customer@example.test" not in combined
     assert "bearer-secret" not in combined
     assert "424242" not in combined
 
 
-def test_importer_row_failure_supports_logging_without_optional_sinks(caplog):
-    from core.importers.snipeit import SnipeITImporter
+def test_stage_reporter_row_failure_supports_logging_without_optional_sinks(caplog):
+    reporter = StageReporter(default_tenant=MagicMock(pk=7), user=MagicMock(pk=11))
+    result = StageResult("assets")
 
-    importer = SnipeITImporter(
-        client=_client(),
-        tenant=MagicMock(pk=7),
-        user=MagicMock(pk=11),
-        checkout_inventory_item=MagicMock(),
-        create_component_allocation=MagicMock(),
-    )
-
-    importer._record_failure("assets.persist", 42, RuntimeError("bearer-secret"))
+    reporter.row_failure(result, "assets.persist", RuntimeError("bearer-secret"))
 
     record = next(record for record in caplog.records if hasattr(record, "integration"))
     assert record.integration["operation"] == "assets.persist"

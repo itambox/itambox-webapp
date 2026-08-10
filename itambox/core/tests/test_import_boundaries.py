@@ -915,7 +915,7 @@ class TenantResourceGrantBoundaryTests(SimpleTestCase):
         surface_calls = {
             PROJECT_ROOT / "inventory" / "api" / "views.py": {"checkout_inventory_item"},
             PROJECT_ROOT / "assets" / "views" / "request_views.py": {"checkout_inventory_item"},
-            PROJECT_ROOT / "core" / "importers" / "snipeit.py": {
+            PROJECT_ROOT / "core" / "importers" / "snipeit" / "common.py": {
                 "_checkout_inventory_item",
                 "_create_component_allocation",
                 "checkout_inventory_item",
@@ -1220,13 +1220,34 @@ class SnipeITImporterBoundaryTests(SimpleTestCase):
     COMMAND = "core.management.commands.import_snipeit"
 
     def test_importer_does_not_import_inventory_services(self):
-        self.assertFalse(
-            _imports(self.IMPORTER, "inventory.services"),
-            f"{self.IMPORTER} must receive inventory service callables through injection",
-        )
+        import core.importers.snipeit as pkg
+
+        package_root = Path(pkg.__file__).parent
+        paths = [Path(pkg.__file__)] + sorted(package_root.rglob("*.py"))
+        for path in paths:
+            relative = path.relative_to(package_root).with_suffix("")
+            parts = list(relative.parts)
+            if parts[-1] == "__init__":
+                parts.pop()
+            module = ".".join(("core", "importers", "snipeit", *parts))
+            with self.subTest(module=module, target="inventory.services"):
+                self.assertFalse(
+                    _imports(module, "inventory.services"),
+                    f"{module} must receive inventory service callables through injection",
+                )
+            with self.subTest(module=module, target="assets.services"):
+                self.assertFalse(
+                    _imports(module, "assets.services"),
+                    f"{module} must receive the asset checkout service through injection",
+                )
 
     def test_command_owns_the_inventory_services_edge(self):
         self.assertTrue(
             _imports(self.COMMAND, "inventory.services", top_level_only=True),
             f"{self.COMMAND} must remain the inventory-service composition root",
+        )
+        self.assertIn(
+            "assets.services.checkout_asset",
+            _edges(self.COMMAND, top_level_only=True),
+            f"{self.COMMAND} must own the asset checkout-service composition-root edge",
         )
