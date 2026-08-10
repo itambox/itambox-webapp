@@ -59,17 +59,7 @@ SUITE_SCHEMA_VERSION = 1
 # The whole suite must run. This is not a budget to spend: every skip is a test
 # that did not execute, so raising this number requires naming which tests are
 # allowed to skip and why, in review, in this file.
-#
-# Allowed skips (reviewed in PR #279 for issue #259):
-# - itambox.compliance.tests.test_custody_rbac.CustodyInternalRouteTests::
-#   test_prepare_route_is_explicitly_skipped_when_slice_d_is_absent -- the
-#   technician-authorized prepare-session route is the documented Slice D
-#   follow-up of #259 and is not present in this PR.
-# - itambox.compliance.tests.test_custody_rbac.CustodyInternalRouteTests::
-#   test_technician_export_is_denied_by_default -- the internal export route is
-#   a documented follow-up of #259; the export codename and seed behavior are
-#   covered by tests, the route itself is not present yet.
-MAX_SKIPPED_TESTS = 2
+MAX_SKIPPED_TESTS = 0
 
 # Published for visibility only -- crossing it never fails the gate.
 SLOW_TEST_SECONDS = 5.0

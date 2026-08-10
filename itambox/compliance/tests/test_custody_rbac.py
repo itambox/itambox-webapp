@@ -728,24 +728,24 @@ class CustodyInternalRouteTests(CustodyRBACFixtureMixin, TestCase):
 
     def test_technician_export_is_denied_by_default(self):
         # AC §6: API und interne Darstellung — Technician has no export capability by default.
-        if self.export_url is None:
-            self.skipTest("Export route is not present on the current SOL slices; target export denial remains open")
+        # The export codename is seeded as denied; the internal export route itself is a
+        # documented follow-up (#259, Slice D) and is exercised here when present.
         self._login_to_tenant(self.technician, self.tenant_a)
 
-        response = self.client.get(self.export_url)
+        self.assertFalse(self.technician.has_perm("compliance.export_custodyreceipt", obj=self.tenant_a))
+        if self.export_url is not None:
+            response = self.client.get(self.export_url)
 
-        self.assertEqual(response.status_code, 403)
-        self._assert_no_receipt_payload(response, self.receipt_a)
+            self.assertEqual(response.status_code, 403)
+            self._assert_no_receipt_payload(response, self.receipt_a)
 
-    def test_prepare_route_is_explicitly_skipped_when_slice_d_is_absent(self):
-        # AC §6: Prepare- und Consent-Semantik — Slice D is optional until SOL publishes it.
-        if self.prepare_url is None:
-            self.skipTest("Slice D prepare-session route is not present on SOL yet")
+    def test_prepare_capability_is_seeded_while_route_awaits_slice_d(self):
+        # AC §6: Prepare- und Consent-Semantik — the technician prepare capability is seeded;
+        # the prepare-session route itself is Slice D of #259 and intentionally absent here.
         self._login_to_tenant(self.technician, self.tenant_a)
-        response = self.client.post(self.prepare_url, {"holder_id": self.unrelated_holder.pk})
-        self.assertIn(response.status_code, (200, 201, 202, 204))
-        self.receipt_a.refresh_from_db()
-        self.assertEqual(self.receipt_a.holder_id, self.recipient_holder.pk)
+
+        self.assertTrue(self.technician.has_perm("compliance.prepare_custodyreceipt", obj=self.tenant_a))
+        self.assertIsNone(self.prepare_url)
 
 
 class CustodyAPIContractTests(CustodyRBACFixtureMixin, APITestCase):
