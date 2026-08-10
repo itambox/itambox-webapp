@@ -298,7 +298,6 @@ def _send_webhook(rule, event, instance_tenant_id=None):
         event_data=event.data,
         retry_count=retry_count,
         retry_backoff=retry_backoff,
-        tenant_id=rule.tenant_id,
         actor_id=getattr(get_current_user(), "pk", None),
         request_id=str(get_current_request_id()) if get_current_request_id() is not None else None,
     )

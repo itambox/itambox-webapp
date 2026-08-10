@@ -171,7 +171,6 @@ def send_webhook_task(
             attempt=attempt + 1,
             retry_count=retry_count,
             retry_backoff=retry_backoff,
-            tenant_id=tenant_id,
             actor_id=actor_id,
             request_id=request_id,
         )
