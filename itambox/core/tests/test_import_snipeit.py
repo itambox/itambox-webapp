@@ -8,12 +8,16 @@ SnipeITClient._get, which backs every paginated get_all() call.
 from __future__ import annotations
 
 import datetime
+import logging
+from io import StringIO
 from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
 
 import pytest
 from django.contrib.auth import get_user_model
+from django.core.management.base import OutputWrapper
 
+from core.errors import IntegrationAuthenticationError, IntegrationContext, IntegrationUnavailableError, RetryBudget
 from core.importers.snipeit import IMPORT_NOTE, SnipeITClient, SnipeITImporter, _clean_field_name
 from core.tests.mixins import TenantTestMixin
 from inventory.services import checkout_inventory_item, create_component_allocation
@@ -207,8 +211,10 @@ def _make_client_mock(pages: dict | None = None) -> SnipeITClient:
     client = SnipeITClient.__new__(SnipeITClient)
     client.base_url = "https://snipe.example"
     client.PAGE_SIZE = 500
+    client.context = IntegrationContext(provider="snipe-it", operation="test")
+    client.retry_budget_factory = RetryBudget
 
-    def fake_get(endpoint, params=None, _retries=0):
+    def fake_get(endpoint, params=None, **kwargs):
         path = endpoint.split("?")[0]
         for prefix, data in defaults.items():
             if path == prefix or path.startswith(prefix + "/"):
@@ -460,7 +466,7 @@ class TestSnipeITImporter(TenantTestMixin):
             ],
         }
 
-        def fake_get(endpoint, params=None, _retries=0):
+        def fake_get(endpoint, params=None, **kwargs):
             if endpoint == "/api/v1/statuslabels":
                 if (params or {}).get("offset", 0) == 0:
                     return two_page_labels
@@ -472,6 +478,8 @@ class TestSnipeITImporter(TenantTestMixin):
         client = SnipeITClient.__new__(SnipeITClient)
         client.base_url = "https://snipe.example"
         client.PAGE_SIZE = 2
+        client.context = IntegrationContext(provider="snipe-it", operation="test")
+        client.retry_budget_factory = RetryBudget
         client._get = fake_get
 
         with TaskContext(tenant_id=self.tenant.pk, user_id=self.admin.pk):
@@ -519,3 +527,49 @@ class TestSnipeITImporter(TenantTestMixin):
         # own, so omitting either callable fails at construction, not mid-import.
         with pytest.raises(TypeError):
             SnipeITImporter(client=_make_client_mock(), tenant=self.tenant, user=self.admin)
+
+    @pytest.mark.parametrize("abort_during_import", [False, True])
+    def test_management_command_reports_safe_integration_failures(self, abort_during_import, monkeypatch, caplog):
+        from django.core.management.base import CommandError
+
+        from core.management.commands import import_snipeit
+
+        secret = "customer@example.test bearer-secret"
+        client = MagicMock()
+        client.base_url = "https://snipe.example"
+        context = IntegrationContext(provider="snipe-it", operation="import", tenant_id=self.tenant.pk)
+        if abort_during_import:
+            client.get_detail.return_value = {"id": 1}
+            importer = MagicMock()
+            importer.run.side_effect = IntegrationUnavailableError(context=context, cause_type="Timeout")
+        else:
+            client.get_detail.side_effect = IntegrationAuthenticationError(context=context, cause_type="HTTPError")
+            importer = MagicMock()
+
+        monkeypatch.setenv("SNIPEIT_TOKEN", secret)
+        monkeypatch.setattr("core.importers.snipeit.SnipeITClient", MagicMock(return_value=client))
+        monkeypatch.setattr("core.importers.snipeit.SnipeITImporter", MagicMock(return_value=importer))
+        command = import_snipeit.Command()
+        output = StringIO()
+        command.stdout = OutputWrapper(output)
+        options = {
+            "token_env": "SNIPEIT_TOKEN",
+            "url": "https://user:password@snipe.example/?token=query-secret",
+            "tenant": self.tenant.slug,
+            "map_companies_to_tenants": False,
+            "dry_run": True,
+            "update": False,
+            "skip": "",
+            "admin_user": self.admin.username,
+        }
+
+        expected = pytest.raises(SystemExit) if abort_during_import else pytest.raises(CommandError)
+        with caplog.at_level(logging.ERROR), expected as raised:
+            command.handle(**options)
+
+        if abort_during_import:
+            assert raised.value.code == 1
+        combined = caplog.text + output.getvalue()
+        assert "integration" in combined.lower()
+        assert secret not in combined
+        assert "query-secret" not in combined

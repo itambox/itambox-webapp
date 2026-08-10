@@ -5,7 +5,7 @@ from django.conf import settings
 from django.contrib import messages
 from django.contrib.auth.mixins import LoginRequiredMixin, PermissionRequiredMixin
 from django.contrib.contenttypes.models import ContentType
-from django.core.exceptions import ImproperlyConfigured
+from django.core.exceptions import FieldDoesNotExist, ImproperlyConfigured
 from django.db import models, transaction
 from django.http import Http404
 from django.shortcuts import redirect
@@ -203,7 +203,7 @@ class ObjectImportView(PermissionRequiredMixin, LoginRequiredMixin, BaseHTMXView
                 continue
             try:
                 field = model._meta.get_field(name)
-            except Exception:
+            except FieldDoesNotExist:
                 fields_info.append(
                     {"name": name, "required": name in required, "accessor": "", "description": "", "choices": []}
                 )

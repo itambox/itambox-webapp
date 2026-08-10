@@ -147,6 +147,7 @@ PYTHONPATH=itambox uv run --locked --group dev python -m pytest -q -p no:cachepr
   itambox/assets/tests/test_requests.py \
   itambox/core/tests/test_import_boundaries.py \
   itambox/core/tests/test_csp_nonce_context.py \
+  itambox/core/tests/test_csv_import_error_contracts.py \
   itambox/core/tests/test_e2e_workflow.py \
   itambox/core/tests/test_global_label_template_permissions.py \
   itambox/core/tests/test_html_sanitizer.py \
@@ -218,6 +219,7 @@ PYTHONPATH=itambox uv run --locked --group dev python -m pytest -q -p no:cachepr
   itambox/core/tests/test_media_isolation.py \
   itambox/core/tests/test_multi_tenant_auth.py \
   itambox/core/tests/test_security.py \
+  itambox/core/tests/test_snipeit_error_contracts.py \
   itambox/itambox/tests/test_capability_surfaces.py \
   itambox/procurement/tests/test_concurrency.py \
   itambox/procurement/tests/test_localization.py \

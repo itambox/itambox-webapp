@@ -11,10 +11,13 @@ from __future__ import annotations
 
 import datetime
 import logging
+import math
 import re
 import time
+from collections.abc import Callable
 from decimal import Decimal, InvalidOperation
 from typing import Iterator
+from urllib.parse import urlsplit, urlunsplit
 
 import requests
 from dateutil.relativedelta import relativedelta
@@ -22,7 +25,25 @@ from django.contrib.contenttypes.models import ContentType
 from django.db import transaction
 from django.utils import timezone
 from django.utils.text import slugify
+from django.views.decorators.debug import sensitive_variables
+from requests import exceptions as requests_exceptions
 
+from core.context import get_current_request_id
+from core.errors import (
+    MAX_RETRY_AFTER_SECONDS,
+    IntegrationAuthenticationError,
+    IntegrationConfigurationError,
+    IntegrationContext,
+    IntegrationContractError,
+    IntegrationError,
+    IntegrationNotFoundError,
+    IntegrationRateLimitedError,
+    IntegrationRequestError,
+    IntegrationRetryBudgetExceededError,
+    IntegrationUnavailableError,
+    IntegrationUnexpectedError,
+    RetryBudget,
+)
 from core.tasks.context import TaskContext
 
 logger = logging.getLogger(__name__)
@@ -35,8 +56,7 @@ IMPORT_NOTE = "Imported from Snipe-IT"
 # ---------------------------------------------------------------------------
 
 
-class SnipeITError(Exception):
-    pass
+SnipeITError = IntegrationError
 
 
 # ---------------------------------------------------------------------------
@@ -49,8 +69,20 @@ class SnipeITClient:
 
     PAGE_SIZE = 500
 
-    def __init__(self, base_url: str, token: str):
-        self.base_url = base_url.rstrip("/")
+    @sensitive_variables("token")
+    def __init__(
+        self,
+        base_url: str,
+        token: str,
+        *,
+        context: IntegrationContext | None = None,
+        retry_budget_factory: Callable[[], RetryBudget] | None = None,
+    ):
+        parsed = urlsplit(base_url)
+        safe_netloc = parsed.netloc.rsplit("@", 1)[-1]
+        self.base_url = urlunsplit((parsed.scheme, safe_netloc, parsed.path.rstrip("/"), "", ""))
+        self.context = context or IntegrationContext(provider="snipe-it", operation="import")
+        self.retry_budget_factory = retry_budget_factory or RetryBudget
         self._session = requests.Session()
         self._session.headers.update(
             {
@@ -62,39 +94,129 @@ class SnipeITClient:
     def get_all(self, endpoint: str, params: dict | None = None) -> Iterator[dict]:
         """Yield every row from a paginated list endpoint."""
         offset = 0
+        budget = self.retry_budget_factory()
         while True:
-            data = self._get(endpoint, {**(params or {}), "limit": self.PAGE_SIZE, "offset": offset})
-            rows = data.get("rows") or []
+            data = self._get(
+                endpoint,
+                {**(params or {}), "limit": self.PAGE_SIZE, "offset": offset},
+                budget=budget,
+                operation="collection.list",
+            )
+            rows = data.get("rows")
+            total = data.get("total")
+            if not isinstance(rows, list) or any(not isinstance(row, dict) for row in rows):
+                raise IntegrationContractError(context=self._operation_context("collection.list"))
+            if not isinstance(total, int) or isinstance(total, bool) or total < 0:
+                raise IntegrationContractError(context=self._operation_context("collection.list"))
             yield from rows
             offset += len(rows)
-            if offset >= (data.get("total") or 0) or not rows:
+            if offset >= total or not rows:
                 break
 
     def get_detail(self, endpoint: str) -> dict:
         """GET a single resource."""
-        return self._get(endpoint)
+        return self._get(endpoint, budget=self.retry_budget_factory(), operation="detail.get")
 
-    def _get(self, endpoint: str, params: dict | None = None, _retries: int = 0) -> dict:
+    def _operation_context(self, operation: str) -> IntegrationContext:
+        return IntegrationContext(
+            provider=self.context.provider,
+            operation=operation,
+            tenant_id=self.context.tenant_id,
+            actor_id=self.context.actor_id,
+            request_id=self.context.request_id,
+        )
+
+    @staticmethod
+    def _parse_retry_after(headers) -> float | None:
+        value = headers.get("Retry-After")
+        try:
+            parsed = float(value)
+        except (TypeError, ValueError):
+            return None
+        if not math.isfinite(parsed):
+            return None
+        return max(0.0, min(parsed, MAX_RETRY_AFTER_SECONDS))
+
+    @sensitive_variables()
+    def _get(
+        self,
+        endpoint: str,
+        params: dict | None = None,
+        *,
+        budget: RetryBudget | None = None,
+        operation: str = "request.get",
+    ) -> dict:
         url = f"{self.base_url}{endpoint}"
+        context = self._operation_context(operation)
+        response = self._request(url, params=params, context=context, budget=budget or RetryBudget())
+        self._raise_response_error(response, context=context)
+        return self._parse_response(response, context=context)
+
+    @sensitive_variables()
+    def _request(self, url: str, *, params: dict | None, context: IntegrationContext, budget: RetryBudget):
+        while True:
+            try:
+                response = self._session.get(url, params=params, timeout=30, allow_redirects=False)
+            except (
+                requests_exceptions.SSLError,
+                requests_exceptions.InvalidURL,
+                requests_exceptions.MissingSchema,
+                requests_exceptions.TooManyRedirects,
+            ) as exc:
+                raise IntegrationConfigurationError(context=context, cause_type=type(exc).__name__) from None
+            except requests_exceptions.RequestException as exc:
+                raise IntegrationUnavailableError(context=context, cause_type=type(exc).__name__) from None
+            if response.status_code != 429:
+                return response
+
+            retry_after = self._parse_retry_after(response.headers)
+            rate_limited = IntegrationRateLimitedError(
+                context=context,
+                status_code=response.status_code,
+                retry_after=retry_after,
+            )
+            delay = budget.next_delay(retry_after, now=time.monotonic())
+            if delay is None:
+                if budget.attempts == 0:
+                    raise rate_limited
+                raise IntegrationRetryBudgetExceededError(
+                    context=context,
+                    status_code=response.status_code,
+                    retry_after=rate_limited.retry_after,
+                ) from rate_limited
+            log_extra = rate_limited.log_extra(retry_count=budget.attempts, retry_delay=delay)
+            logger.warning(
+                "Snipe-IT request rate-limited; retrying integration=%s",
+                log_extra["integration"],
+                extra=log_extra,
+            )
+            time.sleep(delay)
+
+    @staticmethod
+    def _raise_response_error(response, *, context: IntegrationContext) -> None:
+        status_code = response.status_code
+        if status_code in (401, 403):
+            raise IntegrationAuthenticationError(context=context, status_code=status_code)
+        if status_code == 404:
+            raise IntegrationNotFoundError(context=context, status_code=status_code)
+        if status_code >= 500:
+            raise IntegrationUnavailableError(context=context, status_code=status_code)
+        if status_code >= 400:
+            raise IntegrationRequestError(context=context, status_code=status_code)
+
+    @staticmethod
+    def _parse_response(response, *, context: IntegrationContext) -> dict:
         try:
-            resp = self._session.get(url, params=params, timeout=30)
-        except requests.RequestException as exc:
-            raise SnipeITError(f"Network error fetching {url}: {exc}") from exc
-
-        if resp.status_code == 429:
-            wait = int(resp.headers.get("Retry-After", 30))
-            if _retries < 5:
-                logger.warning("Snipe-IT rate-limited — sleeping %ds (retry %d)", wait, _retries + 1)
-                time.sleep(wait)
-                return self._get(endpoint, params=params, _retries=_retries + 1)
-            raise SnipeITError(f"Rate-limited after 5 retries on {url}")
-
-        try:
-            resp.raise_for_status()
-        except requests.HTTPError as exc:
-            raise SnipeITError(f"HTTP {resp.status_code} from {url}: {exc}") from exc
-
-        return resp.json()
+            data = response.json()
+        except (TypeError, ValueError) as exc:
+            raise IntegrationContractError(
+                context=context,
+                status_code=response.status_code,
+                cause_type=type(exc).__name__,
+            ) from None
+        if not isinstance(data, dict):
+            raise IntegrationContractError(context=context, status_code=response.status_code)
+        return data
 
 
 # ---------------------------------------------------------------------------
@@ -319,6 +441,34 @@ class SnipeITImporter:
             self.job.append_log(msg)
         logger.info(msg)
 
+    def _record_failure(self, operation: str, object_id: int, exc: Exception, counter: dict | None = None) -> None:
+        """Record a safe row/subresource failure without payload or exception text."""
+        request_id = get_current_request_id()
+        context = IntegrationContext(
+            provider="snipe-it",
+            operation=operation,
+            tenant_id=getattr(self.default_tenant, "pk", None),
+            actor_id=getattr(self.user, "pk", None),
+            request_id=str(request_id) if request_id else None,
+        )
+        error = (
+            exc
+            if isinstance(exc, IntegrationError)
+            else IntegrationUnexpectedError(
+                context=context,
+                cause_type=type(exc).__name__,
+            )
+        )
+        extra = error.log_extra(cause_type=None if isinstance(exc, IntegrationError) else type(exc).__name__)
+        logger.warning("Snipe-IT import item degraded integration=%s", extra["integration"], extra=extra)
+        message = f"  ! {operation}: one item could not be imported"
+        if self._stdout:
+            self._stdout.write(message)
+        if self.job:
+            self.job.append_log(message)
+        if counter is not None:
+            counter["failed"] += 1
+
     def _counter(self, key: str) -> dict:
         if key not in self.counts:
             self.counts[key] = {"created": 0, "updated": 0, "skipped": 0, "failed": 0}
@@ -379,8 +529,8 @@ class SnipeITImporter:
                     c["created"] += 1
                     self._status_map[sid] = obj
             except Exception as exc:
-                self._log(f"  ! statuslabel {sid} '{name}': {exc}")
-                c["failed"] += 1
+                # broad except: task-isolation: one remote row must not abort the reviewed import batch
+                self._record_failure("statuslabels.persist", sid, exc, c)
         self._finish(key)
 
     # ------------------------------------------------------------------
@@ -415,8 +565,8 @@ class SnipeITImporter:
                     c["created" if created else "skipped"] += 1
                     self._manufacturer_map[sid] = obj
             except Exception as exc:
-                self._log(f"  ! manufacturer {sid} '{name}': {exc}")
-                c["failed"] += 1
+                # broad except: task-isolation: one remote row must not abort the reviewed import batch
+                self._record_failure("manufacturers.persist", sid, exc, c)
         self._finish(key)
 
     # ------------------------------------------------------------------
@@ -455,8 +605,8 @@ class SnipeITImporter:
                     c["created"] += 1
                     self._category_map[sid] = obj
             except Exception as exc:
-                self._log(f"  ! category {sid} '{name}': {exc}")
-                c["failed"] += 1
+                # broad except: task-isolation: one remote row must not abort the reviewed import batch
+                self._record_failure("categories.persist", sid, exc, c)
         self._finish(key)
 
     # ------------------------------------------------------------------
@@ -527,8 +677,8 @@ class SnipeITImporter:
                     c["created"] += 1
                     self._supplier_map[sid] = obj
             except Exception as exc:
-                self._log(f"  ! supplier {sid} '{name}': {exc}")
-                c["failed"] += 1
+                # broad except: task-isolation: one remote row must not abort the reviewed import batch
+                self._record_failure("suppliers.persist", sid, exc, c)
         self._finish(key)
 
     # ------------------------------------------------------------------
@@ -561,8 +711,8 @@ class SnipeITImporter:
                     c["created"] += 1
                     self._tenant_map[sid] = obj
             except Exception as exc:
-                self._log(f"  ! company {sid} '{name}': {exc}")
-                c["failed"] += 1
+                # broad except: task-isolation: one remote row must not abort the reviewed import batch
+                self._record_failure("companies.persist", sid, exc, c)
         self._finish(key)
 
     # ------------------------------------------------------------------
@@ -641,16 +791,16 @@ class SnipeITImporter:
                 try:
                     _upsert_location(row)
                 except Exception as exc:
-                    self._log(f"  ! location {row['id']} (pass 1): {exc}")
-                    c["failed"] += 1
+                    # broad except: task-isolation: one remote row must not abort the reviewed import batch
+                    self._record_failure("locations.pass1", row["id"], exc, c)
 
         for row in rows:
             if _nested_id(row.get("parent")):
                 try:
                     _upsert_location(row)
                 except Exception as exc:
-                    self._log(f"  ! location {row['id']} (pass 2): {exc}")
-                    c["failed"] += 1
+                    # broad except: task-isolation: one remote row must not abort the reviewed import batch
+                    self._record_failure("locations.pass2", row["id"], exc, c)
 
         self._finish(key)
 
@@ -704,8 +854,8 @@ class SnipeITImporter:
                     c["created"] += 1
                     self._holder_map[sid] = obj
             except Exception as exc:
-                self._log(f"  ! user {sid} '{upn}': {exc}")
-                c["failed"] += 1
+                # broad except: task-isolation: one remote row must not abort the reviewed import batch
+                self._record_failure("users.persist", sid, exc, c)
         self._finish(key)
 
     # ------------------------------------------------------------------
@@ -755,8 +905,8 @@ class SnipeITImporter:
                     c["created"] += 1
                     self._field_map[db_col] = obj
             except Exception as exc:
-                self._log(f"  ! field {sid} '{raw_name}': {exc}")
-                c["failed"] += 1
+                # broad except: task-isolation: one remote row must not abort the reviewed import batch
+                self._record_failure("fields.persist", sid, exc, c)
         self._finish(key)
 
     # ------------------------------------------------------------------
@@ -797,8 +947,8 @@ class SnipeITImporter:
                     c["created"] += 1
                     self._fieldset_map[sid] = obj
             except Exception as exc:
-                self._log(f"  ! fieldset {sid} '{name}': {exc}")
-                c["failed"] += 1
+                # broad except: task-isolation: one remote row must not abort the reviewed import batch
+                self._record_failure("fieldsets.persist", sid, exc, c)
         self._finish(key)
 
     # ------------------------------------------------------------------
@@ -852,8 +1002,8 @@ class SnipeITImporter:
                     c["created"] += 1
                     self._model_map[sid] = obj
             except Exception as exc:
-                self._log(f"  ! model {sid} '{model_name}': {exc}")
-                c["failed"] += 1
+                # broad except: task-isolation: one remote row must not abort the reviewed import batch
+                self._record_failure("models.persist", sid, exc, c)
         self._finish(key)
 
     # ------------------------------------------------------------------
@@ -992,8 +1142,8 @@ class SnipeITImporter:
                     self._asset_map[sid] = obj
 
             except Exception as exc:
-                self._log(f"  ! asset {sid} '{asset_tag}': {exc}")
-                c["failed"] += 1
+                # broad except: task-isolation: one remote row must not abort the reviewed import batch
+                self._record_failure("assets.persist", sid, exc, c)
                 continue
 
             # Handle checkout / assignment
@@ -1035,7 +1185,8 @@ class SnipeITImporter:
                                 notes="Imported from Snipe-IT",
                             )
             except Exception as exc:
-                self._log(f"  ! checkout asset {sid}: {exc}")
+                # broad except: boundary-isolation: optional checkout failure must not discard the asset
+                self._record_failure("assets.checkout", sid, exc)
 
         self._finish(key)
 
@@ -1105,8 +1256,8 @@ class SnipeITImporter:
                     c["created"] += 1
 
             except Exception as exc:
-                self._log(f"  ! accessory {sid} '{name}': {exc}")
-                c["failed"] += 1
+                # broad except: task-isolation: one remote row must not abort the reviewed import batch
+                self._record_failure("accessories.persist", sid, exc, c)
 
         self._finish(key)
 
@@ -1153,7 +1304,8 @@ class SnipeITImporter:
                     continue
                 self._import_assignment(accessory, qty, holder=holder)
         except Exception as exc:
-            logger.warning("Could not import checkouts for accessory %s: %s", snipe_id, exc)
+            # broad except: boundary-isolation: optional checkouts may degrade without discarding the parent item
+            self._record_failure("accessories.checkouts", snipe_id, exc)
 
     # ------------------------------------------------------------------
     # Consumables
@@ -1211,8 +1363,8 @@ class SnipeITImporter:
                     c["created"] += 1
 
             except Exception as exc:
-                self._log(f"  ! consumable {sid} '{name}': {exc}")
-                c["failed"] += 1
+                # broad except: task-isolation: one remote row must not abort the reviewed import batch
+                self._record_failure("consumables.persist", sid, exc, c)
 
         self._finish(key)
 
@@ -1274,8 +1426,8 @@ class SnipeITImporter:
                     c["created"] += 1
 
             except Exception as exc:
-                self._log(f"  ! component {sid} '{name}': {exc}")
-                c["failed"] += 1
+                # broad except: task-isolation: one remote row must not abort the reviewed import batch
+                self._record_failure("components.persist", sid, exc, c)
 
         self._finish(key)
 
@@ -1302,7 +1454,8 @@ class SnipeITImporter:
                     continue
                 self._import_assignment(component, qty, asset=asset)
         except Exception as exc:
-            logger.warning("Could not import allocations for component %s: %s", snipe_id, exc)
+            # broad except: boundary-isolation: optional allocations may degrade without discarding the component
+            self._record_failure("components.allocations", snipe_id, exc)
 
     # ------------------------------------------------------------------
     # Licenses + seat assignments
@@ -1405,8 +1558,8 @@ class SnipeITImporter:
                     c["created"] += 1
 
             except Exception as exc:
-                self._log(f"  ! license {sid} '{name}': {exc}")
-                c["failed"] += 1
+                # broad except: task-isolation: one remote row must not abort the reviewed import batch
+                self._record_failure("licenses.persist", sid, exc, c)
 
         self._finish(key)
 
@@ -1438,7 +1591,8 @@ class SnipeITImporter:
                         defaults={"notes": "Imported from Snipe-IT"},
                     )
         except Exception as exc:
-            logger.warning("Could not import seats for license %s: %s", snipe_id, exc)
+            # broad except: boundary-isolation: optional seats may degrade without discarding the license
+            self._record_failure("licenses.seats", snipe_id, exc)
 
     # ------------------------------------------------------------------
     # Maintenances
@@ -1507,7 +1661,7 @@ class SnipeITImporter:
                     c["created"] += 1
 
             except Exception as exc:
-                self._log(f"  ! maintenance {sid} (asset {asset_id}): {exc}")
-                c["failed"] += 1
+                # broad except: task-isolation: one remote row must not abort the reviewed import batch
+                self._record_failure("maintenances.persist", sid, exc, c)
 
         self._finish(key)

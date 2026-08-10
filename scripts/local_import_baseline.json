@@ -1103,12 +1103,6 @@
     },
     {
       "path": "itambox/core/forms/import_forms.py",
-      "context": "ClassDef:BulkImportForm/FunctionDef:import_data",
-      "statement": "from django.db import transaction",
-      "count": 1
-    },
-    {
-      "path": "itambox/core/forms/import_forms.py",
       "context": "ClassDef:BulkImportForm/FunctionDef:map_row",
       "statement": "from django.db import models as _models",
       "count": 1

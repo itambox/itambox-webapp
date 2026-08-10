@@ -6,12 +6,27 @@ from django.core.exceptions import ValidationError
 from django.db import transaction
 from django.utils.translation import gettext_lazy as _
 
+from core.context import get_current_request_id
 from core.models import Job, Notification
 
 from .context import TaskContext
 from .utils import reverse_job_detail
 
 logger = logging.getLogger(__name__)
+IMPORT_ABORT_MESSAGE = "The import could not be completed due to an unexpected error."
+
+
+def _task_log_extra(*, operation, tenant_id, actor_id, exception_type=None):
+    request_id = get_current_request_id()
+    context = {
+        "operation": operation,
+        "tenant_id": tenant_id,
+        "actor_id": actor_id,
+        "request_id": str(request_id) if request_id else None,
+    }
+    if exception_type is not None:
+        context["exception_type"] = exception_type
+    return {"import_context": context}
 
 
 def import_csv_task(
@@ -92,13 +107,16 @@ def import_csv_task(
                     target_url=reverse_job_detail(job.pk),
                 )
 
-            except Exception as e:
-                # The raw exception (str(e)) can carry DB driver text / SQL
-                # fragments / internal paths — log it server-side only and surface
-                # a generic message to the user. The job log carries the details
-                # for an operator who can already see them.
-                logger.exception("Exception during async import task")
-                job.mark_failed(str(e))
+            except Exception as exc:
+                # broad except: task-isolation: task aborts must leave a safe job result and notification
+                extra = _task_log_extra(
+                    operation="task.run",
+                    tenant_id=tenant_id,
+                    actor_id=user_id,
+                    exception_type=type(exc).__name__,
+                )
+                logger.error("Asynchronous import aborted import_context=%s", extra["import_context"], extra=extra)
+                job.mark_failed(IMPORT_ABORT_MESSAGE)
                 Notification.objects.create(
                     user=ctx.user,
                     subject=_("Bulk Import Error"),
@@ -106,5 +124,13 @@ def import_csv_task(
                     level=Notification.LEVEL_DANGER,
                     target_url=reverse_job_detail(job.pk),
                 )
-        except Exception:
-            logger.exception("Outer exception during async import task")
+        except Exception as exc:
+            # broad except: cleanup-reraise: record safe task context before worker-level propagation
+            extra = _task_log_extra(
+                operation="task.cleanup",
+                tenant_id=tenant_id,
+                actor_id=user_id,
+                exception_type=type(exc).__name__,
+            )
+            logger.error("Asynchronous import cleanup failed import_context=%s", extra["import_context"], extra=extra)
+            raise

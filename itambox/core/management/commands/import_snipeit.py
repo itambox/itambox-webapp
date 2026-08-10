@@ -16,6 +16,7 @@ Out of scope (v1): images/file uploads, activity history, depreciation schedules
 kits, Snipe "requestable" requests.
 """
 
+import logging
 import os
 import sys
 
@@ -23,9 +24,11 @@ from django.contrib.auth import get_user_model
 from django.core.management.base import BaseCommand, CommandError
 from django.utils import timezone
 
+from core.errors import IntegrationContext
 from inventory.services import checkout_inventory_item, create_component_allocation
 
 User = get_user_model()
+logger = logging.getLogger(__name__)
 
 
 class Command(BaseCommand):
@@ -127,6 +130,18 @@ class Command(BaseCommand):
             if not user:
                 raise CommandError("No superuser found. Create one first or pass --admin-user.")
 
+        client = SnipeITClient(
+            base_url=base_url,
+            token=token,
+            context=IntegrationContext(
+                provider="snipe-it",
+                operation="import",
+                tenant_id=tenant.pk if tenant else None,
+                actor_id=user.pk,
+            ),
+        )
+        base_url = client.base_url
+
         if dry_run:
             self.stdout.write(self.style.WARNING("\n[DRY RUN] No data will be written to the database.\n"))
 
@@ -164,16 +179,20 @@ class Command(BaseCommand):
         if skip:
             self.stdout.write(f"  Skipping: {', '.join(sorted(skip))}")
 
-        client = SnipeITClient(base_url=base_url, token=token)
-
         # Verify connectivity
         try:
             client.get_detail("/api/v1/statuslabels?limit=1&offset=0")
         except SnipeITError as exc:
-            msg = f"Cannot connect to Snipe-IT at {base_url}: {exc}"
+            msg = f"Cannot connect to Snipe-IT: {exc.display_message()}"
+            log_extra = exc.log_extra()
+            logger.error(
+                "Snipe-IT connectivity check failed integration=%s",
+                log_extra["integration"],
+                extra=log_extra,
+            )
             if job:
                 job.mark_failed(msg)
-            raise CommandError(msg) from exc
+            raise CommandError(msg) from None
 
         from core.tasks.context import TaskContext
 
@@ -199,7 +218,13 @@ class Command(BaseCommand):
             try:
                 counts = importer.run()
             except SnipeITError as exc:
-                msg = f"Import aborted: {exc}"
+                msg = f"Import aborted: {exc.display_message()}"
+                log_extra = exc.log_extra()
+                logger.error(
+                    "Snipe-IT import aborted integration=%s",
+                    log_extra["integration"],
+                    extra=log_extra,
+                )
                 self.stdout.write(self.style.ERROR(msg))
                 if job:
                     job.mark_failed(msg)
