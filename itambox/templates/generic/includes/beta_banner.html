@@ -23,7 +23,8 @@ stays `beta-module-banner` so the existing dismissal script keeps working.
           </ul>
         {% endif %}
         <a class="small"
-           href="{% static 'docs/' %}{{ capability_notice.docs_url|cut:'.md' }}.html">
+           href="{% static 'docs/' %}{{ capability_notice.docs_url|cut:'.md' }}.html"
+           hx-boost="false">
           {% translate "Read the capability contract" %}
         </a>
       </div>

@@ -16,6 +16,7 @@ import './form-submit-loading';
 import './sidebar';
 import './dashboard';
 import './modal-handler';
+import './boost-guard';
 import './audit';
 import './scanner';
 import './scan-basket';
