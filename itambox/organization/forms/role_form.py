@@ -13,6 +13,7 @@ from django import forms
 from django.apps import apps as django_apps
 from django.contrib.auth import get_user_model
 from django.contrib.auth.models import Permission
+from django.db.models import Q
 from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
 
@@ -362,11 +363,34 @@ for _plugin_key, _plugin_app in (("docusignenvelope", "itambox_esign"),):
 
 
 # Custom (non-CRUD) permissions exposed as named checkboxes alongside the matrix.
-CUSTOM_PERMISSIONS = [
-    ("add_delegated_assetrequest", _("Submit asset requests on behalf of others"), "assets.add_delegated_assetrequest"),
-    ("receive_purchaseorder", _("Receive purchase orders"), "procurement.receive_purchaseorder"),
-    ("approve_purchaseorder", _("Approve purchase orders"), "procurement.approve_purchaseorder"),
-]
+# Derived dynamically from the live permission table (everything declared via
+# ``Meta.permissions``) so newly added custom codenames are never invisible to
+# the role editor again (gap hit on #296 with prepare/export custody receipts).
+def get_custom_permissions():
+    """All non-CRUD permissions as ``(field_key, label, full_codename)`` tuples.
+
+    ``field_key`` combines app label and codename so the generated ``perm_*``
+    form fields stay unique even when two apps declare the same codename.
+    """
+    non_crud = (
+        ~Q(codename__startswith="view_")
+        & ~Q(codename__startswith="add_")
+        & ~Q(codename__startswith="change_")
+        & ~Q(codename__startswith="delete_")
+    )
+    permissions = (
+        Permission.objects.select_related("content_type")
+        .filter(non_crud)
+        .order_by("content_type__app_label", "codename")
+    )
+    return [
+        (
+            f"{permission.content_type.app_label}_{permission.codename}",
+            permission.name,
+            f"{permission.content_type.app_label}.{permission.codename}",
+        )
+        for permission in permissions
+    ]
 
 
 class RoleForm(forms.ModelForm):
@@ -429,8 +453,9 @@ class RoleForm(forms.ModelForm):
             self.fields[f"perm_{key}_delete"].initial = f"{app}.delete_{model}" in existing_perms
 
         # Custom (non-CRUD) permissions.
-        for codename, label, full in CUSTOM_PERMISSIONS:
-            fname = f"perm_{codename}"
+        self._custom_permissions = get_custom_permissions()
+        for field_key, label, full in self._custom_permissions:
+            fname = f"perm_{field_key}"
             self.fields[fname] = forms.BooleanField(
                 required=False,
                 label=label,
@@ -471,8 +496,8 @@ class RoleForm(forms.ModelForm):
             if cleaned_data.get(f"perm_{key}_delete"):
                 assigned_perms.add(f"{app}.delete_{model}")
 
-        for codename, _label, full in CUSTOM_PERMISSIONS:
-            if cleaned_data.get(f"perm_{codename}"):
+        for field_key, _label, full in self._custom_permissions:
+            if cleaned_data.get(f"perm_{field_key}"):
                 assigned_perms.add(full)
 
         # If any permission is granted, also auto-grant the dashboard perms needed for a
@@ -737,7 +762,7 @@ class RoleForm(forms.ModelForm):
 
     @property
     def custom_permission_fields(self):
-        return [(label, self[f"perm_{codename}"]) for codename, label, _ in CUSTOM_PERMISSIONS]
+        return [(label, self[f"perm_{field_key}"]) for field_key, label, _ in self._custom_permissions]
 
 
 class RoleFilterForm(FilterForm):

@@ -7910,14 +7910,6 @@
     {
       "path": "itambox/organization/forms/__init__.py",
       "code": "F401",
-      "message": "'.role_form.CUSTOM_PERMISSIONS' imported but unused",
-      "source": "from .role_form import (",
-      "context": "Module:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/organization/forms/__init__.py",
-      "code": "F401",
       "message": "'.role_form.MATRIX_MODELS' imported but unused",
       "source": "from .role_form import (",
       "context": "Module:body",

@@ -11,7 +11,6 @@ from .membership_form import (
 from .region_form import RegionFilterForm, RegionForm
 from .resource_grant_form import TenantResourceGrantForm
 from .role_form import (
-    CUSTOM_PERMISSIONS,
     MATRIX_MODELS,
     RoleAssignUsersForm,
     RoleFilterForm,
