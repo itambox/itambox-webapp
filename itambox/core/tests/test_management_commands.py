@@ -82,16 +82,31 @@ class ManagementCommandsTestCase(TransactionTestCase):
         admin_accounts = User.objects.filter(username="admin") | User.objects.filter(username__startswith="admin@")
         self.assertGreater(admin_accounts.count(), 0)
         for user in admin_accounts:
+            self.assertTrue(
+                Membership._base_manager.filter(user=user, is_active=True).exists(),
+                user.username,
+            )
             self.assertFalse(
                 AssetHolder._base_manager.filter(user=user, deleted_at__isnull=True).exists(),
                 user.username,
             )
 
-    def test_seed_access_invariant_fails_closed_and_exempts_admin_accounts(self):
+    def test_seed_access_invariant_requires_admin_memberships_but_exempts_admin_holders(self):
         tenant = Tenant.objects.create(name="Seed Invariant Tenant", slug="seed-invariant-tenant")
         admin = User.objects.create_user(username="admin", password="password")
         org_admin = User.objects.create_user(username="admin@example.com", password="password")
+
+        for user in (admin, org_admin):
+            with self.subTest(user=user.username), pytest.raises(CommandError, match="no active membership"):
+                check_seed_access_invariants([user])
+            Membership._base_manager.create(user=user, tenant=tenant, is_active=True)
+
         check_seed_access_invariants([admin, org_admin])
+
+        passwordless = User.objects.create(username="passwordless@example.com")
+        passwordless.set_unusable_password()
+        passwordless.save(update_fields=["password"])
+        check_seed_access_invariants([passwordless])
 
         named_person = User.objects.create_user(
             username="named.person@example.com",
@@ -100,6 +115,11 @@ class ManagementCommandsTestCase(TransactionTestCase):
             last_name="Person",
             password="password",
         )
+        membership = Membership._base_manager.create(user=named_person, tenant=tenant, is_active=True)
+        with pytest.raises(CommandError, match="named.person@example.com: 0 active AssetHolder profiles"):
+            check_seed_access_invariants([named_person])
+
+        membership.delete()
         AssetHolder._base_manager.create(
             tenant=tenant,
             user=named_person,
@@ -111,6 +131,9 @@ class ManagementCommandsTestCase(TransactionTestCase):
 
         with pytest.raises(CommandError, match="named.person@example.com: no active membership"):
             check_seed_access_invariants([named_person])
+
+        Membership._base_manager.create(user=named_person, tenant=tenant, is_active=True)
+        check_seed_access_invariants([named_person])
 
     def test_seed_data_refuses_to_wipe_without_force_when_not_debug(self):
         # The destructive clear must be blocked outside DEBUG unless --force is passed.

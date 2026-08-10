@@ -131,23 +131,24 @@ def check_seed_access_invariants(users=None):
     violations = []
 
     for user in users:
-        if _is_admin_seed_account(user) or not user.has_usable_password():
+        if not user.has_usable_password():
             continue
         active_membership_tenant_ids = set(
             Membership._base_manager.filter(user_id=user.pk, is_active=True).values_list("tenant_id", flat=True)
         )
-        holders = AssetHolder._base_manager.filter(
-            user_id=user.pk,
-            deleted_at__isnull=True,
-        )
-        holder_count = holders.count()
         reasons = []
         if not active_membership_tenant_ids:
             reasons.append("no active membership")
-        if holder_count != 1:
-            reasons.append(f"{holder_count} active AssetHolder profiles")
-        elif holders.values_list("tenant_id", flat=True).first() not in active_membership_tenant_ids:
-            reasons.append("holder tenant is not an active membership tenant")
+        if not _is_admin_seed_account(user):
+            holders = AssetHolder._base_manager.filter(
+                user_id=user.pk,
+                deleted_at__isnull=True,
+            )
+            holder_count = holders.count()
+            if holder_count != 1:
+                reasons.append(f"{holder_count} active AssetHolder profiles")
+            elif holders.values_list("tenant_id", flat=True).first() not in active_membership_tenant_ids:
+                reasons.append("holder tenant is not an active membership tenant")
         if reasons:
             violations.append(f"{user.username}: {', '.join(reasons)}")
 
