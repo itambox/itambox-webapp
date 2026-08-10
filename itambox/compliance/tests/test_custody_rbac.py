@@ -11,7 +11,6 @@ from io import StringIO
 from unittest.mock import patch
 
 import pytest
-
 from django.contrib.auth import get_user_model
 from django.contrib.auth.models import Permission
 from django.contrib.contenttypes.models import ContentType
