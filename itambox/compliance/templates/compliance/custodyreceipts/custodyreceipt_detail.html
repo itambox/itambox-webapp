@@ -107,15 +107,15 @@
     <div class="alert alert-info" role="alert">
       <h4 class="alert-title">{% translate "Recipient handoff is ready" %}</h4>
       <p>
-        {% blocktranslate with expires=custody_handoff_expires_at|date:"Y-m-d H:i:s T" %}This one-time handoff expires at {{ expires }}. Pass control of the device to the intended holder before opening it.{% endblocktranslate %}
+        {% blocktranslate with expires=custody_handoff_expires_at|date:"Y-m-d H:i:s T" %}This one-time handoff expires at {{ expires }}. Copy the link and send it to the intended holder — it only works in their account.{% endblocktranslate %}
       </p>
-      <a href="{{ custody_handoff_url }}"
-         class="btn btn-info"
-         target="_blank"
-         rel="noopener">
-        <i class="mdi mdi-open-in-new me-1"></i>
-        {% translate "Open recipient handoff" %}
-      </a>
+      <button type="button"
+              class="btn btn-info"
+              data-copy-value="{{ custody_handoff_url }}"
+              data-copy-feedback="{% translate 'Copied!' %}">
+        <i class="mdi mdi-content-copy me-1"></i>
+        {% translate "Copy recipient handoff link" %}
+      </button>
     </div>
   {% endif %}
   <div class="card shadow-sm">
