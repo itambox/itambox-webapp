@@ -247,6 +247,47 @@ class PluginLoaderTestCase(SimpleTestCase):
 
         record_failure.assert_not_called()
 
+    def test_nested_module_not_found_is_not_treated_as_optional_absence(self):
+        # A ModuleNotFoundError for anything other than the exact optional
+        # "<plugin>.urls" module (e.g. a missing dependency inside an existing
+        # urls.py) must be recorded as a plugin failure, never swallowed as
+        # "optional URLconf absent".
+        dummy_name = "test_mock_plugin_nested_import_error"
+        module_path = Path(__file__).resolve().parents[1] / "urls.py"
+
+        with (
+            self.settings(PLUGINS=[dummy_name], DEBUG=False),
+            patch("itambox.plugins.utils.is_plugin_active", return_value=True),
+            patch("itambox.plugins.utils.record_plugin_failure") as record_failure,
+            patch(
+                "django.apps.apps.get_app_config",
+                return_value=types.SimpleNamespace(base_url=dummy_name),
+            ),
+            patch("importlib.import_module", side_effect=ModuleNotFoundError(name="missing.dependency")),
+        ):
+            runpy.run_path(str(module_path), run_name="issue99_core_urls_nested_import_error")
+
+        record_failure.assert_called_once()
+        self.assertEqual(record_failure.call_args.args[0], dummy_name)
+        self.assertEqual(record_failure.call_args.kwargs["stage"], "urls")
+
+    def test_record_plugin_failure_redacts_configured_secrets_from_diagnostic(self):
+        # The failure diagnostic for the new api/graphql/urls stages must not
+        # carry configured secret values even when the exception text contains
+        # them verbatim.
+        from itambox.plugins.runtime import record_plugin_failure
+
+        dummy_name = "test_mock_plugin_secret_redaction"
+        dummy = DummySettings()
+        dummy.PLUGINS_CONFIG = {dummy_name: {"api_token": "router secret value"}}
+        with patch("itambox.plugins.runtime._settings_object", return_value=dummy):
+            record_plugin_failure(dummy_name, RuntimeError("router secret value"), stage="api")
+
+        diagnostic = dummy.PLUGINS_DIAGNOSTICS[0]
+        self.assertEqual(diagnostic["plugin"], dummy_name)
+        self.assertEqual(diagnostic["stage"], "api")
+        self.assertNotIn("router secret value", str(diagnostic))
+
     def test_loader_min_version_compatible(self):
         dummy_name = "test_mock_plugin_min_ok"
         MockPluginConfig = _api_compatible_config(
