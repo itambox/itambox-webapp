@@ -213,6 +213,7 @@ PYTHONPATH=itambox uv run --locked --group dev python -m pytest -q -p no:cachepr
   itambox/users/tests/test_provider_patch.py \
   itambox/users/tests/test_provider_services.py \
   itambox/users/tests/test_release_blockers_scim.py \
+  itambox/users/tests/test_user_groups.py \
   scripts/tests/test_ci_workflow_policy.py \
   scripts/tests/test_contract_policy.py \
   scripts/tests/test_inline_style_workflow_policy.py \

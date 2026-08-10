@@ -10133,22 +10133,6 @@
     },
     {
       "path": "itambox/users/views.py",
-      "code": "E402",
-      "message": "module level import not at top of file",
-      "source": "from organization.access import accessible_tenant_ids",
-      "context": "Module:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/users/views.py",
-      "code": "E402",
-      "message": "module level import not at top of file",
-      "source": "from organization.models import RoleGrant, Tenant",
-      "context": "Module:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/users/views.py",
       "code": "F401",
       "message": "'.models.UserPreference' imported but unused",
       "source": "from .models import UserPreference",
