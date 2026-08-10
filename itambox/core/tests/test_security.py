@@ -114,6 +114,20 @@ class SecurityHardeningTests(TestCase):
             with self.assertRaises(ValidationError):
                 validate_image_attachment(SimpleUploadedFile("image.png", b"not-an-image"))
 
+    def test_file_magic_fallback_does_not_trust_client_content_type(self):
+        def unavailable_magic(_chunk, _mime):
+            raise RuntimeError("libmagic unavailable")
+
+        fake_magic = SimpleNamespace(from_buffer=unavailable_magic)
+        with patch.dict(sys.modules, {"magic": fake_magic}):
+            # The extension gate stands alone when libmagic is unavailable: a
+            # safe extension with a spoofed client content type is accepted,
+            # but a dangerous extension with the same spoofed type is rejected
+            # regardless of what the client claims.
+            validate_file_attachment(SimpleUploadedFile("notes.txt", b"unknown bytes", content_type="text/html"))
+            with self.assertRaises(ValidationError):
+                validate_file_attachment(SimpleUploadedFile("notes.exe", b"unknown bytes", content_type="text/html"))
+
     @override_settings(RATELIMIT_LIMIT=3, RATELIMIT_PERIOD=60)
     def test_rate_limiting_middleware(self):
         login_url = reverse("login")

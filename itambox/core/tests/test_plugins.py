@@ -1,6 +1,8 @@
+import runpy
 import sys
 import types
 from pathlib import Path
+from unittest.mock import patch
 
 from django.conf import settings
 from django.template.loader import render_to_string
@@ -13,7 +15,7 @@ from rest_framework.test import APITestCase
 from core.templatetags.plugins import plugin_template_content
 from itambox.context_processors import plugin_diagnostics_processor
 from itambox.plugins import PluginConfig
-from itambox.plugins.utils import deep_merge, load_plugins
+from itambox.plugins.utils import deep_merge, is_plugin_active, load_plugins
 from itambox.plugins.views import PluginTemplateContent
 from itambox.registry import registry
 
@@ -157,6 +159,134 @@ class PluginLoaderTestCase(SimpleTestCase):
         self.assertEqual(diagnostic["failure_class"], "ModuleNotFoundError")
         self.assertEqual(diagnostic["stage"], "import")
         self.assertEqual(len(dummy_settings.PLUGINS_DIAGNOSTICS), 1)
+
+    def test_active_settings_fallback_does_not_activate_an_unconfigured_plugin(self):
+        dummy_name = "test_mock_plugin_registry_transition"
+        dummy_settings = DummySettings()
+        dummy_settings.PLUGINS_ACTIVE = [dummy_name]
+
+        with patch("itambox.plugins.runtime.apps.get_app_config", side_effect=LookupError):
+            self.assertTrue(is_plugin_active(dummy_name, dummy_settings))
+            self.assertFalse(is_plugin_active("test_mock_plugin_not_active", dummy_settings))
+
+    def test_rest_router_failure_isolated_from_plugin_router_startup(self):
+        dummy_name = "test_mock_plugin_router_failure"
+        module_path = Path(__file__).resolve().parents[2] / "itambox" / "plugins" / "urls.py"
+
+        with (
+            patch("itambox.plugins.utils.is_plugin_active", return_value=True),
+            patch("itambox.plugins.utils.record_plugin_failure") as record_failure,
+            patch.object(
+                registry,
+                "get_plugin_viewsets",
+                return_value={dummy_name: [("broken", object, "broken")]},
+            ),
+            patch("rest_framework.routers.DefaultRouter.register", side_effect=RuntimeError("router secret")),
+        ):
+            runpy.run_path(str(module_path), run_name="issue99_plugin_urls")
+
+        record_failure.assert_called_once()
+        self.assertEqual(record_failure.call_args.kwargs["stage"], "api")
+
+    def test_graphql_schema_failure_isolated_from_core_schema_startup(self):
+        dummy_name = "test_mock_plugin_graphql_failure"
+        module_path = Path(__file__).resolve().parents[1] / "schema.py"
+
+        with (
+            patch("itambox.plugins.utils.is_plugin_active", return_value=True),
+            patch("itambox.plugins.utils.record_plugin_failure") as record_failure,
+            patch(
+                "django.apps.apps.get_app_config",
+                return_value=types.SimpleNamespace(graphql_schema="test_mock_plugin.graphql"),
+            ),
+            patch("importlib.import_module", side_effect=RuntimeError("schema secret")),
+            self.settings(PLUGINS=[dummy_name]),
+        ):
+            namespace = runpy.run_path(str(module_path), run_name="issue99_core_schema")
+
+        self.assertIn("schema", namespace)
+        record_failure.assert_called_once()
+        self.assertEqual(record_failure.call_args.args[0], dummy_name)
+        self.assertEqual(record_failure.call_args.kwargs["stage"], "graphql")
+
+    def test_plugin_urlconf_failure_isolated_from_core_url_startup(self):
+        dummy_name = "test_mock_plugin_urlconf_failure"
+        module_path = Path(__file__).resolve().parents[1] / "urls.py"
+
+        with (
+            self.settings(PLUGINS=[dummy_name], DEBUG=False),
+            patch("itambox.plugins.utils.is_plugin_active", return_value=True),
+            patch("itambox.plugins.utils.record_plugin_failure") as record_failure,
+            patch(
+                "django.apps.apps.get_app_config",
+                return_value=types.SimpleNamespace(base_url=dummy_name),
+            ),
+            patch("importlib.import_module", side_effect=RuntimeError("urlconf secret")),
+        ):
+            runpy.run_path(str(module_path), run_name="issue99_core_urls")
+
+        record_failure.assert_called_once()
+        self.assertEqual(record_failure.call_args.args[0], dummy_name)
+        self.assertEqual(record_failure.call_args.kwargs["stage"], "urls")
+
+    def test_missing_optional_plugin_urlconf_is_not_reported_as_a_failure(self):
+        dummy_name = "test_mock_plugin_without_urlconf"
+        module_path = Path(__file__).resolve().parents[1] / "urls.py"
+
+        with (
+            self.settings(PLUGINS=[dummy_name], DEBUG=False),
+            patch("itambox.plugins.utils.is_plugin_active", return_value=True),
+            patch("itambox.plugins.utils.record_plugin_failure") as record_failure,
+            patch(
+                "django.apps.apps.get_app_config",
+                return_value=types.SimpleNamespace(base_url=dummy_name),
+            ),
+            patch("importlib.import_module", side_effect=ModuleNotFoundError(name=f"{dummy_name}.urls")),
+        ):
+            runpy.run_path(str(module_path), run_name="issue99_core_urls_without_optional_conf")
+
+        record_failure.assert_not_called()
+
+    def test_nested_module_not_found_is_not_treated_as_optional_absence(self):
+        # A ModuleNotFoundError for anything other than the exact optional
+        # "<plugin>.urls" module (e.g. a missing dependency inside an existing
+        # urls.py) must be recorded as a plugin failure, never swallowed as
+        # "optional URLconf absent".
+        dummy_name = "test_mock_plugin_nested_import_error"
+        module_path = Path(__file__).resolve().parents[1] / "urls.py"
+
+        with (
+            self.settings(PLUGINS=[dummy_name], DEBUG=False),
+            patch("itambox.plugins.utils.is_plugin_active", return_value=True),
+            patch("itambox.plugins.utils.record_plugin_failure") as record_failure,
+            patch(
+                "django.apps.apps.get_app_config",
+                return_value=types.SimpleNamespace(base_url=dummy_name),
+            ),
+            patch("importlib.import_module", side_effect=ModuleNotFoundError(name="missing.dependency")),
+        ):
+            runpy.run_path(str(module_path), run_name="issue99_core_urls_nested_import_error")
+
+        record_failure.assert_called_once()
+        self.assertEqual(record_failure.call_args.args[0], dummy_name)
+        self.assertEqual(record_failure.call_args.kwargs["stage"], "urls")
+
+    def test_record_plugin_failure_redacts_configured_secrets_from_diagnostic(self):
+        # The failure diagnostic for the new api/graphql/urls stages must not
+        # carry configured secret values even when the exception text contains
+        # them verbatim.
+        from itambox.plugins.runtime import record_plugin_failure
+
+        dummy_name = "test_mock_plugin_secret_redaction"
+        dummy = DummySettings()
+        dummy.PLUGINS_CONFIG = {dummy_name: {"api_token": "router secret value"}}
+        with patch("itambox.plugins.runtime._settings_object", return_value=dummy):
+            record_plugin_failure(dummy_name, RuntimeError("router secret value"), stage="api")
+
+        diagnostic = dummy.PLUGINS_DIAGNOSTICS[0]
+        self.assertEqual(diagnostic["plugin"], dummy_name)
+        self.assertEqual(diagnostic["stage"], "api")
+        self.assertNotIn("router secret value", str(diagnostic))
 
     def test_loader_min_version_compatible(self):
         dummy_name = "test_mock_plugin_min_ok"

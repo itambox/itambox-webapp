@@ -188,6 +188,7 @@ nav:
       - Subscription Stable Qualification: 'development/subscription-stable-qualification.md'
       - Security Scanning: 'development/security-scanning.md'
       - Capability Registry: 'development/capability-registry.md'
+      - Optional Capability Fallbacks: 'development/capability-fallbacks.md'
       - Tenant Resource Grant Security: 'development/tenant-resource-grant-security.md'
       - Template and Style Linting: 'development/template-and-style-linting.md'
       - CSP and Inline-Style Policy: 'development/csp-inline-style-policy.md'

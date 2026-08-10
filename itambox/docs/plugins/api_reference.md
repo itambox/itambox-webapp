@@ -11,6 +11,8 @@ Only deployment operators activate plugins by placing an importable package name
 
 A plugin that cannot be imported, is malformed, fails compatibility checks, or raises during startup is disabled. ITAMbox continues starting and publishes a diagnostic; the failed plugin contributes no middleware, URL, REST router, GraphQL schema, menu, or template hook.
 
+The safety boundary and test matrix for this intentional degradation are documented in [Optional Capability Fallbacks](../development/capability-fallbacks.md).
+
 ## `PluginConfig`
 
 A plugin package's `__init__.py` must expose a class assigned to `config` that subclasses `itambox.plugins.PluginConfig`.

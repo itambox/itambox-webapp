@@ -19,6 +19,7 @@ from django.utils import timezone
 from model_bakery import baker
 
 from core.features import BETA, STABLE, is_beta_module, module_maturity
+from itambox.apps import _plugin_activation_probe
 from itambox.capabilities import (
     ALWAYS_ON,
     EXPERIMENTAL,
@@ -37,6 +38,7 @@ REPO_ROOT = Path(__file__).resolve().parents[3]
 DOCS_ROOT = REPO_ROOT / "itambox" / "docs"
 MATURITY_DOC = DOCS_ROOT / "development" / "module-maturity.md"
 REGISTRY_DOC = DOCS_ROOT / "development" / "capability-registry.md"
+FALLBACK_DOC = DOCS_ROOT / "development" / "capability-fallbacks.md"
 README = REPO_ROOT / "README.md"
 
 # The slice this issue declares. Written out rather than derived so a silently
@@ -195,6 +197,14 @@ class TestActivationDefaults:
         state = registry.state("platform.plugins")
         assert (state.active, state.value_present) == (True, True)
         assert "demo_plugin" not in repr(state)
+
+    @override_settings(
+        PLUGINS=("broken_plugin",),
+        PLUGINS_ACTIVE=(),
+        PLUGINS_DIAGNOSTICS=({"plugin": "broken_plugin"},),
+    )
+    def test_a_failed_plugin_does_not_keep_the_platform_capability_active(self):
+        assert _plugin_activation_probe() == ActivationState(active=False, value_present=True)
 
 
 @pytest.mark.django_db
@@ -409,6 +419,20 @@ class TestDocumentationConsistency:
         text = REGISTRY_DOC.read_text(encoding="utf-8")
         for capability in registry.all():
             assert f"`{capability.key}`" in text, f"{capability.key} is undocumented"
+
+    def test_optional_fallback_matrix_is_published_with_security_boundaries(self):
+        text = FALLBACK_DOC.read_text(encoding="utf-8")
+        for marker in (
+            "unresolved_references()",
+            "CapabilityRegistry.state()",
+            "PluginConfig.ready()",
+            "validate_file_attachment()",
+            "validate_image_attachment()",
+            "authentication, authorization, tenant isolation",
+            "Content-Type",
+            "SCIM",
+        ):
+            assert marker in text, f"fallback contract is missing {marker!r}"
 
     def test_the_registry_document_records_the_declared_contract(self):
         rows = _documented_contracts(REGISTRY_DOC)
