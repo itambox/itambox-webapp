@@ -34,6 +34,9 @@ PDF_STYLE_EXCEPTIONS = {
     ),
     "itambox/core/tasks/labels.py": "self-contained HTML is consumed by xhtml2pdf and is not sent as browser HTML",
 }
+UNSAFE_INLINE_EXCEPTIONS = {
+    "itambox/itambox/middleware.py": re.compile(r"style-src-attr 'unsafe-inline'", re.IGNORECASE),
+}
 
 STYLE_ATTRIBUTE_RE = re.compile(r"\bstyle\s*=\s*['\"]", re.IGNORECASE)
 HTML_STYLE_ATTRIBUTE_RE = re.compile(r"<[A-Za-z][^>]*\bstyle\s*=\s*['\"]", re.IGNORECASE | re.DOTALL)
@@ -90,6 +93,9 @@ def scan_source(relative_path: str, text: str) -> list[Finding]:
 
 
 def _unsafe_inline_findings(relative_path: str, text: str) -> list[Finding]:
+    allowed = UNSAFE_INLINE_EXCEPTIONS.get(relative_path)
+    if allowed:
+        text = allowed.sub("style-src-attr <runtime-library-exception>", text)
     return _findings_for_matches(
         relative_path,
         text,

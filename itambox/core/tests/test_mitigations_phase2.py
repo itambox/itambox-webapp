@@ -61,7 +61,7 @@ class MitigationsPhase2Tests(TestCase):
         self.assertIn("script-src", directives)
         self.assertNotIn("'unsafe-inline'", directives["script-src"])
 
-    def test_csp_middleware_blocks_inline_style_attributes(self):
+    def test_csp_middleware_scopes_inline_style_relaxation_to_attributes(self):
         def get_response(req):
             return HttpResponse("Hello")
 
@@ -76,10 +76,17 @@ class MitigationsPhase2Tests(TestCase):
             if len(parts) == 2:
                 directives[parts[0]] = parts[1]
 
-        self.assertNotIn("'unsafe-inline'", csp_header)
+        self.assertNotIn("'unsafe-inline'", directives["style-src"])
         self.assertIn("'nonce-{}'".format(request.csp_nonce), directives["style-src"])
-        self.assertEqual(directives["style-src-attr"], "'none'")
+        self.assertEqual(directives["style-src-attr"], "'unsafe-inline'")
+        self.assertNotIn("'unsafe-inline'", directives["style-src-elem"])
         self.assertIn("'nonce-{}'".format(request.csp_nonce), directives["style-src-elem"])
+
+        request_without_nonce = RequestFactory().get("/")
+        response_without_nonce = middleware.process_response(request_without_nonce, HttpResponse("Hello"))
+        self.assertIn("style-src-attr 'unsafe-inline'", response_without_nonce["Content-Security-Policy"])
+        self.assertNotIn("style-src 'self' 'unsafe-inline'", response_without_nonce["Content-Security-Policy"])
+        self.assertNotIn("style-src-elem 'self' 'unsafe-inline'", response_without_nonce["Content-Security-Policy"])
 
     def test_base_filter_set_scopes_choices(self):
         # Create Tenants

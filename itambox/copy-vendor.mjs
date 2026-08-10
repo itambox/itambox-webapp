@@ -25,15 +25,18 @@ mkdirSync(dist('inter'), { recursive: true });
 
 // Tabler CSS
 cpSync('node_modules/@tabler/core/dist/css/tabler.min.css', dist('tabler/css/tabler.min.css'));
+cpSync('node_modules/@tabler/core/dist/css/tabler.min.css.map', dist('tabler/css/tabler.min.css.map'));
 cpSync('node_modules/@tabler/core/dist/css/tabler-flags.min.css', dist('tabler/css/tabler-flags.min.css'));
 cpSync('node_modules/@tabler/core/dist/css/tabler-payments.min.css', dist('tabler/css/tabler-payments.min.css'));
 cpSync('node_modules/@tabler/core/dist/css/tabler-vendors.min.css', dist('tabler/css/tabler-vendors.min.css'));
+cpSync('node_modules/@tabler/core/dist/css/tabler-vendors.min.css.map', dist('tabler/css/tabler-vendors.min.css.map'));
 
 // Tabler images (flags, payments)
 cpSync('node_modules/@tabler/core/dist/img', dist('tabler/img'), { recursive: true });
 
 // Tom Select CSS
 cpSync('node_modules/tom-select/dist/css/tom-select.bootstrap5.css', dist('tom-select/css/tom-select.bootstrap5.css'));
+cpSync('node_modules/tom-select/dist/css/tom-select.bootstrap5.css.map', dist('tom-select/css/tom-select.bootstrap5.css.map'));
 
 // GridStack CSS
 cpSync('node_modules/gridstack/dist/gridstack.min.css', dist('gridstack/gridstack.min.css'));
