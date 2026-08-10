@@ -4950,14 +4950,6 @@
     {
       "path": "itambox/core/tests/test_management_commands.py",
       "code": "F401",
-      "message": "'organization.models.Tenant' imported but unused",
-      "source": "from organization.models import Tenant",
-      "context": "Module:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/core/tests/test_management_commands.py",
-      "code": "F401",
       "message": "'unittest.mock.MagicMock' imported but unused",
       "source": "from unittest.mock import MagicMock, patch",
       "context": "Module:body",

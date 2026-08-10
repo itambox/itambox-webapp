@@ -476,6 +476,7 @@ and Django-settings fallback for the canonical setting below.
 |---|---|
 | `ITAMBOX_ENV` | Environment selection; fails closed to production |
 | `ITAMBOX_BASE_URL` | Public base URL embedded in QR labels and outbound links |
+| `ITAMBOX_SEED_PASSWORD` | Password assigned to users created by the demo seed; seed-only credential |
 | `ITAMBOX_DEFAULT_CURRENCY` | Fallback ISO 4217 currency for money display |
 | `ITAMBOX_PAGINATOR_COUNT_CAP` | Upper bound of the list-page row counter |
 | `ITAMBOX_SESSION_COOKIE_AGE` | Session lifetime |

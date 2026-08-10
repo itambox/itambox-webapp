@@ -38,6 +38,10 @@ DEBUG = False
 # Set in production to e.g. https://itam.example.com
 ITAMBOX_BASE_URL = os.environ.get("ITAMBOX_BASE_URL", "").rstrip("/")
 
+# Password assigned to users created by the demo seed. The deployed demo can set
+# this independently without changing the source fallback used by local setups.
+SEED_PASSWORD = os.environ.get("ITAMBOX_SEED_PASSWORD", "itambox2026")
+
 # Default display currency (ISO 4217) used when a tenant has not set its own.
 # Affects the {% money %} template filter — display only, no exchange rates.
 ITAMBOX_DEFAULT_CURRENCY = os.environ.get("ITAMBOX_DEFAULT_CURRENCY", "EUR")

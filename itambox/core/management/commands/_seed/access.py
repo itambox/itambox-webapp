@@ -23,15 +23,16 @@ managed tenants, never a second membership.
 import random
 from datetime import timedelta
 
+from django.apps import apps
+from django.conf import settings
 from django.contrib.auth import get_user_model
 from django.contrib.auth.models import Permission
+from django.core.management.base import CommandError
 from django.utils import timezone
 
 from core.mfa import role_is_privileged
 
 User = get_user_model()
-
-SEED_PASSWORD = "itambox2026"
 
 TECHNICIAN_CUSTODY_DENIED_PERMISSIONS = frozenset(
     {
@@ -70,6 +71,87 @@ def _technician_permissions(all_permissions, operational_apps):
         if permission in available and permission not in permissions
     )
     return permissions
+
+
+def _is_admin_seed_account(user):
+    username = (user.username or "").lower()
+    return username == "admin" or username.startswith("admin@")
+
+
+def _holder_name(user):
+    name_parts = (user.email or user.username).split("@", 1)[0].replace("_", ".").split(".")
+    first_name = (user.first_name or name_parts[0] or "Demo").strip()
+    last_name = (user.last_name or " ".join(name_parts[1:]) or "User").strip()
+    return first_name, last_name
+
+
+def _ensure_holder(user, tenant):
+    """Return the user's active holder profile in ``tenant``, creating or linking one."""
+    AssetHolder = apps.get_model("organization", "AssetHolder")
+    fallback_upn = user.email or user.username
+    candidate_upns = [user.username]
+    if fallback_upn not in candidate_upns:
+        candidate_upns.append(fallback_upn)
+
+    for upn in candidate_upns:
+        holder = AssetHolder._base_manager.filter(
+            tenant=tenant,
+            upn=upn,
+            deleted_at__isnull=True,
+        ).first()
+        if holder is None:
+            continue
+        if holder.user_id not in (None, user.pk):
+            raise CommandError(
+                f"Seed holder invariant failed: active UPN {upn!r} in tenant {tenant.slug!r} "
+                f"already belongs to another user."
+            )
+        if holder.user_id is None:
+            holder.user = user
+            holder.save(update_fields=["user"])
+        return holder
+
+    first_name, last_name = _holder_name(user)
+    return AssetHolder._base_manager.create(
+        first_name=first_name,
+        last_name=last_name,
+        upn=fallback_upn,
+        email=fallback_upn,
+        user=user,
+        tenant=tenant,
+    )
+
+
+def check_seed_access_invariants(users=None):
+    """Fail closed unless every seeded named person has one holder and membership."""
+    Membership = apps.get_model("organization", "Membership")
+    AssetHolder = apps.get_model("organization", "AssetHolder")
+    users = User._base_manager.all() if users is None else users
+    violations = []
+
+    for user in users:
+        if _is_admin_seed_account(user) or not user.has_usable_password():
+            continue
+        active_membership_tenant_ids = set(
+            Membership._base_manager.filter(user_id=user.pk, is_active=True).values_list("tenant_id", flat=True)
+        )
+        holders = AssetHolder._base_manager.filter(
+            user_id=user.pk,
+            deleted_at__isnull=True,
+        )
+        holder_count = holders.count()
+        reasons = []
+        if not active_membership_tenant_ids:
+            reasons.append("no active membership")
+        if holder_count != 1:
+            reasons.append(f"{holder_count} active AssetHolder profiles")
+        elif holders.values_list("tenant_id", flat=True).first() not in active_membership_tenant_ids:
+            reasons.append("holder tenant is not an active membership tenant")
+        if reasons:
+            violations.append(f"{user.username}: {', '.join(reasons)}")
+
+    if violations:
+        raise CommandError("Seed access invariant failed: " + "; ".join(violations))
 
 
 class SeedAccessMixin:
@@ -240,9 +322,10 @@ class SeedAccessMixin:
                 },
             )
             if created:
-                user.set_password(SEED_PASSWORD)
+                user.set_password(settings.SEED_PASSWORD)
                 user.save()
             self._users[username] = user
+            _ensure_holder(user, msp_tenant)
             if kind == "engineer":
                 self._engineer_users.append(user)
 
@@ -301,7 +384,7 @@ class SeedAccessMixin:
                 },
             )
             if created:
-                user.set_password(SEED_PASSWORD)
+                user.set_password(settings.SEED_PASSWORD)
                 user.save()
             self._users[username] = user
             customer_admins += 1
@@ -351,11 +434,10 @@ class SeedAccessMixin:
                     },
                 )
                 if created:
-                    user.set_password(SEED_PASSWORD)
+                    user.set_password(settings.SEED_PASSWORD)
                     user.save()
                 self._users[username] = user
-                holder.user = user
-                holder.save(update_fields=["user"])
+                holder = _ensure_holder(user, tenant)
                 grant(
                     user,
                     tenant,
