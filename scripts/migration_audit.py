@@ -111,7 +111,7 @@ SEMANTIC_DISPOSITIONS = {
     ),
     **_dispositions(
         "upgrade-only",
-        "Clears misleading signed_at timestamps on non-accepted custody receipts during 1.0 upgrade; pending receipts must not carry a signature timestamp.",
+        "Clears misleading signed_at values on non-accepted custody receipts; pending receipts must stay unsigned.",
         {"compliance.0102_clear_unsigned_receipt_timestamps"},
     ),
     **_dispositions(
