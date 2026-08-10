@@ -13,6 +13,14 @@
       </button>
     </form>
   {% endif %}
+  {% if can_export_custody_receipt %}
+    <a href="{% url 'compliance:custodyreceipt_export' pk=object.pk %}"
+       class="btn btn-primary"
+       download>
+      <i class="mdi mdi-download me-1"></i>
+      {% translate "Export" %}
+    </a>
+  {% endif %}
 {% endblock extra_page_actions %}
 {% block object_details %}
   <dl class="row mb-0">

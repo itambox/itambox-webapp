@@ -1,4 +1,5 @@
 import hashlib
+import json
 import logging
 import re
 from datetime import timedelta
@@ -7,6 +8,7 @@ from urllib.parse import parse_qsl, urlencode, urlparse, urlunparse
 from django.contrib.auth.decorators import login_required, permission_required
 from django.core.exceptions import ValidationError
 from django.db import transaction
+from django.http import HttpResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse, reverse_lazy
 from django.utils import timezone
@@ -27,6 +29,7 @@ logger = logging.getLogger(__name__)
 
 VIEW_CUSTODY_RECEIPT_PERMISSION = "compliance.view_custodyreceipt"
 PREPARE_CUSTODY_RECEIPT_PERMISSION = "compliance.prepare_custodyreceipt"
+EXPORT_CUSTODY_RECEIPT_PERMISSION = "compliance.export_custodyreceipt"
 CUSTODY_TOKEN_PATTERN = re.compile(r"[A-Za-z0-9_-]{64}")
 CUSTODY_SIGNING_SESSION_TOKEN_PATTERN = re.compile(r"[A-Za-z0-9_-]{64}")
 CUSTODY_LINK_TTL = timedelta(days=7)
@@ -230,6 +233,75 @@ def _consume_custody_signing_session(signing_session, *, outcome, consumed_at):
     signing_session.consumed_at = consumed_at
     signing_session.outcome = outcome
     signing_session.save(update_fields=["consumed_at", "outcome", "updated_at"])
+
+
+def _isoformat_or_none(value):
+    return value.isoformat() if value is not None else None
+
+
+def _custody_receipt_export_payload(receipt):
+    signing_sessions = (
+        CustodySigningSession.objects.select_related("operator", "intended_holder")
+        .filter(receipt=receipt, receipt__asset__tenant_id=receipt.asset.tenant_id)
+        .order_by("created_at", "pk")
+    )
+    return {
+        "format": "itambox.custody-receipt",
+        "version": 1,
+        "omitted_sensitive_fields": ["signature_canvas", "signature_data", "token"],
+        "receipt": {
+            "id": receipt.pk,
+            "asset_id": receipt.asset_id,
+            "holder_id": receipt.holder_id,
+            "custody_template_id": receipt.custody_template_id,
+            "signature_provider": receipt.signature_provider,
+            "eula_text": receipt.eula_text,
+            "disclaimer": receipt.disclaimer,
+            "qms_reference": receipt.qms_reference,
+            "accepted": receipt.accepted,
+            "accepted_date": _isoformat_or_none(receipt.accepted_date),
+            "acceptance_method": receipt.acceptance_method,
+            "acceptance_status": receipt.acceptance_status,
+            "signature_hash": receipt.signature_hash,
+            "verification_hash": receipt.verification_hash,
+            "signed_at": _isoformat_or_none(receipt.signed_at),
+            "eula_version": receipt.eula_version,
+            "created_date": _isoformat_or_none(receipt.created_date),
+            "ip_address": receipt.ip_address,
+            "user_agent": receipt.user_agent,
+            "created_at": _isoformat_or_none(receipt.created_at),
+            "updated_at": _isoformat_or_none(receipt.updated_at),
+        },
+        "asset": {
+            "id": receipt.asset_id,
+            "tenant_id": receipt.asset.tenant_id,
+            "name": receipt.asset.name,
+            "asset_tag": receipt.asset.asset_tag,
+            "serial_number": receipt.asset.serial_number,
+        },
+        "holder": {
+            "id": receipt.holder_id,
+            "user_id": receipt.holder.user_id,
+            "first_name": receipt.holder.first_name,
+            "last_name": receipt.holder.last_name,
+            "upn": receipt.holder.upn,
+            "email": receipt.holder.email,
+        },
+        "signing_sessions": [
+            {
+                "id": signing_session.pk,
+                "operator_id": signing_session.operator_id,
+                "operator_username": signing_session.operator.get_username(),
+                "intended_holder_id": signing_session.intended_holder_id,
+                "created_at": _isoformat_or_none(signing_session.created_at),
+                "expires_at": _isoformat_or_none(signing_session.expires_at),
+                "consumed_at": _isoformat_or_none(signing_session.consumed_at),
+                "canceled_at": _isoformat_or_none(signing_session.canceled_at),
+                "outcome": signing_session.outcome,
+            }
+            for signing_session in signing_sessions
+        ],
+    }
 
 
 def _process_custody_post(request, token, receipt, signing_session=None):
@@ -496,6 +568,11 @@ class CustodyReceiptDetailView(InternalCustodyPermissionMixin, ObjectDetailView)
             and receipt.holder_id is not None
             and self.request.user.has_perm(PREPARE_CUSTODY_RECEIPT_PERMISSION, obj=receipt.asset)
         )
+        context["can_export_custody_receipt"] = (
+            receipt.acceptance_status == CustodyReceipt.STATUS_ACCEPTED
+            and receipt.accepted
+            and self.request.user.has_perm(EXPORT_CUSTODY_RECEIPT_PERMISSION, obj=receipt.asset)
+        )
         if context["can_prepare_signing_session"]:
             handoff_session = signing_sessions.filter(
                 operator=self.request.user,
@@ -536,6 +613,30 @@ class CustodyReceiptPrepareView(InternalCustodyPermissionMixin, SimplePostView):
             intended_holder=receipt.holder,
         )
         return {"message": "Custody signing session prepared for recipient handoff."}
+
+
+class CustodyReceiptExportView(InternalCustodyPermissionMixin, ObjectDetailView):
+    queryset = CustodyReceipt.objects.select_related("asset", "asset__tenant", "holder")
+    permission_required = EXPORT_CUSTODY_RECEIPT_PERMISSION
+
+    def get_queryset(self):
+        queryset = scope_custody_receipts(super().get_queryset(), user=self.request.user)
+        return queryset.filter(acceptance_status=CustodyReceipt.STATUS_ACCEPTED, accepted=True)
+
+    def has_permission(self):
+        if not self.request.user.is_authenticated:
+            return False
+        receipt = self.get_object()
+        return self.request.user.has_perm(EXPORT_CUSTODY_RECEIPT_PERMISSION, obj=receipt.asset)
+
+    def get(self, request, *args, **kwargs):
+        receipt = self.get_object()
+        payload = _custody_receipt_export_payload(receipt)
+        content = json.dumps(payload, ensure_ascii=True, separators=(",", ":"), sort_keys=True) + "\n"
+        response = HttpResponse(content, content_type="application/json; charset=utf-8")
+        response["Content-Disposition"] = f'attachment; filename="custody-receipt-{receipt.pk}.json"'
+        response["X-Content-Type-Options"] = "nosniff"
+        return response
 
 
 class CustodyTemplateEditView(ObjectEditView):

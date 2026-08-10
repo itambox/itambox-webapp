@@ -1055,3 +1055,108 @@ class CustodySigningSessionRaceTests(CustodyRBACFixtureMixin, TransactionTestCas
         self.assertEqual(self.receipt_a.acceptance_status, CustodyReceipt.STATUS_ACCEPTED)
         self.assertIsNotNone(self.signing_session.consumed_at)
         self.assertEqual(self.signing_session.outcome, CustodySigningSession.OUTCOME_ACCEPTED)
+
+
+class CustodyReceiptExportTests(CustodyRBACFixtureMixin, TestCase):
+    def _export_url(self, receipt=None):
+        receipt = receipt or self.receipt_a
+        return reverse("compliance:custodyreceipt_export", kwargs={"pk": receipt.pk})
+
+    def _accept_receipt(self, receipt=None):
+        receipt = receipt or self.receipt_a
+        signed_at = timezone.now()
+        receipt.accepted = True
+        receipt.accepted_date = signed_at
+        receipt.acceptance_method = "digital_signature"
+        receipt.acceptance_status = CustodyReceipt.STATUS_ACCEPTED
+        receipt.signature_canvas = "dummy-export-signature-canvas"
+        receipt.signature_data = "dummy-export-signature-data"
+        receipt.signature_hash = "dummy-export-signature-hash"
+        receipt.verification_hash = "dummy-export-verification-hash"
+        receipt.signed_at = signed_at
+        receipt.eula_version = "1.0"
+        receipt.ip_address = "192.0.2.20"
+        receipt.user_agent = "dummy-export-user-agent"
+        receipt.save()
+        return receipt
+
+    def test_authorized_accepted_export_is_deterministic_json_without_secrets(self):
+        self._accept_receipt()
+        consumed_at = timezone.now()
+        signing_session = CustodySigningSession._base_manager.create(
+            receipt=self.receipt_a,
+            operator=self.technician,
+            intended_holder=self.recipient_holder,
+            token=DUMMY_SESSION_TOKEN,
+            expires_at=consumed_at + timedelta(minutes=30),
+            consumed_at=consumed_at,
+            outcome=CustodySigningSession.OUTCOME_ACCEPTED,
+        )
+        self._login_to_tenant(self.tenant_admin, self.tenant_a)
+
+        first_response = self.client.get(self._export_url())
+        second_response = self.client.get(self._export_url())
+
+        self.assertEqual(first_response.status_code, 200)
+        self.assertEqual(first_response.content, second_response.content)
+        self.assertEqual(first_response["Content-Type"], "application/json; charset=utf-8")
+        self.assertEqual(
+            first_response["Content-Disposition"],
+            f'attachment; filename="custody-receipt-{self.receipt_a.pk}.json"',
+        )
+        self.assertEqual(first_response["X-Content-Type-Options"], "nosniff")
+        payload = json.loads(first_response.content)
+        self.assertEqual(payload["format"], "itambox.custody-receipt")
+        self.assertEqual(payload["version"], 1)
+        self.assertEqual(payload["receipt"]["acceptance_status"], CustodyReceipt.STATUS_ACCEPTED)
+        self.assertEqual(payload["receipt"]["verification_hash"], "dummy-export-verification-hash")
+        self.assertEqual(payload["signing_sessions"][0]["id"], signing_session.pk)
+        self.assertEqual(payload["signing_sessions"][0]["operator_id"], self.technician.pk)
+        self.assertNotIn("token", payload["receipt"])
+        self.assertNotIn("token", payload["signing_sessions"][0])
+        self.assertNotIn(DUMMY_TOKEN_A.encode(), first_response.content)
+        self.assertNotIn(DUMMY_SESSION_TOKEN.encode(), first_response.content)
+        self.assertNotIn(b"dummy-export-signature-canvas", first_response.content)
+        self.assertNotIn(b"dummy-export-signature-data", first_response.content)
+
+    def test_pending_receipt_export_is_neutral_404(self):
+        self._login_to_tenant(self.tenant_admin, self.tenant_a)
+
+        response = self.client.get(self._export_url())
+
+        self.assertEqual(response.status_code, 404)
+        self._assert_no_receipt_payload(response, self.receipt_a)
+
+    def test_technician_without_export_permission_gets_internal_403(self):
+        self._accept_receipt()
+        self._login_to_tenant(self.technician, self.tenant_a)
+
+        response = self.client.get(self._export_url())
+
+        self.assertEqual(response.status_code, 403)
+        self.assertTemplateUsed(response, "compliance/custody/internal_permission_error.html")
+        self.assertContains(response, "internal_custody_permission_required", status_code=403)
+        self._assert_no_receipt_payload(response, self.receipt_a)
+
+    def test_foreign_tenant_export_is_neutral_404(self):
+        self._accept_receipt()
+        self._login_to_tenant(self.cross_tenant_user, self.tenant_b)
+
+        response = self.client.get(self._export_url())
+
+        self.assertEqual(response.status_code, 404)
+        self._assert_no_receipt_payload(response, self.receipt_a)
+
+    def test_export_button_requires_permission_and_accepted_state(self):
+        detail_url = reverse("compliance:custodyreceipt_detail", kwargs={"pk": self.receipt_a.pk})
+        self._login_to_tenant(self.tenant_admin, self.tenant_a)
+        pending_response = self.client.get(detail_url)
+        self.assertNotContains(pending_response, self._export_url())
+
+        self._accept_receipt()
+        accepted_response = self.client.get(detail_url)
+        self.assertContains(accepted_response, self._export_url())
+
+        self._login_to_tenant(self.technician, self.tenant_a)
+        technician_response = self.client.get(detail_url)
+        self.assertNotContains(technician_response, self._export_url())
