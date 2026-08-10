@@ -16,6 +16,7 @@
   {% if can_export_custody_receipt %}
     <a href="{% url 'compliance:custodyreceipt_export' pk=object.pk %}"
        class="btn btn-primary"
+       hx-boost="false"
        download>
       <i class="mdi mdi-download me-1"></i>
       {% translate "Export" %}
