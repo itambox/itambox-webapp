@@ -366,6 +366,8 @@ class TestSnipeITCatalogStages(TenantTestMixin):
         def fail_bad(*args, **kwargs):
             if kwargs.get(failure_key) in {"Broken", "broken_field", "Broken Fieldset"}:
                 raise RuntimeError("bad row")
+            if (kwargs.get("defaults") or {}).get("name") in {"Broken", "broken_field", "Broken Fieldset"}:
+                raise RuntimeError("bad row")
             return original(*args, **kwargs)
 
         monkeypatch.setattr(manager, manager_method, fail_bad)
