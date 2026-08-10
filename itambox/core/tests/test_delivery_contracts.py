@@ -238,9 +238,7 @@ class DeliveryContractTests(SimpleTestCase):
             from_name="ITAMbox",
             from_address="noreply@example.com",
         )
-        channel = SimpleNamespace(
-            channel_type="email", config={"recipients": ["admin@example.com"]}, tenant_id=7
-        )
+        channel = SimpleNamespace(channel_type="email", config={"recipients": ["admin@example.com"]}, tenant_id=7)
         connection = MagicMock()
         get_connection.return_value = connection
 
