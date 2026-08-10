@@ -8,6 +8,7 @@ from core.errors import (
     IntegrationConfigurationError,
     IntegrationContext,
     IntegrationContractError,
+    IntegrationNotFoundError,
     IntegrationRateLimitedError,
     IntegrationRequestError,
     IntegrationRetryBudgetExceededError,
@@ -47,6 +48,7 @@ def _client(*, budget=None):
     [
         (401, IntegrationAuthenticationError),
         (403, IntegrationAuthenticationError),
+        (404, IntegrationNotFoundError),
         (400, IntegrationRequestError),
         (500, IntegrationUnavailableError),
         (503, IntegrationUnavailableError),
@@ -126,6 +128,11 @@ def test_zero_retry_budget_surfaces_rate_limit_without_sleeping():
     sleep.assert_not_called()
 
 
+@pytest.mark.parametrize("retry_after", ["nan", "inf", "-inf"])
+def test_non_finite_retry_after_is_rejected(retry_after):
+    assert SnipeITClient._parse_retry_after({"Retry-After": retry_after}) is None
+
+
 @pytest.mark.parametrize("payload", [[], {"rows": "not-a-list", "total": 1}, {"rows": [], "total": "one"}])
 def test_collection_response_shape_is_a_typed_contract_error(payload):
     client = _client()
@@ -195,3 +202,21 @@ def test_importer_row_failure_log_redacts_payload_identity_and_exception_text(ca
     assert "customer@example.test" not in combined
     assert "bearer-secret" not in combined
     assert "424242" not in combined
+
+
+def test_importer_row_failure_supports_logging_without_optional_sinks(caplog):
+    from core.importers.snipeit import SnipeITImporter
+
+    importer = SnipeITImporter(
+        client=_client(),
+        tenant=MagicMock(pk=7),
+        user=MagicMock(pk=11),
+        checkout_inventory_item=MagicMock(),
+        create_component_allocation=MagicMock(),
+    )
+
+    importer._record_failure("assets.persist", 42, RuntimeError("bearer-secret"))
+
+    record = next(record for record in caplog.records if hasattr(record, "integration"))
+    assert record.integration["operation"] == "assets.persist"
+    assert "bearer-secret" not in caplog.text
