@@ -8,7 +8,7 @@ from urllib.parse import parse_qsl, urlencode, urlparse, urlunparse
 from django.contrib.auth.decorators import login_required, permission_required
 from django.core.exceptions import ValidationError
 from django.db import transaction
-from django.http import HttpResponse
+from django.http import Http404, HttpResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse, reverse_lazy
 from django.utils import timezone
@@ -620,8 +620,7 @@ class CustodyReceiptExportView(InternalCustodyPermissionMixin, ObjectDetailView)
     permission_required = EXPORT_CUSTODY_RECEIPT_PERMISSION
 
     def get_queryset(self):
-        queryset = scope_custody_receipts(super().get_queryset(), user=self.request.user)
-        return queryset.filter(acceptance_status=CustodyReceipt.STATUS_ACCEPTED, accepted=True)
+        return scope_custody_receipts(super().get_queryset(), user=self.request.user)
 
     def has_permission(self):
         if not self.request.user.is_authenticated:
@@ -631,6 +630,8 @@ class CustodyReceiptExportView(InternalCustodyPermissionMixin, ObjectDetailView)
 
     def get(self, request, *args, **kwargs):
         receipt = self.get_object()
+        if receipt.acceptance_status != CustodyReceipt.STATUS_ACCEPTED or not receipt.accepted:
+            raise Http404
         payload = _custody_receipt_export_payload(receipt)
         content = json.dumps(payload, ensure_ascii=True, separators=(",", ":"), sort_keys=True) + "\n"
         response = HttpResponse(content, content_type="application/json; charset=utf-8")
