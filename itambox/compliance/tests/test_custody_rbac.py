@@ -871,6 +871,9 @@ class CustodySigningSessionPrepareTests(CustodyRBACFixtureMixin, TestCase):
         self.assertContains(detail_response, "Recipient handoff is ready")
         self.assertContains(detail_response, signing_session.token)
         self.assertContains(detail_response, DUMMY_TOKEN_A)
+        # Export must not be intercepted by htmx boost: a native download
+        # (Content-Disposition attachment) survives only without hx-boost.
+        self.assertContains(detail_response, 'hx-boost="false"')
 
     def test_different_operator_sees_session_audit_without_handoff_tokens(self):
         self._login_to_tenant(self.technician, self.tenant_a)
