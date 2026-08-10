@@ -363,6 +363,16 @@ OPERATIONS_MENU = Menu(
                     ),
                 ),
                 get_model_item("compliance", "custodytemplate", _("Custody Templates")),
+                # Explicit MenuItem, not get_model_item: custody receipts have
+                # no create route (receipts are system-generated), and the
+                # helper's full CRUD link family would emit a NoReverseMatch
+                # for custodyreceipt_create on every page render (#318).
+                MenuItem(
+                    link="compliance:custodyreceipt_list",
+                    link_text=_("Custody Receipts"),
+                    permissions=["compliance.view_custodyreceipt"],
+                    buttons=(),
+                ),
             ),
         ),
     ),

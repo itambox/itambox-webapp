@@ -165,3 +165,26 @@ class TestNavGroupGateUnify(TenantTestMixin):
 
         for user, expected in ((granted, True), (denied, False), (superuser, True)):
             assert nav_gate(user) == is_global_group_admin(user) == expected
+
+
+def test_operations_menu_exposes_custody_receipts_entry():
+    """Regression #315/#318: custody receipts must be reachable from the nav
+    menu, and every emitted link must resolve (get_model_item on custodyreceipt
+    would emit custodyreceipt_create, which does not exist -> NoReverseMatch
+    on every page render)."""
+    from django.urls import reverse
+
+    from core.navigation.menu import get_menus
+
+    links = []
+    for menu in get_menus():
+        for group in menu.groups:
+            for item in group.items:
+                links.append(getattr(item, "link", None))
+
+    assert "compliance:custodyreceipt_list" in links
+    assert "compliance:custodytemplate_list" in links
+    # Every nav link must resolve to a real route (regression #318).
+    for link in links:
+        if link:
+            reverse(link)
