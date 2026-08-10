@@ -2861,7 +2861,7 @@ export interface components {
       /** @description Base64 canvas stroke vector string representation */
       signature_canvas: string;
       /** Format: date-time */
-      signed_at: string;
+      signed_at: string | null;
       eula_version: string;
       /** Format: date-time */
       created_date: string | null;
@@ -32356,7 +32356,7 @@ export interface operations {
   procurement_purchase_orders_retrieve: {
     parameters: {
       path: {
-        /** @description A unique integer value identifying this purchase order. */
+        /** @description A unique integer value identifying this Purchase Order. */
         id: number;
       };
     };
@@ -32405,7 +32405,7 @@ export interface operations {
   procurement_purchase_orders_update: {
     parameters: {
       path: {
-        /** @description A unique integer value identifying this purchase order. */
+        /** @description A unique integer value identifying this Purchase Order. */
         id: number;
       };
     };
@@ -32479,7 +32479,7 @@ export interface operations {
   procurement_purchase_orders_destroy: {
     parameters: {
       path: {
-        /** @description A unique integer value identifying this purchase order. */
+        /** @description A unique integer value identifying this Purchase Order. */
         id: number;
       };
     };
@@ -32539,7 +32539,7 @@ export interface operations {
   procurement_purchase_orders_partial_update: {
     parameters: {
       path: {
-        /** @description A unique integer value identifying this purchase order. */
+        /** @description A unique integer value identifying this Purchase Order. */
         id: number;
       };
     };
@@ -32604,7 +32604,7 @@ export interface operations {
   procurement_purchase_orders_approve_create: {
     parameters: {
       path: {
-        /** @description A unique integer value identifying this purchase order. */
+        /** @description A unique integer value identifying this Purchase Order. */
         id: number;
       };
     };
@@ -32650,7 +32650,7 @@ export interface operations {
   procurement_purchase_orders_cancel_create: {
     parameters: {
       path: {
-        /** @description A unique integer value identifying this purchase order. */
+        /** @description A unique integer value identifying this Purchase Order. */
         id: number;
       };
     };
@@ -32696,7 +32696,7 @@ export interface operations {
   procurement_purchase_orders_order_create: {
     parameters: {
       path: {
-        /** @description A unique integer value identifying this purchase order. */
+        /** @description A unique integer value identifying this Purchase Order. */
         id: number;
       };
     };
@@ -32742,7 +32742,7 @@ export interface operations {
   procurement_purchase_orders_receive_create: {
     parameters: {
       path: {
-        /** @description A unique integer value identifying this purchase order. */
+        /** @description A unique integer value identifying this Purchase Order. */
         id: number;
       };
     };
@@ -32795,7 +32795,7 @@ export interface operations {
   procurement_purchase_orders_reopen_create: {
     parameters: {
       path: {
-        /** @description A unique integer value identifying this purchase order. */
+        /** @description A unique integer value identifying this Purchase Order. */
         id: number;
       };
     };
