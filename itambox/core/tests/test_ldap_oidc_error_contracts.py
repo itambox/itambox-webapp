@@ -11,6 +11,7 @@ from django.test import SimpleTestCase
 from core.auth.ldap import (
     LDAPAuthenticationError,
     LDAPConfigurationError,
+    LDAPRequestError,
     LDAPUnavailableError,
     MultiTenantLDAPBackend,
     classify_ldap_error,
@@ -24,6 +25,7 @@ from core.auth.oidc import (
 from core.errors import FailureDisposition, IntegrationContext
 from core.management.commands.sync_tenant_ldap import Command as LDAPSyncCommand
 from core.managers import set_current_tenant
+from core.models import Job
 from core.tasks.ldap import sync_tenant_ldap_task
 
 
@@ -32,6 +34,14 @@ class _TransientLDAPError(Exception):
 
 
 class _InvalidCredentialsLDAPError(Exception):
+    pass
+
+
+class _ConfigurationLDAPError(Exception):
+    pass
+
+
+class _RequestLDAPError(Exception):
     pass
 
 
@@ -89,6 +99,27 @@ class IntegrationContractTests(SimpleTestCase):
         self.assertIsInstance(error, CommandError)
         self.assertEqual(error.disposition, FailureDisposition.TERMINAL)
         self.assertEqual(error.display_message(), "LDAP configuration is incomplete or invalid.")
+
+    def test_ldap_classifier_distinguishes_configuration_and_unknown_provider_errors(self):
+        context = IntegrationContext(provider="ldap", operation="sync.search", tenant_id=17)
+        secret = "provider diagnostic contains bind-password"
+
+        with (
+            patch("core.auth.ldap._LDAP_TRANSIENT_ERRORS", ()),
+            patch("core.auth.ldap._LDAP_AUTHENTICATION_ERRORS", ()),
+            patch("core.auth.ldap._LDAP_CONFIGURATION_ERRORS", (_ConfigurationLDAPError,)),
+        ):
+            configuration = classify_ldap_error(_ConfigurationLDAPError(secret), context=context)
+            request = classify_ldap_error(_RequestLDAPError(secret), context=context)
+
+        self.assertIsInstance(configuration, LDAPConfigurationError)
+        self.assertEqual(configuration.disposition, FailureDisposition.TERMINAL)
+        self.assertEqual(configuration.cause_type, "_ConfigurationLDAPError")
+        self.assertIsInstance(request, LDAPRequestError)
+        self.assertEqual(request.disposition, FailureDisposition.TERMINAL)
+        self.assertEqual(request.display_message(), "The LDAP directory rejected the operation.")
+        self.assertNotIn(secret, str(configuration))
+        self.assertNotIn(secret, str(request))
 
     @patch("core.auth.ldap.django_auth_ldap_installed", False)
     @patch("core.auth.ldap.LDAPBackend.authenticate")
@@ -163,6 +194,31 @@ class IntegrationContractTests(SimpleTestCase):
         self.assertIsInstance(raised.exception, SuspiciousOperation)
         self.assertEqual(raised.exception.disposition, FailureDisposition.TERMINAL)
 
+    @patch("core.auth.oidc.OIDCAuthenticationBackend.verify_token")
+    def test_oidc_rejects_wrong_authorized_party_and_wrong_issuer(self, parent_verify):
+        backend = TenantOIDCBackend()
+
+        def settings_value(name, default=None):
+            values = {"OIDC_RP_CLIENT_ID": "expected-client", "OIDC_OP_ISSUER": "https://issuer.example/"}
+            return values.get(name, default)
+
+        with patch.object(backend, "get_settings", side_effect=settings_value):
+            parent_verify.return_value = {
+                "aud": ["expected-client", "another-client"],
+                "azp": "another-client",
+                "iss": "https://issuer.example/",
+            }
+            with self.assertRaises(OIDCTokenValidationError):
+                backend.verify_token("secret-id-token")
+
+            parent_verify.return_value = {
+                "aud": "expected-client",
+                "azp": "expected-client",
+                "iss": "https://unexpected.example/",
+            }
+            with self.assertRaises(OIDCTokenValidationError):
+                backend.verify_token("secret-id-token")
+
     @patch("core.management.commands.sync_tenant_ldap.django_auth_ldap_installed", True)
     @patch("core.management.commands.sync_tenant_ldap.ldap.initialize")
     def test_sync_command_maps_transient_bind_failure_without_leaking_provider_text(self, initialize):
@@ -203,6 +259,58 @@ class IntegrationContractTests(SimpleTestCase):
         self.assertEqual(raised.exception.context.operation, "sync.configure")
         self.assertEqual(raised.exception.context.tenant_id, 17)
 
+    def test_sync_command_rejects_missing_connection_and_search_configuration(self):
+        tenant = SimpleNamespace(pk=17, slug="tenant-alpha", name="Tenant Alpha")
+        command = LDAPSyncCommand(stdout=StringIO())
+
+        incomplete_configs = (
+            {"USER_SEARCH_BASE": "ou=users,dc=internal"},
+            {"SERVER_URI": "ldap://directory.internal", "BIND_DN": "cn=service"},
+        )
+        for config in incomplete_configs:
+            with self.subTest(config=config), self.settings(ITAMBOX_TENANT_LDAP_CONFIGS={tenant.slug: config}):
+                with self.assertRaises(LDAPConfigurationError) as raised:
+                    command._run_sync(tenant)
+
+            self.assertEqual(raised.exception.context.operation, "sync.configure")
+            self.assertEqual(raised.exception.context.tenant_id, 17)
+
+    @patch("core.management.commands.sync_tenant_ldap.ldap.initialize")
+    def test_sync_command_maps_provider_failures_at_connect_and_search_boundaries(self, initialize):
+        tenant = SimpleNamespace(pk=17, slug="tenant-alpha", name="Tenant Alpha")
+        config = {
+            tenant.slug: {
+                "SERVER_URI": "ldap://directory.internal",
+                "BIND_DN": "cn=service",
+                "USER_SEARCH_BASE": "ou=users,dc=internal",
+            }
+        }
+        secret = "provider diagnostic contains bind-password"
+
+        with (
+            patch("core.management.commands.sync_tenant_ldap.django_auth_ldap_installed", True),
+            patch("core.management.commands.sync_tenant_ldap._LDAP_PROVIDER_ERROR", _RequestLDAPError),
+            patch("core.auth.ldap._LDAP_TRANSIENT_ERRORS", ()),
+            patch("core.auth.ldap._LDAP_AUTHENTICATION_ERRORS", ()),
+            patch("core.auth.ldap._LDAP_CONFIGURATION_ERRORS", ()),
+            self.settings(ITAMBOX_TENANT_LDAP_CONFIGS=config),
+        ):
+            initialize.side_effect = _RequestLDAPError(secret)
+            with self.assertRaises(LDAPRequestError) as connect_failure:
+                LDAPSyncCommand(stdout=StringIO())._run_sync(tenant)
+
+            initialize.side_effect = None
+            connection = initialize.return_value
+            connection.search.side_effect = _RequestLDAPError(secret)
+            with self.assertRaises(LDAPRequestError) as search_failure:
+                LDAPSyncCommand(stdout=StringIO())._run_sync(tenant)
+
+        self.assertEqual(connect_failure.exception.context.operation, "sync.connect")
+        self.assertEqual(search_failure.exception.context.operation, "sync.search")
+        self.assertNotIn(secret, str(connect_failure.exception))
+        self.assertNotIn(secret, str(search_failure.exception))
+        connection.unbind_s.assert_called_once_with()
+
     @patch("core.tasks.ldap.Notification.objects.create")
     @patch("core.tasks.ldap.Job.objects.get")
     @patch("core.tasks.ldap.call_command")
@@ -238,3 +346,54 @@ class IntegrationContractTests(SimpleTestCase):
         notification_message = str(create_notification.call_args.kwargs["message"])
         self.assertIn(error.display_message(), notification_message)
         self.assertNotIn(provider_secret, notification_message)
+
+    @patch("core.tasks.ldap.call_command")
+    @patch("core.tasks.ldap.TaskContext")
+    @patch("core.tasks.ldap.Job.objects.get")
+    def test_task_stops_when_job_is_missing_or_no_longer_pending(self, get_job, task_context, call_command):
+        task_context.return_value.__enter__.return_value = SimpleNamespace(user=SimpleNamespace(pk=23))
+        get_job.side_effect = Job.DoesNotExist
+
+        with self.assertLogs("core.tasks.ldap", level="ERROR") as missing_logs:
+            sync_tenant_ldap_task(31, "tenant-alpha", 23, tenant_id=17)
+
+        self.assertIn("LDAP sync job 31 not found", " ".join(missing_logs.output))
+        call_command.assert_not_called()
+
+        job = MagicMock(pk=31)
+        job.mark_running.return_value = False
+        get_job.side_effect = None
+        get_job.return_value = job
+        with self.assertLogs("core.tasks.ldap", level="INFO") as cancelled_logs:
+            sync_tenant_ldap_task(31, "tenant-alpha", 23, tenant_id=17)
+
+        self.assertIn("no longer pending", " ".join(cancelled_logs.output))
+        job.append_log.assert_not_called()
+        call_command.assert_not_called()
+
+    @patch("core.tasks.ldap.Notification.objects.create")
+    @patch("core.tasks.ldap.Job.objects.get")
+    @patch("core.tasks.ldap.call_command")
+    @patch("core.tasks.ldap.TaskContext")
+    def test_task_converts_unexpected_failure_to_safe_terminal_contract(
+        self, task_context, call_command, get_job, create_notification
+    ):
+        secret = "unexpected diagnostic contains bind-password"
+        call_command.side_effect = RuntimeError(secret)
+        job = MagicMock(pk=31)
+        job.mark_running.return_value = True
+        get_job.return_value = job
+        task_context.return_value.__enter__.return_value = SimpleNamespace(user=SimpleNamespace(pk=23))
+
+        sync_tenant_ldap_task(31, "tenant-alpha", 23, tenant_id=17)
+
+        safe_message = job.mark_failed.call_args.args[0]
+        self.assertNotIn(secret, safe_message)
+        self.assertIn("unexpected", safe_message.lower())
+        persisted = " ".join(call.args[0] for call in job.append_log.call_args_list)
+        self.assertIn("code=integration.unexpected", persisted)
+        self.assertIn("operation=sync", persisted)
+        self.assertNotIn(secret, persisted)
+        notification_message = str(create_notification.call_args.kwargs["message"])
+        self.assertIn(safe_message, notification_message)
+        self.assertNotIn(secret, notification_message)
