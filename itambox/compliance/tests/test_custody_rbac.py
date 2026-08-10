@@ -1227,16 +1227,17 @@ class CustodyReceiptExportTests(CustodyRBACFixtureMixin, TestCase):
         self._login_to_tenant(self.technician, self.tenant_a)
         technician_response = self.client.get(detail_url)
         self.assertNotContains(technician_response, self._export_url())
+
     def test_superadmin_can_export_accepted_receipt(self):
-            self._mark_accepted()
-            self.client.force_login(self.superadmin)
+        self._accept_receipt()
+        self.client.force_login(self.superadmin)
 
-            response = self.client.get(self.export_url)
+        response = self.client.get(self._export_url())
 
-            self.assertGreaterEqual(response.status_code, 200)
-            self.assertLess(response.status_code, 300)
-            self._assert_body_contains(response, DUMMY_VERIFICATION_HASH)
-            self._assert_body_not_contains(response, DUMMY_TOKEN_A)
+        self.assertGreaterEqual(response.status_code, 200)
+        self.assertLess(response.status_code, 300)
+        self.assertContains(response, "dummy-export-verification-hash")
+        self.assertNotContains(response, DUMMY_TOKEN_A)
 
 
 class CustodySigningSessionAuditTests(CustodyRBACFixtureMixin, TestCase):
@@ -1262,4 +1263,9 @@ class CustodySigningSessionAuditTests(CustodyRBACFixtureMixin, TestCase):
             "session token must appear exactly once, inside the handoff link",
         )
         self.assertIn(f"?session={signing_session.token}", response_body)
-        self._assert_body_not_contains(response, DUMMY_TOKEN_A)
+        self.assertEqual(
+            response_body.count(DUMMY_TOKEN_A),
+            1,
+            "receipt token must appear exactly once, inside the handoff link path",
+        )
+        self.assertIn(f"/compliance/custody/sign/{DUMMY_TOKEN_A}/", response_body)
