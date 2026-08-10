@@ -5,7 +5,12 @@ from django.core.exceptions import ValidationError
 from django.test import TestCase
 from django.urls import reverse
 
-from core.managers import set_current_membership, set_current_tenant
+from core.managers import (
+    set_current_all_accessible,
+    set_current_membership,
+    set_current_tenant,
+    set_current_tenant_group,
+)
 from core.tests.mixins import grant
 from organization.models import (
     Membership,
@@ -19,6 +24,7 @@ from organization.rbac import accessible_tenant_ids, effective_permissions
 from users.filters import UserGroupFilterSet
 from users.forms import GroupManagedRoleGrantForm, UserGroupForm
 from users.models import GroupMembership, UserGroup
+from users.views import _user_scope_tenant_ids
 
 User = get_user_model()
 
@@ -184,6 +190,29 @@ class GroupResolverTests(TestCase):
         )
         self.assertIn("assets.view_asset", effective_permissions(self.user, self.customer_a))
         self.assertNotIn("assets.view_asset", effective_permissions(self.user, self.customer_b))
+
+    def test_user_scope_tenant_ids_cover_single_group_and_all_accessible(self):
+        make_group_grant(
+            self.group,
+            self.role,
+            (RoleGrantScope.SCOPE_TENANT, self.customer_a),
+        )
+        set_current_tenant(self.customer_a)
+        self.assertEqual(_user_scope_tenant_ids(self.user), {self.customer_a.pk})
+
+        set_current_tenant(None)
+        set_current_tenant_group(self.root_group)
+        self.assertEqual(_user_scope_tenant_ids(self.user), {self.customer_a.pk})
+
+        set_current_tenant_group(None)
+        set_current_all_accessible(True)
+        self.assertEqual(_user_scope_tenant_ids(self.user), {self.provider.pk, self.customer_a.pk})
+
+    def tearDown(self):
+        set_current_tenant(None)
+        set_current_tenant_group(None)
+        set_current_all_accessible(False)
+        super().tearDown()
 
     def test_inactive_membership_and_group_are_both_inert(self):
         make_group_grant(

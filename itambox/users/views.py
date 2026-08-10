@@ -17,10 +17,13 @@ from django.views.generic import TemplateView, UpdateView, View
 from django.views.generic.base import TemplateResponseMixin
 from django_tables2 import RequestConfig, SingleTableView
 
+from core.context import get_current_all_accessible, get_current_tenant, get_current_tenant_group
 from core.models import ObjectChange
 from core.tables import ObjectChangeTable
 from itambox.utils import get_paginate_count
 from itambox.views.generic import BaseHTMXView
+from organization.access import accessible_tenant_ids, get_descendant_tenant_group_ids
+from organization.models import Tenant
 
 from .forms import UserPreferencesForm, UserProfileForm
 from .models import UserPreference
@@ -494,6 +497,29 @@ from .forms import UserBulkEditForm, UserFilterForm, UserForm
 from .tables import UserTable
 
 
+def _user_scope_tenant_ids(user):
+    """Return the live tenant ids represented by the current workspace scope."""
+    accessible_ids = accessible_tenant_ids(user)
+    active_tenant = get_current_tenant()
+    if active_tenant is not None:
+        return accessible_ids & {active_tenant.pk}
+
+    active_group = get_current_tenant_group()
+    if active_group is not None:
+        group_ids = get_descendant_tenant_group_ids(active_group.pk, live_only=True)
+        return set(
+            Tenant.objects.filter(
+                pk__in=accessible_ids,
+                group_id__in=group_ids,
+                deleted_at__isnull=True,
+            ).values_list("pk", flat=True)
+        )
+
+    if get_current_all_accessible():
+        return accessible_ids
+    return set()
+
+
 class UserListView(ObjectListView):
     queryset = User.objects.all()
     filterset = UserFilterSet
@@ -505,12 +531,7 @@ class UserListView(ObjectListView):
         qs = super().get_queryset()
         if self.request.user.is_superuser:
             return qs
-        from core.managers import get_current_tenant
-
-        active_tenant = get_current_tenant()
-        if active_tenant is None:
-            return qs.none()
-        return qs.filter(memberships__tenant=active_tenant).distinct()
+        return qs.filter(memberships__tenant__in=_user_scope_tenant_ids(self.request.user)).distinct()
 
 
 class UserBulkEditView(ObjectBulkEditView):
@@ -526,12 +547,7 @@ class UserBulkEditView(ObjectBulkEditView):
         qs = super()._get_queryset(pks)
         if self.request.user.is_superuser:
             return qs
-        from core.managers import get_current_tenant
-
-        active_tenant = get_current_tenant()
-        if active_tenant is None:
-            return qs.none()
-        return qs.filter(memberships__tenant=active_tenant).distinct()
+        return qs.filter(memberships__tenant__in=_user_scope_tenant_ids(self.request.user)).distinct()
 
     def post(self, request, *args, **kwargs):
         pks = request.POST.getlist("pk")
