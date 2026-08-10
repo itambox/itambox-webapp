@@ -65,6 +65,7 @@ def _parse_date(val: str | None) -> datetime.date | None:
     for fmt in ("%Y-%m-%d", "%m/%d/%Y", "%d/%m/%Y"):
         try:
             return datetime.datetime.strptime(val, fmt).date()
+        # broad except: boundary-isolation: malformed remote date values degrade to None
         except (ValueError, TypeError):
             pass
     return None

@@ -36,6 +36,7 @@ class AssetModelImporter:
         raw_eol_months = row.get("eol") or None
         try:
             eol_months = int(raw_eol_months) if raw_eol_months else None
+        # broad except: boundary-isolation: optional child rows may degrade without discarding the parent item
         except (TypeError, ValueError):
             eol_months = None
         part_number = (row.get("model_number") or "")[:100]
@@ -76,6 +77,7 @@ class AssetModelImporter:
                     obj, outcome = self._upsert(model, row)
                 self.dependencies.asset_models[source_id] = obj
                 result.counts.record(outcome)
+            # broad except: task-isolation: one remote row must not abort the reviewed import batch
             except Exception as exc:
                 self.context.reporter.row_failure(result, "models.persist", exc)
         self.context.reporter.finish(result)

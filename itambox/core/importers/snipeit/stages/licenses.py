@@ -37,6 +37,7 @@ class LicenseImporter:
         for row in self.context.client.get_all("/api/v1/licenses"):
             try:
                 self._process_row(row, result, License, Software, LicenseSeatAssignment)
+            # broad except: task-isolation: one remote row must not abort the reviewed import batch
             except Exception as exc:
                 self.context.reporter.row_failure(result, "licenses.persist", exc)
 
@@ -185,5 +186,6 @@ class LicenseImporter:
                         asset=asset,
                         defaults={"notes": IMPORT_NOTE},
                     )
+        # broad except: boundary-isolation: optional child rows may degrade without discarding the parent item
         except Exception as exc:
             self.context.reporter.warning(result, "licenses.seats", exc)

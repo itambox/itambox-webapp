@@ -56,6 +56,7 @@ class CompanyImporter:
                         outcome = "created"
                 self.dependencies.tenants[sid] = obj
                 result.counts.record(outcome)
+            # broad except: task-isolation: one remote row must not abort the reviewed import batch
             except Exception as exc:
                 self.context.reporter.row_failure(result, "companies.persist", exc)
         self.context.reporter.finish(result)
@@ -83,6 +84,7 @@ class LocationImporter:
             if not _nested_id(row.get("parent")):
                 try:
                     self._upsert_location(row, import_site, result, Location)
+                # broad except: task-isolation: one remote row must not abort the reviewed import batch
                 except Exception as exc:
                     self.context.reporter.row_failure(result, "locations.pass1", exc)
 
@@ -90,6 +92,7 @@ class LocationImporter:
             if _nested_id(row.get("parent")):
                 try:
                     self._upsert_location(row, import_site, result, Location)
+                # broad except: task-isolation: one remote row must not abort the reviewed import batch
                 except Exception as exc:
                     self.context.reporter.row_failure(result, "locations.pass2", exc)
 
@@ -212,6 +215,7 @@ class UserImporter:
                         outcome = "created"
                 self.dependencies.holders[sid] = obj
                 result.counts.record(outcome)
+            # broad except: task-isolation: one remote row must not abort the reviewed import batch
             except Exception as exc:
                 self.context.reporter.row_failure(result, "users.persist", exc)
         self.context.reporter.finish(result)

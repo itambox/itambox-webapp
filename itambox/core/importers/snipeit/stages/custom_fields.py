@@ -71,6 +71,7 @@ class CustomFieldImporter:
                 db_column = row.get("db_column_name") or ""
                 self.dependencies.custom_fields[db_column] = obj
                 result.counts.record(outcome)
+            # broad except: task-isolation: one remote row must not abort the reviewed import batch
             except Exception as exc:
                 self.context.reporter.row_failure(result, "fields.persist", exc)
         self.context.reporter.finish(result)
@@ -116,6 +117,7 @@ class FieldsetImporter:
                     obj, outcome = self._upsert(model, row)
                 self.dependencies.fieldsets[source_id] = obj
                 result.counts.record(outcome)
+            # broad except: task-isolation: one remote row must not abort the reviewed import batch
             except Exception as exc:
                 self.context.reporter.row_failure(result, "fieldsets.persist", exc)
         self.context.reporter.finish(result)

@@ -56,6 +56,7 @@ class AccessoryImporter:
         for row in self.context.client.get_all("/api/v1/accessories"):
             try:
                 self._process_row(row, result, Accessory, AccessoryStock, Location, AccessoryAssignment)
+            # broad except: task-isolation: one remote row must not abort the reviewed import batch
             except Exception as exc:
                 self.context.reporter.row_failure(result, "accessories.persist", exc)
 
@@ -127,6 +128,7 @@ class AccessoryImporter:
                 ).exists():
                     continue
                 self.dependencies.assignments.assign(accessory, qty, holder=holder)
+        # broad except: boundary-isolation: optional child rows may degrade without discarding the parent item
         except Exception as exc:
             self.context.reporter.warning(result, "accessories.checkouts", exc)
 
@@ -148,6 +150,7 @@ class ConsumableImporter:
         for row in self.context.client.get_all("/api/v1/consumables"):
             try:
                 self._process_row(row, result, Consumable, ConsumableStock, Location)
+            # broad except: task-isolation: one remote row must not abort the reviewed import batch
             except Exception as exc:
                 self.context.reporter.row_failure(result, "consumables.persist", exc)
 
@@ -218,6 +221,7 @@ class ComponentImporter:
         for row in self.context.client.get_all("/api/v1/components"):
             try:
                 self._process_row(row, result, Component, ComponentStock, ComponentAllocation, Location)
+            # broad except: task-isolation: one remote row must not abort the reviewed import batch
             except Exception as exc:
                 self.context.reporter.row_failure(result, "components.persist", exc)
 
@@ -289,5 +293,6 @@ class ComponentImporter:
                 ).exists():
                     continue
                 self.dependencies.assignments.assign(component, qty, asset=asset)
+        # broad except: boundary-isolation: optional child rows may degrade without discarding the parent item
         except Exception as exc:
             self.context.reporter.warning(result, "components.allocations", exc)

@@ -107,6 +107,7 @@ class SnipeITClient:
         value = headers.get("Retry-After")
         try:
             parsed = float(value)
+        # broad except: boundary-isolation: optional child rows may degrade without discarding the parent item
         except (TypeError, ValueError):
             return None
         if not math.isfinite(parsed):
@@ -184,6 +185,7 @@ class SnipeITClient:
     def _parse_response(response, *, context: IntegrationContext) -> dict:
         try:
             data = response.json()
+        # broad except: boundary-isolation: optional child rows may degrade without discarding the parent item
         except (TypeError, ValueError) as exc:
             raise IntegrationContractError(
                 context=context,

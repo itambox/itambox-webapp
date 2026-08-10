@@ -88,6 +88,7 @@ class MaintenanceImporter:
                             supplier=supplier,
                         )
                     result.counts.created += 1
+            # broad except: task-isolation: one remote row must not abort the reviewed import batch
             except Exception as exc:
                 self.context.reporter.row_failure(result, "maintenances.persist", exc)
 

@@ -59,6 +59,7 @@ class HardwareImporter:
                 self.dependencies.assets[source_id] = asset
                 result.counts.record(outcome)
                 checkout_rows.append((row, asset))
+            # broad except: task-isolation: one remote row must not abort the reviewed import batch
             except Exception as exc:
                 self.context.reporter.row_failure(result, "assets.persist", exc)
 
@@ -154,6 +155,7 @@ class HardwareImporter:
         if purchase_date and warranty_months:
             try:
                 return purchase_date + relativedelta(months=int(warranty_months))
+            # broad except: boundary-isolation: malformed warranty months degrade to no expiration
             except (TypeError, ValueError):
                 pass
         return None
@@ -211,6 +213,7 @@ class HardwareImporter:
                 tenant_id=asset.tenant_id,
                 **kwargs,
             )
+        # broad except: boundary-isolation: optional child rows may degrade without discarding the parent item
         except Exception as exc:
             self.context.reporter.warning(result, "assets.checkout", exc)
 

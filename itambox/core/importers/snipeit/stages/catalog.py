@@ -69,6 +69,7 @@ class StatusLabelImporter:
                     obj, outcome = self._upsert(model, row)
                 self.dependencies.status_labels[source_id] = obj
                 result.counts.record(outcome)
+            # broad except: task-isolation: one remote row must not abort the reviewed import batch
             except Exception as exc:
                 self.context.reporter.row_failure(result, "statuslabels.persist", exc)
         self.context.reporter.finish(result)
@@ -108,6 +109,7 @@ class ManufacturerImporter:
                     obj, outcome = self._upsert(model, row)
                 self.dependencies.manufacturers[source_id] = obj
                 result.counts.record(outcome)
+            # broad except: task-isolation: one remote row must not abort the reviewed import batch
             except Exception as exc:
                 self.context.reporter.row_failure(result, "manufacturers.persist", exc)
         self.context.reporter.finish(result)
@@ -151,6 +153,7 @@ class CategoryImporter:
                     obj, outcome = self._upsert(model, row)
                 self.dependencies.categories[source_id] = obj
                 result.counts.record(outcome)
+            # broad except: task-isolation: one remote row must not abort the reviewed import batch
             except Exception as exc:
                 self.context.reporter.row_failure(result, "categories.persist", exc)
         self.context.reporter.finish(result)
@@ -227,6 +230,7 @@ class SupplierImporter:
                     )
                 self.dependencies.suppliers[source_id] = obj
                 result.counts.record(outcome)
+            # broad except: task-isolation: one remote row must not abort the reviewed import batch
             except Exception as exc:
                 self.context.reporter.row_failure(result, "suppliers.persist", exc)
         self.context.reporter.finish(result)
