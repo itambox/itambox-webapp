@@ -5,7 +5,7 @@ from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
 
 from core.context import _current_user, set_current_membership, set_current_tenant
-from core.events import send_notification_to_channel
+from core.events import DeliveryDisposition, delivery_log_context, delivery_log_message, send_notification_to_channel
 from core.tasks.context import TaskContext
 from extras.models import AlertLog, AlertRule
 
@@ -207,22 +207,24 @@ def _dispatch_channels(rule, match, alert_log):
     delivery = {}
     for channel in channels:
         try:
-            ok = send_notification_to_channel(channel, match["subject"], match["message"])
-            delivery[str(channel.pk)] = "ok" if ok else "failed"
-            if not ok:
+            result = send_notification_to_channel(channel, match["subject"], match["message"])
+            delivery[str(channel.pk)] = "ok" if result else result.disposition.value
+            if not result:
+                context = delivery_log_context(result.operation, tenant_id=rule.tenant_id)
                 logger.warning(
-                    "Channel %s (%s) returned failure for alert '%s'.",
-                    channel.name,
-                    channel.channel_type,
-                    match["subject"],
+                    "%s disposition=%s user_visible=%s",
+                    delivery_log_message(context),
+                    result.disposition.value,
+                    result.user_visible,
                 )
-        except Exception as exc:
-            delivery[str(channel.pk)] = f"error: {exc}"
+        # broad except: boundary-isolation: third-party notification backends expose non-enumerable exceptions
+        except Exception:
+            delivery[str(channel.pk)] = DeliveryDisposition.TERMINAL.value
+            context = delivery_log_context("alert.channel.dispatch", tenant_id=rule.tenant_id)
             logger.error(
-                "Exception dispatching to channel %s for alert '%s': %s",
-                channel,
-                match["subject"],
-                exc,
+                "%s disposition=terminal reason=unexpected_channel_error channel_id=%s",
+                delivery_log_message(context),
+                channel.pk,
             )
     return delivery
 

@@ -172,14 +172,6 @@
       "count": 1
     },
     {
-      "path": "itambox/core/events.py",
-      "scope": "FunctionDef:send_notification_to_channel",
-      "handler_type": "Exception",
-      "classification": "log-only",
-      "body_sha256": "0e38378d75635dcbef31c972ace9bfafcff5fb9b9bba76bd7882652b8c9da824",
-      "count": 1
-    },
-    {
       "path": "itambox/core/forms/mixins.py",
       "scope": "ClassDef:ConfirmationForm/FunctionDef:__init__",
       "handler_type": "Exception",
@@ -385,14 +377,6 @@
       "handler_type": "Exception",
       "classification": "silent",
       "body_sha256": "122cdb7faad01863e33bd02c5849da4de23b6bf625c24d27706e642f57ed9aa3",
-      "count": 1
-    },
-    {
-      "path": "itambox/core/tasks/alerts.py",
-      "scope": "FunctionDef:_dispatch_channels",
-      "handler_type": "Exception",
-      "classification": "log-only",
-      "body_sha256": "532a0756a21a985530834193ae72a646524fa52cd043298d0e2b6c49e9633c62",
       "count": 1
     },
     {

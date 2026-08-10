@@ -2853,14 +2853,6 @@
     },
     {
       "path": "itambox/core/events.py",
-      "code": "C901",
-      "message": "'send_notification_to_channel' is too complex (12)",
-      "source": "def send_notification_to_channel(channel, subject, body):",
-      "context": "Module:body/FunctionDef:send_notification_to_channel:self",
-      "count": 1
-    },
-    {
-      "path": "itambox/core/events.py",
       "code": "F401",
       "message": "'hashlib' imported but unused",
       "source": "import hashlib",

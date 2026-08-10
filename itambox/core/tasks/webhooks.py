@@ -11,6 +11,8 @@ from django.utils import timezone
 from django_q.models import Schedule
 from django_q.tasks import async_task
 
+from core.events import DeliveryDisposition, DeliveryResult, delivery_log_context, delivery_log_message
+
 logger = logging.getLogger(__name__)
 WEBHOOK_ENVELOPE_SCHEMA_VERSION = 1
 
@@ -46,7 +48,9 @@ def send_webhook_task(
     event_id: int | str | None = None,
     delivery_id: str | None = None,
     tenant_id: int | str | None = None,
-) -> None:
+    actor_id: int | None = None,
+    request_id: str | None = None,
+) -> DeliveryResult:
     """Dispatch a webhook event. Retries on 5xx and connection errors; 4xx are final."""
     from django.core.exceptions import ValidationError
 
@@ -73,6 +77,14 @@ def send_webhook_task(
     # AND pins the connection to the validated address — the request cannot be
     # re-routed by a second DNS answer between check and use (DNS rebinding),
     # and redirects are never followed. A blocked URL is final — do not retry.
+    operation = "webhook.deliver"
+    context = delivery_log_context(
+        operation,
+        tenant_id=tenant_id,
+        actor_id=actor_id,
+        request_id=request_id,
+        endpoint=url,
+    )
     target_kind = webhook_target_kind(url)
     try:
         envelope = _webhook_envelope(
@@ -122,20 +134,21 @@ def send_webhook_task(
             response = request_pinned(method, url, headers=req_headers, data=body, timeout=10)
 
         if 400 <= response.status_code < 500:
-            logger.warning("Webhook %s returned %s — not retrying (4xx is final)", url, response.status_code)
-            return
+            logger.warning("%s disposition=terminal reason=http_4xx", delivery_log_message(context))
+            return DeliveryResult(operation, DeliveryDisposition.TERMINAL, True, "Webhook delivery was rejected.")
         response.raise_for_status()
-        logger.info("Webhook sent to %s — status %s", url, response.status_code)
+        logger.info("%s disposition=success", delivery_log_message(context))
+        return DeliveryResult(operation, DeliveryDisposition.SUCCESS)
 
-    except ValidationError as exc:
+    except ValidationError:
         # Blocked by the SSRF guard (internal target, bad scheme, or unresolvable
         # host — fail closed). Final: never retried.
-        logger.error("Webhook %s blocked by SSRF guard: %s", url, exc)
-        return
-    except requests.RequestException as exc:
+        logger.error("%s disposition=terminal reason=invalid_target", delivery_log_message(context))
+        return DeliveryResult(operation, DeliveryDisposition.TERMINAL, True, "Invalid webhook configuration.")
+    except requests.RequestException:
         if attempt >= retry_count:
-            logger.error("Webhook %s: all %d attempts failed: %s", url, retry_count, exc)
-            return
+            logger.error("%s disposition=retryable reason=attempt_limit", delivery_log_message(context))
+            return DeliveryResult(operation, DeliveryDisposition.RETRYABLE)
 
         retry_kwargs = dict(
             url=url,
@@ -158,6 +171,8 @@ def send_webhook_task(
             attempt=attempt + 1,
             retry_count=retry_count,
             retry_backoff=retry_backoff,
+            actor_id=actor_id,
+            request_id=request_id,
         )
 
         if retry_backoff and retry_backoff > 0:
@@ -168,11 +183,10 @@ def send_webhook_task(
             # int, or a JSONField-sourced dict of primitives. repeats defaults to
             # -1, which makes django-q delete the schedule after it fires once.
             logger.warning(
-                "Webhook %s failed (attempt %d/%d): %s — retrying in %ds",
-                url,
+                "%s disposition=retryable action=scheduled attempt=%d retry_count=%d delay_seconds=%d",
+                delivery_log_message(context),
                 attempt + 1,
                 retry_count,
-                exc,
                 retry_backoff,
             )
             Schedule.objects.create(
@@ -183,10 +197,10 @@ def send_webhook_task(
             )
         else:
             logger.warning(
-                "Webhook %s failed (attempt %d/%d): %s — retrying immediately",
-                url,
+                "%s disposition=retryable action=reenqueued attempt=%d retry_count=%d",
+                delivery_log_message(context),
                 attempt + 1,
                 retry_count,
-                exc,
             )
             async_task("core.tasks.send_webhook_task", **retry_kwargs)
+        return DeliveryResult(operation, DeliveryDisposition.RETRYABLE)
