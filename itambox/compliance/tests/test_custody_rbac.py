@@ -945,6 +945,22 @@ class CustodySigningSessionHandoffTests(CustodyRBACFixtureMixin, TestCase):
     def _handoff_url(self, session_token=DUMMY_SESSION_TOKEN, receipt_token=DUMMY_TOKEN_A):
         return f"{self._sign_url(receipt_token)}?session={session_token}"
 
+    def test_old_receipt_with_valid_session_skips_link_ttl(self):
+        # Regression (#300): a freshly prepared signing session is the
+        # operator-authorized handoff channel and must override the 7-day
+        # bearer-link TTL — otherwise the assisted handoff is dead on every
+        # receipt older than CUSTODY_LINK_TTL (hit live on demo.itambox.dev:
+        # seed receipts from 2026-07-18 returned 410 custody_link_expired
+        # despite a valid session).
+        CustodyReceipt.objects.filter(pk=self.receipt_a.pk).update(
+            created_date=timezone.now() - timedelta(days=8),
+        )
+        self._login_to_tenant(self.recipient, self.tenant_a)
+
+        response = self.client.get(self._handoff_url())
+
+        self.assertEqual(response.status_code, 200)
+
     def test_intended_recipient_accept_consumes_session_with_accepted_outcome(self):
         self._login_to_tenant(self.recipient, self.tenant_a)
 

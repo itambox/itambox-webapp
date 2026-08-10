@@ -103,7 +103,13 @@ def _completed_receipt_response(request, receipt):
     return None
 
 
-def _expired_receipt_response(request, receipt):
+def _expired_receipt_response(request, receipt, *, signing_session=None):
+    if signing_session is not None:
+        # A valid signing session is the operator-authorized, fresh handoff
+        # channel (30-minute TTL, one-time consumption) and overrides the
+        # bearer-link TTL — the link-TTL check applies only to the unassisted
+        # path without a session.
+        return None
     if receipt.created_date is None or receipt.created_date + CUSTODY_LINK_TTL <= timezone.now():
         return _custody_error_response(
             request,
@@ -309,9 +315,6 @@ def _process_custody_post(request, token, receipt, signing_session=None):
         # Re-fetch under a row lock and re-check status so concurrent or
         # double-submitted POSTs cannot compute non-deterministic evidence.
         receipt = CustodyReceipt.objects.select_for_update().get(pk=receipt.pk)
-        expired_response = _expired_receipt_response(request, receipt)
-        if expired_response is not None:
-            return expired_response
 
         signing_session, session_error = _lock_custody_signing_session(request, receipt, signing_session)
         if session_error is not None:
@@ -410,13 +413,13 @@ def custody_eula_sign(request, token):
             status=404,
         )
 
-    expired_response = _expired_receipt_response(request, receipt)
-    if expired_response is not None:
-        return expired_response
-
     signing_session, holder, signing_context_error = _resolve_custody_signing_context(request, receipt)
     if signing_context_error is not None:
         return signing_context_error
+
+    expired_response = _expired_receipt_response(request, receipt, signing_session=signing_session)
+    if expired_response is not None:
+        return expired_response
     asset = receipt.asset
 
     from django.conf import settings
