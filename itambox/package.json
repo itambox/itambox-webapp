@@ -33,7 +33,7 @@
     "globals": "^17.7.0",
     "openapi-fetch": "0.17.0",
     "openapi-typescript": "6.7.6",
-    "postcss": "^8.5.23",
+    "postcss": "^8.5.26",
     "postcss-cli": "^11.0.1",
     "sass": "^1.80.0",
     "stylelint": "17.14.1",
