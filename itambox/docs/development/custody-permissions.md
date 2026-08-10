@@ -7,7 +7,7 @@ It deliberately separates:
 - the behaviour present on `origin/main` at the start of this change; and
 - the target contract for the issue implementation.
 
-The target contract is based on the local design reference `issue-259-readiness.md`, §5.3 and §5.5, and the decisions recorded in the decision log below. The readiness file is a local, uncommitted design reference and is not part of the product documentation or implementation change.
+The target contract is based on the local design reference `issue-259-readiness.md`, §5.2 Option B, §5.3, §5.4 and §5.5, and the decisions recorded in the decision log below. Slice D implements the assisted-signing session and export parts of that contract. The readiness file is a local, uncommitted design reference and is not part of the product documentation or implementation change.
 
 No bearer token, signature payload, credential, or complete EULA is reproduced in this document.
 
@@ -65,9 +65,9 @@ On `origin/main`, `compliance/urls.py:42-44` contains only the bearer-token sign
 | Recipient signing/consent | `custody/sign/<str:token>/` — `custody_eula_sign` (`views.py:151-191`). The route resolves the opaque token, optionally requires login, checks expiry/completed state, and when authenticated checks the user against the holder. | Keep a dedicated recipient flow. A Technician or administrator permission must never turn the operator into the signer. The intended holder remains the only consent principal. Option B adds a server-bound prepare/session handoff before this step. | No `sign_custodyreceipt` codename for Technicians. A valid recipient token/session and the intended-holder binding are required. `REQUIRE_CUSTODY_SIGNIN=True` remains the production default; the explicit `False` configuration is tested separately and must not create an operator impersonation path. |
 | Internal receipt list | No route on `origin/main`; receipt rows appear only in embedded tables. | Add an authenticated internal list surface with `view_custodyreceipt`. | Query through `asset__tenant` and the active authorized tenant. Missing internal permission returns `403` with the internal-permission error contract; a foreign tenant is hidden as `404`. No bearer token is needed to render internal rows. |
 | Internal receipt detail | No route on `origin/main`; accepted data is shown through the public token route. | Add an authenticated internal detail surface with `view_custodyreceipt`. | Same `asset__tenant` boundary and object-level permission as the list. It is independent of recipient consent and must not be an alias for `custody_eula_sign`. |
-| Prepare/hand off a signing session | No separate session exists. The asset page links directly to the raw token with `?onsite=true`. | Add the Option-B prepare/session action using `prepare_custodyreceipt`. It binds the receipt, asset tenant, operator, intended holder, creation/expiry, and session state. | A Technician may prepare in the own/effective tenant. The operator cannot replace the intended holder, set the Technician as signer, or use prepare to mutate acceptance. Unauthorized internal callers receive the internal `403`, never `wrong-recipient`. |
+| Prepare/hand off a signing session | No separate session exists. The asset page links directly to the raw token with `?onsite=true`. | **Implemented in Slice D:** `compliance:custodyreceipt_prepare` provides the Option-B prepare/session action using `prepare_custodyreceipt`. It binds the receipt, asset tenant, intended holder, operator, creation/expiry, and session state. | A Technician may prepare in the own/effective tenant. The operator cannot replace the intended holder, set the Technician as signer, or use prepare to mutate acceptance. Unauthorized internal callers receive the internal `403`, never `wrong-recipient`. |
 | Finished receipt internal view | No separate internal route. `receipt_success.html` is reached through the same token route and is subject to the public-link expiry order. | Use the internal detail surface and `view_custodyreceipt`; an authorized operator may inspect a finished receipt independently of the expired public bearer link. The recipient may see only the result belonging to the recipient-bound flow. | Tenant isolation remains mandatory. The public recipient link may be expired while the authorized internal view remains available. |
-| Export | No custody-specific export route on `origin/main`. | Add an explicit export action guarded by `export_custodyreceipt`. | Separate from `view_custodyreceipt`; same tenant/object check. Technician is denied by default. Recipient has no internal export capability. |
+| Export | No custody-specific export route on `origin/main`. | **Implemented in Slice D:** `compliance:custodyreceipt_export` provides an explicit export action guarded by `export_custodyreceipt`. | Separate from `view_custodyreceipt`; same tenant/object check. Technician is denied by default. Recipient has no internal export capability. |
 
 ### 2.3 Embedded surfaces
 
@@ -212,9 +212,9 @@ Each positive cell names the permission codename that makes the capability avail
 
 | Role / principal | See template | Manage templates in own permitted scope | Internal receipt list/detail | Prepare session | Recipient sign/consent | See finished receipt internally | Export |
 | --- | --- | --- | --- | --- | --- | --- | --- |
-| **Superadmin** (`is_superuser`) | **Yes** — `compliance.view_custodytemplate`; global and tenant-scoped templates | **Yes** — `add_custodytemplate`, `change_custodytemplate`, `delete_custodytemplate`; global/tenant/group scope as allowed | **Yes** — `compliance.view_custodyreceipt`; all tenants through the privileged internal scope | **Yes** — `compliance.prepare_custodyreceipt`; all authorized tenants | **Only if self is the intended holder**; no admin override and no operator signer substitution | **Yes** — `compliance.view_custodyreceipt` | **Yes** — `compliance.export_custodyreceipt` |
-| **Administrator / Tenant Admin** | **Yes** — `compliance.view_custodytemplate`; own tenant and permitted shared scope | **Yes** — `add/change/delete_custodytemplate` in own permitted scope; no implicit global/group mutation | **Yes** — `compliance.view_custodyreceipt`; own/effective tenant only | **Yes** — `compliance.prepare_custodyreceipt`; own/effective tenant only | **Only as own intended holder**; no admin override | **Yes** — `compliance.view_custodyreceipt`; own/effective tenant | **Yes** — `compliance.export_custodyreceipt`; own/effective tenant |
-| **IT Technician** | **Yes** — `compliance.view_custodytemplate` | **No by default** — no custody template-policy mutation (`add/change/delete_custodytemplate`) | **Yes** — `compliance.view_custodyreceipt`; own/effective tenant and only scoped records | **Yes** — `compliance.prepare_custodyreceipt`; own/effective tenant | **Only if self is the intended holder**; no Technician signer permission and no operator consent | **Yes** — `compliance.view_custodyreceipt`; own/effective tenant | **No by default** — no `compliance.export_custodyreceipt` |
+|| **Superadmin** (`is_superuser`) | **Yes** — `compliance.view_custodytemplate`; global and tenant-scoped templates | **Yes** — `add_custodytemplate`, `change_custodytemplate`, `delete_custodytemplate`; global/tenant/group scope as allowed | **Yes** — `compliance.view_custodyreceipt`; all tenants through the privileged internal scope | **Implemented — Yes** — `compliance.prepare_custodyreceipt`, route `compliance:custodyreceipt_prepare`; all authorized tenants | **Only if self is the intended holder**; no admin override and no operator signer substitution | **Yes** — `compliance.view_custodyreceipt` | **Implemented — Yes** — `compliance.export_custodyreceipt`, route `compliance:custodyreceipt_export` |
+|| **Administrator / Tenant Admin** | **Yes** — `compliance.view_custodytemplate`; own tenant and permitted shared scope | **Yes** — `add/change/delete_custodytemplate` in own permitted scope; no implicit global/group mutation | **Yes** — `compliance.view_custodyreceipt`; own/effective tenant only | **Implemented — Yes** — `compliance.prepare_custodyreceipt`, route `compliance:custodyreceipt_prepare`; own/effective tenant only | **Only as own intended holder**; no admin override | **Yes** — `compliance.view_custodyreceipt`; own/effective tenant | **Implemented — Yes** — `compliance.export_custodyreceipt`, route `compliance:custodyreceipt_export`; own/effective tenant |
+|| **IT Technician** | **Yes** — `compliance.view_custodytemplate` | **No by default** — no custody template-policy mutation (`add/change/delete_custodytemplate`) | **Yes** — `compliance.view_custodyreceipt`; own/effective tenant and only scoped records | **Implemented — Yes** — `compliance.prepare_custodyreceipt`, route `compliance:custodyreceipt_prepare`; own/effective tenant | **Only if self is the intended holder**; no Technician signer permission and no operator consent | **Yes** — `compliance.view_custodyreceipt`; own/effective tenant | **No by default** — no `compliance.export_custodyreceipt` (route exists but is denied) |
 | **Ordinary User / Recipient without internal custody role** | **No** internal template catalog permission | **No** | **No** internal receipt list/detail | **No** | **Yes only when self is the intended holder**, through a valid recipient token/session; no internal permission is needed for the recipient step | **Only the own completed result in the bound recipient flow**; not an internal catalog read | **No internal export**; only a separately specified own-recipient result, if ever introduced |
 | **Unrelated user in the same tenant** | No receipt content through custody surfaces | **No** | **No** | **No** | **No** — `403` with `wrong-recipient`; no mutation and no receipt payload | **No** | **No** |
 | **User from another tenant** | **No** for the foreign tenant | **No** | **No** — internal UI/API object access is neutral `404` | **No** — no cross-tenant session or recipient payload; deny without disclosure | **No**; a recipient request must not turn a cross-tenant object into a readable result | **No** | **No** — neutral `404`/deny according to the surface, never a payload |
@@ -228,7 +228,46 @@ Each positive cell names the permission codename that makes the capability avail
 5. The ordinary recipient's “yes” is a holder-binding decision, not a role grant.
 6. Cross-tenant internal reads are 404, not a useful 403, and no error variant includes unverified domain data.
 
-## 7. Consent, expiry, and mutation semantics
+## 7. Slice D — Assisted-signing session, handoff, and export
+
+Slice D implements the binding decision from §5.2 Option B: the operator prepares a short-lived server-side session, then the intended holder performs the consent step as a separate principal. The prepare action is not a signing action and does not change the receipt's acceptance state.
+
+### 7.1 Session model and lifecycle
+
+The persisted `CustodySigningSession` binds these values:
+
+- `receipt`, with the tenant boundary derived through `receipt__asset__tenant`;
+- `operator`, the authenticated prepare user;
+- `intended_holder`, copied from the receipt and never supplied by the operator;
+- its opaque one-time `token`;
+- `created_at` and `expires_at`; and
+- lifecycle fields `consumed_at`, `canceled_at`, and `outcome` (`accepted` or `declined`).
+
+The default `CUSTODY_SIGNING_SESSION_TTL` is 30 minutes. It is independent of the seven-day public bearer-link TTL: expiry is checked server-side and an expired session cannot be used to reach the consent mutation. The derived status is `active`, `expired`, `consumed`, or `canceled`; a session is consumed atomically with the first terminal accept or decline operation. Reuse, guessing, changing the receipt identifier, and crossing a tenant boundary never produce a usable handoff. Session material is opaque and is not written to logs, changelog snapshots, or internal HTML.
+
+### 7.2 Prepare flow
+
+`POST` to `compliance:custodyreceipt_prepare` requires an authenticated internal caller with `compliance.prepare_custodyreceipt` on the receipt's asset tenant. The route resolves the receipt through the `asset__tenant` boundary before performing the capability check. It creates a new session for a pending receipt with a holder; multiple sessions may exist for the same receipt, but only an active, unconsumed, unexpired session can be handed off. Preparing a second session does not overwrite the first session or alter the receipt.
+
+The request does not accept a replacement recipient. The holder is copied from the receipt by the server, and the operator is taken from the authenticated request. A receipt without a holder is rejected without creating a session. Missing capability returns the internal custody permission error, while a foreign receipt is neutral `404`; neither path uses the recipient-facing `wrong-recipient` response.
+
+### 7.3 Recipient handoff and consent
+
+The prepared session is handed to the intended recipient, who must authenticate as the holder before accepting or declining. The sign path validates the session, receipt, tenant, holder binding, expiry, and active state before entering the receipt transaction. The operator never becomes the signer. Accept stores the normal verification/signature data and consumes the session; decline stores the distinct declined terminal state and consumes the session. An expired, unknown, forged, already-consumed, other-receipt, or cross-tenant session is neutral and cannot mutate either the session or receipt. A wrong authenticated recipient receives `wrong-recipient` and cannot reach the mutation.
+
+The existing public-link rules remain in force: unknown links use `custody_link_unavailable` (`404`), expired links use `custody_link_expired` (`410`), and the intended-recipient check uses `wrong_recipient` (`403`). Session-specific failures are `custody_session_unavailable` (`404`) for an unknown, malformed, other-receipt, or cross-tenant session, and `custody_session_expired_or_used` (`410`) for an expired, consumed, or canceled session. These responses never render receipt, asset, holder, EULA, token, or session payload.
+
+### 7.4 Export route
+
+`GET` to `compliance:custodyreceipt_export` is an authenticated internal action guarded independently by `compliance.export_custodyreceipt`. It uses the same asset-derived tenant boundary as the internal detail view and is available only for an accepted receipt. The response contains the verification data needed to validate the finished receipt, but never the raw public bearer token or an active signing/session secret.
+
+The export route returns the internal custody permission error (`403`) when the caller lacks the capability, including the seeded Technician role. A pending receipt and a foreign-tenant receipt are not exportable and are returned as neutral `404` responses. Superadmin export remains available through the privileged internal scope.
+
+### 7.5 Audit presentation
+
+The internal receipt detail keeps the two principals distinguishable: the session history identifies the prepare operator and its creation/expiry/consumption timestamps, while the receipt identifies the authenticated consent recipient, consent time, terminal result, and verification data. Multiple prepare sessions remain separately auditable. Internal list/detail HTML contains no raw public token and no session secret; the audit view is therefore useful without recreating a bearer link.
+
+## 8. Consent, expiry, and mutation semantics
 
 The existing recipient implementation already uses a transaction and `select_for_update()` in `_process_custody_post()` (`itambox/compliance/views.py:87-149`). The target keeps the following invariants:
 
@@ -244,7 +283,7 @@ The existing recipient implementation already uses a transaction and `select_for
 
 `REQUIRE_CUSTODY_SIGNIN=True` is the production default. Tests also exercise the explicit `False` setting. In the safe `False` mode, disabling the login redirect does not authorize an anonymous consent POST: a bearer-link visitor still receives `403 recipient_authentication_required` unless authenticated as the intended holder. Whichever authentication mode is active, the implementation must preserve the distinction between the operator who prepares a session and the intended recipient who consents.
 
-## 8. Decision log
+## 9. Decision log
 
 These decisions are binding for issue #259 and supersede the unresolved recommendations in the original HOLD section of the readiness report.
 
@@ -256,11 +295,13 @@ These decisions are binding for issue #259 and supersede the unresolved recommen
 | Technician seed | Narrow the custody-specific Technician grant to viewing plus preparation. **No export by default** and no custody-template policy mutation. | `issue-259-readiness.md`, §5.3 target matrix, together with the maintainer decision that the Technician seed is narrower. |
 | Technician signing codename | Do **not** create or grant `sign_custodyreceipt` to Technicians. | `issue-259-readiness.md`, §5.1/§5.3: consent is not an internal administrative right. |
 | Recipient principal | The intended Recipient remains the only signer/consenter. Superadmin, Tenant Admin, and Technician privileges never override the holder binding. | `issue-259-readiness.md`, §5.1, §5.2 Option B, and §6 “Prepare- und Consent-Semantik”. |
-| Sign-in policy | `REQUIRE_CUSTODY_SIGNIN=True` remains the production default. The explicit `False` mode is covered by regression tests and must not give an operator a recipient override. | `issue-259-readiness.md`, §5.4 “Configuration”, §6 “Token, Ablauf und Fehler”, plus the issue decision to test both settings. |
+|| Sign-in policy | `REQUIRE_CUSTODY_SIGNIN=True` remains the production default. The explicit `False` mode is covered by regression tests and must not give an operator a recipient override. | `issue-259-readiness.md`, §5.4 “Configuration”, §6 “Token, Ablauf und Fehler”, plus the issue decision to test both settings. |
+|| Assisted-signing session | **Option B is implemented:** prepare is a persisted, short-lived, one-time session bound to receipt, asset tenant, operator, and intended holder. Prepare never changes recipient identity or acceptance; only the authenticated intended holder can consume the handoff through consent. | `issue-259-readiness.md`, §5.2 Option B, §5.4, §6 “Prepare- und Consent-Semantik”; Slice D routes `compliance:custodyreceipt_prepare` and the recipient handoff. |
+|| Export separation | **Implemented:** finished-receipt export is a separate route guarded by `export_custodyreceipt`, independent from internal view and denied to the seeded Technician role. | `issue-259-readiness.md`, §5.3/§5.5 and §6 “API und interne Darstellung”; Slice D route `compliance:custodyreceipt_export`. |
 
 The readiness document remains a read-only design reference. If implementation details (for example, concrete URL names) differ from the conceptual surfaces above, the route declaration and tests are the final executable contract, but the permission separation, tenant boundary, error classes, and recipient-binding decisions are not optional.
 
-## 9. Review checklist
+## 10. Review checklist
 
 - [ ] Every internal receipt query uses `asset__tenant` or an equivalent centralized boundary decision.
 - [ ] No embedded table turns an internal “view” action into a raw-token signing link.

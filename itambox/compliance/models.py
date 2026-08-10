@@ -1,9 +1,12 @@
 import secrets
+from datetime import timedelta
 
+from django import conf
 from django.conf import settings
 from django.contrib.auth import get_user_model
 from django.db import models
 from django.urls import reverse
+from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
 
 from compliance.choices import AuditSessionStatusChoices, AuditVerificationMethodChoices
@@ -11,6 +14,7 @@ from core.managers import (
     AllObjectsManager,
     SoftDeleteManager,
     TenantScopingAllObjectsManager,
+    TenantScopingManager,
     TenantScopingSoftDeleteManager,
 )
 from core.mixins import (
@@ -27,6 +31,15 @@ from core.models import BaseModel, ChangeLoggingMixin, StandardModel
 
 def generate_token():
     return secrets.token_urlsafe(48)
+
+
+def generate_custody_signing_session_token():
+    return secrets.token_urlsafe(48)
+
+
+def custody_signing_session_expiry():
+    ttl = getattr(conf.settings, "CUSTODY_SIGNING_SESSION_TTL", timedelta(minutes=30))
+    return timezone.now() + ttl
 
 
 class CustodyTemplate(TaggableMixin, CloneableMixin, ExportableMixin, ChangeLoggingMixin, SoftDeleteMixin, BaseModel):
@@ -202,6 +215,81 @@ class CustodyReceipt(ChangeLoggingMixin, BaseModel):
 
     def __str__(self):
         return f"Custody Receipt for {self.asset} assigned to {self.holder} ({self.get_acceptance_status_display()})"
+
+    def get_absolute_url(self):
+        return reverse("compliance:custodyreceipt_detail", kwargs={"pk": self.pk})
+
+
+class CustodySigningSession(BaseModel):
+    """Short-lived, operator-prepared handoff for recipient custody consent."""
+
+    objects = TenantScopingManager()
+    tenant_lookup = "receipt__asset__tenant"
+    deny_global_tenant = True
+
+    OUTCOME_ACCEPTED = CustodyReceipt.STATUS_ACCEPTED
+    OUTCOME_DECLINED = CustodyReceipt.STATUS_DECLINED
+    OUTCOME_CHOICES = (
+        (OUTCOME_ACCEPTED, _("Accepted")),
+        (OUTCOME_DECLINED, _("Declined")),
+    )
+
+    receipt = models.ForeignKey(
+        CustodyReceipt,
+        on_delete=models.PROTECT,
+        related_name="signing_sessions",
+        editable=False,
+        verbose_name=_("Custody Receipt"),
+    )
+    operator = models.ForeignKey(
+        conf.settings.AUTH_USER_MODEL,
+        on_delete=models.PROTECT,
+        related_name="prepared_custody_signing_sessions",
+        editable=False,
+        verbose_name=_("Operator"),
+    )
+    intended_holder = models.ForeignKey(
+        "organization.AssetHolder",
+        on_delete=models.PROTECT,
+        related_name="custody_signing_sessions",
+        null=True,
+        blank=True,
+        editable=False,
+        verbose_name=_("Intended Holder"),
+    )
+    token = models.CharField(
+        max_length=64,
+        unique=True,
+        default=generate_custody_signing_session_token,
+        editable=False,
+    )
+    expires_at = models.DateTimeField(default=custody_signing_session_expiry, editable=False)
+    consumed_at = models.DateTimeField(null=True, blank=True, editable=False)
+    canceled_at = models.DateTimeField(null=True, blank=True, editable=False)
+    outcome = models.CharField(max_length=20, choices=OUTCOME_CHOICES, blank=True, editable=False)
+
+    class Meta:
+        ordering = ("-created_at", "-pk")
+        default_permissions = ()
+        verbose_name = _("Custody Signing Session")
+        verbose_name_plural = _("Custody Signing Sessions")
+
+    def __str__(self):
+        return f"Custody signing session {self.pk} for receipt {self.receipt_id}"
+
+    @property
+    def is_active(self):
+        return self.canceled_at is None and self.consumed_at is None and self.expires_at > timezone.now()
+
+    @property
+    def status(self):
+        if self.canceled_at is not None:
+            return "canceled"
+        if self.consumed_at is not None:
+            return "consumed"
+        if self.expires_at <= timezone.now():
+            return "expired"
+        return "active"
 
 
 User = get_user_model()

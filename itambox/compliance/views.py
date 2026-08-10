@@ -1,22 +1,26 @@
 import hashlib
+import json
 import logging
 import re
 from datetime import timedelta
 from urllib.parse import parse_qsl, urlencode, urlparse, urlunparse
 
 from django.contrib.auth.decorators import login_required, permission_required
+from django.core.exceptions import ValidationError
 from django.db import transaction
+from django.http import Http404, HttpResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse, reverse_lazy
 from django.utils import timezone
 
 from itambox.panels import Panel
 from itambox.views.generic import ObjectCloneView, ObjectDeleteView, ObjectDetailView, ObjectEditView, ObjectListView
+from itambox.views.generic.service_views import SimplePostView
 
 from .filters import CustodyReceiptFilterSet
 from .forms import CustodyTemplateForm
 from .forms_filter import CustodyReceiptFilterForm
-from .models import CustodyReceipt, CustodyTemplate
+from .models import CustodyReceipt, CustodySigningSession, CustodyTemplate
 from .registry import signature_providers
 from .services import scope_custody_receipts
 from .tables import CustodyReceiptTable, CustodyTemplateTable
@@ -24,7 +28,10 @@ from .tables import CustodyReceiptTable, CustodyTemplateTable
 logger = logging.getLogger(__name__)
 
 VIEW_CUSTODY_RECEIPT_PERMISSION = "compliance.view_custodyreceipt"
+PREPARE_CUSTODY_RECEIPT_PERMISSION = "compliance.prepare_custodyreceipt"
+EXPORT_CUSTODY_RECEIPT_PERMISSION = "compliance.export_custodyreceipt"
 CUSTODY_TOKEN_PATTERN = re.compile(r"[A-Za-z0-9_-]{64}")
+CUSTODY_SIGNING_SESSION_TOKEN_PATTERN = re.compile(r"[A-Za-z0-9_-]{64}")
 CUSTODY_LINK_TTL = timedelta(days=7)
 
 
@@ -148,7 +155,156 @@ def _resolve_custody_receipt(token):
     )
 
 
-def _process_custody_post(request, token, receipt):
+def _custody_signing_session_error_response(request, *, gone):
+    if gone:
+        return _custody_error_response(
+            request,
+            error_code="custody_session_expired_or_used",
+            title="Custody Signing Session Unavailable",
+            error="This custody signing session has expired or is no longer available.",
+            status=410,
+        )
+    return _custody_error_response(
+        request,
+        error_code="custody_session_unavailable",
+        title="Custody Signing Session Unavailable",
+        error="The requested custody signing session is unavailable.",
+        status=404,
+    )
+
+
+def _custody_signing_session_state_error(request, signing_session, receipt):
+    if (
+        signing_session.receipt_id != receipt.pk
+        or signing_session.intended_holder_id is None
+        or signing_session.intended_holder_id != receipt.holder_id
+    ):
+        return _custody_signing_session_error_response(request, gone=False)
+    if (
+        signing_session.consumed_at is not None
+        or signing_session.canceled_at is not None
+        or signing_session.expires_at <= timezone.now()
+    ):
+        return _custody_signing_session_error_response(request, gone=True)
+    return None
+
+
+def _resolve_custody_signing_session(request, receipt):
+    session_token = request.GET.get("session")
+    if session_token is None:
+        return None, None
+    if CUSTODY_SIGNING_SESSION_TOKEN_PATTERN.fullmatch(session_token) is None:
+        return None, _custody_signing_session_error_response(request, gone=False)
+    signing_session = (
+        CustodySigningSession._base_manager.select_related("intended_holder", "intended_holder__user")
+        .filter(token=session_token, receipt_id=receipt.pk)
+        .first()
+    )
+    if signing_session is None:
+        return None, _custody_signing_session_error_response(request, gone=False)
+    state_error = _custody_signing_session_state_error(request, signing_session, receipt)
+    return signing_session, state_error
+
+
+def _resolve_custody_signing_context(request, receipt):
+    signing_session, context_error = _resolve_custody_signing_session(request, receipt)
+    if context_error is not None:
+        return None, None, context_error
+    holder = signing_session.intended_holder if signing_session is not None else receipt.holder
+    return signing_session, holder, _signer_error_response(request, holder)
+
+
+def _lock_custody_signing_session(request, receipt, signing_session):
+    if signing_session is None:
+        return None, None
+    signing_session = (
+        CustodySigningSession._base_manager.select_for_update()
+        .filter(pk=signing_session.pk, receipt_id=receipt.pk)
+        .first()
+    )
+    if signing_session is None:
+        return None, _custody_signing_session_error_response(request, gone=False)
+    return signing_session, _custody_signing_session_state_error(request, signing_session, receipt)
+
+
+def _consume_custody_signing_session(signing_session, *, outcome, consumed_at):
+    if signing_session is None:
+        return
+    signing_session.consumed_at = consumed_at
+    signing_session.outcome = outcome
+    signing_session.save(update_fields=["consumed_at", "outcome", "updated_at"])
+
+
+def _isoformat_or_none(value):
+    return value.isoformat() if value is not None else None
+
+
+def _custody_receipt_export_payload(receipt):
+    signing_sessions = (
+        CustodySigningSession.objects.select_related("operator", "intended_holder")
+        .filter(receipt=receipt, receipt__asset__tenant_id=receipt.asset.tenant_id)
+        .order_by("created_at", "pk")
+    )
+    return {
+        "format": "itambox.custody-receipt",
+        "version": 1,
+        "omitted_sensitive_fields": ["signature_canvas", "signature_data", "token"],
+        "receipt": {
+            "id": receipt.pk,
+            "asset_id": receipt.asset_id,
+            "holder_id": receipt.holder_id,
+            "custody_template_id": receipt.custody_template_id,
+            "signature_provider": receipt.signature_provider,
+            "eula_text": receipt.eula_text,
+            "disclaimer": receipt.disclaimer,
+            "qms_reference": receipt.qms_reference,
+            "accepted": receipt.accepted,
+            "accepted_date": _isoformat_or_none(receipt.accepted_date),
+            "acceptance_method": receipt.acceptance_method,
+            "acceptance_status": receipt.acceptance_status,
+            "signature_hash": receipt.signature_hash,
+            "verification_hash": receipt.verification_hash,
+            "signed_at": _isoformat_or_none(receipt.signed_at),
+            "eula_version": receipt.eula_version,
+            "created_date": _isoformat_or_none(receipt.created_date),
+            "ip_address": receipt.ip_address,
+            "user_agent": receipt.user_agent,
+            "created_at": _isoformat_or_none(receipt.created_at),
+            "updated_at": _isoformat_or_none(receipt.updated_at),
+        },
+        "asset": {
+            "id": receipt.asset_id,
+            "tenant_id": receipt.asset.tenant_id,
+            "name": receipt.asset.name,
+            "asset_tag": receipt.asset.asset_tag,
+            "serial_number": receipt.asset.serial_number,
+        },
+        "holder": {
+            "id": receipt.holder_id,
+            "user_id": receipt.holder.user_id,
+            "first_name": receipt.holder.first_name,
+            "last_name": receipt.holder.last_name,
+            "upn": receipt.holder.upn,
+            "email": receipt.holder.email,
+        },
+        "signing_sessions": [
+            {
+                "id": signing_session.pk,
+                "operator_id": signing_session.operator_id,
+                "operator_username": signing_session.operator.get_username(),
+                "intended_holder_id": signing_session.intended_holder_id,
+                "created_at": _isoformat_or_none(signing_session.created_at),
+                "expires_at": _isoformat_or_none(signing_session.expires_at),
+                "consumed_at": _isoformat_or_none(signing_session.consumed_at),
+                "canceled_at": _isoformat_or_none(signing_session.canceled_at),
+                "outcome": signing_session.outcome,
+            }
+            for signing_session in signing_sessions
+        ],
+    }
+
+
+def _process_custody_post(request, token, receipt, signing_session=None):
     with transaction.atomic():
         # Re-fetch under a row lock and re-check status so concurrent or
         # double-submitted POSTs cannot compute non-deterministic evidence.
@@ -157,8 +313,12 @@ def _process_custody_post(request, token, receipt):
         if expired_response is not None:
             return expired_response
 
+        signing_session, session_error = _lock_custody_signing_session(request, receipt, signing_session)
+        if session_error is not None:
+            return session_error
+
         asset = receipt.asset
-        holder = receipt.holder
+        holder = signing_session.intended_holder if signing_session is not None else receipt.holder
         signer_error = _signer_error_response(request, holder, require_authenticated=True)
         if signer_error is not None:
             return signer_error
@@ -170,11 +330,17 @@ def _process_custody_post(request, token, receipt):
         action = request.POST.get("action", "accept")
         signature_data = request.POST.get("signature_canvas")
         if action == "decline":
+            consumed_at = timezone.now()
             receipt.accepted = False
             receipt.accepted_date = None
             receipt.acceptance_status = CustodyReceipt.STATUS_DECLINED
             receipt.signed_at = None
             receipt.save(update_fields=["accepted", "accepted_date", "acceptance_status", "signed_at", "updated_at"])
+            _consume_custody_signing_session(
+                signing_session,
+                outcome=CustodySigningSession.OUTCOME_DECLINED,
+                consumed_at=consumed_at,
+            )
             return _custody_error_response(
                 request,
                 error_code="custody_declined",
@@ -210,6 +376,11 @@ def _process_custody_post(request, token, receipt):
         receipt.eula_version = "1.0"
         receipt.signed_at = signed_at
         receipt.save()
+        _consume_custody_signing_session(
+            signing_session,
+            outcome=CustodySigningSession.OUTCOME_ACCEPTED,
+            consumed_at=signed_at,
+        )
 
         transaction.on_commit(
             lambda: _safe_dispatch_custody(
@@ -243,11 +414,10 @@ def custody_eula_sign(request, token):
     if expired_response is not None:
         return expired_response
 
+    signing_session, holder, signing_context_error = _resolve_custody_signing_context(request, receipt)
+    if signing_context_error is not None:
+        return signing_context_error
     asset = receipt.asset
-    holder = receipt.holder
-    signer_error = _signer_error_response(request, holder)
-    if signer_error is not None:
-        return signer_error
 
     from django.conf import settings
 
@@ -270,7 +440,7 @@ def custody_eula_sign(request, token):
         signer_error = _signer_error_response(request, holder, require_authenticated=True)
         if signer_error is not None:
             return signer_error
-        return _process_custody_post(request, token, receipt)
+        return _process_custody_post(request, token, receipt, signing_session=signing_session)
 
     return render(
         request,
@@ -382,10 +552,93 @@ class CustodyReceiptDetailView(InternalCustodyPermissionMixin, ObjectDetailView)
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
-        signature = self.object.signature_canvas
+        receipt = self.object
+        signature = receipt.signature_canvas
         if signature.startswith("data:image/png;base64,"):
             context["signature_image"] = signature
+
+        now = timezone.now()
+        signing_sessions = CustodySigningSession.objects.select_related("operator", "intended_holder").filter(
+            receipt=receipt,
+            receipt__asset__tenant_id=receipt.asset.tenant_id,
+        )
+        context["signing_sessions"] = signing_sessions.defer("token")
+        context["can_prepare_signing_session"] = (
+            receipt.acceptance_status == CustodyReceipt.STATUS_PENDING
+            and receipt.holder_id is not None
+            and self.request.user.has_perm(PREPARE_CUSTODY_RECEIPT_PERMISSION, obj=receipt.asset)
+        )
+        context["can_export_custody_receipt"] = (
+            receipt.acceptance_status == CustodyReceipt.STATUS_ACCEPTED
+            and receipt.accepted
+            and self.request.user.has_perm(EXPORT_CUSTODY_RECEIPT_PERMISSION, obj=receipt.asset)
+        )
+        if context["can_prepare_signing_session"]:
+            handoff_session = signing_sessions.filter(
+                operator=self.request.user,
+                intended_holder_id=receipt.holder_id,
+                consumed_at__isnull=True,
+                canceled_at__isnull=True,
+                expires_at__gt=now,
+            ).first()
+            if handoff_session is not None:
+                handoff_path = reverse("compliance:custody_eula_sign", kwargs={"token": receipt.token})
+                handoff_path = f"{handoff_path}?{urlencode({'session': handoff_session.token})}"
+                context["custody_handoff_url"] = self.request.build_absolute_uri(handoff_path)
+                context["custody_handoff_expires_at"] = handoff_session.expires_at
         return context
+
+
+class CustodyReceiptPrepareView(InternalCustodyPermissionMixin, SimplePostView):
+    queryset = CustodyReceipt.objects.select_related("asset", "asset__tenant", "holder")
+    permission_required = PREPARE_CUSTODY_RECEIPT_PERMISSION
+
+    def get_queryset(self):
+        return scope_custody_receipts(super().get_queryset(), user=self.request.user)
+
+    def has_permission(self):
+        if not self.request.user.is_authenticated:
+            return False
+        receipt = self.get_object()
+        return self.request.user.has_perm(PREPARE_CUSTODY_RECEIPT_PERMISSION, obj=receipt.asset)
+
+    def perform_action(self, receipt, request):
+        if receipt.acceptance_status != CustodyReceipt.STATUS_PENDING:
+            raise ValidationError("Only pending custody receipts can have a signing session prepared.")
+        if receipt.holder_id is None:
+            raise ValidationError("A custody signing session requires an intended holder.")
+        CustodySigningSession.objects.create(
+            receipt=receipt,
+            operator=request.user,
+            intended_holder=receipt.holder,
+        )
+        return {"message": "Custody signing session prepared for recipient handoff."}
+
+
+class CustodyReceiptExportView(InternalCustodyPermissionMixin, ObjectDetailView):
+    queryset = CustodyReceipt.objects.select_related("asset", "asset__tenant", "holder")
+    permission_required = EXPORT_CUSTODY_RECEIPT_PERMISSION
+
+    def get_queryset(self):
+        return scope_custody_receipts(super().get_queryset(), user=self.request.user)
+
+    def has_permission(self):
+        if not self.request.user.is_authenticated:
+            return False
+        receipt = self.get_object()
+        return self.request.user.has_perm(EXPORT_CUSTODY_RECEIPT_PERMISSION, obj=receipt.asset)
+
+    def get(self, request, *args, **kwargs):
+        receipt = self.get_object()
+        if receipt.acceptance_status != CustodyReceipt.STATUS_ACCEPTED or not receipt.accepted:
+            raise Http404
+        payload = _custody_receipt_export_payload(receipt)
+        content = json.dumps(payload, ensure_ascii=True, separators=(",", ":"), sort_keys=True) + "\n"
+        response = HttpResponse(content, content_type="application/json; charset=utf-8")
+        response["Content-Disposition"] = f'attachment; filename="custody-receipt-{receipt.pk}.json"'
+        response["Cache-Control"] = "no-store"
+        response["X-Content-Type-Options"] = "nosniff"
+        return response
 
 
 class CustodyTemplateEditView(ObjectEditView):

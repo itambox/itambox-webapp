@@ -33,6 +33,16 @@ urlpatterns = [
     # Custody Receipts
     path("custody-receipts/", views.CustodyReceiptListView.as_view(), name="custodyreceipt_list"),
     path("custody-receipts/<int:pk>/", views.CustodyReceiptDetailView.as_view(), name="custodyreceipt_detail"),
+    path(
+        "custody-receipts/<int:pk>/prepare/",
+        views.CustodyReceiptPrepareView.as_view(),
+        name="custodyreceipt_prepare",
+    ),
+    path(
+        "custody-receipts/<int:pk>/export/",
+        views.CustodyReceiptExportView.as_view(),
+        name="custodyreceipt_export",
+    ),
     # Custody Templates
     path("custody-templates/", views.CustodyTemplateListView.as_view(), name="custodytemplate_list"),
     path("custody-templates/add/", views.CustodyTemplateEditView.as_view(), name="custodytemplate_create"),

@@ -6,6 +6,7 @@ Contains all common settings shared between dev and prod.
 import json
 import os
 import warnings as py_warnings
+from datetime import timedelta
 from pathlib import Path
 
 from django.core.exceptions import ImproperlyConfigured
@@ -539,6 +540,7 @@ ITAMBOX_QTASK_FAILED_RETENTION_DAYS = int(os.environ.get("ITAMBOX_QTASK_FAILED_R
 
 ALLOW_GLOBAL_CUSTODY_TEMPLATES = os.environ.get("ITAMBOX_ALLOW_GLOBAL_CUSTODY_TEMPLATES", "True") == "True"
 REQUIRE_CUSTODY_SIGNIN = os.environ.get("ITAMBOX_REQUIRE_CUSTODY_SIGNIN", "True") == "True"
+CUSTODY_SIGNING_SESSION_TTL = timedelta(minutes=30)
 
 # The operator switch for the Beta report designer (capability
 # `reporting.designer`, issue #171). Off by default: the designer's column,
