@@ -239,11 +239,7 @@ class GroupResolverTests(TestCase):
             return set(list_view.get_queryset().values_list("username", flat=True))
 
         def bulk_usernames():
-            return set(
-                bulk_view._get_queryset([customer_agent.pk, self.user.pk]).values_list(
-                    "username", flat=True
-                )
-            )
+            return set(bulk_view._get_queryset([customer_agent.pk, self.user.pk]).values_list("username", flat=True))
 
         # Single tenant: only members of that tenant.
         set_current_tenant(self.customer_a)

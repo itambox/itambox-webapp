@@ -3857,20 +3857,8 @@
     },
     {
       "path": "itambox/users/views.py",
-      "context": "ClassDef:UserBulkEditView/FunctionDef:_get_queryset",
-      "statement": "from core.managers import get_current_tenant",
-      "count": 1
-    },
-    {
-      "path": "itambox/users/views.py",
       "context": "ClassDef:UserGroupBulkDeleteView/FunctionDef:post",
       "statement": "from django.http import HttpResponseRedirect",
-      "count": 1
-    },
-    {
-      "path": "itambox/users/views.py",
-      "context": "ClassDef:UserListView/FunctionDef:get_queryset",
-      "statement": "from core.managers import get_current_tenant",
       "count": 1
     },
     {
