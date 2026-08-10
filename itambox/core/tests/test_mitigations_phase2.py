@@ -1,4 +1,7 @@
+import json
+import re
 import sys
+from pathlib import Path
 
 import django_filters
 from django.http import HttpResponse
@@ -24,6 +27,15 @@ class MockAssetFilterSet(BaseFilterSet):
 
 
 class MitigationsPhase2Tests(TestCase):
+    def test_base_template_disables_htmx_runtime_indicator_styles(self):
+        template = Path(__file__).parents[2] / "templates" / "base.html"
+        match = re.search(r'<meta name="htmx-config"\s+content=\'([^\']+)\'>', template.read_text())
+
+        self.assertIsNotNone(match)
+        config = json.loads(match.group(1))
+        self.assertFalse(config["includeIndicatorStyles"])
+        self.assertFalse(config["scrollIntoViewOnBoost"])
+
     def test_pagination_limit_zero_capped(self):
         from rest_framework.request import Request
 

@@ -22,6 +22,14 @@ attributes. Authored templates, Python emitters, and frontend DOM style writes
 remain prohibited by the blocking source gate. ApexCharts receives the request
 nonce through its `chart.nonce` option for the style elements it creates.
 
+HTMX's loading-indicator rules are authored in the application's bundled SCSS.
+The base template sets `includeIndicatorStyles` to `false`, so HTMX does not
+inject its runtime `<style>` element, which would be rejected by the nonce-only
+`style-src-elem` policy. The global `.htmx-indicator` rules in `_layout.scss`
+keep the page loader and filter indicators hidden until an HTMX request is
+active, then show them with the expected transition. This keeps the loader
+CSP-clean without a runtime style exception.
+
 HTMX fragments are inserted into the already loaded document, so they must reuse
 the parent document nonce. The base template publishes it in a meta element and
 the HTMX bridge sends it as `X-CSP-Nonce`; `CSPMiddleware` accepts that header only
@@ -72,6 +80,9 @@ tools open and preserve the console across HTMX navigation:
    or the scanner library, and the Network panel contains no 404 requests for
    `tabler.min.css.map`, `tabler-vendors.min.css.map`, or
    `tom-select.bootstrap5.css.map`.
+5. During an HTMX request, confirm the global top progress bar appears; after
+   completion, confirm it hides again. Confirm there is no console CSP violation
+   for an HTMX-injected style element.
 
 ## Dynamic styles
 
