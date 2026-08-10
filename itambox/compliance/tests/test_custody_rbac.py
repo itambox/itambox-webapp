@@ -20,7 +20,7 @@ from model_bakery import baker
 from rest_framework.test import APITestCase
 
 from assets.models import Asset
-from compliance.models import CustodyReceipt, CustodyTemplate
+from compliance.models import CustodyReceipt, CustodySigningSession, CustodyTemplate
 from core.management.commands._seed.access import SeedAccessMixin
 from core.models import ObjectChange
 from core.tests.mixins import TenantTestMixin, grant
@@ -30,6 +30,8 @@ User = get_user_model()
 
 DUMMY_TOKEN_A = "a" * 64
 DUMMY_TOKEN_B = "b" * 64
+DUMMY_SESSION_TOKEN = "s" * 64
+DUMMY_SESSION_TOKEN_B = "t" * 64
 DUMMY_SIGNATURE = "dummy-signature-payload"
 DUMMY_EULA = "dummy-eula-marker"
 DUMMY_PASSWORD = "dummy-test-password"
@@ -825,3 +827,231 @@ class CustodyAPIContractTests(CustodyRBACFixtureMixin, APITestCase):
         self.receipt_a.refresh_from_db()
         self.assertFalse(self.receipt_a.accepted)
         self.assertEqual(self.receipt_a.acceptance_status, CustodyReceipt.STATUS_PENDING)
+
+
+@override_settings(CUSTODY_SIGNING_SESSION_TTL=timedelta(minutes=30))
+class CustodySigningSessionPrepareTests(CustodyRBACFixtureMixin, TestCase):
+    def _prepare_url(self, receipt=None):
+        receipt = receipt or self.receipt_a
+        return reverse("compliance:custodyreceipt_prepare", kwargs={"pk": receipt.pk})
+
+    def test_prepare_creates_operator_bound_short_lived_session_and_handoff(self):
+        self._login_to_tenant(self.technician, self.tenant_a)
+
+        response = self.client.post(
+            self._prepare_url(),
+            {
+                "operator": self.unrelated.pk,
+                "intended_holder": self.unrelated_holder.pk,
+            },
+        )
+
+        self.assertRedirects(
+            response,
+            reverse("compliance:custodyreceipt_detail", kwargs={"pk": self.receipt_a.pk}),
+            fetch_redirect_response=False,
+        )
+        signing_session = CustodySigningSession._base_manager.get(receipt=self.receipt_a)
+        self.assertEqual(signing_session.operator, self.technician)
+        self.assertEqual(signing_session.intended_holder, self.recipient_holder)
+        self.assertAlmostEqual(
+            (signing_session.expires_at - signing_session.created_at).total_seconds(),
+            30 * 60,
+            delta=2,
+        )
+        self.assertIsNone(signing_session.consumed_at)
+        self.assertIsNone(signing_session.canceled_at)
+        self.assertEqual(signing_session.outcome, "")
+
+        detail_response = self.client.get(response.url)
+        self.assertContains(detail_response, "Recipient handoff is ready")
+        self.assertContains(detail_response, signing_session.token)
+        self.assertContains(detail_response, DUMMY_TOKEN_A)
+
+    def test_different_operator_sees_session_audit_without_handoff_tokens(self):
+        self._login_to_tenant(self.technician, self.tenant_a)
+        self.client.post(self._prepare_url())
+        signing_session = CustodySigningSession._base_manager.get(receipt=self.receipt_a)
+
+        self._login_to_tenant(self.tenant_admin, self.tenant_a)
+        response = self.client.get(reverse("compliance:custodyreceipt_detail", kwargs={"pk": self.receipt_a.pk}))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, self.technician.username)
+        self.assertContains(response, "Active")
+        self.assertNotContains(response, signing_session.token)
+        self.assertNotContains(response, DUMMY_TOKEN_A)
+
+    def test_prepare_without_permission_is_internal_403(self):
+        self._login_to_tenant(self.unrelated, self.tenant_a)
+
+        response = self.client.post(self._prepare_url())
+
+        self.assertEqual(response.status_code, 403)
+        self.assertTemplateUsed(response, "compliance/custody/internal_permission_error.html")
+        self.assertContains(response, "internal_custody_permission_required", status_code=403)
+        self.assertFalse(CustodySigningSession._base_manager.filter(receipt=self.receipt_a).exists())
+
+    def test_prepare_for_foreign_tenant_is_neutral_404(self):
+        self._login_to_tenant(self.technician, self.tenant_a)
+
+        response = self.client.post(self._prepare_url(self.receipt_b))
+
+        self.assertEqual(response.status_code, 404)
+        self._assert_no_receipt_payload(response, self.receipt_b)
+        self.assertFalse(CustodySigningSession._base_manager.filter(receipt=self.receipt_b).exists())
+
+    def test_completed_receipt_is_rejected_without_creating_session(self):
+        self.receipt_a.acceptance_status = CustodyReceipt.STATUS_ACCEPTED
+        self.receipt_a.accepted = True
+        self.receipt_a.save(update_fields=["acceptance_status", "accepted", "updated_at"])
+        self._login_to_tenant(self.technician, self.tenant_a)
+
+        response = self.client.post(self._prepare_url(), follow=True)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Only pending custody receipts")
+        self.assertFalse(CustodySigningSession._base_manager.filter(receipt=self.receipt_a).exists())
+
+
+@override_settings(REQUIRE_CUSTODY_SIGNIN=True)
+class CustodySigningSessionHandoffTests(CustodyRBACFixtureMixin, TestCase):
+    def setUp(self):
+        super().setUp()
+        self.signing_session = CustodySigningSession._base_manager.create(
+            receipt=self.receipt_a,
+            operator=self.technician,
+            intended_holder=self.recipient_holder,
+            token=DUMMY_SESSION_TOKEN,
+            expires_at=timezone.now() + timedelta(minutes=30),
+        )
+
+    def _handoff_url(self, session_token=DUMMY_SESSION_TOKEN, receipt_token=DUMMY_TOKEN_A):
+        return f"{self._sign_url(receipt_token)}?session={session_token}"
+
+    def test_intended_recipient_accept_consumes_session_with_accepted_outcome(self):
+        self._login_to_tenant(self.recipient, self.tenant_a)
+
+        response = self.client.post(
+            self._handoff_url(),
+            {"action": "accept", "signature_canvas": DUMMY_SIGNATURE},
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.receipt_a.refresh_from_db()
+        self.signing_session.refresh_from_db()
+        self.assertEqual(self.receipt_a.acceptance_status, CustodyReceipt.STATUS_ACCEPTED)
+        self.assertIsNotNone(self.signing_session.consumed_at)
+        self.assertEqual(self.signing_session.outcome, CustodySigningSession.OUTCOME_ACCEPTED)
+
+    def test_intended_recipient_decline_consumes_session_with_declined_outcome(self):
+        self._login_to_tenant(self.recipient, self.tenant_a)
+
+        response = self.client.post(self._handoff_url(), {"action": "decline"})
+
+        self.assertEqual(response.status_code, 200)
+        self.receipt_a.refresh_from_db()
+        self.signing_session.refresh_from_db()
+        self.assertEqual(self.receipt_a.acceptance_status, CustodyReceipt.STATUS_DECLINED)
+        self.assertIsNotNone(self.signing_session.consumed_at)
+        self.assertEqual(self.signing_session.outcome, CustodySigningSession.OUTCOME_DECLINED)
+
+    def test_non_recipient_operator_cannot_consume_session(self):
+        self._login_to_tenant(self.technician, self.tenant_a)
+
+        response = self.client.post(
+            self._handoff_url(),
+            {"action": "accept", "signature_canvas": DUMMY_SIGNATURE},
+        )
+
+        self.assertEqual(response.status_code, 403)
+        self._assert_wrong_recipient(response)
+        self.signing_session.refresh_from_db()
+        self.assertIsNone(self.signing_session.consumed_at)
+        self.assertEqual(self.signing_session.outcome, "")
+
+    def test_expired_consumed_and_canceled_sessions_are_neutral_410(self):
+        self._login_to_tenant(self.recipient, self.tenant_a)
+        now = timezone.now()
+        terminal_states = (
+            {"expires_at": now - timedelta(seconds=1)},
+            {"consumed_at": now, "outcome": CustodySigningSession.OUTCOME_ACCEPTED},
+            {"canceled_at": now},
+        )
+
+        for terminal_state in terminal_states:
+            with self.subTest(terminal_state=sorted(terminal_state)):
+                CustodySigningSession._base_manager.filter(pk=self.signing_session.pk).update(
+                    expires_at=now + timedelta(minutes=30),
+                    consumed_at=None,
+                    canceled_at=None,
+                    outcome="",
+                )
+                CustodySigningSession._base_manager.filter(pk=self.signing_session.pk).update(**terminal_state)
+
+                response = self.client.get(self._handoff_url())
+
+                self.assertEqual(response.status_code, 410)
+                self._assert_body_contains(response, "custody_session_expired_or_used")
+                self._assert_no_receipt_payload(response, self.receipt_a)
+
+    def test_unknown_and_mismatched_sessions_are_neutral_404(self):
+        mismatched_session = CustodySigningSession._base_manager.create(
+            receipt=self.receipt_b,
+            operator=self.cross_tenant_user,
+            intended_holder=self.cross_holder,
+            token=DUMMY_SESSION_TOKEN_B,
+            expires_at=timezone.now() + timedelta(minutes=30),
+        )
+        self._login_to_tenant(self.recipient, self.tenant_a)
+
+        for token in ("z" * 64, mismatched_session.token, "invalid-session"):
+            with self.subTest(token_length=len(token)):
+                response = self.client.get(self._handoff_url(session_token=token))
+
+                self.assertEqual(response.status_code, 404)
+                self._assert_body_contains(response, "custody_session_unavailable")
+                self._assert_no_receipt_payload(response, self.receipt_a)
+
+
+@override_settings(REQUIRE_CUSTODY_SIGNIN=True)
+class CustodySigningSessionRaceTests(CustodyRBACFixtureMixin, TransactionTestCase):
+    reset_sequences = True
+
+    def setUp(self):
+        super().setUp()
+        self.signing_session = CustodySigningSession._base_manager.create(
+            receipt=self.receipt_a,
+            operator=self.technician,
+            intended_holder=self.recipient_holder,
+            token=DUMMY_SESSION_TOKEN,
+            expires_at=timezone.now() + timedelta(minutes=30),
+        )
+
+    def _post_handoff_from_independent_client(self, signature):
+        close_old_connections()
+        try:
+            client = self.client_class()
+            client.force_login(self.recipient)
+            session = client.session
+            session["active_tenant_id"] = self.tenant_a.pk
+            session.save()
+            url = f"{self._sign_url(DUMMY_TOKEN_A)}?session={DUMMY_SESSION_TOKEN}"
+            return client.post(url, {"action": "accept", "signature_canvas": signature})
+        finally:
+            close_old_connections()
+
+    def test_concurrent_session_posts_allow_exactly_one_consumption(self):
+        with ThreadPoolExecutor(max_workers=2) as executor:
+            futures = [
+                executor.submit(self._post_handoff_from_independent_client, "dummy-session-signature-one"),
+                executor.submit(self._post_handoff_from_independent_client, "dummy-session-signature-two"),
+            ]
+            responses = [future.result() for future in futures]
+
+        self.receipt_a.refresh_from_db()
+        self.signing_session.refresh_from_db()
+        self.assertEqual(sorted(response.status_code for response in responses), [200, 410])
+        self.assertEqual(self.receipt_a.acceptance_status, CustodyReceipt.STATUS_ACCEPTED)
+        self.assertIsNotNone(self.signing_session.consumed_at)
+        self.assertEqual(self.signing_session.outcome, CustodySigningSession.OUTCOME_ACCEPTED)

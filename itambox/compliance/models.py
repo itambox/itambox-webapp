@@ -1,6 +1,7 @@
 import secrets
 from datetime import timedelta
 
+from django import conf
 from django.conf import settings
 from django.contrib.auth import get_user_model
 from django.db import models
@@ -37,7 +38,7 @@ def generate_custody_signing_session_token():
 
 
 def custody_signing_session_expiry():
-    ttl = getattr(settings, "CUSTODY_SIGNING_SESSION_TTL", timedelta(minutes=30))
+    ttl = getattr(conf.settings, "CUSTODY_SIGNING_SESSION_TTL", timedelta(minutes=30))
     return timezone.now() + ttl
 
 
@@ -241,7 +242,7 @@ class CustodySigningSession(BaseModel):
         verbose_name=_("Custody Receipt"),
     )
     operator = models.ForeignKey(
-        settings.AUTH_USER_MODEL,
+        conf.settings.AUTH_USER_MODEL,
         on_delete=models.PROTECT,
         related_name="prepared_custody_signing_sessions",
         editable=False,

@@ -1,6 +1,19 @@
 {% extends "generic/object_detail.html" %}
 {% load i18n %}
 {% block title %}{% translate "Custody Receipt" %} #{{ object.pk }} {% translate "- ITAMbox" %}{% endblock %}
+{% block extra_page_actions %}
+  {% if can_prepare_signing_session %}
+    <form method="post"
+          action="{% url 'compliance:custodyreceipt_prepare' pk=object.pk %}"
+          class="d-inline">
+      {% csrf_token %}
+      <button type="submit" class="btn btn-primary">
+        <i class="mdi mdi-account-arrow-right-outline me-1"></i>
+        {% translate "Prepare signing session" %}
+      </button>
+    </form>
+  {% endif %}
+{% endblock extra_page_actions %}
 {% block object_details %}
   <dl class="row mb-0">
     <dt class="col-sm-4">{% translate "Asset" %}</dt>
@@ -81,3 +94,69 @@
     </div>
   {% endif %}
 {% endblock object_details %}
+{% block full_width_content %}
+  {% if custody_handoff_url %}
+    <div class="alert alert-info" role="alert">
+      <h4 class="alert-title">{% translate "Recipient handoff is ready" %}</h4>
+      <p>
+        {% blocktranslate with expires=custody_handoff_expires_at|date:"Y-m-d H:i:s T" %}This one-time handoff expires at {{ expires }}. Pass control of the device to the intended holder before opening it.{% endblocktranslate %}
+      </p>
+      <a href="{{ custody_handoff_url }}"
+         class="btn btn-info"
+         target="_blank"
+         rel="noopener">
+        <i class="mdi mdi-open-in-new me-1"></i>
+        {% translate "Open recipient handoff" %}
+      </a>
+    </div>
+  {% endif %}
+  <div class="card shadow-sm">
+    <div class="card-header">
+      <h3 class="card-title">{% translate "Signing sessions" %}</h3>
+    </div>
+    {% if signing_sessions %}
+      <div class="table-responsive">
+        <table class="table card-table table-vcenter">
+          <thead>
+            <tr>
+              <th>{% translate "Session" %}</th>
+              <th>{% translate "Operator" %}</th>
+              <th>{% translate "Intended holder" %}</th>
+              <th>{% translate "Prepared" %}</th>
+              <th>{% translate "Expires" %}</th>
+              <th>{% translate "Status" %}</th>
+              <th>{% translate "Consumed" %}</th>
+              <th>{% translate "Result" %}</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for signing_session in signing_sessions %}
+              <tr>
+                <td>#{{ signing_session.pk }}</td>
+                <td>{{ signing_session.operator }}</td>
+                <td>{{ signing_session.intended_holder|default:"-" }}</td>
+                <td>{{ signing_session.created_at|date:"Y-m-d H:i:s T" }}</td>
+                <td>{{ signing_session.expires_at|date:"Y-m-d H:i:s T" }}</td>
+                <td>
+                  {% if signing_session.status == "active" %}
+                    <span class="badge bg-info text-info-fg">{% translate "Active" %}</span>
+                  {% elif signing_session.status == "consumed" %}
+                    <span class="badge bg-success text-success-fg">{% translate "Consumed" %}</span>
+                  {% elif signing_session.status == "canceled" %}
+                    <span class="badge bg-secondary text-secondary-fg">{% translate "Canceled" %}</span>
+                  {% else %}
+                    <span class="badge bg-warning text-warning-fg">{% translate "Expired" %}</span>
+                  {% endif %}
+                </td>
+                <td>{{ signing_session.consumed_at|date:"Y-m-d H:i:s T"|default:"-" }}</td>
+                <td>{{ signing_session.get_outcome_display|default:"-" }}</td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    {% else %}
+      <div class="card-body text-secondary">{% translate "No signing sessions have been prepared." %}</div>
+    {% endif %}
+  </div>
+{% endblock full_width_content %}
