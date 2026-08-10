@@ -84,6 +84,18 @@ class TestBannerTemplate:
         assert "Webhook" in html
         assert "capability-registry" in html or "development/" in html
 
+    def test_the_contract_link_is_excluded_from_boost(self):
+        """The docs link points outside the app shell: it must never be a
+        boosted HTMX request (global hx-boost on <body> would otherwise swap
+        the standalone docs page into the app layout and break the UI).
+        Defense in depth next to the central boost-guard (static/src/boost-guard.ts).
+        """
+        html = render_to_string(
+            "generic/includes/beta_banner.html",
+            {"capability_notice": _notice_for_key("automation.webhooks")},
+        )
+        assert 'hx-boost="false"' in html
+
     def test_the_banner_renders_the_declared_limitations(self):
         notice = _notice_for_key("automation.webhooks")
         html = render_to_string("generic/includes/beta_banner.html", {"capability_notice": notice})
