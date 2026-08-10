@@ -12,10 +12,62 @@ from mozilla_django_oidc.views import OIDCAuthenticationCallbackView, OIDCAuthen
 
 from core.auth.providers import is_usable_oidc_config
 from core.auth.provisioning import provision_membership, provision_provider_membership
+from core.context import get_current_request_id, get_current_user
+from core.errors import IntegrationAuthenticationError, IntegrationConfigurationError, IntegrationContext
 from core.managers import get_current_tenant, set_current_tenant
 from organization.models import Tenant
 
 logger = logging.getLogger(__name__)
+
+
+class OIDCConfigurationError(IntegrationConfigurationError, ImproperlyConfigured):
+    code = "oidc.configuration"
+    user_message = "OIDC configuration is incomplete or invalid."
+
+
+class OIDCTokenValidationError(IntegrationAuthenticationError, SuspiciousOperation):
+    code = "oidc.token_validation"
+    user_message = "OIDC token validation failed."
+
+
+class OIDCTokenConfigurationError(IntegrationConfigurationError, SuspiciousOperation):
+    code = "oidc.token_configuration"
+    user_message = "OIDC token validation is not configured securely."
+
+
+def _oidc_context(operation):
+    tenant = get_current_tenant()
+    actor = get_current_user()
+    request_id = get_current_request_id()
+    return IntegrationContext(
+        provider="oidc",
+        operation=operation,
+        tenant_id=getattr(tenant, "pk", None),
+        actor_id=getattr(actor, "pk", None),
+        request_id=str(request_id) if request_id else None,
+    )
+
+
+def _raise_token_validation_error():
+    error = OIDCTokenValidationError(context=_oidc_context("token.verify"))
+    log_extra = error.log_extra()
+    logger.warning(
+        "OIDC token validation failed integration=%s",
+        log_extra["integration"],
+        extra=log_extra,
+    )
+    raise error
+
+
+def _raise_token_configuration_error():
+    error = OIDCTokenConfigurationError(context=_oidc_context("token.verify"))
+    log_extra = error.log_extra()
+    logger.error(
+        "OIDC token configuration rejected authentication integration=%s",
+        log_extra["integration"],
+        extra=log_extra,
+    )
+    raise error
 
 
 def _usable_tenant_oidc_config(tenant):
@@ -72,10 +124,7 @@ class TenantOIDCSettingsMixin:
         try:
             return import_from_settings(attr, *args)
         except ImproperlyConfigured as exc:
-            tenant_slug = tenant.slug if tenant else "<unknown>"
-            raise ImproperlyConfigured(
-                f"OIDC not configured for tenant: {tenant_slug} (missing setting: {attr})"
-            ) from exc
+            raise OIDCConfigurationError(context=_oidc_context("settings.resolve")) from exc
 
     def __getattr__(self, name):
         if name.startswith("OIDC_"):
@@ -105,12 +154,12 @@ class TenantOIDCBackend(TenantOIDCSettingsMixin, OIDCAuthenticationBackend):
         aud = payload.get("aud")
         aud_list = aud if isinstance(aud, list) else [aud]
         if client_id not in aud_list:
-            raise SuspiciousOperation("OIDC ID token audience does not match the configured client ID.")
+            _raise_token_validation_error()
 
         # Per the spec, when present `azp` must identify this client.
         azp = payload.get("azp")
         if azp is not None and azp != client_id:
-            raise SuspiciousOperation("OIDC ID token authorized party (azp) does not match the client ID.")
+            _raise_token_validation_error()
 
         # Issuer validation is MANDATORY. If the tenant config omits OIDC_OP_ISSUER,
         # authentication is rejected rather than accepting tokens from any issuer —
@@ -118,13 +167,9 @@ class TenantOIDCBackend(TenantOIDCSettingsMixin, OIDCAuthenticationBackend):
         # Operators must configure OIDC_OP_ISSUER for every tenant that uses OIDC.
         expected_iss = self.get_settings("OIDC_OP_ISSUER", None)
         if not expected_iss:
-            raise SuspiciousOperation(
-                "OIDC issuer (OIDC_OP_ISSUER) is not configured for this tenant. "
-                "Authentication denied to prevent token-substitution attacks. "
-                "Set OIDC_OP_ISSUER in ITAMBOX_TENANT_OIDC_CONFIGS for this tenant."
-            )
+            _raise_token_configuration_error()
         if payload.get("iss") != expected_iss:
-            raise SuspiciousOperation("OIDC ID token issuer does not match the expected issuer.")
+            _raise_token_validation_error()
 
         return payload
 

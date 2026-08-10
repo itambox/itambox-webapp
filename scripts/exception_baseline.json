@@ -772,22 +772,6 @@
       "count": 1
     },
     {
-      "path": "itambox/core/tasks/ldap.py",
-      "scope": "FunctionDef:sync_tenant_ldap_task",
-      "handler_type": "Exception",
-      "classification": "log-only",
-      "body_sha256": "9fdb8e86a6b5f043f7477e717a294fe9597af11510835b02b96e4b0eaa137f13",
-      "count": 1
-    },
-    {
-      "path": "itambox/core/tasks/ldap.py",
-      "scope": "FunctionDef:sync_tenant_ldap_task",
-      "handler_type": "Exception",
-      "classification": "log-only",
-      "body_sha256": "a4d4cdb71d5ad3b6461a0fea7cbf7c76337ae8eff738ffe3a147fae745977265",
-      "count": 1
-    },
-    {
       "path": "itambox/core/tasks/utils.py",
       "scope": "FunctionDef:reverse_job_detail",
       "handler_type": "Exception",

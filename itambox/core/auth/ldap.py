@@ -3,7 +3,14 @@ import sys
 
 from django.conf import settings
 from django.core.exceptions import ImproperlyConfigured
+from django.core.management.base import CommandError
 
+from core.errors import (
+    IntegrationAuthenticationError,
+    IntegrationConfigurationError,
+    IntegrationRequestError,
+    IntegrationUnavailableError,
+)
 from core.managers import get_current_tenant, set_current_tenant
 
 try:  # noqa: C901
@@ -84,6 +91,59 @@ except ImportError:
 
     backend_mod.LDAPBackend = LDAPBackend
     config_mod.LDAPSearch = LDAPSearch
+
+
+def _ldap_exception_types(*names):
+    return tuple(error_type for name in names if isinstance((error_type := getattr(ldap, name, None)), type))
+
+
+_LDAP_TRANSIENT_ERRORS = _ldap_exception_types("SERVER_DOWN", "TIMEOUT", "CONNECT_ERROR", "UNAVAILABLE", "BUSY")
+_LDAP_AUTHENTICATION_ERRORS = _ldap_exception_types("INVALID_CREDENTIALS", "INSUFFICIENT_ACCESS")
+_LDAP_CONFIGURATION_ERRORS = _ldap_exception_types("FILTER_ERROR", "PARAM_ERROR", "PROTOCOL_ERROR")
+
+
+class LDAPConfigurationError(IntegrationConfigurationError, CommandError):
+    code = "ldap.configuration"
+    user_message = "LDAP configuration is incomplete or invalid."
+
+
+class LDAPDependencyUnavailableError(LDAPConfigurationError):
+    code = "ldap.dependency_unavailable"
+    user_message = (
+        "django-auth-ldap is unavailable. Use the locked Linux/WSL or Docker "
+        "environment; native Windows does not support LDAP synchronization."
+    )
+
+
+class LDAPAuthenticationError(IntegrationAuthenticationError, CommandError):
+    code = "ldap.authentication"
+    user_message = "LDAP authentication or authorization failed."
+
+
+class LDAPUnavailableError(IntegrationUnavailableError, CommandError):
+    code = "ldap.unavailable"
+    user_message = "The LDAP directory is temporarily unavailable; retry the operation later."
+
+
+class LDAPRequestError(IntegrationRequestError, CommandError):
+    code = "ldap.request_rejected"
+    user_message = "The LDAP directory rejected the operation."
+
+
+def classify_ldap_error(exc, *, context):
+    """Map one python-ldap failure by SDK semantics without exposing its text."""
+    if _LDAP_TRANSIENT_ERRORS and isinstance(exc, _LDAP_TRANSIENT_ERRORS):
+        error_type = LDAPUnavailableError
+    elif _LDAP_AUTHENTICATION_ERRORS and isinstance(exc, _LDAP_AUTHENTICATION_ERRORS):
+        error_type = LDAPAuthenticationError
+    elif _LDAP_CONFIGURATION_ERRORS and isinstance(exc, _LDAP_CONFIGURATION_ERRORS):
+        error_type = LDAPConfigurationError
+    else:
+        error_type = LDAPRequestError
+    error = error_type(context=context, cause_type=type(exc).__name__)
+    error.__cause__ = exc
+    return error
+
 
 logger = logging.getLogger("django_auth_ldap")
 
@@ -180,6 +240,11 @@ class MultiTenantLDAPBackend(LDAPBackend):
             return False
 
     def authenticate(self, request, username=None, password=None, **kwargs):  # noqa: C901
+        # The optional dependency fallback is capability removal, not degraded
+        # authorization: this backend must never authenticate when python-ldap is
+        # unavailable. Other configured backends make their own independent decision.
+        if not django_auth_ldap_installed:
+            return None
         # Resolve active tenant from UPN/email suffix if not already set
         if not get_current_tenant() and username and "@" in username:
             parts = username.split("@")

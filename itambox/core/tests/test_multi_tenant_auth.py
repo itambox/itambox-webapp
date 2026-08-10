@@ -150,6 +150,7 @@ class MultiTenantAuthTestCase(TestCase):
         self.assertEqual(config_beta.entityid, "https://beta.example.com/saml2/metadata/")
         self.assertIn("https://beta.example.com/saml2/acs/", config_beta.endpoint("assertion_consumer_service"))
 
+    @patch("core.auth.ldap.django_auth_ldap_installed", True)
     def test_ldap_authenticate_tenant_resolution_by_username(self):
         """Test that MultiTenantLDAPBackend resolves and binds the correct tenant based on UPN suffix."""
         backend = MultiTenantLDAPBackend()
