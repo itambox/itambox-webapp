@@ -171,14 +171,14 @@
           </p>
           <div class="row">
             {% for label, field in form.custom_permission_fields %}
-            <div class="col-md-6 mb-3">
-              <div class="form-check">
-                {{ field }}
-                <label class="form-check-label" for="{{ field.id_for_label }}">
-                  <strong>{{ label }}</strong>
-                </label>
+              <div class="col-md-6 mb-3">
+                <div class="form-check">
+                  {{ field }}
+                  <label class="form-check-label" for="{{ field.id_for_label }}">
+                    <strong>{{ label }}</strong>
+                  </label>
+                </div>
               </div>
-            </div>
             {% endfor %}
           </div>
           <div class="d-flex justify-content-end mt-4">
