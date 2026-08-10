@@ -35,11 +35,22 @@
 
     navigator.clipboard.writeText(text).then(function () {
       const feedback = btn.getAttribute('data-copy-feedback') || gettext('Copied!');
-      const original = btn.textContent || '';
+      if (btn.getAttribute('data-copy-original') === null) {
+        // Stash the real label once: on repeated clicks within the feedback
+        // window the current textContent is already the feedback text, and
+        // using it as the new "original" would leave the button stuck on
+        // "Copied!" (hit live on demo.itambox.dev, #314).
+        btn.setAttribute('data-copy-original', btn.textContent || '');
+      }
       btn.textContent = feedback;
       setTimeout(function () {
-        btn.textContent = original;
+        btn.textContent = btn.getAttribute('data-copy-original') || '';
+        btn.removeAttribute('data-copy-original');
       }, 2000);
+    }).catch(function () {
+      // Clipboard access can be denied (InPrivate, unfocused window, headless
+      // context). Fail visibly instead of silently doing nothing (#314).
+      console.warn('ITAMbox: clipboard write denied — handoff link not copied.');
     });
   }
 
