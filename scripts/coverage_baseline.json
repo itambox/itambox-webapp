@@ -4,14 +4,13 @@
   "coverage_series": "7.15",
   "policy_sha256": "d361fd8b3ad72413b002fabc4612c7646ef74b2bc39a07ef07c4884f47551845",
   "totals": {
-    "num_statements": 42450,
-    "covered_lines": 36063,
-    "line_rate": 84.95,
-    "num_branches": 11072,
-    "covered_branches": 7564,
-    "branch_rate": 68.32,
+    "num_statements": 43174,
+    "covered_lines": 37123,
+    "line_rate": 85.98,
+    "num_branches": 11220,
+    "covered_branches": 7775,
+    "branch_rate": 69.3,
     "excluded_lines": 32,
-    "measured_files": 491
-  },
-  "decline_justification": "The report-provider rewrite deliberately removes the fully covered legacy compiler, legacy provider, and central dispatcher. The measured branch denominator therefore decreases from 11192 to 11072 while the rewritten provider paths are covered by the characterization and provider-contract suites."
+    "measured_files": 493
+  }
 }
