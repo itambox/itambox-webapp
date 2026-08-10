@@ -84,28 +84,40 @@ ITAMbox API generation.
 
 ## Webhook and domain-event envelope
 
-The outbound envelope for a non-Slack, non-Teams target has exactly these
-fields. It is signed with `X-Hub-Signature-256` (HMAC-SHA256 over the serialised
-body) when the endpoint carries a secret.
+The outbound webhook envelope is version 1 independently of the ITAMbox product
+version. Every target format carries the five versioned identity fields below;
+generic targets add the existing event fields, while Slack and Teams retain
+their vendor-specific message fields. Generic payloads are signed with
+`X-Hub-Signature-256` (HMAC-SHA256 over the serialised body) when the endpoint
+carries a secret.
 
 <!-- contract-inventory: webhook-envelope -->
 
 | Field | Value |
 |---|---|
+| `schema_version` | integer `1`; changes only when the wire semantics change |
+| `event_id` | immutable `Event.pk` identifying the domain event |
+| `delivery_id` | UUID identifying one delivery and preserved across retries |
+| `attempt` | one-based delivery attempt number; retries increment it |
+| `tenant` | owning tenant primary key, or `null` for a tenant-less object |
 | `event` | the action, from `core.EventActionChoices` |
 | `model` | `app_label.model_name` of the changed object |
 | `object_id` | primary key of the changed object |
 | `timestamp` | ISO-8601 event time |
 | `data` | the event's recorded payload |
 
-**The envelope carries no wire version, no event identifier, and no idempotency
-key.** `automation.webhooks` is Beta opt-in and declares its payload schema
-unfrozen, so a consumer pins against the release it validated against.
-`contract_version` on a capability declaration versions the registry record and
-never appears in this payload.
+`schema_version` is a wire-contract marker, not a product release number.
+`event_id` stays unchanged for the same immutable event. `delivery_id` is
+generated once when the delivery is enqueued and is copied into retry tasks;
+the current implementation has no durable delivery record, so repeated direct
+task invocation cannot provide deduplication until the later delivery-record
+work lands. `tenant` is derived from the changed object's owner rather than
+ambient request context. No secret, encrypted value, custom-field snapshot, or
+full object snapshot is part of v1.
 
-Slack and Teams targets receive those vendors' own message shapes instead; those
-are the vendors' contracts, not ITAMbox's.
+Slack and Teams targets receive those vendors' own message shapes with the same
+five ITAMbox fields added at top level; those vendor fields remain endpoint-
+specific and are not a second envelope version.
 
 ## Persisted choice values
 

@@ -1,10 +1,12 @@
 import hashlib
 import hmac
 import json
+import uuid
 from unittest.mock import MagicMock, patch
 
 from django.contrib.contenttypes.models import ContentType
 from django.core import mail
+from django.core.exceptions import ValidationError
 from django.db import transaction
 from django.test import TransactionTestCase
 from django.utils import timezone
@@ -13,6 +15,7 @@ from assets.models import Manufacturer
 from core.events import dispatch_event, send_notification_to_channel
 from core.models import Notification
 from extras.models import Event, EventRule, NotificationChannel, WebhookEndpoint
+from organization.models import Location, Tenant
 
 
 class EventsSystemTestCase(TransactionTestCase):
@@ -190,6 +193,147 @@ class EventsSystemTestCase(TransactionTestCase):
         expected_sig = hmac.new(b"mysecretkey", body.encode("utf-8"), hashlib.sha256).hexdigest()
         self.assertEqual(headers["X-Hub-Signature-256"], f"sha256={expected_sig}")
 
+        payload = json.loads(body)
+        dispatched_event = Event.objects.filter(
+            model=self.manufacturer_ct,
+            object_id=event.pk,
+            action="create",
+        ).latest("pk")
+        self.assertEqual(
+            {"schema_version", "event_id", "delivery_id", "attempt", "tenant"},
+            set(payload) - {"event", "model", "object_id", "timestamp", "data"},
+        )
+        self.assertEqual(payload["schema_version"], 1)
+        self.assertEqual(payload["event_id"], dispatched_event.pk)
+        self.assertEqual(payload["attempt"], 1)
+        self.assertIsNone(payload["tenant"])
+        self.assertEqual(payload["event"], "create")
+        self.assertEqual(payload["model"], "assets.manufacturer")
+        self.assertEqual(payload["object_id"], event.pk)
+        self.assertEqual(payload["data"], {"app_label": "assets", "model_name": "manufacturer"})
+        self.assertNotIn("mysecretkey", body)
+        uuid.UUID(payload["delivery_id"])
+
+    @patch("core.http.request_pinned")
+    def test_webhook_envelope_is_present_in_platform_payloads(self, mock_request_pinned):
+        mock_response = MagicMock(status_code=200)
+        mock_request_pinned.return_value = mock_response
+
+        for index, url in enumerate(
+            (
+                "https://hooks.slack.com/services/test",
+                "https://tenant.webhook.office.com/webhookb2/test",
+            ),
+            start=1,
+        ):
+            from core.tasks.webhooks import send_webhook_task
+
+            send_webhook_task(
+                url=url,
+                method="POST",
+                headers={},
+                secret="",
+                event_id=100 + index,
+                delivery_id=f"delivery-{index}",
+                tenant_id=200 + index,
+                event_action="create",
+                event_model_app_label="assets",
+                event_model_name="manufacturer",
+                event_object_id=index,
+                event_timestamp_iso="2024-01-01T00:00:00+00:00",
+                event_data={"app_label": "assets", "model_name": "manufacturer"},
+            )
+
+            payload = mock_request_pinned.call_args.kwargs["json"]
+            self.assertEqual(payload["schema_version"], 1)
+            self.assertEqual(payload["event_id"], 100 + index)
+            self.assertEqual(payload["delivery_id"], f"delivery-{index}")
+            self.assertEqual(payload["attempt"], 1)
+            self.assertEqual(payload["tenant"], 200 + index)
+            if index == 1:
+                self.assertEqual(
+                    payload,
+                    {
+                        "schema_version": 1,
+                        "event_id": 101,
+                        "delivery_id": "delivery-1",
+                        "attempt": 1,
+                        "tenant": 201,
+                        "text": "Event: create on manufacturer (ID: 1)",
+                    },
+                )
+            else:
+                self.assertEqual(
+                    payload,
+                    {
+                        "schema_version": 1,
+                        "event_id": 102,
+                        "delivery_id": "delivery-2",
+                        "attempt": 1,
+                        "tenant": 202,
+                        "@type": "MessageCard",
+                        "@context": "https://schema.org/extensions",
+                        "summary": "Event: create on manufacturer (ID: 2)",
+                        "themeColor": "0076D7",
+                        "title": "ITAMbox Notification",
+                        "text": "Event: create on manufacturer (ID: 2)",
+                    },
+                )
+
+    @patch("core.http.request_pinned")
+    def test_webhook_tenant_comes_from_object_not_ambient_context(self, mock_request_pinned):
+        mock_request_pinned.return_value = MagicMock(status_code=200)
+        from core.managers import set_current_tenant
+
+        tenant_a = Tenant.objects.create(name="Envelope A", slug="envelope-a")
+        tenant_b = Tenant.objects.create(name="Envelope B", slug="envelope-b")
+        endpoint = WebhookEndpoint.objects.create(
+            name="Global envelope endpoint",
+            url="https://example.com/envelope",
+            tenant=None,
+        )
+        EventRule.objects.create(
+            name="Global envelope rule",
+            model=ContentType.objects.get_for_model(Location),
+            events=["create"],
+            action_type=EventRule.ACTION_WEBHOOK,
+            webhook=endpoint,
+            tenant=None,
+            enabled=True,
+        )
+        location = Location(name="Tenant A location", tenant=tenant_a)
+        location.pk = 876543
+
+        set_current_tenant(tenant_b)
+        try:
+            dispatch_event(Location, location, "create")
+        finally:
+            set_current_tenant(None)
+
+        payload = json.loads(mock_request_pinned.call_args.kwargs["data"])
+        self.assertEqual(payload["tenant"], tenant_a.pk)
+        self.assertNotEqual(payload["tenant"], tenant_b.pk)
+
+    def test_cross_tenant_rule_endpoint_validation_remains_enforced(self):
+        tenant_a = Tenant.objects.create(name="Validation A", slug="validation-a")
+        tenant_b = Tenant.objects.create(name="Validation B", slug="validation-b")
+        endpoint = WebhookEndpoint.objects.create(
+            name="Tenant B endpoint",
+            url="https://example.com/tenant-b",
+            tenant=tenant_b,
+        )
+        rule = EventRule(
+            name="Tenant A rule",
+            model=self.manufacturer_ct,
+            events=["create"],
+            action_type=EventRule.ACTION_WEBHOOK,
+            webhook=endpoint,
+            tenant=tenant_a,
+        )
+
+        with self.assertRaises(ValidationError):
+            rule.full_clean()
+
     @patch("core.http.request_pinned")
     def test_webhook_delivery_via_linked_endpoint(self, mock_request_pinned):
         # A rule linked to a WebhookEndpoint sources URL/method/headers/secret/retry from
@@ -353,6 +497,9 @@ class WebhookRetryTestCase(TransactionTestCase):
         method="POST",
         headers={},
         secret="",
+        event_id=42,
+        delivery_id="delivery-42",
+        tenant_id=None,
         event_action="create",
         event_model_app_label="assets",
         event_model_name="manufacturer",
@@ -376,6 +523,30 @@ class WebhookRetryTestCase(TransactionTestCase):
         _, kw = mock_async.call_args
         self.assertEqual(kw["attempt"], 1)
         self.assertEqual(kw["retry_count"], 2)
+
+    @patch("core.http.request_pinned")
+    @patch("core.tasks.webhooks.async_task")
+    def test_retry_preserves_event_and_delivery_identity_and_advances_attempt(self, mock_async, mock_request_pinned):
+        from core.tasks.webhooks import send_webhook_task
+
+        failed_response = MagicMock(status_code=503)
+        failed_response.raise_for_status.side_effect = __import__("requests").HTTPError(response=failed_response)
+        successful_response = MagicMock(status_code=200)
+        successful_response.raise_for_status.return_value = None
+        mock_request_pinned.side_effect = [failed_response, successful_response]
+
+        send_webhook_task(**self.BASE_KWARGS, retry_count=1, retry_backoff=0)
+        retry_kwargs = mock_async.call_args.kwargs
+        send_webhook_task(**retry_kwargs)
+
+        first_payload = mock_request_pinned.call_args_list[0].kwargs["data"]
+        second_payload = mock_request_pinned.call_args_list[1].kwargs["data"]
+        first_payload = json.loads(first_payload)
+        second_payload = json.loads(second_payload)
+        self.assertEqual(first_payload["event_id"], second_payload["event_id"])
+        self.assertEqual(first_payload["delivery_id"], second_payload["delivery_id"])
+        self.assertEqual(first_payload["attempt"], 1)
+        self.assertEqual(second_payload["attempt"], 2)
 
     @patch("core.http.request_pinned")
     @patch("core.tasks.webhooks.async_task")

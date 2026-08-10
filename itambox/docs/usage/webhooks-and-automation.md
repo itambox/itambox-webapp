@@ -184,8 +184,9 @@ engine supports:
 | `gt` | Greater than | `{"field": "data.purchase_cost", "op": "gt", "value": 5000}` |
 | `lt` | Less than | `{"field": "data.purchase_cost", "op": "lt", "value": 1000}` |
 
-Conditions are matched against `event.data` — the serialized snapshot of the
-object at the time the event was created. Combine multiple conditions with
+Conditions are matched against fields recorded in `event.data` at dispatch
+time. v1 records event metadata only; it does not serialize a full object
+snapshot. Combine multiple conditions with
 `"type": "and"` or `"type": "or"` at the top level:
 
 ```json
@@ -292,6 +293,11 @@ A standard webhook payload (non-Slack, non-Teams) looks like:
 
 ```json
 {
+    "schema_version": 1,
+    "event_id": 4242,
+    "delivery_id": "550e8400-e29b-41d4-a716-446655440000",
+    "attempt": 1,
+    "tenant": 7,
     "event": "create",
     "model": "assets.asset",
     "object_id": 42,
@@ -305,6 +311,11 @@ A standard webhook payload (non-Slack, non-Teams) looks like:
 
 | Field | Description |
 |---|---|
+| `schema_version` | The independent webhook wire-contract version. v1 is the integer `1`; it is not the ITAMbox product version. |
+| `event_id` | The immutable `Event.pk` for the domain event. It does not change on retry. |
+| `delivery_id` | A UUID for one delivery. It remains stable across retries of that delivery. |
+| `attempt` | One-based attempt number. The initial send is `1`; each retry increments it. |
+| `tenant` | The owning tenant primary key, or `null` for a tenant-less object. It is derived from the object, not ambient request context. |
 | `event` | The event action — `create`, `update`, `delete`, or `restore` |
 | `model` | Fully-qualified Django model reference (`<app_label>.<model_name>`) |
 | `object_id` | The primary key of the affected object |
@@ -313,7 +324,23 @@ A standard webhook payload (non-Slack, non-Teams) looks like:
 
 Slack and Teams webhooks use platform-specific payloads (Slack Block Kit /
 Teams Adaptive Card) and do **not** include the HMAC signature header — those
-platforms handle authentication through their own webhook URL tokens.
+platforms handle authentication through their own webhook URL tokens. They
+still carry the same `schema_version`, `event_id`, `delivery_id`, `attempt`, and
+`tenant` fields at the top level alongside their existing vendor fields.
+
+### Envelope version and compatibility
+
+This is webhook envelope **v1**, independent of the ITAMbox product release.
+The marker changes only when the wire semantics change. The additions are
+compatible with consumers that ignore unknown JSON members, but strict JSON
+validators or schemas that reject additional properties may fail after the
+upgrade and must be updated to accept the five v1 fields. Existing events and
+deliveries from before the upgrade are not backfilled and have no v1 marker.
+
+The envelope deliberately contains no full object snapshot, domain serializer
+output, secret, encrypted value, or custom-field snapshot. A system-wide rule or
+endpoint still receives the changed object's owning tenant; the ambient tenant
+context cannot override it. Cross-tenant rule/endpoint links remain rejected.
 
 ---
 
@@ -384,13 +411,14 @@ platforms handle authentication through their own webhook URL tokens.
 
 **My event rule fires on every update, not just the field I care about**
 
-: Add a `conditions` filter to narrow the rule. For example, to fire only
-  when an asset's `status` changes to `retired`:
+: Add a `conditions` filter to narrow the rule. Conditions can only match
+  fields present in the recorded event data; v1 does not add object snapshots.
+  For example, to match a recorded event field:
   ```json
   {"field": "status", "op": "eq", "value": "retired"}
   ```
-  The condition is evaluated against `event.data`, which holds the
-  serialized object state at the time the event was created.
+  The condition is evaluated against `event.data`, which contains the
+  metadata recorded when the event was created.
 
 **Webhook URL is rejected by the SSRF guard**
 

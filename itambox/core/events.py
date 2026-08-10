@@ -3,6 +3,7 @@ import hmac
 import json
 import logging
 from types import SimpleNamespace
+from uuid import uuid4
 
 import requests
 from django.contrib.auth import get_user_model
@@ -98,7 +99,7 @@ def process_event_rules(event, instance_tenant_id=None):
         # Per-rule isolation: one rule's action raising must not abort the remaining rules
         # for this event.
         try:
-            _execute_event_action(rule, event)
+            _execute_event_action(rule, event, instance_tenant_id)
         except Exception:
             logger.exception("Event rule %s action failed for event %s", rule.pk, event.pk)
 
@@ -167,18 +168,18 @@ def _evaluate_condition(rule, event):
     return True
 
 
-def _execute_event_action(rule, event):
+def _execute_event_action(rule, event, instance_tenant_id=None):
     """Execute the action specified by an event rule."""
 
     if rule.action_type == EventRule.ACTION_WEBHOOK:
-        _send_webhook(rule, event)
+        _send_webhook(rule, event, instance_tenant_id)
     elif rule.action_type == EventRule.ACTION_NOTIFICATION:
         _send_notification(rule, event)
     # 'script' action_type was removed; existing rows are silently skipped.
     # Scripts may return as a proper plugin hook post-1.0.
 
 
-def _send_webhook(rule, event):
+def _send_webhook(rule, event, instance_tenant_id=None):
     """Send a webhook request for the rule.
 
     Prefers the linked WebhookEndpoint (``rule.webhook``) — its URL, method, headers,
@@ -231,6 +232,9 @@ def _send_webhook(rule, event):
         headers=headers,
         secret="" if endpoint is not None else secret,
         webhook_endpoint_id=endpoint.pk if endpoint is not None else None,
+        event_id=event.pk,
+        delivery_id=str(uuid4()),
+        tenant_id=instance_tenant_id,
         event_action=event.action,
         event_model_app_label=event.model.app_label,
         event_model_name=event.model.model,

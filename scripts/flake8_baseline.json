@@ -4894,14 +4894,6 @@
     {
       "path": "itambox/core/tests/test_events.py",
       "code": "F401",
-      "message": "'json' imported but unused",
-      "source": "import json",
-      "context": "Module:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/core/tests/test_events.py",
-      "code": "F401",
       "message": "'organization.models.Membership' imported but unused",
       "source": "        from organization.models import Location, Membership, Role, Tenant",
       "context": "Module:body/ClassDef:EventsSystemTestCase:body/FunctionDef:test_event_rules_scoped_to_instance_tenant_in_system_context:body",

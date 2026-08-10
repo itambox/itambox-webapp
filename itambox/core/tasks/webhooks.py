@@ -4,6 +4,7 @@ import hmac
 import json
 import logging
 from collections.abc import Mapping
+from uuid import uuid4
 
 import requests
 from django.utils import timezone
@@ -11,6 +12,20 @@ from django_q.models import Schedule
 from django_q.tasks import async_task
 
 logger = logging.getLogger(__name__)
+WEBHOOK_ENVELOPE_SCHEMA_VERSION = 1
+
+
+def _webhook_envelope(*, event_id, delivery_id, attempt, tenant_id):
+    """Return the stable v1 metadata shared by every webhook payload format."""
+    return {
+        "schema_version": WEBHOOK_ENVELOPE_SCHEMA_VERSION,
+        "event_id": event_id,
+        "delivery_id": delivery_id,
+        # The task retry counter is zero-based internally; the wire contract is
+        # deliberately one-based so the first delivery is attempt 1.
+        "attempt": attempt + 1,
+        "tenant": tenant_id,
+    }
 
 
 def send_webhook_task(
@@ -28,6 +43,9 @@ def send_webhook_task(
     retry_count: int = 3,
     retry_backoff: int = 60,
     webhook_endpoint_id: int | None = None,
+    event_id: int | str | None = None,
+    delivery_id: str | None = None,
+    tenant_id: int | str | None = None,
 ) -> None:
     """Dispatch a webhook event. Retries on 5xx and connection errors; 4xx are final."""
     from django.core.exceptions import ValidationError
@@ -45,6 +63,11 @@ def send_webhook_task(
         if endpoint:
             secret = endpoint.secret_decrypted
 
+    # The initial enqueue creates this once; retry kwargs carry it forward. A
+    # direct task invocation without an id still gets a valid envelope, but
+    # cannot provide durable deduplication until the delivery record work lands.
+    delivery_id = delivery_id or str(uuid4())
+
     # SSRF guard: every send goes through core.http.request_pinned, which
     # validates the URL at send time (fail closed, incl. unresolvable hosts)
     # AND pins the connection to the validated address — the request cannot be
@@ -52,21 +75,34 @@ def send_webhook_task(
     # and redirects are never followed. A blocked URL is final — do not retry.
     target_kind = webhook_target_kind(url)
     try:
+        envelope = _webhook_envelope(
+            event_id=event_id,
+            delivery_id=delivery_id,
+            attempt=attempt,
+            tenant_id=tenant_id,
+        )
+        summary = f"Event: {event_action} on {event_model_name} (ID: {event_object_id})"
         if target_kind == "slack":
-            payload = {"text": f"Event: {event_action} on {event_model_name} (ID: {event_object_id})"}
+            payload = {**envelope, "text": summary}
             response = request_pinned("POST", url, json=payload, timeout=10)
         elif target_kind == "teams":
             payload = {
+                **envelope,
                 "@type": "MessageCard",
                 "@context": "https://schema.org/extensions",
-                "summary": f"Event: {event_action} on {event_model_name} (ID: {event_object_id})",
+                "summary": summary,
                 "themeColor": "0076D7",
                 "title": "ITAMbox Notification",
-                "text": f"Event: {event_action} on {event_model_name} (ID: {event_object_id})",
+                "text": summary,
             }
             response = request_pinned("POST", url, json=payload, timeout=10)
         else:
             payload = {
+                "schema_version": envelope["schema_version"],
+                "event_id": envelope["event_id"],
+                "delivery_id": envelope["delivery_id"],
+                "attempt": envelope["attempt"],
+                "tenant": envelope["tenant"],
                 "event": event_action,
                 "model": f"{event_model_app_label}.{event_model_name}",
                 "object_id": event_object_id,
@@ -110,6 +146,9 @@ def send_webhook_task(
             # their plaintext config secret.
             secret="" if webhook_endpoint_id else secret,
             webhook_endpoint_id=webhook_endpoint_id,
+            event_id=event_id,
+            delivery_id=delivery_id,
+            tenant_id=tenant_id,
             event_action=event_action,
             event_model_app_label=event_model_app_label,
             event_model_name=event_model_name,
