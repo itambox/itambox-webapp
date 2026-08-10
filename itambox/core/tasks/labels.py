@@ -15,10 +15,10 @@ from django.utils.translation import gettext_lazy as _
 
 from core.html_sanitizer import sanitize_label_html_for_pdf
 from core.models import Job, Notification
+from core.tasks.utils import TaskResult, TaskStatus, classify_task_error, reverse_job_detail
 from extras.models import FileAttachment
 
 from .context import TaskContext
-from core.tasks.utils import TaskResult, TaskStatus, classify_task_error, reverse_job_detail
 
 logger = logging.getLogger(__name__)
 _LABEL_PRINT_CSS_PATH = Path(__file__).resolve().parents[2] / "static" / "src" / "styles" / "_label-print.scss"
