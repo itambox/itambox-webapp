@@ -100,6 +100,35 @@ class FindingPolicyTests(unittest.TestCase):
             self.assertEqual(result.blocking, 1)
             self.assertEqual(json.loads(sarif.read_text())["version"], "2.1.0")
 
+    def test_trivy_sarif_uses_relative_uri_for_image_targets(self):
+        target = "itambox:release-rehearsal (debian 12.15)"
+        report = {
+            "SchemaVersion": 2,
+            "Results": [
+                {
+                    "Target": target,
+                    "Vulnerabilities": [
+                        {
+                            "VulnerabilityID": "CVE-2026-0001",
+                            "PkgName": "example",
+                            "InstalledVersion": "1.0.0",
+                            "Severity": "HIGH",
+                        }
+                    ],
+                }
+            ],
+        }
+        with tempfile.TemporaryDirectory() as root:
+            sarif = Path(root) / "results.sarif"
+            evaluate_trivy([report], [], sarif)
+            result = json.loads(sarif.read_text(encoding="utf-8"))["runs"][0]["results"][0]
+
+        self.assertEqual(
+            result["locations"][0]["physicalLocation"]["artifactLocation"]["uri"],
+            "trivy-targets/itambox%3Arelease-rehearsal%20%28debian%2012.15%29",
+        )
+        self.assertEqual(result["properties"]["target"], target)
+
     def test_exact_trivy_suppression_and_low_findings_do_not_block(self):
         report = {
             "SchemaVersion": 2,

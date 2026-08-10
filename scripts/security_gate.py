@@ -12,6 +12,7 @@ from dataclasses import dataclass
 from datetime import date
 from pathlib import Path
 from typing import Any
+from urllib.parse import quote
 
 BLOCKING_SEVERITIES = {"HIGH", "CRITICAL"}
 TRIVY_SEVERITIES = {"UNKNOWN", "LOW", "MEDIUM", "HIGH", "CRITICAL"}
@@ -230,6 +231,11 @@ def evaluate_trivy(
     return GateResult(blocking == 0, blocking, suppressed, dict(counts))
 
 
+def _sarif_target_uri(target: str) -> str:
+    """Return a relative URI that Code Scanning can bind to the checkout."""
+    return f"trivy-targets/{quote(target, safe='._-~')}"
+
+
 def _write_sarif(path: Path, findings: list[dict[str, str]]) -> None:
     rules = {}
     results = []
@@ -247,7 +253,10 @@ def _write_sarif(path: Path, findings: list[dict[str, str]]) -> None:
                 "ruleId": finding["id"],
                 "level": level.get(finding["severity"], "note"),
                 "message": {"text": f"{finding['package']} {finding['version']} ({finding['severity']})"},
-                "locations": [{"physicalLocation": {"artifactLocation": {"uri": finding["target"]}}}],
+                "locations": [
+                    {"physicalLocation": {"artifactLocation": {"uri": _sarif_target_uri(finding["target"])}}}
+                ],
+                "properties": {"target": finding["target"]},
             }
         )
     payload = {
