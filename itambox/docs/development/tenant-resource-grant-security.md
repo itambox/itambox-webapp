@@ -142,6 +142,7 @@ PYTHONPATH=itambox uv run --locked --group dev python -m pytest -q -p no:cachepr
   itambox/assets/tests/test_existing.py \
   itambox/assets/tests/test_issue260_asset_detail_responsive.py \
   itambox/itambox/tests/test_django_tables2_compat.py \
+  itambox/itambox/tests/test_generic_view_components.py \
   itambox/assets/tests/test_tables_category.py \
   itambox/assets/tests/test_requests.py \
   itambox/core/tests/test_import_boundaries.py \
@@ -173,6 +174,9 @@ PYTHONPATH=itambox uv run --locked --group dev python -m pytest -q -p no:cachepr
   itambox/core/tests/test_report_warranty_expiration.py \
   itambox/core/tests/test_phase3_task_audit.py \
   itambox/core/tests/test_reporting.py \
+  itambox/compliance/tests/test_custody_permissions.py \
+  itambox/compliance/tests/test_custody_rbac.py \
+  itambox/compliance/tests/test_views.py \
   itambox/extras/tests/test_dashboard_all_accessible.py \
   itambox/extras/tests/test_dashboard_widgets.py \
   itambox/extras/tests/test_existing.py \

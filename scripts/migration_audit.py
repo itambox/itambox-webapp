@@ -16,6 +16,9 @@ OPERATION_TYPES = (
     "BtreeGistExtension",
 )
 POST_TRANSITION_MIGRATIONS = {
+    "compliance.0101_alter_custodyreceipt_signed_at",
+    "compliance.0102_clear_unsigned_receipt_timestamps",
+    "compliance.0103_alter_custodyreceipt_options",
     "extras.0101_issue88_drop_legacy_webhook_name_like",
     "extras.0102_alter_event_action",
     "extras.0103_remove_reporttemplate_advanced_mode_and_more",
@@ -107,6 +110,11 @@ SEMANTIC_DISPOSITIONS = {
         "review-blocker",
         "Known greenfield and upgrade-support blocker; do not claim snapshot support.",
         {"organization.0027_drop_legacy_role_models"},
+    ),
+    **_dispositions(
+        "upgrade-only",
+        "Clears misleading signed_at values on non-accepted custody receipts; pending receipts must stay unsigned.",
+        {"compliance.0102_clear_unsigned_receipt_timestamps"},
     ),
     **_dispositions(
         "upgrade-only",

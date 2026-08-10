@@ -55,9 +55,9 @@ class CustodyReceiptTable(BaseTable):
         from django.urls import reverse
         from django.utils.html import format_html
 
-        url = reverse("compliance:custody_eula_sign", kwargs={"token": record.token})
+        url = reverse("compliance:custodyreceipt_detail", kwargs={"pk": record.pk})
         return format_html(
-            '<a class="btn btn-sm btn-soft-primary" href="{}" target="_blank" title="View/Sign Receipt">'
+            '<a class="btn btn-sm btn-soft-primary" href="{}" title="View Receipt">'
             '<i class="mdi mdi-eye-outline me-1"></i>View'
             "</a>",
             url,

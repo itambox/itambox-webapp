@@ -267,7 +267,6 @@ class SeedComplianceMixin:
                         eula_version="1.0",
                         accepted=False,
                         acceptance_status=CustodyReceipt.STATUS_PENDING,
-                        signed_at=receipt_dt,
                         acceptance_method="link",
                     )
 

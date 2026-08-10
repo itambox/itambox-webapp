@@ -1,22 +1,31 @@
 import hashlib
 import logging
+import re
+from datetime import timedelta
 from urllib.parse import parse_qsl, urlencode, urlparse, urlunparse
 
 from django.contrib.auth.decorators import login_required, permission_required
 from django.db import transaction
 from django.shortcuts import get_object_or_404, redirect, render
-from django.urls import reverse_lazy
+from django.urls import reverse, reverse_lazy
 from django.utils import timezone
 
 from itambox.panels import Panel
 from itambox.views.generic import ObjectCloneView, ObjectDeleteView, ObjectDetailView, ObjectEditView, ObjectListView
 
+from .filters import CustodyReceiptFilterSet
 from .forms import CustodyTemplateForm
+from .forms_filter import CustodyReceiptFilterForm
 from .models import CustodyReceipt, CustodyTemplate
 from .registry import signature_providers
-from .tables import CustodyTemplateTable
+from .services import scope_custody_receipts
+from .tables import CustodyReceiptTable, CustodyTemplateTable
 
 logger = logging.getLogger(__name__)
+
+VIEW_CUSTODY_RECEIPT_PERMISSION = "compliance.view_custodyreceipt"
+CUSTODY_TOKEN_PATTERN = re.compile(r"[A-Za-z0-9_-]{64}")
+CUSTODY_LINK_TTL = timedelta(days=7)
 
 
 def _authenticated_user_is_holder(user, holder):
@@ -51,44 +60,109 @@ def _external_signature_redirect(receipt, request):
     return redirect(url)
 
 
+def _external_provider_response(request, receipt, holder):
+    if receipt.signature_provider == "local":
+        return None
+    if not request.user.is_authenticated:
+        return _signer_error_response(request, holder, require_authenticated=True)
+    return _external_signature_redirect(receipt, request)
+
+
+def _custody_error_response(request, *, error_code, title, error, status):
+    return render(
+        request,
+        "compliance/custody/sign_error.html",
+        {
+            "error_code": error_code,
+            "error_title": title,
+            "error": error,
+        },
+        status=status,
+    )
+
+
 def _completed_receipt_response(request, receipt):
-    context = {"receipt": receipt, "asset": receipt.asset, "holder": receipt.holder}
     if receipt.acceptance_status == CustodyReceipt.STATUS_ACCEPTED:
+        context = {"receipt": receipt, "asset": receipt.asset, "holder": receipt.holder}
         return render(request, "compliance/custody/receipt_success.html", context)
     if receipt.acceptance_status == CustodyReceipt.STATUS_DECLINED:
-        return render(
+        return _custody_error_response(
             request,
-            "compliance/custody/sign_error.html",
-            {"error": "This custody transfer has been declined."},
+            error_code="custody_declined",
+            title="Custody Transfer Declined",
+            error="This custody transfer has been declined.",
+            status=200,
         )
     return None
 
 
 def _expired_receipt_response(request, receipt):
-    if receipt.created_date and (timezone.now() - receipt.created_date).days > 7:
-        return render(
+    if receipt.created_date is None or receipt.created_date + CUSTODY_LINK_TTL <= timezone.now():
+        return _custody_error_response(
             request,
-            "compliance/custody/sign_error.html",
-            {"error": "This custody acceptance link has expired (7 day limit)."},
+            error_code="custody_link_expired",
+            title="Custody Link Expired",
+            error="This custody acceptance link has expired. Request a new link from your IT administrator.",
+            status=410,
         )
     return None
 
 
-def _signer_error_response(request, holder):
-    if request.user.is_authenticated and holder is not None and not _authenticated_user_is_holder(request.user, holder):
-        return render(
+def _signer_error_response(request, holder, *, require_authenticated=False):
+    if holder is None:
+        return _custody_error_response(
             request,
-            "compliance/custody/sign_error.html",
-            {"error": "You are not the intended recipient of this custody receipt."},
+            error_code="wrong_recipient",
+            title="Recipient Verification Failed",
+            error="You are not the intended recipient of this custody receipt.",
+            status=403,
+        )
+    if not request.user.is_authenticated:
+        if require_authenticated:
+            return _custody_error_response(
+                request,
+                error_code="recipient_authentication_required",
+                title="Recipient Authentication Required",
+                error="Sign in as the intended recipient before completing this custody action.",
+                status=403,
+            )
+        return None
+    if not _authenticated_user_is_holder(request.user, holder):
+        return _custody_error_response(
+            request,
+            error_code="wrong_recipient",
+            title="Recipient Verification Failed",
+            error="You are not the intended recipient of this custody receipt.",
+            status=403,
         )
     return None
 
 
-def _process_custody_post(request, token, receipt, asset, holder):
+def _resolve_custody_receipt(token):
+    if CUSTODY_TOKEN_PATTERN.fullmatch(token) is None:
+        return None
+    return (
+        CustodyReceipt.objects.select_related("asset", "asset__tenant", "holder", "holder__user")
+        .filter(token=token)
+        .first()
+    )
+
+
+def _process_custody_post(request, token, receipt):
     with transaction.atomic():
         # Re-fetch under a row lock and re-check status so concurrent or
         # double-submitted POSTs cannot compute non-deterministic evidence.
         receipt = CustodyReceipt.objects.select_for_update().get(pk=receipt.pk)
+        expired_response = _expired_receipt_response(request, receipt)
+        if expired_response is not None:
+            return expired_response
+
+        asset = receipt.asset
+        holder = receipt.holder
+        signer_error = _signer_error_response(request, holder, require_authenticated=True)
+        if signer_error is not None:
+            return signer_error
+
         completed_response = _completed_receipt_response(request, receipt)
         if completed_response is not None:
             return completed_response
@@ -96,12 +170,17 @@ def _process_custody_post(request, token, receipt, asset, holder):
         action = request.POST.get("action", "accept")
         signature_data = request.POST.get("signature_canvas")
         if action == "decline":
+            receipt.accepted = False
+            receipt.accepted_date = None
             receipt.acceptance_status = CustodyReceipt.STATUS_DECLINED
-            receipt.save(update_fields=["acceptance_status", "updated_at"])
-            return render(
+            receipt.signed_at = None
+            receipt.save(update_fields=["accepted", "accepted_date", "acceptance_status", "signed_at", "updated_at"])
+            return _custody_error_response(
                 request,
-                "compliance/custody/sign_error.html",
-                {"error": "You have declined the custody transfer."},
+                error_code="custody_declined",
+                title="Custody Transfer Declined",
+                error="You have declined the custody transfer.",
+                status=200,
             )
         if not signature_data or signature_data == "empty":
             return render(
@@ -116,11 +195,12 @@ def _process_custody_post(request, token, receipt, asset, holder):
                 },
             )
 
-        timestamp_str = timezone.now().isoformat()
+        signed_at = timezone.now()
+        timestamp_str = signed_at.isoformat()
         raw_to_hash = f"{holder.upn}|{asset.asset_tag}|{timestamp_str}|{signature_data}"
         verification_hash = hashlib.sha256(raw_to_hash.encode("utf-8")).hexdigest()
         receipt.accepted = True
-        receipt.accepted_date = timezone.now()
+        receipt.accepted_date = signed_at
         receipt.acceptance_method = "digital"
         receipt.acceptance_status = CustodyReceipt.STATUS_ACCEPTED
         receipt.signature_canvas = signature_data
@@ -128,7 +208,7 @@ def _process_custody_post(request, token, receipt, asset, holder):
         receipt.signature_hash = verification_hash
         receipt.verification_hash = verification_hash
         receipt.eula_version = "1.0"
-        receipt.signed_at = timezone.now()
+        receipt.signed_at = signed_at
         receipt.save()
 
         transaction.on_commit(
@@ -149,40 +229,48 @@ def _process_custody_post(request, token, receipt, asset, holder):
 
 
 def custody_eula_sign(request, token):
-    from django.conf import settings
-
-    if getattr(settings, "REQUIRE_CUSTODY_SIGNIN", False) and not request.user.is_authenticated:
-        from django.contrib.auth.views import redirect_to_login
-
-        return redirect_to_login(request.get_full_path())
-
-    receipt = get_object_or_404(CustodyReceipt, token=token)
-
-    external_redirect = _external_signature_redirect(receipt, request)
-    if external_redirect is not None:
-        return external_redirect
+    receipt = _resolve_custody_receipt(token)
+    if receipt is None:
+        return _custody_error_response(
+            request,
+            error_code="custody_link_unavailable",
+            title="Custody Link Unavailable",
+            error="The requested custody link is unavailable.",
+            status=404,
+        )
 
     expired_response = _expired_receipt_response(request, receipt)
     if expired_response is not None:
         return expired_response
 
-    completed_response = _completed_receipt_response(request, receipt)
-    if completed_response is not None:
-        return completed_response
-
     asset = receipt.asset
     holder = receipt.holder
-
-    # Bind the signer to the intended holder. The receipt token is the primary
-    # credential, but if the visitor IS authenticated they must be the holder —
-    # otherwise a logged-in user (Bob) who obtains Alice's token could sign on
-    # her behalf, and the verification hash would falsely embed Alice's identity.
     signer_error = _signer_error_response(request, holder)
     if signer_error is not None:
         return signer_error
 
+    from django.conf import settings
+
+    require_signin = getattr(settings, "REQUIRE_CUSTODY_SIGNIN", False)
+    if require_signin and not request.user.is_authenticated:
+        from django.contrib.auth.views import redirect_to_login
+
+        return redirect_to_login(request.get_full_path())
+
+    if receipt.acceptance_status in {CustodyReceipt.STATUS_ACCEPTED, CustodyReceipt.STATUS_DECLINED}:
+        if not request.user.is_authenticated:
+            return _signer_error_response(request, holder, require_authenticated=True)
+        return _completed_receipt_response(request, receipt)
+
+    external_response = _external_provider_response(request, receipt, holder)
+    if external_response is not None:
+        return external_response
+
     if request.method == "POST":
-        return _process_custody_post(request, token, receipt, asset, holder)
+        signer_error = _signer_error_response(request, holder, require_authenticated=True)
+        if signer_error is not None:
+            return signer_error
+        return _process_custody_post(request, token, receipt)
 
     return render(
         request,
@@ -215,6 +303,7 @@ class CustodyTemplateListView(ObjectListView):
 
 class CustodyTemplateDetailView(ObjectDetailView):
     queryset = CustodyTemplate.objects.select_related("tenant", "tenant_group").prefetch_related("tags")
+    related_object_exclusions = ("compliance.custodyreceipt",)
     template_name = "compliance/custodytemplates/custodytemplate_detail.html"
 
     def get_context_data(self, **kwargs):
@@ -227,11 +316,75 @@ class CustodyTemplateDetailView(ObjectDetailView):
 
         from .tables import CustodyReceiptTable
 
-        receipts_qs = template.receipts.all().select_related("asset", "holder", "custody_template")
-        receipts_table = CustodyReceiptTable(receipts_qs, request=self.request)
-        RequestConfig(self.request, paginate={"per_page": get_paginate_count(self.request)}).configure(receipts_table)
-        context["receipts_table"] = receipts_table
+        can_view_receipts = self.request.user.has_perm(VIEW_CUSTODY_RECEIPT_PERMISSION)
+        context["can_view_custody_receipts"] = can_view_receipts
+        if can_view_receipts:
+            receipts_qs = scope_custody_receipts(
+                template.receipts.all().select_related("asset", "holder", "custody_template"),
+                user=self.request.user,
+                permission=VIEW_CUSTODY_RECEIPT_PERMISSION,
+            )
+            receipts_table = CustodyReceiptTable(receipts_qs, request=self.request)
+            RequestConfig(self.request, paginate={"per_page": get_paginate_count(self.request)}).configure(
+                receipts_table
+            )
+            context["receipts_table"] = receipts_table
 
+        receipt_list_url = reverse("compliance:custodyreceipt_list")
+        context["related_objects_list"] = [
+            item for item in context.get("related_objects_list", []) if not item["url"].startswith(receipt_list_url)
+        ]
+
+        return context
+
+
+class InternalCustodyPermissionMixin:
+    """Render a custody-specific 403 for authenticated internal users."""
+
+    def handle_no_permission(self):
+        if not self.request.user.is_authenticated:
+            return super().handle_no_permission()
+        return render(
+            self.request,
+            "compliance/custody/internal_permission_error.html",
+            {"error_code": "internal_custody_permission_required"},
+            status=403,
+        )
+
+
+class CustodyReceiptListView(InternalCustodyPermissionMixin, ObjectListView):
+    queryset = CustodyReceipt.objects.select_related("asset", "holder", "custody_template")
+    filterset = CustodyReceiptFilterSet
+    filterset_form = CustodyReceiptFilterForm
+    table = CustodyReceiptTable
+    action_buttons = ()
+
+    def get_queryset(self):
+        return scope_custody_receipts(
+            super().get_queryset(),
+            user=self.request.user,
+            permission=VIEW_CUSTODY_RECEIPT_PERMISSION,
+        )
+
+
+class CustodyReceiptDetailView(InternalCustodyPermissionMixin, ObjectDetailView):
+    queryset = CustodyReceipt.objects.select_related("asset", "asset__tenant", "holder", "custody_template")
+    template_name = "compliance/custodyreceipts/custodyreceipt_detail.html"
+
+    def get_queryset(self):
+        return scope_custody_receipts(super().get_queryset(), user=self.request.user)
+
+    def has_permission(self):
+        if not self.request.user.is_authenticated:
+            return False
+        receipt = self.get_object()
+        return self.request.user.has_perm(VIEW_CUSTODY_RECEIPT_PERMISSION, obj=receipt.asset)
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        signature = self.object.signature_canvas
+        if signature.startswith("data:image/png;base64,"):
+            context["signature_image"] = signature
         return context
 
 

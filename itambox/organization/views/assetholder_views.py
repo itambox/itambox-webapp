@@ -10,6 +10,7 @@ from django.views.generic import View
 from django_tables2 import RequestConfig
 
 from assets.forms.import_forms import AssetHolderBulkImportForm
+from compliance.services import scope_custody_receipts
 from itambox.panels import Panel
 from itambox.utils import get_paginate_count
 from itambox.views.generic import (
@@ -49,6 +50,7 @@ class AssetHolderDetailView(ObjectDetailView):
     queryset = AssetHolder.objects.select_related("tenant", "user").prefetch_related(
         "asset_assignments__asset", "asset_assignments__asset__status", "tags"
     )
+    related_object_exclusions = ("compliance.custodyreceipt",)
 
     layout = (((Panel("info", _("Asset Holder Details")),),),)
 
@@ -87,14 +89,25 @@ class AssetHolderDetailView(ObjectDetailView):
         license_assignments_table.configure(self.request)
         context["license_assignments_table"] = license_assignments_table
 
-        # Signed Custody EULAs
+        # Custody receipts
         from compliance.models import CustodyReceipt
         from compliance.tables import CustodyReceiptTable
 
-        custody_receipts_qs = CustodyReceipt.objects.filter(holder=assetholder)
-        custody_receipts_table = CustodyReceiptTable(custody_receipts_qs, request=self.request)
-        custody_receipts_table.configure(self.request)
-        context["custody_receipts_table"] = custody_receipts_table
+        can_view_receipts = self.request.user.has_perm("compliance.view_custodyreceipt", obj=assetholder)
+        context["can_view_custody_receipts"] = can_view_receipts
+        custody_receipts_qs = CustodyReceipt.objects.none()
+        if can_view_receipts:
+            custody_receipts_qs = scope_custody_receipts(
+                CustodyReceipt.objects.filter(
+                    holder=assetholder,
+                    asset__tenant=assetholder.tenant,
+                ).select_related("asset", "holder", "custody_template"),
+                user=self.request.user,
+                permission="compliance.view_custodyreceipt",
+            )
+            custody_receipts_table = CustodyReceiptTable(custody_receipts_qs, request=self.request)
+            custody_receipts_table.configure(self.request)
+            context["custody_receipts_table"] = custody_receipts_table
 
         related_objects_list = []
         asset_count = assetholder.checked_out_assets.count()
@@ -137,9 +150,9 @@ class AssetHolderDetailView(ObjectDetailView):
         if custody_count:
             related_objects_list.append(
                 {
-                    "label": _("Custody EULAs"),
+                    "label": _("Custody Receipts"),
                     "count": custody_count,
-                    "url": f"{reverse('organization:assetholder_detail', kwargs={'pk': assetholder.pk})}#custody",
+                    "url": f"{reverse('compliance:custodyreceipt_list')}?holder={assetholder.pk}",
                 }
             )
         context["related_objects_list"] = related_objects_list

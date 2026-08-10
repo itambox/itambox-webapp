@@ -54,43 +54,39 @@
       <span class="text-muted"><i>{% translate "Not Set" %}</i></span>
     {% endif %}
   </dd>
-  {% if assignment and assignment.assigned_to and assignment.assigned_to_type == 'assetholder' %}
+  {% if can_view_custody_receipts and assignment and assignment.assigned_to and assignment.assigned_to_type == 'assetholder' %}
     <dt class="col-sm-4">{% translate "Custody Status:" %}</dt>
     <dd class="col-sm-8">
-      {% if custody_receipt and custody_receipt.accepted %}
+      {% if custody_receipt_summary.acceptance_status == "accepted" %}
         <span class="badge bg-success-lt text-success font-weight-bold px-2 py-1 align-middle">
           <i class="mdi mdi-shield-check-outline me-1"></i>
           {% translate "Custody Secured" %}
         </span>
-        <a href="{% url 'compliance:custody_eula_sign' token=eula_token %}"
-           target="_blank"
-           class="btn btn-sm btn-ghost-success border-0 py-1.5 px-2 ms-2 font-weight-bold align-middle">
+        <a href="{{ custody_receipt_summary.detail_url }}"
+           class="btn btn-sm btn-ghost-success border-0 py-1 px-2 ms-2 font-weight-bold align-middle">
           <i class="mdi mdi-file-document-outline me-1"></i>
           {% translate "View Signed Receipt" %}
         </a>
-      {% elif custody_receipt %}
+      {% elif custody_receipt_summary.acceptance_status == "declined" %}
+        <span class="badge bg-danger-lt text-danger font-weight-bold px-2 py-1 align-middle">
+          <i class="mdi mdi-close-circle-outline me-1"></i>
+          {% translate "Custody Declined" %}
+        </span>
+        <a href="{{ custody_receipt_summary.detail_url }}"
+           class="btn btn-sm btn-ghost-secondary border-0 py-1 px-2 ms-2 font-weight-bold align-middle">
+          <i class="mdi mdi-file-document-outline me-1"></i>
+          {% translate "View Receipt" %}
+        </a>
+      {% elif custody_receipt_summary %}
         <span class="badge bg-warning-lt text-warning font-weight-bold px-2 py-1 align-middle">
           <i class="mdi mdi-alert-outline me-1"></i>
           {% translate "Pending EULA Acceptance" %}
         </span>
-        <a href="{% url 'compliance:custody_eula_sign' token=eula_token %}?onsite=true"
-           target="_blank"
-           class="btn btn-sm btn-primary py-1 px-2.5 ms-2 font-weight-bold align-middle shadow-sm">
-          <i class="mdi mdi-pencil-box-outline me-1"></i>
-          {% translate "Sign Custody (On-Site)..." %}
+        <a href="{{ custody_receipt_summary.detail_url }}"
+           class="btn btn-sm btn-ghost-secondary border-0 py-1 px-2 ms-2 font-weight-bold align-middle">
+          <i class="mdi mdi-file-document-outline me-1"></i>
+          {% translate "View Receipt" %}
         </a>
-        <div class="mt-2 input-group input-group-flat csp-style-33e94a5a2c44">
-          <input type="text"
-                 class="form-control form-control-sm text-secondary small specs-container"
-                 readonly
-                 value="{{ request.scheme }}://{{ request.get_host }}{% url 'compliance:custody_eula_sign' token=eula_token %}"
-                 id="eula-link-input" />
-          <span class="input-group-text p-0 bg-transparent">
-            <button class="btn btn-sm btn-ghost-indigo font-weight-bold py-1 px-3 border-0"
-                    data-copy-input="#eula-link-input"
-                    data-copy-feedback="{% translate 'Copied!' %}">{% translate "Copy Link" %}</button>
-          </span>
-        </div>
       {% else %}
         <span class="badge bg-secondary-lt text-secondary font-weight-bold px-2 py-1 align-middle">
           <i class="mdi mdi-information-outline me-1"></i>

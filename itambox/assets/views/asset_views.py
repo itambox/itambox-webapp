@@ -16,6 +16,8 @@ from django.utils.translation import gettext_lazy as _
 from django.views.decorators.http import require_POST
 from django_tables2 import RequestConfig
 
+from compliance.services import scope_custody_receipts
+
 logger = logging.getLogger(__name__)
 
 from assets.choices import RequestStatusChoices
@@ -98,6 +100,7 @@ class AssetDetailView(ObjectDetailView):
         "component_allocations__component",
         "component_allocations__component__manufacturer",
     )
+    related_object_exclusions = ("compliance.custodyreceipt",)
 
     layout = (
         (
@@ -174,10 +177,20 @@ class AssetDetailView(ObjectDetailView):
         # Custody Receipts
         from compliance.tables import CustodyReceiptTable
 
-        receipt_qs = CustodyReceipt.objects.filter(asset=asset).select_related("asset", "holder", "custody_template")
-        receipts_table = CustodyReceiptTable(receipt_qs, request=self.request)
-        RequestConfig(self.request, paginate={"per_page": 10}).configure(receipts_table)
-        context["receipts_table"] = receipts_table
+        can_view_receipts = self.request.user.has_perm("compliance.view_custodyreceipt", obj=asset)
+        context["can_view_custody_receipts"] = can_view_receipts
+        receipt_qs = CustodyReceipt.objects.none()
+        if can_view_receipts:
+            receipt_qs = scope_custody_receipts(
+                CustodyReceipt.objects.filter(asset=asset, asset__tenant=asset.tenant).select_related(
+                    "asset", "holder", "custody_template"
+                ),
+                user=self.request.user,
+                permission="compliance.view_custodyreceipt",
+            )
+            receipts_table = CustodyReceiptTable(receipt_qs, request=self.request)
+            RequestConfig(self.request, paginate={"per_page": 10}).configure(receipts_table)
+            context["receipts_table"] = receipts_table
 
         # License Seat Assignments
         from licenses.models import LicenseSeatAssignment
@@ -200,20 +213,30 @@ class AssetDetailView(ObjectDetailView):
         context["resolved_depreciation_policy"] = str(policy) if policy else None
         context["resolved_depreciation_rung"] = rung
 
-        custody_receipt = None
-        eula_token = None
-        if active_assignment and active_assignment.assigned_target:
-            if isinstance(active_assignment.assigned_target, AssetHolder):
-                custody_receipt = (
-                    CustodyReceipt.objects.filter(asset=asset, holder=active_assignment.assigned_target)
-                    .order_by("-created_date")
-                    .first()
-                )
-                if custody_receipt:
-                    eula_token = custody_receipt.token
+        if can_view_receipts and active_assignment and isinstance(active_assignment.assigned_target, AssetHolder):
+            current_receipt = (
+                receipt_qs.filter(holder=active_assignment.assigned_target).order_by("-created_date", "-pk").first()
+            )
+            if current_receipt is not None:
+                context["custody_receipt_summary"] = {
+                    "acceptance_status": current_receipt.acceptance_status,
+                    "detail_url": reverse("compliance:custodyreceipt_detail", kwargs={"pk": current_receipt.pk}),
+                }
 
-        context["custody_receipt"] = custody_receipt
-        context["eula_token"] = eula_token
+        receipt_list_url = reverse("compliance:custodyreceipt_list")
+        context["related_objects_list"] = [
+            item for item in context.get("related_objects_list", []) if not item["url"].startswith(receipt_list_url)
+        ]
+        receipt_count = receipt_qs.count()
+        if receipt_count:
+            context["related_objects_list"].append(
+                {
+                    "label": str(_("Custody Receipts")),
+                    "count": receipt_count,
+                    "url": f"{receipt_list_url}?asset={asset.pk}",
+                }
+            )
+            context["related_objects_list"].sort(key=lambda item: item["label"])
 
         # Check if current user has an approved request for this asset
         approved_request = None

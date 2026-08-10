@@ -42,8 +42,9 @@ class RelatedObjectProvider:
     whose subquery can't be built safely also falls back to ``.count()``.
     """
 
-    def __init__(self, obj):
+    def __init__(self, obj, *, excluded_model_labels=()):
         self.obj = obj
+        self.excluded_model_labels = frozenset(excluded_model_labels)
 
     @staticmethod
     def count_uses_distinct(related_model):
@@ -78,6 +79,8 @@ class RelatedObjectProvider:
             if relation.auto_created and not relation.concrete:
                 related_model = relation.related_model
                 if not related_model:
+                    continue
+                if related_model._meta.label_lower in self.excluded_model_labels:
                     continue
 
                 accessor_name = relation.get_accessor_name()

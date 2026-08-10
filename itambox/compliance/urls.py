@@ -30,6 +30,9 @@ urlpatterns = [
     ),
     path("audit-sessions/<int:pk>/start/", views_audit.AuditSessionStartView.as_view(), name="auditsession_start"),
     path("audit-sessions/<int:pk>/delete/", views_audit.AuditSessionDeleteView.as_view(), name="auditsession_delete"),
+    # Custody Receipts
+    path("custody-receipts/", views.CustodyReceiptListView.as_view(), name="custodyreceipt_list"),
+    path("custody-receipts/<int:pk>/", views.CustodyReceiptDetailView.as_view(), name="custodyreceipt_detail"),
     # Custody Templates
     path("custody-templates/", views.CustodyTemplateListView.as_view(), name="custodytemplate_list"),
     path("custody-templates/add/", views.CustodyTemplateEditView.as_view(), name="custodytemplate_create"),

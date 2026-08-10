@@ -543,10 +543,13 @@ class MigrationAuditTests(unittest.TestCase):
         self.assertEqual(inventory["summary"]["replacement_shards"], 62)
         self.assertEqual(inventory["summary"]["replacement_targets"], 262)
         self.assertEqual(inventory["summary"]["explicit_replacement_chain_edges"], 61)
-        self.assertEqual(inventory["summary"]["post_transition_migrations"], 9)
+        self.assertEqual(inventory["summary"]["post_transition_migrations"], 12)
         self.assertEqual(
             inventory["post_transition_migrations"],
             [
+                "compliance.0101_alter_custodyreceipt_signed_at",
+                "compliance.0102_clear_unsigned_receipt_timestamps",
+                "compliance.0103_alter_custodyreceipt_options",
                 "extras.0101_issue88_drop_legacy_webhook_name_like",
                 "extras.0102_alter_event_action",
                 "extras.0103_remove_reporttemplate_advanced_mode_and_more",
