@@ -23,7 +23,7 @@ from core.tables import ObjectChangeTable
 from itambox.utils import get_paginate_count
 from itambox.views.generic import BaseHTMXView
 from organization.access import accessible_tenant_ids, get_descendant_tenant_group_ids
-from organization.models import Tenant
+from organization.models import RoleGrant, Tenant
 
 from .forms import UserPreferencesForm, UserProfileForm
 from .models import UserPreference
@@ -674,7 +674,6 @@ from django.db.models import Count, Prefetch
 
 from core.auth.guards import validate_group_membership_grant
 from itambox.views.generic import ObjectBulkDeleteView
-from organization.models import RoleGrant
 
 from .filters import UserGroupFilterSet
 from .forms import UserGroupAssignUsersForm, UserGroupFilterForm, UserGroupForm
