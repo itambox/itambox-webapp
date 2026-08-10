@@ -100,12 +100,14 @@ def generate_label_batch_task(
                 assets = Asset.objects.filter(pk__in=asset_pks)
 
                 zip_buffer = io.BytesIO()
+                rendered = 0
                 with zipfile.ZipFile(zip_buffer, "w", zipfile.ZIP_DEFLATED) as zip_file:
                     for asset in assets:
                         try:
                             img_data = generate_single_label_graphic(asset, label_format)
                             filename = f"label_{asset.asset_tag}_{label_format}.png"
                             zip_file.writestr(filename, img_data)
+                            rendered += 1
                             job.append_log(f" - Rendered label for asset PK {asset.pk}.")
                         # broad except: boundary-isolation: one label failure must not abort the requested batch
                         except Exception as ex:
@@ -114,6 +116,10 @@ def generate_label_batch_task(
                                 "Label rendering failed",
                                 extra={**log_extra, "object_id": asset.pk, "exception_type": type(ex).__name__},
                             )
+
+                if rendered == 0:
+                    job.mark_failed("[terminal] labels.no_labels_rendered")
+                    return TaskResult(TaskStatus.TERMINAL, "labels.no_labels_rendered", user_visible=True)
 
                 zip_buffer.seek(0)
 
@@ -131,12 +137,15 @@ def generate_label_batch_task(
                     user=ctx.user,
                     subject=_("Label Generation Complete"),
                     message=_("Successfully generated label batch zip for %(count)s asset(s). Click to download.")
-                    % {"count": assets.count()},
+                    % {"count": rendered},
                     level=Notification.LEVEL_SUCCESS,
                     target_url=attachment.get_download_url(),
                 )
                 return TaskResult(
-                    TaskStatus.SUCCESS, "labels.zip_completed", {"total": assets.count()}, user_visible=True
+                    TaskStatus.PARTIAL if rendered < len(assets) else TaskStatus.SUCCESS,
+                    "labels.zip_partial" if rendered < len(assets) else "labels.zip_completed",
+                    {"rendered": rendered, "failed": len(assets) - rendered},
+                    user_visible=True,
                 )
 
             # broad except: task-isolation: record a safe typed task-boundary failure
