@@ -31546,7 +31546,7 @@ paths:
         name: id
         schema:
           type: integer
-        description: A unique integer value identifying this purchase order.
+        description: A unique integer value identifying this Purchase Order.
         required: true
       tags:
       - procurement
@@ -31602,7 +31602,7 @@ paths:
         name: id
         schema:
           type: integer
-        description: A unique integer value identifying this purchase order.
+        description: A unique integer value identifying this Purchase Order.
         required: true
       tags:
       - procurement
@@ -31688,7 +31688,7 @@ paths:
         name: id
         schema:
           type: integer
-        description: A unique integer value identifying this purchase order.
+        description: A unique integer value identifying this Purchase Order.
         required: true
       tags:
       - procurement
@@ -31773,7 +31773,7 @@ paths:
         name: id
         schema:
           type: integer
-        description: A unique integer value identifying this purchase order.
+        description: A unique integer value identifying this Purchase Order.
         required: true
       tags:
       - procurement
@@ -31830,7 +31830,7 @@ paths:
         name: id
         schema:
           type: integer
-        description: A unique integer value identifying this purchase order.
+        description: A unique integer value identifying this Purchase Order.
         required: true
       tags:
       - procurement
@@ -31885,7 +31885,7 @@ paths:
         name: id
         schema:
           type: integer
-        description: A unique integer value identifying this purchase order.
+        description: A unique integer value identifying this Purchase Order.
         required: true
       tags:
       - procurement
@@ -31941,7 +31941,7 @@ paths:
         name: id
         schema:
           type: integer
-        description: A unique integer value identifying this purchase order.
+        description: A unique integer value identifying this Purchase Order.
         required: true
       tags:
       - procurement
@@ -31997,7 +31997,7 @@ paths:
         name: id
         schema:
           type: integer
-        description: A unique integer value identifying this purchase order.
+        description: A unique integer value identifying this Purchase Order.
         required: true
       tags:
       - procurement
@@ -32065,7 +32065,7 @@ paths:
         name: id
         schema:
           type: integer
-        description: A unique integer value identifying this purchase order.
+        description: A unique integer value identifying this Purchase Order.
         required: true
       tags:
       - procurement

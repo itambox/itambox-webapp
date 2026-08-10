@@ -2711,6 +2711,18 @@ msgstr "Beschaffung"
 msgid "Purchase Orders"
 msgstr "Bestellungen"
 
+msgid "Resource Grant"
+msgstr "Ressourcen-Freigabe"
+
+msgid "Resource Grants"
+msgstr "Ressourcen-Freigaben"
+
+msgid "Tenant resource grant"
+msgstr "Ressourcen-Freigabe"
+
+msgid "Tenant resource grants"
+msgstr "Ressourcen-Freigaben"
+
 msgid "Requests"
 msgstr "Anfragen"
 

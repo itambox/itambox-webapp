@@ -1350,8 +1350,8 @@ class TenantResourceGrant(SoftDeleteMixin, ChangeLoggingMixin, BaseModel):
 
     class Meta:
         ordering = ["-created_at"]
-        verbose_name = _("Tenant resource grant")
-        verbose_name_plural = _("Tenant resource grants")
+        verbose_name = _("Resource Grant")
+        verbose_name_plural = _("Resource Grants")
         constraints = [
             models.CheckConstraint(
                 check=(
