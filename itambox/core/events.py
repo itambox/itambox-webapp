@@ -45,13 +45,23 @@ def delivery_log_context(operation, *, tenant_id=None, actor_id=None, request_id
     """Build non-sensitive correlation fields for delivery-boundary logs."""
     user = get_current_user()
     tenant = get_current_tenant()
-    parsed = urlsplit(endpoint) if endpoint else None
+    try:
+        parsed = urlsplit(endpoint) if endpoint else None
+    except ValueError:
+        parsed = None
+    if parsed is not None and parsed.hostname:
+        host = parsed.hostname
+        if parsed.port is not None:
+            host = f"{host}:{parsed.port}"
+        endpoint_log = f"{parsed.scheme}://{host}"
+    else:
+        endpoint_log = ""
     return {
         "operation": operation,
         "actor_id": actor_id if actor_id is not None else getattr(user, "pk", None),
         "tenant_id": tenant_id if tenant_id is not None else getattr(tenant, "pk", None),
         "request_id": request_id if request_id is not None else get_current_request_id(),
-        "endpoint": f"{parsed.scheme}://{parsed.netloc}" if parsed else "",
+        "endpoint": endpoint_log,
     }
 
 
@@ -498,7 +508,7 @@ def _send_email_notification(channel, subject, body):
     except smtplib.SMTPAuthenticationError:
         logger.error("%s disposition=terminal reason=authentication", delivery_log_message(context))
         return DeliveryResult(operation, DeliveryDisposition.TERMINAL, True, str(_("Email authentication failed.")))
-    except (TimeoutError, ConnectionError, smtplib.SMTPServerDisconnected):
+    except (TimeoutError, ConnectionError, smtplib.SMTPServerDisconnected, smtplib.SMTPConnectError):
         logger.warning("%s disposition=retryable reason=transport", delivery_log_message(context))
         return DeliveryResult(operation, DeliveryDisposition.RETRYABLE)
     except (smtplib.SMTPRecipientsRefused, smtplib.SMTPSenderRefused, smtplib.SMTPDataError, smtplib.SMTPException):
