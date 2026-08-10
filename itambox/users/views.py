@@ -674,8 +674,7 @@ from django.db.models import Count, Prefetch
 
 from core.auth.guards import validate_group_membership_grant
 from itambox.views.generic import ObjectBulkDeleteView
-from organization.access import accessible_tenant_ids
-from organization.models import RoleGrant, Tenant
+from organization.models import RoleGrant
 
 from .filters import UserGroupFilterSet
 from .forms import UserGroupAssignUsersForm, UserGroupFilterForm, UserGroupForm
