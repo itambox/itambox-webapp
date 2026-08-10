@@ -82,15 +82,25 @@ class ManagementCommandsTestCase(TransactionTestCase):
         admin_accounts = User.objects.filter(username="admin") | User.objects.filter(username__startswith="admin@")
         self.assertGreater(admin_accounts.count(), 0)
         for user in admin_accounts:
+            self.assertTrue(
+                Membership._base_manager.filter(user=user, is_active=True).exists(),
+                user.username,
+            )
             self.assertFalse(
                 AssetHolder._base_manager.filter(user=user, deleted_at__isnull=True).exists(),
                 user.username,
             )
 
-    def test_seed_access_invariant_fails_closed_and_exempts_admin_accounts(self):
+    def test_seed_access_invariant_requires_admin_memberships_but_exempts_admin_holders(self):
         tenant = Tenant.objects.create(name="Seed Invariant Tenant", slug="seed-invariant-tenant")
         admin = User.objects.create_user(username="admin", password="password")
         org_admin = User.objects.create_user(username="admin@example.com", password="password")
+
+        for user in (admin, org_admin):
+            with self.subTest(user=user.username), pytest.raises(CommandError, match="no active membership"):
+                check_seed_access_invariants([user])
+            Membership._base_manager.create(user=user, tenant=tenant, is_active=True)
+
         check_seed_access_invariants([admin, org_admin])
 
         named_person = User.objects.create_user(
