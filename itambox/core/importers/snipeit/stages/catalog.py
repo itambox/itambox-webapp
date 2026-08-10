@@ -8,7 +8,7 @@ from dataclasses import dataclass
 from django.apps import apps
 from django.db import transaction
 
-from core.importers.snipeit.common import _CATEGORY_APPLIES_MAP, _STATUS_TYPE_MAP
+from core.importers.snipeit.common import _CATEGORY_APPLIES_MAP, _STATUS_TYPE_MAP, _unique_slug
 from core.importers.snipeit.contracts import ImportContext, Outcome, StageResult
 
 
@@ -92,9 +92,15 @@ class ManufacturerImporter:
         if obj and self.context.update:
             return obj, "updated"
         if not self.context.dry_run:
-            obj, created = model.objects.get_or_create(name=name)
+            # The active (non-deleted) slug is unique (unique_manufacturer_slug_active),
+            # so an empty slug would collide from the second row on. The seed
+            # (core/management/commands/_seed/catalog.py) uses the same slug pattern.
+            obj, created = model.objects.get_or_create(
+                slug=_unique_slug(model, name),
+                defaults={"name": name},
+            )
         else:
-            obj = model(id=-source_id, name=name)
+            obj = model(id=-source_id, name=name, slug=_unique_slug(model, name))
             created = True
         return obj, "created" if created else "skipped"
 

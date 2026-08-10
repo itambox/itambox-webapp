@@ -113,6 +113,21 @@ class TestSnipeITCatalogStages(TenantTestMixin):
         assert updated.counts.updated == 1
         assert deps.manufacturers[102] == obj
 
+    def test_manufacturers_multiple_rows_get_unique_slugs(self):
+        """Regression: Manufacturer has no AutoSlugMixin and a partial unique
+        index on active slug, so empty slugs collide from the second row on."""
+        from assets.models import Manufacturer
+
+        deps = ManufacturerDependencies({})
+        rows = [{"id": 201, "name": "Mfr Alpha"}, {"id": 202, "name": "Mfr Beta"}]
+        result = self._run(lambda context: ManufacturerImporter(context, deps), "/api/v1/manufacturers", rows)
+        assert result.counts.created == 2
+        assert result.counts.failed == 0
+        slugs = {m.slug for m in Manufacturer._base_manager.filter(name__in=["Mfr Alpha", "Mfr Beta"])}
+        assert len(slugs) == 2
+        assert all(slugs)
+        assert deps.manufacturers[201].slug and deps.manufacturers[202].slug
+
     def test_categories_create_skip_and_update(self):
         from assets.models import Category
 
