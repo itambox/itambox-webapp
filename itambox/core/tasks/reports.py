@@ -15,6 +15,7 @@ from core.events import send_notification_to_channel
 from core.models import EmailSettings
 from core.reports import build_report_context, get_polished_system_html_template
 from core.tasks.context import TaskContext
+from core.tasks.utils import TaskResult, TaskStatus, classify_task_error
 from extras.models import FileAttachment, ReportGenerationArchive, ScheduledReport
 from itambox.capabilities import registry
 
@@ -199,14 +200,24 @@ def _deliver_report_channels(sched, summary_cards, total_rows):
             delivered = send_notification_to_channel(channel, report_subject, report_body)
         # broad except: boundary-isolation: channel integrations may raise implementation-specific failures
         except Exception as error:
-            logger.exception("Scheduled report channel '%s' raised during delivery.", channel.name)
-            outcome.record_failure(f"{channel.name}: {error}")
+            logger.error(
+                "Scheduled report channel delivery failed",
+                extra={
+                    "operation": "reports.channel_delivery",
+                    "channel_id": getattr(channel, "pk", None),
+                    "exception_type": type(error).__name__,
+                },
+            )
+            outcome.record_failure("channel.delivery_failed")
         else:
             if delivered:
                 outcome.record_success()
             else:
-                logger.warning("Scheduled report channel '%s' reported delivery failure.", channel.name)
-                outcome.record_failure(f"{channel.name}: delivery returned false")
+                logger.warning(
+                    "Scheduled report channel reported delivery failure",
+                    extra={"operation": "reports.channel_delivery", "channel_id": getattr(channel, "pk", None)},
+                )
+                outcome.record_failure("channel.delivery_rejected")
     return outcome
 
 
@@ -217,9 +228,8 @@ def _resolve_report_scope(sched):
         filter_tenants = list(sched.report.filter_tenants.all())
     if active_tenant is None and not filter_tenants:
         logger.error(
-            "Scheduled report '%s' has no tenant scope (no tenant, no filter_tenants) — "
-            "refusing to compile a cross-tenant report.",
-            sched.name,
+            "Scheduled report has no tenant scope; refusing cross-tenant compilation",
+            extra={"operation": "reports.scope", "scheduled_report_id": getattr(sched, "pk", None)},
         )
         return None
     return active_tenant, filter_tenants
@@ -239,14 +249,22 @@ def _process_scheduled_report(sched, active_tenant, filter_tenants):
         archive_entry = _archive_report_output(sched, template, output, active_tenant)
     # broad except: task-isolation: one scheduled report failure must not abort the worker batch
     except Exception as error:
-        logger.exception("Error generating scheduled report '%s'", sched.name)
-        sched.last_status = f"failed: {error}"[:50]
+        status = classify_task_error(error)
+        logger.error(
+            "Scheduled report generation failed",
+            extra={
+                "operation": "reports.generate",
+                "scheduled_report_id": getattr(sched, "pk", None),
+                "exception_type": type(error).__name__,
+            },
+        )
+        sched.last_status = f"{status.value}: report.generation_failed"
         sched.save()
         if archive_entry:
             archive_entry.status = "failed"
-            archive_entry.error_message = str(error)
+            archive_entry.error_message = "report.generation_failed"
             archive_entry.save()
-        return False
+        return TaskResult(status, "report.generation_failed", user_visible=True)
 
     delivery = _DeliveryOutcome()
     recipients = _resolve_report_recipients(sched)
@@ -255,13 +273,20 @@ def _process_scheduled_report(sched, active_tenant, filter_tenants):
             delivered = _deliver_report_email(sched, template, output, recipients)
         # broad except: boundary-isolation: SMTP providers expose implementation-specific delivery failures
         except Exception as error:
-            logger.exception("Scheduled report email delivery failed for '%s'.", sched.name)
-            delivery.record_failure(f"email: {error}")
+            logger.error(
+                "Scheduled report email delivery failed",
+                extra={
+                    "operation": "reports.email_delivery",
+                    "scheduled_report_id": getattr(sched, "pk", None),
+                    "exception_type": type(error).__name__,
+                },
+            )
+            delivery.record_failure("email.delivery_failed")
         else:
             if delivered:
                 delivery.record_success()
             else:
-                delivery.record_failure("email: delivery returned false")
+                delivery.record_failure("email.delivery_rejected")
 
     delivery.merge(_deliver_report_channels(sched, summary_cards, len(rows)))
     if delivery.failures:
@@ -274,44 +299,71 @@ def _process_scheduled_report(sched, active_tenant, filter_tenants):
             sched.last_status = f"delivery_{delivery.status}: {delivery_detail}"[:50]
         sched.save()
         logger.warning(
-            "Scheduled report '%s' completed with delivery status '%s': %s",
-            sched.name,
-            delivery.status,
-            "; ".join(delivery.failures),
+            "Scheduled report completed with delivery failures",
+            extra={
+                "operation": "reports.delivery",
+                "scheduled_report_id": getattr(sched, "pk", None),
+                "delivery_status": delivery.status,
+            },
         )
         # Generation and archival completed.  Do not signal a task retry here:
         # retrying after a partial fan-out could duplicate already successful deliveries.
-        return delivery.status != "failed"
+        status = TaskStatus.PARTIAL if delivery.succeeded else TaskStatus.TERMINAL
+        return TaskResult(
+            status,
+            "report.delivery_partial" if delivery.succeeded else "report.delivery_failed",
+            {"attempted": delivery.attempted, "succeeded": delivery.succeeded},
+            user_visible=True,
+        )
 
     sched.last_status = "success"
     sched.save()
-    logger.info("Scheduled report '%s' successfully processed.", sched.name)
-    return True
+    logger.info(
+        "Scheduled report successfully processed",
+        extra={"operation": "reports.generate", "scheduled_report_id": getattr(sched, "pk", None)},
+    )
+    return TaskResult(TaskStatus.SUCCESS, "report.completed", user_visible=True)
 
 
-def generate_scheduled_report_task(scheduled_report_id: int) -> bool | None:
+def generate_scheduled_report_task(scheduled_report_id: int) -> TaskResult:
     """Compile and deliver one scheduled report inside a tenant-scoped task context."""
     try:
         sched = ScheduledReport.objects.get(pk=scheduled_report_id)
     except ScheduledReport.DoesNotExist:
-        logger.error("ScheduledReport %s not found.", scheduled_report_id)
-        return False
+        logger.error(
+            "Scheduled report not found",
+            extra={"operation": "reports.generate", "scheduled_report_id": scheduled_report_id},
+        )
+        return TaskResult(TaskStatus.TERMINAL, "report.not_found")
 
     if not registry.is_active("reporting.designer"):
-        logger.warning("Report designer capability is inactive. Skipping %s.", sched.name)
-        return False
+        logger.warning(
+            "Report designer capability is inactive",
+            extra={"operation": "reports.generate", "scheduled_report_id": sched.pk},
+        )
+        return TaskResult(TaskStatus.SKIPPED, "report.capability_inactive")
 
     if not sched.is_active:
-        logger.warning("ScheduledReport %s is inactive. Skipping.", sched.name)
-        return False
+        logger.warning(
+            "Scheduled report is inactive",
+            extra={"operation": "reports.generate", "scheduled_report_id": sched.pk},
+        )
+        return TaskResult(TaskStatus.SKIPPED, "report.inactive")
 
     scope = _resolve_report_scope(sched)
     if scope is None:
-        return None
+        return TaskResult(TaskStatus.TERMINAL, "report.scope_missing", user_visible=True)
     active_tenant, filter_tenants = scope
 
-    with TaskContext(tenant_id=active_tenant.id if active_tenant else None, user_id=None):
-        logger.info("Generating scheduled report: %s (Format: %s)", sched.name, sched.format)
+    with TaskContext(
+        tenant_id=active_tenant.id if active_tenant else None,
+        user_id=None,
+        operation="reports.generate",
+    ) as ctx:
+        logger.info(
+            "Generating scheduled report",
+            extra={**ctx.log_context, "scheduled_report_id": sched.pk},
+        )
         sched.last_run = timezone.now()
         sched.save()
         return _process_scheduled_report(sched, active_tenant, filter_tenants)

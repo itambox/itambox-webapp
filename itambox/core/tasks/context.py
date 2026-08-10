@@ -79,9 +79,15 @@ class TaskContext:
     # object compared by identity, never by value.
     _system_authorization_issuer: object
 
-    def __init__(self, tenant_id: int | None = None, user_id: int | None = None) -> None:
+    def __init__(
+        self,
+        tenant_id: int | None = None,
+        user_id: int | None = None,
+        operation: str = "background_task",
+    ) -> None:
         self.tenant_id = tenant_id
         self.user_id = user_id
+        self.operation = operation
         self.tenant = None
         self.user = None
         self._entered = False
@@ -129,12 +135,31 @@ class TaskContext:
             # ObjectChange rows for all saves inside the task.
             _request_id.set(uuid.uuid4())
             self._entered = True
-        except Exception:
+            logger.info(
+                "Task context entered",
+                extra=self.log_context,
+            )
+        # broad except: cleanup-reraise: restore every captured context variable before propagating setup failure
+        except Exception as exc:
+            logger.error(
+                "Task context setup failed",
+                extra={**self.log_context, "exception_type": type(exc).__name__},
+            )
             self._entered = False
             self._restore_context()
             raise
 
         return self
+
+    @property
+    def log_context(self) -> dict[str, object]:
+        request_id = get_current_request_id()
+        return {
+            "operation": self.operation,
+            "tenant_id": self.tenant_id,
+            "actor_id": self.user_id,
+            "request_id": str(request_id) if request_id else None,
+        }
 
     def authorize_system(self, *, permission: str, operation: str, reason: str) -> SystemAuthorizationContext:
         """Issue an explicit authorization bound to this actorless task.

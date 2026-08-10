@@ -17,9 +17,9 @@ from django.db import transaction
 from django.utils.translation import gettext as _
 
 from core.models import Job, Notification
+from core.tasks.utils import TaskResult, TaskStatus, classify_task_error, reverse_job_detail
 
 from .context import TaskContext
-from .utils import reverse_job_detail
 
 logger = logging.getLogger(__name__)
 
@@ -53,22 +53,23 @@ def bulk_dispose_task(
     tenant_id: int | None = None,
     disposal_kwargs: Mapping[str, object] | None = None,
     proceeds_map: Mapping[str, object] | None = None,
-) -> None:
+) -> TaskResult:
     """Asynchronously dispose selected hardware assets."""
     disposal_kwargs = disposal_kwargs or {}
     proceeds_map = proceeds_map or {}
 
-    with TaskContext(tenant_id=tenant_id, user_id=user_id) as ctx:
+    with TaskContext(tenant_id=tenant_id, user_id=user_id, operation="assets.bulk_disposal") as ctx:
+        log_extra = {**ctx.log_context, "job_id": job_id}
         try:
             try:
                 job = Job.objects.get(pk=job_id)
             except Job.DoesNotExist:
-                logger.error("Job %s not found during async disposal.", job_id)
-                return
+                logger.error("Bulk disposal job not found", extra=log_extra)
+                return TaskResult(TaskStatus.TERMINAL, "disposal.job_not_found")
 
             if not job.mark_running():
                 logger.info("Job %s is no longer pending (cancelled?); skipping disposal.", job_id)
-                return
+                return TaskResult(TaskStatus.SKIPPED, "disposal.job_not_pending")
             job.append_log("Initializing asynchronous bulk disposal pipeline...")
             job.append_log(f"Assets to process: {len(asset_pks)}")
 
@@ -105,16 +106,21 @@ def bulk_dispose_task(
                         )
                         if already_disposed:
                             skipped_count += 1
-                            job.append_log(f" - Asset {asset.asset_tag} ({asset.name}) skipped (already disposed).")
+                            job.append_log(f" - Asset PK {pk} skipped (already disposed).")
                             continue
 
                         proceeds = _parse_proceeds(proceeds_map.get(str(pk)))
                         dispose_asset(asset=asset, user=ctx.user, proceeds=proceeds, **shared)
                         success_count += 1
-                        job.append_log(f" - Asset {asset.asset_tag} ({asset.name}) disposed.")
+                        job.append_log(f" - Asset PK {pk} disposed.")
+                    # broad except: boundary-isolation: one asset failure must not abort the requested batch
                     except Exception as ex:
                         failure_count += 1
-                        job.append_log(f" - Failed to dispose Asset PK {pk}: {ex}")
+                        job.append_log(f" - Asset PK {pk} failed [disposal.item_failed].")
+                        logger.warning(
+                            "Bulk disposal item failed",
+                            extra={**log_extra, "object_id": pk, "exception_type": type(ex).__name__},
+                        )
 
                 job.append_log(
                     f"Bulk disposal finished. Disposed: {success_count} | "
@@ -130,7 +136,9 @@ def bulk_dispose_task(
                         level=Notification.LEVEL_DANGER,
                         target_url=reverse_job_detail(job.pk),
                     )
-                    return
+                    return TaskResult(
+                        TaskStatus.TERMINAL, "disposal.all_failed", {"failed": failure_count}, user_visible=True
+                    )
 
                 job.mark_completed(
                     result={
@@ -147,16 +155,27 @@ def bulk_dispose_task(
                     level=Notification.LEVEL_SUCCESS,
                     target_url=reverse_job_detail(job.pk),
                 )
+                return TaskResult(
+                    TaskStatus.PARTIAL if failure_count else TaskStatus.SUCCESS,
+                    "disposal.partial" if failure_count else "disposal.completed",
+                    {"disposed": success_count, "skipped": skipped_count, "failed": failure_count},
+                    user_visible=True,
+                )
 
+            # broad except: task-isolation: record a safe typed task-boundary failure
             except Exception as e:
-                logger.exception("Exception during bulk disposal task")
-                job.mark_failed(str(e))
+                status = classify_task_error(e)
+                logger.error("Bulk disposal task failed", extra={**log_extra, "exception_type": type(e).__name__})
+                job.mark_failed(f"[{status.value}] disposal.boundary_failed")
                 Notification.objects.create(
                     user=ctx.user,
                     subject=_("Bulk Disposal Error"),
-                    message=_("A system exception occurred during disposal: %(error)s") % {"error": str(e)},
+                    message=_("The bulk disposal could not be completed. Code: disposal.boundary_failed"),
                     level=Notification.LEVEL_DANGER,
                     target_url=reverse_job_detail(job.pk),
                 )
-        except Exception:
-            logger.exception("Outer exception during bulk disposal task")
+                return TaskResult(status, "disposal.boundary_failed", user_visible=True)
+        # broad except: task-isolation: failures before Job resolution remain observable to the queue caller
+        except Exception as exc:
+            logger.error("Bulk disposal entry failed", extra={**log_extra, "exception_type": type(exc).__name__})
+            return TaskResult(classify_task_error(exc), "disposal.entry_failed")

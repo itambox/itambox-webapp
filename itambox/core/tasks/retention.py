@@ -2,10 +2,12 @@ import logging
 
 from django.core.management import call_command
 
+from core.tasks.utils import RetryableTaskError, TaskResult, TaskStatus, TerminalTaskError, classify_task_error
+
 logger = logging.getLogger(__name__)
 
 
-def prune_changelog_task() -> None:
+def prune_changelog_task() -> TaskResult:
     """Scheduled daily task: prune aged changelog/operational-data rows.
 
     Registered as a daily django-q2 Schedule by
@@ -23,5 +25,15 @@ def prune_changelog_task() -> None:
     invisible instead.
     """
     logger.info("Starting scheduled prune_changelog run.")
-    call_command("prune_changelog")
+    try:
+        call_command("prune_changelog")
+    # broad except: cleanup-reraise: classify the queue-visible failure without swallowing it
+    except Exception as exc:
+        error_type = RetryableTaskError if classify_task_error(exc) is TaskStatus.RETRYABLE else TerminalTaskError
+        logger.error(
+            "Scheduled prune_changelog failed",
+            extra={"operation": "retention.prune_changelog", "exception_type": type(exc).__name__},
+        )
+        raise error_type(code="retention.prune_failed", message="Scheduled retention pruning failed.") from exc
     logger.info("Scheduled prune_changelog run complete.")
+    return TaskResult(TaskStatus.SUCCESS, "retention.prune_completed")

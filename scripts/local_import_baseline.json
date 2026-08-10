@@ -2110,12 +2110,6 @@
       "count": 1
     },
     {
-      "path": "itambox/core/tasks/utils.py",
-      "context": "FunctionDef:reverse_job_detail",
-      "statement": "from django.urls import reverse",
-      "count": 1
-    },
-    {
       "path": "itambox/core/tasks/webhooks.py",
       "context": "FunctionDef:send_webhook_task",
       "statement": "from django.core.exceptions import ValidationError",

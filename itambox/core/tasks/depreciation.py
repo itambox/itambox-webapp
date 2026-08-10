@@ -5,6 +5,7 @@ from django.utils import timezone
 from assets.depreciation import compute_book_value
 from assets.models import Asset
 from core.tasks.context import TaskContext
+from core.tasks.utils import RetryableTaskError, TaskStatus, TerminalTaskError, classify_task_error
 
 logger = logging.getLogger(__name__)
 
@@ -32,30 +33,39 @@ def calculate_depreciation() -> int:
     Currently left as None (system-level attribution).
     """
     # Cross-tenant: no tenant_id. No actor user for this scheduled system task.
-    with TaskContext(tenant_id=None, user_id=None):
-        now = timezone.now()
-        assets_to_update = []
+    try:
+        with TaskContext(tenant_id=None, user_id=None, operation="assets.calculate_depreciation"):
+            now = timezone.now()
+            assets_to_update = []
 
-        assets = Asset.objects.select_related(
-            "asset_type__depreciation",
-            "depreciation_override",
-            "tenant__default_depreciation",
-            "status",
-        ).filter(purchase_cost__isnull=False)
+            assets = Asset.objects.select_related(
+                "asset_type__depreciation",
+                "depreciation_override",
+                "tenant__default_depreciation",
+                "status",
+            ).filter(purchase_cost__isnull=False)
 
-        for asset in assets:
-            new_value = compute_book_value(asset)
-            if new_value is None:
-                continue
-            if asset.current_book_value != new_value:
-                asset.current_book_value = new_value
-                asset.depreciation_updated_at = now
-                assets_to_update.append(asset)
+            for asset in assets:
+                new_value = compute_book_value(asset)
+                if new_value is None:
+                    continue
+                if asset.current_book_value != new_value:
+                    asset.current_book_value = new_value
+                    asset.depreciation_updated_at = now
+                    assets_to_update.append(asset)
 
-        if assets_to_update:
-            Asset.objects.bulk_update(
-                assets_to_update,
-                ["current_book_value", "depreciation_updated_at"],
-                batch_size=1000,
-            )
-        return len(assets_to_update)
+            if assets_to_update:
+                Asset.objects.bulk_update(
+                    assets_to_update,
+                    ["current_book_value", "depreciation_updated_at"],
+                    batch_size=1000,
+                )
+            return len(assets_to_update)
+    # broad except: cleanup-reraise: preserve the integer success contract and type queue-visible failures
+    except Exception as exc:
+        error_type = RetryableTaskError if classify_task_error(exc) is TaskStatus.RETRYABLE else TerminalTaskError
+        logger.error(
+            "Depreciation task failed",
+            extra={"operation": "assets.calculate_depreciation", "exception_type": type(exc).__name__},
+        )
+        raise error_type(code="depreciation.failed", message="Depreciation calculation failed.") from exc

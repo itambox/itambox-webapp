@@ -84,6 +84,22 @@ class LabelRendererHTMLTests(SimpleTestCase):
         rendered_output = render_label_html(self.asset, oversized_rendered, self.barcode_uri)
         self.assertIn('class="label-card-table"', rendered_output)
 
+    def test_custom_template_fallback_redacts_template_and_exception_details(self):
+        label_template = SimpleNamespace(
+            pk=17,
+            name="customer-secret-template",
+            template_code="{{ invalid",
+            barcode_format="qr",
+        )
+
+        with self.assertLogs("core.tasks.labels", level="WARNING") as captured:
+            rendered = render_label_html(self.asset, label_template, self.barcode_uri)
+
+        log_output = " ".join(captured.output)
+        self.assertIn('class="label-card-table"', rendered)
+        self.assertNotIn("customer-secret-template", log_output)
+        self.assertNotIn("invalid", log_output)
+
     def test_grid_document_pads_cards_and_marks_page_boundaries(self):
         label_template = SimpleNamespace()
         document = _build_labels_document(["<div>Label</div>"] * 25, label_template, "a4_grid")
