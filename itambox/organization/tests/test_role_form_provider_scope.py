@@ -34,6 +34,8 @@ This module now covers the successor invariants:
 """
 
 from django.contrib.auth import get_user_model
+from django.contrib.auth.models import Permission
+from django.db.models import Q
 from django.test import TestCase
 from django.urls import reverse
 
@@ -111,7 +113,7 @@ class DeletedProviderCapabilityVocabularyTests(TenantTestMixin, TestCase):
                     f"{app}.delete_{model}",
                 }
             )
-        offered_codenames.update(full for _codename, _label, full in role_form_module.CUSTOM_PERMISSIONS)
+        offered_codenames.update(full for _field_key, _label, full in role_form_module.get_custom_permissions())
         manage_star = {c for c in offered_codenames if c.split(".", 1)[-1].startswith("manage_")}
         self.assertEqual(manage_star, set())
 
@@ -121,6 +123,62 @@ class DeletedProviderCapabilityVocabularyTests(TenantTestMixin, TestCase):
         self.assertNotIn("provider", field_names)
         self.assertIn("tenant", field_names)
         self.assertIn("shared_with_managed", field_names)
+
+
+class RoleFormCustomPermissionExposureTests(TenantTestMixin, TestCase):
+    """Custom ``Meta.permissions`` must surface in the role editor (regression #296)."""
+
+    def setUp(self):
+        self.clear_tenant_context()
+        self.setup_tenant_context(name="Custom Perm Tenant", slug="custom-perm-tenant")
+
+    def test_prepare_and_export_custody_receipt_permissions_are_offered(self):
+        # Regression for #296: prepare/export custody receipts (added via
+        # Meta.permissions in issue #259) were missing from the role editor's
+        # hard-coded custom-permission list and could never be granted via UI.
+        form = RoleForm(user=self.tenant_admin, tenant=self.tenant)
+        offered = {full for _field_key, _label, full in form._custom_permissions}
+        self.assertIn("compliance.prepare_custodyreceipt", offered)
+        self.assertIn("compliance.export_custodyreceipt", offered)
+        self.assertIn("perm_compliance_prepare_custodyreceipt", form.fields)
+        self.assertIn("perm_compliance_export_custodyreceipt", form.fields)
+
+    def test_role_editor_covers_every_non_crud_permission(self):
+        # The "never a gap again" gate: the derived list equals the live
+        # non-CRUD permission table (everything declared via Meta.permissions).
+        expected = {
+            f"{app_label}.{codename}"
+            for app_label, codename in (
+                Permission.objects.select_related("content_type")
+                .filter(
+                    ~Q(codename__startswith="view_"),
+                    ~Q(codename__startswith="add_"),
+                    ~Q(codename__startswith="change_"),
+                    ~Q(codename__startswith="delete_"),
+                )
+                .values_list("content_type__app_label", "codename")
+            )
+        }
+        offered = {full for _field_key, _label, full in role_form_module.get_custom_permissions()}
+        self.assertEqual(offered, expected)
+
+    def test_custom_permission_grant_persists_full_codename(self):
+        # Granting a custom permission through the form stores the full
+        # "app.codename" in Role.permissions (prepare custody receipts).
+        form = RoleForm(
+            user=self.tenant_admin,
+            tenant=self.tenant,
+            data={
+                "name": "Custody Operator",
+                "description": "",
+                "perm_compliance_prepare_custodyreceipt": "on",
+            },
+        )
+        self.assertTrue(form.is_valid(), form.errors)
+        role = form.save()
+        self.assertIn("compliance.prepare_custodyreceipt", role.permissions)
+        # An unselected custom permission stays unset.
+        self.assertNotIn("compliance.export_custodyreceipt", role.permissions)
 
     def test_organization_models_has_no_provider_model(self):
         self.assertFalse(hasattr(organization_models, "Provider"))

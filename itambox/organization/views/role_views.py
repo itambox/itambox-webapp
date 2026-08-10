@@ -27,7 +27,7 @@ from itambox.views.generic.utils import safe_return_url
 
 from ..filters import RoleFilterSet
 from ..forms import RoleAssignUsersForm, RoleFilterForm, RoleForm
-from ..forms.role_form import CUSTOM_PERMISSIONS, MATRIX_MODELS
+from ..forms.role_form import MATRIX_MODELS, get_custom_permissions
 from ..models import Membership, Role, RoleGrant, RoleGrantScope, Tenant
 from ..tables import RoleTable
 
@@ -122,7 +122,7 @@ class RoleDetailView(ObjectDetailView):
                 }
             )
         context["matrix_grouped_items"] = groups
-        context["custom_permissions"] = CUSTOM_PERMISSIONS
+        context["custom_permissions"] = get_custom_permissions()
         active = getattr(self.request, "active_tenant", None)
         # Scope the member count to the tenant being viewed so it agrees with the
         # (active-tenant-scoped) members list the link resolves to — a shared-in
