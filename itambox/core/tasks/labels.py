@@ -68,6 +68,37 @@ def generate_single_label_graphic(asset: object, label_format: str) -> bytes:
     return buffer.getvalue()
 
 
+def _finalize_label_zip(job, user, zip_buffer: io.BytesIO, rendered: int, total: int) -> TaskResult:
+    if rendered == 0:
+        job.mark_failed("[terminal] labels.no_labels_rendered")
+        return TaskResult(TaskStatus.TERMINAL, "labels.no_labels_rendered", user_visible=True)
+
+    zip_buffer.seek(0)
+    ct = ContentType.objects.get_for_model(Job)
+    attachment = FileAttachment.objects.create(
+        model=ct, object_id=job.pk, name=f"labels_batch_{job.pk}.zip", mime_type="application/zip"
+    )
+    attachment.file.save(f"labels_batch_{job.pk}.zip", ContentFile(zip_buffer.getvalue()))
+    attachment.save()
+
+    job.append_log("ZIP package generated and saved successfully.")
+    job.mark_completed(result={"file_name": attachment.name, "download_url": attachment.get_download_url()})
+    Notification.objects.create(
+        user=user,
+        subject=_("Label Generation Complete"),
+        message=_("Successfully generated label batch zip for %(count)s asset(s). Click to download.")
+        % {"count": rendered},
+        level=Notification.LEVEL_SUCCESS,
+        target_url=attachment.get_download_url(),
+    )
+    return TaskResult(
+        TaskStatus.PARTIAL if rendered < total else TaskStatus.SUCCESS,
+        "labels.zip_partial" if rendered < total else "labels.zip_completed",
+        {"rendered": rendered, "failed": total - rendered},
+        user_visible=True,
+    )
+
+
 def generate_label_batch_task(
     job_id: int,
     asset_pks: Sequence[int | str],
@@ -117,36 +148,7 @@ def generate_label_batch_task(
                                 extra={**log_extra, "object_id": asset.pk, "exception_type": type(ex).__name__},
                             )
 
-                if rendered == 0:
-                    job.mark_failed("[terminal] labels.no_labels_rendered")
-                    return TaskResult(TaskStatus.TERMINAL, "labels.no_labels_rendered", user_visible=True)
-
-                zip_buffer.seek(0)
-
-                ct = ContentType.objects.get_for_model(Job)
-                attachment = FileAttachment.objects.create(
-                    model=ct, object_id=job.pk, name=f"labels_batch_{job.pk}.zip", mime_type="application/zip"
-                )
-                attachment.file.save(f"labels_batch_{job.pk}.zip", ContentFile(zip_buffer.getvalue()))
-                attachment.save()
-
-                job.append_log("ZIP package generated and saved successfully.")
-                job.mark_completed(result={"file_name": attachment.name, "download_url": attachment.get_download_url()})
-
-                Notification.objects.create(
-                    user=ctx.user,
-                    subject=_("Label Generation Complete"),
-                    message=_("Successfully generated label batch zip for %(count)s asset(s). Click to download.")
-                    % {"count": rendered},
-                    level=Notification.LEVEL_SUCCESS,
-                    target_url=attachment.get_download_url(),
-                )
-                return TaskResult(
-                    TaskStatus.PARTIAL if rendered < len(assets) else TaskStatus.SUCCESS,
-                    "labels.zip_partial" if rendered < len(assets) else "labels.zip_completed",
-                    {"rendered": rendered, "failed": len(assets) - rendered},
-                    user_visible=True,
-                )
+                return _finalize_label_zip(job, ctx.user, zip_buffer, rendered, len(assets))
 
             # broad except: task-isolation: record a safe typed task-boundary failure
             except Exception as e:

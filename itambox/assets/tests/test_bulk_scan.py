@@ -12,6 +12,7 @@ from decimal import Decimal
 from unittest.mock import patch
 
 from django.contrib.auth import get_user_model
+from django.db import OperationalError
 from django.test import TestCase
 from django.urls import reverse
 
@@ -28,6 +29,7 @@ from core.models import Job
 from core.tasks.checkin import bulk_checkin_task
 from core.tasks.checkout import bulk_checkout_task
 from core.tasks.disposal import bulk_dispose_task
+from core.tasks.utils import TaskStatus
 from core.tests.mixins import TenantTestMixin
 from organization.models import AssetHolder, Location, Site, Tenant
 
@@ -353,6 +355,64 @@ class BulkCheckinTaskTests(TenantTestMixin, TestCase):
         asset.refresh_from_db()
         self.assertEqual(asset.location, dest)
 
+    def test_missing_and_cancelled_jobs_return_typed_outcomes(self):
+        missing = bulk_checkin_task(999999, [], self.tenant_admin.pk, self.tenant.pk)
+        cancelled_job = self._job()
+        cancelled_job.status = Job.STATUS_FAILED
+        cancelled_job.save(update_fields=["status"])
+
+        skipped = bulk_checkin_task(cancelled_job.pk, [], self.tenant_admin.pk, self.tenant.pk)
+
+        self.assertEqual((missing.status, missing.code), (TaskStatus.TERMINAL, "checkin.job_not_found"))
+        self.assertEqual((skipped.status, skipped.code), (TaskStatus.SKIPPED, "checkin.job_not_pending"))
+
+    @patch("assets.services.checkin_asset", side_effect=RuntimeError("secret-person secret-asset"))
+    def test_item_failures_are_terminal_and_redacted(self, _checkin):
+        job = self._job()
+
+        with self.assertLogs("core.tasks.checkin", level="WARNING") as captured:
+            result = bulk_checkin_task(job.pk, [str(self.checked_out.pk)], self.tenant_admin.pk, self.tenant.pk)
+
+        job.refresh_from_db()
+        rendered = " ".join(captured.output) + " " + job.logs
+        self.assertEqual((result.status, result.code), (TaskStatus.TERMINAL, "checkin.all_failed"))
+        self.assertEqual(dict(result.counts), {"failed": 1, "total": 1})
+        self.assertEqual(job.status, Job.STATUS_FAILED)
+        self.assertNotIn("secret-person", rendered)
+        self.assertNotIn("secret-asset", rendered)
+
+    def test_item_failure_after_success_returns_partial(self):
+        job = self._job()
+
+        result = bulk_checkin_task(
+            job.pk,
+            [str(self.checked_out.pk), "999999"],
+            self.tenant_admin.pk,
+            self.tenant.pk,
+        )
+
+        self.assertEqual((result.status, result.code), (TaskStatus.PARTIAL, "checkin.partial"))
+        self.assertEqual(dict(result.counts), {"checked_in": 1, "skipped": 0, "failed": 1})
+
+    @patch("assets.models.StatusLabel.objects.filter", side_effect=ValueError("secret-boundary"))
+    def test_boundary_failure_is_terminal_and_redacted(self, _filter):
+        job = self._job()
+
+        result = bulk_checkin_task(job.pk, [], self.tenant_admin.pk, self.tenant.pk, status_id=self.archived.pk)
+
+        job.refresh_from_db()
+        self.assertEqual((result.status, result.code), (TaskStatus.TERMINAL, "checkin.boundary_failed"))
+        self.assertEqual(job.status, Job.STATUS_FAILED)
+        self.assertNotIn("secret-boundary", job.logs)
+
+    @patch("core.tasks.checkin.Job.objects.get", side_effect=OperationalError("secret-database"))
+    def test_entry_database_failure_is_retryable_and_redacted(self, _get):
+        with self.assertLogs("core.tasks.checkin", level="ERROR") as captured:
+            result = bulk_checkin_task(17, [], self.tenant_admin.pk, self.tenant.pk)
+
+        self.assertEqual((result.status, result.code), (TaskStatus.RETRYABLE, "checkin.entry_failed"))
+        self.assertNotIn("secret-database", " ".join(captured.output))
+
 
 class BulkDisposeTaskTests(TenantTestMixin, TestCase):
     def setUp(self):
@@ -436,6 +496,83 @@ class BulkDisposeTaskTests(TenantTestMixin, TestCase):
         refreshed = AssetDisposal.objects.get(asset=self.a1)
         self.assertEqual(refreshed.disposal_method, "donation")
         self.assertEqual(refreshed.pk, original.pk)
+
+    def test_missing_and_cancelled_jobs_return_typed_outcomes(self):
+        missing = bulk_dispose_task(999999, [], self.tenant_admin.pk, self.tenant.pk)
+        cancelled_job = self._job()
+        cancelled_job.status = Job.STATUS_FAILED
+        cancelled_job.save(update_fields=["status"])
+
+        skipped = bulk_dispose_task(cancelled_job.pk, [], self.tenant_admin.pk, self.tenant.pk)
+
+        self.assertEqual((missing.status, missing.code), (TaskStatus.TERMINAL, "disposal.job_not_found"))
+        self.assertEqual((skipped.status, skipped.code), (TaskStatus.SKIPPED, "disposal.job_not_pending"))
+
+    @patch("assets.services.dispose_asset", side_effect=RuntimeError("secret-disposal-payload"))
+    def test_item_failures_are_terminal_and_redacted(self, _dispose):
+        job = self._job()
+
+        with self.assertLogs("core.tasks.disposal", level="WARNING") as captured:
+            result = bulk_dispose_task(
+                job.pk,
+                [str(self.a1.pk)],
+                self.tenant_admin.pk,
+                self.tenant.pk,
+                disposal_kwargs=self._kwargs(),
+            )
+
+        job.refresh_from_db()
+        rendered = " ".join(captured.output) + " " + job.logs
+        self.assertEqual((result.status, result.code), (TaskStatus.TERMINAL, "disposal.all_failed"))
+        self.assertEqual(dict(result.counts), {"failed": 1})
+        self.assertNotIn("secret-disposal-payload", rendered)
+
+    def test_item_failure_after_success_returns_partial(self):
+        job = self._job()
+
+        result = bulk_dispose_task(
+            job.pk,
+            [str(self.a1.pk), "999999"],
+            self.tenant_admin.pk,
+            self.tenant.pk,
+            disposal_kwargs=self._kwargs(),
+        )
+
+        self.assertEqual((result.status, result.code), (TaskStatus.PARTIAL, "disposal.partial"))
+        self.assertEqual(dict(result.counts), {"disposed": 1, "skipped": 0, "failed": 1})
+
+    @patch("core.tasks.disposal._parse_date", side_effect=ValueError("secret-date"))
+    def test_boundary_failure_returns_terminal_result(self, _parse):
+        job = self._job()
+
+        result = bulk_dispose_task(job.pk, [], self.tenant_admin.pk, self.tenant.pk, disposal_kwargs=self._kwargs())
+
+        job.refresh_from_db()
+        self.assertEqual((result.status, result.code), (TaskStatus.TERMINAL, "disposal.boundary_failed"))
+        self.assertNotIn("secret-date", job.logs)
+
+    @patch("core.tasks.disposal.Notification.objects.create", side_effect=ValueError("secret-notification"))
+    def test_boundary_notification_failure_is_redacted(self, _create):
+        job = self._job()
+
+        with self.assertLogs("core.tasks.disposal", level="ERROR") as captured:
+            result = bulk_dispose_task(
+                job.pk,
+                [str(self.a1.pk)],
+                self.tenant_admin.pk,
+                self.tenant.pk,
+                disposal_kwargs=self._kwargs(),
+            )
+
+        job.refresh_from_db()
+        self.assertEqual((result.status, result.code), (TaskStatus.TERMINAL, "disposal.entry_failed"))
+        self.assertNotIn("secret-notification", " ".join(captured.output) + " " + job.logs)
+
+    @patch("core.tasks.disposal.Job.objects.get", side_effect=OperationalError("secret-database"))
+    def test_entry_database_failure_is_retryable(self, _get):
+        result = bulk_dispose_task(17, [], self.tenant_admin.pk, self.tenant.pk)
+
+        self.assertEqual((result.status, result.code), (TaskStatus.RETRYABLE, "disposal.entry_failed"))
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -632,6 +769,92 @@ class BulkCheckoutTests(TenantTestMixin, TestCase):
         )
         self.asset.refresh_from_db()
         self.assertEqual(self.asset.status, custom)
+
+    def test_task_missing_and_cancelled_jobs_return_typed_outcomes(self):
+        missing = bulk_checkout_task(
+            999999, [], "assetholder", self.holder.pk, self.tenant_admin.pk, "", tenant_id=self.tenant.pk
+        )
+        cancelled_job = self._job()
+        cancelled_job.status = Job.STATUS_FAILED
+        cancelled_job.save(update_fields=["status"])
+
+        skipped = bulk_checkout_task(
+            cancelled_job.pk,
+            [],
+            "assetholder",
+            self.holder.pk,
+            self.tenant_admin.pk,
+            "",
+            tenant_id=self.tenant.pk,
+        )
+
+        self.assertEqual((missing.status, missing.code), (TaskStatus.TERMINAL, "checkout.job_not_found"))
+        self.assertEqual((skipped.status, skipped.code), (TaskStatus.SKIPPED, "checkout.job_not_pending"))
+
+    @patch("assets.services.checkout_asset", side_effect=RuntimeError("secret-holder secret-asset"))
+    def test_task_item_failures_are_terminal_and_redacted(self, _checkout):
+        job = self._job()
+
+        with self.assertLogs("core.tasks.checkout", level="WARNING") as captured:
+            result = bulk_checkout_task(
+                job.pk,
+                [str(self.asset.pk)],
+                "assetholder",
+                self.holder.pk,
+                self.tenant_admin.pk,
+                "",
+                tenant_id=self.tenant.pk,
+            )
+
+        job.refresh_from_db()
+        rendered = " ".join(captured.output) + " " + job.logs
+        self.assertEqual((result.status, result.code), (TaskStatus.TERMINAL, "checkout.all_failed"))
+        self.assertEqual(dict(result.counts), {"failed": 1})
+        self.assertNotIn("secret-holder", rendered)
+        self.assertNotIn("secret-asset", rendered)
+
+    def test_task_item_failure_after_success_returns_partial(self):
+        job = self._job()
+
+        result = bulk_checkout_task(
+            job.pk,
+            [str(self.asset.pk), "999999"],
+            "assetholder",
+            self.holder.pk,
+            self.tenant_admin.pk,
+            "",
+            tenant_id=self.tenant.pk,
+        )
+
+        self.assertEqual((result.status, result.code), (TaskStatus.PARTIAL, "checkout.partial"))
+        self.assertEqual(dict(result.counts), {"checked_out": 1, "failed": 1})
+
+    @patch("core.tasks.checkout.ContentType.objects.get", side_effect=ValueError("secret-target"))
+    def test_task_boundary_failure_is_terminal_and_redacted(self, _get):
+        job = self._job()
+
+        result = bulk_checkout_task(
+            job.pk,
+            [],
+            "assetholder",
+            self.holder.pk,
+            self.tenant_admin.pk,
+            "",
+            tenant_id=self.tenant.pk,
+        )
+
+        job.refresh_from_db()
+        self.assertEqual((result.status, result.code), (TaskStatus.TERMINAL, "checkout.boundary_failed"))
+        self.assertEqual(job.status, Job.STATUS_FAILED)
+        self.assertNotIn("secret-target", job.logs)
+
+    @patch("core.tasks.checkout.Job.objects.get", side_effect=OperationalError("secret-database"))
+    def test_task_entry_database_failure_is_retryable(self, _get):
+        result = bulk_checkout_task(
+            17, [], "assetholder", self.holder.pk, self.tenant_admin.pk, "", tenant_id=self.tenant.pk
+        )
+
+        self.assertEqual((result.status, result.code), (TaskStatus.RETRYABLE, "checkout.entry_failed"))
 
     # ── page ──
     def test_checkout_page_renders(self):
