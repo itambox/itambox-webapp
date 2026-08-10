@@ -11,6 +11,10 @@
   let grid: GridStackInstance | null = null;
   let gsLoaded = false;
 
+  function getCSPNonce(): string | undefined {
+    return document.querySelector('meta[name="csp-nonce"]')?.getAttribute('content') || undefined;
+  }
+
   function getCSRFToken(): string {
     return ITAMboxState.getCSRFToken();
   }
@@ -221,6 +225,7 @@
 
       let options: any = {
         chart: {
+          nonce: getCSPNonce(),
           type: chartType === "doughnut" ? "donut" : chartType,
           height: 200,
           fontFamily: 'inherit',
@@ -392,6 +397,7 @@
 
       let options: any = {
         chart: {
+          nonce: getCSPNonce(),
           type: chartFormat,
           height: 180,
           fontFamily: 'inherit',
@@ -535,6 +541,7 @@
 
       let options: any = {
         chart: {
+          nonce: getCSPNonce(),
           type: chartType === "doughnut" ? "donut" : chartType,
           height: chartType === "bar" ? Math.max(160, 30 * data.length) : 200,
           fontFamily: 'inherit',

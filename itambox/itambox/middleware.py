@@ -101,7 +101,8 @@ class CSPMiddleware:
     Adds Content-Security-Policy headers to all responses.
 
     Uses a cryptographically secure random base64 nonce for inline scripts and
-    nonce-authorized style elements. Inline style attributes are always blocked.
+    nonce-authorized style elements. Runtime style attributes are allowed for
+    bundled UI libraries; authored inline styles remain blocked by the source gate.
     """
 
     def __init__(self, get_response=None):
@@ -130,7 +131,7 @@ class CSPMiddleware:
                 f"script-src 'self' 'nonce-{nonce}'; "
                 f"style-src 'self'{style_nonce} https://rsms.me; "
                 f"style-src-elem 'self'{style_nonce} https://rsms.me; "
-                "style-src-attr 'none'; "
+                "style-src-attr 'unsafe-inline'; "
                 "img-src 'self' data:; "
                 "font-src 'self'; "
                 "media-src 'self' data:; "
@@ -146,7 +147,7 @@ class CSPMiddleware:
                 "script-src 'self'; "
                 "style-src 'self' https://rsms.me; "
                 "style-src-elem 'self' https://rsms.me; "
-                "style-src-attr 'none'; "
+                "style-src-attr 'unsafe-inline'; "
                 "img-src 'self' data:; "
                 "font-src 'self'; "
                 "media-src 'self' data:; "

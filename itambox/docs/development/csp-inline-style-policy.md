@@ -10,13 +10,17 @@ authored frontend code must not quietly reintroduce inline styles.
 
 - `style-src 'self' 'nonce-<request nonce>' https://rsms.me`
 - `style-src-elem 'self' 'nonce-<request nonce>' https://rsms.me`
-- `style-src-attr 'none'`
+- `style-src-attr 'unsafe-inline'`
 
 The nonce is request-local (`request.csp_nonce`) and is also exposed through the
 CSP context variable while the request is rendering. There is no `unsafe-inline`
-allowance. Style elements in browser HTML therefore require
+allowance in `style-src` or `style-src-elem`. Style elements in browser HTML therefore require
 `nonce="{{ request.csp_nonce }}"` (or the equivalent generated nonce), while a
-`style=` attribute is never permitted.
+`style=` attribute is permitted at runtime. This narrowly scoped exception is
+needed because HTMX and ApexCharts update element geometry through style
+attributes. Authored templates, Python emitters, and frontend DOM style writes
+remain prohibited by the blocking source gate. ApexCharts receives the request
+nonce through its `chart.nonce` option for the style elements it creates.
 
 HTMX fragments are inserted into the already loaded document, so they must reuse
 the parent document nonce. The base template publishes it in a meta element and
@@ -48,9 +52,26 @@ uv run --locked --group dev python scripts/check_inline_styles.py
 ```
 
 The same check runs as the `inline-style` CI job and as a blocking pre-commit
-hook. It fails when its inventory is empty, when it sees an inline attribute, an
+hook. It fails when its inventory is empty, when it sees an authored inline attribute, an
 un-nonced browser style element, a DOM style write, or `unsafe-inline` in
-production source.
+production source. The sole `unsafe-inline` exception is the exact
+`style-src-attr` directive in `CSPMiddleware`; the gate continues to reject it in
+`style-src` and `style-src-elem`.
+
+## Browser regression check
+
+After a CSP or bundled-library change, load each page with browser developer
+tools open and preserve the console across HTMX navigation:
+
+1. On the dashboard, confirm the Asset Status Labels donut and Asset Age
+   Distribution bar chart have normal geometry, labels, and tooltips.
+2. Open the report designer, generate a preview, and exercise its chart output.
+3. Open the global asset scanner and a bulk/audit scanner page, then start and
+   close the scanner overlay.
+4. Confirm the console contains no CSP style violations from HTMX, ApexCharts,
+   or the scanner library, and the Network panel contains no 404 requests for
+   `tabler.min.css.map`, `tabler-vendors.min.css.map`, or
+   `tom-select.bootstrap5.css.map`.
 
 ## Dynamic styles
 

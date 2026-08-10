@@ -43,10 +43,20 @@ class InlineStylePolicyTests(unittest.TestCase):
             [],
         )
 
-    def test_unsafe_inline_is_always_a_production_finding(self):
+    def test_unsafe_inline_is_a_production_finding_outside_attribute_exception(self):
         findings = scan_source("itambox/itambox/middleware.py", "style-src 'unsafe-inline'")
 
         self.assertEqual([finding.rule for finding in findings], ["CSP-STYLE1"])
+
+    def test_runtime_style_attribute_exception_is_narrow(self):
+        self.assertEqual(
+            scan_source("itambox/itambox/middleware.py", "style-src-attr 'unsafe-inline'"),
+            [],
+        )
+        source = "style-src 'unsafe-inline'; style-src-attr 'unsafe-inline'; style-src-elem 'unsafe-inline'"
+        findings = scan_source("itambox/itambox/middleware.py", source)
+
+        self.assertEqual([finding.rule for finding in findings], ["CSP-STYLE1", "CSP-STYLE1"])
 
     def test_inventory_is_gettracked_and_nonempty(self):
         self.assertTrue(tracked_source_files(Path.cwd()))
