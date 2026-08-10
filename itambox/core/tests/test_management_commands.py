@@ -103,6 +103,11 @@ class ManagementCommandsTestCase(TransactionTestCase):
 
         check_seed_access_invariants([admin, org_admin])
 
+        passwordless = User.objects.create(username="passwordless@example.com")
+        passwordless.set_unusable_password()
+        passwordless.save(update_fields=["password"])
+        check_seed_access_invariants([passwordless])
+
         named_person = User.objects.create_user(
             username="named.person@example.com",
             email="named.person@example.com",
@@ -110,6 +115,11 @@ class ManagementCommandsTestCase(TransactionTestCase):
             last_name="Person",
             password="password",
         )
+        membership = Membership._base_manager.create(user=named_person, tenant=tenant, is_active=True)
+        with pytest.raises(CommandError, match="named.person@example.com: 0 active AssetHolder profiles"):
+            check_seed_access_invariants([named_person])
+
+        membership.delete()
         AssetHolder._base_manager.create(
             tenant=tenant,
             user=named_person,
@@ -121,6 +131,9 @@ class ManagementCommandsTestCase(TransactionTestCase):
 
         with pytest.raises(CommandError, match="named.person@example.com: no active membership"):
             check_seed_access_invariants([named_person])
+
+        Membership._base_manager.create(user=named_person, tenant=tenant, is_active=True)
+        check_seed_access_invariants([named_person])
 
     def test_seed_data_refuses_to_wipe_without_force_when_not_debug(self):
         # The destructive clear must be blocked outside DEBUG unless --force is passed.
