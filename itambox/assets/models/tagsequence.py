@@ -1,5 +1,7 @@
 """AssetTagSequence — tenant-scoped auto-numbering sequences for asset tags."""
 
+import time
+
 from django.db import models
 from django.urls import reverse
 from django.utils.translation import gettext_lazy as _
@@ -94,6 +96,11 @@ class AssetTagSequence(ChangeLoggingMixin, BaseModel, SoftDeleteMixin):
         blank-tag, no-tenant assets can both take the create branch and race the
         unique_global_prefix constraint -> IntegrityError. Absorb that race by
         re-selecting the row the other writer committed.
+
+        The winner's insert may still be invisible under READ COMMITTED when the
+        race happens inside an outer ``transaction.atomic()`` block (e.g. a
+        custody accept), so the re-select retries briefly instead of raising a
+        hard 500 (hit on #306: parallel custody accepts on a fresh instance).
         """
         from django.db import IntegrityError
 
@@ -104,9 +111,22 @@ class AssetTagSequence(ChangeLoggingMixin, BaseModel, SoftDeleteMixin):
                 prefix="ASSET-",
                 defaults={"next_value": 1, "zero_padding": 6, "is_active": True},
             )
+            return seq
         except IntegrityError:
-            seq = cls.all_objects.get(tenant__isnull=True, category__isnull=True, prefix="ASSET-")
-        return seq
+            # A parallel writer won the unique_global_prefix race; re-select
+            # its row with a short bounded retry.
+            return cls._select_global_default_with_retry()
+
+    @classmethod
+    def _select_global_default_with_retry(cls):
+        """Re-select the global default row the winner of the race committed."""
+        for _attempt in range(5):
+            try:
+                return cls.all_objects.get(tenant__isnull=True, category__isnull=True, prefix="ASSET-")
+            except cls.DoesNotExist:
+                time.sleep(0.05)
+        # No row after the retry bound: surface the real DoesNotExist.
+        return cls.all_objects.get(tenant__isnull=True, category__isnull=True, prefix="ASSET-")
 
     @classmethod
     def get_next_tag_for_asset(cls, asset):
