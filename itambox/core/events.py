@@ -47,14 +47,14 @@ def delivery_log_context(operation, *, tenant_id=None, actor_id=None, request_id
     tenant = get_current_tenant()
     try:
         parsed = urlsplit(endpoint) if endpoint else None
+        if parsed is not None and parsed.hostname:
+            host = parsed.hostname
+            if parsed.port is not None:
+                host = f"{host}:{parsed.port}"
+            endpoint_log = f"{parsed.scheme}://{host}"
+        else:
+            endpoint_log = ""
     except ValueError:
-        parsed = None
-    if parsed is not None and parsed.hostname:
-        host = parsed.hostname
-        if parsed.port is not None:
-            host = f"{host}:{parsed.port}"
-        endpoint_log = f"{parsed.scheme}://{host}"
-    else:
         endpoint_log = ""
     return {
         "operation": operation,
