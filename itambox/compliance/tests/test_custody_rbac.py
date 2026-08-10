@@ -10,8 +10,6 @@ from datetime import timedelta
 from io import StringIO
 from unittest.mock import patch
 
-import pytest
-
 from django.contrib.auth import get_user_model
 from django.contrib.auth.models import Permission
 from django.contrib.contenttypes.models import ContentType
@@ -1029,54 +1027,98 @@ class CustodySigningSessionHandoffTests(CustodyRBACFixtureMixin, TestCase):
                 self.assertEqual(response.status_code, 404)
                 self._assert_body_contains(response, "custody_session_unavailable")
                 self._assert_no_receipt_payload(response, self.receipt_a)
+
     def test_consumed_session_cannot_be_reused(self):
-            self._login_to_tenant(self.recipient, self.tenant_a)
-            self.client.post(
-                self._handoff_url(),
-                {"action": "accept", "signature_canvas": DUMMY_SIGNATURE},
-            )
+        self._login_to_tenant(self.recipient, self.tenant_a)
+        self.client.post(
+            self._handoff_url(),
+            {"action": "accept", "signature_canvas": DUMMY_SIGNATURE},
+        )
 
-            response = self.client.post(
-                self._handoff_url(),
-                {"action": "accept", "signature_canvas": DUMMY_SIGNATURE},
-            )
+        response = self.client.post(
+            self._handoff_url(),
+            {"action": "accept", "signature_canvas": DUMMY_SIGNATURE},
+        )
 
-            self.assertEqual(response.status_code, 410)
-            self._assert_body_contains(response, "custody_session_expired_or_used")
-            self._assert_no_receipt_payload(response, self.receipt_a)
+        self.assertEqual(response.status_code, 410)
+        self._assert_body_contains(response, "custody_session_expired_or_used")
+        self._assert_no_receipt_payload(response, self.receipt_a)
+
+    def test_expired_session_is_neutral_410_without_mutation(self):
+        self.signing_session.expires_at = timezone.now() - timedelta(seconds=1)
+        self.signing_session.save(update_fields=["expires_at", "updated_at"])
+        self._login_to_tenant(self.recipient, self.tenant_a)
+
+        response = self.client.get(self._handoff_url())
+
+        self.assertEqual(response.status_code, 410)
+        self._assert_body_contains(response, "custody_session_expired_or_used")
+        self._assert_no_receipt_payload(response, self.receipt_a)
+        self.signing_session.refresh_from_db()
+        self.assertIsNone(self.signing_session.consumed_at)
+        self.receipt_a.refresh_from_db()
+        self.assertEqual(self.receipt_a.acceptance_status, CustodyReceipt.STATUS_PENDING)
+
     def test_session_bound_to_another_receipt_is_neutral_404(self):
-            other_session = CustodySigningSession._base_manager.create(
-                receipt=self.receipt_b,
-                operator=self.cross_tenant_user,
-                intended_holder=self.cross_holder,
-                token=DUMMY_SESSION_TOKEN_B,
-                expires_at=timezone.now() + timedelta(minutes=30),
-            )
-            self._login_to_tenant(self.recipient, self.tenant_a)
+        other_session = CustodySigningSession._base_manager.create(
+            receipt=self.receipt_b,
+            operator=self.cross_tenant_user,
+            intended_holder=self.cross_holder,
+            token=DUMMY_SESSION_TOKEN_B,
+            expires_at=timezone.now() + timedelta(minutes=30),
+        )
+        self._login_to_tenant(self.recipient, self.tenant_a)
 
-            response = self.client.get(self._handoff_url(session_token=other_session.token))
+        response = self.client.get(self._handoff_url(session_token=other_session.token))
 
-            self.assertEqual(response.status_code, 404)
-            self._assert_body_contains(response, "custody_session_unavailable")
-            self._assert_no_receipt_payload(response, self.receipt_a)
+        self.assertEqual(response.status_code, 404)
+        self._assert_body_contains(response, "custody_session_unavailable")
+        self._assert_no_receipt_payload(response, self.receipt_a)
+
     def test_cross_tenant_session_is_neutral_404(self):
-            other_session = CustodySigningSession._base_manager.create(
-                receipt=self.receipt_b,
-                operator=self.cross_tenant_user,
-                intended_holder=self.cross_holder,
-                token=DUMMY_SESSION_TOKEN_B,
-                expires_at=timezone.now() + timedelta(minutes=30),
-            )
-            self._login_to_tenant(self.cross_tenant_user, self.tenant_b)
+        other_session = CustodySigningSession._base_manager.create(
+            receipt=self.receipt_b,
+            operator=self.cross_tenant_user,
+            intended_holder=self.cross_holder,
+            token=DUMMY_SESSION_TOKEN_B,
+            expires_at=timezone.now() + timedelta(minutes=30),
+        )
+        self._login_to_tenant(self.cross_tenant_user, self.tenant_b)
 
-            response = self.client.get(self._handoff_url(session_token=other_session.token))
+        response = self.client.get(self._handoff_url(session_token=other_session.token))
 
-            self.assertEqual(response.status_code, 404)
-            self._assert_body_contains(response, "custody_session_unavailable")
-            self._assert_no_receipt_payload(response, self.receipt_a)
+        self.assertEqual(response.status_code, 404)
+        self._assert_body_contains(response, "custody_session_unavailable")
+        self._assert_no_receipt_payload(response, self.receipt_a)
 
 
+@override_settings(REQUIRE_CUSTODY_SIGNIN=True)
+class CustodySigningSessionAuditTests(CustodyRBACFixtureMixin, TestCase):
+    """A non-operator internal user sees the session audit without handoff tokens.
 
+    The creating operator is the only principal who receives the handoff link
+    (with the short-lived one-time session token); every other authorized viewer
+    sees the audit row without any session secret.
+    """
+
+    def test_internal_detail_separates_operator_recipient_and_timestamps_without_tokens(self):
+        self._login_to_tenant(self.technician, self.tenant_a)
+        self.client.post(reverse("compliance:custodyreceipt_prepare", kwargs={"pk": self.receipt_a.pk}))
+        signing_session = CustodySigningSession._base_manager.get(receipt=self.receipt_a)
+
+        self._login_to_tenant(self.tenant_admin, self.tenant_a)
+        response = self.client.get(reverse("compliance:custodyreceipt_detail", kwargs={"pk": self.receipt_a.pk}))
+
+        self.assertEqual(response.status_code, 200)
+        self._assert_body_contains(response, self.technician.username)
+        self._assert_body_contains(response, str(self.recipient_holder))
+        self._assert_body_contains(response, "Active")
+        response_body = response.content.decode("utf-8", errors="replace")
+        self.assertFalse(
+            signing_session.token in response_body,
+            "internal detail must not render a custody signing session secret for non-operators",
+        )
+        self._assert_body_not_contains(response, DUMMY_TOKEN_A)
 
 
 @override_settings(REQUIRE_CUSTODY_SIGNIN=True)
@@ -1238,34 +1280,3 @@ class CustodyReceiptExportTests(CustodyRBACFixtureMixin, TestCase):
         self.assertLess(response.status_code, 300)
         self.assertContains(response, "dummy-export-verification-hash")
         self.assertNotContains(response, DUMMY_TOKEN_A)
-
-
-class CustodySigningSessionAuditTests(CustodyRBACFixtureMixin, TestCase):
-    def test_operator_handoff_link_renders_session_token_only_as_query_parameter(self):
-        # AC §6: Audit — the handoff link is the explicitly necessary handoff (Design §5.4.2):
-        # the operator sees the session token exactly once, inside the ?session= link; the
-        # audit table itself stays token-free (non-operator view covered by
-        # test_different_operator_sees_session_audit_without_handoff_tokens).
-        self._login_to_tenant(self.technician, self.tenant_a)
-        self.client.post(reverse("compliance:custodyreceipt_prepare", kwargs={"pk": self.receipt_a.pk}))
-        signing_session = CustodySigningSession._base_manager.get(receipt=self.receipt_a)
-
-        response = self.client.get(reverse("compliance:custodyreceipt_detail", kwargs={"pk": self.receipt_a.pk}))
-
-        self.assertEqual(response.status_code, 200)
-        self._assert_body_contains(response, self.technician.username)
-        self._assert_body_contains(response, str(self.recipient_holder))
-        self._assert_body_contains(response, "Active")
-        response_body = response.content.decode("utf-8", errors="replace")
-        self.assertEqual(
-            response_body.count(signing_session.token),
-            1,
-            "session token must appear exactly once, inside the handoff link",
-        )
-        self.assertIn(f"?session={signing_session.token}", response_body)
-        self.assertEqual(
-            response_body.count(DUMMY_TOKEN_A),
-            1,
-            "receipt token must appear exactly once, inside the handoff link path",
-        )
-        self.assertIn(f"/compliance/custody/sign/{DUMMY_TOKEN_A}/", response_body)
