@@ -223,6 +223,20 @@ class CustodyReceiptViewTests(TestCase):
         self.assertNotContains(response, self.asset.name, status_code=410)
         self.assertNotContains(response, self.holder.first_name, status_code=410)
 
+    def test_sign_portal_expired_link_post_without_session(self):
+        # POST path: the link-TTL check must still apply on the unassisted
+        # path (no ?session=) after the row/session lock — covers the
+        # post-lock 410 branch (differential coverage).
+        from django.utils import timezone
+
+        CustodyReceipt.objects.filter(pk=self.receipt.pk).update(created_date=timezone.now() - timedelta(days=8))
+        url = reverse("compliance:custody_eula_sign", kwargs={"token": self.receipt.token})
+        self.client.logout()
+        with override_settings(REQUIRE_CUSTODY_SIGNIN=True):
+            response = self.client.post(url, {"action": "accept", "signature_canvas": "x"})
+        self.assertEqual(response.status_code, 410)
+        self.assertEqual(response.context["error_code"], "custody_link_expired")
+
     def test_sign_portal_redirect_when_signin_required_unauthenticated(self):
         from django.test import override_settings
 
