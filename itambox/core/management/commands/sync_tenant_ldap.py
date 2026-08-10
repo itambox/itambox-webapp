@@ -23,7 +23,7 @@ from organization.models import Membership, Role, RoleGrant, RoleGrantScope, Ten
 
 logger = logging.getLogger("django_auth_ldap")
 User = get_user_model()
-_LDAP_PROVIDER_ERROR = ldap.LDAPError
+_LDAP_PROVIDER_ERROR = getattr(ldap, "LDAPError", Exception)
 
 LDAP_GRANT_REASON = "LDAP directory synchronization"
 LDAP_PRIVILEGED_GRANT_LIFETIME = timedelta(days=1)
