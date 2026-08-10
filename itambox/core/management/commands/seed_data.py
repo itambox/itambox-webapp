@@ -31,7 +31,7 @@ from django.contrib.contenttypes.models import ContentType
 from django.core.management.base import BaseCommand
 from django.db import transaction
 
-from core.management.commands._seed.access import SeedAccessMixin
+from core.management.commands._seed.access import SeedAccessMixin, check_seed_access_invariants
 from core.management.commands._seed.assets import SeedAssetsMixin
 from core.management.commands._seed.catalog import SeedCatalogMixin
 from core.management.commands._seed.compliance import SeedComplianceMixin
@@ -49,7 +49,6 @@ from core.management.commands._seed.subscriptions import SeedSubscriptionsMixin
 
 User = get_user_model()
 
-SEED_PASSWORD = "itambox2026"
 TODAY = datetime.date.today()
 
 
@@ -116,6 +115,7 @@ class Command(
 
         if options["production"]:
             self._seed_minimal()
+            check_seed_access_invariants(())
         else:
             self._seed_all()
 
@@ -295,6 +295,7 @@ class Command(
             self._seed_compliance()  # audit sessions + custody receipts
             self._seed_export_templates()  # global Jinja export templates (no tenant/random)
             self._simulate_history()  # real 2-year change history (last)
+            check_seed_access_invariants(self._users.values())
 
     # ─────────────────────────────────────────────────────────────────
     # Catalog (shared status-label defs used by both _seed_minimal and _seed_catalog)

@@ -78,7 +78,7 @@ uv run --locked --group dev python manage.py seed_data --skip-drop
 uv run --locked --group dev python manage.py runserver
 ```
 
-Open <http://127.0.0.1:8000> and sign in as `lars.eklund` with the demo password `itambox2026`. The seed contains public credentials and sample organizations; keep it local and use it only with a disposable evaluation database. `--skip-drop` prevents the command from clearing existing records, but it still creates and updates demo data.
+Open <http://127.0.0.1:8000> and sign in as `lars.eklund` with the seed password from `ITAMBOX_SEED_PASSWORD` (default: `itambox2026`; the deployed demo uses `demopass2026`). The seed contains public credentials and sample organizations; keep it local and use it only with a disposable evaluation database. `--skip-drop` prevents the command from clearing existing records, but it still creates and updates demo data.
 
 See [CONTRIBUTING.md](CONTRIBUTING.md) for platform-specific activation commands, database setup, test prerequisites, and the complete quality gates.
 

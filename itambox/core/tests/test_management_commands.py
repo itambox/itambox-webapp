@@ -7,10 +7,11 @@ from django.contrib.auth import get_user_model
 from django.core.management import CommandError, call_command
 from django.test import SimpleTestCase, TransactionTestCase, override_settings
 
+from core.management.commands._seed.access import check_seed_access_invariants
 from core.management.commands.sync_tenant_ldap import Command as SyncTenantLDAPCommand
 from core.models import EmailSettings, Job
 from licenses.models import License
-from organization.models import Tenant
+from organization.models import AssetHolder, Membership, Tenant
 from subscriptions.models import SubscriptionAssignment
 
 User = get_user_model()
@@ -54,7 +55,8 @@ class ManagementCommandsTestCase(TransactionTestCase):
         self.assertIn("Database seeding complete", self.stdout.getvalue())
 
     def test_full_seed_data_keeps_subscription_assignments_within_tenant(self):
-        call_command("seed_data", force=True, stdout=self.stdout, stderr=self.stderr)
+        with override_settings(SEED_PASSWORD="configured-seed-password"):
+            call_command("seed_data", force=True, stdout=self.stdout, stderr=self.stderr)
 
         assignments = list(SubscriptionAssignment._base_manager.select_related("subscription"))
         self.assertGreater(len(assignments), 0)
@@ -62,6 +64,53 @@ class ManagementCommandsTestCase(TransactionTestCase):
             target = assignment._resolve_assigned_object_unscoped()
             self.assertIsNotNone(target)
             self.assertEqual(target.tenant_id, assignment.subscription.tenant_id)
+
+        lars = User.objects.get(username="lars.eklund")
+        self.assertTrue(lars.check_password("configured-seed-password"))
+        check_seed_access_invariants()
+
+        seeded_people = User.objects.exclude(username="admin").exclude(username__startswith="admin@")
+        self.assertGreater(seeded_people.count(), 0)
+        for user in seeded_people:
+            self.assertTrue(user.has_usable_password())
+            memberships = Membership._base_manager.filter(user=user, is_active=True)
+            holders = AssetHolder._base_manager.filter(user=user, deleted_at__isnull=True)
+            self.assertEqual(memberships.count(), 1, user.username)
+            self.assertEqual(holders.count(), 1, user.username)
+            self.assertEqual(holders.get().tenant_id, memberships.get().tenant_id, user.username)
+
+        admin_accounts = User.objects.filter(username="admin") | User.objects.filter(username__startswith="admin@")
+        self.assertGreater(admin_accounts.count(), 0)
+        for user in admin_accounts:
+            self.assertFalse(
+                AssetHolder._base_manager.filter(user=user, deleted_at__isnull=True).exists(),
+                user.username,
+            )
+
+    def test_seed_access_invariant_fails_closed_and_exempts_admin_accounts(self):
+        tenant = Tenant.objects.create(name="Seed Invariant Tenant", slug="seed-invariant-tenant")
+        admin = User.objects.create_user(username="admin", password="password")
+        org_admin = User.objects.create_user(username="admin@example.com", password="password")
+        check_seed_access_invariants([admin, org_admin])
+
+        named_person = User.objects.create_user(
+            username="named.person@example.com",
+            email="named.person@example.com",
+            first_name="Named",
+            last_name="Person",
+            password="password",
+        )
+        AssetHolder._base_manager.create(
+            tenant=tenant,
+            user=named_person,
+            first_name="Named",
+            last_name="Person",
+            upn=named_person.username,
+            email=named_person.email,
+        )
+
+        with pytest.raises(CommandError, match="named.person@example.com: no active membership"):
+            check_seed_access_invariants([named_person])
 
     def test_seed_data_refuses_to_wipe_without_force_when_not_debug(self):
         # The destructive clear must be blocked outside DEBUG unless --force is passed.

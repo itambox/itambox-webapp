@@ -3236,14 +3236,6 @@
       "count": 1
     },
     {
-      "path": "itambox/core/management/commands/_seed/access.py",
-      "code": "C901",
-      "message": "'SeedAccessMixin._seed_access' is too complex (30)",
-      "source": "    def _seed_access(self):",
-      "context": "Module:body/ClassDef:SeedAccessMixin:body/FunctionDef:_seed_access:self",
-      "count": 1
-    },
-    {
       "path": "itambox/core/management/commands/_seed/assets.py",
       "code": "B007",
       "message": "Loop control variable 'tenant' not used within the loop body. If this is intended, start the name with an underscore.",
@@ -4944,14 +4936,6 @@
       "code": "F401",
       "message": "'core.models.EmailSettings' imported but unused",
       "source": "from core.models import EmailSettings, Job",
-      "context": "Module:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/core/tests/test_management_commands.py",
-      "code": "F401",
-      "message": "'organization.models.Tenant' imported but unused",
-      "source": "from organization.models import Tenant",
       "context": "Module:body",
       "count": 1
     },
