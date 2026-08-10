@@ -79,6 +79,14 @@ class ManagementCommandsTestCase(TransactionTestCase):
             self.assertEqual(holders.count(), 1, user.username)
             self.assertEqual(holders.get().tenant_id, memberships.get().tenant_id, user.username)
 
+        admin_accounts = User.objects.filter(username="admin") | User.objects.filter(username__startswith="admin@")
+        self.assertGreater(admin_accounts.count(), 0)
+        for user in admin_accounts:
+            self.assertFalse(
+                AssetHolder._base_manager.filter(user=user, deleted_at__isnull=True).exists(),
+                user.username,
+            )
+
     def test_seed_access_invariant_fails_closed_and_exempts_admin_accounts(self):
         tenant = Tenant.objects.create(name="Seed Invariant Tenant", slug="seed-invariant-tenant")
         admin = User.objects.create_user(username="admin", password="password")

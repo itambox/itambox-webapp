@@ -22,6 +22,7 @@ managed tenants, never a second membership.
 
 import random
 from datetime import timedelta
+from functools import partial
 
 from django.apps import apps
 from django.conf import settings
@@ -154,74 +155,151 @@ def check_seed_access_invariants(users=None):
         raise CommandError("Seed access invariant failed: " + "; ".join(violations))
 
 
+def _grant_access(
+    user,
+    tenant,
+    role,
+    *,
+    seed_grant_expiry,
+    granted_by=None,
+    scope_type=None,
+    scoped_tenants=None,
+    reason="",
+):
+    """Create a membership-backed grant and its requested additive scopes."""
+    Membership = apps.get_model("organization", "Membership")
+    RoleGrant = apps.get_model("organization", "RoleGrant")
+    RoleGrantScope = apps.get_model("organization", "RoleGrantScope")
+    scope_type = scope_type or RoleGrantScope.SCOPE_OWN
+    membership, _ = Membership.objects.get_or_create(user=user, tenant=tenant)
+    privileged = role_is_privileged(role)
+    if privileged and not reason.strip():
+        raise ValueError(f"Privileged seed grant {role} requires a reason.")
+
+    role_grant = RoleGrant.objects.filter(membership=membership, role=role).order_by("pk").first()
+    if role_grant is None:
+        role_grant = RoleGrant(
+            membership=membership,
+            role=role,
+            granted_by=granted_by,
+            reason=reason,
+            valid_until=seed_grant_expiry if privileged else None,
+        )
+        role_grant.full_clean()
+        role_grant.save()
+    elif privileged:
+        role_grant.granted_by = granted_by
+        role_grant.reason = reason
+        role_grant.valid_until = seed_grant_expiry
+        role_grant.full_clean()
+        role_grant.save(update_fields=["granted_by", "reason", "valid_until"])
+
+    if scope_type == RoleGrantScope.SCOPE_TENANT:
+        if not scoped_tenants:
+            raise ValueError("A tenant-scoped seed grant requires at least one tenant.")
+        scope_specs = [{"scope_type": scope_type, "tenant": scoped_tenant} for scoped_tenant in scoped_tenants]
+    else:
+        scope_specs = [{"scope_type": scope_type}]
+
+    for scope_spec in scope_specs:
+        if RoleGrantScope.objects.filter(role_grant=role_grant, **scope_spec).exists():
+            continue
+        scope = RoleGrantScope(role_grant=role_grant, **scope_spec)
+        scope.full_clean()
+        scope.save()
+    return role_grant
+
+
 class SeedAccessMixin:
     """Mixin for Command(BaseCommand).  Reads/writes self._ registries."""
+
+    def _seed_customer_admins(self, grant):
+        """Seed technical customer-admin accounts without holder profiles."""
+        customer_admins = 0
+        for org in self._orgs:
+            if org["kind"] != "customer":
+                continue
+            domain = org["domain"]
+            label = org["group"][0] if org["group"] else org["tenants"][0]["name"]
+            username = f"admin@{domain}"
+            user, created = User.objects.get_or_create(
+                username=username,
+                defaults={
+                    "email": username,
+                    "first_name": "IT",
+                    "last_name": f"Admin ({label})",
+                    "is_staff": False,
+                    "is_superuser": False,
+                },
+            )
+            if created:
+                user.set_password(settings.SEED_PASSWORD)
+                user.save()
+            self._users[username] = user
+            customer_admins += 1
+            for tenant_spec in org["tenants"]:
+                slug = tenant_spec["slug"]
+                grant(
+                    user,
+                    self._tenants[slug],
+                    self._roles[(slug, "Administrator")],
+                    granted_by=self._provisioner,
+                    reason="Demo seed: customer administrator access.",
+                )
+
+        return customer_admins
+
+    def _seed_named_customer_users(self, grant):
+        """Seed customer logins backed by existing holder profiles."""
+        # Per tenant, promote one existing holder to Asset Manager and a few
+        # more to Read-Only. They log in with their own holder identity.
+        team_leads = 0
+        end_users = 0
+        for slug, tenant in self._tenants.items():
+            if self._tenant_meta[slug]["kind"] == "msp":
+                continue
+            holders = [holder for holder in self._tenant_holders.get(slug, []) if holder.user_id is None]
+            if not holders:
+                continue
+            scoped_logins = [(holders[0], "Asset Manager")]
+            scoped_logins.extend((holder, "Read-Only") for holder in holders[1 : 1 + random.randint(2, 3)])
+            for holder, role_name in scoped_logins:
+                username = holder.upn
+                user, created = User.objects.get_or_create(
+                    username=username,
+                    defaults={
+                        "email": holder.email or username,
+                        "first_name": holder.first_name,
+                        "last_name": holder.last_name,
+                        "is_staff": False,
+                        "is_superuser": False,
+                    },
+                )
+                if created:
+                    user.set_password(settings.SEED_PASSWORD)
+                    user.save()
+                self._users[username] = user
+                _ensure_holder(user, tenant)
+                grant(
+                    user,
+                    tenant,
+                    self._roles[(slug, role_name)],
+                    granted_by=self._provisioner,
+                    reason=f"Demo seed: {role_name} access for a customer user.",
+                )
+                if role_name == "Asset Manager":
+                    team_leads += 1
+                else:
+                    end_users += 1
+
+        return team_leads, end_users
 
     def _seed_access(self):
         from organization.models import Membership, Role, RoleGrant, RoleGrantScope
 
         self.stdout.write("--- Access: users, roles, role grants ---")
         seed_grant_expiry = timezone.now() + timedelta(days=3650)
-
-        def grant(
-            user,
-            tenant,
-            role,
-            *,
-            granted_by=None,
-            scope_type=RoleGrantScope.SCOPE_OWN,
-            scoped_tenants=None,
-            reason="",
-        ):
-            """Create a membership-backed grant and its requested additive scopes."""
-            membership, _ = Membership.objects.get_or_create(user=user, tenant=tenant)
-            privileged = role_is_privileged(role)
-            if privileged and not reason.strip():
-                raise ValueError(f"Privileged seed grant {role} requires a reason.")
-
-            role_grant = (
-                RoleGrant.objects.filter(
-                    membership=membership,
-                    role=role,
-                )
-                .order_by("pk")
-                .first()
-            )
-            if role_grant is None:
-                role_grant = RoleGrant(
-                    membership=membership,
-                    role=role,
-                    granted_by=granted_by,
-                    reason=reason,
-                    valid_until=seed_grant_expiry if privileged else None,
-                )
-                role_grant.full_clean()
-                role_grant.save()
-            elif privileged:
-                # ``--skip-drop`` refreshes seeded elevated grants to an
-                # explicitly justified, future-dated state.
-                role_grant.granted_by = granted_by
-                role_grant.reason = reason
-                role_grant.valid_until = seed_grant_expiry
-                role_grant.full_clean()
-                role_grant.save(update_fields=["granted_by", "reason", "valid_until"])
-
-            if scope_type == RoleGrantScope.SCOPE_TENANT:
-                if not scoped_tenants:
-                    raise ValueError("A tenant-scoped seed grant requires at least one tenant.")
-                scope_specs = [
-                    {"scope_type": scope_type, "tenant": scoped_tenant} for scoped_tenant in (scoped_tenants or ())
-                ]
-            else:
-                scope_specs = [{"scope_type": scope_type}]
-
-            for scope_spec in scope_specs:
-                if RoleGrantScope.objects.filter(role_grant=role_grant, **scope_spec).exists():
-                    continue
-                scope = RoleGrantScope(role_grant=role_grant, **scope_spec)
-                scope.full_clean()
-                scope.save()
-            return role_grant
+        grant = partial(_grant_access, seed_grant_expiry=seed_grant_expiry)
 
         # Build permission catalogs from Django's permission table.
         all_perms = [
@@ -365,90 +443,8 @@ class SeedAccessMixin:
             self._engineer_users = list(self._users.values())
         self._provisioner = self._engineer_users[0]
 
-        # One customer-admin login per customer org, scoped to their own tenants.
-        customer_admins = 0
-        for org in self._orgs:
-            if org["kind"] != "customer":
-                continue
-            domain = org["domain"]
-            label = org["group"][0] if org["group"] else org["tenants"][0]["name"]
-            username = f"admin@{domain}"
-            user, created = User.objects.get_or_create(
-                username=username,
-                defaults={
-                    "email": username,
-                    "first_name": "IT",
-                    "last_name": f"Admin ({label})",
-                    "is_staff": False,
-                    "is_superuser": False,
-                },
-            )
-            if created:
-                user.set_password(settings.SEED_PASSWORD)
-                user.save()
-            self._users[username] = user
-            customer_admins += 1
-            for t in org["tenants"]:
-                slug = t["slug"]
-                grant(
-                    user,
-                    self._tenants[slug],
-                    self._roles[(slug, "Administrator")],
-                    granted_by=self._provisioner,
-                    reason="Demo seed: customer administrator access.",
-                )
-                # Link this login to a holder profile in their first tenant.
-                holders = self._tenant_holders.get(slug, [])
-                if holders and holders[0].user_id is None:
-                    holders[0].user = user
-                    holders[0].save(update_fields=["user"])
-
-        # Realistic permission spread: the vast majority of customer logins are NOT
-        # admins. Per tenant we promote one existing holder to a single-tenant
-        # "Asset Manager" (team lead) and a few more to single-tenant "Read-Only"
-        # (self-service end users). They log in with their own holder identity.
-        team_leads = 0
-        end_users = 0
-        for slug, tenant in self._tenants.items():
-            if self._tenant_meta[slug]["kind"] == "msp":
-                continue  # MSP staff are handled above
-            holders = [h for h in self._tenant_holders.get(slug, []) if h.user_id is None]
-            if not holders:
-                continue
-            # 1 team lead (Asset Manager), scoped to this tenant only.
-            lead = holders[0]
-            scoped_logins = [(lead, "Asset Manager")]
-            # 2-3 read-only self-service users, scoped to this tenant only.
-            for h in holders[1 : 1 + random.randint(2, 3)]:
-                scoped_logins.append((h, "Read-Only"))
-            for holder, role_name in scoped_logins:
-                username = holder.upn  # email-style UPN as the login
-                user, created = User.objects.get_or_create(
-                    username=username,
-                    defaults={
-                        "email": holder.email or username,
-                        "first_name": holder.first_name,
-                        "last_name": holder.last_name,
-                        "is_staff": False,
-                        "is_superuser": False,
-                    },
-                )
-                if created:
-                    user.set_password(settings.SEED_PASSWORD)
-                    user.save()
-                self._users[username] = user
-                holder = _ensure_holder(user, tenant)
-                grant(
-                    user,
-                    tenant,
-                    self._roles[(slug, role_name)],
-                    granted_by=self._provisioner,
-                    reason=f"Demo seed: {role_name} access for a customer user.",
-                )
-                if role_name == "Asset Manager":
-                    team_leads += 1
-                else:
-                    end_users += 1
+        customer_admins = self._seed_customer_admins(grant)
+        team_leads, end_users = self._seed_named_customer_users(grant)
 
         managed_count = sum(1 for t in self._tenants.values() if t.managed_by_id == msp_tenant.pk)
         staff_reach = (
