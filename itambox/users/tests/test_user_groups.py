@@ -24,7 +24,7 @@ from organization.rbac import accessible_tenant_ids, effective_permissions
 from users.filters import UserGroupFilterSet
 from users.forms import GroupManagedRoleGrantForm, UserGroupForm
 from users.models import GroupMembership, UserGroup
-from users.views import _user_scope_tenant_ids
+from users.views import UserBulkEditView, UserListView, _user_scope_tenant_ids
 
 User = get_user_model()
 
@@ -213,6 +213,59 @@ class GroupResolverTests(TestCase):
         set_current_tenant_group(None)
         set_current_all_accessible(False)
         super().tearDown()
+
+    def test_user_list_and_bulk_edit_querysets_honor_workspace_scopes(self):
+        from django.test import RequestFactory
+
+        customer_agent = make_user("customer_agent")
+        Membership.objects.create(user=customer_agent, tenant=self.customer_a)
+        make_group_grant(
+            self.group,
+            self.role,
+            (RoleGrantScope.SCOPE_TENANT, self.customer_a),
+        )
+
+        request = RequestFactory().get(reverse("users:user_list"))
+        request.user = self.user
+
+        list_view = UserListView()
+        list_view.request = request
+        list_view.kwargs = {}
+
+        bulk_view = UserBulkEditView()
+        bulk_view.request = request
+
+        def list_usernames():
+            return set(list_view.get_queryset().values_list("username", flat=True))
+
+        def bulk_usernames():
+            return set(
+                bulk_view._get_queryset([customer_agent.pk, self.user.pk]).values_list(
+                    "username", flat=True
+                )
+            )
+
+        # Single tenant: only members of that tenant.
+        set_current_tenant(self.customer_a)
+        self.assertEqual(list_usernames(), {"customer_agent"})
+        self.assertEqual(bulk_usernames(), {"customer_agent"})
+
+        # Tenant group: members of accessible tenants in the group subtree.
+        set_current_tenant(None)
+        set_current_tenant_group(self.root_group)
+        self.assertEqual(list_usernames(), {"customer_agent"})
+        self.assertEqual(bulk_usernames(), {"customer_agent"})
+
+        # All accessible tenants: members of every accessible tenant.
+        set_current_tenant_group(None)
+        set_current_all_accessible(True)
+        self.assertEqual(list_usernames(), {"customer_agent", "technician"})
+        self.assertEqual(bulk_usernames(), {"customer_agent", "technician"})
+
+        # No scope: fail closed to an empty list.
+        set_current_all_accessible(False)
+        self.assertEqual(list_usernames(), set())
+        self.assertEqual(bulk_usernames(), set())
 
     def test_inactive_membership_and_group_are_both_inert(self):
         make_group_grant(
