@@ -1118,6 +1118,7 @@ class CustodyReceiptExportTests(CustodyRBACFixtureMixin, TestCase):
             first_response["Content-Disposition"],
             f'attachment; filename="custody-receipt-{self.receipt_a.pk}.json"',
         )
+        self.assertEqual(first_response["Cache-Control"], "no-store")
         self.assertEqual(first_response["X-Content-Type-Options"], "nosniff")
         payload = json.loads(first_response.content)
         self.assertEqual(payload["format"], "itambox.custody-receipt")

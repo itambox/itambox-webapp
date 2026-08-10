@@ -635,6 +635,7 @@ class CustodyReceiptExportView(InternalCustodyPermissionMixin, ObjectDetailView)
         content = json.dumps(payload, ensure_ascii=True, separators=(",", ":"), sort_keys=True) + "\n"
         response = HttpResponse(content, content_type="application/json; charset=utf-8")
         response["Content-Disposition"] = f'attachment; filename="custody-receipt-{receipt.pk}.json"'
+        response["Cache-Control"] = "no-store"
         response["X-Content-Type-Options"] = "nosniff"
         return response
 
