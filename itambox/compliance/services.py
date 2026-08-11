@@ -143,6 +143,7 @@ def _holder_language(holder):
     if holder.user_id:
         try:
             stored_language = (holder.user.preferences.data or {}).get("language")
+        # broad except: availability-tradeoff: a preferences lookup failure falls back to the default language
         except Exception:
             stored_language = None
         if stored_language in dict(settings.LANGUAGES):
@@ -212,6 +213,7 @@ def _cooldown_allows_handoff(request, receipt):
     key = f"custody-handoff-email:{receipt.asset.tenant_id}:{request.user.pk}:{receipt.pk}"
     try:
         return caches[alias].add(key, True, CUSTODY_HANDOFF_COOLDOWN_SECONDS)
+    # broad except: availability-tradeoff: a cache failure fails open so handoff e-mail is not blocked
     except Exception:
         return True
 
@@ -321,6 +323,7 @@ def send_custody_handoff_email(request, receipt, signing_session):
     )
     try:
         result = send_email_notification([receipt.holder.email], subject, body, tenant_id=receipt.asset.tenant_id)
+    # broad except: boundary-isolation: an e-mail integration failure is classified as a retryable delivery outcome
     except Exception as exc:
         result = DeliveryResult(
             "email.deliver",

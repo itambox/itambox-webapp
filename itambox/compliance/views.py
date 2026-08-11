@@ -723,6 +723,7 @@ class CustodyReceiptPdfExportView(InternalCustodyPermissionMixin, ObjectDetailVi
         )
         try:
             pdf_bytes = report_pdf_bytes(rendered_html)
+        # broad except: render-degrade: a renderer failure degrades the export to an error page instead of a crash
         except Exception as exc:
             logger.error(
                 "custody_receipt_pdf_render_failed receipt_id=%s tenant_id=%s actor_id=%s request_id=%s "
