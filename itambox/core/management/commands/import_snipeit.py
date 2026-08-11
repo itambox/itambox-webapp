@@ -24,6 +24,9 @@ from django.contrib.auth import get_user_model
 from django.core.management.base import BaseCommand, CommandError
 from django.utils import timezone
 
+from assets.choices import StatusTypeChoices
+from assets.models.choices import WarrantyTypeChoices
+from assets.services import checkout_asset
 from core.errors import IntegrationContext
 from inventory.services import checkout_inventory_item, create_component_allocation
 
@@ -214,6 +217,9 @@ class Command(BaseCommand):
                 # inventory domain services so the importer itself does not.
                 checkout_inventory_item=checkout_inventory_item,
                 create_component_allocation=create_component_allocation,
+                checkout_asset=checkout_asset,
+                deployed_status_type=StatusTypeChoices.DEPLOYED,
+                warranty_type=WarrantyTypeChoices.HARDWARE,
             )
             try:
                 counts = importer.run()
@@ -229,6 +235,7 @@ class Command(BaseCommand):
                 if job:
                     job.mark_failed(msg)
                 sys.exit(1)
+            stage_results = importer.stage_results
 
         elapsed = (timezone.now() - started).total_seconds()
 
@@ -239,12 +246,14 @@ class Command(BaseCommand):
 
         total_created = total_updated = total_failed = 0
         for entity, stats in counts.items():
+            warning_count = stage_results[entity].warning_count
             self.stdout.write(
                 f"  {entity:20s}  "
                 f"created={stats['created']:4d}  "
                 f"updated={stats['updated']:4d}  "
                 f"skipped={stats['skipped']:4d}  "
-                f"failed={stats['failed']:4d}"
+                f"failed={stats['failed']:4d}  "
+                f"warnings={warning_count:4d}"
             )
             total_created += stats["created"]
             total_updated += stats["updated"]
@@ -262,5 +271,7 @@ class Command(BaseCommand):
                     "total_failed": total_failed,
                     "elapsed_seconds": elapsed,
                     "counts": counts,
+                    "warning_counts": {key: result.warning_count for key, result in stage_results.items()},
+                    "total_warnings": sum(result.warning_count for result in stage_results.values()),
                 }
             )

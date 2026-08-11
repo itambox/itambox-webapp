@@ -4,13 +4,22 @@
   "coverage_series": "7.15",
   "policy_sha256": "d361fd8b3ad72413b002fabc4612c7646ef74b2bc39a07ef07c4884f47551845",
   "totals": {
-    "num_statements": 43174,
-    "covered_lines": 37123,
-    "line_rate": 85.98,
-    "num_branches": 11220,
-    "covered_branches": 7775,
-    "branch_rate": 69.3,
-    "excluded_lines": 32,
-    "measured_files": 493
+    "num_statements": 43836,
+    "covered_lines": 38102,
+    "line_rate": 86.92,
+    "num_branches": 11302,
+    "covered_branches": 7972,
+    "branch_rate": 70.54,
+    "excluded_lines": 37,
+    "measured_files": 506
+  },
+  "decline_justification": {
+    "reason": "5 new excluded lines in core/importers/snipeit/contracts.py: 2 for the TYPE_CHECKING import-time-only block (repo-sanctioned exclude pattern) and 3 for the ImportStage protocol ellipsis stub (coverage.py default exclusion); no runtime behaviour hidden",
+    "previous_line_rate": 85.98,
+    "previous_branch_rate": 69.3,
+    "previous_excluded_lines": 32,
+    "previous_measured_files": 493,
+    "previous_num_statements": 43174,
+    "previous_num_branches": 11220
   }
 }

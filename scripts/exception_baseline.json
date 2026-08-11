@@ -180,22 +180,6 @@
       "count": 1
     },
     {
-      "path": "itambox/core/importers/snipeit.py",
-      "scope": "ClassDef:SnipeITImporter/FunctionDef:_import_hardware",
-      "handler_type": "(TypeError, ValueError)",
-      "classification": "pass-only",
-      "body_sha256": "5c04595997820c90159baeb6d4411d9a479f4dc26f1ac532dd740dcb011f3e23",
-      "count": 1
-    },
-    {
-      "path": "itambox/core/importers/snipeit.py",
-      "scope": "FunctionDef:_parse_date",
-      "handler_type": "(TypeError, ValueError)",
-      "classification": "pass-only",
-      "body_sha256": "5c04595997820c90159baeb6d4411d9a479f4dc26f1ac532dd740dcb011f3e23",
-      "count": 1
-    },
-    {
       "path": "itambox/core/management/commands/_seed/engine.py",
       "scope": "ClassDef:ChangeLogEngine/FunctionDef:_tenant_of",
       "handler_type": "Exception",
