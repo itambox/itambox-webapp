@@ -132,6 +132,7 @@
       <p>
         {% blocktranslate with expires=custody_handoff_expires_at|date:"Y-m-d H:i:s T" %}This one-time handoff expires at {{ expires }}. Copy the link and send it to the intended holder — it only works in their account.{% endblocktranslate %}
       </p>
+      <div class="d-flex flex-wrap gap-2 mt-2">
       <button type="button"
               class="btn btn-info"
               data-copy-value="{{ custody_handoff_url }}"
@@ -167,8 +168,9 @@
           <i class="mdi mdi-email-off-outline me-1"></i>
           {% translate "E-mail link to holder" %}
         </button>
-        <span class="text-secondary ms-2">{{ custody_handoff_email_disabled_reason }}</span>
+        <span class="text-secondary align-self-center">{{ custody_handoff_email_disabled_reason }}</span>
       {% endif %}
+      </div>
       <div id="custody-handoff-qr-{{ object.pk }}" class="collapse mt-3">
         <figure class="mb-0">
           <img src="{{ custody_handoff_qr_url }}"

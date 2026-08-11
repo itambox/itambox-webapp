@@ -204,3 +204,28 @@
     { passive: true },
   );
 })();
+
+/**
+ * ITAMbox Bootstrap component rebind after HTMX content swaps.
+ *
+ * Boosted navigations replace the body content; Bootstrap's data-API binds
+ * toggles at initial load, so elements swapped in later (e.g. the custody
+ * handoff QR collapse on the receipt detail page) would otherwise ignore
+ * clicks. htmx.onLoad runs for every newly swapped fragment, so this is the
+ * safe place to (re)create component instances without double-binding.
+ */
+(function () {
+  if (typeof htmx === 'undefined' || typeof bootstrap === 'undefined') return;
+  htmx.onLoad(function (content: HTMLElement) {
+    content.querySelectorAll<HTMLElement>('[data-bs-toggle="collapse"]').forEach(function (el) {
+      if (typeof bootstrap.Collapse !== 'undefined') {
+        bootstrap.Collapse.getOrCreateInstance(el);
+      }
+    });
+    content.querySelectorAll<HTMLElement>('[data-bs-toggle="dropdown"]').forEach(function (el) {
+      if (typeof bootstrap.Dropdown !== 'undefined') {
+        bootstrap.Dropdown.getOrCreateInstance(el);
+      }
+    });
+  });
+})();
