@@ -30,7 +30,7 @@
     "cssnano": "^8.0.4",
     "esbuild": "^0.28.1",
     "eslint": "^10.8.0",
-    "globals": "^17.7.0",
+    "globals": "^17.9.0",
     "openapi-fetch": "0.17.0",
     "openapi-typescript": "6.7.6",
     "postcss": "^8.5.23",
