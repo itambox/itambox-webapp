@@ -9,6 +9,7 @@ import json
 from concurrent.futures import ThreadPoolExecutor
 from contextlib import nullcontext
 from datetime import timedelta
+from html.parser import HTMLParser
 from io import StringIO
 from unittest.mock import patch
 
@@ -943,6 +944,46 @@ class CustodySigningSessionPrepareTests(CustodyRBACFixtureMixin, TestCase):
         self.assertFalse(CustodySigningSession._base_manager.filter(receipt=self.receipt_a).exists())
 
 
+class _HandoffPanelParser(HTMLParser):
+    """Extract mobile-safety facts from the real handoff panel markup."""
+
+    def __init__(self):
+        super().__init__()
+        self.action_row_depth = 0
+        self.reason_in_row = False
+        self.panel_seen = False
+        self.figure_mx0 = False
+        self.img = {}
+
+    def handle_starttag(self, tag, attrs):
+        attributes = dict(attrs)
+        classes = set(attributes.get("class", "").split())
+        if tag == "div" and "d-flex" in classes and "flex-wrap" in classes:
+            self.action_row_depth = 1
+        elif self.action_row_depth:
+            self.action_row_depth += 1
+        if tag == "div" and attributes.get("id", "").startswith("custody-handoff-qr-"):
+            self.panel_seen = True
+        if tag == "figure" and "mx-0" in classes:
+            self.figure_mx0 = True
+        if tag == "img":
+            img_classes = set(attributes.get("class", "").split())
+            self.img = {
+                "img-fluid": "img-fluid" in img_classes,
+                "qr-class": "custody-handoff-qr" in img_classes,
+                "width": attributes.get("width"),
+                "height": attributes.get("height"),
+            }
+
+    def handle_endtag(self, tag):
+        if self.action_row_depth:
+            self.action_row_depth -= 1
+
+    def handle_data(self, data):
+        if self.action_row_depth and "E-mail is not configured" in data:
+            self.reason_in_row = True
+
+
 @override_settings(REQUIRE_CUSTODY_SIGNIN=True)
 class CustodySigningSessionHandoffTests(CustodyRBACFixtureMixin, TestCase):
     def setUp(self):
@@ -1058,6 +1099,13 @@ class CustodySigningSessionHandoffTests(CustodyRBACFixtureMixin, TestCase):
         self.assertEqual(response["Content-Security-Policy"], "default-src 'none'")
         self.assertTrue(body.startswith(b"<svg"))
         self.assertIn(b"<path", body)
+        # Regression: the SVG must ship its own opaque quiet zone so the
+        # symbol stays decodable under [data-bs-theme="dark"] and WebView
+        # algorithmic darkening (black-on-transparent was invisible there).
+        # segno normalises the CUSTODY_HANDOFF_QR_DARK/LIGHT hex constants
+        # (#000000/#ffffff) to their short forms in the emitted markup.
+        self.assertIn(b"#000", body)
+        self.assertIn(b"#fff", body)
         self.assertNotIn(DUMMY_TOKEN_A.encode(), body)
         self.assertNotIn(DUMMY_SESSION_TOKEN.encode(), body)
         self.assertNotIn(b"<script", body.lower())
@@ -1512,6 +1560,32 @@ class CustodySigningSessionHandoffTests(CustodyRBACFixtureMixin, TestCase):
         self.assertEqual(response.status_code, 404)
         self._assert_body_contains(response, "custody_session_unavailable")
         self._assert_no_receipt_payload(response, self.receipt_a)
+
+    def test_internal_detail_handoff_qr_panel_is_mobile_safe(self):
+        """Regression (mobile WebView findings 2026-08-10/11): with e-mail
+        delivery disabled the reason sentence must NOT live inside the flex
+        button row (it interleaved with wrapped buttons on narrow viewports),
+        the QR collapse panel must be a sibling AFTER the row, the figure must
+        carry the mobile-safe margin/centering hooks, and the img must keep
+        its intrinsic square size contract plus the theme-safe CSS hook."""
+        with patch("compliance.views.custody_handoff_email_is_configured", return_value=False):
+            self._login_operator()
+            response = self.client.get(reverse("compliance:custodyreceipt_detail", kwargs={"pk": self.receipt_a.pk}))
+
+        parser = _HandoffPanelParser()
+        parser.feed(response.content.decode())
+        parser.close()
+
+        self.assertFalse(parser.reason_in_row, "disabled-reason text must not live inside the flex button row")
+        self.assertTrue(parser.panel_seen, "QR collapse panel must be present after the button row")
+        self.assertTrue(parser.figure_mx0, "figure must carry mx-0 so the UA 40px side margins do not crush it")
+        self.assertTrue(parser.img.get("img-fluid"), "img must stay responsive")
+        self.assertTrue(parser.img.get("qr-class"), "img must keep the theme-safe .custody-handoff-qr hook")
+        # Intrinsic-size contract: the module-count-derived dimensions are
+        # square; the exact pixel value depends on the handoff URL length, so
+        # pin the shape rather than re-deriving the URL here.
+        self.assertIsNotNone(parser.img.get("width"))
+        self.assertEqual(parser.img.get("width"), parser.img.get("height"))
 
 
 @override_settings(REQUIRE_CUSTODY_SIGNIN=True)

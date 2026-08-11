@@ -700,3 +700,21 @@ $badge-colors: ('primary', 'secondary', 'success', 'info', 'warning', 'danger',
 .stock-adjust-quantity {
     font-size: 0.85rem;
 }
+
+// ---- Custody handoff QR ----
+// The SVG ships its own opaque light background (compliance/services.py) so it
+// decodes identically in both themes. These rules only make that white block
+// read as an intentional card, and stop UA-level darkening from re-inverting
+// it (WebView forced-dark, Windows High Contrast).
+.custody-handoff-qr {
+    max-width: 100%;
+    height: auto;
+    padding: 0.5rem;
+    background-color: #fff;
+    border-radius: var(--tblr-border-radius, 0.25rem);
+    forced-color-adjust: none;
+}
+
+.custody-handoff-qr-figure {
+    margin-inline: 0; // UA stylesheet gives <figure> 40px side margins
+}
