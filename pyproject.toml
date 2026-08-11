@@ -40,7 +40,7 @@ dependencies = [
     "gunicorn>=26.0.0,<27.0",
     "whitenoise>=6.6,<7.0",
     "psycopg2-binary>=2.9.12,<3.0",
-    "django-redis>=5.4,<6.0",
+    "django-redis>=7.0.0,<8.0",
     "redis>=8.0.1,<9.0",
     "Pillow>=12.3.0,<13.0",
     # Excluded on native Windows because importing without a usable libmagic DLL
