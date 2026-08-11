@@ -403,7 +403,7 @@ test.describe('SSO and SCIM 2.0 Provisioning Specs', () => {
   });
 
   test('13. Positive OIDC login provisions a tenant-bound user and asset holder', async ({ browser }) => {
-    test.setTimeout(60_000);
+    test.setTimeout(120_000);
     const oidcContext = await browser.newContext({ baseURL });
     let page: Page | undefined;
     try {

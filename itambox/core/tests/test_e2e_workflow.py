@@ -246,7 +246,7 @@ def test_positive_oidc_e2e_keeps_the_flow_explicit_and_fresh():
     assert "console.log(process.env.ITAMBOX_TENANT_OIDC_CONFIGS)" not in preflight
     assert "Sign in with E2E OIDC (OIDC)" in positive
     assert "browser.newContext({ baseURL });" in positive
-    assert "test.setTimeout(60_000);" in positive
+    assert "test.setTimeout(120_000);" in positive
     assert "await oidcContext.clearCookies();" in positive
     assert "await page.goto('about:blank', { waitUntil: 'commit' });" in positive
     assert "await page.close();" in positive
