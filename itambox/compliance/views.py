@@ -5,16 +5,24 @@ import re
 from datetime import timedelta
 from urllib.parse import parse_qsl, urlencode, urlparse, urlunparse
 
+from django.contrib import messages
 from django.contrib.auth.decorators import login_required, permission_required
+from django.contrib.auth.mixins import LoginRequiredMixin
 from django.core.exceptions import ValidationError
 from django.db import transaction
-from django.http import Http404, HttpResponse
+from django.http import Http404, HttpResponse, HttpResponseServerError
 from django.shortcuts import get_object_or_404, redirect, render
+from django.template.loader import render_to_string
 from django.urls import reverse, reverse_lazy
 from django.utils import timezone
+from django.utils.translation import gettext_lazy as _
+from django.views.generic import View
 
+from core.context import get_current_request_id
+from core.reports.exporters import PDF_MIME, report_pdf_bytes
 from itambox.panels import Panel
 from itambox.views.generic import ObjectCloneView, ObjectDeleteView, ObjectDetailView, ObjectEditView, ObjectListView
+from itambox.views.generic.htmx_responses import error_response, is_htmx_request, success_response
 from itambox.views.generic.service_views import SimplePostView
 
 from .filters import CustodyReceiptFilterSet
@@ -22,7 +30,20 @@ from .forms import CustodyTemplateForm
 from .forms_filter import CustodyReceiptFilterForm
 from .models import CustodyReceipt, CustodySigningSession, CustodyTemplate
 from .registry import signature_providers
-from .services import scope_custody_receipts
+from .services import (
+    CustodyHandoffGone,
+    CustodyHandoffNotFound,
+    CustodyHandoffPermissionDenied,
+    build_custody_handoff_url,
+    custody_handoff_email_is_configured,
+    custody_handoff_qr_module_count,
+    custody_handoff_qr_rendered_size,
+    render_custody_handoff_qr_svg,
+    resolve_custody_handoff,
+    scope_custody_receipts,
+    send_custody_handoff_email,
+    validated_signature_image,
+)
 from .tables import CustodyReceiptTable, CustodyTemplateTable
 
 logger = logging.getLogger(__name__)
@@ -585,10 +606,31 @@ class CustodyReceiptDetailView(InternalCustodyPermissionMixin, ObjectDetailView)
                 expires_at__gt=now,
             ).first()
             if handoff_session is not None:
-                handoff_path = reverse("compliance:custody_eula_sign", kwargs={"token": receipt.token})
-                handoff_path = f"{handoff_path}?{urlencode({'session': handoff_session.token})}"
-                context["custody_handoff_url"] = self.request.build_absolute_uri(handoff_path)
+                context["custody_handoff_url"] = build_custody_handoff_url(self.request, receipt, handoff_session)
                 context["custody_handoff_expires_at"] = handoff_session.expires_at
+                context["custody_handoff_session"] = handoff_session
+                context["custody_handoff_qr_url"] = reverse(
+                    "compliance:custodyreceipt_handoff_qr",
+                    kwargs={"pk": receipt.pk, "session_pk": handoff_session.pk},
+                )
+                context["custody_handoff_email_url"] = reverse(
+                    "compliance:custodyreceipt_handoff_email",
+                    kwargs={"pk": receipt.pk, "session_pk": handoff_session.pk},
+                )
+                context["custody_handoff_qr_module_count"] = custody_handoff_qr_module_count(
+                    context["custody_handoff_url"]
+                )
+                context["custody_handoff_qr_rendered_size"] = custody_handoff_qr_rendered_size(
+                    context["custody_handoff_url"]
+                )
+                context["custody_handoff_email_enabled"] = bool(
+                    receipt.holder.email and custody_handoff_email_is_configured()
+                )
+                context["custody_handoff_email_disabled_reason"] = (
+                    _("The holder has no e-mail address.")
+                    if not receipt.holder.email
+                    else _("E-mail is not configured.")
+                )
         return context
 
 
@@ -642,6 +684,144 @@ class CustodyReceiptExportView(InternalCustodyPermissionMixin, ObjectDetailView)
         response["Cache-Control"] = "no-store"
         response["X-Content-Type-Options"] = "nosniff"
         return response
+
+
+def _custody_receipt_pdf_context(receipt):
+    payload = _custody_receipt_export_payload(receipt)
+    tenant = receipt.asset.tenant
+    return {
+        "receipt_data": payload["receipt"],
+        "asset_data": payload["asset"],
+        "holder_data": payload["holder"],
+        "signing_sessions": payload["signing_sessions"],
+        "tenant_name": tenant.name if tenant is not None else _("Global"),
+        "signature_image": validated_signature_image(receipt.signature_canvas),
+    }
+
+
+class CustodyReceiptPdfExportView(InternalCustodyPermissionMixin, ObjectDetailView):
+    queryset = CustodyReceipt.objects.select_related("asset", "asset__tenant", "holder")
+    permission_required = EXPORT_CUSTODY_RECEIPT_PERMISSION
+
+    def get_queryset(self):
+        return scope_custody_receipts(super().get_queryset(), user=self.request.user)
+
+    def has_permission(self):
+        if not self.request.user.is_authenticated:
+            return False
+        receipt = self.get_object()
+        return self.request.user.has_perm(EXPORT_CUSTODY_RECEIPT_PERMISSION, obj=receipt.asset)
+
+    def get(self, request, *args, **kwargs):
+        receipt = self.get_object()
+        if receipt.acceptance_status != CustodyReceipt.STATUS_ACCEPTED or not receipt.accepted:
+            raise Http404
+        rendered_html = render_to_string(
+            "compliance/custodyreceipts/custodyreceipt_export_pdf.html",
+            {"request": request, **_custody_receipt_pdf_context(receipt)},
+            request=request,
+        )
+        try:
+            pdf_bytes = report_pdf_bytes(rendered_html)
+        # broad except: render-degrade: a renderer failure degrades the export to an error page instead of a crash
+        except Exception as exc:
+            logger.error(
+                "custody_receipt_pdf_render_failed receipt_id=%s tenant_id=%s actor_id=%s request_id=%s "
+                "exception_type=%s",
+                receipt.pk,
+                receipt.asset.tenant_id,
+                request.user.pk,
+                get_current_request_id(),
+                type(exc).__name__,
+            )
+            return HttpResponseServerError(_("Unable to render the custody receipt PDF."))
+        response = HttpResponse(pdf_bytes, content_type=PDF_MIME)
+        response["Content-Disposition"] = f'attachment; filename="custody-receipt-{receipt.pk}.pdf"'
+        response["Cache-Control"] = "no-store"
+        response["X-Content-Type-Options"] = "nosniff"
+        return response
+
+
+def _custody_internal_handoff_gone_response(request):
+    return render(
+        request,
+        "compliance/custody/internal_handoff_error.html",
+        {"error_code": "internal_custody_handoff_unavailable"},
+        status=410,
+    )
+
+
+def _custody_handoff_outcome_message(outcome):
+    result = outcome["result"]
+    if result.disposition == "success":
+        return _(
+            "The handoff e-mail was accepted for delivery. The signing session expires in %(minutes)s minutes."
+        ) % {"minutes": outcome["remaining_minutes"]}
+    if result.disposition == "retryable":
+        return _("Delivery could not be confirmed; the session remains active.")
+    raise ValidationError(result.user_message or _("Email delivery was rejected."))
+
+
+class CustodyHandoffViewBase(InternalCustodyPermissionMixin, LoginRequiredMixin, View):
+    def resolve_handoff(self, request, kwargs):
+        try:
+            return resolve_custody_handoff(
+                request,
+                receipt_id=kwargs["pk"],
+                session_id=kwargs["session_pk"],
+            )
+        except CustodyHandoffPermissionDenied:
+            return self.handle_no_permission()
+        except CustodyHandoffNotFound:
+            raise Http404 from None
+        except CustodyHandoffGone:
+            return _custody_internal_handoff_gone_response(request)
+
+
+class CustodyReceiptHandoffQrView(CustodyHandoffViewBase):
+    def get(self, request, *args, **kwargs):
+        handoff = self.resolve_handoff(request, kwargs)
+        if isinstance(handoff, HttpResponse):
+            return handoff
+        receipt, signing_session = handoff
+        handoff_url = build_custody_handoff_url(request, receipt, signing_session)
+        response = HttpResponse(render_custody_handoff_qr_svg(handoff_url), content_type="image/svg+xml")
+        response["Content-Disposition"] = f'inline; filename="custody-handoff-{signing_session.pk}.svg"'
+        response["Cache-Control"] = "no-store"
+        response["X-Content-Type-Options"] = "nosniff"
+        response["Content-Security-Policy"] = "default-src 'none'"
+        response._csp_default_none = True
+        return response
+
+
+class CustodyReceiptHandoffEmailView(CustodyHandoffViewBase):
+    def post(self, request, *args, **kwargs):
+        handoff = self.resolve_handoff(request, kwargs)
+        if isinstance(handoff, HttpResponse):
+            return handoff
+        receipt, signing_session = handoff
+        try:
+            outcome = send_custody_handoff_email(request, receipt, signing_session)
+            result = outcome["result"]
+            message = _custody_handoff_outcome_message(outcome)
+        except CustodyHandoffNotFound:
+            raise Http404 from None
+        except CustodyHandoffGone:
+            return _custody_internal_handoff_gone_response(request)
+        except ValidationError as exc:
+            message = "; ".join(exc.messages)
+            if is_htmx_request(request):
+                return error_response(message)
+            messages.error(request, message)
+            return redirect(receipt.get_absolute_url())
+
+        if is_htmx_request(request):
+            return success_response(message)
+        if result.disposition == "retryable":
+            messages.info(request, message)
+        else:
+            messages.success(request, message)
+        return redirect(receipt.get_absolute_url())
 
 
 class CustodyTemplateEditView(ObjectEditView):

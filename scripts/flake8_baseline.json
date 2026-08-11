@@ -2636,14 +2636,6 @@
       "count": 1
     },
     {
-      "path": "itambox/compliance/models.py",
-      "code": "F401",
-      "message": "'django.conf.settings' imported but unused",
-      "source": "from django.conf import settings",
-      "context": "Module:body",
-      "count": 1
-    },
-    {
       "path": "itambox/compliance/reconciliation.py",
       "code": "F401",
       "message": "'django.urls.reverse' imported but unused",

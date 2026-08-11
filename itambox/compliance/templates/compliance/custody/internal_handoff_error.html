@@ -1,0 +1,20 @@
+{% extends "base_public.html" %}
+{% load i18n %}
+{% block title %}{% translate "Custody handoff unavailable" %} Â· {% translate "ITAMbox" %}{% endblock %}
+{% block content %}
+  <div class="container-tight py-4">
+    <div class="empty">
+      <div class="empty-header">410</div>
+      <p class="empty-title">{% translate "Custody handoff unavailable" %}</p>
+      <p class="empty-subtitle text-secondary"
+         data-error-code="{{ error_code }}">
+        {% translate "Custody handoff session expired or no longer available." %}
+      </p>
+      <div class="empty-action">
+        <a href="{% url 'dashboard' %}" class="btn btn-primary">
+          <i class="mdi mdi-arrow-left me-1"></i>{% translate "Back to dashboard" %}
+        </a>
+      </div>
+    </div>
+  </div>
+{% endblock %}

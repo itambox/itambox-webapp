@@ -1,0 +1,248 @@
+{% load i18n %}
+<!DOCTYPE html>
+<html lang="en" xmlns:pdf="http://www.xhtml2pdf.com">
+  <head>
+    <meta charset="utf-8">
+    <title>{% translate "Custody Receipt" %} #{{ receipt_data.id }}</title>
+    <style nonce="{{ request.csp_nonce }}">
+      @page {
+        size: a4 portrait;
+        margin: 18mm 16mm 17mm 16mm;
+        @frame footer {
+          -pdf-frame-content: custody-footer;
+          bottom: 7mm;
+          height: 7mm;
+        }
+      }
+      body {
+        color: #2d3035;
+        font-family: Helvetica, Arial, sans-serif;
+        font-size: 10pt;
+        line-height: 1.35;
+      }
+      h1, h2, h3 {
+        color: #20242a;
+        margin: 0;
+      }
+      h1 {
+        font-size: 20pt;
+      }
+      h2 {
+        border-bottom: 1px solid #c9c4b9;
+        font-size: 13pt;
+        margin-bottom: 7pt;
+        padding-bottom: 3pt;
+      }
+      .header {
+        border-bottom: 3px solid #b35c2e;
+        margin-bottom: 16pt;
+        padding-bottom: 8pt;
+      }
+      .tenant {
+        color: #6b6b67;
+        font-size: 9pt;
+        margin-bottom: 3pt;
+      }
+      .receipt-number {
+        color: #6b6b67;
+        font-size: 9pt;
+        text-align: right;
+      }
+      .accepted {
+        background-color: #e1f0e4;
+        color: #216332;
+        font-size: 9pt;
+        font-weight: bold;
+        padding: 4pt 7pt;
+        text-align: center;
+      }
+      .section {
+        margin-bottom: 15pt;
+      }
+      .metadata {
+        border: 1px solid #d8d3c8;
+        margin-bottom: 8pt;
+      }
+      .metadata td {
+        border-bottom: 1px solid #ece9e2;
+        padding: 4pt 6pt;
+        vertical-align: top;
+      }
+      .metadata tr:last-child td {
+        border-bottom: 0;
+      }
+      .label {
+        color: #6b6b67;
+        font-size: 8pt;
+        font-weight: bold;
+        text-transform: uppercase;
+      }
+      .value {
+        word-wrap: break-word;
+      }
+      .terms {
+        border-left: 3px solid #b35c2e;
+        padding: 5pt 8pt;
+        white-space: pre-wrap;
+      }
+      .small {
+        color: #6b6b67;
+        font-size: 8.5pt;
+      }
+      .signature {
+        border: 1px solid #d8d3c8;
+        max-height: 42mm;
+        max-width: 105mm;
+        padding: 4pt;
+      }
+      .hash {
+        font-family: Courier, monospace;
+        font-size: 8pt;
+        word-wrap: break-word;
+      }
+      .footer {
+        border-top: 1px solid #d8d3c8;
+        color: #6b6b67;
+        font-size: 8pt;
+        padding-top: 3pt;
+        text-align: center;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="header">
+      <table>
+        <tr>
+          <td>
+            <div class="tenant">{{ tenant_name }}</div>
+            <h1>{% translate "Custody Receipt" %}</h1>
+          </td>
+          <td class="receipt-number">
+            <div>{% translate "Receipt" %} #{{ receipt_data.id }}</div>
+            <div class="accepted">{% translate "Accepted" %}</div>
+          </td>
+        </tr>
+      </table>
+    </div>
+    <div class="section">
+      <h2>{% translate "Asset and holder" %}</h2>
+      <table class="metadata">
+        <tr>
+          <td width="50%">
+            <div class="label">{% translate "Asset" %}</div>
+            <div class="value">{{ asset_data.name|default:"-" }}</div>
+          </td>
+          <td width="50%">
+            <div class="label">{% translate "Asset tag" %}</div>
+            <div class="value">{{ asset_data.asset_tag|default:"-" }}</div>
+          </td>
+        </tr>
+        <tr>
+          <td>
+            <div class="label">{% translate "Serial number" %}</div>
+            <div class="value">{{ asset_data.serial_number|default:"-" }}</div>
+          </td>
+          <td>
+            <div class="label">{% translate "Asset ID" %}</div>
+            <div class="value">{{ asset_data.id }}</div>
+          </td>
+        </tr>
+        <tr>
+          <td>
+            <div class="label">{% translate "Holder" %}</div>
+            <div class="value">{{ holder_data.first_name }} {{ holder_data.last_name }}</div>
+          </td>
+          <td>
+            <div class="label">{% translate "Holder ID" %}</div>
+            <div class="value">{{ holder_data.id }}</div>
+          </td>
+        </tr>
+        <tr>
+          <td>
+            <div class="label">{% translate "UPN" %}</div>
+            <div class="value">{{ holder_data.upn|default:"-" }}</div>
+          </td>
+          <td>
+            <div class="label">{% translate "E-mail" %}</div>
+            <div class="value">{{ holder_data.email|default:"-" }}</div>
+          </td>
+        </tr>
+      </table>
+    </div>
+    <div class="section">
+      <h2>{% translate "Terms accepted" %}</h2>
+      <div class="terms">{{ receipt_data.eula_text|default:"-"|linebreaksbr }}</div>
+      <table class="metadata">
+        <tr>
+          <td width="50%"><span class="label">{% translate "Disclaimer" %}</span><br>{{ receipt_data.disclaimer|default:"-"|linebreaksbr }}</td>
+          <td width="50%"><span class="label">{% translate "QMS reference" %}</span><br>{{ receipt_data.qms_reference|default:"-" }}</td>
+        </tr>
+        <tr>
+          <td><span class="label">{% translate "EULA version" %}</span><br>{{ receipt_data.eula_version|default:"-" }}</td>
+          <td><span class="label">{% translate "Acceptance method" %}</span><br>{{ receipt_data.acceptance_method|default:"-" }}</td>
+        </tr>
+      </table>
+    </div>
+    <div class="section">
+      <h2>{% translate "Acceptance attestation" %}</h2>
+      <table class="metadata">
+        <tr>
+          <td width="50%"><span class="label">{% translate "Accepted date" %}</span><br>{{ receipt_data.accepted_date|default:"-" }}</td>
+          <td width="50%"><span class="label">{% translate "Signed at" %}</span><br>{{ receipt_data.signed_at|default:"-" }}</td>
+        </tr>
+        <tr>
+          <td><span class="label">{% translate "Acceptance status" %}</span><br>{{ receipt_data.acceptance_status|default:"-" }}</td>
+          <td><span class="label">{% translate "Signature provider" %}</span><br>{{ receipt_data.signature_provider|default:"-" }}</td>
+        </tr>
+        <tr>
+          <td><span class="label">{% translate "IP address" %}</span><br>{{ receipt_data.ip_address|default:"-" }}</td>
+          <td><span class="label">{% translate "User agent" %}</span><br>{{ receipt_data.user_agent|default:"-" }}</td>
+        </tr>
+      </table>
+    </div>
+    <div class="section">
+      <h2>{% translate "Signature and hashes" %}</h2>
+      {% if signature_image %}
+        <img src="{{ signature_image }}"
+             alt="{% translate 'Captured recipient signature' %}"
+             class="signature">
+      {% else %}
+        <p class="small">{% translate "No renderable signature image is stored." %}</p>
+      {% endif %}
+      <table class="metadata">
+        <tr>
+          <td width="50%"><span class="label">{% translate "Signature hash" %}</span><br><span class="hash">{{ receipt_data.signature_hash|default:"-" }}</span></td>
+          <td width="50%"><span class="label">{% translate "Verification hash" %}</span><br><span class="hash">{{ receipt_data.verification_hash|default:"-" }}</span></td>
+        </tr>
+      </table>
+    </div>
+    <div class="section">
+      <h2>{% translate "Handoff audit appendix" %}</h2>
+      {% for session in signing_sessions %}
+        <table class="metadata">
+          <tr>
+            <td width="50%"><span class="label">{% translate "Operator" %}</span><br>{{ session.operator_username|default:"-" }}</td>
+            <td width="50%"><span class="label">{% translate "Intended holder" %}</span><br>{{ session.intended_holder_id|default:"-" }} / {{ holder_data.first_name }} {{ holder_data.last_name }}</td>
+          </tr>
+          <tr>
+            <td><span class="label">{% translate "Prepared" %}</span><br>{{ session.created_at|default:"-" }}</td>
+            <td><span class="label">{% translate "Expires" %}</span><br>{{ session.expires_at|default:"-" }}</td>
+          </tr>
+          <tr>
+            <td><span class="label">{% translate "Consumed" %}</span><br>{{ session.consumed_at|default:"-" }}</td>
+            <td><span class="label">{% translate "Canceled" %}</span><br>{{ session.canceled_at|default:"-" }}</td>
+          </tr>
+          <tr>
+            <td><span class="label">{% translate "Outcome" %}</span><br>{{ session.outcome|default:"-" }}</td>
+            <td><span class="label">{% translate "Session ID" %}</span><br>{{ session.id }}</td>
+          </tr>
+        </table>
+      {% empty %}
+        <p class="small">{% translate "No signing-session audit record is stored." %}</p>
+      {% endfor %}
+    </div>
+    <div id="custody-footer" class="footer">
+      {% blocktranslate with receipt_id=receipt_data.id tenant=tenant_name %}Custody Receipt #{{ receipt_id }} - {{ tenant }} - Page{% endblocktranslate %}<pdf:pagenumber />
+    </div>
+  </body>
+</html>

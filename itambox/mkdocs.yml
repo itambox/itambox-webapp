@@ -184,6 +184,7 @@ nav:
       - OpenAPI Schema Policy: 'development/openapi-schema-policy.md'
       - Security Test Expectations: 'development/security-test-expectations.md'
       - Custody Permission Surfaces: 'development/custody-permissions.md'
+      - Custody Export & Handoff Design: 'development/design-custody-export-pdf-and-handoff-qr-email.md'
       - Procurement Stable Qualification: 'development/procurement-stable-qualification.md'
       - Subscription Stable Qualification: 'development/subscription-stable-qualification.md'
       - Security Scanning: 'development/security-scanning.md'

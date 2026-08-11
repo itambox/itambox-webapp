@@ -43,6 +43,21 @@ urlpatterns = [
         views.CustodyReceiptExportView.as_view(),
         name="custodyreceipt_export",
     ),
+    path(
+        "custody-receipts/<int:pk>/export.pdf",
+        views.CustodyReceiptPdfExportView.as_view(),
+        name="custodyreceipt_export_pdf",
+    ),
+    path(
+        "custody-receipts/<int:pk>/signing-sessions/<int:session_pk>/handoff-qr.svg",
+        views.CustodyReceiptHandoffQrView.as_view(),
+        name="custodyreceipt_handoff_qr",
+    ),
+    path(
+        "custody-receipts/<int:pk>/signing-sessions/<int:session_pk>/email/",
+        views.CustodyReceiptHandoffEmailView.as_view(),
+        name="custodyreceipt_handoff_email",
+    ),
     # Custody Templates
     path("custody-templates/", views.CustodyTemplateListView.as_view(), name="custodytemplate_list"),
     path("custody-templates/add/", views.CustodyTemplateEditView.as_view(), name="custodytemplate_create"),

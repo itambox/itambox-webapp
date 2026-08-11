@@ -34,9 +34,10 @@ if env_path.exists():
 
 DEBUG = False
 
-# Public base URL used to construct scannable QR links (no trailing slash).
-# Set in production to e.g. https://itam.example.com
-ITAMBOX_BASE_URL = os.environ.get("ITAMBOX_BASE_URL", "").rstrip("/")
+# Public base URL used to construct bearer handoff links (no trailing slash).
+# Set in production to e.g. https://itam.example.com. An invalid non-empty value
+# is rejected by the compliance system check rather than silently normalised.
+ITAMBOX_BASE_URL = os.environ.get("ITAMBOX_BASE_URL", "")
 
 # Password assigned to users created by the demo seed. The deployed demo can set
 # this independently without changing the source fallback used by local setups.

@@ -1,6 +1,7 @@
 from django.contrib.auth import get_user_model
 from django.contrib.auth.models import Permission
-from django.test import TestCase
+from django.core.checks import run_checks
+from django.test import TestCase, override_settings
 from django.urls import reverse
 from django.utils import timezone
 from model_bakery import baker
@@ -208,6 +209,18 @@ class CustodyReceiptInternalViewTests(TenantTestMixin, TestCase):
 
 
 class CustodyPermissionPolicyTests(TestCase):
+    @override_settings(ITAMBOX_BASE_URL="https://public.example.test/")
+    def test_configured_handoff_base_url_rejects_trailing_slash(self):
+        errors = run_checks(tags=["security"])
+
+        self.assertIn("compliance.E001", {error.id for error in errors})
+
+    @override_settings(ITAMBOX_BASE_URL="https://public.example.test")
+    def test_configured_handoff_base_url_accepts_absolute_http_url(self):
+        errors = run_checks(tags=["security"])
+
+        self.assertNotIn("compliance.E001", {error.id for error in errors})
+
     def test_receipt_action_permissions_are_explicit_and_do_not_delegate_consent(self):
         codenames = {codename for codename, _label in CustodyReceipt._meta.permissions}
 

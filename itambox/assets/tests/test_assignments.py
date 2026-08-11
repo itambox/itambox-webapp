@@ -113,6 +113,44 @@ class AssetAssignmentTestCase(TestCase):
         self.assertIn(f"tenant_id={tenant.pk}", output)
         self.assertIn(f"actor_id={self.user.pk}", output)
 
+    def test_custody_email_without_holder_address_raises_without_fallback_send(self):
+        tenant = baker.make("organization.Tenant")
+        category = baker.make("assets.Category")
+        asset_type = baker.make("assets.AssetType", category=category)
+        asset = baker.make(Asset, status=self.status, tenant=tenant, asset_type=asset_type)
+        holder = baker.make(
+            "organization.AssetHolder",
+            tenant=tenant,
+            email="",
+        )
+        baker.make(
+            CustodyTemplate,
+            tenant=tenant,
+            category=category,
+            is_active=True,
+            require_acceptance=True,
+            email_signature_request=True,
+            signature_provider="local",
+        )
+        email_config = SimpleNamespace(
+            enabled=True,
+            from_address="itambox@example.test",
+            test_recipient="test-recipient@example.test",
+        )
+        provider = SimpleNamespace(initiate_signature=lambda receipt, request: "https://example.test/accept")
+        request = SimpleNamespace(user=self.user)
+
+        with (
+            patch("core.models.EmailSettings.load", return_value=email_config),
+            patch("compliance.registry.signature_providers.get", return_value=provider),
+            patch("assets.services.send_mail") as send_mail,
+        ):
+            with self.assertRaises(ValidationError) as raised:
+                checkout_asset(asset=asset, holder=holder, user=self.user, request=request)
+
+        self.assertIn("holder has no e-mail address", str(raised.exception))
+        send_mail.assert_not_called()
+
     def test_checkin_asset_with_custom_status_location_and_date(self):
         """
         Verify checking in an asset with custom status, location, and check-in date.
