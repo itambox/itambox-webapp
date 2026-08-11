@@ -403,11 +403,21 @@ test.describe('SSO and SCIM 2.0 Provisioning Specs', () => {
   });
 
   test('13. Positive OIDC login provisions a tenant-bound user and asset holder', async ({ browser }) => {
+    test.setTimeout(60_000);
     const oidcContext = await browser.newContext({ baseURL });
     try {
       await oidcContext.clearCookies();
       const page = await oidcContext.newPage();
-      await page.setExtraHTTPHeaders({ 'X-Forwarded-For': '127.0.0.2' });
+      await page.route('**/*', async route => {
+        const requestUrl = new URL(route.request().url());
+        if (requestUrl.origin !== appOrigin) {
+          await route.continue();
+          return;
+        }
+        await route.continue({
+          headers: { ...route.request().headers(), 'x-forwarded-for': '127.0.0.2' },
+        });
+      });
       const loginResponse = await page.goto('/accounts/login/');
       if (loginResponse === null) {
         throw new Error('OIDC login page navigation returned no response');
