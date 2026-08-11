@@ -555,6 +555,7 @@ test.describe('SSO and SCIM 2.0 Provisioning Specs', () => {
       await expect(assetHolderRow).toContainText('Helix Biopharma AG');
     } finally {
       if (page) {
+        await page.goto('about:blank', { waitUntil: 'commit' });
         await page.close();
       }
       await oidcContext.close();
