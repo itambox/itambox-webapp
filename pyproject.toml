@@ -60,7 +60,7 @@ dependencies = [
 [dependency-groups]
 dev = [
     "pytest>=9.0.3,<10.0",
-    "pytest-django>=4.8,<5.0",
+    "pytest-django>=4.13.0,<5.0",
     "pytest-cov>=5.0,<8.0",
     "pytest-xdist>=3.5,<4.0",
     "model-bakery>=1.17,<2.0",
