@@ -20,6 +20,7 @@ POST_TRANSITION_MIGRATIONS = {
     "compliance.0102_clear_unsigned_receipt_timestamps",
     "compliance.0103_alter_custodyreceipt_options",
     "compliance.0104_custodysigningsession",
+    "compliance.0105_custodyhandoffdelivery",
     "extras.0101_issue88_drop_legacy_webhook_name_like",
     "extras.0102_alter_event_action",
     "extras.0103_remove_reporttemplate_advanced_mode_and_more",

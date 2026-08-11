@@ -14,13 +14,35 @@
     </form>
   {% endif %}
   {% if can_export_custody_receipt %}
-    <a href="{% url 'compliance:custodyreceipt_export' pk=object.pk %}"
-       class="btn btn-primary"
-       hx-boost="false"
-       download>
-      <i class="mdi mdi-download me-1"></i>
-      {% translate "Export" %}
-    </a>
+    <div class="btn-group"
+         role="group"
+         aria-label="{% translate 'Receipt export formats' %}">
+      <a href="{% url 'compliance:custodyreceipt_export_pdf' pk=object.pk %}"
+         class="btn btn-primary"
+         hx-boost="false"
+         download>
+        <i class="mdi mdi-file-pdf-box me-1"></i>
+        {% translate "Download PDF" %}
+      </a>
+      <button type="button"
+              class="btn btn-primary dropdown-toggle dropdown-toggle-split"
+              data-bs-toggle="dropdown"
+              aria-expanded="false"
+              aria-label="{% translate 'Other export formats' %}">
+        <span class="visually-hidden">{% translate "Other export formats" %}</span>
+      </button>
+      <ul class="dropdown-menu dropdown-menu-end">
+        <li>
+          <a href="{% url 'compliance:custodyreceipt_export' pk=object.pk %}"
+             class="dropdown-item"
+             hx-boost="false"
+             download>
+            <i class="mdi mdi-code-json me-1"></i>
+            {% translate "Download JSON" %}
+          </a>
+        </li>
+      </ul>
+    </div>
   {% endif %}
 {% endblock extra_page_actions %}
 {% block object_details %}
@@ -117,6 +139,48 @@
         <i class="mdi mdi-content-copy me-1"></i>
         {% translate "Copy recipient handoff link" %}
       </button>
+      <button type="button"
+              class="btn btn-secondary"
+              data-bs-toggle="collapse"
+              data-bs-target="#custody-handoff-qr-{{ object.pk }}"
+              aria-controls="custody-handoff-qr-{{ object.pk }}"
+              aria-expanded="false">
+        <i class="mdi mdi-qrcode me-1"></i>
+        {% translate "Show QR code" %}
+      </button>
+      {% if custody_handoff_email_enabled %}
+        <form method="post"
+              action="{{ custody_handoff_email_url }}"
+              class="d-inline"
+              hx-boost="false">
+          {% csrf_token %}
+          <button type="submit" class="btn btn-secondary">
+            <i class="mdi mdi-email-send-outline me-1"></i>
+            {% translate "E-mail link to holder" %}
+          </button>
+        </form>
+      {% else %}
+        <button type="button"
+                class="btn btn-secondary"
+                disabled
+                title="{{ custody_handoff_email_disabled_reason }}">
+          <i class="mdi mdi-email-off-outline me-1"></i>
+          {% translate "E-mail link to holder" %}
+        </button>
+        <span class="text-secondary ms-2">{{ custody_handoff_email_disabled_reason }}</span>
+      {% endif %}
+      <div id="custody-handoff-qr-{{ object.pk }}" class="collapse mt-3">
+        <figure class="mb-0">
+          <img src="{{ custody_handoff_qr_url }}"
+               alt="{% translate 'QR code for the one-time recipient handoff' %}"
+               class="img-fluid custody-handoff-qr"
+               width="{{ custody_handoff_qr_rendered_size }}"
+               height="{{ custody_handoff_qr_rendered_size }}">
+          <figcaption class="text-secondary mt-2">
+            {% blocktranslate with modules=custody_handoff_qr_module_count expires=custody_handoff_expires_at|date:"Y-m-d H:i:s T" %}This one-time code uses {{ modules }} modules and expires at {{ expires }}. It is a credential for the intended holder only.{% endblocktranslate %}
+          </figcaption>
+        </figure>
+      </div>
     </div>
   {% endif %}
   <div class="card shadow-sm">
@@ -136,6 +200,7 @@
               <th>{% translate "Status" %}</th>
               <th>{% translate "Consumed" %}</th>
               <th>{% translate "Result" %}</th>
+              <th>{% translate "E-mail delivery" %}</th>
             </tr>
           </thead>
           <tbody>
@@ -159,6 +224,16 @@
                 </td>
                 <td>{{ signing_session.consumed_at|date:"Y-m-d H:i:s T"|default:"-" }}</td>
                 <td>{{ signing_session.get_outcome_display|default:"-" }}</td>
+                <td>
+                  {% for delivery in signing_session.handoff_deliveries.all %}
+                    <div>
+                      <span class="badge bg-secondary text-secondary-fg">#{{ delivery.attempt }}</span>
+                      {{ delivery.get_status_display }}
+                    </div>
+                  {% empty %}
+                    <span class="text-secondary">{% translate "-" %}</span>
+                  {% endfor %}
+                </td>
               </tr>
             {% endfor %}
           </tbody>

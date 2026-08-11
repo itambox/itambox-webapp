@@ -12,7 +12,7 @@ from uuid import uuid4
 import requests
 from django.contrib.auth import get_user_model
 from django.contrib.contenttypes.models import ContentType
-from django.core.mail import EmailMessage, get_connection
+from django.core.mail import BadHeaderError, EmailMessage, get_connection
 from django.db.models import Q
 from django.utils.translation import gettext_lazy as _
 
@@ -36,6 +36,7 @@ class DeliveryResult:
     disposition: DeliveryDisposition
     user_visible: bool = False
     user_message: str = ""
+    error_class: str | None = None
 
     def __bool__(self):
         return self.disposition == DeliveryDisposition.SUCCESS
@@ -470,19 +471,34 @@ def _send_teams_notification(webhook_url, message_text, title=None):
         return DeliveryResult(operation, DeliveryDisposition.RETRYABLE)
 
 
-def _send_email_notification(channel, subject, body):
+def send_email_notification(recipients, subject, body, *, tenant_id):
+    """Deliver a plain-text e-mail to an explicit recipient list.
+
+    The transport is deliberately independent from notification-channel audience
+    configuration so recipient-bound custody links cannot be broadcast to a
+    channel's administrators or test address.
+    """
     operation = "email.deliver"
-    context = delivery_log_context(operation, tenant_id=channel.tenant_id)
+    context = delivery_log_context(operation, tenant_id=tenant_id)
     email_config = EmailSettings.load()
     if not email_config or not email_config.enabled:
         logger.warning("%s disposition=terminal reason=disabled", delivery_log_message(context))
-        return DeliveryResult(operation, DeliveryDisposition.TERMINAL, True, str(_("Email is not configured.")))
+        return DeliveryResult(
+            operation,
+            DeliveryDisposition.TERMINAL,
+            True,
+            str(_("Email is not configured.")),
+            "configuration",
+        )
 
-    recipients = channel.config.get("recipients", [])
     if not recipients:
         logger.warning("%s disposition=terminal reason=no_recipients", delivery_log_message(context))
         return DeliveryResult(
-            operation, DeliveryDisposition.TERMINAL, True, str(_("No email recipients are configured."))
+            operation,
+            DeliveryDisposition.TERMINAL,
+            True,
+            str(_("No email recipients are configured.")),
+            "missing_recipient",
         )
 
     try:
@@ -506,13 +522,43 @@ def _send_email_notification(channel, subject, body):
         return DeliveryResult(operation, DeliveryDisposition.SUCCESS)
     except smtplib.SMTPAuthenticationError:
         logger.error("%s disposition=terminal reason=authentication", delivery_log_message(context))
-        return DeliveryResult(operation, DeliveryDisposition.TERMINAL, True, str(_("Email authentication failed.")))
+        return DeliveryResult(
+            operation,
+            DeliveryDisposition.TERMINAL,
+            True,
+            str(_("Email authentication failed.")),
+            "SMTPAuthenticationError",
+        )
     except (TimeoutError, ConnectionError, smtplib.SMTPServerDisconnected, smtplib.SMTPConnectError):
         logger.warning("%s disposition=retryable reason=transport", delivery_log_message(context))
-        return DeliveryResult(operation, DeliveryDisposition.RETRYABLE)
+        return DeliveryResult(operation, DeliveryDisposition.RETRYABLE, error_class="timeout")
     except (smtplib.SMTPRecipientsRefused, smtplib.SMTPSenderRefused, smtplib.SMTPDataError, smtplib.SMTPException):
         logger.error("%s disposition=terminal reason=smtp_rejected", delivery_log_message(context))
-        return DeliveryResult(operation, DeliveryDisposition.TERMINAL, True, str(_("Email delivery was rejected.")))
+        return DeliveryResult(
+            operation,
+            DeliveryDisposition.TERMINAL,
+            True,
+            str(_("Email delivery was rejected.")),
+            "SMTPException",
+        )
+    except (BadHeaderError, ValueError):
+        logger.error("%s disposition=terminal reason=invalid_message", delivery_log_message(context))
+        return DeliveryResult(
+            operation,
+            DeliveryDisposition.TERMINAL,
+            True,
+            str(_("Email delivery was rejected.")),
+            "invalid_message",
+        )
+
+
+def _send_email_notification(channel, subject, body):
+    return send_email_notification(
+        channel.config.get("recipients", []),
+        subject,
+        body,
+        tenant_id=channel.tenant_id,
+    )
 
 
 def send_notification_to_channel(channel, subject, body):

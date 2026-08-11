@@ -292,6 +292,58 @@ class CustodySigningSession(BaseModel):
         return "active"
 
 
+class CustodyHandoffDelivery(BaseModel):
+    """Durable, token-free audit record for a handoff e-mail attempt."""
+
+    objects = TenantScopingManager()
+    tenant_lookup = "signing_session__receipt__asset__tenant"
+    deny_global_tenant = True
+
+    STATUS_REQUESTED = "requested"
+    STATUS_SUCCEEDED = "succeeded"
+    STATUS_TERMINAL_FAILED = "terminal_failed"
+    STATUS_CHOICES = (
+        (STATUS_REQUESTED, _("Requested")),
+        (STATUS_SUCCEEDED, _("Succeeded")),
+        (STATUS_TERMINAL_FAILED, _("Terminal failure")),
+    )
+
+    receipt = models.ForeignKey(
+        CustodyReceipt,
+        on_delete=models.PROTECT,
+        related_name="handoff_deliveries",
+        editable=False,
+        verbose_name=_("Custody Receipt"),
+    )
+    signing_session = models.ForeignKey(
+        CustodySigningSession,
+        on_delete=models.PROTECT,
+        related_name="handoff_deliveries",
+        editable=False,
+        verbose_name=_("Custody Signing Session"),
+    )
+    operator = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.PROTECT,
+        related_name="custody_handoff_deliveries",
+        editable=False,
+        verbose_name=_("Operator"),
+    )
+    attempt = models.PositiveIntegerField(verbose_name=_("Attempt"))
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, verbose_name=_("Status"))
+    error_class = models.CharField(max_length=100, blank=True, null=True, verbose_name=_("Error class"))
+    delivered_at = models.DateTimeField(null=True, blank=True, verbose_name=_("Delivered at"))
+
+    class Meta:
+        ordering = ("-created_at", "-pk")
+        unique_together = (("signing_session", "attempt"),)
+        verbose_name = _("Custody Handoff Delivery")
+        verbose_name_plural = _("Custody Handoff Deliveries")
+
+    def __str__(self):
+        return f"Custody handoff delivery {self.pk} (attempt {self.attempt})"
+
+
 User = get_user_model()
 
 

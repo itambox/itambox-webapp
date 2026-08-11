@@ -122,6 +122,9 @@ class CSPMiddleware:
             reset_current_csp_nonce(nonce_token)
 
     def process_response(self, request, response):
+        if getattr(response, "_csp_default_none", False):
+            response["Content-Security-Policy"] = "default-src 'none'"
+            return response
         nonce = getattr(request, "csp_nonce", "")
         form_action = "'self' https:" if getattr(response, _SAML_HTTPS_FORM_ACTION, False) else "'self'"
         style_nonce = f" 'nonce-{nonce}'" if nonce else ""

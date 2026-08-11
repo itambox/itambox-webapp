@@ -200,6 +200,7 @@ PLATFORM_LAYER_PREFIXES = {
 MODULE_LAYER_OVERRIDES = {
     "assets.depreciation": "domain-service",
     "assets.scanning": "domain-service",
+    "compliance.checks": "composition",
     "compliance.providers": "domain-service",
     "compliance.registry": "domain-service",
     "core.filters": "presentation",
