@@ -408,9 +408,9 @@ test.describe('SSO and SCIM 2.0 Provisioning Specs', () => {
     try {
       await oidcContext.clearCookies();
       const page = await oidcContext.newPage();
-      const loginResponse = await page.goto('/accounts/login/', {
-        headers: { 'X-Forwarded-For': '127.0.0.2' },
-      });
+      await page.setExtraHTTPHeaders({ 'X-Forwarded-For': '127.0.0.2' });
+      const loginResponse = await page.goto('/accounts/login/');
+      await page.setExtraHTTPHeaders({});
       if (loginResponse === null) {
         throw new Error('OIDC login page navigation returned no response');
       }
