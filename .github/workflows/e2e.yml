@@ -31,6 +31,13 @@ jobs:
           --health-interval=2s
           --health-timeout=2s
           --health-retries=30
+      oidc:
+        image: ghcr.io/navikt/mock-oauth2-server:6.0.0@sha256:b9fa251aefee22a97c32534d23a1c400f01dbd483ab263b013d89f6d60d96691
+        env:
+          JSON_CONFIG: >-
+            {"interactiveLogin":true,"httpServer":"NettyWrapper","tokenProvider":{"keyProvider":{"algorithm":"RS256"}},"tokenCallbacks":[{"issuerId":"itambox-e2e","tokenExpiry":300,"requestMappings":[{"requestParam":"subject","match":"itambox-e2e-oidc-user","claims":{"sub":"itambox-e2e-oidc-user","email":"e2e.oidc@itambox.local","given_name":"E2E","family_name":"OIDC","groups":["e2e-oidc-admins"],"aud":["${clientId}"],"azp":"${clientId}"}}]}]}
+        ports:
+          - 8081:8080
 
     env:
       ITAMBOX_ENV: dev
@@ -47,6 +54,11 @@ jobs:
       E2E_ISOLATION_TENANT_SLUG: e2e-isolation-tenant
       E2E_TENANT_GROUP_NAME: E2E Tenant Read-Only Group
       E2E_BASE_URL: http://localhost:8000
+      E2E_OIDC_PROVIDER_URL: http://127.0.0.1:8081
+      E2E_OIDC_SUBJECT: itambox-e2e-oidc-user
+      E2E_OIDC_EMAIL: e2e.oidc@itambox.local
+      ITAMBOX_TENANT_OIDC_CONFIGS: >-
+        {"helix-rnd":{"enabled":true,"display_name":"E2E OIDC","OIDC_RP_CLIENT_ID":"itambox-e2e-client","OIDC_RP_CLIENT_SECRET":"itambox-e2e-secret","OIDC_OP_AUTHORIZATION_ENDPOINT":"http://127.0.0.1:8081/itambox-e2e/authorize","OIDC_OP_TOKEN_ENDPOINT":"http://127.0.0.1:8081/itambox-e2e/token","OIDC_OP_USER_ENDPOINT":"http://127.0.0.1:8081/itambox-e2e/userinfo","OIDC_OP_ISSUER":"http://127.0.0.1:8081/itambox-e2e","OIDC_OP_JWKS_ENDPOINT":"http://127.0.0.1:8081/itambox-e2e/jwks","OIDC_RP_SIGN_ALGO":"RS256","OIDC_RP_SCOPES":"openid email profile groups","OIDC_USE_NONCE":true,"OIDC_CREATE_USER":true,"OIDC_GROUP_ROLE_MAPPING":{"e2e-oidc-admins":"Admin"}}}
       # Playwright's webServer config uses a venv path; in CI we manage the server
       # ourselves for reliability and to avoid venv path assumptions.
       E2E_NO_WEBSERVER: "1"
@@ -123,6 +135,68 @@ jobs:
         working-directory: ./itambox/tests/e2e
         run: npx playwright install --with-deps chromium
 
+      - name: Check OIDC mock provider readiness
+        env:
+          E2E_OIDC_PROVIDER_URL: ${{ env.E2E_OIDC_PROVIDER_URL }}
+        run: |
+          set -Eeuo pipefail
+          provider_url="$E2E_OIDC_PROVIDER_URL"
+          alive_url="${provider_url}/isalive"
+          discovery_url="${provider_url}/itambox-e2e/.well-known/openid-configuration"
+          jwks_url="${provider_url}/itambox-e2e/jwks"
+          discovery_path="${RUNNER_TEMP}/oidc-discovery.json"
+          jwks_path="${RUNNER_TEMP}/oidc-jwks.json"
+          deadline=$((SECONDS + 60))
+          attempt=0
+          live=false
+
+          while (( SECONDS < deadline && attempt < 60 )); do
+            attempt=$((attempt + 1))
+            if curl --fail --silent --show-error --max-time 5 "$alive_url" >/dev/null 2>/dev/null; then
+              live=true
+              break
+            fi
+            sleep 1
+          done
+          if [[ "$live" != true ]]; then
+            echo "OIDC mock provider did not become live within the bounded readiness window."
+            exit 1
+          fi
+
+          curl --fail --silent --show-error --max-time 10 "$discovery_url" > "$discovery_path"
+          curl --fail --silent --show-error --max-time 10 "$jwks_url" > "$jwks_path"
+          E2E_OIDC_PROVIDER_URL="$provider_url" DISCOVERY_PATH="$discovery_path" JWKS_PATH="$jwks_path" python - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+
+          provider_url = os.environ["E2E_OIDC_PROVIDER_URL"]
+          expected = {
+              "issuer": f"{provider_url}/itambox-e2e",
+              "authorization_endpoint": f"{provider_url}/itambox-e2e/authorize",
+              "token_endpoint": f"{provider_url}/itambox-e2e/token",
+              "userinfo_endpoint": f"{provider_url}/itambox-e2e/userinfo",
+              "jwks_uri": f"{provider_url}/itambox-e2e/jwks",
+          }
+          discovery = json.loads(Path(os.environ["DISCOVERY_PATH"]).read_text(encoding="utf-8"))
+          for key, value in expected.items():
+              if discovery.get(key) != value:
+                  raise SystemExit(f"OIDC discovery contract mismatch for {key}")
+
+          jwks = json.loads(Path(os.environ["JWKS_PATH"]).read_text(encoding="utf-8"))
+          if not any(
+              key.get("kty") == "RSA"
+              and key.get("use", "sig") == "sig"
+              and key.get("alg", "RS256") == "RS256"
+              for key in jwks.get("keys", [])
+          ):
+              raise SystemExit("OIDC JWKS has no RSA signing key usable for RS256")
+
+          for key, value in expected.items():
+              print(f"OIDC {key}: {value}")
+          print("OIDC mock provider readiness passed; JWKS contains an RSA signing key usable for RS256.")
+          PY
+
       - name: Run Django system checks
         working-directory: ./itambox
         run: uv run --locked --no-sync python manage.py check
@@ -154,10 +228,12 @@ jobs:
           import os
 
           from django.contrib.auth import get_user_model
-          from organization.models import Tenant
+          from django.db.models import Q
+          from organization.models import AssetHolder, Membership, Role, Tenant
           from users.models import Token, UserGroup
 
           User = get_user_model()
+          oidc_email = os.environ["E2E_OIDC_EMAIL"]
           user, _ = User.objects.get_or_create(
               username=os.environ["E2E_USERNAME"],
               defaults={"email": os.environ["DJANGO_SUPERUSER_EMAIL"]},
@@ -180,6 +256,48 @@ jobs:
           )
           if isolation_tenant.is_provider or isolation_tenant.deleted_at is not None:
               raise RuntimeError("E2E isolation fixture tenant must be a live non-provider tenant")
+
+          administrator_roles = Role.all_objects.filter(
+              tenant=tenant,
+              name="Administrator",
+              deleted_at__isnull=True,
+          )
+          if administrator_roles.count() != 1:
+              raise RuntimeError("E2E tenant must have exactly one live Administrator role")
+          administrator = administrator_roles.get()
+          admin_roles = Role.all_objects.filter(
+              tenant=tenant,
+              name="Admin",
+              deleted_at__isnull=True,
+          )
+          if admin_roles.count() > 1:
+              raise RuntimeError("E2E tenant must have at most one live Admin role")
+          admin = admin_roles.first()
+          if admin is None:
+              Role.all_objects.create(
+                  tenant=tenant,
+                  name="Admin",
+                  description="E2E OIDC mapped role.",
+                  permissions=list(administrator.permissions or []),
+              )
+          else:
+              admin.permissions = list(administrator.permissions or [])
+              admin.save(update_fields=["permissions"])
+
+          if User._base_manager.filter(email=oidc_email).exists():
+              raise RuntimeError("E2E OIDC fixture User already exists")
+          holder_match = AssetHolder.all_objects.filter(tenant=tenant).filter(
+              Q(email=oidc_email) | Q(upn=oidc_email) | Q(user__email=oidc_email) | Q(user__username=oidc_email)
+          )
+          if holder_match.exists():
+              raise RuntimeError("E2E OIDC fixture AssetHolder already exists")
+          membership_match = Membership._base_manager.filter(tenant=tenant).filter(
+              Q(user__email=oidc_email) | Q(user__username=oidc_email)
+          )
+          if membership_match.exists():
+              raise RuntimeError("E2E OIDC fixture Membership already exists")
+          print("E2E OIDC fixture absence and Admin-role preconditions passed.")
+
           UserGroup._base_manager.get_or_create(
               tenant=tenant,
               name=os.environ["E2E_TENANT_GROUP_NAME"],
@@ -201,7 +319,34 @@ jobs:
         working-directory: ./itambox
         run: |
           echo "Starting Django dev server on loopback port 8000..."
-          uv run --locked --no-sync python manage.py runserver 127.0.0.1:8000 &
+          # The redacted wrapper below executes: uv run --locked --no-sync python manage.py runserver 127.0.0.1:8000
+          uv run --locked --no-sync python - <<'PY' &
+          import os
+          import re
+          import runpy
+          import sys
+
+          import django
+          from django.conf import settings
+          from django.core.servers import basehttp
+
+          original_log_message = basehttp.WSGIRequestHandler.log_message
+
+          def redacted_log_message(self, format, *args):
+              safe_args = tuple(
+                  re.sub(r'([^\s"]+)\?[^\s"]*', r'\1', value) if isinstance(value, str) else value
+                  for value in args
+              )
+              return original_log_message(self, format, *safe_args)
+
+          basehttp.WSGIRequestHandler.log_message = redacted_log_message
+          os.environ.setdefault("DJANGO_SETTINGS_MODULE", "core.settings.dev")
+          django.setup()
+          settings.RATELIMIT_USE_X_FORWARDED_FOR = True
+          settings.RATELIMIT_NUM_PROXIES = 1
+          sys.argv = ["manage.py", "runserver", "127.0.0.1:8000", "--noreload"]
+          runpy.run_path("manage.py", run_name="__main__")
+          PY
           DJANGO_PID=$!
           echo "DJANGO_PID=$DJANGO_PID" >> "$GITHUB_ENV"
           django_ready=false

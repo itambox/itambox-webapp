@@ -353,6 +353,64 @@ performs by default:
 | **Issuer** | The `iss` claim must match `OIDC_OP_ISSUER` exactly. If `OIDC_OP_ISSUER` is not configured, authentication is **rejected** (fail-closed by design). |
 | **Algorithm** | The backend verifies the signature algorithm and rejects `none` / `HS256` downgrades. |
 
+### Testing with a local mock OIDC provider
+
+The following recipe is for development and test environments only. It uses NAV's
+`mock-oauth2-server` with a pinned image and binds the provider to loopback:
+
+```text
+ghcr.io/navikt/mock-oauth2-server:6.0.0@sha256:b9fa251aefee22a97c32534d23a1c400f01dbd483ab263b013d89f6d60d96691
+```
+
+Set `JSON_CONFIG` to the provider configuration with interactive login, `NettyWrapper`, RS256, and
+one exact subject request mapping, then run the image with a loopback-only port binding:
+
+```bash
+docker run --rm --name itambox-oidc-mock \
+  --publish 127.0.0.1:8081:8080 \
+  --env JSON_CONFIG="$JSON_CONFIG" \
+  ghcr.io/navikt/mock-oauth2-server:6.0.0@sha256:b9fa251aefee22a97c32534d23a1c400f01dbd483ab263b013d89f6d60d96691
+```
+
+Configure the provider's issuer as `http://127.0.0.1:8081/itambox-e2e` and use the interactive
+subject `itambox-e2e-oidc-user`. The provider mapping should match that subject exactly and return
+the claims needed by the test identity; arbitrary typed subjects must not receive the mapped claim
+set. Never replace `127.0.0.1:8081:8080` with a public host binding.
+
+For ITAMbox, use a redacted tenant configuration like this and replace the client values with
+local-test values:
+
+```json
+{
+  "helix-rnd": {
+    "enabled": true,
+    "display_name": "Local OIDC mock",
+    "OIDC_RP_CLIENT_ID": "local-test-client",
+    "OIDC_RP_CLIENT_SECRET": "<redacted-local-test-secret>",
+    "OIDC_OP_AUTHORIZATION_ENDPOINT": "http://127.0.0.1:8081/itambox-e2e/authorize",
+    "OIDC_OP_TOKEN_ENDPOINT": "http://127.0.0.1:8081/itambox-e2e/token",
+    "OIDC_OP_USER_ENDPOINT": "http://127.0.0.1:8081/itambox-e2e/userinfo",
+    "OIDC_OP_ISSUER": "http://127.0.0.1:8081/itambox-e2e",
+    "OIDC_OP_JWKS_ENDPOINT": "http://127.0.0.1:8081/itambox-e2e/jwks",
+    "OIDC_RP_SIGN_ALGO": "RS256",
+    "OIDC_RP_SCOPES": "openid email profile groups",
+    "OIDC_USE_NONCE": true,
+    "OIDC_CREATE_USER": true,
+    "OIDC_GROUP_ROLE_MAPPING": {"local-oidc-admins": "Admin"}
+  }
+}
+```
+
+Use the provider's JWKS endpoint rather than a static signing key; omit `OIDC_RP_IDP_SIGN_KEY`.
+The shared callback is always the exact URL `http://localhost:8000/oidc/callback/`, while the
+tenant-specific authorization entry point is `http://localhost:8000/oidc/authenticate/helix-rnd/`.
+Register the shared callback URL exactly in the relying-party configuration; do not substitute the
+tenant-specific initiation URL.
+
+Never expose the mock provider publicly: it is intentionally not a production identity provider.
+Never reuse a fixed client secret from a local test outside local tests, and do not place it in
+production configuration or documentation.
+
 ### Provider-Staff Mapping
 
 For tenants that are **managed** by a provider (`managed_by` is set), the

@@ -1,4 +1,4 @@
-import { test, expect, APIRequestContext } from '@playwright/test';
+import { test, expect, APIRequestContext, Page } from '@playwright/test';
 
 function requiredEnv(name: string): string {
   const value = process.env[name];
@@ -12,7 +12,12 @@ const scimTenantSlug = requiredEnv('E2E_TENANT_SLUG');
 const isolationTenantSlug = requiredEnv('E2E_ISOLATION_TENANT_SLUG');
 const tenantGroupName = requiredEnv('E2E_TENANT_GROUP_NAME');
 const scimToken = requiredEnv('E2E_SCIM_TOKEN');
+const oidcProviderUrl = requiredEnv('E2E_OIDC_PROVIDER_URL');
+const oidcSubject = requiredEnv('E2E_OIDC_SUBJECT');
+const oidcEmail = requiredEnv('E2E_OIDC_EMAIL');
 const baseURL = process.env.E2E_BASE_URL || 'http://localhost:8000';
+const appOrigin = new URL(baseURL).origin;
+const providerOrigin = new URL(oidcProviderUrl).origin;
 const scimHeaders = { Authorization: `Bearer ${scimToken}` };
 const scimUrl = (path: string) => `/api/tenants/${scimTenantSlug}/scim/v2/${path}`;
 
@@ -394,6 +399,167 @@ test.describe('SSO and SCIM 2.0 Provisioning Specs', () => {
       expect(afterLogout.headers()['location']).toMatch(/^\/accounts\/login\//);
     } finally {
       await authenticatedContext.close();
+    }
+  });
+
+  test('13. Positive OIDC login provisions a tenant-bound user and asset holder', async ({ browser }) => {
+    test.setTimeout(120_000);
+    const oidcContext = await browser.newContext({ baseURL });
+    let page: Page | undefined;
+    try {
+      await oidcContext.clearCookies();
+      page = await oidcContext.newPage();
+      await page.setExtraHTTPHeaders({ 'X-Forwarded-For': '127.0.0.2' });
+      const loginResponse = await page.goto('/accounts/login/');
+      await page.setExtraHTTPHeaders({});
+      if (loginResponse === null) {
+        throw new Error('OIDC login page navigation returned no response');
+      }
+      expect(loginResponse.status()).toBe(200);
+
+      const oidcLink = page.getByRole('link', { name: 'Sign in with E2E OIDC (OIDC)' });
+      await expect(oidcLink).toHaveCount(1);
+      await expect(oidcLink).toBeVisible();
+      const linkHref = await oidcLink.getAttribute('href');
+      if (!linkHref) {
+        throw new Error('E2E OIDC login link has no target');
+      }
+      const initiationHref = new URL(linkHref, baseURL);
+      expect(initiationHref.pathname).toBe('/oidc/authenticate/helix-rnd/');
+
+      const initiationResponsePromise = page.waitForResponse(response => {
+        const url = new URL(response.url());
+        return (
+          response.request().method() === 'GET' &&
+          url.origin === appOrigin &&
+          url.pathname === '/oidc/authenticate/helix-rnd/'
+        );
+      });
+      const providerResponsePromise = page.waitForResponse(response => {
+        const url = new URL(response.url());
+        return (
+          response.request().method() === 'GET' &&
+          url.origin === providerOrigin &&
+          url.pathname === '/itambox-e2e/authorize'
+        );
+      });
+      await oidcLink.click();
+
+      const initiationResponse = await initiationResponsePromise;
+      expect(initiationResponse.status()).toBe(302);
+      const initiationLocation = initiationResponse.headers()['location'];
+      if (!initiationLocation) {
+        throw new Error('OIDC initiation did not return a provider location');
+      }
+      const initiationUrl = new URL(initiationLocation, baseURL);
+      expect(initiationUrl.origin).toBe(providerOrigin);
+      expect(initiationUrl.pathname).toBe('/itambox-e2e/authorize');
+      const initiationState = initiationUrl.searchParams.get('state');
+      if (!initiationState) {
+        throw new Error('OIDC initiation did not include state');
+      }
+
+      const providerResponse = await providerResponsePromise;
+      expect(providerResponse.status()).toBe(200);
+      const providerPageUrl = new URL(providerResponse.url());
+      expect(providerPageUrl.origin).toBe(providerOrigin);
+      expect(providerPageUrl.pathname).toBe('/itambox-e2e/authorize');
+      const subjectInput = page.locator('input[name="username"]');
+      await expect(subjectInput).toBeVisible();
+      const signInButton = page.getByRole('button', { name: 'Sign-in' });
+      await expect(signInButton).toBeVisible();
+      await subjectInput.fill(oidcSubject);
+
+      const providerPostResponsePromise = page.waitForResponse(response => {
+        const url = new URL(response.url());
+        return (
+          response.request().method() === 'POST' &&
+          url.origin === providerOrigin &&
+          url.pathname === '/itambox-e2e/authorize'
+        );
+      });
+      const callbackResponsePromise = page.waitForResponse(response => {
+        const url = new URL(response.url());
+        return (
+          response.request().method() === 'GET' &&
+          url.origin === appOrigin &&
+          url.pathname === '/oidc/callback/'
+        );
+      });
+      const dashboardResponsePromise = page.waitForResponse(response => {
+        const url = new URL(response.url());
+        return response.request().method() === 'GET' && url.origin === appOrigin && url.pathname === '/';
+      });
+      await signInButton.click();
+
+      const [providerPostResponse, callbackResponse, dashboardResponse] = await Promise.all([
+        providerPostResponsePromise,
+        callbackResponsePromise,
+        dashboardResponsePromise,
+      ]);
+      expect(providerPostResponse.status()).toBe(302);
+      const callbackLocation = providerPostResponse.headers()['location'];
+      if (!callbackLocation) {
+        throw new Error('OIDC provider did not return the application callback location');
+      }
+      const callbackUrl = new URL(callbackLocation, oidcProviderUrl);
+      const callbackState = callbackUrl.searchParams.get('state');
+      const callbackCode = callbackUrl.searchParams.get('code');
+      if (
+        callbackUrl.origin !== appOrigin ||
+        callbackUrl.pathname !== '/oidc/callback/' ||
+        !callbackCode ||
+        !callbackState ||
+        callbackState !== initiationState
+      ) {
+        throw new Error('OIDC provider callback location failed the bounded state/code contract');
+      }
+
+      expect(callbackResponse.status()).toBe(302);
+      if (callbackResponse.headers()['location'] !== '/') {
+        throw new Error('OIDC callback did not redirect to the dashboard root');
+      }
+      expect(dashboardResponse.status()).toBe(200);
+      if (new URL(dashboardResponse.url()).pathname !== '/') {
+        throw new Error('OIDC callback did not complete at the dashboard root');
+      }
+      await expect(page).toHaveTitle('Dashboard - ITAMbox');
+      await expect(page.locator('#dashboard-grid')).toBeVisible();
+      await expect(page.locator('.workspace-switcher-name')).toHaveText('Helix Biopharma AG');
+
+      const membershipResponse = await page.goto(`/organization/memberships/?q=${encodeURIComponent(oidcEmail)}`);
+      if (membershipResponse === null) {
+        throw new Error('Membership list navigation returned no response');
+      }
+      expect(membershipResponse.status()).toBe(200);
+      expect(new URL(page.url()).pathname).toBe('/organization/memberships/');
+      const membershipRows = page.locator('table tbody tr');
+      await expect(membershipRows).toHaveCount(1);
+      const membershipRow = membershipRows.first();
+      await expect(membershipRow.getByRole('link', { name: oidcEmail, exact: true })).toHaveCount(1);
+      await expect(membershipRow.getByRole('link', { name: 'Admin', exact: true })).toHaveCount(1);
+      // django-tables2 BooleanColumn renders the active state as <span class="true">✔</span>.
+      await expect(membershipRow.locator('span.true')).toHaveCount(1);
+
+      const assetHolderResponse = await page.goto(`/organization/asset-holders/?q=${encodeURIComponent(oidcEmail)}`);
+      if (assetHolderResponse === null) {
+        throw new Error('AssetHolder list navigation returned no response');
+      }
+      expect(assetHolderResponse.status()).toBe(200);
+      expect(new URL(page.url()).pathname).toBe('/organization/asset-holders/');
+      const assetHolderRows = page.locator('table tbody tr');
+      await expect(assetHolderRows).toHaveCount(1);
+      const assetHolderRow = assetHolderRows.first();
+      await expect(assetHolderRow.getByRole('link', { name: oidcEmail, exact: true })).toHaveCount(1);
+      await expect(assetHolderRow).toContainText('E2E');
+      await expect(assetHolderRow).toContainText('OIDC');
+      await expect(assetHolderRow).toContainText('Helix Biopharma AG');
+    } finally {
+      if (page) {
+        await page.goto('about:blank', { waitUntil: 'commit' });
+        await page.close();
+      }
+      await oidcContext.close();
     }
   });
 });

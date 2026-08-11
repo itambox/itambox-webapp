@@ -72,6 +72,25 @@ class TenantOIDCTestCase(TestCase):
         self.assertEqual(backend.OIDC_RP_CLIENT_ID, "beta-client-id")
         self.assertEqual(backend.OIDC_RP_CLIENT_SECRET, "beta-secret")
 
+    def test_optional_settings_default_to_none(self):
+        backend = TenantOIDCBackend()
+
+        # No tenant context: optional settings resolve to None (the upstream
+        # OIDCAuthenticationBackend.__init__ contract) instead of raising
+        # OIDCConfigurationError, so the JWKS fallback path stays reachable
+        # for RS/ES-signed providers configured with JWKS only.
+        set_current_tenant(None)
+        self.assertIsNone(backend.OIDC_RP_IDP_SIGN_KEY)
+        self.assertIsNone(backend.OIDC_OP_JWKS_ENDPOINT)
+
+        # Tenant context: configured values win, unset optional keys stay None.
+        set_current_tenant(self.tenant_alpha)
+        self.assertEqual(
+            backend.OIDC_OP_JWKS_ENDPOINT,
+            "https://auth.alpha.com/.well-known/jwks.json",
+        )
+        self.assertIsNone(backend.OIDC_RP_IDP_SIGN_KEY)
+
     def test_user_creation_and_update(self):
         backend = TenantOIDCBackend()
         set_current_tenant(self.tenant_alpha)

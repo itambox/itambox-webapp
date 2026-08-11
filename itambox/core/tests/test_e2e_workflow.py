@@ -1,3 +1,5 @@
+import json
+import unittest
 from pathlib import Path
 
 REPOSITORY_ROOT = Path(__file__).resolve().parents[3]
@@ -6,6 +8,31 @@ PLAYWRIGHT_CONFIG_PATH = REPOSITORY_ROOT / "itambox" / "tests" / "e2e" / "playwr
 PREFLIGHT_PATH = REPOSITORY_ROOT / "itambox" / "tests" / "e2e" / "preflight-check.mjs"
 E2E_PACKAGE_PATH = REPOSITORY_ROOT / "itambox" / "tests" / "e2e" / "package.json"
 SCIM_SPEC_PATH = REPOSITORY_ROOT / "itambox" / "tests" / "e2e" / "spec" / "07-sso-scim.spec.ts"
+
+
+def _folded_json_env_value(document, key):
+    lines = document.splitlines()
+    marker = f"{key}: >-"
+    for index, line in enumerate(lines):
+        if line.strip() != marker:
+            continue
+        key_indent = len(line) - len(line.lstrip())
+        value_lines = []
+        for value_line in lines[index + 1 :]:
+            if value_line.strip() and len(value_line) - len(value_line.lstrip()) <= key_indent:
+                break
+            if value_line.strip():
+                value_lines.append(value_line.strip())
+        return json.loads("".join(value_lines))
+    raise AssertionError(f"missing folded JSON environment value: {key}")
+
+
+def load_tests(_loader, _tests, _pattern):
+    suite = unittest.TestSuite()
+    for name, test in globals().items():
+        if name.startswith("test_") and callable(test):
+            suite.addTest(unittest.FunctionTestCase(test))
+    return suite
 
 
 def test_e2e_workflow_generates_masked_ephemeral_credentials_before_seeding():
@@ -78,6 +105,96 @@ def test_e2e_workflow_provisions_full_demo_and_masked_scim_credentials():
     assert workflow.index("Seed full E2E fixture data") < workflow.index("Provision E2E principal and SCIM token")
 
 
+def test_e2e_workflow_pins_the_positive_oidc_provider_contract_before_django():
+    workflow = WORKFLOW_PATH.read_text(encoding="utf-8")
+    service_config = _folded_json_env_value(workflow, "JSON_CONFIG")
+    tenant_config = _folded_json_env_value(workflow, "ITAMBOX_TENANT_OIDC_CONFIGS")
+
+    assert (
+        "ghcr.io/navikt/mock-oauth2-server:6.0.0@sha256:"
+        "b9fa251aefee22a97c32534d23a1c400f01dbd483ab263b013d89f6d60d96691"
+    ) in workflow
+    assert service_config == {
+        "interactiveLogin": True,
+        "httpServer": "NettyWrapper",
+        "tokenProvider": {"keyProvider": {"algorithm": "RS256"}},
+        "tokenCallbacks": [
+            {
+                "issuerId": "itambox-e2e",
+                "tokenExpiry": 300,
+                "requestMappings": [
+                    {
+                        "requestParam": "subject",
+                        "match": "itambox-e2e-oidc-user",
+                        "claims": {
+                            "sub": "itambox-e2e-oidc-user",
+                            "email": "e2e.oidc@itambox.local",
+                            "given_name": "E2E",
+                            "family_name": "OIDC",
+                            "groups": ["e2e-oidc-admins"],
+                            "aud": ["${clientId}"],
+                            "azp": "${clientId}",
+                        },
+                    }
+                ],
+            }
+        ],
+    }
+    assert tenant_config == {
+        "helix-rnd": {
+            "enabled": True,
+            "display_name": "E2E OIDC",
+            "OIDC_RP_CLIENT_ID": "itambox-e2e-client",
+            "OIDC_RP_CLIENT_SECRET": "itambox-e2e-secret",
+            "OIDC_OP_AUTHORIZATION_ENDPOINT": "http://127.0.0.1:8081/itambox-e2e/authorize",
+            "OIDC_OP_TOKEN_ENDPOINT": "http://127.0.0.1:8081/itambox-e2e/token",
+            "OIDC_OP_USER_ENDPOINT": "http://127.0.0.1:8081/itambox-e2e/userinfo",
+            "OIDC_OP_ISSUER": "http://127.0.0.1:8081/itambox-e2e",
+            "OIDC_OP_JWKS_ENDPOINT": "http://127.0.0.1:8081/itambox-e2e/jwks",
+            "OIDC_RP_SIGN_ALGO": "RS256",
+            "OIDC_RP_SCOPES": "openid email profile groups",
+            "OIDC_USE_NONCE": True,
+            "OIDC_CREATE_USER": True,
+            "OIDC_GROUP_ROLE_MAPPING": {"e2e-oidc-admins": "Admin"},
+        }
+    }
+    assert "E2E_OIDC_PROVIDER_URL: http://127.0.0.1:8081" in workflow
+    assert "E2E_OIDC_SUBJECT: itambox-e2e-oidc-user" in workflow
+    assert "E2E_OIDC_EMAIL: e2e.oidc@itambox.local" in workflow
+    assert workflow.index("ITAMBOX_TENANT_OIDC_CONFIGS:") < workflow.index("Run Django system checks")
+    assert workflow.index("Check OIDC mock provider readiness") < workflow.index("Run Django system checks")
+    assert "deadline=$((SECONDS + 60))" in workflow
+    assert "while (( SECONDS < deadline && attempt < 60 ))" in workflow
+    assert "curl --fail --silent --show-error" in workflow
+    assert "/isalive" in workflow
+    assert "openid-configuration" in workflow
+    assert "authorization_endpoint" in workflow
+    assert "token_endpoint" in workflow
+    assert "userinfo_endpoint" in workflow
+    assert "jwks_uri" in workflow
+    assert "for key, value in expected.items():" in workflow
+    assert "JWKS contains an RSA signing key usable for RS256" in workflow
+    assert 'key.get("kty") == "RSA"' in workflow
+    assert 'key.get("use", "sig") == "sig"' in workflow
+    assert 'key.get("alg", "RS256") == "RS256"' in workflow
+    assert "settings.RATELIMIT_USE_X_FORWARDED_FOR = True" in workflow
+    assert "settings.RATELIMIT_NUM_PROXIES = 1" in workflow
+    assert "Role.all_objects.filter(" in workflow
+    assert 'name="Administrator"' in workflow
+    assert 'name="Admin"' in workflow
+    assert "User._base_manager.filter(email=oidc_email)" in workflow
+    assert "AssetHolder.all_objects.filter(tenant=tenant)" in workflow
+    assert "Membership._base_manager.filter(tenant=tenant)" in workflow
+
+
+def test_e2e_workflow_redacts_query_strings_from_django_request_logging():
+    workflow = WORKFLOW_PATH.read_text(encoding="utf-8")
+
+    assert "WSGIRequestHandler.log_message" in workflow
+    assert 'runpy.run_path("manage.py", run_name="__main__")' in workflow
+    assert "re.sub(r'([^\\s\"]+)\\?[^\\s\"]*', r'\\1', value)" in workflow
+
+
 def test_scim_e2e_uses_bearer_auth_and_preserves_tenant_anti_harvesting():
     preflight = PREFLIGHT_PATH.read_text(encoding="utf-8")
     spec = SCIM_SPEC_PATH.read_text(encoding="utf-8")
@@ -110,3 +227,54 @@ def test_scim_e2e_uses_bearer_auth_and_preserves_tenant_anti_harvesting():
     assert "mockcode" not in spec
     assert "mockstate" not in spec
     assert "combo_code" not in spec
+
+
+def test_positive_oidc_e2e_keeps_the_flow_explicit_and_fresh():
+    spec = SCIM_SPEC_PATH.read_text(encoding="utf-8")
+    preflight = PREFLIGHT_PATH.read_text(encoding="utf-8")
+    positive = spec.split("test('13. Positive OIDC login", 1)[1]
+
+    for variable in (
+        "E2E_OIDC_PROVIDER_URL",
+        "E2E_OIDC_SUBJECT",
+        "E2E_OIDC_EMAIL",
+        "ITAMBOX_TENANT_OIDC_CONFIGS",
+    ):
+        assert variable in preflight
+    assert "JSON.parse(process.env.ITAMBOX_TENANT_OIDC_CONFIGS)" in preflight
+    assert "(redacted)" in preflight
+    assert "console.log(process.env.ITAMBOX_TENANT_OIDC_CONFIGS)" not in preflight
+    assert "Sign in with E2E OIDC (OIDC)" in positive
+    assert "browser.newContext({ baseURL });" in positive
+    assert "test.setTimeout(120_000);" in positive
+    assert "await oidcContext.clearCookies();" in positive
+    assert "await page.goto('about:blank', { waitUntil: 'commit' });" in positive
+    assert "await page.close();" in positive
+    assert "storageState" not in positive
+    assert "await page.setExtraHTTPHeaders({ 'X-Forwarded-For': '127.0.0.2' });" in positive
+    assert "await page.setExtraHTTPHeaders({});" in positive
+    assert 'input[name="username"]' in positive
+    assert "getByRole('button', { name: 'Sign-in' })" in positive
+    assert "expect(loginResponse.status()).toBe(200);" in positive
+    assert "expect(initiationResponse.status()).toBe(302);" in positive
+    assert "expect(providerResponse.status()).toBe(200);" in positive
+    assert "expect(providerPostResponse.status()).toBe(302);" in positive
+    assert "expect(callbackResponse.status()).toBe(302);" in positive
+    assert "expect(dashboardResponse.status()).toBe(200);" in positive
+    assert "expect(membershipResponse.status()).toBe(200);" in positive
+    assert "expect(assetHolderResponse.status()).toBe(200);" in positive
+    assert "callbackState !== initiationState" in positive
+    assert "await expect(page).toHaveTitle('Dashboard - ITAMbox');" in positive
+    assert "#dashboard-grid" in positive
+    assert "workspace-switcher-name" in positive
+    assert "Helix Biopharma AG" in positive
+    assert "organization/memberships/?q=" in positive
+    assert "organization/asset-holders/?q=" in positive
+    assert "toHaveCount(1)" in positive
+    assert "span.true" in positive
+    assert "getByRole('link', { name: 'Admin', exact: true })" in positive
+    assert "E2E" in positive
+    assert "OIDC" in positive
+    assert "finally" in positive
+    assert "console.log" not in positive
+    assert "soft-pass" not in positive.lower()
