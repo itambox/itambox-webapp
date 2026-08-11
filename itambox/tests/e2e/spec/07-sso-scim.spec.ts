@@ -538,7 +538,8 @@ test.describe('SSO and SCIM 2.0 Provisioning Specs', () => {
       const membershipRow = membershipRows.first();
       await expect(membershipRow.getByRole('link', { name: oidcEmail, exact: true })).toHaveCount(1);
       await expect(membershipRow.getByRole('link', { name: 'Admin', exact: true })).toHaveCount(1);
-      await expect(membershipRow.locator('.mdi-check-circle-outline')).toHaveCount(1);
+      // django-tables2 BooleanColumn renders the active state as <span class="true">✔</span>.
+      await expect(membershipRow.locator('span.true')).toHaveCount(1);
 
       const assetHolderResponse = await page.goto(`/organization/asset-holders/?q=${encodeURIComponent(oidcEmail)}`);
       if (assetHolderResponse === null) {

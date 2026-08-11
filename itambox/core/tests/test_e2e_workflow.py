@@ -271,7 +271,7 @@ def test_positive_oidc_e2e_keeps_the_flow_explicit_and_fresh():
     assert "organization/memberships/?q=" in positive
     assert "organization/asset-holders/?q=" in positive
     assert "toHaveCount(1)" in positive
-    assert "mdi-check-circle-outline" in positive
+    assert "span.true" in positive
     assert "getByRole('link', { name: 'Admin', exact: true })" in positive
     assert "E2E" in positive
     assert "OIDC" in positive
