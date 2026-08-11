@@ -877,6 +877,10 @@ class CustodySigningSessionPrepareTests(CustodyRBACFixtureMixin, TestCase):
         self.assertContains(detail_response, "Recipient handoff is ready")
         self.assertContains(detail_response, signing_session.token)
         self.assertContains(detail_response, DUMMY_TOKEN_A)
+        # Handoff actions must wrap on narrow viewports: the button group is a
+        # flex-wrap container so the copy / QR / e-mail actions never collapse
+        # into overlapping vertical strips on mobile (demo finding 2026-08-10).
+        self.assertContains(detail_response, 'class="d-flex flex-wrap gap-2 mt-2"')
         # Export must not be intercepted by htmx boost: a native download
         # (Content-Disposition attachment) survives only without hx-boost.
         self.assertContains(detail_response, 'hx-boost="false"')
