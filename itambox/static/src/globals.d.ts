@@ -19,6 +19,7 @@ declare const htmx: {
   find: (elt: Element, selector: string) => Element | null;
   ajax: (method: string, url: string, opts?: Record<string, unknown>) => void;
   on: (event: string, callback: (evt: Event) => void) => void;
+  onLoad: (callback: (content: HTMLElement) => void) => void;
 };
 
 // Bootstrap
@@ -51,6 +52,24 @@ declare const bootstrap: {
     getOrCreateInstance: (element: Element) => { show: () => void; hide: () => void; dispose: () => void };
   };
   Offcanvas: {
+    new (element: Element, options?: Record<string, unknown>): {
+      show: () => void;
+      hide: () => void;
+      dispose: () => void;
+    };
+    getInstance: (element: Element) => { hide: () => void } | null;
+    getOrCreateInstance: (element: Element) => { show: () => void; hide: () => void };
+  };
+  Collapse: {
+    new (element: Element, options?: Record<string, unknown>): {
+      show: () => void;
+      hide: () => void;
+      dispose: () => void;
+    };
+    getInstance: (element: Element) => { hide: () => void } | null;
+    getOrCreateInstance: (element: Element) => { show: () => void; hide: () => void };
+  };
+  Dropdown: {
     new (element: Element, options?: Record<string, unknown>): {
       show: () => void;
       hide: () => void;
