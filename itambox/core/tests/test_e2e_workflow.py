@@ -246,6 +246,7 @@ def test_positive_oidc_e2e_keeps_the_flow_explicit_and_fresh():
     assert "console.log(process.env.ITAMBOX_TENANT_OIDC_CONFIGS)" not in preflight
     assert "Sign in with E2E OIDC (OIDC)" in positive
     assert "browser.newContext({ baseURL });" in positive
+    assert "await oidcContext.clearCookies();" in positive
     assert "storageState" not in positive
     assert "X-Forwarded-For" in positive
     assert 'input[name="username"]' in positive
