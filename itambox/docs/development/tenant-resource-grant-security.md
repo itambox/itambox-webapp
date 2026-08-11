@@ -222,6 +222,7 @@ PYTHONPATH=itambox uv run --locked --group dev python -m pytest -q -p no:cachepr
   scripts/tests/test_security_gate.py \
   scripts/tests/test_typing_policy.py \
   itambox/assets/tests/test_audit_ws6_10.py \
+  itambox/assets/tests/test_assignments.py \
   itambox/assets/tests/test_tag_sequence_concurrency.py \
   itambox/core/tests/test_context_isolation.py \
   itambox/core/tests/test_management_commands.py \
