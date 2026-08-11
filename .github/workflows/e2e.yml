@@ -192,7 +192,9 @@ jobs:
           ):
               raise SystemExit("OIDC JWKS has no RSA signing key usable for RS256")
 
-          print("OIDC mock provider readiness passed: issuer, authorization, token, userinfo, and JWKS endpoints verified.")
+          for key, value in expected.items():
+              print(f"OIDC {key}: {value}")
+          print("OIDC mock provider readiness passed; JWKS contains an RSA signing key usable for RS256.")
           PY
 
       - name: Run Django system checks
@@ -284,7 +286,9 @@ jobs:
 
           if User._base_manager.filter(email=oidc_email).exists():
               raise RuntimeError("E2E OIDC fixture User already exists")
-          holder_match = AssetHolder.all_objects.filter(tenant=tenant).filter(Q(email=oidc_email) | Q(upn=oidc_email))
+          holder_match = AssetHolder.all_objects.filter(tenant=tenant).filter(
+              Q(email=oidc_email) | Q(upn=oidc_email) | Q(user__email=oidc_email) | Q(user__username=oidc_email)
+          )
           if holder_match.exists():
               raise RuntimeError("E2E OIDC fixture AssetHolder already exists")
           membership_match = Membership._base_manager.filter(tenant=tenant).filter(
