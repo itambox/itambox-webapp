@@ -7,7 +7,13 @@ import requests
 from django.core.exceptions import ValidationError
 from django.test import SimpleTestCase
 
-from core.events import DeliveryDisposition, DeliveryResult, delivery_log_context, send_notification_to_channel
+from core.events import (
+    DeliveryDisposition,
+    DeliveryResult,
+    delivery_log_context,
+    send_email_notification,
+    send_notification_to_channel,
+)
 from core.tasks.alerts import _dispatch_channels
 from core.tasks.webhooks import send_webhook_task
 
@@ -253,6 +259,60 @@ class DeliveryContractTests(SimpleTestCase):
                 result = send_notification_to_channel(channel, "subject", "body")
                 self.assertEqual(result.disposition, disposition)
                 self.assertEqual(result.user_visible, user_visible)
+
+    @patch("core.events.EmailSettings.load")
+    @patch("core.events.get_connection")
+    def test_recipient_aware_email_helper_sends_only_explicit_recipients(self, get_connection, load_settings):
+        load_settings.return_value = SimpleNamespace(
+            enabled=True,
+            smtp_host="smtp.example.com",
+            smtp_port=587,
+            smtp_username="user",
+            smtp_password_decrypted="secret-password",
+            smtp_use_tls=True,
+            from_name="ITAMbox",
+            from_address="noreply@example.com",
+        )
+        connection = MagicMock()
+        get_connection.return_value = connection
+
+        result = send_email_notification(
+            ["holder@example.test"],
+            "Custody handoff",
+            "one-time body",
+            tenant_id=7,
+        )
+
+        self.assertEqual(result.disposition, DeliveryDisposition.SUCCESS)
+        message = connection.send_messages.call_args.args[0][0]
+        self.assertEqual(message.to, ["holder@example.test"])
+        self.assertNotIn("test@example", message.to)
+
+    @patch("core.events.EmailSettings.load")
+    @patch("core.events.get_connection")
+    def test_recipient_aware_email_helper_classifies_invalid_message_safely(self, get_connection, load_settings):
+        load_settings.return_value = SimpleNamespace(
+            enabled=True,
+            smtp_host="smtp.example.com",
+            smtp_port=587,
+            smtp_username="user",
+            smtp_password_decrypted="secret-password",
+            smtp_use_tls=True,
+            from_name="ITAMbox",
+            from_address="noreply@example.com",
+        )
+        with patch("core.events.EmailMessage", side_effect=ValueError("secret header detail")):
+            result = send_email_notification(
+                ["holder@example.test"],
+                "subject",
+                "body",
+                tenant_id=7,
+            )
+
+        self.assertEqual(result.disposition, DeliveryDisposition.TERMINAL)
+        self.assertEqual(result.error_class, "invalid_message")
+        self.assertNotIn("secret header detail", result.user_message)
+        get_connection.assert_called_once()
 
     def test_unsupported_notification_channel_is_terminal(self):
         channel = SimpleNamespace(channel_type="webhook", config={}, tenant_id=7)

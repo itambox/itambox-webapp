@@ -4,8 +4,10 @@ The fixture values in this module are deliberately dummy values. They are not
 bearer credentials, signature payloads, or production EULA content.
 """
 
+import base64
 import json
 from concurrent.futures import ThreadPoolExecutor
+from contextlib import nullcontext
 from datetime import timedelta
 from io import StringIO
 from unittest.mock import patch
@@ -14,7 +16,7 @@ import pytest
 from django.contrib.auth import get_user_model
 from django.contrib.auth.models import Permission
 from django.contrib.contenttypes.models import ContentType
-from django.db import close_old_connections
+from django.db import IntegrityError, close_old_connections
 from django.test import TestCase, TransactionTestCase, override_settings
 from django.urls import NoReverseMatch, reverse
 from django.utils import timezone
@@ -22,12 +24,16 @@ from model_bakery import baker
 from rest_framework.test import APITestCase
 
 from assets.models import Asset
-from compliance.models import CustodyReceipt, CustodySigningSession, CustodyTemplate
+from compliance.models import CustodyHandoffDelivery, CustodyReceipt, CustodySigningSession, CustodyTemplate
+from compliance.services import _custody_handoff_email_content
 from compliance.views import CustodyReceiptPrepareView
+from core.events import DeliveryDisposition, DeliveryResult
 from core.management.commands._seed.access import SeedAccessMixin
 from core.models import ObjectChange
 from core.tests.mixins import TenantTestMixin, grant
+from extras.models import JournalEntry
 from organization.models import AssetHolder, Role, RoleGrant, Tenant
+from users.models import UserPreference
 
 User = get_user_model()
 
@@ -948,6 +954,25 @@ class CustodySigningSessionHandoffTests(CustodyRBACFixtureMixin, TestCase):
     def _handoff_url(self, session_token=DUMMY_SESSION_TOKEN, receipt_token=DUMMY_TOKEN_A):
         return f"{self._sign_url(receipt_token)}?session={session_token}"
 
+    def _qr_url(self, receipt=None, session=None):
+        receipt = receipt or self.receipt_a
+        session = session or self.signing_session
+        return reverse(
+            "compliance:custodyreceipt_handoff_qr",
+            kwargs={"pk": receipt.pk, "session_pk": session.pk},
+        )
+
+    def _email_url(self, receipt=None, session=None):
+        receipt = receipt or self.receipt_a
+        session = session or self.signing_session
+        return reverse(
+            "compliance:custodyreceipt_handoff_email",
+            kwargs={"pk": receipt.pk, "session_pk": session.pk},
+        )
+
+    def _login_operator(self):
+        self._login_to_tenant(self.technician, self.tenant_a)
+
     def test_old_receipt_with_valid_session_skips_link_ttl(self):
         # Regression (#300): a freshly prepared signing session is the
         # operator-authorized handoff channel and must override the 7-day
@@ -963,6 +988,379 @@ class CustodySigningSessionHandoffTests(CustodyRBACFixtureMixin, TestCase):
         response = self.client.get(self._handoff_url())
 
         self.assertEqual(response.status_code, 200)
+
+    def test_internal_detail_renders_copy_qr_and_email_controls_without_extra_tokens(self):
+        self._login_operator()
+        with patch("compliance.views.custody_handoff_email_is_configured", return_value=True):
+            response = self.client.get(reverse("compliance:custodyreceipt_detail", kwargs={"pk": self.receipt_a.pk}))
+        body = response.content.decode("utf-8", errors="replace")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertIn("Copy recipient handoff link", body)
+        self.assertIn("Show QR code", body)
+        self.assertIn(self._qr_url(), body)
+        self.assertIn(self._email_url(), body)
+        self.assertIn("csrfmiddlewaretoken", body)
+        self.assertEqual(body.count(DUMMY_TOKEN_A), 1)
+        self.assertEqual(body.count(DUMMY_SESSION_TOKEN), 1)
+        self.assertIn('data-bs-toggle="collapse"', body)
+        self.assertIn('hx-boost="false"', body)
+        self.assertIn("30", body)
+
+    def test_internal_detail_hides_delivery_controls_without_live_operator_session(self):
+        self._login_to_tenant(self.technician, self.tenant_a)
+        detail_url = reverse("compliance:custodyreceipt_detail", kwargs={"pk": self.receipt_a.pk})
+
+        self.signing_session.expires_at = timezone.now() - timedelta(seconds=1)
+        self.signing_session.save(update_fields=["expires_at", "updated_at"])
+        response = self.client.get(detail_url)
+        self.assertNotContains(response, "Copy recipient handoff link")
+        self.assertNotContains(response, "Show QR code")
+        self.assertNotContains(response, "E-mail link to holder")
+
+        response = self.client.get(detail_url)
+        self.assertNotContains(response, "Copy recipient handoff link")
+
+        self.signing_session.expires_at = timezone.now() + timedelta(minutes=30)
+        self.signing_session.consumed_at = timezone.now()
+        self.signing_session.outcome = CustodySigningSession.OUTCOME_ACCEPTED
+        self.signing_session.save(update_fields=["expires_at", "consumed_at", "outcome", "updated_at"])
+        response = self.client.get(detail_url)
+        self.assertNotContains(response, "Copy recipient handoff link")
+
+        self.receipt_a.acceptance_status = CustodyReceipt.STATUS_ACCEPTED
+        self.receipt_a.accepted = True
+        self.receipt_a.save(update_fields=["acceptance_status", "accepted", "updated_at"])
+        response = self.client.get(detail_url)
+        self.assertNotContains(response, "Copy recipient handoff link")
+
+        self._login_to_tenant(self.tenant_admin, self.tenant_a)
+        response = self.client.get(detail_url)
+        self.assertNotContains(response, "Copy recipient handoff link")
+
+    def test_qr_endpoint_returns_safe_svg_and_headers(self):
+        self._login_operator()
+
+        response = self.client.get(self._qr_url())
+        body = response.content
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response["Content-Type"], "image/svg+xml")
+        self.assertEqual(
+            response["Content-Disposition"], f'inline; filename="custody-handoff-{self.signing_session.pk}.svg"'
+        )
+        self.assertEqual(response["Cache-Control"], "no-store")
+        self.assertEqual(response["X-Content-Type-Options"], "nosniff")
+        self.assertEqual(response["Content-Security-Policy"], "default-src 'none'")
+        self.assertTrue(body.startswith(b"<svg"))
+        self.assertIn(b"<path", body)
+        self.assertNotIn(DUMMY_TOKEN_A.encode(), body)
+        self.assertNotIn(DUMMY_SESSION_TOKEN.encode(), body)
+        self.assertNotIn(b"<script", body.lower())
+        self.assertNotIn(b"<foreignobject", body.lower())
+
+    def test_qr_endpoint_uses_shared_configured_base_url(self):
+        self._login_operator()
+        with (
+            override_settings(ITAMBOX_BASE_URL="https://public.example.test"),
+            patch("compliance.views.render_custody_handoff_qr_svg", return_value=b"<svg />") as render_qr,
+        ):
+            response = self.client.get(self._qr_url())
+
+        self.assertEqual(response.status_code, 200)
+        encoded_url = render_qr.call_args.args[0]
+        self.assertTrue(encoded_url.startswith("https://public.example.test/"))
+        self.assertIn(DUMMY_TOKEN_A, encoded_url)
+        self.assertIn(DUMMY_SESSION_TOKEN, encoded_url)
+
+    def test_qr_endpoint_enforces_internal_scope_and_terminal_surface(self):
+        self._login_to_tenant(self.unrelated, self.tenant_a)
+        denied = self.client.get(self._qr_url())
+        self.assertEqual(denied.status_code, 403)
+        self.assertNotIn(DUMMY_TOKEN_A, denied.content.decode())
+
+        self._login_to_tenant(self.cross_tenant_user, self.tenant_b)
+        foreign = self.client.get(self._qr_url())
+        self.assertEqual(foreign.status_code, 404)
+        self._assert_no_receipt_payload(foreign, self.receipt_a)
+
+        self._login_operator()
+        self.signing_session.expires_at = timezone.now() - timedelta(seconds=1)
+        self.signing_session.save(update_fields=["expires_at", "updated_at"])
+        expired = self.client.get(self._qr_url())
+        self.assertEqual(expired.status_code, 410)
+        self.assertContains(expired, "internal_custody_handoff_unavailable", status_code=410)
+        self.assertNotContains(expired, "custody_session_expired_or_used", status_code=410)
+
+        self.signing_session.expires_at = timezone.now() + timedelta(minutes=30)
+        self.signing_session.save(update_fields=["expires_at", "updated_at"])
+        self.receipt_a.acceptance_status = CustodyReceipt.STATUS_ACCEPTED
+        self.receipt_a.accepted = True
+        self.receipt_a.save(update_fields=["acceptance_status", "accepted", "updated_at"])
+        completed = self.client.get(self._qr_url())
+        self.assertEqual(completed.status_code, 410)
+        self.assertNotContains(completed, "custody_session_expired_or_used", status_code=410)
+
+    def test_email_post_derives_holder_recipient_and_records_success(self):
+        self._login_operator()
+        result = DeliveryResult("email.deliver", DeliveryDisposition.SUCCESS)
+        with (
+            patch("compliance.services.custody_handoff_email_is_configured", return_value=True),
+            patch("compliance.services.send_email_notification", return_value=result) as send_email,
+            patch("compliance.services._cooldown_allows_handoff", return_value=True),
+        ):
+            response = self.client.post(self._email_url(), {"recipient": "attacker@example.test"})
+
+        self.assertEqual(response.status_code, 302)
+        self.assertEqual(send_email.call_args.args[0], [self.recipient_holder.email])
+        subject, body = send_email.call_args.args[1:3]
+        self.assertIn(self.asset_a.asset_tag, subject)
+        self.assertIn(self.asset_a.asset_tag, body)
+        self.assertIn(DUMMY_TOKEN_A, body)
+        self.assertIn(DUMMY_SESSION_TOKEN, body)
+        self.assertNotIn("attacker@example.test", body)
+        delivery = CustodyHandoffDelivery._base_manager.get(signing_session=self.signing_session)
+        self.assertEqual(delivery.attempt, 1)
+        self.assertEqual(delivery.status, CustodyHandoffDelivery.STATUS_SUCCEEDED)
+        self.assertIsNotNone(delivery.delivered_at)
+
+    def test_email_post_maps_retry_and_terminal_without_success_message(self):
+        self._login_operator()
+        outcomes = (
+            DeliveryResult("email.deliver", DeliveryDisposition.RETRYABLE, error_class="timeout"),
+            DeliveryResult(
+                "email.deliver",
+                DeliveryDisposition.TERMINAL,
+                True,
+                "Email delivery was rejected.",
+                "SMTPException",
+            ),
+        )
+        for outcome in outcomes:
+            with self.subTest(disposition=outcome.disposition):
+                with (
+                    patch("compliance.services.custody_handoff_email_is_configured", return_value=True),
+                    patch("compliance.services.send_email_notification", return_value=outcome),
+                    patch("compliance.services._cooldown_allows_handoff", return_value=True),
+                ):
+                    response = self.client.post(self._email_url(), follow=True)
+                self.assertEqual(response.status_code, 200)
+                self.assertNotContains(response, "accepted for delivery")
+                self.assertIsNone(self.signing_session.consumed_at)
+                self.assertEqual(self.receipt_a.acceptance_status, CustodyReceipt.STATUS_PENDING)
+
+                self.signing_session = CustodySigningSession._base_manager.get(pk=self.signing_session.pk)
+                if outcome.disposition == DeliveryDisposition.RETRYABLE:
+                    self.assertEqual(self.signing_session.handoff_deliveries.count(), 1)
+                else:
+                    self.assertEqual(self.signing_session.handoff_deliveries.count(), 2)
+
+    def test_email_without_holder_address_never_sends_or_books_delivery(self):
+        self._login_operator()
+        self.recipient_holder.email = ""
+        self.recipient_holder.save(update_fields=["email", "updated_at"])
+        with (
+            patch("compliance.services.custody_handoff_email_is_configured", return_value=True),
+            patch("compliance.services.send_email_notification") as send_email,
+        ):
+            response = self.client.post(self._email_url(), follow=True)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "holder has no e-mail address")
+        send_email.assert_not_called()
+        self.assertFalse(CustodyHandoffDelivery._base_manager.filter(signing_session=self.signing_session).exists())
+
+    def test_email_disabled_configuration_is_safe_and_not_success(self):
+        self._login_operator()
+        with (
+            patch("compliance.views.custody_handoff_email_is_configured", return_value=False),
+            patch("compliance.services.custody_handoff_email_is_configured", return_value=False),
+            patch("compliance.services.send_email_notification") as send_email,
+        ):
+            detail = self.client.get(reverse("compliance:custodyreceipt_detail", kwargs={"pk": self.receipt_a.pk}))
+            response = self.client.post(self._email_url(), follow=True)
+
+        self.assertContains(detail, "E-mail is not configured.")
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Email is not configured.")
+        send_email.assert_not_called()
+        self.assertFalse(CustodyHandoffDelivery._base_manager.filter(signing_session=self.signing_session).exists())
+
+    def test_email_post_rejects_unauthorized_foreign_and_terminal_sessions(self):
+        self._login_to_tenant(self.unrelated, self.tenant_a)
+        with patch("compliance.services.send_email_notification") as send_email:
+            denied = self.client.post(self._email_url())
+        self.assertEqual(denied.status_code, 403)
+        send_email.assert_not_called()
+
+        self._login_operator()
+        self.signing_session.canceled_at = timezone.now()
+        self.signing_session.save(update_fields=["canceled_at", "updated_at"])
+        gone = self.client.post(self._email_url())
+        self.assertEqual(gone.status_code, 410)
+        self.assertContains(gone, "internal_custody_handoff_unavailable", status_code=410)
+
+    def test_delivery_bound_refusal_books_no_row_and_journals_refused_event(self):
+        self._login_operator()
+        with (
+            patch("compliance.services.custody_handoff_email_is_configured", return_value=True),
+            patch("compliance.services._cooldown_allows_handoff", return_value=True),
+            patch(
+                "compliance.services.send_email_notification",
+                return_value=DeliveryResult("email.deliver", DeliveryDisposition.SUCCESS),
+            ) as send_email,
+        ):
+            for attempt in range(3):
+                response = self.client.post(self._email_url())
+                self.assertEqual(response.status_code, 302, attempt)
+            refused = self.client.post(self._email_url(), follow=True)
+
+        self.assertEqual(refused.status_code, 200)
+        self.assertContains(refused, "attempt limit has been reached")
+        self.assertEqual(send_email.call_count, 3)
+        self.assertEqual(CustodyHandoffDelivery._base_manager.filter(signing_session=self.signing_session).count(), 3)
+        refused_entries = JournalEntry._base_manager.filter(
+            object_id=self.asset_a.pk,
+            comment__contains="refused",
+        )
+        self.assertTrue(refused_entries.exists())
+        comment = refused_entries.order_by("-created").first().comment
+        for secret in (self.recipient_holder.email, DUMMY_TOKEN_A, DUMMY_SESSION_TOKEN):
+            self.assertNotIn(secret, comment)
+
+    def test_delivery_retry_books_second_attempt_and_unique_constraint_holds(self):
+        self._login_operator()
+        retry = DeliveryResult("email.deliver", DeliveryDisposition.RETRYABLE, error_class="timeout")
+        success = DeliveryResult("email.deliver", DeliveryDisposition.SUCCESS)
+        with (
+            patch("compliance.services.custody_handoff_email_is_configured", return_value=True),
+            patch("compliance.services._cooldown_allows_handoff", return_value=True),
+            patch("compliance.services.send_email_notification", side_effect=[retry, success]),
+        ):
+            self.client.post(self._email_url())
+            self.client.post(self._email_url())
+
+        deliveries = list(
+            CustodyHandoffDelivery._base_manager.filter(signing_session=self.signing_session).order_by("attempt")
+        )
+        self.assertEqual([delivery.attempt for delivery in deliveries], [1, 2])
+        self.assertEqual(deliveries[0].status, CustodyHandoffDelivery.STATUS_REQUESTED)
+        self.assertEqual(deliveries[0].error_class, "timeout")
+        self.assertEqual(deliveries[1].status, CustodyHandoffDelivery.STATUS_SUCCEEDED)
+        with self.assertRaises(IntegrityError):
+            CustodyHandoffDelivery._base_manager.create(
+                receipt=self.receipt_a,
+                signing_session=self.signing_session,
+                operator=self.technician,
+                attempt=2,
+                status=CustodyHandoffDelivery.STATUS_REQUESTED,
+            )
+
+    def test_journal_contains_only_safe_delivery_correlation(self):
+        self._login_operator()
+        with (
+            patch("compliance.services.custody_handoff_email_is_configured", return_value=True),
+            patch("compliance.services._cooldown_allows_handoff", return_value=True),
+            patch(
+                "compliance.services.send_email_notification",
+                return_value=DeliveryResult("email.deliver", DeliveryDisposition.SUCCESS),
+            ),
+        ):
+            self.client.post(self._email_url())
+
+        entry = JournalEntry._base_manager.filter(object_id=self.asset_a.pk).order_by("-created").first()
+        self.assertEqual(entry.tenant_id, self.tenant_a.pk)
+        self.assertEqual(entry.user_id, self.technician.pk)
+        self.assertIn("succeeded", entry.comment)
+        self.assertIn("expires at", entry.comment)
+        for secret in (self.recipient_holder.email, DUMMY_TOKEN_A, DUMMY_SESSION_TOKEN, "email.deliver"):
+            self.assertNotIn(secret, entry.comment)
+        self.assertNotIn(f"receipt_id={self.receipt_a.pk}", entry.comment)
+        self.assertNotIn(f"session_id={self.signing_session.pk}", entry.comment)
+
+    def test_email_content_uses_holder_preference_language(self):
+        UserPreference.objects.create(user=self.recipient, data={"language": "de"})
+
+        with patch("compliance.services.translation.override", return_value=nullcontext()) as override:
+            _custody_handoff_email_content(self.receipt_a, self.signing_session, "https://public.example.test/handoff")
+
+        override.assert_called_once_with("de")
+
+    def test_cooldown_refuses_second_session_without_booking_delivery(self):
+        self._login_operator()
+        second_session = CustodySigningSession._base_manager.create(
+            receipt=self.receipt_a,
+            operator=self.technician,
+            intended_holder=self.recipient_holder,
+            token="q" * 64,
+            expires_at=timezone.now() + timedelta(minutes=30),
+        )
+        result = DeliveryResult("email.deliver", DeliveryDisposition.SUCCESS)
+        with (
+            patch("compliance.services.custody_handoff_email_is_configured", return_value=True),
+            patch("compliance.services.send_email_notification", return_value=result) as send_email,
+        ):
+            first = self.client.post(self._email_url())
+            second = self.client.post(self._email_url(session=second_session), follow=True)
+
+        self.assertEqual(first.status_code, 302)
+        self.assertEqual(second.status_code, 200)
+        self.assertContains(second, "Please wait before sending another handoff e-mail.")
+        send_email.assert_called_once()
+        self.assertFalse(CustodyHandoffDelivery._base_manager.filter(signing_session=second_session).exists())
+
+    def test_receipt_bound_refuses_fresh_session_after_six_attempts(self):
+        self._login_operator()
+        sessions = [self.signing_session]
+        for index in range(5):
+            sessions.append(
+                CustodySigningSession._base_manager.create(
+                    receipt=self.receipt_a,
+                    operator=self.technician,
+                    intended_holder=self.recipient_holder,
+                    token=(chr(97 + index) * 63) + str(index),
+                    expires_at=timezone.now() + timedelta(minutes=30),
+                )
+            )
+        for session in sessions:
+            CustodyHandoffDelivery._base_manager.create(
+                receipt=self.receipt_a,
+                signing_session=session,
+                operator=self.technician,
+                attempt=1,
+                status=CustodyHandoffDelivery.STATUS_SUCCEEDED,
+            )
+        seventh_session = CustodySigningSession._base_manager.create(
+            receipt=self.receipt_a,
+            operator=self.technician,
+            intended_holder=self.recipient_holder,
+            token="z" * 64,
+            expires_at=timezone.now() + timedelta(minutes=30),
+        )
+        with (
+            patch("compliance.services.custody_handoff_email_is_configured", return_value=True),
+            patch("compliance.services._cooldown_allows_handoff", return_value=True),
+            patch("compliance.services.send_email_notification") as send_email,
+        ):
+            response = self.client.post(self._email_url(session=seventh_session), follow=True)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "attempt limit has been reached")
+        send_email.assert_not_called()
+        self.assertFalse(CustodyHandoffDelivery._base_manager.filter(signing_session=seventh_session).exists())
+
+    def test_delivery_manager_is_tenant_scoped(self):
+        delivery = CustodyHandoffDelivery._base_manager.create(
+            receipt=self.receipt_a,
+            signing_session=self.signing_session,
+            operator=self.technician,
+            attempt=1,
+            status=CustodyHandoffDelivery.STATUS_REQUESTED,
+        )
+        with self.tenant_context(self.tenant_a):
+            self.assertTrue(CustodyHandoffDelivery.objects.filter(pk=delivery.pk).exists())
+        with self.tenant_context(self.tenant_b):
+            self.assertFalse(CustodyHandoffDelivery.objects.filter(pk=delivery.pk).exists())
 
     def test_intended_recipient_accept_consumes_session_with_accepted_outcome(self):
         self._login_to_tenant(self.recipient, self.tenant_a)
@@ -1185,10 +1583,63 @@ class CustodySigningSessionRaceTests(CustodyRBACFixtureMixin, TransactionTestCas
         self.assertEqual(self.signing_session.outcome, CustodySigningSession.OUTCOME_ACCEPTED)
 
 
+@override_settings(REQUIRE_CUSTODY_SIGNIN=True)
+@pytest.mark.serial_only
+class CustodyHandoffDeliveryRaceTests(CustodyRBACFixtureMixin, TransactionTestCase):
+    reset_sequences = True
+
+    def setUp(self):
+        super().setUp()
+        self.signing_session = CustodySigningSession._base_manager.create(
+            receipt=self.receipt_a,
+            operator=self.technician,
+            intended_holder=self.recipient_holder,
+            token=DUMMY_SESSION_TOKEN,
+            expires_at=timezone.now() + timedelta(minutes=30),
+        )
+
+    def _post_handoff_email(self):
+        close_old_connections()
+        try:
+            client = self.client_class()
+            client.force_login(self.technician)
+            session = client.session
+            session["active_tenant_id"] = self.tenant_a.pk
+            session.save()
+            url = reverse(
+                "compliance:custodyreceipt_handoff_email",
+                kwargs={"pk": self.receipt_a.pk, "session_pk": self.signing_session.pk},
+            )
+            return client.post(url)
+        finally:
+            close_old_connections()
+
+    def test_concurrent_posts_receive_unique_attempt_numbers(self):
+        result = DeliveryResult("email.deliver", DeliveryDisposition.SUCCESS)
+        with (
+            patch("compliance.services.custody_handoff_email_is_configured", return_value=True),
+            patch("compliance.services._cooldown_allows_handoff", return_value=True),
+            patch("compliance.services.send_email_notification", return_value=result),
+        ):
+            with ThreadPoolExecutor(max_workers=2) as executor:
+                responses = list(executor.map(lambda _: self._post_handoff_email(), range(2)))
+
+        deliveries = list(
+            CustodyHandoffDelivery._base_manager.filter(signing_session=self.signing_session).order_by("attempt")
+        )
+        self.assertEqual(sorted(response.status_code for response in responses), [302, 302])
+        self.assertEqual([delivery.attempt for delivery in deliveries], [1, 2])
+        self.assertTrue(all(delivery.status == CustodyHandoffDelivery.STATUS_SUCCEEDED for delivery in deliveries))
+
+
 class CustodyReceiptExportTests(CustodyRBACFixtureMixin, TestCase):
     def _export_url(self, receipt=None):
         receipt = receipt or self.receipt_a
         return reverse("compliance:custodyreceipt_export", kwargs={"pk": receipt.pk})
+
+    def _pdf_url(self, receipt=None):
+        receipt = receipt or self.receipt_a
+        return reverse("compliance:custodyreceipt_export_pdf", kwargs={"pk": receipt.pk})
 
     def _accept_receipt(self, receipt=None):
         receipt = receipt or self.receipt_a
@@ -1247,6 +1698,155 @@ class CustodyReceiptExportTests(CustodyRBACFixtureMixin, TestCase):
         self.assertNotIn(DUMMY_SESSION_TOKEN.encode(), first_response.content)
         self.assertNotIn(b"dummy-export-signature-canvas", first_response.content)
         self.assertNotIn(b"dummy-export-signature-data", first_response.content)
+
+    def test_authorized_accepted_export_returns_pdf_with_download_headers(self):
+        self._accept_receipt()
+        self._login_to_tenant(self.tenant_admin, self.tenant_a)
+
+        response = self.client.get(self._pdf_url())
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response["Content-Type"], "application/pdf")
+        self.assertEqual(
+            response["Content-Disposition"],
+            f'attachment; filename="custody-receipt-{self.receipt_a.pk}.pdf"',
+        )
+        self.assertEqual(response["Cache-Control"], "no-store")
+        self.assertEqual(response["X-Content-Type-Options"], "nosniff")
+        self.assertTrue(response.content.startswith(b"%PDF"))
+        self.assertGreater(len(response.content), 500)
+
+    def test_pdf_renderer_receives_allowlisted_context_without_secrets(self):
+        self._accept_receipt()
+        session = CustodySigningSession._base_manager.create(
+            receipt=self.receipt_a,
+            operator=self.technician,
+            intended_holder=self.recipient_holder,
+            token=DUMMY_SESSION_TOKEN,
+            expires_at=timezone.now() + timedelta(minutes=30),
+        )
+        self._login_to_tenant(self.tenant_admin, self.tenant_a)
+
+        with patch("compliance.views.report_pdf_bytes", return_value=b"%PDF-test") as render_pdf:
+            response = self.client.get(self._pdf_url())
+
+        self.assertEqual(response.status_code, 200)
+        rendered_html = render_pdf.call_args.args[0]
+        for expected in (
+            self.asset_a.asset_tag,
+            "Dummy Recipient",
+            DUMMY_EULA,
+            "dummy-export-verification-hash",
+        ):
+            self.assertIn(expected, rendered_html)
+        self.assertIn(str(session.pk), rendered_html)
+        for secret in (DUMMY_TOKEN_A, DUMMY_SESSION_TOKEN, "dummy-export-signature-data"):
+            self.assertNotIn(secret, rendered_html)
+
+    def test_pdf_signature_image_validation_and_fallback(self):
+        valid_png = (
+            "data:image/png;base64,"
+            "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII="
+        )
+        oversized_png = (
+            "data:image/png;base64," + base64.b64encode(b"\x89PNG\r\n\x1a\n" + b"x" * (2 * 1024 * 1024 + 1)).decode()
+        )
+        cases = (
+            (valid_png, valid_png, True),
+            ("data:image/png;base64,not-base64", "No renderable signature image is stored.", False),
+            (oversized_png, "No renderable signature image is stored.", False),
+        )
+        self._accept_receipt()
+        self._login_to_tenant(self.tenant_admin, self.tenant_a)
+
+        for signature, expected, is_image in cases:
+            with self.subTest(is_image=is_image):
+                self.receipt_a.signature_canvas = signature
+                self.receipt_a.save(update_fields=["signature_canvas", "updated_at"])
+                with patch("compliance.views.report_pdf_bytes", return_value=b"%PDF-test") as render_pdf:
+                    response = self.client.get(self._pdf_url())
+                self.assertEqual(response.status_code, 200)
+                rendered_html = render_pdf.call_args.args[0]
+                self.assertIn(expected, rendered_html)
+                if is_image:
+                    self.assertIn('alt="Captured recipient signature"', rendered_html)
+
+    def test_pdf_export_preserves_scope_and_permission_contract(self):
+        self._login_to_tenant(self.tenant_admin, self.tenant_a)
+        pending_response = self.client.get(self._pdf_url())
+        self.assertEqual(pending_response.status_code, 404)
+        self._assert_no_receipt_payload(pending_response, self.receipt_a)
+
+        self._accept_receipt()
+        self._login_to_tenant(self.technician, self.tenant_a)
+        denied_response = self.client.get(self._pdf_url())
+        self.assertEqual(denied_response.status_code, 403)
+        self._assert_no_receipt_payload(denied_response, self.receipt_a)
+
+        self._login_to_tenant(self.cross_tenant_user, self.tenant_b)
+        foreign_response = self.client.get(self._pdf_url())
+        self.assertEqual(foreign_response.status_code, 404)
+        self._assert_no_receipt_payload(foreign_response, self.receipt_a)
+
+        self.client.force_login(self.superadmin)
+        superadmin_response = self.client.get(self._pdf_url())
+        self.assertGreaterEqual(superadmin_response.status_code, 200)
+        self.assertLess(superadmin_response.status_code, 300)
+
+    def test_pdf_and_json_download_controls_are_native_downloads(self):
+        self._accept_receipt()
+        detail_url = reverse("compliance:custodyreceipt_detail", kwargs={"pk": self.receipt_a.pk})
+        self._login_to_tenant(self.tenant_admin, self.tenant_a)
+
+        response = self.client.get(detail_url)
+
+        pdf_href = 'href="' + self._pdf_url() + '"'
+        json_href = 'href="' + self._export_url() + '"'
+        self.assertContains(response, pdf_href)
+        self.assertContains(response, json_href)
+        body = response.content.decode()
+        for url in (self._pdf_url(), self._export_url()):
+            link_start = body.index('href="' + url + '"')
+            link_end = body.index("</a>", link_start)
+            link = body[link_start:link_end]
+            self.assertIn('hx-boost="false"', link)
+            self.assertIn(" download", link)
+
+    def test_pdf_export_handles_long_eula(self):
+        self._accept_receipt()
+        self.receipt_a.eula_text = "\n".join(f"Legal term {index}: {DUMMY_EULA}" for index in range(250))
+        self.receipt_a.save(update_fields=["eula_text", "updated_at"])
+        self._login_to_tenant(self.tenant_admin, self.tenant_a)
+
+        response = self.client.get(self._pdf_url())
+
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(response.content.startswith(b"%PDF"))
+        self.assertGreater(len(response.content), 4000)
+
+    def test_pdf_renderer_failure_returns_safe_server_error(self):
+        self._accept_receipt()
+        self._login_to_tenant(self.tenant_admin, self.tenant_a)
+
+        with (
+            patch("compliance.views.report_pdf_bytes", side_effect=RuntimeError("secret renderer detail")),
+            self.assertLogs("compliance.views", level="ERROR") as captured,
+        ):
+            response = self.client.get(self._pdf_url())
+
+        self.assertEqual(response.status_code, 500)
+        body = response.content.decode("utf-8", errors="replace")
+        self.assertNotIn(self.asset_a.asset_tag, body)
+        self.assertNotIn("secret renderer detail", body)
+        rendered = " ".join(captured.output)
+        for field in (
+            f"receipt_id={self.receipt_a.pk}",
+            f"tenant_id={self.tenant_a.pk}",
+            f"actor_id={self.tenant_admin.pk}",
+        ):
+            self.assertIn(field, rendered)
+        self.assertIn("exception_type=RuntimeError", rendered)
+        self.assertNotIn("secret renderer detail", rendered)
 
     def test_pending_receipt_export_is_neutral_404(self):
         self._login_to_tenant(self.tenant_admin, self.tenant_a)
