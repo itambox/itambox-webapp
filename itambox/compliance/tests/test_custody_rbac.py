@@ -1586,6 +1586,11 @@ class CustodySigningSessionHandoffTests(CustodyRBACFixtureMixin, TestCase):
         # pin the shape rather than re-deriving the URL here.
         self.assertIsNotNone(parser.img.get("width"))
         self.assertEqual(parser.img.get("width"), parser.img.get("height"))
+        # Tabler's .alert is a flex row; with several children (title, copy,
+        # button group, note, QR panel) every child collapses to min-content
+        # width on narrow viewports (text breaks letter-by-letter). The
+        # handoff box must force block layout so the children stack.
+        self.assertContains(response, 'class="alert alert-info d-block"')
 
 
 @override_settings(REQUIRE_CUSTODY_SIGNIN=True)
