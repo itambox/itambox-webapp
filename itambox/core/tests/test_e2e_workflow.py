@@ -177,6 +177,8 @@ def test_e2e_workflow_pins_the_positive_oidc_provider_contract_before_django():
     assert 'key.get("kty") == "RSA"' in workflow
     assert 'key.get("use", "sig") == "sig"' in workflow
     assert 'key.get("alg", "RS256") == "RS256"' in workflow
+    assert "settings.RATELIMIT_USE_X_FORWARDED_FOR = True" in workflow
+    assert "settings.RATELIMIT_NUM_PROXIES = 1" in workflow
     assert "Role.all_objects.filter(" in workflow
     assert 'name="Administrator"' in workflow
     assert 'name="Admin"' in workflow
@@ -245,6 +247,7 @@ def test_positive_oidc_e2e_keeps_the_flow_explicit_and_fresh():
     assert "Sign in with E2E OIDC (OIDC)" in positive
     assert "browser.newContext({ baseURL });" in positive
     assert "storageState" not in positive
+    assert "X-Forwarded-For" in positive
     assert 'input[name="username"]' in positive
     assert "getByRole('button', { name: 'Sign-in' })" in positive
     assert "expect(loginResponse.status()).toBe(200);" in positive

@@ -321,10 +321,13 @@ jobs:
           echo "Starting Django dev server on loopback port 8000..."
           # The redacted wrapper below executes: uv run --locked --no-sync python manage.py runserver 127.0.0.1:8000
           uv run --locked --no-sync python - <<'PY' &
+          import os
           import re
           import runpy
           import sys
 
+          import django
+          from django.conf import settings
           from django.core.servers import basehttp
 
           original_log_message = basehttp.WSGIRequestHandler.log_message
@@ -337,6 +340,10 @@ jobs:
               return original_log_message(self, format, *safe_args)
 
           basehttp.WSGIRequestHandler.log_message = redacted_log_message
+          os.environ.setdefault("DJANGO_SETTINGS_MODULE", "core.settings.dev")
+          django.setup()
+          settings.RATELIMIT_USE_X_FORWARDED_FOR = True
+          settings.RATELIMIT_NUM_PROXIES = 1
           sys.argv = ["manage.py", "runserver", "127.0.0.1:8000", "--noreload"]
           runpy.run_path("manage.py", run_name="__main__")
           PY
