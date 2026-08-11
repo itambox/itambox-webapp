@@ -24,6 +24,12 @@ SIGNATURE_PNG_PREFIX = "data:image/png;base64,"
 MAX_SIGNATURE_IMAGE_BYTES = 2 * 1024 * 1024
 CUSTODY_HANDOFF_QR_BORDER = 4
 CUSTODY_HANDOFF_QR_SCALE = 3
+# The symbol ships its own opaque quiet zone: a transparent background renders
+# as near-invisible black-on-black under [data-bs-theme="dark"] and under
+# WebView algorithmic darkening, and leaves the 4-module quiet zone at the
+# mercy of whatever paints behind it. Decoders assume dark-on-light.
+CUSTODY_HANDOFF_QR_DARK = "#000000"
+CUSTODY_HANDOFF_QR_LIGHT = "#ffffff"
 CUSTODY_HANDOFF_COOLDOWN_SECONDS = 10
 CUSTODY_HANDOFF_SESSION_ATTEMPT_LIMIT = 3
 CUSTODY_HANDOFF_RECEIPT_ATTEMPT_LIMIT = 6
@@ -117,6 +123,8 @@ def render_custody_handoff_qr_svg(handoff_url):
         kind="svg",
         scale=CUSTODY_HANDOFF_QR_SCALE,
         border=CUSTODY_HANDOFF_QR_BORDER,
+        dark=CUSTODY_HANDOFF_QR_DARK,
+        light=CUSTODY_HANDOFF_QR_LIGHT,
         xmldecl=False,
     )
     return output.getvalue()

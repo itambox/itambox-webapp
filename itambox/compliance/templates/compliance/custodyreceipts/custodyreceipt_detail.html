@@ -168,17 +168,19 @@
             <i class="mdi mdi-email-off-outline me-1"></i>
             {% translate "E-mail link to holder" %}
           </button>
-          <span class="text-secondary align-self-center">{{ custody_handoff_email_disabled_reason }}</span>
         {% endif %}
       </div>
+      {% if not custody_handoff_email_enabled %}
+        <p class="text-secondary small mt-2 mb-0">{{ custody_handoff_email_disabled_reason }}</p>
+      {% endif %}
       <div id="custody-handoff-qr-{{ object.pk }}" class="collapse mt-3">
-        <figure class="mb-0">
+        <figure class="custody-handoff-qr-figure mx-0 mb-0 text-center">
           <img src="{{ custody_handoff_qr_url }}"
                alt="{% translate 'QR code for the one-time recipient handoff' %}"
                class="img-fluid custody-handoff-qr"
                width="{{ custody_handoff_qr_rendered_size }}"
                height="{{ custody_handoff_qr_rendered_size }}">
-          <figcaption class="text-secondary mt-2">
+          <figcaption class="text-secondary small mt-2 text-break text-start">
             {% blocktranslate with modules=custody_handoff_qr_module_count expires=custody_handoff_expires_at|date:"Y-m-d H:i:s T" %}This one-time code uses {{ modules }} modules and expires at {{ expires }}. It is a credential for the intended holder only.{% endblocktranslate %}
           </figcaption>
         </figure>
