@@ -1,4 +1,5 @@
 import json
+import unittest
 from pathlib import Path
 
 REPOSITORY_ROOT = Path(__file__).resolve().parents[3]
@@ -24,6 +25,14 @@ def _folded_json_env_value(document, key):
                 value_lines.append(value_line.strip())
         return json.loads("".join(value_lines))
     raise AssertionError(f"missing folded JSON environment value: {key}")
+
+
+def load_tests(_loader, _tests, _pattern):
+    suite = unittest.TestSuite()
+    for name, test in globals().items():
+        if name.startswith("test_") and callable(test):
+            suite.addTest(unittest.FunctionTestCase(test))
+    return suite
 
 
 def test_e2e_workflow_generates_masked_ephemeral_credentials_before_seeding():
