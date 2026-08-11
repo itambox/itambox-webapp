@@ -1,4 +1,4 @@
-import { test, expect, APIRequestContext } from '@playwright/test';
+import { test, expect, APIRequestContext, Page } from '@playwright/test';
 
 function requiredEnv(name: string): string {
   const value = process.env[name];
@@ -405,9 +405,10 @@ test.describe('SSO and SCIM 2.0 Provisioning Specs', () => {
   test('13. Positive OIDC login provisions a tenant-bound user and asset holder', async ({ browser }) => {
     test.setTimeout(60_000);
     const oidcContext = await browser.newContext({ baseURL });
+    let page: Page | undefined;
     try {
       await oidcContext.clearCookies();
-      const page = await oidcContext.newPage();
+      page = await oidcContext.newPage();
       await page.setExtraHTTPHeaders({ 'X-Forwarded-For': '127.0.0.2' });
       const loginResponse = await page.goto('/accounts/login/');
       await page.setExtraHTTPHeaders({});
@@ -553,6 +554,9 @@ test.describe('SSO and SCIM 2.0 Provisioning Specs', () => {
       await expect(assetHolderRow).toContainText('OIDC');
       await expect(assetHolderRow).toContainText('Helix Biopharma AG');
     } finally {
+      if (page) {
+        await page.close();
+      }
       await oidcContext.close();
     }
   });

@@ -248,6 +248,7 @@ def test_positive_oidc_e2e_keeps_the_flow_explicit_and_fresh():
     assert "browser.newContext({ baseURL });" in positive
     assert "test.setTimeout(60_000);" in positive
     assert "await oidcContext.clearCookies();" in positive
+    assert "await page.close();" in positive
     assert "storageState" not in positive
     assert "await page.setExtraHTTPHeaders({ 'X-Forwarded-For': '127.0.0.2' });" in positive
     assert "await page.setExtraHTTPHeaders({});" in positive
