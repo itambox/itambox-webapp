@@ -1223,7 +1223,7 @@ Completion requires the positive browser callback and JIT/tenant assertions.
 | `scripts/resource_grant_test_manifest.json` | No change expected because no Python test file is added and the existing policy test is already listed | existing entries `19`, `120` |
 | `pyproject.toml` | No change | runtime dependency `35`; dev group `60-91` |
 | `uv.lock` | No change | current OIDC resolution `1567-1574` |
-| `itambox/core/auth/oidc.py` | No change; E2E exercises the production backend/views as-is | backend `135-380`; views `406-459` |
+| `itambox/core/auth/oidc.py` | Scope addendum (approved): optional-setting defaults (`OIDC_RP_IDP_SIGN_KEY`, `OIDC_OP_JWKS_ENDPOINT` → `None`) in `get_settings`; E2E otherwise exercises the backend/views as-is | settings mixin `97-133`; backend `135-380`; views `406-459` |
 
 ### Expected implementation diff shape
 
@@ -1235,8 +1235,9 @@ The follow-up should modify five existing files:
 4. existing workflow policy test;
 5. OIDC usage documentation.
 
-It should add no application module, migration, Python dependency, provider config file, private key,
-new TypeScript spec, or new Python test file.
+It should add no migration, Python dependency, provider config file, private key, new TypeScript
+spec, or new Python test file. The only application-module change is the approved
+`core/auth/oidc.py` optional-setting defaults (see the scope addendum below).
 
 If implementation discovers that the mock cannot satisfy the exact bounded contract without an
 application change, stop and return to design review rather than weakening validation.
@@ -1334,3 +1335,29 @@ defaults below are therefore binding for the follow-up implementation.
 5. Keep the positive scenario in `07-sso-scim.spec.ts` and use a fresh browser context, rather than adding a new spec file? **Approved (recommended default: yes).**
 6. Treat the provider as CI infrastructure with no `pyproject.toml`/`uv.lock` dependency and document an equivalent local Docker recipe? **Approved (recommended default: yes).**
 7. Require JIT postconditions through the tenant-scoped Membership and AssetHolder UI tables, with no test-only database/API endpoint? **Approved (recommended default: yes).**
+
+## Scope addendum (2026-08-11): optional OIDC settings default to None
+
+The first E2E run of the follow-up PR exposed a defect in `TenantOIDCSettingsMixin.get_settings`
+(`itambox/core/auth/oidc.py:104-127`): `TenantOIDCBackend` deliberately skips the upstream
+`OIDCAuthenticationBackend.__init__` (which sets `OIDC_RP_IDP_SIGN_KEY` and `OIDC_OP_JWKS_ENDPOINT`
+to `None`), so any lazy attribute read of those optional settings falls through to
+`import_from_settings` without a default and raises `OIDCConfigurationError` before the JWKS
+fallback can run (mozilla-django-oidc 5.0.2 `auth.py:53,59,201-204`). A tenant configured with JWKS
+only — exactly what this design mandates — therefore cannot complete a callback: the shared callback
+500s at `oidc.py:127`, which the E2E artifact confirmed (`OIDCConfigurationError at
+/oidc/callback/`, raised during `TenantOIDCCallbackView`).
+
+Maintainer decision (parent-side, best-judgement while the maintainer was unavailable; reversible):
+extend `get_settings` with the two upstream defaults (`OIDC_RP_IDP_SIGN_KEY` → `None`,
+`OIDC_OP_JWKS_ENDPOINT` → `None`), mirroring the existing `OIDC_RP_SIGN_ALGO`/`OIDC_RP_SCOPES`
+default pattern, plus a unit test in `itambox/core/tests/test_oidc.py`.
+
+Safety assessment: neutral. Required settings (`OIDC_RP_CLIENT_ID`, `OIDC_RP_CLIENT_SECRET`,
+endpoints, `OIDC_OP_ISSUER`) still raise when missing; the strict audience/`azp`/issuer validation in
+`verify_token` is untouched; the login-page usability check (`itambox/core/auth/providers.py:145-157`)
+still requires either JWKS or a signing key before a provider button is rendered. The JWKS-only
+provider contract (maintainer decision 2) is preserved and becomes actually exercisable.
+
+Implementation: `itambox/core/auth/oidc.py` (`get_settings` defaults), `itambox/core/tests/test_oidc.py`
+(`test_optional_settings_default_to_none`), this addendum, and the implementation-map update above.

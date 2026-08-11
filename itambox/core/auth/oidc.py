@@ -119,6 +119,13 @@ class TenantOIDCSettingsMixin:
             args = args or ("RS256",)
         elif attr == "OIDC_RP_SCOPES":
             args = args or ("openid email profile",)
+        elif attr in ("OIDC_RP_IDP_SIGN_KEY", "OIDC_OP_JWKS_ENDPOINT"):
+            # Optional settings: mirror the upstream OIDCAuthenticationBackend
+            # __init__ defaults (None). TenantOIDCBackend deliberately skips
+            # super().__init__(), so without these defaults a lazy attribute
+            # read raises OIDCConfigurationError before the JWKS fallback can
+            # run for RS/ES-signed providers configured with JWKS only.
+            args = args or (None,)
 
         # Fallback to global django settings
         try:
