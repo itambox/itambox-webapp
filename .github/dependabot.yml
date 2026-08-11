@@ -6,8 +6,10 @@
 
 version: 2
 updates:
-  # Check the root pyproject.toml and uv.lock dependency graph.
-  - package-ecosystem: "pip"
+  # Check the root pyproject.toml and uv.lock dependency graph. The uv
+  # ecosystem updates pyproject.toml and uv.lock together, which the pip
+  # ecosystem does not (its PRs break `uv sync --locked` builds).
+  - package-ecosystem: "uv"
     directory: "/"
     schedule:
       interval: "weekly"
