@@ -8,7 +8,8 @@
  *
  * Checks:
  *   1. E2E_USERNAME / E2E_PASSWORD / E2E_TENANT_SLUG / E2E_ISOLATION_TENANT_SLUG /
- *      E2E_TENANT_GROUP_NAME / E2E_SCIM_TOKEN are set
+ *      E2E_TENANT_GROUP_NAME / E2E_SCIM_TOKEN / E2E_OIDC_PROVIDER_URL /
+ *      E2E_OIDC_SUBJECT / E2E_OIDC_EMAIL / ITAMBOX_TENANT_OIDC_CONFIGS are set
  *   2. Python virtual environment exists
  *   3. Django system checks pass
  *   4. Database migrations are applied
@@ -96,6 +97,45 @@ if (process.env.E2E_SCIM_TOKEN) {
   fail('E2E_SCIM_TOKEN is not set');
 }
 
+if (process.env.E2E_OIDC_PROVIDER_URL) {
+  ok(`E2E_OIDC_PROVIDER_URL = ${process.env.E2E_OIDC_PROVIDER_URL}`);
+} else {
+  fail('E2E_OIDC_PROVIDER_URL is not set');
+}
+
+if (process.env.E2E_OIDC_SUBJECT) {
+  ok(`E2E_OIDC_SUBJECT = ${process.env.E2E_OIDC_SUBJECT}`);
+} else {
+  fail('E2E_OIDC_SUBJECT is not set');
+}
+
+if (process.env.E2E_OIDC_EMAIL) {
+  ok(`E2E_OIDC_EMAIL = ${process.env.E2E_OIDC_EMAIL}`);
+} else {
+  fail('E2E_OIDC_EMAIL is not set');
+}
+
+if (process.env.ITAMBOX_TENANT_OIDC_CONFIGS) {
+  try {
+    const tenantOidcConfig = JSON.parse(process.env.ITAMBOX_TENANT_OIDC_CONFIGS);
+    if (
+      tenantOidcConfig &&
+      typeof tenantOidcConfig === 'object' &&
+      !Array.isArray(tenantOidcConfig) &&
+      tenantOidcConfig['helix-rnd'] &&
+      typeof tenantOidcConfig['helix-rnd'] === 'object'
+    ) {
+      ok('ITAMBOX_TENANT_OIDC_CONFIGS is set for helix-rnd (redacted)');
+    } else {
+      fail('ITAMBOX_TENANT_OIDC_CONFIGS must contain a helix-rnd object (redacted)');
+    }
+  } catch {
+    fail('ITAMBOX_TENANT_OIDC_CONFIGS is not valid JSON (redacted)');
+  }
+} else {
+  fail('ITAMBOX_TENANT_OIDC_CONFIGS is not set');
+}
+
 // ── Check 2: virtual environment ────────────────────────────────────────────
 if (existsSync(pythonExe)) {
   ok(`Python virtualenv found at ${pythonExe}`);
@@ -170,6 +210,9 @@ if (errors === 0) {
   console.error('  export E2E_ISOLATION_TENANT_SLUG=e2e-isolation-tenant');
   console.error('  export E2E_TENANT_GROUP_NAME="E2E Tenant Read-Only Group"');
   console.error('  export E2E_SCIM_TOKEN=<tenant-scoped-write-token>');
+  console.error('  export E2E_OIDC_PROVIDER_URL=http://127.0.0.1:8081');
+  console.error('  export E2E_OIDC_SUBJECT=itambox-e2e-oidc-user');
+  console.error('  export E2E_OIDC_EMAIL=e2e.oidc@itambox.local');
   console.error('  make seed          # ensure seed data exists');
   console.error('  make migrate       # ensure migrations are applied');
   console.error('  cd itambox/tests/e2e && npm test\n');
