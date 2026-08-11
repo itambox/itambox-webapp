@@ -1,6 +1,6 @@
 {% load i18n %}
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" xmlns:pdf="http://www.xhtml2pdf.com">
   <head>
     <meta charset="utf-8">
     <title>{% translate "Custody Receipt" %} #{{ receipt_data.id }}</title>
@@ -242,7 +242,7 @@
       {% endfor %}
     </div>
     <div id="custody-footer" class="footer">
-      {% blocktranslate with receipt_id=receipt_data.id tenant=tenant_name %}Custody Receipt #{{ receipt_id }} - {{ tenant }} - Page{% endblocktranslate %}
+      {% blocktranslate with receipt_id=receipt_data.id tenant=tenant_name %}Custody Receipt #{{ receipt_id }} - {{ tenant }} - Page{% endblocktranslate %}<pdf:pagenumber />
     </div>
   </body>
 </html>
