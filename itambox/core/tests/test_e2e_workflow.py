@@ -249,9 +249,7 @@ def test_positive_oidc_e2e_keeps_the_flow_explicit_and_fresh():
     assert "test.setTimeout(60_000);" in positive
     assert "await oidcContext.clearCookies();" in positive
     assert "storageState" not in positive
-    assert "await page.route('**/*'" in positive
-    assert "requestUrl.origin !== appOrigin" in positive
-    assert "x-forwarded-for': '127.0.0.2'" in positive
+    assert "headers: { 'X-Forwarded-For': '127.0.0.2' }" in positive
     assert 'input[name="username"]' in positive
     assert "getByRole('button', { name: 'Sign-in' })" in positive
     assert "expect(loginResponse.status()).toBe(200);" in positive
