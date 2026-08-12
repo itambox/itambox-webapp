@@ -6,6 +6,8 @@ This changelog follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) 
 
 ## [Unreleased]
 
+## [1.0.0-alpha.3] - 2026-08-12
+
 ### Added
 
 - Added a shared typed external-integration error contract with retryable/terminal classification, safe user messages, bounded Graph retry handling, structured tenant/actor/request context, and documented follow-up boundaries for other adapters.
@@ -13,6 +15,8 @@ This changelog follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) 
 - Published the 1.x compatibility, deprecation, and support policy together with a bounded external-contract inventory covering REST/GraphQL/SCIM surfaces, the webhook envelope, persisted choice values, contract-bearing settings, permission codenames, UI URL namespaces, and each capability's contract class and exclusions. A stdlib gate derives every enumerated surface from source and fails when the published contract and the code disagree.
 - Added explicit Purchase Order lifecycle endpoints at `/api/procurement/purchase-orders/{id}/approve/`, `/order/`, `/receive/`, `/cancel/`, and `/reopen/`.
 - Published the bounded procurement Stable qualification matrix, including existing UI, REST, service, tenant, permission, audit, currency, and PostgreSQL concurrency guarantees plus the deliberately absent surfaces.
+- Added explicit, opt-in Event retention controlled by `ITAMBOX_EVENT_RETENTION_DAYS`, with observable pruning of expired events.
+- Added opaque SCIM resource IDs and per-domain scoped `externalId` values; the previous identifier scheme remains readable through a 1.x dual-read window.
 
 ### Changed
 
@@ -21,11 +25,23 @@ This changelog follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) 
 - Subscription status is now a closed four-state lifecycle (`active`, `suspended`, `cancelled`, `expired`) driven by explicit UI, REST, GraphQL, admin, and background actions. The canonical renewal-term field is `vendor_contract_auto_renews`; `auto_renewal` remains a 1.x read/write API compatibility alias.
 - Purchase Order `status` and Purchase Order Line `qty_received` are read-only in the REST schema. API clients must use the corresponding lifecycle endpoint: differing direct writes now return HTTP 400 with sanctioned-action guidance, while identical values remain accepted and ignored for full-representation PUT compatibility. Existing rows require no migration.
 - Asset Request auto-approval and the Beta Asset Request procurement seam are now opt-in through `ITAMBOX_REQUISITION_AUTO_APPROVAL_THRESHOLDS`; fresh deployments leave requests pending. The legacy setting name remains a deprecated 1.x fallback with a startup warning.
+- Alert rules with no configured channels now deliver nowhere instead of implicitly fanning out to every enabled tenant or tenant-less channel; platform-global in-app delivery remains explicit.
+- Closed the Event action vocabulary: `EventRule.events` is validated against the supported action set ahead of the 1.0 contract freeze.
+- Scheduled reports are gated on the report designer opt-in: with the designer disabled, the navigation entry is hidden, all scheduled-report routes return 404, and the background task fails closed while preserving saved rows.
+- Completed the zero-error OpenAPI generation contract and the generated-client compatibility check.
+- Updated locked runtime dependencies to redis-py 8.1 and django-redis 7.0.
 
 ### Fixed
 
 - Made invalid generic list filters fail closed to an empty result while retaining field-level validation errors across full-page, HTMX, direct-query, and saved-filter requests.
 - Serialized concurrent Purchase Order approvals so only one draft-to-approved transition succeeds, and preserved the Purchase Order currency on assets materialized by receiving.
+- Scheduled-report runs now preserve their failure status and the original exception, keeping failed deliveries observable.
+- Corrected the alert-channel delivery documentation to match shipped behavior (synchronous, single-attempt delivery).
+- Made SCIM capability metadata truthful: removed the fake HTTP Basic capability, fixed `User.lastModified` handling, and wired request-id propagation.
+- Custom (non-CRUD) permissions declared via `Meta.permissions` are now exposed in the role editor, making actions such as preparing and exporting custody receipts grantable through the UI.
+- A valid signing session now overrides the seven-day custody bearer-link TTL, restoring assisted handoff on receipts older than seven days.
+- Fixed custody handoff UI issues: QR codes have a proper quiet zone, the handoff panel is mobile-safe, actions wrap on small screens, Bootstrap collapses rebind after HTMX swaps, copy feedback is sticky with a clipboard fallback, and custody export links are no longer htmx-boosted.
+- Fixed frontend issues: app-external links (docs, API, GraphQL, admin) are no longer htmx-boosted, the report preview button no longer leaks across pages, theme-token changelog panels and mobile stacking render correctly, Purchase Order and Resource Grant labels are localized, the responsive asset shell cleanup is complete, and scanner camera detections are throttled through one shared gate.
 
 ### Security
 
@@ -33,6 +49,10 @@ This changelog follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) 
 - Added cross-tenant read/write matrices for contracts, Purchase Orders, and Purchase Order lines together with real two-connection receipt and approval race tests.
 - Centralized Asset Request-to-Purchase Order linking in a tenant-locked, permission-checked, idempotent service and made failed UI linking roll back the new purchase order.
 - Removed the unused global pip installation and ensurepip bootstrap from the production runtime image, with build-time checks that the copied runtime environment remains pip-free, while preserving locked uv-based dependency resolution in the builder.
+- Global cross-tenant report aggregation is now permission-gated; the curated built-in report contract remains unchanged.
+- Froze and proved the tenant resource-grant security boundary with cross-tenant read/write matrices and adversarial coverage.
+- Removed the remaining unsafe-inline style dependency from the Content Security Policy and restored runtime dashboard styles under the hardened policy.
+- Remediated the dependency security-gate findings in the locked dependency set.
 
 ## [1.0.0-alpha.2] - 2026-07-28
 
@@ -144,6 +164,7 @@ This changelog follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) 
 - The full pytest suite is not safe to run with `pytest-xdist`; use the default serial configuration.
 - SQLite is not supported. PostgreSQL 15 or newer is required for development, tests, and production.
 
-[Unreleased]: https://github.com/itambox/itambox-webapp/compare/v1.0.0-alpha.2...HEAD
+[Unreleased]: https://github.com/itambox/itambox-webapp/compare/v1.0.0-alpha.3...HEAD
+[1.0.0-alpha.3]: https://github.com/itambox/itambox-webapp/releases/tag/v1.0.0-alpha.3
 [1.0.0-alpha.2]: https://github.com/itambox/itambox-webapp/releases/tag/v1.0.0-alpha.2
 [1.0.0-alpha.1]: https://github.com/itambox/itambox-webapp/releases/tag/v1.0.0-alpha.1
