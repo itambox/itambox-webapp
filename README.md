@@ -26,7 +26,7 @@
 ITAMbox gives internal IT teams and managed service providers one tenant-aware system for assets, stock, software, licenses, subscriptions, procurement, custody, and audits. REST/OpenAPI covers tenant-scoped application resources; the built-in GraphQL schema covers assets, software, licenses, inventory, and subscriptions, with extension points for plugins.
 
 > [!IMPORTANT]
-> This repository is pre-release. `1.0.0-alpha.2` is current version metadata for a limited-audience prerelease, not a production support line. APIs, migrations, routes, and configuration may change throughout the alpha series. Use a disposable or fully backed-up environment for evaluation and do not assume version-skipping or support guarantees.
+> This repository is pre-release. `1.0.0-alpha.3` is current version metadata for a limited-audience prerelease, not a production support line. APIs, migrations, routes, and configuration may change throughout the alpha series. Use a disposable or fully backed-up environment for evaluation and do not assume version-skipping or support guarantees.
 
 ## What ITAMbox covers
 
