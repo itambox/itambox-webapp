@@ -9,14 +9,23 @@ from django.db.models import Q
 from django.utils import timezone
 
 from core import context as core_context
+from core import tenant_scope as _tenant_scope
 from core.authorization_cache import synchronize_authorization_cache
 from core.context import SystemAuthorizationContext, get_current_request_id
-from core.tenant_scope import (  # noqa: F401 -- re-exported for established importers
-    _descendant_group_ids_cache,
-    get_ancestor_tenant_group_ids,
-    get_descendant_tenant_group_ids,
-)
+from core.tenant_scope import _descendant_group_ids_cache  # noqa: F401 -- re-exported for established importers
 from organization import rbac as _rbac
+
+
+def get_descendant_tenant_group_ids(group_id: int | None, live_only: bool = False) -> set[int]:
+    """Kernel-owned descendant-group walk (issue #100); kept as a typed wrapper
+    so the public organization API surface remains a real definition."""
+    return _tenant_scope.get_descendant_tenant_group_ids(group_id, live_only=live_only)
+
+
+def get_ancestor_tenant_group_ids(group_id: int | None, live_only: bool = False) -> set[int]:
+    """Kernel-owned ancestor-group walk (issue #100); kept as a typed wrapper
+    so the public organization API surface remains a real definition."""
+    return _tenant_scope.get_ancestor_tenant_group_ids(group_id, live_only=live_only)
 
 
 def shared_resource_ids(model: type[object], tenant: object | None) -> Iterable[int]:
