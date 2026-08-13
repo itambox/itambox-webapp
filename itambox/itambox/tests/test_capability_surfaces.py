@@ -122,14 +122,14 @@ class TestBannerTemplate:
         assert 'role="status"' in html
         assert 'aria-live="polite"' in html
         assert 'data-maturity="experimental"' in html
-        assert 'btn-close' not in html
+        assert "btn-close" not in html
 
     def test_the_maturity_badge_exposes_text_and_an_accessible_name(self):
         html = render_to_string(
             "generic/includes/capability_badge.html",
             {"capability_notice": _notice_for_key("platform.plugins")},
         )
-        assert 'aria-label=' in html
+        assert "aria-label=" in html
         assert 'aria-hidden="true"' not in html
         assert "Experimental" in html
 
