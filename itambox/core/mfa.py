@@ -8,6 +8,8 @@ D). The classification is policy, not provisioning mechanics, so it belongs on
 this side of the edge and leaves this module a dependency-free leaf.
 """
 
+from core.tenant_scope import applicable_grants
+
 PASSWORD_BACKEND = "core.auth.PasswordLoginOnlyBackend"
 
 # Role names that convey privileged access regardless of their permission set.
@@ -37,9 +39,6 @@ def user_requires_mfa(user) -> bool:
         return False
     if getattr(user, "is_superuser", False):
         return True
-    # inline import: cycle: avoids core.mfa <-> organization model imports at module load.
-    from organization.rbac import applicable_grants
-
     return any(bool(grant.scopes.all()) and role_is_privileged(grant.role) for grant in applicable_grants(user))
 
 

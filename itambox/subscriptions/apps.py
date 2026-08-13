@@ -13,6 +13,9 @@ class SubscriptionsConfig(AppConfig):
         import subscriptions.signals  # noqa
         import subscriptions.search  # noqa
 
+        # inline import: app-registry: curated import forms load only after the app registry is ready.
+        import subscriptions.forms
+
         self._register_capabilities()
         post_migrate.connect(self._register_subscription_tasks, sender=self)
 

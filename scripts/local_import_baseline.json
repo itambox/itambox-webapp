@@ -22,18 +22,6 @@
       "count": 1
     },
     {
-      "path": "itambox/assets/apps.py",
-      "context": "ClassDef:AssetsConfig/FunctionDef:ready",
-      "statement": "import assets.search",
-      "count": 1
-    },
-    {
-      "path": "itambox/assets/apps.py",
-      "context": "ClassDef:AssetsConfig/FunctionDef:ready",
-      "statement": "import assets.signals",
-      "count": 1
-    },
-    {
       "path": "itambox/assets/filters.py",
       "context": "ClassDef:AssetFilterSet/FunctionDef:filter_audit_due",
       "statement": "from django.db.models import Case, DurationField, ExpressionWrapper, F, When",
@@ -916,24 +904,6 @@
       "count": 1
     },
     {
-      "path": "itambox/core/auth/__init__.py",
-      "context": "ClassDef:MembershipBackend/FunctionDef:_ambient_tenant",
-      "statement": "from organization.access import managed_accessible_tenant_ids",
-      "count": 1
-    },
-    {
-      "path": "itambox/core/auth/__init__.py",
-      "context": "ClassDef:MembershipBackend/FunctionDef:_ambient_tenant",
-      "statement": "from organization.models import Membership, Tenant",
-      "count": 1
-    },
-    {
-      "path": "itambox/core/auth/__init__.py",
-      "context": "ClassDef:MembershipBackend/FunctionDef:_object_tenant",
-      "statement": "from organization.models import Tenant",
-      "count": 1
-    },
-    {
       "path": "itambox/core/auth/ldap.py",
       "context": "ClassDef:MultiTenantLDAPBackend/FunctionDef:authenticate",
       "statement": "from organization.models import Tenant",
@@ -1090,12 +1060,6 @@
       "count": 1
     },
     {
-      "path": "itambox/core/forms/import_forms.py",
-      "context": "ClassDef:BulkImportForm/FunctionDef:map_row",
-      "statement": "from django.db import models as _models",
-      "count": 1
-    },
-    {
       "path": "itambox/core/forms/mixins.py",
       "context": "ClassDef:BulkEditForm/FunctionDef:__init__",
       "statement": "from django.db.models import ForeignKey, ManyToManyField",
@@ -1123,12 +1087,6 @@
       "path": "itambox/core/forms/tenant.py",
       "context": "FunctionDef:scope_tenant_field",
       "statement": "from organization.models import Tenant",
-      "count": 1
-    },
-    {
-      "path": "itambox/core/graphql_utils.py",
-      "context": "FunctionDef:generate_slug",
-      "statement": "from itambox.utils import generate_unique_slug",
       "count": 1
     },
     {
@@ -1237,12 +1195,6 @@
       "path": "itambox/core/management/commands/_seed/compliance.py",
       "context": "ClassDef:SeedComplianceMixin/FunctionDef:_seed_compliance",
       "statement": "from compliance.models import AssetAudit, AuditSession, CustodyReceipt",
-      "count": 1
-    },
-    {
-      "path": "itambox/core/management/commands/_seed/engine.py",
-      "context": "ClassDef:ChangeLogEngine/FunctionDef:log_create",
-      "statement": "from itambox.utils import serialize_object",
       "count": 1
     },
     {
@@ -1474,24 +1426,6 @@
       "count": 1
     },
     {
-      "path": "itambox/core/managers.py",
-      "context": "ClassDef:TenantScopingQuerySet/FunctionDef:_member_visible_group_ids",
-      "statement": "from django.apps import apps",
-      "count": 1
-    },
-    {
-      "path": "itambox/core/managers.py",
-      "context": "ClassDef:TenantScopingQuerySet/FunctionDef:filter_by_tenant",
-      "statement": "from django.apps import apps",
-      "count": 1
-    },
-    {
-      "path": "itambox/core/mixins.py",
-      "context": "ClassDef:AutoSlugMixin/FunctionDef:save",
-      "statement": "from itambox.utils import generate_unique_slug",
-      "count": 1
-    },
-    {
       "path": "itambox/core/mixins.py",
       "context": "ClassDef:SoftDeleteMixin/FunctionDef:delete",
       "statement": "from core.choices import ObjectChangeActionChoices",
@@ -1513,12 +1447,6 @@
       "path": "itambox/core/mixins.py",
       "context": "ClassDef:SoftDeleteMixin/FunctionDef:delete",
       "statement": "from django.utils import timezone",
-      "count": 1
-    },
-    {
-      "path": "itambox/core/mixins.py",
-      "context": "ClassDef:SoftDeleteMixin/FunctionDef:delete",
-      "statement": "from itambox.utils import serialize_object",
       "count": 1
     },
     {
@@ -1774,12 +1702,6 @@
       "count": 1
     },
     {
-      "path": "itambox/core/tasks/csv_import.py",
-      "context": "FunctionDef:import_csv_task",
-      "statement": "from itambox.views.generic import ObjectImportView",
-      "count": 1
-    },
-    {
       "path": "itambox/core/tasks/disposal.py",
       "context": "FunctionDef:bulk_dispose_task",
       "statement": "from assets.models import Asset, AssetDisposal",
@@ -1831,18 +1753,6 @@
       "path": "itambox/core/tasks/intune_sync.py",
       "context": "FunctionDef:_sync_device_software",
       "statement": "from software.models import InstalledSoftware, Software",
-      "count": 1
-    },
-    {
-      "path": "itambox/core/tasks/labels.py",
-      "context": "FunctionDef:_html_to_pdf_bytes",
-      "statement": "from xhtml2pdf import pisa",
-      "count": 1
-    },
-    {
-      "path": "itambox/core/tasks/labels.py",
-      "context": "FunctionDef:_pdf_safe_link_callback",
-      "statement": "from django.conf import settings",
       "count": 1
     },
     {
@@ -2723,24 +2633,6 @@
     },
     {
       "path": "itambox/itambox/middleware.py",
-      "context": "ClassDef:CurrentUserMiddleware/FunctionDef:process_request",
-      "statement": "from core.auth.cache import begin_authorization_request",
-      "count": 1
-    },
-    {
-      "path": "itambox/itambox/middleware.py",
-      "context": "ClassDef:CurrentUserMiddleware/FunctionDef:process_response",
-      "statement": "from core.auth.cache import end_authorization_request",
-      "count": 2
-    },
-    {
-      "path": "itambox/itambox/middleware.py",
-      "context": "ClassDef:TenantMiddleware/FunctionDef:process_request",
-      "statement": "from organization.access import _descendant_group_ids_cache",
-      "count": 1
-    },
-    {
-      "path": "itambox/itambox/middleware.py",
       "context": "ClassDef:TenantMiddleware/FunctionDef:process_request",
       "statement": "from organization.access import accessible_tenant_ids",
       "count": 1
@@ -2987,26 +2879,8 @@
     },
     {
       "path": "itambox/organization/models.py",
-      "context": "ClassDef:AssetHolder/FunctionDef:checked_out_assets",
-      "statement": "from assets.models import AssetAssignment",
-      "count": 1
-    },
-    {
-      "path": "itambox/organization/models.py",
       "context": "ClassDef:CostCenter/FunctionDef:clean",
       "statement": "from django.core.exceptions import ValidationError",
-      "count": 1
-    },
-    {
-      "path": "itambox/organization/models.py",
-      "context": "ClassDef:RoleGrant/FunctionDef:covers_tenant",
-      "statement": "from organization.access import get_descendant_tenant_group_ids",
-      "count": 1
-    },
-    {
-      "path": "itambox/organization/models.py",
-      "context": "ClassDef:RoleGrant/FunctionDef:scoped_tenant_ids",
-      "statement": "from organization.access import get_descendant_tenant_group_ids",
       "count": 1
     },
     {
@@ -3547,12 +3421,6 @@
       "path": "itambox/users/models.py",
       "context": "ClassDef:Token/FunctionDef:save",
       "statement": "from core.managers import get_current_tenant",
-      "count": 1
-    },
-    {
-      "path": "itambox/users/models.py",
-      "context": "ClassDef:Token/FunctionDef:save",
-      "statement": "from organization.models import Tenant",
       "count": 1
     },
     {

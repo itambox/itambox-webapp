@@ -248,7 +248,13 @@ PYTHONPATH=itambox uv run --locked --group dev python -m pytest -q -p no:cachepr
   itambox/subscriptions/tests/test_models.py \
   itambox/users/tests/test_scim_migrations.py \
   scripts/tests/test_check_test_report.py \
-  scripts/tests/test_check_xdist_matrix.py
+  scripts/tests/test_check_xdist_matrix.py \
+  itambox/core/tests/test_authorization_cache_sync.py \
+  itambox/core/tests/test_issue100_import_cycles.py \
+  itambox/core/tests/test_issue100_tenancy_boundaries.py \
+  itambox/core/tests/test_issue29_tenant_scope.py \
+  itambox/organization/tests/test_authorization_cache.py \
+  itambox/core/tests/test_tasks.py
 ```
 
 Run the contract-policy checks from the repository root:

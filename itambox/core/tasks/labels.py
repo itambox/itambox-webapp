@@ -15,6 +15,7 @@ from django.utils.translation import gettext_lazy as _
 
 from core.html_sanitizer import sanitize_label_html_for_pdf
 from core.models import Job, Notification
+from core.pdf_renderer import html_to_pdf_bytes, pdf_safe_link_callback
 from core.tasks.utils import TaskResult, TaskStatus, classify_task_error, reverse_job_detail
 from extras.models import FileAttachment
 
@@ -386,44 +387,11 @@ def _build_labels_document(rendered_cards, label_template, layout_mode):
 
 
 def _pdf_safe_link_callback(uri, rel):
-    """Resolve resource URIs for xhtml2pdf, blocking outbound network fetches.
-
-    xhtml2pdf's default link handler will fetch any ``<img src>`` / CSS
-    ``url()`` it encounters — including ``http(s)://`` and internal addresses —
-    which turns user-authored label/report templates into an SSRF primitive
-    (e.g. hitting cloud-metadata or internal services). We allow only inline
-    ``data:`` URIs and files physically under STATIC_ROOT / MEDIA_ROOT; anything
-    else (remote URLs, ``file://``, traversal) resolves to nothing.
-    """
-    from django.conf import settings
-
-    if uri.startswith("data:"):
-        return uri
-
-    for url_prefix, root in (
-        (getattr(settings, "STATIC_URL", None), getattr(settings, "STATIC_ROOT", None)),
-        (getattr(settings, "MEDIA_URL", None), getattr(settings, "MEDIA_ROOT", None)),
-    ):
-        if url_prefix and root and uri.startswith(url_prefix):
-            root_abs = os.path.abspath(root)
-            candidate = os.path.abspath(os.path.join(root_abs, uri[len(url_prefix) :].lstrip("/")))
-            # Reject path traversal outside the served root.
-            if os.path.commonpath([root_abs, candidate]) == root_abs and os.path.isfile(candidate):
-                return candidate
-            return ""
-    # Remote URLs (http/https), file://, protocol-relative, etc. are refused.
-    return ""
+    return pdf_safe_link_callback(uri, rel)
 
 
 def _html_to_pdf_bytes(html_content):
-    """Render an HTML document to PDF bytes via xhtml2pdf."""
-    from xhtml2pdf import pisa
-
-    pdf_buffer = io.BytesIO()
-    pisa_status = pisa.CreatePDF(html_content, dest=pdf_buffer, link_callback=_pdf_safe_link_callback)
-    if pisa_status.err:
-        raise RuntimeError(f"xhtml2pdf rendering failed with status code {pisa_status.err}")
-    return pdf_buffer.getvalue()
+    return html_to_pdf_bytes(html_content)
 
 
 def render_labels_pdf(assets, label_template, layout_mode="roll"):

@@ -39,7 +39,7 @@ class AuthorizationCacheInvalidationTests(TestCase):
         return group, grant
 
     def test_invalidation_publishes_again_after_transaction_commit(self):
-        with mock.patch("core.auth.cache.cache.set") as cache_set:
+        with mock.patch("core.authorization_cache.cache.set") as cache_set:
             with self.captureOnCommitCallbacks(execute=False) as callbacks:
                 invalidate_user_authorization_cache(self.first_user)
 

@@ -8,7 +8,7 @@ from django.utils.translation import gettext_lazy as _
 
 from core.context import get_current_user
 from core.managers import get_current_tenant
-from organization.access import authorize_tenant_operation, resolved_shared_stock_ids
+from organization.access import authorize_tenant_operation, resolve_stock_access, resolved_shared_stock_ids
 from organization.models import Location, Tenant, TenantResourceGrant
 
 from .models import (
@@ -399,12 +399,6 @@ def resolve_grant_for_checkout(
     exact grant row is returned for provenance. Shared by the item checkout
     flow and the kit checkout flow.
     """
-    # inline imports: cycle: break an inventory <-> organization import cycle at load
-    from core.managers import get_current_tenant
-    from itambox.middleware import get_current_user
-    from organization.models import TenantResourceGrant
-    from organization.services import resolve_stock_access
-
     if source_location is None:
         return None
     stock_row = (

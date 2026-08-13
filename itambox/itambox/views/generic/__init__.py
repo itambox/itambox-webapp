@@ -76,9 +76,6 @@ from itambox.views.generic.bulk import (  # noqa: F401
     ObjectBulkDeleteView,
 )
 
-# ObjectExportView lives in itambox.views.features; import it last to avoid the
-# circular-import that arises when features.py imports back into generic.
-from itambox.views.features import ObjectExportView  # noqa: F401, E402
 # isort: on
 
 __all__ = [
@@ -126,6 +123,4 @@ __all__ = [
     # bulk
     "ObjectBulkEditView",
     "ObjectBulkDeleteView",
-    # export (late import to avoid circular)
-    "ObjectExportView",
 ]

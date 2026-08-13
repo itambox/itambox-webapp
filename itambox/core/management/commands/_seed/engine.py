@@ -26,6 +26,7 @@ from django.utils import timezone
 
 from core.choices import ObjectChangeActionChoices
 from core.models import ObjectChange
+from core.serialization import serialize_object
 from core.tasks.context import TaskContext
 
 
@@ -155,8 +156,6 @@ class ChangeLogEngine:
         object, using the same serializer the live create path uses. Also back-dates
         the object's created_at/updated_at to ``when``. Returns ``obj``.
         """
-        from itambox.utils import serialize_object
-
         when = as_aware_datetime(when)
         try:
             obj.refresh_from_db()  # DB-typed values for an accurate serialized snapshot

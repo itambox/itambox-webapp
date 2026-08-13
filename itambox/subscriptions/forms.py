@@ -10,7 +10,7 @@ from django.utils.translation import gettext_lazy as _
 
 from assets.models import Asset
 from core.forms import BulkEditForm, CrispyFormMixin, FilterForm, scope_tenant_field, scope_tenant_group_field
-from core.forms.import_forms import BulkImportForm, register_import_form
+from core.importers.bulk_forms import BulkImportForm, register_import_form
 from extras.customfields import CustomFieldModelFormMixin
 from organization.models import AssetHolder, CostCenter, Location, Tenant, TenantGroup
 

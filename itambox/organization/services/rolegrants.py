@@ -27,7 +27,7 @@ from django.utils.translation import gettext_lazy as _
 
 from core.auth.guards import validate_group_membership_grant, validate_role_grant
 from core.mfa import role_is_privileged
-from organization.access import get_descendant_tenant_group_ids
+from core.tenant_scope import get_descendant_tenant_group_ids
 from organization.models import Membership, Role, RoleGrant, RoleGrantScope, Tenant, TenantGroup
 from organization.services.errors import (
     ConcurrentGrantChange,

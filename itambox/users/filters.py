@@ -6,7 +6,7 @@ from django.contrib.auth import get_user_model
 from django.db.models import Q
 from django.utils.translation import gettext_lazy as _
 
-from organization.access import get_ancestor_tenant_group_ids
+from core.tenant_scope import get_ancestor_tenant_group_ids
 from organization.models import Role, RoleGrantScope, Tenant
 
 from .models import UserGroup

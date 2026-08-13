@@ -1,6 +1,5 @@
 """Canonical tenant, RBAC, and explicitly shared-resource access helpers."""
 
-import contextvars
 import datetime
 from collections.abc import Iterable
 from dataclasses import dataclass
@@ -10,78 +9,14 @@ from django.db.models import Q
 from django.utils import timezone
 
 from core import context as core_context
+from core.authorization_cache import synchronize_authorization_cache
 from core.context import SystemAuthorizationContext, get_current_request_id
-
-# Request-local memo for the recursive descendant walk below. Each request runs
-# in its own context, so the cache lives for the request lifetime and is
-# discarded when the context ends. Keyed by (group_id, live_only).
-_descendant_group_ids_cache = contextvars.ContextVar(
-    "descendant_tenant_group_ids_cache",
-    default=None,
+from core.tenant_scope import (  # noqa: F401 -- re-exported for established importers
+    _descendant_group_ids_cache,
+    get_ancestor_tenant_group_ids,
+    get_descendant_tenant_group_ids,
 )
-
-
-def get_descendant_tenant_group_ids(group_id: int | None, live_only: bool = False) -> set[int]:
-    if group_id is None:
-        return set()
-    cache = _descendant_group_ids_cache.get()
-    if cache is None:
-        cache = {}
-        _descendant_group_ids_cache.set(cache)
-    cache_key = (group_id, live_only)
-    if cache_key in cache:
-        return cache[cache_key]
-    # inline import: app-registry: avoids organization model import during app initialization.
-    from organization.models import TenantGroup
-
-    if (
-        live_only
-        and not TenantGroup._base_manager.filter(
-            pk=group_id,
-            deleted_at__isnull=True,
-        ).exists()
-    ):
-        cache[cache_key] = set()
-        return cache[cache_key]
-
-    ids = {group_id}
-    frontier = [group_id]
-    while frontier:
-        children_qs = TenantGroup._base_manager.filter(
-            parent_id__in=frontier,
-        ).exclude(pk__in=ids)
-        if live_only:
-            children_qs = children_qs.filter(deleted_at__isnull=True)
-        children = list(children_qs.values_list("pk", flat=True))
-        if not children:
-            break
-        ids.update(children)
-        frontier = children
-    cache[cache_key] = ids
-    return ids
-
-
-def get_ancestor_tenant_group_ids(group_id: int | None, live_only: bool = False) -> set[int]:
-    if group_id is None:
-        return set()
-    # inline import: app-registry: avoids organization model import during app initialization.
-    from organization.models import TenantGroup
-
-    groups = TenantGroup._base_manager.all()
-    if live_only:
-        groups = groups.filter(deleted_at__isnull=True)
-    parent_by_id = dict(groups.values_list("pk", "parent_id"))
-    if group_id not in parent_by_id:
-        return set()
-
-    seen = set()
-    node = group_id
-    while node is not None and node not in seen and node in parent_by_id:
-        seen.add(node)
-        node = parent_by_id[node]
-    # Only a chain that terminates at a real root is valid. Cycles and dangling
-    # parent references are malformed persisted topology and fail closed.
-    return seen if node is None else set()
+from organization import rbac as _rbac
 
 
 def shared_resource_ids(model: type[object], tenant: object | None) -> Iterable[int]:
@@ -606,20 +541,13 @@ def accessible_tenant_ids_with_expiry(user: object | None) -> tuple[frozenset[in
     # serving a stale set while the shared cache is unreachable.
     can_cache = hasattr(user, "__dict__")
     if can_cache:
-        # inline import: cycle: avoids an organization.access -> core.auth import cycle
-        # at load (core.auth resolves permissions through organization.rbac).
-        from core.auth.cache import synchronize_authorization_cache
-
         synchronize_authorization_cache(user)
         cached = user.__dict__.get(cache_key)
         if cached is not None:
             cached_valid_until = user.__dict__.get(expiry_key)
             if cached_valid_until is None or cached_valid_until > timezone.now():
                 return cached, cached_valid_until
-    # inline import: cycle: avoids organization.access <-> organization.rbac at load time.
-    from organization.rbac import resolve_accessible_tenant_ids_with_expiry
-
-    result, valid_until = resolve_accessible_tenant_ids_with_expiry(user)
+    result, valid_until = _rbac.resolve_accessible_tenant_ids_with_expiry(user)
     result = frozenset(result)
     if can_cache:
         user.__dict__[cache_key] = result
@@ -635,11 +563,8 @@ def accessible_tenant_ids(user: object | None) -> set[int]:
 def managed_accessible_tenant_ids(user: object | None) -> set[int]:
     if user is None or not getattr(user, "is_authenticated", False):
         return set()
-    # inline import: cycle: avoids organization.access <-> organization.rbac at load time.
-    from organization.rbac import applicable_grants
-
     tenant_ids = set()
-    for grant in applicable_grants(user):
+    for grant in _rbac.applicable_grants(user):
         tenant_ids.update(grant.scoped_tenant_ids())
     return tenant_ids
 

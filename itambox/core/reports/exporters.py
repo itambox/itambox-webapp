@@ -9,6 +9,8 @@ or rendered HTML, so they stay format-agnostic across report types.
 
 import io
 
+from core.pdf_renderer import html_to_pdf_bytes
+
 XLSX_MIME = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
 PDF_MIME = "application/pdf"
 
@@ -43,8 +45,4 @@ def report_xlsx_bytes(headers, rows, sheet_title="Report"):
 def report_pdf_bytes(rendered_html):
     """Render already-compiled report HTML into PDF bytes via the shared
     xhtml2pdf renderer (same engine + SSRF-safe link callback as label PDFs)."""
-    # inline import: cycle: reuse the label PDF renderer without a core.reports -> core.tasks
-    # import at module load (and keep xhtml2pdf an on-demand dependency).
-    from core.tasks.labels import _html_to_pdf_bytes
-
-    return _html_to_pdf_bytes(rendered_html)
+    return html_to_pdf_bytes(rendered_html)

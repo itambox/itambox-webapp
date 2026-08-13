@@ -7,6 +7,7 @@ from django.db import transaction
 from django.utils.translation import gettext_lazy as _
 
 from core.context import get_current_request_id
+from core.importers.bulk_forms import get_import_form_class
 from core.models import Job, Notification
 
 from .context import TaskContext
@@ -63,11 +64,7 @@ def import_csv_task(
                         % {"app_label": app_label, "model_name": model_name}
                     )
 
-                from itambox.views.generic import ObjectImportView
-
-                view_instance = ObjectImportView()
-                view_instance.model = model
-                ImportFormClass = view_instance.get_form_class()
+                ImportFormClass = get_import_form_class(model)
 
                 form = ImportFormClass()
                 form._rows_data = rows_data

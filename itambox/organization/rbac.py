@@ -3,7 +3,8 @@
 from django.db.models import F, Q
 from django.utils import timezone
 
-from organization.access import get_descendant_tenant_group_ids
+from core.authorization_cache import synchronize_authorization_cache
+from core.tenant_scope import get_descendant_tenant_group_ids
 from organization.models import RoleGrant, RoleGrantScope, Tenant
 
 
@@ -21,10 +22,6 @@ def applicable_grants(user):
     """
     can_cache = hasattr(user, "__dict__")
     if can_cache:
-        # inline import: cycle: avoids an organization.rbac -> core.auth import cycle at
-        # load (core.auth resolves permissions through organization.rbac).
-        from core.auth.cache import synchronize_authorization_cache
-
         synchronize_authorization_cache(user)
         cached = user.__dict__.get("_applicable_grants")
         if cached is not None:
@@ -125,9 +122,6 @@ def build_accessible_tenant_permissions_map(user, grants=None):
     """
     if not hasattr(user, "__dict__"):
         return {}
-    # inline import: cycle: avoids an organization.rbac -> core.auth import cycle at load.
-    from core.auth.cache import synchronize_authorization_cache
-
     synchronize_authorization_cache(user)
     cached = user.__dict__.get("_tenant_permissions_map")
     if cached is not None:
