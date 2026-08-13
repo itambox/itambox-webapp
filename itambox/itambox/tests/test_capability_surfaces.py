@@ -233,7 +233,7 @@ class TestAccessibilityTemplateContracts:
         edit_only_actions = str(edit_only_table.render_actions(asset_record))
         assert '<button class="btn btn-sm btn-action dropdown-toggle' in edit_only_actions
         assert 'title="Edit Details"' in edit_only_actions
-        assert 'Changelog' in edit_only_actions
+        assert "Changelog" in edit_only_actions
         assert 'title="Delete"' not in edit_only_actions
 
     def test_shared_toast_and_modal_errors_are_announced(self):
