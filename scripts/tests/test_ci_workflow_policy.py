@@ -26,6 +26,7 @@ from scripts.check_architecture import linked_documents
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 WORKFLOW_PATH = REPO_ROOT / ".github" / "workflows" / "ci.yml"
+E2E_WORKFLOW_PATH = REPO_ROOT / ".github" / "workflows" / "e2e.yml"
 PRE_COMMIT_PATH = REPO_ROOT / ".pre-commit-config.yaml"
 MAKEFILE_PATH = REPO_ROOT / "Makefile"
 
@@ -44,6 +45,14 @@ POST_SUITE_GATES = {
 # Both lanes must have succeeded: the gates read files the lanes write, and
 # the combined coverage report exists only when both lanes ran.
 LANES_SUCCEEDED = "steps.parallel.conclusion == 'success' && steps.serial.conclusion == 'success'"
+
+
+class AccessibilityE2EWorkflowPolicyTests(unittest.TestCase):
+    def test_accessibility_browser_contracts_run_before_merge(self):
+        workflow = E2E_WORKFLOW_PATH.read_text(encoding="utf-8")
+
+        self.assertRegex(workflow, r"(?m)^  pull_request:\n    branches: \[main\]$")
+        self.assertIn("run: npm test", workflow)
 
 
 def _assign_field(step, body):

@@ -250,17 +250,18 @@ class AssetTable(BaseTable):  # Inherit from BaseTable
             if record.active_assignment:
                 checkin_url = reverse("assets:asset_checkin", kwargs={"pk": record.pk})
                 html += format_html(
-                    '<a class="btn btn-sm btn-soft-outline-success check-action cursor-pointer" role="button" '
+                    '<button class="btn btn-sm btn-soft-outline-success check-action cursor-pointer" type="button" '
                     'hx-get="{}" hx-target="#modal-placeholder" hx-swap="innerHTML" '
-                    'title="Check-in" aria-label="Check-in"><i class="mdi mdi-login me-1"></i>Check-in</a>',
+                    'title="Check-in" aria-label="Check-in"><i class="mdi mdi-login me-1"></i>Check-in</button>',
                     checkin_url,
                 )
             else:
                 checkout_url = reverse("assets:asset_checkout_modal", kwargs={"pk": record.pk})
                 html += format_html(
-                    '<a class="btn btn-sm btn-soft-success check-action cursor-pointer" role="button" '
+                    '<button class="btn btn-sm btn-soft-success check-action cursor-pointer" type="button" '
                     'hx-get="{}" hx-target="#modal-placeholder" hx-swap="innerHTML" '
-                    'title="Check-out" aria-label="Check-out"><i class="mdi mdi-logout me-1"></i>Check-out</a>',
+                    'title="Check-out" aria-label="Check-out">'
+                    '<i class="mdi mdi-logout me-1"></i>Check-out</button>',
                     checkout_url,
                 )
 
@@ -277,27 +278,30 @@ class AssetTable(BaseTable):  # Inherit from BaseTable
         if can_edit and can_delete:
             edit_url = reverse("assets:asset_update", kwargs={"pk": record.pk})
             del_url = reverse("assets:asset_delete", kwargs={"pk": record.pk})
-            html += (
-                f'<span class="btn-group dropdown">'
-                f'<a class="btn btn-sm btn-action" href="{edit_url}" title="Edit Details"><i class="mdi mdi-pencil-outline"></i></a>'
-                f'<a class="btn btn-sm btn-action dropdown-toggle dropdown-toggle-split" type="button" data-bs-toggle="dropdown" aria-expanded="false">'
-                f"</a>"
-                f'<ul class="dropdown-menu dropdown-menu-end">'
-                f"{changelog_li}"
-                f'<li><hr class="dropdown-divider"></li>'
-                f'<li><a class="dropdown-item text-danger" href="{del_url}"><i class="mdi mdi-trash-can-outline me-1"></i>Delete</a></li>'
-                f"</ul></span>"
+            html += format_html(
+                '<span class="btn-group dropdown">'
+                '<a class="btn btn-sm btn-action" href="{}" title="Edit Details">'
+                '<i class="mdi mdi-pencil-outline"></i></a>'
+                '<button class="btn btn-sm btn-action dropdown-toggle dropdown-toggle-split" '
+                'type="button" data-bs-toggle="dropdown" aria-expanded="false" aria-label="More actions"></button>'
+                '<ul class="dropdown-menu dropdown-menu-end">{}<li><hr class="dropdown-divider"></li>'
+                '<li><a class="dropdown-item text-danger" href="{}">'
+                '<i class="mdi mdi-trash-can-outline me-1"></i>Delete</a></li></ul></span>',
+                edit_url,
+                mark_safe(changelog_li),
+                del_url,
             )
         elif can_edit:
             edit_url = reverse("assets:asset_update", kwargs={"pk": record.pk})
-            html += (
-                f'<span class="btn-group dropdown">'
-                f'<a class="btn btn-sm btn-action" href="{edit_url}" title="Edit Details"><i class="mdi mdi-pencil-outline"></i></a>'
-                f'<a class="btn btn-sm btn-action dropdown-toggle dropdown-toggle-split" type="button" data-bs-toggle="dropdown" aria-expanded="false">'
-                f"</a>"
-                f'<ul class="dropdown-menu dropdown-menu-end">'
-                f"{changelog_li}"
-                f"</ul></span>"
+            html += format_html(
+                '<span class="btn-group dropdown">'
+                '<a class="btn btn-sm btn-action" href="{}" title="Edit Details">'
+                '<i class="mdi mdi-pencil-outline"></i></a>'
+                '<button class="btn btn-sm btn-action dropdown-toggle dropdown-toggle-split" '
+                'type="button" data-bs-toggle="dropdown" aria-expanded="false" aria-label="More actions"></button>'
+                '<ul class="dropdown-menu dropdown-menu-end">{}</ul></span>',
+                edit_url,
+                mark_safe(changelog_li),
             )
         elif can_delete:
             del_url = reverse("assets:asset_delete", kwargs={"pk": record.pk})

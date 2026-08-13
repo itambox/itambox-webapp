@@ -655,32 +655,8 @@
       "path": "itambox/assets/tables.py",
       "code": "B907",
       "message": "'del_url' is manually surrounded by quotes, consider using the `!r` conversion flag.",
-      "source": "html += (\n                f'<span class=\"btn-group dropdown\">'\n                f'<a class=\"btn btn-sm btn-action\" href=\"{edit_url}\" title=\"Edit Details\"><i class=\"mdi mdi-pencil-outline\"></i></a>'\n                f'<a class=\"btn btn-sm btn-action dropdown-toggle dropdown-toggle-split\" type=\"button\" data-bs-toggle=\"dropdown\" aria-expanded=\"false\">'\n                f\"</a>\"\n                f'<ul class=\"dropdown-menu dropdown-menu-end\">'\n                f\"{changelog_li}\"\n                f'<li><hr class=\"dropdown-divider\"></li>'\n                f'<li><a class=\"dropdown-item text-danger\" href=\"{del_url}\"><i class=\"mdi mdi-trash-can-outline me-1\"></i>Delete</a></li>'\n                f\"</ul></span>\"\n            )",
-      "context": "Module:body/ClassDef:AssetTable:body/FunctionDef:render_actions:body/If:BoolOp(op=And(), values=[Name(id='can_edit', ctx=Load()), Name(id='can_delete', ctx=Load())]):body",
-      "count": 1
-    },
-    {
-      "path": "itambox/assets/tables.py",
-      "code": "B907",
-      "message": "'del_url' is manually surrounded by quotes, consider using the `!r` conversion flag.",
       "source": "html += f'<a class=\"btn btn-sm btn-action btn-action-danger\" href=\"{del_url}\" title=\"Delete\"><i class=\"mdi mdi-trash-can-outline\"></i></a>'",
       "context": "Module:body/ClassDef:AssetTable:body/FunctionDef:render_actions:body/If:BoolOp(op=And(), values=[Name(id='can_edit', ctx=Load()), Name(id='can_delete', ctx=Load())]):orelse/If:Name(id='can_edit', ctx=Load()):orelse/If:Name(id='can_delete', ctx=Load()):body",
-      "count": 1
-    },
-    {
-      "path": "itambox/assets/tables.py",
-      "code": "B907",
-      "message": "'edit_url' is manually surrounded by quotes, consider using the `!r` conversion flag.",
-      "source": "html += (\n                f'<span class=\"btn-group dropdown\">'\n                f'<a class=\"btn btn-sm btn-action\" href=\"{edit_url}\" title=\"Edit Details\"><i class=\"mdi mdi-pencil-outline\"></i></a>'\n                f'<a class=\"btn btn-sm btn-action dropdown-toggle dropdown-toggle-split\" type=\"button\" data-bs-toggle=\"dropdown\" aria-expanded=\"false\">'\n                f\"</a>\"\n                f'<ul class=\"dropdown-menu dropdown-menu-end\">'\n                f\"{changelog_li}\"\n                f\"</ul></span>\"\n            )",
-      "context": "Module:body/ClassDef:AssetTable:body/FunctionDef:render_actions:body/If:BoolOp(op=And(), values=[Name(id='can_edit', ctx=Load()), Name(id='can_delete', ctx=Load())]):orelse/If:Name(id='can_edit', ctx=Load()):body",
-      "count": 1
-    },
-    {
-      "path": "itambox/assets/tables.py",
-      "code": "B907",
-      "message": "'edit_url' is manually surrounded by quotes, consider using the `!r` conversion flag.",
-      "source": "html += (\n                f'<span class=\"btn-group dropdown\">'\n                f'<a class=\"btn btn-sm btn-action\" href=\"{edit_url}\" title=\"Edit Details\"><i class=\"mdi mdi-pencil-outline\"></i></a>'\n                f'<a class=\"btn btn-sm btn-action dropdown-toggle dropdown-toggle-split\" type=\"button\" data-bs-toggle=\"dropdown\" aria-expanded=\"false\">'\n                f\"</a>\"\n                f'<ul class=\"dropdown-menu dropdown-menu-end\">'\n                f\"{changelog_li}\"\n                f'<li><hr class=\"dropdown-divider\"></li>'\n                f'<li><a class=\"dropdown-item text-danger\" href=\"{del_url}\"><i class=\"mdi mdi-trash-can-outline me-1\"></i>Delete</a></li>'\n                f\"</ul></span>\"\n            )",
-      "context": "Module:body/ClassDef:AssetTable:body/FunctionDef:render_actions:body/If:BoolOp(op=And(), values=[Name(id='can_edit', ctx=Load()), Name(id='can_delete', ctx=Load())]):body",
       "count": 1
     },
     {
@@ -734,22 +710,6 @@
     {
       "path": "itambox/assets/tables.py",
       "code": "B950",
-      "message": "line too long (133 > 120 characters)",
-      "source": "                f'<a class=\"btn btn-sm btn-action\" href=\"{edit_url}\" title=\"Edit Details\"><i class=\"mdi mdi-pencil-outline\"></i></a>'",
-      "context": "Module:body/ClassDef:AssetTable:body/FunctionDef:render_actions:body/If:BoolOp(op=And(), values=[Name(id='can_edit', ctx=Load()), Name(id='can_delete', ctx=Load())]):body",
-      "count": 1
-    },
-    {
-      "path": "itambox/assets/tables.py",
-      "code": "B950",
-      "message": "line too long (133 > 120 characters)",
-      "source": "                f'<a class=\"btn btn-sm btn-action\" href=\"{edit_url}\" title=\"Edit Details\"><i class=\"mdi mdi-pencil-outline\"></i></a>'",
-      "context": "Module:body/ClassDef:AssetTable:body/FunctionDef:render_actions:body/If:BoolOp(op=And(), values=[Name(id='can_edit', ctx=Load()), Name(id='can_delete', ctx=Load())]):orelse/If:Name(id='can_edit', ctx=Load()):body",
-      "count": 1
-    },
-    {
-      "path": "itambox/assets/tables.py",
-      "code": "B950",
       "message": "line too long (134 > 120 characters)",
       "source": "            html += f'<a class=\"btn btn-sm btn-action\" href=\"{clone_url}\" title=\"Copy/Clone\"><i class=\"mdi mdi-content-copy\"></i></a>'",
       "context": "Module:body/ClassDef:AssetTable:body/FunctionDef:render_actions:body/If:Name(id='can_clone', ctx=Load()):body",
@@ -758,33 +718,9 @@
     {
       "path": "itambox/assets/tables.py",
       "code": "B950",
-      "message": "line too long (138 > 120 characters)",
-      "source": "                f'<li><a class=\"dropdown-item text-danger\" href=\"{del_url}\"><i class=\"mdi mdi-trash-can-outline me-1\"></i>Delete</a></li>'",
-      "context": "Module:body/ClassDef:AssetTable:body/FunctionDef:render_actions:body/If:BoolOp(op=And(), values=[Name(id='can_edit', ctx=Load()), Name(id='can_delete', ctx=Load())]):body",
-      "count": 1
-    },
-    {
-      "path": "itambox/assets/tables.py",
-      "code": "B950",
       "message": "line too long (151 > 120 characters)",
       "source": "            html += f'<a class=\"btn btn-sm btn-action btn-action-danger\" href=\"{del_url}\" title=\"Delete\"><i class=\"mdi mdi-trash-can-outline\"></i></a>'",
       "context": "Module:body/ClassDef:AssetTable:body/FunctionDef:render_actions:body/If:BoolOp(op=And(), values=[Name(id='can_edit', ctx=Load()), Name(id='can_delete', ctx=Load())]):orelse/If:Name(id='can_edit', ctx=Load()):orelse/If:Name(id='can_delete', ctx=Load()):body",
-      "count": 1
-    },
-    {
-      "path": "itambox/assets/tables.py",
-      "code": "B950",
-      "message": "line too long (152 > 120 characters)",
-      "source": "                f'<a class=\"btn btn-sm btn-action dropdown-toggle dropdown-toggle-split\" type=\"button\" data-bs-toggle=\"dropdown\" aria-expanded=\"false\">'",
-      "context": "Module:body/ClassDef:AssetTable:body/FunctionDef:render_actions:body/If:BoolOp(op=And(), values=[Name(id='can_edit', ctx=Load()), Name(id='can_delete', ctx=Load())]):body",
-      "count": 1
-    },
-    {
-      "path": "itambox/assets/tables.py",
-      "code": "B950",
-      "message": "line too long (152 > 120 characters)",
-      "source": "                f'<a class=\"btn btn-sm btn-action dropdown-toggle dropdown-toggle-split\" type=\"button\" data-bs-toggle=\"dropdown\" aria-expanded=\"false\">'",
-      "context": "Module:body/ClassDef:AssetTable:body/FunctionDef:render_actions:body/If:BoolOp(op=And(), values=[Name(id='can_edit', ctx=Load()), Name(id='can_delete', ctx=Load())]):orelse/If:Name(id='can_edit', ctx=Load()):body",
       "count": 1
     },
     {
@@ -4286,22 +4222,6 @@
     {
       "path": "itambox/core/tables/columns.py",
       "code": "B907",
-      "message": "'toggle_text' is manually surrounded by quotes, consider using the `!r` conversion flag.",
-      "source": "html += (\n                f'<span class=\"btn-group dropdown\">'\n                f\"{button}\"\n                f'<a class=\"btn btn-sm btn-action dropdown-toggle dropdown-toggle-split\" type=\"button\" data-bs-toggle=\"dropdown\" aria-expanded=\"false\" aria-label=\"{toggle_text}\">'\n                f\"</a>\"\n                f'<ul class=\"dropdown-menu dropdown-menu-end\">{\"\".join(dropdown_links)}</ul>'\n                f\"</span>\"\n            )",
-      "context": "Module:body/ClassDef:ActionsColumn:body/FunctionDef:render:body/If:BoolOp(op=And(), values=[Name(id='button', ctx=Load()), Name(id='dropdown_links', ctx=Load())]):body",
-      "count": 1
-    },
-    {
-      "path": "itambox/core/tables/columns.py",
-      "code": "B907",
-      "message": "'toggle_text' is manually surrounded by quotes, consider using the `!r` conversion flag.",
-      "source": "html += (\n                f'<span class=\"btn-group dropdown\">'\n                f'<a class=\"btn btn-sm btn-action dropdown-toggle dropdown-toggle-split\" type=\"button\" data-bs-toggle=\"dropdown\" aria-expanded=\"false\" aria-label=\"{toggle_text}\">'\n                f\"</a>\"\n                f'<ul class=\"dropdown-menu dropdown-menu-end\">{\"\".join(dropdown_links)}</ul>'\n                f\"</span>\"\n            )",
-      "context": "Module:body/ClassDef:ActionsColumn:body/FunctionDef:render:body/If:BoolOp(op=And(), values=[Name(id='button', ctx=Load()), Name(id='dropdown_links', ctx=Load())]):orelse/If:Name(id='button', ctx=Load()):orelse/If:Name(id='dropdown_links', ctx=Load()):body",
-      "count": 1
-    },
-    {
-      "path": "itambox/core/tables/columns.py",
-      "code": "B907",
       "message": "'url' is manually surrounded by quotes, consider using the `!r` conversion flag.",
       "source": "button = (\n                    f'<a class=\"btn btn-sm {ghost_class}\" href=\"{url}\" type=\"button\" '\n                    f'title=\"{attrs[\"title\"]}\" aria-label=\"{attrs[\"title\"]}\">{icon}</a>'\n                )",
       "context": "Module:body/ClassDef:ActionsColumn:body/FunctionDef:render:body/For:Tuple(elts=[Name(id='idx', ctx=Store()), Tuple(elts=[Name(id='action', ctx=Store()), Name(id='attrs', ctx=Store())], ctx=Store())], ctx=Store()):Call(func=Name(id='enumerate', ctx=Load()), args=[Call(func=Attribute(value=Attribute(value=Name(id='self', ctx=Load()), attr='actions', ctx=Load()), attr='items', ctx=Load()), args=[], keywords=[])], keywords=[]):body/If:BoolOp(op=Or(), values=[Compare(left=Call(func=Name(id='len', ctx=Load()), args=[Attribute(value=Name(id='self', ctx=Load()), attr='actions', ctx=Load())], keywords=[]), ops=[Eq()], comparators=[Constant(value=1)]), BoolOp(op=And(), values=[Attribute(value=Name(id='self', ctx=Load()), attr='split_actions', ctx=Load()), Compare(left=Name(id='idx', ctx=Load()), ops=[Eq()], comparators=[Constant(value=0)])])]):body",
@@ -4313,22 +4233,6 @@
       "message": "'url' is manually surrounded by quotes, consider using the `!r` conversion flag.",
       "source": "dropdown_links.append(f'<li><a class=\"dropdown-item\" href=\"{url}\">{icon} {attrs[\"title\"]}</a></li>')",
       "context": "Module:body/ClassDef:ActionsColumn:body/FunctionDef:render:body/For:Tuple(elts=[Name(id='idx', ctx=Store()), Tuple(elts=[Name(id='action', ctx=Store()), Name(id='attrs', ctx=Store())], ctx=Store())], ctx=Store()):Call(func=Name(id='enumerate', ctx=Load()), args=[Call(func=Attribute(value=Attribute(value=Name(id='self', ctx=Load()), attr='actions', ctx=Load()), attr='items', ctx=Load()), args=[], keywords=[])], keywords=[]):body/If:BoolOp(op=Or(), values=[Compare(left=Call(func=Name(id='len', ctx=Load()), args=[Attribute(value=Name(id='self', ctx=Load()), attr='actions', ctx=Load())], keywords=[]), ops=[Eq()], comparators=[Constant(value=1)]), BoolOp(op=And(), values=[Attribute(value=Name(id='self', ctx=Load()), attr='split_actions', ctx=Load()), Compare(left=Name(id='idx', ctx=Load()), ops=[Eq()], comparators=[Constant(value=0)])])]):orelse",
-      "count": 1
-    },
-    {
-      "path": "itambox/core/tables/columns.py",
-      "code": "B950",
-      "message": "line too long (179 > 120 characters)",
-      "source": "                f'<a class=\"btn btn-sm btn-action dropdown-toggle dropdown-toggle-split\" type=\"button\" data-bs-toggle=\"dropdown\" aria-expanded=\"false\" aria-label=\"{toggle_text}\">'",
-      "context": "Module:body/ClassDef:ActionsColumn:body/FunctionDef:render:body/If:BoolOp(op=And(), values=[Name(id='button', ctx=Load()), Name(id='dropdown_links', ctx=Load())]):body",
-      "count": 1
-    },
-    {
-      "path": "itambox/core/tables/columns.py",
-      "code": "B950",
-      "message": "line too long (179 > 120 characters)",
-      "source": "                f'<a class=\"btn btn-sm btn-action dropdown-toggle dropdown-toggle-split\" type=\"button\" data-bs-toggle=\"dropdown\" aria-expanded=\"false\" aria-label=\"{toggle_text}\">'",
-      "context": "Module:body/ClassDef:ActionsColumn:body/FunctionDef:render:body/If:BoolOp(op=And(), values=[Name(id='button', ctx=Load()), Name(id='dropdown_links', ctx=Load())]):orelse/If:Name(id='button', ctx=Load()):orelse/If:Name(id='dropdown_links', ctx=Load()):body",
       "count": 1
     },
     {

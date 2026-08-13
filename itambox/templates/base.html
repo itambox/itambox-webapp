@@ -5,6 +5,7 @@
 {% load partials %}
 {% load django_htmx %}
 {% load plugins %}
+{% get_current_language as LANGUAGE_CODE %}
 <!DOCTYPE html>
 <html lang="{{ LANGUAGE_CODE }}"
       data-itambox-user-id="{{ request.user.pk }}"

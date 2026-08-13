@@ -4,19 +4,22 @@
  * and avoid issues during HTMX history navigation/restores.
  */
 
-function initBetaBanner() {
+export function initBetaBanner() {
   const el = document.getElementById('beta-module-banner');
   if (el) {
-    if (sessionStorage.getItem('beta_banner_dismissed') === '1') {
+    const maturity = el.dataset.maturity || 'beta';
+    const capability = el.dataset.capability || 'legacy-module';
+    const dismissalKey = `beta_banner_dismissed:${capability}`;
+    if (maturity === 'beta' && sessionStorage.getItem(dismissalKey) === '1') {
       el.remove();
     } else {
       el.classList.remove('d-none');
       
       const closeBtn = el.querySelector('.btn-close');
-      if (closeBtn && !closeBtn.getAttribute('data-listener-active')) {
+      if (maturity === 'beta' && closeBtn && !closeBtn.getAttribute('data-listener-active')) {
         closeBtn.setAttribute('data-listener-active', 'true');
         closeBtn.addEventListener('click', () => {
-          sessionStorage.setItem('beta_banner_dismissed', '1');
+          sessionStorage.setItem(dismissalKey, '1');
           el.remove();
         });
       }
@@ -32,4 +35,4 @@ if (document.readyState === 'loading') {
 }
 
 // Run on HTMX content swaps
-document.body.addEventListener('htmx:afterSettle', initBetaBanner);
+document.body?.addEventListener('htmx:afterSettle', initBetaBanner);

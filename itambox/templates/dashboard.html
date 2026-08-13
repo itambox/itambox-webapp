@@ -6,6 +6,7 @@
   {% translate "Dashboard - ITAMbox" %}
 {% endblock %}
 {% block page_header %}
+  <h1 class="visually-hidden">{% translate "Dashboard" %}: {{ active_dashboard.name }}</h1>
   <div class="dropdown d-inline-block">
     <button class="btn btn-outline-primary dropdown-toggle d-flex align-items-center"
             type="button"
@@ -126,13 +127,13 @@
           {# Neutral header; the configured style accent lives in the icon chip #}
           {% get_widget_icon entry.config as widget_icon %}
           <div class="card-header d-flex justify-content-between align-items-center">
-            <h3 class="card-title">
+            <h2 class="card-title">
               <span class="widget-icon-chip{% if entry.config.style %} widget-icon-chip--{{ entry.config.style }}{% endif %}"
                     aria-hidden="true">
                 <i class="mdi mdi-{{ widget_icon }}"></i>
               </span>
               <span class="widget-title-text">{{ entry.config.title }}</span>
-            </h3>
+            </h2>
             <div class="card-actions d-flex gap-1">
               <button class="btn btn-icon btn-sm btn-ghost-secondary"
                       hx-get="{% url 'extras:dashboard_widget_config' dashboard_id=active_dashboard.id index=entry.index %}"
@@ -152,7 +153,9 @@
               </button>
             </div>
           </div>
-          <div class="card-body overflow-auto">{% render_widget entry.config entry.index %}</div>
+          <div class="card-body overflow-auto"
+               tabindex="0"
+               aria-label="{{ entry.config.title }}">{% render_widget entry.config entry.index %}</div>
           {% get_widget_footer_links entry.config entry.index as footer_links %}
           {% if footer_links %}
             <div class="card-footer bg-surface-secondary d-flex justify-content-end align-items-center flex-wrap gap-2 csp-style-3e808d2c8045">

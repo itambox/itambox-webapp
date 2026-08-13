@@ -5,8 +5,11 @@ maturity a user, an operator, and an API client all see. These tests pin those
 three readers to the same source.
 """
 
+import re
 from collections import namedtuple
 from io import StringIO
+from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
 from django.conf import settings
@@ -24,6 +27,7 @@ from itambox.views.generic.capability_notices import capability_notice
 #: reads ``view.queryset.model``, so there is nothing else to imitate.
 _StubQuerySet = namedtuple("_StubQuerySet", "model")
 _StubView = namedtuple("_StubView", "queryset")
+_APP_ROOT = Path(__file__).resolve().parents[2]
 
 
 class TestSurfaceMarker:
@@ -101,6 +105,36 @@ class TestBannerTemplate:
         html = render_to_string("generic/includes/beta_banner.html", {"capability_notice": notice})
         assert notice["limitations"][0] in html
 
+    def test_the_beta_banner_is_a_polite_live_region_with_a_label(self):
+        html = render_to_string(
+            "generic/includes/beta_banner.html",
+            {"capability_notice": _notice_for_key("automation.webhooks")},
+        )
+        assert 'role="status"' in html
+        assert 'aria-live="polite"' in html
+        assert 'aria-atomic="true"' in html
+        assert 'aria-labelledby="beta-module-banner-title"' in html
+        assert 'id="beta-module-banner-title"' in html
+
+    def test_the_experimental_banner_is_announced_without_a_dismiss_control(self):
+        html = render_to_string(
+            "generic/includes/beta_banner.html",
+            {"capability_notice": _notice_for_key("platform.plugins")},
+        )
+        assert 'role="status"' in html
+        assert 'aria-live="polite"' in html
+        assert 'data-maturity="experimental"' in html
+        assert "btn-close" not in html
+
+    def test_the_maturity_badge_exposes_text_and_an_accessible_name(self):
+        html = render_to_string(
+            "generic/includes/capability_badge.html",
+            {"capability_notice": _notice_for_key("platform.plugins")},
+        )
+        assert "aria-label=" in html
+        assert 'aria-hidden="true"' not in html
+        assert "Experimental" in html
+
     def test_the_banner_is_silent_without_a_notice(self):
         html = render_to_string("generic/includes/beta_banner.html", {})
         assert html.strip() == ""
@@ -119,6 +153,96 @@ class TestBannerTemplate:
     def test_the_badge_is_silent_without_a_notice(self):
         html = render_to_string("generic/includes/capability_badge.html", {})
         assert html.strip() == ""
+
+
+class TestAccessibilityTemplateContracts:
+    def test_theme_controls_are_named_buttons_with_hidden_icons(self):
+        html = "\n".join(
+            (
+                (_APP_ROOT / "templates" / "layout.html").read_text(encoding="utf-8"),
+                (_APP_ROOT / "templates" / "global_includes" / "_topbar.html").read_text(encoding="utf-8"),
+            )
+        )
+        theme_buttons = [
+            match.groups()
+            for match in re.finditer(r"<button(?P<attrs>[^>]*)>(?P<body>.*?)</button>", html, re.DOTALL)
+            if "color-mode-toggle" in match.group("attrs")
+        ]
+
+        assert len(theme_buttons) == 4
+        for attrs, body in theme_buttons:
+            assert 'type="button"' in attrs
+            assert "aria-label=\"{% translate 'Enable " in attrs
+            assert 'aria-hidden="true"' in body
+
+    def test_page_shell_has_language_and_landmark_contracts(self):
+        base = (_APP_ROOT / "templates" / "base.html").read_text(encoding="utf-8")
+        public = (_APP_ROOT / "templates" / "base_public.html").read_text(encoding="utf-8")
+        breadcrumbs = (_APP_ROOT / "templates" / "global_includes" / "_breadcrumbs.html").read_text(encoding="utf-8")
+
+        for html in (base, public):
+            assert "{% get_current_language as LANGUAGE_CODE %}" in html
+            assert '<html lang="{{ LANGUAGE_CODE }}"' in html
+        assert '<nav class="d-flex justify-content-between' in breadcrumbs
+        assert "aria-label=\"{% translate 'Breadcrumb' %}\"" in breadcrumbs
+
+    def test_dashboard_scroll_regions_are_named_and_keyboard_reachable(self):
+        html = (_APP_ROOT / "templates" / "dashboard.html").read_text(encoding="utf-8")
+
+        assert '<h1 class="visually-hidden">{% translate "Dashboard" %}' in html
+        assert '<h2 class="card-title">' in html
+        assert 'class="card-body overflow-auto"' in html
+        assert 'tabindex="0"' in html
+        assert 'aria-label="{{ entry.config.title }}"' in html
+
+    def test_quick_search_has_a_stable_focus_target_and_name(self):
+        html = (_APP_ROOT / "templates" / "htmx" / "quick_search.html").read_text(encoding="utf-8")
+
+        assert 'id="quick-search-input"' in html
+        assert "aria-label=\"{% translate 'Search' %}\"" in html
+
+    def test_table_selectors_and_action_menus_are_named_native_controls(self):
+        from assets.models import Manufacturer
+        from assets.tables import AssetTable
+        from core.tables.columns import ActionsColumn, ToggleColumn
+
+        record = Manufacturer(pk=1, name="Accessibility Probe", slug="accessibility-probe")
+        actions = str(ActionsColumn().render(record, table=None))
+
+        assert '<button class="btn btn-sm btn-action dropdown-toggle' in actions
+        assert 'aria-label="Toggle Dropdown"' in actions
+        assert '<a class="btn btn-sm btn-action dropdown-toggle' not in actions
+        assert str(ToggleColumn().attrs["input"]["aria-label"]) == "Select row"
+
+        asset_table = AssetTable([])
+        asset_table.request = SimpleNamespace(user=SimpleNamespace(has_perm=lambda *_args: True))
+        asset_record = SimpleNamespace(pk=1, active_assignment=None, deleted_at=None)
+        asset_actions = str(asset_table.render_actions(asset_record))
+
+        assert '<button class="btn btn-sm btn-soft-success check-action' in asset_actions
+        assert '<button class="btn btn-sm btn-action dropdown-toggle' in asset_actions
+        assert 'aria-label="More actions"' in asset_actions
+        assert '<a class="btn btn-sm btn-action dropdown-toggle' not in asset_actions
+
+        edit_only_table = AssetTable([])
+        edit_only_table.request = SimpleNamespace(
+            user=SimpleNamespace(
+                has_perm=lambda permission, _record: permission != "assets.delete_asset",
+            )
+        )
+        edit_only_actions = str(edit_only_table.render_actions(asset_record))
+        assert '<button class="btn btn-sm btn-action dropdown-toggle' in edit_only_actions
+        assert 'title="Edit Details"' in edit_only_actions
+        assert "Changelog" in edit_only_actions
+        assert 'title="Delete"' not in edit_only_actions
+
+    def test_shared_toast_and_modal_errors_are_announced(self):
+        toast = (_APP_ROOT / "templates" / "global_includes" / "_toast.html").read_text(encoding="utf-8")
+        modal = (_APP_ROOT / "templates" / "generic" / "includes" / "add_stock_modal.html").read_text(encoding="utf-8")
+        for html in (toast, modal):
+            assert 'role="alert"' in html
+            assert 'aria-live="assertive"' in html
+            assert 'aria-atomic="true"' in html
 
 
 @pytest.mark.django_db

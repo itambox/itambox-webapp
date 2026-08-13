@@ -21,6 +21,13 @@
   }
 
   function initTomSelect(el: HTMLSelectElement): TomSelect | null {
+    const originalLabel = el.id
+      ? document.querySelector<HTMLLabelElement>(`label[for="${CSS.escape(el.id)}"]`)
+      : null;
+    const labelText = originalLabel?.textContent?.trim();
+    if (labelText && !el.hasAttribute('aria-label') && !el.hasAttribute('aria-labelledby')) {
+      el.setAttribute('aria-label', labelText);
+    }
     const url = el.getAttribute('data-tom-select-url');
     const plugins = ['dropdown_input'];
     if (el.multiple) {
@@ -73,7 +80,9 @@
       if (el.name) {
         ts.control_input.setAttribute('name', el.name + '-ts-control');
       }
-      const label = document.getElementById(el.id + '-ts-label') || document.querySelector('label[for="' + el.id + '-ts-control"]');
+      const label = originalLabel
+        || document.getElementById(el.id + '-ts-label')
+        || document.querySelector('label[for="' + el.id + '-ts-control"]');
       if (label) {
         label.setAttribute('for', inputId);
       }

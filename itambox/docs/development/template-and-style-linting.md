@@ -85,6 +85,43 @@ centralized in the configuration:
 These are not a general Stylelint disable and do not cover arbitrary framework
 selectors or properties. New exceptions must be narrowly scoped and documented.
 
+## Accessibility qualification baseline
+
+The accessibility contract for full-page and HTMX journeys is qualified with the
+Playwright spec `tests/e2e/spec/issue101-accessibility.spec.ts`. It runs axe-core
+against the dashboard and a post-HTMX list state, and covers keyboard-only focus,
+modal focus return, both supported themes, and reduced-motion media preferences.
+Axe violations are blocking; no blanket suppression is permitted. A suppression,
+if ever required for a third-party widget, must be scoped to the widget and
+reviewed with a reason and removal condition.
+
+Authored foreground/background combinations target WCAG 2.2 AA contrast: at least
+4.5:1 for normal text and 3:1 for large text and user-interface components. The
+light and dark token definitions in `static/src/styles/_tokens.scss` are the
+source values; axe's `color-contrast` rule is the automated qualification for
+representative rendered states.
+
+The reduced-motion stylesheet disables non-essential animation and transitions
+while preserving focus indicators and meaningful state changes. Components must
+not use reduced motion as a reason to remove keyboard focus, hover/focus styling,
+or status announcements.
+
+The six qualification criteria are covered by these executable contracts:
+
+| Criterion | Evidence |
+|---|---|
+| Representative full-page and HTMX states pass axe | Dashboard and post-filter list scans in `issue101-accessibility.spec.ts`; the baseline has no suppressions. |
+| Primary workflows are keyboard usable | Keyboard submission of the list filter, skip-link focus, and keyboard modal open/close in the Playwright spec. |
+| Modal and HTMX focus is predictable | The Playwright spec checks list-filter focus after the swap and focus return to the modal trigger. |
+| Status and error feedback uses live regions | Rendered-template contracts in `itambox/tests/test_capability_surfaces.py` check the maturity banner, shared toast, and modal form error. |
+| Supported themes meet the contrast target | The Playwright spec runs axe, including `color-contrast`, in both light and dark themes. |
+| Reduced-motion preferences are respected | The Playwright spec emulates `prefers-reduced-motion: reduce` and checks computed animation and transition durations. |
+
+Run the browser qualification from `itambox/tests/e2e/` with
+`npm test -- issue101-accessibility.spec.ts`. It requires the same migrated,
+seeded PostgreSQL fixture and authenticated browser state prepared by the E2E
+workflow.
+
 ## Dependencies and CI
 
 `uv.lock` and `itambox/package-lock.json` are committed. CI uses locked installs

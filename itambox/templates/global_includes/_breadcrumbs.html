@@ -3,7 +3,8 @@
 {# Renders Bootstrap breadcrumbs based on a list of tuples passed in context #}
 {# Expected context variable: breadcrumbs = [(url, label), (url, label), ...] #}
 {# The last item is treated as the active page. #}
-<div class="d-flex justify-content-between align-items-center w-100{% if breadcrumbs or help_url %} breadcrumbs-header-min-height{% endif %}">
+<nav class="d-flex justify-content-between align-items-center w-100{% if breadcrumbs or help_url %} breadcrumbs-header-min-height{% endif %}"
+     aria-label="{% translate 'Breadcrumb' %}">
   {% if breadcrumbs %}
     <ol class="breadcrumb breadcrumb-arrows mb-0"
         aria-label="{% translate 'breadcrumbs' %}">
@@ -26,4 +27,4 @@
       <i class="mdi mdi-help-circle csp-style-300e17994aa9"></i>
     </a>
   {% endif %}
-</div>
+</nav>

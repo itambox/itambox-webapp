@@ -5,4 +5,5 @@ Silent for Stable and for anything the capability registry does not own.
 {% endcomment %}
 {% if capability_notice %}<span class="badge bg-warning-lt ms-2 align-middle"
       data-capability="{{ capability_notice.key }}"
-      title="{% blocktranslate with name=capability_notice.title %}{{ name }} is still settling; its API and data model may change.{% endblocktranslate %}">{{ capability_notice.maturity|title }}</span>{% endif %}
+      aria-label="{% blocktranslate with name=capability_notice.title grade=capability_notice.maturity|title %}{{ name }} maturity: {{ grade }}{% endblocktranslate %}"
+      title="{% blocktranslate with name=capability_notice.title %}{{ name }} is still settling; its API and data model may change.{% endblocktranslate %}"><span class="visually-hidden">{% translate "Maturity:" %}</span>{{ capability_notice.maturity|title }}</span>{% endif %}
