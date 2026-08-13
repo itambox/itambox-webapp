@@ -104,7 +104,7 @@ class MultiDashboardViewsTests(TestCase):
 
         self.assertEqual(response.status_code, 200)
         content = response.content.decode()
-        page_header = content.split('<div class="page-header d-print-none"', 1)[1].split('<div id="tabs-block"', 1)[0]
+        page_header = content.split('<div class="page-header d-print-none">', 1)[1].split('<div id="tabs-block"', 1)[0]
         self.assertNotIn("page-header-block", page_header)
         self.assertNotIn("page-pretitle", page_header)
         self.assertNotIn("page-title", page_header)
