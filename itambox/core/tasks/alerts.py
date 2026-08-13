@@ -101,14 +101,16 @@ def _schedule_alert_dispatch(rule, match, alert_log):
     """Dispatch one persisted alert after commit and record disposition state."""
     alert_id = alert_log.pk
     rule_id = rule.pk
+    tenant_id = rule.tenant_id
     alert_match = dict(match)
 
     def dispatch_alert():
         notified_at = timezone.now()
         try:
-            rule_for_dispatch = AlertRule._base_manager.get(pk=rule_id)
-            persisted_alert = AlertLog.unscoped.get(pk=alert_id)
-            delivery = _dispatch_channels(rule_for_dispatch, alert_match, persisted_alert)
+            with TaskContext(tenant_id=tenant_id):
+                rule_for_dispatch = AlertRule._base_manager.get(pk=rule_id)
+                persisted_alert = AlertLog.unscoped.get(pk=alert_id)
+                delivery = _dispatch_channels(rule_for_dispatch, alert_match, persisted_alert)
         except Exception:
             logger.exception("Alert delivery failed for AlertLog %s.", alert_id)
             delivery = {"__dispatch__": DeliveryDisposition.TERMINAL.value}
