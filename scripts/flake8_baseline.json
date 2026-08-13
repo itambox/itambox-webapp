@@ -3870,7 +3870,7 @@
     {
       "path": "itambox/core/serialization.py",
       "code": "C901",
-      "message": "'serialize_object' is too complex (15)",
+      "message": "'serialize_object' is too complex (16)",
       "source": "def serialize_object(obj: Model, extra_fields=None, exclude_fields=None) -> dict:",
       "context": "Module:body/FunctionDef:serialize_object:self",
       "count": 1

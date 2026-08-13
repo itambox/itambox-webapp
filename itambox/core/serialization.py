@@ -42,5 +42,8 @@ def serialize_object(obj: Model, extra_fields=None, exclude_fields=None) -> dict
         elif isinstance(field_value, (Decimal, UUID)):
             data[field_name] = str(field_value)
         else:
-            data[field_name] = field_value.name if isinstance(field_value, FieldFile) and field_value else field_value
+            if isinstance(field_value, FieldFile):
+                data[field_name] = field_value.name if field_value else None
+            else:
+                data[field_name] = field_value
     return data

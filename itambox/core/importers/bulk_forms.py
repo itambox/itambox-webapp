@@ -149,24 +149,24 @@ def get_import_form_class(model):
     if registered is not None:
         return registered
 
-    required_fields = []
-    optional_fields = []
+    dynamic_required_fields = []
+    dynamic_optional_fields = []
     for field in model._meta.fields:
         if field.primary_key or field.auto_created or not field.editable:
             continue
         if field.name in IMPORT_EXCLUDED_FIELDS:
             continue
         if not field.blank and not field.null and field.default is models.NOT_PROVIDED:
-            required_fields.append(field.name)
+            dynamic_required_fields.append(field.name)
         else:
-            optional_fields.append(field.name)
+            dynamic_optional_fields.append(field.name)
 
     target_model = model
 
     class DynamicBulkImportForm(BulkImportForm):
         model = target_model
-        required_fields = required_fields
-        optional_fields = optional_fields
+        required_fields = dynamic_required_fields
+        optional_fields = dynamic_optional_fields
 
     return DynamicBulkImportForm
 
