@@ -69,15 +69,19 @@ test.describe('Issue #101 accessibility qualification', () => {
         probe.className = 'htmx-indicator';
         document.body.appendChild(probe);
         const style = getComputedStyle(probe);
+        const toMilliseconds = (duration: string) => {
+          const value = Number.parseFloat(duration);
+          return duration.trim().endsWith('ms') ? value : value * 1000;
+        };
         const result = {
-          animationDuration: style.animationDuration,
-          transitionDuration: style.transitionDuration,
+          animationDuration: toMilliseconds(style.animationDuration),
+          transitionDuration: toMilliseconds(style.transitionDuration),
         };
         probe.remove();
         return result;
       });
-      expect(motion.animationDuration).toBe('0.01ms');
-      expect(motion.transitionDuration).toBe('0.01ms');
+      expect(motion.animationDuration).toBeCloseTo(0.01, 5);
+      expect(motion.transitionDuration).toBeCloseTo(0.01, 5);
     });
   }
 });
