@@ -7,6 +7,7 @@ from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.contrib.auth.mixins import LoginRequiredMixin, PermissionRequiredMixin
 from django.contrib.contenttypes.models import ContentType
+from django.db import transaction
 from django.db.models import Count
 from django.http import Http404, HttpResponse
 from django.shortcuts import get_object_or_404, redirect, render
@@ -467,7 +468,9 @@ class AlertRuleRunNowView(SimplePostView):
 
 @method_decorator(login_required, name="dispatch")
 class AlertLogListView(ObjectListView):
-    queryset = AlertLog.objects.select_related("rule", "content_type").order_by("-created_at")
+    queryset = (
+        AlertLog.objects.filter(tenant__isnull=False).select_related("rule", "content_type").order_by("-created_at")
+    )
     table = AlertLogTable
     template_name = "core/alerts/alert_list.html"
     action_buttons = ()
@@ -485,8 +488,8 @@ class AlertLogListView(ObjectListView):
 
         current_tenant = get_current_tenant()
 
-        active_qs = AlertLog.objects.filter(status=AlertLog.STATUS_ACTIVE)
-        acknowledged_qs = AlertLog.objects.filter(status=AlertLog.STATUS_ACKNOWLEDGED)
+        active_qs = AlertLog.objects.filter(tenant__isnull=False, status=AlertLog.STATUS_ACTIVE)
+        acknowledged_qs = AlertLog.objects.filter(tenant__isnull=False, status=AlertLog.STATUS_ACKNOWLEDGED)
 
         if current_tenant:
             active_qs = active_qs.filter(tenant=current_tenant)
@@ -498,7 +501,7 @@ class AlertLogListView(ObjectListView):
 
 
 class AlertAcknowledgeView(SimplePostView):
-    queryset = AlertLog.objects.all()
+    queryset = AlertLog.objects.filter(tenant__isnull=False)
     permission_required = ("extras.change_alertlog",)
 
     def perform_action(self, alert, request):
@@ -565,10 +568,26 @@ class _BulkAlertActionView(LoginRequiredMixin, PermissionRequiredMixin, View):
         if not pks:
             return self._respond(request, gettext("No alerts selected."), "warning", return_url)
 
-        qs = AlertLog.objects.filter(pk__in=pks)
-        if self.eligible_statuses:
-            qs = qs.filter(status__in=self.eligible_statuses)
-        count = self.apply(qs, request.user)
+        try:
+            unique_pks = {int(value) for value in pks}
+        except (TypeError, ValueError):
+            unique_pks = set()
+        with transaction.atomic():
+            locked_alerts = list(AlertLog.objects.select_for_update().filter(pk__in=unique_pks).order_by("pk"))
+            # Materialize the locked rows before comparing the selection. Django
+            # strips FOR UPDATE from aggregate COUNT queries, so COUNT() cannot
+            # prove all-or-safe semantics under READ COMMITTED.
+            if not unique_pks or len(locked_alerts) != len(unique_pks):
+                return self._respond(
+                    request,
+                    gettext("The selection contains an alert that is not accessible in the active tenant."),
+                    "danger",
+                    return_url,
+                )
+            eligible = locked_alerts
+            if self.eligible_statuses:
+                eligible = [alert for alert in locked_alerts if alert.status in self.eligible_statuses]
+            count = self.apply(eligible, request.user)
         return self._respond(request, self.success_message(count), "success", return_url)
 
     def _respond(self, request, message, level, return_url):
@@ -581,6 +600,9 @@ class _BulkAlertActionView(LoginRequiredMixin, PermissionRequiredMixin, View):
                 }
             )
             return resp
+        # Django messages has no Bootstrap-style ``danger`` helper.
+        if level == "danger":
+            level = "error"
         getattr(messages, level)(request, message)
         return redirect(return_url)
 
@@ -589,7 +611,13 @@ class AlertBulkAcknowledgeView(_BulkAlertActionView):
     eligible_statuses = (AlertLog.STATUS_ACTIVE,)
 
     def apply(self, queryset, user):
-        return queryset.update(status=AlertLog.STATUS_ACKNOWLEDGED, acknowledged_by=user)
+        count = 0
+        for alert in queryset:
+            alert.status = AlertLog.STATUS_ACKNOWLEDGED
+            alert.acknowledged_by = user
+            alert.save(update_fields=["status", "acknowledged_by"])
+            count += 1
+        return count
 
     def success_message(self, count):
         return gettext("%(count)s alert(s) acknowledged.") % {"count": count}
@@ -599,11 +627,14 @@ class AlertBulkResolveView(_BulkAlertActionView):
     eligible_statuses = (AlertLog.STATUS_ACTIVE, AlertLog.STATUS_ACKNOWLEDGED)
 
     def apply(self, queryset, user):
-        return queryset.update(
-            status=AlertLog.STATUS_RESOLVED,
-            resolved_by=user,
-            resolved_at=timezone.now(),
-        )
+        count = 0
+        for alert in queryset:
+            alert.status = AlertLog.STATUS_RESOLVED
+            alert.resolved_by = user
+            alert.resolved_at = timezone.now()
+            alert.save(update_fields=["status", "resolved_by", "resolved_at"])
+            count += 1
+        return count
 
     def success_message(self, count):
         return gettext("%(count)s alert(s) resolved.") % {"count": count}

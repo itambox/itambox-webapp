@@ -1,8 +1,11 @@
 from django.contrib.contenttypes.models import ContentType
 from django.db import models
+from drf_spectacular.types import OpenApiTypes
+from drf_spectacular.utils import extend_schema_field
 from rest_framework import serializers
 
 from extras.models import (
+    AlertLog,
     AlertRule,
     CustomField,
     CustomFieldset,
@@ -272,6 +275,53 @@ class AlertRuleSerializer(BaseModelSerializer):
             "updated_at",
         ]
         brief_fields = ["id", "url", "name", "alert_type", "severity", "is_active"]
+
+
+class AlertLogSerializer(BaseModelSerializer):
+    url = serializers.HyperlinkedIdentityField(view_name="api:extras_api:alertlog-detail")
+    rule_display = serializers.StringRelatedField(source="rule", read_only=True)
+    status_display = serializers.CharField(source="get_status_display", read_only=True)
+    severity_display = serializers.CharField(source="get_severity_display", read_only=True)
+    acknowledged_by_display = serializers.StringRelatedField(source="acknowledged_by", read_only=True)
+    resolved_by_display = serializers.StringRelatedField(source="resolved_by", read_only=True)
+    content_object_display = serializers.SerializerMethodField()
+
+    class Meta:
+        model = AlertLog
+        fields = [
+            "id",
+            "url",
+            "rule",
+            "tenant",
+            "rule_display",
+            "subject",
+            "message",
+            "severity",
+            "severity_display",
+            "content_type",
+            "object_id",
+            "content_object_display",
+            "status",
+            "status_display",
+            "delivery_status",
+            "last_notified_at",
+            "acknowledged_by",
+            "acknowledged_by_display",
+            "resolved_by",
+            "resolved_by_display",
+            "resolution_notes",
+            "resolved_at",
+            "tenant_resolution_status",
+            "created_at",
+            "updated_at",
+        ]
+        read_only_fields = fields
+        brief_fields = ["id", "url", "subject", "severity", "status", "created_at"]
+
+    @extend_schema_field(OpenApiTypes.STR)
+    def get_content_object_display(self, instance):
+        obj = instance.content_object_safe
+        return str(obj) if obj is not None else None
 
 
 class JournalEntrySerializer(BaseModelSerializer):

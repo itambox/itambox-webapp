@@ -1,6 +1,7 @@
 from itambox.api.routers import ITAMBoxRouter
 
 from .views import (
+    AlertLogViewSet,
     AlertRuleViewSet,
     CustomFieldsetViewSet,
     CustomFieldViewSet,
@@ -22,6 +23,7 @@ router.register(r"custom-fieldsets", CustomFieldsetViewSet)
 router.register(r"event-rules", EventRuleViewSet)
 router.register(r"webhook-endpoints", WebhookEndpointViewSet)
 router.register(r"notification-channels", NotificationChannelViewSet)
+router.register(r"alert-logs", AlertLogViewSet)
 router.register(r"alert-rules", AlertRuleViewSet)
 router.register(r"journal-entries", JournalEntryViewSet)
 

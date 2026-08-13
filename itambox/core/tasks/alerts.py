@@ -97,6 +97,29 @@ def _prefetch_open_logs(rule_id=None):
     return {(log.rule_id, log.content_type_id, log.object_id): log for log in qs}
 
 
+def _schedule_alert_dispatch(rule, match, alert_log):
+    """Dispatch one persisted alert after commit and record disposition state."""
+    alert_id = alert_log.pk
+    rule_id = rule.pk
+    alert_match = dict(match)
+
+    def dispatch_alert():
+        notified_at = timezone.now()
+        try:
+            rule_for_dispatch = AlertRule._base_manager.get(pk=rule_id)
+            persisted_alert = AlertLog.unscoped.get(pk=alert_id)
+            delivery = _dispatch_channels(rule_for_dispatch, alert_match, persisted_alert)
+        except Exception:
+            logger.exception("Alert delivery failed for AlertLog %s.", alert_id)
+            delivery = {"__dispatch__": DeliveryDisposition.TERMINAL.value}
+        AlertLog.unscoped.filter(pk=alert_id).update(
+            delivery_status=delivery,
+            last_notified_at=notified_at,
+        )
+
+    transaction.on_commit(dispatch_alert)
+
+
 def _evaluate_rule(rule, today, existing_logs):
     """Evaluate one rule: create/renotify alerts and auto-resolve cleared ones.
 
@@ -172,21 +195,22 @@ def _evaluate_rule(rule, today, existing_logs):
                 # Treat the adopted row as the existing alert (re-notify below).
                 existing = alert_log
             else:
-                if not rule.is_muted:
-                    alert_log.delivery_status = _dispatch_channels(rule, match, alert_log)
-                    alert_log.last_notified_at = now
-                    alert_log.save(update_fields=["delivery_status", "last_notified_at"])
                 existing_logs[key] = alert_log
                 fresh_count += 1
                 logger.info("Triggered AlertLog %s for '%s' on '%s'.", alert_log.pk, match["subject"], obj)
+                if not rule.is_muted:
+                    # Mark the in-memory row as scheduled so duplicate matches in
+                    # one evaluation cannot immediately re-notify it before commit.
+                    alert_log.last_notified_at = now
+
+                    _schedule_alert_dispatch(rule, match, alert_log)
 
         if existing is not None and not rule.is_muted and rule.renotify_interval_days > 0:
             # Existing unresolved alert — re-notify on cadence.
             ref = existing.last_notified_at or existing.created_at
             if ref and (now - ref) >= timezone.timedelta(days=rule.renotify_interval_days):
-                existing.delivery_status = _dispatch_channels(rule, match, existing)
                 existing.last_notified_at = now
-                existing.save(update_fields=["delivery_status", "last_notified_at"])
+                _schedule_alert_dispatch(rule, match, existing)
                 logger.info("Re-notified AlertLog %s for '%s'.", existing.pk, existing.subject)
 
     # Auto-resolve logs whose conditions have cleared.
@@ -396,7 +420,7 @@ def _match_low_stock(rule):
             matches.append(
                 {
                     "obj": comp,
-                    "tenant": rule.tenant,
+                    "tenant": comp.tenant,
                     "subject": _("Low Stock: %(name)s") % {"name": comp.name},
                     "message": _(
                         "Component '%(name)s' available stock is %(available)s, "
