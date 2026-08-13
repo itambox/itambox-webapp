@@ -268,6 +268,14 @@
       "count": 1
     },
     {
+      "path": "itambox/core/serialization.py",
+      "scope": "FunctionDef:serialize_object",
+      "handler_type": "Exception",
+      "classification": "silent",
+      "body_sha256": "50ee25091dc78fe74b3d034691c0c39bb8bb5f5c60a373ac6e605509a864e2a5",
+      "count": 1
+    },
+    {
       "path": "itambox/core/signals.py",
       "scope": "FunctionDef:_defer_notify_watchers",
       "handler_type": "Exception",

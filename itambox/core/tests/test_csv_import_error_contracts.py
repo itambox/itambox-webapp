@@ -6,7 +6,8 @@ from django.core.exceptions import FieldDoesNotExist
 from django.db import IntegrityError, transaction
 
 from assets.models import Manufacturer
-from core.forms.import_forms import BulkImportForm, ImportResult, _import_log_extra, _model_has_concrete_field
+from core.forms.import_forms import BulkImportForm, ImportResult
+from core.importers.bulk_forms import _import_log_extra, _model_has_concrete_field
 from core.models import Job, Notification
 from core.tasks.csv_import import _task_log_extra, import_csv_task
 from core.tests.mixins import TenantTestMixin

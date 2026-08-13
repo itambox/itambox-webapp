@@ -4,9 +4,9 @@ from django.core.exceptions import PermissionDenied, ValidationError
 from django.utils.text import slugify
 from django.utils.translation import gettext_lazy as _
 
-logger = logging.getLogger(__name__)
-
 from core.slugs import generate_unique_slug
+
+logger = logging.getLogger(__name__)
 
 MAX_PAGINATION_LIMIT = 200
 

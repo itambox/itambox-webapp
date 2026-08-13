@@ -1,7 +1,6 @@
 import base64
 import io
 import logging
-import os
 import zipfile
 from collections.abc import Iterator, Sequence
 from math import isfinite

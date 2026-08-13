@@ -16,7 +16,6 @@ from django_q.tasks import async_task
 
 from core.importers.bulk_forms import (
     IMPORT_EXCLUDED_FIELDS,
-    BulkImportForm,
     _model_has_concrete_field,
     get_import_form_class,
     is_model_importable,

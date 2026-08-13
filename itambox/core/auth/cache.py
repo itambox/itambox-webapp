@@ -6,4 +6,4 @@ preserving its patchable cache/logger objects for legacy tests and integrations.
 """
 
 from core.authorization_cache import *  # noqa: F401,F403
-from core.authorization_cache import cache, logger
+from core.authorization_cache import cache, logger  # noqa: F401 -- re-exported for legacy importers

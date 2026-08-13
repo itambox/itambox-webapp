@@ -2884,22 +2884,6 @@
       "count": 1
     },
     {
-      "path": "itambox/core/forms/import_forms.py",
-      "code": "C901",
-      "message": "'BulkImportForm.clean' is too complex (32)",
-      "source": "    def clean(self):",
-      "context": "Module:body/ClassDef:BulkImportForm:body/FunctionDef:clean:self",
-      "count": 1
-    },
-    {
-      "path": "itambox/core/forms/import_forms.py",
-      "code": "F401",
-      "message": "'django.db.models as _models' imported but unused",
-      "source": "        from django.db import models as _models",
-      "context": "Module:body/ClassDef:BulkImportForm:body/FunctionDef:map_row:body",
-      "count": 1
-    },
-    {
       "path": "itambox/core/forms/mixins.py",
       "code": "B007",
       "message": "Loop control variable 'filter_field' not used within the loop body. If this is intended, start the name with an underscore.",
@@ -3025,6 +3009,14 @@
       "message": "'django.utils.text.slugify' imported but unused",
       "source": "from django.utils.text import slugify",
       "context": "Module:body",
+      "count": 1
+    },
+    {
+      "path": "itambox/core/importers/bulk_forms.py",
+      "code": "C901",
+      "message": "'BulkImportForm.clean' is too complex (32)",
+      "source": "    def clean(self):",
+      "context": "Module:body/ClassDef:BulkImportForm:body/FunctionDef:clean:self",
       "count": 1
     },
     {
@@ -3873,6 +3865,14 @@
       "message": "'django.db.models.Value' imported but unused",
       "source": "from django.db.models import F, Q, Value",
       "context": "Module:body",
+      "count": 1
+    },
+    {
+      "path": "itambox/core/serialization.py",
+      "code": "C901",
+      "message": "'serialize_object' is too complex (15)",
+      "source": "def serialize_object(obj: Model, extra_fields=None, exclude_fields=None) -> dict:",
+      "context": "Module:body/FunctionDef:serialize_object:self",
       "count": 1
     },
     {

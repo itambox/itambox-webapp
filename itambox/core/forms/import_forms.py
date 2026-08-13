@@ -11,8 +11,6 @@ from core.importers.bulk_forms import (
     MAX_IMPORT_ROWS,
     BulkImportForm,
     ImportResult,
-    _import_log_extra,
-    _model_has_concrete_field,
     get_import_form_class,
     get_registered_import_form,
     is_model_importable,
