@@ -224,6 +224,18 @@ class TestAccessibilityTemplateContracts:
         assert 'aria-label="More actions"' in asset_actions
         assert '<a class="btn btn-sm btn-action dropdown-toggle' not in asset_actions
 
+        edit_only_table = AssetTable([])
+        edit_only_table.request = SimpleNamespace(
+            user=SimpleNamespace(
+                has_perm=lambda permission, _record: permission != "assets.delete_asset",
+            )
+        )
+        edit_only_actions = str(edit_only_table.render_actions(asset_record))
+        assert '<button class="btn btn-sm btn-action dropdown-toggle' in edit_only_actions
+        assert 'title="Edit Details"' in edit_only_actions
+        assert 'Changelog' in edit_only_actions
+        assert 'title="Delete"' not in edit_only_actions
+
     def test_shared_toast_and_modal_errors_are_announced(self):
         toast = (_APP_ROOT / "templates" / "global_includes" / "_toast.html").read_text(encoding="utf-8")
         modal = (_APP_ROOT / "templates" / "generic" / "includes" / "add_stock_modal.html").read_text(encoding="utf-8")
