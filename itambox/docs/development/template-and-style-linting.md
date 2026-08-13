@@ -85,6 +85,27 @@ centralized in the configuration:
 These are not a general Stylelint disable and do not cover arbitrary framework
 selectors or properties. New exceptions must be narrowly scoped and documented.
 
+## Accessibility qualification baseline
+
+The accessibility contract for full-page and HTMX journeys is qualified with the
+Playwright spec `tests/e2e/spec/issue101-accessibility.spec.ts`. It runs axe-core
+against the dashboard and a post-HTMX list state, and covers keyboard-only focus,
+modal focus return, both supported themes, and reduced-motion media preferences.
+Axe violations are blocking; no blanket suppression is permitted. A suppression,
+if ever required for a third-party widget, must be scoped to the widget and
+reviewed with a reason and removal condition.
+
+Authored foreground/background combinations target WCAG 2.2 AA contrast: at least
+4.5:1 for normal text and 3:1 for large text and user-interface components. The
+light and dark token definitions in `static/src/styles/_tokens.scss` are the
+source values; axe's `color-contrast` rule is the automated qualification for
+representative rendered states.
+
+The reduced-motion stylesheet disables non-essential animation and transitions
+while preserving focus indicators and meaningful state changes. Components must
+not use reduced motion as a reason to remove keyboard focus, hover/focus styling,
+or status announcements.
+
 ## Dependencies and CI
 
 `uv.lock` and `itambox/package-lock.json` are committed. CI uses locked installs

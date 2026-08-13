@@ -28,13 +28,17 @@
         <div class="mobile-topbar-actions d-flex d-lg-none align-items-center gap-2 ms-auto me-2">
           {# Language selection moved to user Preferences (applies app-wide). #}
           {# Mobile Theme Switcher #}
-          <button class="nav-link px-0 color-mode-toggle hide-theme-dark"
-                  title="{% translate 'Enable dark mode' %}">
-            <i class="mdi mdi-weather-night"></i>
+          <button type="button"
+                  class="nav-link px-0 color-mode-toggle hide-theme-dark"
+                  title="{% translate 'Enable dark mode' %}"
+                  aria-label="{% translate 'Enable dark mode' %}">
+            <i class="mdi mdi-weather-night" aria-hidden="true"></i>
           </button>
-          <button class="nav-link px-0 color-mode-toggle hide-theme-light"
-                  title="{% translate 'Enable light mode' %}">
-            <i class="mdi mdi-weather-sunny"></i>
+          <button type="button"
+                  class="nav-link px-0 color-mode-toggle hide-theme-light"
+                  title="{% translate 'Enable light mode' %}"
+                  aria-label="{% translate 'Enable light mode' %}">
+            <i class="mdi mdi-weather-sunny" aria-hidden="true"></i>
           </button>
           {# Mobile Notifications Dropdown — opens as a full-width panel on mobile #}
           <div class="nav-item dropdown">

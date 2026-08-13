@@ -3,7 +3,10 @@
 {% load partials %}
 {% startpartial stock-modal-form %}
 {% if form.errors %}
-  <div class="alert alert-danger">{% translate "Please correct the errors below." %}</div>
+  <div class="alert alert-danger"
+       role="alert"
+       aria-live="assertive"
+       aria-atomic="true">{% translate "Please correct the errors below." %}</div>
 {% endif %}
 {% crispy form %}
 {% endpartial %}

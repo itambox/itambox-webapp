@@ -7,6 +7,7 @@ three readers to the same source.
 
 from collections import namedtuple
 from io import StringIO
+from pathlib import Path
 
 import pytest
 from django.conf import settings
@@ -24,6 +25,7 @@ from itambox.views.generic.capability_notices import capability_notice
 #: reads ``view.queryset.model``, so there is nothing else to imitate.
 _StubQuerySet = namedtuple("_StubQuerySet", "model")
 _StubView = namedtuple("_StubView", "queryset")
+_APP_ROOT = Path(__file__).resolve().parents[2]
 
 
 class TestSurfaceMarker:
@@ -101,6 +103,36 @@ class TestBannerTemplate:
         html = render_to_string("generic/includes/beta_banner.html", {"capability_notice": notice})
         assert notice["limitations"][0] in html
 
+    def test_the_beta_banner_is_a_polite_live_region_with_a_label(self):
+        html = render_to_string(
+            "generic/includes/beta_banner.html",
+            {"capability_notice": _notice_for_key("automation.webhooks")},
+        )
+        assert 'role="status"' in html
+        assert 'aria-live="polite"' in html
+        assert 'aria-atomic="true"' in html
+        assert 'aria-labelledby="beta-module-banner-title"' in html
+        assert 'id="beta-module-banner-title"' in html
+
+    def test_the_experimental_banner_is_announced_without_a_dismiss_control(self):
+        html = render_to_string(
+            "generic/includes/beta_banner.html",
+            {"capability_notice": _notice_for_key("platform.plugins")},
+        )
+        assert 'role="status"' in html
+        assert 'aria-live="polite"' in html
+        assert 'data-maturity="experimental"' in html
+        assert 'btn-close' not in html
+
+    def test_the_maturity_badge_exposes_text_and_an_accessible_name(self):
+        html = render_to_string(
+            "generic/includes/capability_badge.html",
+            {"capability_notice": _notice_for_key("platform.plugins")},
+        )
+        assert 'aria-label=' in html
+        assert 'aria-hidden="true"' not in html
+        assert "Experimental" in html
+
     def test_the_banner_is_silent_without_a_notice(self):
         html = render_to_string("generic/includes/beta_banner.html", {})
         assert html.strip() == ""
@@ -119,6 +151,29 @@ class TestBannerTemplate:
     def test_the_badge_is_silent_without_a_notice(self):
         html = render_to_string("generic/includes/capability_badge.html", {})
         assert html.strip() == ""
+
+
+class TestAccessibilityTemplateContracts:
+    def test_mobile_theme_controls_are_named_buttons_with_hidden_icons(self):
+        html = "\n".join(
+            (
+                (_APP_ROOT / "templates" / "layout.html").read_text(encoding="utf-8"),
+                (_APP_ROOT / "templates" / "global_includes" / "_topbar.html").read_text(encoding="utf-8"),
+            )
+        )
+        assert html.count("aria-label=\"{% translate 'Enable dark mode' %}\"") >= 2
+        assert html.count("aria-label=\"{% translate 'Enable light mode' %}\"") >= 2
+        assert 'mdi-weather-night" aria-hidden="true"' in html
+        assert 'mdi-weather-sunny" aria-hidden="true"' in html
+        assert html.count('type="button"') >= 2
+
+    def test_shared_toast_and_modal_errors_are_announced(self):
+        toast = (_APP_ROOT / "templates" / "global_includes" / "_toast.html").read_text(encoding="utf-8")
+        modal = (_APP_ROOT / "templates" / "generic" / "includes" / "add_stock_modal.html").read_text(encoding="utf-8")
+        for html in (toast, modal):
+            assert 'role="alert"' in html
+            assert 'aria-live="assertive"' in html
+            assert 'aria-atomic="true"' in html
 
 
 @pytest.mark.django_db

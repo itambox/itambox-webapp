@@ -3,18 +3,24 @@
 {% comment %}
 Registry-backed maturity banner. `capability_notice` is set by the generic list
 and detail views from itambox.views.generic.capability_notices; `is_beta_module`
-is the deprecated app-level flag a handful of views still set directly. The id
-stays `beta-module-banner` so the existing dismissal script keeps working.
+is the deprecated app-level flag a handful of views still set directly.
+Experimental capabilities are announced but deliberately cannot be dismissed.
 {% endcomment %}
 {% if capability_notice %}
   <div class="alert alert-warning border-0 rounded-0 border-bottom d-flex align-items-center justify-content-between mb-0 px-3 py-2 d-none"
        id="beta-module-banner"
        data-capability="{{ capability_notice.key }}"
-       data-maturity="{{ capability_notice.maturity }}">
+       data-maturity="{{ capability_notice.maturity }}"
+       role="status"
+       aria-live="polite"
+       aria-atomic="true"
+       aria-labelledby="beta-module-banner-title">
     <div class="d-flex align-items-center">
-      <i class="mdi mdi-flask-outline me-2 fs-3"></i>
+      <i class="mdi mdi-flask-outline me-2 fs-3" aria-hidden="true"></i>
       <div>
-        {% blocktranslate with name=capability_notice.title grade=capability_notice.maturity|title %}<strong>{{ name }}</strong> is <strong>{{ grade }}</strong>. Its API and data model may change in future releases. Your feedback is welcome.{% endblocktranslate %}
+        <span id="beta-module-banner-title">
+          {% blocktranslate with name=capability_notice.title grade=capability_notice.maturity|title %}<strong>{{ name }}</strong> is <strong>{{ grade }}</strong>. Its API and data model may change in future releases. Your feedback is welcome.{% endblocktranslate %}
+        </span>
         {% if capability_notice.limitations %}
           <ul class="mb-0 mt-1 ps-3 small">
             {% for limitation in capability_notice.limitations %}
@@ -27,17 +33,26 @@ stays `beta-module-banner` so the existing dismissal script keeps working.
            hx-boost="false">{% translate "Read the capability contract" %}</a>
       </div>
     </div>
-    <button type="button"
-            class="btn-close ms-3 flex-shrink-0"
-            aria-label="{% translate 'Dismiss' %}"></button>
+    {% if capability_notice.maturity == "beta" %}
+      <button type="button"
+              class="btn-close ms-3 flex-shrink-0"
+              aria-label="{% translate 'Dismiss' %}"></button>
+    {% endif %}
   </div>
 {% elif is_beta_module %}
   <div class="alert alert-warning border-0 rounded-0 border-bottom d-flex align-items-center justify-content-between mb-0 px-3 py-2 d-none"
-       id="beta-module-banner">
+       id="beta-module-banner"
+       data-maturity="beta"
+       role="status"
+       aria-live="polite"
+       aria-atomic="true"
+       aria-labelledby="beta-module-banner-title">
     <div class="d-flex align-items-center">
-      <i class="mdi mdi-flask-outline me-2 fs-3"></i>
+      <i class="mdi mdi-flask-outline me-2 fs-3" aria-hidden="true"></i>
       <div>
-        {% blocktranslate %}This module is in <strong>Beta</strong>. The API and data model may change in future releases. Your feedback is welcome.{% endblocktranslate %}
+        <span id="beta-module-banner-title">
+          {% blocktranslate %}This module is in <strong>Beta</strong>. The API and data model may change in future releases. Your feedback is welcome.{% endblocktranslate %}
+        </span>
       </div>
     </div>
     <button type="button"

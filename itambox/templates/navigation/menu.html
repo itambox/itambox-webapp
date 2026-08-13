@@ -26,7 +26,8 @@
         <div class="dropdown-menu-columns">
           <div class="dropdown-menu-column">
             {% for group, items in groups %}
-              <span class="dropdown-header text-info">{{ group.label }}{% if group.beta %} <span class="badge bg-yellow-lt ms-1">{% translate "Beta" %}</span>{% endif %}</span>
+              <span class="dropdown-header text-info">{{ group.label }}{% if group.beta %} <span class="badge bg-yellow-lt ms-1"
+       aria-label="{% translate 'Beta capability' %}"><span class="visually-hidden">{% translate "Maturity:" %}</span>{% translate "Beta" %}</span>{% endif %}</span>
               {% for item, buttons in items %}
                 <div class="dropdown-item d-flex justify-content-between align-items-center ps-3 py-0 text-wrap csp-style-87ae4f90fc31">
                   <a href="{{ item.url }}"
