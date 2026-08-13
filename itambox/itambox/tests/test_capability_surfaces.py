@@ -189,7 +189,8 @@ class TestAccessibilityTemplateContracts:
     def test_dashboard_scroll_regions_are_named_and_keyboard_reachable(self):
         html = (_APP_ROOT / "templates" / "dashboard.html").read_text(encoding="utf-8")
 
-        assert '<h2 class="visually-hidden">{% translate "Dashboard" %}' in html
+        assert '<h1 class="visually-hidden">{% translate "Dashboard" %}' in html
+        assert '<h2 class="card-title">' in html
         assert 'class="card-body overflow-auto"' in html
         assert 'tabindex="0"' in html
         assert 'aria-label="{{ entry.config.title }}"' in html

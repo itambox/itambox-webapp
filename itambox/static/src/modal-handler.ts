@@ -9,6 +9,45 @@
  */
 (function () {
   let pendingModalTrigger: HTMLElement | null = null;
+  let pendingEscapeModal: HTMLElement | null = null;
+  const openedModals = new WeakSet<HTMLElement>();
+
+  // Bootstrap ignores Escape while a modal is opening because its internal
+  // transition guard makes hide() a no-op. Capture the key before Bootstrap's
+  // bubbling listener and finish the dismissal after the opening transition.
+  document.body.addEventListener('show.bs.modal', function (evt: Event) {
+    if (evt.target instanceof HTMLElement) openedModals.delete(evt.target);
+  });
+
+  document.addEventListener('keydown', function (evt: KeyboardEvent) {
+    if (evt.key !== 'Escape') return;
+    const modal = (evt.target as HTMLElement | null)?.closest<HTMLElement>('.modal.show');
+    if (!modal) return;
+    const instance = bootstrap.Modal.getInstance(modal);
+    if (!instance) return;
+
+    evt.preventDefault();
+    evt.stopPropagation();
+    if (openedModals.has(modal)) {
+      instance.hide();
+    } else {
+      pendingEscapeModal = modal;
+    }
+  }, true);
+
+  document.body.addEventListener('shown.bs.modal', function (evt: Event) {
+    const modal = evt.target;
+    if (!(modal instanceof HTMLElement)) return;
+    openedModals.add(modal);
+    if (modal === pendingEscapeModal) {
+      pendingEscapeModal = null;
+      bootstrap.Modal.getInstance(modal)?.hide();
+    }
+  });
+
+  document.body.addEventListener('hidden.bs.modal', function (evt: Event) {
+    if (evt.target instanceof HTMLElement) openedModals.delete(evt.target);
+  });
 
   document.body.addEventListener('htmx:beforeRequest', function (evt: Event) {
     const detail = (evt as CustomEvent).detail;
@@ -59,22 +98,16 @@
     });
   });
 
-  // 1b. Cancel-inside-modal guard.
-  // Modal forms carry an hx-target pointing at their own modal body, and the
-  // global `hx-boost="true"` on <body> turns plain <a href> controls (e.g. the
-  // crispy "Cancel" link) into boosted requests that INHERIT that hx-target — so
-  // clicking Cancel would load the whole cancel_url page into the modal body
-  // instead of closing the modal. A boosted anchor navigation inside a modal is
-  // never what we want, so abort the request and just dismiss the modal.
+  // 1b. Dismiss only the existing explicit Cancel-link contract. Generic
+  // anchors may be legitimate modal content and must keep their navigation.
   document.body.addEventListener('htmx:beforeRequest', function (evt: Event) {
     const detail = (evt as CustomEvent).detail;
-    const elt = detail && (detail.elt as HTMLElement | undefined);
-    if (!elt || elt.tagName !== 'A') return;               // only anchors (Cancel/back links)
+    const elt = detail?.elt as HTMLElement | undefined;
+    if (!elt || !elt.matches('a[data-no-dirty-track="true"]') || detail?.boosted !== true) return;
     const modal = elt.closest('.modal') as HTMLElement | null;
-    if (!modal) return;                                    // only when inside a modal
-    const verb = detail.requestConfig && detail.requestConfig.verb;
-    if (!detail.boosted && verb !== 'get') return;         // form POSTs etc. are untouched
-    evt.preventDefault();                                  // abort the boosted page-load-into-modal
+    if (!modal) return;
+
+    evt.preventDefault();
     try {
       bootstrap.Modal.getOrCreateInstance(modal).hide();
     } catch (_e) {

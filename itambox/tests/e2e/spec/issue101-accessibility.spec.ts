@@ -17,11 +17,13 @@ test.describe('Issue #101 accessibility qualification', () => {
 
     const search = page.locator('form.filter-form-inline input[type="search"]');
     await expect(search).toBeVisible();
+    const initialListMarkup = await list.innerHTML();
     await search.fill('issue-101-focus-probe');
     await Promise.all([
       page.waitForResponse((response) => response.url().includes('q=issue-101-focus-probe')),
       search.press('Enter'),
     ]);
+    await expect.poll(() => list.innerHTML()).not.toBe(initialListMarkup);
     await expect(search).toHaveValue('issue-101-focus-probe');
     await expect(search).toBeFocused();
 

@@ -183,9 +183,17 @@ html {
     }
 }
 
-#footer-stamp a {
-    color: var(--tblr-link-color);
-    text-decoration: underline;
+#footer-stamp {
+    color: var(--tblr-secondary-color) !important;
+
+    a {
+        color: var(--tblr-link-color) !important;
+        text-decoration: underline;
+    }
+}
+
+.nav-tabs .nav-link {
+    color: var(--tblr-secondary-color);
 }
 
 // WCAG 2.3.3 / user preference: remove non-essential motion without hiding
