@@ -522,7 +522,7 @@ class AlertAcknowledgeView(SimplePostView):
 
 
 class AlertResolveView(SimplePostView):
-    queryset = AlertLog.objects.all()
+    queryset = AlertLog.objects.filter(tenant__isnull=False)
     permission_required = ("extras.change_alertlog",)
 
     def perform_action(self, alert, request):
@@ -573,7 +573,10 @@ class _BulkAlertActionView(LoginRequiredMixin, PermissionRequiredMixin, View):
         except (TypeError, ValueError):
             unique_pks = set()
         with transaction.atomic():
-            locked_alerts = list(AlertLog.objects.select_for_update().filter(pk__in=unique_pks).order_by("pk"))
+            locked_qs = AlertLog.objects.select_for_update().filter(pk__in=unique_pks).order_by("pk")
+            if not request.user.is_superuser and get_current_tenant() is not None:
+                locked_qs = locked_qs.filter(tenant__isnull=False)
+            locked_alerts = list(locked_qs)
             # Materialize the locked rows before comparing the selection. Django
             # strips FOR UPDATE from aggregate COUNT queries, so COUNT() cannot
             # prove all-or-safe semantics under READ COMMITTED.

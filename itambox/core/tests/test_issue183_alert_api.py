@@ -56,6 +56,24 @@ class AlertBulkTenantBoundaryTests(TenantTestMixin, TestCase):
         )
         self.client_login_to_tenant(self.tenant_user, self.tenant_a)
 
+    def test_bulk_selection_with_unresolved_null_tenant_mutates_nothing(self):
+        unresolved = AlertLog._base_manager.create(
+            tenant=None,
+            rule=self.rule_a,
+            subject="unresolved",
+            message="unresolved",
+            content_type=ContentType.objects.get_for_model(AlertRule),
+            object_id=self.rule_a.pk + 100000,
+            tenant_resolution_status="unresolved",
+        )
+        response = self.client.post(
+            reverse("extras:alertlog_bulk_acknowledge"),
+            {"pk": [unresolved.pk]},
+        )
+        self.assertEqual(response.status_code, 302)
+        unresolved.refresh_from_db()
+        self.assertEqual(unresolved.status, AlertLog.STATUS_ACTIVE)
+
     def test_bulk_selection_with_foreign_pk_mutates_nothing(self):
         response = self.client.post(
             reverse("extras:alertlog_bulk_acknowledge"),
