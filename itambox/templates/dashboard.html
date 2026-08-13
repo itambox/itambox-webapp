@@ -6,6 +6,7 @@
   {% translate "Dashboard - ITAMbox" %}
 {% endblock %}
 {% block page_header %}
+  <h2 class="visually-hidden">{% translate "Dashboard" %}: {{ active_dashboard.name }}</h2>
   <div class="dropdown d-inline-block">
     <button class="btn btn-outline-primary dropdown-toggle d-flex align-items-center"
             type="button"
@@ -152,7 +153,9 @@
               </button>
             </div>
           </div>
-          <div class="card-body overflow-auto">{% render_widget entry.config entry.index %}</div>
+          <div class="card-body overflow-auto"
+               tabindex="0"
+               aria-label="{{ entry.config.title }}">{% render_widget entry.config entry.index %}</div>
           {% get_widget_footer_links entry.config entry.index as footer_links %}
           {% if footer_links %}
             <div class="card-footer bg-surface-secondary d-flex justify-content-end align-items-center flex-wrap gap-2 csp-style-3e808d2c8045">

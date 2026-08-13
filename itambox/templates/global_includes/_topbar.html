@@ -79,14 +79,15 @@
                 aria-label="{% translate 'Enable dark mode' %}"
                 data-bs-toggle="tooltip"
                 data-bs-placement="bottom">
-          <i class="mdi mdi-weather-night fs-2"></i>
+          <i class="mdi mdi-weather-night fs-2" aria-hidden="true"></i>
         </button>
-        <button class="nav-link px-0 color-mode-toggle hide-theme-light"
+        <button type="button"
+                class="nav-link px-0 color-mode-toggle hide-theme-light"
                 title="{% translate 'Enable light mode' %}"
                 aria-label="{% translate 'Enable light mode' %}"
                 data-bs-toggle="tooltip"
                 data-bs-placement="bottom">
-          <i class="mdi mdi-weather-sunny fs-2"></i>
+          <i class="mdi mdi-weather-sunny fs-2" aria-hidden="true"></i>
         </button>
         <div class="nav-item dropdown d-none d-md-flex me-3"
              hx-get="{% url 'users:notification_poll' %}"

@@ -120,6 +120,7 @@ class ToggleColumn(tables.CheckBoxColumn):
                 },
                 "input": {
                     "class": "form-check-input",
+                    "aria-label": _("Select row"),
                 },
             }
         super().__init__(*args, default=default, visible=visible, **kwargs)
@@ -262,24 +263,25 @@ class ActionsColumn(tables.Column):
             break
 
         toggle_text = _("Toggle Dropdown")
+        dropdown_button = format_html(
+            '<button class="btn btn-sm btn-action dropdown-toggle dropdown-toggle-split" '
+            'type="button" data-bs-toggle="dropdown" aria-expanded="false" aria-label="{}"></button>',
+            toggle_text,
+        )
         if button and dropdown_links:
-            html += (
-                f'<span class="btn-group dropdown">'
-                f"{button}"
-                f'<a class="btn btn-sm btn-action dropdown-toggle dropdown-toggle-split" type="button" data-bs-toggle="dropdown" aria-expanded="false" aria-label="{toggle_text}">'
-                f"</a>"
-                f'<ul class="dropdown-menu dropdown-menu-end">{"".join(dropdown_links)}</ul>'
-                f"</span>"
+            html += format_html(
+                '<span class="btn-group dropdown">{}{}<ul class="dropdown-menu dropdown-menu-end">{}</ul></span>',
+                mark_safe(button),
+                dropdown_button,
+                mark_safe("".join(dropdown_links)),
             )
         elif button:
             html += button
         elif dropdown_links:
-            html += (
-                f'<span class="btn-group dropdown">'
-                f'<a class="btn btn-sm btn-action dropdown-toggle dropdown-toggle-split" type="button" data-bs-toggle="dropdown" aria-expanded="false" aria-label="{toggle_text}">'
-                f"</a>"
-                f'<ul class="dropdown-menu dropdown-menu-end">{"".join(dropdown_links)}</ul>'
-                f"</span>"
+            html += format_html(
+                '<span class="btn-group dropdown">{}<ul class="dropdown-menu dropdown-menu-end">{}</ul></span>',
+                dropdown_button,
+                mark_safe("".join(dropdown_links)),
             )
 
         # Clone — a standalone leading button shown for any model that has a

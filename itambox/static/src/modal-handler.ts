@@ -8,15 +8,30 @@
  *  - Listens for 'quickAddSuccess' to dynamically insert and select options.
  */
 (function () {
+  let pendingModalTrigger: HTMLElement | null = null;
+
+  document.body.addEventListener('htmx:beforeRequest', function (evt: Event) {
+    const detail = (evt as CustomEvent).detail;
+    const target = detail?.target as HTMLElement | undefined;
+    const requestElement = detail?.elt as HTMLElement | undefined;
+    if (target?.id !== 'modal-placeholder' || !requestElement) return;
+
+    const focused = requestElement.matches(':focus')
+      ? requestElement
+      : requestElement.querySelector<HTMLElement>(':focus');
+    pendingModalTrigger = focused || requestElement;
+  });
+
   // 1. HTMX Auto-Show and auto-cleanup listener
   document.body.addEventListener('htmx:afterSettle', function (evt: Event) {
     const detail = (evt as CustomEvent).detail;
     if (!detail || !detail.target) return;
 
     const target = detail.target as HTMLElement;
-    if (target.id !== 'modal-placeholder') return;
+    if (target.id !== 'modal-placeholder' || evt.target !== target) return;
 
-    const triggerEl = detail.elt as HTMLElement | null;
+    const triggerEl = pendingModalTrigger;
+    pendingModalTrigger = null;
     const modals = target.querySelectorAll<HTMLElement>('.modal');
     modals.forEach(function (modal) {
       try {

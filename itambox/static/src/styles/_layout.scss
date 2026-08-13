@@ -183,6 +183,11 @@ html {
     }
 }
 
+#footer-stamp a {
+    color: var(--tblr-link-color);
+    text-decoration: underline;
+}
+
 // WCAG 2.3.3 / user preference: remove non-essential motion without hiding
 // focus indicators or changing meaningful expanded/active states.
 @media (prefers-reduced-motion: reduce) {

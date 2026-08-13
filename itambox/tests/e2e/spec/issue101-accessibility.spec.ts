@@ -18,8 +18,11 @@ test.describe('Issue #101 accessibility qualification', () => {
     const search = page.locator('form.filter-form-inline input[type="search"]');
     await expect(search).toBeVisible();
     await search.fill('issue-101-focus-probe');
-    await search.press('Enter');
-    await expect(list).toBeVisible();
+    await Promise.all([
+      page.waitForResponse((response) => response.url().includes('q=issue-101-focus-probe')),
+      search.press('Enter'),
+    ]);
+    await expect(search).toHaveValue('issue-101-focus-probe');
     await expect(search).toBeFocused();
 
     const results = await new AxeBuilder({ page }).include('#page-content-wrapper').analyze();
@@ -28,15 +31,16 @@ test.describe('Issue #101 accessibility qualification', () => {
 
   test('modal keyboard flow returns focus to its trigger', async ({ page }) => {
     await page.goto('/inventory/accessories/');
-    const trigger = page.locator('[hx-target="#modal-placeholder"]').first();
+    const trigger = page.getByRole('button', { name: 'Configure Table' });
     await expect(trigger).toBeVisible();
     await trigger.focus();
     await trigger.press('Enter');
 
     const modal = page.locator('.modal.show');
     await expect(modal).toBeVisible();
-    await expect(modal).toContainText(/Action|Configure|Checkout|Clone|Delete/);
+    await expect(modal).toContainText('Configure Accessories Table');
 
+    await modal.getByRole('button', { name: 'Close' }).focus();
     await page.keyboard.press('Escape');
     await expect(modal).not.toBeVisible();
     await expect(trigger).toBeFocused();

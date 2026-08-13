@@ -1,4 +1,5 @@
 let pendingFocus: { id?: string; name?: string } | null = null;
+let pendingTrigger: HTMLElement | null = null;
 
 function focusElement(element: HTMLElement): void {
   if (element.matches('h1, h2, h3, [data-focus-after-swap]') && !element.hasAttribute('tabindex')) {
@@ -22,6 +23,7 @@ function rememberFocusedControl(event: Event): void {
   const element = detail?.elt;
   if (!(element instanceof HTMLElement)) return;
   const focused = element.matches(':focus') ? element : element.querySelector<HTMLElement>(':focus');
+  if (focused) pendingTrigger = element;
   if (!(focused instanceof HTMLInputElement || focused instanceof HTMLSelectElement || focused instanceof HTMLTextAreaElement)) {
     return;
   }
@@ -32,13 +34,20 @@ function focusAfterHtmxSettle(event: Event): void {
   const detail = (event as CustomEvent).detail as { target?: Element; elt?: Element } | undefined;
   const target = detail?.target;
   if (!(target instanceof HTMLElement)) return;
+  // One HTMX response may settle the main target plus several OOB targets.
+  // Only the main target owns focus restoration; otherwise a later OOB event
+  // can steal focus into a refreshed sidebar or toolbar.
+  if (event.target !== target) return;
   if (target.id === 'modal-placeholder' || isInsideModal(target)) {
     pendingFocus = null;
+    pendingTrigger = null;
     return;
   }
 
   const invalid = target.querySelector<HTMLElement>('[aria-invalid="true"], .is-invalid');
   if (invalid) {
+    pendingFocus = null;
+    pendingTrigger = null;
     focusElement(invalid);
     return;
   }
@@ -52,12 +61,14 @@ function focusAfterHtmxSettle(event: Event): void {
     const replacement = selector ? target.querySelector<HTMLElement>(selector) : null;
     pendingFocus = null;
     if (replacement) {
+      pendingTrigger = null;
       focusElement(replacement);
       return;
     }
   }
 
-  const trigger = detail?.elt;
+  const trigger = pendingTrigger;
+  pendingTrigger = null;
   if (trigger instanceof HTMLElement && trigger.isConnected && !isInsideModal(trigger)) {
     const control = focusableTrigger(trigger);
     if (control) {

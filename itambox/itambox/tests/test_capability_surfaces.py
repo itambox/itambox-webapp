@@ -5,9 +5,11 @@ maturity a user, an operator, and an API client all see. These tests pin those
 three readers to the same source.
 """
 
+import re
 from collections import namedtuple
 from io import StringIO
 from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
 from django.conf import settings
@@ -154,18 +156,72 @@ class TestBannerTemplate:
 
 
 class TestAccessibilityTemplateContracts:
-    def test_mobile_theme_controls_are_named_buttons_with_hidden_icons(self):
+    def test_theme_controls_are_named_buttons_with_hidden_icons(self):
         html = "\n".join(
             (
                 (_APP_ROOT / "templates" / "layout.html").read_text(encoding="utf-8"),
                 (_APP_ROOT / "templates" / "global_includes" / "_topbar.html").read_text(encoding="utf-8"),
             )
         )
-        assert html.count("aria-label=\"{% translate 'Enable dark mode' %}\"") >= 2
-        assert html.count("aria-label=\"{% translate 'Enable light mode' %}\"") >= 2
-        assert 'mdi-weather-night" aria-hidden="true"' in html
-        assert 'mdi-weather-sunny" aria-hidden="true"' in html
-        assert html.count('type="button"') >= 2
+        theme_buttons = [
+            match.groups()
+            for match in re.finditer(r"<button(?P<attrs>[^>]*)>(?P<body>.*?)</button>", html, re.DOTALL)
+            if "color-mode-toggle" in match.group("attrs")
+        ]
+
+        assert len(theme_buttons) == 4
+        for attrs, body in theme_buttons:
+            assert 'type="button"' in attrs
+            assert "aria-label=\"{% translate 'Enable " in attrs
+            assert 'aria-hidden="true"' in body
+
+    def test_page_shell_has_language_and_landmark_contracts(self):
+        base = (_APP_ROOT / "templates" / "base.html").read_text(encoding="utf-8")
+        public = (_APP_ROOT / "templates" / "base_public.html").read_text(encoding="utf-8")
+        breadcrumbs = (_APP_ROOT / "templates" / "global_includes" / "_breadcrumbs.html").read_text(encoding="utf-8")
+
+        for html in (base, public):
+            assert "{% get_current_language as LANGUAGE_CODE %}" in html
+            assert '<html lang="{{ LANGUAGE_CODE }}"' in html
+        assert '<nav class="d-flex justify-content-between' in breadcrumbs
+        assert "aria-label=\"{% translate 'Breadcrumb' %}\"" in breadcrumbs
+
+    def test_dashboard_scroll_regions_are_named_and_keyboard_reachable(self):
+        html = (_APP_ROOT / "templates" / "dashboard.html").read_text(encoding="utf-8")
+
+        assert '<h2 class="visually-hidden">{% translate "Dashboard" %}' in html
+        assert 'class="card-body overflow-auto"' in html
+        assert 'tabindex="0"' in html
+        assert 'aria-label="{{ entry.config.title }}"' in html
+
+    def test_quick_search_has_a_stable_focus_target_and_name(self):
+        html = (_APP_ROOT / "templates" / "htmx" / "quick_search.html").read_text(encoding="utf-8")
+
+        assert 'id="quick-search-input"' in html
+        assert "aria-label=\"{% translate 'Search' %}\"" in html
+
+    def test_table_selectors_and_action_menus_are_named_native_controls(self):
+        from assets.models import Manufacturer
+        from assets.tables import AssetTable
+        from core.tables.columns import ActionsColumn, ToggleColumn
+
+        record = Manufacturer(pk=1, name="Accessibility Probe", slug="accessibility-probe")
+        actions = str(ActionsColumn().render(record, table=None))
+
+        assert '<button class="btn btn-sm btn-action dropdown-toggle' in actions
+        assert 'aria-label="Toggle Dropdown"' in actions
+        assert '<a class="btn btn-sm btn-action dropdown-toggle' not in actions
+        assert str(ToggleColumn().attrs["input"]["aria-label"]) == "Select row"
+
+        asset_table = AssetTable([])
+        asset_table.request = SimpleNamespace(user=SimpleNamespace(has_perm=lambda *_args: True))
+        asset_record = SimpleNamespace(pk=1, active_assignment=None, deleted_at=None)
+        asset_actions = str(asset_table.render_actions(asset_record))
+
+        assert '<button class="btn btn-sm btn-soft-success check-action' in asset_actions
+        assert '<button class="btn btn-sm btn-action dropdown-toggle' in asset_actions
+        assert 'aria-label="More actions"' in asset_actions
+        assert '<a class="btn btn-sm btn-action dropdown-toggle' not in asset_actions
 
     def test_shared_toast_and_modal_errors_are_announced(self):
         toast = (_APP_ROOT / "templates" / "global_includes" / "_toast.html").read_text(encoding="utf-8")

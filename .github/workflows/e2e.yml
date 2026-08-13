@@ -3,6 +3,8 @@ name: E2E (Playwright)
 on:
   push:
     branches: [master, main]
+  pull_request:
+    branches: [main]
   workflow_dispatch:
 
 permissions:

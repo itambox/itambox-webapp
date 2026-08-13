@@ -18,10 +18,10 @@
 //    Cube left    #6366f1 (indigo-500)
 //    Cube right   #4f46e5 (indigo-600)
 //  Status palette — SEMANTIC ONLY, never change for chrome:
-//    Success  --tblr-success  #2fb344
-//    Danger   --tblr-danger   #d63939
-//    Warning  --tblr-warning  #f59f00
-//    Info     --tblr-info     #206bc4
+//    Success  --tblr-success  #126122
+//    Danger   --tblr-danger   #b4232e
+//    Warning  --tblr-warning  #855000
+//    Info     --tblr-info     #1769aa
 //  Color discipline (the premium rule):
 //    Indigo is the ONLY chrome accent. Semantic colors appear only when
 //    they carry meaning (status, destructive, check-in/out). Row actions
@@ -71,6 +71,28 @@ html,
     --tblr-primary: #4f46e5;
     --tblr-primary-rgb: 79, 70, 229;
     --tblr-primary-fg: #fff;
+    --tblr-secondary: #57534e;
+    --tblr-secondary-rgb: 87, 83, 78;
+    --tblr-muted: #57534e;
+    --tblr-muted-rgb: 87, 83, 78;
+    --tblr-success: #126122;
+    --tblr-success-rgb: 18, 97, 34;
+    --tblr-green: #126122;
+    --tblr-green-rgb: 18, 97, 34;
+    --tblr-info: #1769aa;
+    --tblr-info-rgb: 23, 105, 170;
+    --tblr-azure: #1769aa;
+    --tblr-azure-rgb: 23, 105, 170;
+    --tblr-warning: #855000;
+    --tblr-warning-rgb: 133, 80, 0;
+    --tblr-yellow: #855000;
+    --tblr-yellow-rgb: 133, 80, 0;
+    --tblr-danger: #b4232e;
+    --tblr-danger-rgb: 180, 35, 46;
+    --tblr-red: #b4232e;
+    --tblr-red-rgb: 180, 35, 46;
+    --tblr-orange: #a13b00;
+    --tblr-orange-rgb: 161, 59, 0;
 
     // ITAMbox Custom Tokens
     --itambox-primary: #4f46e5;
@@ -151,6 +173,28 @@ html,
     --tblr-focus-ring-color: rgb(129 140 248 / 30%);
     --tblr-link-color: #818cf8;
     --tblr-link-hover-color: #a5b4fc;
+    --tblr-secondary: #b0afc0;
+    --tblr-secondary-rgb: 176, 175, 192;
+    --tblr-muted: #a09fb2;
+    --tblr-muted-rgb: 160, 159, 178;
+    --tblr-success: #69db7c;
+    --tblr-success-rgb: 105, 219, 124;
+    --tblr-green: #69db7c;
+    --tblr-green-rgb: 105, 219, 124;
+    --tblr-info: #74c0fc;
+    --tblr-info-rgb: 116, 192, 252;
+    --tblr-azure: #74c0fc;
+    --tblr-azure-rgb: 116, 192, 252;
+    --tblr-warning: #ffd43b;
+    --tblr-warning-rgb: 255, 212, 59;
+    --tblr-yellow: #ffd43b;
+    --tblr-yellow-rgb: 255, 212, 59;
+    --tblr-danger: #ff8787;
+    --tblr-danger-rgb: 255, 135, 135;
+    --tblr-red: #ff8787;
+    --tblr-red-rgb: 255, 135, 135;
+    --tblr-orange: #ffa94d;
+    --tblr-orange-rgb: 255, 169, 77;
 
     // --- Elevation: dark surfaces are FLAT — hairlines + glows carry depth.
     // Shadows remain for floating layers (dropdowns/modals) only.

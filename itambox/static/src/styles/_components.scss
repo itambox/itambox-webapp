@@ -250,12 +250,12 @@ $soft-btn-colors: ('primary', 'secondary', 'success', 'danger', 'warning', 'info
 // they read as the same button. Check-out: unmistakably filled (still
 // translucent, no border). Check-in: pure outline, zero fill at rest.
 .check-action.btn-soft-success {
-    background-color: rgb(var(--tblr-success-rgb), 0.25);
+    background-color: rgb(var(--tblr-success-rgb), 0.12);
     border-color: transparent;
 
     &:hover,
     &:focus-visible {
-        background-color: rgb(var(--tblr-success-rgb), 0.38);
+        background-color: rgb(var(--tblr-success-rgb), 0.2);
         border-color: transparent;
     }
 }
