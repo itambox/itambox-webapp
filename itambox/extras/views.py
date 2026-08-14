@@ -1030,8 +1030,7 @@ class ScheduledReportScopeApprovalView(CapabilityRequiredMixin, PermissionRequir
         return render(request, self.template_name, self.get_context_data())
 
     def post(self, request, *args, **kwargs):
-        from .models import ScheduledReportScopeAuthorization
-
+        scope_authorization_model = apps.get_model("extras", "ScheduledReportScopeAuthorization")
         sched = self.object = self.get_object()
         action = request.POST.get("action")
         return_url = safe_return_url(request, request.POST.get("return_url"), reverse("extras:scheduledreport_list"))
@@ -1052,10 +1051,10 @@ class ScheduledReportScopeApprovalView(CapabilityRequiredMixin, PermissionRequir
                         _("Your cross-tenant reach does not cover: %(tenants)s. The approval would not take effect.")
                         % {"tenants": ", ".join(missing)}
                     )
-                ScheduledReportScopeAuthorization.approve(sched, request.user)
+                scope_authorization_model.approve(sched, request.user)
                 messages.success(request, _("Cross-tenant scope of '%(name)s' approved.") % {"name": sched.name})
             elif action == "revoke":
-                ScheduledReportScopeAuthorization.revoke(sched, request.user)
+                scope_authorization_model.revoke(sched, request.user)
                 messages.success(
                     request, _("Cross-tenant scope approval of '%(name)s' revoked.") % {"name": sched.name}
                 )
