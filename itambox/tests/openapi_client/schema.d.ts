@@ -269,6 +269,12 @@ export interface paths {
   "/api/core/object-changes/{id}/": {
     get: operations["core_object_changes_retrieve"];
   };
+  "/api/extras/alert-logs/": {
+    get: operations["extras_alert_logs_list"];
+  };
+  "/api/extras/alert-logs/{id}/": {
+    get: operations["extras_alert_logs_retrieve"];
+  };
   "/api/extras/alert-rules/": {
     get: operations["extras_alert_rules_list"];
     put: operations["extras_alert_rules_update_bulk"];
@@ -1669,6 +1675,60 @@ export interface components {
      * @enum {string}
      */
     ActionTypeEnum: "webhook" | "notification";
+    AlertLog: {
+      id: number;
+      /** Format: uri */
+      url: string;
+      rule: number;
+      /** @description The tenant owning this log. Null represents system-wide logs. */
+      tenant: number | null;
+      rule_display: string;
+      subject: string;
+      message: string;
+      severity: components["schemas"]["SeverityEnum"];
+      severity_display: string;
+      content_type: number;
+      object_id: number;
+      content_object_display: string;
+      /** @default active */
+      status: components["schemas"]["AlertLogStatusEnum"];
+      status_display: string;
+      /** @description Per-channel delivery result: {channel_pk: 'ok'|'failed'|'error: ...'} */
+      delivery_status: unknown;
+      /**
+       * Format: date-time
+       * @description When channel notifications were last dispatched for this alert (drives re-notify).
+       */
+      last_notified_at: string | null;
+      acknowledged_by: number | null;
+      acknowledged_by_display: string;
+      resolved_by: number | null;
+      resolved_by_display: string;
+      resolution_notes: string;
+      /** Format: date-time */
+      resolved_at: string | null;
+      /**
+       * Tenant Resolution
+       * @description Reconciliation state for legacy tenant-less alerts.
+       *
+       * * `not_required` - Not required
+       * * `resolved` - Resolved from target
+       * * `global` - Global target
+       * * `unresolved` - Unresolved — operator review required
+       */
+      tenant_resolution_status: components["schemas"]["TenantResolutionStatusEnum"];
+      /** Format: date-time */
+      created_at: string;
+      /** Format: date-time */
+      updated_at: string;
+    };
+    /**
+     * @description * `active` - Active
+     * * `acknowledged` - Acknowledged
+     * * `resolved` - Resolved
+     * @enum {string}
+     */
+    AlertLogStatusEnum: "active" | "acknowledged" | "resolved";
     AlertRule: {
       id: number;
       /** Format: uri */
@@ -3660,6 +3720,23 @@ export interface components {
        */
       previous?: string | null;
       results: components["schemas"]["AccessoryStock"][];
+      /** @description True when `count` was capped at ITAMBOX_PAGINATOR_COUNT_CAP and the real total is larger. Use `start` (keyset cursor) pagination to iterate the full result set. */
+      count_capped?: boolean;
+    };
+    PaginatedAlertLogList: {
+      /** @example 123 */
+      count: number | null;
+      /**
+       * Format: uri
+       * @example http://api.example.org/accounts/?offset=400&limit=100
+       */
+      next?: string | null;
+      /**
+       * Format: uri
+       * @example http://api.example.org/accounts/?offset=200&limit=100
+       */
+      previous?: string | null;
+      results: components["schemas"]["AlertLog"][];
       /** @description True when `count` was capped at ITAMBOX_PAGINATOR_COUNT_CAP and the real total is larger. Use `start` (keyset cursor) pagination to iterate the full result set. */
       count_capped?: boolean;
     };
@@ -6423,6 +6500,14 @@ export interface components {
       group_id?: number | null;
       description?: string;
     };
+    /**
+     * @description * `not_required` - Not required
+     * * `resolved` - Resolved from target
+     * * `global` - Global target
+     * * `unresolved` - Unresolved — operator review required
+     * @enum {string}
+     */
+    TenantResolutionStatusEnum: "not_required" | "resolved" | "global" | "unresolved";
     Token: {
       id: number;
       key: string;
@@ -15558,6 +15643,104 @@ export interface operations {
       200: {
         content: {
           "application/json": components["schemas"]["ObjectChange"];
+        };
+      };
+      /** @description The request could not be completed. */
+      400: {
+        content: {
+          "application/json": components["schemas"]["APIError"];
+        };
+      };
+      /** @description The request could not be completed. */
+      401: {
+        content: {
+          "application/json": components["schemas"]["APIError"];
+        };
+      };
+      /** @description The request could not be completed. */
+      403: {
+        content: {
+          "application/json": components["schemas"]["APIError"];
+        };
+      };
+      /** @description The request could not be completed. */
+      404: {
+        content: {
+          "application/json": components["schemas"]["APIError"];
+        };
+      };
+    };
+  };
+  extras_alert_logs_list: {
+    parameters: {
+      query?: {
+        /** @description Created after */
+        created_after?: string;
+        /** @description Created before */
+        created_before?: string;
+        /** @description Number of results to return per page. */
+        limit?: number;
+        /** @description The initial index from which to return the results. */
+        offset?: number;
+        /** @description Rule */
+        rule?: number;
+        /**
+         * @description Severity
+         *
+         * * `info` - Info
+         * * `warning` - Warning
+         * * `critical` - Critical
+         */
+        severity?: ("critical" | "info" | "warning")[];
+        /** @description Keyset/cursor pagination: return results with pk >= start, ordered by pk. Skips the (capped) row count and stays O(page) regardless of table size — use this instead of offset/limit for bulk export or iterating large collections. Follow the `next` link to walk subsequent pages. */
+        start?: number;
+        /**
+         * @description Status
+         *
+         * * `active` - Active
+         * * `acknowledged` - Acknowledged
+         * * `resolved` - Resolved
+         */
+        status?: ("acknowledged" | "active" | "resolved")[];
+      };
+    };
+    responses: {
+      200: {
+        content: {
+          "application/json": components["schemas"]["PaginatedAlertLogList"];
+        };
+      };
+      /** @description The request could not be completed. */
+      400: {
+        content: {
+          "application/json": components["schemas"]["APIError"];
+        };
+      };
+      /** @description The request could not be completed. */
+      401: {
+        content: {
+          "application/json": components["schemas"]["APIError"];
+        };
+      };
+      /** @description The request could not be completed. */
+      403: {
+        content: {
+          "application/json": components["schemas"]["APIError"];
+        };
+      };
+    };
+  };
+  extras_alert_logs_retrieve: {
+    parameters: {
+      path: {
+        /** @description A unique integer value identifying this Alert Log. */
+        id: number;
+      };
+    };
+    responses: {
+      200: {
+        content: {
+          "application/json": components["schemas"]["AlertLog"];
         };
       };
       /** @description The request could not be completed. */
