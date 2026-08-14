@@ -1,5 +1,6 @@
 from django.contrib.contenttypes.models import ContentType
 from django.db import models
+from django.utils.translation import gettext_lazy as _
 from drf_spectacular.types import OpenApiTypes
 from drf_spectacular.utils import extend_schema_field
 from rest_framework import serializers
@@ -26,6 +27,10 @@ from itambox.api.fields import ContentTypeField, validate_gfk_target_tenant
 # does not persist the mask. Mirrors WebhookEndpoint.secret being write-only.
 _SECRET_CONFIG_HINTS = ("webhook_url", "secret", "password", "token", "api_key", "apikey", "auth")
 _REDACTED_PLACEHOLDER = "•" * 8  # eight bullets
+_EVENT_RULE_CONDITIONS_WITHDRAWN_MESSAGE = _(
+    "Event rule conditions are withdrawn for the 1.0 release. Existing conditions are preserved and remain readable; "
+    "new or changed conditions cannot be submitted."
+)
 
 
 def _is_secret_config_key(key):
@@ -155,6 +160,16 @@ class EventRuleSerializer(BaseModelSerializer):
             )
         return value
 
+    def validate_conditions(self, value: dict[str, object] | None) -> dict[str, object] | None:
+        if self.instance is None:
+            if value:
+                raise serializers.ValidationError(_EVENT_RULE_CONDITIONS_WITHDRAWN_MESSAGE)
+        elif value != self.instance.conditions:
+            raise serializers.ValidationError(_EVENT_RULE_CONDITIONS_WITHDRAWN_MESSAGE)
+        return value
+
+    conditions_withdrawn = serializers.BooleanField(read_only=True)
+
     class Meta:
         model = EventRule
         fields = [
@@ -164,6 +179,7 @@ class EventRuleSerializer(BaseModelSerializer):
             "model",
             "events",
             "conditions",
+            "conditions_withdrawn",
             "action_type",
             "action_type_display",
             "webhook",

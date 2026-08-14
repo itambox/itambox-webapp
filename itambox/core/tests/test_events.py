@@ -12,7 +12,7 @@ from django.test import TransactionTestCase
 from django.utils import timezone
 
 from assets.models import Manufacturer
-from core.events import dispatch_event, send_notification_to_channel
+from core.events import _check_conditions, _evaluate_condition, dispatch_event, send_notification_to_channel
 from core.models import Notification
 from extras.models import Event, EventRule, NotificationChannel, WebhookEndpoint
 from organization.models import Location, Tenant
@@ -46,6 +46,7 @@ class EventsSystemTestCase(TransactionTestCase):
         self.assertIsNotNone(event_delete)
 
     def test_event_rule_conditions_evaluation(self):
+        """B7: authored conditions now fail closed for 1.0, so no notification is dispatched."""
         # Create a rule with an "and" condition
         EventRule.objects.create(
             name="Test Rule with Conditions",
@@ -74,13 +75,155 @@ class EventsSystemTestCase(TransactionTestCase):
             action="create",
             data={"app_label": "assets", "model_name": "manufacturer"},
         )
-        # Should match and trigger a notification
+        # Authored conditions are withdrawn and must not dispatch.
         dispatch_event(Manufacturer, event, "create")
 
         notification = Notification.objects.filter(level="warning").first()
-        self.assertIsNotNone(notification)
-        self.assertIn("manufacturer", notification.subject)
-        self.assertIn("assets", notification.message)
+        self.assertIsNone(notification)
+
+    def test_unknown_or_incomplete_conditions_fail_closed(self):
+        cases = [
+            {"field": "model_name", "op": "unknown", "value": "manufacturer"},
+            {"op": "eq", "value": "manufacturer"},
+            {"field": "model_name", "value": "manufacturer"},
+        ]
+
+        for index, conditions in enumerate(cases):
+            with self.subTest(conditions=conditions):
+                rule = EventRule.objects.create(
+                    name=f"Fail-closed condition rule {index}",
+                    model=self.manufacturer_ct,
+                    events=["create"],
+                    action_type=EventRule.ACTION_NOTIFICATION,
+                    action_config={"subject": f"FAIL-CLOSED-{index}"},
+                    conditions=conditions,
+                    enabled=True,
+                )
+                event = Event.objects.create(
+                    model=self.manufacturer_ct,
+                    object_id=1000 + index,
+                    action="create",
+                    data={"app_label": "assets", "model_name": "manufacturer"},
+                )
+
+                self.assertFalse(_evaluate_condition(conditions, event))
+                self.assertFalse(_check_conditions(conditions, event))
+                dispatch_event(Manufacturer, event, "create")
+
+                self.assertFalse(Notification.objects.filter(subject=rule.action_config["subject"]).exists())
+
+    def test_evaluate_condition_gt_lt_and_non_dict_shapes(self):
+        """The withdrawn engine keeps its numeric operators (v2 reuse path) and
+        fails closed on unexpected shapes."""
+        event = Event(
+            model=self.manufacturer_ct,
+            object_id=1,
+            action="create",
+            data={"price": "10"},
+        )
+        self.assertTrue(_evaluate_condition({"field": "price", "op": "gt", "value": 5}, event))
+        self.assertFalse(_evaluate_condition({"field": "price", "op": "gt", "value": 15}, event))
+        self.assertTrue(_evaluate_condition({"field": "price", "op": "lt", "value": 15}, event))
+        self.assertFalse(_evaluate_condition({"field": "price", "op": "lt", "value": 5}, event))
+        self.assertFalse(_evaluate_condition({"field": "price", "op": "gt", "value": "not-a-number"}, event))
+        self.assertFalse(_evaluate_condition("not-a-dict", event))
+        self.assertFalse(_check_conditions([], event))
+
+    def test_empty_conditions_continue_to_match(self):
+        for index, conditions in enumerate(({}, {"rules": []})):
+            with self.subTest(conditions=conditions):
+                rule = EventRule.objects.create(
+                    name=f"Empty condition rule {index}",
+                    model=self.manufacturer_ct,
+                    events=["create"],
+                    action_type=EventRule.ACTION_NOTIFICATION,
+                    action_config={"subject": f"EMPTY-CONDITIONS-{index}"},
+                    conditions=conditions,
+                    enabled=True,
+                )
+                event = Event.objects.create(
+                    model=self.manufacturer_ct,
+                    object_id=1100 + index,
+                    action="create",
+                    data={"app_label": "assets", "model_name": "manufacturer"},
+                )
+
+                self.assertTrue(_check_conditions(conditions, event))
+                dispatch_event(Manufacturer, event, "create")
+
+                self.assertTrue(Notification.objects.filter(subject=rule.action_config["subject"]).exists())
+
+        # ``None`` cannot be persisted (the column is NOT NULL); the fail-open
+        # evaluation path for a missing payload is exercised directly instead.
+        self.assertTrue(_check_conditions(None, event))
+
+    def test_flat_condition_does_not_dispatch(self):
+        rule = EventRule.objects.create(
+            name="Flat condition rule",
+            model=self.manufacturer_ct,
+            events=["create"],
+            action_type=EventRule.ACTION_NOTIFICATION,
+            action_config={"subject": "FLAT-CONDITION"},
+            conditions={"field": "model_name", "op": "eq", "value": "manufacturer"},
+            enabled=True,
+        )
+        event = Event.objects.create(
+            model=self.manufacturer_ct,
+            object_id=1200,
+            action="create",
+            data={"app_label": "assets", "model_name": "manufacturer"},
+        )
+
+        dispatch_event(Manufacturer, event, "create")
+
+        self.assertFalse(Notification.objects.filter(subject=rule.action_config["subject"]).exists())
+
+    @patch("django_q.tasks.async_task")
+    def test_webhook_rule_with_conditions_does_not_enqueue_task(self, mock_async_task):
+        EventRule.objects.create(
+            name="Webhook condition rule",
+            model=self.manufacturer_ct,
+            events=["create"],
+            action_type=EventRule.ACTION_WEBHOOK,
+            action_config={"url": "https://example.com/webhook"},
+            conditions={"rules": [{"field": "model_name", "op": "eq", "value": "manufacturer"}]},
+            enabled=True,
+        )
+        event = Event.objects.create(
+            model=self.manufacturer_ct,
+            object_id=1300,
+            action="create",
+            data={"app_label": "assets", "model_name": "manufacturer"},
+        )
+
+        dispatch_event(Manufacturer, event, "create")
+
+        mock_async_task.assert_not_called()
+
+    def test_event_rule_conditions_withdrawn_truth_table(self):
+        cases = [
+            ({}, False),
+            (None, False),
+            ({"rules": []}, False),
+            ({"type": "and", "rules": []}, False),
+            ({"rules": [{"field": "model_name", "op": "eq", "value": "manufacturer"}]}, True),
+            ({"field": "model_name", "op": "eq", "value": "manufacturer"}, True),
+            ([], True),
+            ("authored", True),
+        ]
+
+        for conditions, expected in cases:
+            with self.subTest(conditions=conditions):
+                rule = EventRule(conditions=conditions)
+                self.assertEqual(rule.conditions_withdrawn, expected)
+
+    def test_event_rule_conditions_json_renders_pretty_json(self):
+        rule = EventRule(conditions={"rules": [{"field": "model_name", "op": "eq", "value": "manufacturer"}]})
+
+        self.assertEqual(
+            rule.conditions_json,
+            '{\n  "rules": [\n    {\n      "field": "model_name",\n      "op": "eq",\n      "value": "manufacturer"\n    }\n  ]\n}',
+        )
 
     def test_event_rules_scoped_to_instance_tenant_in_system_context(self):
         """WS5-1: in a system context (no active tenant/user) a save must fire ONLY the

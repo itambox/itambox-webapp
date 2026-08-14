@@ -3161,6 +3161,7 @@ export interface components {
       events?: unknown;
       /** @description Optional conditions for rule matching */
       conditions?: unknown;
+      conditions_withdrawn: boolean;
       action_type: components["schemas"]["ActionTypeEnum"];
       action_type_display: string;
       webhook: components["schemas"]["WebhookEndpoint"];

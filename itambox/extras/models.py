@@ -1,3 +1,5 @@
+import json
+
 from django.apps import apps
 from django.conf import settings
 from django.contrib.contenttypes.fields import GenericForeignKey
@@ -21,6 +23,15 @@ from core.mixins import BookmarkableMixin, SoftDeleteMixin
 from core.models import BaseModel, ChangeLoggingMixin
 from core.report_keys import unknown_column_keys
 from core.validators import validate_external_url, validate_file_attachment, validate_image_attachment
+
+
+def has_authored_conditions(conditions):
+    """Return whether conditions contain authored expressions or an unexpected form."""
+    if conditions is None:
+        return False
+    if not isinstance(conditions, dict):
+        return True
+    return bool(conditions.get("rules")) or "field" in conditions or "op" in conditions
 
 
 class Tag(ChangeLoggingMixin, BaseModel, SoftDeleteMixin, BookmarkableMixin):
@@ -317,6 +328,14 @@ class EventRule(ChangeLoggingMixin, SoftDeleteMixin, BaseModel):
 
     def __str__(self):
         return self.name
+
+    @property
+    def conditions_withdrawn(self):
+        return has_authored_conditions(self.conditions)
+
+    @property
+    def conditions_json(self):
+        return json.dumps(self.conditions, indent=2)
 
     def get_absolute_url(self):
         return reverse("extras:eventrule_detail", kwargs={"pk": self.pk})

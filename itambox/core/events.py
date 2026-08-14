@@ -18,7 +18,7 @@ from django.utils.translation import gettext_lazy as _
 
 from core.context import get_current_request_id, get_current_tenant, get_current_user
 from core.models import ChangeLoggingMixin, EmailSettings
-from extras.models import Event, EventRule, NotificationChannel, WebhookEndpoint
+from extras.models import Event, EventRule, NotificationChannel, WebhookEndpoint, has_authored_conditions
 
 logger = logging.getLogger(__name__)
 
@@ -149,6 +149,14 @@ def process_event_rules(event, instance_tenant_id=None):
         if event.action not in events_list:
             continue
 
+        if rule.conditions_withdrawn:
+            logger.info(
+                "Skipping event rule pk=%s tenant=%s: conditions withdrawn for 1.0",
+                rule.pk,
+                rule.tenant_id,
+            )
+            continue
+
         if not _check_conditions(rule.conditions, event):
             continue
 
@@ -164,40 +172,34 @@ def process_event_rules(event, instance_tenant_id=None):
 
 
 def _check_conditions(conditions, event):
-    """Evaluate optional JSON conditions on the event."""
+    """Fail-closed evaluation of optional JSON conditions on the event.
 
-    if not conditions:
+    WP-15 (D4): the condition feature is withdrawn for 1.0. Any authored
+    condition expression (or an unexpected, non-dict payload) fails closed so
+    the rule never matches on the near-empty v1 event envelope. Truly empty
+    condition payloads (``None``, ``{}``, or a dict whose ``rules`` list is
+    empty) preserve the historical unconditional-match behavior.
+    """
+
+    if conditions is None or conditions == {}:
         return True
-
-    condition_type = conditions.get("type", "and")
-    rules = conditions.get("rules", [])
-
-    if not rules:
-        return True
-
-    results = []
-    for rule in rules:
-        # A nested group has the same shape as the top level ({'type', 'rules'});
-        # a leaf condition has 'field'/'op'. Detect groups by the 'rules' key.
-        if isinstance(rule, dict) and "rules" in rule:
-            results.append(_check_conditions(rule, event))
-        else:
-            results.append(_evaluate_condition(rule, event))
-
-    if condition_type == "or":
-        return any(results)
-    return all(results)
+    if not isinstance(conditions, dict):
+        return False
+    return not has_authored_conditions(conditions)
 
 
 def _evaluate_condition(rule, event):
     """Evaluate a single condition rule against the event."""
+
+    if not isinstance(rule, dict):
+        return False
 
     field = rule.get("field")
     op = rule.get("op")
     value = rule.get("value")
 
     if not field or not op:
-        return True
+        return False
 
     data = event.data or {}
     actual = data.get(field)
@@ -210,18 +212,15 @@ def _evaluate_condition(rule, event):
         return str(value) in str(actual) if actual else False
     elif op == "in":
         return actual in (value if isinstance(value, list) else [value])
-    elif op == "gt":
+    elif op in ("gt", "lt"):
         try:
-            return float(actual) > float(value)
+            lhs = float(actual)
+            rhs = float(value)
         except (TypeError, ValueError):
             return False
-    elif op == "lt":
-        try:
-            return float(actual) < float(value)
-        except (TypeError, ValueError):
-            return False
+        return lhs > rhs if op == "gt" else lhs < rhs
 
-    return True
+    return False
 
 
 def _execute_event_action(rule, event, instance_tenant_id=None):

@@ -1,5 +1,6 @@
 import django_tables2 as tables
 from django.contrib.contenttypes.models import ContentType
+from django.utils.html import format_html
 from django.utils.translation import gettext_lazy as _
 
 from extras.models import EventRule, ExportTemplate, LabelTemplate, WebhookEndpoint
@@ -59,12 +60,13 @@ class EventRuleTable(BaseTable):
     name = tables.Column(linkify=True)
     model = tables.Column(verbose_name=_("Model"))
     action_type = tables.Column(verbose_name=_("Action"))
+    conditions = tables.Column(accessor="conditions_withdrawn", verbose_name=_("Conditions"), orderable=False)
     enabled = BooleanColumn()
 
     class Meta(BaseTable.Meta):
         model = EventRule
-        fields = ("name", "model", "action_type", "enabled")
-        sequence = ("name", "model", "action_type", "enabled")
+        fields = ("name", "model", "action_type", "conditions", "enabled")
+        sequence = ("name", "model", "action_type", "conditions", "enabled")
 
     def render_model(self, value):
         return f"{value.app_label}.{value.model}"
@@ -72,6 +74,11 @@ class EventRuleTable(BaseTable):
     def render_action_type(self, value):
         action_map = dict(EventRule.ACTION_TYPE_CHOICES)
         return action_map.get(value, value)
+
+    def render_conditions(self, value):
+        if value:
+            return format_html('<span class="badge bg-warning">{}</span>', _("Withdrawn"))
+        return "—"
 
 
 class LabelTemplateTable(BaseTable):

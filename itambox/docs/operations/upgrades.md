@@ -57,6 +57,16 @@ docker compose logs --tail=100 app worker
 
 `collectstatic` runs while the application image is built, so the included stack does not need a separate post-deployment collection step.
 
+## Post-upgrade notes
+
+Event rule conditions are withdrawn for the 1.0 release. Existing condition JSON
+is preserved and remains readable, but rules with authored conditions will not
+dispatch. After upgrading, identify affected active rules with:
+
+```bash
+python manage.py eventrule_withdrawn_report
+```
+
 ## Rollback
 
 Do not assume a Django migration can be reversed safely. A migration may be irreversible or may discard data when reversed. The reliable rollback is the complete pre-update set:

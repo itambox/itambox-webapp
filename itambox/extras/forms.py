@@ -6,7 +6,9 @@ from django import forms
 from django.contrib.contenttypes.models import ContentType
 from django.core.exceptions import ValidationError
 from django.db.models import Q
+from django.templatetags.static import static
 from django.urls import reverse
+from django.utils.html import format_html
 from django.utils.translation import gettext_lazy as _
 
 from core.features import report_designer_probe
@@ -325,6 +327,11 @@ PRESET_PAYLOADS = {
     "teams": TEAMS_PAYLOAD_PRESET,
 }
 
+_EVENT_RULE_CONDITIONS_WITHDRAWN_MESSAGE = _(
+    "Event rule conditions are withdrawn for the 1.0 release. Existing conditions are preserved and remain readable; "
+    "new or changed conditions cannot be submitted."
+)
+
 
 class WebhookEndpointForm(forms.ModelForm):
     payload_preset = forms.ChoiceField(
@@ -487,6 +494,25 @@ class EventRuleForm(forms.ModelForm):
             if self.instance.action_config:
                 self.initial["action_config"] = _json.dumps(self.instance.action_config, indent=2)
 
+        if self.instance and self.instance.pk and self.instance.conditions:
+            conditions_block = format_html(
+                '<div class="alert alert-warning" role="alert">{}</div>'
+                '<pre class="bg-light border rounded p-3">{}</pre>'
+                '<a href="{}">{}</a>',
+                _(
+                    "Conditions are withdrawn for the 1.0 release. Existing conditions are preserved and remain "
+                    "readable; new or changed conditions cannot be submitted."
+                ),
+                self.instance.conditions_json,
+                static("docs/usage/webhooks-and-automation.html") + "#event-rule-conditions-withdrawn-for-10",
+                _("Read the Event Rule conditions documentation."),
+            )
+        else:
+            conditions_block = format_html(
+                '<div class="alert alert-secondary" role="status">{}</div>',
+                _("Conditions are not available for the 1.0 release."),
+            )
+
         self.helper = FormHelper()
         layout_fields = [
             Fieldset(
@@ -510,7 +536,7 @@ class EventRuleForm(forms.ModelForm):
                 _("Action"),
                 "webhook",
                 "payload_preset",
-                "conditions",
+                HTML(conditions_block),
                 "action_config",
             ),
         ]
@@ -527,15 +553,27 @@ class EventRuleForm(forms.ModelForm):
         self.helper.layout = Layout(*layout_fields)
 
     def clean_conditions(self):
+        if self.instance and self.instance.pk and self.add_prefix("conditions") not in self.data:
+            return self.instance.conditions
+
         data = self.cleaned_data["conditions"]
         if isinstance(data, str):
             if not data.strip():
-                return {}
-            try:
-                return _json.loads(data)
-            except _json.JSONDecodeError as exc:
-                raise forms.ValidationError(_("Conditions must be valid JSON.")) from exc
-        return data or {}
+                data = {}
+            else:
+                try:
+                    data = _json.loads(data)
+                except _json.JSONDecodeError as exc:
+                    raise forms.ValidationError(_("Conditions must be valid JSON.")) from exc
+        data = data or {}
+
+        if self.instance and self.instance.pk:
+            if data != self.instance.conditions:
+                raise forms.ValidationError(_EVENT_RULE_CONDITIONS_WITHDRAWN_MESSAGE)
+        elif data:
+            raise forms.ValidationError(_EVENT_RULE_CONDITIONS_WITHDRAWN_MESSAGE)
+
+        return data
 
     def clean_action_config(self):
         data = self.cleaned_data["action_config"]
