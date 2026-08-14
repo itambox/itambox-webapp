@@ -10,6 +10,15 @@ class ReportDesignerMigrationTests(TransactionTestCase):
     migrate_from = ("extras", "0102_alter_event_action")
     migrate_to = ("extras", "0105_reporttemplate_advanced_mode_and_more")
 
+    def tearDown(self):
+        # Restore the shared test database to the migration leaf state so later
+        # tests never see a rehearsed (partially migrated) schema.
+        try:
+            executor = MigrationExecutor(connection)
+            executor.migrate(executor.loader.graph.leaf_nodes())
+        finally:
+            super().tearDown()
+
     def setUp(self):
         self.executor = MigrationExecutor(connection)
         self.executor.migrate([self.migrate_from])

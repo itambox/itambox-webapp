@@ -23,6 +23,15 @@ class AlertTenantReconciliationMigrationTests(TransactionTestCase):
         self.executor = MigrationExecutor(connection)
         return self.executor.migrate([target])
 
+    def tearDown(self):
+        # Restore the shared test database to the migration leaf state so later
+        # tests never see a rehearsed (partially migrated) schema.
+        try:
+            executor = MigrationExecutor(connection)
+            executor.migrate(executor.loader.graph.leaf_nodes())
+        finally:
+            super().tearDown()
+
     def test_forward_and_reverse_preserve_unresolved_alert_rows(self):
         try:
             old_apps = self._migrate(self.migrate_from).apps
