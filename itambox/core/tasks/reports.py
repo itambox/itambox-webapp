@@ -335,6 +335,8 @@ def _resolve_scope_authorization(sched, active_tenant, filter_tenants):
     if not _scope_requires_authorization(active_tenant, filter_tenants):
         return None
     authorization = _load_scope_authorization(sched)
+    # getattr keeps this compatible with the lightweight test doubles used in
+    # the designer contract tests (SimpleNamespace rows have no revoked_at).
     if authorization is None or getattr(authorization, "revoked_at", None) is not None:
         return None
     scope_tenant_ids = sorted({tenant.pk for tenant in filter_tenants})
@@ -468,7 +470,11 @@ def generate_scheduled_report_task(scheduled_report_id: int) -> TaskResult:
     active_tenant, filter_tenants = scope
     if not filter_tenants:
         existing_authorization = ScheduledReportScopeAuthorization._base_manager.filter(scheduled_report=sched).first()
-        if existing_authorization and existing_authorization.scope_tenant_ids:
+        if (
+            existing_authorization
+            and existing_authorization.scope_tenant_ids
+            and existing_authorization.revoked_at is None
+        ):
             # Soft-deleting a tenant strips it from filter M2M sets, so a
             # previously approved broad scope can silently collapse to the
             # owner tenant. Fail closed instead of substituting owner data.

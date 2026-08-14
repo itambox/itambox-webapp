@@ -113,6 +113,13 @@ class ScheduledReportScopeApprovalViewTests(TestCase):
         self.assertEqual(authorization.revoked_by, self.admin)
         self.assertIsNotNone(authorization.revoked_at)
 
+    def test_revoke_post_refuses_when_reach_does_not_cover_the_stored_scope(self):
+        self._client_for(self.admin).post(self.url, {"action": "approve"})
+        response = self._client_for(self.partial).post(self.url, {"action": "revoke"}, follow=True)
+        authorization = ScheduledReportScopeAuthorization.objects.get(scheduled_report=self.sched)
+        self.assertFalse(authorization.is_revoked())
+        self.assertContains(response, "does not cover")
+
     def test_approve_after_revoke_clears_the_revocation(self):
         client = self._client_for(self.admin)
         client.post(self.url, {"action": "approve"})

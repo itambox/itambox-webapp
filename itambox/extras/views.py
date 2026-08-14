@@ -1063,7 +1063,7 @@ class ScheduledReportScopeApprovalView(CapabilityRequiredMixin, PermissionRequir
             return redirect(return_url)
         except PermissionDenied as error:
             messages.error(request, str(error))
-            return redirect(return_url)
+            return redirect(request.path)
         except ValidationError as error:
             for message in getattr(error, "messages", [str(error)]):
                 messages.error(request, message)

@@ -1,3 +1,4 @@
+from django.apps import apps
 from django.conf import settings
 from django.contrib.contenttypes.fields import GenericForeignKey
 from django.contrib.contenttypes.models import ContentType
@@ -1153,11 +1154,11 @@ class ScheduledReportScopeAuthorization(models.Model):
     def approve(cls, scheduled_report, actor):
         """Persist an exact scope approval for a principal with cross-tenant permission."""
         if not getattr(actor, "is_active", False) or not actor.has_perm("reports.view_cross_tenant_reports"):
-            raise PermissionDenied("Cross-tenant report scope approval requires the cross-tenant report permission.")
+            raise PermissionDenied(_("Cross-tenant report scope approval requires the cross-tenant report permission."))
         # The scope reads use the unscoped through table, so the permission
         # check above binding the ambient tenant cannot truncate the scope.
         if not scheduled_report.scope_requires_authorization():
-            raise ValidationError("A single-tenant schedule does not need cross-tenant scope approval.")
+            raise ValidationError(_("A single-tenant schedule does not need cross-tenant scope approval."))
         scope_tenant_ids = scheduled_report.effective_scope_tenant_ids()
         authorization, _created = cls.objects.update_or_create(
             scheduled_report=scheduled_report,
@@ -1176,16 +1177,36 @@ class ScheduledReportScopeAuthorization(models.Model):
         """Persist the revocation of an existing scope approval.
 
         Revocation keeps the row so the approve/revoke history stays visible,
-        but marks it void: report generation treats a revoked approval like an
-        absent one and fails closed with ``report.scope_unauthorized``.
+        but marks it void: a revoked approval authorizes nothing. Generation
+        fails closed with ``report.scope_unauthorized`` while the schedule
+        remains cross-tenant; a schedule wound back to single-tenant runs as
+        an ordinary single-tenant schedule.
+
+        Revocation is immediately and permanently effective on write, so the
+        actor must hold the cross-tenant permission on every tenant of the
+        stored approval. Approve has a generation-time reach backstop;
+        revoke does not.
         """
         if not getattr(actor, "is_active", False) or not actor.has_perm("reports.view_cross_tenant_reports"):
-            raise PermissionDenied("Cross-tenant report scope revocation requires the cross-tenant report permission.")
+            raise PermissionDenied(
+                _("Cross-tenant report scope revocation requires the cross-tenant report permission.")
+            )
         authorization = cls.objects.filter(scheduled_report=scheduled_report).first()
         if authorization is None:
-            raise ValidationError("This schedule has no cross-tenant scope approval to revoke.")
+            raise ValidationError(_("This schedule has no cross-tenant scope approval to revoke."))
         if authorization.revoked_at is not None:
-            raise ValidationError("This schedule's cross-tenant scope approval is already revoked.")
+            raise ValidationError(_("This schedule's cross-tenant scope approval is already revoked."))
+        Tenant = apps.get_model("organization", "Tenant")
+        missing_tenants = [
+            tenant
+            for tenant in Tenant._base_manager.filter(pk__in=authorization.scope_tenant_ids)
+            if not actor.has_perm("reports.view_cross_tenant_reports", obj=tenant)
+        ]
+        if missing_tenants:
+            raise PermissionDenied(
+                _("Your cross-tenant reach does not cover: %(tenants)s. The revocation would not be effective.")
+                % {"tenants": ", ".join(tenant.name for tenant in missing_tenants)}
+            )
         authorization.revoked_by = actor
         authorization.revoked_at = timezone.now()
         authorization.save(update_fields=["revoked_by", "revoked_at"])
