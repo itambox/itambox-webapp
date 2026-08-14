@@ -5,7 +5,7 @@ from unittest.mock import Mock, call, patch
 
 import pytest
 from django.core.exceptions import ObjectDoesNotExist, PermissionDenied, ValidationError
-from django.test import RequestFactory, SimpleTestCase, override_settings
+from django.test import RequestFactory, SimpleTestCase, TestCase, override_settings
 
 from core.models import ChangeLoggingMixin
 from core.reports.columns import headers_for, label_for
@@ -31,6 +31,7 @@ from extras.forms import ReportTemplateForm
 from extras.models import ReportTemplate, ScheduledReport, ScheduledReportScopeAuthorization
 from extras.views import ReportTemplateDetailView, ReportTemplateDownloadView, ReportTemplatePreviewView
 from itambox.capabilities import ActivationState
+from organization.models import Tenant
 
 
 class ReportDesignerIssue181ContractTests(SimpleTestCase):
@@ -711,3 +712,72 @@ class ReportDesignerIssue181CoverageTests(SimpleTestCase):
             pdf_response = ReportTemplateDownloadView().get(SimpleNamespace(GET={"format": "pdf", "print": "true"}), 1)
         assert pdf_response["Content-Type"].startswith("application/pdf")
         assert pdf_response["Content-Disposition"].startswith("inline;")
+
+
+class ReportDesignerFilterTenantWriteTests(TestCase):
+    def setUp(self):
+        self.tenant_a = Tenant.objects.create(name="Filter Tenant A", slug="filter-tenant-a")
+        self.tenant_b = Tenant.objects.create(name="Filter Tenant B", slug="filter-tenant-b")
+        self.template = ReportTemplate.objects.create(
+            name="Grandfathered Filter Template",
+            report_type=ReportTemplate.REPORT_TYPE_ASSET_SUMMARY,
+            tenant=self.tenant_a,
+        )
+        ReportTemplate._base_manager.filter(pk=self.template.pk).update(legacy_designer_grandfathered=True)
+        self.template.refresh_from_db()
+        self.template.filter_tenants.add(self.tenant_a)
+        self.admin = SimpleNamespace(is_superuser=True, is_staff=True)
+        self.current_user = patch("extras.forms.get_current_user", return_value=self.admin)
+        self.current_user.start()
+        self.addCleanup(self.current_user.stop)
+
+    def _form(self, filter_tenant):
+        return ReportTemplateForm(
+            data={
+                "name": self.template.name,
+                "description": self.template.description,
+                "report_type": self.template.report_type,
+                "included_columns": [],
+                "include_summary_cards": "on",
+                "include_distribution_chart": "",
+                "group_by_field": "",
+                "style_preset": self.template.style_preset,
+                "advanced_mode": "",
+                "template_content": "",
+                "tenant": str(self.tenant_a.pk),
+                "filter_tenants": [str(filter_tenant.pk)],
+            },
+            instance=ReportTemplate.objects.get(pk=self.template.pk),
+        )
+
+    @override_settings(FEATURE_REPORT_DESIGNER=False, REPORT_DESIGNER_ENABLED=False)
+    def test_flag_off_blocks_grandfathered_filter_tenant_change_through_form_save(self):
+        form = self._form(self.tenant_b)
+        assert form.is_valid()
+        with pytest.raises(ValidationError, match="grandfathered"):
+            form.save()
+        assert set(self.template.filter_tenants.values_list("pk", flat=True)) == {self.tenant_a.pk}
+
+    @override_settings(FEATURE_REPORT_DESIGNER=False, REPORT_DESIGNER_ENABLED=False)
+    def test_flag_off_blocks_grandfathered_filter_tenant_change_through_deferred_save_m2m(self):
+        form = self._form(self.tenant_b)
+        assert form.is_valid()
+        form.save(commit=False)
+        with pytest.raises(ValidationError, match="grandfathered"):
+            form.save_m2m()
+        assert set(self.template.filter_tenants.values_list("pk", flat=True)) == {self.tenant_a.pk}
+
+    @override_settings(FEATURE_REPORT_DESIGNER=False, REPORT_DESIGNER_ENABLED=False)
+    def test_flag_off_allows_noop_grandfathered_filter_tenant_save_m2m(self):
+        form = self._form(self.tenant_a)
+        assert form.is_valid()
+        form.save(commit=False)
+        form.save_m2m()
+        assert set(self.template.filter_tenants.values_list("pk", flat=True)) == {self.tenant_a.pk}
+
+    @override_settings(FEATURE_REPORT_DESIGNER=True, REPORT_DESIGNER_ENABLED=False)
+    def test_flag_on_allows_grandfathered_filter_tenant_change_through_form_save(self):
+        form = self._form(self.tenant_b)
+        assert form.is_valid()
+        form.save()
+        assert set(self.template.filter_tenants.values_list("pk", flat=True)) == {self.tenant_b.pk}

@@ -25,8 +25,8 @@ POST_TRANSITION_MIGRATIONS = {
     "extras.0102_alter_event_action",
     "extras.0103_remove_reporttemplate_advanced_mode_and_more",
     "extras.0104_issue183_alert_tenant_reconciliation",
-    "extras.0104_reporttemplate_advanced_mode_and_more",
-    "extras.0105_scheduledreportscopeauthorization",
+    "extras.0105_reporttemplate_advanced_mode_and_more",
+    "extras.0106_scheduledreportscopeauthorization",
     "inventory.0101_alter_accessoryassignment_options_and_more",
     "organization.0101_membership_external_id_and_more",
     "organization.0102_alter_tenantresourcegrant_options",
@@ -72,7 +72,7 @@ SEMANTIC_DISPOSITIONS = {
             "Restores durable report-designer fields, recovers serialized legacy values, stamps only the bounded "
             "live scheduled set, and reports out-of-bound custom HTML templates."
         ),
-        {"extras.0104_reporttemplate_advanced_mode_and_more"},
+        {"extras.0105_reporttemplate_advanced_mode_and_more"},
     ),
     **_dispositions(
         "upgrade-only",

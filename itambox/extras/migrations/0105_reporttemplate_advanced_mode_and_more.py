@@ -102,7 +102,6 @@ def recover_and_stamp_report_designer(apps, schema_editor):
     ReportTemplate = apps.get_model("extras", "ReportTemplate")
     ScheduledReport = apps.get_model("extras", "ScheduledReport")
     ObjectChange = apps.get_model("core", "ObjectChange")
-
     changes = ObjectChange._base_manager.filter(
         changed_object_type__app_label="extras",
         changed_object_type__model="reporttemplate",
@@ -162,13 +161,15 @@ def recover_and_stamp_report_designer(apps, schema_editor):
 def clear_grandfathering_marker(apps, schema_editor):
     """Reverse only the activation effect; never rewrite user content."""
     ReportTemplate = apps.get_model("extras", "ReportTemplate")
-    ReportTemplate._base_manager.filter(legacy_designer_grandfathered=True).update(legacy_designer_grandfathered=False)
+    table = schema_editor.connection.ops.quote_name(ReportTemplate._meta.db_table)
+    column = schema_editor.connection.ops.quote_name("legacy_designer_grandfathered")
+    schema_editor.execute(f"UPDATE {table} SET {column} = %s", [False])
 
 
 class Migration(migrations.Migration):
     dependencies = [
         ("core", "0100_issue88_shard_38_core_relations"),
-        ("extras", "0103_remove_reporttemplate_advanced_mode_and_more"),
+        ("extras", "0104_issue183_alert_tenant_reconciliation"),
         ("users", "0100_issue88_shard_62_users_relations"),
     ]
 

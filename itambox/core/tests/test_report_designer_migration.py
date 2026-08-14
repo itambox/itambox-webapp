@@ -8,7 +8,7 @@ from django.test import TransactionTestCase
 class ReportDesignerMigrationTests(TransactionTestCase):
     reset_sequences = True
     migrate_from = ("extras", "0102_alter_event_action")
-    migrate_to = ("extras", "0104_reporttemplate_advanced_mode_and_more")
+    migrate_to = ("extras", "0105_reporttemplate_advanced_mode_and_more")
 
     def setUp(self):
         self.executor = MigrationExecutor(connection)
@@ -55,6 +55,8 @@ class ReportDesignerMigrationTests(TransactionTestCase):
             postchange_data={"advanced_mode": True, "template_content": "<p>legacy</p>"},
         )
 
+        connection.commit()
+        connection.close()
         self.executor = MigrationExecutor(connection)
         self.executor.migrate([self.migrate_to])
 
@@ -68,15 +70,21 @@ class ReportDesignerMigrationTests(TransactionTestCase):
             self.assertFalse(rows[name].legacy_designer_grandfathered)
 
     def test_upgrade_report_names_out_of_bound_custom_html_templates(self):
-        self.executor.migrate(self.migrate_from)
+        connection.commit()
+        connection.close()
+        self.executor = MigrationExecutor(connection)
+        self.executor.migrate([self.migrate_from])
         with connection.cursor() as cursor:
             cursor.execute(
                 "UPDATE extras_reporttemplate SET template_content = %s WHERE id = %s",
                 ["<p>unscheduled legacy</p>", self.unscheduled_content.pk],
             )
 
-        with self.assertLogs("extras.migrations.0104_reporttemplate_advanced_mode_and_more", level="WARNING") as logs:
-            self.executor.migrate(self.migrate_to)
+        connection.commit()
+        connection.close()
+        self.executor = MigrationExecutor(connection)
+        with self.assertLogs("extras.migrations.0105_reporttemplate_advanced_mode_and_more", level="WARNING") as logs:
+            self.executor.migrate([self.migrate_to])
 
         report = "\n".join(logs.output)
         self.assertIn("unscheduled-content", report)
@@ -84,7 +92,7 @@ class ReportDesignerMigrationTests(TransactionTestCase):
         self.assertNotIn("live-content", report)
 
     def test_forward_reverse_forward_is_idempotent_and_preserves_schema_and_content(self):
-        migration = importlib.import_module("extras.migrations.0104_reporttemplate_advanced_mode_and_more")
+        migration = importlib.import_module("extras.migrations.0105_reporttemplate_advanced_mode_and_more")
         report_model = self.executor.loader.project_state([self.migrate_to]).apps.get_model("extras", "ReportTemplate")
         self.assertEqual(
             {"advanced_mode", "template_content", "legacy_designer_grandfathered"},
@@ -105,7 +113,11 @@ class ReportDesignerMigrationTests(TransactionTestCase):
         original = (row.advanced_mode, row.template_content, row.legacy_designer_grandfathered)
         self.assertEqual(original, (True, "<p>legacy</p>", True))
 
+        connection.commit()
+        connection.close()
+        self.executor = MigrationExecutor(connection)
         self.executor.migrate([self.migrate_from])
+        connection.close()
         reversed_apps = self.executor.loader.project_state([self.migrate_from]).apps
         reversed_report = reversed_apps.get_model("extras", "ReportTemplate")
         reversed_row = reversed_report.objects.get(name="live-content")
@@ -133,6 +145,8 @@ class ReportDesignerMigrationTests(TransactionTestCase):
 
         # Re-applying the migration must not duplicate columns, rewrite content,
         # or broaden grandfathering beyond the bounded live-schedule set.
+        connection.close()
+        self.executor = MigrationExecutor(connection)
         self.executor.migrate([self.migrate_to])
         forward_apps = self.executor.loader.project_state([self.migrate_to]).apps
         forward_row = forward_apps.get_model("extras", "ReportTemplate").objects.get(name="live-content")

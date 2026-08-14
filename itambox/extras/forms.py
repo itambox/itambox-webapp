@@ -4,15 +4,17 @@ from crispy_forms.helper import FormHelper
 from crispy_forms.layout import HTML, Column, Div, Field, Fieldset, Layout, Row, Submit
 from django import forms
 from django.contrib.contenttypes.models import ContentType
+from django.core.exceptions import ValidationError
 from django.db.models import Q
 from django.urls import reverse
 from django.utils.translation import gettext_lazy as _
 
+from core.features import report_designer_probe
 from core.forms import ColorFieldFormMixin, FilterForm
 from core.managers import get_current_tenant
 
 from .filters import TagFilter
-from .models import CustomField, CustomFieldset, SavedFilter, Tag
+from .models import CustomField, CustomFieldset, ReportTemplate, SavedFilter, Tag
 
 
 class TagForm(ColorFieldFormMixin, forms.ModelForm):
@@ -911,6 +913,24 @@ class ReportTemplateForm(forms.ModelForm):
         cleaned_data = super().clean()
         _resolve_nonadmin_write_tenant(self, get_current_user())
         return cleaned_data
+
+    def _validate_designer_m2m_write(self):
+        """Keep flag-off grandfathering effective for the tenant M2M field."""
+        if (
+            report_designer_probe().active
+            or not self.instance.pk
+            or "filter_tenants" not in self.fields
+            or not self.instance.legacy_designer_grandfathered
+        ):
+            return
+        existing_ids = set(self.instance.filter_tenants.values_list("pk", flat=True))
+        candidate_ids = {tenant.pk for tenant in self.cleaned_data.get("filter_tenants", ())}
+        if existing_ids != candidate_ids:
+            raise ValidationError(_("The report designer is disabled. Editing a grandfathered template requires it."))
+
+    def _save_m2m(self):
+        self._validate_designer_m2m_write()
+        return super()._save_m2m()
 
     def save(self, commit=True):
         instance = super().save(commit=False)

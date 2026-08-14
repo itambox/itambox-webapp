@@ -7,7 +7,7 @@ from django.db import migrations, models
 
 class Migration(migrations.Migration):
     dependencies = [
-        ("extras", "0104_reporttemplate_advanced_mode_and_more"),
+        ("extras", "0105_reporttemplate_advanced_mode_and_more"),
         ("users", "0100_issue88_shard_62_users_relations"),
         migrations.swappable_dependency(settings.AUTH_USER_MODEL),
     ]
