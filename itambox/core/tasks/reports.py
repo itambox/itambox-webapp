@@ -1,25 +1,33 @@
-import csv
-import io
 import logging
 from dataclasses import dataclass, field
 
 from django.core.exceptions import ValidationError
 from django.core.files.base import ContentFile
 from django.core.mail import EmailMessage
-from django.template import Context, Template
 from django.utils import timezone
 from django.utils.translation import gettext as _
 
-from core.csv_utils import csv_safe, safe_csv_filename
+from core.csv_utils import safe_csv_filename
 from core.events import send_notification_to_channel
+from core.features import report_designer_probe
 from core.models import EmailSettings
-from core.reports import build_report_context, get_polished_system_html_template
+from core.reports import build_report_context
+from core.reports.rendering import render_report_csv, render_report_html
 from core.tasks.context import TaskContext
 from core.tasks.utils import TaskResult, TaskStatus, classify_task_error
-from extras.models import FileAttachment, ReportGenerationArchive, ScheduledReport
-from itambox.capabilities import registry
+from extras.models import (
+    FileAttachment,
+    ReportGenerationArchive,
+    ScheduledReport,
+    ScheduledReportScopeAuthorization,
+)
 
 logger = logging.getLogger(__name__)
+
+
+def _render_report_html(context_data, template=None):
+    """Compatibility hook for existing task tests and integrations."""
+    return render_report_html(context_data, template)
 
 
 @dataclass
@@ -60,10 +68,6 @@ def _report_filename(template, extension):
     return f"{safe_csv_filename(template.name).lower().replace(' ', '_')}_{timezone.now():%Y%m%d}.{extension}"
 
 
-def _render_report_html(context_data):
-    return Template(get_polished_system_html_template()).render(Context(context_data))
-
-
 def _attachment_email_body(format_name, template):
     return _("Please find attached the scheduled %(format)s report for '%(name)s' generated on %(timestamp)s UTC.") % {
         "format": format_name,
@@ -74,7 +78,7 @@ def _attachment_email_body(format_name, template):
 
 def _render_report_output(sched, template, headers, rows, context_data):
     if sched.format == ScheduledReport.FORMAT_HTML:
-        return _ReportOutput(email_body=_render_report_html(context_data))
+        return _ReportOutput(email_body=_render_report_html(context_data, template))
 
     if sched.format == ScheduledReport.FORMAT_PDF:
         # inline import: heavy-import: PDF exporter is needed only for PDF schedules
@@ -82,7 +86,7 @@ def _render_report_output(sched, template, headers, rows, context_data):
 
         return _ReportOutput(
             email_body=_attachment_email_body("PDF", template),
-            attachment_content=report_pdf_bytes(_render_report_html(context_data)),
+            attachment_content=report_pdf_bytes(_render_report_html(context_data, template)),
             attachment_filename=_report_filename(template, "pdf"),
             attachment_mime=PDF_MIME,
         )
@@ -99,14 +103,16 @@ def _render_report_output(sched, template, headers, rows, context_data):
         )
 
     if sched.format == ScheduledReport.FORMAT_CSV:
-        csv_buffer = io.StringIO()
-        writer = csv.writer(csv_buffer)
-        writer.writerow(headers)
-        for row in rows:
-            writer.writerow([csv_safe(row.get(header, "-")) for header in headers])
+        csv_content = render_report_csv(
+            template,
+            headers,
+            rows,
+            summary_cards=context_data.get("summary_cards"),
+            grouped_data=context_data.get("grouped_data"),
+        )
         return _ReportOutput(
             email_body=_attachment_email_body("CSV", template),
-            attachment_content=csv_buffer.getvalue(),
+            attachment_content=csv_content,
             attachment_filename=_report_filename(template, "csv"),
             attachment_mime="text/csv",
         )
@@ -235,6 +241,41 @@ def _resolve_report_scope(sched):
     return active_tenant, filter_tenants
 
 
+def _scope_requires_authorization(active_tenant, filter_tenants):
+    """Return whether persisted scope exceeds the schedule owner's tenant."""
+    active_tenant_id = getattr(active_tenant, "pk", None)
+    scope_tenant_ids = sorted({tenant.pk for tenant in filter_tenants})
+    if not scope_tenant_ids and active_tenant_id is not None:
+        scope_tenant_ids = [active_tenant_id]
+    return active_tenant_id is None or scope_tenant_ids != [active_tenant_id]
+
+
+def _resolve_scope_authorization(sched, active_tenant, filter_tenants):
+    """Resolve a current, durable principal approval for a broad schedule."""
+    if not _scope_requires_authorization(active_tenant, filter_tenants):
+        return None
+    authorization = (
+        ScheduledReportScopeAuthorization.objects.filter(scheduled_report_id=sched.pk)
+        .select_related("authorized_by")
+        .first()
+    )
+    if authorization is None:
+        return None
+    scope_tenant_ids = sorted({tenant.pk for tenant in filter_tenants})
+    try:
+        authorized_scope = sorted({int(tenant_id) for tenant_id in authorization.scope_tenant_ids})
+    except (TypeError, ValueError):
+        return None
+    principal = authorization.authorized_by
+    if (
+        authorized_scope != scope_tenant_ids
+        or not principal.is_active
+        or not principal.has_perm("reports.view_cross_tenant_reports")
+    ):
+        return None
+    return principal.pk
+
+
 def _process_scheduled_report(sched, active_tenant, filter_tenants):
     archive_entry = None
     try:
@@ -336,7 +377,7 @@ def generate_scheduled_report_task(scheduled_report_id: int) -> TaskResult:
         )
         return TaskResult(TaskStatus.TERMINAL, "report.not_found")
 
-    if not registry.is_active("reporting.designer"):
+    if not report_designer_probe().active and not getattr(sched.report, "legacy_designer_grandfathered", False):
         logger.warning(
             "Report designer capability is inactive",
             extra={"operation": "reports.generate", "scheduled_report_id": sched.pk},
@@ -354,10 +395,17 @@ def generate_scheduled_report_task(scheduled_report_id: int) -> TaskResult:
     if scope is None:
         return TaskResult(TaskStatus.TERMINAL, "report.scope_missing", user_visible=True)
     active_tenant, filter_tenants = scope
+    scope_authorized_user_id = _resolve_scope_authorization(sched, active_tenant, filter_tenants)
+    if _scope_requires_authorization(active_tenant, filter_tenants) and scope_authorized_user_id is None:
+        logger.warning(
+            "Scheduled report has no current durable authorization for its broad tenant scope",
+            extra={"operation": "reports.scope", "scheduled_report_id": sched.pk},
+        )
+        return TaskResult(TaskStatus.TERMINAL, "report.scope_unauthorized", user_visible=True)
 
     with TaskContext(
         tenant_id=active_tenant.id if active_tenant else None,
-        user_id=None,
+        user_id=scope_authorized_user_id,
         operation="reports.generate",
     ) as ctx:
         logger.info(

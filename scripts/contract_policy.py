@@ -277,6 +277,9 @@ EXCLUDED_SETTINGS = {
     "ITAMBOX_SECURE_SSL_REDIRECT": "deployment-local transport policy",
     "ITAMBOX_SERVER_EMAIL": "deployment-local mail identity for error reports",
     "ITAMBOX_STATIC_ROOT": "deployment-local filesystem path",
+    "ITAMBOX_REPORT_DESIGNER_ENABLED": (
+        "deprecated compatibility alias retained for one release; use ITAMBOX_FEATURE_REPORT_DESIGNER instead"
+    ),
 }
 
 #: The exact limitation text each published ``Exclusions`` summary was written
@@ -316,7 +319,7 @@ CAPABILITY_LIMITATIONS = {
         "saved templates may need to be rebuilt.",
     ),
     "reporting.scheduled": (
-        "The scheduled capability requires the operator flag ITAMBOX_REPORT_DESIGNER_ENABLED and an active "
+        "The scheduled capability requires the operator flag ITAMBOX_FEATURE_REPORT_DESIGNER and an active "
         "schedule row; disabling the flag pauses delivery without deleting saved schedules.",
         "Delivery depends on a running qcluster worker; a stopped worker silently skips runs.",
         "Archive retention is not yet configurable per schedule.",

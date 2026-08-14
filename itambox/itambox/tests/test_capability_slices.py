@@ -445,9 +445,9 @@ class TestDocumentationConsistency:
         text = REGISTRY_DOC.read_text(encoding="utf-8")
         installation = (DOCS_ROOT / "operations" / "installation.md").read_text(encoding="utf-8")
         readme = README.read_text(encoding="utf-8")
-        assert "ITAMBOX_REPORT_DESIGNER_ENABLED" in text
-        assert "ITAMBOX_REPORT_DESIGNER_ENABLED" in installation
-        assert "ITAMBOX_REPORT_DESIGNER_ENABLED" in readme
+        assert "ITAMBOX_FEATURE_REPORT_DESIGNER" in text
+        assert "ITAMBOX_FEATURE_REPORT_DESIGNER" in installation
+        assert "ITAMBOX_FEATURE_REPORT_DESIGNER" in readme
         phrase = "scheduled delivery of existing report templates"
         assert phrase in " ".join(text.lower().split())
         assert phrase in " ".join(installation.lower().split())

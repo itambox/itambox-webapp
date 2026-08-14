@@ -488,7 +488,7 @@ and Django-settings fallback for the canonical setting below.
 | `ITAMBOX_REQUISITION_AUTO_APPROVAL_THRESHOLDS` | Opt-in Asset Request auto-approval thresholds and Beta procurement-seam activation |
 | `ITAMBOX_REQUIRE_CUSTODY_SIGNIN` | Signature requirement on custody sign-off |
 | `ITAMBOX_ALLOW_GLOBAL_CUSTODY_TEMPLATES` | Whether custody templates may be tenant-less |
-| `ITAMBOX_REPORT_DESIGNER_ENABLED` | Activation flag of the Beta opt-in report designer |
+| `ITAMBOX_FEATURE_REPORT_DESIGNER` | Activation flag of the Beta opt-in report designer |
 | `ITAMBOX_PLUGINS` | Activation list of the Experimental plugin system |
 | `ITAMBOX_TENANT_LDAP_CONFIGS` | Per-tenant LDAP configuration |
 | `ITAMBOX_TENANT_SAML_CONFIGS` | Per-tenant SAML configuration |
@@ -544,7 +544,7 @@ not publish.
 | `procurement.requisition_seam` | `beta-enabled` | enabled | Asset Request fulfillment links | The asset-request to purchase-order-line reservation flow is incomplete; partial fulfilment may need manual reconciliation.<br>Auto-approval thresholds are process-wide, not per tenant. |
 | `reporting.curated` | `stable` | always-on | Curated report catalogue | none |
 | `reporting.designer` | `beta-opt-in` | opt-in | Saved report templates | Column, filter, and grouping model is expected to change; saved templates may need rebuilding |
-| `reporting.scheduled` | `beta-opt-in` | opt-in | Scheduled reports and generation archive | Requires `ITAMBOX_REPORT_DESIGNER_ENABLED=True` and at least one enabled schedule row; false pauses delivery and hides/routes-closes the schedule surfaces without deleting saved schedules; delivery also depends on a running worker |
+| `reporting.scheduled` | `beta-opt-in` | opt-in | Scheduled reports and generation archive | Requires `ITAMBOX_FEATURE_REPORT_DESIGNER=True` and at least one enabled schedule row; false pauses delivery and hides/routes-closes the schedule surfaces without deleting saved schedules; delivery also depends on a running worker |
 | `subscriptions.tracking` | `stable` | always-on | Providers, subscriptions, assignments | none |
 | `users.scim_provisioning` | `beta-opt-in` | opt-in | Tenant- and provider-scoped SCIM mounts | PATCH semantics and filtering are partial; the tenant mount provisions Users and exposes Groups read-only, only provider mounts provision Groups |
 

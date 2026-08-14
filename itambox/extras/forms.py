@@ -873,10 +873,14 @@ class ReportTemplateForm(forms.ModelForm):
             "include_distribution_chart",
             "group_by_field",
             "style_preset",
+            "advanced_mode",
+            "template_content",
             "tenant",
             "filter_tenants",
         ]
         widgets = {
+            "advanced_mode": forms.CheckboxInput(),
+            "template_content": forms.Textarea(attrs={"rows": 15}),
             "tenant": forms.Select(attrs={"class": "form-select"}),
             "filter_tenants": forms.SelectMultiple(attrs={"class": "form-select", "data-tom-select": ""}),
         }

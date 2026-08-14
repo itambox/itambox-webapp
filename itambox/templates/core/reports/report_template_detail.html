@@ -38,6 +38,11 @@
   </div>
 {% endblock %}
 {% block content %}
+  {% if legacy_designer_notice %}
+    <div class="alert alert-warning" role="status">
+      {% translate "This template uses the legacy report designer and continues to render only because it was grandfathered during migration. Set ITAMBOX_FEATURE_REPORT_DESIGNER=True before editing it." %}
+    </div>
+  {% endif %}
   <div class="row g-3">
     <!-- Left Column: Details -->
     <div class="col-md-5">

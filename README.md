@@ -103,7 +103,7 @@ docker compose up -d
 ```
 
 Existing deployments that use the Beta report-template designer must set
-`ITAMBOX_REPORT_DESIGNER_ENABLED=True` before upgrading; it is disabled by
+`ITAMBOX_FEATURE_REPORT_DESIGNER=True` before upgrading; it is disabled by
 default. The curated catalogue is unaffected and scheduled delivery of existing
 report templates is paused while the flag is `False` (saved schedules are not
 deleted). A fresh deployment must enable the designer before it can author a

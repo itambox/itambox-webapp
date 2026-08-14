@@ -1,6 +1,6 @@
 from django.apps import AppConfig
 
-from core.features import object_enabled_probe, settings_probe
+from core.features import object_enabled_probe, report_designer_probe
 from itambox.capabilities import (
     ALWAYS_ON,
     BETA,
@@ -21,7 +21,7 @@ DOCS = "development/capability-registry.md"
 
 def _scheduled_reports_probe():
     """Report schedules only when the designer gate and a live row agree."""
-    designer = settings_probe("REPORT_DESIGNER_ENABLED")()
+    designer = report_designer_probe()
     scheduled = object_enabled_probe("extras", "ScheduledReport", "is_active")()
     return ActivationState(
         active=designer.active and scheduled.active,
@@ -76,7 +76,7 @@ class ExtrasConfig(AppConfig):
                 maturity=BETA,
                 security_critical=False,
                 activation=OPT_IN,
-                activation_probe=settings_probe("REPORT_DESIGNER_ENABLED"),
+                activation_probe=report_designer_probe,
                 activation_source=SOURCE_OPERATOR_FLAG,
                 owns=("extras.ReportTemplate",),
                 docs_url=DOCS,
@@ -98,7 +98,7 @@ class ExtrasConfig(AppConfig):
                 owns=("extras.ReportGenerationArchive", "extras.ScheduledReport"),
                 docs_url=DOCS,
                 limitations=(
-                    "The scheduled capability requires the operator flag ITAMBOX_REPORT_DESIGNER_ENABLED and an active "
+                    "The scheduled capability requires the operator flag ITAMBOX_FEATURE_REPORT_DESIGNER and an active "
                     "schedule row; disabling the flag pauses delivery without deleting saved schedules.",
                     "Delivery depends on a running qcluster worker; a stopped worker silently skips runs.",
                     "Archive retention is not yet configurable per schedule.",

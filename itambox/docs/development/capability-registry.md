@@ -113,7 +113,7 @@ decides behaviour and do not add another authorization or execution gate:
 * `alerting.rules` and `automation.webhooks` count enabled rows. A deployment
   that already has an enabled event rule keeps those capabilities active;
   nothing new switches them off.
-* `reporting.scheduled` combines the `ITAMBOX_REPORT_DESIGNER_ENABLED` operator
+* `reporting.scheduled` combines the `ITAMBOX_FEATURE_REPORT_DESIGNER` operator
   flag with enabled schedule rows. Its menu and every schedule route use the
   designer gate, and the background task checks the designer gate plus the
   schedule's own active state before delivery. With the flag off, scheduled
@@ -130,7 +130,7 @@ decides behaviour and do not add another authorization or execution gate:
   the SCIM endpoints.
 
 `reporting.designer` and `reporting.scheduled` are deliberately enforced by
-the same operator boundary. The operator flag `ITAMBOX_REPORT_DESIGNER_ENABLED`
+the same operator boundary. The operator flag `ITAMBOX_FEATURE_REPORT_DESIGNER`
 defaults to `False`; while inactive, designer and scheduled-report navigation
 is hidden, their routes return 404, and scheduled delivery of existing report
 templates is paused. Set the flag to `True` to retain or enable access to saved

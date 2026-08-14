@@ -192,7 +192,7 @@ Report providers declare the model-level view permissions relevant to their doma
 
 **Scheduled Reports** automatically compile a Report Template on a recurring
 schedule and deliver the result via email or notification channels. This Beta
-surface shares the `ITAMBOX_REPORT_DESIGNER_ENABLED` gate with the report
+surface shares the `ITAMBOX_FEATURE_REPORT_DESIGNER` gate with the report
 designer: when the flag is `False`, the menu and routes are hidden/closed and
 existing delivery is paused without deleting saved schedules. Set the flag to
 `True` to use scheduled delivery again.

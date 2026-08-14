@@ -30,6 +30,7 @@ __all__ = [
     "module_maturity",
     "object_enabled_probe",
     "settings_probe",
+    "report_designer_probe",
 ]
 
 _MISSING = object()
@@ -134,3 +135,11 @@ def settings_probe(setting_name, default=False):
         return ActivationState(active=bool(value), value_present=bool(value))
 
     return probe
+
+
+def report_designer_probe():
+    """Observe the operator-wide report designer flag."""
+    # The old setting remains a one-release compatibility alias so existing
+    # deployments/tests do not silently switch behaviour during the rename.
+    value = getattr(settings, "FEATURE_REPORT_DESIGNER", False) or getattr(settings, "REPORT_DESIGNER_ENABLED", False)
+    return ActivationState(active=bool(value), value_present=bool(value))

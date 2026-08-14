@@ -1,6 +1,4 @@
-import csv
 import datetime
-import io
 import json
 
 from django.contrib import messages
@@ -20,6 +18,7 @@ from django_tables2 import RequestConfig
 
 from assets.tables import AssetTable  # Import AssetTable
 from core.managers import get_current_tenant
+from core.reports.rendering import render_report_csv, render_report_html
 from itambox.capabilities import registry
 from itambox.panels import Panel
 from itambox.utils import get_model_viewname, get_paginate_count  # Import the utility function
@@ -745,7 +744,7 @@ class NotificationChannelTestView(SimplePostView):
 # Reporting Views
 # =============================================================================
 
-#: The report designer is opt-in (ITAMBOX_REPORT_DESIGNER_ENABLED). Every route
+#: The report designer is opt-in (ITAMBOX_FEATURE_REPORT_DESIGNER). Every route
 #: below that edits, previews, renders, or schedules a ReportTemplate is closed
 #: while the capability is inactive, so the flag an operator sets and the routes
 #: or background delivery a deployment serves cannot drift apart. The Stable
@@ -784,6 +783,7 @@ class ReportTemplateDetailView(CapabilityRequiredMixin, ObjectDetailView):
         obj = self.get_object()
         context["title"] = _("Report Template: %(name)s") % {"name": obj.name}
         context["schedules"] = obj.schedules.all()
+        context["legacy_designer_notice"] = bool(obj.legacy_designer_grandfathered)
         return context
 
 
@@ -1015,11 +1015,14 @@ class ReportTriggerImmediateView(CapabilityRequiredMixin, PermissionRequiredMixi
 @method_decorator(login_required, name="dispatch")
 class ReportTemplatePreviewView(CapabilityRequiredMixin, PermissionRequiredMixin, View):
     capability_key = REPORT_DESIGNER_CAPABILITY
-    permission_required = ("extras.view_reporttemplate",)
+    permission_required = ()
+
+    def has_permission(self):
+        return self.request.user.has_perm("extras.add_reporttemplate") or self.request.user.has_perm(
+            "extras.change_reporttemplate"
+        )
 
     def post(self, request, *args, **kwargs):
-        from django.template import Context, Template
-
         report_type = request.POST.get("report_type")
         style_preset = request.POST.get("style_preset", "default")
         included_columns = request.POST.getlist("included_columns")
@@ -1031,7 +1034,8 @@ class ReportTemplatePreviewView(CapabilityRequiredMixin, PermissionRequiredMixin
             or request.POST.get("include_distribution_chart") == "true"
         )
         group_by_field = request.POST.get("group_by_field", "")
-        name = request.POST.get("name", "Preview Report")
+        advanced_mode = request.POST.get("advanced_mode") in ("on", "true", "1")
+        template_content = request.POST.get("template_content", "")
         description = request.POST.get("description", "")
 
         # Resolve active tenant for preview scoping
@@ -1056,7 +1060,7 @@ class ReportTemplatePreviewView(CapabilityRequiredMixin, PermissionRequiredMixin
 
         # Create dynamic in-memory ReportTemplate object
         template_instance = ReportTemplate(
-            name=name,
+            name=request.POST.get("name", "Preview Report"),
             description=description,
             report_type=report_type,
             included_columns=included_columns,
@@ -1064,19 +1068,20 @@ class ReportTemplatePreviewView(CapabilityRequiredMixin, PermissionRequiredMixin
             include_distribution_chart=include_distribution_chart,
             group_by_field=group_by_field,
             style_preset=style_preset,
+            advanced_mode=advanced_mode,
+            template_content=template_content,
         )
 
-        from core.reports import build_report_context, get_polished_system_html_template
+        # inline imports: heavy-import: report provider discovery is only needed for this preview request
+        from core.reports import build_report_context
 
         try:
             _headers, _rows, _summary_cards, _grouped_data, _chart_svg, context_data = build_report_context(
                 template_instance, active_tenant=active_tenant, filter_tenants=filter_tenants
             )
 
-            html_template_str = get_polished_system_html_template()
-            django_template = Template(html_template_str)
             context_data["request"] = request
-            rendered_html = django_template.render(Context(context_data))
+            rendered_html = render_report_html(context_data, template_instance)
 
             return HttpResponse(rendered_html)
         except PermissionError:
@@ -1104,8 +1109,6 @@ class ReportTemplateDownloadView(CapabilityRequiredMixin, PermissionRequiredMixi
         return self.request.user.has_perms(perms, obj=obj)
 
     def get(self, request, pk, *args, **kwargs):
-        from django.template import Context, Template
-
         # objects automatically handles tenant scoping!
         template = get_object_or_404(ReportTemplate.objects.all(), pk=pk)
 
@@ -1117,7 +1120,8 @@ class ReportTemplateDownloadView(CapabilityRequiredMixin, PermissionRequiredMixi
         # Enforce sandboxed constellation
         filter_tenants = list(template.filter_tenants.all())
 
-        from core.reports import build_report_context, get_polished_system_html_template
+        # inline imports: heavy-import: report provider discovery is only needed for this export request
+        from core.reports import build_report_context
 
         try:
             headers, rows, _summary_cards, _grouped_data, _chart_svg, context_data = build_report_context(
@@ -1131,15 +1135,9 @@ class ReportTemplateDownloadView(CapabilityRequiredMixin, PermissionRequiredMixi
             stamp = f"{timezone.now():%Y%m%d}"
 
             if format_type == "csv":
-                from core.csv_utils import csv_safe
-
-                csv_buffer = io.StringIO()
-                writer = csv.writer(csv_buffer)
-                writer.writerow(headers)
-                # Each cell neutralized against CSV formula injection.
-                for r in rows:
-                    writer.writerow([csv_safe(r.get(head, "-")) for head in headers])
-                response = HttpResponse(csv_buffer.getvalue(), content_type="text/csv")
+                response = HttpResponse(
+                    render_report_csv(template, headers, rows, _summary_cards, _grouped_data), content_type="text/csv"
+                )
                 response["Content-Disposition"] = f'attachment; filename="{safe_name}_{stamp}.csv"'
                 return response
 
@@ -1153,10 +1151,8 @@ class ReportTemplateDownloadView(CapabilityRequiredMixin, PermissionRequiredMixi
                 return response
 
             # HTML render — shared by the html and pdf formats.
-            html_template_str = get_polished_system_html_template()
-            django_template = Template(html_template_str)
             context_data["request"] = request
-            rendered_html = django_template.render(Context(context_data))
+            rendered_html = render_report_html(context_data, template)
 
             if format_type == "pdf":
                 from core.reports.exporters import PDF_MIME, report_pdf_bytes
