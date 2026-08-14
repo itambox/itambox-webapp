@@ -1052,34 +1052,7 @@ class ScheduledReportScopeApprovalView(CapabilityRequiredMixin, PermissionRequir
         return_url = safe_return_url(request, request.POST.get("return_url"), reverse("extras:scheduledreport_list"))
         try:
             if action == "approve":
-                scope_tenant_ids = sched.effective_scope_tenant_ids()
-                scope_tenants = self._scope_tenants(sched)
-                if not scope_tenant_ids:
-                    raise ValidationError(
-                        _("This schedule has no resolvable scope tenants, so a cross-tenant approval cannot be stored.")
-                    )
-                if len(scope_tenants) != len(set(scope_tenant_ids)):
-                    raise ValidationError(
-                        _(
-                            "Not every tenant in the scope resolves to an existing tenant, so the approval would not take effect."
-                        )
-                    )
-                if not self._approval_would_be_effective(sched, scope_tenants):
-                    missing = [
-                        tenant.name
-                        for tenant in scope_tenants
-                        if not request.user.has_perm("reports.view_cross_tenant_reports", obj=tenant)
-                    ]
-                    raise ValidationError(
-                        _("Your cross-tenant reach does not cover: %(tenants)s. The approval would not take effect.")
-                        % {"tenants": ", ".join(missing)}
-                    )
-                authorization = scope_authorization_model.approve(sched, request.user)
-                if sorted(set(authorization.scope_tenant_ids)) != sorted(set(scope_tenant_ids)):
-                    # The scope changed between the reach check and the snapshot.
-                    raise ValidationError(
-                        _("The scope changed while approving; please review the scope and approve again.")
-                    )
+                self._approve_scope(sched, request, scope_authorization_model)
                 messages.success(request, _("Cross-tenant scope of '%(name)s' approved.") % {"name": sched.name})
             elif action == "revoke":
                 scope_authorization_model.revoke(sched, request.user)
@@ -1096,6 +1069,34 @@ class ScheduledReportScopeApprovalView(CapabilityRequiredMixin, PermissionRequir
             for message in error.messages:
                 messages.error(request, message)
             return self._error_redirect(request)
+
+    def _approve_scope(self, sched, request, scope_authorization_model):
+        scope_tenant_ids = sched.effective_scope_tenant_ids()
+        scope_tenants = self._scope_tenants(sched)
+        if not scope_tenant_ids:
+            raise ValidationError(
+                _("This schedule has no resolvable scope tenants, so a cross-tenant approval cannot be stored.")
+            )
+        if len(scope_tenants) != len(set(scope_tenant_ids)):
+            raise ValidationError(
+                _(
+                    "Not every tenant in the scope resolves to an existing tenant, so the approval would not take effect."
+                )
+            )
+        if not self._approval_would_be_effective(sched, scope_tenants):
+            missing = [
+                tenant.name
+                for tenant in scope_tenants
+                if not request.user.has_perm("reports.view_cross_tenant_reports", obj=tenant)
+            ]
+            raise ValidationError(
+                _("Your cross-tenant reach does not cover: %(tenants)s. The approval would not take effect.")
+                % {"tenants": ", ".join(missing)}
+            )
+        authorization = scope_authorization_model.approve(sched, request.user)
+        if sorted(set(authorization.scope_tenant_ids)) != sorted(set(scope_tenant_ids)):
+            # The scope changed between the reach check and the snapshot.
+            raise ValidationError(_("The scope changed while approving; please review the scope and approve again."))
 
 
 @method_decorator(login_required, name="dispatch")
