@@ -713,6 +713,31 @@ class ScheduledReportScopeAuthorizationTests(TestCase):
 
     @override_settings(REPORT_DESIGNER_ENABLED=True)
     @patch("core.tasks.reports._process_scheduled_report")
+    def test_scope_tenants_all_soft_deleted_fails_closed(self, mock_process):
+        from core.tasks.reports import generate_scheduled_report_task
+        from core.tasks.utils import TaskStatus
+
+        deleted_scope = ScheduledReport.objects.create(
+            name="Deleted-Scope Schedule",
+            report=self.template,
+            tenant=self.tenant_a,
+            format=ScheduledReport.FORMAT_HTML,
+            save_to_archive=False,
+            is_active=True,
+        )
+        deleted_scope.filter_tenants.add(self.tenant_b)
+        self.tenant_b.delete()
+
+        result = generate_scheduled_report_task(deleted_scope.pk)
+
+        self.assertEqual(result.status, TaskStatus.TERMINAL)
+        self.assertEqual(result.code, "report.scope_missing")
+        mock_process.assert_not_called()
+        deleted_scope.refresh_from_db()
+        self.assertIsNone(deleted_scope.last_run)
+
+    @override_settings(REPORT_DESIGNER_ENABLED=True)
+    @patch("core.tasks.reports._process_scheduled_report")
     def test_principal_lacking_one_persisted_tenant_is_rejected(self, mock_process):
         from core.tasks.reports import generate_scheduled_report_task
         from core.tasks.utils import TaskStatus

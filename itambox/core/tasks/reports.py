@@ -252,6 +252,14 @@ def _resolve_report_scope(sched):
         # plain base manager returns the full persisted scope. Keep the
         # soft-delete filter the scoped managers previously enforced.
         filter_tenants = list(Tenant._base_manager.filter(pk__in=scope_ids, deleted_at__isnull=True).order_by("pk"))
+        if not filter_tenants:
+            # Every explicitly scoped tenant is soft-deleted. Fail closed instead
+            # of silently substituting the owner tenant's data.
+            logger.error(
+                "Scheduled report scope tenants are all soft-deleted; refusing compilation",
+                extra={"operation": "reports.scope", "scheduled_report_id": getattr(sched, "pk", None)},
+            )
+            return None
     if active_tenant is None and not filter_tenants:
         logger.error(
             "Scheduled report has no tenant scope; refusing cross-tenant compilation",

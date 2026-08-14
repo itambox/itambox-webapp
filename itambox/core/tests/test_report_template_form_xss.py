@@ -24,9 +24,10 @@ class ReportTemplateFormSavedSequenceXSSTests(TenantTestMixin, TestCase):
     def setUp(self):
         self.setup_tenant_context(name="XSS Tenant", slug="xss-rep")
         self.set_active_tenant(self.tenant)
-        # The model-level write gate rejects unknown column keys on save, so the
-        # hostile value is planted via a bulk update (which bypasses save-time
-        # validation) to keep proving the template is robust regardless of writer.
+        # ReportTemplate.clean() (invoked by the pre-save validation hook)
+        # rejects unknown column keys, so the hostile value is planted via a
+        # bulk update (which bypasses save-time validation) to keep proving
+        # the template is robust regardless of writer.
         self.template = ReportTemplate.objects.create(
             name="Hostile Cols",
             report_type=ReportTemplate.REPORT_TYPE_ASSET_SUMMARY,
