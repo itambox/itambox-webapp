@@ -1,7 +1,7 @@
 from datetime import date, datetime
 from decimal import Decimal
 from types import SimpleNamespace
-from unittest.mock import Mock, call, patch
+from unittest.mock import ANY, Mock, call, patch
 
 import pytest
 from django.core.exceptions import ObjectDoesNotExist, PermissionDenied, ValidationError
@@ -624,7 +624,13 @@ class ReportDesignerIssue181CoverageTests(SimpleTestCase):
             assert ScheduledReportScopeAuthorization.approve(schedule, actor) is authorization
         authorization_manager.update_or_create.assert_called_once_with(
             scheduled_report=schedule,
-            defaults={"authorized_by": actor, "scope_tenant_ids": [1, 2]},
+            defaults={
+                "authorized_by": actor,
+                "scope_tenant_ids": [1, 2],
+                "approved_at": ANY,
+                "revoked_by": None,
+                "revoked_at": None,
+            },
         )
 
     def test_report_scope_uses_persisted_scope_without_owner_fallback(self):
