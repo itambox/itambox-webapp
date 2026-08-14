@@ -101,9 +101,12 @@ add a bounded helper/policy test and update this document in the same change.
 
 ## HTML sinks and exceptions
 
-The report custom HTML/Jinja override was removed from `ReportTemplate`; visual
-No-Code report configuration and scheduled system reports remain. This prevents
-arbitrary user report HTML from becoming a CSP exception.
+The report custom HTML/Jinja override is a Beta, sandboxed opt-in surface on
+`ReportTemplate`. It is available while `ITAMBOX_FEATURE_REPORT_DESIGNER` is
+enabled, and migration-managed bounded grandfathered templates may continue
+using it while the flag is disabled. The renderer limits output to the published
+context with autoescaping and no model/object access; this prevents arbitrary
+user report HTML from becoming a CSP exception.
 
 Custom `LabelTemplate` Jinja remains a Beta print-layout feature. Before either
 PDF sink, its output is rendered with an immutable, autoescaping sandbox over a
