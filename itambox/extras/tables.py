@@ -399,25 +399,45 @@ class AlertLogTable(BaseTable):
         return format_html('<span class="badge bg-{}">{}</span>', color, value.capitalize())
 
     def render_delivery(self, record):
+        outcome = record.delivery_outcome or AlertLog.DELIVERY_OUTCOME_NONE
         statuses = record.delivery_status or {}
-        if not statuses:
-            return format_html('<span class="text-muted" title="No channels / not yet dispatched">&mdash;</span>')
-        total = len(statuses)
-        failed = [k for k, v in statuses.items() if v != "ok"]
-        if not failed:
+        if outcome == AlertLog.DELIVERY_OUTCOME_NONE:
+            if statuses.get("__no_channels__"):
+                return format_html(
+                    '<span class="badge bg-secondary" title="{}">none</span>',
+                    _("No channels attached to this rule"),
+                )
             return format_html(
-                '<span class="badge bg-success" title="All {} channel(s) delivered">{}/{}</span>',
-                total,
-                total,
-                total,
+                '<span class="text-muted" title="{}">&mdash;</span>',
+                _("No delivery planned (muted rule or never dispatched)"),
             )
-        failed_detail = "; ".join(f"{k}: {statuses[k]}" for k in failed)
-        return format_html(
-            '<span class="badge bg-danger" title="{}">{}/{} failed</span>',
-            failed_detail,
-            len(failed),
-            total,
-        )
+        if outcome == AlertLog.DELIVERY_OUTCOME_PENDING:
+            return format_html('<span class="badge bg-info" title="{}">pending</span>', _("Dispatch pending"))
+        if outcome == AlertLog.DELIVERY_OUTCOME_DELIVERED:
+            failed = _failed_channel_summary(statuses)
+            if failed:
+                return format_html(
+                    '<span class="badge bg-warning text-dark" title="{}">delivered*</span>',
+                    f"{_('Delivered with channel failures')}: {failed}",
+                )
+            return format_html('<span class="badge bg-success" title="{}">delivered</span>', _("All channels delivered"))
+        failed = _failed_channel_summary(statuses) or _("Delivery failed")
+        return format_html('<span class="badge bg-danger" title="{}">failed</span>', failed)
+
+
+def _failed_channel_summary(statuses):
+    """Human summary of failed channel outcomes (structured or legacy payload)."""
+    parts = []
+    for key, value in statuses.items():
+        if key.startswith("__"):
+            continue
+        if isinstance(value, dict):
+            disposition = value.get("disposition")
+            if disposition in ("retryable", "terminal"):
+                parts.append(f"{key}: {value.get('error_class') or disposition}")
+        elif isinstance(value, str) and value != "ok":
+            parts.append(f"{key}: {value}")
+    return "; ".join(parts)
 
 
 # =============================================================================

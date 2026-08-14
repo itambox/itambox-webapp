@@ -151,6 +151,52 @@ to run once per day (e.g. at 08:00 UTC). The evaluation engine:
 > UI views remain tenant-scoped. This is an implementation detail — it means
 > alert evaluation works correctly even when no user is logged in.
 
+### Delivery semantics (single-attempt policy)
+
+Channel delivery follows an explicitly **single-attempt, best-effort policy**
+with a terminal failed state — there is **no automatic retry**:
+
+- Each planned dispatch runs **exactly one attempt** per attached channel.
+- The per-channel outcome is recorded as a typed result:
+  `success`, `retryable` (transient-class failure, e.g. SMTP timeout or HTTP 5xx),
+  or `terminal` (permanent failure, e.g. rejected credentials or 4xx response),
+  together with the delivery identifier, attempt timestamp, the typed error
+  class when the boundary supplied one, and a safe user-visible message when
+  the boundary declared one.
+- A dispatch whose callback crashed before completing is recorded as
+  `__dispatch__: terminal` with outcome `failed` — it is **not** retried.
+- **No manual redelivery** exists: there is no UI action and no API endpoint to
+  re-send a failed delivery, and nothing in the UI advertises one.
+- Re-notification is a *separate, deliberate* feature, not a retry: an alert
+  whose delivery failed stays in the inbox, and if the rule's renotification
+  interval is configured (or you use **Run now**), a **fresh** dispatch attempt
+  with a new delivery identifier starts on the next evaluation.
+
+#### Filtering on delivery outcome
+
+The Alert Log list (and the read-only REST API) supports a **Delivery Outcome**
+filter so operators can find alerts that fired but were **not** delivered:
+
+| Outcome | Meaning |
+|---|---|
+| `none` | No delivery planned (muted rule, no channels attached, or legacy row) |
+| `pending` | Dispatch scheduled but never completed (e.g. worker stopped mid-run) |
+| `delivered` | At least one channel delivered successfully |
+| `failed` | Every attempted channel failed (typed failure stored per channel) |
+
+Each log also exposes `delivery_attempts`, `last_delivery_id`, and
+`last_delivery_error` (the typed error class of the most recent failure) so the
+failure state is queryable in-product — logs alone are never the only source of
+truth.
+
+#### Operator upgrade note
+
+Upgrading from an earlier version preserves all existing `AlertLog` rows and
+their `delivery_status` payloads verbatim; the new `delivery_outcome` column is
+derived once from the existing payloads during the migration. Historical
+deliveries keep their original per-channel records; no attempt history is
+fabricated for deliveries made before the upgrade.
+
 ---
 
 ## Notification Channels
