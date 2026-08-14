@@ -360,14 +360,7 @@ from .forms import (
     ScheduledReportFilterForm,
     ScheduledReportForm,
 )
-from .models import (
-    AlertLog,
-    AlertRule,
-    NotificationChannel,
-    ReportTemplate,
-    ScheduledReport,
-    ScheduledReportScopeAuthorization,
-)
+from .models import AlertLog, AlertRule, NotificationChannel, ReportTemplate, ScheduledReport
 from .tables import (
     AlertLogTable,
     AlertRuleTable,
@@ -1037,6 +1030,8 @@ class ScheduledReportScopeApprovalView(CapabilityRequiredMixin, PermissionRequir
         return render(request, self.template_name, self.get_context_data())
 
     def post(self, request, *args, **kwargs):
+        from .models import ScheduledReportScopeAuthorization
+
         sched = self.object = self.get_object()
         action = request.POST.get("action")
         return_url = safe_return_url(request, request.POST.get("return_url"), reverse("extras:scheduledreport_list"))
