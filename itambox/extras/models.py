@@ -1030,39 +1030,48 @@ class ScheduledReport(ChangeLoggingMixin, BaseModel):
     def __str__(self):
         return f"{self.name} -> {self.report.name}"
 
-    def explicit_scope_tenant_ids(self):
-        """Persisted filter-scope ids, read through the unscoped through table."""
-        through = self.filter_tenants.through
-        filter_ids = set(
-            through._base_manager.filter(scheduledreport_id=self.pk).values_list("tenant_id", flat=True)
-        )
-        if not filter_ids and self.report_id:
-            report_through = self.report.filter_tenants.through
-            filter_ids = set(
-                report_through._base_manager.filter(reporttemplate_id=self.report_id).values_list(
-                    "tenant_id", flat=True
-                )
-            )
+    def persisted_scope_tenant_ids(self):
+        """Return explicit persisted filter-scope ids without tenant scoping.
+
+        A schedule's own filter tenants take precedence over the report
+        template's inherited filter tenants. Real model relations are read
+        through their unscoped through-table manager so an ambient tenant
+        cannot truncate the persisted scope; lightweight test doubles use
+        their relation's ``all()`` fallback.
+        """
+
+        def relation_tenant_ids(relation, owner_field, owner_id):
+            through = getattr(relation, "through", None)
+            if through is not None:
+                return set(through._base_manager.filter(**{owner_field: owner_id}).values_list("tenant_id", flat=True))
+            return {tenant.pk for tenant in relation.all()}
+
+        filter_ids = relation_tenant_ids(self.filter_tenants, "scheduledreport_id", getattr(self, "pk", None))
+        report_id = getattr(self, "report_id", None)
+        report = getattr(self, "report", None)
+        if not filter_ids and report_id and report is not None:
+            filter_ids = relation_tenant_ids(report.filter_tenants, "reporttemplate_id", report_id)
         return sorted(filter_ids)
+
+    def explicit_scope_tenant_ids(self):
+        """Backward-compatible alias for the persisted explicit scope helper."""
+        return self.persisted_scope_tenant_ids()
 
     def effective_scope_tenant_ids(self):
         """Return the persisted tenant ids this schedule will compile.
 
-        Reads the through table directly: tenant scoping filters Tenant M2M
-        reads while an ambient tenant is bound, which would silently truncate
-        the persisted scope.
+        The owner tenant is only a fallback when neither the schedule nor its
+        report template has an explicit persisted filter scope.
         """
-        scope_ids = self.explicit_scope_tenant_ids() if hasattr(self, "explicit_scope_tenant_ids") else []
-        if not scope_ids:
-            # DB-independent doubles (coverage helpers) and lightweight callers
-            # resolve the scope through the M2M managers instead.
-            filter_tenants = list(self.filter_tenants.all())
-            if not filter_tenants and self.report_id:
-                filter_tenants = list(self.report.filter_tenants.all())
-            scope_ids = sorted({tenant.pk for tenant in filter_tenants})
+        scope_ids = (
+            self.persisted_scope_tenant_ids()
+            if hasattr(self, "persisted_scope_tenant_ids")
+            else ScheduledReport.persisted_scope_tenant_ids(self)
+        )
         if scope_ids:
             return scope_ids
-        active_tenant = self.tenant or (self.report.tenant if self.report_id else None)
+        report = getattr(self, "report", None)
+        active_tenant = getattr(self, "tenant", None) or (getattr(report, "tenant", None) if report else None)
         return [active_tenant.pk] if active_tenant else []
 
     def scope_requires_authorization(self):

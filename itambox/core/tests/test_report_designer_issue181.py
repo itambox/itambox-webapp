@@ -21,6 +21,7 @@ from core.tasks.reports import (
     _principal_can_authorize_scope,
     _render_report_output,
     _resolve_authorized_principal,
+    _resolve_report_scope,
     _resolve_scope_authorization,
     _scope_requires_authorization,
     _tenant_scope_permission_is_valid,
@@ -589,16 +590,19 @@ class ReportDesignerIssue181CoverageTests(SimpleTestCase):
             tenant=tenant_a,
         )
         schedule.effective_scope_tenant_ids = lambda: ScheduledReport.effective_scope_tenant_ids(schedule)
+        assert ScheduledReport.persisted_scope_tenant_ids(schedule) == [2]
         assert ScheduledReport.effective_scope_tenant_ids(schedule) == [2]
         assert ScheduledReport.scope_requires_authorization(schedule) is True
 
         schedule.filter_tenants = SimpleNamespace(all=lambda: [tenant_a, tenant_b])
+        assert ScheduledReport.persisted_scope_tenant_ids(schedule) == [1, 2]
         assert ScheduledReport.effective_scope_tenant_ids(schedule) == [1, 2]
         assert ScheduledReport.scope_requires_authorization(schedule) is True
 
         schedule.filter_tenants = SimpleNamespace(all=lambda: [])
         schedule.report = SimpleNamespace(filter_tenants=SimpleNamespace(all=lambda: []), tenant=None)
         schedule.tenant = tenant_a
+        assert ScheduledReport.persisted_scope_tenant_ids(schedule) == []
         assert ScheduledReport.effective_scope_tenant_ids(schedule) == [1]
         assert ScheduledReport.scope_requires_authorization(schedule) is False
 
@@ -622,6 +626,31 @@ class ReportDesignerIssue181CoverageTests(SimpleTestCase):
             scheduled_report=schedule,
             defaults={"authorized_by": actor, "scope_tenant_ids": [1, 2]},
         )
+
+    def test_report_scope_uses_persisted_scope_without_owner_fallback(self):
+        tenant_a = SimpleNamespace(pk=1)
+        tenant_b = SimpleNamespace(pk=2)
+        schedule = SimpleNamespace(
+            pk=17,
+            tenant=tenant_a,
+            report=SimpleNamespace(tenant=tenant_a),
+            persisted_scope_tenant_ids=lambda: [2],
+            effective_scope_tenant_ids=lambda: [1, 2],
+        )
+        query = Mock()
+        query.order_by.return_value = [tenant_b]
+        with patch.object(Tenant.all_objects, "filter", return_value=query) as filter_scope:
+            assert _resolve_report_scope(schedule) == (tenant_a, [tenant_b])
+        filter_scope.assert_called_once_with(pk__in=[2])
+
+        owner_only = SimpleNamespace(
+            pk=18,
+            tenant=tenant_a,
+            report=SimpleNamespace(tenant=tenant_a),
+            persisted_scope_tenant_ids=lambda: [],
+            effective_scope_tenant_ids=lambda: [1],
+        )
+        assert _resolve_report_scope(owner_only) == (tenant_a, [])
 
     def test_scheduled_reports_probe_requires_both_operator_and_row_gates(self):
         with (
