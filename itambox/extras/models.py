@@ -1477,14 +1477,17 @@ class AlertLog(ChangeLoggingMixin, BaseModel):
     delivery_attempts = models.PositiveIntegerField(
         default=0,
         verbose_name=_("Delivery Attempts"),
-        help_text=_("Number of dispatch runs attempted for this alert (single-attempt policy: 1 per planned dispatch)."),
+        help_text=_(
+            "Number of dispatch runs attempted for this alert; each planned dispatch (including "
+            "renotification) counts as one fresh attempt."
+        ),
     )
     last_delivery_id = models.CharField(
         max_length=64,
         null=True,
         blank=True,
         verbose_name=_("Last Delivery ID"),
-        help_text=_("Stable unique identifier of the most recent dispatch run; unchanged across retries of that run."),
+        help_text=_("Stable unique identifier of the most recent dispatch run; unchanged for that run."),
     )
     last_delivery_error = models.CharField(
         max_length=255,

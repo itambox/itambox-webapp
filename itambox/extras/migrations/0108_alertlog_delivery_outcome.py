@@ -12,6 +12,7 @@ Existing ``AlertLog`` rows and their ``delivery_status`` values are preserved
 verbatim (additive contract of WP-13).
 """
 
+from django.conf import settings
 from django.db import migrations, models
 
 
@@ -99,7 +100,7 @@ class Migration(migrations.Migration):
             name="delivery_attempts",
             field=models.PositiveIntegerField(
                 default=0,
-                help_text="Number of dispatch runs attempted for this alert (single-attempt policy: 1 per planned dispatch).",
+                help_text="Number of dispatch runs attempted for this alert; each planned dispatch (including renotification) counts as one fresh attempt.",
                 verbose_name="Delivery Attempts",
             ),
         ),
@@ -108,7 +109,7 @@ class Migration(migrations.Migration):
             name="last_delivery_id",
             field=models.CharField(
                 blank=True,
-                help_text="Stable unique identifier of the most recent dispatch run; unchanged across retries of that run.",
+                help_text="Stable unique identifier of the most recent dispatch run; unchanged for that run.",
                 max_length=64,
                 null=True,
                 verbose_name="Last Delivery ID",
