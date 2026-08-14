@@ -639,9 +639,11 @@ class ReportDesignerIssue181CoverageTests(SimpleTestCase):
         )
         query = Mock()
         query.order_by.return_value = [tenant_b]
-        with patch.object(Tenant._base_manager, "filter", return_value=query) as filter_scope:
+        tenant_model = SimpleNamespace(_base_manager=SimpleNamespace(filter=Mock(return_value=query)))
+        with patch("django.apps.apps.get_model", return_value=tenant_model) as get_model:
             assert _resolve_report_scope(schedule) == (tenant_a, [tenant_b])
-        filter_scope.assert_called_once_with(pk__in=[2])
+        get_model.assert_called_once_with("organization", "Tenant")
+        tenant_model._base_manager.filter.assert_called_once_with(pk__in=[2])
 
         owner_only = SimpleNamespace(
             pk=18,
