@@ -116,12 +116,11 @@ decides behaviour and do not add another authorization or execution gate:
 * `reporting.scheduled` combines the `ITAMBOX_FEATURE_REPORT_DESIGNER` operator
   flag with enabled schedule rows. Its menu and every schedule route use the
   designer gate, and the background task checks the designer gate plus the
-  schedule's own active state before delivery. With the flag off, scheduled
-  delivery is paused without deleting saved `ScheduledReport` rows; setting the
-  flag back to `True` exposes the surfaces and allows normal schedule
-  registration again. Existing recurring Q schedules continue normally; a
-  one-shot Q schedule already consumed while disabled must be registered again
-  from the saved row.
+  schedule's own active state before delivery. With the flag off, delivery is
+  skipped for non-grandfathered report templates; the migration-managed bounded
+  grandfathered set continues normally. Saved `ScheduledReport` rows are never
+  deleted. A one-shot Q schedule already consumed while disabled must be
+  registered again from the saved row.
 * `platform.plugins` reads `PLUGINS`, which is genuinely empty by default.
 * `users.scim_provisioning` observes the tenant-bound API tokens that the SCIM
   authenticators already require. It reports active when at least one token is
@@ -131,11 +130,13 @@ decides behaviour and do not add another authorization or execution gate:
 
 `reporting.designer` and `reporting.scheduled` are deliberately enforced by
 the same operator boundary. The operator flag `ITAMBOX_FEATURE_REPORT_DESIGNER`
-defaults to `False`; while inactive, designer and scheduled-report navigation
-is hidden, their routes return 404, and scheduled delivery of existing report
-templates is paused. Set the flag to `True` to retain or enable access to saved
-report templates and their schedules. Saved schedules are retained while the
-flag is off. The Stable curated-report catalogue is unaffected.
+defaults to `False`; while inactive, designer and scheduled-report navigation is
+hidden and their routes return 404. Scheduled delivery is skipped for
+non-grandfathered templates, while the migration-managed bounded grandfathered
+set may continue rendering and delivery. Saved schedules are retained and
+grandfathered templates are read-only while the flag is off. Set the flag to
+`True` to retain or enable authoring, editing, and normal schedule registration.
+The Stable curated-report catalogue is unaffected.
 
 ## Where the grade shows up
 

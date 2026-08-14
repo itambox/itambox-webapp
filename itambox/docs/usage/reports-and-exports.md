@@ -194,8 +194,11 @@ Report providers declare the model-level view permissions relevant to their doma
 schedule and deliver the result via email or notification channels. This Beta
 surface shares the `ITAMBOX_FEATURE_REPORT_DESIGNER` gate with the report
 designer: when the flag is `False`, the menu and routes are hidden/closed and
-existing delivery is paused without deleting saved schedules. Set the flag to
-`True` to use scheduled delivery again.
+delivery is skipped for non-grandfathered templates. The migration-managed
+bounded grandfathered set may continue to render and deliver, while those
+templates remain read-only until the flag is enabled. Saved schedules are not
+deleted. Set the flag to `True` to author, edit, and use scheduled delivery
+normally again.
 
 ### Creating a Scheduled Report
 
