@@ -1030,13 +1030,8 @@ class ScheduledReport(ChangeLoggingMixin, BaseModel):
     def __str__(self):
         return f"{self.name} -> {self.report.name}"
 
-    def effective_scope_tenant_ids(self):
-        """Return the persisted tenant ids this schedule will compile.
-
-        Reads the through table directly: tenant scoping filters Tenant M2M
-        reads while an ambient tenant is bound, which would silently truncate
-        the persisted scope.
-        """
+    def explicit_scope_tenant_ids(self):
+        """Persisted filter-scope ids, read through the unscoped through table."""
         through = self.filter_tenants.through
         filter_ids = set(
             through._base_manager.filter(scheduledreport_id=self.pk).values_list("tenant_id", flat=True)
@@ -1048,8 +1043,18 @@ class ScheduledReport(ChangeLoggingMixin, BaseModel):
                     "tenant_id", flat=True
                 )
             )
-        if filter_ids:
-            return sorted(filter_ids)
+        return sorted(filter_ids)
+
+    def effective_scope_tenant_ids(self):
+        """Return the persisted tenant ids this schedule will compile.
+
+        Reads the through table directly: tenant scoping filters Tenant M2M
+        reads while an ambient tenant is bound, which would silently truncate
+        the persisted scope.
+        """
+        scope_ids = self.explicit_scope_tenant_ids()
+        if scope_ids:
+            return scope_ids
         active_tenant = self.tenant or (self.report.tenant if self.report_id else None)
         return [active_tenant.pk] if active_tenant else []
 

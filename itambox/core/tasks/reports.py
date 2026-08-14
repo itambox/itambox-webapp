@@ -230,11 +230,13 @@ def _deliver_report_channels(sched, summary_cards, total_rows):
 
 def _resolve_report_scope(sched):
     active_tenant = sched.tenant or (sched.report.tenant if sched.report else None)
-    # Resolve the persisted scope through the model's unscoped through-table
-    # reader: the ambient tenant (bound in request threads and left behind by
-    # permission checks) would otherwise silently truncate the M2M read.
-    if hasattr(sched, "effective_scope_tenant_ids"):
-        scope_ids = sched.effective_scope_tenant_ids()
+    # Resolve the persisted scope through unscoped through-table reads: the
+    # ambient tenant (bound in request threads and left behind by permission
+    # checks) would otherwise silently truncate the M2M read. The explicit
+    # filter list stays empty when no filter tenants are configured; the owner
+    # tenant travels separately as active_tenant.
+    if hasattr(sched, "explicit_scope_tenant_ids"):
+        scope_ids = sched.explicit_scope_tenant_ids()
     else:
         filter_relation = list(sched.filter_tenants.all())
         if not filter_relation and sched.report:
