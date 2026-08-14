@@ -544,7 +544,7 @@ not publish.
 | `procurement.requisition_seam` | `beta-enabled` | enabled | Asset Request fulfillment links | The asset-request to purchase-order-line reservation flow is incomplete; partial fulfilment may need manual reconciliation.<br>Auto-approval thresholds are process-wide, not per tenant. |
 | `reporting.curated` | `stable` | always-on | Curated report catalogue | none |
 | `reporting.designer` | `beta-opt-in` | opt-in | Saved report templates | Column, filter, and grouping model is expected to change; saved templates may need rebuilding |
-| `reporting.scheduled` | `beta-opt-in` | opt-in | Scheduled reports and generation archive | Requires `ITAMBOX_FEATURE_REPORT_DESIGNER=True` and at least one enabled schedule row; false pauses delivery and hides/routes-closes the schedule surfaces without deleting saved schedules; delivery also depends on a running worker |
+| `reporting.scheduled` | `beta-opt-in` | opt-in | Scheduled reports and generation archive | Requires `ITAMBOX_FEATURE_REPORT_DESIGNER=True` and at least one enabled schedule row; when false, the schedule surfaces are hidden/closed and delivery is skipped for non-grandfathered templates while the migration-managed bounded grandfathered set may continue; saved schedules are retained and grandfathered templates are read-only; delivery also depends on a running worker |
 | `subscriptions.tracking` | `stable` | always-on | Providers, subscriptions, assignments | none |
 | `users.scim_provisioning` | `beta-opt-in` | opt-in | Tenant- and provider-scoped SCIM mounts | PATCH semantics and filtering are partial; the tenant mount provisions Users and exposes Groups read-only, only provider mounts provision Groups |
 
