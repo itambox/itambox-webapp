@@ -28,6 +28,7 @@ POST_TRANSITION_MIGRATIONS = {
     "extras.0105_reporttemplate_advanced_mode_and_more",
     "extras.0106_scheduledreportscopeauthorization",
     "extras.0107_scheduledreportscopeauthorization_revocation",
+    "extras.0108_alertlog_delivery_outcome",
     "inventory.0101_alter_accessoryassignment_options_and_more",
     "organization.0101_membership_external_id_and_more",
     "organization.0102_alter_tenantresourcegrant_options",
@@ -197,6 +198,15 @@ SEMANTIC_DISPOSITIONS = {
             "ambiguous or unresolved targets for operator review."
         ),
         {"extras.0104_issue183_alert_tenant_reconciliation"},
+    ),
+    **_dispositions(
+        "required-fresh",
+        (
+            "Adds additive WP-13 delivery observability fields and idempotently derives "
+            "the filterable delivery_outcome from existing per-channel payloads without "
+            "mutating delivery_status; fully reversible."
+        ),
+        {"extras.0108_alertlog_delivery_outcome"},
     ),
 }
 

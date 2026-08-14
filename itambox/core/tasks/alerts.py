@@ -1,6 +1,8 @@
 import logging
+from uuid import uuid4
 
 from django.db import IntegrityError, transaction
+from django.db.models import F
 from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
 
@@ -98,26 +100,52 @@ def _prefetch_open_logs(rule_id=None):
 
 
 def _schedule_alert_dispatch(rule, match, alert_log):
-    """Dispatch one persisted alert after commit and record disposition state."""
+    """Dispatch one persisted alert after commit and record disposition state.
+
+    WP-13 (Path B): exactly one delivery attempt per planned dispatch. Each run
+    carries a stable unique ``delivery_id``; the run is claimed (marker written)
+    before any channel send so a repeated invocation of the same run cannot
+    duplicate in-app notifications or lifecycle transitions.
+    """
     alert_id = alert_log.pk
     rule_id = rule.pk
     tenant_id = alert_log.tenant_id
     alert_match = dict(match)
+    delivery_id = str(uuid4())
 
     def dispatch_alert():
         notified_at = timezone.now()
+        # Idempotency guard: if this exact run was already claimed/executed,
+        # skip it. on_commit callbacks run serially in-process, and the claim
+        # update below is written before any channel is contacted.
+        if AlertLog.unscoped.filter(pk=alert_id, last_delivery_id=delivery_id).exists():
+            logger.debug("Alert delivery run %s already executed for AlertLog %s; skipping.", delivery_id, alert_id)
+            return
         try:
             with TaskContext(tenant_id=tenant_id):
                 rule_for_dispatch = AlertRule._base_manager.get(pk=rule_id)
                 persisted_alert = AlertLog.unscoped.get(pk=alert_id)
-                delivery = _dispatch_channels(rule_for_dispatch, alert_match, persisted_alert)
+                # Claim the run before sending: pending marker + attempt counter
+                # + delivery id are persisted first so a replayed invocation
+                # observes the marker and backs off.
+                AlertLog.unscoped.filter(pk=alert_id).update(
+                    delivery_status={"__dispatch__": "pending", "__delivery_id__": delivery_id},
+                    delivery_attempts=F("delivery_attempts") + 1,
+                    last_delivery_id=delivery_id,
+                    delivery_outcome=AlertLog.DELIVERY_OUTCOME_PENDING,
+                    last_notified_at=notified_at,
+                )
+                delivery = _dispatch_channels(rule_for_dispatch, alert_match, persisted_alert, delivery_id=delivery_id)
+                delivery["__delivery_id__"] = delivery_id
         # broad except: boundary-isolation: delivery backend failures are non-enumerable and become terminal
         except Exception:
             logger.exception("Alert delivery failed for AlertLog %s.", alert_id)
-            delivery = {"__dispatch__": DeliveryDisposition.TERMINAL.value}
+            delivery = {"__dispatch__": "terminal", "__delivery_id__": delivery_id}
         try:
             AlertLog.unscoped.filter(pk=alert_id).update(
                 delivery_status=delivery,
+                delivery_outcome=_delivery_outcome(delivery),
+                last_delivery_error=_delivery_error(delivery),
                 last_notified_at=notified_at,
             )
         # broad except: task-isolation: metadata write failure must not abort later callbacks
@@ -172,6 +200,9 @@ def _evaluate_rule(rule, today, existing_logs):
                         object_id=obj.pk,
                         tenant=match.get("tenant"),
                         delivery_status=({"__dispatch__": "pending"} if not rule.is_muted else {}),
+                        delivery_outcome=(
+                            AlertLog.DELIVERY_OUTCOME_PENDING if not rule.is_muted else AlertLog.DELIVERY_OUTCOME_NONE
+                        ),
                     )
             except IntegrityError:
                 # The partial unique constraint fired (or, rarely, another
@@ -225,8 +256,10 @@ def _evaluate_rule(rule, today, existing_logs):
             if (pending or (rule.renotify_interval_days > 0 and due)) and key not in scheduled_dispatch_keys:
                 AlertLog.unscoped.filter(pk=existing.pk).update(
                     delivery_status={"__dispatch__": "pending"},
+                    delivery_outcome=AlertLog.DELIVERY_OUTCOME_PENDING,
                 )
                 existing.delivery_status = {"__dispatch__": "pending"}
+                existing.delivery_outcome = AlertLog.DELIVERY_OUTCOME_PENDING
                 existing.last_notified_at = now
                 _schedule_alert_dispatch(rule, match, existing)
                 scheduled_dispatch_keys.add(key)
@@ -241,8 +274,14 @@ def _evaluate_rule(rule, today, existing_logs):
     return fresh_count
 
 
-def _dispatch_channels(rule, match, alert_log):
-    """Send notifications to all explicitly attached channels; return per-channel delivery dict."""
+def _dispatch_channels(rule, match, alert_log, delivery_id=None):
+    """Send notifications to all explicitly attached channels; return typed per-channel delivery dict.
+
+    WP-13 (Path B): exactly one attempt per planned dispatch. Each channel entry
+    carries the typed disposition (success|retryable|terminal), the stable
+    delivery identifier, the attempt timestamp, and — for failures — the typed
+    error class and a user-visible message when the boundary declared one.
+    """
     channels = rule.channels.all()
     if not channels.exists():
         return {"__no_channels__": "no channels attached to this rule"}
@@ -251,7 +290,7 @@ def _dispatch_channels(rule, match, alert_log):
     for channel in channels:
         try:
             result = send_notification_to_channel(channel, match["subject"], match["message"])
-            delivery[str(channel.pk)] = "ok" if result else result.disposition.value
+            delivery[str(channel.pk)] = _delivery_entry(result, delivery_id)
             if not result:
                 context = delivery_log_context(result.operation, tenant_id=rule.tenant_id)
                 logger.warning(
@@ -262,7 +301,13 @@ def _dispatch_channels(rule, match, alert_log):
                 )
         # broad except: boundary-isolation: third-party notification backends expose non-enumerable exceptions
         except Exception:
-            delivery[str(channel.pk)] = DeliveryDisposition.TERMINAL.value
+            delivery[str(channel.pk)] = {
+                "disposition": DeliveryDisposition.TERMINAL.value,
+                "operation": "alert.channel.dispatch",
+                "delivery_id": delivery_id,
+                "attempted_at": timezone.now().isoformat(),
+                "error_class": "unexpected_channel_error",
+            }
             context = delivery_log_context("alert.channel.dispatch", tenant_id=rule.tenant_id)
             logger.error(
                 "%s disposition=terminal reason=unexpected_channel_error channel_id=%s",
@@ -270,6 +315,84 @@ def _dispatch_channels(rule, match, alert_log):
                 channel.pk,
             )
     return delivery
+
+
+def _delivery_entry(result, delivery_id):
+    """Persistable structured outcome for one channel delivery (WP-13)."""
+    entry = {
+        "disposition": result.disposition.value,
+        "operation": result.operation,
+        "delivery_id": delivery_id,
+        "attempted_at": timezone.now().isoformat(),
+    }
+    if not result:
+        # Typed failure detail; the safe user-visible message is persisted only
+        # when the boundary declared it user-visible (never raw exception text).
+        if result.error_class:
+            entry["error_class"] = result.error_class
+        if result.user_visible and result.user_message:
+            entry["message"] = result.user_message
+    return entry
+
+
+def _disposition_from_value(value):
+    """Normalize a per-channel payload value (structured dict or legacy string) to a disposition."""
+    if isinstance(value, dict):
+        return value.get("disposition")
+    if isinstance(value, str):
+        if value == "ok":
+            return "success"
+        if value.startswith("error"):
+            return "terminal"
+        return value
+    return None
+
+
+def _delivery_outcome(payload):
+    """Derive the filterable single-attempt outcome from a delivery payload (WP-13)."""
+    if not payload:
+        return AlertLog.DELIVERY_OUTCOME_NONE
+    if payload.get("__dispatch__") == "pending":
+        return AlertLog.DELIVERY_OUTCOME_PENDING
+    if payload.get("__dispatch__") == "terminal":
+        return AlertLog.DELIVERY_OUTCOME_FAILED
+    if "__no_channels__" in payload:
+        return AlertLog.DELIVERY_OUTCOME_NONE
+    channel_values = [value for key, value in payload.items() if not key.startswith("__")]
+    if not channel_values:
+        return AlertLog.DELIVERY_OUTCOME_NONE
+    dispositions = [
+        disposition
+        for disposition in (_disposition_from_value(value) for value in channel_values)
+        if disposition is not None
+    ]
+    if any(disposition == "success" for disposition in dispositions):
+        return AlertLog.DELIVERY_OUTCOME_DELIVERED
+    return AlertLog.DELIVERY_OUTCOME_FAILED
+
+
+def _delivery_error(payload):
+    """Typed error of the first failed channel in the payload, or ``None``.
+
+    Deterministic (payload key order = dispatch order). Returns the typed error
+    class when the boundary supplied one, otherwise the disposition itself.
+    """
+    if not payload or payload.get("__dispatch__") == "pending":
+        return None
+    if payload.get("__dispatch__") == "terminal":
+        return "dispatch_crash"
+    for key, value in payload.items():
+        if key.startswith("__"):
+            continue
+        if isinstance(value, dict):
+            disposition = value.get("disposition")
+            if disposition in (DeliveryDisposition.RETRYABLE.value, DeliveryDisposition.TERMINAL.value):
+                return value.get("error_class") or disposition
+        else:
+            disposition = _disposition_from_value(value)
+            if disposition in (DeliveryDisposition.RETRYABLE.value, DeliveryDisposition.TERMINAL.value):
+                return disposition
+    return None
 
 
 def _auto_resolve_cleared(rule, matched_keys):

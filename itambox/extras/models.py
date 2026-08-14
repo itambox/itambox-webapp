@@ -1424,6 +1424,21 @@ class AlertLog(ChangeLoggingMixin, BaseModel):
         (STATUS_RESOLVED, _("Resolved")),
     ]
 
+    # Denormalized single-attempt delivery outcome (WP-13, Path B). ``delivery_status``
+    # keeps the full per-channel typed payload; this field makes delivery queryable/
+    # filterable without JSON lookups and stays truthful under the no-retry policy.
+    DELIVERY_OUTCOME_NONE = "none"
+    DELIVERY_OUTCOME_PENDING = "pending"
+    DELIVERY_OUTCOME_DELIVERED = "delivered"
+    DELIVERY_OUTCOME_FAILED = "failed"
+
+    DELIVERY_OUTCOME_CHOICES = [
+        (DELIVERY_OUTCOME_NONE, _("No delivery planned")),
+        (DELIVERY_OUTCOME_PENDING, _("Dispatch pending")),
+        (DELIVERY_OUTCOME_DELIVERED, _("Delivered")),
+        (DELIVERY_OUTCOME_FAILED, _("Failed")),
+    ]
+
     rule = models.ForeignKey(AlertRule, on_delete=models.CASCADE, related_name="logs", verbose_name=_("Rule"))
     subject = models.CharField(max_length=255, verbose_name=_("Subject"))
     message = models.TextField(verbose_name=_("Message"))
@@ -1444,7 +1459,42 @@ class AlertLog(ChangeLoggingMixin, BaseModel):
         default=dict,
         blank=True,
         verbose_name=_("Delivery Status"),
-        help_text=_("Per-channel delivery result: {channel_pk: 'ok'|'failed'|'error: ...'}"),
+        help_text=_(
+            "Per-channel typed delivery outcome: {channel_pk: {disposition, operation, "
+            "delivery_id, attempted_at, error_class?, message?}} plus dispatch bookkeeping "
+            "keys (__dispatch__, __delivery_id__, __no_channels__). Legacy string values "
+            "('ok'|'failed'|'error: ...') remain readable."
+        ),
+    )
+    delivery_outcome = models.CharField(
+        max_length=20,
+        choices=DELIVERY_OUTCOME_CHOICES,
+        default=DELIVERY_OUTCOME_NONE,
+        db_index=True,
+        verbose_name=_("Delivery Outcome"),
+        help_text=_("Denormalized single-attempt delivery outcome (none|pending|delivered|failed)."),
+    )
+    delivery_attempts = models.PositiveIntegerField(
+        default=0,
+        verbose_name=_("Delivery Attempts"),
+        help_text=_(
+            "Number of dispatch runs attempted for this alert; each planned dispatch (including "
+            "renotification) counts as one fresh attempt."
+        ),
+    )
+    last_delivery_id = models.CharField(
+        max_length=64,
+        null=True,
+        blank=True,
+        verbose_name=_("Last Delivery ID"),
+        help_text=_("Stable unique identifier of the most recent dispatch run; unchanged for that run."),
+    )
+    last_delivery_error = models.CharField(
+        max_length=255,
+        null=True,
+        blank=True,
+        verbose_name=_("Last Delivery Error"),
+        help_text=_("Typed error class (or disposition) of the most recent failed channel delivery, if any."),
     )
     last_notified_at = models.DateTimeField(
         null=True,

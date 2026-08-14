@@ -244,7 +244,10 @@ class AlertDeliveryFailureTests(TransactionTestCase):
 
         alert = AlertLog.unscoped.get(rule=rule)
         self.assertEqual(alert.status, AlertLog.STATUS_ACTIVE)
-        self.assertEqual(alert.delivery_status, {"__dispatch__": "terminal"})
+        self.assertEqual(alert.delivery_status["__dispatch__"], "terminal")
+        self.assertIn("__delivery_id__", alert.delivery_status)
+        self.assertEqual(alert.delivery_outcome, AlertLog.DELIVERY_OUTCOME_FAILED)
+        self.assertEqual(alert.last_delivery_error, "dispatch_crash")
         self.assertIsNotNone(alert.last_notified_at)
 
     def test_post_commit_dispatch_receives_persisted_alert_and_keeps_one_create_audit(self):
@@ -287,7 +290,13 @@ class AlertDeliveryFailureTests(TransactionTestCase):
         dispatch.assert_called_once()
         self.assertEqual(dispatch.call_args.args[2].pk, alert.pk)
         alert.refresh_from_db()
-        self.assertEqual(alert.delivery_status, {"7": "ok"})
+        # The patched channel returns the legacy "ok" string; the run still
+        # records the stable delivery id and the filterable outcome.
+        self.assertEqual(alert.delivery_status["7"], "ok")
+        self.assertIn("__delivery_id__", alert.delivery_status)
+        self.assertEqual(alert.delivery_outcome, AlertLog.DELIVERY_OUTCOME_DELIVERED)
+        self.assertEqual(alert.delivery_attempts, 1)
+        self.assertIsNotNone(alert.last_delivery_id)
         self.assertIsNotNone(alert.last_notified_at)
         alert_ct = ContentType.objects.get_for_model(AlertLog)
         self.assertEqual(
@@ -331,27 +340,39 @@ class AlertRenotifyDeliveryTests(TransactionTestCase):
             object_id=rule.pk + 1,
         )
         match = {"obj": rule, "tenant": tenant, "subject": "alert", "message": "alert"}
-        failed_update = Mock(side_effect=RuntimeError("metadata update failure"))
-        first_filter = Mock(update=failed_update)
-        second_filter = AlertLog.unscoped.filter(pk=second.pk)
+        real_filter = AlertLog.unscoped.filter
+        # The FIRST TWO filter() calls of the first dispatch are replaced: the
+        # idempotency guard (exists()=False) and the claim write, which must
+        # fail. Everything after that uses the real queryset so the second
+        # callback still runs to completion.
+        first_guard = Mock()
+        first_guard.exists.return_value = False
+        first_guard.update = Mock(side_effect=RuntimeError("metadata update failure"))
+        remaining = iter([first_guard, first_guard])
+
+        def flaky_filter(*args, **kwargs):
+            try:
+                return next(remaining)
+            except StopIteration:
+                return real_filter(*args, **kwargs)
 
         with (
             patch("core.tasks.alerts._dispatch_channels", return_value={"7": "ok"}),
-            patch.object(
-                AlertLog.unscoped,
-                "filter",
-                side_effect=[first_filter, second_filter],
-            ) as filter_mock,
+            patch.object(AlertLog.unscoped, "filter", side_effect=flaky_filter),
         ):
             with transaction.atomic():
                 _schedule_alert_dispatch(rule, match, first)
                 _schedule_alert_dispatch(rule, match, second)
 
-        self.assertEqual(filter_mock.call_count, 2)
         first.refresh_from_db()
         second.refresh_from_db()
-        self.assertEqual(first.delivery_status, {})
-        self.assertEqual(second.delivery_status, {"7": "ok"})
+        # The failed claim write is contained: the first dispatch is recorded
+        # as a terminal crash, and the second callback still runs fully.
+        self.assertEqual(first.delivery_status["__dispatch__"], "terminal")
+        self.assertIn("__delivery_id__", first.delivery_status)
+        self.assertEqual(first.delivery_outcome, AlertLog.DELIVERY_OUTCOME_FAILED)
+        self.assertEqual(second.delivery_status["7"], "ok")
+        self.assertEqual(second.delivery_outcome, AlertLog.DELIVERY_OUTCOME_DELIVERED)
 
     def test_duplicate_match_schedules_only_one_pending_dispatch(self):
         from unittest.mock import patch
@@ -481,5 +502,7 @@ class AlertRenotifyDeliveryTests(TransactionTestCase):
         dispatch.assert_called_once()
 
         alert.refresh_from_db()
-        self.assertEqual(alert.delivery_status, {"__dispatch__": "terminal"})
+        self.assertEqual(alert.delivery_status["__dispatch__"], "terminal")
+        self.assertEqual(alert.delivery_outcome, AlertLog.DELIVERY_OUTCOME_FAILED)
+        self.assertEqual(alert.last_delivery_error, "dispatch_crash")
         self.assertGreater(alert.last_notified_at, old)

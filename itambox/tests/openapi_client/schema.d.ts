@@ -1693,8 +1693,23 @@ export interface components {
       /** @default active */
       status: components["schemas"]["AlertLogStatusEnum"];
       status_display: string;
-      /** @description Per-channel delivery result: {channel_pk: 'ok'|'failed'|'error: ...'} */
+      /** @description Per-channel typed delivery outcome: {channel_pk: {disposition, operation, delivery_id, attempted_at, error_class?, message?}} plus dispatch bookkeeping keys (__dispatch__, __delivery_id__, __no_channels__). Legacy string values ('ok'|'failed'|'error: ...') remain readable. */
       delivery_status: unknown;
+      /**
+       * @description Denormalized single-attempt delivery outcome (none|pending|delivered|failed).
+       *
+       * * `none` - No delivery planned
+       * * `pending` - Dispatch pending
+       * * `delivered` - Delivered
+       * * `failed` - Failed
+       */
+      delivery_outcome: components["schemas"]["DeliveryOutcomeEnum"];
+      /** @description Number of dispatch runs attempted for this alert; each planned dispatch (including renotification) counts as one fresh attempt. */
+      delivery_attempts: number;
+      /** @description Stable unique identifier of the most recent dispatch run; unchanged for that run. */
+      last_delivery_id: string | null;
+      /** @description Typed error class (or disposition) of the most recent failed channel delivery, if any. */
+      last_delivery_error: string | null;
       /**
        * Format: date-time
        * @description When channel notifications were last dispatched for this alert (drives re-notify).
@@ -3065,6 +3080,14 @@ export interface components {
      * @enum {string}
      */
     DataSanitizationMethodEnum: "none" | "nist_clear" | "nist_purge" | "nist_destroy" | "dod_3pass" | "degauss" | "physical_destruction" | "crypto_erase";
+    /**
+     * @description * `none` - No delivery planned
+     * * `pending` - Dispatch pending
+     * * `delivered` - Delivered
+     * * `failed` - Failed
+     * @enum {string}
+     */
+    DeliveryOutcomeEnum: "none" | "pending" | "delivered" | "failed";
     Depreciation: {
       id: number;
       /** Depreciation Name */
@@ -15678,6 +15701,15 @@ export interface operations {
         created_after?: string;
         /** @description Created before */
         created_before?: string;
+        /**
+         * @description Delivery Outcome
+         *
+         * * `none` - No delivery planned
+         * * `pending` - Dispatch pending
+         * * `delivered` - Delivered
+         * * `failed` - Failed
+         */
+        delivery_outcome?: ("delivered" | "failed" | "none" | "pending")[];
         /** @description Number of results to return per page. */
         limit?: number;
         /** @description The initial index from which to return the results. */

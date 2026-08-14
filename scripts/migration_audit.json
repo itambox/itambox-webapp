@@ -11255,6 +11255,49 @@
     },
     {
       "dependencies": [
+        "extras.0107_scheduledreportscopeauthorization_revocation",
+        "users.0100_issue88_shard_62_users_relations"
+      ],
+      "id": "extras.0108_alertlog_delivery_outcome",
+      "is_replacement": false,
+      "operations": {
+        "BtreeGistExtension": {
+          "count": 0
+        },
+        "RunPython": {
+          "with_noop_reverse": 0,
+          "with_reverse": 1,
+          "without_reverse": 0
+        },
+        "RunSQL": {
+          "with_noop_reverse": 0,
+          "with_reverse": 0,
+          "without_reverse": 0
+        },
+        "SeparateDatabaseAndState": {
+          "count": 0
+        }
+      },
+      "path": "itambox/extras/migrations/0108_alertlog_delivery_outcome.py",
+      "replaces": [],
+      "reviewed_disposition": {
+        "disposition": "required-fresh",
+        "rationale": "Adds additive WP-13 delivery observability fields and idempotently derives the filterable delivery_outcome from existing per-channel payloads without mutating delivery_status; fully reversible."
+      },
+      "run_before": [],
+      "special_users_bootstrap": false,
+      "swappable_user_dependency": true,
+      "syntactic_facts": {
+        "has_custom_operations": {
+          "BtreeGistExtension": false,
+          "RunPython": true,
+          "RunSQL": false,
+          "SeparateDatabaseAndState": false
+        }
+      }
+    },
+    {
+      "dependencies": [
         "assets.0018_alter_assetaudit_unique_together_and_more",
         "extras.0004_alter_configcontext_options_alter_dashboard_options_and_more",
         "licenses.0002_license_supplier",
@@ -17651,6 +17694,7 @@
     "extras.0105_reporttemplate_advanced_mode_and_more",
     "extras.0106_scheduledreportscopeauthorization",
     "extras.0107_scheduledreportscopeauthorization_revocation",
+    "extras.0108_alertlog_delivery_outcome",
     "inventory.0101_alter_accessoryassignment_options_and_more",
     "organization.0101_membership_external_id_and_more",
     "organization.0102_alter_tenantresourcegrant_options",
@@ -17672,7 +17716,8 @@
       "assets.0043_seed_depreciation_policies",
       "assets.0051_assetreservation_assetreservation_no_overlap",
       "assets.0100_issue88_shard_42_assets_relations",
-      "assets.0100_issue88_shard_43_assets_seed"
+      "assets.0100_issue88_shard_43_assets_seed",
+      "extras.0108_alertlog_delivery_outcome"
     ],
     "review_blocker": [
       "organization.0027_drop_legacy_role_models"
@@ -17786,6 +17831,7 @@
       "extras.0035_alter_alertlog_acknowledged_by_and_more",
       "extras.0106_scheduledreportscopeauthorization",
       "extras.0107_scheduledreportscopeauthorization_revocation",
+      "extras.0108_alertlog_delivery_outcome",
       "organization.0001_initial",
       "organization.0002_tenantinvitation_tenantmembership",
       "organization.0009_alter_tenantmembership_unique_together_and_more",
@@ -17928,7 +17974,7 @@
         ]
       }
     },
-    "post_transition_migrations": 18,
+    "post_transition_migrations": 19,
     "replacement_shards": 62,
     "replacement_targets": 262
   }

@@ -154,6 +154,11 @@ class AlertLogFilterSet(BaseFilterSet):
         label=_("Severity"),
         widget=forms.SelectMultiple(attrs={"class": "form-select"}),
     )
+    delivery_outcome = django_filters.MultipleChoiceFilter(
+        choices=AlertLog.DELIVERY_OUTCOME_CHOICES,
+        label=_("Delivery Outcome"),
+        widget=forms.SelectMultiple(attrs={"class": "form-select"}),
+    )
     rule = django_filters.ModelChoiceFilter(
         queryset=AlertRule.objects.all(),
         label=_("Rule"),
@@ -174,7 +179,7 @@ class AlertLogFilterSet(BaseFilterSet):
 
     class Meta:
         model = AlertLog
-        fields = ["status", "severity", "rule", "created_after", "created_before"]
+        fields = ["status", "severity", "delivery_outcome", "rule", "created_after", "created_before"]
 
 
 class JournalEntryFilterSet(BaseFilterSet):
