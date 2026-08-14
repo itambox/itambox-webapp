@@ -1,11 +1,12 @@
 from types import SimpleNamespace
+from unittest.mock import Mock, call, patch
 
 import pytest
 from django.core.exceptions import ValidationError
 from django.test import SimpleTestCase, override_settings
 
 from core.reports.rendering import render_report_html
-from core.tasks.reports import _render_report_output
+from core.tasks.reports import _render_report_output, _resolve_scope_authorization
 from extras.forms import ReportTemplateForm
 from extras.models import ReportTemplate, ScheduledReport
 
@@ -103,6 +104,33 @@ class ReportDesignerIssue181ContractTests(SimpleTestCase):
             {"report_name": "inactive", "summary_cards": [], "grouped_data": {}},
         )
         assert "<h1>inactive</h1>" not in output.email_body
+
+    def test_worker_scope_authorization_checks_each_persisted_tenant(self):
+        tenant_a = SimpleNamespace(pk=1)
+        tenant_b = SimpleNamespace(pk=2)
+        principal = Mock(is_active=True, pk=99)
+        principal.has_perm.side_effect = lambda permission, obj=None: obj is tenant_a
+        authorization = SimpleNamespace(scope_tenant_ids=[tenant_a.pk, tenant_b.pk], authorized_by=principal)
+        authorization_manager = Mock()
+        authorization_manager.filter.return_value.select_related.return_value.first.return_value = authorization
+        schedule = SimpleNamespace(pk=123)
+
+        with (
+            patch("core.tasks.reports.ScheduledReportScopeAuthorization.objects", authorization_manager),
+            patch("core.tasks.reports.TaskContext") as task_context,
+            patch("core.tasks.reports.get_current_user", return_value=principal),
+        ):
+            result = _resolve_scope_authorization(schedule, tenant_a, [tenant_a, tenant_b])
+
+        assert result is None
+        assert task_context.call_args_list == [
+            call(tenant_id=tenant_a.pk, user_id=principal.pk, operation="reports.scope_authorization"),
+            call(tenant_id=tenant_b.pk, user_id=principal.pk, operation="reports.scope_authorization"),
+        ]
+        assert principal.has_perm.call_args_list == [
+            call("reports.view_cross_tenant_reports", obj=tenant_a),
+            call("reports.view_cross_tenant_reports", obj=tenant_b),
+        ]
 
     def test_legacy_csv_shape_does_not_require_custom_html(self):
         template = SimpleNamespace(

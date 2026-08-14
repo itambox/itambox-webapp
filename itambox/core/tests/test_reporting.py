@@ -713,6 +713,31 @@ class ScheduledReportScopeAuthorizationTests(TestCase):
 
     @override_settings(REPORT_DESIGNER_ENABLED=True)
     @patch("core.tasks.reports._process_scheduled_report")
+    def test_principal_lacking_one_persisted_tenant_is_rejected(self, mock_process):
+        from core.tasks.reports import generate_scheduled_report_task
+        from core.tasks.utils import TaskStatus
+        from organization.models import Membership, Role, RoleGrant, RoleGrantScope
+
+        limited_user = User.objects.create_user(username="limited-scope-authorizer", password="password123")
+        role = Role.objects.create(
+            tenant=self.tenant_a,
+            name="Tenant A Report Viewer",
+            permissions=["reports.view_cross_tenant_reports"],
+        )
+        membership = Membership.objects.create(user=limited_user, tenant=self.tenant_a)
+        grant = RoleGrant.objects.create(membership=membership, role=role)
+        RoleGrantScope.objects.create(role_grant=grant, scope_type=RoleGrantScope.SCOPE_OWN)
+        ScheduledReportScopeAuthorization.approve(self.sched, limited_user)
+        result = generate_scheduled_report_task(self.sched.pk)
+
+        self.assertEqual(result.status, TaskStatus.TERMINAL)
+        self.assertEqual(result.code, "report.scope_unauthorized")
+        mock_process.assert_not_called()
+        self.sched.refresh_from_db()
+        self.assertIsNone(self.sched.last_run)
+
+    @override_settings(REPORT_DESIGNER_ENABLED=True)
+    @patch("core.tasks.reports._process_scheduled_report")
     def test_authorized_broad_schedule_runs_as_approved_principal_and_exact_scope(self, mock_process):
         from core.context import get_current_tenant, get_current_user
         from core.tasks.reports import generate_scheduled_report_task

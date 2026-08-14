@@ -1,12 +1,13 @@
 import logging
 from dataclasses import dataclass, field
 
-from django.core.exceptions import ValidationError
+from django.core.exceptions import ObjectDoesNotExist, PermissionDenied, ValidationError
 from django.core.files.base import ContentFile
 from django.core.mail import EmailMessage
 from django.utils import timezone
 from django.utils.translation import gettext as _
 
+from core.context import get_current_user
 from core.csv_utils import safe_csv_filename
 from core.events import send_notification_to_channel
 from core.features import report_designer_probe
@@ -267,12 +268,26 @@ def _resolve_scope_authorization(sched, active_tenant, filter_tenants):
     except (TypeError, ValueError):
         return None
     principal = authorization.authorized_by
-    if (
-        authorized_scope != scope_tenant_ids
-        or not principal.is_active
-        or not principal.has_perm("reports.view_cross_tenant_reports")
-    ):
+    if authorized_scope != scope_tenant_ids or not principal.is_active:
         return None
+    for tenant in filter_tenants:
+        tenant_id = getattr(tenant, "pk", None)
+        if tenant_id is None:
+            return None
+        try:
+            with TaskContext(
+                tenant_id=tenant_id,
+                user_id=principal.pk,
+                operation="reports.scope_authorization",
+            ):
+                worker_principal = get_current_user()
+                if worker_principal is None or not worker_principal.has_perm(
+                    "reports.view_cross_tenant_reports",
+                    obj=tenant,
+                ):
+                    return None
+        except (ObjectDoesNotExist, PermissionDenied):
+            return None
     return principal.pk
 
 
