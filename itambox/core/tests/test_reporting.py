@@ -739,17 +739,39 @@ class ScheduledReportScopeAuthorizationTests(TestCase):
     @override_settings(REPORT_DESIGNER_ENABLED=True)
     @patch("core.tasks.reports._process_scheduled_report")
     def test_authorized_broad_schedule_runs_as_approved_principal_and_exact_scope(self, mock_process):
-        from core.context import get_current_tenant, get_current_user
+        from core.context import get_current_all_accessible, get_current_tenant, get_current_user
         from core.tasks.reports import generate_scheduled_report_task
         from core.tasks.utils import TaskResult, TaskStatus
+        from organization.models import Membership, Role, RoleGrant, RoleGrantScope
 
-        authorization = ScheduledReportScopeAuthorization.approve(self.sched, self.user)
+        authorized_user = User.objects.create_user(username="non-superuser-authorizer", password="password123")
+        for tenant in (self.tenant_a, self.tenant_b):
+            role = Role.objects.create(
+                tenant=tenant,
+                name=f"Report Viewer {tenant.pk}",
+                permissions=["reports.view_cross_tenant_reports"],
+            )
+            membership = Membership.objects.create(user=authorized_user, tenant=tenant)
+            grant = RoleGrant.objects.create(membership=membership, role=role)
+            RoleGrantScope.objects.create(role_grant=grant, scope_type=RoleGrantScope.SCOPE_OWN)
+
+        self.assertEqual(
+            list(self.sched.filter_tenants.values_list("pk", flat=True)),
+            [self.tenant_a.pk, self.tenant_b.pk],
+        )
+        self.assertTrue(self.sched.scope_requires_authorization())
+        authorization = ScheduledReportScopeAuthorization.objects.create(
+            scheduled_report=self.sched,
+            authorized_by=authorized_user,
+            scope_tenant_ids=[self.tenant_a.pk, self.tenant_b.pk],
+        )
         self.assertEqual(authorization.scope_tenant_ids, [self.tenant_a.pk, self.tenant_b.pk])
 
         def process(sched, active_tenant, filter_tenants):
-            self.assertEqual(get_current_user().pk, self.user.pk)
+            self.assertEqual(get_current_user().pk, authorized_user.pk)
             self.assertIsNone(get_current_tenant())
-            self.assertEqual({tenant.pk for tenant in filter_tenants}, {self.tenant_a.pk, self.tenant_b.pk})
+            self.assertTrue(get_current_all_accessible())
+            self.assertEqual([tenant.pk for tenant in filter_tenants], [self.tenant_a.pk, self.tenant_b.pk])
             return TaskResult(TaskStatus.SUCCESS, "report.completed")
 
         mock_process.side_effect = process
@@ -776,11 +798,19 @@ class ScheduledReportScopeAuthorizationTests(TestCase):
     @override_settings(REPORT_DESIGNER_ENABLED=True)
     @patch("core.tasks.reports._process_scheduled_report")
     def test_ordinary_single_tenant_schedule_does_not_require_approval(self, mock_process):
+        from core.context import get_current_all_accessible, get_current_tenant
         from core.tasks.reports import generate_scheduled_report_task
         from core.tasks.utils import TaskResult, TaskStatus
 
         self.sched.filter_tenants.clear()
-        mock_process.return_value = TaskResult(TaskStatus.SUCCESS, "report.completed")
+
+        def process(sched, active_tenant, filter_tenants):
+            self.assertEqual(get_current_tenant().pk, self.tenant_a.pk)
+            self.assertFalse(get_current_all_accessible())
+            self.assertEqual(filter_tenants, [])
+            return TaskResult(TaskStatus.SUCCESS, "report.completed")
+
+        mock_process.side_effect = process
 
         result = generate_scheduled_report_task(self.sched.pk)
 

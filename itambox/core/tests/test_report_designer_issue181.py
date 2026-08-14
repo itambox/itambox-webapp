@@ -410,6 +410,7 @@ class ReportDesignerIssue181CoverageTests(SimpleTestCase):
         task_context.assert_called_once_with(
             tenant_id=None,
             user_id=authorized_principal_id,
+            all_accessible=True,
             operation="reports.generate",
         )
         process_report.assert_called_once_with(schedule, tenant_a, [tenant_a, tenant_b])

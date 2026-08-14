@@ -452,6 +452,7 @@ def generate_scheduled_report_task(scheduled_report_id: int) -> TaskResult:
         tenant_id=None if scope_requires_authorization else active_tenant.id if active_tenant else None,
         user_id=scope_authorized_user_id,
         operation="reports.generate",
+        all_accessible=scope_requires_authorization,
     ) as ctx:
         logger.info(
             "Generating scheduled report",
