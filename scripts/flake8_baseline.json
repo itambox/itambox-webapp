@@ -2773,14 +2773,6 @@
     },
     {
       "path": "itambox/core/events.py",
-      "code": "C901",
-      "message": "'_evaluate_condition' is too complex (12)",
-      "source": "def _evaluate_condition(rule, event):",
-      "context": "Module:body/FunctionDef:_evaluate_condition:self",
-      "count": 1
-    },
-    {
-      "path": "itambox/core/events.py",
       "code": "F401",
       "message": "'hashlib' imported but unused",
       "source": "import hashlib",

@@ -117,6 +117,43 @@ class EventRuleFormWithdrawnGuardTests(TestCase):
         self.assertIn("withdrawn", str(form.errors["conditions"]))
 
 
+class EventRuleWithdrawnUiStatusTests(TenantTestMixin, TestCase):
+    def setUp(self):
+        self.model = ContentType.objects.get_for_model(EventRule)
+        self.rule_with_conditions = EventRule.objects.create(
+            name="Withdrawn rule",
+            model=self.model,
+            events=["create"],
+            action_type=EventRule.ACTION_NOTIFICATION,
+            conditions={"rules": [{"field": "model_name", "op": "eq", "value": "manufacturer"}]},
+            enabled=True,
+        )
+        self.rule_without_conditions = EventRule.objects.create(
+            name="Plain rule",
+            model=self.model,
+            events=["create"],
+            action_type=EventRule.ACTION_NOTIFICATION,
+            conditions={},
+            enabled=True,
+        )
+        self.list_url = reverse("extras:eventrule_list")
+
+    def test_list_table_shows_withdrawn_badge_and_dash(self):
+        admin = User.objects.create_superuser(username="admin", password="password")
+        self.client.force_login(admin)
+
+        response = self.client.get(self.list_url)
+
+        self.assertEqual(response.status_code, 200)
+        content = response.content.decode()
+        self.assertIn("Withdrawn rule", content)
+        self.assertIn("Withdrawn", content)
+        self.assertIn("Plain rule", content)
+        self.assertIn("—", content)
+        # The authored condition JSON must never leak into the list table.
+        self.assertNotIn('"field": "model_name"', content)
+
+
 class EventRuleSerializerWithdrawnGuardTests(TenantTestMixin, APITestCase):
     def setUp(self):
         self.tenant_a = Tenant.objects.create(name="Tenant A", slug="tenant-a")
@@ -159,7 +196,7 @@ class EventRuleSerializerWithdrawnGuardTests(TenantTestMixin, APITestCase):
     def _etag(self, obj):
         # Mutating API requests require an If-Match precondition (optimistic
         # concurrency guard); the client builds the token from updated_at.
-        return f'W/"{obj.updated_at.isoformat()}"'
+        return 'W/"{0}"'.format(obj.updated_at.isoformat())
 
     def test_post_create_with_conditions_returns_400(self):
         self.client.force_authenticate(user=User.objects.create_superuser(username="admin", password="password"))

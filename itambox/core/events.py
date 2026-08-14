@@ -212,16 +212,13 @@ def _evaluate_condition(rule, event):
         return str(value) in str(actual) if actual else False
     elif op == "in":
         return actual in (value if isinstance(value, list) else [value])
-    elif op == "gt":
+    elif op in ("gt", "lt"):
         try:
-            return float(actual) > float(value)
+            lhs = float(actual)
+            rhs = float(value)
         except (TypeError, ValueError):
             return False
-    elif op == "lt":
-        try:
-            return float(actual) < float(value)
-        except (TypeError, ValueError):
-            return False
+        return lhs > rhs if op == "gt" else lhs < rhs
 
     return False
 

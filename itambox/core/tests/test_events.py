@@ -112,6 +112,23 @@ class EventsSystemTestCase(TransactionTestCase):
 
                 self.assertFalse(Notification.objects.filter(subject=rule.action_config["subject"]).exists())
 
+    def test_evaluate_condition_gt_lt_and_non_dict_shapes(self):
+        """The withdrawn engine keeps its numeric operators (v2 reuse path) and
+        fails closed on unexpected shapes."""
+        event = Event(
+            model=self.manufacturer_ct,
+            object_id=1,
+            action="create",
+            data={"price": "10"},
+        )
+        self.assertTrue(_evaluate_condition({"field": "price", "op": "gt", "value": 5}, event))
+        self.assertFalse(_evaluate_condition({"field": "price", "op": "gt", "value": 15}, event))
+        self.assertTrue(_evaluate_condition({"field": "price", "op": "lt", "value": 15}, event))
+        self.assertFalse(_evaluate_condition({"field": "price", "op": "lt", "value": 5}, event))
+        self.assertFalse(_evaluate_condition({"field": "price", "op": "gt", "value": "not-a-number"}, event))
+        self.assertFalse(_evaluate_condition("not-a-dict", event))
+        self.assertFalse(_check_conditions([], event))
+
     def test_empty_conditions_continue_to_match(self):
         for index, conditions in enumerate(({}, {"rules": []})):
             with self.subTest(conditions=conditions):
@@ -199,6 +216,14 @@ class EventsSystemTestCase(TransactionTestCase):
             with self.subTest(conditions=conditions):
                 rule = EventRule(conditions=conditions)
                 self.assertEqual(rule.conditions_withdrawn, expected)
+
+    def test_event_rule_conditions_json_renders_pretty_json(self):
+        rule = EventRule(conditions={"rules": [{"field": "model_name", "op": "eq", "value": "manufacturer"}]})
+
+        self.assertEqual(
+            rule.conditions_json,
+            '{\n  "rules": [\n    {\n      "field": "model_name",\n      "op": "eq",\n      "value": "manufacturer"\n    }\n  ]\n}',
+        )
 
     def test_event_rules_scoped_to_instance_tenant_in_system_context(self):
         """WS5-1: in a system context (no active tenant/user) a save must fire ONLY the

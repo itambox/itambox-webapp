@@ -209,6 +209,7 @@ MODULE_LAYER_OVERRIDES = {
     "core.paginator": "presentation",
     "extras.customfields": "domain-service",
     "extras.dashboard.utils": "presentation",
+    "extras.management.commands.eventrule_withdrawn_report": "composition",
     "extras.utils": "domain-service",
     "inventory.kit_checkout": "domain-service",
     # A genuinely mixed module: it holds an abstract model mixin *and* two

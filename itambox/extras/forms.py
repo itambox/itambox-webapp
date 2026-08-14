@@ -6,6 +6,7 @@ from django import forms
 from django.contrib.contenttypes.models import ContentType
 from django.core.exceptions import ValidationError
 from django.db.models import Q
+from django.templatetags.static import static
 from django.urls import reverse
 from django.utils.html import format_html
 from django.utils.translation import gettext_lazy as _
@@ -496,12 +497,15 @@ class EventRuleForm(forms.ModelForm):
         if self.instance and self.instance.pk and self.instance.conditions:
             conditions_block = format_html(
                 '<div class="alert alert-warning" role="alert">{}</div>'
-                '<pre class="bg-light border rounded p-3">{}</pre>',
+                '<pre class="bg-light border rounded p-3">{}</pre>'
+                '<a href="{}">{}</a>',
                 _(
                     "Conditions are withdrawn for the 1.0 release. Existing conditions are preserved and remain "
                     "readable; new or changed conditions cannot be submitted."
                 ),
                 self.instance.conditions_json,
+                static("docs/usage/webhooks-and-automation.html") + "#event-rule-conditions-withdrawn-for-10",
+                _("Read the Event Rule conditions documentation."),
             )
         else:
             conditions_block = format_html(
