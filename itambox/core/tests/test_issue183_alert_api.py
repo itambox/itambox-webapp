@@ -85,6 +85,62 @@ class AlertBulkTenantBoundaryTests(TenantTestMixin, TestCase):
         self.assertEqual(self.local.status, AlertLog.STATUS_ACTIVE)
         self.assertEqual(self.foreign.status, AlertLog.STATUS_ACTIVE)
 
+    def _login_superuser_without_active_tenant(self):
+        self.client.logout()
+        self.client.force_login(self.tenant_admin)
+        session = self.client.session
+        session.pop("active_tenant_id", None)
+        session.pop("active_tenant_group_id", None)
+        session.pop("active_all_accessible", None)
+        session.save()
+        self.clear_tenant_context()
+
+    def test_no_active_tenant_superuser_cannot_bulk_mutate_foreign_alert(self):
+        self._login_superuser_without_active_tenant()
+        response = self.client.post(
+            reverse("extras:alertlog_bulk_acknowledge"),
+            {"pk": [self.foreign.pk]},
+        )
+        self.assertEqual(response.status_code, 302)
+        self.foreign.refresh_from_db()
+        self.assertEqual(self.foreign.status, AlertLog.STATUS_ACTIVE)
+
+    def test_no_active_tenant_superuser_cannot_bulk_mutate_tenantless_alert(self):
+        tenantless = AlertLog._base_manager.create(
+            tenant=None,
+            rule=self.rule_a,
+            subject="tenantless-superuser",
+            message="tenantless-superuser",
+            content_type=ContentType.objects.get_for_model(AlertRule),
+            object_id=self.rule_a.pk + 100001,
+            tenant_resolution_status="global",
+        )
+        self._login_superuser_without_active_tenant()
+        response = self.client.post(
+            reverse("extras:alertlog_bulk_acknowledge"),
+            {"pk": [tenantless.pk]},
+        )
+        self.assertEqual(response.status_code, 302)
+        tenantless.refresh_from_db()
+        self.assertEqual(tenantless.status, AlertLog.STATUS_ACTIVE)
+
+    def test_active_tenant_superuser_can_bulk_mutate_current_tenant_alert(self):
+        self.client_login_to_tenant(self.tenant_admin, self.tenant_a)
+        response = self.client.post(
+            reverse("extras:alertlog_bulk_acknowledge"),
+            {"pk": [self.local.pk]},
+        )
+        self.assertEqual(response.status_code, 302)
+        self.local.refresh_from_db()
+        self.assertEqual(self.local.status, AlertLog.STATUS_ACKNOWLEDGED)
+
+    def test_no_active_tenant_superuser_cannot_single_mutate_foreign_alert(self):
+        self._login_superuser_without_active_tenant()
+        response = self.client.post(reverse("extras:alertlog_acknowledge", kwargs={"pk": self.foreign.pk}))
+        self.assertEqual(response.status_code, 404)
+        self.foreign.refresh_from_db()
+        self.assertEqual(self.foreign.status, AlertLog.STATUS_ACTIVE)
+
     def test_superuser_cannot_bulk_mutate_unresolved_null_tenant_alert(self):
         unresolved = AlertLog._base_manager.create(
             tenant=None,
@@ -92,12 +148,10 @@ class AlertBulkTenantBoundaryTests(TenantTestMixin, TestCase):
             subject="unresolved-superuser",
             message="unresolved-superuser",
             content_type=ContentType.objects.get_for_model(AlertRule),
-            object_id=self.rule_a.pk + 100001,
+            object_id=self.rule_a.pk + 100002,
             tenant_resolution_status="unresolved",
         )
-        self.client.logout()
-        self.client.force_login(self.tenant_admin)
-        self.clear_tenant_context()
+        self._login_superuser_without_active_tenant()
         response = self.client.post(
             reverse("extras:alertlog_bulk_acknowledge"),
             {"pk": [unresolved.pk]},

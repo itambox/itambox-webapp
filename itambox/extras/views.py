@@ -500,7 +500,17 @@ class AlertLogListView(ObjectListView):
         return context
 
 
-class AlertAcknowledgeView(SimplePostView):
+class _TenantBoundAlertActionMixin:
+    # Keep superuser single-alert mutations fail-closed without an active tenant.
+
+    def get_queryset(self):
+        queryset = super().get_queryset()
+        if self.request.user.is_superuser and get_current_tenant() is None:
+            return queryset.none()
+        return queryset
+
+
+class AlertAcknowledgeView(_TenantBoundAlertActionMixin, SimplePostView):
     queryset = AlertLog.objects.filter(tenant__isnull=False)
     permission_required = ("extras.change_alertlog",)
 
@@ -521,7 +531,7 @@ class AlertAcknowledgeView(SimplePostView):
         )
 
 
-class AlertResolveView(SimplePostView):
+class AlertResolveView(_TenantBoundAlertActionMixin, SimplePostView):
     queryset = AlertLog.objects.filter(tenant__isnull=False)
     permission_required = ("extras.change_alertlog",)
 
@@ -578,7 +588,13 @@ class _BulkAlertActionView(LoginRequiredMixin, PermissionRequiredMixin, View):
             # including for superusers: reconciliation has not established an
             # owner, so bulk actions must fail closed rather than guess.
             locked_qs = locked_qs.exclude(tenant__isnull=True, tenant_resolution_status="unresolved")
-            if not request.user.is_superuser:
+            current_tenant = get_current_tenant()
+            if request.user.is_superuser and current_tenant is None:
+                # TenantScopingManager intentionally gives superusers a global
+                # queryset without a scope. A bulk mutation must never use that
+                # global path: without an active tenant, fail closed.
+                locked_qs = locked_qs.none()
+            elif not request.user.is_superuser:
                 locked_qs = locked_qs.filter(tenant__isnull=False)
             locked_alerts = list(locked_qs)
             # Materialize the locked rows before comparing the selection. Django

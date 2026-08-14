@@ -6,6 +6,7 @@ from django.test import Client, TestCase
 from django.urls import reverse
 
 from extras.models import AlertLog, AlertRule
+from organization.models import Tenant
 
 User = get_user_model()
 
@@ -16,7 +17,12 @@ class AlertBulkActionViewTests(TestCase):
         self.admin = User.objects.create_superuser(username="bulkadmin", password="x", email="a@b.com")
         self.client = Client()
         self.client.force_login(self.admin)
+        self.tenant = Tenant.objects.create(name="Bulk Tenant", slug="bulk-tenant")
+        session = self.client.session
+        session["active_tenant_id"] = self.tenant.pk
+        session.save()
         self.rule = AlertRule.objects.create(
+            tenant=self.tenant,
             name="Bulk Rule",
             alert_type=AlertRule.ALERT_TYPE_LOW_STOCK,
             threshold_value=5,
@@ -25,6 +31,7 @@ class AlertBulkActionViewTests(TestCase):
 
     def _log(self, oid, status=AlertLog.STATUS_ACTIVE):
         return AlertLog.objects.create(
+            tenant=self.tenant,
             rule=self.rule,
             subject="s",
             message="m",
