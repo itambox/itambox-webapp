@@ -146,11 +146,18 @@ class ScheduledReportScopeApprovalViewTests(TestCase):
         self.assertContains(response, "would not take effect")
 
     def test_approve_refused_when_a_scope_tenant_does_not_resolve(self):
-        through = self.sched.filter_tenants.through
-        through._base_manager.create(scheduledreport_id=self.sched.pk, tenant_id=999999)
-        response = self._client_for(self.admin).post(self.url, {"action": "approve"}, follow=True)
+        from unittest.mock import patch
+
+        # Simulate a stale scope id (e.g. a hard-deleted tenant still present in
+        # the through table) without violating the tenant FK at flush time.
+        with patch.object(
+            ScheduledReport,
+            "effective_scope_tenant_ids",
+            return_value=[self.tenant_a.pk, self.tenant_b.pk, 999999],
+        ):
+            response = self._client_for(self.admin).post(self.url, {"action": "approve"}, follow=True)
         self.assertEqual(ScheduledReportScopeAuthorization.objects.filter(scheduled_report=self.sched).count(), 0)
-        self.assertContains(response, "does not resolve")
+        self.assertContains(response, "resolves to an existing tenant")
 
     def test_stored_authorizer_reach_loss_is_surfaced_on_the_page(self):
         from organization.models import RoleGrant
