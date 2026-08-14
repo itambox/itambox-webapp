@@ -2,6 +2,7 @@
 
 from django.contrib.auth import get_user_model
 from django.contrib.contenttypes.models import ContentType
+from django.db import transaction
 from django.test import TestCase, TransactionTestCase
 from django.urls import reverse
 from django.utils import timezone
@@ -300,6 +301,117 @@ class AlertDeliveryFailureTests(TransactionTestCase):
 
 
 class AlertRenotifyDeliveryTests(TransactionTestCase):
+    def test_metadata_update_failure_does_not_block_later_dispatch_callback(self):
+        from unittest.mock import Mock, patch
+
+        from core.tasks.alerts import _schedule_alert_dispatch
+
+        tenant = Tenant.objects.create(name="Issue 183 Callback Tenant", slug="issue-183-callback-tenant")
+        rule = AlertRule.objects.create(
+            name="Issue 183 Callback Rule",
+            alert_type=AlertRule.ALERT_TYPE_LOW_STOCK,
+            threshold_value=5,
+            tenant=tenant,
+        )
+        content_type = ContentType.objects.get_for_model(AlertRule)
+        first = AlertLog._base_manager.create(
+            tenant=tenant,
+            rule=rule,
+            subject="first",
+            message="first",
+            content_type=content_type,
+            object_id=rule.pk,
+        )
+        second = AlertLog._base_manager.create(
+            tenant=tenant,
+            rule=rule,
+            subject="second",
+            message="second",
+            content_type=content_type,
+            object_id=rule.pk + 1,
+        )
+        match = {"obj": rule, "tenant": tenant, "subject": "alert", "message": "alert"}
+        failed_update = Mock(side_effect=RuntimeError("metadata update failure"))
+        first_filter = Mock(update=failed_update)
+        second_filter = AlertLog.unscoped.filter(pk=second.pk)
+
+        with (
+            patch("core.tasks.alerts._dispatch_channels", return_value={"7": "ok"}),
+            patch.object(
+                AlertLog.unscoped,
+                "filter",
+                side_effect=[first_filter, second_filter],
+            ) as filter_mock,
+        ):
+            with transaction.atomic():
+                _schedule_alert_dispatch(rule, match, first)
+                _schedule_alert_dispatch(rule, match, second)
+
+        self.assertEqual(filter_mock.call_count, 2)
+        first.refresh_from_db()
+        second.refresh_from_db()
+        self.assertEqual(first.delivery_status, {})
+        self.assertEqual(second.delivery_status, {"7": "ok"})
+
+    def test_duplicate_match_schedules_only_one_pending_dispatch(self):
+        from unittest.mock import patch
+
+        from core.tasks.alerts import _evaluate_rule
+
+        tenant = Tenant.objects.create(name="Issue 183 Duplicate Tenant", slug="issue-183-duplicate-tenant")
+        rule = AlertRule.objects.create(
+            name="Issue 183 Duplicate Rule",
+            alert_type=AlertRule.ALERT_TYPE_LOW_STOCK,
+            threshold_value=5,
+            tenant=tenant,
+            renotify_interval_days=0,
+        )
+        alert = AlertLog._base_manager.create(
+            tenant=tenant,
+            rule=rule,
+            subject="duplicate",
+            message="duplicate",
+            content_type=ContentType.objects.get_for_model(AlertRule),
+            object_id=rule.pk,
+            delivery_status={"__dispatch__": "pending"},
+        )
+        match = {"obj": rule, "tenant": tenant, "subject": "duplicate", "message": "duplicate"}
+        with (
+            patch("core.tasks.alerts._collect_matches", return_value=[match, match]),
+            patch("core.tasks.alerts._dispatch_channels", return_value={"7": "ok"}) as dispatch,
+        ):
+            with TaskContext(tenant_id=tenant.pk):
+                _evaluate_rule(rule, timezone.now().date(), {(rule.pk, alert.content_type_id, alert.object_id): alert})
+        dispatch.assert_called_once()
+
+    def test_pending_alert_is_retried_on_next_evaluation(self):
+        from unittest.mock import patch
+
+        from core.tasks.alerts import _evaluate_rule
+
+        tenant = Tenant.objects.create(name="Issue 183 Pending Tenant", slug="issue-183-pending-tenant")
+        rule = AlertRule.objects.create(
+            name="Issue 183 Pending Rule",
+            alert_type=AlertRule.ALERT_TYPE_LOW_STOCK,
+            threshold_value=5,
+            tenant=tenant,
+        )
+        alert = AlertLog._base_manager.create(
+            tenant=tenant,
+            rule=rule,
+            subject="pending",
+            message="pending",
+            content_type=ContentType.objects.get_for_model(AlertRule),
+            object_id=rule.pk,
+            delivery_status={"__dispatch__": "pending"},
+        )
+        with patch("core.tasks.alerts._collect_matches", return_value=[]):
+            # A pending row without a current match remains safe and untouched.
+            with TaskContext(tenant_id=tenant.pk):
+                _evaluate_rule(rule, timezone.now().date(), {(rule.pk, alert.content_type_id, alert.object_id): alert})
+        alert.refresh_from_db()
+        self.assertEqual(alert.delivery_status, {"__dispatch__": "pending"})
+
     def test_renotify_delivery_failure_is_post_commit_and_isolated(self):
         from unittest.mock import patch
 

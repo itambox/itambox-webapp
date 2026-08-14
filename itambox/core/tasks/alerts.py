@@ -101,7 +101,7 @@ def _schedule_alert_dispatch(rule, match, alert_log):
     """Dispatch one persisted alert after commit and record disposition state."""
     alert_id = alert_log.pk
     rule_id = rule.pk
-    tenant_id = rule.tenant_id
+    tenant_id = alert_log.tenant_id
     alert_match = dict(match)
 
     def dispatch_alert():
@@ -114,10 +114,15 @@ def _schedule_alert_dispatch(rule, match, alert_log):
         except Exception:
             logger.exception("Alert delivery failed for AlertLog %s.", alert_id)
             delivery = {"__dispatch__": DeliveryDisposition.TERMINAL.value}
-        AlertLog.unscoped.filter(pk=alert_id).update(
-            delivery_status=delivery,
-            last_notified_at=notified_at,
-        )
+        try:
+            AlertLog.unscoped.filter(pk=alert_id).update(
+                delivery_status=delivery,
+                last_notified_at=notified_at,
+            )
+        except Exception:
+            # A metadata-write failure must not escape the on_commit callback:
+            # Django stops executing later callbacks when one raises.
+            logger.exception("Alert delivery metadata update failed for AlertLog %s.", alert_id)
 
     transaction.on_commit(dispatch_alert)
 
@@ -132,6 +137,7 @@ def _evaluate_rule(rule, today, existing_logs):
     now = timezone.now()
     fresh_count = 0
     matched_keys = set()  # (content_type_id, object_id) for this rule run
+    scheduled_dispatch_keys = set()  # at most one callback per alert in this pass
 
     try:
         matches = _collect_matches(rule, today)
@@ -163,6 +169,7 @@ def _evaluate_rule(rule, today, existing_logs):
                         content_type=ct,
                         object_id=obj.pk,
                         tenant=match.get("tenant"),
+                        delivery_status=({"__dispatch__": "pending"} if not rule.is_muted else {}),
                     )
             except IntegrityError:
                 # The partial unique constraint fired (or, rarely, another
@@ -206,13 +213,21 @@ def _evaluate_rule(rule, today, existing_logs):
                     alert_log.last_notified_at = now
 
                     _schedule_alert_dispatch(rule, match, alert_log)
+                    scheduled_dispatch_keys.add(key)
 
-        if existing is not None and not rule.is_muted and rule.renotify_interval_days > 0:
-            # Existing unresolved alert — re-notify on cadence.
+        if existing is not None and not rule.is_muted:
+            # Retry a committed-but-undelivered alert, or re-notify on cadence.
+            pending = (existing.delivery_status or {}).get("__dispatch__") == "pending"
             ref = existing.last_notified_at or existing.created_at
-            if ref and (now - ref) >= timezone.timedelta(days=rule.renotify_interval_days):
+            due = ref and (now - ref) >= timezone.timedelta(days=rule.renotify_interval_days)
+            if (pending or (rule.renotify_interval_days > 0 and due)) and key not in scheduled_dispatch_keys:
+                AlertLog.unscoped.filter(pk=existing.pk).update(
+                    delivery_status={"__dispatch__": "pending"},
+                )
+                existing.delivery_status = {"__dispatch__": "pending"}
                 existing.last_notified_at = now
                 _schedule_alert_dispatch(rule, match, existing)
+                scheduled_dispatch_keys.add(key)
                 logger.info("Re-notified AlertLog %s for '%s'.", existing.pk, existing.subject)
 
     # Auto-resolve logs whose conditions have cleared.

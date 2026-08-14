@@ -56,6 +56,12 @@ def reverse_alert_tenant_reconciliation(apps, schema_editor):
 
 
 class Migration(migrations.Migration):
+    # PostgreSQL change-log triggers queue events for the backfill UPDATE. Keep
+    # the AddField/index DDL and the data operation in separate transactions so
+    # deferred CREATE INDEX cannot run while AlertLog still has pending trigger
+    # events during a real MigrationExecutor forward migration.
+    atomic = False
+
     dependencies = [
         ("contenttypes", "0002_remove_content_type_name"),
         ("extras", "0103_remove_reporttemplate_advanced_mode_and_more"),

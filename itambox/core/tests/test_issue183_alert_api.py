@@ -85,6 +85,27 @@ class AlertBulkTenantBoundaryTests(TenantTestMixin, TestCase):
         self.assertEqual(self.local.status, AlertLog.STATUS_ACTIVE)
         self.assertEqual(self.foreign.status, AlertLog.STATUS_ACTIVE)
 
+    def test_superuser_cannot_bulk_mutate_unresolved_null_tenant_alert(self):
+        unresolved = AlertLog._base_manager.create(
+            tenant=None,
+            rule=self.rule_a,
+            subject="unresolved-superuser",
+            message="unresolved-superuser",
+            content_type=ContentType.objects.get_for_model(AlertRule),
+            object_id=self.rule_a.pk + 100001,
+            tenant_resolution_status="unresolved",
+        )
+        self.client.logout()
+        self.client.force_login(self.tenant_admin)
+        self.clear_tenant_context()
+        response = self.client.post(
+            reverse("extras:alertlog_bulk_acknowledge"),
+            {"pk": [unresolved.pk]},
+        )
+        self.assertEqual(response.status_code, 302)
+        unresolved.refresh_from_db()
+        self.assertEqual(unresolved.status, AlertLog.STATUS_ACTIVE)
+
 
 class AlertLogReadOnlyAPITests(APITestCase):
     def setUp(self):

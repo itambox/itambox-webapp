@@ -574,7 +574,11 @@ class _BulkAlertActionView(LoginRequiredMixin, PermissionRequiredMixin, View):
             unique_pks = set()
         with transaction.atomic():
             locked_qs = AlertLog.objects.select_for_update().filter(pk__in=unique_pks).order_by("pk")
-            if not request.user.is_superuser and get_current_tenant() is not None:
+            # A null-tenant row marked unresolved is never safe to mutate,
+            # including for superusers: reconciliation has not established an
+            # owner, so bulk actions must fail closed rather than guess.
+            locked_qs = locked_qs.exclude(tenant__isnull=True, tenant_resolution_status="unresolved")
+            if not request.user.is_superuser:
                 locked_qs = locked_qs.filter(tenant__isnull=False)
             locked_alerts = list(locked_qs)
             # Materialize the locked rows before comparing the selection. Django
