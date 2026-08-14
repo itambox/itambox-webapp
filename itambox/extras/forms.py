@@ -221,7 +221,6 @@ from .models import (
     ExportTemplate,
     LabelTemplate,
     NotificationChannel,
-    ReportTemplate,
     ScheduledReport,
     WebhookEndpoint,
 )
