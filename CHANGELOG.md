@@ -27,7 +27,7 @@ This changelog follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) 
 - Asset Request auto-approval and the Beta Asset Request procurement seam are now opt-in through `ITAMBOX_REQUISITION_AUTO_APPROVAL_THRESHOLDS`; fresh deployments leave requests pending. The legacy setting name remains a deprecated 1.x fallback with a startup warning.
 - Alert rules with no configured channels now deliver nowhere instead of implicitly fanning out to every enabled tenant or tenant-less channel; platform-global in-app delivery remains explicit.
 - Closed the Event action vocabulary: `EventRule.events` is validated against the supported action set ahead of the 1.0 contract freeze.
-- Scheduled reports are gated on the report designer opt-in: with the designer disabled, the navigation entry is hidden, all scheduled-report routes return 404, and the background task fails closed while preserving saved rows.
+- Scheduled reports are gated on the report designer opt-in: with the designer disabled, the navigation entry is hidden, all scheduled-report routes return 404, and the background task skips non-grandfathered templates while preserving saved rows. Migration-managed bounded grandfathered templates continue to render and deliver; those templates are read-only until the designer is enabled.
 - Completed the zero-error OpenAPI generation contract and the generated-client compatibility check.
 - Updated locked runtime dependencies to redis-py 8.1 and django-redis 7.0.
 
