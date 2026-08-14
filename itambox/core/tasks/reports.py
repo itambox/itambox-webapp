@@ -230,9 +230,16 @@ def _deliver_report_channels(sched, summary_cards, total_rows):
 
 def _resolve_report_scope(sched):
     active_tenant = sched.tenant or (sched.report.tenant if sched.report else None)
-    filter_tenants = list(sched.filter_tenants.all())
-    if not filter_tenants and sched.report:
-        filter_tenants = list(sched.report.filter_tenants.all())
+    # Resolve the persisted scope through the model's unscoped through-table
+    # reader: the ambient tenant (bound in request threads and left behind by
+    # permission checks) would otherwise silently truncate the M2M read.
+    scope_ids = sched.effective_scope_tenant_ids()
+    filter_tenants = []
+    if scope_ids:
+        # inline import: heavy-import: organization models are only needed for tenant resolution
+        from organization.models import Tenant
+
+        filter_tenants = list(Tenant.all_objects.filter(pk__in=scope_ids).order_by("pk"))
     if active_tenant is None and not filter_tenants:
         logger.error(
             "Scheduled report has no tenant scope; refusing cross-tenant compilation",
