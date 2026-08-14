@@ -11079,6 +11079,26 @@ paths:
           type: string
           format: date
         description: Created before
+      - in: query
+        name: delivery_outcome
+        schema:
+          type: array
+          items:
+            type: string
+            enum:
+            - delivered
+            - failed
+            - none
+            - pending
+        description: |-
+          Delivery Outcome
+
+          * `none` - No delivery planned
+          * `pending` - Dispatch pending
+          * `delivered` - Delivered
+          * `failed` - Failed
+        explode: true
+        style: form
       - name: limit
         required: false
         in: query
@@ -38053,8 +38073,38 @@ components:
           readOnly: true
         delivery_status:
           readOnly: true
-          description: 'Per-channel delivery result: {channel_pk: ''ok''|''failed''|''error:
-            ...''}'
+          description: 'Per-channel typed delivery outcome: {channel_pk: {disposition,
+            operation, delivery_id, attempted_at, error_class?, message?}} plus dispatch
+            bookkeeping keys (__dispatch__, __delivery_id__, __no_channels__). Legacy
+            string values (''ok''|''failed''|''error: ...'') remain readable.'
+        delivery_outcome:
+          allOf:
+          - $ref: '#/components/schemas/DeliveryOutcomeEnum'
+          readOnly: true
+          description: |-
+            Denormalized single-attempt delivery outcome (none|pending|delivered|failed).
+
+            * `none` - No delivery planned
+            * `pending` - Dispatch pending
+            * `delivered` - Delivered
+            * `failed` - Failed
+        delivery_attempts:
+          type: integer
+          readOnly: true
+          description: Number of dispatch runs attempted for this alert; each planned
+            dispatch (including renotification) counts as one fresh attempt.
+        last_delivery_id:
+          type: string
+          readOnly: true
+          nullable: true
+          description: Stable unique identifier of the most recent dispatch run; unchanged
+            for that run.
+        last_delivery_error:
+          type: string
+          readOnly: true
+          nullable: true
+          description: Typed error class (or disposition) of the most recent failed
+            channel delivery, if any.
         last_notified_at:
           type: string
           format: date-time
@@ -38110,8 +38160,12 @@ components:
       - content_object_display
       - content_type
       - created_at
+      - delivery_attempts
+      - delivery_outcome
       - delivery_status
       - id
+      - last_delivery_error
+      - last_delivery_id
       - last_notified_at
       - message
       - object_id
@@ -41208,6 +41262,18 @@ components:
         * `degauss` - Degaussing
         * `physical_destruction` - Physical Destruction (shred/crush)
         * `crypto_erase` - Cryptographic Erase
+    DeliveryOutcomeEnum:
+      enum:
+      - none
+      - pending
+      - delivered
+      - failed
+      type: string
+      description: |-
+        * `none` - No delivery planned
+        * `pending` - Dispatch pending
+        * `delivered` - Delivered
+        * `failed` - Failed
     Depreciation:
       type: object
       properties:
