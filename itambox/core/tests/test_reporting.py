@@ -726,6 +726,7 @@ class ScheduledReportScopeAuthorizationTests(TestCase):
             is_active=True,
         )
         deleted_scope.filter_tenants.add(self.tenant_b)
+        ScheduledReportScopeAuthorization.approve(deleted_scope, self.user)
         self.tenant_b.delete()
 
         result = generate_scheduled_report_task(deleted_scope.pk)
