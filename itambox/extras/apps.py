@@ -99,7 +99,8 @@ class ExtrasConfig(AppConfig):
                 docs_url=DOCS,
                 limitations=(
                     "The scheduled capability requires the operator flag ITAMBOX_FEATURE_REPORT_DESIGNER and an active "
-                    "schedule row; disabling the flag pauses delivery without deleting saved schedules.",
+                    "schedule row; disabling the flag pauses delivery for non-grandfathered templates without deleting "
+                    "saved schedules, while the migration-managed bounded grandfathered set keeps rendering.",
                     "Delivery depends on a running qcluster worker; a stopped worker silently skips runs.",
                     "Archive retention is not yet configurable per schedule.",
                 ),
