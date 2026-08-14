@@ -440,7 +440,8 @@ def generate_scheduled_report_task(scheduled_report_id: int) -> TaskResult:
         return TaskResult(TaskStatus.TERMINAL, "report.scope_missing", user_visible=True)
     active_tenant, filter_tenants = scope
     scope_authorized_user_id = _resolve_scope_authorization(sched, active_tenant, filter_tenants)
-    if _scope_requires_authorization(active_tenant, filter_tenants) and scope_authorized_user_id is None:
+    scope_requires_authorization = _scope_requires_authorization(active_tenant, filter_tenants)
+    if scope_requires_authorization and scope_authorized_user_id is None:
         logger.warning(
             "Scheduled report has no current durable authorization for its broad tenant scope",
             extra={"operation": "reports.scope", "scheduled_report_id": sched.pk},
@@ -448,7 +449,7 @@ def generate_scheduled_report_task(scheduled_report_id: int) -> TaskResult:
         return TaskResult(TaskStatus.TERMINAL, "report.scope_unauthorized", user_visible=True)
 
     with TaskContext(
-        tenant_id=active_tenant.id if active_tenant else None,
+        tenant_id=None if scope_requires_authorization else active_tenant.id if active_tenant else None,
         user_id=scope_authorized_user_id,
         operation="reports.generate",
     ) as ctx:

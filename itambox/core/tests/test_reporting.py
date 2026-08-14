@@ -748,7 +748,7 @@ class ScheduledReportScopeAuthorizationTests(TestCase):
 
         def process(sched, active_tenant, filter_tenants):
             self.assertEqual(get_current_user().pk, self.user.pk)
-            self.assertEqual(get_current_tenant().pk, self.tenant_a.pk)
+            self.assertIsNone(get_current_tenant())
             self.assertEqual({tenant.pk for tenant in filter_tenants}, {self.tenant_a.pk, self.tenant_b.pk})
             return TaskResult(TaskStatus.SUCCESS, "report.completed")
 

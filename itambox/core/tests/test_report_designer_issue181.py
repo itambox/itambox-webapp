@@ -381,6 +381,39 @@ class ReportDesignerIssue181CoverageTests(SimpleTestCase):
         assert result.status.value == "terminal"
         assert result.code == "report.scope_unauthorized"
 
+    def test_generate_task_uses_authorized_principal_without_ambient_tenant_for_broad_scope(self):
+        schedule = SimpleNamespace(
+            pk=3,
+            report=SimpleNamespace(legacy_designer_grandfathered=False),
+            is_active=True,
+            save=Mock(),
+        )
+        tenant_a = SimpleNamespace(pk=1, id=1)
+        tenant_b = SimpleNamespace(pk=2, id=2)
+        authorized_principal_id = 99
+        expected_result = SimpleNamespace(status="success")
+        manager = Mock()
+        manager.get.return_value = schedule
+
+        with (
+            patch("core.tasks.reports.ScheduledReport.objects", manager),
+            patch("core.tasks.reports.report_designer_probe", return_value=SimpleNamespace(active=True)),
+            patch("core.tasks.reports._resolve_report_scope", return_value=(tenant_a, [tenant_a, tenant_b])),
+            patch("core.tasks.reports._resolve_scope_authorization", return_value=authorized_principal_id),
+            patch("core.tasks.reports._scope_requires_authorization", return_value=True),
+            patch("core.tasks.reports.TaskContext") as task_context,
+            patch("core.tasks.reports._process_scheduled_report", return_value=expected_result) as process_report,
+        ):
+            result = generate_scheduled_report_task(schedule.pk)
+
+        assert result is expected_result
+        task_context.assert_called_once_with(
+            tenant_id=None,
+            user_id=authorized_principal_id,
+            operation="reports.generate",
+        )
+        process_report.assert_called_once_with(schedule, tenant_a, [tenant_a, tenant_b])
+
     @staticmethod
     def _persisted_template_state(**overrides):
         state = {
