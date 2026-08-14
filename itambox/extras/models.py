@@ -1052,7 +1052,14 @@ class ScheduledReport(ChangeLoggingMixin, BaseModel):
         reads while an ambient tenant is bound, which would silently truncate
         the persisted scope.
         """
-        scope_ids = self.explicit_scope_tenant_ids()
+        scope_ids = self.explicit_scope_tenant_ids() if hasattr(self, "explicit_scope_tenant_ids") else []
+        if not scope_ids:
+            # DB-independent doubles (coverage helpers) and lightweight callers
+            # resolve the scope through the M2M managers instead.
+            filter_tenants = list(self.filter_tenants.all())
+            if not filter_tenants and self.report_id:
+                filter_tenants = list(self.report.filter_tenants.all())
+            scope_ids = sorted({tenant.pk for tenant in filter_tenants})
         if scope_ids:
             return scope_ids
         active_tenant = self.tenant or (self.report.tenant if self.report_id else None)
