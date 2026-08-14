@@ -160,7 +160,7 @@ class EventRuleSerializer(BaseModelSerializer):
             )
         return value
 
-    def validate_conditions(self, value):
+    def validate_conditions(self, value: dict[str, object] | None) -> dict[str, object] | None:
         if self.instance is None:
             if value:
                 raise serializers.ValidationError(_EVENT_RULE_CONDITIONS_WITHDRAWN_MESSAGE)
