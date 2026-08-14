@@ -1,5 +1,6 @@
 # itambox/extras/tables.py
 import django_tables2 as tables
+from django.apps import apps
 from django.core.exceptions import ObjectDoesNotExist
 from django.urls import reverse
 from django.utils.html import escape, format_html
@@ -468,7 +469,7 @@ class ScheduledReportTable(BaseTable):
                 url,
                 _("Review"),
             )
-        if sorted(set(authorization.scope_tenant_ids)) != sorted(set(record.effective_scope_tenant_ids())):
+        if not self._authorization_is_current(authorization, record):
             return format_html(
                 '<span class="badge bg-danger">{}</span> <a href="{}">{}</a>',
                 _("Scope changed"),
@@ -481,6 +482,18 @@ class ScheduledReportTable(BaseTable):
             url,
             _("Manage"),
         )
+
+    def _authorization_is_current(self, authorization, record):
+        # Generation compares the stored snapshot against the LIVE scope
+        # tenants; mirror that so a soft-deleted scope tenant reads as a scope
+        # change instead of a green "Approved".
+        Tenant = apps.get_model("organization", "Tenant")
+        live_ids = sorted(
+            Tenant._base_manager.filter(
+                pk__in=record.effective_scope_tenant_ids(), deleted_at__isnull=True
+            ).values_list("pk", flat=True)
+        )
+        return sorted(set(authorization.scope_tenant_ids)) == live_ids
 
     actions = tables.TemplateColumn(
         template_code="""

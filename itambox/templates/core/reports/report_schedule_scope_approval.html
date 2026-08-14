@@ -43,48 +43,52 @@
                 </li>
               {% endfor %}
             </ul>
+          {% endif %}
 
-            {% if authorization %}
-              <dl class="row">
-                <dt class="col-sm-4">{% translate "Approved by" %}</dt>
-                <dd class="col-sm-8">{{ authorization.authorized_by }}</dd>
-                <dt class="col-sm-4">{% translate "Approved at" %}</dt>
-                <dd class="col-sm-8">{{ authorization.approved_at }}</dd>
-                {% if authorization.is_revoked %}
-                  <dt class="col-sm-4">{% translate "Revoked by" %}</dt>
-                  <dd class="col-sm-8">{{ authorization.revoked_by }} ({{ authorization.revoked_at }})</dd>
-                {% endif %}
-              </dl>
-              {% if authorization_is_current %}
-                <div class="alert alert-success">
-                  {% translate "The stored approval matches the current scope and remains in effect." %}
-                </div>
-                {% if not stored_approval_is_effective %}
-                  <div class="alert alert-warning">
-                    {% translate "The stored approval no longer takes effect: the authorizing principal is inactive or has lost cross-tenant reach over part of the scope. Delivery fails closed until the scope is approved again." %}
-                  </div>
-                {% endif %}
-              {% elif not authorization.is_revoked %}
-                <div class="alert alert-danger">
-                  {% translate "The scope changed after the approval, so the stored approval no longer matches." %}
-                  {% translate "Stored scope:" %} {{ authorization.scope_tenant_ids|join:", " }}
-                  <br>
-                  {% translate "Delivery fails closed until the scope is approved again." %}
+          {% if authorization %}
+            <dl class="row">
+              <dt class="col-sm-4">{% translate "Approved by" %}</dt>
+              <dd class="col-sm-8">{{ authorization.authorized_by }}</dd>
+              <dt class="col-sm-4">{% translate "Approved at" %}</dt>
+              <dd class="col-sm-8">{{ authorization.approved_at }}</dd>
+              {% if authorization.is_revoked %}
+                <dt class="col-sm-4">{% translate "Revoked by" %}</dt>
+                <dd class="col-sm-8">{{ authorization.revoked_by }} ({{ authorization.revoked_at }})</dd>
+              {% endif %}
+            </dl>
+            {% if authorization_is_current %}
+              <div class="alert alert-success">
+                {% translate "The stored approval matches the current scope and remains in effect." %}
+              </div>
+              {% if not stored_approval_is_effective %}
+                <div class="alert alert-warning">
+                  {% translate "The stored approval no longer takes effect: the authorizing principal is inactive or has lost cross-tenant reach over part of the scope. Delivery fails closed until the scope is approved again." %}
                 </div>
               {% endif %}
-            {% else %}
-              <div class="alert alert-warning">
-                {% translate "No scope approval exists. Delivery of this schedule terminates with an authorization error until an approval is stored." %}
+            {% elif not authorization.is_revoked %}
+              <div class="alert alert-danger">
+                {% translate "The scope changed after the approval, so the stored approval no longer matches." %}
+                {% blocktranslate trimmed with stored=stored_scope_tenant_names|join:", " %}
+                  Stored scope: {{ stored }}
+                {% endblocktranslate %}
+                <br>
+                {% translate "Delivery fails closed until the scope is approved again." %}
               </div>
             {% endif %}
+          {% elif requires_authorization %}
+            <div class="alert alert-warning">
+              {% translate "No scope approval exists. Delivery of this schedule terminates with an authorization error until an approval is stored." %}
+            </div>
+          {% endif %}
 
-            {% if not approval_would_be_effective %}
-              <div class="alert alert-warning">
-                {% translate "Your cross-tenant permission does not cover every tenant in this scope, so an approval by you would not take effect. Delivery would keep failing closed." %}
-              </div>
-            {% endif %}
+          {% if requires_authorization and scope_tenants and not approval_would_be_effective %}
+            <div class="alert alert-warning">
+              {% translate "Your cross-tenant permission does not cover every tenant in this scope, so an approval by you would not take effect. Delivery would keep failing closed." %}
+            </div>
+          {% endif %}
 
-            <div class="d-flex gap-2">
+          <div class="d-flex gap-2">
+            {% if requires_authorization %}
               <form method="post" class="d-inline">
                 {% csrf_token %}
                 <input type="hidden" name="action" value="approve">
@@ -94,19 +98,19 @@
                   {% translate "Approve Scope" %}
                 </button>
               </form>
-              {% if authorization and not authorization.is_revoked %}
-                <form method="post" class="d-inline">
-                  {% csrf_token %}
-                  <input type="hidden" name="action" value="revoke">
-                  <input type="hidden" name="return_url" value="{{ return_url }}">
-                  <button type="submit" class="btn btn-danger">
-                    <i class="mdi mdi-close"></i>
-                    {% translate "Revoke Approval" %}
-                  </button>
-                </form>
-              {% endif %}
-            </div>
-          {% endif %}
+            {% endif %}
+            {% if authorization and not authorization.is_revoked %}
+              <form method="post" class="d-inline">
+                {% csrf_token %}
+                <input type="hidden" name="action" value="revoke">
+                <input type="hidden" name="return_url" value="{{ return_url }}">
+                <button type="submit" class="btn btn-danger">
+                  <i class="mdi mdi-close"></i>
+                  {% translate "Revoke Approval" %}
+                </button>
+              </form>
+            {% endif %}
+          </div>
         </div>
       </div>
     </div>

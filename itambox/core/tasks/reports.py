@@ -468,21 +468,10 @@ def generate_scheduled_report_task(scheduled_report_id: int) -> TaskResult:
     if scope is None:
         return TaskResult(TaskStatus.TERMINAL, "report.scope_missing", user_visible=True)
     active_tenant, filter_tenants = scope
-    if not filter_tenants:
-        existing_authorization = ScheduledReportScopeAuthorization._base_manager.filter(scheduled_report=sched).first()
-        if (
-            existing_authorization
-            and existing_authorization.scope_tenant_ids
-            and existing_authorization.revoked_at is None
-        ):
-            # Soft-deleting a tenant strips it from filter M2M sets, so a
-            # previously approved broad scope can silently collapse to the
-            # owner tenant. Fail closed instead of substituting owner data.
-            logger.error(
-                "Scheduled report approved scope tenants were removed; refusing owner fallback",
-                extra={"operation": "reports.scope", "scheduled_report_id": sched.pk},
-            )
-            return TaskResult(TaskStatus.TERMINAL, "report.scope_missing", user_visible=True)
+    # A schedule wound back to its owner tenant runs as an ordinary
+    # single-tenant schedule; a stale approval row only matters again if the
+    # scope is re-widened (generation then fails closed on the mismatch). The
+    # all-scope-tenants-soft-deleted collapse is already terminal above.
     scope_authorized_user_id = _resolve_scope_authorization(sched, active_tenant, filter_tenants)
     scope_requires_authorization = _scope_requires_authorization(active_tenant, filter_tenants)
     if scope_requires_authorization and scope_authorized_user_id is None:

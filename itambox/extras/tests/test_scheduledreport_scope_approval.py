@@ -96,7 +96,7 @@ class ScheduledReportScopeApprovalViewTests(TestCase):
     def test_approve_post_refuses_when_reach_does_not_cover_scope(self):
         response = self._client_for(self.partial).post(self.url, {"action": "approve"}, follow=True)
         self.assertEqual(ScheduledReportScopeAuthorization.objects.filter(scheduled_report=self.sched).count(), 0)
-        self.assertContains(response, "does not cover")
+        self.assertContains(response, "reach does not cover")
 
     def test_approve_of_single_tenant_schedule_is_rejected(self):
         self.sched.filter_tenants.clear()
@@ -118,7 +118,7 @@ class ScheduledReportScopeApprovalViewTests(TestCase):
         response = self._client_for(self.partial).post(self.url, {"action": "revoke"}, follow=True)
         authorization = ScheduledReportScopeAuthorization.objects.get(scheduled_report=self.sched)
         self.assertFalse(authorization.is_revoked())
-        self.assertContains(response, "does not cover")
+        self.assertContains(response, "The revocation would not be effective")
 
     def test_approve_after_revoke_clears_the_revocation(self):
         client = self._client_for(self.admin)
@@ -157,7 +157,42 @@ class ScheduledReportScopeApprovalViewTests(TestCase):
         ):
             response = self._client_for(self.admin).post(self.url, {"action": "approve"}, follow=True)
         self.assertEqual(ScheduledReportScopeAuthorization.objects.filter(scheduled_report=self.sched).count(), 0)
-        self.assertContains(response, "resolves to an existing tenant")
+        self.assertContains(response, "resolves to a live tenant")
+
+    def test_approve_refused_when_a_scope_tenant_is_soft_deleted(self):
+        self.tenant_b.delete()
+        response = self._client_for(self.admin).post(self.url, {"action": "approve"}, follow=True)
+        self.assertEqual(ScheduledReportScopeAuthorization.objects.filter(scheduled_report=self.sched).count(), 0)
+        self.assertContains(response, "resolves to a live tenant")
+
+    def test_wound_back_schedule_still_offers_revoke(self):
+        self._client_for(self.admin).post(self.url, {"action": "approve"})
+        self.sched.filter_tenants.clear()
+        response = self._client_for(self.admin).get(self.url)
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Revoke Approval")
+
+    def test_approve_rolls_back_when_the_snapshot_diverges(self):
+        from types import SimpleNamespace
+        from unittest.mock import patch
+
+        with patch.object(
+            ScheduledReportScopeAuthorization,
+            "approve",
+            return_value=SimpleNamespace(scope_tenant_ids=[self.tenant_a.pk]),
+        ):
+            response = self._client_for(self.admin).post(self.url, {"action": "approve"}, follow=True)
+        self.assertEqual(ScheduledReportScopeAuthorization.objects.filter(scheduled_report=self.sched).count(), 0)
+        self.assertContains(response, "scope changed while approving")
+
+    def test_error_redirect_preserves_the_return_url(self):
+        self.sched.filter_tenants.clear()
+        response = self._client_for(self.admin).post(
+            self.url, {"action": "approve", "return_url": "/extras/reports/schedules/?page=2"}
+        )
+        self.assertEqual(response.status_code, 302)
+        self.assertIn("return_url=", response.url)
+        self.assertIn("page=2", response.url)
 
     def test_stored_authorizer_reach_loss_is_surfaced_on_the_page(self):
         from organization.models import RoleGrant
@@ -259,4 +294,10 @@ class ScheduledReportScopeBadgeTests(TestCase):
         self.sched.filter_tenants.add(self.tenant_a, self.tenant_b)
         ScheduledReportScopeAuthorization.approve(self.sched, self.admin)
         self.sched.filter_tenants.add(self.tenant_c)
+        self.assertIn("Scope changed", self._badge())
+
+    def test_soft_deleted_scope_tenant_shows_scope_changed(self):
+        self.sched.filter_tenants.add(self.tenant_a, self.tenant_b)
+        ScheduledReportScopeAuthorization.approve(self.sched, self.admin)
+        self.tenant_b.delete()
         self.assertIn("Scope changed", self._badge())

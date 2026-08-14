@@ -889,6 +889,29 @@ class ScheduledReportScopeAuthorizationTests(TestCase):
 
     @override_settings(REPORT_DESIGNER_ENABLED=True)
     @patch("core.tasks.reports._process_scheduled_report")
+    def test_schedule_wound_back_with_a_live_approval_runs_single_tenant(self, mock_process):
+        from core.context import get_current_all_accessible, get_current_tenant
+        from core.tasks.reports import generate_scheduled_report_task
+        from core.tasks.utils import TaskResult, TaskStatus
+
+        ScheduledReportScopeAuthorization.approve(self.sched, self.user)
+        self.sched.filter_tenants.clear()
+
+        def process(sched, active_tenant, filter_tenants):
+            self.assertEqual(get_current_tenant().pk, self.tenant_a.pk)
+            self.assertFalse(get_current_all_accessible())
+            self.assertEqual(filter_tenants, [])
+            return TaskResult(TaskStatus.SUCCESS, "report.completed")
+
+        mock_process.side_effect = process
+
+        result = generate_scheduled_report_task(self.sched.pk)
+
+        self.assertEqual(result.status, TaskStatus.SUCCESS)
+        mock_process.assert_called_once()
+
+    @override_settings(REPORT_DESIGNER_ENABLED=True)
+    @patch("core.tasks.reports._process_scheduled_report")
     def test_approve_after_revoke_restores_generation(self, mock_process):
         from core.tasks.reports import generate_scheduled_report_task
         from core.tasks.utils import TaskResult, TaskStatus

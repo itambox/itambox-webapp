@@ -991,7 +991,9 @@ class ScheduledReportScopeApprovalView(CapabilityRequiredMixin, PermissionRequir
         scope_tenant_ids = sched.effective_scope_tenant_ids()
         if not scope_tenant_ids:
             return []
-        return list(Tenant._base_manager.filter(pk__in=scope_tenant_ids).order_by("name"))
+        # Live tenants only: generation resolves the same way, so a
+        # soft-deleted scope tenant must not read as approvable here.
+        return list(Tenant._base_manager.filter(pk__in=scope_tenant_ids, deleted_at__isnull=True).order_by("name"))
 
     def _principal_covers_scope(self, principal, scope_tenants):
         # An approval only takes effect when the principal holds the
@@ -1007,8 +1009,11 @@ class ScheduledReportScopeApprovalView(CapabilityRequiredMixin, PermissionRequir
     def get_context_data(self, **kwargs):
         sched = self.object = self.get_object()
         authorization = self._stored_authorization(sched)
-        scope_tenant_ids = sorted(set(sched.effective_scope_tenant_ids()))
         scope_tenants = self._scope_tenants(sched)
+        # The page mirrors generation: the current scope is the LIVE tenant
+        # set, so a soft-deleted scope tenant reads as a scope change, not as
+        # "still in effect".
+        scope_tenant_ids = sorted({tenant.pk for tenant in scope_tenants})
         authorization_is_current = bool(
             authorization
             and not authorization.is_revoked()
@@ -1028,11 +1033,20 @@ class ScheduledReportScopeApprovalView(CapabilityRequiredMixin, PermissionRequir
             "authorization": authorization,
             "authorization_is_current": authorization_is_current,
             "stored_approval_is_effective": stored_approval_is_effective,
+            "stored_scope_tenant_names": self._stored_scope_tenant_names(authorization),
             "approval_would_be_effective": self._approval_would_be_effective(sched, scope_tenants),
             "return_url": safe_return_url(
                 self.request, self.request.GET.get("return_url"), reverse("extras:scheduledreport_list")
             ),
         }
+
+    def _stored_scope_tenant_names(self, authorization):
+        if authorization is None or not authorization.scope_tenant_ids:
+            return []
+        Tenant = apps.get_model("organization", "Tenant")
+        tenants = Tenant._base_manager.filter(pk__in=authorization.scope_tenant_ids).order_by("name")
+        by_pk = {tenant.pk: tenant.name for tenant in tenants}
+        return [by_pk.get(pk, f"#{pk}") for pk in authorization.scope_tenant_ids]
 
     def get(self, request, *args, **kwargs):
         return render(request, self.template_name, self.get_context_data())
@@ -1079,9 +1093,7 @@ class ScheduledReportScopeApprovalView(CapabilityRequiredMixin, PermissionRequir
             )
         if len(scope_tenants) != len(set(scope_tenant_ids)):
             raise ValidationError(
-                _(
-                    "Not every tenant in the scope resolves to an existing tenant, so the approval would not take effect."
-                )
+                _("Not every tenant in the scope resolves to a live tenant, so the approval would not take effect.")
             )
         if not self._approval_would_be_effective(sched, scope_tenants):
             missing = [
@@ -1093,10 +1105,16 @@ class ScheduledReportScopeApprovalView(CapabilityRequiredMixin, PermissionRequir
                 _("Your cross-tenant reach does not cover: %(tenants)s. The approval would not take effect.")
                 % {"tenants": ", ".join(missing)}
             )
-        authorization = scope_authorization_model.approve(sched, request.user)
-        if sorted(set(authorization.scope_tenant_ids)) != sorted(set(scope_tenant_ids)):
-            # The scope changed between the reach check and the snapshot.
-            raise ValidationError(_("The scope changed while approving; please review the scope and approve again."))
+        # approve() snapshots the scope itself; atomically re-verify the
+        # stored snapshot matches the scope we reach-checked, so a concurrent
+        # scope edit cannot leave an unverified authorization behind.
+        with transaction.atomic():
+            authorization = scope_authorization_model.approve(sched, request.user)
+            if sorted(set(authorization.scope_tenant_ids)) != sorted({tenant.pk for tenant in scope_tenants}):
+                # The scope changed between the reach check and the snapshot.
+                raise ValidationError(
+                    _("The scope changed while approving; please review the scope and approve again.")
+                )
 
 
 @method_decorator(login_required, name="dispatch")
