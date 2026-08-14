@@ -251,43 +251,72 @@ def _scope_requires_authorization(active_tenant, filter_tenants):
     return active_tenant_id is None or scope_tenant_ids != [active_tenant_id]
 
 
-def _resolve_scope_authorization(sched, active_tenant, filter_tenants):
-    """Resolve a current, durable principal approval for a broad schedule."""
-    if not _scope_requires_authorization(active_tenant, filter_tenants):
-        return None
-    authorization = (
+def _load_scope_authorization(sched):
+    """Load the durable approval for a scheduled report."""
+    return (
         ScheduledReportScopeAuthorization.objects.filter(scheduled_report_id=sched.pk)
         .select_related("authorized_by")
         .first()
     )
+
+
+def _parse_authorized_scope(authorization):
+    try:
+        return sorted({int(tenant_id) for tenant_id in authorization.scope_tenant_ids})
+    except (TypeError, ValueError):
+        return None
+
+
+def _resolve_authorized_principal(authorization):
+    try:
+        principal = getattr(authorization, "authorized_by", None)
+    except ObjectDoesNotExist:
+        return None
+    if principal is None or not getattr(principal, "is_active", False):
+        return None
+    return principal
+
+
+def _tenant_scope_permission_is_valid(principal, tenant):
+    tenant_id = getattr(tenant, "pk", None)
+    if tenant_id is None:
+        return False
+    try:
+        with TaskContext(
+            tenant_id=tenant_id,
+            user_id=principal.pk,
+            operation="reports.scope_authorization",
+        ):
+            worker_principal = get_current_user()
+            return worker_principal is not None and worker_principal.has_perm(
+                "reports.view_cross_tenant_reports",
+                obj=tenant,
+            )
+    except (ObjectDoesNotExist, PermissionDenied):
+        return False
+
+
+def _principal_can_authorize_scope(principal, filter_tenants):
+    for tenant in filter_tenants:
+        if not _tenant_scope_permission_is_valid(principal, tenant):
+            return False
+    return True
+
+
+def _resolve_scope_authorization(sched, active_tenant, filter_tenants):
+    """Resolve a current, durable principal approval for a broad schedule."""
+    if not _scope_requires_authorization(active_tenant, filter_tenants):
+        return None
+    authorization = _load_scope_authorization(sched)
     if authorization is None:
         return None
     scope_tenant_ids = sorted({tenant.pk for tenant in filter_tenants})
-    try:
-        authorized_scope = sorted({int(tenant_id) for tenant_id in authorization.scope_tenant_ids})
-    except (TypeError, ValueError):
+    authorized_scope = _parse_authorized_scope(authorization)
+    if authorized_scope is None or authorized_scope != scope_tenant_ids:
         return None
-    principal = authorization.authorized_by
-    if authorized_scope != scope_tenant_ids or not principal.is_active:
+    principal = _resolve_authorized_principal(authorization)
+    if principal is None or not _principal_can_authorize_scope(principal, filter_tenants):
         return None
-    for tenant in filter_tenants:
-        tenant_id = getattr(tenant, "pk", None)
-        if tenant_id is None:
-            return None
-        try:
-            with TaskContext(
-                tenant_id=tenant_id,
-                user_id=principal.pk,
-                operation="reports.scope_authorization",
-            ):
-                worker_principal = get_current_user()
-                if worker_principal is None or not worker_principal.has_perm(
-                    "reports.view_cross_tenant_reports",
-                    obj=tenant,
-                ):
-                    return None
-        except (ObjectDoesNotExist, PermissionDenied):
-            return None
     return principal.pk
 
 
