@@ -420,7 +420,9 @@ class AlertLogTable(BaseTable):
                     '<span class="badge bg-warning text-dark" title="{}">delivered*</span>',
                     f"{_('Delivered with channel failures')}: {failed}",
                 )
-            return format_html('<span class="badge bg-success" title="{}">delivered</span>', _("All channels delivered"))
+            return format_html(
+                '<span class="badge bg-success" title="{}">delivered</span>', _("All channels delivered")
+            )
         failed = _failed_channel_summary(statuses) or _("Delivery failed")
         return format_html('<span class="badge bg-danger" title="{}">failed</span>', failed)
 

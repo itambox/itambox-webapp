@@ -64,18 +64,10 @@ class DeliveryOutcomeDerivationTests(SimpleTestCase):
         self.assertIsNone(_delivery_error(payload))
 
     def test_legacy_string_payloads_derive_truthfully(self):
-        self.assertEqual(
-            _delivery_outcome({"7": "ok"}), AlertLog.DELIVERY_OUTCOME_DELIVERED
-        )
-        self.assertEqual(
-            _delivery_outcome({"7": "failed"}), AlertLog.DELIVERY_OUTCOME_FAILED
-        )
-        self.assertEqual(
-            _delivery_outcome({"7": "error: SMTP rejected"}), AlertLog.DELIVERY_OUTCOME_FAILED
-        )
-        self.assertEqual(
-            _delivery_outcome({"7": "retryable"}), AlertLog.DELIVERY_OUTCOME_FAILED
-        )
+        self.assertEqual(_delivery_outcome({"7": "ok"}), AlertLog.DELIVERY_OUTCOME_DELIVERED)
+        self.assertEqual(_delivery_outcome({"7": "failed"}), AlertLog.DELIVERY_OUTCOME_FAILED)
+        self.assertEqual(_delivery_outcome({"7": "error: SMTP rejected"}), AlertLog.DELIVERY_OUTCOME_FAILED)
+        self.assertEqual(_delivery_outcome({"7": "retryable"}), AlertLog.DELIVERY_OUTCOME_FAILED)
         self.assertEqual(_delivery_error({"7": "retryable"}), "retryable")
         self.assertIsNone(_delivery_error({"7": "ok"}))
 
@@ -304,8 +296,7 @@ class AlertDispatchObservabilityTests(TransactionTestCase):
             delivery_outcome=AlertLog.DELIVERY_OUTCOME_DELIVERED,
             delivery_attempts=1,
             last_delivery_id="old-run",
-            last_notified_at=timezone.now()
-            - timezone.timedelta(days=2),
+            last_notified_at=timezone.now() - timezone.timedelta(days=2),
         )
         match = {"obj": rule, "tenant": tenant, "subject": "renotify", "message": "renotify"}
         existing = {(rule.pk, alert.content_type_id, alert.object_id): alert}
@@ -562,16 +553,24 @@ class AlertDeliveryTableRenderTests(TestCase):
         table = AlertLogTable([])
 
         delivered = AlertLog._base_manager.create(
-            tenant=tenant, rule=rule, subject="d", message="m",
-            content_type=content_type, object_id=1,
+            tenant=tenant,
+            rule=rule,
+            subject="d",
+            message="m",
+            content_type=content_type,
+            object_id=1,
             delivery_outcome=AlertLog.DELIVERY_OUTCOME_DELIVERED,
             delivery_status={"7": {"disposition": "success", "operation": "in_app.deliver"}},
         )
         self.assertIn("badge bg-success", table.render_delivery(delivered))
 
         failed = AlertLog._base_manager.create(
-            tenant=tenant, rule=rule, subject="f", message="m",
-            content_type=content_type, object_id=2,
+            tenant=tenant,
+            rule=rule,
+            subject="f",
+            message="m",
+            content_type=content_type,
+            object_id=2,
             delivery_outcome=AlertLog.DELIVERY_OUTCOME_FAILED,
             delivery_status={
                 "7": {
@@ -586,16 +585,24 @@ class AlertDeliveryTableRenderTests(TestCase):
         self.assertIn("SMTPException", rendered)
 
         pending = AlertLog._base_manager.create(
-            tenant=tenant, rule=rule, subject="p", message="m",
-            content_type=content_type, object_id=3,
+            tenant=tenant,
+            rule=rule,
+            subject="p",
+            message="m",
+            content_type=content_type,
+            object_id=3,
             delivery_outcome=AlertLog.DELIVERY_OUTCOME_PENDING,
             delivery_status={"__dispatch__": "pending"},
         )
         self.assertIn("badge bg-info", table.render_delivery(pending))
 
         no_channels = AlertLog._base_manager.create(
-            tenant=tenant, rule=rule, subject="n", message="m",
-            content_type=content_type, object_id=4,
+            tenant=tenant,
+            rule=rule,
+            subject="n",
+            message="m",
+            content_type=content_type,
+            object_id=4,
             delivery_outcome=AlertLog.DELIVERY_OUTCOME_NONE,
             delivery_status={"__no_channels__": "no channels attached to this rule"},
         )
