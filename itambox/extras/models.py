@@ -1132,14 +1132,13 @@ class ScheduledReportScopeAuthorization(models.Model):
     @classmethod
     def approve(cls, scheduled_report, actor):
         """Persist an exact scope approval for a principal with cross-tenant permission."""
-        # Compute the scope before the permission check: the permission backends
-        # bind the ambient tenant, and tenant scoping filters Tenant M2M reads,
-        # so the persisted scope would otherwise be silently truncated.
+        if not getattr(actor, "is_active", False) or not actor.has_perm("reports.view_cross_tenant_reports"):
+            raise PermissionDenied("Cross-tenant report scope approval requires the cross-tenant report permission.")
+        # The scope reads use the unscoped through table, so the permission
+        # check above binding the ambient tenant cannot truncate the scope.
         if not scheduled_report.scope_requires_authorization():
             raise ValidationError("A single-tenant schedule does not need cross-tenant scope approval.")
         scope_tenant_ids = scheduled_report.effective_scope_tenant_ids()
-        if not getattr(actor, "is_active", False) or not actor.has_perm("reports.view_cross_tenant_reports"):
-            raise PermissionDenied("Cross-tenant report scope approval requires the cross-tenant report permission.")
         authorization, _created = cls.objects.update_or_create(
             scheduled_report=scheduled_report,
             defaults={"authorized_by": actor, "scope_tenant_ids": scope_tenant_ids},
