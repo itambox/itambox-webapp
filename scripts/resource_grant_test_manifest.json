@@ -33,6 +33,8 @@
     "itambox/core/tests/test_issue100_import_cycles.py",
     "itambox/core/tests/test_issue100_tenancy_boundaries.py",
     "itambox/core/tests/test_issue29_tenant_scope.py",
+    "itambox/core/tests/test_kernel_leaves.py",
+    "itambox/core/tests/test_kernel_serialization.py",
     "itambox/core/tests/test_label_renderer_html.py",
     "itambox/core/tests/test_ldap_oidc_error_contracts.py",
     "itambox/core/tests/test_management_commands.py",
@@ -44,6 +46,7 @@
     "itambox/core/tests/test_oidc.py",
     "itambox/core/tests/test_phase3_task_audit.py",
     "itambox/core/tests/test_plugins.py",
+    "itambox/core/tests/test_pdf_renderer.py",
     "itambox/core/tests/test_report_asset_disposal_eol.py",
     "itambox/core/tests/test_report_characterization.py",
     "itambox/core/tests/test_report_chart_html.py",
@@ -236,7 +239,10 @@
     "itambox/core/tests/test_issue100_tenancy_boundaries.py",
     "itambox/core/tests/test_issue29_tenant_scope.py",
     "itambox/organization/tests/test_authorization_cache.py",
-    "itambox/core/tests/test_tasks.py"
+    "itambox/core/tests/test_tasks.py",
+    "itambox/core/tests/test_kernel_leaves.py",
+    "itambox/core/tests/test_kernel_serialization.py",
+    "itambox/core/tests/test_pdf_renderer.py"
   ],
   "supporting_files": [
     "itambox/inventory/tests/factories.py",

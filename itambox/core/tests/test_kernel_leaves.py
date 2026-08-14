@@ -1,0 +1,591 @@
+"""Unit contracts for the kernel slug and tenant-scope leaves (issue #100)."""
+
+import csv
+from types import ModuleType, SimpleNamespace
+from unittest import mock
+
+from django.core.exceptions import FieldDoesNotExist, ValidationError
+from django.core.files.uploadedfile import SimpleUploadedFile
+from django.db import models
+from django.test import SimpleTestCase
+
+from core import tenant_scope as tenant_scope_module
+from core.authorization_cache import invalidate_user_authorization_cache
+from core.forms.import_forms import (
+    BulkImportForm,
+    get_import_form_class,
+    is_model_importable,
+    register_import_form,
+    resolve_related,
+)
+from core.slugs import generate_unique_slug
+
+
+class _Manager:
+    def __init__(self, existing_results):
+        self._existing_results = list(existing_results)
+        self.filter_calls = []
+
+    def filter(self, **kwargs):
+        self.filter_calls.append(kwargs)
+        return self
+
+    def exclude(self, **kwargs):
+        return self
+
+    def exists(self):
+        if self._existing_results:
+            return self._existing_results.pop(0)
+        return False
+
+
+class _SlugModel:
+    _base_manager = None
+    objects = None
+
+    def __init__(self, slug=None, source="Plain Name"):
+        self.slug = slug
+        self.slug_source = source
+        self.pk = None
+
+
+class _ImportField:
+    def __init__(
+        self,
+        name,
+        *,
+        primary_key=False,
+        editable=True,
+        blank=False,
+        null=False,
+        relation=False,
+        related_model=None,
+    ):
+        self.name = name
+        self.primary_key = primary_key
+        self.auto_created = False
+        self.editable = editable
+        self.blank = blank
+        self.null = null
+        self.default = models.NOT_PROVIDED
+        self.is_relation = relation
+        self.many_to_one = relation
+        self.related_model = related_model
+        self.attname = f"{name}_id" if relation else name
+
+
+class _ImportMeta:
+    def __init__(self, fields):
+        self.fields = fields
+        self.pk = next(field for field in fields if field.primary_key)
+
+    def get_field(self, name):
+        for field in self.fields:
+            if field.name == name:
+                return field
+        raise FieldDoesNotExist(name)
+
+
+class _ImportRelatedManager:
+    def __init__(self, related_object=None):
+        self.related_object = related_object
+
+    def filter(self, **kwargs):
+        return self
+
+    def first(self):
+        return self.related_object
+
+    def get(self, **kwargs):
+        if self.related_object is None:
+            raise _ImportModel.DoesNotExist
+        return self.related_object
+
+
+class _ImportModel:
+    DoesNotExist = type("DoesNotExist", (Exception,), {})
+    objects = None
+    _meta = None
+
+    def __init__(self, **values):
+        self.__dict__.update(values)
+        self.saved = False
+        self.cleaned = False
+        self.snapshotted = False
+
+    def full_clean(self):
+        self.cleaned = True
+
+    def save(self):
+        self.saved = True
+
+    def snapshot(self):
+        self.snapshotted = True
+
+
+class KernelSlugTests(SimpleTestCase):
+    def test_existing_slug_is_left_untouched(self):
+        obj = _SlugModel(slug="already-set")
+        generate_unique_slug(obj)
+        self.assertEqual(obj.slug, "already-set")
+
+    def test_collision_appends_counter(self):
+        obj = _SlugModel(slug="", source="Asset")
+        previous = _SlugModel._base_manager
+        _SlugModel._base_manager = _Manager([True, False])
+        try:
+            generate_unique_slug(obj, "slug_source")
+        finally:
+            _SlugModel._base_manager = previous
+        self.assertEqual(obj.slug, "asset-1")
+
+    def test_no_collision_keeps_base_slug(self):
+        obj = _SlugModel(slug="", source="Asset")
+        previous = _SlugModel._base_manager
+        _SlugModel._base_manager = _Manager([False])
+        try:
+            generate_unique_slug(obj, "slug_source")
+        finally:
+            _SlugModel._base_manager = previous
+        self.assertEqual(obj.slug, "asset")
+
+
+class _GroupManager:
+    def __init__(self, children_by_parent, *, exists=True):
+        self._children = children_by_parent
+        self._exists = exists
+
+    def filter(self, **kwargs):
+        parents = kwargs.get("parent_id__in", [])
+        children = {child for parent in parents for child in self._children.get(parent, ())}
+        if kwargs.get("deleted_at__isnull") is not None:
+            children = children & self._children.get("__live__", children)
+        self._pending = sorted(children)
+        return self
+
+    def exclude(self, **kwargs):
+        excluded = kwargs.get("pk__in", set())
+        self._pending = [child for child in self._pending if child not in excluded]
+        return self
+
+    def exists(self):
+        return self._exists
+
+    def values_list(self, *args, **kwargs):
+        return list(self._pending)
+
+
+class _GroupModel:
+    _base_manager = None
+
+
+class _AncestorManager:
+    def __init__(self, parent_by_id):
+        self._parent_by_id = parent_by_id
+
+    def all(self):
+        return self
+
+    def filter(self, **kwargs):
+        return self
+
+    def values_list(self, *args, **kwargs):
+        return [(group_id, parent_id) for group_id, parent_id in self._parent_by_id.items()]
+
+
+class TenantScopeContractTests(SimpleTestCase):
+    def test_invalidation_of_unidentified_user_is_a_noop(self):
+        invalidate_user_authorization_cache(None)
+
+    def test_descendant_and_ancestor_walk_reject_missing_group(self):
+        self.assertEqual(tenant_scope_module.get_descendant_tenant_group_ids(None), set())
+        self.assertEqual(tenant_scope_module.get_ancestor_tenant_group_ids(None), set())
+
+    def test_unregistered_provider_name_fails_closed(self):
+        with self.assertRaisesRegex(RuntimeError, "is not registered"):
+            tenant_scope_module._call("__never_registered__", object())
+
+    def test_live_only_walk_prunes_deleted_groups(self):
+        _GroupModel._base_manager = _GroupManager({}, exists=False)
+        with mock.patch.object(tenant_scope_module, "tenant_group_model", return_value=_GroupModel):
+            ids = tenant_scope_module.get_descendant_tenant_group_ids(1, live_only=True)
+        self.assertEqual(ids, set())
+
+    def test_descendant_walk_collects_subtree_and_is_request_local_cached(self):
+        _GroupModel._base_manager = _GroupManager({1: (2, 3), 2: (4,), 3: (), 4: ()})
+        with mock.patch.object(tenant_scope_module, "tenant_group_model", return_value=_GroupModel):
+            first = tenant_scope_module.get_descendant_tenant_group_ids(1)
+            second = tenant_scope_module.get_descendant_tenant_group_ids(1)
+        self.assertEqual(first, {1, 2, 3, 4})
+        self.assertEqual(second, first)
+
+    def test_ancestor_walk_returns_chain_and_fails_closed_on_cycle(self):
+        _GroupModel._base_manager = _AncestorManager({1: None, 2: 1, 3: 2})
+        with mock.patch.object(tenant_scope_module, "tenant_group_model", return_value=_GroupModel):
+            self.assertEqual(tenant_scope_module.get_ancestor_tenant_group_ids(3), {1, 2, 3})
+            self.assertEqual(tenant_scope_module.get_ancestor_tenant_group_ids(3, live_only=True), {1, 2, 3})
+        _GroupModel._base_manager = _AncestorManager({1: 2, 2: 1})
+        with mock.patch.object(tenant_scope_module, "tenant_group_model", return_value=_GroupModel):
+            self.assertEqual(tenant_scope_module.get_ancestor_tenant_group_ids(1), set())
+
+    def test_provider_registration_resolves_through_owning_module(self):
+        provider = ModuleType("kernel_test_provider")
+
+        def provider_function(name, result):
+            def function(*args, **kwargs):
+                return (result, *args, *(() if "grants" not in kwargs else (kwargs["grants"],)))
+
+            function.__module__ = provider.__name__
+            function.__name__ = name
+            setattr(provider, name, function)
+
+        provider_function("accessible_tenant_ids", "accessible")
+        provider_function("accessible_tenant_ids_with_expiry", "expiry")
+        provider_function("managed_accessible_tenant_ids", "managed")
+        provider_function("applicable_grants", "grants")
+        provider_function("resolve_effective_permissions_with_expiry", "permissions")
+        provider_function("build_accessible_tenant_permissions_map", "map")
+        previous = tenant_scope_module._provider_modules.copy()
+        try:
+            with mock.patch.dict(tenant_scope_module.sys.modules, {provider.__name__: provider}):
+                tenant_scope_module.register_tenant_scope_provider(
+                    accessible_tenant_ids=provider.accessible_tenant_ids,
+                    accessible_tenant_ids_with_expiry=provider.accessible_tenant_ids_with_expiry,
+                    managed_accessible_tenant_ids=provider.managed_accessible_tenant_ids,
+                    applicable_grants=provider.applicable_grants,
+                    resolve_effective_permissions_with_expiry=provider.resolve_effective_permissions_with_expiry,
+                    build_accessible_tenant_permissions_map=provider.build_accessible_tenant_permissions_map,
+                )
+                self.assertEqual(tenant_scope_module.accessible_tenant_ids("u"), ("accessible", "u"))
+                self.assertEqual(tenant_scope_module.accessible_tenant_ids_with_expiry("u"), ("expiry", "u"))
+                self.assertEqual(tenant_scope_module.managed_accessible_tenant_ids("u"), ("managed", "u"))
+                self.assertEqual(tenant_scope_module.applicable_grants("u"), ("grants", "u"))
+                self.assertEqual(
+                    tenant_scope_module.resolve_effective_permissions_with_expiry("u", "t"),
+                    ("permissions", "u", "t"),
+                )
+                self.assertEqual(
+                    tenant_scope_module.build_accessible_tenant_permissions_map("u", grants=[1]),
+                    ("map", "u", [1]),
+                )
+        finally:
+            tenant_scope_module._provider_modules.clear()
+            tenant_scope_module._provider_modules.update(previous)
+
+    def test_model_lookup_helpers_use_the_django_registry(self):
+        sentinel = object()
+        with mock.patch.object(tenant_scope_module.apps, "get_model", return_value=sentinel) as get_model:
+            self.assertIs(tenant_scope_module.tenant_group_model(), sentinel)
+            self.assertIs(tenant_scope_module.tenant_model(), sentinel)
+        self.assertEqual(
+            get_model.call_args_list, [mock.call("organization", "TenantGroup"), mock.call("organization", "Tenant")]
+        )
+
+    def test_accessible_wrappers_delegate_to_registered_provider(self):
+        sentinel = object()
+        with mock.patch.object(tenant_scope_module, "_call", return_value=sentinel) as call:
+            self.assertIs(tenant_scope_module.accessible_tenant_ids("u"), sentinel)
+            self.assertIs(tenant_scope_module.managed_accessible_tenant_ids("u"), sentinel)
+        self.assertEqual(call.call_count, 2)
+
+
+class KernelImportLeafTests(SimpleTestCase):
+    def setUp(self):
+        owner = type("Owner", (), {})
+        owner.objects = _ImportRelatedManager(SimpleNamespace(pk=17))
+        _ImportModel._meta = _ImportMeta(
+            [
+                _ImportField("id", primary_key=True),
+                _ImportField("name"),
+                _ImportField("slug", blank=True, null=True),
+                _ImportField("owner", relation=True, related_model=owner),
+            ]
+        )
+        _ImportModel.objects = _ImportRelatedManager()
+
+    def test_import_context_and_form_metadata_are_safe(self):
+        from core.importers.bulk_forms import _import_log_extra
+
+        context = _import_log_extra(operation="row.persist", row_number=4, exception_type="ValueError")
+        self.assertEqual(context["import_context"]["operation"], "row.persist")
+        self.assertEqual(context["import_context"]["row_number"], 4)
+        self.assertEqual(context["import_context"]["exception_type"], "ValueError")
+
+        class ImportForm(BulkImportForm):
+            model = _ImportModel
+            required_fields = ["name"]
+            optional_fields = ["slug"]
+
+        form = ImportForm()
+        self.assertEqual(form.field_names, ["name", "slug"])
+        form.cleaned_data = {}
+        self.assertEqual(form.clean_csv_file(), None)
+
+        minimal = _import_log_extra(operation="task.run")
+        self.assertNotIn("row_number", minimal["import_context"])
+        self.assertNotIn("exception_type", minimal["import_context"])
+
+    def test_editor_csv_and_yaml_inputs_normalize_rows(self):
+        class ImportForm(BulkImportForm):
+            model = _ImportModel
+            required_fields = ["name"]
+            optional_fields = ["enabled", "count", "note"]
+
+        csv_form = ImportForm(
+            data={
+                "active_tab": "editor",
+                "import_format": "csv",
+                "delimiter": ",",
+                "import_text": "name,enabled\n Asset , true \n",
+            }
+        )
+        self.assertTrue(csv_form.is_valid(), csv_form.errors)
+        self.assertEqual(csv_form._rows_data, [{"name": "Asset", "enabled": "true"}])
+
+        yaml_form = ImportForm(
+            data={
+                "active_tab": "editor",
+                "import_format": "yaml",
+                "import_text": "- name: Asset\n  enabled: true\n  count: 3\n  note:\n- null: ignored\n",
+            }
+        )
+        self.assertTrue(yaml_form.is_valid(), yaml_form.errors)
+        self.assertEqual(yaml_form._rows_data[0], {"name": "Asset", "enabled": "True", "count": "3", "note": ""})
+        self.assertEqual(yaml_form._rows_data[1], {})
+
+        single_yaml_form = ImportForm(data={"import_format": "yaml", "import_text": "name: Single\ncount: 2\n"})
+        self.assertTrue(single_yaml_form.is_valid(), single_yaml_form.errors)
+        self.assertEqual(single_yaml_form._rows_data, [{"name": "Single", "count": "2"}])
+
+    def test_import_parser_rejects_empty_missing_and_malformed_inputs(self):
+        class ImportForm(BulkImportForm):
+            model = _ImportModel
+            required_fields = ["name"]
+
+        cases = [
+            ({"active_tab": "editor", "import_text": ""}, "editor tab"),
+            ({"active_tab": "editor", "import_text": "name\n"}, "CSV data is empty"),
+            ({"active_tab": "editor", "import_text": "other\nvalue"}, "Missing required columns"),
+            ({"active_tab": "editor", "import_format": "yaml", "import_text": "- item\n"}, "mappings"),
+            ({"active_tab": "editor", "import_format": "yaml", "import_text": "value"}, "list of objects"),
+        ]
+        for data, expected in cases:
+            with self.subTest(expected=expected):
+                form = ImportForm(data=data)
+                self.assertFalse(form.is_valid())
+                self.assertIn(expected, str(form.errors))
+
+        malformed = ImportForm(data={"active_tab": "editor", "import_text": "name\nvalue"})
+        with mock.patch("core.importers.bulk_forms.csv.DictReader", side_effect=csv.Error("bad")):
+            self.assertFalse(malformed.is_valid())
+        self.assertIn("Failed to parse CSV data", str(malformed.errors))
+
+    def test_upload_parser_accepts_utf8_and_latin1_files(self):
+        class ImportForm(BulkImportForm):
+            model = _ImportModel
+            required_fields = ["name"]
+
+        utf8_form = ImportForm(
+            data={"active_tab": "upload"},
+            files={"csv_file": SimpleUploadedFile("names.csv", b"\xef\xbb\xbfname\nAsset\n")},
+        )
+        self.assertTrue(utf8_form.is_valid(), utf8_form.errors)
+        self.assertEqual(utf8_form._rows_data, [{"name": "Asset"}])
+
+        latin1_form = ImportForm(
+            data={"active_tab": "upload"},
+            files={"csv_file": SimpleUploadedFile("names.csv", b"name\ncaf\xe9\n")},
+        )
+        self.assertTrue(latin1_form.is_valid(), latin1_form.errors)
+        self.assertEqual(latin1_form._rows_data, [{"name": "café"}])
+
+    def test_import_row_mapping_resolves_relations_and_skips_unknown_columns(self):
+        class ImportForm(BulkImportForm):
+            model = _ImportModel
+            required_fields = ["name"]
+            optional_fields = ["owner", "not_a_field"]
+
+        form = ImportForm()
+        mapped = form.map_row({"id": "7", "name": " Asset ", "owner": "17", "not_a_field": "ignored"})
+        self.assertEqual(mapped, {"id": "7", "name": "Asset", "owner_id": 17})
+
+    def test_import_row_create_update_and_validation_paths(self):
+        class ImportForm(BulkImportForm):
+            model = _ImportModel
+            required_fields = ["name"]
+
+        form = ImportForm()
+        created = _ImportModel()
+        form._create_instance = mock.Mock(return_value=created)
+        form._import_row({"name": "Asset"}, 2)
+        self.assertTrue(created.cleaned)
+        self.assertTrue(created.saved)
+
+        updated = _ImportModel()
+        _ImportModel.objects = _ImportRelatedManager(updated)
+        form._import_row({"id": "7", "name": "Updated"}, 3)
+        self.assertTrue(updated.snapshotted)
+        self.assertTrue(updated.saved)
+
+        with self.assertRaises(ValidationError):
+            form._validate_row({}, 4)
+        with self.assertRaises(NotImplementedError):
+            BulkImportForm().import_data()
+
+    def test_import_data_collects_validation_and_unexpected_row_errors(self):
+        class ImportForm(BulkImportForm):
+            model = _ImportModel
+
+        form = ImportForm()
+        form._rows_data = [{"name": "ok"}, {"name": "bad"}, {"name": "broken"}]
+        form._import_row = mock.Mock(side_effect=[None, ValidationError("invalid"), RuntimeError("internal")])
+        atomic = mock.MagicMock()
+        with mock.patch("core.importers.bulk_forms.transaction.atomic", return_value=atomic):
+            result = form.import_data()
+        self.assertEqual(result.imported_count, 1)
+        self.assertEqual(result.errors[0], "Row 3: invalid")
+        self.assertEqual(result.errors[1], "Row 4: could not be imported due to an unexpected error.")
+
+        empty = ImportForm()
+        self.assertEqual(empty.import_data().imported_count, 0)
+
+    def test_import_row_handles_missing_object_and_plain_instances(self):
+        class ImportForm(BulkImportForm):
+            model = _ImportModel
+
+        form = ImportForm()
+        _ImportModel.objects = _ImportRelatedManager()
+        with self.assertRaisesRegex(ValidationError, "does not exist"):
+            form._import_row({"id": "99"}, 2)
+
+        class PlainInstance:
+            def __init__(self):
+                self.saved = False
+
+            def save(self):
+                self.saved = True
+
+        plain = PlainInstance()
+        form._create_instance = mock.Mock(return_value=plain)
+        form._import_row({"name": "plain"}, 2)
+        self.assertTrue(plain.saved)
+
+    def test_import_form_registration_without_model_is_a_noop(self):
+        from core.importers import bulk_forms
+
+        previous = bulk_forms._IMPORT_FORM_REGISTRY.copy()
+        try:
+
+            class UncuratedForm(BulkImportForm):
+                pass
+
+            self.assertIs(register_import_form(UncuratedForm), UncuratedForm)
+            self.assertNotIn(UncuratedForm, bulk_forms._IMPORT_FORM_REGISTRY)
+        finally:
+            bulk_forms._IMPORT_FORM_REGISTRY.clear()
+            bulk_forms._IMPORT_FORM_REGISTRY.update(previous)
+
+    def test_import_model_policy_handles_missing_and_sensitive_models(self):
+        self.assertFalse(is_model_importable(None))
+        self.assertFalse(
+            is_model_importable(SimpleNamespace(_meta=SimpleNamespace(app_label="users", model_name="user")))
+        )
+        self.assertTrue(
+            is_model_importable(SimpleNamespace(_meta=SimpleNamespace(app_label="assets", model_name="asset")))
+        )
+
+    def test_dynamic_import_form_excludes_framework_fields_and_keeps_required_fields(self):
+        class FakeModel:
+            pass
+
+        def field_type(name, **kwargs):
+            values = {
+                "name": name,
+                "primary_key": False,
+                "auto_created": False,
+                "editable": True,
+                "blank": False,
+                "null": False,
+                "default": models.NOT_PROVIDED,
+            }
+            values.update(kwargs)
+            return SimpleNamespace(**values)
+
+        FakeModel._meta = SimpleNamespace(
+            fields=[
+                field_type("id", primary_key=True),
+                field_type("name"),
+                field_type("description", blank=True, null=True),
+                field_type("created_at"),
+                field_type("computed", editable=False),
+            ]
+        )
+        fake_model = FakeModel
+        form_class = get_import_form_class(fake_model)
+        self.assertEqual(form_class.required_fields, ["name"])
+        self.assertEqual(form_class.optional_fields, ["description"])
+        self.assertIs(form_class.model, fake_model)
+
+    def test_registered_import_form_wins_over_dynamic_form(self):
+        from core.importers import bulk_forms
+
+        model = object()
+        previous = bulk_forms._IMPORT_FORM_REGISTRY.copy()
+        try:
+            model_for_registry = model
+
+            class CuratedForm(BulkImportForm):
+                model = model_for_registry
+
+            register_import_form(CuratedForm)
+            self.assertIs(get_import_form_class(model), CuratedForm)
+        finally:
+            bulk_forms._IMPORT_FORM_REGISTRY.clear()
+            bulk_forms._IMPORT_FORM_REGISTRY.update(previous)
+
+    def test_related_resolution_checks_id_exact_case_insensitive_and_fallback(self):
+        class RelatedMeta:
+            def get_field(self, name):
+                if name not in {"slug", "name"}:
+                    raise FieldDoesNotExist(name)
+                return object()
+
+        class RelatedObjects:
+            def __init__(self):
+                self.calls = []
+
+            def filter(self, **kwargs):
+                self.calls.append(kwargs)
+                return self
+
+            def first(self):
+                query = self.calls[-1]
+                if query == {"pk": 7} or query == {"slug": "Asset"} or query == {"slug__iexact": "ASSET"}:
+                    return SimpleNamespace(pk=99)
+                return None
+
+        related_model = SimpleNamespace(_meta=RelatedMeta(), objects=RelatedObjects())
+        self.assertEqual(resolve_related(related_model, "7"), 99)
+        self.assertEqual(resolve_related(related_model, "Asset"), 99)
+        self.assertEqual(resolve_related(related_model, "ASSET"), 99)
+        self.assertEqual(resolve_related(related_model, "unknown"), "unknown")
+
+    def test_slug_source_tuple_and_empty_source_have_safe_fallbacks(self):
+        obj = _SlugModel(slug="")
+        obj.parent = SimpleNamespace(name="Parent")
+        obj.code = "Child"
+        previous = _SlugModel._base_manager
+        _SlugModel._base_manager = _Manager([False, False])
+        try:
+            generate_unique_slug(obj, ["parent__name", "code"])
+            self.assertEqual(obj.slug, "parent-child")
+            obj.slug = ""
+            obj.parent = None
+            obj.code = ""
+            generate_unique_slug(obj, ["parent__name", "code"])
+            self.assertEqual(obj.slug, "auto-slug")
+        finally:
+            if previous is None:
+                _SlugModel._base_manager = previous
+            else:
+                _SlugModel._base_manager = previous
