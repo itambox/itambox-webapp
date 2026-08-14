@@ -607,7 +607,7 @@ class MigrationAuditTests(unittest.TestCase):
         )
         self.assertEqual(
             len(inventory["special_users_bootstrap"]["swappable_dependents"]),
-            56,
+            57,
         )
         self.assertEqual(
             inventory["reviewed_semantics"]["required_fresh"],
@@ -617,6 +617,7 @@ class MigrationAuditTests(unittest.TestCase):
                 "assets.0051_assetreservation_assetreservation_no_overlap",
                 "assets.0100_issue88_shard_42_assets_relations",
                 "assets.0100_issue88_shard_43_assets_seed",
+                "extras.0108_alertlog_delivery_outcome",
             ],
         )
         replacement_extension = next(
