@@ -445,13 +445,14 @@ class TestDocumentationConsistency:
         text = REGISTRY_DOC.read_text(encoding="utf-8")
         installation = (DOCS_ROOT / "operations" / "installation.md").read_text(encoding="utf-8")
         readme = README.read_text(encoding="utf-8")
-        assert "ITAMBOX_REPORT_DESIGNER_ENABLED" in text
-        assert "ITAMBOX_REPORT_DESIGNER_ENABLED" in installation
-        assert "ITAMBOX_REPORT_DESIGNER_ENABLED" in readme
-        phrase = "scheduled delivery of existing report templates"
-        assert phrase in " ".join(text.lower().split())
-        assert phrase in " ".join(installation.lower().split())
-        assert phrase in " ".join(readme.lower().split())
+        assert "ITAMBOX_FEATURE_REPORT_DESIGNER" in text
+        assert "ITAMBOX_FEATURE_REPORT_DESIGNER" in installation
+        assert "ITAMBOX_FEATURE_REPORT_DESIGNER" in readme
+        for document in (text, installation, readme):
+            normalized = " ".join(document.lower().split())
+            assert "grandfathered" in normalized
+            assert "non-grandfathered" in normalized
+            assert "delivery" in normalized
         assert "registry.register_all" in text
         assert "returns early when its first key" not in text
 

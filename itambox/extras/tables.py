@@ -1,5 +1,7 @@
 # itambox/extras/tables.py
 import django_tables2 as tables
+from django.apps import apps
+from django.core.exceptions import ObjectDoesNotExist
 from django.urls import reverse
 from django.utils.html import escape, format_html
 from django.utils.safestring import mark_safe
@@ -443,6 +445,56 @@ class ScheduledReportTable(BaseTable):
     is_active = BooleanColumn()
     last_run = tables.DateTimeColumn(format="Y-m-d H:i:s")
     last_status = tables.Column()
+    scope = tables.Column(accessor="pk", verbose_name=_("Scope"), orderable=False, empty_values=())
+
+    def render_scope(self, record, value):
+        try:
+            authorization = record.scope_authorization
+        except ObjectDoesNotExist:
+            authorization = None
+        url = reverse("extras:scheduledreport_scope_approval", kwargs={"pk": record.pk})
+        if authorization is None:
+            if not record.scope_requires_authorization():
+                return format_html('<span class="badge bg-secondary">{}</span>', _("Single tenant"))
+            return format_html(
+                '<span class="badge bg-warning">{}</span> <a href="{}">{}</a>',
+                _("Approval required"),
+                url,
+                _("Approve"),
+            )
+        if authorization.is_revoked():
+            return format_html(
+                '<span class="badge bg-danger">{}</span> <a href="{}">{}</a>',
+                _("Revoked"),
+                url,
+                _("Review"),
+            )
+        if not self._authorization_is_current(authorization, record):
+            return format_html(
+                '<span class="badge bg-danger">{}</span> <a href="{}">{}</a>',
+                _("Scope changed"),
+                url,
+                _("Review"),
+            )
+        return format_html(
+            '<span class="badge bg-success">{}</span> <a href="{}">{}</a>',
+            _("Approved"),
+            url,
+            _("Manage"),
+        )
+
+    def _authorization_is_current(self, authorization, record):
+        # Generation compares the stored snapshot against the LIVE scope
+        # tenants; mirror that so a soft-deleted scope tenant reads as a scope
+        # change instead of a green "Approved".
+        Tenant = apps.get_model("organization", "Tenant")
+        live_ids = sorted(
+            Tenant._base_manager.filter(
+                pk__in=record.effective_scope_tenant_ids(), deleted_at__isnull=True
+            ).values_list("pk", flat=True)
+        )
+        return sorted(set(authorization.scope_tenant_ids)) == live_ids
+
     actions = tables.TemplateColumn(
         template_code="""
         <div class="d-flex gap-1 justify-content-end">
@@ -474,5 +526,27 @@ class ScheduledReportTable(BaseTable):
 
     class Meta(BaseTable.Meta):
         model = ScheduledReport
-        fields = ("pk", "name", "report", "recipients", "format", "is_active", "last_run", "last_status", "actions")
-        sequence = ("pk", "name", "report", "recipients", "format", "is_active", "last_run", "last_status", "actions")
+        fields = (
+            "pk",
+            "name",
+            "report",
+            "recipients",
+            "format",
+            "is_active",
+            "last_run",
+            "last_status",
+            "scope",
+            "actions",
+        )
+        sequence = (
+            "pk",
+            "name",
+            "report",
+            "recipients",
+            "format",
+            "is_active",
+            "last_run",
+            "last_status",
+            "scope",
+            "actions",
+        )

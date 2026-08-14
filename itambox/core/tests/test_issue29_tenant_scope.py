@@ -757,6 +757,44 @@ class AllAccessibleMiddlewareTests(TestCase):
         self.assertIsNone(get_current_tenant_group())
         self.assertEqual(_current_user.get(), self.member)
 
+    def test_tenantless_task_context_can_bind_all_accessible_scope_and_restore_it(self):
+        from core.tasks.context import TaskContext
+
+        _current_user.set(self.member)
+        set_current_tenant(None)
+        set_current_tenant_group(None)
+        set_current_membership(None)
+        set_current_all_accessible(False)
+
+        with TaskContext(tenant_id=None, user_id=self.member.pk, all_accessible=True):
+            self.assertIsNone(get_current_tenant())
+            self.assertIsNone(get_current_tenant_group())
+            self.assertIsNone(get_current_membership())
+            self.assertTrue(get_current_all_accessible())
+            self.assertEqual(_current_user.get(), self.member)
+
+        self.assertFalse(get_current_all_accessible())
+        self.assertIsNone(get_current_tenant())
+        self.assertIsNone(get_current_tenant_group())
+        self.assertIsNone(get_current_membership())
+        self.assertEqual(_current_user.get(), self.member)
+
+    def test_tenant_bound_task_context_never_combines_tenant_and_all_accessible_scope(self):
+        from core.tasks.context import TaskContext
+
+        _current_user.set(self.member)
+        set_current_tenant(None)
+        set_current_tenant_group(None)
+        set_current_membership(None)
+        set_current_all_accessible(True)
+
+        with TaskContext(tenant_id=self.cust.pk, user_id=self.member.pk, all_accessible=True):
+            self.assertEqual(get_current_tenant(), self.cust)
+            self.assertFalse(get_current_all_accessible())
+
+        self.assertTrue(get_current_all_accessible())
+        self.assertIsNone(get_current_tenant())
+
     def test_task_context_does_not_inherit_membership_from_another_tenant(self):
         from core.tasks.context import TaskContext
 

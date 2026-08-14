@@ -2220,12 +2220,6 @@
     {
       "path": "itambox/extras/views.py",
       "context": "ClassDef:ReportTemplateDownloadView/FunctionDef:get",
-      "statement": "from core.csv_utils import csv_safe",
-      "count": 1
-    },
-    {
-      "path": "itambox/extras/views.py",
-      "context": "ClassDef:ReportTemplateDownloadView/FunctionDef:get",
       "statement": "from core.csv_utils import safe_csv_filename",
       "count": 1
     },
@@ -2233,12 +2227,6 @@
       "path": "itambox/extras/views.py",
       "context": "ClassDef:ReportTemplateDownloadView/FunctionDef:get",
       "statement": "from core.managers import get_current_tenant",
-      "count": 1
-    },
-    {
-      "path": "itambox/extras/views.py",
-      "context": "ClassDef:ReportTemplateDownloadView/FunctionDef:get",
-      "statement": "from core.reports import build_report_context, get_polished_system_html_template",
       "count": 1
     },
     {
@@ -2255,26 +2243,8 @@
     },
     {
       "path": "itambox/extras/views.py",
-      "context": "ClassDef:ReportTemplateDownloadView/FunctionDef:get",
-      "statement": "from django.template import Context, Template",
-      "count": 1
-    },
-    {
-      "path": "itambox/extras/views.py",
       "context": "ClassDef:ReportTemplatePreviewView/FunctionDef:post",
       "statement": "from core.managers import get_current_tenant",
-      "count": 1
-    },
-    {
-      "path": "itambox/extras/views.py",
-      "context": "ClassDef:ReportTemplatePreviewView/FunctionDef:post",
-      "statement": "from core.reports import build_report_context, get_polished_system_html_template",
-      "count": 1
-    },
-    {
-      "path": "itambox/extras/views.py",
-      "context": "ClassDef:ReportTemplatePreviewView/FunctionDef:post",
-      "statement": "from django.template import Context, Template",
       "count": 1
     },
     {

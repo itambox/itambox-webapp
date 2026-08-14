@@ -384,7 +384,7 @@ SCHEDULED_REPORT_VIEWS = (
 class TestReportDesignerOptIn:
     """The report designer is opt-in, and one mechanism decides it.
 
-    ``ITAMBOX_REPORT_DESIGNER_ENABLED`` is the operator flag; the registry reads
+    ``ITAMBOX_FEATURE_REPORT_DESIGNER`` is the operator flag; the registry reads
     it and the routes read the registry. A flag the probe consults but no route
     honours would be a label, not an activation mechanism.
     """

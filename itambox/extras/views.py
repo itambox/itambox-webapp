@@ -1,17 +1,18 @@
-import csv
 import datetime
-import io
 import json
 
+from django.apps import apps
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.contrib.auth.mixins import LoginRequiredMixin, PermissionRequiredMixin
 from django.contrib.contenttypes.models import ContentType
+from django.core.exceptions import ObjectDoesNotExist, PermissionDenied, ValidationError
 from django.db import transaction
 from django.db.models import Count
 from django.http import Http404, HttpResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse, reverse_lazy
+from django.utils.html import escape
 from django.utils.http import urlencode
 from django.utils.translation import gettext
 from django.utils.translation import gettext_lazy as _
@@ -20,6 +21,7 @@ from django_tables2 import RequestConfig
 
 from assets.tables import AssetTable  # Import AssetTable
 from core.managers import get_current_tenant
+from core.reports.rendering import render_report_csv, render_report_html
 from itambox.capabilities import registry
 from itambox.panels import Panel
 from itambox.utils import get_model_viewname, get_paginate_count  # Import the utility function
@@ -745,7 +747,7 @@ class NotificationChannelTestView(SimplePostView):
 # Reporting Views
 # =============================================================================
 
-#: The report designer is opt-in (ITAMBOX_REPORT_DESIGNER_ENABLED). Every route
+#: The report designer is opt-in (ITAMBOX_FEATURE_REPORT_DESIGNER). Every route
 #: below that edits, previews, renders, or schedules a ReportTemplate is closed
 #: while the capability is inactive, so the flag an operator sets and the routes
 #: or background delivery a deployment serves cannot drift apart. The Stable
@@ -784,6 +786,7 @@ class ReportTemplateDetailView(CapabilityRequiredMixin, ObjectDetailView):
         obj = self.get_object()
         context["title"] = _("Report Template: %(name)s") % {"name": obj.name}
         context["schedules"] = obj.schedules.all()
+        context["legacy_designer_notice"] = bool(obj.legacy_designer_grandfathered)
         return context
 
 
@@ -828,7 +831,7 @@ class ReportTemplateBulkDeleteView(CapabilityRequiredMixin, ObjectBulkDeleteView
 @method_decorator(login_required, name="dispatch")
 class ScheduledReportListView(CapabilityRequiredMixin, ObjectListView):
     capability_key = REPORT_DESIGNER_CAPABILITY
-    queryset = ScheduledReport.objects.select_related("report")
+    queryset = ScheduledReport.objects.select_related("report").prefetch_related("scope_authorization")
     filterset = ScheduledReportFilterSet
     filterset_form = ScheduledReportFilterForm
     table = ScheduledReportTable
@@ -954,6 +957,172 @@ class ScheduledReportBulkDeleteView(CapabilityRequiredMixin, ObjectBulkDeleteVie
 
 
 @method_decorator(login_required, name="dispatch")
+class ScheduledReportScopeApprovalView(CapabilityRequiredMixin, PermissionRequiredMixin, LoginRequiredMixin, View):
+    """Approve or revoke the durable cross-tenant scope approval of a schedule.
+
+    Approval requires the same cross-tenant report permission the model gate
+    enforces, and is refused when the acting principal's reach does not cover
+    every tenant in scope — an ineffective approval would only delay the
+    fail-closed ``report.scope_unauthorized`` terminal state to delivery time.
+    """
+
+    capability_key = REPORT_DESIGNER_CAPABILITY
+    permission_required = ("reports.view_cross_tenant_reports",)
+    template_name = "core/reports/report_schedule_scope_approval.html"
+
+    def get_queryset(self):
+        return ScheduledReport.objects.select_related("report").prefetch_related(
+            "filter_tenants",
+            "scope_authorization__authorized_by",
+            "scope_authorization__revoked_by",
+        )
+
+    def get_object(self):
+        return get_object_or_404(self.get_queryset(), pk=self.kwargs.get("pk"))
+
+    def _stored_authorization(self, sched):
+        try:
+            return sched.scope_authorization
+        except ObjectDoesNotExist:
+            return None
+
+    def _scope_tenants(self, sched):
+        Tenant = apps.get_model("organization", "Tenant")
+        scope_tenant_ids = sched.effective_scope_tenant_ids()
+        if not scope_tenant_ids:
+            return []
+        # Live tenants only: generation resolves the same way, so a
+        # soft-deleted scope tenant must not read as approvable here.
+        return list(Tenant._base_manager.filter(pk__in=scope_tenant_ids, deleted_at__isnull=True).order_by("name"))
+
+    def _principal_covers_scope(self, principal, scope_tenants):
+        # An approval only takes effect when the principal holds the
+        # cross-tenant permission on EVERY tenant in scope; delivery re-checks
+        # this per tenant, so refuse to store an approval that cannot work.
+        if not scope_tenants or not getattr(principal, "is_active", False):
+            return False
+        return all(principal.has_perm("reports.view_cross_tenant_reports", obj=tenant) for tenant in scope_tenants)
+
+    def _approval_would_be_effective(self, sched, scope_tenants):
+        return self._principal_covers_scope(self.request.user, scope_tenants)
+
+    def get_context_data(self, **kwargs):
+        sched = self.object = self.get_object()
+        authorization = self._stored_authorization(sched)
+        scope_tenants = self._scope_tenants(sched)
+        # The page mirrors generation: the current scope is the LIVE tenant
+        # set, so a soft-deleted scope tenant reads as a scope change, not as
+        # "still in effect".
+        scope_tenant_ids = sorted({tenant.pk for tenant in scope_tenants})
+        authorization_is_current = bool(
+            authorization
+            and not authorization.is_revoked()
+            and sorted(set(authorization.scope_tenant_ids)) == scope_tenant_ids
+        )
+        # Generation also fails closed when the stored authorizer lost reach or
+        # became inactive; surface that state so the page answers the question
+        # an operator actually opens it for.
+        stored_approval_is_effective = bool(
+            authorization_is_current and self._principal_covers_scope(authorization.authorized_by, scope_tenants)
+        )
+        return {
+            "object": sched,
+            "title": _("Scope Approval: %(name)s") % {"name": sched.name},
+            "requires_authorization": sched.scope_requires_authorization(),
+            "scope_tenants": scope_tenants,
+            "authorization": authorization,
+            "authorization_is_current": authorization_is_current,
+            "stored_approval_is_effective": stored_approval_is_effective,
+            "stored_scope_tenant_names": self._stored_scope_tenant_names(authorization),
+            "approval_would_be_effective": self._approval_would_be_effective(sched, scope_tenants),
+            "return_url": safe_return_url(
+                self.request, self.request.GET.get("return_url"), reverse("extras:scheduledreport_list")
+            ),
+        }
+
+    def _stored_scope_tenant_names(self, authorization):
+        if authorization is None or not authorization.scope_tenant_ids:
+            return []
+        Tenant = apps.get_model("organization", "Tenant")
+        tenants = Tenant._base_manager.filter(pk__in=authorization.scope_tenant_ids).order_by("name")
+        by_pk = {tenant.pk: tenant.name for tenant in tenants}
+        return [by_pk.get(pk, f"#{pk}") for pk in authorization.scope_tenant_ids]
+
+    def get(self, request, *args, **kwargs):
+        return render(request, self.template_name, self.get_context_data())
+
+    def _error_redirect(self, request):
+        return_url = safe_return_url(
+            request,
+            request.POST.get("return_url") or request.GET.get("return_url"),
+            None,
+        )
+        target = reverse("extras:scheduledreport_scope_approval", kwargs={"pk": self.kwargs["pk"]})
+        if return_url:
+            target = f"{target}?{urlencode({'return_url': return_url})}"
+        return redirect(target)
+
+    def post(self, request, *args, **kwargs):
+        # The model is resolved lazily: extending the module-level extras.models
+        # import line would churn the flake8 E402 baseline identity for views.py.
+        scope_authorization_model = apps.get_model("extras", "ScheduledReportScopeAuthorization")
+        sched = self.object = self.get_object()
+        action = request.POST.get("action")
+        return_url = safe_return_url(request, request.POST.get("return_url"), reverse("extras:scheduledreport_list"))
+        try:
+            if action == "approve":
+                self._approve_scope(sched, request, scope_authorization_model)
+                messages.success(request, _("Cross-tenant scope of '%(name)s' approved.") % {"name": sched.name})
+            elif action == "revoke":
+                scope_authorization_model.revoke(sched, request.user)
+                messages.success(
+                    request, _("Cross-tenant scope approval of '%(name)s' revoked.") % {"name": sched.name}
+                )
+            else:
+                messages.error(request, _("Unknown scope approval action."))
+            return redirect(return_url)
+        except PermissionDenied as error:
+            messages.error(request, str(error) or _("You are not permitted to change this scope approval."))
+            return self._error_redirect(request)
+        except ValidationError as error:
+            for message in error.messages:
+                messages.error(request, message)
+            return self._error_redirect(request)
+
+    def _approve_scope(self, sched, request, scope_authorization_model):
+        scope_tenant_ids = sched.effective_scope_tenant_ids()
+        scope_tenants = self._scope_tenants(sched)
+        if not scope_tenant_ids:
+            raise ValidationError(
+                _("This schedule has no resolvable scope tenants, so a cross-tenant approval cannot be stored.")
+            )
+        if len(scope_tenants) != len(set(scope_tenant_ids)):
+            raise ValidationError(
+                _("Not every tenant in the scope resolves to a live tenant, so the approval would not take effect.")
+            )
+        if not self._approval_would_be_effective(sched, scope_tenants):
+            missing = [
+                tenant.name
+                for tenant in scope_tenants
+                if not request.user.has_perm("reports.view_cross_tenant_reports", obj=tenant)
+            ]
+            raise ValidationError(
+                _("Your cross-tenant reach does not cover: %(tenants)s. The approval would not take effect.")
+                % {"tenants": ", ".join(missing)}
+            )
+        # approve() snapshots the scope itself; atomically re-verify the
+        # stored snapshot matches the scope we reach-checked, so a concurrent
+        # scope edit cannot leave an unverified authorization behind.
+        with transaction.atomic():
+            authorization = scope_authorization_model.approve(sched, request.user)
+            if sorted(set(authorization.scope_tenant_ids)) != sorted({tenant.pk for tenant in scope_tenants}):
+                # The scope changed between the reach check and the snapshot.
+                raise ValidationError(
+                    _("The scope changed while approving; please review the scope and approve again.")
+                )
+
+
+@method_decorator(login_required, name="dispatch")
 class ReportTriggerImmediateView(CapabilityRequiredMixin, PermissionRequiredMixin, LoginRequiredMixin, View):
     capability_key = REPORT_DESIGNER_CAPABILITY
     permission_required = ("extras.view_scheduledreport",)
@@ -1015,11 +1184,14 @@ class ReportTriggerImmediateView(CapabilityRequiredMixin, PermissionRequiredMixi
 @method_decorator(login_required, name="dispatch")
 class ReportTemplatePreviewView(CapabilityRequiredMixin, PermissionRequiredMixin, View):
     capability_key = REPORT_DESIGNER_CAPABILITY
-    permission_required = ("extras.view_reporttemplate",)
+    permission_required = ()
+
+    def has_permission(self):
+        return self.request.user.has_perm("extras.add_reporttemplate") or self.request.user.has_perm(
+            "extras.change_reporttemplate"
+        )
 
     def post(self, request, *args, **kwargs):
-        from django.template import Context, Template
-
         report_type = request.POST.get("report_type")
         style_preset = request.POST.get("style_preset", "default")
         included_columns = request.POST.getlist("included_columns")
@@ -1031,7 +1203,8 @@ class ReportTemplatePreviewView(CapabilityRequiredMixin, PermissionRequiredMixin
             or request.POST.get("include_distribution_chart") == "true"
         )
         group_by_field = request.POST.get("group_by_field", "")
-        name = request.POST.get("name", "Preview Report")
+        advanced_mode = request.POST.get("advanced_mode") in ("on", "true", "1")
+        template_content = request.POST.get("template_content", "")
         description = request.POST.get("description", "")
 
         # Resolve active tenant for preview scoping
@@ -1056,7 +1229,7 @@ class ReportTemplatePreviewView(CapabilityRequiredMixin, PermissionRequiredMixin
 
         # Create dynamic in-memory ReportTemplate object
         template_instance = ReportTemplate(
-            name=name,
+            name=request.POST.get("name", "Preview Report"),
             description=description,
             report_type=report_type,
             included_columns=included_columns,
@@ -1064,23 +1237,30 @@ class ReportTemplatePreviewView(CapabilityRequiredMixin, PermissionRequiredMixin
             include_distribution_chart=include_distribution_chart,
             group_by_field=group_by_field,
             style_preset=style_preset,
+            advanced_mode=advanced_mode,
+            template_content=template_content,
         )
 
-        from core.reports import build_report_context, get_polished_system_html_template
+        # inline imports: heavy-import: report provider discovery is only needed for this preview request
+        from core.reports import build_report_context
 
         try:
+            template_instance.full_clean(validate_constraints=False)
             _headers, _rows, _summary_cards, _grouped_data, _chart_svg, context_data = build_report_context(
                 template_instance, active_tenant=active_tenant, filter_tenants=filter_tenants
             )
 
-            html_template_str = get_polished_system_html_template()
-            django_template = Template(html_template_str)
             context_data["request"] = request
-            rendered_html = django_template.render(Context(context_data))
+            rendered_html = render_report_html(context_data, template_instance)
 
             return HttpResponse(rendered_html)
         except PermissionError:
             return HttpResponse(gettext("You may not view this report's data."), status=403)
+        except ValidationError as exc:
+            details = escape("; ".join(str(message) for message in exc.messages))
+            return HttpResponse(
+                f"<h3>{gettext('Invalid report template configuration.')}</h3><p>{details}</p>", status=400
+            )
         except Exception:
             # Full detail (with traceback) goes to the server log; the client gets a
             # generic message so exception text is never reflected in the response.
@@ -1104,8 +1284,6 @@ class ReportTemplateDownloadView(CapabilityRequiredMixin, PermissionRequiredMixi
         return self.request.user.has_perms(perms, obj=obj)
 
     def get(self, request, pk, *args, **kwargs):
-        from django.template import Context, Template
-
         # objects automatically handles tenant scoping!
         template = get_object_or_404(ReportTemplate.objects.all(), pk=pk)
 
@@ -1117,7 +1295,8 @@ class ReportTemplateDownloadView(CapabilityRequiredMixin, PermissionRequiredMixi
         # Enforce sandboxed constellation
         filter_tenants = list(template.filter_tenants.all())
 
-        from core.reports import build_report_context, get_polished_system_html_template
+        # inline imports: heavy-import: report provider discovery is only needed for this export request
+        from core.reports import build_report_context
 
         try:
             headers, rows, _summary_cards, _grouped_data, _chart_svg, context_data = build_report_context(
@@ -1131,15 +1310,9 @@ class ReportTemplateDownloadView(CapabilityRequiredMixin, PermissionRequiredMixi
             stamp = f"{timezone.now():%Y%m%d}"
 
             if format_type == "csv":
-                from core.csv_utils import csv_safe
-
-                csv_buffer = io.StringIO()
-                writer = csv.writer(csv_buffer)
-                writer.writerow(headers)
-                # Each cell neutralized against CSV formula injection.
-                for r in rows:
-                    writer.writerow([csv_safe(r.get(head, "-")) for head in headers])
-                response = HttpResponse(csv_buffer.getvalue(), content_type="text/csv")
+                response = HttpResponse(
+                    render_report_csv(template, headers, rows, _summary_cards, _grouped_data), content_type="text/csv"
+                )
                 response["Content-Disposition"] = f'attachment; filename="{safe_name}_{stamp}.csv"'
                 return response
 
@@ -1153,10 +1326,8 @@ class ReportTemplateDownloadView(CapabilityRequiredMixin, PermissionRequiredMixi
                 return response
 
             # HTML render — shared by the html and pdf formats.
-            html_template_str = get_polished_system_html_template()
-            django_template = Template(html_template_str)
             context_data["request"] = request
-            rendered_html = django_template.render(Context(context_data))
+            rendered_html = render_report_html(context_data, template)
 
             if format_type == "pdf":
                 from core.reports.exporters import PDF_MIME, report_pdf_bytes

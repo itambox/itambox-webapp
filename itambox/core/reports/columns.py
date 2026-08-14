@@ -6,6 +6,8 @@ honoured; providers only own stable column keys and their defaults.
 
 from django.utils.translation import gettext_lazy as _
 
+from core.report_keys import REPORT_COLUMN_KEYS
+
 _COLUMN_LABELS = {
     "asset_tag": _("Asset Tag"),
     "name": _("Asset Name"),
@@ -100,6 +102,11 @@ _COLUMN_LABELS = {
     "license_count": _("License Count"),
 }
 
+CANONICAL_COLUMN_KEYS = REPORT_COLUMN_KEYS
+
+if frozenset(_COLUMN_LABELS) != CANONICAL_COLUMN_KEYS:
+    raise RuntimeError("Report column labels and canonical machine keys are out of sync")
+
 
 def label_for(column):
     """Resolve one column key to its display label in the active language.
@@ -117,4 +124,4 @@ def headers_for(columns):
     honoured; resolving here keeps every consumer (HTML, CSV, XLSX, PDF) on
     plain strings.
     """
-    return [label_for(column) for column in columns if column in _COLUMN_LABELS]
+    return [label_for(column) for column in columns if column in CANONICAL_COLUMN_KEYS]

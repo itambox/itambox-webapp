@@ -58,6 +58,7 @@ class TaskContext:
 
     tenant_id: int | None
     user_id: int | None
+    all_accessible: bool
     tenant: _TaskTenant | None
     user: _TaskUser | None
     _entered: bool
@@ -84,10 +85,13 @@ class TaskContext:
         tenant_id: int | None = None,
         user_id: int | None = None,
         operation: str = "background_task",
+        *,
+        all_accessible: bool = False,
     ) -> None:
         self.tenant_id = tenant_id
         self.user_id = user_id
         self.operation = operation
+        self.all_accessible = all_accessible
         self.tenant = None
         self.user = None
         self._entered = False
@@ -118,6 +122,8 @@ class TaskContext:
 
         try:
             self._resolve_principal_and_tenant()
+            if self.tenant is None:
+                set_current_all_accessible(self.all_accessible)
             _current_user.set(self.user)
             if self.tenant:
                 set_current_tenant(self.tenant)

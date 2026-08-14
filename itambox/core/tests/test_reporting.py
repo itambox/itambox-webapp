@@ -20,7 +20,13 @@ from core.tasks.reports import (
     _resolve_report_recipients,
     _resolve_report_scope,
 )
-from extras.models import NotificationChannel, ReportGenerationArchive, ReportTemplate, ScheduledReport
+from extras.models import (
+    NotificationChannel,
+    ReportGenerationArchive,
+    ReportTemplate,
+    ScheduledReport,
+    ScheduledReportScopeAuthorization,
+)
 
 User = get_user_model()
 
@@ -666,6 +672,302 @@ class ScheduledReportingAndAlertsTests(TestCase):
 
         self.assertFalse(success)
         self.assertEqual(sched.last_status, "delivery_failed: email.delivery_rejected")
+
+
+class ScheduledReportScopeAuthorizationTests(TestCase):
+    def setUp(self):
+        from organization.models import Tenant
+
+        self.tenant_a = Tenant.objects.create(name="Schedule Tenant A", slug="schedule-tenant-a")
+        self.tenant_b = Tenant.objects.create(name="Schedule Tenant B", slug="schedule-tenant-b")
+        self.tenant_c = Tenant.objects.create(name="Schedule Tenant C", slug="schedule-tenant-c")
+        self.user = User.objects.create_superuser(username="schedule-authorizer", password="password123")
+        self.template = ReportTemplate.objects.create(
+            name="Cross-Tenant Schedule Template",
+            report_type=ReportTemplate.REPORT_TYPE_ASSET_SUMMARY,
+            tenant=self.tenant_a,
+        )
+        self.sched = ScheduledReport.objects.create(
+            name="Cross-Tenant Schedule",
+            report=self.template,
+            tenant=self.tenant_a,
+            format=ScheduledReport.FORMAT_HTML,
+            save_to_archive=False,
+            is_active=True,
+        )
+        self.sched.filter_tenants.add(self.tenant_a, self.tenant_b)
+
+    @override_settings(REPORT_DESIGNER_ENABLED=True)
+    @patch("core.tasks.reports._process_scheduled_report")
+    def test_unauthorized_broad_schedule_is_rejected_before_generation(self, mock_process):
+        from core.tasks.reports import generate_scheduled_report_task
+        from core.tasks.utils import TaskStatus
+
+        result = generate_scheduled_report_task(self.sched.pk)
+
+        self.assertEqual(result.status, TaskStatus.TERMINAL)
+        self.assertEqual(result.code, "report.scope_unauthorized")
+        mock_process.assert_not_called()
+        self.sched.refresh_from_db()
+        self.assertIsNone(self.sched.last_run)
+
+    @override_settings(REPORT_DESIGNER_ENABLED=True)
+    @patch("core.tasks.reports._process_scheduled_report")
+    def test_scope_tenants_all_soft_deleted_fails_closed(self, mock_process):
+        from core.tasks.reports import generate_scheduled_report_task
+        from core.tasks.utils import TaskStatus
+
+        deleted_scope = ScheduledReport.objects.create(
+            name="Deleted-Scope Schedule",
+            report=self.template,
+            tenant=self.tenant_a,
+            format=ScheduledReport.FORMAT_HTML,
+            save_to_archive=False,
+            is_active=True,
+        )
+        deleted_scope.filter_tenants.add(self.tenant_b)
+        ScheduledReportScopeAuthorization.approve(deleted_scope, self.user)
+        self.tenant_b.delete()
+
+        result = generate_scheduled_report_task(deleted_scope.pk)
+
+        self.assertEqual(result.status, TaskStatus.TERMINAL)
+        self.assertEqual(result.code, "report.scope_missing")
+        mock_process.assert_not_called()
+        deleted_scope.refresh_from_db()
+        self.assertIsNone(deleted_scope.last_run)
+
+    @override_settings(REPORT_DESIGNER_ENABLED=True)
+    @patch("core.tasks.reports._process_scheduled_report")
+    def test_principal_lacking_one_persisted_tenant_is_rejected(self, mock_process):
+        from core.tasks.reports import generate_scheduled_report_task
+        from core.tasks.utils import TaskStatus
+        from organization.models import Membership, Role, RoleGrant, RoleGrantScope
+
+        limited_user = User.objects.create_user(username="limited-scope-authorizer", password="password123")
+        role = Role.objects.create(
+            tenant=self.tenant_a,
+            name="Tenant A Report Viewer",
+            permissions=["reports.view_cross_tenant_reports"],
+        )
+        membership = Membership.objects.create(user=limited_user, tenant=self.tenant_a)
+        grant = RoleGrant.objects.create(membership=membership, role=role)
+        RoleGrantScope.objects.create(role_grant=grant, scope_type=RoleGrantScope.SCOPE_OWN)
+        ScheduledReportScopeAuthorization.approve(self.sched, limited_user)
+        result = generate_scheduled_report_task(self.sched.pk)
+
+        self.assertEqual(result.status, TaskStatus.TERMINAL)
+        self.assertEqual(result.code, "report.scope_unauthorized")
+        mock_process.assert_not_called()
+        self.sched.refresh_from_db()
+        self.assertIsNone(self.sched.last_run)
+
+    @override_settings(REPORT_DESIGNER_ENABLED=True)
+    @patch("core.tasks.reports._process_scheduled_report")
+    def test_authorized_broad_schedule_runs_as_approved_principal_and_exact_scope(self, mock_process):
+        from core.context import get_current_all_accessible, get_current_tenant, get_current_user
+        from core.tasks.reports import generate_scheduled_report_task
+        from core.tasks.utils import TaskResult, TaskStatus
+        from organization.models import Membership, Role, RoleGrant, RoleGrantScope
+
+        authorized_user = User.objects.create_user(username="non-superuser-authorizer", password="password123")
+        for tenant in (self.tenant_a, self.tenant_b):
+            role = Role.objects.create(
+                tenant=tenant,
+                name=f"Report Viewer {tenant.pk}",
+                permissions=["reports.view_cross_tenant_reports"],
+            )
+            membership = Membership.objects.create(user=authorized_user, tenant=tenant)
+            grant = RoleGrant.objects.create(membership=membership, role=role)
+            RoleGrantScope.objects.create(role_grant=grant, scope_type=RoleGrantScope.SCOPE_OWN)
+
+        self.assertEqual(
+            list(self.sched.filter_tenants.values_list("pk", flat=True)),
+            [self.tenant_a.pk, self.tenant_b.pk],
+        )
+        self.assertTrue(self.sched.scope_requires_authorization())
+        authorization = ScheduledReportScopeAuthorization.objects.create(
+            scheduled_report=self.sched,
+            authorized_by=authorized_user,
+            scope_tenant_ids=[self.tenant_a.pk, self.tenant_b.pk],
+        )
+        self.assertEqual(authorization.scope_tenant_ids, [self.tenant_a.pk, self.tenant_b.pk])
+
+        def process(sched, active_tenant, filter_tenants):
+            self.assertEqual(get_current_user().pk, authorized_user.pk)
+            self.assertIsNone(get_current_tenant())
+            self.assertTrue(get_current_all_accessible())
+            self.assertEqual([tenant.pk for tenant in filter_tenants], [self.tenant_a.pk, self.tenant_b.pk])
+            return TaskResult(TaskStatus.SUCCESS, "report.completed")
+
+        mock_process.side_effect = process
+        result = generate_scheduled_report_task(self.sched.pk)
+
+        self.assertEqual(result.status, TaskStatus.SUCCESS)
+        mock_process.assert_called_once()
+
+    @override_settings(REPORT_DESIGNER_ENABLED=True)
+    @patch("core.tasks.reports._process_scheduled_report")
+    def test_scope_change_after_approval_fails_closed_without_cross_tenant_expansion(self, mock_process):
+        from core.tasks.reports import generate_scheduled_report_task
+        from core.tasks.utils import TaskStatus
+
+        ScheduledReportScopeAuthorization.approve(self.sched, self.user)
+        self.sched.filter_tenants.add(self.tenant_c)
+
+        result = generate_scheduled_report_task(self.sched.pk)
+
+        self.assertEqual(result.status, TaskStatus.TERMINAL)
+        self.assertEqual(result.code, "report.scope_unauthorized")
+        mock_process.assert_not_called()
+
+    @override_settings(REPORT_DESIGNER_ENABLED=True)
+    @patch("core.tasks.reports._process_scheduled_report")
+    def test_ordinary_single_tenant_schedule_does_not_require_approval(self, mock_process):
+        from core.context import get_current_all_accessible, get_current_tenant
+        from core.tasks.reports import generate_scheduled_report_task
+        from core.tasks.utils import TaskResult, TaskStatus
+
+        self.sched.filter_tenants.clear()
+
+        def process(sched, active_tenant, filter_tenants):
+            self.assertEqual(get_current_tenant().pk, self.tenant_a.pk)
+            self.assertFalse(get_current_all_accessible())
+            self.assertEqual(filter_tenants, [])
+            return TaskResult(TaskStatus.SUCCESS, "report.completed")
+
+        mock_process.side_effect = process
+
+        result = generate_scheduled_report_task(self.sched.pk)
+
+        self.assertEqual(result.status, TaskStatus.SUCCESS)
+        mock_process.assert_called_once()
+
+    @override_settings(REPORT_DESIGNER_ENABLED=True)
+    @patch("core.tasks.reports._process_scheduled_report")
+    def test_revoked_approval_fails_closed_at_generation(self, mock_process):
+        from core.tasks.reports import generate_scheduled_report_task
+        from core.tasks.utils import TaskStatus
+
+        authorization = ScheduledReportScopeAuthorization.approve(self.sched, self.user)
+        approved_at = authorization.approved_at
+        ScheduledReportScopeAuthorization.revoke(self.sched, self.user)
+        authorization.refresh_from_db()
+        # Revocation must not stamp over the original approval time.
+        self.assertEqual(authorization.approved_at, approved_at)
+
+        result = generate_scheduled_report_task(self.sched.pk)
+
+        self.assertEqual(result.status, TaskStatus.TERMINAL)
+        self.assertEqual(result.code, "report.scope_unauthorized")
+        mock_process.assert_not_called()
+        self.sched.refresh_from_db()
+        self.assertIsNone(self.sched.last_run)
+
+    @override_settings(REPORT_DESIGNER_ENABLED=True)
+    @patch("core.tasks.reports._process_scheduled_report")
+    def test_revoked_schedule_wound_back_to_single_tenant_runs_normally(self, mock_process):
+        from core.context import get_current_tenant
+        from core.tasks.reports import generate_scheduled_report_task
+        from core.tasks.utils import TaskResult, TaskStatus
+
+        ScheduledReportScopeAuthorization.approve(self.sched, self.user)
+        ScheduledReportScopeAuthorization.revoke(self.sched, self.user)
+        self.sched.filter_tenants.clear()
+
+        def process(sched, active_tenant, filter_tenants):
+            self.assertEqual(get_current_tenant().pk, self.tenant_a.pk)
+            self.assertEqual(filter_tenants, [])
+            return TaskResult(TaskStatus.SUCCESS, "report.completed")
+
+        mock_process.side_effect = process
+
+        result = generate_scheduled_report_task(self.sched.pk)
+
+        self.assertEqual(result.status, TaskStatus.SUCCESS)
+        mock_process.assert_called_once()
+
+    @override_settings(REPORT_DESIGNER_ENABLED=True)
+    @patch("core.tasks.reports._process_scheduled_report")
+    def test_schedule_wound_back_with_a_live_approval_runs_single_tenant(self, mock_process):
+        from core.context import get_current_all_accessible, get_current_tenant
+        from core.tasks.reports import generate_scheduled_report_task
+        from core.tasks.utils import TaskResult, TaskStatus
+
+        ScheduledReportScopeAuthorization.approve(self.sched, self.user)
+        self.sched.filter_tenants.clear()
+
+        def process(sched, active_tenant, filter_tenants):
+            self.assertEqual(get_current_tenant().pk, self.tenant_a.pk)
+            self.assertFalse(get_current_all_accessible())
+            self.assertEqual(filter_tenants, [])
+            return TaskResult(TaskStatus.SUCCESS, "report.completed")
+
+        mock_process.side_effect = process
+
+        result = generate_scheduled_report_task(self.sched.pk)
+
+        self.assertEqual(result.status, TaskStatus.SUCCESS)
+        mock_process.assert_called_once()
+
+    @override_settings(REPORT_DESIGNER_ENABLED=True)
+    @patch("core.tasks.reports._process_scheduled_report")
+    def test_approve_after_revoke_restores_generation(self, mock_process):
+        from core.tasks.reports import generate_scheduled_report_task
+        from core.tasks.utils import TaskResult, TaskStatus
+
+        ScheduledReportScopeAuthorization.approve(self.sched, self.user)
+        ScheduledReportScopeAuthorization.revoke(self.sched, self.user)
+        authorization = ScheduledReportScopeAuthorization.approve(self.sched, self.user)
+        self.assertFalse(authorization.is_revoked())
+        self.assertIsNone(authorization.revoked_at)
+        self.assertIsNone(authorization.revoked_by)
+
+        mock_process.return_value = TaskResult(TaskStatus.SUCCESS, "report.completed")
+        result = generate_scheduled_report_task(self.sched.pk)
+
+        self.assertEqual(result.status, TaskStatus.SUCCESS)
+        mock_process.assert_called_once()
+
+    def test_revoke_requires_the_cross_tenant_permission(self):
+        from django.core.exceptions import PermissionDenied
+
+        ScheduledReportScopeAuthorization.approve(self.sched, self.user)
+        limited = User.objects.create_user(username="revoke-limited", password="password123")
+        with self.assertRaises(PermissionDenied):
+            ScheduledReportScopeAuthorization.revoke(self.sched, limited)
+
+    def test_revoke_requires_reach_over_the_stored_scope(self):
+        from django.core.exceptions import PermissionDenied
+
+        from organization.models import Membership, Role, RoleGrant, RoleGrantScope
+
+        ScheduledReportScopeAuthorization.approve(self.sched, self.user)
+        partial = User.objects.create_user(username="revoke-partial", password="password123")
+        role = Role.objects.create(
+            tenant=self.tenant_a, name="CT A only", permissions=["reports.view_cross_tenant_reports"]
+        )
+        membership = Membership.objects.create(user=partial, tenant=self.tenant_a)
+        grant_ = RoleGrant.objects.create(membership=membership, role=role)
+        RoleGrantScope.objects.create(role_grant=grant_, scope_type=RoleGrantScope.SCOPE_OWN)
+        with self.assertRaises(PermissionDenied):
+            ScheduledReportScopeAuthorization.revoke(self.sched, partial)
+        authorization = ScheduledReportScopeAuthorization.objects.get(scheduled_report=self.sched)
+        self.assertFalse(authorization.is_revoked())
+
+    def test_revoke_requires_an_existing_approval(self):
+        from django.core.exceptions import ValidationError
+
+        with self.assertRaises(ValidationError):
+            ScheduledReportScopeAuthorization.revoke(self.sched, self.user)
+
+    def test_revoke_of_a_revoked_approval_is_rejected(self):
+        from django.core.exceptions import ValidationError
+
+        ScheduledReportScopeAuthorization.approve(self.sched, self.user)
+        ScheduledReportScopeAuthorization.revoke(self.sched, self.user)
+        with self.assertRaises(ValidationError):
+            ScheduledReportScopeAuthorization.revoke(self.sched, self.user)
 
 
 class ReportCrossTenantPermissionTests(TestCase):

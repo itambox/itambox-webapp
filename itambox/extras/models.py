@@ -1,12 +1,15 @@
+from django.apps import apps
 from django.conf import settings
 from django.contrib.contenttypes.fields import GenericForeignKey
 from django.contrib.contenttypes.models import ContentType
-from django.core.exceptions import ValidationError
+from django.core.exceptions import PermissionDenied, ValidationError
 from django.db import models
 from django.urls import reverse
+from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
 
 from core.csv_utils import csv_safe, safe_csv_filename
+from core.features import report_designer_probe
 from core.managers import (
     AllObjectsManager,
     SoftDeleteManager,
@@ -16,6 +19,7 @@ from core.managers import (
 )
 from core.mixins import BookmarkableMixin, SoftDeleteMixin
 from core.models import BaseModel, ChangeLoggingMixin
+from core.report_keys import unknown_column_keys
 from core.validators import validate_external_url, validate_file_attachment, validate_image_attachment
 
 
@@ -809,6 +813,22 @@ class ReportTemplate(ChangeLoggingMixin, SoftDeleteMixin, BaseModel):
             ("minimal", _("Minimal (Clean)")),
         ],
     )
+    advanced_mode = models.BooleanField(
+        default=False,
+        verbose_name=_("Legacy CSV Shape"),
+        help_text=_("Use the legacy summary CSV shape; this does not enable custom HTML execution."),
+    )
+    template_content = models.TextField(
+        blank=True,
+        verbose_name=_("Custom HTML Template"),
+        help_text=_("Optional sandboxed Jinja2 custom HTML template."),
+    )
+    legacy_designer_grandfathered = models.BooleanField(
+        default=False,
+        editable=False,
+        verbose_name=_("Legacy Designer Grandfathered"),
+        help_text=_("Migration-managed marker for bounded legacy scheduled templates."),
+    )
 
     class Meta:
         ordering = ["name"]
@@ -825,6 +845,83 @@ class ReportTemplate(ChangeLoggingMixin, SoftDeleteMixin, BaseModel):
 
     def get_absolute_url(self):
         return reverse("extras:reporttemplate_detail", kwargs={"pk": self.pk})
+
+    _DESIGNER_DISABLED_MESSAGE = _(
+        "The report designer is disabled. Set ITAMBOX_FEATURE_REPORT_DESIGNER=True before enabling "
+        "legacy CSV mode, saving custom HTML, or editing a grandfathered template."
+    )
+
+    @classmethod
+    def _designer_write_fields(cls):
+        """Return concrete, user-editable fields covered by the write policy."""
+        return tuple(field for field in cls._meta.concrete_fields if field.editable and not field.primary_key)
+
+    def _designer_persisted_state(self):
+        if self.pk is None:
+            return None
+        fields = self._designer_write_fields()
+        return (
+            type(self)
+            ._base_manager.filter(pk=self.pk)
+            .values(*(field.attname for field in fields), "legacy_designer_grandfathered")
+            .first()
+        )
+
+    def _designer_default_state(self):
+        state = {field.attname: field.get_default() for field in self._designer_write_fields()}
+        state["legacy_designer_grandfathered"] = False
+        return state
+
+    def _validate_designer_write(self, existing=None, *, update_fields=None, enforce_marker=True):
+        if enforce_marker:
+            if self.legacy_designer_grandfathered and not existing:
+                raise ValidationError(_("The legacy designer marker is migration-managed and cannot be forged."))
+            if existing and existing["legacy_designer_grandfathered"] != self.legacy_designer_grandfathered:
+                raise ValidationError(_("The legacy designer marker is migration-managed and cannot be changed."))
+
+        if report_designer_probe().active:
+            return
+
+        previous = existing or self._designer_default_state()
+        fields = self._designer_write_fields()
+        if update_fields is not None:
+            update_fields = set(update_fields)
+            fields = tuple(field for field in fields if field.name in update_fields or field.attname in update_fields)
+        candidate = {field.attname: getattr(self, field.attname) for field in fields}
+        changed = {field.attname for field in fields if candidate[field.attname] != previous[field.attname]}
+        if not changed:
+            return
+
+        if previous["legacy_designer_grandfathered"]:
+            raise ValidationError(self._DESIGNER_DISABLED_MESSAGE)
+
+        previous_content = previous["template_content"] or ""
+        candidate_content = getattr(self, "template_content", "") or ""
+        content_changed = (
+            "template_content" in changed
+            and candidate_content != previous_content
+            and bool(previous_content.strip() or candidate_content.strip())
+        )
+        saving_nonempty_custom_html = bool(candidate_content.strip())
+        advanced_enabled = "advanced_mode" in changed and bool(self.advanced_mode and not previous["advanced_mode"])
+        if saving_nonempty_custom_html or content_changed or advanced_enabled:
+            raise ValidationError(self._DESIGNER_DISABLED_MESSAGE)
+
+    def clean(self):
+        super().clean()
+        unknown = unknown_column_keys(self.included_columns)
+        if unknown:
+            raise ValidationError(
+                {"included_columns": _("Unknown report column key(s): %(keys)s") % {"keys": ", ".join(unknown)}}
+            )
+        if report_designer_probe().active:
+            return
+        self._validate_designer_write(self._designer_persisted_state(), enforce_marker=False)
+
+    def save(self, *args, **kwargs):
+        existing = self._designer_persisted_state()
+        self._validate_designer_write(existing, update_fields=kwargs.get("update_fields"))
+        return super().save(*args, **kwargs)
 
 
 class ScheduledReport(ChangeLoggingMixin, BaseModel):
@@ -935,6 +1032,56 @@ class ScheduledReport(ChangeLoggingMixin, BaseModel):
     def __str__(self):
         return f"{self.name} -> {self.report.name}"
 
+    def persisted_scope_tenant_ids(self):
+        """Return explicit persisted filter-scope ids without tenant scoping.
+
+        A schedule's own filter tenants take precedence over the report
+        template's inherited filter tenants. Real model relations are read
+        through their unscoped through-table manager so an ambient tenant
+        cannot truncate the persisted scope; lightweight test doubles use
+        their relation's ``all()`` fallback.
+        """
+
+        def relation_tenant_ids(relation, owner_field, owner_id):
+            through = getattr(relation, "through", None)
+            if through is not None:
+                return set(through._base_manager.filter(**{owner_field: owner_id}).values_list("tenant_id", flat=True))
+            return {tenant.pk for tenant in relation.all()}
+
+        filter_ids = relation_tenant_ids(self.filter_tenants, "scheduledreport_id", getattr(self, "pk", None))
+        report_id = getattr(self, "report_id", None)
+        report = getattr(self, "report", None)
+        if not filter_ids and report_id and report is not None:
+            filter_ids = relation_tenant_ids(report.filter_tenants, "reporttemplate_id", report_id)
+        return sorted(filter_ids)
+
+    def explicit_scope_tenant_ids(self):
+        """Backward-compatible alias for the persisted explicit scope helper."""
+        return self.persisted_scope_tenant_ids()
+
+    def effective_scope_tenant_ids(self):
+        """Return the persisted tenant ids this schedule will compile.
+
+        The owner tenant is only a fallback when neither the schedule nor its
+        report template has an explicit persisted filter scope.
+        """
+        scope_ids = (
+            self.persisted_scope_tenant_ids()
+            if hasattr(self, "persisted_scope_tenant_ids")
+            else ScheduledReport.persisted_scope_tenant_ids(self)
+        )
+        if scope_ids:
+            return scope_ids
+        report = getattr(self, "report", None)
+        active_tenant = getattr(self, "tenant", None) or (getattr(report, "tenant", None) if report else None)
+        return [active_tenant.pk] if active_tenant else []
+
+    def scope_requires_authorization(self):
+        """Whether this schedule cannot be represented by one owner tenant."""
+        active_tenant = self.tenant or (self.report.tenant if self.report_id else None)
+        scope_ids = self.effective_scope_tenant_ids()
+        return active_tenant is None or scope_ids != [active_tenant.pk]
+
     def delete(self, *args, **kwargs):
         if self.schedule:
             try:
@@ -972,6 +1119,104 @@ class ScheduledReport(ChangeLoggingMixin, BaseModel):
                     raise ValidationError(
                         {"recipients": _("'%(email)s' is not a valid email address.") % {"email": email}}
                     ) from None
+
+
+class ScheduledReportScopeAuthorization(models.Model):
+    """Durable approval for a scheduled report's cross-tenant scope."""
+
+    scheduled_report = models.OneToOneField(
+        ScheduledReport,
+        on_delete=models.CASCADE,
+        related_name="scope_authorization",
+        verbose_name=_("Scheduled Report"),
+    )
+    authorized_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.PROTECT,
+        related_name="scheduled_report_scope_authorizations",
+        editable=False,
+        verbose_name=_("Authorized By"),
+    )
+    scope_tenant_ids = models.JSONField(default=list, editable=False, verbose_name=_("Authorized Tenant Scope"))
+    approved_at = models.DateTimeField(default=timezone.now, editable=False, verbose_name=_("Approved At"))
+    revoked_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.PROTECT,
+        related_name="revoked_scheduled_report_scope_authorizations",
+        null=True,
+        blank=True,
+        editable=False,
+        verbose_name=_("Revoked By"),
+    )
+    revoked_at = models.DateTimeField(null=True, blank=True, editable=False, verbose_name=_("Revoked At"))
+
+    @classmethod
+    def approve(cls, scheduled_report, actor):
+        """Persist an exact scope approval for a principal with cross-tenant permission."""
+        if not getattr(actor, "is_active", False) or not actor.has_perm("reports.view_cross_tenant_reports"):
+            raise PermissionDenied(_("Cross-tenant report scope approval requires the cross-tenant report permission."))
+        # The scope reads use the unscoped through table, so the permission
+        # check above binding the ambient tenant cannot truncate the scope.
+        if not scheduled_report.scope_requires_authorization():
+            raise ValidationError(_("A single-tenant schedule does not need cross-tenant scope approval."))
+        scope_tenant_ids = scheduled_report.effective_scope_tenant_ids()
+        authorization, _created = cls.objects.update_or_create(
+            scheduled_report=scheduled_report,
+            defaults={
+                "authorized_by": actor,
+                "scope_tenant_ids": scope_tenant_ids,
+                "approved_at": timezone.now(),
+                "revoked_by": None,
+                "revoked_at": None,
+            },
+        )
+        return authorization
+
+    @classmethod
+    def revoke(cls, scheduled_report, actor):
+        """Persist the revocation of an existing scope approval.
+
+        Revocation keeps the row so the approve/revoke history stays visible,
+        but marks it void: a revoked approval authorizes nothing. Generation
+        fails closed with ``report.scope_unauthorized`` while the schedule
+        remains cross-tenant; a schedule wound back to single-tenant runs as
+        an ordinary single-tenant schedule.
+
+        Revocation is immediately and permanently effective on write, so the
+        actor must hold the cross-tenant permission on every tenant of the
+        stored approval. Approve has a generation-time reach backstop;
+        revoke does not.
+        """
+        if not getattr(actor, "is_active", False) or not actor.has_perm("reports.view_cross_tenant_reports"):
+            raise PermissionDenied(
+                _("Cross-tenant report scope revocation requires the cross-tenant report permission.")
+            )
+        authorization = cls.objects.filter(scheduled_report=scheduled_report).first()
+        if authorization is None:
+            raise ValidationError(_("This schedule has no cross-tenant scope approval to revoke."))
+        if authorization.revoked_at is not None:
+            raise ValidationError(_("This schedule's cross-tenant scope approval is already revoked."))
+        Tenant = apps.get_model("organization", "Tenant")
+        missing_tenants = [
+            tenant
+            for tenant in Tenant._base_manager.filter(pk__in=authorization.scope_tenant_ids)
+            if not actor.has_perm("reports.view_cross_tenant_reports", obj=tenant)
+        ]
+        if missing_tenants:
+            raise PermissionDenied(
+                _("Your cross-tenant reach does not cover: %(tenants)s. The revocation would not be effective.")
+                % {"tenants": ", ".join(tenant.name for tenant in missing_tenants)}
+            )
+        authorization.revoked_by = actor
+        authorization.revoked_at = timezone.now()
+        authorization.save(update_fields=["revoked_by", "revoked_at"])
+        return authorization
+
+    def is_revoked(self):
+        return self.revoked_at is not None
+
+    def __str__(self):
+        return f"Scope approval for {self.scheduled_report}"
 
 
 class ReportGenerationArchive(ChangeLoggingMixin, BaseModel):

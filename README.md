@@ -103,11 +103,14 @@ docker compose up -d
 ```
 
 Existing deployments that use the Beta report-template designer must set
-`ITAMBOX_REPORT_DESIGNER_ENABLED=True` before upgrading; it is disabled by
-default. The curated catalogue is unaffected and scheduled delivery of existing
-report templates is paused while the flag is `False` (saved schedules are not
-deleted). A fresh deployment must enable the designer before it can author a
-template or use scheduled delivery.
+`ITAMBOX_FEATURE_REPORT_DESIGNER=True` before upgrading; it is disabled by
+default. The curated catalogue is unaffected. While the flag is `False`, the
+designer and schedule UI/routes remain closed and scheduled delivery is skipped
+for non-grandfathered templates; the migration-managed bounded grandfathered set
+continues to render and deliver so existing legacy schedules are not broken.
+Saved schedules are not deleted, and grandfathered templates are read-only until
+the flag is enabled. A fresh deployment must enable the designer before it can
+author a template or use scheduled delivery.
 
 Back up PostgreSQL, uploaded media, `ITAMBOX_SECRET_KEY`, `ITAMBOX_FIELD_ENCRYPTION_KEYS`, and `ITAMBOX_API_TOKEN_PEPPERS` together. Follow the [installation guide](itambox/docs/operations/installation.md), [backup and restore guide](itambox/docs/operations/backup-restore.md), and [upgrade guide](itambox/docs/operations/upgrades.md).
 

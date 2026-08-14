@@ -1,25 +1,34 @@
-import csv
-import io
 import logging
 from dataclasses import dataclass, field
 
-from django.core.exceptions import ValidationError
+from django.core.exceptions import ObjectDoesNotExist, PermissionDenied, ValidationError
 from django.core.files.base import ContentFile
 from django.core.mail import EmailMessage
-from django.template import Context, Template
 from django.utils import timezone
 from django.utils.translation import gettext as _
 
-from core.csv_utils import csv_safe, safe_csv_filename
+from core.context import get_current_user
+from core.csv_utils import safe_csv_filename
 from core.events import send_notification_to_channel
+from core.features import report_designer_probe
 from core.models import EmailSettings
-from core.reports import build_report_context, get_polished_system_html_template
+from core.reports import build_report_context
+from core.reports.rendering import render_report_csv, render_report_html
 from core.tasks.context import TaskContext
 from core.tasks.utils import TaskResult, TaskStatus, classify_task_error
-from extras.models import FileAttachment, ReportGenerationArchive, ScheduledReport
-from itambox.capabilities import registry
+from extras.models import (
+    FileAttachment,
+    ReportGenerationArchive,
+    ScheduledReport,
+    ScheduledReportScopeAuthorization,
+)
 
 logger = logging.getLogger(__name__)
+
+
+def _render_report_html(context_data, template=None):
+    """Compatibility hook for existing task tests and integrations."""
+    return render_report_html(context_data, template)
 
 
 @dataclass
@@ -60,10 +69,6 @@ def _report_filename(template, extension):
     return f"{safe_csv_filename(template.name).lower().replace(' ', '_')}_{timezone.now():%Y%m%d}.{extension}"
 
 
-def _render_report_html(context_data):
-    return Template(get_polished_system_html_template()).render(Context(context_data))
-
-
 def _attachment_email_body(format_name, template):
     return _("Please find attached the scheduled %(format)s report for '%(name)s' generated on %(timestamp)s UTC.") % {
         "format": format_name,
@@ -74,7 +79,7 @@ def _attachment_email_body(format_name, template):
 
 def _render_report_output(sched, template, headers, rows, context_data):
     if sched.format == ScheduledReport.FORMAT_HTML:
-        return _ReportOutput(email_body=_render_report_html(context_data))
+        return _ReportOutput(email_body=_render_report_html(context_data, template))
 
     if sched.format == ScheduledReport.FORMAT_PDF:
         # inline import: heavy-import: PDF exporter is needed only for PDF schedules
@@ -82,7 +87,7 @@ def _render_report_output(sched, template, headers, rows, context_data):
 
         return _ReportOutput(
             email_body=_attachment_email_body("PDF", template),
-            attachment_content=report_pdf_bytes(_render_report_html(context_data)),
+            attachment_content=report_pdf_bytes(_render_report_html(context_data, template)),
             attachment_filename=_report_filename(template, "pdf"),
             attachment_mime=PDF_MIME,
         )
@@ -99,14 +104,16 @@ def _render_report_output(sched, template, headers, rows, context_data):
         )
 
     if sched.format == ScheduledReport.FORMAT_CSV:
-        csv_buffer = io.StringIO()
-        writer = csv.writer(csv_buffer)
-        writer.writerow(headers)
-        for row in rows:
-            writer.writerow([csv_safe(row.get(header, "-")) for header in headers])
+        csv_content = render_report_csv(
+            template,
+            headers,
+            rows,
+            summary_cards=context_data.get("summary_cards"),
+            grouped_data=context_data.get("grouped_data"),
+        )
         return _ReportOutput(
             email_body=_attachment_email_body("CSV", template),
-            attachment_content=csv_buffer.getvalue(),
+            attachment_content=csv_content,
             attachment_filename=_report_filename(template, "csv"),
             attachment_mime="text/csv",
         )
@@ -223,9 +230,36 @@ def _deliver_report_channels(sched, summary_cards, total_rows):
 
 def _resolve_report_scope(sched):
     active_tenant = sched.tenant or (sched.report.tenant if sched.report else None)
-    filter_tenants = list(sched.filter_tenants.all())
-    if not filter_tenants and sched.report:
-        filter_tenants = list(sched.report.filter_tenants.all())
+    # Resolve the persisted scope through unscoped through-table reads: the
+    # ambient tenant (bound in request threads and left behind by permission
+    # checks) would otherwise silently truncate the M2M read. The explicit
+    # filter list stays empty when no filter tenants are configured; the owner
+    # tenant travels separately as active_tenant.
+    if hasattr(sched, "persisted_scope_tenant_ids"):
+        scope_ids = sched.persisted_scope_tenant_ids()
+    else:
+        filter_relation = list(sched.filter_tenants.all())
+        if not filter_relation and sched.report:
+            filter_relation = list(sched.report.filter_tenants.all())
+        scope_ids = sorted({tenant.pk for tenant in filter_relation})
+    filter_tenants = []
+    if scope_ids:
+        # inline import: heavy-import: organization models are only needed for tenant resolution
+        from django.apps import apps
+
+        Tenant = apps.get_model("organization", "Tenant")
+        # Tenant.all_objects/objects apply ambient-tenant scoping; only the
+        # plain base manager returns the full persisted scope. Keep the
+        # soft-delete filter the scoped managers previously enforced.
+        filter_tenants = list(Tenant._base_manager.filter(pk__in=scope_ids, deleted_at__isnull=True).order_by("pk"))
+        if not filter_tenants:
+            # Every explicitly scoped tenant is soft-deleted. Fail closed instead
+            # of silently substituting the owner tenant's data.
+            logger.error(
+                "Scheduled report scope tenants are all soft-deleted; refusing compilation",
+                extra={"operation": "reports.scope", "scheduled_report_id": getattr(sched, "pk", None)},
+            )
+            return None
     if active_tenant is None and not filter_tenants:
         logger.error(
             "Scheduled report has no tenant scope; refusing cross-tenant compilation",
@@ -233,6 +267,97 @@ def _resolve_report_scope(sched):
         )
         return None
     return active_tenant, filter_tenants
+
+
+def _scope_requires_authorization(active_tenant, filter_tenants):
+    """Return whether persisted scope exceeds the schedule owner's tenant."""
+    active_tenant_id = getattr(active_tenant, "pk", None)
+    scope_tenant_ids = sorted({tenant.pk for tenant in filter_tenants})
+    if not scope_tenant_ids and active_tenant_id is not None:
+        scope_tenant_ids = [active_tenant_id]
+    return active_tenant_id is None or scope_tenant_ids != [active_tenant_id]
+
+
+def _load_scope_authorization(sched):
+    """Load the durable approval for a scheduled report."""
+    return (
+        ScheduledReportScopeAuthorization.objects.filter(scheduled_report_id=sched.pk)
+        .select_related("authorized_by")
+        .first()
+    )
+
+
+def _stored_scope_tenants_are_live(authorization):
+    """Whether every tenant of a stored approval still exists as a live row."""
+    # inline import: heavy-import: organization models are only needed for tenant resolution
+    from django.apps import apps
+
+    Tenant = apps.get_model("organization", "Tenant")
+    stored_ids = set(authorization.scope_tenant_ids)
+    live_ids = set(Tenant._base_manager.filter(pk__in=stored_ids, deleted_at__isnull=True).values_list("pk", flat=True))
+    return live_ids == stored_ids
+
+
+def _parse_authorized_scope(authorization):
+    try:
+        return sorted({int(tenant_id) for tenant_id in authorization.scope_tenant_ids})
+    except (TypeError, ValueError):
+        return None
+
+
+def _resolve_authorized_principal(authorization):
+    try:
+        principal = getattr(authorization, "authorized_by", None)
+    except ObjectDoesNotExist:
+        return None
+    if principal is None or not getattr(principal, "is_active", False):
+        return None
+    return principal
+
+
+def _tenant_scope_permission_is_valid(principal, tenant):
+    tenant_id = getattr(tenant, "pk", None)
+    if tenant_id is None:
+        return False
+    try:
+        with TaskContext(
+            tenant_id=tenant_id,
+            user_id=principal.pk,
+            operation="reports.scope_authorization",
+        ):
+            worker_principal = get_current_user()
+            return worker_principal is not None and worker_principal.has_perm(
+                "reports.view_cross_tenant_reports",
+                obj=tenant,
+            )
+    except (ObjectDoesNotExist, PermissionDenied):
+        return False
+
+
+def _principal_can_authorize_scope(principal, filter_tenants):
+    for tenant in filter_tenants:
+        if not _tenant_scope_permission_is_valid(principal, tenant):
+            return False
+    return True
+
+
+def _resolve_scope_authorization(sched, active_tenant, filter_tenants):
+    """Resolve a current, durable principal approval for a broad schedule."""
+    if not _scope_requires_authorization(active_tenant, filter_tenants):
+        return None
+    authorization = _load_scope_authorization(sched)
+    # getattr keeps this compatible with the lightweight test doubles used in
+    # the designer contract tests (SimpleNamespace rows have no revoked_at).
+    if authorization is None or getattr(authorization, "revoked_at", None) is not None:
+        return None
+    scope_tenant_ids = sorted({tenant.pk for tenant in filter_tenants})
+    authorized_scope = _parse_authorized_scope(authorization)
+    if authorized_scope is None or authorized_scope != scope_tenant_ids:
+        return None
+    principal = _resolve_authorized_principal(authorization)
+    if principal is None or not _principal_can_authorize_scope(principal, filter_tenants):
+        return None
+    return principal.pk
 
 
 def _process_scheduled_report(sched, active_tenant, filter_tenants):
@@ -336,7 +461,7 @@ def generate_scheduled_report_task(scheduled_report_id: int) -> TaskResult:
         )
         return TaskResult(TaskStatus.TERMINAL, "report.not_found")
 
-    if not registry.is_active("reporting.designer"):
+    if not report_designer_probe().active and not getattr(sched.report, "legacy_designer_grandfathered", False):
         logger.warning(
             "Report designer capability is inactive",
             extra={"operation": "reports.generate", "scheduled_report_id": sched.pk},
@@ -354,11 +479,37 @@ def generate_scheduled_report_task(scheduled_report_id: int) -> TaskResult:
     if scope is None:
         return TaskResult(TaskStatus.TERMINAL, "report.scope_missing", user_visible=True)
     active_tenant, filter_tenants = scope
+    if not filter_tenants:
+        existing_authorization = ScheduledReportScopeAuthorization._base_manager.filter(scheduled_report=sched).first()
+        if (
+            existing_authorization
+            and existing_authorization.scope_tenant_ids
+            and existing_authorization.revoked_at is None
+            and not _stored_scope_tenants_are_live(existing_authorization)
+        ):
+            # Soft-deleting a tenant strips its through rows, so an approved
+            # broad scope silently collapses to the owner tenant. Fail closed
+            # instead of substituting owner data. A deliberate wind-back (the
+            # stored tenants are still live) runs single-tenant below.
+            logger.error(
+                "Scheduled report approved scope tenants were removed; refusing owner fallback",
+                extra={"operation": "reports.scope", "scheduled_report_id": sched.pk},
+            )
+            return TaskResult(TaskStatus.TERMINAL, "report.scope_missing", user_visible=True)
+    scope_authorized_user_id = _resolve_scope_authorization(sched, active_tenant, filter_tenants)
+    scope_requires_authorization = _scope_requires_authorization(active_tenant, filter_tenants)
+    if scope_requires_authorization and scope_authorized_user_id is None:
+        logger.warning(
+            "Scheduled report has no current durable authorization for its broad tenant scope",
+            extra={"operation": "reports.scope", "scheduled_report_id": sched.pk},
+        )
+        return TaskResult(TaskStatus.TERMINAL, "report.scope_unauthorized", user_visible=True)
 
     with TaskContext(
-        tenant_id=active_tenant.id if active_tenant else None,
-        user_id=None,
+        tenant_id=None if scope_requires_authorization else active_tenant.id if active_tenant else None,
+        user_id=scope_authorized_user_id,
         operation="reports.generate",
+        all_accessible=scope_requires_authorization,
     ) as ctx:
         logger.info(
             "Generating scheduled report",

@@ -192,10 +192,13 @@ Report providers declare the model-level view permissions relevant to their doma
 
 **Scheduled Reports** automatically compile a Report Template on a recurring
 schedule and deliver the result via email or notification channels. This Beta
-surface shares the `ITAMBOX_REPORT_DESIGNER_ENABLED` gate with the report
+surface shares the `ITAMBOX_FEATURE_REPORT_DESIGNER` gate with the report
 designer: when the flag is `False`, the menu and routes are hidden/closed and
-existing delivery is paused without deleting saved schedules. Set the flag to
-`True` to use scheduled delivery again.
+delivery is skipped for non-grandfathered templates. The migration-managed
+bounded grandfathered set may continue to render and deliver, while those
+templates remain read-only until the flag is enabled. Saved schedules are not
+deleted. Set the flag to `True` to author, edit, and use scheduled delivery
+normally again.
 
 ### Creating a Scheduled Report
 
@@ -244,6 +247,25 @@ In addition to email delivery via the **Recipients** field, scheduled reports
 can be attached to one or more **Notification Channels** (configured under
 Extras → Notification Channels). This enables delivery to webhooks, Slack,
 Microsoft Teams, or other integrated platforms.
+
+### Cross-Tenant Scope Approvals
+
+A schedule whose **Filter Tenants** scope spans more than one tenant compiles
+cross-tenant data and therefore requires a durable scope approval. The schedule
+list shows the scope state per schedule; the **Scope Approval** page
+(**Extras → Scheduled Reports → Scope**) names every tenant in scope and the
+current approval.
+
+- Approving or revoking requires the `reports.view_cross_tenant_reports`
+  permission on every tenant in scope; an approval by a principal whose reach
+  does not cover the full scope is refused instead of being stored and later
+  failing at delivery time.
+- Without a current approval, delivery of a cross-tenant schedule terminates
+  with an authorization error (`report.scope_unauthorized`) rather than
+  rendering unapproved tenant data. Changing the scope after an approval
+  invalidates it, as does revoking it.
+- Revocation keeps the approval history visible and marks it void; approving
+  again records a fresh approval.
 
 ### Monitoring
 

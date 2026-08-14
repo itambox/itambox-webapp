@@ -4,19 +4,20 @@ from django.db import migrations
 
 
 class Migration(migrations.Migration):
-
     dependencies = [
-        ('extras', '0102_alter_event_action'),
-        ('users', '0100_issue88_shard_62_users_relations'),
+        ("extras", "0102_alter_event_action"),
+        ("users", "0100_issue88_shard_62_users_relations"),
     ]
 
     operations = [
-        migrations.RemoveField(
-            model_name='reporttemplate',
-            name='advanced_mode',
-        ),
-        migrations.RemoveField(
-            model_name='reporttemplate',
-            name='template_content',
+        # Keep the physical columns for existing content. The ORM state is
+        # removed here only so 0104 can reintroduce the durable 1.x contract
+        # together with bounded grandfathering.
+        migrations.SeparateDatabaseAndState(
+            database_operations=[],
+            state_operations=[
+                migrations.RemoveField(model_name="reporttemplate", name="advanced_mode"),
+                migrations.RemoveField(model_name="reporttemplate", name="template_content"),
+            ],
         ),
     ]

@@ -5774,14 +5774,6 @@
     {
       "path": "itambox/extras/views.py",
       "code": "F401",
-      "message": "'django.shortcuts.render' imported but unused",
-      "source": "from django.shortcuts import get_object_or_404, redirect, render",
-      "context": "Module:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/extras/views.py",
-      "code": "F401",
       "message": "'django.views.generic.CreateView' imported but unused",
       "source": "from django.views.generic import CreateView, DeleteView, DetailView, ListView, UpdateView, View",
       "context": "Module:body",

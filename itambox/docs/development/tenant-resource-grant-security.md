@@ -180,6 +180,8 @@ PYTHONPATH=itambox uv run --locked --group dev python -m pytest -q -p no:cachepr
   itambox/core/tests/test_report_characterization.py \
   itambox/core/tests/test_report_chart_html.py \
   itambox/core/tests/test_report_custom_html_removal.py \
+  itambox/core/tests/test_report_designer_issue181.py \
+  itambox/core/tests/test_report_designer_migration.py \
   itambox/core/tests/test_report_asset_disposal_eol.py \
   itambox/core/tests/test_report_contract_renewals.py \
   itambox/core/tests/test_report_custody_compliance.py \
@@ -191,12 +193,14 @@ PYTHONPATH=itambox uv run --locked --group dev python -m pytest -q -p no:cachepr
   itambox/core/tests/test_report_warranty_expiration.py \
   itambox/core/tests/test_phase3_task_audit.py \
   itambox/core/tests/test_reporting.py \
+  itambox/core/tests/test_report_template_form_xss.py \
   itambox/compliance/tests/test_custody_permissions.py \
   itambox/compliance/tests/test_custody_rbac.py \
   itambox/compliance/tests/test_views.py \
   itambox/extras/tests/test_dashboard_all_accessible.py \
   itambox/extras/tests/test_dashboard_widgets.py \
   itambox/extras/tests/test_existing.py \
+  itambox/extras/tests/test_scheduledreport_scope_approval.py \
   itambox/inventory/tests/test_accessories.py \
   itambox/inventory/tests/test_api_over_allocation.py \
   itambox/inventory/tests/test_assignment_system_authorization_provenance.py \
