@@ -831,9 +831,7 @@ class ReportTemplateBulkDeleteView(CapabilityRequiredMixin, ObjectBulkDeleteView
 @method_decorator(login_required, name="dispatch")
 class ScheduledReportListView(CapabilityRequiredMixin, ObjectListView):
     capability_key = REPORT_DESIGNER_CAPABILITY
-    queryset = ScheduledReport.objects.select_related("report").prefetch_related(
-        "scope_authorization__authorized_by", "scope_authorization__revoked_by"
-    )
+    queryset = ScheduledReport.objects.select_related("report").prefetch_related("scope_authorization")
     filterset = ScheduledReportFilterSet
     filterset_form = ScheduledReportFilterForm
     table = ScheduledReportTable
@@ -993,25 +991,34 @@ class ScheduledReportScopeApprovalView(CapabilityRequiredMixin, PermissionRequir
         scope_tenant_ids = sched.effective_scope_tenant_ids()
         if not scope_tenant_ids:
             return []
-        return list(Tenant._base_manager.filter(pk__in=scope_tenant_ids))
+        return list(Tenant._base_manager.filter(pk__in=scope_tenant_ids).order_by("name"))
 
-    def _approval_would_be_effective(self, sched, scope_tenants):
-        # An approval only takes effect when the acting principal holds the
+    def _principal_covers_scope(self, principal, scope_tenants):
+        # An approval only takes effect when the principal holds the
         # cross-tenant permission on EVERY tenant in scope; delivery re-checks
         # this per tenant, so refuse to store an approval that cannot work.
-        return all(
-            self.request.user.has_perm("reports.view_cross_tenant_reports", obj=tenant) for tenant in scope_tenants
-        )
+        if not scope_tenants or not getattr(principal, "is_active", False):
+            return False
+        return all(principal.has_perm("reports.view_cross_tenant_reports", obj=tenant) for tenant in scope_tenants)
+
+    def _approval_would_be_effective(self, sched, scope_tenants):
+        return self._principal_covers_scope(self.request.user, scope_tenants)
 
     def get_context_data(self, **kwargs):
         sched = self.object = self.get_object()
         authorization = self._stored_authorization(sched)
+        scope_tenant_ids = sorted(set(sched.effective_scope_tenant_ids()))
         scope_tenants = self._scope_tenants(sched)
-        scope_tenant_ids = sorted({tenant.pk for tenant in scope_tenants})
         authorization_is_current = bool(
             authorization
             and not authorization.is_revoked()
-            and sorted(authorization.scope_tenant_ids) == scope_tenant_ids
+            and sorted(set(authorization.scope_tenant_ids)) == scope_tenant_ids
+        )
+        # Generation also fails closed when the stored authorizer lost reach or
+        # became inactive; surface that state so the page answers the question
+        # an operator actually opens it for.
+        stored_approval_is_effective = bool(
+            authorization_is_current and self._principal_covers_scope(authorization.authorized_by, scope_tenants)
         )
         return {
             "object": sched,
@@ -1020,6 +1027,7 @@ class ScheduledReportScopeApprovalView(CapabilityRequiredMixin, PermissionRequir
             "scope_tenants": scope_tenants,
             "authorization": authorization,
             "authorization_is_current": authorization_is_current,
+            "stored_approval_is_effective": stored_approval_is_effective,
             "approval_would_be_effective": self._approval_would_be_effective(sched, scope_tenants),
             "return_url": safe_return_url(
                 self.request, self.request.GET.get("return_url"), reverse("extras:scheduledreport_list")
@@ -1029,17 +1037,32 @@ class ScheduledReportScopeApprovalView(CapabilityRequiredMixin, PermissionRequir
     def get(self, request, *args, **kwargs):
         return render(request, self.template_name, self.get_context_data())
 
+    def _error_redirect(self, request):
+        return_url = request.POST.get("return_url") or request.GET.get("return_url")
+        if return_url:
+            return redirect(f"{request.path}?{urlencode({'return_url': return_url})}")
+        return redirect(request.path)
+
     def post(self, request, *args, **kwargs):
+        # The model is resolved lazily: extending the module-level extras.models
+        # import line would churn the flake8 E402 baseline identity for views.py.
         scope_authorization_model = apps.get_model("extras", "ScheduledReportScopeAuthorization")
         sched = self.object = self.get_object()
         action = request.POST.get("action")
         return_url = safe_return_url(request, request.POST.get("return_url"), reverse("extras:scheduledreport_list"))
         try:
             if action == "approve":
+                scope_tenant_ids = sched.effective_scope_tenant_ids()
                 scope_tenants = self._scope_tenants(sched)
-                if not scope_tenants:
+                if not scope_tenant_ids:
                     raise ValidationError(
                         _("This schedule has no resolvable scope tenants, so a cross-tenant approval cannot be stored.")
+                    )
+                if len(scope_tenants) != len(set(scope_tenant_ids)):
+                    raise ValidationError(
+                        _(
+                            "Not every tenant in the scope resolves to an existing tenant, so the approval would not take effect."
+                        )
                     )
                 if not self._approval_would_be_effective(sched, scope_tenants):
                     missing = [
@@ -1051,7 +1074,12 @@ class ScheduledReportScopeApprovalView(CapabilityRequiredMixin, PermissionRequir
                         _("Your cross-tenant reach does not cover: %(tenants)s. The approval would not take effect.")
                         % {"tenants": ", ".join(missing)}
                     )
-                scope_authorization_model.approve(sched, request.user)
+                authorization = scope_authorization_model.approve(sched, request.user)
+                if sorted(set(authorization.scope_tenant_ids)) != sorted(set(scope_tenant_ids)):
+                    # The scope changed between the reach check and the snapshot.
+                    raise ValidationError(
+                        _("The scope changed while approving; please review the scope and approve again.")
+                    )
                 messages.success(request, _("Cross-tenant scope of '%(name)s' approved.") % {"name": sched.name})
             elif action == "revoke":
                 scope_authorization_model.revoke(sched, request.user)
@@ -1062,12 +1090,12 @@ class ScheduledReportScopeApprovalView(CapabilityRequiredMixin, PermissionRequir
                 messages.error(request, _("Unknown scope approval action."))
             return redirect(return_url)
         except PermissionDenied as error:
-            messages.error(request, str(error))
-            return redirect(request.path)
+            messages.error(request, str(error) or _("You are not permitted to change this scope approval."))
+            return self._error_redirect(request)
         except ValidationError as error:
-            for message in getattr(error, "messages", [str(error)]):
+            for message in error.messages:
                 messages.error(request, message)
-            return redirect(request.path)
+            return self._error_redirect(request)
 
 
 @method_decorator(login_required, name="dispatch")

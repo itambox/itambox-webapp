@@ -27,9 +27,9 @@
           {% else %}
             <p>
               {% blocktranslate trimmed with schedule=object.name %}
-                The schedule <strong>{{ schedule }}</strong> compiles report data across more than one
-                tenant. Delivery therefore requires a durable cross-tenant scope approval; without one,
-                delivery terminates with an authorization error instead of running against unapproved data.
+                The schedule {{ schedule }} compiles report data across more than one tenant. Delivery
+                therefore requires a durable cross-tenant scope approval; without one, delivery
+                terminates with an authorization error instead of running against unapproved data.
               {% endblocktranslate %}
             </p>
 
@@ -59,9 +59,17 @@
                 <div class="alert alert-success">
                   {% translate "The stored approval matches the current scope and remains in effect." %}
                 </div>
+                {% if not stored_approval_is_effective %}
+                  <div class="alert alert-warning">
+                    {% translate "The stored approval no longer takes effect: the authorizing principal is inactive or has lost cross-tenant reach over part of the scope. Delivery fails closed until the scope is approved again." %}
+                  </div>
+                {% endif %}
               {% elif not authorization.is_revoked %}
                 <div class="alert alert-danger">
-                  {% translate "The scope changed after the approval, so the stored approval no longer matches. Delivery fails closed until the scope is approved again." %}
+                  {% translate "The scope changed after the approval, so the stored approval no longer matches." %}
+                  {% translate "Stored scope:" %} {{ authorization.scope_tenant_ids|join:", " }}
+                  <br>
+                  {% translate "Delivery fails closed until the scope is approved again." %}
                 </div>
               {% endif %}
             {% else %}

@@ -461,14 +461,14 @@ class ScheduledReportTable(BaseTable):
                 url,
                 _("Approve"),
             )
-        if authorization.revoked_at is not None:
+        if authorization.is_revoked():
             return format_html(
                 '<span class="badge bg-danger">{}</span> <a href="{}">{}</a>',
                 _("Revoked"),
                 url,
                 _("Review"),
             )
-        if sorted(authorization.scope_tenant_ids) != sorted(record.effective_scope_tenant_ids()):
+        if sorted(set(authorization.scope_tenant_ids)) != sorted(set(record.effective_scope_tenant_ids())):
             return format_html(
                 '<span class="badge bg-danger">{}</span> <a href="{}">{}</a>',
                 _("Scope changed"),

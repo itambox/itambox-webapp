@@ -144,3 +144,53 @@ class ScheduledReportScopeApprovalViewTests(TestCase):
         response = self._client_for(self.partial).get(self.url)
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "would not take effect")
+
+    def test_approve_refused_when_a_scope_tenant_does_not_resolve(self):
+        through = self.sched.filter_tenants.through
+        through._base_manager.create(scheduledreport_id=self.sched.pk, tenant_id=999999)
+        response = self._client_for(self.admin).post(self.url, {"action": "approve"}, follow=True)
+        self.assertEqual(ScheduledReportScopeAuthorization.objects.filter(scheduled_report=self.sched).count(), 0)
+        self.assertContains(response, "does not resolve")
+
+    def test_stored_authorizer_reach_loss_is_surfaced_on_the_page(self):
+        from organization.models import RoleGrant
+
+        self._client_for(self.operator).post(self.url, {"action": "approve"})
+        RoleGrant.objects.filter(membership__user=self.operator, role__tenant=self.tenant_b).delete()
+        response = self._client_for(self.admin).get(self.url)
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "no longer takes effect")
+
+    def test_off_host_return_url_is_sanitized(self):
+        response = self._client_for(self.admin).post(
+            self.url, {"action": "approve", "return_url": "https://evil.example/phish"}
+        )
+        self.assertEqual(response.status_code, 302)
+        self.assertEqual(response.url, reverse("extras:scheduledreport_list"))
+
+
+class ScheduledReportScopeApprovalCapabilityGateTests(TestCase):
+    def setUp(self):
+        self.tenant_a = Tenant.objects.create(name="Gate Tenant A", slug="gate-tenant-a")
+        self.admin = User.objects.create_superuser(username="scope-gate-admin", password="password123", email="a@b.com")
+        self.template = ReportTemplate.objects.create(
+            name="Gate Template",
+            report_type=ReportTemplate.REPORT_TYPE_ASSET_SUMMARY,
+            tenant=self.tenant_a,
+        )
+        self.sched = ScheduledReport.objects.create(
+            name="Gate Schedule",
+            report=self.template,
+            tenant=self.tenant_a,
+            format=ScheduledReport.FORMAT_HTML,
+            save_to_archive=False,
+            is_active=True,
+        )
+        self.url = reverse("extras:scheduledreport_scope_approval", kwargs={"pk": self.sched.pk})
+
+    @override_settings(REPORT_DESIGNER_ENABLED=False)
+    def test_route_is_closed_when_the_designer_capability_is_inactive(self):
+        client = Client()
+        client.force_login(self.admin)
+        response = client.get(self.url)
+        self.assertEqual(response.status_code, 404)
