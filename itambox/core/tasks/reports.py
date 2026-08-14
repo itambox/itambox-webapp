@@ -233,7 +233,13 @@ def _resolve_report_scope(sched):
     # Resolve the persisted scope through the model's unscoped through-table
     # reader: the ambient tenant (bound in request threads and left behind by
     # permission checks) would otherwise silently truncate the M2M read.
-    scope_ids = sched.effective_scope_tenant_ids()
+    if hasattr(sched, "effective_scope_tenant_ids"):
+        scope_ids = sched.effective_scope_tenant_ids()
+    else:
+        filter_relation = list(sched.filter_tenants.all())
+        if not filter_relation and sched.report:
+            filter_relation = list(sched.report.filter_tenants.all())
+        scope_ids = sorted({tenant.pk for tenant in filter_relation})
     filter_tenants = []
     if scope_ids:
         # inline import: heavy-import: organization models are only needed for tenant resolution
