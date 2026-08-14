@@ -229,7 +229,11 @@ class ScheduledReportScopeBadgeTests(TestCase):
         self.table = ScheduledReportTable(ScheduledReport.objects.all())
 
     def _badge(self):
-        return str(self.table.render_scope(self.sched, self.sched.pk))
+        # The table renders rows fresh from the queryset; mirror that instead of
+        # reusing the setUp instance, whose reverse-O2O cache is not invalidated
+        # by approve()/revoke() (they write through the queryset path).
+        fresh = ScheduledReport.objects.get(pk=self.sched.pk)
+        return str(self.table.render_scope(fresh, fresh.pk))
 
     def test_single_tenant_schedule_shows_no_approval_badge(self):
         self.assertEqual(self._badge(), '<span class="badge bg-secondary">Single tenant</span>')
@@ -238,7 +242,7 @@ class ScheduledReportScopeBadgeTests(TestCase):
         self.sched.filter_tenants.add(self.tenant_a, self.tenant_b)
         badge = self._badge()
         self.assertIn("Approval required", badge)
-        self.assertIn("scheduledreport_scope_approval", badge)
+        self.assertIn("/scope-approval/", badge)
 
     def test_current_approval_shows_approved(self):
         self.sched.filter_tenants.add(self.tenant_a, self.tenant_b)
