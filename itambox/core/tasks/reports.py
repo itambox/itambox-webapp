@@ -289,6 +289,7 @@ def _load_scope_authorization(sched):
 
 def _stored_scope_tenants_are_live(authorization):
     """Whether every tenant of a stored approval still exists as a live row."""
+    # inline import: heavy-import: organization models are only needed for tenant resolution
     from django.apps import apps
 
     Tenant = apps.get_model("organization", "Tenant")
