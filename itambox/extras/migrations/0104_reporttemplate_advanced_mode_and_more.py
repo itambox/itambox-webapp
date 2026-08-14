@@ -1,5 +1,9 @@
+import logging
+
 from django.db import migrations, models, router
 from django.db.migrations.operations.base import Operation
+
+logger = logging.getLogger(__name__)
 
 
 class AddPersistentReportDesignerFields(Operation):
@@ -135,6 +139,25 @@ def recover_and_stamp_report_designer(apps, schema_editor):
         legacy_designer_grandfathered=False,
     ).update(legacy_designer_grandfathered=True)
 
+    out_of_bound_templates = list(
+        ReportTemplate._base_manager.filter(
+            deleted_at__isnull=True,
+            template_content__regex=r"\S",
+            legacy_designer_grandfathered=False,
+        )
+        .order_by("name", "pk")
+        .values("pk", "name")
+    )
+    if out_of_bound_templates:
+        affected = ", ".join(f"{row['name']} (pk={row['pk']})" for row in out_of_bound_templates)
+        logger.warning(
+            "Report designer migration found %s active custom HTML template(s) outside the bounded "
+            "grandfathered set. Their custom HTML will not render while "
+            "ITAMBOX_FEATURE_REPORT_DESIGNER is disabled. Affected templates: %s",
+            len(out_of_bound_templates),
+            affected,
+        )
+
 
 def clear_grandfathering_marker(apps, schema_editor):
     """Reverse only the activation effect; never rewrite user content."""
@@ -144,8 +167,9 @@ def clear_grandfathering_marker(apps, schema_editor):
 
 class Migration(migrations.Migration):
     dependencies = [
-        ("core", "0029_null_to_empty_strings"),
+        ("core", "0100_issue88_shard_38_core_relations"),
         ("extras", "0103_remove_reporttemplate_advanced_mode_and_more"),
+        ("users", "0100_issue88_shard_62_users_relations"),
     ]
 
     operations = [

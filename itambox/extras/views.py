@@ -1076,6 +1076,7 @@ class ReportTemplatePreviewView(CapabilityRequiredMixin, PermissionRequiredMixin
         from core.reports import build_report_context
 
         try:
+            template_instance.full_clean(validate_constraints=False)
             _headers, _rows, _summary_cards, _grouped_data, _chart_svg, context_data = build_report_context(
                 template_instance, active_tenant=active_tenant, filter_tenants=filter_tenants
             )

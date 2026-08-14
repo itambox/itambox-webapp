@@ -11064,12 +11064,15 @@
           "without_reverse": 0
         },
         "SeparateDatabaseAndState": {
-          "count": 0
+          "count": 1
         }
       },
       "path": "itambox/extras/migrations/0103_remove_reporttemplate_advanced_mode_and_more.py",
       "replaces": [],
-      "reviewed_disposition": null,
+      "reviewed_disposition": {
+        "disposition": "upgrade-only",
+        "rationale": "Retains physical legacy report-designer columns while removing them from the historical ORM state before the durable 1.x contract is restored."
+      },
       "run_before": [],
       "special_users_bootstrap": false,
       "swappable_user_dependency": false,
@@ -11078,7 +11081,7 @@
           "BtreeGistExtension": false,
           "RunPython": false,
           "RunSQL": false,
-          "SeparateDatabaseAndState": false
+          "SeparateDatabaseAndState": true
         }
       }
     },
@@ -11121,6 +11124,90 @@
         "has_custom_operations": {
           "BtreeGistExtension": false,
           "RunPython": true,
+          "RunSQL": false,
+          "SeparateDatabaseAndState": false
+        }
+      }
+    },
+    {
+      "dependencies": [
+        "core.0100_issue88_shard_38_core_relations",
+        "extras.0103_remove_reporttemplate_advanced_mode_and_more",
+        "users.0100_issue88_shard_62_users_relations"
+      ],
+      "id": "extras.0104_reporttemplate_advanced_mode_and_more",
+      "is_replacement": false,
+      "operations": {
+        "BtreeGistExtension": {
+          "count": 0
+        },
+        "RunPython": {
+          "with_noop_reverse": 0,
+          "with_reverse": 1,
+          "without_reverse": 0
+        },
+        "RunSQL": {
+          "with_noop_reverse": 0,
+          "with_reverse": 0,
+          "without_reverse": 0
+        },
+        "SeparateDatabaseAndState": {
+          "count": 0
+        }
+      },
+      "path": "itambox/extras/migrations/0104_reporttemplate_advanced_mode_and_more.py",
+      "replaces": [],
+      "reviewed_disposition": {
+        "disposition": "upgrade-only",
+        "rationale": "Restores durable report-designer fields, recovers serialized legacy values, stamps only the bounded live scheduled set, and reports out-of-bound custom HTML templates."
+      },
+      "run_before": [],
+      "special_users_bootstrap": false,
+      "swappable_user_dependency": false,
+      "syntactic_facts": {
+        "has_custom_operations": {
+          "BtreeGistExtension": false,
+          "RunPython": true,
+          "RunSQL": false,
+          "SeparateDatabaseAndState": false
+        }
+      }
+    },
+    {
+      "dependencies": [
+        "extras.0104_reporttemplate_advanced_mode_and_more",
+        "users.0100_issue88_shard_62_users_relations"
+      ],
+      "id": "extras.0105_scheduledreportscopeauthorization",
+      "is_replacement": false,
+      "operations": {
+        "BtreeGistExtension": {
+          "count": 0
+        },
+        "RunPython": {
+          "with_noop_reverse": 0,
+          "with_reverse": 0,
+          "without_reverse": 0
+        },
+        "RunSQL": {
+          "with_noop_reverse": 0,
+          "with_reverse": 0,
+          "without_reverse": 0
+        },
+        "SeparateDatabaseAndState": {
+          "count": 0
+        }
+      },
+      "path": "itambox/extras/migrations/0105_scheduledreportscopeauthorization.py",
+      "replaces": [],
+      "reviewed_disposition": null,
+      "run_before": [],
+      "special_users_bootstrap": false,
+      "swappable_user_dependency": true,
+      "syntactic_facts": {
+        "has_custom_operations": {
+          "BtreeGistExtension": false,
+          "RunPython": false,
           "RunSQL": false,
           "SeparateDatabaseAndState": false
         }
@@ -17521,6 +17608,8 @@
     "extras.0102_alter_event_action",
     "extras.0103_remove_reporttemplate_advanced_mode_and_more",
     "extras.0104_issue183_alert_tenant_reconciliation",
+    "extras.0104_reporttemplate_advanced_mode_and_more",
+    "extras.0105_scheduledreportscopeauthorization",
     "inventory.0101_alter_accessoryassignment_options_and_more",
     "organization.0101_membership_external_id_and_more",
     "organization.0102_alter_tenantresourcegrant_options",
@@ -17598,7 +17687,9 @@
       "extras.0033_alertlog_uniq_open_alert_per_object",
       "extras.0034_journalentry_tenant",
       "extras.0101_issue88_drop_legacy_webhook_name_like",
+      "extras.0103_remove_reporttemplate_advanced_mode_and_more",
       "extras.0104_issue183_alert_tenant_reconciliation",
+      "extras.0104_reporttemplate_advanced_mode_and_more",
       "inventory.0013_backfill_stock_tenant_and_provenance",
       "licenses.0008_remove_licenseseatassignment_chk_assignment_to_one_target_and_more",
       "organization.0014_null_to_empty_strings",
@@ -17652,6 +17743,7 @@
       "extras.0032_savedfilter",
       "extras.0033_alertlog_uniq_open_alert_per_object",
       "extras.0035_alter_alertlog_acknowledged_by_and_more",
+      "extras.0105_scheduledreportscopeauthorization",
       "organization.0001_initial",
       "organization.0002_tenantinvitation_tenantmembership",
       "organization.0009_alter_tenantmembership_unique_together_and_more",
@@ -17794,7 +17886,7 @@
         ]
       }
     },
-    "post_transition_migrations": 15,
+    "post_transition_migrations": 17,
     "replacement_shards": 62,
     "replacement_targets": 262
   }

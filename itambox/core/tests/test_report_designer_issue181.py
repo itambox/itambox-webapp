@@ -489,6 +489,7 @@ class ReportDesignerIssue181CoverageTests(SimpleTestCase):
         ):
             assert _scheduled_reports_probe() == ActivationState(False, True)
 
+    @override_settings(FEATURE_REPORT_DESIGNER=True, REPORT_DESIGNER_ENABLED=False)
     def test_report_views_cover_preview_permissions_and_rendering_seams(self):
         preview = ReportTemplatePreviewView()
         preview.request = SimpleNamespace(user=Mock(has_perm=Mock(side_effect=[False, True])))
@@ -525,6 +526,29 @@ class ReportDesignerIssue181CoverageTests(SimpleTestCase):
         with patch("core.reports.build_report_context", side_effect=PermissionError):
             response = preview.post(request)
         assert response.status_code == 403
+
+    def test_preview_rejects_unknown_columns_before_building_report_context(self):
+        request = RequestFactory().post(
+            "/preview/",
+            {
+                "report_type": "asset_summary",
+                "included_columns": ["asset_tag", "not_published"],
+            },
+        )
+        request.user = SimpleNamespace(is_superuser=False)
+        with (
+            patch("extras.views.get_current_tenant", return_value=None),
+            patch(
+                "core.reports.build_report_context",
+                return_value=([], [], [], {}, "", {"report_name": "preview"}),
+            ) as build_context,
+            patch("extras.views.render_report_html", return_value="<h1>preview</h1>"),
+        ):
+            response = ReportTemplatePreviewView().post(request)
+
+        assert response.status_code == 400
+        assert b"Template render failed. See the server log for details." in response.content
+        build_context.assert_not_called()
 
     def test_report_template_detail_and_download_cover_csv_html_and_pdf(self):
         detail = ReportTemplateDetailView()

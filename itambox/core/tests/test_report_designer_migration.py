@@ -67,6 +67,22 @@ class ReportDesignerMigrationTests(TransactionTestCase):
         for name in ("live-empty", "inactive-content", "unscheduled-content", "advanced-empty"):
             self.assertFalse(rows[name].legacy_designer_grandfathered)
 
+    def test_upgrade_report_names_out_of_bound_custom_html_templates(self):
+        self.executor.migrate(self.migrate_from)
+        with connection.cursor() as cursor:
+            cursor.execute(
+                "UPDATE extras_reporttemplate SET template_content = %s WHERE id = %s",
+                ["<p>unscheduled legacy</p>", self.unscheduled_content.pk],
+            )
+
+        with self.assertLogs("extras.migrations.0104_reporttemplate_advanced_mode_and_more", level="WARNING") as logs:
+            self.executor.migrate(self.migrate_to)
+
+        report = "\n".join(logs.output)
+        self.assertIn("unscheduled-content", report)
+        self.assertIn(str(self.unscheduled_content.pk), report)
+        self.assertNotIn("live-content", report)
+
     def test_forward_reverse_forward_is_idempotent_and_preserves_schema_and_content(self):
         migration = importlib.import_module("extras.migrations.0104_reporttemplate_advanced_mode_and_more")
         report_model = self.executor.loader.project_state([self.migrate_to]).apps.get_model("extras", "ReportTemplate")
