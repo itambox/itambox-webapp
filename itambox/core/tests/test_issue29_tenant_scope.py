@@ -417,7 +417,7 @@ class AllAccessibleScopeTests(TestCase):
 
         with (
             mock.patch(
-                "core.auth.cache.cache.get_many",
+                "core.authorization_cache.cache.get_many",
                 side_effect=RuntimeError("cache unavailable"),
             ),
             mock.patch.object(

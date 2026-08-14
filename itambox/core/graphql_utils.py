@@ -4,6 +4,8 @@ from django.core.exceptions import PermissionDenied, ValidationError
 from django.utils.text import slugify
 from django.utils.translation import gettext_lazy as _
 
+from core.slugs import generate_unique_slug
+
 logger = logging.getLogger(__name__)
 
 MAX_PAGINATION_LIMIT = 200
@@ -51,6 +53,4 @@ def generate_slug(instance):
         getattr(instance, "slug", None),
     )
     if not getattr(instance, "slug", None):
-        from itambox.utils import generate_unique_slug
-
         generate_unique_slug(instance, getattr(instance, "slug_source", "name"))

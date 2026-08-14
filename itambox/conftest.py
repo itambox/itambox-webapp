@@ -172,7 +172,7 @@ def _reset_test_context():
     from django.conf import settings
     from django.core.cache import caches
 
-    from core.auth.cache import _request_invalidation_state
+    from core.authorization_cache import _request_invalidation_state
     from core.context import (
         _csp_nonce,
         _current_all_accessible,

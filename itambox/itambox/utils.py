@@ -4,6 +4,7 @@ import os
 from decimal import Decimal
 from uuid import UUID
 
+from django.apps import apps
 from django.conf import settings
 from django.contrib.contenttypes.models import ContentType
 from django.core.paginator import Paginator
@@ -43,10 +44,7 @@ def get_paginate_count(request):
 
     if request.user.is_authenticated:
         try:
-            # inline import: cycle: users.models imports ChangeLoggingMixin from
-            # core.models, which imports this module (itambox.utils) — a module-top
-            # import here would close that cycle at app-load time.
-            from users.models import UserPreference
+            UserPreference = apps.get_model("users", "UserPreference")
 
             if not hasattr(request, "_user_preferences_cache"):
                 request._user_preferences_cache = UserPreference.objects.filter(user=request.user).first()

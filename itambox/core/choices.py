@@ -1,6 +1,6 @@
 from django.utils.translation import gettext_lazy as _
 
-from itambox.utils import ChoiceSet
+from core.choice_sets import ChoiceSet
 
 
 class ObjectChangeActionChoices(ChoiceSet):

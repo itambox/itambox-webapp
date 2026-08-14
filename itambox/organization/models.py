@@ -1,3 +1,4 @@
+from django.apps import apps
 from django.conf import settings
 from django.contrib.contenttypes.fields import GenericForeignKey
 from django.contrib.contenttypes.models import ContentType
@@ -9,6 +10,7 @@ from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
 
 from core.choices import ObjectChangeActionChoices
+from core.tenant_scope import get_descendant_tenant_group_ids
 
 
 def _default_currency():
@@ -483,7 +485,7 @@ class AssetHolder(CustomFieldDataMixin, SubscribableMixin, StandardModel, SoftDe
 
     @property
     def checked_out_assets(self):
-        from assets.models import AssetAssignment
+        AssetAssignment = apps.get_model("assets", "AssetAssignment")
 
         return AssetAssignment.objects.filter(assigned_user=self, is_active=True)
 
@@ -937,8 +939,6 @@ class RoleGrant(ChangeLoggingMixin, models.Model):
                 ):
                     tenant_ids.add(scope.tenant_id)
             elif scope.scope_type == RoleGrantScope.SCOPE_TENANT_GROUP:
-                from organization.access import get_descendant_tenant_group_ids
-
                 tenant_ids.update(
                     Tenant._base_manager.filter(
                         managed_by_id=self.role.tenant_id,
@@ -991,8 +991,6 @@ class RoleGrant(ChangeLoggingMixin, models.Model):
             if scope.scope_type == RoleGrantScope.SCOPE_TENANT_GROUP:
                 if not scope.tenant_group_id or not tenant.group_id:
                     continue
-                from organization.access import get_descendant_tenant_group_ids
-
                 if tenant.group_id in get_descendant_tenant_group_ids(
                     scope.tenant_group_id,
                     live_only=True,

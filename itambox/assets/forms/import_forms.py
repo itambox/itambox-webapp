@@ -1,5 +1,5 @@
 from assets.models import Asset, AssetType, Manufacturer
-from core.forms.import_forms import BulkImportForm, register_import_form
+from core.importers.bulk_forms import BulkImportForm, register_import_form
 from inventory.models import Accessory, Consumable
 from licenses.models import License
 from organization.models import AssetHolder, Location

@@ -5,7 +5,7 @@ from django.contrib.contenttypes.models import ContentType
 from django.db.models.signals import post_delete, post_save, pre_delete, pre_save
 from django.dispatch import receiver
 
-from core.auth.cache import (
+from core.authorization_cache import (
     invalidate_authorization_topology,
     invalidate_user_authorization_cache,
 )

@@ -1,4 +1,3 @@
-import builtins
 import logging
 from unittest.mock import MagicMock, patch
 
@@ -7,7 +6,8 @@ from django.core.exceptions import FieldDoesNotExist
 from django.db import IntegrityError, transaction
 
 from assets.models import Manufacturer
-from core.forms.import_forms import BulkImportForm, ImportResult, _import_log_extra, _model_has_concrete_field
+from core.forms.import_forms import BulkImportForm, ImportResult
+from core.importers.bulk_forms import _import_log_extra, _model_has_concrete_field
 from core.models import Job, Notification
 from core.tasks.csv_import import _task_log_extra, import_csv_task
 from core.tests.mixins import TenantTestMixin
@@ -37,24 +37,17 @@ class _SyntheticColumnImportForm(_ConditionalImportForm):
 @pytest.mark.django_db
 class TestImportRowContract(TenantTestMixin):
     def test_curated_form_loader_failure_falls_back_without_leaking_exception(self, caplog, monkeypatch):
-        from core.forms import import_forms
+        """Issue #100: curated forms are registered in ``AppConfig.ready`` — the
+        lazy discovery (and its failure path) is gone. An unregistered model falls
+        back to the dynamic form path without raising and without leaking anything
+        into the log."""
+        from core.importers import bulk_forms
 
-        original_import = builtins.__import__
-
-        def guarded_import(name, *args, **kwargs):
-            if name == "assets.forms.import_forms":
-                raise RuntimeError(SECRET)
-            return original_import(name, *args, **kwargs)
-
-        monkeypatch.setattr(import_forms, "_IMPORT_FORMS_LOADED", False)
-        monkeypatch.setattr(builtins, "__import__", guarded_import)
         with caplog.at_level(logging.ERROR):
-            result = import_forms.get_registered_import_form(MagicMock())
+            result = bulk_forms.get_registered_import_form(MagicMock())
 
         assert result is None
-        record = next(record for record in caplog.records if record.import_context["operation"] == "curated_forms.load")
-        assert record.import_context["exception_type"] == "RuntimeError"
-        assert SECRET not in caplog.text
+        assert not caplog.records
 
     def test_field_help_preserves_curated_non_model_columns(self):
         view = ObjectImportView()
@@ -106,13 +99,13 @@ class TestImportRowContract(TenantTestMixin):
         [
             (
                 "csv",
-                "core.forms.import_forms.csv.DictReader",
+                "core.importers.bulk_forms.csv.DictReader",
                 __import__("csv").Error(SECRET),
                 "Failed to parse CSV data.",
             ),
             (
                 "yaml",
-                "core.forms.import_forms.yaml.safe_load",
+                "core.importers.bulk_forms.yaml.safe_load",
                 __import__("yaml").YAMLError(SECRET),
                 "Failed to parse YAML data.",
             ),
@@ -192,14 +185,14 @@ class TestImportRowContract(TenantTestMixin):
 
 @pytest.mark.django_db
 class TestImportTaskAbortContract(TenantTestMixin):
-    @patch("itambox.views.generic.ObjectImportView.get_form_class")
-    def test_abort_persists_and_logs_only_safe_contract_fields(self, get_form_class, caplog):
+    @patch("core.tasks.csv_import.get_import_form_class")
+    def test_abort_persists_and_logs_only_safe_contract_fields(self, get_import_form_class, caplog):
         self.setup_tenant_context(name="Task Tenant", slug="task-tenant")
         user = self.tenant_user
         job = Job.objects.create(name="Import Job", tenant=self.tenant, status=Job.STATUS_PENDING)
         form = MagicMock()
         form.import_data.side_effect = RuntimeError(SECRET)
-        get_form_class.return_value = lambda: form
+        get_import_form_class.return_value = MagicMock(return_value=form)
 
         with caplog.at_level(logging.ERROR):
             import_csv_task(

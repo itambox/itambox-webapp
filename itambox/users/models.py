@@ -4,6 +4,7 @@ import ipaddress
 import secrets
 import uuid
 
+from django.apps import apps
 from django.conf import settings
 from django.contrib.auth.models import AbstractUser
 from django.contrib.postgres.fields import ArrayField
@@ -207,7 +208,7 @@ class Token(ChangeLoggingMixin, models.Model):
 
             tenant = get_current_tenant()
             if not tenant:
-                from organization.models import Tenant
+                Tenant = apps.get_model("organization", "Tenant")
 
                 tenant = Tenant._base_manager.first()
                 if not tenant:

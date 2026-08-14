@@ -29,12 +29,12 @@ class TasksTestCase(TransactionTestCase):
 
         self.stock_tenant = Tenant.objects.create(name="Task Stock Tenant", slug="task-stock-tenant")
 
-    @patch("itambox.views.generic.ObjectImportView.get_form_class")
-    def test_import_csv_task_success(self, mock_get_form_class):
+    @patch("core.tasks.csv_import.get_import_form_class")
+    def test_import_csv_task_success(self, mock_get_import_form_class):
         # Mocking ObjectImportView and the Form
         mock_form = MagicMock()
         mock_form.import_data.return_value = (5, [])  # 5 success, 0 errors
-        mock_get_form_class.return_value = lambda: mock_form
+        mock_get_import_form_class.return_value = MagicMock(return_value=mock_form)
 
         job = Job.objects.create(name="Import Job", status=Job.STATUS_PENDING)
 
@@ -55,11 +55,11 @@ class TasksTestCase(TransactionTestCase):
         self.assertIsNotNone(notification)
         self.assertIn("Successfully imported 5 record(s)", notification.message)
 
-    @patch("itambox.views.generic.ObjectImportView.get_form_class")
-    def test_import_csv_task_failed(self, mock_get_form_class):
+    @patch("core.tasks.csv_import.get_import_form_class")
+    def test_import_csv_task_failed(self, mock_get_import_form_class):
         mock_form = MagicMock()
         mock_form.import_data.return_value = (0, ["Row 1: invalid name", "Row 2: missing field"])
-        mock_get_form_class.return_value = lambda: mock_form
+        mock_get_import_form_class.return_value = MagicMock(return_value=mock_form)
 
         job = Job.objects.create(name="Import Job Failed", status=Job.STATUS_PENDING)
 

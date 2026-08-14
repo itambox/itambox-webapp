@@ -14,11 +14,10 @@ from django.utils.translation import gettext as _
 from django.views.generic import TemplateView
 from django_q.tasks import async_task
 
-from core.forms.import_forms import (
+from core.importers.bulk_forms import (
     IMPORT_EXCLUDED_FIELDS,
-    BulkImportForm,
     _model_has_concrete_field,
-    get_registered_import_form,
+    get_import_form_class,
     is_model_importable,
 )
 from core.managers import get_current_tenant
@@ -70,37 +69,7 @@ class ObjectImportView(PermissionRequiredMixin, LoginRequiredMixin, BaseHTMXView
         if not model:
             raise ImproperlyConfigured(f"{self.__class__.__name__} needs a model attribute or model_form.")
 
-        # A curated BulkImportForm registered for this model wins — it carries
-        # domain-accurate required/optional field lists. Otherwise fall back to
-        # a dynamic form introspected from the model's editable fields.
-        registered = get_registered_import_form(model)
-        if registered is not None:
-            return registered
-
-        required_fields = []
-        optional_fields = []
-        for field in model._meta.fields:
-            if field.primary_key or field.auto_created or not field.editable:
-                continue
-            if field.name in IMPORT_EXCLUDED_FIELDS:
-                continue
-            if not field.blank and not field.null and field.default is models.NOT_PROVIDED:
-                required_fields.append(field.name)
-            else:
-                optional_fields.append(field.name)
-
-        target_model = model
-        target_required = list(required_fields)
-        target_optional = list(optional_fields)
-
-        # The base map_row already resolves FKs by id/slug/name and skips
-        # non-model columns, so no per-form override is needed.
-        class DynamicBulkImportForm(BulkImportForm):
-            model = target_model
-            required_fields = target_required
-            optional_fields = target_optional
-
-        return DynamicBulkImportForm
+        return get_import_form_class(model)
 
     def get(self, request, *args, **kwargs):
         form = self.get_form_class()()

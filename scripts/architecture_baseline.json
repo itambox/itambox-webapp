@@ -2,527 +2,7 @@
   "schema_version": 1,
   "canonical_python": "3.12",
   "policy_sha256": "e2add7e89753802013331af0687c61b3e3ba2d9a862331e75e3ec61c6d22ac3c",
-  "cycles": [
-    {
-      "id": "effective|assets.forms.__init__|assets.forms.import_forms|core.forms.import_forms",
-      "graph": "effective",
-      "modules": [
-        "assets.forms.__init__",
-        "assets.forms.import_forms",
-        "core.forms.import_forms"
-      ],
-      "edges": [
-        {
-          "source": "assets.forms.__init__",
-          "target": "assets.forms.import_forms",
-          "kind": "module-top"
-        },
-        {
-          "source": "assets.forms.import_forms",
-          "target": "core.forms.import_forms",
-          "kind": "module-top"
-        },
-        {
-          "source": "core.forms.import_forms",
-          "target": "assets.forms.__init__",
-          "kind": "function-body"
-        },
-        {
-          "source": "core.forms.import_forms",
-          "target": "assets.forms.import_forms",
-          "kind": "function-body"
-        }
-      ],
-      "owner": "area:assets",
-      "removal_issue": 100,
-      "removal_direction": "Have each application register its import form with core.forms.import_forms at app load, so the central import view resolves a registered form instead of importing assets.forms from inside a function.",
-      "accepted_reason": "Pre-existing at 66c74c4d when the architecture boundary gate was introduced.",
-      "notes": "keystone edges: core.forms.import_forms -> assets.forms.import_forms (deferred @register_import_form lookup); assets.forms.import_forms -> core.forms.import_forms"
-    },
-    {
-      "id": "effective|assets.models.__init__|assets.models.asset|assets.models.assignment|assets.models.catalog|assets.models.lifecycle|assets.models.maintenance|assets.models.requests|assets.models.tagsequence|core.auth.__init__|core.choices|core.managers|core.mfa|core.mixins|core.models|extras.models|itambox.utils|organization.access|organization.models|organization.rbac|users.models",
-      "graph": "effective",
-      "modules": [
-        "assets.models.__init__",
-        "assets.models.asset",
-        "assets.models.assignment",
-        "assets.models.catalog",
-        "assets.models.lifecycle",
-        "assets.models.maintenance",
-        "assets.models.requests",
-        "assets.models.tagsequence",
-        "core.auth.__init__",
-        "core.choices",
-        "core.managers",
-        "core.mfa",
-        "core.mixins",
-        "core.models",
-        "extras.models",
-        "itambox.utils",
-        "organization.access",
-        "organization.models",
-        "organization.rbac",
-        "users.models"
-      ],
-      "edges": [
-        {
-          "source": "assets.models.__init__",
-          "target": "assets.models.asset",
-          "kind": "module-top"
-        },
-        {
-          "source": "assets.models.__init__",
-          "target": "assets.models.assignment",
-          "kind": "module-top"
-        },
-        {
-          "source": "assets.models.__init__",
-          "target": "assets.models.catalog",
-          "kind": "module-top"
-        },
-        {
-          "source": "assets.models.__init__",
-          "target": "assets.models.lifecycle",
-          "kind": "module-top"
-        },
-        {
-          "source": "assets.models.__init__",
-          "target": "assets.models.maintenance",
-          "kind": "module-top"
-        },
-        {
-          "source": "assets.models.__init__",
-          "target": "assets.models.requests",
-          "kind": "module-top"
-        },
-        {
-          "source": "assets.models.__init__",
-          "target": "assets.models.tagsequence",
-          "kind": "module-top"
-        },
-        {
-          "source": "assets.models.asset",
-          "target": "assets.models.tagsequence",
-          "kind": "function-body"
-        },
-        {
-          "source": "assets.models.asset",
-          "target": "core.managers",
-          "kind": "module-top"
-        },
-        {
-          "source": "assets.models.asset",
-          "target": "core.mixins",
-          "kind": "module-top"
-        },
-        {
-          "source": "assets.models.asset",
-          "target": "core.models",
-          "kind": "module-top"
-        },
-        {
-          "source": "assets.models.assignment",
-          "target": "core.managers",
-          "kind": "module-top"
-        },
-        {
-          "source": "assets.models.assignment",
-          "target": "core.mixins",
-          "kind": "module-top"
-        },
-        {
-          "source": "assets.models.assignment",
-          "target": "core.models",
-          "kind": "module-top"
-        },
-        {
-          "source": "assets.models.catalog",
-          "target": "core.managers",
-          "kind": "module-top"
-        },
-        {
-          "source": "assets.models.catalog",
-          "target": "core.mixins",
-          "kind": "module-top"
-        },
-        {
-          "source": "assets.models.catalog",
-          "target": "core.models",
-          "kind": "module-top"
-        },
-        {
-          "source": "assets.models.catalog",
-          "target": "extras.models",
-          "kind": "module-top"
-        },
-        {
-          "source": "assets.models.lifecycle",
-          "target": "core.managers",
-          "kind": "module-top"
-        },
-        {
-          "source": "assets.models.lifecycle",
-          "target": "core.mixins",
-          "kind": "module-top"
-        },
-        {
-          "source": "assets.models.lifecycle",
-          "target": "core.models",
-          "kind": "module-top"
-        },
-        {
-          "source": "assets.models.maintenance",
-          "target": "core.managers",
-          "kind": "module-top"
-        },
-        {
-          "source": "assets.models.maintenance",
-          "target": "core.mixins",
-          "kind": "module-top"
-        },
-        {
-          "source": "assets.models.maintenance",
-          "target": "core.models",
-          "kind": "module-top"
-        },
-        {
-          "source": "assets.models.requests",
-          "target": "core.managers",
-          "kind": "function-body"
-        },
-        {
-          "source": "assets.models.requests",
-          "target": "core.managers",
-          "kind": "module-top"
-        },
-        {
-          "source": "assets.models.requests",
-          "target": "core.mixins",
-          "kind": "module-top"
-        },
-        {
-          "source": "assets.models.requests",
-          "target": "core.models",
-          "kind": "module-top"
-        },
-        {
-          "source": "assets.models.tagsequence",
-          "target": "core.managers",
-          "kind": "module-top"
-        },
-        {
-          "source": "assets.models.tagsequence",
-          "target": "core.mixins",
-          "kind": "module-top"
-        },
-        {
-          "source": "assets.models.tagsequence",
-          "target": "core.models",
-          "kind": "module-top"
-        },
-        {
-          "source": "core.auth.__init__",
-          "target": "organization.access",
-          "kind": "function-body"
-        },
-        {
-          "source": "core.auth.__init__",
-          "target": "organization.models",
-          "kind": "function-body"
-        },
-        {
-          "source": "core.auth.__init__",
-          "target": "organization.rbac",
-          "kind": "function-body"
-        },
-        {
-          "source": "core.choices",
-          "target": "itambox.utils",
-          "kind": "module-top"
-        },
-        {
-          "source": "core.managers",
-          "target": "core.auth.__init__",
-          "kind": "function-body"
-        },
-        {
-          "source": "core.managers",
-          "target": "organization.access",
-          "kind": "function-body"
-        },
-        {
-          "source": "core.mfa",
-          "target": "organization.rbac",
-          "kind": "function-body"
-        },
-        {
-          "source": "core.mixins",
-          "target": "core.choices",
-          "kind": "function-body"
-        },
-        {
-          "source": "core.mixins",
-          "target": "itambox.utils",
-          "kind": "function-body"
-        },
-        {
-          "source": "core.models",
-          "target": "core.choices",
-          "kind": "module-top"
-        },
-        {
-          "source": "core.models",
-          "target": "core.managers",
-          "kind": "function-body"
-        },
-        {
-          "source": "core.models",
-          "target": "core.managers",
-          "kind": "module-top"
-        },
-        {
-          "source": "core.models",
-          "target": "core.mixins",
-          "kind": "function-body"
-        },
-        {
-          "source": "core.models",
-          "target": "core.mixins",
-          "kind": "module-top"
-        },
-        {
-          "source": "core.models",
-          "target": "itambox.utils",
-          "kind": "module-top"
-        },
-        {
-          "source": "extras.models",
-          "target": "core.managers",
-          "kind": "module-top"
-        },
-        {
-          "source": "extras.models",
-          "target": "core.mixins",
-          "kind": "module-top"
-        },
-        {
-          "source": "extras.models",
-          "target": "core.models",
-          "kind": "module-top"
-        },
-        {
-          "source": "itambox.utils",
-          "target": "users.models",
-          "kind": "function-body"
-        },
-        {
-          "source": "organization.access",
-          "target": "core.auth.__init__",
-          "kind": "function-body"
-        },
-        {
-          "source": "organization.access",
-          "target": "organization.models",
-          "kind": "function-body"
-        },
-        {
-          "source": "organization.access",
-          "target": "organization.rbac",
-          "kind": "function-body"
-        },
-        {
-          "source": "organization.models",
-          "target": "assets.models.__init__",
-          "kind": "function-body"
-        },
-        {
-          "source": "organization.models",
-          "target": "core.choices",
-          "kind": "module-top"
-        },
-        {
-          "source": "organization.models",
-          "target": "core.managers",
-          "kind": "module-top"
-        },
-        {
-          "source": "organization.models",
-          "target": "core.mfa",
-          "kind": "module-top"
-        },
-        {
-          "source": "organization.models",
-          "target": "core.mixins",
-          "kind": "module-top"
-        },
-        {
-          "source": "organization.models",
-          "target": "core.models",
-          "kind": "module-top"
-        },
-        {
-          "source": "organization.models",
-          "target": "organization.access",
-          "kind": "function-body"
-        },
-        {
-          "source": "organization.rbac",
-          "target": "core.auth.__init__",
-          "kind": "function-body"
-        },
-        {
-          "source": "organization.rbac",
-          "target": "organization.access",
-          "kind": "module-top"
-        },
-        {
-          "source": "organization.rbac",
-          "target": "organization.models",
-          "kind": "module-top"
-        },
-        {
-          "source": "users.models",
-          "target": "core.managers",
-          "kind": "function-body"
-        },
-        {
-          "source": "users.models",
-          "target": "core.managers",
-          "kind": "module-top"
-        },
-        {
-          "source": "users.models",
-          "target": "core.mixins",
-          "kind": "module-top"
-        },
-        {
-          "source": "users.models",
-          "target": "core.models",
-          "kind": "module-top"
-        },
-        {
-          "source": "users.models",
-          "target": "organization.models",
-          "kind": "function-body"
-        }
-      ],
-      "owner": "area:assets",
-      "removal_issue": 100,
-      "removal_direction": "Decide where the tenancy primitives live: move Tenant/Membership/RoleGrant or their query helpers so core.managers, core.mfa and itambox.utils stop reaching into organization.* and users.models at all.",
-      "accepted_reason": "Pre-existing at 66c74c4d when the architecture boundary gate was introduced.",
-      "notes": "keystone edges: core.managers -> organization.access; core.mfa -> organization.rbac; itambox.utils -> users.models; organization.models -> core.models. Cutting the first three splits the component into the assets/extras model layer and the tenancy kernel."
-    },
-    {
-      "id": "effective|core.reports.exporters|core.tasks.__init__|core.tasks.csv_import|core.tasks.reports|itambox.views.__init__|itambox.views.features|itambox.views.generic.__init__|itambox.views.utility",
-      "graph": "effective",
-      "modules": [
-        "core.reports.exporters",
-        "core.tasks.__init__",
-        "core.tasks.csv_import",
-        "core.tasks.reports",
-        "itambox.views.__init__",
-        "itambox.views.features",
-        "itambox.views.generic.__init__",
-        "itambox.views.utility"
-      ],
-      "edges": [
-        {
-          "source": "core.reports.exporters",
-          "target": "core.tasks.__init__",
-          "kind": "function-body"
-        },
-        {
-          "source": "core.tasks.__init__",
-          "target": "core.tasks.csv_import",
-          "kind": "module-top"
-        },
-        {
-          "source": "core.tasks.__init__",
-          "target": "core.tasks.reports",
-          "kind": "module-top"
-        },
-        {
-          "source": "core.tasks.csv_import",
-          "target": "itambox.views.__init__",
-          "kind": "function-body"
-        },
-        {
-          "source": "core.tasks.csv_import",
-          "target": "itambox.views.generic.__init__",
-          "kind": "function-body"
-        },
-        {
-          "source": "core.tasks.reports",
-          "target": "core.reports.exporters",
-          "kind": "function-body"
-        },
-        {
-          "source": "itambox.views.__init__",
-          "target": "itambox.views.features",
-          "kind": "module-top"
-        },
-        {
-          "source": "itambox.views.__init__",
-          "target": "itambox.views.generic.__init__",
-          "kind": "module-top"
-        },
-        {
-          "source": "itambox.views.__init__",
-          "target": "itambox.views.utility",
-          "kind": "module-top"
-        },
-        {
-          "source": "itambox.views.features",
-          "target": "core.tasks.__init__",
-          "kind": "function-body"
-        },
-        {
-          "source": "itambox.views.features",
-          "target": "itambox.views.generic.__init__",
-          "kind": "module-top"
-        },
-        {
-          "source": "itambox.views.generic.__init__",
-          "target": "itambox.views.features",
-          "kind": "module-top"
-        },
-        {
-          "source": "itambox.views.utility",
-          "target": "itambox.views.generic.__init__",
-          "kind": "module-top"
-        }
-      ],
-      "owner": "area:operations",
-      "removal_issue": 100,
-      "removal_direction": "Extract the CSV import and export helpers the background tasks call out of itambox.views.generic into a service module, so core.tasks stops importing generic presentation and itambox.views stops enqueuing.",
-      "accepted_reason": "Pre-existing at 66c74c4d when the architecture boundary gate was introduced.",
-      "notes": "keystone edges: core.tasks.csv_import -> itambox.views.generic.__init__; itambox.views.features -> core.tasks.__init__; core.reports.exporters -> core.tasks.__init__"
-    },
-    {
-      "id": "module-top|itambox.views.features|itambox.views.generic.__init__",
-      "graph": "module-top",
-      "modules": [
-        "itambox.views.features",
-        "itambox.views.generic.__init__"
-      ],
-      "edges": [
-        {
-          "source": "itambox.views.features",
-          "target": "itambox.views.generic.__init__",
-          "kind": "module-top"
-        },
-        {
-          "source": "itambox.views.generic.__init__",
-          "target": "itambox.views.features",
-          "kind": "module-top"
-        }
-      ],
-      "owner": "area:frontend",
-      "removal_issue": 100,
-      "removal_direction": "Move the shared feature-flag helpers out of itambox.views.features into a module both packages import, then delete the deferred re-export at the foot of itambox/itambox/views/generic/__init__.py.",
-      "accepted_reason": "Pre-existing at 66c74c4d when the architecture boundary gate was introduced."
-    }
-  ],
+  "cycles": [],
   "layer_exceptions": [
     {
       "id": "R-F1|itambox.api.authentication|organization.models|function-body",
@@ -581,48 +61,6 @@
       "accepted_reason": "Pre-existing at 66c74c4d when the architecture boundary gate was introduced."
     },
     {
-      "id": "R-F1|itambox.utils|users.models|function-body",
-      "rule": "R-F1",
-      "source": "itambox.utils",
-      "source_layer": "framework",
-      "target": "users.models",
-      "target_layer": "domain-model",
-      "kind": "function-body",
-      "count": 1,
-      "owner": "area:operations",
-      "removal_issue": 100,
-      "removal_direction": "Resolve the users model through apps.get_model() inside itambox.utils, or accept the instance as an argument, so the framework layer carries no import edge into users.models.",
-      "accepted_reason": "Pre-existing at 66c74c4d when the architecture boundary gate was introduced."
-    },
-    {
-      "id": "R-F2|itambox.middleware|core.auth.__init__|function-body",
-      "rule": "R-F2",
-      "source": "itambox.middleware",
-      "source_layer": "framework",
-      "target": "core.auth.__init__",
-      "target_layer": "integration",
-      "kind": "function-body",
-      "count": 3,
-      "owner": "area:auth-rbac",
-      "removal_issue": 100,
-      "removal_direction": "Invert the dependency so core.auth registers what it offers with itambox.middleware at app load, instead of itambox.middleware importing a platform service from the framework layer.",
-      "accepted_reason": "Pre-existing at 66c74c4d when the architecture boundary gate was introduced."
-    },
-    {
-      "id": "R-F2|itambox.middleware|core.auth.cache|function-body",
-      "rule": "R-F2",
-      "source": "itambox.middleware",
-      "source_layer": "framework",
-      "target": "core.auth.cache",
-      "target_layer": "integration",
-      "kind": "function-body",
-      "count": 3,
-      "owner": "area:auth-rbac",
-      "removal_issue": 100,
-      "removal_direction": "Invert the dependency so core.auth.cache registers what it offers with itambox.middleware at app load, instead of itambox.middleware importing a platform service from the framework layer.",
-      "accepted_reason": "Pre-existing at 66c74c4d when the architecture boundary gate was introduced."
-    },
-    {
       "id": "R-F3|itambox.api.authentication|organization.access|function-body",
       "rule": "R-F3",
       "source": "itambox.api.authentication",
@@ -672,24 +110,10 @@
       "target": "organization.access",
       "target_layer": "domain-service",
       "kind": "function-body",
-      "count": 3,
+      "count": 1,
       "owner": "area:auth-rbac",
       "removal_issue": 100,
       "removal_direction": "Publish the behaviour itambox.middleware needs from organization.access as a registry hook the framework owns, so the framework depends on its own interface rather than on organization.",
-      "accepted_reason": "Pre-existing at 66c74c4d when the architecture boundary gate was introduced."
-    },
-    {
-      "id": "R-I1|core.auth.__init__|organization.models|function-body",
-      "rule": "R-I1",
-      "source": "core.auth.__init__",
-      "source_layer": "integration",
-      "target": "organization.models",
-      "target_layer": "domain-model",
-      "kind": "function-body",
-      "count": 4,
-      "owner": "area:auth-rbac",
-      "removal_issue": 100,
-      "removal_direction": "Resolve the organization model through apps.get_model() inside core.auth, so the integration layer maps external identities without importing organization.models.",
       "accepted_reason": "Pre-existing at 66c74c4d when the architecture boundary gate was introduced."
     },
     {
@@ -700,7 +124,7 @@
       "target": "organization.models",
       "target_layer": "domain-model",
       "kind": "function-body",
-      "count": 2,
+      "count": 1,
       "owner": "area:auth-rbac",
       "removal_issue": 100,
       "removal_direction": "Resolve the organization model through apps.get_model() inside core.auth.guards, so the integration layer maps external identities without importing organization.models.",
@@ -889,48 +313,6 @@
       "accepted_reason": "Pre-existing at 66c74c4d when the architecture boundary gate was introduced."
     },
     {
-      "id": "R-I3|core.auth.__init__|organization.access|function-body",
-      "rule": "R-I3",
-      "source": "core.auth.__init__",
-      "source_layer": "integration",
-      "target": "organization.access",
-      "target_layer": "domain-service",
-      "kind": "function-body",
-      "count": 3,
-      "owner": "area:auth-rbac",
-      "removal_issue": 100,
-      "removal_direction": "Reach the organization authorisation helpers core.auth needs through an interface the platform owns, rather than importing organization.access from an integration module.",
-      "accepted_reason": "Pre-existing at 66c74c4d when the architecture boundary gate was introduced."
-    },
-    {
-      "id": "R-I3|core.auth.__init__|organization.rbac|function-body",
-      "rule": "R-I3",
-      "source": "core.auth.__init__",
-      "source_layer": "integration",
-      "target": "organization.rbac",
-      "target_layer": "domain-service",
-      "kind": "function-body",
-      "count": 2,
-      "owner": "area:auth-rbac",
-      "removal_issue": 100,
-      "removal_direction": "Reach the organization authorisation helpers core.auth needs through an interface the platform owns, rather than importing organization.rbac from an integration module.",
-      "accepted_reason": "Pre-existing at 66c74c4d when the architecture boundary gate was introduced."
-    },
-    {
-      "id": "R-I3|core.auth.guards|organization.access|function-body",
-      "rule": "R-I3",
-      "source": "core.auth.guards",
-      "source_layer": "integration",
-      "target": "organization.access",
-      "target_layer": "domain-service",
-      "kind": "function-body",
-      "count": 1,
-      "owner": "area:auth-rbac",
-      "removal_issue": 100,
-      "removal_direction": "Reach the organization authorisation helpers core.auth.guards needs through an interface the platform owns, rather than importing organization.access from an integration module.",
-      "accepted_reason": "Pre-existing at 66c74c4d when the architecture boundary gate was introduced."
-    },
-    {
       "id": "R-I3|core.auth.guards|organization.rbac|function-body",
       "rule": "R-I3",
       "source": "core.auth.guards",
@@ -942,62 +324,6 @@
       "owner": "area:auth-rbac",
       "removal_issue": 100,
       "removal_direction": "Reach the organization authorisation helpers core.auth.guards needs through an interface the platform owns, rather than importing organization.rbac from an integration module.",
-      "accepted_reason": "Pre-existing at 66c74c4d when the architecture boundary gate was introduced."
-    },
-    {
-      "id": "R-K2|core.managers|core.auth.__init__|function-body",
-      "rule": "R-K2",
-      "source": "core.managers",
-      "source_layer": "kernel",
-      "target": "core.auth.__init__",
-      "target_layer": "integration",
-      "kind": "function-body",
-      "count": 2,
-      "owner": "area:organization",
-      "removal_issue": 100,
-      "removal_direction": "Invert the dependency so core.auth registers with core.managers at app load; the kernel must not reach outward into a platform service or integration.",
-      "accepted_reason": "Pre-existing at 66c74c4d when the architecture boundary gate was introduced."
-    },
-    {
-      "id": "R-K2|core.managers|core.auth.cache|function-body",
-      "rule": "R-K2",
-      "source": "core.managers",
-      "source_layer": "kernel",
-      "target": "core.auth.cache",
-      "target_layer": "integration",
-      "kind": "function-body",
-      "count": 2,
-      "owner": "area:organization",
-      "removal_issue": 100,
-      "removal_direction": "Invert the dependency so core.auth.cache registers with core.managers at app load; the kernel must not reach outward into a platform service or integration.",
-      "accepted_reason": "Pre-existing at 66c74c4d when the architecture boundary gate was introduced."
-    },
-    {
-      "id": "R-K3|core.managers|organization.access|function-body",
-      "rule": "R-K3",
-      "source": "core.managers",
-      "source_layer": "kernel",
-      "target": "organization.access",
-      "target_layer": "domain-service",
-      "kind": "function-body",
-      "count": 4,
-      "owner": "area:organization",
-      "removal_issue": 100,
-      "removal_direction": "Move the query helper core.managers needs out of organization.access into the kernel, or hand the result in from the caller, so the kernel names no domain application.",
-      "accepted_reason": "Pre-existing at 66c74c4d when the architecture boundary gate was introduced."
-    },
-    {
-      "id": "R-K3|core.mfa|organization.rbac|function-body",
-      "rule": "R-K3",
-      "source": "core.mfa",
-      "source_layer": "kernel",
-      "target": "organization.rbac",
-      "target_layer": "domain-service",
-      "kind": "function-body",
-      "count": 1,
-      "owner": "area:auth-rbac",
-      "removal_issue": 100,
-      "removal_direction": "Move the query helper core.mfa needs out of organization.rbac into the kernel, or hand the result in from the caller, so the kernel names no domain application.",
       "accepted_reason": "Pre-existing at 66c74c4d when the architecture boundary gate was introduced."
     },
     {
@@ -1547,34 +873,6 @@
       "accepted_reason": "Currency formatting remains a deliberate platform-to-presentation dependency until the shared money template filter is moved behind a platform-owned formatting boundary."
     },
     {
-      "id": "R-S2|core.tasks.csv_import|itambox.views.__init__|function-body",
-      "rule": "R-S2",
-      "source": "core.tasks.csv_import",
-      "source_layer": "platform-service",
-      "target": "itambox.views.__init__",
-      "target_layer": "presentation",
-      "kind": "function-body",
-      "count": 1,
-      "owner": "area:operations",
-      "removal_issue": 100,
-      "removal_direction": "Move the formatting helper core.tasks.csv_import needs out of itambox.views into a service-layer module that the presentation layer also imports, so the service stops depending on presentation.",
-      "accepted_reason": "Pre-existing at 66c74c4d when the architecture boundary gate was introduced."
-    },
-    {
-      "id": "R-S2|core.tasks.csv_import|itambox.views.generic.__init__|function-body",
-      "rule": "R-S2",
-      "source": "core.tasks.csv_import",
-      "source_layer": "platform-service",
-      "target": "itambox.views.generic.__init__",
-      "target_layer": "presentation",
-      "kind": "function-body",
-      "count": 1,
-      "owner": "area:operations",
-      "removal_issue": 100,
-      "removal_direction": "Move the formatting helper core.tasks.csv_import needs out of itambox.views.generic into a service-layer module that the presentation layer also imports, so the service stops depending on presentation.",
-      "accepted_reason": "Pre-existing at 66c74c4d when the architecture boundary gate was introduced."
-    },
-    {
       "id": "R-S3|core.tasks.checkin|assets.services|function-body",
       "rule": "R-S3",
       "source": "core.tasks.checkin",
@@ -1687,20 +985,6 @@
       "accepted_reason": "Pre-existing at 66c74c4d when the architecture boundary gate was introduced; itambox/inventory/mixins.py holds an abstract model mixin and two django-tables2 classes in one module, so it crosses the boundary in both directions."
     },
     {
-      "id": "R-X1|inventory.abstract_models|organization.access|function-body",
-      "rule": "R-X1",
-      "source": "inventory.abstract_models",
-      "source_layer": "domain-model",
-      "target": "organization.access",
-      "target_layer": "domain-service",
-      "kind": "function-body",
-      "count": 1,
-      "owner": "area:inventory",
-      "removal_issue": 100,
-      "removal_direction": "Move the helper inventory.abstract_models calls out of organization.access into the model module itself, or invert the call so organization depends on the model rather than the model on the service.",
-      "accepted_reason": "Pre-existing at 66c74c4d when the architecture boundary gate was introduced."
-    },
-    {
       "id": "R-X1|inventory.models|inventory.kit_checkout|module-top",
       "rule": "R-X1",
       "source": "inventory.models",
@@ -1726,20 +1010,6 @@
       "owner": "area:inventory",
       "removal_issue": 100,
       "removal_direction": "Move the helper inventory.models calls out of inventory.stock into the model module itself, or invert the call so inventory depends on the model rather than the model on the service.",
-      "accepted_reason": "Pre-existing at 66c74c4d when the architecture boundary gate was introduced."
-    },
-    {
-      "id": "R-X1|organization.models|organization.access|function-body",
-      "rule": "R-X1",
-      "source": "organization.models",
-      "source_layer": "domain-model",
-      "target": "organization.access",
-      "target_layer": "domain-service",
-      "kind": "function-body",
-      "count": 2,
-      "owner": "area:organization",
-      "removal_issue": 100,
-      "removal_direction": "Move the helper organization.models calls out of organization.access into the model module itself, or invert the call so organization depends on the model rather than the model on the service.",
       "accepted_reason": "Pre-existing at 66c74c4d when the architecture boundary gate was introduced."
     },
     {
@@ -1771,34 +1041,6 @@
       "accepted_reason": "Pre-existing at 66c74c4d when the architecture boundary gate was introduced."
     },
     {
-      "id": "R-X2|inventory.abstract_models|organization.models|function-body",
-      "rule": "R-X2",
-      "source": "inventory.abstract_models",
-      "source_layer": "domain-model",
-      "target": "organization.models",
-      "target_layer": "domain-model",
-      "kind": "function-body",
-      "count": 1,
-      "owner": "area:inventory",
-      "removal_issue": 100,
-      "removal_direction": "Either declare (inventory, organization) in CROSS_DOMAIN_MODEL_EDGES with an ADR note explaining the coupling, or resolve organization.models through apps.get_model() inside inventory.abstract_models.",
-      "accepted_reason": "Pre-existing at 66c74c4d when the architecture boundary gate was introduced."
-    },
-    {
-      "id": "R-X2|organization.models|assets.models.__init__|function-body",
-      "rule": "R-X2",
-      "source": "organization.models",
-      "source_layer": "domain-model",
-      "target": "assets.models.__init__",
-      "target_layer": "domain-model",
-      "kind": "function-body",
-      "count": 1,
-      "owner": "area:organization",
-      "removal_issue": 100,
-      "removal_direction": "Either declare (organization, assets) in CROSS_DOMAIN_MODEL_EDGES with an ADR note explaining the coupling, or resolve assets.models through apps.get_model() inside organization.models.",
-      "accepted_reason": "Pre-existing at 66c74c4d when the architecture boundary gate was introduced."
-    },
-    {
       "id": "R-X2|subscriptions.models|licenses.models|function-body",
       "rule": "R-X2",
       "source": "subscriptions.models",
@@ -1811,37 +1053,9 @@
       "removal_issue": 100,
       "removal_direction": "Either declare (subscriptions, licenses) in CROSS_DOMAIN_MODEL_EDGES with an ADR note explaining the coupling, or resolve licenses.models through apps.get_model() inside subscriptions.models.",
       "accepted_reason": "Pre-existing at 66c74c4d when the architecture boundary gate was introduced."
-    },
-    {
-      "id": "R-X2|users.models|organization.models|function-body",
-      "rule": "R-X2",
-      "source": "users.models",
-      "source_layer": "domain-model",
-      "target": "organization.models",
-      "target_layer": "domain-model",
-      "kind": "function-body",
-      "count": 1,
-      "owner": "area:organization",
-      "removal_issue": 100,
-      "removal_direction": "Either declare (users, organization) in CROSS_DOMAIN_MODEL_EDGES with an ADR note explaining the coupling, or resolve organization.models through apps.get_model() inside users.models.",
-      "accepted_reason": "Pre-existing at 66c74c4d when the architecture boundary gate was introduced."
     }
   ],
   "unsupported_cycle_claims": [
-    {
-      "id": "itambox/core/auth/guards.py|FunctionDef:_live_role_grant_scope_request|from organization.access import get_descendant_tenant_group_ids",
-      "source": "core.auth.guards",
-      "path": "itambox/core/auth/guards.py",
-      "scope": "FunctionDef:_live_role_grant_scope_request",
-      "statement": "from organization.access import get_descendant_tenant_group_ids",
-      "targets": [
-        "organization.access",
-        "organization.models"
-      ],
-      "owner": "area:auth-rbac",
-      "removal_issue": 100,
-      "removal_direction": "Hoist `from organization.access import get_descendant_tenant_group_ids` to module top in itambox/core/auth/guards.py, or re-categorise the annotation as app-registry, heavy-import, or optional-dependency: organization.access, organization.models shares no strongly connected component with this module in either graph."
-    },
     {
       "id": "itambox/core/auth/guards.py|FunctionDef:validate_role_grant|from organization.models import RoleGrantScope, Tenant",
       "source": "core.auth.guards",
@@ -1870,19 +1084,6 @@
       "removal_direction": "Hoist `from itambox.middleware import get_current_user` to module top in itambox/core/forms/tenant.py, or re-categorise the annotation as app-registry, heavy-import, or optional-dependency: itambox.middleware shares no strongly connected component with this module in either graph."
     },
     {
-      "id": "itambox/core/reports/exporters.py|FunctionDef:report_pdf_bytes|from core.tasks.labels import _html_to_pdf_bytes",
-      "source": "core.reports.exporters",
-      "path": "itambox/core/reports/exporters.py",
-      "scope": "FunctionDef:report_pdf_bytes",
-      "statement": "from core.tasks.labels import _html_to_pdf_bytes",
-      "targets": [
-        "core.tasks.labels"
-      ],
-      "owner": "area:operations",
-      "removal_issue": 100,
-      "removal_direction": "Hoist `from core.tasks.labels import _html_to_pdf_bytes` to module top in itambox/core/reports/exporters.py, or re-categorise the annotation as app-registry, heavy-import, or optional-dependency: core.tasks.__init__, core.tasks.labels shares no strongly connected component with this module in either graph."
-    },
-    {
       "id": "itambox/extras/dashboard/widgets.py|FunctionDef:_resolve_target_tenant|from organization.models import Tenant",
       "source": "extras.dashboard.widgets",
       "path": "itambox/extras/dashboard/widgets.py",
@@ -1894,20 +1095,6 @@
       "owner": "area:frontend",
       "removal_issue": 100,
       "removal_direction": "Hoist `from organization.models import Tenant` to module top in itambox/extras/dashboard/widgets.py, or re-categorise the annotation as app-registry, heavy-import, or optional-dependency: organization.models shares no strongly connected component with this module in either graph."
-    },
-    {
-      "id": "itambox/inventory/abstract_models.py|ClassDef:AbstractAssignment/FunctionDef:_grant_coverage_problems|from organization.access import get_ancestor_tenant_group_ids",
-      "source": "inventory.abstract_models",
-      "path": "itambox/inventory/abstract_models.py",
-      "scope": "ClassDef:AbstractAssignment/FunctionDef:_grant_coverage_problems",
-      "statement": "from organization.access import get_ancestor_tenant_group_ids",
-      "targets": [
-        "organization.access",
-        "organization.models"
-      ],
-      "owner": "area:inventory",
-      "removal_issue": 100,
-      "removal_direction": "Hoist `from organization.access import get_ancestor_tenant_group_ids` to module top in itambox/inventory/abstract_models.py, or re-categorise the annotation as app-registry, heavy-import, or optional-dependency: organization.access, organization.models shares no strongly connected component with this module in either graph."
     },
     {
       "id": "itambox/inventory/services.py|FunctionDef:recipient_assignment_union|from core.managers import get_current_tenant",
@@ -1923,33 +1110,6 @@
       "removal_direction": "Hoist `from core.managers import get_current_tenant` to module top in itambox/inventory/services.py, or re-categorise the annotation as app-registry, heavy-import, or optional-dependency: core.managers shares no strongly connected component with this module in either graph."
     },
     {
-      "id": "itambox/inventory/services.py|FunctionDef:resolve_grant_for_checkout|from core.managers import get_current_tenant",
-      "source": "inventory.services",
-      "path": "itambox/inventory/services.py",
-      "scope": "FunctionDef:resolve_grant_for_checkout",
-      "statement": "from core.managers import get_current_tenant",
-      "targets": [
-        "core.managers",
-        "organization.models"
-      ],
-      "owner": "area:inventory",
-      "removal_issue": 100,
-      "removal_direction": "Hoist `from core.managers import get_current_tenant` to module top in itambox/inventory/services.py, or re-categorise the annotation as app-registry, heavy-import, or optional-dependency: core.managers, itambox.middleware, organization.models, organization.services.__init__ shares no strongly connected component with this module in either graph."
-    },
-    {
-      "id": "itambox/itambox/middleware.py|ClassDef:TenantMiddleware/FunctionDef:process_request|from organization.access import get_descendant_tenant_group_ids",
-      "source": "itambox.middleware",
-      "path": "itambox/itambox/middleware.py",
-      "scope": "ClassDef:TenantMiddleware/FunctionDef:process_request",
-      "statement": "from organization.access import get_descendant_tenant_group_ids",
-      "targets": [
-        "organization.access"
-      ],
-      "owner": "area:auth-rbac",
-      "removal_issue": 100,
-      "removal_direction": "Hoist `from organization.access import get_descendant_tenant_group_ids` to module top in itambox/itambox/middleware.py, or re-categorise the annotation as app-registry, heavy-import, or optional-dependency: organization.access shares no strongly connected component with this module in either graph."
-    },
-    {
       "id": "itambox/itambox/middleware.py|ClassDef:TenantMiddleware/FunctionDef:process_request|from organization.models import Membership, Tenant, TenantGroup",
       "source": "itambox.middleware",
       "path": "itambox/itambox/middleware.py",
@@ -1961,45 +1121,6 @@
       "owner": "area:auth-rbac",
       "removal_issue": 100,
       "removal_direction": "Hoist `from organization.models import Membership, Tenant, TenantGroup` to module top in itambox/itambox/middleware.py, or re-categorise the annotation as app-registry, heavy-import, or optional-dependency: organization.models shares no strongly connected component with this module in either graph."
-    },
-    {
-      "id": "itambox/organization/access.py|FunctionDef:accessible_tenant_ids_with_expiry|from core.auth.cache import synchronize_authorization_cache",
-      "source": "organization.access",
-      "path": "itambox/organization/access.py",
-      "scope": "FunctionDef:accessible_tenant_ids_with_expiry",
-      "statement": "from core.auth.cache import synchronize_authorization_cache",
-      "targets": [
-        "core.auth.cache"
-      ],
-      "owner": "area:organization",
-      "removal_issue": 100,
-      "removal_direction": "Hoist `from core.auth.cache import synchronize_authorization_cache` to module top in itambox/organization/access.py, or re-categorise the annotation as app-registry, heavy-import, or optional-dependency: core.auth.__init__, core.auth.cache shares no strongly connected component with this module in either graph."
-    },
-    {
-      "id": "itambox/organization/rbac.py|FunctionDef:applicable_grants|from core.auth.cache import synchronize_authorization_cache",
-      "source": "organization.rbac",
-      "path": "itambox/organization/rbac.py",
-      "scope": "FunctionDef:applicable_grants",
-      "statement": "from core.auth.cache import synchronize_authorization_cache",
-      "targets": [
-        "core.auth.cache"
-      ],
-      "owner": "area:organization",
-      "removal_issue": 100,
-      "removal_direction": "Hoist `from core.auth.cache import synchronize_authorization_cache` to module top in itambox/organization/rbac.py, or re-categorise the annotation as app-registry, heavy-import, or optional-dependency: core.auth.__init__, core.auth.cache shares no strongly connected component with this module in either graph."
-    },
-    {
-      "id": "itambox/organization/rbac.py|FunctionDef:build_accessible_tenant_permissions_map|from core.auth.cache import synchronize_authorization_cache",
-      "source": "organization.rbac",
-      "path": "itambox/organization/rbac.py",
-      "scope": "FunctionDef:build_accessible_tenant_permissions_map",
-      "statement": "from core.auth.cache import synchronize_authorization_cache",
-      "targets": [
-        "core.auth.cache"
-      ],
-      "owner": "area:organization",
-      "removal_issue": 100,
-      "removal_direction": "Hoist `from core.auth.cache import synchronize_authorization_cache` to module top in itambox/organization/rbac.py, or re-categorise the annotation as app-registry, heavy-import, or optional-dependency: core.auth.__init__, core.auth.cache shares no strongly connected component with this module in either graph."
     },
     {
       "id": "itambox/organization/views/membership_views.py|ClassDef:MembershipListView/FunctionDef:_context_tenant_ids|from organization.access import accessible_tenant_ids, get_descendant_tenant_group_ids",

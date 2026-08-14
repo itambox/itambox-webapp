@@ -42,11 +42,11 @@ from core.mixins import (
     SoftDeleteMixin,
     TaggableMixin,
 )
+from core.serialization import serialize_object
 from core.validators import validate_file_attachment, validate_image_attachment
 
 # Local application
 from itambox.registry import registry
-from itambox.utils import serialize_object
 
 
 def _object_pks(objects):

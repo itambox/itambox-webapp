@@ -1,9 +1,11 @@
 """Privilege-escalation guards for canonical RoleGrant writes."""
 
+from django.apps import apps
 from django.core.exceptions import ValidationError
 from django.utils.translation import gettext_lazy as _
 
 from core.auth import MembershipBackend
+from core.tenant_scope import get_descendant_tenant_group_ids
 
 
 def validate_permission_grant(granting_user, permissions, tenant):
@@ -167,9 +169,7 @@ def _live_role_grant_scope_request(
             target_group = scope.tenant_group
             if target_group is None or target_group.deleted_at is not None:
                 continue
-            # inline imports: cycle: avoid core.auth <-> organization import cycles at load time.
-            from organization.access import get_descendant_tenant_group_ids
-            from organization.models import Tenant
+            Tenant = apps.get_model("organization", "Tenant")
 
             has_live_group_scope = (
                 has_live_group_scope

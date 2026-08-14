@@ -1,10 +1,11 @@
 import logging
 
+from django.apps import apps
 from django.contrib.auth import get_user_model
 from django.contrib.auth.backends import ModelBackend
 from django.utils import timezone
 
-from core.auth.cache import synchronize_authorization_cache
+from core.authorization_cache import synchronize_authorization_cache
 
 # Read the request context from the leaf module rather than from
 # ``core.managers`` (issue #87 phase D): the managers import this package for
@@ -17,6 +18,13 @@ from core.context import (
     get_current_tenant_group,
     set_current_membership,
     set_current_tenant,
+)
+from core.tenant_scope import (
+    accessible_tenant_ids_with_expiry,
+    build_accessible_tenant_permissions_map,
+    get_descendant_tenant_group_ids,
+    managed_accessible_tenant_ids,
+    resolve_effective_permissions_with_expiry,
 )
 
 logger = logging.getLogger(__name__)
@@ -85,9 +93,6 @@ class MembershipBackend:
             if valid_until is None or valid_until > timezone.now():
                 return permissions
 
-        # inline import: app-registry: avoids AppRegistryNotReady at auth-backend import time.
-        from organization.rbac import resolve_effective_permissions_with_expiry
-
         permissions, valid_until = resolve_effective_permissions_with_expiry(
             user_obj,
             tenant,
@@ -99,7 +104,7 @@ class MembershipBackend:
     def _object_tenant(self, user_obj, obj):
         """The tenant carried by ``obj`` (a Tenant instance IS its own context), or
         ``None`` for a tenant-less (global/shared) object."""
-        from organization.models import Tenant
+        Tenant = apps.get_model("organization", "Tenant")
 
         obj_tenant = getattr(obj, "tenant", None)
         if obj_tenant is None and isinstance(obj, Tenant):
@@ -129,10 +134,7 @@ class MembershipBackend:
                 tenants, valid_until = getattr(user_obj, cache_key)
                 if valid_until is None or valid_until > timezone.now():
                     return tenants
-            # inline imports: app-registry: avoid AppRegistryNotReady / a core<->organization cycle at load
-            from organization.access import accessible_tenant_ids_with_expiry
-            from organization.models import Tenant
-
+            Tenant = apps.get_model("organization", "Tenant")
             ids, valid_until = accessible_tenant_ids_with_expiry(user_obj)
             tenants = list(
                 Tenant._base_manager.filter(
@@ -150,13 +152,7 @@ class MembershipBackend:
             tenants, valid_until = getattr(user_obj, cache_key)
             if valid_until is None or valid_until > timezone.now():
                 return tenants
-        # inline imports: app-registry: avoid AppRegistryNotReady / a core<->organization cycle at load
-        from organization.access import (
-            accessible_tenant_ids_with_expiry,
-            get_descendant_tenant_group_ids,
-        )
-        from organization.models import Tenant
-
+        Tenant = apps.get_model("organization", "Tenant")
         # live_only: prune soft-deleted subgroups exactly like filter_by_tenant's
         # walk, so the gate never counts a tenant the scoped querysets will hide.
         ids, valid_until = accessible_tenant_ids_with_expiry(user_obj)
@@ -173,7 +169,8 @@ class MembershipBackend:
     def _ambient_tenant(self, user_obj):
         """Single-tenant ambient context: bound membership → current tenant →
         first active membership's tenant → first scoped managed tenant."""
-        from organization.models import Membership, Tenant
+        Membership = apps.get_model("organization", "Membership")
+        Tenant = apps.get_model("organization", "Tenant")
 
         membership = get_current_membership()
         if membership and membership.user_id == user_obj.pk and membership.tenant_id:
@@ -195,8 +192,6 @@ class MembershipBackend:
             return first.tenant
         # Defensive fallback: a user whose only access is managed reach (should not
         # happen — reach rides on a membership — but fail towards a valid context).
-        from organization.access import managed_accessible_tenant_ids
-
         reachable = managed_accessible_tenant_ids(user_obj)
         if reachable:
             tenant = Tenant._base_manager.filter(pk__in=reachable).order_by("name").first()
@@ -241,9 +236,6 @@ class MembershipBackend:
         group_tenants = self._group_scope_tenants(user_obj)
         if group_tenants is None:
             return frozenset()
-        # inline import: app-registry: avoids AppRegistryNotReady at auth-backend import time.
-        from organization.rbac import build_accessible_tenant_permissions_map
-
         build_accessible_tenant_permissions_map(user_obj)
         all_perms = set()
         for tenant in group_tenants:

@@ -3,6 +3,8 @@ import os
 import re
 import uuid
 
+from core.authorization_cache import begin_authorization_request, end_authorization_request
+
 # The user/request-id contextvars and their accessors live in the leaf module
 # ``core.context`` (issue #87 phase D). This middleware is what *populates*
 # them, while the tenant-scoping managers and the auth backends *read* them —
@@ -28,6 +30,7 @@ from core.context import (  # noqa: F401 -- re-exported for existing importers
     set_current_tenant_group,
     set_current_user,
 )
+from core.tenant_scope import _descendant_group_ids_cache, get_descendant_tenant_group_ids
 
 from .ratelimit import RateLimitMiddleware
 
@@ -58,8 +61,6 @@ class CurrentUserMiddleware:
         request_id = uuid.uuid4()
         user_token = _current_user.set(user)
         request_id_token = _request_id.set(request_id)
-        from core.auth.cache import begin_authorization_request
-
         authorization_token = begin_authorization_request(request_id)
         return (
             user_token,
@@ -70,8 +71,6 @@ class CurrentUserMiddleware:
     def process_response(self, request, response, tokens=None):
         if tokens is not None:
             user_token, request_id_token, authorization_token = tokens
-            from core.auth.cache import end_authorization_request
-
             end_authorization_request(authorization_token)
             _current_user.reset(user_token)
             _request_id.reset(request_id_token)
@@ -80,8 +79,6 @@ class CurrentUserMiddleware:
             # invoked outside __call__): clear to None as before.
             _current_user.set(None)
             _request_id.set(None)
-            from core.auth.cache import end_authorization_request
-
             end_authorization_request()
         return response
 
@@ -244,8 +241,6 @@ class TenantMiddleware:
     def process_request(self, request):
         # Reset the per-request descendant-group-ids cache so a reused WSGI
         # worker thread can never serve stale results from a prior request.
-        from organization.access import _descendant_group_ids_cache
-
         _descendant_group_ids_cache.set(None)
 
         # Snapshot the context active on entry so process_response can restore it
@@ -357,9 +352,6 @@ class TenantMiddleware:
                 # managed reach). The descendant walk (pruned at soft-deleted nodes)
                 # matches filter_by_tenant and the auth backend's group gate — a member
                 # whose tenants all sit in a child group may still activate the parent.
-                # inline import: cycle: avoid a middleware <-> organization cycle at load
-                from organization.access import get_descendant_tenant_group_ids
-
                 group_tenant_ids = set(
                     Tenant._base_manager.filter(
                         group_id__in=get_descendant_tenant_group_ids(

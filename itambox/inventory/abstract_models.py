@@ -1,3 +1,4 @@
+from django.apps import apps
 from django.db import models
 from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
@@ -11,6 +12,7 @@ from core.mixins import (
     TaggableMixin,
 )
 from core.models import BaseModel, ChangeLoggingMixin, DeletableVaultModel
+from core.tenant_scope import get_ancestor_tenant_group_ids
 
 from .mixins import CheckableInventoryModelMixin
 from .models_assignment_write import assignment_write_is_authorized
@@ -354,9 +356,7 @@ class AbstractAssignment(JournalingMixin, TaggableMixin, SoftDeleteMixin, Change
 
     def _grant_coverage_problems(self, grant):
         """Structural coverage check — RBAC is the resolver's/service's job."""
-        # inline import: cycle: breaks an inventory <-> organization import cycle at load
-        from organization.access import get_ancestor_tenant_group_ids
-        from organization.models import TenantResourceGrant
+        TenantResourceGrant = apps.get_model("organization", "TenantResourceGrant")
 
         problems = []
         if grant.deleted_at is not None:

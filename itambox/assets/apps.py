@@ -8,6 +8,8 @@ class AssetsConfig(AppConfig):
     def ready(self):
         # Import signals
         # Import search indexes to register them
+        # inline import: app-registry: curated import forms load only after the app registry is ready.
+        import assets.forms.import_forms
         import assets.search
         import assets.signals
 

@@ -1,6 +1,9 @@
+from django.apps import apps
 from django.core.exceptions import FieldDoesNotExist, FieldError
 from django.db import models
 from django.db.models import QuerySet
+
+from core.authorization_cache import synchronize_authorization_cache
 
 # The request-context contextvars and their accessors live in the leaf module
 # ``core.context`` (issue #87 phase D): the middleware that populates them and
@@ -25,6 +28,7 @@ from core.context import (  # noqa: F401 -- re-exported for existing importers
     set_current_tenant,
     set_current_tenant_group,
 )
+from core.tenant_scope import accessible_tenant_ids, get_ancestor_tenant_group_ids
 
 
 class SoftDeleteQuerySet(models.QuerySet):
@@ -59,11 +63,6 @@ class TenantScopingQuerySet(models.QuerySet):
         sees that tenant's group. ``_base_manager`` (unscoped) keeps this off the
         tenant-scoped path and avoids recursion back into ``filter_by_tenant``.
         """
-        from django.apps import apps
-
-        # inline imports: cycle: avoid a core.managers -> organization import cycle at load.
-        from organization.access import accessible_tenant_ids
-
         Tenant = apps.get_model("organization", "Tenant")
         accessible = accessible_tenant_ids(user)
         group_ids = set(Tenant._base_manager.filter(pk__in=accessible).values_list("group_id", flat=True))
@@ -104,19 +103,10 @@ class TenantScopingQuerySet(models.QuerySet):
             can_cache = hasattr(user, "__dict__")
             cache_key = f"_group_scope_tenants_ids_{active_group.pk}"
             if can_cache:
-                # inline import: app-registry: core.auth.__init__ calls
-                # get_user_model() at module scope, so importing core.auth.cache
-                # from this (model-layer) module at load time raises
-                # AppRegistryNotReady.
-                from core.auth.cache import synchronize_authorization_cache
-
                 synchronize_authorization_cache(user)
                 cached = user.__dict__.get(cache_key)
                 if cached is not None:
                     return cached
-            # inline import: cycle: avoid a core.managers -> organization cycle at load.
-            from organization.access import accessible_tenant_ids
-
             accessible = accessible_tenant_ids(user)
             result = list(
                 Tenant._base_manager.filter(
@@ -157,10 +147,6 @@ class TenantScopingQuerySet(models.QuerySet):
         members, and a superuser keeps their own global path.
         """
         if user is not None and getattr(user, "is_authenticated", False) and not getattr(user, "is_superuser", False):
-            # inline import: cycle: avoid a core.managers -> organization circular
-            # import at module load.
-            from organization.access import accessible_tenant_ids
-
             return list(accessible_tenant_ids(user))
         return []
 
@@ -176,12 +162,6 @@ class TenantScopingQuerySet(models.QuerySet):
         """
         if user is None or not hasattr(user, "__dict__"):
             return frozenset()
-        # inline imports: app-registry: core.auth.__init__ calls get_user_model()
-        # at module scope and organization.access reaches models, so neither can
-        # be imported from this model-layer module at load time.
-        from core.auth.cache import synchronize_authorization_cache
-        from organization.access import get_ancestor_tenant_group_ids
-
         synchronize_authorization_cache(user)
         tenant_key = tuple(sorted(allowed_tenant_ids))
         cached = user.__dict__.get("_all_accessible_group_ids")
@@ -212,8 +192,6 @@ class TenantScopingQuerySet(models.QuerySet):
             current_user = get_current_user()
             if get_current_scope_conflict(current_user):
                 return self.none()
-
-            from django.apps import apps
 
             Tenant = apps.get_model("organization", "Tenant")
 

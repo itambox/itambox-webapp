@@ -12,6 +12,28 @@ class OrganizationConfig(AppConfig):
         import organization.search
         import organization.signals
 
+        # inline imports: app-registry: domain modules load only after the app registry is ready.
+        from core.tenant_scope import register_tenant_scope_provider
+        from organization.access import (
+            accessible_tenant_ids,
+            accessible_tenant_ids_with_expiry,
+            managed_accessible_tenant_ids,
+        )
+        from organization.rbac import (
+            applicable_grants,
+            build_accessible_tenant_permissions_map,
+            effective_permissions_with_expiry,
+        )
+
+        register_tenant_scope_provider(
+            accessible_tenant_ids=accessible_tenant_ids,
+            accessible_tenant_ids_with_expiry=accessible_tenant_ids_with_expiry,
+            managed_accessible_tenant_ids=managed_accessible_tenant_ids,
+            applicable_grants=applicable_grants,
+            build_accessible_tenant_permissions_map=build_accessible_tenant_permissions_map,
+            resolve_effective_permissions_with_expiry=effective_permissions_with_expiry,
+        )
+
         self._register_capabilities()
 
     def _register_capabilities(self):

@@ -7,8 +7,8 @@ from django.dispatch import receiver
 from core.choices import ObjectChangeActionChoices
 from core.managers import get_current_tenant
 from core.models import write_object_change
+from core.serialization import serialize_object
 from itambox.middleware import get_current_request_id, get_current_user
-from itambox.utils import serialize_object
 
 logger = logging.getLogger(__name__)
 User = get_user_model()
