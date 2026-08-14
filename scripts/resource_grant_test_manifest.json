@@ -58,6 +58,8 @@
     "itambox/core/tests/test_report_currency.py",
     "itambox/core/tests/test_report_custody_compliance.py",
     "itambox/core/tests/test_report_custom_html_removal.py",
+    "itambox/core/tests/test_report_designer_issue181.py",
+    "itambox/core/tests/test_report_designer_migration.py",
     "itambox/core/tests/test_report_export_formats.py",
     "itambox/core/tests/test_report_hardware_inventory.py",
     "itambox/core/tests/test_report_provider_registry.py",
