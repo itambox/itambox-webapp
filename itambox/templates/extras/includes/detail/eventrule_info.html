@@ -50,10 +50,18 @@
       {% endif %}
     </dd>
   {% endif %}
-  {% if object.conditions %}
+  {% if object.conditions_withdrawn %}
     <dt class="col-sm-3">{% translate "Matching Conditions:" %}</dt>
     <dd class="col-sm-9">
-      <pre class="bg-dark text-light p-3 rounded font-monospace csp-style-ec1ffaf1ff16">{{ object.conditions }}</pre>
+      <span class="badge bg-warning">{% translate "Withdrawn for 1.0" %}</span>
+      <p class="mt-2">
+        {% translate "Conditions cannot be evaluated for 1.0 because the v1 event envelope carries only app_label and model_name." %}
+        {% translate "This rule will not dispatch." %}
+        {% translate "The conditions are preserved and remain readable." %}
+        {% translate "A v2 snapshot version is planned, but there is no 1.0 snapshot contract." %}
+      </p>
+      <p>{% translate "See the event rule conditions documentation for details." %}</p>
+      <pre class="bg-dark text-light p-3 rounded font-monospace csp-style-ec1ffaf1ff16">{{ object.conditions_json }}</pre>
     </dd>
   {% endif %}
   {% if object.action_config %}

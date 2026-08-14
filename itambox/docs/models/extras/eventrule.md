@@ -8,7 +8,7 @@ An **Event Rule** matches database lifecycle changes (e.g. object creation, upda
 | --- | --- | --- | --- |
 | **Action Config** | Advanced JSON configurations (custom payload overrides, header mappings, etc.). | JSON | No |
 | **Action Type** | Type of action to trigger (e.g., Webhook). | Choice | Yes |
-| **Conditions** | Optional criteria or filter rules (e.g., match only if `status` changes to `Retired`). | JSON | No |
+| **Conditions** | Preserved authored conditions; withdrawn and read-only for 1.0. Authored values fail closed and do not dispatch the rule. | JSON | No |
 | **Enabled** | Flag indicating if this rule is actively monitored. | Boolean | Yes |
 | **Events** | List of event types triggering this rule (e.g., `create`, `update`, `delete`). | JSON | Yes |
 | **Model** | The target database model being monitored. | Foreign Key | Yes |
@@ -18,5 +18,5 @@ An **Event Rule** matches database lifecycle changes (e.g. object creation, upda
 
 ## Features & Validation
 
-* **Event Filtering**: Fine-grained conditional checks to prevent webhooks from firing on minor, unrelated field updates.
+* **Condition Preservation**: Existing condition JSON remains readable, but authored conditions are not evaluated in 1.0 and fail closed.
 * **Webhook Mapping**: Webhooks mapped under `webhook` take precedence over generic configs.

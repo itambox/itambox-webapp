@@ -161,7 +161,7 @@ notification.
 | **Events** | Yes | JSON list of event types: `["create"]`, `["create", "update"]`, `["delete"]`, `["restore"]` |
 | **Action Type** | Yes | `Webhook` (calls an endpoint) or `Notification` (in-app alert) |
 | **Webhook** | Cond. | The Webhook Endpoint to call. Required when action type is `Webhook`. |
-| **Conditions** | No | Optional JSON filter rules to narrow when the rule fires (see below) |
+| **Conditions** | No | Preserved JSON conditions; authored conditions are read-only and withdrawn for 1.0 (see below) |
 | **Action Config** | No | Advanced JSON overrides — custom headers, payload templates |
 | **Enabled** | — | Toggle to temporarily pause the rule |
 | **Tenant** | Admin only | Scope the rule to events from a specific tenant, or leave blank for system-wide |
@@ -174,30 +174,9 @@ notification.
 
 ### Conditions
 
-The `Conditions` field accepts a JSON object that filters events. The condition
-engine supports:
-
-| Operator | Description | Example |
-|---|---|---|
-| `eq` | Equal | `{"field": "status", "op": "eq", "value": "active"}` |
-| `neq` | Not equal | `{"field": "status", "op": "neq", "value": "draft"}` |
-| `gt` | Greater than | `{"field": "data.purchase_cost", "op": "gt", "value": 5000}` |
-| `lt` | Less than | `{"field": "data.purchase_cost", "op": "lt", "value": 1000}` |
-
-Conditions are matched against fields recorded in `event.data` at dispatch
-time. v1 records event metadata only; it does not serialize a full object
-snapshot. Combine multiple conditions with
-`"type": "and"` or `"type": "or"` at the top level:
-
-```json
-{
-    "type": "and",
-    "rules": [
-        {"field": "status", "op": "eq", "value": "retired"},
-        {"field": "data.purchase_cost", "op": "gt", "value": 5000}
-    ]
-}
-```
+Conditions are preserved for readability but are read-only for the 1.0 release.
+See [Event rule conditions (withdrawn for 1.0)](#event-rule-conditions-withdrawn-for-10)
+for the fail-closed behavior and the upgrade report.
 
 ### Event types
 
@@ -342,6 +321,26 @@ output, secret, encrypted value, or custom-field snapshot. A system-wide rule or
 endpoint still receives the changed object's owning tenant; the ambient tenant
 context cannot override it. Cross-tenant rule/endpoint links remain rejected.
 
+## Event rule conditions (withdrawn for 1.0)
+
+Event rule conditions are withdrawn for the 1.0 release. Existing
+`EventRule.conditions` JSON is preserved byte-for-byte and remains readable in
+the UI, but authored conditions are not evaluated and the rule does not
+dispatch. This is fail-closed: a rule with authored expressions is skipped
+instead of being treated as a match on incomplete event data. Empty conditions
+retain their historical match behavior.
+
+The v1 event envelope described above carries only event metadata in `data`,
+including `app_label` and `model_name`; it does not carry a full object
+snapshot. Conditions therefore cannot be evaluated for 1.0. A v2 snapshot
+version is planned, but ITAMbox makes no 1.0 snapshot-contract promise.
+
+To identify active rules affected by this withdrawal after an upgrade, run:
+
+```bash
+python manage.py eventrule_withdrawn_report
+```
+
 ---
 
 ## Troubleshooting
@@ -411,14 +410,11 @@ context cannot override it. Cross-tenant rule/endpoint links remain rejected.
 
 **My event rule fires on every update, not just the field I care about**
 
-: Add a `conditions` filter to narrow the rule. Conditions can only match
-  fields present in the recorded event data; v1 does not add object snapshots.
-  For example, to match a recorded event field:
-  ```json
-  {"field": "status", "op": "eq", "value": "retired"}
-  ```
-  The condition is evaluated against `event.data`, which contains the
-  metadata recorded when the event was created.
+: Conditions are withdrawn for 1.0 and cannot be evaluated against the v1
+  envelope. Existing authored conditions are preserved and remain readable, but
+  the rule will not dispatch until a future snapshot-capable version is
+  available. Run `python manage.py eventrule_withdrawn_report` to identify
+  affected rules.
 
 **Webhook URL is rejected by the SSRF guard**
 
