@@ -916,6 +916,7 @@ class ScheduledReportScopeAuthorizationTests(TestCase):
 
     def test_revoke_requires_reach_over_the_stored_scope(self):
         from django.core.exceptions import PermissionDenied
+
         from organization.models import Membership, Role, RoleGrant, RoleGrantScope
 
         ScheduledReportScopeAuthorization.approve(self.sched, self.user)
