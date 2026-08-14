@@ -11063,6 +11063,164 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/APIError'
+  /api/extras/alert-logs/:
+    get:
+      operationId: extras_alert_logs_list
+      parameters:
+      - in: query
+        name: created_after
+        schema:
+          type: string
+          format: date
+        description: Created after
+      - in: query
+        name: created_before
+        schema:
+          type: string
+          format: date
+        description: Created before
+      - name: limit
+        required: false
+        in: query
+        description: Number of results to return per page.
+        schema:
+          type: integer
+      - name: offset
+        required: false
+        in: query
+        description: The initial index from which to return the results.
+        schema:
+          type: integer
+      - in: query
+        name: rule
+        schema:
+          type: integer
+        description: Rule
+      - in: query
+        name: severity
+        schema:
+          type: array
+          items:
+            type: string
+            enum:
+            - critical
+            - info
+            - warning
+        description: |-
+          Severity
+
+          * `info` - Info
+          * `warning` - Warning
+          * `critical` - Critical
+        explode: true
+        style: form
+      - name: start
+        required: false
+        in: query
+        description: 'Keyset/cursor pagination: return results with pk >= start, ordered
+          by pk. Skips the (capped) row count and stays O(page) regardless of table
+          size — use this instead of offset/limit for bulk export or iterating large
+          collections. Follow the `next` link to walk subsequent pages.'
+        schema:
+          type: integer
+      - in: query
+        name: status
+        schema:
+          type: array
+          items:
+            type: string
+            enum:
+            - acknowledged
+            - active
+            - resolved
+        description: |-
+          Status
+
+          * `active` - Active
+          * `acknowledged` - Acknowledged
+          * `resolved` - Resolved
+        explode: true
+        style: form
+      tags:
+      - extras
+      security:
+      - TokenAuth: []
+      - cookieAuth: []
+      - basicAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedAlertLogList'
+          description: ''
+        '400':
+          description: The request could not be completed.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/APIError'
+        '401':
+          description: The request could not be completed.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/APIError'
+        '403':
+          description: The request could not be completed.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/APIError'
+      x-itambox-maturity: stable
+  /api/extras/alert-logs/{id}/:
+    get:
+      operationId: extras_alert_logs_retrieve
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: A unique integer value identifying this Alert Log.
+        required: true
+      tags:
+      - extras
+      security:
+      - TokenAuth: []
+      - cookieAuth: []
+      - basicAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AlertLog'
+          description: ''
+        '400':
+          description: The request could not be completed.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/APIError'
+        '401':
+          description: The request could not be completed.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/APIError'
+        '403':
+          description: The request could not be completed.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/APIError'
+        '404':
+          description: The request could not be completed.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/APIError'
+      x-itambox-maturity: stable
   /api/extras/alert-rules/:
     get:
       operationId: extras_alert_rules_list
@@ -37842,6 +38000,146 @@ components:
       description: |-
         * `webhook` - Webhook
         * `notification` - Notification
+    AlertLog:
+      type: object
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        url:
+          type: string
+          format: uri
+          readOnly: true
+        rule:
+          type: integer
+          readOnly: true
+        tenant:
+          type: integer
+          readOnly: true
+          nullable: true
+          description: The tenant owning this log. Null represents system-wide logs.
+        rule_display:
+          type: string
+          readOnly: true
+        subject:
+          type: string
+          readOnly: true
+        message:
+          type: string
+          readOnly: true
+        severity:
+          allOf:
+          - $ref: '#/components/schemas/SeverityEnum'
+          readOnly: true
+        severity_display:
+          type: string
+          readOnly: true
+        content_type:
+          type: integer
+          readOnly: true
+        object_id:
+          type: integer
+          readOnly: true
+        content_object_display:
+          type: string
+          readOnly: true
+        status:
+          allOf:
+          - $ref: '#/components/schemas/AlertLogStatusEnum'
+          readOnly: true
+          default: active
+        status_display:
+          type: string
+          readOnly: true
+        delivery_status:
+          readOnly: true
+          description: 'Per-channel delivery result: {channel_pk: ''ok''|''failed''|''error:
+            ...''}'
+        last_notified_at:
+          type: string
+          format: date-time
+          readOnly: true
+          nullable: true
+          description: When channel notifications were last dispatched for this alert
+            (drives re-notify).
+        acknowledged_by:
+          type: integer
+          readOnly: true
+          nullable: true
+        acknowledged_by_display:
+          type: string
+          readOnly: true
+        resolved_by:
+          type: integer
+          readOnly: true
+          nullable: true
+        resolved_by_display:
+          type: string
+          readOnly: true
+        resolution_notes:
+          type: string
+          readOnly: true
+        resolved_at:
+          type: string
+          format: date-time
+          readOnly: true
+          nullable: true
+        tenant_resolution_status:
+          allOf:
+          - $ref: '#/components/schemas/TenantResolutionStatusEnum'
+          readOnly: true
+          title: Tenant Resolution
+          description: |-
+            Reconciliation state for legacy tenant-less alerts.
+
+            * `not_required` - Not required
+            * `resolved` - Resolved from target
+            * `global` - Global target
+            * `unresolved` - Unresolved — operator review required
+        created_at:
+          type: string
+          format: date-time
+          readOnly: true
+        updated_at:
+          type: string
+          format: date-time
+          readOnly: true
+      required:
+      - acknowledged_by
+      - acknowledged_by_display
+      - content_object_display
+      - content_type
+      - created_at
+      - delivery_status
+      - id
+      - last_notified_at
+      - message
+      - object_id
+      - resolution_notes
+      - resolved_at
+      - resolved_by
+      - resolved_by_display
+      - rule
+      - rule_display
+      - severity
+      - severity_display
+      - status
+      - status_display
+      - subject
+      - tenant
+      - tenant_resolution_status
+      - updated_at
+      - url
+    AlertLogStatusEnum:
+      enum:
+      - active
+      - acknowledged
+      - resolved
+      type: string
+      description: |-
+        * `active` - Active
+        * `acknowledged` - Acknowledged
+        * `resolved` - Resolved
     AlertRule:
       type: object
       properties:
@@ -42537,6 +42835,35 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/AccessoryStock'
+        count_capped:
+          type: boolean
+          description: True when `count` was capped at ITAMBOX_PAGINATOR_COUNT_CAP
+            and the real total is larger. Use `start` (keyset cursor) pagination to
+            iterate the full result set.
+    PaginatedAlertLogList:
+      type: object
+      required:
+      - count
+      - results
+      properties:
+        count:
+          type: integer
+          example: 123
+          nullable: true
+        next:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?offset=400&limit=100
+        previous:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?offset=200&limit=100
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/AlertLog'
         count_capped:
           type: boolean
           description: True when `count` was capped at ITAMBOX_PAGINATOR_COUNT_CAP
@@ -48057,6 +48384,18 @@ components:
       required:
       - name
       - slug
+    TenantResolutionStatusEnum:
+      enum:
+      - not_required
+      - resolved
+      - global
+      - unresolved
+      type: string
+      description: |-
+        * `not_required` - Not required
+        * `resolved` - Resolved from target
+        * `global` - Global target
+        * `unresolved` - Unresolved — operator review required
     Token:
       type: object
       properties:

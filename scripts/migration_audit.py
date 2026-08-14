@@ -173,7 +173,10 @@ SEMANTIC_DISPOSITIONS = {
     ),
     **_dispositions(
         "upgrade-only",
-        "Backfills tenant attribution for legacy tenant-less alerts while marking ambiguous or unresolved targets for operator review.",
+        (
+            "Backfills tenant attribution for legacy tenant-less alerts while marking "
+            "ambiguous or unresolved targets for operator review."
+        ),
         {"extras.0104_issue183_alert_tenant_reconciliation"},
     ),
 }
