@@ -248,7 +248,9 @@ def _resolve_report_scope(sched):
         from django.apps import apps
 
         Tenant = apps.get_model("organization", "Tenant")
-        filter_tenants = list(Tenant.all_objects.filter(pk__in=scope_ids).order_by("pk"))
+        # Tenant.all_objects/objects apply ambient-tenant scoping; only the
+        # plain base manager returns the full persisted scope.
+        filter_tenants = list(Tenant._base_manager.filter(pk__in=scope_ids).order_by("pk"))
     if active_tenant is None and not filter_tenants:
         logger.error(
             "Scheduled report has no tenant scope; refusing cross-tenant compilation",
