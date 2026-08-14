@@ -201,3 +201,58 @@ class ScheduledReportScopeApprovalCapabilityGateTests(TestCase):
         client.force_login(self.admin)
         response = client.get(self.url)
         self.assertEqual(response.status_code, 404)
+
+
+class ScheduledReportScopeBadgeTests(TestCase):
+    """Pin the list-column badge states to the generation semantics."""
+
+    def setUp(self):
+        from extras.tables import ScheduledReportTable
+
+        self.tenant_a = Tenant.objects.create(name="Badge Tenant A", slug="badge-tenant-a")
+        self.tenant_b = Tenant.objects.create(name="Badge Tenant B", slug="badge-tenant-b")
+        self.tenant_c = Tenant.objects.create(name="Badge Tenant C", slug="badge-tenant-c")
+        self.admin = User.objects.create_superuser(username="badge-admin", password="password123", email="a@b.com")
+        self.template = ReportTemplate.objects.create(
+            name="Badge Template",
+            report_type=ReportTemplate.REPORT_TYPE_ASSET_SUMMARY,
+            tenant=self.tenant_a,
+        )
+        self.sched = ScheduledReport.objects.create(
+            name="Badge Schedule",
+            report=self.template,
+            tenant=self.tenant_a,
+            format=ScheduledReport.FORMAT_HTML,
+            save_to_archive=False,
+            is_active=True,
+        )
+        self.table = ScheduledReportTable(ScheduledReport.objects.all())
+
+    def _badge(self):
+        return str(self.table.render_scope(self.sched, self.sched.pk))
+
+    def test_single_tenant_schedule_shows_no_approval_badge(self):
+        self.assertEqual(self._badge(), '<span class="badge bg-secondary">Single tenant</span>')
+
+    def test_cross_tenant_schedule_without_approval_shows_approval_required(self):
+        self.sched.filter_tenants.add(self.tenant_a, self.tenant_b)
+        badge = self._badge()
+        self.assertIn("Approval required", badge)
+        self.assertIn("scheduledreport_scope_approval", badge)
+
+    def test_current_approval_shows_approved(self):
+        self.sched.filter_tenants.add(self.tenant_a, self.tenant_b)
+        ScheduledReportScopeAuthorization.approve(self.sched, self.admin)
+        self.assertIn("Approved", self._badge())
+
+    def test_revoked_approval_shows_revoked(self):
+        self.sched.filter_tenants.add(self.tenant_a, self.tenant_b)
+        ScheduledReportScopeAuthorization.approve(self.sched, self.admin)
+        ScheduledReportScopeAuthorization.revoke(self.sched, self.admin)
+        self.assertIn("Revoked", self._badge())
+
+    def test_stale_approval_shows_scope_changed(self):
+        self.sched.filter_tenants.add(self.tenant_a, self.tenant_b)
+        ScheduledReportScopeAuthorization.approve(self.sched, self.admin)
+        self.sched.filter_tenants.add(self.tenant_c)
+        self.assertIn("Scope changed", self._badge())
