@@ -151,15 +151,27 @@ class KernelSlugTests(SimpleTestCase):
 
 
 class _GroupManager:
-    def __init__(self, children_by_parent, *, exists=True):
+    def __init__(self, children_by_parent, *, deleted_ids=()):
         self._children = children_by_parent
-        self._exists = exists
+        self._deleted_ids = set(deleted_ids)
+        self.filter_calls = []
+        self.query_count = 0
+        self._pending = []
 
     def filter(self, **kwargs):
+        self.query_count += 1
+        self.filter_calls.append(kwargs)
+        if "pk" in kwargs:
+            all_ids = {group_id for group_id, children in self._children.items() if group_id != "__live__"}
+            all_ids.update(child for children in self._children.values() for child in children)
+            self._pending = [kwargs["pk"]] if kwargs["pk"] in all_ids else []
+            if kwargs.get("deleted_at__isnull") is True:
+                self._pending = [child for child in self._pending if child not in self._deleted_ids]
+            return self
         parents = kwargs.get("parent_id__in", [])
         children = {child for parent in parents for child in self._children.get(parent, ())}
-        if kwargs.get("deleted_at__isnull") is not None:
-            children = children & self._children.get("__live__", children)
+        if kwargs.get("deleted_at__isnull") is True:
+            children -= self._deleted_ids
         self._pending = sorted(children)
         return self
 
@@ -169,7 +181,7 @@ class _GroupManager:
         return self
 
     def exists(self):
-        return self._exists
+        return bool(self._pending)
 
     def values_list(self, *args, **kwargs):
         return list(self._pending)
@@ -180,17 +192,26 @@ class _GroupModel:
 
 
 class _AncestorManager:
-    def __init__(self, parent_by_id):
+    def __init__(self, parent_by_id, *, deleted_ids=()):
         self._parent_by_id = parent_by_id
+        self._deleted_ids = set(deleted_ids)
+        self.filter_calls = []
+        self._visible_ids = set(parent_by_id)
 
     def all(self):
+        self._visible_ids = set(self._parent_by_id)
         return self
 
     def filter(self, **kwargs):
+        self.filter_calls.append(kwargs)
+        if kwargs.get("deleted_at__isnull") is True:
+            self._visible_ids -= self._deleted_ids
         return self
 
     def values_list(self, *args, **kwargs):
-        return [(group_id, parent_id) for group_id, parent_id in self._parent_by_id.items()]
+        return [
+            (group_id, parent_id) for group_id, parent_id in self._parent_by_id.items() if group_id in self._visible_ids
+        ]
 
 
 class TenantScopeContractTests(SimpleTestCase):
@@ -206,24 +227,47 @@ class TenantScopeContractTests(SimpleTestCase):
             tenant_scope_module._call("__never_registered__", object())
 
     def test_live_only_walk_prunes_deleted_groups(self):
-        _GroupModel._base_manager = _GroupManager({}, exists=False)
+        manager = _GroupManager(
+            {1: (2, 3), 2: (4,), 3: (), 4: ()},
+            deleted_ids={2, 4},
+        )
+        _GroupModel._base_manager = manager
         with mock.patch.object(tenant_scope_module, "tenant_group_model", return_value=_GroupModel):
             ids = tenant_scope_module.get_descendant_tenant_group_ids(1, live_only=True)
-        self.assertEqual(ids, set())
+        self.assertEqual(ids, {1, 3})
+        self.assertTrue(all(call.get("deleted_at__isnull") is True for call in manager.filter_calls))
+
+        deleted_root_manager = _GroupManager({5: (6,), 6: ()}, deleted_ids={5})
+        _GroupModel._base_manager = deleted_root_manager
+        with mock.patch.object(tenant_scope_module, "tenant_group_model", return_value=_GroupModel):
+            self.assertEqual(tenant_scope_module.get_descendant_tenant_group_ids(5, live_only=True), set())
+        self.assertEqual(deleted_root_manager.filter_calls, [{"pk": 5, "deleted_at__isnull": True}])
 
     def test_descendant_walk_collects_subtree_and_is_request_local_cached(self):
-        _GroupModel._base_manager = _GroupManager({1: (2, 3), 2: (4,), 3: (), 4: ()})
-        with mock.patch.object(tenant_scope_module, "tenant_group_model", return_value=_GroupModel):
-            first = tenant_scope_module.get_descendant_tenant_group_ids(1)
-            second = tenant_scope_module.get_descendant_tenant_group_ids(1)
-        self.assertEqual(first, {1, 2, 3, 4})
+        manager = _GroupManager({101: (102, 103), 102: (104,), 103: (), 104: ()})
+        _GroupModel._base_manager = manager
+        cache_token = tenant_scope_module._descendant_group_ids_cache.set({})
+        try:
+            with mock.patch.object(tenant_scope_module, "tenant_group_model", return_value=_GroupModel):
+                first = tenant_scope_module.get_descendant_tenant_group_ids(101)
+                first_query_count = manager.query_count
+                second = tenant_scope_module.get_descendant_tenant_group_ids(101)
+        finally:
+            tenant_scope_module._descendant_group_ids_cache.reset(cache_token)
+        self.assertEqual(first, {101, 102, 103, 104})
         self.assertEqual(second, first)
+        self.assertGreater(first_query_count, 0)
+        self.assertEqual(manager.query_count, first_query_count)
 
     def test_ancestor_walk_returns_chain_and_fails_closed_on_cycle(self):
         _GroupModel._base_manager = _AncestorManager({1: None, 2: 1, 3: 2})
         with mock.patch.object(tenant_scope_module, "tenant_group_model", return_value=_GroupModel):
             self.assertEqual(tenant_scope_module.get_ancestor_tenant_group_ids(3), {1, 2, 3})
-            self.assertEqual(tenant_scope_module.get_ancestor_tenant_group_ids(3, live_only=True), {1, 2, 3})
+        live_manager = _AncestorManager({1: None, 2: 1, 3: 2}, deleted_ids={2})
+        _GroupModel._base_manager = live_manager
+        with mock.patch.object(tenant_scope_module, "tenant_group_model", return_value=_GroupModel):
+            self.assertEqual(tenant_scope_module.get_ancestor_tenant_group_ids(3, live_only=True), set())
+        self.assertEqual(live_manager.filter_calls, [{"deleted_at__isnull": True}])
         _GroupModel._base_manager = _AncestorManager({1: 2, 2: 1})
         with mock.patch.object(tenant_scope_module, "tenant_group_model", return_value=_GroupModel):
             self.assertEqual(tenant_scope_module.get_ancestor_tenant_group_ids(1), set())
