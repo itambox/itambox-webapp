@@ -454,26 +454,30 @@ class AlertRenotifyDeliveryTests(TransactionTestCase):
             config={"recipients": []},
         )
         rule.channels.add(channel)
-        with TaskContext(tenant_id=tenant.pk):
-            _evaluate_rule(rule, timezone.now().date(), {})
+        # Keep the initial delivery outside the failure patch and make the
+        # post-commit boundary explicit for the renotify assertion below.
+        with transaction.atomic():
+            with TaskContext(tenant_id=tenant.pk):
+                _evaluate_rule(rule, timezone.now().date(), {})
         alert = AlertLog.unscoped.get(rule=rule)
         old = timezone.now() - timezone.timedelta(days=10)
         AlertLog.unscoped.filter(pk=alert.pk).update(last_notified_at=old)
         alert.refresh_from_db()
 
         with patch("core.tasks.alerts._dispatch_channels", side_effect=RuntimeError("renotify failure")) as dispatch:
-            with TaskContext(tenant_id=tenant.pk):
-                _evaluate_rule(
-                    rule,
-                    timezone.now().date(),
-                    {
-                        (
-                            rule.pk,
-                            ContentType.objects.get_for_model(accessory).pk,
-                            accessory.pk,
-                        ): alert
-                    },
-                )
+            with transaction.atomic():
+                with TaskContext(tenant_id=tenant.pk):
+                    _evaluate_rule(
+                        rule,
+                        timezone.now().date(),
+                        {
+                            (
+                                rule.pk,
+                                ContentType.objects.get_for_model(accessory).pk,
+                                accessory.pk,
+                            ): alert
+                        },
+                    )
         dispatch.assert_called_once()
 
         alert.refresh_from_db()
