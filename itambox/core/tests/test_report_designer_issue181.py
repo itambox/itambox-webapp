@@ -639,7 +639,7 @@ class ReportDesignerIssue181CoverageTests(SimpleTestCase):
         )
         query = Mock()
         query.order_by.return_value = [tenant_b]
-        with patch.object(Tenant.all_objects, "filter", return_value=query) as filter_scope:
+        with patch.object(Tenant._base_manager, "filter", return_value=query) as filter_scope:
             assert _resolve_report_scope(schedule) == (tenant_a, [tenant_b])
         filter_scope.assert_called_once_with(pk__in=[2])
 
