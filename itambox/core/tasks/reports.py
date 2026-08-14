@@ -467,9 +467,7 @@ def generate_scheduled_report_task(scheduled_report_id: int) -> TaskResult:
         return TaskResult(TaskStatus.TERMINAL, "report.scope_missing", user_visible=True)
     active_tenant, filter_tenants = scope
     if not filter_tenants:
-        existing_authorization = ScheduledReportScopeAuthorization._base_manager.filter(
-            scheduled_report=sched
-        ).first()
+        existing_authorization = ScheduledReportScopeAuthorization._base_manager.filter(scheduled_report=sched).first()
         if existing_authorization and existing_authorization.scope_tenant_ids:
             # Soft-deleting a tenant strips it from filter M2M sets, so a
             # previously approved broad scope can silently collapse to the
