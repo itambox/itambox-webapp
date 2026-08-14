@@ -72,6 +72,8 @@ def derive_outcomes_backwards(apps, schema_editor):
 class Migration(migrations.Migration):
     dependencies = [
         ("extras", "0107_scheduledreportscopeauthorization_revocation"),
+        ("users", "0100_issue88_shard_62_users_relations"),
+        migrations.swappable_dependency(settings.AUTH_USER_MODEL),
     ]
 
     operations = [

@@ -341,14 +341,14 @@ class AlertRenotifyDeliveryTests(TransactionTestCase):
         )
         match = {"obj": rule, "tenant": tenant, "subject": "alert", "message": "alert"}
         real_filter = AlertLog.unscoped.filter
-        # Only the FIRST filter() call of the first dispatch (its idempotency
-        # guard) is replaced: the guard must answer exists()=False, and its
-        # claim write must fail. Everything after that uses the real queryset
-        # so the second callback still runs to completion.
+        # The FIRST TWO filter() calls of the first dispatch are replaced: the
+        # idempotency guard (exists()=False) and the claim write, which must
+        # fail. Everything after that uses the real queryset so the second
+        # callback still runs to completion.
         first_guard = Mock()
         first_guard.exists.return_value = False
         first_guard.update = Mock(side_effect=RuntimeError("metadata update failure"))
-        remaining = iter([first_guard])
+        remaining = iter([first_guard, first_guard])
 
         def flaky_filter(*args, **kwargs):
             try:

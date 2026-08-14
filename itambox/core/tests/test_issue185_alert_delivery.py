@@ -310,7 +310,10 @@ class AlertDispatchObservabilityTests(TransactionTestCase):
         match = {"obj": rule, "tenant": tenant, "subject": "renotify", "message": "renotify"}
         existing = {(rule.pk, alert.content_type_id, alert.object_id): alert}
 
-        with patch("core.tasks.alerts.uuid4", return_value="fresh-run"):
+        with (
+            patch("core.tasks.alerts.uuid4", return_value="fresh-run"),
+            patch("core.tasks.alerts._collect_matches", return_value=[match]),
+        ):
             with TaskContext(tenant_id=tenant.pk):
                 with transaction.atomic():
                     _evaluate_rule(rule, timezone.now().date(), existing)
@@ -480,8 +483,11 @@ class AlertLifecycleIndependentOfDeliveryTests(TransactionTestCase):
     def test_lifecycle_survives_every_channel_failing(self):
         from unittest.mock import patch
 
+        from assets.models import Manufacturer
         from core.events import DeliveryDisposition, DeliveryResult
         from core.tasks.context import TaskContext
+        from inventory.models import Accessory, AccessoryStock
+        from organization.models import Location, Site
 
         tenant = Tenant.objects.create(name="WP-13 Lifecycle Tenant", slug="wp-13-lifecycle-tenant")
         user = User.objects.create_user(username="wp13-lifecycle", password="x")
@@ -499,6 +505,19 @@ class AlertLifecycleIndependentOfDeliveryTests(TransactionTestCase):
             config={"recipient_users": [user.pk]},
         )
         rule.channels.add(channel)
+        manufacturer = Manufacturer.objects.create(name="WP-13 Lifecycle Mfr", slug="wp-13-lifecycle-mfr")
+        site = Site.objects.create(name="WP-13 Lifecycle Site", slug="wp-13-lifecycle-site", tenant=tenant)
+        location = Location.objects.create(
+            name="WP-13 Lifecycle Loc", slug="wp-13-lifecycle-loc", tenant=tenant, site=site
+        )
+        accessory = Accessory.objects.create(
+            name="WP-13 Lifecycle Accessory",
+            slug="wp-13-lifecycle-accessory",
+            manufacturer=manufacturer,
+            tenant=tenant,
+            min_qty=5,
+        )
+        AccessoryStock.objects.create(accessory=accessory, location=location, qty=1)
 
         failure = DeliveryResult("in_app.deliver", DeliveryDisposition.TERMINAL, True, "backend down", "timeout")
         with patch("core.tasks.alerts.send_notification_to_channel", return_value=failure):
@@ -540,7 +559,7 @@ class AlertDeliveryTableRenderTests(TestCase):
             tenant=tenant,
         )
         content_type = ContentType.objects.get_for_model(AlertRule)
-        table = AlertLogTable()
+        table = AlertLogTable([])
 
         delivered = AlertLog._base_manager.create(
             tenant=tenant, rule=rule, subject="d", message="m",
@@ -608,60 +627,59 @@ class AlertDeliveryOutcomeMigrationTests(TransactionTestCase):
             super().tearDown()
 
     def test_forward_derives_outcomes_and_reverse_preserves_rows(self):
-        try:
-            old_apps = self._migrate(self.migrate_from).apps
-            Tenant = old_apps.get_model("organization", "Tenant")
-            AlertRule = old_apps.get_model("extras", "AlertRule")
-            AlertLog = old_apps.get_model("extras", "AlertLog")
-            ContentType = old_apps.get_model("contenttypes", "ContentType")
+        old_apps = self._migrate(self.migrate_from).apps
+        Tenant = old_apps.get_model("organization", "Tenant")
+        AlertRule = old_apps.get_model("extras", "AlertRule")
+        AlertLog = old_apps.get_model("extras", "AlertLog")
+        ContentType = old_apps.get_model("contenttypes", "ContentType")
 
-            tenant = Tenant.objects.create(name="WP-13 Migration Tenant", slug="wp-13-migration-tenant")
-            rule = AlertRule.objects.create(
-                tenant=tenant,
-                name="WP-13 Migration Rule",
-                alert_type="low_stock",
-                threshold_value=1,
+        tenant = Tenant.objects.create(name="WP-13 Migration Tenant", slug="wp-13-migration-tenant")
+        rule = AlertRule.objects.create(
+            tenant=tenant,
+            name="WP-13 Migration Rule",
+            alert_type="low_stock",
+            threshold_value=1,
+        )
+        rule_ct = ContentType.objects.get(app_label="extras", model="alertrule")
+        cases = [
+            ({"7": "ok"}, "delivered"),
+            ({"7": "failed"}, "failed"),
+            ({"7": "error: SMTP rejected"}, "failed"),
+            ({"7": "retryable"}, "failed"),
+            ({"__dispatch__": "pending"}, "pending"),
+            ({"__dispatch__": "terminal"}, "failed"),
+            ({"__no_channels__": "no channels attached to this rule"}, "none"),
+            ({}, "none"),
+            ({"7": {"disposition": "success", "operation": "in_app.deliver"}}, "delivered"),
+            ({"7": {"disposition": "terminal", "error_class": "SMTPException"}}, "failed"),
+        ]
+        expected = {}
+        for index, (payload, outcome) in enumerate(cases):
+            log = AlertLog.objects.create(
+                rule=rule,
+                subject=f"case-{index}",
+                message="m",
+                content_type_id=rule_ct.pk,
+                object_id=index + 1,
+                tenant_id=tenant.pk,
+                status="active",
+                delivery_status=payload,
             )
-            rule_ct = ContentType.objects.get(app_label="extras", model="alertrule")
-            cases = [
-                ({"7": "ok"}, "delivered"),
-                ({"7": "failed"}, "failed"),
-                ({"7": "error: SMTP rejected"}, "failed"),
-                ({"7": "retryable"}, "failed"),
-                ({"__dispatch__": "pending"}, "pending"),
-                ({"__dispatch__": "terminal"}, "failed"),
-                ({"__no_channels__": "no channels attached to this rule"}, "none"),
-                ({}, "none"),
-                ({"7": {"disposition": "success", "operation": "in_app.deliver"}}, "delivered"),
-                ({"7": {"disposition": "terminal", "error_class": "SMTPException"}}, "failed"),
-            ]
-            expected = {}
-            for index, (payload, outcome) in enumerate(cases):
-                log = AlertLog.objects.create(
-                    rule=rule,
-                    subject=f"case-{index}",
-                    message="m",
-                    content_type_id=rule_ct.pk,
-                    object_id=index + 1,
-                    tenant_id=tenant.pk,
-                    status="active",
-                    delivery_status=payload,
-                )
-                expected[log.pk] = outcome
+            expected[log.pk] = outcome
 
-            new_apps = self._migrate(self.migrate_to).apps
-            NewAlertLog = new_apps.get_model("extras", "AlertLog")
-            for pk, outcome in expected.items():
-                self.assertEqual(
-                    NewAlertLog.objects.get(pk=pk).delivery_outcome,
-                    outcome,
-                    f"payload case {pk} derived wrong outcome",
-                )
+        new_apps = self._migrate(self.migrate_to).apps
+        NewAlertLog = new_apps.get_model("extras", "AlertLog")
+        for pk, outcome in expected.items():
+            self.assertEqual(
+                NewAlertLog.objects.get(pk=pk).delivery_outcome,
+                outcome,
+                f"payload case {pk} derived wrong outcome",
+            )
 
-            # Reverse: added fields drop, rows and original payloads survive.
-            self._migrate(self.migrate_from)
-            old_again = MigrationExecutor(connection).loader.project_state(self.migrate_from).apps
-            OldAlertLog = old_again.get_model("extras", "AlertLog")
-            self.assertEqual(OldAlertLog.objects.count(), len(cases))
-            first = OldAlertLog.objects.order_by("pk").first()
-            self.assertEqual(first.delivery_status, {"7": "ok"})
+        # Reverse: added fields drop, rows and original payloads survive.
+        self._migrate(self.migrate_from)
+        old_again = MigrationExecutor(connection).loader.project_state(self.migrate_from).apps
+        OldAlertLog = old_again.get_model("extras", "AlertLog")
+        self.assertEqual(OldAlertLog.objects.count(), len(cases))
+        first = OldAlertLog.objects.order_by("pk").first()
+        self.assertEqual(first.delivery_status, {"7": "ok"})

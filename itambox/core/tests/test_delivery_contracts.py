@@ -349,7 +349,8 @@ class DeliveryContractTests(SimpleTestCase):
         ):
             result = _dispatch_channels(rule, {"subject": "secret subject", "message": "secret body"}, None)
 
-        self.assertEqual(result, {"23": DeliveryDisposition.TERMINAL.value})
+        self.assertEqual(result["23"]["disposition"], DeliveryDisposition.TERMINAL.value)
+        self.assertEqual(result["23"]["error_class"], "unexpected_channel_error")
         rendered = " ".join(captured.output)
         self.assertIn("operation=alert.channel.dispatch", rendered)
         self.assertIn("channel_id=23", rendered)
@@ -372,7 +373,10 @@ class DeliveryContractTests(SimpleTestCase):
         with patch("core.tasks.alerts.send_notification_to_channel", side_effect=results):
             delivery = _dispatch_channels(rule, {"subject": "subject", "message": "body"}, None)
 
-        self.assertEqual(delivery, {"23": "ok", "29": DeliveryDisposition.RETRYABLE.value})
+        self.assertEqual(delivery["23"]["disposition"], DeliveryDisposition.SUCCESS.value)
+        self.assertEqual(delivery["29"]["disposition"], DeliveryDisposition.RETRYABLE.value)
+        self.assertNotIn("error_class", delivery["23"])
+        self.assertNotIn("message", delivery["29"])
 
     @patch("core.events.EmailSettings.load")
     @patch("core.events.get_connection")
