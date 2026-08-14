@@ -1052,7 +1052,8 @@ class ScheduledReportScopeApprovalView(CapabilityRequiredMixin, PermissionRequir
         return render(request, self.template_name, self.get_context_data())
 
     def _error_redirect(self, request):
-        return_url = request.POST.get("return_url") or request.GET.get("return_url")
+        candidate = request.POST.get("return_url") or request.GET.get("return_url")
+        return_url = safe_return_url(request, candidate, None)
         if return_url:
             return redirect(f"{request.path}?{urlencode({'return_url': return_url})}")
         return redirect(request.path)
