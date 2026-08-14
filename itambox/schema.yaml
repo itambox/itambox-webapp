@@ -41396,6 +41396,9 @@ components:
           description: List of event action types, e.g. ['create', 'update']
         conditions:
           description: Optional conditions for rule matching
+        conditions_withdrawn:
+          type: boolean
+          readOnly: true
         action_type:
           $ref: '#/components/schemas/ActionTypeEnum'
         action_type_display:
@@ -41421,6 +41424,7 @@ components:
       required:
       - action_type
       - action_type_display
+      - conditions_withdrawn
       - created_at
       - id
       - model
