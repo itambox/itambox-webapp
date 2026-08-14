@@ -448,14 +448,14 @@ class ScheduledReportTable(BaseTable):
     scope = tables.Column(accessor="pk", verbose_name=_("Scope"), orderable=False, empty_values=())
 
     def render_scope(self, record, value):
-        if not record.scope_requires_authorization():
-            return format_html('<span class="badge bg-secondary">{}</span>', _("Single tenant"))
         try:
             authorization = record.scope_authorization
         except ObjectDoesNotExist:
             authorization = None
         url = reverse("extras:scheduledreport_scope_approval", kwargs={"pk": record.pk})
         if authorization is None:
+            if not record.scope_requires_authorization():
+                return format_html('<span class="badge bg-secondary">{}</span>', _("Single tenant"))
             return format_html(
                 '<span class="badge bg-warning">{}</span> <a href="{}">{}</a>',
                 _("Approval required"),

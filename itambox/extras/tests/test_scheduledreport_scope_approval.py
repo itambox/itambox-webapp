@@ -163,7 +163,7 @@ class ScheduledReportScopeApprovalViewTests(TestCase):
         self.tenant_b.delete()
         response = self._client_for(self.admin).post(self.url, {"action": "approve"}, follow=True)
         self.assertEqual(ScheduledReportScopeAuthorization.objects.filter(scheduled_report=self.sched).count(), 0)
-        self.assertContains(response, "resolves to a live tenant")
+        self.assertContains(response, "does not need cross-tenant scope approval")
 
     def test_wound_back_schedule_still_offers_revoke(self):
         self._client_for(self.admin).post(self.url, {"action": "approve"})
@@ -186,13 +186,15 @@ class ScheduledReportScopeApprovalViewTests(TestCase):
         self.assertContains(response, "scope changed while approving")
 
     def test_error_redirect_preserves_the_return_url(self):
+        from urllib.parse import unquote
+
         self.sched.filter_tenants.clear()
         response = self._client_for(self.admin).post(
             self.url, {"action": "approve", "return_url": "/extras/reports/schedules/?page=2"}
         )
         self.assertEqual(response.status_code, 302)
         self.assertIn("return_url=", response.url)
-        self.assertIn("page=2", response.url)
+        self.assertIn("page=2", unquote(response.url))
 
     def test_stored_authorizer_reach_loss_is_surfaced_on_the_page(self):
         from organization.models import RoleGrant

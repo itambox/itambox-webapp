@@ -287,6 +287,16 @@ def _load_scope_authorization(sched):
     )
 
 
+def _stored_scope_tenants_are_live(authorization):
+    """Whether every tenant of a stored approval still exists as a live row."""
+    from django.apps import apps
+
+    Tenant = apps.get_model("organization", "Tenant")
+    stored_ids = set(authorization.scope_tenant_ids)
+    live_ids = set(Tenant._base_manager.filter(pk__in=stored_ids, deleted_at__isnull=True).values_list("pk", flat=True))
+    return live_ids == stored_ids
+
+
 def _parse_authorized_scope(authorization):
     try:
         return sorted({int(tenant_id) for tenant_id in authorization.scope_tenant_ids})
@@ -468,10 +478,23 @@ def generate_scheduled_report_task(scheduled_report_id: int) -> TaskResult:
     if scope is None:
         return TaskResult(TaskStatus.TERMINAL, "report.scope_missing", user_visible=True)
     active_tenant, filter_tenants = scope
-    # A schedule wound back to its owner tenant runs as an ordinary
-    # single-tenant schedule; a stale approval row only matters again if the
-    # scope is re-widened (generation then fails closed on the mismatch). The
-    # all-scope-tenants-soft-deleted collapse is already terminal above.
+    if not filter_tenants:
+        existing_authorization = ScheduledReportScopeAuthorization._base_manager.filter(scheduled_report=sched).first()
+        if (
+            existing_authorization
+            and existing_authorization.scope_tenant_ids
+            and existing_authorization.revoked_at is None
+            and not _stored_scope_tenants_are_live(existing_authorization)
+        ):
+            # Soft-deleting a tenant strips its through rows, so an approved
+            # broad scope silently collapses to the owner tenant. Fail closed
+            # instead of substituting owner data. A deliberate wind-back (the
+            # stored tenants are still live) runs single-tenant below.
+            logger.error(
+                "Scheduled report approved scope tenants were removed; refusing owner fallback",
+                extra={"operation": "reports.scope", "scheduled_report_id": sched.pk},
+            )
+            return TaskResult(TaskStatus.TERMINAL, "report.scope_missing", user_visible=True)
     scope_authorized_user_id = _resolve_scope_authorization(sched, active_tenant, filter_tenants)
     scope_requires_authorization = _scope_requires_authorization(active_tenant, filter_tenants)
     if scope_requires_authorization and scope_authorized_user_id is None:
