@@ -844,6 +844,67 @@ class ReportTemplate(ChangeLoggingMixin, SoftDeleteMixin, BaseModel):
     def get_absolute_url(self):
         return reverse("extras:reporttemplate_detail", kwargs={"pk": self.pk})
 
+    _DESIGNER_DISABLED_MESSAGE = _(
+        "The report designer is disabled. Set ITAMBOX_FEATURE_REPORT_DESIGNER=True before enabling "
+        "legacy CSV mode, saving custom HTML, or editing a grandfathered template."
+    )
+
+    @classmethod
+    def _designer_write_fields(cls):
+        """Return concrete, user-editable fields covered by the write policy."""
+        return tuple(field for field in cls._meta.concrete_fields if field.editable and not field.primary_key)
+
+    def _designer_persisted_state(self):
+        if self.pk is None:
+            return None
+        fields = self._designer_write_fields()
+        return (
+            type(self)
+            ._base_manager.filter(pk=self.pk)
+            .values(*(field.attname for field in fields), "legacy_designer_grandfathered")
+            .first()
+        )
+
+    def _designer_default_state(self):
+        state = {field.attname: field.get_default() for field in self._designer_write_fields()}
+        state["legacy_designer_grandfathered"] = False
+        return state
+
+    def _validate_designer_write(self, existing=None, *, update_fields=None, enforce_marker=True):
+        if enforce_marker:
+            if self.legacy_designer_grandfathered and not existing:
+                raise ValidationError(_("The legacy designer marker is migration-managed and cannot be forged."))
+            if existing and existing["legacy_designer_grandfathered"] != self.legacy_designer_grandfathered:
+                raise ValidationError(_("The legacy designer marker is migration-managed and cannot be changed."))
+
+        if report_designer_probe().active:
+            return
+
+        previous = existing or self._designer_default_state()
+        fields = self._designer_write_fields()
+        if update_fields is not None:
+            update_fields = set(update_fields)
+            fields = tuple(field for field in fields if field.name in update_fields or field.attname in update_fields)
+        candidate = {field.attname: getattr(self, field.attname) for field in fields}
+        changed = {field.attname for field in fields if candidate[field.attname] != previous[field.attname]}
+        if not changed:
+            return
+
+        if previous["legacy_designer_grandfathered"]:
+            raise ValidationError(self._DESIGNER_DISABLED_MESSAGE)
+
+        previous_content = previous["template_content"] or ""
+        candidate_content = getattr(self, "template_content", "") or ""
+        content_changed = (
+            "template_content" in changed
+            and candidate_content != previous_content
+            and bool(previous_content.strip() or candidate_content.strip())
+        )
+        saving_nonempty_custom_html = bool(candidate_content.strip())
+        advanced_enabled = "advanced_mode" in changed and bool(self.advanced_mode and not previous["advanced_mode"])
+        if saving_nonempty_custom_html or content_changed or advanced_enabled:
+            raise ValidationError(self._DESIGNER_DISABLED_MESSAGE)
+
     def clean(self):
         super().clean()
         unknown = unknown_column_keys(self.included_columns)
@@ -853,63 +914,11 @@ class ReportTemplate(ChangeLoggingMixin, SoftDeleteMixin, BaseModel):
             )
         if report_designer_probe().active:
             return
-        previous = None
-        if self.pk:
-            previous = (
-                type(self)
-                ._base_manager.filter(pk=self.pk)
-                .values("advanced_mode", "template_content", "legacy_designer_grandfathered")
-                .first()
-            )
-        previous = previous or {"advanced_mode": False, "template_content": "", "legacy_designer_grandfathered": False}
-        new_advanced = bool(self.advanced_mode and not previous["advanced_mode"])
-        new_content = bool((self.template_content or "").strip()) and not bool(
-            (previous["template_content"] or "").strip()
-        )
-        editing_grandfathered = previous["legacy_designer_grandfathered"] and (
-            self.advanced_mode != previous["advanced_mode"] or self.template_content != previous["template_content"]
-        )
-        if new_advanced or new_content or editing_grandfathered:
-            raise ValidationError(
-                _(
-                    "The report designer is disabled. Set ITAMBOX_FEATURE_REPORT_DESIGNER=True before enabling "
-                    "legacy CSV mode, saving custom HTML, or editing a grandfathered template."
-                )
-            )
+        self._validate_designer_write(self._designer_persisted_state(), enforce_marker=False)
 
     def save(self, *args, **kwargs):
-        existing = None
-        if self.pk:
-            existing = (
-                type(self)
-                ._base_manager.filter(pk=self.pk)
-                .values("advanced_mode", "template_content", "legacy_designer_grandfathered")
-                .first()
-            )
-        if self.legacy_designer_grandfathered and not existing:
-            raise ValidationError(_("The legacy designer marker is migration-managed and cannot be forged."))
-        if existing and existing["legacy_designer_grandfathered"] != self.legacy_designer_grandfathered:
-            raise ValidationError(_("The legacy designer marker is migration-managed and cannot be changed."))
-        if not report_designer_probe().active:
-            previous = existing or {
-                "advanced_mode": False,
-                "template_content": "",
-                "legacy_designer_grandfathered": False,
-            }
-            new_advanced = bool(self.advanced_mode and not previous["advanced_mode"])
-            new_content = bool((self.template_content or "").strip()) and not bool(
-                (previous["template_content"] or "").strip()
-            )
-            editing_grandfathered = previous["legacy_designer_grandfathered"] and (
-                self.advanced_mode != previous["advanced_mode"] or self.template_content != previous["template_content"]
-            )
-            if new_advanced or new_content or editing_grandfathered:
-                raise ValidationError(
-                    _(
-                        "The report designer is disabled. Set ITAMBOX_FEATURE_REPORT_DESIGNER=True before enabling "
-                        "legacy CSV mode, saving custom HTML, or editing a grandfathered template."
-                    )
-                )
+        existing = self._designer_persisted_state()
+        self._validate_designer_write(existing, update_fields=kwargs.get("update_fields"))
         return super().save(*args, **kwargs)
 
 

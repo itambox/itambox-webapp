@@ -7,6 +7,7 @@ import pytest
 from django.core.exceptions import ObjectDoesNotExist, PermissionDenied, ValidationError
 from django.test import RequestFactory, SimpleTestCase, override_settings
 
+from core.models import ChangeLoggingMixin
 from core.reports.columns import headers_for, label_for
 from core.reports.rendering import (
     _custom_context,
@@ -379,20 +380,41 @@ class ReportDesignerIssue181CoverageTests(SimpleTestCase):
         assert result.status.value == "terminal"
         assert result.code == "report.scope_unauthorized"
 
+    @staticmethod
+    def _persisted_template_state(**overrides):
+        state = {
+            "name": "template",
+            "description": "",
+            "tenant_id": None,
+            "report_type": ReportTemplate.REPORT_TYPE_ASSET_SUMMARY,
+            "included_columns": [],
+            "include_summary_cards": True,
+            "include_distribution_chart": False,
+            "group_by_field": "",
+            "style_preset": "default",
+            "advanced_mode": False,
+            "template_content": "",
+            "legacy_designer_grandfathered": False,
+        }
+        state.update(overrides)
+        return state
+
     def test_report_template_clean_and_save_enforce_disabled_designer_without_database(self):
         active_template = ReportTemplate(name="active", included_columns=[])
         with patch("extras.models.report_designer_probe", return_value=SimpleNamespace(active=True)):
             assert active_template.clean() is None
 
         existing_query = Mock()
-        existing_query.values.return_value.first.return_value = {
-            "advanced_mode": True,
-            "template_content": "<p>old</p>",
-            "legacy_designer_grandfathered": True,
-        }
+        existing_query.values.return_value.first.return_value = self._persisted_template_state(
+            name="unchanged",
+            advanced_mode=True,
+            template_content="<p>old</p>",
+            legacy_designer_grandfathered=True,
+        )
         unchanged = ReportTemplate(
             pk=5,
             name="unchanged",
+            report_type=ReportTemplate.REPORT_TYPE_ASSET_SUMMARY,
             included_columns=[],
             advanced_mode=True,
             template_content="<p>old</p>",
@@ -426,6 +448,100 @@ class ReportDesignerIssue181CoverageTests(SimpleTestCase):
         with patch.object(ReportTemplate._base_manager, "filter", return_value=marker_query):
             with pytest.raises(ValidationError, match="cannot be changed"):
                 changed_marker.save()
+
+    def test_flag_off_rejects_changes_to_existing_non_grandfathered_html_on_clean_and_save(self):
+        existing_query = Mock()
+        existing_query.values.return_value.first.return_value = self._persisted_template_state(
+            name="custom html",
+            template_content="<p>old</p>",
+        )
+        template = ReportTemplate(
+            pk=5,
+            name="custom html",
+            report_type=ReportTemplate.REPORT_TYPE_ASSET_SUMMARY,
+            included_columns=[],
+            template_content="<p>new</p>",
+        )
+        with (
+            patch.object(ReportTemplate._base_manager, "filter", return_value=existing_query),
+            patch("extras.models.report_designer_probe", return_value=SimpleNamespace(active=False)),
+        ):
+            with pytest.raises(ValidationError, match="saving custom HTML"):
+                template.clean()
+            with patch.object(ChangeLoggingMixin, "save") as parent_save:
+                with pytest.raises(ValidationError, match="saving custom HTML"):
+                    template.save()
+            parent_save.assert_not_called()
+
+    def test_flag_off_rejects_metadata_only_edits_to_grandfathered_template(self):
+        existing_query = Mock()
+        existing_query.values.return_value.first.return_value = self._persisted_template_state(
+            name="grandfathered",
+            description="original",
+            template_content="<p>legacy</p>",
+            legacy_designer_grandfathered=True,
+        )
+        template = ReportTemplate(
+            pk=5,
+            name="grandfathered",
+            description="edited",
+            report_type=ReportTemplate.REPORT_TYPE_ASSET_SUMMARY,
+            included_columns=[],
+            template_content="<p>legacy</p>",
+            legacy_designer_grandfathered=True,
+        )
+        with (
+            patch.object(ReportTemplate._base_manager, "filter", return_value=existing_query),
+            patch("extras.models.report_designer_probe", return_value=SimpleNamespace(active=False)),
+            patch.object(ChangeLoggingMixin, "save") as parent_save,
+        ):
+            with pytest.raises(ValidationError, match="editing a grandfathered"):
+                template.save()
+        parent_save.assert_not_called()
+
+    def test_flag_off_allows_noop_save_of_grandfathered_template(self):
+        existing_query = Mock()
+        existing_query.values.return_value.first.return_value = self._persisted_template_state(
+            name="grandfathered",
+            template_content="<p>legacy</p>",
+            legacy_designer_grandfathered=True,
+        )
+        template = ReportTemplate(
+            pk=5,
+            name="grandfathered",
+            report_type=ReportTemplate.REPORT_TYPE_ASSET_SUMMARY,
+            included_columns=[],
+            template_content="<p>legacy</p>",
+            legacy_designer_grandfathered=True,
+        )
+        with (
+            patch.object(ReportTemplate._base_manager, "filter", return_value=existing_query),
+            patch("extras.models.report_designer_probe", return_value=SimpleNamespace(active=False)),
+            patch.object(ChangeLoggingMixin, "save") as parent_save,
+        ):
+            template.save()
+        parent_save.assert_called_once()
+
+    def test_flag_on_allows_editing_existing_non_grandfathered_html(self):
+        existing_query = Mock()
+        existing_query.values.return_value.first.return_value = self._persisted_template_state(
+            name="custom html",
+            template_content="<p>old</p>",
+        )
+        template = ReportTemplate(
+            pk=5,
+            name="custom html",
+            report_type=ReportTemplate.REPORT_TYPE_ASSET_SUMMARY,
+            included_columns=[],
+            template_content="<p>new</p>",
+        )
+        with (
+            patch.object(ReportTemplate._base_manager, "filter", return_value=existing_query),
+            patch("extras.models.report_designer_probe", return_value=SimpleNamespace(active=True)),
+            patch.object(ChangeLoggingMixin, "save") as parent_save,
+        ):
+            template.save()
+        parent_save.assert_called_once()
 
     def test_scheduled_report_scope_helpers_and_approval_are_database_independent(self):
         tenant_a = SimpleNamespace(pk=1)
