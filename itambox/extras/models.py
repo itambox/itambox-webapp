@@ -1031,12 +1031,25 @@ class ScheduledReport(ChangeLoggingMixin, BaseModel):
         return f"{self.name} -> {self.report.name}"
 
     def effective_scope_tenant_ids(self):
-        """Return the persisted tenant ids this schedule will compile."""
-        filter_tenants = list(self.filter_tenants.all())
-        if not filter_tenants and self.report_id:
-            filter_tenants = list(self.report.filter_tenants.all())
-        if filter_tenants:
-            return sorted({tenant.pk for tenant in filter_tenants})
+        """Return the persisted tenant ids this schedule will compile.
+
+        Reads the through table directly: tenant scoping filters Tenant M2M
+        reads while an ambient tenant is bound, which would silently truncate
+        the persisted scope.
+        """
+        through = self.filter_tenants.through
+        filter_ids = set(
+            through._base_manager.filter(scheduledreport_id=self.pk).values_list("tenant_id", flat=True)
+        )
+        if not filter_ids and self.report_id:
+            report_through = self.report.filter_tenants.through
+            filter_ids = set(
+                report_through._base_manager.filter(reporttemplate_id=self.report_id).values_list(
+                    "tenant_id", flat=True
+                )
+            )
+        if filter_ids:
+            return sorted(filter_ids)
         active_tenant = self.tenant or (self.report.tenant if self.report_id else None)
         return [active_tenant.pk] if active_tenant else []
 
@@ -1107,11 +1120,14 @@ class ScheduledReportScopeAuthorization(models.Model):
     @classmethod
     def approve(cls, scheduled_report, actor):
         """Persist an exact scope approval for a principal with cross-tenant permission."""
-        if not getattr(actor, "is_active", False) or not actor.has_perm("reports.view_cross_tenant_reports"):
-            raise PermissionDenied("Cross-tenant report scope approval requires the cross-tenant report permission.")
+        # Compute the scope before the permission check: the permission backends
+        # bind the ambient tenant, and tenant scoping filters Tenant M2M reads,
+        # so the persisted scope would otherwise be silently truncated.
         if not scheduled_report.scope_requires_authorization():
             raise ValidationError("A single-tenant schedule does not need cross-tenant scope approval.")
         scope_tenant_ids = scheduled_report.effective_scope_tenant_ids()
+        if not getattr(actor, "is_active", False) or not actor.has_perm("reports.view_cross_tenant_reports"):
+            raise PermissionDenied("Cross-tenant report scope approval requires the cross-tenant report permission.")
         authorization, _created = cls.objects.update_or_create(
             scheduled_report=scheduled_report,
             defaults={"authorized_by": actor, "scope_tenant_ids": scope_tenant_ids},
