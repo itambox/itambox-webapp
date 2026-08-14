@@ -235,19 +235,18 @@ def _resolve_report_scope(sched):
     # checks) would otherwise silently truncate the M2M read. The explicit
     # filter list stays empty when no filter tenants are configured; the owner
     # tenant travels separately as active_tenant.
+    tenant_model = None
     if hasattr(sched, "explicit_scope_tenant_ids"):
         scope_ids = sched.explicit_scope_tenant_ids()
+        tenant_model = sched.filter_tenants.model
     else:
         filter_relation = list(sched.filter_tenants.all())
         if not filter_relation and sched.report:
             filter_relation = list(sched.report.filter_tenants.all())
         scope_ids = sorted({tenant.pk for tenant in filter_relation})
     filter_tenants = []
-    if scope_ids:
-        # inline import: heavy-import: organization models are only needed for tenant resolution
-        from organization.models import Tenant
-
-        filter_tenants = list(Tenant._base_manager.filter(pk__in=scope_ids).order_by("pk"))
+    if scope_ids and tenant_model is not None:
+        filter_tenants = list(tenant_model._base_manager.filter(pk__in=scope_ids).order_by("pk"))
     if active_tenant is None and not filter_tenants:
         logger.error(
             "Scheduled report has no tenant scope; refusing cross-tenant compilation",
