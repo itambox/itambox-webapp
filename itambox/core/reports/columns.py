@@ -6,7 +6,7 @@ honoured; providers only own stable column keys and their defaults.
 
 from django.utils.translation import gettext_lazy as _
 
-from core.report_keys import REPORT_COLUMN_KEYS, unknown_column_keys
+from core.report_keys import REPORT_COLUMN_KEYS
 
 _COLUMN_LABELS = {
     "asset_tag": _("Asset Tag"),
