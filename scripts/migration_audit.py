@@ -24,6 +24,7 @@ POST_TRANSITION_MIGRATIONS = {
     "extras.0101_issue88_drop_legacy_webhook_name_like",
     "extras.0102_alter_event_action",
     "extras.0103_remove_reporttemplate_advanced_mode_and_more",
+    "extras.0104_issue183_alert_tenant_reconciliation",
     "inventory.0101_alter_accessoryassignment_options_and_more",
     "organization.0101_membership_external_id_and_more",
     "organization.0102_alter_tenantresourcegrant_options",
@@ -169,6 +170,11 @@ SEMANTIC_DISPOSITIONS = {
             "users.0007_usergroup",
             "users.0013_remove_usergroup_users_usergroup_unique_tenant_name_active_and_more",
         },
+    ),
+    **_dispositions(
+        "upgrade-only",
+        "Backfills tenant attribution for legacy tenant-less alerts while marking ambiguous or unresolved targets for operator review.",
+        {"extras.0104_issue183_alert_tenant_reconciliation"},
     ),
 }
 

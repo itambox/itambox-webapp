@@ -111,6 +111,7 @@ def _schedule_alert_dispatch(rule, match, alert_log):
                 rule_for_dispatch = AlertRule._base_manager.get(pk=rule_id)
                 persisted_alert = AlertLog.unscoped.get(pk=alert_id)
                 delivery = _dispatch_channels(rule_for_dispatch, alert_match, persisted_alert)
+        # broad except: boundary-isolation: delivery backend failures are non-enumerable and become terminal
         except Exception:
             logger.exception("Alert delivery failed for AlertLog %s.", alert_id)
             delivery = {"__dispatch__": DeliveryDisposition.TERMINAL.value}
@@ -119,6 +120,7 @@ def _schedule_alert_dispatch(rule, match, alert_log):
                 delivery_status=delivery,
                 last_notified_at=notified_at,
             )
+        # broad except: task-isolation: metadata write failure must not abort later callbacks
         except Exception:
             # A metadata-write failure must not escape the on_commit callback:
             # Django stops executing later callbacks when one raises.

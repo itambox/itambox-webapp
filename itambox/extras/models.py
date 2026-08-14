@@ -1257,6 +1257,7 @@ class AlertLog(ChangeLoggingMixin, BaseModel):
             if obj is None or not self._content_object_matches_tenant(obj):
                 return None
             return obj
+        # broad except: render-degrade: an unresolved alert target must not fail serialization
         except Exception:
             return None
 
