@@ -1158,7 +1158,7 @@ class AlertRule(ChangeLoggingMixin, SoftDeleteMixin, BaseModel):
         return reverse("extras:alertrule_detail", kwargs={"pk": self.pk})
 
 
-class AlertLog(BaseModel):
+class AlertLog(ChangeLoggingMixin, BaseModel):
     objects = TenantScopingManager()
     # Deliberately cross-tenant / unscoped manager for context-independent
     # dedup/auto-resolve in the alert engine ONLY: the tenant-scoping default
@@ -1235,21 +1235,64 @@ class AlertLog(BaseModel):
         verbose_name=_("Tenant"),
         help_text=_("The tenant owning this log. Null represents system-wide logs."),
     )
+    tenant_resolution_status = models.CharField(
+        max_length=20,
+        choices=[
+            ("not_required", _("Not required")),
+            ("resolved", _("Resolved from target")),
+            ("global", _("Global target")),
+            ("unresolved", _("Unresolved — operator review required")),
+        ],
+        default="not_required",
+        db_index=True,
+        verbose_name=_("Tenant Resolution"),
+        help_text=_("Reconciliation state for legacy tenant-less alerts."),
+    )
 
     @property
     def content_object_safe(self):
+        # Resolve through an unscoped fallback, then enforce the alert tenant.
         try:
-            obj = self.content_object
-            if obj is not None:
-                return obj
-            if self.content_type and self.object_id:
-                model_class = self.content_type.model_class()
-                if hasattr(model_class, "all_objects"):
-                    return model_class.all_objects.filter(pk=self.object_id).first()
-                return model_class.objects.filter(pk=self.object_id).first()
+            obj = self._resolve_content_object()
+            if obj is None or not self._content_object_matches_tenant(obj):
+                return None
+            return obj
+        # broad except: render-degrade: an unresolved alert target must not fail serialization
         except Exception:
-            pass
-        return None
+            return None
+
+    def _resolve_content_object(self):
+        obj = self.content_object
+        if obj is not None or not self.content_type or not self.object_id:
+            return obj
+        model_class = self.content_type.model_class()
+        manager = getattr(model_class, "all_objects", None) or model_class._base_manager
+        return manager.filter(pk=self.object_id).first()
+
+    def _content_object_matches_tenant(self, obj):
+        model_class = self.content_type.model_class() if self.content_type else None
+        allows_global = bool(
+            getattr(model_class, "allow_global_tenant", False) or getattr(model_class, "changelog_global", False)
+        )
+        has_tenant, object_tenant_id = self._content_object_tenant_id(obj)
+        if not has_tenant:
+            # Tenant ownership that cannot be derived from the target itself
+            # must never be guessed from the active request context.
+            return allows_global
+        if object_tenant_id is None and not allows_global:
+            return False
+        if self.tenant_id is None:
+            return object_tenant_id is None
+        return object_tenant_id is None or object_tenant_id == self.tenant_id
+
+    @staticmethod
+    def _content_object_tenant_id(obj):
+        if hasattr(obj, "tenant_id"):
+            return True, obj.tenant_id
+        if hasattr(obj, "tenant"):
+            object_tenant = getattr(obj, "tenant", None)
+            return True, getattr(object_tenant, "pk", None)
+        return False, None
 
     class Meta:
         ordering = ["-created_at"]

@@ -1,6 +1,7 @@
 from django_filters.rest_framework import DjangoFilterBackend
 
 from extras.filters import (
+    AlertLogFilterSet,
     AlertRuleFilterSet,
     CustomFieldFilterSet,
     CustomFieldsetFilterSet,
@@ -11,6 +12,7 @@ from extras.filters import (
     WebhookEndpointFilterSet,
 )
 from extras.models import (
+    AlertLog,
     AlertRule,
     CustomField,
     CustomFieldset,
@@ -21,9 +23,11 @@ from extras.models import (
     Tag,
     WebhookEndpoint,
 )
-from itambox.api.viewsets import ITAMBoxModelViewSet
+from itambox.api.permissions import StrictTenantPermission, TokenPermissions
+from itambox.api.viewsets import ITAMBoxModelViewSet, ITAMBoxReadOnlyModelViewSet
 
 from .serializers import (
+    AlertLogSerializer,
     AlertRuleSerializer,
     CustomFieldSerializer,
     CustomFieldsetSerializer,
@@ -83,6 +87,19 @@ class NotificationChannelViewSet(ITAMBoxModelViewSet):
     serializer_class = NotificationChannelSerializer
     filter_backends = (DjangoFilterBackend,)
     filterset_class = NotificationChannelFilterSet
+
+
+class AlertLogViewSet(ITAMBoxReadOnlyModelViewSet):
+    http_method_names = ["get", "head", "options"]
+    permission_classes = [TokenPermissions, StrictTenantPermission]
+    queryset = (
+        AlertLog.objects.filter(tenant__isnull=False)
+        .select_related("rule", "content_type", "acknowledged_by", "resolved_by", "tenant")
+        .all()
+    )
+    serializer_class = AlertLogSerializer
+    filter_backends = (DjangoFilterBackend,)
+    filterset_class = AlertLogFilterSet
 
 
 class AlertRuleViewSet(ITAMBoxModelViewSet):

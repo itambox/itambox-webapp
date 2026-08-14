@@ -148,6 +148,7 @@ PYTHONPATH=itambox uv run --locked --group dev python -m pytest -q -p no:cachepr
   itambox/itambox/tests/test_generic_view_components.py \
   itambox/assets/tests/test_tables_category.py \
   itambox/assets/tests/test_requests.py \
+  itambox/core/tests/test_alert_views.py \
   itambox/core/tests/test_import_boundaries.py \
   itambox/core/tests/test_csp_nonce_context.py \
   itambox/core/tests/test_csv_import_error_contracts.py \
@@ -252,6 +253,9 @@ PYTHONPATH=itambox uv run --locked --group dev python -m pytest -q -p no:cachepr
   itambox/core/tests/test_authorization_cache_sync.py \
   itambox/core/tests/test_issue100_import_cycles.py \
   itambox/core/tests/test_issue100_tenancy_boundaries.py \
+  itambox/core/tests/test_issue183_alert_api.py \
+  itambox/core/tests/test_issue183_alert_migration.py \
+  itambox/core/tests/test_issue183_alerts.py \
   itambox/core/tests/test_issue29_tenant_scope.py \
   itambox/organization/tests/test_authorization_cache.py \
   itambox/core/tests/test_tasks.py \

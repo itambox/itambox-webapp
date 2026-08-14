@@ -11084,6 +11084,50 @@
     },
     {
       "dependencies": [
+        "contenttypes.0002_remove_content_type_name",
+        "extras.0103_remove_reporttemplate_advanced_mode_and_more",
+        "users.0100_issue88_shard_62_users_relations"
+      ],
+      "id": "extras.0104_issue183_alert_tenant_reconciliation",
+      "is_replacement": false,
+      "operations": {
+        "BtreeGistExtension": {
+          "count": 0
+        },
+        "RunPython": {
+          "with_noop_reverse": 0,
+          "with_reverse": 1,
+          "without_reverse": 0
+        },
+        "RunSQL": {
+          "with_noop_reverse": 0,
+          "with_reverse": 0,
+          "without_reverse": 0
+        },
+        "SeparateDatabaseAndState": {
+          "count": 0
+        }
+      },
+      "path": "itambox/extras/migrations/0104_issue183_alert_tenant_reconciliation.py",
+      "replaces": [],
+      "reviewed_disposition": {
+        "disposition": "upgrade-only",
+        "rationale": "Backfills tenant attribution for legacy tenant-less alerts while marking ambiguous or unresolved targets for operator review."
+      },
+      "run_before": [],
+      "special_users_bootstrap": false,
+      "swappable_user_dependency": false,
+      "syntactic_facts": {
+        "has_custom_operations": {
+          "BtreeGistExtension": false,
+          "RunPython": true,
+          "RunSQL": false,
+          "SeparateDatabaseAndState": false
+        }
+      }
+    },
+    {
+      "dependencies": [
         "assets.0018_alter_assetaudit_unique_together_and_more",
         "extras.0004_alter_configcontext_options_alter_dashboard_options_and_more",
         "licenses.0002_license_supplier",
@@ -17476,6 +17520,7 @@
     "extras.0101_issue88_drop_legacy_webhook_name_like",
     "extras.0102_alter_event_action",
     "extras.0103_remove_reporttemplate_advanced_mode_and_more",
+    "extras.0104_issue183_alert_tenant_reconciliation",
     "inventory.0101_alter_accessoryassignment_options_and_more",
     "organization.0101_membership_external_id_and_more",
     "organization.0102_alter_tenantresourcegrant_options",
@@ -17553,6 +17598,7 @@
       "extras.0033_alertlog_uniq_open_alert_per_object",
       "extras.0034_journalentry_tenant",
       "extras.0101_issue88_drop_legacy_webhook_name_like",
+      "extras.0104_issue183_alert_tenant_reconciliation",
       "inventory.0013_backfill_stock_tenant_and_provenance",
       "licenses.0008_remove_licenseseatassignment_chk_assignment_to_one_target_and_more",
       "organization.0014_null_to_empty_strings",
@@ -17748,7 +17794,7 @@
         ]
       }
     },
-    "post_transition_migrations": 14,
+    "post_transition_migrations": 15,
     "replacement_shards": 62,
     "replacement_targets": 262
   }
