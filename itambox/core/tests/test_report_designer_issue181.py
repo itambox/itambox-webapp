@@ -643,7 +643,7 @@ class ReportDesignerIssue181CoverageTests(SimpleTestCase):
         with patch("django.apps.apps.get_model", return_value=tenant_model) as get_model:
             assert _resolve_report_scope(schedule) == (tenant_a, [tenant_b])
         get_model.assert_called_once_with("organization", "Tenant")
-        tenant_model._base_manager.filter.assert_called_once_with(pk__in=[2])
+        tenant_model._base_manager.filter.assert_called_once_with(pk__in=[2], deleted_at__isnull=True)
 
         owner_only = SimpleNamespace(
             pk=18,
