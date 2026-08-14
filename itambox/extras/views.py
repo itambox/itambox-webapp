@@ -5,11 +5,13 @@ from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.contrib.auth.mixins import LoginRequiredMixin, PermissionRequiredMixin
 from django.contrib.contenttypes.models import ContentType
+from django.core.exceptions import ValidationError
 from django.db import transaction
 from django.db.models import Count
 from django.http import Http404, HttpResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse, reverse_lazy
+from django.utils.html import escape
 from django.utils.http import urlencode
 from django.utils.translation import gettext
 from django.utils.translation import gettext_lazy as _
@@ -1087,6 +1089,11 @@ class ReportTemplatePreviewView(CapabilityRequiredMixin, PermissionRequiredMixin
             return HttpResponse(rendered_html)
         except PermissionError:
             return HttpResponse(gettext("You may not view this report's data."), status=403)
+        except ValidationError as exc:
+            details = escape("; ".join(str(message) for message in exc.messages))
+            return HttpResponse(
+                f"<h3>{gettext('Invalid report template configuration.')}</h3><p>{details}</p>", status=400
+            )
         except Exception:
             # Full detail (with traceback) goes to the server log; the client gets a
             # generic message so exception text is never reflected in the response.

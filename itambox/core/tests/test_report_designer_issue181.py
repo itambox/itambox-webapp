@@ -664,7 +664,9 @@ class ReportDesignerIssue181CoverageTests(SimpleTestCase):
             response = ReportTemplatePreviewView().post(request)
 
         assert response.status_code == 400
-        assert b"Template render failed. See the server log for details." in response.content
+        assert b"Invalid report template configuration." in response.content
+        assert b"Unknown report column key" in response.content
+        assert b"not_published" in response.content
         build_context.assert_not_called()
 
     def test_report_template_detail_and_download_cover_csv_html_and_pdf(self):
