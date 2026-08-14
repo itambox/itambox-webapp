@@ -180,6 +180,8 @@ PYTHONPATH=itambox uv run --locked --group dev python -m pytest -q -p no:cachepr
   itambox/core/tests/test_report_characterization.py \
   itambox/core/tests/test_report_chart_html.py \
   itambox/core/tests/test_report_custom_html_removal.py \
+  itambox/core/tests/test_report_designer_issue181.py \
+  itambox/core/tests/test_report_designer_migration.py \
   itambox/core/tests/test_report_asset_disposal_eol.py \
   itambox/core/tests/test_report_contract_renewals.py \
   itambox/core/tests/test_report_custody_compliance.py \
