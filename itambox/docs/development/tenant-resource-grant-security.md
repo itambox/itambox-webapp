@@ -200,6 +200,7 @@ PYTHONPATH=itambox uv run --locked --group dev python -m pytest -q -p no:cachepr
   itambox/extras/tests/test_dashboard_all_accessible.py \
   itambox/extras/tests/test_dashboard_widgets.py \
   itambox/extras/tests/test_existing.py \
+  itambox/extras/tests/test_scheduledreport_scope_approval.py \
   itambox/inventory/tests/test_accessories.py \
   itambox/inventory/tests/test_api_over_allocation.py \
   itambox/inventory/tests/test_assignment_system_authorization_provenance.py \

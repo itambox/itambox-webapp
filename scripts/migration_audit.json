@@ -11215,6 +11215,46 @@
     },
     {
       "dependencies": [
+        "extras.0106_scheduledreportscopeauthorization",
+        "users.0100_issue88_shard_62_users_relations"
+      ],
+      "id": "extras.0107_scheduledreportscopeauthorization_revocation",
+      "is_replacement": false,
+      "operations": {
+        "BtreeGistExtension": {
+          "count": 0
+        },
+        "RunPython": {
+          "with_noop_reverse": 0,
+          "with_reverse": 0,
+          "without_reverse": 0
+        },
+        "RunSQL": {
+          "with_noop_reverse": 0,
+          "with_reverse": 0,
+          "without_reverse": 0
+        },
+        "SeparateDatabaseAndState": {
+          "count": 0
+        }
+      },
+      "path": "itambox/extras/migrations/0107_scheduledreportscopeauthorization_revocation.py",
+      "replaces": [],
+      "reviewed_disposition": null,
+      "run_before": [],
+      "special_users_bootstrap": false,
+      "swappable_user_dependency": true,
+      "syntactic_facts": {
+        "has_custom_operations": {
+          "BtreeGistExtension": false,
+          "RunPython": false,
+          "RunSQL": false,
+          "SeparateDatabaseAndState": false
+        }
+      }
+    },
+    {
+      "dependencies": [
         "assets.0018_alter_assetaudit_unique_together_and_more",
         "extras.0004_alter_configcontext_options_alter_dashboard_options_and_more",
         "licenses.0002_license_supplier",
@@ -17610,6 +17650,7 @@
     "extras.0104_issue183_alert_tenant_reconciliation",
     "extras.0105_reporttemplate_advanced_mode_and_more",
     "extras.0106_scheduledreportscopeauthorization",
+    "extras.0107_scheduledreportscopeauthorization_revocation",
     "inventory.0101_alter_accessoryassignment_options_and_more",
     "organization.0101_membership_external_id_and_more",
     "organization.0102_alter_tenantresourcegrant_options",
@@ -17744,6 +17785,7 @@
       "extras.0033_alertlog_uniq_open_alert_per_object",
       "extras.0035_alter_alertlog_acknowledged_by_and_more",
       "extras.0106_scheduledreportscopeauthorization",
+      "extras.0107_scheduledreportscopeauthorization_revocation",
       "organization.0001_initial",
       "organization.0002_tenantinvitation_tenantmembership",
       "organization.0009_alter_tenantmembership_unique_together_and_more",
@@ -17886,7 +17928,7 @@
         ]
       }
     },
-    "post_transition_migrations": 17,
+    "post_transition_migrations": 18,
     "replacement_shards": 62,
     "replacement_targets": 262
   }

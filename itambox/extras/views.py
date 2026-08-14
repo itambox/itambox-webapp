@@ -1,11 +1,12 @@
 import datetime
 import json
 
+from django.apps import apps
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.contrib.auth.mixins import LoginRequiredMixin, PermissionRequiredMixin
 from django.contrib.contenttypes.models import ContentType
-from django.core.exceptions import ValidationError
+from django.core.exceptions import ObjectDoesNotExist, PermissionDenied, ValidationError
 from django.db import transaction
 from django.db.models import Count
 from django.http import Http404, HttpResponse
@@ -359,7 +360,14 @@ from .forms import (
     ScheduledReportFilterForm,
     ScheduledReportForm,
 )
-from .models import AlertLog, AlertRule, NotificationChannel, ReportTemplate, ScheduledReport
+from .models import (
+    AlertLog,
+    AlertRule,
+    NotificationChannel,
+    ReportTemplate,
+    ScheduledReport,
+    ScheduledReportScopeAuthorization,
+)
 from .tables import (
     AlertLogTable,
     AlertRuleTable,
@@ -830,7 +838,9 @@ class ReportTemplateBulkDeleteView(CapabilityRequiredMixin, ObjectBulkDeleteView
 @method_decorator(login_required, name="dispatch")
 class ScheduledReportListView(CapabilityRequiredMixin, ObjectListView):
     capability_key = REPORT_DESIGNER_CAPABILITY
-    queryset = ScheduledReport.objects.select_related("report")
+    queryset = ScheduledReport.objects.select_related("report").prefetch_related(
+        "scope_authorization__authorized_by", "scope_authorization__revoked_by"
+    )
     filterset = ScheduledReportFilterSet
     filterset_form = ScheduledReportFilterForm
     table = ScheduledReportTable
@@ -953,6 +963,117 @@ class ScheduledReportDeleteView(CapabilityRequiredMixin, ObjectDeleteView):
 class ScheduledReportBulkDeleteView(CapabilityRequiredMixin, ObjectBulkDeleteView):
     capability_key = REPORT_DESIGNER_CAPABILITY
     queryset = ScheduledReport.objects.all()
+
+
+@method_decorator(login_required, name="dispatch")
+class ScheduledReportScopeApprovalView(CapabilityRequiredMixin, PermissionRequiredMixin, LoginRequiredMixin, View):
+    """Approve or revoke the durable cross-tenant scope approval of a schedule.
+
+    Approval requires the same cross-tenant report permission the model gate
+    enforces, and is refused when the acting principal's reach does not cover
+    every tenant in scope — an ineffective approval would only delay the
+    fail-closed ``report.scope_unauthorized`` terminal state to delivery time.
+    """
+
+    capability_key = REPORT_DESIGNER_CAPABILITY
+    permission_required = ("reports.view_cross_tenant_reports",)
+    template_name = "core/reports/report_schedule_scope_approval.html"
+
+    def get_queryset(self):
+        return ScheduledReport.objects.select_related("report").prefetch_related(
+            "filter_tenants",
+            "scope_authorization__authorized_by",
+            "scope_authorization__revoked_by",
+        )
+
+    def get_object(self):
+        return get_object_or_404(self.get_queryset(), pk=self.kwargs.get("pk"))
+
+    def _stored_authorization(self, sched):
+        try:
+            return sched.scope_authorization
+        except ObjectDoesNotExist:
+            return None
+
+    def _scope_tenants(self, sched):
+        Tenant = apps.get_model("organization", "Tenant")
+        scope_tenant_ids = sched.effective_scope_tenant_ids()
+        if not scope_tenant_ids:
+            return []
+        return list(Tenant._base_manager.filter(pk__in=scope_tenant_ids))
+
+    def _approval_would_be_effective(self, sched, scope_tenants):
+        # An approval only takes effect when the acting principal holds the
+        # cross-tenant permission on EVERY tenant in scope; delivery re-checks
+        # this per tenant, so refuse to store an approval that cannot work.
+        return all(
+            self.request.user.has_perm("reports.view_cross_tenant_reports", obj=tenant) for tenant in scope_tenants
+        )
+
+    def get_context_data(self, **kwargs):
+        sched = self.object = self.get_object()
+        authorization = self._stored_authorization(sched)
+        scope_tenants = self._scope_tenants(sched)
+        scope_tenant_ids = sorted({tenant.pk for tenant in scope_tenants})
+        authorization_is_current = bool(
+            authorization
+            and not authorization.is_revoked()
+            and sorted(authorization.scope_tenant_ids) == scope_tenant_ids
+        )
+        return {
+            "object": sched,
+            "title": _("Scope Approval: %(name)s") % {"name": sched.name},
+            "requires_authorization": sched.scope_requires_authorization(),
+            "scope_tenants": scope_tenants,
+            "authorization": authorization,
+            "authorization_is_current": authorization_is_current,
+            "approval_would_be_effective": self._approval_would_be_effective(sched, scope_tenants),
+            "return_url": safe_return_url(
+                self.request, self.request.GET.get("return_url"), reverse("extras:scheduledreport_list")
+            ),
+        }
+
+    def get(self, request, *args, **kwargs):
+        return render(request, self.template_name, self.get_context_data())
+
+    def post(self, request, *args, **kwargs):
+        sched = self.object = self.get_object()
+        action = request.POST.get("action")
+        return_url = safe_return_url(request, request.POST.get("return_url"), reverse("extras:scheduledreport_list"))
+        try:
+            if action == "approve":
+                scope_tenants = self._scope_tenants(sched)
+                if not scope_tenants:
+                    raise ValidationError(
+                        _("This schedule has no resolvable scope tenants, so a cross-tenant approval cannot be stored.")
+                    )
+                if not self._approval_would_be_effective(sched, scope_tenants):
+                    missing = [
+                        tenant.name
+                        for tenant in scope_tenants
+                        if not request.user.has_perm("reports.view_cross_tenant_reports", obj=tenant)
+                    ]
+                    raise ValidationError(
+                        _("Your cross-tenant reach does not cover: %(tenants)s. The approval would not take effect.")
+                        % {"tenants": ", ".join(missing)}
+                    )
+                ScheduledReportScopeAuthorization.approve(sched, request.user)
+                messages.success(request, _("Cross-tenant scope of '%(name)s' approved.") % {"name": sched.name})
+            elif action == "revoke":
+                ScheduledReportScopeAuthorization.revoke(sched, request.user)
+                messages.success(
+                    request, _("Cross-tenant scope approval of '%(name)s' revoked.") % {"name": sched.name}
+                )
+            else:
+                messages.error(request, _("Unknown scope approval action."))
+            return redirect(return_url)
+        except PermissionDenied as error:
+            messages.error(request, str(error))
+            return redirect(return_url)
+        except ValidationError as error:
+            for message in getattr(error, "messages", [str(error)]):
+                messages.error(request, message)
+            return redirect(request.path)
 
 
 @method_decorator(login_required, name="dispatch")

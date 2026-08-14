@@ -121,6 +121,11 @@ urlpatterns = [
         name="scheduledreport_trigger",
     ),
     path(
+        "reports/schedules/<int:pk>/scope-approval/",
+        views.ScheduledReportScopeApprovalView.as_view(),
+        name="scheduledreport_scope_approval",
+    ),
+    path(
         "reports/schedules/bulk-delete/",
         views.ScheduledReportBulkDeleteView.as_view(),
         name="scheduledreport_bulk_delete",

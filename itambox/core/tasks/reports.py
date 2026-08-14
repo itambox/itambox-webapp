@@ -335,7 +335,7 @@ def _resolve_scope_authorization(sched, active_tenant, filter_tenants):
     if not _scope_requires_authorization(active_tenant, filter_tenants):
         return None
     authorization = _load_scope_authorization(sched)
-    if authorization is None:
+    if authorization is None or getattr(authorization, "revoked_at", None) is not None:
         return None
     scope_tenant_ids = sorted({tenant.pk for tenant in filter_tenants})
     authorized_scope = _parse_authorized_scope(authorization)

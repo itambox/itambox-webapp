@@ -4,6 +4,7 @@ from django.contrib.contenttypes.models import ContentType
 from django.core.exceptions import PermissionDenied, ValidationError
 from django.db import models
 from django.urls import reverse
+from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
 
 from core.csv_utils import csv_safe, safe_csv_filename
@@ -1136,7 +1137,17 @@ class ScheduledReportScopeAuthorization(models.Model):
         verbose_name=_("Authorized By"),
     )
     scope_tenant_ids = models.JSONField(default=list, editable=False, verbose_name=_("Authorized Tenant Scope"))
-    approved_at = models.DateTimeField(auto_now=True, verbose_name=_("Approved At"))
+    approved_at = models.DateTimeField(default=timezone.now, editable=False, verbose_name=_("Approved At"))
+    revoked_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.PROTECT,
+        related_name="revoked_scheduled_report_scope_authorizations",
+        null=True,
+        blank=True,
+        editable=False,
+        verbose_name=_("Revoked By"),
+    )
+    revoked_at = models.DateTimeField(null=True, blank=True, editable=False, verbose_name=_("Revoked At"))
 
     @classmethod
     def approve(cls, scheduled_report, actor):
@@ -1150,9 +1161,41 @@ class ScheduledReportScopeAuthorization(models.Model):
         scope_tenant_ids = scheduled_report.effective_scope_tenant_ids()
         authorization, _created = cls.objects.update_or_create(
             scheduled_report=scheduled_report,
-            defaults={"authorized_by": actor, "scope_tenant_ids": scope_tenant_ids},
+            defaults={
+                "authorized_by": actor,
+                "scope_tenant_ids": scope_tenant_ids,
+                "approved_at": timezone.now(),
+                "revoked_by": None,
+                "revoked_at": None,
+            },
         )
         return authorization
+
+    @classmethod
+    def revoke(cls, scheduled_report, actor):
+        """Persist the revocation of an existing scope approval.
+
+        Revocation keeps the row so the approve/revoke history stays visible,
+        but marks it void: report generation treats a revoked approval like an
+        absent one and fails closed with ``report.scope_unauthorized``.
+        """
+        if not getattr(actor, "is_active", False) or not actor.has_perm("reports.view_cross_tenant_reports"):
+            raise PermissionDenied("Cross-tenant report scope revocation requires the cross-tenant report permission.")
+        authorization = cls.objects.filter(scheduled_report=scheduled_report).first()
+        if authorization is None:
+            raise ValidationError("This schedule has no cross-tenant scope approval to revoke.")
+        if authorization.revoked_at is not None:
+            raise ValidationError("This schedule's cross-tenant scope approval is already revoked.")
+        authorization.revoked_by = actor
+        authorization.revoked_at = timezone.now()
+        authorization.save(update_fields=["revoked_by", "revoked_at"])
+        return authorization
+
+    def is_revoked(self):
+        return self.revoked_at is not None
+
+    def __str__(self):
+        return f"Scope approval for {self.scheduled_report}"
 
 
 class ReportGenerationArchive(ChangeLoggingMixin, BaseModel):

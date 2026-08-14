@@ -27,6 +27,7 @@ POST_TRANSITION_MIGRATIONS = {
     "extras.0104_issue183_alert_tenant_reconciliation",
     "extras.0105_reporttemplate_advanced_mode_and_more",
     "extras.0106_scheduledreportscopeauthorization",
+    "extras.0107_scheduledreportscopeauthorization_revocation",
     "inventory.0101_alter_accessoryassignment_options_and_more",
     "organization.0101_membership_external_id_and_more",
     "organization.0102_alter_tenantresourcegrant_options",

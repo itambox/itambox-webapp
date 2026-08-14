@@ -248,6 +248,25 @@ can be attached to one or more **Notification Channels** (configured under
 Extras → Notification Channels). This enables delivery to webhooks, Slack,
 Microsoft Teams, or other integrated platforms.
 
+### Cross-Tenant Scope Approvals
+
+A schedule whose **Filter Tenants** scope spans more than one tenant compiles
+cross-tenant data and therefore requires a durable scope approval. The schedule
+list shows the scope state per schedule; the **Scope Approval** page
+(**Extras → Scheduled Reports → Scope**) names every tenant in scope and the
+current approval.
+
+- Approving or revoking requires the `reports.view_cross_tenant_reports`
+  permission on every tenant in scope; an approval by a principal whose reach
+  does not cover the full scope is refused instead of being stored and later
+  failing at delivery time.
+- Without a current approval, delivery of a cross-tenant schedule terminates
+  with an authorization error (`report.scope_unauthorized`) rather than
+  rendering unapproved tenant data. Changing the scope after an approval
+  invalidates it, as does revoking it.
+- Revocation keeps the approval history visible and marks it void; approving
+  again records a fresh approval.
+
 ### Monitoring
 
 Each scheduled report tracks execution state:

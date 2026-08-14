@@ -843,6 +843,64 @@ class ScheduledReportScopeAuthorizationTests(TestCase):
         self.assertEqual(result.status, TaskStatus.SUCCESS)
         mock_process.assert_called_once()
 
+    @override_settings(REPORT_DESIGNER_ENABLED=True)
+    @patch("core.tasks.reports._process_scheduled_report")
+    def test_revoked_approval_fails_closed_at_generation(self, mock_process):
+        from core.tasks.reports import generate_scheduled_report_task
+        from core.tasks.utils import TaskStatus
+
+        ScheduledReportScopeAuthorization.approve(self.sched, self.user)
+        ScheduledReportScopeAuthorization.revoke(self.sched, self.user)
+
+        result = generate_scheduled_report_task(self.sched.pk)
+
+        self.assertEqual(result.status, TaskStatus.TERMINAL)
+        self.assertEqual(result.code, "report.scope_unauthorized")
+        mock_process.assert_not_called()
+        self.sched.refresh_from_db()
+        self.assertIsNone(self.sched.last_run)
+
+    @override_settings(REPORT_DESIGNER_ENABLED=True)
+    @patch("core.tasks.reports._process_scheduled_report")
+    def test_approve_after_revoke_restores_generation(self, mock_process):
+        from core.tasks.reports import generate_scheduled_report_task
+        from core.tasks.utils import TaskResult, TaskStatus
+
+        ScheduledReportScopeAuthorization.approve(self.sched, self.user)
+        ScheduledReportScopeAuthorization.revoke(self.sched, self.user)
+        authorization = ScheduledReportScopeAuthorization.approve(self.sched, self.user)
+        self.assertFalse(authorization.is_revoked())
+        self.assertIsNone(authorization.revoked_at)
+        self.assertIsNone(authorization.revoked_by)
+
+        mock_process.return_value = TaskResult(TaskStatus.SUCCESS, "report.completed")
+        result = generate_scheduled_report_task(self.sched.pk)
+
+        self.assertEqual(result.status, TaskStatus.SUCCESS)
+        mock_process.assert_called_once()
+
+    def test_revoke_requires_the_cross_tenant_permission(self):
+        from django.core.exceptions import PermissionDenied
+
+        ScheduledReportScopeAuthorization.approve(self.sched, self.user)
+        limited = User.objects.create_user(username="revoke-limited", password="password123")
+        with self.assertRaises(PermissionDenied):
+            ScheduledReportScopeAuthorization.revoke(self.sched, limited)
+
+    def test_revoke_requires_an_existing_approval(self):
+        from django.core.exceptions import ValidationError
+
+        with self.assertRaises(ValidationError):
+            ScheduledReportScopeAuthorization.revoke(self.sched, self.user)
+
+    def test_revoke_of_a_revoked_approval_is_rejected(self):
+        from django.core.exceptions import ValidationError
+
+        ScheduledReportScopeAuthorization.approve(self.sched, self.user)
+        ScheduledReportScopeAuthorization.revoke(self.sched, self.user)
+        with self.assertRaises(ValidationError):
+            ScheduledReportScopeAuthorization.revoke(self.sched, self.user)
+
 
 class ReportCrossTenantPermissionTests(TestCase):
     """RBAC matrix from WP-9a: permission gate for cross-tenant report aggregation."""

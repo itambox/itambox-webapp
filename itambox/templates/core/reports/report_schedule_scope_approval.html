@@ -1,0 +1,106 @@
+{% extends base_template|default:"layout.html" %}
+{% load i18n %}
+{% block title %}{% translate "Scope Approval -" %} {{ object.name }} {% translate "- ITAMbox" %}{% endblock %}
+{% block page_header %}
+  <h2 class="page-title">{% translate "Scope Approval:" %} {{ object.name }}</h2>
+{% endblock %}
+{% block page_actions %}
+  {% if return_url %}
+    <a href="{{ return_url }}" class="btn btn-outline-secondary">
+      <i class="mdi mdi-arrow-left"></i>
+      {% translate "Back" %}
+    </a>
+  {% endif %}
+{% endblock page_actions %}
+{% block content %}
+  <div class="row justify-content-center">
+    <div class="col-md-8">
+      <div class="card">
+        <div class="card-header">
+          <h3 class="card-title">{% translate "Cross-Tenant Scope" %}</h3>
+        </div>
+        <div class="card-body">
+          {% if not requires_authorization %}
+            <div class="alert alert-secondary">
+              {% translate "This schedule is single-tenant and does not require a cross-tenant scope approval." %}
+            </div>
+          {% else %}
+            <p>
+              {% blocktranslate trimmed with schedule=object.name %}
+                The schedule <strong>{{ schedule }}</strong> compiles report data across more than one
+                tenant. Delivery therefore requires a durable cross-tenant scope approval; without one,
+                delivery terminates with an authorization error instead of running against unapproved data.
+              {% endblocktranslate %}
+            </p>
+
+            <h4>{% translate "Scope tenants" %}</h4>
+            <ul class="list-group mb-3">
+              {% for tenant in scope_tenants %}
+                <li class="list-group-item">{{ tenant.name }} <span class="text-secondary">({{ tenant.slug }})</span></li>
+              {% empty %}
+                <li class="list-group-item text-danger">
+                  {% translate "No resolvable scope tenants — delivery would fail closed and this scope cannot be approved." %}
+                </li>
+              {% endfor %}
+            </ul>
+
+            {% if authorization %}
+              <dl class="row">
+                <dt class="col-sm-4">{% translate "Approved by" %}</dt>
+                <dd class="col-sm-8">{{ authorization.authorized_by }}</dd>
+                <dt class="col-sm-4">{% translate "Approved at" %}</dt>
+                <dd class="col-sm-8">{{ authorization.approved_at }}</dd>
+                {% if authorization.is_revoked %}
+                  <dt class="col-sm-4">{% translate "Revoked by" %}</dt>
+                  <dd class="col-sm-8">{{ authorization.revoked_by }} ({{ authorization.revoked_at }})</dd>
+                {% endif %}
+              </dl>
+              {% if authorization_is_current %}
+                <div class="alert alert-success">
+                  {% translate "The stored approval matches the current scope and remains in effect." %}
+                </div>
+              {% elif not authorization.is_revoked %}
+                <div class="alert alert-danger">
+                  {% translate "The scope changed after the approval, so the stored approval no longer matches. Delivery fails closed until the scope is approved again." %}
+                </div>
+              {% endif %}
+            {% else %}
+              <div class="alert alert-warning">
+                {% translate "No scope approval exists. Delivery of this schedule terminates with an authorization error until an approval is stored." %}
+              </div>
+            {% endif %}
+
+            {% if not approval_would_be_effective %}
+              <div class="alert alert-warning">
+                {% translate "Your cross-tenant permission does not cover every tenant in this scope, so an approval by you would not take effect. Delivery would keep failing closed." %}
+              </div>
+            {% endif %}
+
+            <div class="d-flex gap-2">
+              <form method="post" class="d-inline">
+                {% csrf_token %}
+                <input type="hidden" name="action" value="approve">
+                <input type="hidden" name="return_url" value="{{ return_url }}">
+                <button type="submit" class="btn btn-success" {% if not approval_would_be_effective %}disabled{% endif %}>
+                  <i class="mdi mdi-check"></i>
+                  {% translate "Approve Scope" %}
+                </button>
+              </form>
+              {% if authorization and not authorization.is_revoked %}
+                <form method="post" class="d-inline">
+                  {% csrf_token %}
+                  <input type="hidden" name="action" value="revoke">
+                  <input type="hidden" name="return_url" value="{{ return_url }}">
+                  <button type="submit" class="btn btn-danger">
+                    <i class="mdi mdi-close"></i>
+                    {% translate "Revoke Approval" %}
+                  </button>
+                </form>
+              {% endif %}
+            </div>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+  </div>
+{% endblock %}

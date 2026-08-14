@@ -1,5 +1,6 @@
 # itambox/extras/tables.py
 import django_tables2 as tables
+from django.core.exceptions import ObjectDoesNotExist
 from django.urls import reverse
 from django.utils.html import escape, format_html
 from django.utils.safestring import mark_safe
@@ -443,6 +444,44 @@ class ScheduledReportTable(BaseTable):
     is_active = BooleanColumn()
     last_run = tables.DateTimeColumn(format="Y-m-d H:i:s")
     last_status = tables.Column()
+    scope = tables.Column(accessor="pk", verbose_name=_("Scope"), orderable=False, empty_values=())
+
+    def render_scope(self, record, value):
+        if not record.scope_requires_authorization():
+            return format_html('<span class="badge bg-secondary">{}</span>', _("Single tenant"))
+        try:
+            authorization = record.scope_authorization
+        except ObjectDoesNotExist:
+            authorization = None
+        url = reverse("extras:scheduledreport_scope_approval", kwargs={"pk": record.pk})
+        if authorization is None:
+            return format_html(
+                '<span class="badge bg-warning">{}</span> <a href="{}">{}</a>',
+                _("Approval required"),
+                url,
+                _("Approve"),
+            )
+        if authorization.revoked_at is not None:
+            return format_html(
+                '<span class="badge bg-danger">{}</span> <a href="{}">{}</a>',
+                _("Revoked"),
+                url,
+                _("Review"),
+            )
+        if sorted(authorization.scope_tenant_ids) != sorted(record.effective_scope_tenant_ids()):
+            return format_html(
+                '<span class="badge bg-danger">{}</span> <a href="{}">{}</a>',
+                _("Scope changed"),
+                url,
+                _("Review"),
+            )
+        return format_html(
+            '<span class="badge bg-success">{}</span> <a href="{}">{}</a>',
+            _("Approved"),
+            url,
+            _("Manage"),
+        )
+
     actions = tables.TemplateColumn(
         template_code="""
         <div class="d-flex gap-1 justify-content-end">
@@ -474,5 +513,27 @@ class ScheduledReportTable(BaseTable):
 
     class Meta(BaseTable.Meta):
         model = ScheduledReport
-        fields = ("pk", "name", "report", "recipients", "format", "is_active", "last_run", "last_status", "actions")
-        sequence = ("pk", "name", "report", "recipients", "format", "is_active", "last_run", "last_status", "actions")
+        fields = (
+            "pk",
+            "name",
+            "report",
+            "recipients",
+            "format",
+            "is_active",
+            "last_run",
+            "last_status",
+            "scope",
+            "actions",
+        )
+        sequence = (
+            "pk",
+            "name",
+            "report",
+            "recipients",
+            "format",
+            "is_active",
+            "last_run",
+            "last_status",
+            "scope",
+            "actions",
+        )

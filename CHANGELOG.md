@@ -6,6 +6,10 @@ This changelog follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) 
 
 ## [Unreleased]
 
+### Added
+
+- Scheduled reports with a cross-tenant scope now have an operator approval workflow: the schedule list shows the scope approval state, and a dedicated Scope Approval page approves or revokes the durable authorization (`reports.view_cross_tenant_reports`). Revocation keeps the approval history and fails delivery closed until a fresh approval covers the full scope.
+
 ### Changed
 
 - The report-designer opt-in flag is now `ITAMBOX_FEATURE_REPORT_DESIGNER`; `ITAMBOX_REPORT_DESIGNER_ENABLED` remains a deprecated 1.x fallback. When the flag is off, scheduled delivery is skipped for non-grandfathered templates, while the migration-managed bounded grandfathered set continues to render and deliver; grandfathered templates are read-only until the designer is enabled.
