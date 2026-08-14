@@ -448,10 +448,11 @@ class TestDocumentationConsistency:
         assert "ITAMBOX_FEATURE_REPORT_DESIGNER" in text
         assert "ITAMBOX_FEATURE_REPORT_DESIGNER" in installation
         assert "ITAMBOX_FEATURE_REPORT_DESIGNER" in readme
-        phrase = "scheduled delivery of existing report templates"
-        assert phrase in " ".join(text.lower().split())
-        assert phrase in " ".join(installation.lower().split())
-        assert phrase in " ".join(readme.lower().split())
+        for document in (text, installation, readme):
+            normalized = " ".join(document.lower().split())
+            assert "grandfathered" in normalized
+            assert "non-grandfathered" in normalized
+            assert "delivery" in normalized
         assert "registry.register_all" in text
         assert "returns early when its first key" not in text
 
