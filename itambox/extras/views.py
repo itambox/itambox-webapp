@@ -1052,11 +1052,15 @@ class ScheduledReportScopeApprovalView(CapabilityRequiredMixin, PermissionRequir
         return render(request, self.template_name, self.get_context_data())
 
     def _error_redirect(self, request):
-        candidate = request.POST.get("return_url") or request.GET.get("return_url")
-        return_url = safe_return_url(request, candidate, None)
+        return_url = safe_return_url(
+            request,
+            request.POST.get("return_url") or request.GET.get("return_url"),
+            None,
+        )
+        target = reverse("extras:scheduledreport_scope_approval", kwargs={"pk": self.kwargs["pk"]})
         if return_url:
-            return redirect(f"{request.path}?{urlencode({'return_url': return_url})}")
-        return redirect(request.path)
+            target = f"{target}?{urlencode({'return_url': return_url})}"
+        return redirect(target)
 
     def post(self, request, *args, **kwargs):
         # The model is resolved lazily: extending the module-level extras.models
