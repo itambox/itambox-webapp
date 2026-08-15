@@ -148,4 +148,3 @@ class SCIMTenantGroupReadPermissionTests(TestCase):
                 else:
                     self.assertEqual(list_response.status_code, status.HTTP_200_OK)
                     self.assertEqual(list_response.json()["totalResults"], 1)
-
