@@ -270,7 +270,7 @@ class WebhookDeliveryUITests(TenantTestMixin, TestCase):
     def test_detail_renders_test_send_and_empty_delivery_markers(self):
         self.client_login_to_tenant(self.operator, self.tenant_a)
         test_delivery = self._delivery(status="success", test_send=True, response_code=200)
-        blank_id_delivery = WebhookDelivery.objects.create(
+        WebhookDelivery.objects.create(
             delivery_id="",
             endpoint=self.endpoint_a,
             tenant=self.tenant_a,
