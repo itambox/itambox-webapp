@@ -2,11 +2,13 @@ import logging
 
 from django.contrib.auth import get_user_model
 from django.contrib.auth.models import Group
+from django.core.exceptions import PermissionDenied
 from django.db.models import Count
 from rest_framework.generics import RetrieveUpdateAPIView
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 
+from core.managers import get_current_tenant
 from itambox.api.viewsets import ITAMBoxModelViewSet, ITAMBoxReadOnlyModelViewSet
 from users.models import Token, UserPreference
 
@@ -26,8 +28,6 @@ class UserViewSet(ITAMBoxReadOnlyModelViewSet):
         # users (incl. is_staff/email) — cross-tenant user enumeration. Scope to
         # users who share the requester's active tenant via the Membership
         # reverse relation (`memberships`). Superusers remain unscoped.
-        from core.managers import get_current_tenant
-
         qs = super().get_queryset()
         if self.request.user.is_superuser:
             return qs
@@ -87,6 +87,15 @@ class TokenViewSet(ITAMBoxModelViewSet):
             serializer.save(user=self.request.user)
 
     def perform_create(self, serializer):
+        # Token.tenant is non-nullable, so the shared _tenant_create_kwargs
+        # fail-closed guard (which only covers nullable tenant fields) never
+        # fires for this viewset. Without an active tenant, Token.save()
+        # silently falls back to the first tenant in the database (fail-open,
+        # issue #353) — e.g. under a tenant-group scope, where permission
+        # checks aggregate over the group subtree but no single tenant anchors
+        # the request. There is no "global" token, so fail closed instead.
+        if get_current_tenant() is None:
+            raise PermissionDenied()
         self._pin_user(serializer)
 
     def perform_update(self, serializer):

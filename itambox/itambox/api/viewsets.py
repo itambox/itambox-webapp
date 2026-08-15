@@ -243,7 +243,16 @@ class ITAMBoxModelViewSet(
         serializer.is_valid(raise_exception=True)
         self.perform_update(serializer)
 
-        qs = self.get_queryset().get(pk=serializer.instance.pk)
+        try:
+            qs = self.get_queryset().get(pk=serializer.instance.pk)
+        except ObjectDoesNotExist:
+            # The update may legitimately move the object out of the
+            # request-scoped queryset (e.g. a superuser transferring a token
+            # to another user, issue #353). The instance was validated and
+            # committed by perform_update() above; serve it directly rather
+            # than failing with a 500 after the commit. Mirrors
+            # get_created_response_instance().
+            qs = serializer.instance
         serializer = self.get_serializer(qs)
         response = Response(serializer.data)
 
