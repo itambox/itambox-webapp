@@ -16,6 +16,7 @@ from extras.models import (
     JournalEntry,
     NotificationChannel,
     Tag,
+    WebhookDelivery,
     WebhookEndpoint,
 )
 from itambox.api.base import BaseModelSerializer
@@ -130,6 +131,62 @@ class WebhookEndpointSerializer(BaseModelSerializer):
         except DjangoValidationError as exc:
             raise serializers.ValidationError(exc.messages) from exc
         return value
+
+
+class WebhookDeliverySerializer(BaseModelSerializer):
+    """Read-only operational history for one webhook delivery.
+
+    Delivery records deliberately expose relationship identifiers and display
+    names only.  Endpoint URL, headers, and secrets are not fields on this
+    serializer, so they cannot leak through either list or detail responses.
+    """
+
+    endpoint = serializers.PrimaryKeyRelatedField(read_only=True, allow_null=True)
+    endpoint_name = serializers.CharField(source="endpoint.name", read_only=True, allow_null=True)
+    event = serializers.PrimaryKeyRelatedField(read_only=True, allow_null=True)
+    tenant = serializers.PrimaryKeyRelatedField(read_only=True, allow_null=True)
+    redelivered_from = serializers.PrimaryKeyRelatedField(read_only=True, allow_null=True)
+    redelivered_by = serializers.PrimaryKeyRelatedField(read_only=True, allow_null=True)
+    redelivered_by_username = serializers.CharField(
+        source="redelivered_by.username",
+        read_only=True,
+        allow_null=True,
+    )
+
+    class Meta:
+        model = WebhookDelivery
+        fields = [
+            "id",
+            "delivery_id",
+            "status",
+            "attempt",
+            "response_code",
+            "error_class",
+            "error_message",
+            "next_retry_at",
+            "test_send",
+            "redelivered_from",
+            "redelivered_by",
+            "redelivered_by_username",
+            "redelivered_at",
+            "attempted_at",
+            "completed_at",
+            "created_at",
+            "updated_at",
+            "endpoint",
+            "endpoint_name",
+            "event",
+            "tenant",
+        ]
+        read_only_fields = fields
+        brief_fields = ["id", "delivery_id", "status", "attempt", "test_send", "created_at"]
+
+
+class WebhookDeliveryActionSerializer(serializers.Serializer):
+    """Stable response body shared by redelivery and test-send actions."""
+
+    id = serializers.IntegerField(read_only=True)
+    delivery_id = serializers.CharField(read_only=True)
 
 
 class EventRuleSerializer(BaseModelSerializer):

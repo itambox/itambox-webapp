@@ -17,6 +17,7 @@ from core.managers import (
     SoftDeleteManager,
     TenantScopingAllObjectsManager,
     TenantScopingManager,
+    TenantScopingQuerySet,
     TenantScopingSoftDeleteManager,
 )
 from core.mixins import BookmarkableMixin, SoftDeleteMixin
@@ -437,6 +438,116 @@ class WebhookEndpoint(ChangeLoggingMixin, SoftDeleteMixin, BaseModel):
 
             return decrypt_string(self.secret)
         return self.secret
+
+
+class WebhookDeliveryQuerySet(TenantScopingQuerySet):
+    """Tenant-scoped delivery history with explicit platform visibility."""
+
+    def visible_to(self, user):
+        """Return deliveries visible to ``user``, including global rows only for platform users."""
+
+        if user is None or not getattr(user, "is_authenticated", False):
+            return self.none()
+        if getattr(user, "is_superuser", False) or user.has_perm("extras.view_webhookdelivery"):
+            return self.model._base_manager.all()
+        return self
+
+
+class WebhookDeliveryManager(models.Manager.from_queryset(WebhookDeliveryQuerySet)):
+    """Tenant-scoped manager exposing the delivery visibility helper."""
+
+    def get_queryset(self):
+        return super().get_queryset().filter_by_tenant()
+
+    def visible_to(self, user):
+        return self.get_queryset().visible_to(user)
+
+
+class WebhookDelivery(BaseModel):
+    objects = WebhookDeliveryManager()
+    all_objects = TenantScopingAllObjectsManager()
+
+    STATUS_PENDING = "pending"
+    STATUS_SUCCESS = "success"
+    STATUS_FAILED = "failed"
+    STATUS_DEAD = "dead"
+    STATUS_CHOICES = [
+        (STATUS_PENDING, _("Pending")),
+        (STATUS_SUCCESS, _("Success")),
+        (STATUS_FAILED, _("Failed")),
+        (STATUS_DEAD, _("Dead")),
+    ]
+
+    tenant = models.ForeignKey(
+        "organization.Tenant",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="webhook_deliveries",
+        db_index=True,
+        verbose_name=_("Tenant"),
+    )
+    endpoint = models.ForeignKey(
+        "WebhookEndpoint",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="deliveries",
+        verbose_name=_("Endpoint"),
+    )
+    event = models.ForeignKey(
+        "Event",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="deliveries",
+        verbose_name=_("Event"),
+    )
+    delivery_id = models.CharField(max_length=36, unique=True, db_index=True, verbose_name=_("Delivery ID"))
+    attempt = models.PositiveIntegerField(default=1, verbose_name=_("Attempt"))
+    status = models.CharField(
+        max_length=20,
+        choices=STATUS_CHOICES,
+        default=STATUS_PENDING,
+        db_index=True,
+        verbose_name=_("Status"),
+    )
+    response_code = models.PositiveSmallIntegerField(null=True, blank=True, verbose_name=_("Response Code"))
+    error_class = models.CharField(max_length=64, blank=True, verbose_name=_("Error Class"))
+    error_message = models.TextField(blank=True, verbose_name=_("Error Message"))
+    next_retry_at = models.DateTimeField(null=True, blank=True, db_index=True, verbose_name=_("Next Retry At"))
+    test_send = models.BooleanField(default=False, db_index=True, verbose_name=_("Test Send"))
+    redelivered_from = models.ForeignKey(
+        "self",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="redeliveries",
+        verbose_name=_("Redelivered From"),
+    )
+    redelivered_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="+",
+        verbose_name=_("Redelivered By"),
+    )
+    redelivered_at = models.DateTimeField(null=True, blank=True, verbose_name=_("Redelivered At"))
+    attempted_at = models.DateTimeField(null=True, blank=True, verbose_name=_("Attempted At"))
+    completed_at = models.DateTimeField(null=True, blank=True, verbose_name=_("Completed At"))
+
+    class Meta:
+        ordering = ["-created_at"]
+        verbose_name = _("Webhook Delivery")
+        verbose_name_plural = _("Webhook Deliveries")
+        indexes = [
+            models.Index(fields=["endpoint", "status"]),
+            models.Index(fields=["tenant", "status", "created_at"]),
+        ]
+
+    def __str__(self):
+        return f"Delivery {self.delivery_id} ({self.status})"
 
 
 class JournalEntry(ChangeLoggingMixin, BaseModel):

@@ -2,6 +2,7 @@
 import django_tables2 as tables
 from django.apps import apps
 from django.core.exceptions import ObjectDoesNotExist
+from django.middleware.csrf import get_token
 from django.urls import reverse
 from django.utils.html import escape, format_html
 from django.utils.safestring import mark_safe
@@ -23,6 +24,7 @@ from .models import (
     SavedFilter,
     ScheduledReport,
     Tag,
+    WebhookDelivery,
 )
 
 # =============================================================================
@@ -215,6 +217,121 @@ class JournalEntryTable(BaseTable):
 
     def render_comment(self, value):
         return Truncator(str(value)).chars(120)
+
+
+class WebhookDeliveryActionsColumn(tables.Column):
+    empty_values = ()
+    orderable = False
+    verbose_name = ""
+    attrs = {
+        "th": {"class": "col-actions text-nowrap"},
+        "td": {"class": "text-end text-nowrap noprint p-1 col-actions"},
+    }
+
+    def render(self, value, record, bound_column, **kwargs):
+        table = bound_column._table
+        if not getattr(table, "can_redeliver", False) or record.status not in {"failed", "dead", "success"}:
+            return ""
+
+        request = getattr(table, "request", None)
+        csrf_token = get_token(request) if request is not None else ""
+        url = reverse("extras:webhookdelivery_redeliver", kwargs={"pk": record.pk})
+        return format_html(
+            '<form method="post" action="{}" class="d-inline">'
+            '<input type="hidden" name="csrfmiddlewaretoken" value="{}">'
+            '<button type="submit" class="btn btn-sm btn-outline-warning">'
+            '<i class="mdi mdi-refresh"></i> {}'
+            "</button></form>",
+            url,
+            csrf_token,
+            _("Redeliver"),
+        )
+
+
+class WebhookDeliveryTable(BaseTable):
+    delivery_id = tables.Column(
+        verbose_name=_("Delivery ID"),
+        orderable=False,
+        # Render even for blank ids: empty_values would skip render_delivery_id
+        # and leave the raw table dash instead of the muted marker.
+        empty_values=(),
+    )
+    event = tables.Column(
+        verbose_name=_("Event / Action"),
+        accessor="event",
+        orderable=False,
+        # Render even for event-less test sends: empty_values would skip
+        # render_event entirely and show a plain dash for test deliveries.
+        empty_values=(),
+    )
+    status = tables.Column(verbose_name=_("Status"))
+    attempt = tables.Column(verbose_name=_("Attempt"))
+    response_code = tables.Column(verbose_name=_("Response"))
+    error_message = tables.Column(verbose_name=_("Error"), accessor="error_message", orderable=False)
+    next_retry_at = tables.DateTimeColumn(verbose_name=_("Next Retry"), format="Y-m-d H:i:s")
+    test_send = tables.Column(verbose_name=_("Test"), orderable=False)
+    redelivered_at = tables.DateTimeColumn(verbose_name=_("Redelivered"), format="Y-m-d H:i:s")
+    created_at = tables.DateTimeColumn(verbose_name=_("Created"), format="Y-m-d H:i:s")
+    actions = WebhookDeliveryActionsColumn()
+
+    class Meta(BaseTable.Meta):
+        model = WebhookDelivery
+        fields = (
+            "delivery_id",
+            "event",
+            "status",
+            "attempt",
+            "response_code",
+            "error_message",
+            "next_retry_at",
+            "test_send",
+            "redelivered_at",
+            "created_at",
+            "actions",
+        )
+        default_columns = fields
+        order_by = ("-created_at",)
+
+    def __init__(self, *args, can_redeliver=False, **kwargs):
+        self.can_redeliver = can_redeliver
+        self.request = kwargs.get("request")
+        super().__init__(*args, **kwargs)
+
+    def render_delivery_id(self, value):
+        if not value:
+            return format_html('<span class="text-muted">&mdash;</span>')
+        return format_html('<code title="{}">{}</code>', value, str(value)[:8])
+
+    def render_event(self, value, record):
+        if record.test_send:
+            return _("Test webhook")
+        if value is None:
+            return format_html('<span class="text-muted">&mdash;</span>')
+        return value.get_action_display()
+
+    def render_status(self, value):
+        colors = {
+            "pending": "info",
+            "success": "success",
+            "failed": "warning",
+            "dead": "danger",
+        }
+        color = colors.get(value, "secondary")
+        return format_html('<span class="badge bg-{}">{}</span>', color, str(value).capitalize())
+
+    def render_response_code(self, value):
+        return value if value is not None else format_html('<span class="text-muted">&mdash;</span>')
+
+    def render_error_message(self, value):
+        if not value:
+            return format_html('<span class="text-muted">&mdash;</span>')
+        truncated = Truncator(str(value)).chars(80)
+        return format_html('<span title="{}">{}</span>', value, truncated)
+
+    def render_test_send(self, value):
+        if value:
+            return format_html('<span class="badge bg-info">{}</span>', _("Test"))
+        return format_html('<span class="text-muted">&mdash;</span>')
 
 
 # =============================================================================

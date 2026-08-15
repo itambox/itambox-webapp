@@ -852,7 +852,7 @@
       "target": "extras.models",
       "target_layer": "domain-model",
       "kind": "function-body",
-      "count": 1,
+      "count": 6,
       "owner": "area:operations",
       "removal_issue": 100,
       "removal_direction": "Resolve extras.models lazily through apps.get_model(), or pass the model instance in as a task argument, so core.tasks.webhooks carries no import edge into the extras domain.",

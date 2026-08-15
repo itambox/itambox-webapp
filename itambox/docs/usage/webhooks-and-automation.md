@@ -107,12 +107,14 @@ retry policy:
 |---|---|
 | **2xx response** | Success — done. |
 | **4xx response** (400–499) | **Final failure.** Client errors (bad request, auth failure, not found) are never retried — fix the payload or credentials and re-send manually. |
-| **5xx response** (500–599) | Retried up to `retry_count` times, with `retry_backoff` seconds between each attempt. |
+| **5xx response** (500–599) | Retried up to `retry_count` times, with capped exponential backoff and ±20% jitter. |
 | **Connection error** (DNS, timeout, TLS) | Same as 5xx — retried. |
 | **SSRF guard rejection** | **Final failure** — blocked URLs are never retried. |
 
-Retries use a one-shot `django-q2` `Schedule` row set to `next_run = now +
-retry_backoff`, so the backoff is honoured even if the worker pool is busy.
+Retries use a one-shot `django-q2` `Schedule` row. The first retry starts at
+`retry_backoff` seconds, then the delay doubles for each later retry, is capped
+at 3600 seconds, and receives ±20% jitter. The schedule means the delay is
+honoured even if the worker pool is busy.
 
 > [!IMPORTANT]
 > The `secret` field is stored encrypted at rest (`enc$...` ciphertext) and is
@@ -122,10 +124,48 @@ retry_backoff`, so the backoff is honoured even if the worker pool is busy.
 > to an endpoint store their secret in the rule config and are not protected
 > this way — migrate them to endpoints.
 
+## Delivery tracking, retries and redelivery
+
+Every enqueued webhook has a durable delivery record. Its lifecycle is:
+
+- **pending** — the delivery is queued or its attempt is in progress.
+- **success** — the endpoint returned a successful response.
+- **failed** — the attempt failed in a retryable way and retries remain.
+- **dead** — the retry budget is exhausted, or the failure is terminal.
+
+The record keeps the stable delivery ID, the last attempt number, response code,
+safe error classification, attempt timestamps, and the next retry time. The
+retry budget is `retry_count`: there is one initial attempt followed by up to
+that many retries. Connection failures and server-side failures are retryable
+under the shared integration error contract. HTTP 4xx responses and SSRF guard
+rejections are terminal and are not retried. Retry delays use exponential
+backoff beginning at `retry_backoff`, doubling per retry, capped at 3600
+seconds, with ±20% jitter (and a minimum delay of one second).
+
+Delivery history is deliberately **not backfilled**. Records and history begin
+when this delivery tracking capability is upgraded; earlier webhook attempts
+remain represented only by the information that was already available.
+
+Manual redelivery always creates a new delivery record and leaves the original
+status, attempt count, and error unchanged. It is allowed for successful
+deliveries as well as failed or dead deliveries, but is refused while a
+delivery is pending or has a retry scheduled for the future. A redelivered test
+send remains marked as a test send.
+
+Operators can send a test webhook from an endpoint. A test delivery has no
+event record and sends the normal v1 envelope with an `event` value of `test`,
+the endpoint model marker, and an empty data object. It uses the endpoint's
+normal retry policy and is included in delivery history.
+
+System-wide endpoint deliveries require platform authorization to view or
+operate. Tenant operators see only delivery records for their own tenant;
+delivery history from before the upgrade is not exposed as synthetic records.
+
 ### Testing a webhook endpoint
 
-There is no built-in "send test" button in the current release. To verify a
-webhook endpoint:
+Use the **Send test webhook** action on the endpoint to verify connectivity.
+The action creates a test delivery record and applies the endpoint's normal
+retry policy. For an event-driven test instead:
 
 1. Create a temporary **Event Rule** linked to the endpoint, targeting a
    low-traffic model (e.g. `Tag`) and listening for the `create` event.
@@ -384,18 +424,17 @@ python manage.py eventrule_withdrawn_report
 
 **How do I check delivery status?**
 
-: There is no persistent delivery log table in the current release. Check the
-  `django-q2` worker logs for per-delivery status messages:
+: Open the endpoint's delivery history to see the durable status, attempt
+  number, response code, safe error, and next retry time. The worker logs still
+  provide operational detail, but never include secrets, response bodies, or
+  full endpoint URLs:
   ```
-  INFO  Webhook sent to https://hooks.example.com/webhook — status 200
-  WARN  Webhook https://hooks.example.com/webhook returned 403 — not retrying (4xx is final)
-  WARN  Webhook https://hooks.example.com/webhook failed (attempt 2/3): ... — retrying in 60s
-  ERROR Webhook https://hooks.example.com/webhook: all 3 attempts failed: ...
-  ERROR Webhook https://hooks.example.com/webhook blocked by SSRF guard: ...
+  INFO  operation=webhook.deliver disposition=success
+  WARN  operation=webhook.deliver disposition=retryable action=retry
+  ERROR operation=webhook.deliver disposition=terminal reason=invalid_target
   ```
-  For long-term monitoring, pipe these logs to your observability stack
-  (ELK, Grafana Loki, CloudWatch, etc.) or set up log-based alerts on
-  `ERROR`-level webhook log lines.
+  Delivery records from before the upgrade do not exist; history starts at the
+  delivery-tracking upgrade.
 
 **The HMAC signature doesn't match on my receiver**
 

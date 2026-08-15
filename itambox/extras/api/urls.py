@@ -10,6 +10,7 @@ from .views import (
     JournalEntryViewSet,
     NotificationChannelViewSet,
     TagViewSet,
+    WebhookDeliveryViewSet,
     WebhookEndpointViewSet,
 )
 
@@ -22,6 +23,7 @@ router.register(r"custom-fields", CustomFieldViewSet)
 router.register(r"custom-fieldsets", CustomFieldsetViewSet)
 router.register(r"event-rules", EventRuleViewSet)
 router.register(r"webhook-endpoints", WebhookEndpointViewSet)
+router.register(r"webhook-deliveries", WebhookDeliveryViewSet, basename="webhookdelivery")
 router.register(r"notification-channels", NotificationChannelViewSet)
 router.register(r"alert-logs", AlertLogViewSet)
 router.register(r"alert-rules", AlertRuleViewSet)

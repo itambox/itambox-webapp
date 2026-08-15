@@ -15740,6 +15740,189 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/APIError'
+  /api/extras/webhook-deliveries/:
+    get:
+      operationId: extras_webhook_deliveries_list
+      parameters:
+      - in: query
+        name: endpoint
+        schema:
+          type: integer
+        description: Endpoint
+      - name: limit
+        required: false
+        in: query
+        description: Number of results to return per page.
+        schema:
+          type: integer
+      - name: offset
+        required: false
+        in: query
+        description: The initial index from which to return the results.
+        schema:
+          type: integer
+      - name: start
+        required: false
+        in: query
+        description: 'Keyset/cursor pagination: return results with pk >= start, ordered
+          by pk. Skips the (capped) row count and stays O(page) regardless of table
+          size — use this instead of offset/limit for bulk export or iterating large
+          collections. Follow the `next` link to walk subsequent pages.'
+        schema:
+          type: integer
+      - in: query
+        name: status
+        schema:
+          type: string
+          enum:
+          - dead
+          - failed
+          - pending
+          - success
+        description: |-
+          Status
+
+          * `pending` - Pending
+          * `success` - Success
+          * `failed` - Failed
+          * `dead` - Dead
+      - in: query
+        name: test_send
+        schema:
+          type: boolean
+        description: Test send
+      tags:
+      - extras
+      security:
+      - TokenAuth: []
+      - cookieAuth: []
+      - basicAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedWebhookDeliveryList'
+          description: ''
+        '400':
+          description: The request could not be completed.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/APIError'
+        '401':
+          description: The request could not be completed.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/APIError'
+        '403':
+          description: The request could not be completed.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/APIError'
+  /api/extras/webhook-deliveries/{id}/:
+    get:
+      operationId: extras_webhook_deliveries_retrieve
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: A unique integer value identifying this Webhook Delivery.
+        required: true
+      tags:
+      - extras
+      security:
+      - TokenAuth: []
+      - cookieAuth: []
+      - basicAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WebhookDelivery'
+          description: ''
+        '400':
+          description: The request could not be completed.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/APIError'
+        '401':
+          description: The request could not be completed.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/APIError'
+        '403':
+          description: The request could not be completed.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/APIError'
+        '404':
+          description: The request could not be completed.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/APIError'
+  /api/extras/webhook-deliveries/{id}/redeliver/:
+    post:
+      operationId: extras_webhook_deliveries_redeliver_create
+      summary: Redeliver a webhook delivery
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: A unique integer value identifying this Webhook Delivery.
+        required: true
+      tags:
+      - extras
+      security:
+      - TokenAuth: []
+      - cookieAuth: []
+      - basicAuth: []
+      responses:
+        '202':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WebhookDeliveryAction'
+          description: ''
+        '400':
+          description: The request could not be completed.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/APIError'
+        '404':
+          description: The request could not be completed.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/APIError'
+        '409':
+          description: The request could not be completed.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/APIError'
+        '412':
+          description: The request could not be completed.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/APIError'
+        '428':
+          description: The request could not be completed.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/APIError'
   /api/extras/webhook-endpoints/:
     get:
       operationId: extras_webhook_endpoints_list
@@ -16313,6 +16496,60 @@ paths:
               schema:
                 $ref: '#/components/schemas/APIError'
       x-itambox-maturity: beta
+  /api/extras/webhook-endpoints/{id}/test/:
+    post:
+      operationId: extras_webhook_endpoints_test_create
+      summary: Send a test webhook
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: A unique integer value identifying this Webhook Endpoint.
+        required: true
+      tags:
+      - extras
+      security:
+      - TokenAuth: []
+      - cookieAuth: []
+      - basicAuth: []
+      responses:
+        '202':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WebhookDeliveryAction'
+          description: ''
+        '400':
+          description: The request could not be completed.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/APIError'
+        '404':
+          description: The request could not be completed.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/APIError'
+        '409':
+          description: The request could not be completed.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/APIError'
+        '412':
+          description: The request could not be completed.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/APIError'
+        '428':
+          description: The request could not be completed.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/APIError'
   /api/inventory/accessories/:
     get:
       operationId: inventory_accessories_list
@@ -44679,6 +44916,35 @@ components:
           description: True when `count` was capped at ITAMBOX_PAGINATOR_COUNT_CAP
             and the real total is larger. Use `start` (keyset cursor) pagination to
             iterate the full result set.
+    PaginatedWebhookDeliveryList:
+      type: object
+      required:
+      - count
+      - results
+      properties:
+        count:
+          type: integer
+          example: 123
+          nullable: true
+        next:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?offset=400&limit=100
+        previous:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?offset=200&limit=100
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/WebhookDelivery'
+        count_capped:
+          type: boolean
+          description: True when `count` was capped at ITAMBOX_PAGINATOR_COUNT_CAP
+            and the real total is larger. Use `start` (keyset cursor) pagination to
+            iterate the full result set.
     PaginatedWebhookEndpointList:
       type: object
       required:
@@ -48753,6 +49019,144 @@ components:
         * `accidental` - Accidental Damage
         * `extended` - Extended
         * `full` - Full Coverage
+    WebhookDelivery:
+      type: object
+      description: |-
+        Read-only operational history for one webhook delivery.
+
+        Delivery records deliberately expose relationship identifiers and display
+        names only.  Endpoint URL, headers, and secrets are not fields on this
+        serializer, so they cannot leak through either list or detail responses.
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        delivery_id:
+          type: string
+          readOnly: true
+        status:
+          allOf:
+          - $ref: '#/components/schemas/WebhookDeliveryStatusEnum'
+          readOnly: true
+        attempt:
+          type: integer
+          readOnly: true
+        response_code:
+          type: integer
+          readOnly: true
+          nullable: true
+        error_class:
+          type: string
+          readOnly: true
+        error_message:
+          type: string
+          readOnly: true
+        next_retry_at:
+          type: string
+          format: date-time
+          readOnly: true
+          nullable: true
+        test_send:
+          type: boolean
+          readOnly: true
+        redelivered_from:
+          type: integer
+          readOnly: true
+          nullable: true
+        redelivered_by:
+          type: integer
+          readOnly: true
+          nullable: true
+        redelivered_by_username:
+          type: string
+          readOnly: true
+          nullable: true
+        redelivered_at:
+          type: string
+          format: date-time
+          readOnly: true
+          nullable: true
+        attempted_at:
+          type: string
+          format: date-time
+          readOnly: true
+          nullable: true
+        completed_at:
+          type: string
+          format: date-time
+          readOnly: true
+          nullable: true
+        created_at:
+          type: string
+          format: date-time
+          readOnly: true
+        updated_at:
+          type: string
+          format: date-time
+          readOnly: true
+        endpoint:
+          type: integer
+          readOnly: true
+          nullable: true
+        endpoint_name:
+          type: string
+          readOnly: true
+          nullable: true
+        event:
+          type: integer
+          readOnly: true
+          nullable: true
+        tenant:
+          type: integer
+          readOnly: true
+          nullable: true
+      required:
+      - attempt
+      - attempted_at
+      - completed_at
+      - created_at
+      - delivery_id
+      - endpoint
+      - endpoint_name
+      - error_class
+      - error_message
+      - event
+      - id
+      - next_retry_at
+      - redelivered_at
+      - redelivered_by
+      - redelivered_by_username
+      - redelivered_from
+      - response_code
+      - status
+      - tenant
+      - test_send
+      - updated_at
+    WebhookDeliveryAction:
+      type: object
+      description: Stable response body shared by redelivery and test-send actions.
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        delivery_id:
+          type: string
+          readOnly: true
+      required:
+      - delivery_id
+      - id
+    WebhookDeliveryStatusEnum:
+      enum:
+      - pending
+      - success
+      - failed
+      - dead
+      type: string
+      description: |-
+        * `pending` - Pending
+        * `success` - Success
+        * `failed` - Failed
+        * `dead` - Dead
     WebhookEndpoint:
       type: object
       properties:
