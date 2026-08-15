@@ -18,7 +18,14 @@ from django.utils.translation import gettext_lazy as _
 
 from core.context import get_current_request_id, get_current_tenant, get_current_user
 from core.models import ChangeLoggingMixin, EmailSettings
-from extras.models import Event, EventRule, NotificationChannel, WebhookDelivery, WebhookEndpoint, has_authored_conditions
+from extras.models import (
+    Event,
+    EventRule,
+    NotificationChannel,
+    WebhookDelivery,
+    WebhookEndpoint,
+    has_authored_conditions,
+)
 
 logger = logging.getLogger(__name__)
 
