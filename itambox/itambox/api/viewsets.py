@@ -103,6 +103,15 @@ class ITAMBoxModelViewSet(
             kwargs["many"] = True
         return super().get_serializer(*args, **kwargs)
 
+    def _get_model(self, *, serializer=None, instance=None):
+        if self.queryset is not None:
+            return self.queryset.model
+        if serializer is not None:
+            return getattr(serializer, "child", serializer).Meta.model
+        if instance is not None:
+            return type(instance)
+        raise AssertionError("A queryset, serializer, or instance is required to derive the viewset model.")
+
     def dispatch(self, request, *args, **kwargs):
         try:
             return super().dispatch(request, *args, **kwargs)
@@ -130,21 +139,7 @@ class ITAMBoxModelViewSet(
         bulk_create = getattr(serializer, "many", False)
         self.perform_create(serializer)
 
-        if bulk_create:
-            instance_pks = [obj.pk for obj in serializer.instance]
-            qs = self.get_queryset().filter(pk__in=instance_pks).order_by("pk")
-        else:
-            try:
-                qs = self.get_queryset().get(pk=serializer.instance.pk)
-            except ObjectDoesNotExist:
-                # The object was just created and validated by this request, so
-                # re-fetching it is safe even when the scoped queryset (e.g. one
-                # filtered through asset__tenant) returns .none() because no
-                # tenant is bound in the current context (e.g. tests, service
-                # accounts).  Fall back to the unsaved instance rather than
-                # raising an unexpected 500.
-                qs = serializer.instance
-
+        qs = self.get_created_response_instance(serializer)
         serializer = self.get_serializer(qs, many=bulk_create)
 
         headers = self.get_success_headers(serializer.data)
@@ -155,6 +150,22 @@ class ITAMBoxModelViewSet(
                 response["ETag"] = etag
 
         return response
+
+    def get_created_response_instance(self, serializer):
+        bulk_create = getattr(serializer, "many", False)
+        if bulk_create:
+            instance_pks = [obj.pk for obj in serializer.instance]
+            return self.get_queryset().filter(pk__in=instance_pks).order_by("pk")
+        try:
+            return self.get_queryset().get(pk=serializer.instance.pk)
+        except ObjectDoesNotExist:
+            # The object was just created and validated by this request, so
+            # re-fetching it is safe even when the scoped queryset (e.g. one
+            # filtered through asset__tenant) returns .none() because no
+            # tenant is bound in the current context (e.g. tests, service
+            # accounts).  Fall back to the unsaved instance rather than
+            # raising an unexpected 500.
+            return serializer.instance
 
     @staticmethod
     def _missing_create_tenant_rows(serializer):
@@ -210,7 +221,7 @@ class ITAMBoxModelViewSet(
         return {}
 
     def perform_create(self, serializer):
-        model = self.queryset.model
+        model = self._get_model(serializer=serializer)
         logger.info(f"Creating new {model._meta.verbose_name}")
 
         save_kwargs = self._tenant_create_kwargs(serializer, model)
@@ -242,7 +253,7 @@ class ITAMBoxModelViewSet(
         return response
 
     def perform_update(self, serializer):
-        model = self.queryset.model
+        model = self._get_model(serializer=serializer)
         logger.info(f"Updating {model._meta.verbose_name} {serializer.instance} (PK: {serializer.instance.pk})")
 
         save_kwargs = {}
@@ -292,7 +303,7 @@ class ITAMBoxModelViewSet(
         return Response(status=status.HTTP_204_NO_CONTENT)
 
     def perform_destroy(self, instance):
-        model = self.queryset.model
+        model = self._get_model(instance=instance)
         logger.info(f"Deleting {model._meta.verbose_name} {instance} (PK: {instance.pk})")
 
         try:

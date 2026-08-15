@@ -38,6 +38,18 @@ membership.
 > and a short key preview are persisted. If you lose the plaintext, you must
 > create a new token.
 
+The REST API follows the same one-time-secret contract. A successful
+`POST /api/users/tokens/` returns HTTP 201 with the 40-character plaintext in
+`key`. That response is the only time the plaintext is available: subsequent
+list and detail responses return `key: null`. Use `key_preview` to identify a
+token without disclosing its credential.
+
+Token detail responses include a weak `ETag` representing the current token
+state. Send that value in `If-Match` when updating or deleting the token. A
+mutation without `If-Match` returns HTTP 428; a stale value returns HTTP 412;
+in either case the token is unchanged. Fetch the detail again to obtain the
+current ETag before retrying.
+
 ### Token Scope: Tenant vs Provider
 
 A token is always scoped to one tenant:
@@ -214,7 +226,9 @@ membership in ITAMbox first.
 - **Bulk operations** — not supported (`POST /Bulk`).
 - **Password changes** — not supported via SCIM. Use the IdP's native password
   management.
-- **Sorting and ETags** — not supported.
+- **SCIM sorting and ETags** — not supported. This limitation does not apply
+  to REST API-token detail and mutation endpoints, which use `ETag` and
+  `If-Match` as documented above.
 - **List pagination** — capped at 200 resources per request.
 - **Provider filtering** — Provider User and Group list endpoints do not apply
   SCIM `filter` parameters. Verify your IdP can operate with paged, unfiltered

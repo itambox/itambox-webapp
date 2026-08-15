@@ -40,6 +40,16 @@ class ETagMixin:
             if current_etag and current_etag not in provided:
                 raise PreconditionFailed(etag=current_etag)
 
+    def retrieve(self, request, *args, **kwargs):
+        instance = self.get_object()
+        serializer = self.get_serializer(instance)
+        response = Response(serializer.data)
+
+        if etag := self._get_etag(instance):
+            response["ETag"] = etag
+
+        return response
+
 
 class BulkUpdateModelMixin:
     def get_bulk_update_queryset(self):
@@ -61,7 +71,7 @@ class BulkUpdateModelMixin:
 
     def perform_bulk_update(self, objects, update_data, partial):
         updated_pks = []
-        with transaction.atomic(using=router.db_for_write(self.queryset.model)):
+        with transaction.atomic(using=router.db_for_write(objects.model)):
             for obj in objects:
                 data = update_data.get(obj.id)
                 if hasattr(obj, "snapshot"):
@@ -95,7 +105,7 @@ class BulkDestroyModelMixin:
 
     def perform_bulk_destroy(self, objects, changelog_messages=None):
         changelog_messages = changelog_messages or {}
-        with transaction.atomic(using=router.db_for_write(self.queryset.model)):
+        with transaction.atomic(using=router.db_for_write(objects.model)):
             for obj in objects:
                 if hasattr(obj, "snapshot"):
                     obj.snapshot()
