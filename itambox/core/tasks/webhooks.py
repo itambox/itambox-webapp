@@ -10,6 +10,7 @@ from collections.abc import Mapping
 from uuid import uuid4
 
 import requests
+from django.apps import apps as django_apps
 from django.conf import settings
 from django.core.exceptions import PermissionDenied, ValidationError
 from django.db import transaction
@@ -69,8 +70,6 @@ def _actor_for_id(actor_id: int | None):
 
 def _tenant_exists(tenant_id: int | str) -> bool:
     """Return whether the tenant reference exists, resolved lazily via the app registry."""
-    from django.apps import apps as django_apps
-
     tenant_model = django_apps.get_model("organization", "Tenant")
     return tenant_model._base_manager.filter(pk=tenant_id).exists()
 
