@@ -17,6 +17,8 @@ from itambox.views.features import (
     WebhookEndpointDetailView,
     WebhookEndpointEditView,
     WebhookEndpointListView,
+    WebhookEndpointTestView,
+    WebhookDeliveryRedeliverView,
 )
 
 from . import views
@@ -140,8 +142,14 @@ urlpatterns = [
     path("webhooks/", WebhookEndpointListView.as_view(), name="webhookendpoint_list"),
     path("webhooks/add/", WebhookEndpointEditView.as_view(), name="webhookendpoint_create"),
     path("webhooks/<int:pk>/", WebhookEndpointDetailView.as_view(), name="webhookendpoint_detail"),
+    path("webhooks/<int:pk>/test/", WebhookEndpointTestView.as_view(), name="webhookendpoint_test"),
     path("webhooks/<int:pk>/edit/", WebhookEndpointEditView.as_view(), name="webhookendpoint_update"),
     path("webhooks/<int:pk>/delete/", WebhookEndpointDeleteView.as_view(), name="webhookendpoint_delete"),
+    path(
+        "webhook-deliveries/<int:pk>/redeliver/",
+        WebhookDeliveryRedeliverView.as_view(),
+        name="webhookdelivery_redeliver",
+    ),
     # Event Rules
     path("event-rules/", EventRuleListView.as_view(), name="eventrule_list"),
     path("event-rules/add/", EventRuleEditView.as_view(), name="eventrule_create"),

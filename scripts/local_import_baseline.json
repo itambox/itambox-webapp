@@ -1810,18 +1810,6 @@
       "count": 1
     },
     {
-      "path": "itambox/core/tasks/webhooks.py",
-      "context": "FunctionDef:send_webhook_task",
-      "statement": "from django.core.exceptions import ValidationError",
-      "count": 1
-    },
-    {
-      "path": "itambox/core/tasks/webhooks.py",
-      "context": "FunctionDef:send_webhook_task",
-      "statement": "from extras.models import WebhookEndpoint",
-      "count": 1
-    },
-    {
       "path": "itambox/core/templatetags/helpers.py",
       "context": "FunctionDef:bulk_action_context",
       "statement": "from itambox.utils import get_model_viewname",
@@ -2641,30 +2629,6 @@
       "path": "itambox/itambox/views/features.py",
       "context": "ClassDef:LabelPrintView/FunctionDef:get",
       "statement": "from core.tasks.labels import render_labels_pdf",
-      "count": 1
-    },
-    {
-      "path": "itambox/itambox/views/features.py",
-      "context": "ClassDef:WebhookEndpointDetailView/FunctionDef:_send_test_webhook",
-      "statement": "from core.validators import validate_external_url",
-      "count": 1
-    },
-    {
-      "path": "itambox/itambox/views/features.py",
-      "context": "ClassDef:WebhookEndpointDetailView/FunctionDef:_send_test_webhook",
-      "statement": "from django.core.exceptions import ValidationError",
-      "count": 1
-    },
-    {
-      "path": "itambox/itambox/views/features.py",
-      "context": "ClassDef:WebhookEndpointDetailView/FunctionDef:_send_test_webhook",
-      "statement": "from django.http import JsonResponse",
-      "count": 1
-    },
-    {
-      "path": "itambox/itambox/views/features.py",
-      "context": "ClassDef:WebhookEndpointDetailView/FunctionDef:_send_test_webhook",
-      "statement": "import requests as http_requests",
       "count": 1
     },
     {

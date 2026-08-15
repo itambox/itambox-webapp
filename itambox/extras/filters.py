@@ -19,6 +19,7 @@ from .models import (
     SavedFilter,
     ScheduledReport,
     Tag,
+    WebhookDelivery,
     WebhookEndpoint,
 )
 
@@ -115,6 +116,22 @@ class WebhookEndpointFilterSet(django_filters.FilterSet):
         if not value.strip():
             return queryset
         return queryset.filter(Q(name__icontains=value) | Q(url__icontains=value)).distinct()
+
+
+class WebhookDeliveryFilterSet(django_filters.FilterSet):
+    endpoint = django_filters.ModelChoiceFilter(
+        queryset=WebhookEndpoint.objects.all(),
+        label=_("Endpoint"),
+    )
+    status = django_filters.ChoiceFilter(
+        choices=WebhookDelivery._meta.get_field("status").choices,
+        label=_("Status"),
+    )
+    test_send = django_filters.BooleanFilter(label=_("Test send"))
+
+    class Meta:
+        model = WebhookDelivery
+        fields = ["endpoint", "status", "test_send"]
 
 
 class NotificationChannelFilterSet(django_filters.FilterSet):

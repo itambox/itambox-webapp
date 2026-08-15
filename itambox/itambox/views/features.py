@@ -11,7 +11,7 @@ from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.contrib.auth.mixins import LoginRequiredMixin
 from django.contrib.contenttypes.models import ContentType
-from django.core.exceptions import PermissionDenied
+from django.core.exceptions import PermissionDenied, ValidationError
 from django.core.serializers.json import DjangoJSONEncoder
 from django.http import Http404, HttpResponse, HttpResponseBadRequest, HttpResponseRedirect
 from django.shortcuts import get_object_or_404, redirect, render
@@ -28,6 +28,7 @@ from core.filters import ObjectChangeFilterSet
 from core.forms import JournalEntryForm
 from core.models import ObjectChange
 from core.tables import EventRuleTable, ExportTemplateTable, LabelTemplateTable, ObjectChangeTable, WebhookEndpointTable
+from core.tasks.webhooks import redeliver_webhook_delivery, send_webhook_test
 from extras.filters import JournalEntryFilterSet
 from extras.forms import (
     EventRuleForm,
@@ -44,9 +45,10 @@ from extras.models import (
     ImageAttachment,
     JournalEntry,
     LabelTemplate,
+    WebhookDelivery,
     WebhookEndpoint,
 )
-from extras.tables import JournalEntryTable
+from extras.tables import JournalEntryTable, WebhookDeliveryTable
 from itambox.panels import Panel
 from itambox.registry import registry
 from itambox.views.generic.utils import safe_return_url
@@ -55,6 +57,15 @@ from organization.services import is_container_scoped_unfiltered, visible_to_con
 from .generic import BaseHTMXView, ObjectDeleteView, ObjectDetailView, ObjectEditView, ObjectListView
 
 logger = logging.getLogger(__name__)
+
+
+def _webhook_deliveries_visible_to(user):
+    """Return the delivery manager appropriate for this viewer's scope."""
+    if user.is_superuser or user.has_perm("extras.view_webhookdelivery"):
+        # Delivery managers intentionally fail closed for ordinary tenant users;
+        # platform visibility is an explicit decision at every query boundary.
+        return WebhookDelivery._base_manager
+    return WebhookDelivery.objects
 
 
 @method_decorator(login_required, name="dispatch")
@@ -665,54 +676,82 @@ class WebhookEndpointDetailView(WorkerStatusContextMixin, ObjectDetailView):
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
-        context["title"] = str(self.get_object())
+        endpoint = self.get_object()
+        can_change = self.request.user.has_perm("extras.change_webhookendpoint", obj=endpoint)
+        deliveries = (
+            _webhook_deliveries_visible_to(self.request.user)
+            .filter(endpoint=endpoint)
+            .select_related("event", "redelivered_by")
+            .order_by("-created_at")
+        )
+        delivery_table = WebhookDeliveryTable(
+            deliveries,
+            request=self.request,
+            can_redeliver=can_change,
+        )
+        RequestConfig(self.request, paginate=False).configure(delivery_table)
+        context["webhook_delivery_table"] = delivery_table
+        context["can_change_webhook"] = can_change
+        context["title"] = str(endpoint)
         return context
 
+
+@method_decorator(login_required, name="dispatch")
+class WebhookEndpointTestView(LoginRequiredMixin, View):
+    http_method_names = ["post"]
+
     def post(self, request, *args, **kwargs):
-        self.object = self.get_object()
-        if "test_webhook" in request.POST:
-            return self._send_test_webhook(request)
-        return self.get(request, *args, **kwargs)
-
-    def _send_test_webhook(self, request):
-        import requests as http_requests
-        from django.http import JsonResponse
-
-        endpoint = self.object
-        payload = {
-            "event": "test",
-            "model": "core.webhookendpoint",
-            "object_id": endpoint.pk,
-            "timestamp": timezone.now().isoformat(),
-            "data": {"test": True, "endpoint": endpoint.name},
-        }
-        body = json.dumps(payload, default=str)
-        headers = endpoint.headers or {}
-        headers.setdefault("Content-Type", "application/json")
-
-        from django.core.exceptions import ValidationError
-
-        from core.validators import validate_external_url
+        endpoint = get_object_or_404(WebhookEndpoint.objects.all(), pk=kwargs["pk"])
+        if not request.user.has_perm("extras.change_webhookendpoint", obj=endpoint):
+            raise PermissionDenied
 
         try:
-            validate_external_url(endpoint.url)
-        except ValidationError as e:
-            messages.error(request, _("Test webhook blocked: %(reason)s") % {"reason": "; ".join(e.messages)})
-            return redirect(self.object.get_absolute_url())
+            send_webhook_test(endpoint.pk, actor_id=request.user.pk)
+        except Exception:
+            # broad except: render-degrade: surface a safe message instead of failing the page
+            logger.exception("Webhook test-send failed for endpoint %s", endpoint.pk)
+            messages.error(request, _("The test webhook could not be queued."))
+        else:
+            messages.success(request, _("Test webhook queued."))
+        return redirect(endpoint.get_absolute_url())
+
+
+@method_decorator(login_required, name="dispatch")
+class WebhookDeliveryRedeliverView(LoginRequiredMixin, View):
+    http_method_names = ["post"]
+
+    def post(self, request, *args, **kwargs):
+        delivery = get_object_or_404(
+            _webhook_deliveries_visible_to(request.user).select_related("endpoint").all(),
+            pk=kwargs["pk"],
+        )
+        endpoint = delivery.endpoint
+        if endpoint is None:
+            raise Http404
+        if not request.user.has_perm("extras.change_webhookendpoint", obj=endpoint):
+            raise PermissionDenied
+
+        if delivery.status == "pending" or (
+            delivery.next_retry_at is not None and delivery.next_retry_at > timezone.now()
+        ):
+            messages.error(request, _("Delivery is still in progress."))
+            return redirect(endpoint.get_absolute_url())
 
         try:
-            response = http_requests.request(
-                method=endpoint.http_method,
-                url=endpoint.url,
-                headers=headers,
-                data=body,
-                timeout=10,
-            )
-            messages.success(request, _("Test webhook sent — HTTP %(status)s") % {"status": response.status_code})
-        except http_requests.RequestException as e:
-            messages.error(request, _("Test webhook failed: %(error)s") % {"error": e})
-
-        return redirect(self.object.get_absolute_url())
+            redeliver_webhook_delivery(delivery.pk, actor_id=request.user.pk)
+        except ValidationError as exc:
+            if any(str(message) == "Delivery is still in progress." for message in exc.messages):
+                messages.error(request, _("Delivery is still in progress."))
+            else:
+                logger.exception("Webhook redelivery validation failed for delivery %s", delivery.pk)
+                messages.error(request, _("The webhook delivery could not be redelivered."))
+        except Exception:
+            # broad except: render-degrade: surface a safe message instead of failing the page
+            logger.exception("Webhook redelivery failed for delivery %s", delivery.pk)
+            messages.error(request, _("The webhook delivery could not be redelivered."))
+        else:
+            messages.success(request, _("Webhook delivery redelivered."))
+        return redirect(endpoint.get_absolute_url())
 
 
 @method_decorator(login_required, name="dispatch")

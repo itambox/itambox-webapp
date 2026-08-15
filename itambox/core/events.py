@@ -18,7 +18,7 @@ from django.utils.translation import gettext_lazy as _
 
 from core.context import get_current_request_id, get_current_tenant, get_current_user
 from core.models import ChangeLoggingMixin, EmailSettings
-from extras.models import Event, EventRule, NotificationChannel, WebhookEndpoint, has_authored_conditions
+from extras.models import Event, EventRule, NotificationChannel, WebhookDelivery, WebhookEndpoint, has_authored_conditions
 
 logger = logging.getLogger(__name__)
 
@@ -300,6 +300,14 @@ def _send_webhook(rule, event, instance_tenant_id=None):
         retry_backoff=retry_backoff,
         actor_id=getattr(get_current_user(), "pk", None),
         request_id=str(get_current_request_id()) if get_current_request_id() is not None else None,
+    )
+
+    WebhookDelivery._base_manager.create(
+        tenant_id=instance_tenant_id,
+        endpoint=endpoint,
+        event=event,
+        delivery_id=task_kwargs["delivery_id"],
+        status=WebhookDelivery.STATUS_PENDING,
     )
 
     if getattr(settings, "Q_CLUSTER", {}).get("sync", False):
