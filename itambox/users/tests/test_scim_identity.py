@@ -30,12 +30,20 @@ class SCIMIdentityContractTests(TestCase):
         self.tenant_role = Role.objects.create(
             tenant=self.tenant_a,
             name="SCIM provisioner",
-            permissions=["organization.change_membership"],
+            permissions=[
+                "organization.change_membership",
+                # WP-20: tenant SCIM Group reads require the same permission as provider reads.
+                "users.view_usergroup",
+            ],
         )
         self.tenant_b_role = Role.objects.create(
             tenant=self.tenant_b,
             name="SCIM provisioner B",
-            permissions=["organization.change_membership"],
+            permissions=[
+                "organization.change_membership",
+                # WP-20: tenant SCIM Group reads require the same permission as provider reads.
+                "users.view_usergroup",
+            ],
         )
         self.provider_role = Role.objects.create(
             tenant=self.provider,

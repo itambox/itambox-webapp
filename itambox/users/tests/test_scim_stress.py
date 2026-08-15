@@ -32,6 +32,8 @@ class SCIMStressTests(TestCase):
                 # SCIM auth authorizes on real permissions, not the "Admin" name —
                 # this role must actually grant membership-management to pass it.
                 "organization.change_membership",
+                # WP-20: tenant SCIM Group reads require the same permission as provider reads.
+                "users.view_usergroup",
             ],
         )
         grant(self.admin_user, self.tenant, self.role_admin)
