@@ -200,6 +200,7 @@ PYTHONPATH=itambox uv run --locked --group dev python -m pytest -q -p no:cachepr
   itambox/compliance/tests/test_custody_rbac.py \
   itambox/compliance/tests/test_views.py \
   itambox/extras/tests/test_dashboard_all_accessible.py \
+  itambox/extras/tests/test_dashboard_api.py \
   itambox/extras/tests/test_dashboard_widgets.py \
   itambox/extras/tests/test_eventrule_withdrawn_guards.py \
   itambox/extras/tests/test_eventrule_withdrawn_report.py \

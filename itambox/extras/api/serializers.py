@@ -87,6 +87,24 @@ class DashboardSerializer(serializers.ModelSerializer):
         fields = ["id", "user", "layout", "created", "last_updated"]
         brief_fields = ["id", "user"]
 
+    def create(self, validated_data):
+        # Dashboards are personal objects: the owner is always the
+        # authenticated requester.  `user` is exposed read-only so a client
+        # can never choose another owner, and without this the insert
+        # crashed with IntegrityError -> HTTP 500 (issue #342).  The
+        # serializer is API-only (DashboardViewSet always provides a request
+        # context).
+        validated_data["user"] = self.context["request"].user
+        return super().create(validated_data)
+
+    def validate_layout(self, value):
+        # The model contract is an ordered list of widget config dicts;
+        # anything else would corrupt the dashboard UI and previously
+        # slipped through as a silently accepted create.
+        if not isinstance(value, list):
+            raise serializers.ValidationError("Layout must be a list of widget configs.")
+        return value
+
 
 class WebhookEndpointSerializer(BaseModelSerializer):
     url = serializers.HyperlinkedIdentityField(view_name="api:extras_api:webhookendpoint-detail")
