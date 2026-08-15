@@ -6,7 +6,8 @@ from django.db import migrations, models
 
 class Migration(migrations.Migration):
     dependencies = [
-        ("users", "0101_user_scim_id_usergroup_external_id_usergroup_scim_id_and_more"),
+        ('users', '0100_issue88_shard_62_users_relations'),
+        ('users', '0101_user_scim_id_usergroup_external_id_usergroup_scim_id_and_more'),
     ]
 
     operations = [
