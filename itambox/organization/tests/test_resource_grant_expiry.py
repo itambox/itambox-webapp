@@ -151,11 +151,12 @@ class ResourceGrantExpiryTests(TestCase):
 
     def test_s6_other_tenant_is_not_counted(self):
         other = Tenant.objects.create(name="Expiry Other", slug="expiry-other")
+        other_grantee = Tenant.objects.create(name="Expiry Other Grantee", slug="expiry-other-grantee")
         cutoff = timezone.now()
         self._grant(valid_until=cutoff - datetime.timedelta(minutes=1))
         other_grant = TenantResourceGrant(
             tenant=other,
-            grantee_tenant=self.grantee,
+            grantee_tenant=other_grantee,
             resource_type=self.content_type,
             resource_id=self.stock.pk,
             access_level=TenantResourceGrant.ACCESS_VIEW,
@@ -171,11 +172,14 @@ class ResourceGrantExpiryTests(TestCase):
 
     def test_s7_malformed_grant_stays_live(self):
         cutoff = timezone.now()
+        # A grant whose resource type is outside the approved allowlist is
+        # malformed but insertable (limit_choices_to is not a DB constraint);
+        # bulk_create bypasses the model clean() allowlist check.
+        foreign_type = ContentType.objects.get_for_model(Accessory)
         malformed = TenantResourceGrant(
             tenant=self.owner,
             grantee_tenant=self.grantee,
-            grantee_tenant_group=TenantGroup.objects.create(name="Expiry Group", slug="expiry-group"),
-            resource_type=self.content_type,
+            resource_type=foreign_type,
             resource_id=self.stock.pk,
             valid_until=cutoff - datetime.timedelta(minutes=1),
         )
@@ -321,12 +325,13 @@ class ResourceGrantExpiryTests(TestCase):
 
     def test_integrity_valid_excludes_corrupt_bulk_evidence(self):
         other = Tenant.objects.create(name="Expiry Evidence Other", slug="expiry-evidence-other")
+        other_grantee = Tenant.objects.create(name="Expiry Evidence Grantee", slug="expiry-evidence-grantee")
         cutoff = timezone.now()
         run = self._run(cutoff)
         grant = self._grant(valid_until=cutoff)
         foreign_grant = TenantResourceGrant(
             tenant=other,
-            grantee_tenant=self.grantee,
+            grantee_tenant=other_grantee,
             resource_type=self.content_type,
             resource_id=self.stock.pk,
             access_level=TenantResourceGrant.ACCESS_VIEW,
@@ -609,7 +614,9 @@ class ResourceGrantRollbackTests(TenantTestMixin, TestCase):
             site=site,
             tenant=self.tenant,
         )
-        manufacturer = Manufacturer.objects.create(name="Expiry Rollback Manufacturer", slug="expiry-rollback-manufacturer")
+        manufacturer = Manufacturer.objects.create(
+            name="Expiry Rollback Manufacturer", slug="expiry-rollback-manufacturer"
+        )
         accessory = Accessory.objects.create(
             name="Expiry Rollback Accessory",
             slug="expiry-rollback-accessory",

@@ -85,7 +85,7 @@ class ResourceGrantExpiryMigrationTests(TransactionTestCase):
         self.assertIsNone(TenantResourceGrant._base_manager.get(pk=direct.pk).deleted_at)
         self.assertIsNone(TenantResourceGrant._base_manager.get(pk=group_grant.pk).deleted_at)
 
-        expired_grantee = TenantResourceGrant._base_manager.create(
+        expired_grantee = TenantResourceGrant(
             tenant_id=owner.pk,
             grantee_tenant_id=group_grantee.pk,
             resource_type_id=resource_type.pk,
@@ -93,6 +93,9 @@ class ResourceGrantExpiryMigrationTests(TransactionTestCase):
             access_level="view",
             valid_until=timezone.now(),
         )
+        # bulk_create: the row deliberately references a pool that does not
+        # exist, so the model clean() ownership proof must be bypassed.
+        TenantResourceGrant._base_manager.bulk_create([expired_grantee])
         cutoff = timezone.now()
         expiry_run = TenantResourceGrantExpiryRun._base_manager.create(
             tenant_id=owner.pk,

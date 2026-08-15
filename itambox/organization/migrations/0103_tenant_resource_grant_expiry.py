@@ -140,12 +140,14 @@ class Migration(migrations.Migration):
                             )
                             | models.Q(
                                 state="enqueue_failed",
+                                outcome__isnull=False,
                                 outcome="retryable",
                                 finished_at__isnull=True,
                                 lease_expires_at__isnull=True,
                             )
                             | models.Q(
                                 state="complete",
+                                outcome__isnull=False,
                                 outcome__in=("success", "partial", "skipped", "terminal"),
                                 finished_at__isnull=False,
                                 lease_expires_at__isnull=True,
