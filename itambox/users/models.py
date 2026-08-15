@@ -158,6 +158,7 @@ class Token(ChangeLoggingMixin, models.Model):
         verbose_name=_("Tenant"),
     )
     created = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True, editable=False)
     expires = models.DateTimeField(blank=True, null=True, db_index=True, verbose_name=_("Expires"))
     last_used = models.DateTimeField(blank=True, null=True, verbose_name=_("Last Used"))
     write_enabled = models.BooleanField(default=True, verbose_name=_("Write Enabled"))

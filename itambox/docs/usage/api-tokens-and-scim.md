@@ -121,6 +121,62 @@ The token's tenant scope is applied automatically — you do not need to pass a
 tenant header. IP restrictions are checked on every request; requests from
 non-allowed IPs receive HTTP 403.
 
+### Managing Tokens via the REST API
+
+Tokens are also a first-class REST resource at `/api/users/tokens/`, so
+automation can create, inspect, and revoke its own tokens without the web UI.
+
+**One-time plaintext key.** `POST /api/users/tokens/` returns `HTTP 201` with
+the full plaintext `key` in the response body — this is the *only* time the
+plaintext is ever returned. Capture it immediately:
+
+```bash
+curl -X POST https://itam.example.com/api/users/tokens/ \
+     -H "Authorization: Token <existing-token>" \
+     -H "Content-Type: application/json" \
+     -d '{"description": "CI/CD Pipeline"}'
+```
+
+```json
+{
+  "id": 42,
+  "key": "b7e1...<40 hex characters>...",
+  "key_preview": "b7e1a2c9",
+  "description": "CI/CD Pipeline",
+  "...": "..."
+}
+```
+
+Every subsequent read of that token — `GET` on the detail or list endpoint,
+including immediately after creation — returns `"key": null`. Only
+`key_preview` (the first 8 characters, non-secret) is available afterward, for
+identifying which token is which in a list. If the plaintext is lost, revoke
+the token and create a replacement; it cannot be recovered or redisplayed.
+
+**ETags and concurrency.** Token detail responses carry an `ETag` response
+header (`W/"<updated_at ISO timestamp>"`). Mutating a token (`PATCH`, `PUT`,
+`DELETE`) requires an `If-Match` header carrying that ETag:
+
+- Missing `If-Match` → `HTTP 428 Precondition Required`.
+- Stale `If-Match` (the token changed since you last read it) →
+  `HTTP 412 Precondition Failed`.
+- Current `If-Match` → the mutation proceeds normally (`204` for `DELETE`,
+  `200` with a fresh `ETag` for `PATCH`/`PUT`).
+
+```bash
+# 1. Read the current ETag
+curl -H "Authorization: Token <existing-token>" \
+     https://itam.example.com/api/users/tokens/42/ -D -
+
+# 2. Delete using that ETag
+curl -X DELETE -H "Authorization: Token <existing-token>" \
+     -H 'If-Match: W/"2026-08-15T18:50:00.123456+00:00"' \
+     https://itam.example.com/api/users/tokens/42/
+```
+
+A deleted token is revoked immediately and cannot be reactivated — create a
+new token instead.
+
 ---
 
 ## SCIM 2.0 Provisioning
@@ -214,7 +270,7 @@ membership in ITAMbox first.
 - **Bulk operations** — not supported (`POST /Bulk`).
 - **Password changes** — not supported via SCIM. Use the IdP's native password
   management.
-- **Sorting and ETags** — not supported.
+- **Sorting** — not supported.
 - **List pagination** — capped at 200 resources per request.
 - **Provider filtering** — Provider User and Group list endpoints do not apply
   SCIM `filter` parameters. Verify your IdP can operate with paged, unfiltered

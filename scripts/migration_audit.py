@@ -36,6 +36,7 @@ POST_TRANSITION_MIGRATIONS = {
     "procurement.0101_alter_purchaseorder_options",
     "subscriptions.0101_remove_subscription_auto_renewal_and_more",
     "users.0101_user_scim_id_usergroup_external_id_usergroup_scim_id_and_more",
+    "users.0102_token_updated_at",
 }
 ISSUE88_SHARD_RE = re.compile(r"issue88_shard_(\d{2})(?:_|$)")
 ALLOWED_DISPOSITIONS = {

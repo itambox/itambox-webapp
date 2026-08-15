@@ -72,6 +72,11 @@ class TokenViewSet(ITAMBoxModelViewSet):
     def get_queryset(self):
         return Token.objects.select_related("user").filter(user=self.request.user)
 
+    def get_created_response_instance(self, serializer):
+        # Token.key is deliberately transient. Keep the saved in-memory object
+        # for the 201 response so the plaintext can be returned exactly once.
+        return serializer.instance
+
     def _pin_user(self, serializer):
         # A user must never be able to provision a token bound to another account
         # (privilege escalation). Only superusers may set an explicit `user`;

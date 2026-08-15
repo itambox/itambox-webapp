@@ -17720,6 +17720,46 @@
           "SeparateDatabaseAndState": false
         }
       }
+    },
+    {
+      "dependencies": [
+        "users.0100_issue88_shard_62_users_relations",
+        "users.0101_user_scim_id_usergroup_external_id_usergroup_scim_id_and_more"
+      ],
+      "id": "users.0102_token_updated_at",
+      "is_replacement": false,
+      "operations": {
+        "BtreeGistExtension": {
+          "count": 0
+        },
+        "RunPython": {
+          "with_noop_reverse": 0,
+          "with_reverse": 0,
+          "without_reverse": 0
+        },
+        "RunSQL": {
+          "with_noop_reverse": 0,
+          "with_reverse": 0,
+          "without_reverse": 0
+        },
+        "SeparateDatabaseAndState": {
+          "count": 0
+        }
+      },
+      "path": "itambox/users/migrations/0102_token_updated_at.py",
+      "replaces": [],
+      "reviewed_disposition": null,
+      "run_before": [],
+      "special_users_bootstrap": false,
+      "swappable_user_dependency": false,
+      "syntactic_facts": {
+        "has_custom_operations": {
+          "BtreeGistExtension": false,
+          "RunPython": false,
+          "RunSQL": false,
+          "SeparateDatabaseAndState": false
+        }
+      }
     }
   ],
   "post_transition_migrations": [
@@ -17742,7 +17782,8 @@
     "organization.0102_alter_tenantresourcegrant_options",
     "procurement.0101_alter_purchaseorder_options",
     "subscriptions.0101_remove_subscription_auto_renewal_and_more",
-    "users.0101_user_scim_id_usergroup_external_id_usergroup_scim_id_and_more"
+    "users.0101_user_scim_id_usergroup_external_id_usergroup_scim_id_and_more",
+    "users.0102_token_updated_at"
   ],
   "reviewed_semantics": {
     "blockers": [
@@ -18017,7 +18058,7 @@
         ]
       }
     },
-    "post_transition_migrations": 20,
+    "post_transition_migrations": 21,
     "replacement_shards": 62,
     "replacement_targets": 262
   }
