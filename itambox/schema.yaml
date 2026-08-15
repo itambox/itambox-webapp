@@ -48948,13 +48948,17 @@ components:
           type: string
           readOnly: true
         owner:
-          type: string
+          type: object
+          additionalProperties:
+            type: string
           readOnly: true
         grantee_type:
           type: string
           readOnly: true
         grantee:
-          type: string
+          type: object
+          additionalProperties:
+            type: string
           readOnly: true
         resource_type:
           type: string
