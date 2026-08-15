@@ -281,6 +281,25 @@ class TokenLifecycleAPITests(TenantTestMixin, APITestCase):
         self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN, response.data)
         self.assertFalse(Token._base_manager.filter(user=self.tenant_user).exists())
 
+    def test_superuser_create_without_active_tenant_fails_closed(self):
+        # The guard is unconditional: even a superuser cannot create a token
+        # without an active tenant context — there is no "global" token, and
+        # the old fallback would silently bind the first tenant in the DB.
+        self.client.force_login(self.tenant_admin)
+        session = self.client.session
+        session.pop("active_tenant_id", None)
+        session.pop("active_tenant_group_id", None)
+        session.save()
+
+        response = self.client.post(
+            self._list_url(),
+            {"user_id": self.tenant_user.pk, "description": "unbound superuser"},
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN, response.data)
+        self.assertFalse(Token._base_manager.filter(user=self.tenant_user).exists())
+
     # --- Shared-helper coverage: model derivation, bulk paths, refetch fallback --
 
     def test_viewset_model_derivation_covers_queryset_and_fallbacks(self):
