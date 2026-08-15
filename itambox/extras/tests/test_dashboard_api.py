@@ -74,6 +74,19 @@ class DashboardAPITests(APITestCase):
         response = self.client.post(self.list_url, {"layout": []}, format="json")
 
         self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED, response.data)
+        self.assertFalse(Dashboard.objects.exists())
+
+    def test_payload_cannot_choose_another_owner(self):
+        """A posted `user` key is ignored; the requester always owns the row."""
+        other = User.objects.create_user(username="dashboard_api_other", password="pw")
+        self._login_as(self.dashboard_user)
+
+        response = self.client.post(self.list_url, {"user": other.pk, "layout": []}, format="json")
+
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED, response.data)
+        dashboard = Dashboard.objects.get(pk=response.data["id"])
+        self.assertEqual(dashboard.user, self.dashboard_user)
+        self.assertNotEqual(dashboard.user, other)
 
     def test_authenticated_user_without_permission_returns_forbidden(self):
         """An active tenant membership alone does not grant dashboard creation."""
