@@ -106,7 +106,7 @@ def visible_to_containers(
     qs: QuerySet[_ModelT],
     perm: str,
     *,
-    request: Any | None = None,
+    request: Any | None = None,  # typing: third-party-untyped: DRF request objects are unparameterized
 ) -> QuerySet[_ModelT]:
     """Restrict unscoped tenant-anchored rows to authorized containers."""
 

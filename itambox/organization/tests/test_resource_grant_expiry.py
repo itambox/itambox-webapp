@@ -35,7 +35,6 @@ from organization.models import (
     RoleGrantScope,
     Site,
     Tenant,
-    TenantGroup,
     TenantResourceGrant,
     TenantResourceGrantExpiryRevocation,
     TenantResourceGrantExpiryRun,
