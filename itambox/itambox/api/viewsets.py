@@ -6,6 +6,7 @@ from django.db import router, transaction
 from django.db.models import ProtectedError, RestrictedError
 from rest_framework import mixins as drf_mixins
 from rest_framework import status
+from rest_framework.exceptions import NotFound
 from rest_framework.response import Response
 from rest_framework.viewsets import GenericViewSet
 
@@ -23,6 +24,15 @@ class BaseViewSet(GenericViewSet):
     def initialize_request(self, request, *args, **kwargs):
         self.brief = request.method == "GET" and "brief" in request.GET
         return super().initialize_request(request, *args, **kwargs)
+
+    def get_object(self):
+        lookup_url_kwarg = self.lookup_url_kwarg or self.lookup_field
+        if lookup_url_kwarg not in self.kwargs:
+            # SimpleMetadata probes PUT while handling OPTIONS on collection routes.
+            # Convert GenericAPIView's missing-lookup assertion into an exception
+            # that the metadata probe treats as an unavailable detail action.
+            raise NotFound()
+        return super().get_object()
 
     def get_queryset(self):
         qs = super().get_queryset()
