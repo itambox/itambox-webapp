@@ -2,7 +2,11 @@
 
 ## Introduction
 
-ITAMbox supports importing resources in bulk using CSV (Comma-Separated Values), TSV (Tab-Separated Values), or YAML files. This feature allows you to efficiently create, update, and manage large numbers of records across all supported models. The import process handles relational field resolution, supports in-place updates (UPSERT), and processes imports asynchronously to ensure system stability.
+ITAMbox supports importing resources in bulk using CSV (Comma-Separated
+Values), TSV (Tab-Separated Values), or YAML files. You can create, update, and
+manage large numbers of records across all supported models. The import process
+handles relational field resolution, supports in-place updates (UPSERT), and
+processes imports asynchronously.
 
 ## Format, Delimiters & Text Pasting
 

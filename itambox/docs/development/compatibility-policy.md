@@ -241,8 +241,9 @@ registered against `automation.webhooks` and `alerting.rules`:
 - alert-channel delivery failures are logged, not retried.
 
 Typed failure contracts, task naming, dispatch-on-commit, and the retry ladder
-are tracked separately in issue #99 and are deliberately not restated here;
-duplicating them would create a second, drifting copy of that contract.
+are tracked separately in the [external integration error
+contract](integration-error-contracts.md) and are deliberately not restated
+here; duplicating them would create a second, drifting copy of that contract.
 
 ## Migrations, rollback, and backward compatibility
 

@@ -51,7 +51,7 @@ production data.
 
 ## Coordinated transitional replacement
 
-The issue #88 baseline keeps all 262 historical first-party migration files
+The baseline keeps all 262 historical first-party migration files
 unchanged and adds exactly 62 replacement shards. Their `replaces` lists form a
 disjoint, complete partition of those historical nodes. Five ordinary
 post-transition migrations follow the replacements. The first removes the redundant
@@ -77,7 +77,7 @@ the shards whose operations use them.
 Only shard 43 executes replacement-path application data. It consolidates the
 status-label and depreciation-policy seeds. Every other historical custom
 operation remains available for predecessor upgrades but is omitted from
-replacement execution. The #192 `users.0101` migration is one of the five
+replacement execution. The `users.0101` migration is one of the five
 post-transition migrations; its forward/backfill and reverse-preservation
 behavior is exercised by `users.tests.test_scim_migrations`.
 

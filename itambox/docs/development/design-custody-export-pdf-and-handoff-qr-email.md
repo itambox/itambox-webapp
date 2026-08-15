@@ -1,7 +1,6 @@
 # Custody receipt PDF export and handoff QR/e-mail delivery
 
-Status: proposed design for issues #312 and #316  
-Source snapshot: `design/issue-312-316-custody-export`, based on `origin/main` at `4b2a4d59`  
+Status: proposed design  \
 Date: 2026-08-10
 
 ## Context
@@ -479,7 +478,9 @@ All open design questions are decided; nothing remains for later review rounds:
 3. **Audit depth and visibility:** asset `JournalEntry` with requested/result state and **no receipt/session IDs** in the visible comment; correlation via `CustodyHandoffDelivery` (Decision B6) for authorized users.
 4. **QR presentation:** behind the "Show QR code” toggle.
 5. **Resend/idempotency policy:** per-session (3) and per-receipt (6) bounds plus per-operator cooldown, enforced through the durable delivery record (Decision B6); the durable model is part of this feature (not a separate change).
-6. **Dependency premise:** reuse the already-approved Segno dependency; no new dependency. The #316 premise ("QR generation needs a small dependency") is factually wrong for this codebase and should be updated in the issue.
+6. **Dependency premise:** reuse the already-approved Segno dependency; no new
+   dependency is required. QR generation does not need a new dependency for
+   this codebase.
 
 ## Acceptance mapping
 

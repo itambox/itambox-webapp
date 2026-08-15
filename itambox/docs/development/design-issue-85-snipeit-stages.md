@@ -1,7 +1,5 @@
 # Design: decompose the Snipe-IT importer into resource stages
 
-Issue: `itambox/itambox-webapp#85`
-
 ## Summary
 
 Replace `itambox/core/importers/snipeit.py` with the import-compatible package
@@ -641,7 +639,7 @@ order. Add them to `mandatory_tests` immediately after the existing
 the identical block at the identical position in the mandatory selector in
 `itambox/docs/development/tenant-resource-grant-security.md`. The manifest and document
 must continue to produce the same ordered tuple. Update the manifest provenance
-to name issue #85.
+to name this design document.
 
 ## CI-gate impact
 
@@ -851,5 +849,5 @@ The implementation is equivalent when all of the following are true:
 `-m 'not serial_only'` lane plus a `serial_only` lane. `CLAUDE.md` still states
 that xdist is disabled. This design treats `AGENTS.md` and the current CI policy
 as authoritative. Correcting that unrelated guidance drift should be a separate
-documentation change so the issue #85 implementation does not mix policy edits
-with the importer refactor.
+documentation change so the importer refactor does not mix policy edits
+with the implementation.

@@ -1,13 +1,15 @@
 # Custody permission surface and capability matrix
 
-This document is the permission inventory for issue #259, **Define role-based custody template and signing view permissions for IT technicians**.
+This document is the permission inventory for role-based custody template and
+signing view permissions for IT technicians.
 
 It deliberately separates:
 
 - the behaviour present on `origin/main` at the start of this change; and
-- the target contract for the issue implementation.
+- the target contract for the implementation.
 
-The target contract is based on the local design reference `issue-259-readiness.md`, §5.2 Option B, §5.3, §5.4 and §5.5, and the decisions recorded in the decision log below. Slice D implements the assisted-signing session and export parts of that contract. The readiness file is a local, uncommitted design reference and is not part of the product documentation or implementation change.
+The target contract is based on the custody readiness design (§5.2 Option B,
+§5.3, §5.4 and §5.5) and the decisions recorded in the decision log below.
 
 No bearer token, signature payload, credential, or complete EULA is reproduced in this document.
 
@@ -38,7 +40,7 @@ The issue uses these action families:
 
 The current routes are declared in `itambox/compliance/urls.py:33-44` and implemented in `itambox/compliance/views.py:210-295`.
 
-| Route and view | Surface today on `origin/main` | Target after issue #259 | Tenant scope and failure contract |
+| Route and view | Current surface on `origin/main` | Target state | Tenant scope and failure contract |
 | --- | --- | --- | --- |
 | `custody-templates/` — `CustodyTemplateListView` | `view_custodytemplate`, supplied by `ObjectListView`. The queryset is tenant-scoped and may include permitted shared/global templates. | Keep `view_custodytemplate`. The list must not imply template-management rights or receipt rights. A Technician may see templates but must not change template policy. | Active tenant/group scope from the generic tenant-scoping mixin. An authenticated object outside the scope is hidden according to the generic 404 boundary; missing permission is the normal generic permission denial. |
 | `custody-templates/add/` — `CustodyTemplateEditView` without `pk` | `add_custodytemplate`. | Keep `add_custodytemplate` for administrators/superadmins in an allowed creation scope. The Technician seed must not grant it. | The selected tenant is checked again in `ObjectEditView.form_valid`. A cross-tenant or unauthorized selected tenant is rejected without creating a row. |
@@ -60,7 +62,7 @@ The generic authorization paths used by these routes are:
 
 On `origin/main`, `compliance/urls.py:42-44` contains only the bearer-token signing route. There is no internal receipt list, internal receipt detail, prepare route, or export route.
 
-| Surface | Route/view today | Target after issue #259 | Permission and binding |
+| Surface | Route/view today | Target state | Permission and binding |
 | --- | --- | --- | --- |
 | Recipient signing/consent | `custody/sign/<str:token>/` — `custody_eula_sign` (`views.py:151-191`). The route resolves the opaque token, optionally requires login, checks expiry/completed state, and when authenticated checks the user against the holder. | Keep a dedicated recipient flow. A Technician or administrator permission must never turn the operator into the signer. The intended holder remains the only consent principal. Option B adds a server-bound prepare/session handoff before this step. | No `sign_custodyreceipt` codename for Technicians. A valid recipient token/session and the intended-holder binding are required. `REQUIRE_CUSTODY_SIGNIN=True` remains the production default; the explicit `False` configuration is tested separately and must not create an operator impersonation path. |
 | Internal receipt list | No route on `origin/main`; receipt rows appear only in embedded tables. | Add an authenticated internal list surface with `view_custodyreceipt`. | Query through `asset__tenant` and the active authorized tenant. Missing internal permission returns `403` with the internal-permission error contract; a foreign tenant is hidden as `404`. No bearer token is needed to render internal rows. |
@@ -285,19 +287,20 @@ The existing recipient implementation already uses a transaction and `select_for
 
 ## 9. Decision log
 
-These decisions are binding for issue #259 and supersede the unresolved recommendations in the original HOLD section of the readiness report.
+These decisions are binding and supersede the unresolved recommendations in the
+original HOLD section of the readiness report.
 
 | Decision | Binding outcome | Design reference |
 | --- | --- | --- |
-| On-site flow | **Option B**: a Technician-authorized, server-side bound prepare/signing session plus a separate internal receipt view. The operator and recipient are separate principals. | `issue-259-readiness.md`, §5.2, Option B; target implications in §5.3 and §6. |
-| Error contract | Invalid/unknown token → **404** neutral; expired token/session → **410** without payload; wrong recipient → **403** `wrong-recipient`; missing internal permission → **403** with the internal-custody message; foreign tenant → **404**. | `issue-259-readiness.md`, §5.5 and draft criteria §6 “Token, Ablauf und Fehler”. |
-| New action codenames | Add **`prepare_custodyreceipt`** and **`export_custodyreceipt`** as explicit Django model permissions. | `issue-259-readiness.md`, §5.1 proposed codenames and the issue decision recorded for implementation. |
-| Technician seed | Narrow the custody-specific Technician grant to viewing plus preparation. **No export by default** and no custody-template policy mutation. | `issue-259-readiness.md`, §5.3 target matrix, together with the maintainer decision that the Technician seed is narrower. |
-| Technician signing codename | Do **not** create or grant `sign_custodyreceipt` to Technicians. | `issue-259-readiness.md`, §5.1/§5.3: consent is not an internal administrative right. |
-| Recipient principal | The intended Recipient remains the only signer/consenter. Superadmin, Tenant Admin, and Technician privileges never override the holder binding. | `issue-259-readiness.md`, §5.1, §5.2 Option B, and §6 “Prepare- und Consent-Semantik”. |
-|| Sign-in policy | `REQUIRE_CUSTODY_SIGNIN=True` remains the production default. The explicit `False` mode is covered by regression tests and must not give an operator a recipient override. | `issue-259-readiness.md`, §5.4 “Configuration”, §6 “Token, Ablauf und Fehler”, plus the issue decision to test both settings. |
-|| Assisted-signing session | **Option B is implemented:** prepare is a persisted, short-lived, one-time session bound to receipt, asset tenant, operator, and intended holder. Prepare never changes recipient identity or acceptance; only the authenticated intended holder can consume the handoff through consent. | `issue-259-readiness.md`, §5.2 Option B, §5.4, §6 “Prepare- und Consent-Semantik”; Slice D routes `compliance:custodyreceipt_prepare` and the recipient handoff. |
-|| Export separation | **Implemented:** finished-receipt export is a separate route guarded by `export_custodyreceipt`, independent from internal view and denied to the seeded Technician role. | `issue-259-readiness.md`, §5.3/§5.5 and §6 “API und interne Darstellung”; Slice D route `compliance:custodyreceipt_export`. |
+| On-site flow | **Option B**: a Technician-authorized, server-side bound prepare/signing session plus a separate internal receipt view. The operator and recipient are separate principals. | Readiness design §5.2, Option B; target implications in §5.3 and §6. |
+| Error contract | Invalid/unknown token → **404** neutral; expired token/session → **410** without payload; wrong recipient → **403** `wrong-recipient`; missing internal permission → **403** with the internal-custody message; foreign tenant → **404**. | Readiness design §5.5 and draft criteria §6 “Token, Ablauf und Fehler”. |
+| New action codenames | Add **`prepare_custodyreceipt`** and **`export_custodyreceipt`** as explicit Django model permissions. | Readiness design §5.1 proposed codenames and the recorded implementation decision. |
+| Technician seed | Narrow the custody-specific Technician grant to viewing plus preparation. **No export by default** and no custody-template policy mutation. | Readiness design §5.3 target matrix, together with the maintainer decision that the Technician seed is narrower. |
+| Technician signing codename | Do **not** create or grant `sign_custodyreceipt` to Technicians. | Readiness design §5.1/§5.3: consent is not an internal administrative right. |
+| Recipient principal | The intended Recipient remains the only signer/consenter. Superadmin, Tenant Admin, and Technician privileges never override the holder binding. | Readiness design §5.1, §5.2 Option B, and §6 “Prepare- und Consent-Semantik”. |
+|| Sign-in policy | `REQUIRE_CUSTODY_SIGNIN=True` remains the production default. The explicit `False` mode is covered by regression tests and must not give an operator a recipient override. | Readiness design §5.4 “Configuration”, §6 “Token, Ablauf und Fehler”, plus the recorded decision to test both settings. |
+|| Assisted-signing session | **Option B is implemented:** prepare is a persisted, short-lived, one-time session bound to receipt, asset tenant, operator, and intended holder. Prepare never changes recipient identity or acceptance; only the authenticated intended holder can consume the handoff through consent. | Readiness design §5.2 Option B, §5.4, §6 “Prepare- und Consent-Semantik”; Slice D routes `compliance:custodyreceipt_prepare` and the recipient handoff. |
+|| Export separation | **Implemented:** finished-receipt export is a separate route guarded by `export_custodyreceipt`, independent from internal view and denied to the seeded Technician role. | Readiness design §5.3/§5.5 and §6 “API und interne Darstellung”; Slice D route `compliance:custodyreceipt_export`. |
 
 The readiness document remains a read-only design reference. If implementation details (for example, concrete URL names) differ from the conceptual surfaces above, the route declaration and tests are the final executable contract, but the permission separation, tenant boundary, error classes, and recipient-binding decisions are not optional.
 
