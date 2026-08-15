@@ -177,6 +177,18 @@ curl -X DELETE -H "Authorization: Token <existing-token>" \
 A deleted token is revoked immediately and cannot be reactivated — create a
 new token instead.
 
+**Tenant context required.** `POST /api/users/tokens/` fails with
+`HTTP 403` when no single tenant anchors the request (for example, a
+tenant-group scope). A token is always tenant-bound, so the API never
+silently assigns a tenant — select a tenant before creating a token.
+
+**Ownership.** A token belongs to the authenticated user. Non-superusers are
+pinned to their own account — a `user_id` naming another user is ignored on
+create and update. A superuser may re-assign a token by `PATCH`ing a new
+`user_id` (with a current `If-Match`); the transfer is committed and returns
+`HTTP 200` with the transferred token. The token then belongs to the new
+owner and is no longer visible in the previous owner's queries.
+
 ---
 
 ## SCIM 2.0 Provisioning
