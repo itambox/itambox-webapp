@@ -702,6 +702,10 @@ class SCIMUserDetailView(SCIMTenantMixin, APIView):
 )
 class SCIMGroupListView(SCIMTenantMixin, APIView):
     def get(self, request, *args, **kwargs):
+        if not request.user.has_perm("users.view_usergroup", obj=self.tenant):
+            raise exceptions.PermissionDenied(
+                "users.view_usergroup is required for this tenant SCIM group operation."
+            )
         filter_str = request.query_params.get("filter")
         try:
             q_obj = parse_scim_filter(filter_str, "group")
@@ -774,6 +778,10 @@ class SCIMGroupListView(SCIMTenantMixin, APIView):
 )
 class SCIMGroupDetailView(SCIMTenantMixin, APIView):
     def get(self, request, pk, *args, **kwargs):
+        if not request.user.has_perm("users.view_usergroup", obj=self.tenant):
+            raise exceptions.PermissionDenied(
+                "users.view_usergroup is required for this tenant SCIM group operation."
+            )
         group = get_scim_object_or_404(
             UserGroup.objects.filter(tenant=self.tenant),
             pk,
