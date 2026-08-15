@@ -26,7 +26,11 @@ from django_q.models import Failure
 
 from core.models import Notification, ObjectChange
 from extras.models import AlertLog, Event
-from organization.models import Tenant
+from organization.models import (
+    Tenant,
+    TenantResourceGrantExpiryRevocation,
+    TenantResourceGrantExpiryRun,
+)
 
 CLASS_CHOICES = ("changelog", "alertlog", "notification", "event", "qtask")
 
@@ -189,6 +193,20 @@ class Command(BaseCommand):
         grand_total = 0
 
         if "changelog" in classes:
+            grand_total += self._run_pruner(
+                "resource-grant-expiry",
+                archive_dir,
+                run_stamp,
+                dry_run,
+                prune_fn=lambda writer: self._prune_expiry_runs(
+                    now=now,
+                    global_days=changelog_days,
+                    tenant=tenant,
+                    batch_size=batch_size,
+                    dry_run=dry_run,
+                    archive_writer=writer,
+                ),
+            )
             grand_total += self._run_pruner(
                 "changelog",
                 archive_dir,
@@ -367,6 +385,79 @@ class Command(BaseCommand):
             archive_writer=archive_writer,
             label="changelog (global cutoff)",
         )
+        return total
+
+    def _prune_expiry_runs(self, *, now, global_days, tenant, batch_size, dry_run, archive_writer):  # noqa: C901
+        """Prune terminal expiry runs by finished time, before ObjectChange rows."""
+
+        terminal = {
+            TenantResourceGrantExpiryRun.OUTCOME_CHOICES[0][0],
+            TenantResourceGrantExpiryRun.OUTCOME_CHOICES[1][0],
+            TenantResourceGrantExpiryRun.OUTCOME_CHOICES[2][0],
+            TenantResourceGrantExpiryRun.OUTCOME_CHOICES[4][0],
+        }
+
+        def prune_for(tenant_id, days, label, excluded_tenant_ids=()):
+            if days == 0:
+                self.stdout.write(f"  [resource-grant-expiry] {label}: retention=unlimited -- skipped.")
+                return 0
+            cutoff = now - timedelta(days=days)
+            queryset = TenantResourceGrantExpiryRun._base_manager.filter(
+                state=TenantResourceGrantExpiryRun.STATE_COMPLETE,
+                outcome__in=terminal,
+                finished_at__isnull=False,
+                finished_at__lt=cutoff,
+            )
+            if tenant_id is not None:
+                queryset = queryset.filter(tenant_id=tenant_id)
+            if excluded_tenant_ids:
+                queryset = queryset.exclude(tenant_id__in=excluded_tenant_ids)
+            if dry_run:
+                count = queryset.count()
+                if count:
+                    self.stdout.write(f"  [DRY RUN][resource-grant-expiry] {label}: would prune {count} row(s).")
+                return count
+
+            total = 0
+            while True:
+                pks = list(queryset.order_by("pk").values_list("pk", flat=True)[:batch_size])
+                if not pks:
+                    break
+                runs = queryset.filter(pk__in=pks)
+                evidence = TenantResourceGrantExpiryRevocation._base_manager.filter(run_id__in=pks)
+                if archive_writer:
+                    archive_writer.write_batch(evidence.values())
+                    archive_writer.write_batch(runs.values())
+                evidence.delete()
+                runs.delete()
+                total += len(pks)
+                self.stdout.write(
+                    f"  [resource-grant-expiry] {label}: pruned batch of {len(pks)} (running total {total})."
+                )
+            self.stdout.write(f"  [resource-grant-expiry] {label}: done: {total} row(s) pruned.")
+            return total
+
+        if tenant is not None:
+            effective_days = tenant.changelog_retention_days
+            return prune_for(
+                tenant.pk,
+                global_days if effective_days is None else effective_days,
+                f"tenant={tenant.slug}",
+            )
+
+        overridden = list(
+            Tenant._base_manager.exclude(changelog_retention_days__isnull=True).only(
+                "id", "slug", "changelog_retention_days"
+            )
+        )
+        overridden_ids = [item.pk for item in overridden]
+        total = 0
+        for item in overridden:
+            total += prune_for(item.pk, item.changelog_retention_days, f"tenant={item.slug}")
+        if global_days == 0:
+            self.stdout.write("  [resource-grant-expiry] global retention=unlimited -- remaining tenants skipped.")
+            return total
+        total += prune_for(None, global_days, "global cutoff", overridden_ids)
         return total
 
     def _prune_simple(self, manager, time_field, now, days, *, batch_size, dry_run, archive_writer, label):

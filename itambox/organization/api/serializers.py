@@ -1,7 +1,9 @@
 from django.contrib.contenttypes.models import ContentType
 from django.utils.translation import gettext_lazy as _
+from drf_spectacular.utils import extend_schema_field
 from rest_framework import serializers
 
+from core.models import ObjectChange
 from extras.api.serializers import TagSerializer
 from itambox.api.base import BaseModelSerializer
 from itambox.api.fields import ContentTypeField, validate_gfk_target_tenant
@@ -18,7 +20,139 @@ from organization.models import (
     SiteGroup,
     Tenant,
     TenantGroup,
+    TenantResourceGrant,
+    TenantResourceGrantExpiryRevocation,
 )
+
+
+class TenantResourceGrantAuditRevocationSerializer(serializers.Serializer):
+    kind = serializers.CharField(read_only=True)
+    user_id = serializers.IntegerField(read_only=True, allow_null=True)
+    request_id = serializers.UUIDField(read_only=True, allow_null=True)
+    time = serializers.DateTimeField(read_only=True, allow_null=True)
+    triggering_valid_until = serializers.DateTimeField(read_only=True, allow_null=True)
+    expiry_run_id = serializers.IntegerField(read_only=True, allow_null=True)
+
+
+class TenantResourceGrantAuditSerializer(BaseModelSerializer):
+    url = serializers.HyperlinkedIdentityField(view_name="api:organization_api:tenantresourcegrantaudit-detail")
+    state = serializers.SerializerMethodField()
+    owner = serializers.SerializerMethodField()
+    grantee_type = serializers.SerializerMethodField()
+    grantee = serializers.SerializerMethodField()
+    resource_type = serializers.SerializerMethodField()
+    revocation = serializers.SerializerMethodField()
+
+    class Meta:
+        model = TenantResourceGrant
+        fields = [
+            "id",
+            "url",
+            "state",
+            "owner",
+            "grantee_type",
+            "grantee",
+            "resource_type",
+            "resource_id",
+            "access_level",
+            "reason",
+            "granted_by_id",
+            "created_at",
+            "valid_until",
+            "revoked_at",
+            "revocation",
+        ]
+        read_only_fields = fields
+
+    def get_state(self, obj):
+        return "active" if obj.deleted_at is None else "revoked"
+
+    def get_owner(self, obj):
+        return {"id": obj.tenant_id, "name": obj.tenant.name}
+
+    def get_grantee_type(self, obj):
+        return "tenant" if obj.grantee_tenant_id is not None else "group"
+
+    def get_grantee(self, obj):
+        grantee = obj.grantee_tenant if obj.grantee_tenant_id is not None else obj.grantee_tenant_group
+        return {"id": grantee.pk, "name": grantee.name}
+
+    def get_resource_type(self, obj):
+        return f"{obj.resource_type.app_label}.{obj.resource_type.model}"
+
+    def _current_evidence(self, obj):
+        if obj.deleted_at is None:
+            return None
+        return (
+            TenantResourceGrantExpiryRevocation._base_manager.integrity_valid()
+            .filter(grant_id=obj.pk, revoked_at=obj.deleted_at)
+            .select_related("object_change")
+            .order_by("-pk")
+            .first()
+        )
+
+    def _current_raw_evidence(self, obj):
+        if obj.deleted_at is None:
+            return None
+        return (
+            TenantResourceGrantExpiryRevocation._base_manager.filter(
+                grant_id=obj.pk,
+                revoked_at=obj.deleted_at,
+            )
+            .order_by("-pk")
+            .first()
+        )
+
+    def _current_delete_change(self, obj):
+        if obj.deleted_at is None:
+            return None
+        grant_type = ContentType.objects.get_for_model(TenantResourceGrant)
+        return (
+            ObjectChange._base_manager.filter(
+                tenant_id=obj.tenant_id,
+                changed_object_type=grant_type,
+                changed_object_id=obj.pk,
+                action="delete",
+            )
+            .order_by("-time", "-pk")
+            .first()
+        )
+
+    @extend_schema_field(TenantResourceGrantAuditRevocationSerializer)
+    def get_revocation(self, obj):
+        evidence = self._current_evidence(obj)
+        raw_evidence = self._current_raw_evidence(obj)
+        if raw_evidence is not None and evidence is None:
+            return {
+                "kind": "unknown",
+                "user_id": None,
+                "request_id": None,
+                "time": None,
+                "triggering_valid_until": None,
+                "expiry_run_id": None,
+            }
+        change = evidence.object_change if evidence is not None else self._current_delete_change(obj)
+        expiry_change = evidence is not None and evidence.object_change_id is not None and change is not None
+        if expiry_change and change.user_id is None:
+            kind = "expiry"
+            user_id = None
+        elif expiry_change:
+            kind = "unknown"
+            user_id = None
+        elif change is not None and change.user_id is not None:
+            kind = "manual"
+            user_id = change.user_id
+        else:
+            kind = "unknown" if obj.deleted_at is not None else "none"
+            user_id = None
+        return {
+            "kind": kind,
+            "user_id": user_id,
+            "request_id": change.request_id if change is not None else None,
+            "time": change.time if change is not None else None,
+            "triggering_valid_until": evidence.triggering_valid_until if evidence is not None else None,
+            "expiry_run_id": evidence.run_id if evidence is not None else None,
+        }
 
 
 class NestedRegionSerializer(BaseModelSerializer):

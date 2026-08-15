@@ -6,20 +6,27 @@ derived from the pool's location, never client-supplied. Revocation is the
 generic delete flow (TenantResourceGrant.delete soft-revokes).
 """
 
+from django.contrib import messages
 from django.contrib.contenttypes.models import ContentType
 from django.db.models import Q
-from django.http import Http404
+from django.http import Http404, HttpResponseRedirect
 from django.shortcuts import get_object_or_404
 from django.urls import reverse, reverse_lazy
 from django.utils.translation import gettext_lazy as _
 
-from core.managers import get_current_tenant
-from itambox.views.generic import ObjectDeleteView, ObjectEditView, ObjectListView
+from core.managers import get_current_all_accessible, get_current_tenant, get_current_tenant_group
+from itambox.views.generic import ObjectDeleteView, ObjectDetailView, ObjectEditView, ObjectListView
 
 from .. import tables
-from ..access import get_ancestor_tenant_group_ids
+from ..access import accessible_tenant_ids, get_ancestor_tenant_group_ids, get_descendant_tenant_group_ids
 from ..forms import TenantResourceGrantForm
-from ..models import TenantResourceGrant
+from ..models import (
+    Tenant,
+    TenantResourceGrant,
+    TenantResourceGrantExpiryRevocation,
+    TenantResourceGrantExpiryRun,
+)
+from ..services.resource_grants import revoke_resource_grant
 
 
 def _grants_involving(tenant):
@@ -153,3 +160,106 @@ class TenantResourceGrantRevokeView(ObjectDeleteView):
                 return TenantResourceGrant.objects.all()
             return TenantResourceGrant.objects.none()
         return TenantResourceGrant.objects.filter(tenant=tenant)
+
+    def form_valid(self, form):
+        result = revoke_resource_grant(
+            self.object.pk,
+            user=self.request.user,
+            active_tenant=get_current_tenant(),
+        )
+        if result is None:
+            raise Http404
+        messages.success(self.request, _("Resource grant revoked."))
+        return HttpResponseRedirect(self.get_success_url())
+
+
+def _run_owner_ids(request):
+    """Owner tenants visible to the run UI in the active request scope."""
+
+    tenant = get_current_tenant()
+    group = get_current_tenant_group()
+    all_accessible = get_current_all_accessible()
+    if request.user.is_superuser and tenant is None and group is None and not all_accessible:
+        return None
+    if tenant is not None:
+        candidate_ids = {tenant.pk}
+    elif group is not None:
+        candidate_ids = set(
+            Tenant._base_manager.filter(
+                group_id__in=get_descendant_tenant_group_ids(group.pk, live_only=True),
+                deleted_at__isnull=True,
+            ).values_list("pk", flat=True)
+        )
+        if not request.user.is_superuser:
+            candidate_ids &= set(accessible_tenant_ids(request.user))
+    elif all_accessible:
+        candidate_ids = set(accessible_tenant_ids(request.user))
+    else:
+        return set()
+    live = Tenant._base_manager.filter(pk__in=candidate_ids, deleted_at__isnull=True)
+    if request.user.is_superuser:
+        return set(live.values_list("pk", flat=True))
+    return {item.pk for item in live if request.user.has_perm("organization.view_tenantresourcegrant", obj=item)}
+
+
+class TenantResourceGrantExpiryRunListView(ObjectListView):
+    queryset = TenantResourceGrantExpiryRun.objects.none()
+    table = tables.TenantResourceGrantExpiryRunTable
+    action_buttons = ()
+    template_name = "organization/resource_grant_expiry_run_list.html"
+
+    def get_permission_required(self):
+        return ("organization.view_tenantresourcegrant",)
+
+    def has_permission(self):
+        owner_ids = _run_owner_ids(self.request)
+        return owner_ids is None or bool(owner_ids)
+
+    def get_queryset(self):
+        owner_ids = _run_owner_ids(self.request)
+        if owner_ids is None:
+            return TenantResourceGrantExpiryRun.objects.select_related("tenant")
+        if not owner_ids:
+            return TenantResourceGrantExpiryRun.objects.none()
+        return TenantResourceGrantExpiryRun.objects.filter(tenant_id__in=owner_ids).select_related("tenant")
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context["title"] = _("Resource grant expiry runs")
+        return context
+
+
+class TenantResourceGrantExpiryRunDetailView(ObjectDetailView):
+    queryset = TenantResourceGrantExpiryRun.objects.select_related("tenant")
+    template_name = "organization/resource_grant_expiry_run_detail.html"
+    related_object_exclusions = ("organization.tenantresourcegrantexpiryrevocation",)
+
+    def get_permission_required(self):
+        return ("organization.view_tenantresourcegrant",)
+
+    def get_queryset(self):
+        owner_ids = _run_owner_ids(self.request)
+        if owner_ids is None:
+            return TenantResourceGrantExpiryRun.objects.select_related("tenant")
+        if not owner_ids:
+            return TenantResourceGrantExpiryRun.objects.none()
+        return TenantResourceGrantExpiryRun.objects.filter(tenant_id__in=owner_ids).select_related("tenant")
+
+    def has_permission(self):
+        owner_ids = _run_owner_ids(self.request)
+        if owner_ids is None:
+            return True
+        obj = self.get_object()
+        return obj.tenant_id in owner_ids and self.request.user.has_perm(
+            "organization.view_tenantresourcegrant", obj=obj.tenant
+        )
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context["expiry_evidence"] = (
+            TenantResourceGrantExpiryRevocation._base_manager.integrity_valid()
+            .filter(run=self.object)
+            .select_related("grant", "object_change")
+        )
+        context["title"] = _("Resource grant expiry run")
+        return context

@@ -16,6 +16,8 @@ from .models import (
     Tenant,
     TenantGroup,
     TenantResourceGrant,
+    TenantResourceGrantExpiryRevocation,
+    TenantResourceGrantExpiryRun,
 )
 
 
@@ -118,6 +120,7 @@ class TenantResourceGrantAdmin(admin.ModelAdmin):
         "resource_id",
         "access_level",
         "granted_by",
+        "valid_until",
         "created_at",
         "deleted_at",
     )
@@ -130,6 +133,48 @@ class TenantResourceGrantAdmin(admin.ModelAdmin):
         # audit surface. _base_manager: the model deliberately defines no
         # all_objects (see the model docstring).
         return TenantResourceGrant._base_manager.all()
+
+
+class _ReadOnlyExpiryAdmin(admin.ModelAdmin):
+    def has_module_permission(self, request):
+        return bool(request.user and request.user.is_superuser)
+
+    def has_view_permission(self, request, obj=None):
+        return bool(request.user and request.user.is_superuser)
+
+    def has_add_permission(self, request):
+        return False
+
+    def has_change_permission(self, request, obj=None):
+        return False
+
+    def has_delete_permission(self, request, obj=None):
+        return False
+
+
+class TenantResourceGrantExpiryRunAdmin(_ReadOnlyExpiryAdmin):
+    list_display = (
+        "tenant",
+        "schedule_slot",
+        "state",
+        "outcome",
+        "attempt_count",
+        "revoked_count",
+        "remaining_due_count",
+        "invalid_count",
+        "finished_at",
+    )
+    readonly_fields = [field.name for field in TenantResourceGrantExpiryRun._meta.fields]
+
+
+class TenantResourceGrantExpiryRevocationAdmin(_ReadOnlyExpiryAdmin):
+    list_display = ("run", "grant", "triggering_valid_until", "revoked_at", "object_change", "request_id")
+    readonly_fields = [field.name for field in TenantResourceGrantExpiryRevocation._meta.fields]
+
+    def get_queryset(self, request):
+        return TenantResourceGrantExpiryRevocation._base_manager.integrity_valid().select_related(
+            "run", "grant", "object_change"
+        )
 
 
 class CostCenterAdmin(admin.ModelAdmin):
@@ -154,3 +199,5 @@ admin.site.register(RoleGrant, RoleGrantAdmin)
 admin.site.register(Role, RoleAdmin)
 admin.site.register(CostCenter, CostCenterAdmin)
 admin.site.register(TenantResourceGrant, TenantResourceGrantAdmin)
+admin.site.register(TenantResourceGrantExpiryRun, TenantResourceGrantExpiryRunAdmin)
+admin.site.register(TenantResourceGrantExpiryRevocation, TenantResourceGrantExpiryRevocationAdmin)

@@ -5,6 +5,7 @@ from django.contrib.contenttypes.models import ContentType
 from django.core.exceptions import ValidationError
 from django.core.validators import MinValueValidator
 from django.db import models
+from django.db.models import F
 from django.urls import reverse
 from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
@@ -22,6 +23,7 @@ from core.managers import (
     SoftDeleteManager,
     TenantScopingAllObjectsManager,
     TenantScopingManager,
+    TenantScopingQuerySet,
     TenantScopingSoftDeleteManager,
 )
 from core.mfa import role_is_privileged
@@ -1345,6 +1347,7 @@ class TenantResourceGrant(SoftDeleteMixin, ChangeLoggingMixin, BaseModel):
         verbose_name=_("Granted by"),
     )
     reason = models.TextField(blank=True, verbose_name=_("Reason"))
+    valid_until = models.DateTimeField(blank=True, null=True, verbose_name=_("Valid until"))
 
     class Meta:
         ordering = ["-created_at"]
@@ -1382,6 +1385,11 @@ class TenantResourceGrant(SoftDeleteMixin, ChangeLoggingMixin, BaseModel):
                 fields=["resource_type", "resource_id"],
                 condition=models.Q(deleted_at__isnull=True),
                 name="org_trg_active_resource_idx",
+            ),
+            models.Index(
+                fields=["tenant", "valid_until"],
+                condition=models.Q(deleted_at__isnull=True, valid_until__isnull=False),
+                name="org_trg_active_expiry_idx",
             ),
         ]
 
@@ -1460,3 +1468,231 @@ class TenantResourceGrant(SoftDeleteMixin, ChangeLoggingMixin, BaseModel):
                         )
                     }
                 )
+
+
+class TenantResourceGrantExpiryRun(BaseModel):
+    """One generation-bound expiry sweep for one owner tenant and hour."""
+
+    objects = TenantScopingManager()
+    deny_global_tenant = True
+
+    STATE_QUEUED = "queued"
+    STATE_RUNNING = "running"
+    STATE_ENQUEUE_FAILED = "enqueue_failed"
+    STATE_COMPLETE = "complete"
+    STATE_CHOICES = (
+        (STATE_QUEUED, _("Queued")),
+        (STATE_RUNNING, _("Running")),
+        (STATE_ENQUEUE_FAILED, _("Enqueue failed")),
+        (STATE_COMPLETE, _("Complete")),
+    )
+
+    OUTCOME_CHOICES = (
+        ("success", _("Success")),
+        ("partial", _("Partial")),
+        ("skipped", _("Skipped")),
+        ("retryable", _("Retryable")),
+        ("terminal", _("Terminal")),
+    )
+
+    tenant = models.ForeignKey(
+        "organization.Tenant",
+        on_delete=models.PROTECT,
+        related_name="resource_grant_expiry_runs",
+        verbose_name=_("Tenant"),
+    )
+    schedule_slot = models.DateTimeField(verbose_name=_("Schedule slot"))
+    cutoff = models.DateTimeField(verbose_name=_("Cutoff"))
+    state = models.CharField(max_length=20, choices=STATE_CHOICES, default=STATE_QUEUED, verbose_name=_("State"))
+    outcome = models.CharField(
+        max_length=20,
+        choices=OUTCOME_CHOICES,
+        blank=True,
+        null=True,
+        verbose_name=_("Outcome"),
+    )
+    generation = models.PositiveIntegerField(default=1, verbose_name=_("Generation"))
+    attempt_count = models.PositiveIntegerField(default=0, verbose_name=_("Attempts"))
+    started_at = models.DateTimeField(blank=True, null=True, verbose_name=_("Started at"))
+    last_attempt_at = models.DateTimeField(blank=True, null=True, verbose_name=_("Last attempt at"))
+    finished_at = models.DateTimeField(blank=True, null=True, verbose_name=_("Finished at"))
+    next_retry_at = models.DateTimeField(blank=True, null=True, verbose_name=_("Next retry at"))
+    dispatch_stale_at = models.DateTimeField(blank=True, null=True, verbose_name=_("Dispatch stale at"))
+    lease_expires_at = models.DateTimeField(blank=True, null=True, verbose_name=_("Lease expires at"))
+    revoked_count = models.PositiveIntegerField(default=0, verbose_name=_("Revoked count"))
+    remaining_due_count = models.PositiveIntegerField(default=0, verbose_name=_("Remaining due count"))
+    invalid_count = models.PositiveIntegerField(default=0, verbose_name=_("Invalid count"))
+    error_code = models.CharField(max_length=100, blank=True, null=True, verbose_name=_("Error code"))
+    error_message = models.TextField(blank=True, null=True, verbose_name=_("Error message"))
+
+    class Meta:
+        default_permissions = ()
+        ordering = ("-schedule_slot", "-pk")
+        verbose_name = _("Resource Grant Expiry Run")
+        verbose_name_plural = _("Resource Grant Expiry Runs")
+        constraints = [
+            models.UniqueConstraint(
+                fields=["tenant", "schedule_slot"],
+                name="organization_trg_expiry_run_tenant_slot_uniq",
+            ),
+            models.CheckConstraint(
+                check=models.Q(generation__gte=1),
+                name="organization_trg_expiry_run_generation_ck",
+            ),
+            models.CheckConstraint(
+                check=models.Q(attempt_count__gte=0),
+                name="organization_trg_expiry_run_attempts_ck",
+            ),
+            models.CheckConstraint(
+                check=(
+                    models.Q(
+                        state="queued",
+                        outcome__isnull=True,
+                        finished_at__isnull=True,
+                        lease_expires_at__isnull=True,
+                    )
+                    | models.Q(
+                        state="queued",
+                        outcome="retryable",
+                        finished_at__isnull=True,
+                        lease_expires_at__isnull=True,
+                    )
+                    | models.Q(
+                        state="running",
+                        outcome__isnull=True,
+                        finished_at__isnull=True,
+                        lease_expires_at__isnull=False,
+                    )
+                    | models.Q(
+                        state="enqueue_failed",
+                        outcome="retryable",
+                        finished_at__isnull=True,
+                        lease_expires_at__isnull=True,
+                    )
+                    | models.Q(
+                        state="complete",
+                        outcome__in=("success", "partial", "skipped", "terminal"),
+                        finished_at__isnull=False,
+                        lease_expires_at__isnull=True,
+                        next_retry_at__isnull=True,
+                    )
+                ),
+                name="organization_trg_expiry_run_state_ck",
+            ),
+        ]
+        indexes = [
+            models.Index(
+                fields=["tenant", "-schedule_slot"],
+                name="org_trg_expiry_run_tenant_slot_idx",
+            ),
+            models.Index(
+                fields=["tenant", "outcome", "-schedule_slot"],
+                name="org_trg_expiry_run_outcome_idx",
+            ),
+        ]
+
+    def __str__(self):
+        return f"{self.tenant} resource grant expiry {self.schedule_slot:%Y-%m-%d %H:%M UTC}"
+
+    def save(self, *args, **kwargs):
+        if self.pk:
+            previous = type(self)._base_manager.filter(pk=self.pk).values(
+                "tenant_id",
+                "schedule_slot",
+                "cutoff",
+            ).first()
+            if previous is not None and any(
+                previous[field] != getattr(self, field)
+                for field in ("tenant_id", "schedule_slot", "cutoff")
+            ):
+                raise ValidationError("Expiry run identity fields are immutable.")
+        return super().save(*args, **kwargs)
+
+    def get_absolute_url(self):
+        return reverse("organization:tenantresourcegrantexpiry_run_detail", kwargs={"pk": self.pk})
+
+
+class TenantResourceGrantExpiryRevocationQuerySet(TenantScopingQuerySet):
+    """Evidence queries that reject cross-tenant or mismatched audit rows."""
+
+    def integrity_valid(self):
+        change_type = ContentType.objects.get_for_model(TenantResourceGrant)
+        return self.filter(run__tenant_id=F("grant__tenant_id")).filter(
+            models.Q(object_change__isnull=True)
+            | models.Q(
+                object_change__tenant_id=F("run__tenant_id"),
+                object_change__changed_object_type_id=change_type.pk,
+                object_change__changed_object_id=F("grant_id"),
+                object_change__action=ObjectChangeActionChoices.ACTION_DELETE,
+                object_change__request_id=F("request_id"),
+            )
+        )
+
+
+class TenantResourceGrantExpiryRevocation(BaseModel):
+    """Immutable evidence for one expiry-driven grant soft deletion."""
+
+    objects = TenantScopingManager.from_queryset(TenantResourceGrantExpiryRevocationQuerySet)()
+    all_objects = TenantResourceGrantExpiryRevocationQuerySet.as_manager()
+    tenant_lookup = "run__tenant"
+    deny_global_tenant = True
+
+    run = models.ForeignKey(
+        TenantResourceGrantExpiryRun,
+        on_delete=models.CASCADE,
+        related_name="revocations",
+        verbose_name=_("Expiry run"),
+    )
+    grant = models.ForeignKey(
+        TenantResourceGrant,
+        on_delete=models.PROTECT,
+        related_name="expiry_revocations",
+        verbose_name=_("Resource grant"),
+    )
+    object_change = models.OneToOneField(
+        "core.ObjectChange",
+        on_delete=models.SET_NULL,
+        related_name="resource_grant_expiry_revocation",
+        blank=True,
+        null=True,
+        verbose_name=_("Delete change"),
+    )
+    triggering_valid_until = models.DateTimeField(verbose_name=_("Triggering deadline"))
+    revoked_at = models.DateTimeField(verbose_name=_("Revoked at"))
+    request_id = models.UUIDField(verbose_name=_("Request ID"))
+
+    class Meta:
+        default_permissions = ()
+        base_manager_name = "all_objects"
+        ordering = ("-revoked_at", "-pk")
+        verbose_name = _("Resource Grant Expiry Revocation")
+        verbose_name_plural = _("Resource Grant Expiry Revocations")
+        constraints = [
+            models.UniqueConstraint(
+                fields=["grant", "revoked_at"],
+                name="organization_trg_expiry_revoke_grant_time_uniq",
+            ),
+        ]
+        indexes = [
+            models.Index(
+                fields=["run", "grant"],
+                name="org_trg_expiry_revoke_run_grant_idx",
+            ),
+        ]
+
+    def save(self, *args, **kwargs):
+        if self.pk:
+            previous = type(self)._base_manager.filter(pk=self.pk).values(
+                "triggering_valid_until",
+                "revoked_at",
+                "request_id",
+            ).first()
+            if previous is not None and any(
+                previous[field] != getattr(self, field)
+                for field in ("triggering_valid_until", "revoked_at", "request_id")
+            ):
+                raise ValidationError("Expiry revocation identity fields are immutable.")
+        return super().save(*args, **kwargs)
+
+    def __str__(self):
+        return f"Expiry revocation {self.grant_id} in run {self.run_id}"

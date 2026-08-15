@@ -66,8 +66,10 @@ from .region_views import (
     RegionEditView,
     RegionListView,
 )
-from .resource_grant_views import (
+from .resource_grant_views import (  # noqa: F401
     TenantResourceGrantCreateView,
+    TenantResourceGrantExpiryRunDetailView,
+    TenantResourceGrantExpiryRunListView,
     TenantResourceGrantListView,
     TenantResourceGrantRevokeView,
 )

@@ -10,6 +10,7 @@ from django.contrib.auth import get_user_model
 from django.contrib.contenttypes.models import ContentType
 from django.test import TestCase
 from django.urls import reverse
+from django.utils import timezone
 
 from assets.models import Manufacturer
 from core.tests.mixins import TenantTestMixin
@@ -136,6 +137,33 @@ class ResourceGrantCreateViewTests(ResourceGrantViewWorld):
         self.assertEqual(grant.resource_id, self.stock.pk)
         self.assertEqual(grant.resource_type_id, self.ct.pk)
         self.assertEqual(grant.granted_by_id, user.pk)
+
+    def test_post_saves_future_deadline(self):
+        self._owner_admin("rgv-admin-deadline")
+        deadline = timezone.now() + timezone.timedelta(days=2)
+        response = self.client.post(
+            self._add_url(),
+            {
+                "grantee_tenant": self.grantee.pk,
+                "access_level": TenantResourceGrant.ACCESS_USE,
+                "valid_until": deadline.isoformat(),
+            },
+        )
+        self.assertEqual(response.status_code, 302)
+        self.assertIsNotNone(TenantResourceGrant.objects.get().valid_until)
+
+    def test_post_rejects_due_deadline(self):
+        self._owner_admin("rgv-admin-expired")
+        response = self.client.post(
+            self._add_url(),
+            {
+                "grantee_tenant": self.grantee.pk,
+                "access_level": TenantResourceGrant.ACCESS_USE,
+                "valid_until": (timezone.now() - timezone.timedelta(seconds=1)).isoformat(),
+            },
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertFalse(TenantResourceGrant.objects.exists())
 
     def test_both_grantees_is_a_form_error(self):
         from organization.models import TenantGroup

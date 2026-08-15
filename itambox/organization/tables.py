@@ -29,6 +29,8 @@ from .models import (
     Tenant,
     TenantGroup,
     TenantResourceGrant,
+    TenantResourceGrantExpiryRevocation,
+    TenantResourceGrantExpiryRun,
 )
 from .templatetags.rbac_badges import membership_kind_badge, reach_badge, shared_role_badge
 
@@ -482,3 +484,75 @@ class TenantResourceGrantTable(BaseTable):
             _("Revoke this grant"),
             _("Revoke"),
         )
+
+
+class TenantResourceGrantExpiryRunTable(BaseTable):
+    schedule_slot = tables.LinkColumn(
+        "organization:tenantresourcegrantexpiry_run_detail",
+        args=[A("pk")],
+        verbose_name=_("Schedule slot"),
+    )
+    tenant = tables.Column(verbose_name=_("Tenant"))
+    state = tables.Column(verbose_name=_("State"))
+    outcome = tables.Column(verbose_name=_("Outcome"))
+    attempt_count = tables.Column(verbose_name=_("Attempts"))
+    revoked_count = tables.Column(verbose_name=_("Revoked"))
+    remaining_due_count = tables.Column(verbose_name=_("Remaining due"))
+    invalid_count = tables.Column(verbose_name=_("Invalid"))
+    started_at = tables.DateTimeColumn(verbose_name=_("Started"), format="Y-m-d H:i")
+    finished_at = tables.DateTimeColumn(verbose_name=_("Finished"), format="Y-m-d H:i")
+    next_retry_at = tables.DateTimeColumn(verbose_name=_("Next retry"), format="Y-m-d H:i")
+    error_code = tables.Column(verbose_name=_("Error code"))
+
+    class Meta(BaseTable.Meta):
+        model = TenantResourceGrantExpiryRun
+        fields = (
+            "pk",
+            "tenant",
+            "schedule_slot",
+            "cutoff",
+            "state",
+            "outcome",
+            "attempt_count",
+            "revoked_count",
+            "remaining_due_count",
+            "invalid_count",
+            "started_at",
+            "finished_at",
+            "next_retry_at",
+            "error_code",
+        )
+        default_columns = (
+            "pk",
+            "tenant",
+            "schedule_slot",
+            "state",
+            "outcome",
+            "revoked_count",
+            "remaining_due_count",
+            "invalid_count",
+            "finished_at",
+        )
+
+
+class TenantResourceGrantExpiryRevocationTable(BaseTable):
+    grant_id = tables.Column(verbose_name=_("Grant"), accessor="grant_id")
+    triggering_valid_until = tables.DateTimeColumn(verbose_name=_("Deadline"), format="Y-m-d H:i")
+    revoked_at = tables.DateTimeColumn(verbose_name=_("Revoked"), format="Y-m-d H:i")
+    request_id = tables.Column(verbose_name=_("Request ID"))
+    object_change = tables.Column(verbose_name=_("Audit change"))
+
+    class Meta(BaseTable.Meta):
+        model = TenantResourceGrantExpiryRevocation
+        fields = ("grant_id", "triggering_valid_until", "revoked_at", "request_id", "object_change")
+        default_columns = fields
+
+    def render_grant_id(self, record):
+        return format_html(
+            '<a href="{}">{}</a>', f"/api/organization/resource-grant-audit/{record.grant_id}/", record.grant_id
+        )
+
+    def render_object_change(self, record):
+        if record.object_change_id is None:
+            return _("Retained evidence; audit change pruned")
+        return format_html('<a href="{}">{}</a>', record.object_change.get_absolute_url(), record.object_change_id)

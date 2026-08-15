@@ -1,4 +1,5 @@
 from django.apps import AppConfig
+from django.db.models.signals import post_migrate
 
 from itambox.capabilities import ALWAYS_ON, CONTRACT_VERSION, SOURCE_ALWAYS, STABLE, Capability, registry
 
@@ -34,7 +35,24 @@ class OrganizationConfig(AppConfig):
             resolve_effective_permissions_with_expiry=effective_permissions_with_expiry,
         )
 
+        post_migrate.connect(self._register_expiry_schedule, sender=self)
         self._register_capabilities()
+
+    def _register_expiry_schedule(self, sender, **kwargs):
+        # inline imports: app-registry: schedule models and helpers load after migrations/apps are ready.
+        from django_q.models import Schedule
+
+        # inline import: app-registry: schedule helpers load after migrations/apps are ready.
+        from core.schedules import register_schedule
+
+        register_schedule(
+            "core.tasks.resource_grants.coordinate_resource_grant_expiry",
+            defaults={
+                "name": "Hourly Resource Grant Expiry Sweep",
+                "schedule_type": Schedule.HOURLY,
+                "repeats": -1,
+            },
+        )
 
     def _register_capabilities(self):
         registry.register_all(self._capabilities())
@@ -67,7 +85,11 @@ class OrganizationConfig(AppConfig):
                 activation=ALWAYS_ON,
                 activation_probe=None,
                 activation_source=SOURCE_ALWAYS,
-                owns=("organization.TenantResourceGrant",),
+                owns=(
+                    "organization.TenantResourceGrant",
+                    "organization.TenantResourceGrantExpiryRun",
+                    "organization.TenantResourceGrantExpiryRevocation",
+                ),
                 docs_url="development/tenant-resource-grant-security.md",
                 limitations=(),
                 contract_version=CONTRACT_VERSION,

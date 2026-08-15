@@ -88,7 +88,7 @@ stale reference is a report rather than a boot failure.
 - `alerting.rules` — `extras.AlertRule`, `extras.NotificationChannel`
 - `automation.webhooks` — `extras.EventRule`, `extras.WebhookEndpoint`
 - `organization.role_grants` — `organization.RoleGrant`
-- `organization.resource_grants` — `organization.TenantResourceGrant`
+- `organization.resource_grants` — `organization.TenantResourceGrant`, `organization.TenantResourceGrantExpiryRun`, `organization.TenantResourceGrantExpiryRevocation`
 - `platform.plugins` — `itambox.plugins`
 - `procurement.core` — `procurement.Contract`, `procurement.PurchaseOrder`, `procurement.PurchaseOrderLine`
 - `procurement.requisition_seam` — `procurement.FulfillmentLink`

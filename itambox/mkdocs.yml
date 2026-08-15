@@ -171,6 +171,7 @@ nav:
       - Backup & Restore: 'operations/backup-restore.md'
       - Recovery Qualification Drill: 'operations/recovery-drill.md'
       - Data Retention: 'operations/data-retention.md'
+      - Resource Grant Expiry: 'operations/resource-grant-expiry.md'
       - Management Commands: 'operations/management-commands.md'
   - Development:
       - Release Checklist: 'development/release-checklist.md'

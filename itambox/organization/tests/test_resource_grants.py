@@ -13,6 +13,7 @@ from django.core.exceptions import ValidationError
 from django.db import IntegrityError, transaction
 from django.test import TestCase
 from django.urls import reverse
+from django.utils import timezone
 
 from assets.models import Manufacturer
 from core.tests.mixins import grant as grant_role
@@ -76,6 +77,23 @@ class TenantResourceGrantValidationTests(TestCase):
         grant = TenantResourceGrant.objects.create(**self._grant_kwargs())
         assert grant.is_active
         assert grant.resource == self.stock
+        assert grant.valid_until is None
+
+    def test_future_deadline_saves_without_changing_liveness(self):
+        deadline = timezone.now() + timezone.timedelta(days=1)
+        grant = TenantResourceGrant.objects.create(**self._grant_kwargs(valid_until=deadline))
+        assert grant.valid_until == deadline
+        assert grant.is_active
+
+    def test_index_is_static_and_does_not_use_a_clock_expression(self):
+        expiry_index = next(
+            index for index in TenantResourceGrant._meta.indexes if index.name == "org_trg_active_expiry_idx"
+        )
+        assert expiry_index.fields == ["tenant", "valid_until"]
+        assert expiry_index.condition.children == [
+            ("deleted_at__isnull", True),
+            ("valid_until__isnull", False),
+        ]
 
     def test_valid_group_grant_saves(self):
         group = TenantGroup.objects.create(name="TRG Group", slug="trg-group")

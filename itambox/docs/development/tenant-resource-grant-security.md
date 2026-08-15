@@ -123,6 +123,52 @@ Future grant expiry or revocation workflows must preserve durable attribution of
 the actor or trusted-system operation and reason that changed authorization state;
 adding lifecycle automation may not erase the original assignment provenance.
 
+## Expiry, audit, and rollback contract
+
+`TenantResourceGrant.valid_until` is nullable configuration. `NULL` means
+perpetual; a non-null value is due when it is less than or equal to the fixed
+cutoff captured by the hourly owner-tenant sweep. It never changes the meaning
+of `is_active`, the default manager, the resolver, the batch projection, the
+coverage check, or either active-grant uniqueness constraint. Liveness changes
+only when the ordinary soft-deletion transition commits. The expiry index is
+static (`deleted_at IS NULL AND valid_until IS NOT NULL`) and contains no clock
+expression.
+
+The scheduled expiry action is the explicit N5 exception for an operator-
+configured system action. Each per-tenant task enters a live `TaskContext` with
+`user_id=None`, installs a synthetic request ID before target resolution, and
+uses an exact `SystemAuthorizationContext` for the delete permission,
+`organization.resource_grant.expire`, and the non-empty scheduled-revocation
+reason. A bare `user=None`, a tenantless context, a failed context entry, or a
+changed ambient tenant cannot authorize the mutation. Every expiry delete has
+one owner-tenant `ObjectChange` with `user=None` and one immutable evidence row.
+
+The coordinator creates one generation-bound run per owner tenant and UTC
+hour. Claim, completion, retry, enqueue-failure, and stale-lease repair are
+compare-and-set transitions. Runs are tenant-isolated; malformed rows remain
+live and receive a stable redacted remediation outcome. The read-only audit API
+allows owner, direct-grantee, and live ancestor-group visibility while keeping
+filtering after the same visibility boundary. Token scope pins the result to
+its tenant. An unbound platform superuser is global, while a tenant- or
+group-bound superuser remains container-limited. Hidden identifiers and filters
+return neutral 404/empty results.
+
+Expiry evidence is bound to the current revocation cycle. If its linked
+`ObjectChange` is pruned, the audit row remains integrity-valid and is shown as
+`unknown` with the run/deadline evidence retained. Manual, deleted-user, stale,
+and actorless history is classified conservatively; no deleted human is
+replaced with a fabricated system user. Lifecycle events remain owner-tenant
+events and never recursively disclose resource names, reasons, or grantee-side
+details.
+
+Rollback is one named row at a time. The operator must correct or clear the
+deadline before a validated model save restores `deleted_at=None`; bulk
+restore, `QuerySet.update()`, direct SQL, and a writable REST restore action are
+unsupported. The prior expiry change, run, and evidence remain untouched, and
+the restored grant still requires independent RBAC. Reversing the migration
+removes the field and operational tables only; it never restores a revoked
+grant.
+
 ## Non-goals
 
 - Grants do not share catalogue objects, tenants, memberships, role data, arbitrary locations, assignment history, or generic related objects.
@@ -279,7 +325,10 @@ PYTHONPATH=itambox uv run --locked --group dev python -m pytest -q -p no:cachepr
   itambox/core/tests/test_tasks.py \
   itambox/core/tests/test_kernel_leaves.py \
   itambox/core/tests/test_kernel_serialization.py \
-  itambox/core/tests/test_pdf_renderer.py
+  itambox/core/tests/test_pdf_renderer.py \
+  itambox/organization/tests/test_resource_grant_audit_api.py \
+  itambox/organization/tests/test_resource_grant_expiry.py \
+  itambox/organization/tests/test_resource_grant_migrations.py
 ```
 
 Run the contract-policy checks from the repository root:

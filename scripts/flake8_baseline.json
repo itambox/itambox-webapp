@@ -7476,14 +7476,6 @@
       "count": 1
     },
     {
-      "path": "itambox/organization/api/views.py",
-      "code": "F401",
-      "message": "'itambox.api.viewsets.ITAMBoxReadOnlyModelViewSet' imported but unused",
-      "source": "from itambox.api.viewsets import ITAMBoxModelViewSet, ITAMBoxReadOnlyModelViewSet",
-      "context": "Module:body",
-      "count": 1
-    },
-    {
       "path": "itambox/organization/apps.py",
       "code": "F401",
       "message": "'organization.signals' imported but unused",
@@ -7864,14 +7856,6 @@
       "code": "E402",
       "message": "module level import not at top of file",
       "source": "from core.models import BaseModel, ChangeLoggingMixin, DeletableVaultModel, StandardModel, VaultModel",
-      "context": "Module:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/organization/models.py",
-      "code": "F401",
-      "message": "'core.managers.TenantScopingManager' imported but unused",
-      "source": "from core.managers import (",
       "context": "Module:body",
       "count": 1
     },
@@ -8440,30 +8424,6 @@
       "code": "F401",
       "message": "'.region_views.RegionListView' imported but unused",
       "source": "from .region_views import (",
-      "context": "Module:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/organization/views/__init__.py",
-      "code": "F401",
-      "message": "'.resource_grant_views.TenantResourceGrantCreateView' imported but unused",
-      "source": "from .resource_grant_views import (",
-      "context": "Module:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/organization/views/__init__.py",
-      "code": "F401",
-      "message": "'.resource_grant_views.TenantResourceGrantListView' imported but unused",
-      "source": "from .resource_grant_views import (",
-      "context": "Module:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/organization/views/__init__.py",
-      "code": "F401",
-      "message": "'.resource_grant_views.TenantResourceGrantRevokeView' imported but unused",
-      "source": "from .resource_grant_views import (",
       "context": "Module:body",
       "count": 1
     },
