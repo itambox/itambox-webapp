@@ -1,6 +1,6 @@
 # CSP and inline-style policy
 
-Issue #24 removes the application's dependency on CSP `style-src 'unsafe-inline'`.
+The application must not depend on CSP `style-src 'unsafe-inline'`.
 The policy is intentionally fail-closed: browser HTML, server-generated HTML, and
 authored frontend code must not quietly reintroduce inline styles.
 

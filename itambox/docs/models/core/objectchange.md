@@ -1,6 +1,7 @@
 # Object Changelog
 
-An **Object Change** record represents an immutable, comprehensive system audit trail capturing every creation, update, soft-delete, or recovery action executed on objects across the entire application.
+An **Object Change** record is an immutable audit trail of every creation,
+update, soft-delete, or recovery action on an object.
 
 ## Attributes
 

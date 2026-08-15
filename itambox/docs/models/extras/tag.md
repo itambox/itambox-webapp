@@ -12,4 +12,5 @@ A **Tag** represents a colored keyword label used to apply lightweight, free-for
 | **Slug** | URL-safe representation. | Slug | Yes |
 
 ## Use Cases
-Most models inside ITAMbox inherit from `TaggableMixin` and sport a `tags` field. This enables powerful tag-based global filtering, grouping, and search queries across heterogenous datasets.
+Most models inside ITAMbox inherit from `TaggableMixin` and expose a `tags`
+field. Tags support global filtering, grouping, and search across models.

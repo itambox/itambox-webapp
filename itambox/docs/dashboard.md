@@ -1,6 +1,8 @@
 # Dashboard
 
-The **Dashboard** is the default landing page of ITAMbox. It provides a highly customizable, widget-based overview of your IT asset management database, including key metrics, analytics, and shortcuts to common tasks.
+The **Dashboard** is the default landing page of ITAMbox. It provides a
+customizable, widget-based overview of your IT asset management database,
+including key metrics, analytics, and shortcuts to common tasks.
 
 ---
 

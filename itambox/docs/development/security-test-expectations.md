@@ -25,9 +25,9 @@ meet these expectations. Failing to meet them is a review defect, not a gate
 bypass: the assertions are visible in the diff.
 
 These expectations apply to the complete serial suite run against a clean
-PostgreSQL database. That suite remains the correctness source of truth until
-issue #21 establishes safe parallel execution; a subset, a `-k` selection, or an
-xdist run is not evidence that these expectations are met.
+PostgreSQL database. That suite remains the correctness source of truth; a
+subset, a `-k` selection, or an xdist run is not evidence that these
+expectations are met.
 
 Test paths below are repository-root relative. Every module and test name cited
 was confirmed present in the tree at the time of writing.

@@ -61,13 +61,14 @@ Each application registers its own slices from `AppConfig.ready` into the
 registry in `itambox/capabilities.py`. The generic list and detail views resolve
 the owning capability *per model* and expose it as `capability_notice`, which
 drives the banner and the header badge. `core.features.module_maturity` and
-`core.features.is_beta_module` remain as registry-backed adapters for one
-release; they hold no data of their own.
+`core.features.is_beta_module` are registry-backed adapters; they hold no data
+of their own.
 
 Navigation badges are driven by `beta=True` on individual `MenuGroup` instances
 in `core/navigation/menu.py`.
 
-Run `python manage.py capabilities` to see what a deployment has switched on.
+The `capabilities` management command reports the effective state of a
+deployment.
 
 ## Promoting a module to Stable
 
