@@ -5,7 +5,10 @@ from django.db import migrations, models
 
 
 class Migration(migrations.Migration):
-    dependencies = [("organization", "0102_alter_tenantresourcegrant_options")]
+    dependencies = [
+        ("organization", "0102_alter_tenantresourcegrant_options"),
+        ("users", "0100_issue88_shard_62_users_relations"),
+    ]
 
     operations = [
         migrations.AddField(
@@ -155,7 +158,7 @@ class Migration(migrations.Migration):
                 "indexes": [
                     models.Index(
                         fields=("tenant", "-schedule_slot"),
-                        name="org_trg_expiry_run_tenant_slot_idx",
+                        name="org_trg_run_tenant_slot_idx",
                     ),
                     models.Index(
                         fields=("tenant", "outcome", "-schedule_slot"),
@@ -221,7 +224,7 @@ class Migration(migrations.Migration):
                 "indexes": [
                     models.Index(
                         fields=("run", "grant"),
-                        name="org_trg_expiry_revoke_run_grant_idx",
+                        name="org_trg_revoke_run_grant_idx",
                     ),
                 ],
             },

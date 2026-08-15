@@ -34,7 +34,7 @@
     <div class="list-group list-group-flush">
       {% for evidence in expiry_evidence %}
         <div class="list-group-item">
-          <a href="/api/organization/resource-grant-audit/{{ evidence.grant_id }}/">
+          <a href="{% url 'api:organization_api:tenantresourcegrantaudit-detail' evidence.grant_id %}">
             {% translate "Grant" %} #{{ evidence.grant_id }}
           </a>
           <span class="text-muted ms-2">{{ evidence.revoked_at }}</span>

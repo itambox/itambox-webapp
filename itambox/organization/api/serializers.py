@@ -42,6 +42,9 @@ class TenantResourceGrantAuditSerializer(BaseModelSerializer):
     grantee = serializers.SerializerMethodField()
     resource_type = serializers.SerializerMethodField()
     revocation = serializers.SerializerMethodField()
+    # The model carries soft-delete liveness (deleted_at), not a dedicated
+    # revocation timestamp; expose it under the audit vocabulary.
+    revoked_at = serializers.DateTimeField(source="deleted_at", read_only=True, allow_null=True)
 
     class Meta:
         model = TenantResourceGrant

@@ -193,6 +193,7 @@ nav:
       - Optional Capability Fallbacks: 'development/capability-fallbacks.md'
       - Tenant Resource Grant Security: 'development/tenant-resource-grant-security.md'
       - Snipe-IT Importer Stage Design: 'development/design-issue-85-snipeit-stages.md'
+      - Expiring Resource Grants Design: 'development/design-issue-195-expiring-resource-grants.md'
       - Template and Style Linting: 'development/template-and-style-linting.md'
       - CSP and Inline-Style Policy: 'development/csp-inline-style-policy.md'
       - Module Maturity: 'development/module-maturity.md'

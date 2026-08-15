@@ -57,6 +57,10 @@ class ResourceGrantExpiryMigrationTests(TransactionTestCase):
         )
         old_grant._base_manager.bulk_create([direct, group_grant, revoked])
 
+        # A fresh executor is required after the first migrate: the loader
+        # caches the applied-migration state at construction time, so reusing
+        # the instance would skip the forward migration.
+        executor = MigrationExecutor(connection)
         executor.migrate([self.migrate_to])
         new_apps = executor.loader.project_state([self.migrate_to]).apps
         new_grant = new_apps.get_model("organization", "TenantResourceGrant")

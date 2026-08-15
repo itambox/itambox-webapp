@@ -33,6 +33,7 @@ POST_TRANSITION_MIGRATIONS = {
     "inventory.0101_alter_accessoryassignment_options_and_more",
     "organization.0101_membership_external_id_and_more",
     "organization.0102_alter_tenantresourcegrant_options",
+    "organization.0103_tenant_resource_grant_expiry",
     "procurement.0101_alter_purchaseorder_options",
     "subscriptions.0101_remove_subscription_auto_renewal_and_more",
     "users.0101_user_scim_id_usergroup_external_id_usergroup_scim_id_and_more",

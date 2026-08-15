@@ -10,6 +10,7 @@ from django.db import IntegrityError, OperationalError, close_old_connections, c
 from django.test import TestCase, TransactionTestCase
 from django.utils import timezone
 
+from assets.models import Manufacturer
 from core.choices import ObjectChangeActionChoices
 from core.models import ObjectChange
 from core.tasks.resource_grants import (
@@ -54,7 +55,13 @@ class ResourceGrantExpiryTests(TestCase):
             site=site,
             tenant=cls.owner,
         )
-        accessory = Accessory.objects.create(name="Expiry Accessory", slug="expiry-accessory", tenant=cls.owner)
+        manufacturer = Manufacturer.objects.create(name="Expiry Manufacturer", slug="expiry-manufacturer")
+        accessory = Accessory.objects.create(
+            name="Expiry Accessory",
+            slug="expiry-accessory",
+            tenant=cls.owner,
+            manufacturer=manufacturer,
+        )
         cls.stock = AccessoryStock.objects.create(accessory=accessory, location=location, qty=2)
         cls.content_type = ContentType.objects.get_for_model(AccessoryStock)
 
@@ -146,7 +153,7 @@ class ResourceGrantExpiryTests(TestCase):
         other = Tenant.objects.create(name="Expiry Other", slug="expiry-other")
         cutoff = timezone.now()
         self._grant(valid_until=cutoff - datetime.timedelta(minutes=1))
-        other_grant = TenantResourceGrant._base_manager.create(
+        other_grant = TenantResourceGrant(
             tenant=other,
             grantee_tenant=self.grantee,
             resource_type=self.content_type,
@@ -154,6 +161,9 @@ class ResourceGrantExpiryTests(TestCase):
             access_level=TenantResourceGrant.ACCESS_VIEW,
             valid_until=cutoff - datetime.timedelta(minutes=1),
         )
+        # bulk_create bypasses the model clean() ownership proof on purpose:
+        # this row is a foreign-tenant grant and must be exercisable as data.
+        TenantResourceGrant._base_manager.bulk_create([other_grant])
         run = self._run(cutoff)
         sweep_expired_resource_grants(self.owner.pk, run.pk, 1)
         other_grant.refresh_from_db()
@@ -189,15 +199,15 @@ class ResourceGrantExpiryTests(TestCase):
         RoleGrantScope.objects.create(role_grant=role_grant, scope_type=RoleGrantScope.SCOPE_OWN)
         run = self._run(timezone.now())
         result = sweep_expired_resource_grants(self.owner.pk, run.pk, 1)
-        role_grant.refresh_from_db()
         assert result.code == CODE_NO_DUE
-        assert role_grant.deleted_at is None
+        # RoleGrant has no deleted_at; the sweep must simply not touch it.
+        assert RoleGrant.objects.filter(pk=role_grant.pk).exists()
 
     def test_s10_second_run_loser_has_no_invented_revocation_count(self):
         cutoff = timezone.now()
         grant = self._grant(valid_until=cutoff)
         first = self._run(cutoff)
-        second = self._run(cutoff + datetime.timedelta(minutes=1))
+        second = self._run(cutoff + datetime.timedelta(hours=1))
         sweep_expired_resource_grants(self.owner.pk, first.pk, 1)
         loser = sweep_expired_resource_grants(self.owner.pk, second.pk, 1)
         second.refresh_from_db()
@@ -314,7 +324,7 @@ class ResourceGrantExpiryTests(TestCase):
         cutoff = timezone.now()
         run = self._run(cutoff)
         grant = self._grant(valid_until=cutoff)
-        foreign_grant = TenantResourceGrant._base_manager.create(
+        foreign_grant = TenantResourceGrant(
             tenant=other,
             grantee_tenant=self.grantee,
             resource_type=self.content_type,
@@ -322,6 +332,9 @@ class ResourceGrantExpiryTests(TestCase):
             access_level=TenantResourceGrant.ACCESS_VIEW,
             valid_until=cutoff,
         )
+        # bulk_create bypasses the ownership proof: the row is intentionally
+        # foreign and must exist as data for the corrupt-evidence scenario.
+        TenantResourceGrant._base_manager.bulk_create([foreign_grant])
         wrong_change = ObjectChange._base_manager.create(
             tenant=self.owner,
             changed_object_type=ContentType.objects.get_for_model(TenantResourceGrant),
@@ -528,8 +541,12 @@ class ResourceGrantExpiryConcurrencyTests(TransactionTestCase):
             site=site,
             tenant=self.owner,
         )
+        manufacturer = Manufacturer.objects.create(name="Expiry Race Manufacturer", slug="expiry-race-manufacturer")
         accessory = Accessory.objects.create(
-            name="Expiry Race Accessory", slug="expiry-race-accessory", tenant=self.owner
+            name="Expiry Race Accessory",
+            slug="expiry-race-accessory",
+            tenant=self.owner,
+            manufacturer=manufacturer,
         )
         self.stock = AccessoryStock.objects.create(accessory=accessory, location=location, qty=2)
         self.content_type = ContentType.objects.get_for_model(AccessoryStock)
@@ -592,8 +609,12 @@ class ResourceGrantRollbackTests(TenantTestMixin, TestCase):
             site=site,
             tenant=self.tenant,
         )
+        manufacturer = Manufacturer.objects.create(name="Expiry Rollback Manufacturer", slug="expiry-rollback-manufacturer")
         accessory = Accessory.objects.create(
-            name="Expiry Rollback Accessory", slug="expiry-rollback-accessory", tenant=self.tenant
+            name="Expiry Rollback Accessory",
+            slug="expiry-rollback-accessory",
+            tenant=self.tenant,
+            manufacturer=manufacturer,
         )
         stock = AccessoryStock.objects.create(accessory=accessory, location=location, qty=2)
         content_type = ContentType.objects.get_for_model(AccessoryStock)

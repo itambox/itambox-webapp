@@ -30,6 +30,7 @@ from organization.models import (
     Tenant,
     TenantGroup,
     TenantResourceGrant,
+    TenantResourceGrantExpiryRevocation,
     TenantResourceGrantExpiryRun,
 )
 
@@ -65,9 +66,10 @@ class ResourceGrantAuditContractTests(TestCase):
             {"kind", "user_id", "request_id", "time", "triggering_valid_until", "expiry_run_id"},
         )
 
-    @pytest.mark.parametrize(
-        "case",
-        (
+    def test_audit_matrix_case_is_named(self):
+        # Mirrors the WP-22 audit matrix (A6..A19) without pytest parametrize,
+        # which is unreliable on Django TestCase methods in this suite.
+        for case in (
             "A6",
             "A7",
             "A8",
@@ -88,10 +90,9 @@ class ResourceGrantAuditContractTests(TestCase):
             "A17",
             "A18",
             "A19",
-        ),
-    )
-    def test_audit_matrix_case_is_named(self, case):
-        self.assertTrue(case.startswith("A"))
+        ):
+            with self.subTest(case=case):
+                self.assertTrue(case.startswith("A"))
 
     def test_filter_contract_uses_scalar_number_filters(self):
         for name in (
@@ -274,7 +275,10 @@ class ResourceGrantAuditAPITests(APITestCase):
         row = next(row for row in self._rows(response) if row["id"] == self.grant.pk)
         self.assertEqual(row["state"], "active")
         self.assertEqual(row["resource_id"], self.owner_stock.pk)
-        self.assertNotIn("accessory", str(row).lower())
+        # The owner's pool is visible, but the pool's display name must not
+        # leak into the row (the resource type string legitimately contains
+        # "accessorystock", so pin the actual accessory name instead).
+        self.assertNotIn(self.owner_stock.accessory.name.lower(), str(row).lower())
 
     def test_a2_direct_grantee_sees_active_grant_without_target_resolution(self):
         self._login(self.grantee_user, self.grantee)
@@ -491,7 +495,7 @@ class ResourceGrantAuditAPITests(APITestCase):
 
     def test_a15_null_expiry_change_link_is_unknown_but_keeps_evidence(self):
         run = self._expire()
-        evidence = run.revocations.model._base_manager.get(run=run, grant=self.grant)
+        evidence = TenantResourceGrantExpiryRevocation._base_manager.get(run=run, grant=self.grant)
         evidence.object_change = None
         evidence.save(update_fields=["object_change", "updated_at"])
         data = TenantResourceGrantAuditSerializer().get_revocation(self.grant)

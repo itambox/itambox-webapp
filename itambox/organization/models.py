@@ -1583,7 +1583,7 @@ class TenantResourceGrantExpiryRun(BaseModel):
         indexes = [
             models.Index(
                 fields=["tenant", "-schedule_slot"],
-                name="org_trg_expiry_run_tenant_slot_idx",
+                name="org_trg_run_tenant_slot_idx",
             ),
             models.Index(
                 fields=["tenant", "outcome", "-schedule_slot"],
@@ -1596,14 +1596,18 @@ class TenantResourceGrantExpiryRun(BaseModel):
 
     def save(self, *args, **kwargs):
         if self.pk:
-            previous = type(self)._base_manager.filter(pk=self.pk).values(
-                "tenant_id",
-                "schedule_slot",
-                "cutoff",
-            ).first()
+            previous = (
+                type(self)
+                ._base_manager.filter(pk=self.pk)
+                .values(
+                    "tenant_id",
+                    "schedule_slot",
+                    "cutoff",
+                )
+                .first()
+            )
             if previous is not None and any(
-                previous[field] != getattr(self, field)
-                for field in ("tenant_id", "schedule_slot", "cutoff")
+                previous[field] != getattr(self, field) for field in ("tenant_id", "schedule_slot", "cutoff")
             ):
                 raise ValidationError("Expiry run identity fields are immutable.")
         return super().save(*args, **kwargs)
@@ -1676,17 +1680,22 @@ class TenantResourceGrantExpiryRevocation(BaseModel):
         indexes = [
             models.Index(
                 fields=["run", "grant"],
-                name="org_trg_expiry_revoke_run_grant_idx",
+                name="org_trg_revoke_run_grant_idx",
             ),
         ]
 
     def save(self, *args, **kwargs):
         if self.pk:
-            previous = type(self)._base_manager.filter(pk=self.pk).values(
-                "triggering_valid_until",
-                "revoked_at",
-                "request_id",
-            ).first()
+            previous = (
+                type(self)
+                ._base_manager.filter(pk=self.pk)
+                .values(
+                    "triggering_valid_until",
+                    "revoked_at",
+                    "request_id",
+                )
+                .first()
+            )
             if previous is not None and any(
                 previous[field] != getattr(self, field)
                 for field in ("triggering_valid_until", "revoked_at", "request_id")
