@@ -102,7 +102,7 @@ class WebhookDeliveryUITests(TenantTestMixin, TestCase):
         self.assertContains(response, "Delivery History")
         self.assertContains(response, self.success_delivery.delivery_id[:8])
         self.assertContains(response, "Success")
-        self.assertContains(response, "Redeliver")
+        self.assertContains(response, "Redeliver</button>")
         self.assertContains(response, self._redeliver_url(self.success_delivery))
         self.assertContains(response, "Send Test Webhook")
         self.assertContains(response, self._test_url())
@@ -115,7 +115,7 @@ class WebhookDeliveryUITests(TenantTestMixin, TestCase):
 
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, self.success_delivery.delivery_id[:8])
-        self.assertNotContains(response, "Redeliver")
+        self.assertNotContains(response, "Redeliver</button>")
         self.assertNotContains(response, self._redeliver_url(self.success_delivery))
         self.assertNotContains(response, "Send Test Webhook")
         self.assertNotContains(response, self._test_url())

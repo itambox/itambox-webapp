@@ -5,7 +5,7 @@ from unittest.mock import MagicMock, patch
 
 import requests
 from django.core.exceptions import ValidationError
-from django.test import SimpleTestCase
+from django.test import TestCase
 
 from core.events import (
     DeliveryDisposition,
@@ -16,9 +16,14 @@ from core.events import (
 )
 from core.tasks.alerts import _dispatch_channels
 from core.tasks.webhooks import send_webhook_task
+from organization.models import Tenant
 
 
-class DeliveryContractTests(SimpleTestCase):
+class DeliveryContractTests(TestCase):
+    def setUp(self):
+        self.tenant = Tenant.objects.create(name="Delivery Contract Tenant", slug="delivery-contract-tenant")
+        self.tenant_id = self.tenant.pk
+
     def test_delivery_result_truth_value_preserves_success_contract(self):
         success = DeliveryResult("test.deliver", DeliveryDisposition.SUCCESS)
         retryable = DeliveryResult("test.deliver", DeliveryDisposition.RETRYABLE)
@@ -118,7 +123,7 @@ class DeliveryContractTests(SimpleTestCase):
                 event_object_id=1,
                 event_timestamp_iso="2026-01-01T00:00:00Z",
                 event_data={"body": "secret-payload"},
-                tenant_id=7,
+                tenant_id=self.tenant_id,
                 actor_id=11,
                 request_id="correlation-13",
             )
@@ -126,7 +131,7 @@ class DeliveryContractTests(SimpleTestCase):
         rendered = " ".join(captured.output)
         self.assertIn("operation=webhook.deliver", rendered)
         self.assertIn("actor_id=11", rendered)
-        self.assertIn("tenant_id=7", rendered)
+        self.assertIn(f"tenant_id={self.tenant_id}", rendered)
         self.assertIn("request_id=correlation-13", rendered)
         self.assertIn("endpoint=https://example.com", rendered)
         for secret in ("secret-query", "secret-header", "secret-signing-key", "secret-payload"):

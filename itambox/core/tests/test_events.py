@@ -362,6 +362,9 @@ class EventsSystemTestCase(TransactionTestCase):
         mock_response = MagicMock(status_code=200)
         mock_request_pinned.return_value = mock_response
 
+        envelope_tenant_a = Tenant.objects.create(name="Envelope Tenant A", slug="envelope-tenant-a")
+        envelope_tenant_b = Tenant.objects.create(name="Envelope Tenant B", slug="envelope-tenant-b")
+
         for index, url in enumerate(
             (
                 "https://hooks.slack.com/services/test",
@@ -371,6 +374,7 @@ class EventsSystemTestCase(TransactionTestCase):
         ):
             from core.tasks.webhooks import send_webhook_task
 
+            tenant = envelope_tenant_a if index == 1 else envelope_tenant_b
             send_webhook_task(
                 url=url,
                 method="POST",
@@ -378,7 +382,7 @@ class EventsSystemTestCase(TransactionTestCase):
                 secret="",
                 event_id=100 + index,
                 delivery_id=f"delivery-{index}",
-                tenant_id=200 + index,
+                tenant_id=tenant.pk,
                 event_action="create",
                 event_model_app_label="assets",
                 event_model_name="manufacturer",
@@ -392,7 +396,7 @@ class EventsSystemTestCase(TransactionTestCase):
             self.assertEqual(payload["event_id"], 100 + index)
             self.assertEqual(payload["delivery_id"], f"delivery-{index}")
             self.assertEqual(payload["attempt"], 1)
-            self.assertEqual(payload["tenant"], 200 + index)
+            self.assertEqual(payload["tenant"], tenant.pk)
             if index == 1:
                 self.assertEqual(
                     payload,
@@ -401,7 +405,7 @@ class EventsSystemTestCase(TransactionTestCase):
                         "event_id": 101,
                         "delivery_id": "delivery-1",
                         "attempt": 1,
-                        "tenant": 201,
+                        "tenant": envelope_tenant_a.pk,
                         "text": "Event: create on manufacturer (ID: 1)",
                     },
                 )
@@ -413,7 +417,7 @@ class EventsSystemTestCase(TransactionTestCase):
                         "event_id": 102,
                         "delivery_id": "delivery-2",
                         "attempt": 1,
-                        "tenant": 202,
+                        "tenant": envelope_tenant_b.pk,
                         "@type": "MessageCard",
                         "@context": "https://schema.org/extensions",
                         "summary": "Event: create on manufacturer (ID: 2)",

@@ -67,6 +67,14 @@ def _actor_for_id(actor_id: int | None):
     return get_user_model()._default_manager.filter(pk=actor_id).first()
 
 
+def _tenant_exists(tenant_id: int | str) -> bool:
+    """Return whether the tenant reference exists, resolved lazily via the app registry."""
+    from django.apps import apps as django_apps
+
+    tenant_model = django_apps.get_model("organization", "Tenant")
+    return tenant_model._base_manager.filter(pk=tenant_id).exists()
+
+
 def _has_permission(user, permission: str) -> bool:
     try:
         return bool(user and getattr(user, "is_authenticated", False) and user.has_perm(permission))
@@ -202,6 +210,10 @@ def _start_delivery(
             effective_tenant_id = tenant_id
             if effective_tenant_id is None and endpoint is not None:
                 effective_tenant_id = endpoint.tenant_id
+            # Fail closed on unknown tenant references: a stale or tampered task
+            # payload must never crash the worker on a foreign-key violation.
+            if effective_tenant_id is not None and not _tenant_exists(effective_tenant_id):
+                effective_tenant_id = None
             event_link_id = (
                 event_id if event_id is not None and Event._base_manager.filter(pk=event_id).exists() else None
             )
@@ -793,7 +805,7 @@ def redeliver_webhook_delivery(delivery_pk: int, *, actor_id: int | None = None)
 
     with transaction.atomic():
         source = (
-            WebhookDelivery._base_manager.select_for_update()
+            WebhookDelivery._base_manager.select_for_update(of=("self",))
             .select_related("endpoint", "event")
             .filter(pk=source.pk)
             .first()

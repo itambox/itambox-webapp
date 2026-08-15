@@ -4,7 +4,6 @@ from uuid import uuid4
 from django.contrib.auth import get_user_model
 from django.core.exceptions import ValidationError as DjangoValidationError
 from django.urls import reverse
-from drf_spectacular.generators import SchemaGenerator
 from rest_framework import status
 from rest_framework.test import APITestCase
 
@@ -230,6 +229,10 @@ class WebhookDeliveryAPITests(TenantTestMixin, APITestCase):
         self.assertNotIn("url", data)
 
     def test_openapi_contains_delivery_list_and_actions(self):
+        # Lazy import: drf_spectacular must not load before DRF has finished
+        # initializing, otherwise it trips the TokenAuthentication import cycle.
+        from drf_spectacular.generators import SchemaGenerator
+
         schema = SchemaGenerator().get_schema(request=None, public=True)
         paths = schema["paths"]
 

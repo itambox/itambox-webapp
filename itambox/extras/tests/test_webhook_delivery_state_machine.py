@@ -33,8 +33,6 @@ User = get_user_model()
 
 
 class WebhookDeliveryStateMachineTests(TenantTestMixin, TransactionTestCase):
-    reset_sequences = True
-
     def setUp(self):
         super().setUp()
         self.tenant = Tenant.objects.create(name="Webhook Delivery Tenant", slug="webhook-delivery-tenant")
@@ -140,7 +138,11 @@ class WebhookDeliveryStateMachineTests(TenantTestMixin, TransactionTestCase):
         self.assertEqual(retry_kwargs["attempt"], 1)
 
     def test_retry_budget_exhaustion_marks_dead_after_initial_plus_budget(self):
-        kwargs = self._task_kwargs(retry_backoff=0)
+        # The task reads retry configuration from the endpoint row, so the
+        # endpoint must carry the immediate-retry policy this test exercises.
+        self.endpoint.retry_backoff = 0
+        self.endpoint.save(update_fields=["retry_backoff"])
+        kwargs = self._task_kwargs()
         response = self._response(503)
         with (
             patch("core.http.request_pinned", return_value=response),
