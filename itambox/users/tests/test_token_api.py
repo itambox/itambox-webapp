@@ -8,8 +8,10 @@ read `self.queryset.model` unconditionally).
 """
 
 import logging
+from unittest import mock
 
 from django.contrib.auth import get_user_model
+from django.core.exceptions import ObjectDoesNotExist
 from django.urls import reverse
 from rest_framework import status
 from rest_framework.test import APITestCase
@@ -17,6 +19,7 @@ from rest_framework.test import APITestCase
 from core.models import ObjectChange
 from core.tests.mixins import TenantTestMixin
 from itambox.api.mixins import ETagMixin
+from users.api.serializers import TokenSerializer
 from users.api.views import TokenViewSet
 from users.models import Token
 
@@ -203,3 +206,59 @@ class TokenLifecycleAPITests(TenantTestMixin, APITestCase):
             self.assertNotIn(plaintext, str(change.prechange_data))
             self.assertNotIn(plaintext, str(change.postchange_data))
             self.assertNotIn(plaintext, change.object_repr)
+
+    # --- Shared-helper coverage: model derivation, bulk paths, refetch fallback --
+
+    def test_viewset_model_derivation_covers_queryset_and_fallbacks(self):
+        view = TokenViewSet()
+        self.assertIs(view._get_model(serializer=TokenSerializer()), Token)
+        self.assertIs(view._get_model(serializer=TokenSerializer(many=True)), Token)
+        self.assertIs(view._get_model(instance=Token(user=self.tenant_user, tenant=self.tenant)), Token)
+
+        view.queryset = Token.objects.all()
+        self.assertIs(view._get_model(), Token)
+
+        view.queryset = None
+        with self.assertRaisesRegex(AssertionError, "queryset, serializer, or instance"):
+            view._get_model()
+
+    def test_bulk_partial_update_writes_through_the_shared_bulk_path(self):
+        first = self._create_token(description="bulk one").data["id"]
+        second = self._create_token(description="bulk two").data["id"]
+
+        response = self.client.patch(
+            self._list_url(),
+            [
+                {"id": first, "description": "bulk one updated"},
+                {"id": second, "description": "bulk two updated"},
+            ],
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK, response.data)
+        self.assertEqual(Token.objects.get(pk=first).description, "bulk one updated")
+        self.assertEqual(Token.objects.get(pk=second).description, "bulk two updated")
+
+    def test_bulk_destroy_writes_through_the_shared_bulk_path(self):
+        first = Token.objects.get(pk=self._create_token().data["id"])
+        second = Token.objects.get(pk=self._create_token().data["id"])
+        # perform_destroy enforces the precondition contract per object, so the
+        # bulk request must carry the current ETag of every target.
+        etags = f"{ETagMixin._get_etag(first)}, {ETagMixin._get_etag(second)}"
+
+        response = self.client.delete(
+            self._list_url(),
+            [{"id": first.pk}, {"id": second.pk}],
+            format="json",
+            HTTP_IF_MATCH=etags,
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_204_NO_CONTENT)
+        self.assertFalse(Token.objects.filter(pk__in=[first.pk, second.pk]).exists())
+
+    def test_created_response_instance_falls_back_when_refetch_misses(self):
+        view = TokenViewSet()
+        serializer = mock.Mock(many=False, instance=mock.Mock(pk=42))
+        with mock.patch.object(TokenViewSet, "get_queryset", side_effect=ObjectDoesNotExist):
+            result = view.get_created_response_instance(serializer)
+        self.assertIs(result, serializer.instance)
