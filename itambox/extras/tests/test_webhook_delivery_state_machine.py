@@ -355,6 +355,244 @@ class WebhookDeliveryStateMachineTests(TenantTestMixin, TransactionTestCase):
                 self.assertNotIn("Authorization", delivery.error_message)
                 self.assertNotIn(response_body, delivery.error_message)
 
+    def test_mismatched_replay_fails_closed(self):
+        other_endpoint = WebhookEndpoint._base_manager.create(
+            name="Other hook",
+            url="http://8.8.8.8/other",
+            tenant=self.tenant,
+        )
+        cases = (
+            {"webhook_endpoint_id": other_endpoint.pk},
+            {"event_id": 999999},
+            {"tenant_id": self.other_tenant.pk},
+        )
+        for overrides in cases:
+            with self.subTest(overrides=overrides):
+                delivery_id = str(uuid4())
+                WebhookDelivery._base_manager.create(
+                    tenant=self.tenant,
+                    endpoint=self.endpoint,
+                    event=self.event,
+                    delivery_id=delivery_id,
+                    status=WebhookDelivery.STATUS_FAILED,
+                )
+                with patch("core.http.request_pinned") as request_pinned:
+                    result = send_webhook_task(**self._task_kwargs(delivery_id=delivery_id, **overrides))
+                delivery = WebhookDelivery._base_manager.get(delivery_id=delivery_id)
+                self.assertEqual(result.disposition.value, "terminal")
+                self.assertEqual(delivery.status, WebhookDelivery.STATUS_DEAD)
+                request_pinned.assert_not_called()
+
+    def test_invalid_targets_fail_closed(self):
+        cases = (
+            {"webhook_endpoint_id": 999999},
+            {"webhook_endpoint_id": None, "url": "", "secret": ""},
+        )
+        for overrides in cases:
+            with self.subTest(overrides=overrides):
+                kwargs = self._task_kwargs(**overrides)
+                with patch("core.http.request_pinned") as request_pinned:
+                    result = send_webhook_task(**kwargs)
+                delivery = WebhookDelivery._base_manager.get(delivery_id=kwargs["delivery_id"])
+                self.assertEqual(result.disposition.value, "terminal")
+                self.assertEqual(delivery.status, WebhookDelivery.STATUS_DEAD)
+                request_pinned.assert_not_called()
+
+        self.endpoint.enabled = False
+        self.endpoint.save(update_fields=["enabled"])
+        with patch("core.http.request_pinned") as request_pinned:
+            result = send_webhook_task(**self._task_kwargs())
+        self.assertEqual(result.disposition.value, "terminal")
+        request_pinned.assert_not_called()
+        self.endpoint.enabled = True
+        self.endpoint.save(update_fields=["enabled"])
+
+        cross_tenant_id = str(uuid4())
+        WebhookDelivery._base_manager.create(
+            tenant=self.other_tenant,
+            endpoint=self.endpoint,
+            delivery_id=cross_tenant_id,
+            status=WebhookDelivery.STATUS_PENDING,
+        )
+        with patch("core.http.request_pinned") as request_pinned:
+            result = send_webhook_task(**self._task_kwargs(delivery_id=cross_tenant_id))
+        self.assertEqual(result.disposition.value, "terminal")
+        request_pinned.assert_not_called()
+
+    def test_unknown_event_and_tenant_references_fail_closed(self):
+        kwargs = self._task_kwargs(event_id=999999, tenant_id=999999)
+        with patch("core.http.request_pinned", return_value=self._response()) as request_pinned:
+            result = send_webhook_task(**kwargs)
+        delivery = WebhookDelivery._base_manager.get(delivery_id=kwargs["delivery_id"])
+        self.assertTrue(result)
+        self.assertIsNone(delivery.event_id)
+        self.assertIsNone(delivery.tenant_id)
+        payload = json.loads(request_pinned.call_args.kwargs["data"])
+        self.assertIsNone(payload["tenant"])
+
+    def test_broken_actor_permission_guard_fails_closed(self):
+        from types import SimpleNamespace
+
+        from core.tasks.webhooks import _is_platform_actor
+
+        broken = SimpleNamespace(is_authenticated=True, is_superuser=False)
+        self.assertFalse(_is_platform_actor(broken))
+        self.assertFalse(_is_platform_actor(None))
+
+    def test_finish_is_noop_when_record_turns_terminal_mid_flight(self):
+        kwargs = self._task_kwargs()
+
+        def _mutate(response):
+            WebhookDelivery._base_manager.filter(delivery_id=kwargs["delivery_id"]).update(status="dead")
+            return response
+
+        with patch("core.http.request_pinned", side_effect=_mutate):
+            result = send_webhook_task(**kwargs)
+        self.assertEqual(result.disposition.value, "noop")
+        delivery = WebhookDelivery._base_manager.get(delivery_id=kwargs["delivery_id"])
+        self.assertEqual(delivery.status, WebhookDelivery.STATUS_DEAD)
+
+    def test_slack_and_teams_test_send_carries_test_fields(self):
+        for host in ("https://hooks.slack.com/services/test", "https://tenant.webhook.office.com/webhookb2/test"):
+            with self.subTest(host=host):
+                endpoint = WebhookEndpoint._base_manager.create(
+                    name=f"Chat hook {host[:20]}",
+                    url=host,
+                    tenant=self.tenant,
+                )
+                with patch("core.tasks.webhooks.async_task") as async_task:
+                    delivery = send_webhook_test(endpoint.pk, actor_id=self.actor.pk)
+                    _, task_kwargs = async_task.call_args
+                with patch("core.http.request_pinned", return_value=self._response()) as request_pinned:
+                    send_webhook_task(**task_kwargs)
+                payload = request_pinned.call_args.kwargs["json"]
+                self.assertEqual(payload["event"], "test")
+                self.assertEqual(payload["object_id"], endpoint.pk)
+                self.assertEqual(payload["schema_version"], 1)
+                delivery.refresh_from_db()
+                self.assertEqual(delivery.status, WebhookDelivery.STATUS_SUCCESS)
+
+    def test_redelivery_variants(self):
+        test_delivery = WebhookDelivery._base_manager.create(
+            tenant=self.tenant,
+            endpoint=self.endpoint,
+            delivery_id=str(uuid4()),
+            status=WebhookDelivery.STATUS_DEAD,
+            test_send=True,
+        )
+        with patch("core.tasks.webhooks.async_task") as async_task:
+            redelivery = redeliver_webhook_delivery(test_delivery.pk, actor_id=self.actor.pk)
+        _, task_kwargs = async_task.call_args
+        self.assertTrue(redelivery.test_send)
+        self.assertTrue(task_kwargs["test_send"])
+        self.assertEqual(task_kwargs["event_action"], "test")
+        self.assertIsNone(task_kwargs["event_id"])
+
+        legacy_rule = EventRule.objects.create(
+            name="Legacy redeliver rule",
+            model=self.event.model,
+            events=[self.event.action],
+            action_type=EventRule.ACTION_WEBHOOK,
+            action_config={"url": "http://8.8.8.8/legacy", "method": "POST"},
+            tenant=self.tenant,
+        )
+        legacy_delivery = WebhookDelivery._base_manager.create(
+            tenant=self.tenant,
+            event=self.event,
+            delivery_id=str(uuid4()),
+            status=WebhookDelivery.STATUS_DEAD,
+        )
+        with patch("core.tasks.webhooks.async_task") as async_task:
+            redeliver_webhook_delivery(legacy_delivery.pk, actor_id=self.actor.pk)
+        _, task_kwargs = async_task.call_args
+        self.assertEqual(task_kwargs["url"], "http://8.8.8.8/legacy")
+        self.assertIsNone(task_kwargs["webhook_endpoint_id"])
+
+        orphan = WebhookDelivery._base_manager.create(
+            tenant=self.tenant,
+            delivery_id=str(uuid4()),
+            status=WebhookDelivery.STATUS_DEAD,
+        )
+        with self.assertRaises(ValidationError):
+            redeliver_webhook_delivery(orphan.pk, actor_id=self.actor.pk)
+
+        with self.assertRaises(PermissionDenied):
+            redeliver_webhook_delivery(legacy_delivery.pk, actor_id=None)
+        legacy_rule.delete()
+
+    def test_platform_permission_user_can_redeliver_system_wide(self):
+        platform_user = User.objects.create_user(username="delivery-platform-viewer", password="password")
+        role = Role.objects.create(
+            tenant=self.tenant,
+            name="Platform delivery viewer",
+            permissions=["extras.view_webhookdelivery", "extras.change_webhookendpoint"],
+        )
+        grant(platform_user, self.tenant, role)
+
+        global_delivery = WebhookDelivery._base_manager.create(
+            tenant=None,
+            endpoint=self.endpoint,
+            delivery_id=str(uuid4()),
+            status=WebhookDelivery.STATUS_DEAD,
+        )
+        with patch("core.tasks.webhooks.async_task") as async_task:
+            redelivery = redeliver_webhook_delivery(global_delivery.pk, actor_id=platform_user.pk)
+        self.assertEqual(redelivery.redelivered_by_id, platform_user.pk)
+        self.assertEqual(redelivery.tenant_id, None)
+        async_task.assert_called_once()
+
+        operator = User.objects.create_user(username="delivery-plain-operator", password="password")
+        with self.assertRaises(PermissionDenied):
+            redeliver_webhook_delivery(global_delivery.pk, actor_id=operator.pk)
+
+    def test_test_send_gating_and_payloads(self):
+        global_endpoint = WebhookEndpoint._base_manager.create(
+            name="Global hook",
+            url="http://8.8.8.8/global",
+            tenant=None,
+        )
+        platform_user = User.objects.create_user(username="delivery-global-operator", password="password")
+        grant(
+            platform_user,
+            self.tenant,
+            Role.objects.create(
+                tenant=self.tenant,
+                name="Global operator",
+                permissions=["extras.view_webhookdelivery", "extras.change_webhookendpoint"],
+            ),
+        )
+        with patch("core.tasks.webhooks.async_task"):
+            delivery = send_webhook_test(global_endpoint.pk, actor_id=platform_user.pk)
+        self.assertTrue(delivery.test_send)
+        self.assertIsNone(delivery.tenant_id)
+
+        operator = User.objects.create_user(username="delivery-tenant-operator-2", password="password")
+        grant(
+            operator,
+            self.tenant,
+            Role.objects.create(
+                tenant=self.tenant,
+                name="Tenant operator 2",
+                permissions=["extras.view_webhookendpoint", "extras.change_webhookendpoint"],
+            ),
+        )
+        with self.assertRaises(PermissionDenied):
+            send_webhook_test(global_endpoint.pk, actor_id=operator.pk)
+        with self.assertRaises(PermissionDenied):
+            send_webhook_test(999999, actor_id=operator.pk)
+        with self.assertRaises(PermissionDenied):
+            send_webhook_test(global_endpoint.pk, actor_id=None)
+
+    def test_delivery_str_contains_identity(self):
+        delivery = WebhookDelivery._base_manager.create(
+            tenant=self.tenant,
+            endpoint=self.endpoint,
+            delivery_id=str(uuid4()),
+            status=WebhookDelivery.STATUS_PENDING,
+        )
+        self.assertIn(delivery.delivery_id, str(delivery))
+        self.assertIn(delivery.status, str(delivery))
+
 
 @pytest.mark.serial_only
 class WebhookDeliveryMigrationTests(TransactionTestCase):

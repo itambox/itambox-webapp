@@ -241,3 +241,26 @@ class WebhookDeliveryAPITests(TenantTestMixin, APITestCase):
         self.assertTrue(delivery_paths)
         self.assertTrue(any("redeliver" in path for path in delivery_paths))
         self.assertTrue(endpoint_test_paths)
+
+    def test_test_send_on_system_wide_endpoint_hides_for_tenant_operator(self):
+        self._login(self.operator, self.tenant_a)
+
+        response = self.client.post(self._endpoint_test_url(self.global_endpoint.pk), format="json")
+
+        self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
+
+    def test_test_send_on_system_wide_endpoint_allows_superuser(self):
+        self._login(self.superuser, self.tenant_a)
+
+        response = self.client.post(self._endpoint_test_url(self.global_endpoint.pk), format="json")
+
+        self.assertEqual(response.status_code, status.HTTP_202_ACCEPTED)
+        self.assertEqual(response.data["delivery_id"], WebhookDelivery.objects.get(pk=response.data["id"]).delivery_id)
+
+    def test_superuser_list_includes_system_wide_deliveries(self):
+        self._login(self.superuser, self.tenant_a)
+
+        response = self.client.get(reverse("api:extras_api:webhookdelivery-list"))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertIn(self.global_delivery.delivery_id, [row["delivery_id"] for row in response.data["results"]])

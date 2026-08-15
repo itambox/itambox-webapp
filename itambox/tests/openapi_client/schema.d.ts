@@ -379,6 +379,16 @@ export interface paths {
     delete: operations["extras_tags_destroy"];
     patch: operations["extras_tags_partial_update"];
   };
+  "/api/extras/webhook-deliveries/": {
+    get: operations["extras_webhook_deliveries_list"];
+  };
+  "/api/extras/webhook-deliveries/{id}/": {
+    get: operations["extras_webhook_deliveries_retrieve"];
+  };
+  "/api/extras/webhook-deliveries/{id}/redeliver/": {
+    /** Redeliver a webhook delivery */
+    post: operations["extras_webhook_deliveries_redeliver_create"];
+  };
   "/api/extras/webhook-endpoints/": {
     get: operations["extras_webhook_endpoints_list"];
     put: operations["extras_webhook_endpoints_update_bulk"];
@@ -391,6 +401,10 @@ export interface paths {
     put: operations["extras_webhook_endpoints_update"];
     delete: operations["extras_webhook_endpoints_destroy"];
     patch: operations["extras_webhook_endpoints_partial_update"];
+  };
+  "/api/extras/webhook-endpoints/{id}/test/": {
+    /** Send a test webhook */
+    post: operations["extras_webhook_endpoints_test_create"];
   };
   "/api/inventory/accessories/": {
     get: operations["inventory_accessories_list"];
@@ -4784,6 +4798,23 @@ export interface components {
       /** @description True when `count` was capped at ITAMBOX_PAGINATOR_COUNT_CAP and the real total is larger. Use `start` (keyset cursor) pagination to iterate the full result set. */
       count_capped?: boolean;
     };
+    PaginatedWebhookDeliveryList: {
+      /** @example 123 */
+      count: number | null;
+      /**
+       * Format: uri
+       * @example http://api.example.org/accounts/?offset=400&limit=100
+       */
+      next?: string | null;
+      /**
+       * Format: uri
+       * @example http://api.example.org/accounts/?offset=200&limit=100
+       */
+      previous?: string | null;
+      results: components["schemas"]["WebhookDelivery"][];
+      /** @description True when `count` was capped at ITAMBOX_PAGINATOR_COUNT_CAP and the real total is larger. Use `start` (keyset cursor) pagination to iterate the full result set. */
+      count_capped?: boolean;
+    };
     PaginatedWebhookEndpointList: {
       /** @example 123 */
       count: number | null;
@@ -6679,6 +6710,55 @@ export interface components {
      * @enum {string}
      */
     WarrantyTypeEnum: "hardware" | "parts_labor" | "onsite" | "accidental" | "extended" | "full";
+    /**
+     * @description Read-only operational history for one webhook delivery.
+     *
+     * Delivery records deliberately expose relationship identifiers and display
+     * names only.  Endpoint URL, headers, and secrets are not fields on this
+     * serializer, so they cannot leak through either list or detail responses.
+     */
+    WebhookDelivery: {
+      id: number;
+      delivery_id: string;
+      status: components["schemas"]["WebhookDeliveryStatusEnum"];
+      attempt: number;
+      response_code: number | null;
+      error_class: string;
+      error_message: string;
+      /** Format: date-time */
+      next_retry_at: string | null;
+      test_send: boolean;
+      redelivered_from: number | null;
+      redelivered_by: number | null;
+      redelivered_by_username: string | null;
+      /** Format: date-time */
+      redelivered_at: string | null;
+      /** Format: date-time */
+      attempted_at: string | null;
+      /** Format: date-time */
+      completed_at: string | null;
+      /** Format: date-time */
+      created_at: string;
+      /** Format: date-time */
+      updated_at: string;
+      endpoint: number | null;
+      endpoint_name: string | null;
+      event: number | null;
+      tenant: number | null;
+    };
+    /** @description Stable response body shared by redelivery and test-send actions. */
+    WebhookDeliveryAction: {
+      id: number;
+      delivery_id: string;
+    };
+    /**
+     * @description * `pending` - Pending
+     * * `success` - Success
+     * * `failed` - Failed
+     * * `dead` - Dead
+     * @enum {string}
+     */
+    WebhookDeliveryStatusEnum: "pending" | "success" | "failed" | "dead";
     WebhookEndpoint: {
       id: number;
       /** Format: uri */
@@ -19452,6 +19532,141 @@ export interface operations {
       };
     };
   };
+  extras_webhook_deliveries_list: {
+    parameters: {
+      query?: {
+        /** @description Endpoint */
+        endpoint?: number;
+        /** @description Number of results to return per page. */
+        limit?: number;
+        /** @description The initial index from which to return the results. */
+        offset?: number;
+        /** @description Keyset/cursor pagination: return results with pk >= start, ordered by pk. Skips the (capped) row count and stays O(page) regardless of table size — use this instead of offset/limit for bulk export or iterating large collections. Follow the `next` link to walk subsequent pages. */
+        start?: number;
+        /**
+         * @description Status
+         *
+         * * `pending` - Pending
+         * * `success` - Success
+         * * `failed` - Failed
+         * * `dead` - Dead
+         */
+        status?: "dead" | "failed" | "pending" | "success";
+        /** @description Test send */
+        test_send?: boolean;
+      };
+    };
+    responses: {
+      200: {
+        content: {
+          "application/json": components["schemas"]["PaginatedWebhookDeliveryList"];
+        };
+      };
+      /** @description The request could not be completed. */
+      400: {
+        content: {
+          "application/json": components["schemas"]["APIError"];
+        };
+      };
+      /** @description The request could not be completed. */
+      401: {
+        content: {
+          "application/json": components["schemas"]["APIError"];
+        };
+      };
+      /** @description The request could not be completed. */
+      403: {
+        content: {
+          "application/json": components["schemas"]["APIError"];
+        };
+      };
+    };
+  };
+  extras_webhook_deliveries_retrieve: {
+    parameters: {
+      path: {
+        /** @description A unique integer value identifying this Webhook Delivery. */
+        id: number;
+      };
+    };
+    responses: {
+      200: {
+        content: {
+          "application/json": components["schemas"]["WebhookDelivery"];
+        };
+      };
+      /** @description The request could not be completed. */
+      400: {
+        content: {
+          "application/json": components["schemas"]["APIError"];
+        };
+      };
+      /** @description The request could not be completed. */
+      401: {
+        content: {
+          "application/json": components["schemas"]["APIError"];
+        };
+      };
+      /** @description The request could not be completed. */
+      403: {
+        content: {
+          "application/json": components["schemas"]["APIError"];
+        };
+      };
+      /** @description The request could not be completed. */
+      404: {
+        content: {
+          "application/json": components["schemas"]["APIError"];
+        };
+      };
+    };
+  };
+  /** Redeliver a webhook delivery */
+  extras_webhook_deliveries_redeliver_create: {
+    parameters: {
+      path: {
+        /** @description A unique integer value identifying this Webhook Delivery. */
+        id: number;
+      };
+    };
+    responses: {
+      202: {
+        content: {
+          "application/json": components["schemas"]["WebhookDeliveryAction"];
+        };
+      };
+      /** @description The request could not be completed. */
+      400: {
+        content: {
+          "application/json": components["schemas"]["APIError"];
+        };
+      };
+      /** @description The request could not be completed. */
+      404: {
+        content: {
+          "application/json": components["schemas"]["APIError"];
+        };
+      };
+      /** @description The request could not be completed. */
+      409: {
+        content: {
+          "application/json": components["schemas"]["APIError"];
+        };
+      };
+      /** @description The request could not be completed. */
+      412: {
+        content: {
+          "application/json": components["schemas"]["APIError"];
+        };
+      };
+      /** @description The request could not be completed. */
+      428: {
+        content: {
+          "application/json": components["schemas"]["APIError"];
+        };
+      };
+    };
+  };
   extras_webhook_endpoints_list: {
     parameters: {
       query?: {
@@ -19881,6 +20096,52 @@ export interface operations {
       };
       /** @description The request could not be completed. */
       403: {
+        content: {
+          "application/json": components["schemas"]["APIError"];
+        };
+      };
+      /** @description The request could not be completed. */
+      404: {
+        content: {
+          "application/json": components["schemas"]["APIError"];
+        };
+      };
+      /** @description The request could not be completed. */
+      409: {
+        content: {
+          "application/json": components["schemas"]["APIError"];
+        };
+      };
+      /** @description The request could not be completed. */
+      412: {
+        content: {
+          "application/json": components["schemas"]["APIError"];
+        };
+      };
+      /** @description The request could not be completed. */
+      428: {
+        content: {
+          "application/json": components["schemas"]["APIError"];
+        };
+      };
+    };
+  };
+  /** Send a test webhook */
+  extras_webhook_endpoints_test_create: {
+    parameters: {
+      path: {
+        /** @description A unique integer value identifying this Webhook Endpoint. */
+        id: number;
+      };
+    };
+    responses: {
+      202: {
+        content: {
+          "application/json": components["schemas"]["WebhookDeliveryAction"];
+        };
+      };
+      /** @description The request could not be completed. */
+      400: {
         content: {
           "application/json": components["schemas"]["APIError"];
         };

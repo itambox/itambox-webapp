@@ -3,6 +3,7 @@ from uuid import uuid4
 
 from django.contrib.auth import get_user_model
 from django.contrib.messages import get_messages
+from django.core.exceptions import ValidationError as DjangoValidationError
 from django.test import TestCase
 from django.urls import reverse
 from django.utils import timezone
@@ -168,6 +169,10 @@ class WebhookDeliveryUITests(TenantTestMixin, TestCase):
         )
         self.assertEqual(created.count(), 1)
         self.assertEqual(created.get().redelivered_by_id, self.operator.pk)
+        self.assertIn(
+            "Webhook delivery redelivered.",
+            [str(message) for message in get_messages(response.wsgi_request)],
+        )
 
     def test_other_tenant_redelivery_is_fail_closed(self):
         self.client_login_to_tenant(self.operator, self.tenant_a)
@@ -203,3 +208,78 @@ class WebhookDeliveryUITests(TenantTestMixin, TestCase):
 
         self.assertContains(response, self.failed_delivery.error_message)
         self.assertNotContains(response, "ui-secret-value")
+
+    def test_platform_user_sees_system_wide_deliveries(self):
+        platform_user = User.objects.create_user(username="webhook_ui_platform", password="pw")
+        grant(
+            platform_user,
+            self.tenant_a,
+            Role.objects.create(
+                tenant=self.tenant_a,
+                name="Webhook UI Platform",
+                permissions=["extras.view_webhookdelivery"],
+            ),
+        )
+        global_delivery = self._delivery(tenant=None, status="success", response_code=200)
+
+        self.client_login_to_tenant(platform_user, self.tenant_a)
+        response = self.client.get(self._endpoint_url())
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, global_delivery.delivery_id[:8])
+
+    def test_test_send_failure_shows_safe_message(self):
+        self.client_login_to_tenant(self.operator, self.tenant_a)
+
+        with patch("itambox.views.features.send_webhook_test", side_effect=RuntimeError("boom")):
+            response = self.client.post(self._test_url())
+
+        self.assertEqual(response.status_code, 302)
+        self.assertIn(
+            "The test webhook could not be queued.",
+            [str(message) for message in get_messages(response.wsgi_request)],
+        )
+
+    def test_redeliver_unexpected_failure_shows_safe_message(self):
+        self.client_login_to_tenant(self.operator, self.tenant_a)
+
+        with patch("itambox.views.features.redeliver_webhook_delivery", side_effect=RuntimeError("boom")):
+            response = self.client.post(self._redeliver_url(self.failed_delivery))
+
+        self.assertEqual(response.status_code, 302)
+        self.assertIn(
+            "The webhook delivery could not be redelivered.",
+            [str(message) for message in get_messages(response.wsgi_request)],
+        )
+
+    def test_redeliver_validation_failure_shows_safe_message(self):
+        self.client_login_to_tenant(self.operator, self.tenant_a)
+
+        with patch(
+            "itambox.views.features.redeliver_webhook_delivery",
+            side_effect=DjangoValidationError("unexpected validation failure"),
+        ):
+            response = self.client.post(self._redeliver_url(self.failed_delivery))
+
+        self.assertEqual(response.status_code, 302)
+        self.assertIn(
+            "The webhook delivery could not be redelivered.",
+            [str(message) for message in get_messages(response.wsgi_request)],
+        )
+
+    def test_detail_renders_test_send_and_empty_delivery_markers(self):
+        self.client_login_to_tenant(self.operator, self.tenant_a)
+        test_delivery = self._delivery(status="success", test_send=True, response_code=200)
+        blank_id_delivery = WebhookDelivery.objects.create(
+            delivery_id="",
+            endpoint=self.endpoint_a,
+            tenant=self.tenant_a,
+            status="pending",
+        )
+
+        response = self.client.get(self._endpoint_url())
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, test_delivery.delivery_id[:8])
+        self.assertContains(response, "Test webhook")
+        self.assertContains(response, blank_id_delivery.pk)
