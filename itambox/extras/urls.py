@@ -13,12 +13,12 @@ from itambox.views.features import (
     LabelTemplateDetailView,
     LabelTemplateEditView,
     LabelTemplateListView,
+    WebhookDeliveryRedeliverView,
     WebhookEndpointDeleteView,
     WebhookEndpointDetailView,
     WebhookEndpointEditView,
     WebhookEndpointListView,
     WebhookEndpointTestView,
-    WebhookDeliveryRedeliverView,
 )
 
 from . import views
