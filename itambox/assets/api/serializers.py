@@ -1,5 +1,4 @@
 from collections.abc import Mapping
-from typing import Any
 
 from django.contrib.auth import get_user_model
 from django.db import models
@@ -25,7 +24,7 @@ from assets.models import (
     Warranty,
 )
 from extras.api.serializers import TagSerializer
-from itambox.api.base import BaseModelSerializer
+from itambox.api.base import BaseModelSerializer, reject_unknown_or_writableless
 from itambox.api.fields import RelatedObjectCountField
 from itambox.api.nested_serializers import (
     NestedAssetRoleSerializer,
@@ -307,24 +306,6 @@ class AssetRequestSerializer(BaseModelSerializer):
         brief_fields = ["id", "requester", "asset", "status", "request_date"]
 
 
-def _reject_unknown_or_writableless(
-    submitted: Mapping[str, object], fields: Mapping[str, serializers.Field[Any]]
-) -> None:
-    """Reject payloads with unknown fields or without any writable field.
-
-    Shared by the single-serializer and bulk (ListSerializer) validation paths so
-    both reject malformed input before any database row can be created.
-    """
-    submitted_keys = set(submitted.keys())
-    unknown_fields = submitted_keys - set(fields)
-    if unknown_fields:
-        raise serializers.ValidationError({field: _("Unknown field.") for field in sorted(unknown_fields)})
-
-    writable_fields = {name for name, field in fields.items() if not field.read_only}
-    if submitted_keys.isdisjoint(writable_fields):
-        raise serializers.ValidationError(_("At least one writable field is required."))
-
-
 class AssetTagSequenceBulkSerializer(serializers.ListSerializer):
     def validate(self, attrs: list[dict[str, object]]) -> list[dict[str, object]]:
         initial = getattr(self, "initial_data", None)
@@ -333,7 +314,7 @@ class AssetTagSequenceBulkSerializer(serializers.ListSerializer):
 
         for item in initial:
             if isinstance(item, Mapping):
-                _reject_unknown_or_writableless(item, self.child.fields)
+                reject_unknown_or_writableless(item, self.child.fields)
         return attrs
 
 
@@ -362,7 +343,7 @@ class AssetTagSequenceSerializer(BaseModelSerializer):
         if self.nested or not isinstance(initial, Mapping):
             return attrs
 
-        _reject_unknown_or_writableless(initial, self.fields)
+        reject_unknown_or_writableless(initial, self.fields)
         return attrs
 
 
