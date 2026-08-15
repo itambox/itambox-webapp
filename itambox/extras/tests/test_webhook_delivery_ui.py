@@ -217,7 +217,7 @@ class WebhookDeliveryUITests(TenantTestMixin, TestCase):
             Role.objects.create(
                 tenant=self.tenant_a,
                 name="Webhook UI Platform",
-                permissions=["extras.view_webhookdelivery"],
+                permissions=["extras.view_webhookdelivery", "extras.view_webhookendpoint"],
             ),
         )
         global_delivery = self._delivery(tenant=None, status="success", response_code=200)
@@ -282,4 +282,7 @@ class WebhookDeliveryUITests(TenantTestMixin, TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, test_delivery.delivery_id[:8])
         self.assertContains(response, "Test webhook")
-        self.assertContains(response, blank_id_delivery.pk)
+        self.assertContains(
+            response,
+            'data-label="Delivery ID"><span class="text-muted">&mdash;</span>',
+        )

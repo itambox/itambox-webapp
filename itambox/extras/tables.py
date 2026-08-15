@@ -249,8 +249,21 @@ class WebhookDeliveryActionsColumn(tables.Column):
 
 
 class WebhookDeliveryTable(BaseTable):
-    delivery_id = tables.Column(verbose_name=_("Delivery ID"), orderable=False)
-    event = tables.Column(verbose_name=_("Event / Action"), accessor="event", orderable=False)
+    delivery_id = tables.Column(
+        verbose_name=_("Delivery ID"),
+        orderable=False,
+        # Render even for blank ids: empty_values would skip render_delivery_id
+        # and leave the raw table dash instead of the muted marker.
+        empty_values=(),
+    )
+    event = tables.Column(
+        verbose_name=_("Event / Action"),
+        accessor="event",
+        orderable=False,
+        # Render even for event-less test sends: empty_values would skip
+        # render_event entirely and show a plain dash for test deliveries.
+        empty_values=(),
+    )
     status = tables.Column(verbose_name=_("Status"))
     attempt = tables.Column(verbose_name=_("Attempt"))
     response_code = tables.Column(verbose_name=_("Response"))

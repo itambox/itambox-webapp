@@ -255,7 +255,10 @@ class WebhookDeliveryAPITests(TenantTestMixin, APITestCase):
         response = self.client.post(self._endpoint_test_url(self.global_endpoint.pk), format="json")
 
         self.assertEqual(response.status_code, status.HTTP_202_ACCEPTED)
-        self.assertEqual(response.data["delivery_id"], WebhookDelivery.objects.get(pk=response.data["id"]).delivery_id)
+        self.assertEqual(
+            response.data["delivery_id"],
+            WebhookDelivery._base_manager.get(pk=response.data["id"]).delivery_id,
+        )
 
     def test_superuser_list_includes_system_wide_deliveries(self):
         self._login(self.superuser, self.tenant_a)

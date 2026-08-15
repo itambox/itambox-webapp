@@ -420,7 +420,19 @@ class WebhookDeliveryStateMachineTests(TenantTestMixin, TransactionTestCase):
         request_pinned.assert_not_called()
 
     def test_unknown_event_and_tenant_references_fail_closed(self):
+        # An endpoint-linked task with unknown tenant/event references fails
+        # closed: the record cannot be attributed to a known tenant.
         kwargs = self._task_kwargs(event_id=999999, tenant_id=999999)
+        with patch("core.http.request_pinned") as request_pinned:
+            result = send_webhook_task(**kwargs)
+        delivery = WebhookDelivery._base_manager.get(delivery_id=kwargs["delivery_id"])
+        self.assertEqual(result.disposition.value, "terminal")
+        self.assertEqual(delivery.status, WebhookDelivery.STATUS_DEAD)
+        request_pinned.assert_not_called()
+
+        # Without an endpoint the send still runs (legacy path) with a
+        # null tenant attribution instead of crashing on the foreign key.
+        kwargs = self._task_kwargs(webhook_endpoint_id=None, event_id=999999, tenant_id=999999)
         with patch("core.http.request_pinned", return_value=self._response()) as request_pinned:
             result = send_webhook_task(**kwargs)
         delivery = WebhookDelivery._base_manager.get(delivery_id=kwargs["delivery_id"])
@@ -442,9 +454,9 @@ class WebhookDeliveryStateMachineTests(TenantTestMixin, TransactionTestCase):
     def test_finish_is_noop_when_record_turns_terminal_mid_flight(self):
         kwargs = self._task_kwargs()
 
-        def _mutate(response):
+        def _mutate(*_args, **_ignored):
             WebhookDelivery._base_manager.filter(delivery_id=kwargs["delivery_id"]).update(status="dead")
-            return response
+            return self._response()
 
         with patch("core.http.request_pinned", side_effect=_mutate):
             result = send_webhook_task(**kwargs)
@@ -532,6 +544,7 @@ class WebhookDeliveryStateMachineTests(TenantTestMixin, TransactionTestCase):
         global_delivery = WebhookDelivery._base_manager.create(
             tenant=None,
             endpoint=self.endpoint,
+            event=self.event,
             delivery_id=str(uuid4()),
             status=WebhookDelivery.STATUS_DEAD,
         )
