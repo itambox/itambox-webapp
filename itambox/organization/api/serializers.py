@@ -67,20 +67,20 @@ class TenantResourceGrantAuditSerializer(BaseModelSerializer):
         ]
         read_only_fields = fields
 
-    def get_state(self, obj):
+    def get_state(self, obj) -> str:
         return "active" if obj.deleted_at is None else "revoked"
 
-    def get_owner(self, obj):
+    def get_owner(self, obj) -> dict[str, str]:
         return {"id": obj.tenant_id, "name": obj.tenant.name}
 
-    def get_grantee_type(self, obj):
+    def get_grantee_type(self, obj) -> str:
         return "tenant" if obj.grantee_tenant_id is not None else "group"
 
-    def get_grantee(self, obj):
+    def get_grantee(self, obj) -> dict[str, str]:
         grantee = obj.grantee_tenant if obj.grantee_tenant_id is not None else obj.grantee_tenant_group
         return {"id": grantee.pk, "name": grantee.name}
 
-    def get_resource_type(self, obj):
+    def get_resource_type(self, obj) -> str:
         return f"{obj.resource_type.app_label}.{obj.resource_type.model}"
 
     def _current_evidence(self, obj):
