@@ -1,8 +1,8 @@
 # Design: expiring tenant resource grants (issue #195 / WP-22)
 
-**Status:** Proposed for maintainer approval  
-**Capability:** `organization.resource_grants` — Stable, security-critical, always on  
-**Source snapshot:** `design/issue-195-expiring-grants` at `7aea051f`  
+**Status:** Proposed for maintainer approval
+**Capability:** `organization.resource_grants` — Stable, security-critical, always on
+**Source snapshot:** `design/issue-195-expiring-grants` at `7aea051f`
 **Hard prerequisite:** WP-21 / issue #194, satisfied
 
 ## 1. Context
