@@ -1,5 +1,5 @@
 {
- "base_commit": "022f9a7a",
+ "base_commit": "04b4085a853863366c0c7f53b98449a9c225aefe",
  "provenance": "All Python test modules changed by WP-21, WP-22 (issue #195), issue #24, the gradual-typing policy gate (#93), CI parallelism/readiness work (#21), and the Snipe-IT importer stage decomposition (#85) relative to base_commit, plus unchanged security baseline suites and WP-13 (#185) alert-channel delivery observability tests.",
  "changed_tests": [
   "itambox/assets/tests/test_assignments.py",
@@ -10,6 +10,7 @@
   "itambox/assets/tests/test_issue260_asset_detail_responsive.py",
   "itambox/assets/tests/test_requests.py",
   "itambox/assets/tests/test_tables_category.py",
+  "itambox/assets/tests/test_tag_sequence_api.py",
   "itambox/assets/tests/test_tag_sequence_concurrency.py",
   "itambox/compliance/tests/test_custody_permissions.py",
   "itambox/compliance/tests/test_custody_rbac.py",
@@ -104,6 +105,7 @@
   "itambox/inventory/tests/test_shared_stock_surfaces.py",
   "itambox/inventory/tests/test_stock_fanout.py",
   "itambox/inventory/tests/test_tenant_resource_grant_security.py",
+  "itambox/itambox/tests/test_api_root.py",
   "itambox/itambox/tests/test_capabilities.py",
   "itambox/itambox/tests/test_capability_slices.py",
   "itambox/itambox/tests/test_capability_surfaces.py",
@@ -133,6 +135,7 @@
   "itambox/users/tests/test_scim_stress.py",
   "itambox/users/tests/test_scim_tenant_group_read_permissions.py",
   "itambox/users/tests/test_token_api.py",
+  "itambox/users/tests/test_user_config_api.py",
   "itambox/users/tests/test_user_groups.py",
   "scripts/tests/test_check_test_report.py",
   "scripts/tests/test_check_xdist_matrix.py",
@@ -146,8 +149,7 @@
   "scripts/tests/test_typing_policy.py"
  ],
  "baseline_tests": [
-  "itambox/inventory/tests/test_stock_action_permissions.py",
-  "itambox/organization/tests/test_resource_grant_views.py"
+  "itambox/inventory/tests/test_stock_action_permissions.py"
  ],
  "mandatory_tests": [
   "itambox/assets/tests/test_existing.py",
@@ -159,6 +161,7 @@
   "itambox/itambox/tests/test_django_tables2_compat.py",
   "itambox/itambox/tests/test_generic_view_components.py",
   "itambox/itambox/tests/test_rest_api_options.py",
+  "itambox/itambox/tests/test_api_root.py",
   "itambox/assets/tests/test_tables_category.py",
   "itambox/assets/tests/test_requests.py",
   "itambox/core/tests/test_alert_views.py",
@@ -252,6 +255,7 @@
   "itambox/users/tests/test_scim_stress.py",
   "itambox/users/tests/test_scim_tenant_group_read_permissions.py",
   "itambox/users/tests/test_token_api.py",
+  "itambox/users/tests/test_user_config_api.py",
   "itambox/users/tests/test_user_groups.py",
   "scripts/tests/test_ci_workflow_policy.py",
   "scripts/tests/test_contract_policy.py",
@@ -263,6 +267,7 @@
   "scripts/tests/test_typing_policy.py",
   "itambox/assets/tests/test_audit_ws6_10.py",
   "itambox/assets/tests/test_assignments.py",
+  "itambox/assets/tests/test_tag_sequence_api.py",
   "itambox/assets/tests/test_tag_sequence_concurrency.py",
   "itambox/core/tests/test_context_isolation.py",
   "itambox/core/tests/test_management_commands.py",

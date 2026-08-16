@@ -194,6 +194,7 @@ PYTHONPATH=itambox uv run --locked --group dev python -m pytest -q -p no:cachepr
   itambox/itambox/tests/test_django_tables2_compat.py \
   itambox/itambox/tests/test_generic_view_components.py \
   itambox/itambox/tests/test_rest_api_options.py \
+  itambox/itambox/tests/test_api_root.py \
   itambox/assets/tests/test_tables_category.py \
   itambox/assets/tests/test_requests.py \
   itambox/core/tests/test_alert_views.py \
@@ -287,6 +288,7 @@ PYTHONPATH=itambox uv run --locked --group dev python -m pytest -q -p no:cachepr
   itambox/users/tests/test_scim_stress.py \
   itambox/users/tests/test_scim_tenant_group_read_permissions.py \
   itambox/users/tests/test_token_api.py \
+  itambox/users/tests/test_user_config_api.py \
   itambox/users/tests/test_user_groups.py \
   scripts/tests/test_ci_workflow_policy.py \
   scripts/tests/test_contract_policy.py \
@@ -298,6 +300,7 @@ PYTHONPATH=itambox uv run --locked --group dev python -m pytest -q -p no:cachepr
   scripts/tests/test_typing_policy.py \
   itambox/assets/tests/test_audit_ws6_10.py \
   itambox/assets/tests/test_assignments.py \
+  itambox/assets/tests/test_tag_sequence_api.py \
   itambox/assets/tests/test_tag_sequence_concurrency.py \
   itambox/core/tests/test_context_isolation.py \
   itambox/core/tests/test_management_commands.py \

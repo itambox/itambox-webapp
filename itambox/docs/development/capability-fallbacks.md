@@ -1,6 +1,6 @@
 # Optional capability fallbacks
 
-This page is the bounded fallback contract for Issue #99's optional-capability
+This page is the bounded fallback contract for the optional-capability
 slice. It documents places where an optional extension, deployment probe, or
 optional dependency may be unavailable without taking down ITAMbox core.
 
@@ -70,7 +70,7 @@ not. No SCIM source or test change is needed for this slice.
 
 This page deliberately does not reclassify generic missing-app filter/table
 helpers or the optional OpenAPI schema component. LDAP, background tasks,
-importers, integration adapters, and event delivery belong to other Issue #99
+importers, integration adapters, and event delivery belong to other
 slices. The `platform.plugins` declaration and its published limitations remain
 unchanged; this page documents fallback safety rather than changing the
 capability's 1.x limitation text.

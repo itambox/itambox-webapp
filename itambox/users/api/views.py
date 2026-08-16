@@ -1,18 +1,26 @@
-import logging
+from copy import deepcopy
 
 from django.contrib.auth import get_user_model
 from django.contrib.auth.models import Group
+from django.core.exceptions import PermissionDenied
 from django.db.models import Count
+from drf_spectacular.utils import extend_schema, extend_schema_view
 from rest_framework.generics import RetrieveUpdateAPIView
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 
+from core.managers import get_current_tenant
 from itambox.api.viewsets import ITAMBoxModelViewSet, ITAMBoxReadOnlyModelViewSet
 from users.models import Token, UserPreference
 
-from .serializers import GroupSerializer, TokenSerializer, UserConfigSerializer, UserSerializer
+from .serializers import (
+    GroupSerializer,
+    TokenSerializer,
+    UserConfigSerializer,
+    UserConfigUpdateSerializer,
+    UserSerializer,
+)
 
-logger = logging.getLogger(__name__)
 User = get_user_model()
 
 
@@ -26,8 +34,6 @@ class UserViewSet(ITAMBoxReadOnlyModelViewSet):
         # users (incl. is_staff/email) — cross-tenant user enumeration. Scope to
         # users who share the requester's active tenant via the Membership
         # reverse relation (`memberships`). Superusers remain unscoped.
-        from core.managers import get_current_tenant
-
         qs = super().get_queryset()
         if self.request.user.is_superuser:
             return qs
@@ -87,12 +93,25 @@ class TokenViewSet(ITAMBoxModelViewSet):
             serializer.save(user=self.request.user)
 
     def perform_create(self, serializer):
+        # Token.tenant is non-nullable, so the shared _tenant_create_kwargs
+        # fail-closed guard (which only covers nullable tenant fields) never
+        # fires for this viewset. Without an active tenant, Token.save()
+        # silently falls back to the first tenant in the database (fail-open,
+        # issue #353) — e.g. under a tenant-group scope, where permission
+        # checks aggregate over the group subtree but no single tenant anchors
+        # the request. There is no "global" token, so fail closed instead.
+        if get_current_tenant() is None:
+            raise PermissionDenied()
         self._pin_user(serializer)
 
     def perform_update(self, serializer):
         self._pin_user(serializer)
 
 
+@extend_schema_view(
+    put=extend_schema(request=UserConfigUpdateSerializer),
+    patch=extend_schema(request=UserConfigUpdateSerializer),
+)
 class UserConfigView(RetrieveUpdateAPIView):
     serializer_class = UserConfigSerializer
     permission_classes = [IsAuthenticated]
@@ -101,15 +120,26 @@ class UserConfigView(RetrieveUpdateAPIView):
         preference, _ = UserPreference.objects.get_or_create(user=self.request.user)
         return preference
 
-    def partial_update(self, request, *args, **kwargs):
+    def _validate_update(self, request):
+        serializer = UserConfigUpdateSerializer(data=request.data, context=self.get_serializer_context())
+        serializer.is_valid(raise_exception=True)
+        return serializer
+
+    def update(self, request, *args, **kwargs):
+        serializer = self._validate_update(request)
         preference = self.get_object()
-        incoming_data = request.data
-        current_data = preference.data if preference.data is not None else {}
-        logger.debug("Received PATCH data in UserConfigView: %s", incoming_data)
-        logger.debug("Current data BEFORE merge: %s", current_data)
+        preference.data = serializer.validated_data
+        preference.save()
+        return Response(self.get_serializer(preference).data)
+
+    def partial_update(self, request, *args, **kwargs):
+        serializer = self._validate_update(request)
+        preference = self.get_object()
+        incoming_data = serializer.validated_data
+        current_data = deepcopy(preference.data) if isinstance(preference.data, dict) else {}
 
         if "tables" in incoming_data:
-            if "tables" not in current_data:
+            if not isinstance(current_data.get("tables"), dict):
                 current_data["tables"] = {}
             for app_label, models in incoming_data["tables"].items():
                 if app_label not in current_data["tables"]:
@@ -117,9 +147,10 @@ class UserConfigView(RetrieveUpdateAPIView):
                 for model_name, config in models.items():
                     current_data["tables"][app_label][model_name] = config
 
+        for key, value in incoming_data.items():
+            if key != "tables":
+                current_data[key] = value
+
         preference.data = current_data
         preference.save()
-        logger.debug("Current data AFTER merge & save: %s", preference.data)
-
-        serializer = self.get_serializer(preference)
-        return Response(serializer.data)
+        return Response(self.get_serializer(preference).data)

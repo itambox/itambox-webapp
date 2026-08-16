@@ -1,8 +1,11 @@
+from collections.abc import Mapping
+
 from django.contrib.auth import get_user_model
 from django.contrib.auth.models import Group
+from django.utils.translation import gettext_lazy as _
 from rest_framework import serializers
 
-from itambox.api.base import BaseModelSerializer
+from itambox.api.base import BaseModelSerializer, reject_unknown_or_writableless
 from users.models import Token, UserPreference
 
 User = get_user_model()
@@ -44,6 +47,36 @@ class UserConfigSerializer(BaseModelSerializer):
         fields = ["data"]
         read_only_fields = ["data"]
         brief_fields = ["data"]
+
+
+class UserConfigUpdateSerializer(serializers.Serializer):
+    tables = serializers.JSONField(required=False)
+    theme = serializers.JSONField(required=False)
+    pagination = serializers.JSONField(required=False)
+    language = serializers.CharField(required=False)
+
+    def validate(self, attrs):
+        initial = getattr(self, "initial_data", None)
+        if not isinstance(initial, Mapping):
+            return attrs
+
+        reject_unknown_or_writableless(initial, self.fields)
+
+        for field_name in ("tables", "theme", "pagination"):
+            if field_name in initial and not isinstance(initial[field_name], dict):
+                raise serializers.ValidationError({field_name: _("Expected a dictionary.")})
+
+        if "tables" in initial:
+            for models in initial["tables"].values():
+                if not isinstance(models, dict):
+                    raise serializers.ValidationError({"tables": _("Each app label value must be a dictionary.")})
+                if any(not isinstance(config, dict) for config in models.values()):
+                    raise serializers.ValidationError({"tables": _("Each table value must be a dictionary.")})
+
+        if "language" in initial and not isinstance(initial["language"], str):
+            raise serializers.ValidationError({"language": _("Expected a string.")})
+
+        return attrs
 
 
 class TokenSerializer(serializers.ModelSerializer):

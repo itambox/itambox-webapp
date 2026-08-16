@@ -187,8 +187,8 @@ The Stable curated-report catalogue is unaffected.
 at the app level, backed by the registry rather than by a literal map. An
 application is graded only when a single capability owns *every* model in it;
 anything finer grades `stable` there and resolves per model through
-`capability_notice`. Both are scheduled for removal one release after the
-registry lands. Use `registry.owner_of("<app_label>.<Model>")` instead.
+`capability_notice`. Both are deprecated; use
+`registry.owner_of("<app_label>.<Model>")` instead.
 
 ## Related
 

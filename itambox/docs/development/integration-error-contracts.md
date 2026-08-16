@@ -1,8 +1,8 @@
 # External integration error contracts
 
-Issue #99 defines one shared contract for failures at external integration
-boundaries. This document is the consumer contract; provider adapters decide
-how their protocol maps into it.
+This document defines one shared contract for failures at external integration
+boundaries. It is the consumer contract; provider adapters decide how their
+protocol maps into it.
 
 ## Two independent axes
 

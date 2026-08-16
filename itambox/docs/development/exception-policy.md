@@ -36,7 +36,10 @@ The gate reports each finding in one of these layers:
 | Presentation | Views, forms, tables, rendering | Return an explicit user-visible failure or a documented rendering degradation |
 | Infrastructure | Caches, middleware, registries, framework adapters | Preserve the security property while degrading availability explicitly |
 
-Issue #99 owns new typed failure contracts for LDAP, OIDC, import, mail, and other remote boundaries. This policy does not introduce a repository-wide `Result` abstraction.
+Typed failure contracts for LDAP, OIDC, import, mail, and other remote
+boundaries are defined in the [external integration error
+contract](integration-error-contracts.md). This policy does not introduce a
+repository-wide `Result` abstraction.
 
 ## Security-sensitive scopes
 

@@ -1,6 +1,6 @@
 # Template and Style Linting
 
-Issue #94 makes the authored template and stylesheet sources blocking quality gates.
+The authored template and stylesheet sources are blocking quality gates.
 The gates are deliberately separate from the application test suite so a parser or
 formatter regression is visible without waiting for the database-backed tests.
 

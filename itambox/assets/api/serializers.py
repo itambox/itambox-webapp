@@ -1,3 +1,5 @@
+from collections.abc import Mapping
+
 from django.contrib.auth import get_user_model
 from django.db import models
 from django.utils.translation import gettext_lazy as _
@@ -22,7 +24,7 @@ from assets.models import (
     Warranty,
 )
 from extras.api.serializers import TagSerializer
-from itambox.api.base import BaseModelSerializer
+from itambox.api.base import BaseModelSerializer, reject_unknown_or_writableless
 from itambox.api.fields import RelatedObjectCountField
 from itambox.api.nested_serializers import (
     NestedAssetRoleSerializer,
@@ -304,6 +306,18 @@ class AssetRequestSerializer(BaseModelSerializer):
         brief_fields = ["id", "requester", "asset", "status", "request_date"]
 
 
+class AssetTagSequenceBulkSerializer(serializers.ListSerializer):
+    def validate(self, attrs: list[dict[str, object]]) -> list[dict[str, object]]:
+        initial = getattr(self, "initial_data", None)
+        if not isinstance(initial, list):
+            return attrs
+
+        for item in initial:
+            if isinstance(item, Mapping):
+                reject_unknown_or_writableless(item, self.child.fields)
+        return attrs
+
+
 class AssetTagSequenceSerializer(BaseModelSerializer):
     class Meta:
         model = AssetTagSequence
@@ -319,6 +333,18 @@ class AssetTagSequenceSerializer(BaseModelSerializer):
             "updated_at",
         ]
         brief_fields = ["id", "prefix", "next_value"]
+        list_serializer_class = AssetTagSequenceBulkSerializer
+
+    def validate(self, attrs: dict[str, object]) -> dict[str, object]:
+        initial = getattr(self, "initial_data", None)
+        # nested=True uses the base class's attribute-lookup shortcut and bulk
+        # (many=True) children carry no initial_data; neither path has a
+        # submitted-field mapping to check.
+        if self.nested or not isinstance(initial, Mapping):
+            return attrs
+
+        reject_unknown_or_writableless(initial, self.fields)
+        return attrs
 
 
 class AssetAssignmentSerializer(BaseModelSerializer):

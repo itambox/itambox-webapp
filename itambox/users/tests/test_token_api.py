@@ -207,6 +207,99 @@ class TokenLifecycleAPITests(TenantTestMixin, APITestCase):
             self.assertNotIn(plaintext, str(change.postchange_data))
             self.assertNotIn(plaintext, change.object_repr)
 
+    # --- AC (issue #353): owner transfer must never 500 after commit --------
+
+    def test_superuser_owner_transfer_returns_200_and_persists(self):
+        # A superuser may re-assign a token to another user. Before the fix the
+        # transfer was committed but the response re-fetch failed against the
+        # requester-scoped queryset (the owner moved out of scope) -> HTTP 500
+        # after the commit, and a retry hit 404.
+        token = Token.objects.create(user=self.tenant_admin, tenant=self.tenant)
+
+        self.client.force_login(self.tenant_admin)
+        session = self.client.session
+        session["active_tenant_id"] = self.tenant.pk
+        session.save()
+
+        response = self.client.patch(
+            self._detail_url(token.pk),
+            {"user_id": self.tenant_user.pk},
+            format="json",
+            HTTP_IF_MATCH=self._current_etag(token.pk),
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK, response.data)
+        self.assertEqual(response.data["user"], self.tenant_user.username)
+        # The plaintext must never resurface on update.
+        self.assertIsNone(response.data["key"])
+
+        token.refresh_from_db()
+        self.assertEqual(token.user_id, self.tenant_user.pk)
+
+    def test_non_superuser_create_with_foreign_user_id_pins_owner_to_requester(self):
+        response = self._create_token(user_id=self.tenant_admin.pk)
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED, response.data)
+        token = Token.objects.get(pk=response.data["id"])
+        self.assertEqual(token.user_id, self.tenant_user.pk)
+
+    def test_non_superuser_update_with_foreign_user_id_keeps_owner(self):
+        pk = self._create_token().data["id"]
+
+        response = self.client.patch(
+            self._detail_url(pk),
+            {"user_id": self.tenant_admin.pk},
+            format="json",
+            HTTP_IF_MATCH=self._current_etag(pk),
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK, response.data)
+        self.assertEqual(response.data["user"], self.tenant_user.username)
+        self.assertEqual(Token.objects.get(pk=pk).user_id, self.tenant_user.pk)
+
+    def test_create_without_active_tenant_fails_closed(self):
+        # Under a tenant-group scope no single tenant anchors the request, but
+        # permission checks aggregate over the group subtree, so the create
+        # reaches the view. Before the fix Token.save() assigned the first
+        # tenant in the database (fail-open). Issue #353.
+        from organization.models import TenantGroup
+
+        group = TenantGroup.objects.create(name="Token Group", slug="token-group")
+        self.tenant.group = group
+        self.tenant.save()
+
+        session = self.client.session
+        session.pop("active_tenant_id", None)
+        session["active_tenant_group_id"] = group.pk
+        session.save()
+
+        response = self.client.post(
+            self._list_url(),
+            {"user_id": self.tenant_user.pk, "description": "unbound scope"},
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN, response.data)
+        self.assertFalse(Token._base_manager.filter(user=self.tenant_user).exists())
+
+    def test_superuser_create_without_active_tenant_fails_closed(self):
+        # The guard is unconditional: even a superuser cannot create a token
+        # without an active tenant context — there is no "global" token, and
+        # the old fallback would silently bind the first tenant in the DB.
+        self.client.force_login(self.tenant_admin)
+        session = self.client.session
+        session.pop("active_tenant_id", None)
+        session.pop("active_tenant_group_id", None)
+        session.save()
+
+        response = self.client.post(
+            self._list_url(),
+            {"user_id": self.tenant_user.pk, "description": "unbound superuser"},
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN, response.data)
+        self.assertFalse(Token._base_manager.filter(user=self.tenant_user).exists())
+
     # --- Shared-helper coverage: model derivation, bulk paths, refetch fallback --
 
     def test_viewset_model_derivation_covers_queryset_and_fallbacks(self):

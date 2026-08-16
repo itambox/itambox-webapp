@@ -37285,6 +37285,17 @@ paths:
       operationId: users_config_update_bulk
       tags:
       - users
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UserConfigUpdateRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/UserConfigUpdateRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/UserConfigUpdateRequest'
       security:
       - TokenAuth: []
       - cookieAuth: []
@@ -37336,6 +37347,17 @@ paths:
       operationId: users_config_partial_update_bulk
       tags:
       - users
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchedUserConfigUpdateRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PatchedUserConfigUpdateRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PatchedUserConfigUpdateRequest'
       security:
       - TokenAuth: []
       - cookieAuth: []
@@ -46959,6 +46981,15 @@ components:
         description:
           type: string
           maxLength: 200
+    PatchedUserConfigUpdateRequest:
+      type: object
+      properties:
+        tables: {}
+        theme: {}
+        pagination: {}
+        language:
+          type: string
+          minLength: 1
     PatchedWarrantyRequest:
       type: object
       properties:
@@ -49176,6 +49207,15 @@ components:
           readOnly: true
       required:
       - data
+    UserConfigUpdateRequest:
+      type: object
+      properties:
+        tables: {}
+        theme: {}
+        pagination: {}
+        language:
+          type: string
+          minLength: 1
     VerificationMethodEnum:
       enum:
       - barcode
