@@ -25,4 +25,4 @@ class ChangelogActivityTemplateTests(SimpleTestCase):
         )
 
         for label in ("Time", "User", "Full Name", "Action", "Type", "Object", "Request ID"):
-            self.assertIn(f'data-label="{label}"', rendered)
+            self.assertIn('data-label="{}"'.format(label), rendered)
