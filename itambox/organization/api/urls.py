@@ -11,6 +11,7 @@ from .views import (
     SiteGroupViewSet,
     SiteViewSet,
     TenantGroupViewSet,
+    TenantResourceGrantAuditViewSet,
     TenantViewSet,
 )
 
@@ -29,5 +30,6 @@ router.register(r"contacts", ContactViewSet)
 router.register(r"contact-roles", ContactRoleViewSet)
 router.register(r"contact-assignments", ContactAssignmentViewSet)
 router.register(r"cost-centers", CostCenterViewSet)
+router.register(r"resource-grant-audit", TenantResourceGrantAuditViewSet, basename="tenantresourcegrantaudit")
 
 urlpatterns = router.urls

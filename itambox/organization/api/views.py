@@ -34,8 +34,12 @@ from organization.models import (
     SiteGroup,
     Tenant,
     TenantGroup,
+    TenantResourceGrant,
 )
+from organization.services.resource_access import visible_to_containers
 
+from .filters import TenantResourceGrantAuditFilterSet
+from .permissions import TenantResourceGrantAuditPermission
 from .serializers import (
     AssetHolderSerializer,
     ContactAssignmentSerializer,
@@ -47,6 +51,7 @@ from .serializers import (
     SiteGroupSerializer,
     SiteSerializer,
     TenantGroupSerializer,
+    TenantResourceGrantAuditSerializer,
     TenantSerializer,
 )
 
@@ -261,3 +266,26 @@ class CostCenterViewSet(ITAMBoxModelViewSet):
     serializer_class = CostCenterSerializer
     filter_backends = (DjangoFilterBackend,)
     filterset_class = CostCenterFilterSet
+
+
+class TenantResourceGrantAuditViewSet(ITAMBoxReadOnlyModelViewSet):
+    permission_classes = [TenantResourceGrantAuditPermission]
+    queryset = TenantResourceGrant._base_manager.all()
+    serializer_class = TenantResourceGrantAuditSerializer
+    filter_backends = (DjangoFilterBackend,)
+    filterset_class = TenantResourceGrantAuditFilterSet
+
+    def get_queryset(self):
+        queryset = TenantResourceGrant._base_manager.all().select_related(
+            "tenant",
+            "grantee_tenant",
+            "grantee_tenant_group",
+            "resource_type",
+            "granted_by",
+        )
+        return visible_to_containers(
+            self.request.user,
+            queryset,
+            "organization.view_tenantresourcegrant",
+            request=self.request,
+        )

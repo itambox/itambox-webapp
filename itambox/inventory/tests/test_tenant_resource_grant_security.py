@@ -13,6 +13,7 @@ from django.utils import timezone
 
 from assets.models import Category, Manufacturer
 from core.tasks.context import TaskContext
+from core.tasks.resource_grants import sweep_expired_resource_grants
 from core.tests.mixins import TenantTestMixin
 from inventory.forms import AccessoryCheckoutForm, ComponentCheckoutForm, ConsumableCheckoutForm
 from inventory.models import (
@@ -32,6 +33,7 @@ from organization.models import (
     Tenant,
     TenantGroup,
     TenantResourceGrant,
+    TenantResourceGrantExpiryRun,
 )
 from organization.services import (
     DENIED_INSUFFICIENT_LEVEL,
@@ -256,6 +258,68 @@ class TenantResourceGrantSecurityBoundaryTests(TenantTestMixin, TestCase):
                 self.assertEqual(self._resolve(actor, family).reason, DENIED_NO_GRANT)
             with self.subTest(family=family["name"], case="superuser-no-grant"):
                 self.assertEqual(self._resolve(superuser, family).reason, DENIED_NO_GRANT)
+
+    def test_s13_expiry_removes_direct_and_group_access_even_for_superuser(self):
+        actor = self._actor(
+            self.grantee,
+            "trgs-expiry-access",
+            [family["assignment_perm"] for family in self.families],
+        )
+        superuser = User.objects.create_superuser(
+            username="trgs-expiry-superuser",
+            password="x",
+            email="trgs-expiry-superuser@example.invalid",
+        )
+        cutoff = timezone.now()
+        grants = [self._grant(family, access=TenantResourceGrant.ACCESS_USE) for family in self.families]
+        for family in self.families:
+            group_grant = self._grant(family, access=TenantResourceGrant.ACCESS_VIEW, direct=False)
+            grants.append(group_grant)
+        TenantResourceGrant._base_manager.filter(pk__in=[grant.pk for grant in grants]).update(valid_until=cutoff)
+        run = TenantResourceGrantExpiryRun._base_manager.create(
+            tenant=self.owner,
+            schedule_slot=cutoff.replace(minute=0, second=0, microsecond=0),
+            cutoff=cutoff,
+            dispatch_stale_at=cutoff + timezone.timedelta(minutes=1),
+        )
+        sweep_expired_resource_grants(self.owner.pk, run.pk, 1)
+        for family in self.families:
+            with self.subTest(family=family["name"], actor="grantee"):
+                self.assertEqual(self._resolve(actor, family).reason, DENIED_NO_GRANT)
+            with self.subTest(family=family["name"], actor="superuser"):
+                self.assertEqual(self._resolve(superuser, family).reason, DENIED_NO_GRANT)
+
+    def test_s14_expiry_preserves_assignment_provenance(self):
+        permissions = [family["assignment_perm"] for family in self.families]
+        actor = self._actor(self.grantee, "trgs-expiry-provenance", permissions)
+        grants = {family["name"]: self._grant(family) for family in self.families}
+        assignments = {}
+        with self.tenant_context(self.grantee):
+            for family in self.families:
+                assignments[family["name"]] = checkout_inventory_item(
+                    family["item"],
+                    1,
+                    holder=self.holder,
+                    source_location=self.owner_location,
+                    user=actor,
+                )
+        cutoff = timezone.now()
+        TenantResourceGrant._base_manager.filter(pk__in=[grant.pk for grant in grants.values()]).update(
+            valid_until=cutoff
+        )
+        run = TenantResourceGrantExpiryRun._base_manager.create(
+            tenant=self.owner,
+            schedule_slot=cutoff.replace(minute=0, second=0, microsecond=0),
+            cutoff=cutoff,
+            dispatch_stale_at=cutoff + timezone.timedelta(minutes=1),
+        )
+        sweep_expired_resource_grants(self.owner.pk, run.pk, 1)
+        for family in self.families:
+            with self.subTest(family=family["name"]):
+                assignment = assignments[family["name"]].__class__._base_manager.get(pk=assignments[family["name"]].pk)
+                self.assertEqual(assignment.resource_grant_id, grants[family["name"]].pk)
+                revoked_grant = TenantResourceGrant._base_manager.get(pk=assignment.resource_grant_id)
+                self.assertIsNotNone(revoked_grant.deleted_at)
 
     def test_actorless_calls_are_denied_for_every_stock_family(self):
         for family in self.families:

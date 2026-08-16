@@ -2,6 +2,7 @@
 
 import os
 import tempfile
+import uuid
 from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import patch
@@ -9,6 +10,7 @@ from unittest.mock import patch
 import pytest
 from django.conf import settings
 from django.core.cache import cache
+from django.core.exceptions import PermissionDenied
 from django.test import SimpleTestCase
 
 import conftest
@@ -30,11 +32,24 @@ from core.managers import get_current_membership, get_current_tenant
 from core.models import _user_validation_cache
 from core.navigation.menu import get_menus
 from core.settings import base as base_settings
+from core.tasks.context import TaskContext
 from core.tests.mixins import TenantTestMixin
 from organization.access import _descendant_group_ids_cache as _access_descendant_group_ids_cache
 
 
 class TenantContextIsolationTests(TenantTestMixin, SimpleTestCase):
+    def test_failed_nested_task_context_never_logs_outer_request_id(self):
+        outer_request_id = uuid.uuid4()
+        _request_id.set(outer_request_id)
+        with patch.object(TaskContext, "_resolve_principal_and_tenant", side_effect=PermissionDenied):
+            with patch("core.tasks.context.logger.error") as error:
+                with pytest.raises(PermissionDenied):
+                    with TaskContext(tenant_id=999, operation="test.bad_task"):
+                        pass
+        self.assertEqual(_request_id.get(), outer_request_id)
+        logged_request_id = error.call_args.kwargs["extra"]["request_id"]
+        self.assertNotEqual(logged_request_id, str(outer_request_id))
+
     def test_test_fixture_exposes_an_explicit_context_reset(self):
         self.assertTrue(callable(getattr(conftest, "_reset_test_context", None)))
         self.assertTrue(callable(getattr(conftest, "_write_node_id_manifest", None)))

@@ -110,6 +110,16 @@ urlpatterns = [
         views.TenantResourceGrantRevokeView.as_view(),
         name="tenantresourcegrant_delete",
     ),
+    path(
+        "resource-grant-expiry-runs/",
+        views.TenantResourceGrantExpiryRunListView.as_view(),
+        name="tenantresourcegrantexpiryrun_list",
+    ),
+    path(
+        "resource-grant-expiry-runs/<int:pk>/",
+        views.TenantResourceGrantExpiryRunDetailView.as_view(),
+        name="tenantresourcegrantexpiryrun_detail",
+    ),
     path("cost-centers/", views.CostCenterListView.as_view(), name="costcenter_list"),
     path("cost-centers/add/", views.CostCenterEditView.as_view(), name="costcenter_create"),
     path("cost-centers/edit/", views.CostCenterBulkEditView.as_view(), name="costcenter_bulk_edit"),

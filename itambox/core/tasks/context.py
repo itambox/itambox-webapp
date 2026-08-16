@@ -119,6 +119,10 @@ class TaskContext:
         self._system_authorization_issuer = object()
         _system_authorization_scope.set(self._system_authorization_issuer)
         _issued_system_authorizations.set(())
+        # Install the task identity before resolving any explicit tenant or
+        # principal. A setup failure inside a synchronous task must never log
+        # or attribute work to the surrounding web request's request ID.
+        _request_id.set(uuid.uuid4())
 
         try:
             self._resolve_principal_and_tenant()
@@ -137,9 +141,6 @@ class TaskContext:
                     if membership:
                         set_current_membership(membership)
 
-            # Wire up change-logging contextvars so ChangeLoggingMixin records
-            # ObjectChange rows for all saves inside the task.
-            _request_id.set(uuid.uuid4())
             self._entered = True
             logger.info(
                 "Task context entered",

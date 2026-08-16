@@ -963,6 +963,12 @@ export interface paths {
     delete: operations["organization_regions_destroy"];
     patch: operations["organization_regions_partial_update"];
   };
+  "/api/organization/resource-grant-audit/": {
+    get: operations["organization_resource_grant_audit_list"];
+  };
+  "/api/organization/resource-grant-audit/{id}/": {
+    get: operations["organization_resource_grant_audit_retrieve"];
+  };
   "/api/organization/site-groups/": {
     get: operations["organization_site_groups_list"];
     put: operations["organization_site_groups_update_bulk"];
@@ -1570,6 +1576,12 @@ export interface components {
      * @enum {string}
      */
     AcceptanceStatusEnum: "pending" | "accepted" | "declined";
+    /**
+     * @description * `view` - View
+     * * `use` - View + allocate/consume
+     * @enum {string}
+     */
+    AccessLevelEnum: "view" | "use";
     Accessory: {
       id: number;
       name: string;
@@ -4747,6 +4759,23 @@ export interface components {
       /** @description True when `count` was capped at ITAMBOX_PAGINATOR_COUNT_CAP and the real total is larger. Use `start` (keyset cursor) pagination to iterate the full result set. */
       count_capped?: boolean;
     };
+    PaginatedTenantResourceGrantAuditList: {
+      /** @example 123 */
+      count: number | null;
+      /**
+       * Format: uri
+       * @example http://api.example.org/accounts/?offset=400&limit=100
+       */
+      next?: string | null;
+      /**
+       * Format: uri
+       * @example http://api.example.org/accounts/?offset=200&limit=100
+       */
+      previous?: string | null;
+      results: components["schemas"]["TenantResourceGrantAudit"][];
+      /** @description True when `count` was capped at ITAMBOX_PAGINATOR_COUNT_CAP and the real total is larger. Use `start` (keyset cursor) pagination to iterate the full result set. */
+      count_capped?: boolean;
+    };
     PaginatedTokenList: {
       /** @example 123 */
       count: number | null;
@@ -6569,6 +6598,42 @@ export interface components {
      * @enum {string}
      */
     TenantResolutionStatusEnum: "not_required" | "resolved" | "global" | "unresolved";
+    TenantResourceGrantAudit: {
+      id: number;
+      /** Format: uri */
+      url: string;
+      state: string;
+      owner: {
+        [key: string]: string;
+      };
+      grantee_type: string;
+      grantee: {
+        [key: string]: string;
+      };
+      resource_type: string;
+      resource_id: number;
+      access_level: components["schemas"]["AccessLevelEnum"];
+      reason: string;
+      granted_by_id: number | null;
+      /** Format: date-time */
+      created_at: string;
+      /** Format: date-time */
+      valid_until: string | null;
+      /** Format: date-time */
+      revoked_at: string | null;
+      revocation: components["schemas"]["TenantResourceGrantAuditRevocation"];
+    };
+    TenantResourceGrantAuditRevocation: {
+      kind: string;
+      user_id: number | null;
+      /** Format: uuid */
+      request_id: string | null;
+      /** Format: date-time */
+      time: string | null;
+      /** Format: date-time */
+      triggering_valid_until: string | null;
+      expiry_run_id: number | null;
+    };
     Token: {
       id: number;
       key: string;
@@ -29605,6 +29670,101 @@ export interface operations {
       };
       /** @description The request could not be completed. */
       428: {
+        content: {
+          "application/json": components["schemas"]["APIError"];
+        };
+      };
+    };
+  };
+  organization_resource_grant_audit_list: {
+    parameters: {
+      query?: {
+        /**
+         * @description * `view` - View
+         * * `use` - View + allocate/consume
+         */
+        access_level?: "use" | "view";
+        grantee_tenant_group_id?: number;
+        grantee_tenant_id?: number;
+        /** @description Number of results to return per page. */
+        limit?: number;
+        /** @description The initial index from which to return the results. */
+        offset?: number;
+        owner_tenant_id?: number;
+        resource_id?: number;
+        resource_type_id?: number;
+        revoked_after?: string;
+        revoked_before?: string;
+        /** @description Keyset/cursor pagination: return results with pk >= start, ordered by pk. Skips the (capped) row count and stays O(page) regardless of table size — use this instead of offset/limit for bulk export or iterating large collections. Follow the `next` link to walk subsequent pages. */
+        start?: number;
+        /**
+         * @description * `active` - Active
+         * * `revoked` - Revoked
+         */
+        state?: "active" | "revoked";
+        valid_until_after?: string;
+        valid_until_before?: string;
+      };
+    };
+    responses: {
+      200: {
+        content: {
+          "application/json": components["schemas"]["PaginatedTenantResourceGrantAuditList"];
+        };
+      };
+      /** @description The request could not be completed. */
+      400: {
+        content: {
+          "application/json": components["schemas"]["APIError"];
+        };
+      };
+      /** @description The request could not be completed. */
+      401: {
+        content: {
+          "application/json": components["schemas"]["APIError"];
+        };
+      };
+      /** @description The request could not be completed. */
+      403: {
+        content: {
+          "application/json": components["schemas"]["APIError"];
+        };
+      };
+    };
+  };
+  organization_resource_grant_audit_retrieve: {
+    parameters: {
+      path: {
+        /** @description A unique integer value identifying this Resource Grant. */
+        id: number;
+      };
+    };
+    responses: {
+      200: {
+        content: {
+          "application/json": components["schemas"]["TenantResourceGrantAudit"];
+        };
+      };
+      /** @description The request could not be completed. */
+      400: {
+        content: {
+          "application/json": components["schemas"]["APIError"];
+        };
+      };
+      /** @description The request could not be completed. */
+      401: {
+        content: {
+          "application/json": components["schemas"]["APIError"];
+        };
+      };
+      /** @description The request could not be completed. */
+      403: {
+        content: {
+          "application/json": components["schemas"]["APIError"];
+        };
+      };
+      /** @description The request could not be completed. */
+      404: {
         content: {
           "application/json": components["schemas"]["APIError"];
         };

@@ -1,0 +1,52 @@
+{% extends "layout.html" %}
+{% load i18n %}
+{% block page_header %}
+  <div class="page-pretitle">{% translate "Resource grant expiry run" %}</div>
+  <h2 class="page-title">{{ object.schedule_slot }}</h2>
+{% endblock %}
+{% block content %}
+  <div class="card mb-3">
+    <div class="card-body">
+      <dl class="row mb-0">
+        <dt class="col-sm-3">{% translate "Tenant" %}</dt>
+        <dd class="col-sm-9">
+          {{ object.tenant }}
+        </dd>
+        <dt class="col-sm-3">{% translate "Cutoff" %}</dt>
+        <dd class="col-sm-9">
+          {{ object.cutoff }}
+        </dd>
+        <dt class="col-sm-3">{% translate "State / outcome" %}</dt>
+        <dd class="col-sm-9">
+          {{ object.state }} / {{ object.outcome|default:_("Not finished") }}
+        </dd>
+        <dt class="col-sm-3">{% translate "Counts" %}</dt>
+        <dd class="col-sm-9">{% translate "Revoked" %}: {{ object.revoked_count }}, {% translate "Remaining due" %}: {{ object.remaining_due_count }}, {% translate "Invalid" %}: {{ object.invalid_count }}</dd>
+        <dt class="col-sm-3">{% translate "Error" %}</dt>
+        <dd class="col-sm-9">{{ object.error_code|default:_("None") }}{% if object.error_message %}: {{ object.error_message }}{% endif %}</dd>
+      </dl>
+    </div>
+  </div>
+  <div class="card">
+    <div class="card-header">
+      <h3 class="card-title">{% translate "Expiry evidence" %}</h3>
+    </div>
+    <div class="list-group list-group-flush">
+      {% for evidence in expiry_evidence %}
+        <div class="list-group-item">
+          <a href="{% url 'api:organization_api:tenantresourcegrantaudit-detail' evidence.grant_id %}">
+            {% translate "Grant" %} #{{ evidence.grant_id }}
+          </a>
+          <span class="text-muted ms-2">{{ evidence.revoked_at }}</span>
+          {% if evidence.object_change_id %}
+            <a class="ms-2" href="{{ evidence.object_change.get_absolute_url }}">{% translate "Audit change" %}</a>
+          {% else %}
+            <span class="text-muted ms-2">{% translate "Audit change pruned; evidence retained" %}</span>
+          {% endif %}
+        </div>
+      {% empty %}
+        <div class="list-group-item text-muted">{% translate "No integrity-valid expiry evidence." %}</div>
+      {% endfor %}
+    </div>
+  </div>
+{% endblock %}

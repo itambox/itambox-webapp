@@ -8,6 +8,7 @@ from crispy_forms.helper import FormHelper
 from crispy_forms.layout import Layout
 from django import forms
 from django.core.exceptions import ValidationError
+from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
 
 from organization.access import (
@@ -20,7 +21,7 @@ from organization.models import Tenant, TenantGroup, TenantResourceGrant
 class TenantResourceGrantForm(forms.ModelForm):
     class Meta:
         model = TenantResourceGrant
-        fields = ["grantee_tenant", "grantee_tenant_group", "access_level", "reason"]
+        fields = ["grantee_tenant", "grantee_tenant_group", "access_level", "reason", "valid_until"]
         widgets = {
             "reason": forms.Textarea(attrs={"rows": 3}),
         }
@@ -71,6 +72,7 @@ class TenantResourceGrantForm(forms.ModelForm):
             "grantee_tenant_group",
             "access_level",
             "reason",
+            "valid_until",
         )
 
     def clean(self):
@@ -79,4 +81,8 @@ class TenantResourceGrantForm(forms.ModelForm):
         group = cleaned.get("grantee_tenant_group")
         if bool(tenant) == bool(group):
             raise ValidationError(_("Select exactly one grantee: a tenant OR a tenant group."))
+        valid_until = cleaned.get("valid_until")
+        if valid_until is not None:
+            if timezone.is_naive(valid_until) or valid_until <= timezone.now():
+                self.add_error("valid_until", _("The deadline must be strictly in the future."))
         return cleaned

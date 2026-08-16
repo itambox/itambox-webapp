@@ -1,0 +1,12 @@
+{% extends "layout.html" %}
+{% load i18n %}
+{% load render_table from django_tables2 %}
+{% block page_header %}
+  <div class="page-pretitle">{% translate "Organization" %}</div>
+  <h2 class="page-title">{% translate "Resource grant expiry runs" %}</h2>
+{% endblock %}
+{% block content %}
+  <div class="card">
+    <div class="table-responsive">{% render_table table "global_includes/htmx_table.html" %}</div>
+  </div>
+{% endblock %}

@@ -28007,6 +28007,171 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/APIError'
+  /api/organization/resource-grant-audit/:
+    get:
+      operationId: organization_resource_grant_audit_list
+      parameters:
+      - in: query
+        name: access_level
+        schema:
+          type: string
+          enum:
+          - use
+          - view
+        description: |-
+          * `view` - View
+          * `use` - View + allocate/consume
+      - in: query
+        name: grantee_tenant_group_id
+        schema:
+          type: number
+      - in: query
+        name: grantee_tenant_id
+        schema:
+          type: number
+      - name: limit
+        required: false
+        in: query
+        description: Number of results to return per page.
+        schema:
+          type: integer
+      - name: offset
+        required: false
+        in: query
+        description: The initial index from which to return the results.
+        schema:
+          type: integer
+      - in: query
+        name: owner_tenant_id
+        schema:
+          type: number
+      - in: query
+        name: resource_id
+        schema:
+          type: integer
+      - in: query
+        name: resource_type_id
+        schema:
+          type: number
+      - in: query
+        name: revoked_after
+        schema:
+          type: string
+          format: date-time
+      - in: query
+        name: revoked_before
+        schema:
+          type: string
+          format: date-time
+      - name: start
+        required: false
+        in: query
+        description: 'Keyset/cursor pagination: return results with pk >= start, ordered
+          by pk. Skips the (capped) row count and stays O(page) regardless of table
+          size — use this instead of offset/limit for bulk export or iterating large
+          collections. Follow the `next` link to walk subsequent pages.'
+        schema:
+          type: integer
+      - in: query
+        name: state
+        schema:
+          type: string
+          enum:
+          - active
+          - revoked
+        description: |-
+          * `active` - Active
+          * `revoked` - Revoked
+      - in: query
+        name: valid_until_after
+        schema:
+          type: string
+          format: date-time
+      - in: query
+        name: valid_until_before
+        schema:
+          type: string
+          format: date-time
+      tags:
+      - organization
+      security:
+      - TokenAuth: []
+      - cookieAuth: []
+      - basicAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedTenantResourceGrantAuditList'
+          description: ''
+        '400':
+          description: The request could not be completed.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/APIError'
+        '401':
+          description: The request could not be completed.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/APIError'
+        '403':
+          description: The request could not be completed.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/APIError'
+      x-itambox-maturity: stable
+  /api/organization/resource-grant-audit/{id}/:
+    get:
+      operationId: organization_resource_grant_audit_retrieve
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: A unique integer value identifying this Resource Grant.
+        required: true
+      tags:
+      - organization
+      security:
+      - TokenAuth: []
+      - cookieAuth: []
+      - basicAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TenantResourceGrantAudit'
+          description: ''
+        '400':
+          description: The request could not be completed.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/APIError'
+        '401':
+          description: The request could not be completed.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/APIError'
+        '403':
+          description: The request could not be completed.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/APIError'
+        '404':
+          description: The request could not be completed.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/APIError'
+      x-itambox-maturity: stable
   /api/organization/site-groups/:
     get:
       operationId: organization_site_groups_list
@@ -38007,6 +38172,14 @@ components:
         * `pending` - Pending
         * `accepted` - Accepted
         * `declined` - Declined
+    AccessLevelEnum:
+      enum:
+      - view
+      - use
+      type: string
+      description: |-
+        * `view` - View
+        * `use` - View + allocate/consume
     Accessory:
       type: object
       properties:
@@ -44851,6 +45024,35 @@ components:
           description: True when `count` was capped at ITAMBOX_PAGINATOR_COUNT_CAP
             and the real total is larger. Use `start` (keyset cursor) pagination to
             iterate the full result set.
+    PaginatedTenantResourceGrantAuditList:
+      type: object
+      required:
+      - count
+      - results
+      properties:
+        count:
+          type: integer
+          example: 123
+          nullable: true
+        next:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?offset=400&limit=100
+        previous:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?offset=200&limit=100
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/TenantResourceGrantAudit'
+        count_capped:
+          type: boolean
+          description: True when `count` was capped at ITAMBOX_PAGINATOR_COUNT_CAP
+            and the real total is larger. Use `start` (keyset cursor) pagination to
+            iterate the full result set.
     PaginatedTokenList:
       type: object
       required:
@@ -48763,6 +48965,119 @@ components:
         * `resolved` - Resolved from target
         * `global` - Global target
         * `unresolved` - Unresolved — operator review required
+    TenantResourceGrantAudit:
+      type: object
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        url:
+          type: string
+          format: uri
+          readOnly: true
+        state:
+          type: string
+          readOnly: true
+        owner:
+          type: object
+          additionalProperties:
+            type: string
+          readOnly: true
+        grantee_type:
+          type: string
+          readOnly: true
+        grantee:
+          type: object
+          additionalProperties:
+            type: string
+          readOnly: true
+        resource_type:
+          type: string
+          readOnly: true
+        resource_id:
+          type: integer
+          readOnly: true
+        access_level:
+          allOf:
+          - $ref: '#/components/schemas/AccessLevelEnum'
+          readOnly: true
+        reason:
+          type: string
+          readOnly: true
+        granted_by_id:
+          type: integer
+          nullable: true
+          readOnly: true
+        created_at:
+          type: string
+          format: date-time
+          readOnly: true
+        valid_until:
+          type: string
+          format: date-time
+          readOnly: true
+          nullable: true
+        revoked_at:
+          type: string
+          format: date-time
+          readOnly: true
+          nullable: true
+        revocation:
+          allOf:
+          - $ref: '#/components/schemas/TenantResourceGrantAuditRevocation'
+          readOnly: true
+      required:
+      - access_level
+      - created_at
+      - granted_by_id
+      - grantee
+      - grantee_type
+      - id
+      - owner
+      - reason
+      - resource_id
+      - resource_type
+      - revocation
+      - revoked_at
+      - state
+      - url
+      - valid_until
+    TenantResourceGrantAuditRevocation:
+      type: object
+      properties:
+        kind:
+          type: string
+          readOnly: true
+        user_id:
+          type: integer
+          readOnly: true
+          nullable: true
+        request_id:
+          type: string
+          format: uuid
+          readOnly: true
+          nullable: true
+        time:
+          type: string
+          format: date-time
+          readOnly: true
+          nullable: true
+        triggering_valid_until:
+          type: string
+          format: date-time
+          readOnly: true
+          nullable: true
+        expiry_run_id:
+          type: integer
+          readOnly: true
+          nullable: true
+      required:
+      - expiry_run_id
+      - kind
+      - request_id
+      - time
+      - triggering_valid_until
+      - user_id
     Token:
       type: object
       properties:
