@@ -6,17 +6,23 @@ from django.utils.decorators import method_decorator
 from django.views import View
 
 from assets.scanning import resolve_scanned_target
-from core.managers import get_current_tenant
+from core.tenant_scope import accessible_tenant_ids
 
 
 @method_decorator(login_required, name="dispatch")
 class ScanResolveView(View):
-    """Resolve a scanned code to an asset URL within the active tenant."""
+    """Resolve a scanned code to an asset URL.
+
+    Resolution is cross-tenant for every tenant the user can access, so a
+    scan succeeds regardless of which tenant is currently selected. Fail
+    closed: a user with no accessible tenants (and no global superuser view)
+    gets a 404 and no data.
+    """
 
     def get(self, request, *args, **kwargs):
-        # Fail closed: no active tenant means tenant-scoped queries open up.
+        # Fail closed: no accessible tenants means tenant-scoped queries open up.
         # Superusers are allowed to bypass this check as they have global view rights.
-        if not get_current_tenant() and not request.user.is_superuser:
+        if not request.user.is_superuser and not accessible_tenant_ids(request.user):
             return JsonResponse({"found": False}, status=404)
 
         if not request.user.has_perm("assets.view_asset"):

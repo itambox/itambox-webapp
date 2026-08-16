@@ -60,14 +60,6 @@
       "count": 1
     },
     {
-      "path": "itambox/assets/scanning.py",
-      "scope": "FunctionDef:resolve_scanned_code",
-      "handler_type": "Asset.DoesNotExist",
-      "classification": "pass-only",
-      "body_sha256": "5c04595997820c90159baeb6d4411d9a479f4dc26f1ac532dd740dcb011f3e23",
-      "count": 1
-    },
-    {
       "path": "itambox/assets/signals.py",
       "scope": "FunctionDef:on_asset_assignment_save",
       "handler_type": "Exception",

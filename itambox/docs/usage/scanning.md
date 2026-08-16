@@ -19,8 +19,18 @@ Supported code formats (handled by the resolve endpoint):
 |---|---|---|
 | Bare asset tag | `IT-00042` | Case-insensitive |
 | Serial number | `SN-ABC123` | Matched when no tag found |
-| `itambox://` scheme | `itambox://tag/IT-00042` | Printed on QR labels |
+| EAN / GTIN | `4012345678901` | EAN-8/13, GTIN-8/12/13/14, UPC — resolved through the AssetType catalogue (asset) or the inventory item's own EAN |
+| `itambox://` scheme | `itambox://asset/42` or `itambox:IT-00042` | Printed on QR labels |
 | Full HTTP URL | `https://itam.example.com/assets/42/` | Scanned from printed QR code |
+
+!!! note "Tenant behavior"
+    The **Find by Scan** flow searches **every tenant you can access**, no
+    matter which tenant is currently selected. A user with no accessible
+    tenant fails closed (404) — nothing ever leaks from tenants the user
+    cannot access. Audit sessions and bulk-scan baskets remain bound to
+    their session tenant: an EAN that matches an AssetType with **exactly
+    one** asset in scope verifies that asset; if several assets share the
+    type, the scan reports the ambiguity instead of picking one silently.
 
 ---
 
@@ -44,13 +54,13 @@ To scan with the camera:
 
 ## Find by Scan & EAN Resolution (`/scan/`)
 
-The **Find by Scan** view resolves any supported code or EAN to the matching target and redirects you to its detail page. The resolution follows a strict hierarchy (tenant-scoped and permission-gated):
+The **Find by Scan** view resolves any supported code or EAN to the matching target and redirects you to its detail page. The resolution follows a strict hierarchy (cross-tenant for every tenant you can access, and permission-gated):
 
 1. **Asset Match**: If the code matches an `Asset` (by asset tag, serial number, or a deep link like `itambox://asset/<pk>`), it redirects you directly to the asset's detail page.
 2. **AssetType EAN Match**: If the code matches an `AssetType` EAN, it redirects you to the asset list view filtered to that EAN (`/assets/?ean=<ean>`).
 3. **Inventory EAN Match**: If the code matches a `Component`, `Accessory`, or `Consumable` EAN, it redirects you directly to that inventory item's detail page.
 
-If no object matches the scanned code, a 404 error is shown. Tenant scoping is strictly enforced.
+If no object matches the scanned code, a 404 error is shown. Tenants you cannot access are never searched.
 
 ---
 
