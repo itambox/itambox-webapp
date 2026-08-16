@@ -177,7 +177,7 @@
                aria-label="{% translate 'Page header' %}">
             <div id="breadcrumbs-block">{% include 'global_includes/_breadcrumbs.html' %}</div>
             <div class="row g-2 align-items-center mt-2">
-              <div class="col-12 col-lg">
+              <div class="col-12 col-lg order-2 order-lg-1">
                 {% block page_header %}
                   <div id="page-header-block">
                     <div class="page-pretitle">{% translate "Overview" %}</div>
@@ -185,7 +185,7 @@
                   </div>
                 {% endblock %}
               </div>
-              <div class="col-12 col-lg-auto ms-lg-auto d-print-none">
+              <div class="col-12 col-lg-auto ms-lg-auto d-flex justify-content-end order-1 order-lg-2 d-print-none">
                 {% block page_actions %}<div id="page-actions-block"></div>{% endblock %}
               </div>
             </div>
@@ -207,8 +207,8 @@
       {# End #page-content-wrapper #}
       {# Footer #}
       <footer class="footer footer-transparent d-print-none py-2">
-        <div class="container-fluid d-flex justify-content-between align-items-center">
-          <ul class="list-inline mb-0 fs-2">
+        <div class="container-fluid d-flex flex-column flex-lg-row justify-content-between align-items-stretch align-items-lg-center gap-2 gap-lg-0">
+          <ul class="list-inline mb-0 fs-2 text-end">
             <li class="list-inline-item">
               <a href="{% static 'docs/index.html' %}"
                  target="_blank"
@@ -270,7 +270,8 @@
               </a>
             </li>
           </ul>
-          <ul class="list-inline list-inline-dots fs-5 mb-0" id="footer-stamp">
+          <ul class="list-inline list-inline-dots fs-5 mb-0 text-center text-lg-end"
+              id="footer-stamp">
             <li class="list-inline-item">{% now 'Y-m-d H:i:s T' %}</li>
             <li class="list-inline-item">v{{ settings.VERSION }}</li>
             <li class="list-inline-item">
