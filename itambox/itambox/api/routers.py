@@ -1,3 +1,4 @@
+from rest_framework.permissions import IsAuthenticated
 from rest_framework.routers import DefaultRouter
 
 
@@ -11,6 +12,15 @@ class ITAMBoxRouter(DefaultRouter):
 
     class APIRootView(DefaultRouter.APIRootView):
         _module_name = None
+
+        # The namespace root only lists registered route names and has no
+        # queryset. DRF's APIRootView defines no permission_classes, so without
+        # this override the view inherits the global defaults and
+        # TokenPermissions asserts on the missing queryset for every
+        # authenticated request (issue #363). Match the explicit pattern of
+        # the /api/ and /api/users/ root views: login required, no
+        # model-bound permission check.
+        permission_classes = [IsAuthenticated]
 
         def get_view_name(self):
             if self._module_name:
