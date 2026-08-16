@@ -4,7 +4,7 @@
  * Copies CSS/JS/font/image files from node_modules into static/dist/vendor/
  * so they can be served via Django's static files without exposing node_modules.
  */
-import { cpSync, mkdirSync } from 'fs';
+import { cpSync, mkdirSync, rmSync } from 'fs';
 import { dirname } from 'path';
 import { fileURLToPath } from 'url';
 
@@ -20,6 +20,8 @@ mkdirSync(dist('gridstack'), { recursive: true });
 mkdirSync(dist('mdi/css'), { recursive: true });
 mkdirSync(dist('mdi/fonts'), { recursive: true });
 mkdirSync(dist('inter'), { recursive: true });
+rmSync(dist('graphiql'), { recursive: true, force: true });
+mkdirSync(dist('graphiql'), { recursive: true });
 
 // --- CSS ---
 
@@ -70,6 +72,9 @@ cpSync('node_modules/apexcharts/dist/apexcharts.min.js', dist('apexcharts.min.js
 
 // HTML5 QR Code Scanner fallback
 cpSync('node_modules/html5-qrcode/html5-qrcode.min.js', dist('html5-qrcode.min.js'));
+
+// GraphiQL UI (served locally; no runtime CDN dependency)
+cpSync('node_modules/graphiql/dist/style.css', dist('graphiql/graphiql.css'));
 
 // --- Brand assets ---
 mkdirSync(__dirname + '/static/dist/brand', { recursive: true });

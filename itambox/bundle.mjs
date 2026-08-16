@@ -1,8 +1,9 @@
 /**
  * ITAMbox static asset bundler — esbuild-based build pipeline.
  *
- * Entry point:
- *   static/src/index.ts → static/dist/itambox.js  (JS bundle, IIFE)
+ * Entry points:
+ *   static/src/index.ts       → static/dist/itambox.js
+ *   static/src/graphql-ui.js  → static/dist/vendor/graphiql/graphiql-ui.js
  *
  * Usage:
  *   node bundle.mjs           Build (production minified)
@@ -26,11 +27,27 @@ const config = {
   logLevel: 'info',
 };
 
+const graphiqlConfig = {
+  entryPoints: [__dirname + '/static/src/graphql-ui.js'],
+  bundle: true,
+  minify: !isWatch,
+  sourcemap: isWatch,
+  outfile: __dirname + '/static/dist/vendor/graphiql/graphiql-ui.js',
+  format: 'iife',
+  target: ['es2020'],
+  // GraphiQL CSS is copied and served as a normal static asset. Do not inject
+  // it from the JS bundle, because that would violate the response CSP.
+  loader: { '.css': 'empty' },
+  logLevel: 'info',
+};
+
 if (isWatch) {
   const ctx = await esbuild.context(config);
-  await ctx.watch();
+  const graphiqlContext = await esbuild.context(graphiqlConfig);
+  await Promise.all([ctx.watch(), graphiqlContext.watch()]);
   console.log('[itambox] Watching JS files for changes...');
 } else {
   await esbuild.build(config);
-  console.log('[itambox] JS build complete — static/dist/itambox.js');
+  await esbuild.build(graphiqlConfig);
+  console.log('[itambox] JS bundles complete — static/dist/');
 }
