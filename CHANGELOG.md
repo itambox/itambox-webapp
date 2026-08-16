@@ -6,6 +6,8 @@ This changelog follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) 
 
 ## [Unreleased]
 
+## [1.0.0-beta.1] - 2026-08-16
+
 ### Added
 
 - Scheduled reports with a cross-tenant scope now have an operator approval workflow: the schedule list shows the scope approval state, and a dedicated Scope Approval page approves or revokes the durable authorization (`reports.view_cross_tenant_reports`). Revocation keeps the approval history and fails delivery closed until a fresh approval covers the full scope.
@@ -172,7 +174,8 @@ This changelog follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) 
 - The full pytest suite is not safe to run with `pytest-xdist`; use the default serial configuration.
 - SQLite is not supported. PostgreSQL 15 or newer is required for development, tests, and production.
 
-[Unreleased]: https://github.com/itambox/itambox-webapp/compare/v1.0.0-alpha.3...HEAD
+[Unreleased]: https://github.com/itambox/itambox-webapp/compare/v1.0.0-beta.1...HEAD
+[1.0.0-beta.1]: https://github.com/itambox/itambox-webapp/releases/tag/v1.0.0-beta.1
 [1.0.0-alpha.3]: https://github.com/itambox/itambox-webapp/releases/tag/v1.0.0-alpha.3
 [1.0.0-alpha.2]: https://github.com/itambox/itambox-webapp/releases/tag/v1.0.0-alpha.2
 [1.0.0-alpha.1]: https://github.com/itambox/itambox-webapp/releases/tag/v1.0.0-alpha.1
