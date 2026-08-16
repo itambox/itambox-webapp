@@ -7,54 +7,6 @@
 {% endblock %}
 {% block page_header %}
   <h1 class="visually-hidden">{% translate "Dashboard" %}: {{ active_dashboard.name }}</h1>
-  <div class="dropdown d-inline-block">
-    <button class="btn btn-outline-primary dropdown-toggle d-flex align-items-center"
-            type="button"
-            id="dashboard-switcher"
-            data-bs-toggle="dropdown"
-            aria-expanded="false">
-      <i class="mdi mdi-view-dashboard-variant-outline me-1"></i>
-      {{ active_dashboard.name }}
-      {% if active_dashboard.tenant %}
-        <span class="badge bg-blue-lt ms-2">{{ active_dashboard.tenant.name }}</span>
-      {% endif %}
-    </button>
-    <ul class="dropdown-menu dropdown-menu-start"
-        aria-labelledby="dashboard-switcher">
-      <li class="dropdown-header">{% translate "Switch Dashboard" %}</li>
-      {% for db in dashboards_list %}
-        <li>
-          <a class="dropdown-item d-flex align-items-center justify-content-between {% if db.id == active_dashboard.id %}active{% endif %}"
-             href="?dashboard={{ db.id }}"
-             hx-get="?dashboard={{ db.id }}"
-             hx-target="#page-content-wrapper"
-             hx-push-url="true">
-            <span>
-              {{ db.name }}
-              {% if db.is_default %}
-                <small class="text-muted ms-1">({% translate "Default" %})</small>
-              {% endif %}
-            </span>
-            {% if db.tenant %}
-              <span class="badge bg-blue-lt ms-2">{{ db.tenant.name }}</span>
-            {% endif %}
-          </a>
-        </li>
-      {% endfor %}
-      <div class="dropdown-divider"></div>
-      <li>
-        <a class="dropdown-item d-flex align-items-center text-primary"
-           hx-get="{% url 'extras:dashboard_manage_modal' %}"
-           hx-target="#dashboard-modal-content"
-           data-bs-toggle="modal"
-           data-bs-target="#dashboard-modal"
-           href="#">
-          <i class="mdi mdi-cog-outline me-1"></i>
-          {% translate "Manage Dashboards" %}
-        </a>
-      </li>
-    </ul>
-  </div>
 {% endblock %}
 {% block page_actions %}
   <style nonce="{{ request.csp_nonce }}">
@@ -64,51 +16,102 @@
         gap: 0.5rem;
     }
   </style>
-  <div class="btn-list" id="dashboard-controls">
-    {# On phones these controls collapse to icon-only to save space; labels return at ≥sm. #}
-    <span id="dashboard-locked-controls">
-      <button id="unlock-dashboard"
-              class="btn btn-outline-secondary d-flex align-items-center"
-              title="{% translate 'Unlock dashboard to resize and reorder widgets' %}">
-        <i class="mdi mdi-lock-open-outline"></i>
-        <span class="d-none d-sm-inline ms-1">{% translate 'Unlock' %}</span>
+  <div class="w-100 d-flex align-items-center justify-content-between gap-2"
+       id="dashboard-page-actions">
+    <div class="dropdown d-inline-block">
+      <button class="btn btn-outline-primary dropdown-toggle d-flex align-items-center"
+              type="button"
+              id="dashboard-switcher"
+              data-bs-toggle="dropdown"
+              aria-expanded="false">
+        <i class="mdi mdi-view-dashboard-variant-outline me-1"></i>
+        <span class="text-truncate">{{ active_dashboard.name }}</span>
+        {% if active_dashboard.tenant %}
+          <span class="badge bg-blue-lt ms-2">{{ active_dashboard.tenant.name }}</span>
+        {% endif %}
       </button>
-    </span>
-    <span class="d-none"  id="dashboard-unlocked-controls">
-      <button id="save-dashboard"
-              class="btn btn-primary d-flex align-items-center"
-              title="{% translate 'Save layout' %}">
-        <i class="mdi mdi-floppy"></i>
-        <span class="d-none d-sm-inline ms-1">{% translate 'Save Layout' %}</span>
-      </button>
-      <button class="btn btn-outline-secondary d-flex align-items-center"
-              hx-get="{% url 'extras:dashboard_widget_add' dashboard_id=active_dashboard.id %}"
-              hx-target="#dashboard-modal-content"
-              data-bs-toggle="modal"
-              data-bs-target="#dashboard-modal"
-              title="{% translate 'Add Widget' %}">
-        <i class="mdi mdi-plus"></i>
-        <span class="d-none d-sm-inline ms-1">{% translate 'Add Widget' %}</span>
-      </button>
-      <button id="lock-dashboard"
-              class="btn btn-outline-secondary d-flex align-items-center"
-              title="{% translate 'Lock dashboard' %}">
-        <i class="mdi mdi-lock"></i>
-        <span class="d-none d-sm-inline ms-1">{% translate 'Lock' %}</span>
-      </button>
-    </span>
-    <form method="post"
-          action="{% url 'extras:dashboard_reset' dashboard_id=active_dashboard.id %}"
-          class="d-inline">
-      {% csrf_token %}
-      <button type="submit"
-              class="btn btn-outline-danger"
-              title="{% translate 'Reset' %}"
-              data-confirm="{% translate 'Reset dashboard to default layout? This cannot be undone.' %}">
-        <i class="mdi mdi-refresh"></i>
-        <span class="d-none d-sm-inline ms-1">{% translate 'Reset' %}</span>
-      </button>
-    </form>
+      <ul class="dropdown-menu dropdown-menu-start"
+          aria-labelledby="dashboard-switcher">
+        <li class="dropdown-header">{% translate "Switch Dashboard" %}</li>
+        {% for db in dashboards_list %}
+          <li>
+            <a class="dropdown-item d-flex align-items-center justify-content-between {% if db.id == active_dashboard.id %}active{% endif %}"
+               href="?dashboard={{ db.id }}"
+               hx-get="?dashboard={{ db.id }}"
+               hx-target="#page-content-wrapper"
+               hx-push-url="true">
+              <span>
+                {{ db.name }}
+                {% if db.is_default %}
+                  <small class="text-muted ms-1">({% translate "Default" %})</small>
+                {% endif %}
+              </span>
+              {% if db.tenant %}
+                <span class="badge bg-blue-lt ms-2">{{ db.tenant.name }}</span>
+              {% endif %}
+            </a>
+          </li>
+        {% endfor %}
+        <div class="dropdown-divider"></div>
+        <li>
+          <a class="dropdown-item d-flex align-items-center text-primary"
+             hx-get="{% url 'extras:dashboard_manage_modal' %}"
+             hx-target="#dashboard-modal-content"
+             data-bs-toggle="modal"
+             data-bs-target="#dashboard-modal"
+             href="#">
+            <i class="mdi mdi-cog-outline me-1"></i>
+            {% translate "Manage Dashboards" %}
+          </a>
+        </li>
+      </ul>
+    </div>
+    <div class="btn-list" id="dashboard-controls">
+      {# On phones these controls collapse to icon-only to save space; labels return at ≥sm. #}
+      <span id="dashboard-locked-controls">
+        <button id="unlock-dashboard"
+                class="btn btn-outline-secondary d-flex align-items-center"
+                title="{% translate 'Unlock dashboard to resize and reorder widgets' %}">
+          <i class="mdi mdi-lock-open-outline"></i>
+          <span class="d-none d-sm-inline ms-1">{% translate 'Unlock' %}</span>
+        </button>
+      </span>
+      <span class="d-none"  id="dashboard-unlocked-controls">
+        <button id="save-dashboard"
+                class="btn btn-primary d-flex align-items-center"
+                title="{% translate 'Save layout' %}">
+          <i class="mdi mdi-floppy"></i>
+          <span class="d-none d-sm-inline ms-1">{% translate 'Save Layout' %}</span>
+        </button>
+        <button class="btn btn-outline-secondary d-flex align-items-center"
+                hx-get="{% url 'extras:dashboard_widget_add' dashboard_id=active_dashboard.id %}"
+                hx-target="#dashboard-modal-content"
+                data-bs-toggle="modal"
+                data-bs-target="#dashboard-modal"
+                title="{% translate 'Add Widget' %}">
+          <i class="mdi mdi-plus"></i>
+          <span class="d-none d-sm-inline ms-1">{% translate 'Add Widget' %}</span>
+        </button>
+        <button id="lock-dashboard"
+                class="btn btn-outline-secondary d-flex align-items-center"
+                title="{% translate 'Lock dashboard' %}">
+          <i class="mdi mdi-lock"></i>
+          <span class="d-none d-sm-inline ms-1">{% translate 'Lock' %}</span>
+        </button>
+      </span>
+      <form method="post"
+            action="{% url 'extras:dashboard_reset' dashboard_id=active_dashboard.id %}"
+            class="d-inline">
+        {% csrf_token %}
+        <button type="submit"
+                class="btn btn-outline-danger"
+                title="{% translate 'Reset' %}"
+                data-confirm="{% translate 'Reset dashboard to default layout? This cannot be undone.' %}">
+          <i class="mdi mdi-refresh"></i>
+          <span class="d-none d-sm-inline ms-1">{% translate 'Reset' %}</span>
+        </button>
+      </form>
+    </div>
   </div>
 {% endblock %}
 {% block content %}
