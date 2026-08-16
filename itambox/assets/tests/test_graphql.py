@@ -211,6 +211,23 @@ class GraphQLTestCase(TestCase):
         response = self.client.get(self.graphql_url, HTTP_ACCEPT="text/html")
         self.assertEqual(response.status_code, 200)
 
+    @override_settings(
+        DEBUG=False,
+        MIDDLEWARE=[m for m in settings.MIDDLEWARE if m != "debug_toolbar.middleware.DebugToolbarMiddleware"],
+    )
+    def test_graphiql_is_available_to_authenticated_users_in_production(self):
+        self.client.force_login(self.admin_user)
+
+        response = self.client.get(self.graphql_url, HTTP_ACCEPT="text/html")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "GraphiQL")
+        self.assertContains(response, 'nonce="')
+        self.assertContains(response, "dist/vendor/graphiql/graphiql.min.css")
+        self.assertContains(response, "dist/vendor/graphiql/plugin-explorer.umd.js")
+        self.assertNotIn("https://cdn.jsdelivr.net", response.content.decode())
+        self.assertNotIn("https://cdn.jsdelivr.net", response["Content-Security-Policy"])
+
     def test_graphql_post_gated_by_auth(self):
         query = "{ assets { name } }"
         # Unauthenticated POST request should return 401

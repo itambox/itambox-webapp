@@ -188,6 +188,8 @@ def query_complexity_validator(max_complexity=1000, fan_out=10):
 
 @method_decorator(csrf_exempt, name="dispatch")
 class PrivateGraphQLView(GraphQLView):
+    graphiql_template = "graphql/graphiql.html"
+
     def __init__(self, *args, **kwargs):
         from graphene.validation import depth_limit_validator
         from graphql.validation import NoSchemaIntrospectionCustomRule, specified_rules
@@ -209,7 +211,10 @@ class PrivateGraphQLView(GraphQLView):
 
     @property
     def graphiql(self):
-        return settings.DEBUG
+        # GET authentication is enforced in dispatch(). Keep the interactive
+        # GraphiQL shell available to authenticated users in production too;
+        # DEBUG only controls schema introspection below.
+        return True
 
     @graphiql.setter
     def graphiql(self, value):
