@@ -104,9 +104,27 @@
         <div class="offcanvas-lg offcanvas-start"
              tabindex="-1"
              id="sidebar-menu"
-             aria-labelledby="sidebar-menu-label">
+             aria-label="{% translate 'Navigation' %}">
           <div class="offcanvas-header d-flex d-lg-none align-items-center justify-content-between px-3 py-2 border-bottom">
-            <h5 class="offcanvas-title font-weight-bold mb-0" id="sidebar-menu-label">{% translate "Menu" %}</h5>
+            <div class="mobile-sidebar-search flex-grow-1 me-2">
+              <form hx-get="{% url 'search' %}"
+                    hx-target="#page-content-wrapper"
+                    hx-push-url="true"
+                    autocomplete="off"
+                    class="w-100">
+                <div class="input-icon">
+                  <span class="input-icon-addon">
+                    <i class="mdi mdi-magnify"></i>
+                  </span>
+                  <input type="text"
+                         name="q"
+                         value="{{ request.GET.q|default:'' }}"
+                         class="form-control"
+                         placeholder="{% translate 'Search…' %}"
+                         aria-label="{% translate 'Search' %}">
+                </div>
+              </form>
+            </div>
             <button type="button"
                     class="btn-close text-reset"
                     data-bs-dismiss="offcanvas"
@@ -114,30 +132,8 @@
                     aria-label="{% translate 'Close' %}"></button>
           </div>
           <div class="offcanvas-body p-0 d-flex flex-column">
-            {# Scrollable navigation area — search + menu #}
-            <div class="flex-grow-1 overflow-auto">
-              <!-- Mobile Quick Search (inside collapse menu) -->
-              <div class="d-flex d-lg-none px-3 py-2 border-bottom mb-2 w-100">
-                <form hx-get="{% url 'search' %}"
-                      hx-target="#page-content-wrapper"
-                      hx-push-url="true"
-                      autocomplete="off"
-                      class="w-100">
-                  <div class="input-icon">
-                    <span class="input-icon-addon">
-                      <i class="mdi mdi-magnify"></i>
-                    </span>
-                    <input type="text"
-                           name="q"
-                           value="{{ request.GET.q|default:'' }}"
-                           class="form-control"
-                           placeholder="{% translate 'Search…' %}"
-                           aria-label="{% translate 'Search' %}">
-                  </div>
-                </form>
-              </div>
-              {% nav %}
-            </div>
+            {# Scrollable navigation area #}
+            <div class="flex-grow-1 overflow-auto">{% nav %}</div>
             {# Workspace/Tenant switcher: mobile drawer only; hidden on desktop where the top navbar provides it. #}
             {% if request.user.is_authenticated %}
               <div class="mobile-tenant-switcher-wrap border-top flex-shrink-0 d-lg-none">

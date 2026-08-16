@@ -219,8 +219,14 @@ $itambox-sidebar-width: 18rem; // 288px — Tabler default is 15rem/240px (+48px
             background-color: var(--itambox-sidebar-bg, var(--tblr-bg-surface)) !important;
             border-bottom: 1px solid var(--itambox-sidebar-border, var(--tblr-border-color)) !important;
 
-            .offcanvas-title {
-                color: var(--tblr-body-color) !important;
+            .mobile-sidebar-search {
+                min-width: 0;
+
+                form,
+                .input-icon {
+                    width: 100%;
+                    min-width: 0;
+                }
             }
         }
 
