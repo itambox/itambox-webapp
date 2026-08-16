@@ -133,9 +133,7 @@
           </div>
           <div class="offcanvas-body p-0 d-flex flex-column">
             {# Scrollable navigation area #}
-            <div class="flex-grow-1 overflow-auto">
-              {% nav %}
-            </div>
+            <div class="flex-grow-1 overflow-auto">{% nav %}</div>
             {# Workspace/Tenant switcher: mobile drawer only; hidden on desktop where the top navbar provides it. #}
             {% if request.user.is_authenticated %}
               <div class="mobile-tenant-switcher-wrap border-top flex-shrink-0 d-lg-none">
