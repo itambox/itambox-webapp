@@ -28,12 +28,13 @@ from django.views.generic import TemplateView
 
 from core.managers import get_current_tenant
 from core.models import Job
+from core.tenant_scope import accessible_tenant_ids
 from itambox.views.generic.utils import safe_return_url
 
 from .. import forms
 from ..depreciation import compute_book_value
 from ..models import Asset, AssetDisposal
-from ..scanning import resolve_scanned_code
+from ..scanning import resolve_scanned_asset
 
 logger = logging.getLogger(__name__)
 
@@ -94,8 +95,9 @@ class AssetScanActionResolveView(View):
     """
 
     def get(self, request, *args, **kwargs):
-        # Fail closed: no active tenant means tenant-scoped queries open up.
-        if not get_current_tenant() and not request.user.is_superuser:
+        # Fail closed: no accessible tenants means tenant-scoped queries open up.
+        # Superusers are allowed to bypass this check as they have global view rights.
+        if not request.user.is_superuser and not accessible_tenant_ids(request.user):
             return JsonResponse({"found": False}, status=404)
 
         mode = request.GET.get("mode", "checkin")
@@ -107,9 +109,15 @@ class AssetScanActionResolveView(View):
         if not code:
             return JsonResponse({"found": False}, status=400)
 
-        asset = resolve_scanned_code(code)
+        asset, ambiguous = resolve_scanned_asset(code)
         if asset is None:
-            return JsonResponse({"found": False}, status=404)
+            # An EAN matching several assets is reported distinctly so the UI
+            # never treats an ambiguous scan as a plain miss (or worse, picks
+            # an arbitrary asset).
+            payload = {"found": False}
+            if ambiguous:
+                payload["ambiguous"] = True
+            return JsonResponse(payload, status=404)
 
         payload = asset_action_payload(asset, mode)
         payload["found"] = True

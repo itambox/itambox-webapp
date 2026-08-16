@@ -79,6 +79,38 @@ class ScanActionResolveTests(TenantTestMixin, TestCase):
         self.assertFalse(data["eligible"])
         self.assertTrue(data["warning"])
 
+    def test_no_accessible_tenants_fails_closed(self):
+        """A member with no accessible tenants gets the fail-closed 404."""
+        user = User.objects.create_user(
+            username="resolve-noaccess", email="resolve-noaccess@example.com", password="password"
+        )
+        self.client.force_login(user)
+        resp = self.client.get(self.url, {"code": "RES-001"})
+        self.assertEqual(resp.status_code, 404)
+        self.assertFalse(json.loads(resp.content)["found"])
+
+    def test_ambiguous_ean_reports_ambiguity(self):
+        """An EAN matching several assets is reported distinctly, never resolved silently."""
+        mfr = Manufacturer.objects.get(slug="mfr-r")
+        ean_type = AssetType.objects.create(
+            manufacturer=mfr, model="EAN Bulk Model", slug="type-ean-bulk", ean="4012345678912"
+        )
+        for i in range(2):
+            Asset.objects.create(
+                name=f"EAN Bulk {i}",
+                asset_tag=f"EANB-{i}",
+                asset_type=ean_type,
+                asset_role=self.role,
+                status=self.deployable,
+                tenant=self.tenant,
+            )
+        self.client_login_to_tenant(self.tenant_admin, self.tenant)
+        resp = self.client.get(self.url, {"code": "4012345678912"})
+        self.assertEqual(resp.status_code, 404)
+        data = json.loads(resp.content)
+        self.assertFalse(data["found"])
+        self.assertTrue(data["ambiguous"])
+
     def test_checkin_eligible_when_checked_out(self):
         holder = AssetHolder.objects.create(
             first_name="A", last_name="B", upn="ab@x.io", email="ab@x.io", tenant=self.tenant

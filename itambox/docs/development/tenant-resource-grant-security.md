@@ -188,6 +188,7 @@ PYTHONPATH=itambox uv run --locked --group dev python -m pytest -q -p no:cachepr
   itambox/assets/tests/test_existing.py \
   itambox/assets/tests/test_bulk_actions.py \
   itambox/assets/tests/test_bulk_scan.py \
+  itambox/assets/tests/test_ean.py \
   itambox/assets/tests/test_issue260_asset_detail_responsive.py \
   itambox/compliance/tests/test_custody_rbac.py \
   itambox/core/tests/test_issue185_alert_delivery.py \
@@ -198,6 +199,7 @@ PYTHONPATH=itambox uv run --locked --group dev python -m pytest -q -p no:cachepr
   itambox/itambox/tests/test_api_root.py \
   itambox/assets/tests/test_tables_category.py \
   itambox/assets/tests/test_requests.py \
+  itambox/assets/tests/test_scanning.py \
   itambox/core/tests/test_alert_views.py \
   itambox/core/tests/test_import_boundaries.py \
   itambox/core/tests/test_csp_nonce_context.py \

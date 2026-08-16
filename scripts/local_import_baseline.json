@@ -257,18 +257,6 @@
     },
     {
       "path": "itambox/assets/scanning.py",
-      "context": "FunctionDef:resolve_scanned_code",
-      "statement": "from assets.models import Asset",
-      "count": 1
-    },
-    {
-      "path": "itambox/assets/scanning.py",
-      "context": "FunctionDef:resolve_scanned_target",
-      "statement": "from assets.models import AssetType",
-      "count": 1
-    },
-    {
-      "path": "itambox/assets/scanning.py",
       "context": "FunctionDef:resolve_scanned_target",
       "statement": "from django.urls import reverse",
       "count": 1
@@ -803,12 +791,6 @@
     },
     {
       "path": "itambox/compliance/views_audit.py",
-      "context": "ClassDef:AssetAuditScanView/FunctionDef:post",
-      "statement": "from assets.scanning import resolve_scanned_code",
-      "count": 1
-    },
-    {
-      "path": "itambox/compliance/views_audit.py",
       "context": "ClassDef:AuditSessionCommitView/FunctionDef:post",
       "statement": "from assets.models import Asset",
       "count": 1
@@ -841,18 +823,6 @@
       "path": "itambox/compliance/views_audit.py",
       "context": "ClassDef:AuditSessionTable/FunctionDef:render_status",
       "statement": "from django.utils.html import format_html",
-      "count": 1
-    },
-    {
-      "path": "itambox/compliance/views_audit.py",
-      "context": "ClassDef:AuditSessionValidateView/FunctionDef:get",
-      "statement": "from assets.models import StatusLabel",
-      "count": 1
-    },
-    {
-      "path": "itambox/compliance/views_audit.py",
-      "context": "ClassDef:AuditSessionValidateView/FunctionDef:get",
-      "statement": "from assets.scanning import resolve_scanned_code",
       "count": 1
     },
     {

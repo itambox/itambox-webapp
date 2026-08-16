@@ -1285,14 +1285,6 @@
     },
     {
       "path": "itambox/assets/tests/test_scanning.py",
-      "code": "F401",
-      "message": "'organization.models.Role' imported but unused",
-      "source": "from organization.models import Membership, Role, Tenant",
-      "context": "Module:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/assets/tests/test_scanning.py",
       "code": "F541",
       "message": "f-string is missing placeholders",
       "source": "        resp = self.client.get(self.url, {\"code\": f\"itambox:SCAN-001\"})",

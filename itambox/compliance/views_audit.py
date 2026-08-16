@@ -15,6 +15,8 @@ from django.utils.translation import gettext_lazy as _
 from django.views.generic import View
 from django_tables2.utils import A
 
+from assets.models import StatusLabel
+from assets.scanning import resolve_scanned_asset
 from compliance.filters import AuditSessionFilterSet
 from compliance.forms_audit import AssetAuditForm, AuditBarcodeScanForm, AuditSessionForm
 from compliance.forms_filter import AuditSessionFilterForm
@@ -32,6 +34,30 @@ from itambox.views.generic.service_views import GenericTransactionView, SimplePo
 
 User = get_user_model()
 logger = logging.getLogger(__name__)
+
+
+def _classify_audit_scan(session, asset, expected_ids, observed_location):
+    """Classify a scanned asset for an active audit session (idempotent, no writes).
+
+    Returns ``(eligible, warning, classification)``.
+    """
+    if not observed_location:
+        return False, str(_("Audit observed location must be specified.")), "unknown"
+    if asset.status and asset.status.type == StatusLabel.TYPE_ARCHIVED:
+        return False, str(_("Archived assets cannot be audited.")), "unknown"
+    already_verified = AssetAudit.objects.filter(session=session, asset=asset).exists()
+    if already_verified:
+        warning = str(_("This asset has already been verified in this session."))
+        if asset.id not in expected_ids:
+            return False, warning, "surprise"
+        if session.location_id is None or observed_location.id == session.location_id:
+            return False, warning, "matched"
+        return False, warning, "mismatch"
+    if asset.id not in expected_ids:
+        return True, None, "surprise"
+    if session.location_id is None or observed_location.id == session.location_id:
+        return True, None, "matched"
+    return True, None, "mismatch"
 
 
 class AuditSessionTable(BaseTable):
@@ -163,17 +189,18 @@ class AssetAuditScanView(LoginRequiredMixin, PermissionRequiredMixin, View):
         if form.is_valid():
             barcode = form.cleaned_data["barcode"].strip()
 
-            from assets.scanning import resolve_scanned_code
-
-            asset = resolve_scanned_code(barcode)
+            asset, ambiguous = resolve_scanned_asset(barcode)
 
             if not asset:
-                response = HttpResponse(
-                    "<div class='alert alert-danger mb-0'>"
-                    + str(_("Scanned asset tag or serial '%(barcode)s' not found in database.") % {"barcode": barcode})
-                    + "</div>",
-                    status=400,
-                )
+                if ambiguous:
+                    message = _("EAN '%(barcode)s' matches multiple assets. Scan the asset tag instead.") % {
+                        "barcode": barcode
+                    }
+                else:
+                    message = _("Scanned asset tag or serial '%(barcode)s' not found in database.") % {
+                        "barcode": barcode
+                    }
+                response = HttpResponse("<div class='alert alert-danger mb-0'>" + str(message) + "</div>", status=400)
                 response["HX-Trigger"] = "playAuditFailSound"
                 return response
 
@@ -219,43 +246,16 @@ class AuditSessionValidateView(LoginRequiredMixin, PermissionRequiredMixin, View
         if not code:
             return JsonResponse({"found": False}, status=400)
 
-        from assets.scanning import resolve_scanned_code
-
-        asset = resolve_scanned_code(code)
+        asset, ambiguous = resolve_scanned_asset(code)
         if asset is None:
-            return JsonResponse({"found": False}, status=404)
-
-        from assets.models import StatusLabel
+            payload = {"found": False}
+            if ambiguous:
+                payload["ambiguous"] = True
+            return JsonResponse(payload, status=404)
 
         expected_ids = set(session.expected_assets_queryset.values_list("id", flat=True))
         observed_location = session.location or asset.location
-
-        if not observed_location:
-            eligible = False
-            warning = str(_("Audit observed location must be specified."))
-            classification = "unknown"
-        elif asset.status and asset.status.type == StatusLabel.TYPE_ARCHIVED:
-            eligible = False
-            warning = str(_("Archived assets cannot be audited."))
-            classification = "unknown"
-        elif AssetAudit.objects.filter(session=session, asset=asset).exists():
-            eligible = False
-            warning = str(_("This asset has already been verified in this session."))
-            if asset.id not in expected_ids:
-                classification = "surprise"
-            elif session.location_id is None or observed_location.id == session.location_id:
-                classification = "matched"
-            else:
-                classification = "mismatch"
-        else:
-            eligible = True
-            warning = None
-            if asset.id not in expected_ids:
-                classification = "surprise"
-            elif session.location_id is None or observed_location.id == session.location_id:
-                classification = "matched"
-            else:
-                classification = "mismatch"
+        eligible, warning, classification = _classify_audit_scan(session, asset, expected_ids, observed_location)
 
         return JsonResponse(
             {
