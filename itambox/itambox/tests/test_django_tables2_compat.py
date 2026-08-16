@@ -59,12 +59,15 @@ class DjangoTables2TemplateCompatibilityTests(unittest.TestCase):
         layout = (template_root / "templates" / "layout.html").read_text(encoding="utf-8")
 
         self.assertIn(
-            '<div class="container-fluid d-flex flex-column flex-lg-row justify-content-between align-items-stretch align-items-lg-center gap-2 gap-lg-0">',
+            '<div class="container-fluid d-flex flex-column flex-lg-row '
+            "justify-content-between align-items-stretch align-items-lg-center "
+            'gap-2 gap-lg-0">',
             layout,
         )
         self.assertIn('<ul class="list-inline mb-0 fs-2 text-end">', layout)
         self.assertIn(
-            '<ul class="list-inline list-inline-dots fs-5 mb-0 text-center text-lg-end" id="footer-stamp">',
+            '<ul class="list-inline list-inline-dots fs-5 mb-0 text-center text-lg-end"\n'
+            '              id="footer-stamp">',
             layout,
         )
 
