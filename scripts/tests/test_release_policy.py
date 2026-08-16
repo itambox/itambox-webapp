@@ -196,6 +196,13 @@ class ReleaseAutomationContractTests(unittest.TestCase):
         ):
             self.assertIn(label, dockerfile)
 
+    def test_runtime_image_explicitly_installs_ca_certificates(self):
+        dockerfile = (REPOSITORY_ROOT / "Dockerfile").read_text(encoding="utf-8")
+        runtime_stage = dockerfile.rsplit("FROM python:3.12-slim-bookworm", 1)[1]
+        install_block = runtime_stage.split("RUN apt-get update", 1)[1].split("&& rm -rf /var/lib/apt/lists/*", 1)[0]
+
+        self.assertIn("ca-certificates", install_block)
+
     def test_public_guidance_uses_dotted_prerelease_examples(self):
         security_policy = (REPOSITORY_ROOT / "SECURITY.md").read_text(encoding="utf-8")
         bug_template = (REPOSITORY_ROOT / ".github" / "ISSUE_TEMPLATE" / "bug_report.md").read_text(encoding="utf-8")
