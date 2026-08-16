@@ -5730,6 +5730,12 @@ export interface components {
       allowed_ips?: string[];
       description?: string;
     };
+    PatchedUserConfigUpdateRequest: {
+      tables?: unknown;
+      theme?: unknown;
+      pagination?: unknown;
+      language?: string;
+    };
     PatchedWarrantyRequest: {
       asset_id?: number;
       warranty_type?: components["schemas"]["WarrantyTypeEnum"];
@@ -6621,6 +6627,12 @@ export interface components {
     };
     UserConfig: {
       data: unknown;
+    };
+    UserConfigUpdateRequest: {
+      tables?: unknown;
+      theme?: unknown;
+      pagination?: unknown;
+      language?: string;
     };
     /**
      * @description * `barcode` - Barcode Scan
@@ -37002,6 +37014,13 @@ export interface operations {
     };
   };
   users_config_update_bulk: {
+    requestBody?: {
+      content: {
+        "application/json": components["schemas"]["UserConfigUpdateRequest"];
+        "application/x-www-form-urlencoded": components["schemas"]["UserConfigUpdateRequest"];
+        "multipart/form-data": components["schemas"]["UserConfigUpdateRequest"];
+      };
+    };
     responses: {
       200: {
         content: {
@@ -37047,6 +37066,13 @@ export interface operations {
     };
   };
   users_config_partial_update_bulk: {
+    requestBody?: {
+      content: {
+        "application/json": components["schemas"]["PatchedUserConfigUpdateRequest"];
+        "application/x-www-form-urlencoded": components["schemas"]["PatchedUserConfigUpdateRequest"];
+        "multipart/form-data": components["schemas"]["PatchedUserConfigUpdateRequest"];
+      };
+    };
     responses: {
       200: {
         content: {

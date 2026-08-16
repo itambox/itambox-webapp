@@ -114,6 +114,17 @@ https://your-itambox-instance.com/api/
 | **SCIM**          | `/api/tenants/<slug>/scim/v2/`                      | Tenant-scoped SCIM 2.0 provisioning                     |
 |                   | `/api/providers/<slug>/scim/v2/`                    | Provider-scoped SCIM 2.0 provisioning                   |
 
+### User configuration
+
+`/api/users/config/` accepts a raw configuration object as the request body; do not wrap it in `data`. The allowed top-level keys are:
+
+- `tables`: a dictionary of app labels to table names to table configuration dictionaries (for example, `{"assets": {"AssetTable": {"columns": ["name"]}}}`). Inner table configuration keys are forward-compatible and are not otherwise validated.
+- `theme`: a dictionary, such as `{"theme": "light"}`; its values are not validated against choices.
+- `pagination`: a dictionary, such as `{"per_page": 50}`; its values are not otherwise validated.
+- `language`: a non-empty string, such as `"de"`; it is not validated against `LANGUAGES`.
+
+`PUT` fully replaces the stored configuration. `PATCH` merges top-level keys, deep-merging `tables` while replacing other supplied keys. Unknown top-level keys and an empty object return `400`; unknown keys are reported with field-level errors. Responses, including `GET`, remain wrapped as `{"data": {...}}`.
+
 ### Pagination
 
 DRF model-viewset list endpoints use limit/offset pagination. Custom endpoints such as SCIM use their own response contracts.

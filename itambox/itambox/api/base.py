@@ -1,8 +1,9 @@
-from collections.abc import Iterator, Sequence
+from collections.abc import Iterator, Mapping, Sequence
 from functools import cached_property
 from typing import Any
 
 from django.db.models import Manager
+from django.utils.translation import gettext_lazy as _
 from drf_spectacular.types import OpenApiTypes
 from drf_spectacular.utils import extend_schema_field
 from rest_framework import serializers
@@ -10,6 +11,24 @@ from rest_framework.utils.serializer_helpers import BindingDict
 
 from itambox.api.exceptions import SerializerNotFound
 from itambox.api.related import get_related_object_by_attrs
+
+
+def reject_unknown_or_writableless(
+    submitted: Mapping[str, object], fields: Mapping[str, serializers.Field[Any]]
+) -> None:
+    """Reject payloads with unknown fields or without any writable field.
+
+    Shared by the single-serializer and bulk (ListSerializer) validation paths so
+    both reject malformed input before any database row can be created.
+    """
+    submitted_keys = set(submitted.keys())
+    unknown_fields = submitted_keys - set(fields)
+    if unknown_fields:
+        raise serializers.ValidationError({field: _("Unknown field.") for field in sorted(unknown_fields)})
+
+    writable_fields = {name for name, field in fields.items() if not field.read_only}
+    if submitted_keys.isdisjoint(writable_fields):
+        raise serializers.ValidationError(_("At least one writable field is required."))
 
 
 # typing: third-party-untyped: DRF base serializer intentionally remains open over concrete child models
