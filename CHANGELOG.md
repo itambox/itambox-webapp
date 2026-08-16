@@ -11,10 +11,32 @@ This changelog follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) 
 ### Added
 
 - Scheduled reports with a cross-tenant scope now have an operator approval workflow: the schedule list shows the scope approval state, and a dedicated Scope Approval page approves or revokes the durable authorization (`reports.view_cross_tenant_reports`). Revocation keeps the approval history and fails delivery closed until a fresh approval covers the full scope.
+- Resource grants can expire: expiry dates drive a system revocation sweep, and a scoped audit API exposes the grant-expiry history (issue #195).
+- Webhook delivery is durable and observable: deliveries run through a state machine with retry handling and typed per-attempt outcomes instead of fire-and-forget sends (PR #349).
+- The production GraphQL surface enables schema introspection for authenticated users and exposes an authenticated GraphiQL interface (PRs #372, #376).
 
 ### Changed
 
 - The report-designer opt-in flag is now `ITAMBOX_FEATURE_REPORT_DESIGNER`; `ITAMBOX_REPORT_DESIGNER_ENABLED` remains a deprecated 1.x fallback. When the flag is off, scheduled delivery is skipped for non-grandfathered templates, while the migration-managed bounded grandfathered set continues to render and deliver; grandfathered templates are read-only until the designer is enabled.
+- Event Rule conditions were withdrawn for 1.0: unsupported conditions fail closed and existing rows are preserved (issue #187).
+- Alert-channel delivery now records typed, observable outcomes per delivery attempt (issue #185).
+- Tenant-surface SCIM group reads require the `users.view_usergroup` permission (issue #193).
+- Accessibility was qualified across full-page and HTMX interaction journeys, and the remaining review gaps were closed (issue #101).
+- The runtime image refreshes its CA-certificate bundle during the build (issue #370).
+
+### Fixed
+
+- API token lifecycle: the key is shown once at creation, responses carry ETags, deletion works without a queryset, owner transfer returns 200, and creation without an active tenant fails closed (issues #341, #353).
+- User configuration and asset-tag-sequence endpoints reject unknown request fields instead of silently ignoring them (issue #344, PR #354).
+- `OPTIONS` on collection endpoints no longer raises 500 (issue #340).
+- API root and API namespace root discovery return 200 for authenticated users instead of 500 (issues #345, #363).
+- Scanner lookup resolves across all accessible tenants and accepts EAN/GTIN codes in every scan flow (issue #367).
+- Frontend: page headers stack actions on mobile, the mobile header/footer order and sidebar search are corrected, the dashboard switcher aligns with the action row, and mobile dashboard changelog cards carry field headings (PRs #365, #366, #368, #373, issue #374).
+
+### Security
+
+- Dashboard creation through the API sets the owner from the request context and rejects owner spoofing (PR #352).
+- The runtime image pins a patched nanoid dependency instead of the vulnerable override.
 
 ## [1.0.0-alpha.3] - 2026-08-12
 
