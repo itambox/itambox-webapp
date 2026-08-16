@@ -4,13 +4,13 @@
   "coverage_series": "7.15",
   "policy_sha256": "d361fd8b3ad72413b002fabc4612c7646ef74b2bc39a07ef07c4884f47551845",
   "totals": {
-    "num_statements": 44844,
-    "covered_lines": 39178,
-    "line_rate": 87.37,
-    "num_branches": 11618,
-    "covered_branches": 8327,
-    "branch_rate": 71.67,
+    "num_statements": 46293,
+    "covered_lines": 40761,
+    "line_rate": 88.05,
+    "num_branches": 12034,
+    "covered_branches": 8761,
+    "branch_rate": 72.8,
     "excluded_lines": 37,
-    "measured_files": 516
+    "measured_files": 524
   }
 }
