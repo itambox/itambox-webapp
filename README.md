@@ -23,10 +23,20 @@
   <img src="https://img.shields.io/badge/database-PostgreSQL%2015%2B-4169e1.svg" alt="PostgreSQL 15 or newer">
 </p>
 
-ITAMbox gives internal IT teams and managed service providers one tenant-aware system for assets, stock, software, licenses, subscriptions, procurement, custody, and audits. REST/OpenAPI covers tenant-scoped application resources; the built-in GraphQL schema covers assets, software, licenses, inventory, and subscriptions, with extension points for plugins.
+ITAMbox gives internal IT teams and managed service providers a single tenant-aware system for assets, stock, software, licenses, subscriptions, procurement, custody, and audits. REST/OpenAPI covers tenant-scoped application resources, and the built-in GraphQL schema covers assets, software, licenses, inventory, and subscriptions, with extension points for plugins.
 
 > [!IMPORTANT]
-> This repository is pre-release. `1.0.0-alpha.3` is current version metadata for a limited-audience prerelease, not a production support line. APIs, migrations, routes, and configuration may change throughout the alpha series. Use a disposable or fully backed-up environment for evaluation and do not assume version-skipping or support guarantees.
+> This repository is pre-release. `1.0.0-beta.1` is current version metadata for the feature-complete pilot, not a production support line. The 1.0 scope is frozen, but APIs, migrations, routes, and configuration can still change for capabilities marked Beta. Use a disposable or fully backed-up environment and test every upgrade against your own data. There are no version-skipping or support guarantees yet.
+
+## Try the live demo
+
+A public demo runs at [demo.itambox.dev](https://demo.itambox.dev) with sample organizations. It redeploys on every merge to `main` and can be wiped without notice, so don't put real data in it.
+
+| Username | Password | Account |
+|---|---|---|
+| `lars.eklund` | `demopass2026` | MSP staff at Northwind IT |
+| `admin@helixbio.com` | `demopass2026` | Administrator for HelixBio's tenants |
+| `niklas.jung@helixbio.com` | `demopass2026` | Regular employee at HelixBio |
 
 ## What ITAMbox covers
 
@@ -57,7 +67,7 @@ Start with [DEVELOPMENT.md](DEVELOPMENT.md) for implementation conventions.
 
 ## Evaluate from source
 
-The documented evaluation path uses development settings. Use the currently qualified Python 3.12 interpreter, Node.js 20, and PostgreSQL 15 or newer. Use a fresh database and a PostgreSQL role that can create test databases and install the `btree_gist` extension.
+The documented evaluation path uses development settings with Python 3.12 (the currently qualified interpreter), Node.js 20, and PostgreSQL 15 or newer. Use a fresh database and a PostgreSQL role that can create test databases and install the `btree_gist` extension.
 
 ```bash
 git clone https://github.com/itambox/itambox-webapp.git
@@ -102,15 +112,13 @@ Configure the reverse proxy, TLS, and port restriction before starting the long-
 docker compose up -d
 ```
 
-Existing deployments that use the Beta report-template designer must set
+Deployments that use the Beta report-template designer must set
 `ITAMBOX_FEATURE_REPORT_DESIGNER=True` before upgrading; it is disabled by
-default. The curated catalogue is unaffected. While the flag is `False`, the
-designer and schedule UI/routes remain closed and scheduled delivery is skipped
-for non-grandfathered templates; the migration-managed bounded grandfathered set
-continues to render and deliver so existing legacy schedules are not broken.
-Saved schedules are not deleted, and grandfathered templates are read-only until
-the flag is enabled. A fresh deployment must enable the designer before it can
-author a template or use scheduled delivery.
+default. With the flag off, the designer and schedule UI stay closed, scheduled
+delivery is skipped for non-grandfathered templates, and the migration-managed
+grandfathered set stays read-only. Saved schedules are not deleted, and the
+curated catalogue is unaffected. A fresh deployment has to enable the designer
+before it can author templates or use scheduled delivery.
 
 Back up PostgreSQL, uploaded media, `ITAMBOX_SECRET_KEY`, `ITAMBOX_FIELD_ENCRYPTION_KEYS`, and `ITAMBOX_API_TOKEN_PEPPERS` together. Follow the [installation guide](itambox/docs/operations/installation.md), [backup and restore guide](itambox/docs/operations/backup-restore.md), and [upgrade guide](itambox/docs/operations/upgrades.md).
 
@@ -136,7 +144,7 @@ npm run typecheck
 npx eslint static/src
 ```
 
-The full pytest suite is not xdist-safe; run it serially. [CONTRIBUTING.md](CONTRIBUTING.md) documents change-specific checks, Playwright prerequisites, and the isolated production smoke test.
+The test suite splits into a parallel xdist lane (`pytest -n auto -m 'not serial_only'`) and a serial-only lane; run both before opening a pull request. [CONTRIBUTING.md](CONTRIBUTING.md) documents the marker rules, change-specific checks, Playwright prerequisites, and the isolated production smoke test.
 
 ## Documentation
 
