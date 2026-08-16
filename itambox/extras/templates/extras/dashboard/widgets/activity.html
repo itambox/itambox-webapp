@@ -19,17 +19,20 @@
         {% for change in recent_changes %}
           <tr>
             {# Time — monospace, scannable #}
-            <td class="text-nowrap text-secondary csp-style-b4738e7da8fe">{{ change.time|date:"Y-m-d H:i" }}</td>
+            <td class="text-nowrap text-secondary csp-style-b4738e7da8fe"
+                data-label="{% translate "Time" %}">{{ change.time|date:"Y-m-d H:i" }}</td>
             {# Username #}
-            <td class="text-nowrap csp-style-3d8f225b32ca">
+            <td class="text-nowrap csp-style-3d8f225b32ca"
+                data-label="{% translate "User" %}">
               <span class="fw-medium">{{ change.user_name }}</span>
             </td>
             {# Full name (resolved from the user FK when it still exists) #}
-            <td class="text-nowrap text-secondary d-none d-lg-table-cell csp-style-1e5172f54813">
+            <td class="text-nowrap text-secondary d-none d-lg-table-cell csp-style-1e5172f54813"
+                data-label="{% translate "Full Name" %}">
               {% if change.user %}{{ change.user.get_full_name|default:"—" }}{% else %}—{% endif %}
             </td>
             {# Action — plain bg-* badges; the soft-badge overlay styles them #}
-            <td class="csp-style-adad3d83de12">
+            <td class="csp-style-adad3d83de12" data-label="{% translate "Action" %}">
               {% if change.action == 'create' %}
                 <span class="badge bg-success">{% translate "Created" %}</span>
               {% elif change.action == 'update' %}
@@ -39,9 +42,11 @@
               {% endif %}
             </td>
             {# Object type #}
-            <td class="text-nowrap text-secondary csp-style-392c68093a4d">{{ change.changed_object_type.name|title }}</td>
+            <td class="text-nowrap text-secondary csp-style-392c68093a4d"
+                data-label="{% translate "Type" %}">{{ change.changed_object_type.name|title }}</td>
             {# Object link #}
-            <td class="text-nowrap text-truncate pe-0 csp-style-e04aaf3f844a">
+            <td class="text-nowrap text-truncate pe-0 csp-style-e04aaf3f844a"
+                data-label="{% translate "Object" %}">
               {% if change.changed_object and change.get_changed_object_url %}
                 <a href="{{ change.get_changed_object_url }}"
                    class="fw-medium text-decoration-none">{{ change.object_repr }}</a>
@@ -51,6 +56,7 @@
             </td>
             {# Request ID — correlate all changes from one request #}
             <td class="text-nowrap text-secondary d-none d-xxl-table-cell csp-style-36577e76c936"
+                data-label="{% translate "Request ID" %}"
                 title="{{ change.request_id }}">{{ change.request_id }}</td>
           </tr>
         {% endfor %}
