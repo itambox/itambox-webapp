@@ -7,6 +7,7 @@ from django.utils.decorators import method_decorator
 from django.utils.translation import gettext_lazy as _
 from django.views.decorators.csrf import csrf_exempt
 from graphene_django.views import GraphQLView
+from graphql.validation import specified_rules
 from rest_framework import exceptions
 
 from itambox.api.authentication import TokenAuthentication
@@ -192,7 +193,6 @@ class PrivateGraphQLView(GraphQLView):
 
     def __init__(self, *args, **kwargs):
         from graphene.validation import depth_limit_validator
-        from graphql.validation import specified_rules
 
         rules = list(specified_rules)
         rules.append(depth_limit_validator(max_depth=10))

@@ -1823,12 +1823,6 @@
     },
     {
       "path": "itambox/core/views/graphql.py",
-      "context": "ClassDef:PrivateGraphQLView/FunctionDef:__init__",
-      "statement": "from graphql.validation import NoSchemaIntrospectionCustomRule, specified_rules",
-      "count": 1
-    },
-    {
-      "path": "itambox/core/views/graphql.py",
       "context": "ClassDef:PrivateGraphQLView/FunctionDef:dispatch",
       "statement": "from django.middleware.csrf import CsrfViewMiddleware",
       "count": 1
