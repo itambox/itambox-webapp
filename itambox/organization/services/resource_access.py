@@ -136,10 +136,15 @@ def visible_to_containers(
 
     if user.is_superuser:
         return qs
-    container_ids = _resource_grant_container_ids(user, perm, request=request)
-    if container_ids is None or not container_ids:
-        return qs.none()
-    allowed = list(container_ids)
+    candidate_ids = accessible_tenant_ids(user)
+    allowed = [
+        tenant.pk
+        for tenant in Tenant._base_manager.filter(
+            pk__in=candidate_ids,
+            deleted_at__isnull=True,
+        )
+        if user.has_perm(perm, obj=tenant)
+    ]
     field_names = {field.name for field in model._meta.get_fields()}
     if "tenant" in field_names:
         return qs.filter(tenant_id__in=allowed)
