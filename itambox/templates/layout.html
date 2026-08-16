@@ -177,7 +177,7 @@
                aria-label="{% translate 'Page header' %}">
             <div id="breadcrumbs-block">{% include 'global_includes/_breadcrumbs.html' %}</div>
             <div class="row g-2 align-items-center mt-2">
-              <div class="col">
+              <div class="col-12 col-lg">
                 {% block page_header %}
                   <div id="page-header-block">
                     <div class="page-pretitle">{% translate "Overview" %}</div>
@@ -185,7 +185,7 @@
                   </div>
                 {% endblock %}
               </div>
-              <div class="col-auto ms-auto d-print-none">
+              <div class="col-12 col-lg-auto ms-lg-auto d-print-none">
                 {% block page_actions %}<div id="page-actions-block"></div>{% endblock %}
               </div>
             </div>
