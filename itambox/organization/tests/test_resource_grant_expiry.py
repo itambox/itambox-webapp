@@ -39,6 +39,7 @@ from core.tasks.utils import RetryableTaskError, TaskStatus, TerminalTaskError
 from core.tests.mixins import TenantTestMixin
 from extras.models import Event
 from inventory.models import Accessory, AccessoryStock
+from organization.admin import TenantResourceGrantExpiryRevocationAdmin
 from organization.models import (
     Location,
     Membership,
@@ -52,7 +53,6 @@ from organization.models import (
     TenantResourceGrantExpiryRevocation,
     TenantResourceGrantExpiryRun,
 )
-from organization.admin import TenantResourceGrantExpiryRevocationAdmin
 from organization.services.resource_grants import (
     InvalidResourceGrantError,
     _validate_expiry_candidate,
@@ -699,9 +699,7 @@ class ResourceGrantExpiryCandidateValidationTests(TenantTestMixin, TestCase):
             slug="candidate-validation-owner",
             permissions=["organization.delete_tenantresourcegrant"],
         )
-        self.grantee = Tenant.objects.create(
-            name="Candidate Validation Grantee", slug="candidate-validation-grantee"
-        )
+        self.grantee = Tenant.objects.create(name="Candidate Validation Grantee", slug="candidate-validation-grantee")
         self.approved_type = ContentType.objects.get_for_model(AccessoryStock)
         self.foreign_type = ContentType.objects.get_for_model(Accessory)
 
@@ -737,9 +735,7 @@ class ResourceGrantExpiryCandidateValidationTests(TenantTestMixin, TestCase):
         cutoff = timezone.now()
         self.assertFalse(_validate_expiry_candidate(self._candidate(valid_until=None), cutoff=cutoff))
         self.assertFalse(
-            _validate_expiry_candidate(
-                self._candidate(valid_until=cutoff + datetime.timedelta(hours=1)), cutoff=cutoff
-            )
+            _validate_expiry_candidate(self._candidate(valid_until=cutoff + datetime.timedelta(hours=1)), cutoff=cutoff)
         )
         self.assertTrue(
             _validate_expiry_candidate(
@@ -762,7 +758,10 @@ class ResourceGrantExpiryServiceGuardTests(TenantTestMixin, TestCase):
         )
         manufacturer = Manufacturer.objects.create(name="Service Guard Manufacturer", slug="service-guard-manufacturer")
         accessory = Accessory.objects.create(
-            name="Service Guard Accessory", slug="service-guard-accessory", tenant=self.tenant, manufacturer=manufacturer
+            name="Service Guard Accessory",
+            slug="service-guard-accessory",
+            tenant=self.tenant,
+            manufacturer=manufacturer,
         )
         stock = AccessoryStock.objects.create(accessory=accessory, location=location, qty=2)
         self.content_type = ContentType.objects.get_for_model(AccessoryStock)
@@ -922,7 +921,10 @@ class ResourceGrantRestoreGuardTests(TenantTestMixin, TestCase):
         )
         manufacturer = Manufacturer.objects.create(name="Restore Guard Manufacturer", slug="restore-guard-manufacturer")
         accessory = Accessory.objects.create(
-            name="Restore Guard Accessory", slug="restore-guard-accessory", tenant=self.tenant, manufacturer=manufacturer
+            name="Restore Guard Accessory",
+            slug="restore-guard-accessory",
+            tenant=self.tenant,
+            manufacturer=manufacturer,
         )
         stock = AccessoryStock.objects.create(accessory=accessory, location=location, qty=2)
         self.content_type = ContentType.objects.get_for_model(AccessoryStock)
@@ -980,7 +982,9 @@ class ResourceGrantRestoreGuardTests(TenantTestMixin, TestCase):
                 valid_until=None,
             )
         foreign = Tenant.objects.create(name="Restore Guard Foreign", slug="restore-guard-foreign")
-        foreign_grantee = Tenant.objects.create(name="Restore Guard Foreign Grantee", slug="restore-guard-foreign-grantee")
+        foreign_grantee = Tenant.objects.create(
+            name="Restore Guard Foreign Grantee", slug="restore-guard-foreign-grantee"
+        )
         foreign_grant = TenantResourceGrant(
             tenant=foreign,
             grantee_tenant=foreign_grantee,
@@ -1021,9 +1025,14 @@ class ResourceGrantRestoreCommandGuardTests(TenantTestMixin, TestCase):
         location = Location.objects.create(
             name="Restore Command Location", slug="restore-command-location", site=site, tenant=self.tenant
         )
-        manufacturer = Manufacturer.objects.create(name="Restore Command Manufacturer", slug="restore-command-manufacturer")
+        manufacturer = Manufacturer.objects.create(
+            name="Restore Command Manufacturer", slug="restore-command-manufacturer"
+        )
         accessory = Accessory.objects.create(
-            name="Restore Command Accessory", slug="restore-command-accessory", tenant=self.tenant, manufacturer=manufacturer
+            name="Restore Command Accessory",
+            slug="restore-command-accessory",
+            tenant=self.tenant,
+            manufacturer=manufacturer,
         )
         stock = AccessoryStock.objects.create(accessory=accessory, location=location, qty=2)
         content_type = ContentType.objects.get_for_model(AccessoryStock)
@@ -1042,13 +1051,9 @@ class ResourceGrantRestoreCommandGuardTests(TenantTestMixin, TestCase):
 
     def test_command_rejects_unresolvable_tenant_and_user(self):
         with self.assertRaises(CommandError):
-            call_command(
-                "restore_resource_grant", grant=1, tenant=999_999, user=self.tenant_user.pk, confirm=True
-            )
+            call_command("restore_resource_grant", grant=1, tenant=999_999, user=self.tenant_user.pk, confirm=True)
         with self.assertRaises(CommandError):
-            call_command(
-                "restore_resource_grant", grant=1, tenant=self.tenant.pk, user=999_999, confirm=True
-            )
+            call_command("restore_resource_grant", grant=1, tenant=self.tenant.pk, user=999_999, confirm=True)
 
     def test_command_rejects_invalid_deadline_values(self):
         with self.assertRaises(CommandError):
@@ -1089,10 +1094,10 @@ class ResourceGrantExpiryIdentityImmutabilityTests(TenantTestMixin, TestCase):
             slug="identity-immutability-owner",
             permissions=["organization.delete_tenantresourcegrant"],
         )
-        self.grantee = Tenant.objects.create(
-            name="Identity Immutability Grantee", slug="identity-immutability-grantee"
+        self.grantee = Tenant.objects.create(name="Identity Immutability Grantee", slug="identity-immutability-grantee")
+        site = Site.objects.create(
+            name="Identity Immutability Site", slug="identity-immutability-site", tenant=self.tenant
         )
-        site = Site.objects.create(name="Identity Immutability Site", slug="identity-immutability-site", tenant=self.tenant)
         location = Location.objects.create(
             name="Identity Immutability Location", slug="identity-immutability-location", site=site, tenant=self.tenant
         )
@@ -1198,9 +1203,7 @@ class ResourceGrantExpiryAdminAndTableTests(TenantTestMixin, TestCase):
         )
 
     def test_admin_queryset_applies_integrity_valid(self):
-        admin_instance = TenantResourceGrantExpiryRevocationAdmin(
-            TenantResourceGrantExpiryRevocation, admin.site
-        )
+        admin_instance = TenantResourceGrantExpiryRevocationAdmin(TenantResourceGrantExpiryRevocation, admin.site)
         request = RequestFactory().get("/admin/")
         qs = admin_instance.get_queryset(request)
         self.assertIn(self.evidence.pk, set(qs.values_list("pk", flat=True)))

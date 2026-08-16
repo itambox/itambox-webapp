@@ -301,9 +301,7 @@ class ResourceGrantExpiryRunScopeTests(ResourceGrantViewWorld):
 
     def test_group_scope_superuser_sees_group_tenants(self):
         group = TenantGroup.objects.create(name="RGV Scope Group", slug="rgv-scope-group")
-        group_tenant = Tenant.objects.create(
-            name="RGV Scope Group Tenant", slug="rgv-scope-group-tenant", group=group
-        )
+        group_tenant = Tenant.objects.create(name="RGV Scope Group Tenant", slug="rgv-scope-group-tenant", group=group)
         superuser = User.objects.create_superuser(username="rgv-scope-group-su", password="x")
         set_current_tenant_group(group)
         self.assertEqual(_run_owner_ids(self._request(superuser)), {group_tenant.pk})

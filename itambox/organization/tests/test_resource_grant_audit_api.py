@@ -702,9 +702,7 @@ class ResourceGrantContainerResolutionTests(TestCase):
             name="Container Group Tenant", slug="container-group-tenant", group=self.group
         )
         self.user = get_user_model().objects.create_user(username="container-user", password="password")
-        self.superuser = get_user_model().objects.create_superuser(
-            username="container-superuser", password="password"
-        )
+        self.superuser = get_user_model().objects.create_superuser(username="container-superuser", password="password")
 
     def tearDown(self):
         set_current_tenant(None)
