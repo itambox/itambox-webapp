@@ -23,11 +23,14 @@ inaccessible or soft-deleted tenant.
 """
 
 import uuid
-from datetime import date, timedelta
+from datetime import date, datetime, timedelta
+from types import SimpleNamespace
+from uuid import uuid4
 
 from django.contrib.auth import get_user_model
 from django.contrib.contenttypes.models import ContentType
-from django.test import RequestFactory, TestCase
+from django.template.loader import render_to_string
+from django.test import RequestFactory, SimpleTestCase, TestCase
 from django.urls import reverse
 from django.utils import timezone
 
@@ -755,3 +758,25 @@ class DashboardViewAllAccessibleGetTests(TestCase):
             r'widget-count-label">Assets</span>\s*<span class="widget-count-value">3<',
         )
         self.assertIn("Zulu Hidden Board", content)
+
+
+class ChangelogActivityTemplateTests(SimpleTestCase):
+    def test_rendered_change_log_cells_have_mobile_labels(self):
+        change = SimpleNamespace(
+            time=datetime(2026, 8, 16, 12, 34),
+            user_name="qonTrixz",
+            user=None,
+            action="update",
+            changed_object_type=SimpleNamespace(name="asset"),
+            changed_object=None,
+            object_repr="Asset 1",
+            request_id=uuid4(),
+        )
+
+        rendered = render_to_string(
+            "extras/dashboard/widgets/activity.html",
+            {"recent_changes": [change]},
+        )
+
+        for label in ("Time", "User", "Full Name", "Action", "Type", "Object", "Request ID"):
+            self.assertIn('data-label="{}"'.format(label), rendered)
