@@ -195,7 +195,7 @@ GET /api/assets/asset-assignments/?assigned_user_id=42&is_active=true
 
 ## GraphQL API
 
-The GraphQL endpoint is `/graphql/`. Authenticated users can open the built-in GraphiQL UI with a GET request, including in production; unauthenticated users are redirected to login. POST requests accept the same `Authorization: Token ***` header as REST. GraphiQL and its built-in documentation explorer are bundled locally into `static/dist/vendor/graphiql/` by `npm run build:vendor`/`npm run build`, so the UI has no runtime CDN dependency. Schema introspection is available only with development settings; production keeps the schema itself non-introspectable.
+The GraphQL endpoint is `/graphql/`. Authenticated users can open the built-in GraphiQL UI with a GET request, including in production; unauthenticated users are redirected to login. POST requests accept the same `Authorization: Token ***` header as REST. GraphiQL and its built-in documentation explorer are bundled locally into `static/dist/vendor/graphiql/` by `npm run build:vendor`/`npm run build`, so the UI has no runtime CDN dependency. Schema introspection is available to authenticated users in every environment, including production (the schema is not a secret; the endpoint stays auth-gated), which powers GraphiQL's docs explorer and autocompletion.
 
 The built-in schema is list-based rather than Relay connection-based. Asset queries accept `limit`, `offset`, `sortBy`, and explicit filters such as `name`, `assetTag`, `serialNumber`, `statusId`, and `locationId`.
 

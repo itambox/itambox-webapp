@@ -201,6 +201,7 @@ PYTHONPATH=itambox uv run --locked --group dev python -m pytest -q -p no:cachepr
   itambox/assets/tests/test_tables_category.py \
   itambox/assets/tests/test_requests.py \
   itambox/assets/tests/test_scanning.py \
+  itambox/assets/tests/test_sec_graphql.py \
   itambox/core/tests/test_alert_views.py \
   itambox/core/tests/test_import_boundaries.py \
   itambox/core/tests/test_csp_nonce_context.py \

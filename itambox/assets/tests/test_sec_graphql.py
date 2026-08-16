@@ -19,8 +19,8 @@ _MIDDLEWARE_NO_TOOLBAR = [m for m in settings.MIDDLEWARE if m != "debug_toolbar.
 
 
 class GraphQLSecurityTestCase(TestCase):
-    """Security guarantees of the GraphQL endpoint: introspection gating (F11)
-    and the query-complexity / cost budget that bounds nested fan-out (F10)."""
+    """Security guarantees of the GraphQL endpoint: introspection availability
+    (F11) and the query-complexity / cost budget that bounds nested fan-out (F10)."""
 
     def setUp(self):
         # Unique fixture names/slugs ('-secgql') so this file can run in the
@@ -76,24 +76,23 @@ class GraphQLSecurityTestCase(TestCase):
             HTTP_AUTHORIZATION=f"Token {self.token.key}",
         )
 
-    # --- F11: introspection must be blocked when DEBUG is off -------------
+    # --- F11: introspection is available in every environment -------------
 
     @override_settings(DEBUG=False, MIDDLEWARE=_MIDDLEWARE_NO_TOOLBAR)
-    def test_introspection_blocked_when_debug_false(self):
+    def test_introspection_allowed_when_debug_false(self):
+        # The schema is not a secret: introspection stays available with DEBUG
+        # off so GraphiQL's docs explorer and autocompletion work in production
+        # (NetBox model). Only authentication gates the endpoint.
         query = "{ __schema { types { name } } }"
         response = self._post(query)
-        # A validation-rule rejection (introspection disabled) returns HTTP 400
-        # with the error in the GraphQL response body.
-        self.assertEqual(response.status_code, 400)
+        self.assertEqual(response.status_code, 200)
         res_data = response.json()
-        self.assertIn("errors", res_data)
-        combined = " ".join(e.get("message", "") for e in res_data["errors"]).lower()
-        self.assertIn("introspection", combined)
+        self.assertNotIn("errors", res_data)
+        self.assertTrue(res_data["data"]["__schema"]["types"])
 
     @override_settings(DEBUG=True, MIDDLEWARE=_MIDDLEWARE_NO_TOOLBAR)
     def test_introspection_allowed_when_debug_true(self):
-        # The complement: with DEBUG on, the NoSchemaIntrospectionCustomRule is
-        # not wired, so introspection succeeds. Guards against the gate flipping.
+        # DEBUG on behaves identically: introspection succeeds.
         query = "{ __schema { types { name } } }"
         response = self._post(query)
         self.assertEqual(response.status_code, 200)

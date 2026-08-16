@@ -192,7 +192,7 @@ class PrivateGraphQLView(GraphQLView):
 
     def __init__(self, *args, **kwargs):
         from graphene.validation import depth_limit_validator
-        from graphql.validation import NoSchemaIntrospectionCustomRule, specified_rules
+        from graphql.validation import specified_rules
 
         rules = list(specified_rules)
         rules.append(depth_limit_validator(max_depth=10))
@@ -203,17 +203,18 @@ class PrivateGraphQLView(GraphQLView):
         # fan-out such as many aliased copies of an expensive list-over-list path.
         rules.append(query_complexity_validator(max_complexity=2000, fan_out=10))
 
-        if not settings.DEBUG:
-            rules.append(NoSchemaIntrospectionCustomRule)
-
+        # Schema introspection is available to authenticated users in every
+        # environment, including production: the schema is not a secret and the
+        # endpoint stays auth-gated, and GraphiQL needs introspection for its
+        # docs explorer and autocompletion (NetBox follows the same model). The
+        # depth/field/complexity budgets above protect the endpoint regardless.
         kwargs["validation_rules"] = rules
         super().__init__(*args, **kwargs)
 
     @property
     def graphiql(self):
         # GET authentication is enforced in dispatch(). Keep the interactive
-        # GraphiQL shell available to authenticated users in production too;
-        # DEBUG only controls schema introspection below.
+        # GraphiQL shell available to authenticated users in production too.
         return True
 
     @graphiql.setter
