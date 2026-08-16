@@ -416,10 +416,31 @@
 
         // Remove all desktop sticky edge-shadow pseudo-elements
         td:first-child::after,
-        td:last-child::before,
         td.col-checkout::before,
         td.col-checkout~td:last-child::before {
             content: none !important;
+        }
+
+        // The desktop right-edge shadow also uses `::before`, but in card mode
+        // that pseudo-element is the field heading. Keep the heading and only
+        // remove the shadow geometry/background.
+        td:last-child::before,
+        td.col-checkout~td:last-child::before {
+            content: attr(data-label) !important;
+            position: static;
+            inset: auto;
+            width: auto;
+            height: auto;
+            background: none !important;
+        }
+
+        // The dark-theme sticky shadow has higher specificity than the generic
+        // mobile reset above; explicitly neutralize it in dark card mode too.
+        [data-bs-theme="dark"] & {
+            td:last-child::before,
+            td.col-checkout~td:last-child::before {
+                background: none !important;
+            }
         }
 
         // Cells with no header (checkbox, actions, checkout): drop the empty label
