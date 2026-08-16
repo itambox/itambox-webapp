@@ -4,6 +4,7 @@ import * as path from 'path';
 
 const repoRoot = path.resolve(__dirname, '../../../../..');
 const brandTemplatePath = path.join(repoRoot, 'itambox', 'templates/global_includes/_brand_lockup.html');
+const layoutTemplatePath = path.join(repoRoot, 'itambox/templates/layout.html');
 const tablerCssPath = path.join(repoRoot, 'itambox/static/dist/vendor/tabler/css/tabler.min.css');
 const itamboxCssPath = path.join(repoRoot, 'itambox/static/dist/itambox.css');
 
@@ -23,6 +24,29 @@ function renderedBrand(): string {
     .slice(svgStart, svgEnd + '</svg>'.length)
     .replace(/\s+\{\{\s*brand_style\.class_name\s*\}\}/, '');
 }
+
+test('mobile offcanvas header uses quick search instead of a visible menu title', () => {
+  const layout = fs.readFileSync(layoutTemplatePath, 'utf8');
+  const headerStart = layout.indexOf('<div class="offcanvas-header');
+  const headerEnd = layout.indexOf('\n          </div>', headerStart);
+  const bodyStart = layout.indexOf('<div class="offcanvas-body');
+  const bodyEnd = layout.indexOf('\n          </div>', bodyStart);
+
+  expect(headerStart).toBeGreaterThanOrEqual(0);
+  expect(headerEnd).toBeGreaterThan(headerStart);
+  expect(bodyStart).toBeGreaterThan(headerEnd);
+  expect(bodyEnd).toBeGreaterThan(bodyStart);
+
+  const header = layout.slice(headerStart, headerEnd);
+  const body = layout.slice(bodyStart, bodyEnd);
+
+  expect(header).not.toContain('offcanvas-title');
+  expect(header).toContain('hx-get="{% url \'search\' %}"');
+  expect(header).toContain('aria-label="{% translate \'Search\' %}"');
+  expect(header.indexOf('hx-get="{% url \'search\' %}"')).toBeLessThan(header.indexOf('data-bs-dismiss="offcanvas"'));
+  expect(body).not.toContain('hx-get="{% url \'search\' %}"');
+  expect(layout).toContain('aria-label="{% translate \'Navigation\' %}"');
+});
 
 async function mountMobileHeader(page: import('@playwright/test').Page, width: number) {
   await page.setViewportSize({ width, height: 740 });
