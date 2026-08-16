@@ -43,6 +43,14 @@ class DjangoTables2TemplateCompatibilityTests(unittest.TestCase):
         self.assertIn("selectAllCb.disabled", batch_source)
         self.assertIn(".mobile-select-all__label", table_styles)
 
+    def test_page_header_stacks_title_and_actions_on_mobile(self):
+        template_root = Path(__file__).resolve().parents[2]
+        for template_name in ("layout.html", "base_htmx.html"):
+            template = (template_root / "templates" / template_name).read_text(encoding="utf-8")
+
+            self.assertIn('<div class="col-12 col-lg">', template)
+            self.assertIn('<div class="col-12 col-lg-auto ms-lg-auto d-print-none">', template)
+
     def test_issue260_responsive_shell_contract_is_declared(self):
         template_root = Path(__file__).resolve().parents[2]
         layout = (template_root / "templates" / "layout.html").read_text(encoding="utf-8")

@@ -33,7 +33,7 @@
     <div id="breadcrumbs-block">{% include 'global_includes/_breadcrumbs.html' %}</div>
     {# End Breadcrumbs #}
     <div class="row g-2 align-items-center mt-2">
-      <div class="col">
+      <div class="col-12 col-lg">
         <div id="page-header-block">
           {% block page_header %}
             <div class="page-pretitle">{% block page_pretitle %}{{ page_pretitle|default:"Overview" }}{% endblock %}</div>
@@ -42,7 +42,7 @@
         </div>
       </div>
       <!-- Page title actions -->
-      <div class="col-auto ms-auto d-print-none">
+      <div class="col-12 col-lg-auto ms-lg-auto d-print-none">
         {% block page_actions %}<div id="page-actions-block"></div>{% endblock %}
       </div>
     </div>
