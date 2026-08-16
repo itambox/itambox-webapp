@@ -540,19 +540,17 @@ class TenantResourceGrantExpiryRevocationTable(BaseTable):
     triggering_valid_until = tables.DateTimeColumn(verbose_name=_("Deadline"), format="Y-m-d H:i")
     revoked_at = tables.DateTimeColumn(verbose_name=_("Revoked"), format="Y-m-d H:i")
     request_id = tables.Column(verbose_name=_("Request ID"))
-    object_change = tables.Column(verbose_name=_("Audit change"))
+    object_change = tables.Column(verbose_name=_("Audit change"), empty_values=())
 
     class Meta(BaseTable.Meta):
         model = TenantResourceGrantExpiryRevocation
         fields = ("grant_id", "triggering_valid_until", "revoked_at", "request_id", "object_change")
         default_columns = fields
 
-    def render_grant_id(self, record):
-        return format_html(
-            '<a href="{}">{}</a>', f"/api/organization/resource-grant-audit/{record.grant_id}/", record.grant_id
-        )
+    def render_grant_id(self, value, record):
+        return format_html('<a href="{}">{}</a>', f"/api/organization/resource-grant-audit/{value}/", value)
 
-    def render_object_change(self, record):
-        if record.object_change_id is None:
+    def render_object_change(self, value, record):
+        if value is None:
             return _("Retained evidence; audit change pruned")
-        return format_html('<a href="{}">{}</a>', record.object_change.get_absolute_url(), record.object_change_id)
+        return format_html('<a href="{}">{}</a>', value.get_absolute_url(), value.pk)

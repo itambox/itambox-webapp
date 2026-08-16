@@ -6,6 +6,7 @@ from unittest.mock import patch
 import pytest
 from django.contrib import admin
 from django.contrib.auth import get_user_model
+from django.contrib.auth.models import AnonymousUser
 from django.contrib.contenttypes.models import ContentType
 from django.core.exceptions import PermissionDenied, ValidationError
 from django.core.management import call_command
@@ -1178,35 +1179,35 @@ class ResourceGrantExpiryAdminAndTableTests(TenantTestMixin, TestCase):
         )
         stock = AccessoryStock.objects.create(accessory=accessory, location=location, qty=2)
         content_type = ContentType.objects.get_for_model(AccessoryStock)
+        cutoff = timezone.now()
         grant = TenantResourceGrant(
             tenant=self.tenant,
             grantee_tenant=grantee,
             resource_type=content_type,
             resource_id=stock.pk,
             access_level=TenantResourceGrant.ACCESS_VIEW,
+            valid_until=cutoff - datetime.timedelta(minutes=1),
         )
         grant.save()
         self.grant = grant
-        cutoff = timezone.now()
         self.run = TenantResourceGrantExpiryRun._base_manager.create(
             tenant=self.tenant,
             schedule_slot=cutoff.replace(minute=0, second=0, microsecond=0),
             cutoff=cutoff,
             dispatch_stale_at=cutoff + datetime.timedelta(minutes=1),
         )
-        self.evidence = TenantResourceGrantExpiryRevocation._base_manager.create(
-            run=self.run,
-            grant=grant,
-            triggering_valid_until=cutoff,
-            revoked_at=cutoff,
-            request_id=uuid.uuid4(),
-        )
+
+    def _sweep(self):
+        with self.captureOnCommitCallbacks(execute=True):
+            sweep_expired_resource_grants(self.tenant.pk, self.run.pk, 1)
+        return TenantResourceGrantExpiryRevocation._base_manager.get(grant=self.grant)
 
     def test_admin_queryset_applies_integrity_valid(self):
+        evidence = self._sweep()
         admin_instance = TenantResourceGrantExpiryRevocationAdmin(TenantResourceGrantExpiryRevocation, admin.site)
         request = RequestFactory().get("/admin/")
         qs = admin_instance.get_queryset(request)
-        self.assertIn(self.evidence.pk, set(qs.values_list("pk", flat=True)))
+        self.assertIn(evidence.pk, set(qs.values_list("pk", flat=True)))
         # A corrupt row (foreign run tenant) drops out of the admin view.
         foreign = Tenant.objects.create(name="Admin Table Foreign", slug="admin-table-foreign")
         foreign_run = TenantResourceGrantExpiryRun._base_manager.create(
@@ -1228,14 +1229,17 @@ class ResourceGrantExpiryAdminAndTableTests(TenantTestMixin, TestCase):
     def test_revocation_table_renders_link_and_retained_branches(self):
         from organization.tables import TenantResourceGrantExpiryRevocationTable
 
+        evidence = self._sweep()
         request = RequestFactory().get("/")
-        table = TenantResourceGrantExpiryRevocationTable([self.evidence])
-        html = table.as_html(request)
+        request.user = AnonymousUser()
+        # Link branches: the grant audit link and the bound audit change link.
+        html = TenantResourceGrantExpiryRevocationTable([evidence]).as_html(request)
         self.assertIn(f"resource-grant-audit/{self.grant.pk}/", html)
+        self.assertIn(evidence.object_change.get_absolute_url(), html)
         # A pruned audit change renders the retained-evidence branch.
-        TenantResourceGrantExpiryRevocation._base_manager.filter(pk=self.evidence.pk).update(object_change=None)
-        self.evidence.refresh_from_db()
-        html = TenantResourceGrantExpiryRevocationTable([self.evidence]).as_html(request)
+        TenantResourceGrantExpiryRevocation._base_manager.filter(pk=evidence.pk).update(object_change=None)
+        evidence.refresh_from_db()
+        html = TenantResourceGrantExpiryRevocationTable([evidence]).as_html(request)
         self.assertIn("Retained evidence", html)
 
 
