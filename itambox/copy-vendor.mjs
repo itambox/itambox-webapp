@@ -4,7 +4,7 @@
  * Copies CSS/JS/font/image files from node_modules into static/dist/vendor/
  * so they can be served via Django's static files without exposing node_modules.
  */
-import { cpSync, mkdirSync } from 'fs';
+import { cpSync, mkdirSync, rmSync } from 'fs';
 import { dirname } from 'path';
 import { fileURLToPath } from 'url';
 
@@ -20,6 +20,7 @@ mkdirSync(dist('gridstack'), { recursive: true });
 mkdirSync(dist('mdi/css'), { recursive: true });
 mkdirSync(dist('mdi/fonts'), { recursive: true });
 mkdirSync(dist('inter'), { recursive: true });
+rmSync(dist('graphiql'), { recursive: true, force: true });
 mkdirSync(dist('graphiql'), { recursive: true });
 
 // --- CSS ---
@@ -73,17 +74,7 @@ cpSync('node_modules/apexcharts/dist/apexcharts.min.js', dist('apexcharts.min.js
 cpSync('node_modules/html5-qrcode/html5-qrcode.min.js', dist('html5-qrcode.min.js'));
 
 // GraphiQL UI (served locally; no runtime CDN dependency)
-cpSync('node_modules/graphiql/graphiql.min.css', dist('graphiql/graphiql.min.css'));
-cpSync('node_modules/@graphiql/plugin-explorer/dist/style.css', dist('graphiql/plugin-explorer.css'));
-cpSync('node_modules/whatwg-fetch/dist/fetch.umd.js', dist('graphiql/fetch.umd.js'));
-cpSync('node_modules/react/umd/react.production.min.js', dist('graphiql/react.production.min.js'));
-cpSync('node_modules/react-dom/umd/react-dom.production.min.js', dist('graphiql/react-dom.production.min.js'));
-cpSync('node_modules/graphiql/graphiql.min.js', dist('graphiql/graphiql.min.js'));
-cpSync('node_modules/graphql-ws/umd/graphql-ws.min.js', dist('graphiql/graphql-ws.min.js'));
-cpSync(
-  'node_modules/@graphiql/plugin-explorer/dist/graphiql-plugin-explorer.umd.js',
-  dist('graphiql/plugin-explorer.umd.js'),
-);
+cpSync('node_modules/graphiql/dist/style.css', dist('graphiql/graphiql.css'));
 
 // --- Brand assets ---
 mkdirSync(__dirname + '/static/dist/brand', { recursive: true });

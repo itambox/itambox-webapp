@@ -24,7 +24,6 @@
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
-    "@graphiql/plugin-explorer": "^0.1.15",
     "@typescript-eslint/eslint-plugin": "^8.61.1",
     "@typescript-eslint/parser": "^8.65.0",
     "autoprefixer": "^10.5.0",
@@ -32,20 +31,19 @@
     "esbuild": "^0.28.1",
     "eslint": "^10.8.0",
     "globals": "^17.9.0",
-    "graphiql": "^2.4.7",
+    "graphiql": "^5.2.4",
     "graphql-ws": "^5.13.1",
     "openapi-fetch": "0.17.0",
     "openapi-typescript": "6.7.6",
     "postcss": "^8.5.26",
     "postcss-cli": "^11.0.1",
-    "react": "^17.0.2",
-    "react-dom": "^17.0.2",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
     "sass": "^1.80.0",
     "stylelint": "17.14.1",
     "stylelint-config-standard-scss": "17.0.0",
     "typescript": "^6.0.3",
-    "typescript-eslint": "^8.65.0",
-    "whatwg-fetch": "^3.6.2"
+    "typescript-eslint": "^8.65.0"
   },
   "dependencies": {
     "@fontsource-variable/inter": "^5.2.8",

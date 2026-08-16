@@ -223,8 +223,8 @@ class GraphQLTestCase(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "GraphiQL")
         self.assertContains(response, 'nonce="')
-        self.assertContains(response, "dist/vendor/graphiql/graphiql.min.css")
-        self.assertContains(response, "dist/vendor/graphiql/plugin-explorer.umd.js")
+        self.assertContains(response, "dist/vendor/graphiql/graphiql.css")
+        self.assertContains(response, "dist/vendor/graphiql/graphiql-ui.js")
         self.assertNotIn("https://cdn.jsdelivr.net", response.content.decode())
         self.assertNotIn("https://cdn.jsdelivr.net", response["Content-Security-Policy"])
 

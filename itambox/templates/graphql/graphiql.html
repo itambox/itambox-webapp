@@ -8,37 +8,34 @@ add "&raw" to the end of the URL within a browser.
 {% load static %}
 <!DOCTYPE html>
 <html>
-<head>
-  <style nonce="{{ request.csp_nonce }}">
-    html, body, #editor {
-      height: 100%;
-      margin: 0;
-      overflow: hidden;
-      width: 100%;
-    }
-  </style>
-  <link href="{% static 'dist/vendor/graphiql/graphiql.min.css' %}" rel="stylesheet" />
-  <link href="{% static 'dist/vendor/graphiql/plugin-explorer.css' %}" rel="stylesheet" />
-  <script src="{% static 'dist/vendor/graphiql/fetch.umd.js' %}" nonce="{{ request.csp_nonce }}"></script>
-  <script src="{% static 'dist/vendor/graphiql/react.production.min.js' %}" nonce="{{ request.csp_nonce }}"></script>
-  <script src="{% static 'dist/vendor/graphiql/react-dom.production.min.js' %}" nonce="{{ request.csp_nonce }}"></script>
-  <script src="{% static 'dist/vendor/graphiql/graphiql.min.js' %}" nonce="{{ request.csp_nonce }}"></script>
-  <script src="{% static 'dist/vendor/graphiql/graphql-ws.min.js' %}" nonce="{{ request.csp_nonce }}"></script>
-  <script src="{% static 'dist/vendor/graphiql/plugin-explorer.umd.js' %}" nonce="{{ request.csp_nonce }}"></script>
-</head>
-<body>
-  <div id="editor"></div>
-  {% csrf_token %}
-  <script type="application/javascript" nonce="{{ request.csp_nonce }}">
-    window.GRAPHENE_SETTINGS = {
-    {% if subscription_path %}
-      subscriptionPath: "{{subscription_path}}",
-    {% endif %}
-      graphiqlHeaderEditorEnabled: {{ graphiql_header_editor_enabled|yesno:"true,false" }},
-      graphiqlShouldPersistHeaders: {{ graphiql_should_persist_headers|yesno:"true,false" }},
-      graphiqlInputValueDeprecation: {{ graphiql_input_value_deprecation|yesno:"true,false" }},
-    };
-  </script>
-  <script src="{% static 'graphene_django/graphiql.js' %}" nonce="{{ request.csp_nonce }}"></script>
-</body>
+  <head>
+    <link href="{% static 'dist/vendor/graphiql/graphiql.css' %}"
+          rel="stylesheet" />
+    <style nonce="{{ request.csp_nonce }}">
+      html,
+      body,
+      #editor {
+        height: 100%;
+        margin: 0;
+        overflow: hidden;
+        width: 100%;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="editor"></div>
+    {% csrf_token %}
+    <script type="application/javascript" nonce="{{ request.csp_nonce }}">
+      window.GRAPHENE_SETTINGS = {
+      {% if subscription_path %}
+        subscriptionPath: "{{ subscription_path }}",
+      {% endif %}
+        graphiqlHeaderEditorEnabled: {{ graphiql_header_editor_enabled|yesno:"true,false" }},
+        graphiqlShouldPersistHeaders: {{ graphiql_should_persist_headers|yesno:"true,false" }},
+        graphiqlInputValueDeprecation: {{ graphiql_input_value_deprecation|yesno:"true,false" }},
+      };
+    </script>
+    <script src="{% static 'dist/vendor/graphiql/graphiql-ui.js' %}"
+            nonce="{{ request.csp_nonce }}"></script>
+  </body>
 </html>
