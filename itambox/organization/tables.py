@@ -488,7 +488,7 @@ class TenantResourceGrantTable(BaseTable):
 
 class TenantResourceGrantExpiryRunTable(BaseTable):
     schedule_slot = tables.LinkColumn(
-        "organization:tenantresourcegrantexpiry_run_detail",
+        "organization:tenantresourcegrantexpiryrun_detail",
         args=[A("pk")],
         verbose_name=_("Schedule slot"),
     )

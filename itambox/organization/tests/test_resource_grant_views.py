@@ -8,19 +8,23 @@ tenant; revocation is owner-side only and soft-deletes.
 
 from django.contrib.auth import get_user_model
 from django.contrib.contenttypes.models import ContentType
-from django.test import TestCase
+from django.test import RequestFactory, TestCase
 from django.urls import reverse
 from django.utils import timezone
 
 from assets.models import Manufacturer
+from core.context import set_current_all_accessible, set_current_tenant, set_current_tenant_group
 from core.tests.mixins import TenantTestMixin
 from inventory.models import Accessory, AccessoryStock
 from organization.models import (
     Location,
     Site,
     Tenant,
+    TenantGroup,
     TenantResourceGrant,
+    TenantResourceGrantExpiryRun,
 )
+from organization.views.resource_grant_views import _run_owner_ids
 
 User = get_user_model()
 
@@ -228,3 +232,83 @@ class ResourceGrantRevokeViewTests(ResourceGrantViewWorld):
         self.assertEqual(response.status_code, 404)
         grant.refresh_from_db()
         self.assertIsNone(grant.deleted_at)
+
+    def test_revoking_an_already_revoked_grant_is_404(self):
+        grant = self._make_grant()
+        user = User.objects.create_user(username="rgv-rev3", password="x")
+        self.client_login_to_tenant(user, self.owner, role_permissions=self.PERMS)
+        url = reverse("organization:tenantresourcegrant_delete", kwargs={"pk": grant.pk})
+        self.assertEqual(self.client.post(url, {"confirm": True}).status_code, 302)
+        self.assertEqual(self.client.post(url, {"confirm": True}).status_code, 404)
+
+
+class ResourceGrantExpiryRunViewTests(ResourceGrantViewWorld):
+    PERMS = ["organization.view_tenantresourcegrant"]
+
+    def _run(self, tenant):
+        cutoff = timezone.now()
+        return TenantResourceGrantExpiryRun._base_manager.create(
+            tenant=tenant,
+            schedule_slot=cutoff.replace(minute=0, second=0, microsecond=0),
+            cutoff=cutoff,
+            dispatch_stale_at=cutoff + timezone.timedelta(minutes=1),
+        )
+
+    def test_owner_sees_own_run_in_list_and_detail(self):
+        run = self._run(self.owner)
+        user = User.objects.create_user(username="rgv-run1", password="x")
+        self.client_login_to_tenant(user, self.owner, role_permissions=self.PERMS)
+        list_response = self.client.get(reverse("organization:tenantresourcegrantexpiryrun_list"))
+        self.assertEqual(list_response.status_code, 200)
+        detail_response = self.client.get(
+            reverse("organization:tenantresourcegrantexpiryrun_detail", kwargs={"pk": run.pk})
+        )
+        self.assertEqual(detail_response.status_code, 200)
+        self.assertContains(detail_response, "Resource grant expiry run")
+
+    def test_foreign_run_is_hidden_in_list_and_404_in_detail(self):
+        run = self._run(self.third)
+        user = User.objects.create_user(username="rgv-run2", password="x")
+        self.client_login_to_tenant(user, self.owner, role_permissions=self.PERMS)
+        list_response = self.client.get(reverse("organization:tenantresourcegrantexpiryrun_list"))
+        self.assertEqual(list_response.status_code, 200)
+        self.assertNotContains(list_response, "rgv-third")
+        detail_response = self.client.get(
+            reverse("organization:tenantresourcegrantexpiryrun_detail", kwargs={"pk": run.pk})
+        )
+        self.assertEqual(detail_response.status_code, 404)
+
+
+class ResourceGrantExpiryRunScopeTests(ResourceGrantViewWorld):
+    def tearDown(self):
+        set_current_tenant(None)
+        set_current_tenant_group(None)
+        set_current_all_accessible(False)
+
+    def _request(self, user):
+        request = RequestFactory().get("/")
+        request.user = user
+        request.auth = None
+        return request
+
+    def test_unbound_superuser_scope_is_global(self):
+        superuser = User.objects.create_superuser(username="rgv-scope-su", password="x")
+        self.assertIsNone(_run_owner_ids(self._request(superuser)))
+
+    def test_unbound_regular_user_scope_is_empty(self):
+        user = User.objects.create_user(username="rgv-scope-none", password="x")
+        self.assertEqual(_run_owner_ids(self._request(user)), set())
+
+    def test_group_scope_superuser_sees_group_tenants(self):
+        group = TenantGroup.objects.create(name="RGV Scope Group", slug="rgv-scope-group")
+        group_tenant = Tenant.objects.create(
+            name="RGV Scope Group Tenant", slug="rgv-scope-group-tenant", group=group
+        )
+        superuser = User.objects.create_superuser(username="rgv-scope-group-su", password="x")
+        set_current_tenant_group(group)
+        self.assertEqual(_run_owner_ids(self._request(superuser)), {group_tenant.pk})
+
+    def test_all_accessible_scope_uses_accessible_tenants(self):
+        set_current_all_accessible(True)
+        superuser = User.objects.create_superuser(username="rgv-scope-all-su", password="x")
+        self.assertEqual(_run_owner_ids(self._request(superuser)), set())

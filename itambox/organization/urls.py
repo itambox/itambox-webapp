@@ -113,12 +113,12 @@ urlpatterns = [
     path(
         "resource-grant-expiry-runs/",
         views.TenantResourceGrantExpiryRunListView.as_view(),
-        name="tenantresourcegrantexpiry_run_list",
+        name="tenantresourcegrantexpiryrun_list",
     ),
     path(
         "resource-grant-expiry-runs/<int:pk>/",
         views.TenantResourceGrantExpiryRunDetailView.as_view(),
-        name="tenantresourcegrantexpiry_run_detail",
+        name="tenantresourcegrantexpiryrun_detail",
     ),
     path("cost-centers/", views.CostCenterListView.as_view(), name="costcenter_list"),
     path("cost-centers/add/", views.CostCenterEditView.as_view(), name="costcenter_create"),

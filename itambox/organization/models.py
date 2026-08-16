@@ -1615,7 +1615,7 @@ class TenantResourceGrantExpiryRun(BaseModel):
         return super().save(*args, **kwargs)
 
     def get_absolute_url(self):
-        return reverse("organization:tenantresourcegrantexpiry_run_detail", kwargs={"pk": self.pk})
+        return reverse("organization:tenantresourcegrantexpiryrun_detail", kwargs={"pk": self.pk})
 
 
 class TenantResourceGrantExpiryRevocationQuerySet(TenantScopingQuerySet):

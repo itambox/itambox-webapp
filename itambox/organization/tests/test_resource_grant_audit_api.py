@@ -11,6 +11,7 @@ from rest_framework.test import APIRequestFactory, APITestCase
 
 from assets.models import Manufacturer
 from core.choices import ObjectChangeActionChoices
+from core.context import set_current_all_accessible, set_current_tenant, set_current_tenant_group
 from core.models import ObjectChange
 from core.tasks.context import TaskContext
 from core.tasks.resource_grants import sweep_expired_resource_grants
@@ -33,6 +34,7 @@ from organization.models import (
     TenantResourceGrantExpiryRevocation,
     TenantResourceGrantExpiryRun,
 )
+from organization.services.resource_access import _resource_grant_container_ids
 
 User = get_user_model()
 
@@ -561,3 +563,186 @@ class ResourceGrantAuditAPITests(APITestCase):
         self.assertEqual(data["kind"], "expiry")
         self.assertEqual(data["expiry_run_id"], second_run.pk)
         self.assertNotEqual(data["expiry_run_id"], first_run.pk)
+
+
+class ResourceGrantAuditFilterStateTests(TestCase):
+    def test_filter_state_contract(self):
+        owner = Tenant.objects.create(name="Filter State Owner", slug="filter-state-owner")
+        grantee = Tenant.objects.create(name="Filter State Grantee", slug="filter-state-grantee")
+        site = Site.objects.create(name="Filter State Site", slug="filter-state-site", tenant=owner)
+        location = Location.objects.create(
+            name="Filter State Location", slug="filter-state-location", site=site, tenant=owner
+        )
+        manufacturer = Manufacturer.objects.create(name="Filter State Manufacturer", slug="filter-state-manufacturer")
+        accessory = Accessory.objects.create(
+            name="Filter State Accessory", slug="filter-state-accessory", tenant=owner, manufacturer=manufacturer
+        )
+        stock = AccessoryStock.objects.create(accessory=accessory, location=location, qty=2)
+        accessory_two = Accessory.objects.create(
+            name="Filter State Accessory Two",
+            slug="filter-state-accessory-two",
+            tenant=owner,
+            manufacturer=manufacturer,
+        )
+        stock_two = AccessoryStock.objects.create(accessory=accessory_two, location=location, qty=1)
+        resource_type = ContentType.objects.get_for_model(AccessoryStock)
+        active = TenantResourceGrant(
+            tenant=owner,
+            grantee_tenant=grantee,
+            resource_type=resource_type,
+            resource_id=stock.pk,
+            access_level=TenantResourceGrant.ACCESS_VIEW,
+        )
+        active.save()
+        revoked = TenantResourceGrant(
+            tenant=owner,
+            grantee_tenant=grantee,
+            resource_type=resource_type,
+            resource_id=stock_two.pk,
+            access_level=TenantResourceGrant.ACCESS_VIEW,
+        )
+        revoked.save()
+        TenantResourceGrant._base_manager.filter(pk=revoked.pk).update(deleted_at=timezone.now())
+
+        base = TenantResourceGrant._base_manager.all()
+        active_qs = TenantResourceGrantAuditFilterSet(data={"state": "active"}, queryset=base).qs
+        revoked_qs = TenantResourceGrantAuditFilterSet(data={"state": "revoked"}, queryset=base).qs
+        unknown_qs = TenantResourceGrantAuditFilterSet(data={"state": "bogus"}, queryset=base).qs
+        self.assertEqual(set(active_qs.values_list("pk", flat=True)), {active.pk})
+        self.assertEqual(set(revoked_qs.values_list("pk", flat=True)), {revoked.pk})
+        self.assertEqual(set(unknown_qs.values_list("pk", flat=True)), {active.pk, revoked.pk})
+
+
+class ResourceGrantAuditObjectPermissionTests(TestCase):
+    def test_object_permission_rejects_mutations(self):
+        user = get_user_model().objects.create_user(username="object-perm-user", password="password")
+        request = APIRequestFactory().post("/api/organization/resource-grant-audit/1/")
+        request.user = user
+        request.auth = None
+        permission = TenantResourceGrantAuditPermission()
+        self.assertFalse(permission.has_object_permission(request, None, object()))
+
+
+class ResourceGrantAuditRevocationBranchTests(TestCase):
+    """Serializer branches not exercised through the request pipeline."""
+
+    def setUp(self):
+        self.owner = Tenant.objects.create(name="Revocation Branch Owner", slug="revocation-branch-owner")
+        self.grantee = Tenant.objects.create(name="Revocation Branch Grantee", slug="revocation-branch-grantee")
+        site = Site.objects.create(name="Revocation Branch Site", slug="revocation-branch-site", tenant=self.owner)
+        location = Location.objects.create(
+            name="Revocation Branch Location", slug="revocation-branch-location", site=site, tenant=self.owner
+        )
+        manufacturer = Manufacturer.objects.create(
+            name="Revocation Branch Manufacturer", slug="revocation-branch-manufacturer"
+        )
+        accessory = Accessory.objects.create(
+            name="Revocation Branch Accessory",
+            slug="revocation-branch-accessory",
+            tenant=self.owner,
+            manufacturer=manufacturer,
+        )
+        stock = AccessoryStock.objects.create(accessory=accessory, location=location, qty=2)
+        resource_type = ContentType.objects.get_for_model(AccessoryStock)
+        cutoff = timezone.now()
+        self.grant = TenantResourceGrant(
+            tenant=self.owner,
+            grantee_tenant=self.grantee,
+            resource_type=resource_type,
+            resource_id=stock.pk,
+            access_level=TenantResourceGrant.ACCESS_VIEW,
+            valid_until=cutoff - timezone.timedelta(minutes=1),
+        )
+        self.grant.save()
+        self.run = TenantResourceGrantExpiryRun._base_manager.create(
+            tenant=self.owner,
+            schedule_slot=cutoff.replace(minute=0, second=0, microsecond=0),
+            cutoff=cutoff,
+            dispatch_stale_at=cutoff + timezone.timedelta(minutes=1),
+        )
+        self.stock_pk = stock.pk
+
+    def test_corrupt_evidence_row_is_unknown_but_keeps_shape(self):
+        with self.captureOnCommitCallbacks(execute=True):
+            sweep_expired_resource_grants(self.owner.pk, self.run.pk, 1)
+        self.grant.refresh_from_db()
+        # Corrupt the evidence row: move it onto a run owned by a foreign
+        # tenant, which breaks the integrity_valid filter while the raw row
+        # still matches the grant.
+        foreign = Tenant.objects.create(name="Revocation Branch Foreign", slug="revocation-branch-foreign")
+        cutoff = timezone.now()
+        foreign_run = TenantResourceGrantExpiryRun._base_manager.create(
+            tenant=foreign,
+            schedule_slot=cutoff.replace(minute=0, second=0, microsecond=0),
+            cutoff=cutoff,
+            dispatch_stale_at=cutoff + timezone.timedelta(minutes=1),
+        )
+        TenantResourceGrantExpiryRevocation._base_manager.filter(grant=self.grant).update(run=foreign_run)
+        data = TenantResourceGrantAuditSerializer().get_revocation(self.grant)
+        self.assertEqual(data["kind"], "unknown")
+        self.assertIsNone(data["user_id"])
+        self.assertIsNone(data["request_id"])
+
+    def test_expiry_evidence_with_actorless_change_is_kind_expiry(self):
+        with self.captureOnCommitCallbacks(execute=True):
+            sweep_expired_resource_grants(self.owner.pk, self.run.pk, 1)
+        self.grant.refresh_from_db()
+        data = TenantResourceGrantAuditSerializer().get_revocation(self.grant)
+        self.assertEqual(data["kind"], "expiry")
+        self.assertIsNone(data["user_id"])
+
+
+class ResourceGrantContainerResolutionTests(TestCase):
+    """Direct branches of the request-bound container resolution."""
+
+    def setUp(self):
+        self.owner = Tenant.objects.create(name="Container Owner", slug="container-owner")
+        self.group = TenantGroup.objects.create(name="Container Group", slug="container-group")
+        self.group_tenant = Tenant.objects.create(
+            name="Container Group Tenant", slug="container-group-tenant", group=self.group
+        )
+        self.user = get_user_model().objects.create_user(username="container-user", password="password")
+        self.superuser = get_user_model().objects.create_superuser(
+            username="container-superuser", password="password"
+        )
+
+    def tearDown(self):
+        set_current_tenant(None)
+        set_current_tenant_group(None)
+        set_current_all_accessible(False)
+
+    def test_unbound_regular_user_resolves_to_nothing(self):
+        self.assertEqual(_resource_grant_container_ids(self.user, "organization.view_tenantresourcegrant"), set())
+
+    def test_scope_conflict_fails_closed(self):
+        set_current_tenant(self.owner)
+        set_current_all_accessible(True)
+        self.assertEqual(_resource_grant_container_ids(self.user, "organization.view_tenantresourcegrant"), set())
+
+    def test_token_scope_wins_and_mismatch_fails_closed(self):
+        request = type("Request", (), {"auth": type("Token", (), {"tenant_id": 999_999, "user_id": self.user.pk})()})()
+        set_current_tenant(self.owner)
+        self.assertEqual(
+            _resource_grant_container_ids(self.user, "organization.view_tenantresourcegrant", request=request),
+            set(),
+        )
+        request.auth.tenant_id = self.owner.pk
+        self.assertEqual(
+            _resource_grant_container_ids(self.superuser, "organization.view_tenantresourcegrant", request=request),
+            {self.owner.pk},
+        )
+
+    def test_group_scope_superuser_sees_group_tenants(self):
+        set_current_tenant_group(self.group)
+        resolved = _resource_grant_container_ids(self.superuser, "organization.view_tenantresourcegrant")
+        self.assertEqual(resolved, {self.group_tenant.pk})
+
+    def test_group_scope_regular_user_is_intersected_with_access(self):
+        set_current_tenant_group(self.group)
+        resolved = _resource_grant_container_ids(self.user, "organization.view_tenantresourcegrant")
+        self.assertEqual(resolved, set())
+
+    def test_all_accessible_scope_uses_accessible_tenants(self):
+        set_current_all_accessible(True)
+        resolved = _resource_grant_container_ids(self.user, "organization.view_tenantresourcegrant")
+        self.assertEqual(resolved, set())
