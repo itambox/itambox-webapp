@@ -68,3 +68,20 @@ test('dashboard changelog cards expose headings and right-align values on mobile
   const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
   expect(overflow).toBeLessThanOrEqual(1);
 });
+
+test('dashboard changelog last card heading has no sticky shadow in dark mobile mode', async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 740 });
+  await page.setContent(changelogWidgetHtml);
+  await page.evaluate(() => document.documentElement.setAttribute('data-bs-theme', 'dark'));
+  await loadAppStyles(page);
+
+  const lastCell = page.locator('tbody td').last();
+  await expect(lastCell).toHaveAttribute('data-label', 'Request ID');
+  const lastCellBefore = await lastCell.evaluate((element) => ({
+    content: getComputedStyle(element, '::before').content,
+    backgroundImage: getComputedStyle(element, '::before').backgroundImage,
+  }));
+
+  expect(lastCellBefore.content).toBe('"Request ID"');
+  expect(lastCellBefore.backgroundImage).toBe('none');
+});

@@ -434,6 +434,15 @@
             background: none !important;
         }
 
+        // The dark-theme sticky shadow has higher specificity than the generic
+        // mobile reset above; explicitly neutralize it in dark card mode too.
+        [data-bs-theme="dark"] & {
+            td:last-child::before,
+            td.col-checkout~td:last-child::before {
+                background: none !important;
+            }
+        }
+
         // Cells with no header (checkbox, actions, checkout): drop the empty label
         td[data-label=""]::before {
             content: none !important;
