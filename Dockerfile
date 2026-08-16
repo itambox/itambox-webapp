@@ -68,7 +68,7 @@ WORKDIR /app
 # Runtime tools and libraries for PostgreSQL, LDAP, SAML/xmlsec, and libmagic.
 RUN apt-get update \
     && apt-get install -y --no-install-recommends \
-        postgresql-client libldap-2.5-0 libsasl2-2 xmlsec1 libmagic1 \
+        ca-certificates postgresql-client libldap-2.5-0 libsasl2-2 xmlsec1 libmagic1 \
     && rm -rf /var/lib/apt/lists/*
 
 # collectstatic, gunicorn, qcluster, and the health check all run from the locked
