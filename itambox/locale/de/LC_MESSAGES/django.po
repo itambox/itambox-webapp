@@ -25,7 +25,7 @@ msgstr ""
 "werden."
 
 msgid "You can only check out an asset to ONE target."
-msgstr "Sie können ein Asset nur an EIN Ziel herausgeben."
+msgstr "Ein Asset kann nur an EIN Ziel ausgegeben werden."
 
 msgid "Specified holder does not exist."
 msgstr "Der angegebene Inhaber existiert nicht."
@@ -317,9 +317,7 @@ msgstr ""
 "Komponente, Zubehör oder Verbrauchsmaterial)."
 
 msgid "You cannot request more than one type of item in a single request."
-msgstr ""
-"Sie können in einer einzelnen Anforderung nicht mehr als einen Artikeltyp "
-"anfordern."
+msgstr "Pro Anfrage kann nur ein Artikeltyp angefordert werden."
 
 msgid "Requested quantity must be greater than zero."
 msgstr "Die angeforderte Menge muss größer als null sein."
@@ -332,13 +330,13 @@ msgid "You do not have permission to request assets on behalf of others."
 msgstr "Sie sind nicht berechtigt, Assets im Namen anderer anzufordern."
 
 msgid "Please select an Asset Holder target."
-msgstr "Bitte wählen Sie einen Asset-Inhaber als Ziel aus."
+msgstr "Wählen Sie einen Asset-Inhaber als Ziel aus."
 
 msgid "Please select a Location target."
-msgstr "Bitte wählen Sie einen Lagerort als Ziel aus."
+msgstr "Wählen Sie einen Lagerort als Ziel aus."
 
 msgid "Please select a Parent Asset target."
-msgstr "Bitte wählen Sie ein übergeordnetes Asset als Ziel aus."
+msgstr "Wählen Sie ein übergeordnetes Asset als Ziel aus."
 
 msgid "Allocate Specific Asset"
 msgstr "Bestimmtes Asset zuweisen"
@@ -440,7 +438,7 @@ msgid "Last Audited By"
 msgstr "Zuletzt geprüft von"
 
 msgid "Allow users to request this asset"
-msgstr "Benutzern erlauben, dieses Asset anzufordern"
+msgstr "Benutzer können dieses Asset anfordern"
 
 msgid "Depreciation override"
 msgstr "Abschreibungsregel (Überschreibung)"
@@ -540,7 +538,7 @@ msgstr ""
 "oder assigned_asset angegeben werden."
 
 msgid "You can only assign an asset to one target."
-msgstr "Sie können ein Asset nur einem Ziel zuweisen."
+msgstr "Ein Asset kann nur einem Ziel zugewiesen werden."
 
 msgid "Assignment target must belong to the same tenant as the asset."
 msgstr "Das Zuweisungsziel muss zum selben Mandanten gehören wie das Asset."
@@ -661,7 +659,7 @@ msgid "Comments"
 msgstr "Kommentare"
 
 msgid "Allow users to request assets of this type"
-msgstr "Benutzern erlauben, Assets dieses Typs anzufordern"
+msgstr "Benutzer können Assets dieses Typs anfordern"
 
 msgid "Asset Types"
 msgstr "Asset-Typen"
@@ -1071,24 +1069,22 @@ msgid ""
 "\n"
 "This link expires in 7 days."
 msgstr ""
-"Ihnen wurde die Verwahrung von Folgendem zugewiesen:\n"
+"Ihnen wurde die Verwahrung für folgendes Asset zugewiesen:\n"
 "\n"
 "  Asset: %(name)s\n"
 "  Inventarnummer: %(tag)s\n"
 "  Seriennummer: %(serial)s\n"
 "\n"
-"Bitte bestätigen Sie die Verwahrung über den folgenden Link:\n"
+"Bestätigen Sie die Verwahrung über diesen Link:\n"
 "%(url)s\n"
 "\n"
-"Dieser Link läuft in 7 Tagen ab."
+"Der Link läuft in 7 Tagen ab."
 
 msgid "Either holder or location must be specified."
 msgstr "Es muss entweder ein Besitzer oder ein Lagerort angegeben werden."
 
 msgid "No Status Label with type 'Deployed' exists. Please configure one."
-msgstr ""
-"Es existiert kein Status-Label vom Typ 'Deployed'. Bitte konfigurieren Sie "
-"eines."
+msgstr "Kein Status-Label vom Typ „Deployed“ vorhanden. Konfigurieren Sie eines."
 
 #, python-format
 msgid "No available assets of type '%(type)s' in stock."
@@ -7494,9 +7490,7 @@ msgstr ""
 "Druckeinstellungen geöffnet."
 
 msgid "Ensure margins are set to \"None\" in your print options."
-msgstr ""
-"Stellen Sie sicher, dass die Ränder in den Druckoptionen auf \"Keine\" "
-"eingestellt sind."
+msgstr "Setzen Sie die Ränder in den Druckoptionen auf „Keine“."
 
 msgid "Delete Asset Type - ITAMbox"
 msgstr "- Delete Asset Type - ITAMbox"
@@ -8249,10 +8243,7 @@ msgid ""
 "the serial numbers and unique details for each asset below. Creating these "
 "assets will automatically allocate them to the corresponding requests."
 msgstr ""
-"Sie nehmen Hardware entgegen, um %(count)s genehmigte Anfrage(n) zu "
-"erfüllen. Geben Sie nachstehend die Seriennummern und individuellen Details "
-"für jedes Asset ein. Durch das Erstellen dieser Assets werden sie "
-"automatisch den entsprechenden Anfragen zugewiesen."
+"Sie nehmen Hardware entgegen, um genehmigte Anfragen zu erfüllen (Anzahl: %(count)s). Geben Sie unten die Seriennummern und individuellen Angaben für jedes Asset ein. Beim Anlegen werden die Assets automatisch den entsprechenden Anfragen zugewiesen."
 
 msgid "Error validating batch"
 msgstr "Fehler bei der Validierung des Stapels"
@@ -10872,6 +10863,179 @@ msgstr "Sammel-Einbuchung"
 
 msgid "Bulk disposal"
 msgstr "Sammel-Entsorgung"
+
+#: assets/forms/asset_form.py:326
+msgid "Add new Asset Role"
+msgstr "Neue Asset-Rolle hinzufügen"
+
+#: assets/forms/asset_form.py:325
+msgid "Add new Asset Type"
+msgstr "Neuen Asset-Typ hinzufügen"
+
+#: assets/forms/asset_form.py:327
+msgid "Add new Location"
+msgstr "Neuen Lagerort hinzufügen"
+
+#: templates/assets/assets/asset_detail.html:419
+msgid "Add Reservation"
+msgstr "Reservierung hinzufügen"
+
+#: templates/assets/includes/detail/asset_assignment.html:73
+msgid "Custody Declined"
+msgstr "Verwahrung abgelehnt"
+
+#: assets/reports.py:665 assets/reports.py:680
+msgid "Disposal Method Distribution"
+msgstr "Verteilung der Entsorgungsmethoden"
+
+#: assets/forms/asset_form.py:196
+msgid "End date cannot be before the start date."
+msgstr "Das Enddatum darf nicht vor dem Startdatum liegen."
+
+#: templates/assets/includes/detail/assetreservation_info.html:28
+#: templates/assets/includes/detail/warranty_info.html:36
+msgid "End Date:"
+msgstr "Enddatum:"
+
+#: templates/assets/includes/detail/warranty_info.html:21
+msgid "Expired/Inactive"
+msgstr "Abgelaufen/inaktiv"
+
+#: software/forms.py:132 templates/assets/assets/asset_detail.html:353
+msgid "Install Software"
+msgstr "Software installieren"
+
+#: assets/forms/asset_form.py:386
+msgid "No active tag sequence found for this scope."
+msgstr "Keine aktive Tag-Sequenz für diesen Geltungsbereich gefunden."
+
+#: templates/assets/assets/asset_detail.html:468
+msgid "No disposal record for this asset."
+msgstr "Kein Entsorgungseintrag für dieses Asset."
+
+#: templates/assets/assets/asset_detail.html:427
+msgid "No reservations for this asset."
+msgstr "Keine Reservierungen für dieses Asset."
+
+#: templates/assets/assets/asset_detail.html:404
+msgid "No warranties registered for this asset."
+msgstr "Keine Garantien für dieses Asset registriert."
+
+#: templates/assets/includes/detail/asset_financial.html:33
+msgid "Not linked"
+msgstr "Nicht verknüpft"
+
+#: assets/reports.py:624
+msgid "Not WEEE Compliant"
+msgstr "Nicht WEEE-konform"
+
+#: assets/forms/asset_form.py:525
+msgid "Optional: Warranty"
+msgstr "Optional: Garantie"
+
+#: templates/assets/includes/detail/asset_financial.html:28
+msgid "Purchase Order:"
+msgstr "Bestellung:"
+
+#: templates/assets/includes/detail/assetreservation_info.html:32
+msgid "Purpose:"
+msgstr "Zweck:"
+
+#: templates/assets/includes/detail/warranty_info.html:48
+msgid "Reference:"
+msgstr "Referenz:"
+
+#: templates/assets/includes/detail/assetreservation_info.html:12
+msgid "Reserved For:"
+msgstr "Reserviert für:"
+
+#: assets/models/asset.py:349
+#, python-format
+msgid "Selected %(field)s belongs to a different tenant than the asset."
+msgstr "Das ausgewählte %(field)s gehört zu einem anderen Mandanten als das Asset."
+
+#: assets/tables.py:190
+msgid "Set on this asset"
+msgstr "Auf diesem Asset gesetzt"
+
+#: assets/forms/asset_form.py:379
+msgid "Suggested:"
+msgstr "Vorgeschlagen:"
+
+#: templates/assets/includes/detail/warranty_info.html:56
+msgid "Terms:"
+msgstr "Bedingungen:"
+
+#: assets/services.py:191 compliance/services.py:311 compliance/views.py:630
+msgid "The holder has no e-mail address."
+msgstr "Der Asset-Inhaber hat keine E-Mail-Adresse."
+
+#: assets/reports.py:543 assets/reports.py:563
+msgid "Total Warranty Cost"
+msgstr "Gesamte Garantiekosten"
+
+#: assets/reports.py:451 compliance/reports.py:57 compliance/reports.py:58
+msgid "Unknown"
+msgstr "Unbekannt"
+
+#: templates/assets/assets/asset_detail.html:464
+msgid "View / Edit Disposal"
+msgstr "Entsorgung anzeigen/bearbeiten"
+
+#: templates/assets/includes/detail/asset_assignment.html:78
+#: templates/assets/includes/detail/asset_assignment.html:88
+msgid "View Receipt"
+msgstr "Übergabeprotokoll anzeigen"
+
+#: assets/forms/asset_form.py:96
+msgid "Warranty End Date"
+msgstr "Garantie-Enddatum"
+
+#: assets/forms/asset_form.py:82
+msgid "Warranty Provider"
+msgstr "Garantieanbieter"
+
+#: assets/forms/asset_form.py:91
+msgid "Warranty Start Date"
+msgstr "Garantie-Startdatum"
+
+#: assets/reports.py:554 assets/reports.py:569
+msgid "Warranty Status Distribution"
+msgstr "Verteilung der Garantiestatuswerte"
+
+#: assets/models/catalog.py:233
+msgid "Barcode (EAN / UPC / GTIN) — scanning shows assets of this type."
+msgstr "Barcode (EAN / UPC / GTIN). Beim Scannen werden Assets dieses Typs angezeigt."
+
+#: assets/services.py:380
+msgid "Disposal proceeds cannot be negative."
+msgstr "Der Entsorgungserlös darf nicht negativ sein."
+
+#: assets/services.py:383
+msgid "Disposal proceeds currency must match the asset's currency (no conversion is applied)."
+msgstr "Die Währung des Entsorgungserlöses muss der Währung des Assets entsprechen. Es findet keine Umrechnung statt."
+
+#: assets/filters.py:58 assets/models/catalog.py:232
+#: inventory/abstract_models.py:59
+msgid "EAN"
+msgstr "EAN"
+
+#: assets/forms/asset_form.py:191
+msgid "End date is required when adding a warranty."
+msgstr "Für eine Garantie ist ein Enddatum erforderlich."
+
+#: assets/forms/asset_form.py:529
+msgid "Fill in to create a warranty for this asset; leave blank to skip."
+msgstr ""
+"Füllen Sie das Feld aus, um eine Garantie für dieses Asset anzulegen. Lassen Sie es leer, um keine Garantie anzulegen."
+
+#: assets/tables.py:183
+msgid "Inherited from asset type"
+msgstr "Vom Asset-Typ übernommen"
+
+#: assets/forms/asset_form.py:186
+msgid "Start date is required when adding a warranty."
+msgstr "Für eine Garantie ist ein Startdatum erforderlich."
 
 #~ msgid "Component Inventory"
 #~ msgstr "Komponenten-Inventar"
