@@ -1,4 +1,5 @@
 import datetime
+import json
 import re
 from decimal import Decimal
 
@@ -1630,3 +1631,55 @@ class Issue391AssetEditTests(TenantTestMixin, TestCase):
             purchase_date=None,
             in_service_date=None,
         )
+
+
+class JavaScriptCatalogLocalizationTest(SimpleTestCase):
+    EXPECTED_GERMAN = {
+        "Supplier": "Lieferant",
+        "Start Date": "Startdatum",
+        "Renewal Date": "Verlängerungsdatum",
+        "Covered Assets": "Abgedeckte Assets",
+        "Warranty Type": "Garantieart",
+        "Warranty Cost": "Garantiekosten",
+        "Reference": "Referenz",
+        "Sanitization Certificate": "Zertifikat zur Datenlöschung",
+        "Recipient": "Empfänger",
+        "Notes": "Notizen",
+        "Item Type": "Artikeltyp",
+        "Name": "Name",
+        "Category": "Kategorie",
+        "Part Number": "Teilenummer",
+        "Total Stock": "Gesamtbestand",
+        "Available": "Verfügbar",
+        "Safety Threshold": "Sicherheitsbestand",
+        "Stock Status": "Bestandsstatus",
+        "Holder": "Asset-Inhaber",
+        "Signature Provider": "Signaturanbieter",
+        "Created Date": "Erstellungsdatum",
+        "IP Address": "IP-Adresse",
+        "Matching": "Übereinstimmung",
+        "Mismatch": "Abweichung",
+        "Surprise": "Unerwartet",
+        "This asset cannot be audited.": "Dieses Asset kann nicht geprüft werden.",
+        "loading": "Wird geladen...",
+        "no_results": "Keine Ergebnisse gefunden",
+        "not_loading": "Keine weiteren Ergebnisse",
+        "option_create": "Option erstellen",
+    }
+
+    def test_german_javascript_catalog_translates_reviewed_entries(self):
+        response = self.client.get(
+            reverse("javascript-catalog"),
+            HTTP_ACCEPT_LANGUAGE="de",
+            HTTP_HOST="localhost",
+        )
+        self.assertEqual(response.status_code, 200)
+        body = response.content.decode("utf-8")
+        marker = "const newcatalog = "
+        start = body.index(marker) + len(marker)
+        end = body.index(";\n", start)
+        catalog = json.loads(body[start:end])
+
+        for source, expected in self.EXPECTED_GERMAN.items():
+            with self.subTest(source=source):
+                self.assertEqual(catalog[source], expected)

@@ -264,17 +264,15 @@ msgstr "Vertragsstatus"
 
 #: .\static\dist\itambox.js:1
 msgid "Supplier"
-msgstr ""
+msgstr "Lieferant"
 
 #: .\static\dist\itambox.js:1
 msgid "Start Date"
-msgstr ""
+msgstr "Startdatum"
 
 #: .\static\dist\itambox.js:1
-#, fuzzy
-#| msgid "End Date"
 msgid "Renewal Date"
-msgstr "Enddatum"
+msgstr "Verlängerungsdatum"
 
 #: .\static\dist\itambox.js:1
 msgid "Days Until Expiry"
@@ -289,10 +287,8 @@ msgid "Auto-Renew"
 msgstr "Autom. Verlängerung"
 
 #: .\static\dist\itambox.js:1
-#, fuzzy
-#| msgid "Assets"
 msgid "Covered Assets"
-msgstr "Assets"
+msgstr "Abgedeckte Assets"
 
 #: .\static\dist\itambox.js:1
 msgid "SLA Response Time"
@@ -307,24 +303,20 @@ msgid "Coverage Hours"
 msgstr "Abdeckungszeiten"
 
 #: .\static\dist\itambox.js:1
-#, fuzzy
-#| msgid "Warranty (Months)"
 msgid "Warranty Type"
-msgstr "Garantie (Monate)"
+msgstr "Garantieart"
 
 #: .\static\dist\itambox.js:1
 msgid "Days Remaining"
 msgstr "Verbleibende Tage"
 
 #: .\static\dist\itambox.js:1
-#, fuzzy
-#| msgid "Warranty (Months)"
 msgid "Warranty Cost"
-msgstr "Garantie (Monate)"
+msgstr "Garantiekosten"
 
 #: .\static\dist\itambox.js:1
 msgid "Reference"
-msgstr ""
+msgstr "Referenz"
 
 #: .\static\dist\itambox.js:1
 msgid "Disposal Date"
@@ -339,10 +331,8 @@ msgid "Data Sanitization Method"
 msgstr "Datenlöschmethode"
 
 #: .\static\dist\itambox.js:1
-#, fuzzy
-#| msgid "Utilization Rate"
 msgid "Sanitization Certificate"
-msgstr "Auslastungsrate"
+msgstr "Zertifikat zur Datenlöschung"
 
 #: .\static\dist\itambox.js:1
 msgid "Sanitized By"
@@ -350,7 +340,7 @@ msgstr "Bereinigt von"
 
 #: .\static\dist\itambox.js:1
 msgid "Recipient"
-msgstr ""
+msgstr "Empfänger"
 
 #: .\static\dist\itambox.js:1
 msgid "Proceeds"
@@ -362,53 +352,41 @@ msgstr "WEEE-konform"
 
 #: .\static\dist\itambox.js:1
 msgid "Notes"
-msgstr ""
+msgstr "Notizen"
 
 #: .\static\dist\itambox.js:1
-#, fuzzy
-#| msgid "Type"
 msgid "Item Type"
-msgstr "Typ"
+msgstr "Artikeltyp"
 
 #: .\static\dist\itambox.js:1
 msgid "Name"
-msgstr ""
+msgstr "Name"
 
 #: .\static\dist\itambox.js:1
 msgid "Category"
-msgstr ""
+msgstr "Kategorie"
 
 #: .\static\dist\itambox.js:1
-#, fuzzy
-#| msgid "Serial Number"
 msgid "Part Number"
-msgstr "Seriennummer"
+msgstr "Teilenummer"
 
 #: .\static\dist\itambox.js:1
-#, fuzzy
-#| msgid "Total Seats"
 msgid "Total Stock"
-msgstr "Gesamtplätze"
+msgstr "Gesamtbestand"
 
 #: .\static\dist\itambox.js:1
-#, fuzzy
-#| msgid "Available Seats"
 msgid "Available"
-msgstr "Verfügbare Plätze"
+msgstr "Verfügbar"
 
 #: .\static\dist\itambox.js:1
 msgid "Safety Threshold"
-msgstr ""
+msgstr "Sicherheitsbestand"
 
 #: .\static\dist\itambox.js:1
-#, fuzzy
-#| msgid "Status"
 msgid "Stock Status"
-msgstr "Status"
+msgstr "Bestandsstatus"
 
 #: .\static\dist\itambox.js:1
-#, fuzzy
-#| msgid "Asset Holder"
 msgid "Holder"
 msgstr "Asset-Inhaber"
 
@@ -425,10 +403,8 @@ msgid "EULA Version"
 msgstr "EULA-Version"
 
 #: .\static\dist\itambox.js:1
-#, fuzzy
-#| msgid "Provider"
 msgid "Signature Provider"
-msgstr "Anbieter"
+msgstr "Signaturanbieter"
 
 #: .\static\dist\itambox.js:1
 msgid "QMS Reference"
@@ -436,13 +412,11 @@ msgstr "QMS-Referenz"
 
 #: .\static\dist\itambox.js:1
 msgid "IP Address"
-msgstr ""
+msgstr "IP-Adresse"
 
 #: .\static\dist\itambox.js:1
-#, fuzzy
-#| msgid "Purchase Date"
 msgid "Created Date"
-msgstr "Kaufdatum"
+msgstr "Erstellungsdatum"
 
 #: .\static\dist\itambox.js:170
 msgid "No records found."
@@ -510,37 +484,35 @@ msgstr "Diese Aktion ist im Vorschaumodus deaktiviert."
 
 #: .\static\dist\itambox.js:226
 msgid "Matching"
-msgstr ""
+msgstr "Übereinstimmung"
 
 #: .\static\dist\itambox.js:226
 msgid "Mismatch"
-msgstr ""
+msgstr "Abweichung"
 
 #: .\static\dist\itambox.js:226
 msgid "Surprise"
-msgstr ""
+msgstr "Unerwartet"
 
 #: .\static\dist\itambox.js:226
 msgid "This asset cannot be audited."
-msgstr ""
+msgstr "Dieses Asset kann nicht geprüft werden."
 
 #: .\static\dist\vendor\tom-select.complete.min.js:286
 msgid "loading"
-msgstr ""
+msgstr "Wird geladen..."
 
 #: .\static\dist\vendor\tom-select.complete.min.js:286
-#, fuzzy
-#| msgid "No results found"
 msgid "no_results"
 msgstr "Keine Ergebnisse gefunden"
 
 #: .\static\dist\vendor\tom-select.complete.min.js:286
 msgid "not_loading"
-msgstr ""
+msgstr "Keine weiteren Ergebnisse"
 
 #: .\static\dist\vendor\tom-select.complete.min.js:286
 msgid "option_create"
-msgstr ""
+msgstr "Option erstellen"
 
 msgid "Contract Renewals & Expirations"
 msgstr "Vertragsverlängerungen & -abläufe"
