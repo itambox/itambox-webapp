@@ -154,11 +154,11 @@
           <tbody>
             {% for asset in covered_assets %}
               <tr>
-                <td>
+                <td data-label="{% translate "Asset" %}">
                   <a href="{{ asset.get_absolute_url }}">{{ asset }}</a>
                 </td>
-                <td>{{ asset.asset_type|default:"-" }}</td>
-                <td class="text-muted">{{ asset.serial_number|default:"-" }}</td>
+                <td data-label="{% translate "Type" %}">{{ asset.asset_type|default:"-" }}</td>
+                <td class="text-muted" data-label="{% translate "Serial" %}">{{ asset.serial_number|default:"-" }}</td>
               </tr>
             {% endfor %}
           </tbody>

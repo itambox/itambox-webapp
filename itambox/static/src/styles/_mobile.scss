@@ -46,6 +46,21 @@
         --tblr-gutter-x: 0.5rem;
     }
 
+    // Detail fields use a responsive auto-fit grid on larger screens. Force a
+    // single shrinkable track on phones and allow long values to wrap inside it.
+    .datagrid {
+        grid-template-columns: minmax(0, 1fr);
+    }
+
+    .datagrid-item,
+    .datagrid-content {
+        min-width: 0;
+    }
+
+    .datagrid-content {
+        overflow-wrap: anywhere;
+    }
+
     // ---- A tiny bit more compact buttons ----
     .btn {
         padding: 0.3125rem 0.625rem;
