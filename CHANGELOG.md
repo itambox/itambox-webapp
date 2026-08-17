@@ -15,6 +15,7 @@ This changelog follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) 
 
 - Asset edits no longer clear purchase and in-service dates when localized HTML5 date controls are submitted after changing the tenant, location, or another field (issue #391).
 - Managed-tenant onboarding now gives the creating provider administrator explicit administrator reach and switches directly into the new tenant without adding a customer membership.
+- Asset reservation quick-add now preserves a native POST fallback from asset detail pages instead of submitting a GET request (issue #390).
 
 ### Security
 

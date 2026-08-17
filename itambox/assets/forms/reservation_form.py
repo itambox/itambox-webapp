@@ -67,3 +67,9 @@ class AssetReservationForm(forms.ModelForm):
             HTML(f'<a href="{cancel_url}" class="btn btn-outline-secondary ms-2">Cancel</a>'),
             HTML("</div>"),
         )
+
+    def _get_validation_exclusions(self):
+        """Keep soft-delete state available to the reservation exclusion constraint."""
+        exclusions = super()._get_validation_exclusions()
+        exclusions.discard("deleted_at")
+        return exclusions
