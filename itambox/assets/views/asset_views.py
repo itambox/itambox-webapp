@@ -581,8 +581,7 @@ def bulk_print_labels(request):
 
     messages.success(
         request,
-        _("Asynchronous label generation job '%(job)s' enqueued successfully! Tracking progress in real-time.")
-        % {"job": job.name},
+        _("Label generation job '%(job)s' queued. Track its progress in real time.") % {"job": job.name},
     )
 
     if request.htmx:

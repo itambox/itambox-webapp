@@ -206,12 +206,10 @@ class AssetRequestForm(forms.ModelForm):
 
         if len(categories_filled) == 0:
             raise ValidationError(
-                _(
-                    "You must specify what item you are requesting (Asset, Asset Type, Component, Accessory, or Consumable)."
-                )
+                _("Select the item you are requesting (Asset, Asset Type, Component, Accessory, or Consumable).")
             )
         if len(categories_filled) > 1:
-            raise ValidationError(_("You cannot request more than one type of item in a single request."))
+            raise ValidationError(_("A request can contain only one item type."))
 
         if qty is None:
             qty = 1
@@ -227,21 +225,21 @@ class AssetRequestForm(forms.ModelForm):
             if not can_delegate:
                 raise ValidationError(_("You do not have permission to request assets on behalf of others."))
             if not assigned_user:
-                raise ValidationError({"assigned_user": _("Please select an Asset Holder target.")})
+                raise ValidationError({"assigned_user": _("Select an Asset Holder.")})
             cleaned_data["assigned_location"] = None
             cleaned_data["assigned_asset"] = None
         elif target_type == "location":
             if not can_delegate:
                 raise ValidationError(_("You do not have permission to request assets on behalf of others."))
             if not assigned_location:
-                raise ValidationError({"assigned_location": _("Please select a Location target.")})
+                raise ValidationError({"assigned_location": _("Select a Location.")})
             cleaned_data["assigned_user"] = None
             cleaned_data["assigned_asset"] = None
         elif target_type == "asset":
             if not can_delegate:
                 raise ValidationError(_("You do not have permission to request assets on behalf of others."))
             if not assigned_asset:
-                raise ValidationError({"assigned_asset": _("Please select a Parent Asset target.")})
+                raise ValidationError({"assigned_asset": _("Select a Parent Asset.")})
             cleaned_data["assigned_user"] = None
             cleaned_data["assigned_location"] = None
         else:  # target_type == '' (Myself)

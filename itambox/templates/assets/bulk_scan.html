@@ -123,7 +123,7 @@
                 <div class="alert alert-warning d-flex align-items-center mt-2 mb-0">
                   <i class="mdi mdi-alert-outline me-2 fs-3"></i>
                   <div class="small">
-                    {% translate "Disposal archives each asset and freezes its book value. Already-disposed assets are skipped." %}
+                    {% translate "The system archives each asset and freezes its book value. It skips assets already marked as disposed." %}
                   </div>
                 </div>
               {% endif %}
@@ -254,8 +254,8 @@
                     aria-label="{% translate 'Close' %}"></button>
           </div>
           <div class="modal-body">
-            <p>{% blocktranslate %}You are about to dispose <strong><span class="scan-basket-confirm-count">0</span></strong> asset(s).{% endblocktranslate %}</p>
-            <p class="text-muted mb-0">{% translate "Each asset will be checked in (if needed), archived, and recorded with a disposal entry. This is hard to reverse." %}</p>
+            <p>{% blocktranslate %}Dispose of <strong><span class="scan-basket-confirm-count">0</span></strong> asset(s)?{% endblocktranslate %}</p>
+            <p class="text-muted mb-0">{% translate "The system checks in each asset if needed, archives it, and records the disposal. Reversing this is difficult." %}</p>
           </div>
           <div class="modal-footer">
             <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">{% translate "Cancel" %}</button>

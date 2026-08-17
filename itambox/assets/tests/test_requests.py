@@ -461,6 +461,53 @@ class RequisitionSystemTestCase(TestCase):
         form_staff = AssetRequestForm(data=form_data, request=request_staff)
         self.assertTrue(form_staff.is_valid())
 
+    def test_form_validation_reports_each_missing_delegated_target(self):
+        from django.test import RequestFactory
+        from model_bakery import baker
+
+        from assets.forms.request_forms import AssetRequestForm
+
+        component = baker.make("inventory.Component", tenant=self.tenant)
+        factory = RequestFactory()
+        request = factory.post("/")
+        request.user = self.other_user
+
+        cases = (
+            (
+                "multiple item types",
+                {
+                    "asset_type": self.type_requestable.pk,
+                    "component": component.pk,
+                },
+                "A request can contain only one item type.",
+                "__all__",
+            ),
+            (
+                "asset holder",
+                {"asset_type": self.type_requestable.pk, "target_type": "assetholder"},
+                "Select an Asset Holder.",
+                "assigned_user",
+            ),
+            (
+                "location",
+                {"asset_type": self.type_requestable.pk, "target_type": "location"},
+                "Select a Location.",
+                "assigned_location",
+            ),
+            (
+                "parent asset",
+                {"asset_type": self.type_requestable.pk, "target_type": "asset"},
+                "Select a Parent Asset.",
+                "assigned_asset",
+            ),
+        )
+
+        for name, form_data, message, field in cases:
+            with self.subTest(name=name):
+                form = AssetRequestForm(data=form_data, request=request)
+                self.assertFalse(form.is_valid())
+                self.assertIn(message, form.errors[field])
+
     def test_prefilled_checkout_and_fulfillment(self):
         # Create an approved request delegated to a location
         req = AssetRequest.objects.create(
