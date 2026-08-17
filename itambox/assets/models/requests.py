@@ -214,12 +214,10 @@ class AssetRequest(JournalingMixin, TaggableMixin, ChangeLoggingMixin, BaseModel
 
         if len(categories_filled) == 0:
             raise ValidationError(
-                _(
-                    "You must specify what item you are requesting (Asset, Asset Type, Component, Accessory, or Consumable)."
-                )
+                _("Select the item you are requesting (Asset, Asset Type, Component, Accessory, or Consumable).")
             )
         if len(categories_filled) > 1:
-            raise ValidationError(_("You cannot request more than one type of item in a single request."))
+            raise ValidationError(_("A request can contain only one item type."))
 
         if self.qty <= 0:
             raise ValidationError(_("Requested quantity must be greater than zero."))

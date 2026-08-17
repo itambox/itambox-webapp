@@ -457,7 +457,7 @@ class RequestBulkReceiveView(PermissionRequiredMixin, View):
                             req.response_date = timezone.now()
                             req.save()
 
-                        messages.success(request, _("Stock received and requests fulfilled successfully."))
+                        messages.success(request, _("Stock received; requests fulfilled."))
                         return redirect("assets:request_list")
                 except Exception as e:
                     messages.error(request, _("Error processing bulk receipt: %(error)s") % {"error": e})

@@ -782,7 +782,7 @@ class CustodyTemplateOverrideTests(TestCase):
         self.assertIn("__all__", form.errors)
         self.assertEqual(
             form.errors["__all__"][0],
-            "You can assign this template to either a Tenant or a Tenant Group, but not both.",
+            "Choose either a Tenant or a Tenant Group for this template, not both.",
         )
 
     def test_form_validation_global_disallowed(self):

@@ -69,6 +69,34 @@ class AssetAssignmentTestCase(TestCase):
         self.peripheral_monitor.refresh_from_db()
         self.assertEqual(self.peripheral_monitor.status, deployed_status)
 
+    def test_assignment_rejects_multiple_targets_with_direct_message(self):
+        holder = baker.make("organization.AssetHolder")
+        assignment = AssetAssignment(
+            asset=self.host_laptop,
+            assigned_user=holder,
+            assigned_asset=self.peripheral_monitor,
+        )
+
+        with self.assertRaisesMessage(ValidationError, "Select only one assignment target."):
+            assignment.full_clean()
+
+    def test_checkout_kit_requires_a_deployed_status_label(self):
+        from assets.services import checkout_kit
+        from core.managers import set_current_tenant
+
+        tenant = baker.make("organization.Tenant")
+        holder = baker.make("organization.AssetHolder", tenant=tenant)
+        set_current_tenant(tenant)
+        StatusLabel.objects.filter(type=StatusLabel.TYPE_DEPLOYED).delete()
+        try:
+            with self.assertRaisesMessage(
+                ValidationError,
+                "No 'Deployed' Status Label exists. Configure one first.",
+            ):
+                checkout_kit(kit=None, holder=holder)
+        finally:
+            set_current_tenant(None)
+
     def test_custody_email_failure_is_logged_without_rolling_back_checkout(self):
         tenant = baker.make("organization.Tenant")
         category = baker.make("assets.Category")

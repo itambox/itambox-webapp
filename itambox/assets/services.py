@@ -200,11 +200,11 @@ def checkout_asset(
                                     "tag": asset.asset_tag,
                                 },
                                 message=_(
-                                    "You have been assigned custody of:\n\n"
+                                    "Custody has been assigned to you:\n\n"
                                     "  Asset: %(name)s\n"
                                     "  Asset Tag: %(tag)s\n"
                                     "  Serial: %(serial)s\n\n"
-                                    "Please accept custody at the following link:\n%(url)s\n\n"
+                                    "Accept custody using this link:\n%(url)s\n\n"
                                     "This link expires in 7 days."
                                 )
                                 % {
@@ -420,7 +420,7 @@ def checkout_kit(
 
     in_use_status = StatusLabel.objects.filter(type=StatusTypeChoices.DEPLOYED).first()
     if not in_use_status:
-        raise ValidationError(_("No Status Label with type 'Deployed' exists. Please configure one."))
+        raise ValidationError(_("No 'Deployed' Status Label exists. Configure one first."))
 
     with transaction.atomic():
         allocated_assets = []

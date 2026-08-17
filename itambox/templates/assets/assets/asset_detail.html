@@ -373,7 +373,7 @@
   {% include 'generic/includes/related_table_tab.html' with tab="audits" table=audits_table title=t_audits empty=e_audits %}
   {% if can_view_custody_receipts %}
     {% translate "Custody Receipts" as t_receipts %}
-    {% translate "No custody receipts generated for this asset." as e_receipts %}
+    {% translate "No custody receipts exist for this asset." as e_receipts %}
     {% include 'generic/includes/related_table_tab.html' with tab="custody-receipts" table=receipts_table title=t_receipts empty=e_receipts %}
   {% endif %}
   {% translate "Allocated Software Licenses" as t_seats %}

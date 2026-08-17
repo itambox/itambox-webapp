@@ -141,7 +141,7 @@ class AssetAssignment(SoftDeleteMixin, JournalingMixin, TaggableMixin, ChangeLog
                     )
                 )
             if len(filled) > 1:
-                raise ValidationError(_("You can only assign an asset to one target."))
+                raise ValidationError(_("Select only one assignment target."))
 
             # Tenant boundary validation
             target = filled[0]

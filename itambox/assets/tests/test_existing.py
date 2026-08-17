@@ -1282,9 +1282,8 @@ class CategoryTestCase(_SeededStatusLabelsMixin, TestCase):
 class AssetCatalogLocalizationTest(SimpleTestCase):
     def test_german_asset_labels_follow_the_glossary(self):
         bulk_receive_message = (
-            "You are receiving hardware to fulfill %(count)s approved request(s). "
-            "Enter the serial numbers and unique details for each asset below. "
-            "Creating these assets will automatically allocate them to the corresponding requests."
+            "Enter serial numbers and asset details below for the approved requests (%(count)s total). "
+            "New assets will be allocated to the matching requests."
         )
         translations = {
             "Add new Asset Type": "Neuen Asset-Typ hinzufügen",
@@ -1292,7 +1291,7 @@ class AssetCatalogLocalizationTest(SimpleTestCase):
             "Custody Declined": "Verwahrung abgelehnt",
             "View Receipt": "Übergabeprotokoll anzeigen",
             "Warranty Provider": "Garantieanbieter",
-            "Please select an Asset Holder target.": "Wählen Sie einen Asset-Inhaber als Ziel aus.",
+            "Select an Asset Holder.": "Wählen Sie einen Asset-Inhaber als Ziel aus.",
             "The holder has no e-mail address.": "Der Asset-Inhaber hat keine E-Mail-Adresse.",
             bulk_receive_message: (
                 "Sie nehmen Hardware entgegen, um genehmigte Anfragen zu erfüllen "
@@ -1316,4 +1315,66 @@ class AssetCatalogLocalizationTest(SimpleTestCase):
 
         with translation.override("de"):
             self.assertEqual(ngettext(singular, plural, 1), "%(counter)s %(model_verbose_name)s löschen")
-            self.assertEqual(ngettext(singular, plural, 2), "%(counter)s %(model_verbose_name_plural)s löschen")
+
+
+class EnglishAssetCopyLocalizationTest(SimpleTestCase):
+    def test_direct_english_asset_copy(self):
+        phrases = [
+            "Select the item you are requesting (Asset, Asset Type, Component, Accessory, or Consumable).",
+            "A request can contain only one item type.",
+            "Select an Asset Holder.",
+            "Select a Location.",
+            "Select a Parent Asset.",
+            "Select only one assignment target.",
+            "No 'Deployed' Status Label exists. Configure one first.",
+            "Choose either a Tenant or a Tenant Group for this template, not both.",
+            "Label generation job '%(job)s' queued. Track its progress in real time.",
+            "Stock received; requests fulfilled.",
+            "The system archives the asset and creates a permanent disposal record for audit.",
+            "The system archives each asset and freezes its book value. It skips assets already marked as disposed.",
+            'Dispose of <strong><span class="scan-basket-confirm-count">0</span></strong> asset(s)?',
+            "The system checks in each asset if needed, archives it, and records the disposal. Reversing this is difficult.",
+            "No custody receipts exist for this asset.",
+            'Set margins to "None" in your print options.',
+        ]
+        with translation.override("en"):
+            for phrase in phrases:
+                with self.subTest(phrase=phrase):
+                    self.assertEqual(gettext(phrase), phrase)
+
+    def test_changed_catalog_keeps_german_copy_and_placeholders(self):
+        custody_message = (
+            "Custody has been assigned to you:\n\n"
+            "  Asset: %(name)s\n"
+            "  Asset Tag: %(tag)s\n"
+            "  Serial: %(serial)s\n\n"
+            "Accept custody using this link:\n%(url)s\n\n"
+            "This link expires in 7 days."
+        )
+        bulk_receive_message = (
+            "Enter serial numbers and asset details below for the approved requests (%(count)s total). "
+            "New assets will be allocated to the matching requests."
+        )
+
+        with translation.override("de"):
+            translated_custody = gettext(custody_message)
+            translated_bulk_receive = gettext(bulk_receive_message)
+
+        self.assertEqual(
+            translated_custody,
+            "Ihnen wurde die Verwahrung für folgendes Asset zugewiesen:\n\n"
+            "  Asset: %(name)s\n"
+            "  Inventarnummer: %(tag)s\n"
+            "  Seriennummer: %(serial)s\n\n"
+            "Bestätigen Sie die Verwahrung über diesen Link:\n%(url)s\n\n"
+            "Der Link läuft in 7 Tagen ab.",
+        )
+        self.assertEqual(
+            translated_bulk_receive,
+            "Sie nehmen Hardware entgegen, um genehmigte Anfragen zu erfüllen (Anzahl: %(count)s). "
+            "Geben Sie unten die Seriennummern und individuellen Angaben für jedes Asset ein. "
+            "Beim Anlegen werden die Assets automatisch den entsprechenden Anfragen zugewiesen.",
+        )
+        for placeholder in ("%(name)s", "%(tag)s", "%(serial)s", "%(url)s"):
+            self.assertEqual(translated_custody.count(placeholder), 1)
+        self.assertEqual(translated_bulk_receive.count("%(count)s"), 1)

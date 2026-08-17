@@ -25,7 +25,7 @@
           <div>
             <h4 class="mb-1 fw-bold">{% translate "Bulk Stock Receipt &amp; Allocation" %}</h4>
             <p class="mb-0 text-muted">
-              {% blocktranslate with count=requests_data|length %}You are receiving hardware to fulfill {{ count }} approved request(s). Enter the serial numbers and unique details for each asset below. Creating these assets will automatically allocate them to the corresponding requests.{% endblocktranslate %}
+              {% blocktranslate with count=requests_data|length %}Enter serial numbers and asset details below for the approved requests ({{ count }} total). New assets will be allocated to the matching requests.{% endblocktranslate %}
             </p>
           </div>
         </div>
