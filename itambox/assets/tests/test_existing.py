@@ -1,12 +1,17 @@
+import datetime
+import re
 from decimal import Decimal
 
+from django import forms
 from django.contrib.auth import get_user_model
 from django.contrib.contenttypes.models import ContentType
-from django.test import SimpleTestCase, TestCase, TransactionTestCase
+from django.test import SimpleTestCase, TestCase, TransactionTestCase, override_settings
 from django.urls import reverse
 from django.utils import translation
 from django.utils.translation import gettext, ngettext
+from model_bakery import baker
 
+from assets.forms.asset_form import AssetForm
 from assets.models import (
     Asset,
     AssetMaintenance,
@@ -21,6 +26,9 @@ from assets.models import (
 )
 from compliance.models import CustodyReceipt
 from core.managers import set_current_tenant
+from core.models import ObjectChange
+from core.serialization import serialize_object
+from core.tests.mixins import TenantTestMixin
 from extras.models import CustomField, CustomFieldset
 from inventory.models import (
     Accessory,
@@ -35,7 +43,7 @@ from inventory.models import (
 from inventory.models_assignment_write import authorized_assignment_write
 from inventory.services import checkin_component, purge_inventory_assignment
 from inventory.tests.factories import create_assignment_fixture
-from organization.models import Contact, ContactAssignment, ContactRole
+from organization.models import Contact, ContactAssignment, ContactRole, Location, Site, Tenant
 
 User = get_user_model()
 
@@ -1378,3 +1386,247 @@ class EnglishAssetCopyLocalizationTest(SimpleTestCase):
         for placeholder in ("%(name)s", "%(tag)s", "%(serial)s", "%(url)s"):
             self.assertEqual(translated_custody.count(placeholder), 1)
         self.assertEqual(translated_bulk_receive.count("%(count)s"), 1)
+
+
+PURCHASE_DATE = datetime.date(2024, 1, 15)
+IN_SERVICE_DATE = datetime.date(2024, 2, 1)
+EXPECTED_EOL_DATE = datetime.date(2027, 1, 15)
+ISO_DATE_RE = re.compile(r"\d{4}-\d{2}-\d{2}\Z")
+
+
+@override_settings(LANGUAGE_CODE="de")
+class Issue391AssetEditTests(TenantTestMixin, TestCase):
+    maxDiff = None
+
+    def setUp(self):
+        self.setup_tenant_context(name="Issue 391 Tenant", slug="issue-391")
+        self.other_tenant = Tenant.objects.create(name="Other Tenant", slug="issue-391-other")
+        self.set_active_tenant(self.tenant)
+
+        site = Site.objects.create(name="Issue 391 Site", slug="issue-391-site", tenant=self.tenant)
+        self.location = Location.objects.create(
+            name="Room 391 A",
+            slug="room-391-a",
+            site=site,
+            tenant=self.tenant,
+        )
+        self.other_location = Location.objects.create(
+            name="Room 391 B",
+            slug="room-391-b",
+            site=site,
+            tenant=self.tenant,
+        )
+        self.asset_type = baker.make(AssetType, eol_months=36)
+        self.status = baker.make(StatusLabel, type=StatusLabel.TYPE_DEPLOYABLE)
+        self.asset = Asset.objects.create(
+            name="Issue 391 Laptop",
+            asset_tag="ISSUE-391",
+            serial_number="SN-391",
+            asset_type=self.asset_type,
+            status=self.status,
+            tenant=self.tenant,
+            location=self.location,
+            purchase_date=PURCHASE_DATE,
+            purchase_cost=Decimal("1299.95"),
+            salvage_value=Decimal("199.95"),
+            currency="EUR",
+            order_number="ORDER-391",
+            in_service_date=IN_SERVICE_DATE,
+            notes="Issue 391 original notes",
+            requestable=True,
+        )
+        self.asset_content_type = ContentType.objects.get_for_model(Asset)
+        self.edit_url = reverse("assets:asset_update", kwargs={"pk": self.asset.pk})
+        self.detail_url = reverse("assets:asset_detail", kwargs={"pk": self.asset.pk})
+        self.client.force_login(self.tenant_admin)
+
+    def _get(self, url=None):
+        with translation.override("de"):
+            return self.client.get(url or self.edit_url, HTTP_ACCEPT_LANGUAGE="de")
+
+    def _post(self, data, *, htmx=False):
+        headers = {"HTTP_ACCEPT_LANGUAGE": "de"}
+        if htmx:
+            headers["HTTP_HX_REQUEST"] = "true"
+        with translation.override("de"):
+            return self.client.post(self.edit_url, data=data, **headers)
+
+    def _browser_form_data(self, response):
+        """Build a complete submission from the response's AssetForm.
+
+        Browsers expose an empty value when a ``type=date`` input receives a
+        localized, non-ISO value attribute. Reproduce that DOM behavior while
+        taking every submitted field from the form's initial or bound data.
+        """
+        form = response.context["form"]
+        self.assertIsInstance(form, AssetForm)
+        data = {}
+        with translation.override("de"):
+            for name, field in form.fields.items():
+                value = form[name].value()
+                widget = field.widget
+                prepared = field.prepare_value(value)
+
+                if isinstance(widget, forms.SelectMultiple):
+                    if prepared in (None, ""):
+                        data[name] = []
+                    elif isinstance(prepared, (list, tuple, set)):
+                        data[name] = [str(item) for item in prepared]
+                    else:
+                        data[name] = [str(prepared)]
+                    continue
+
+                if isinstance(widget, forms.Select):
+                    data[name] = "" if prepared is None else str(prepared)
+                    continue
+
+                rendered = widget.format_value(value)
+                rendered = "" if rendered is None else str(rendered)
+                input_type = widget.attrs.get("type", getattr(widget, "input_type", None))
+                if input_type == "date" and rendered:
+                    try:
+                        valid_date = bool(ISO_DATE_RE.fullmatch(rendered)) and bool(
+                            datetime.date.fromisoformat(rendered)
+                        )
+                    except ValueError:
+                        valid_date = False
+                    if not valid_date:
+                        rendered = ""
+                data[name] = rendered
+
+        self.assertEqual(set(data), set(form.fields))
+        return data
+
+    def _assert_iso_date_inputs(self, response):
+        html = response.content.decode()
+        input_tags = re.findall(r"<input\b[^>]*>", html)
+        for field_name, expected in (
+            ("purchase_date", PURCHASE_DATE.isoformat()),
+            ("in_service_date", IN_SERVICE_DATE.isoformat()),
+        ):
+            with self.subTest(field=field_name):
+                tag = next((item for item in input_tags if 'name="' + field_name + '"' in item), None)
+                self.assertIsNotNone(tag)
+                self.assertIn('type="date"', tag)
+                self.assertIn('value="' + expected + '"', tag)
+
+    def _snapshot(self):
+        asset = Asset._base_manager.get(pk=self.asset.pk)
+        return serialize_object(asset, exclude_fields={"updated_at"})
+
+    def _changes(self):
+        return list(
+            ObjectChange._base_manager.filter(
+                changed_object_type=self.asset_content_type,
+                changed_object_id=self.asset.pk,
+            ).order_by("pk")
+        )
+
+    def _assert_one_change(self, before, *, audit_tenant, **updates):
+        changes = self._changes()
+        self.assertEqual(len(changes), 1)
+        change = changes[0]
+        expected_after = {**before, **updates}
+        self.assertEqual(change.action, "update")
+        self.assertEqual(change.user_id, self.tenant_admin.pk)
+        self.assertEqual(change.tenant_id, audit_tenant.pk)
+        self.assertEqual(change.prechange_data, before)
+        self.assertEqual(change.postchange_data, expected_after)
+
+    def _assert_lifecycle(self, asset):
+        self.assertEqual(
+            (asset.purchase_date, asset.in_service_date, asset.eol_date),
+            (PURCHASE_DATE, IN_SERVICE_DATE, EXPECTED_EOL_DATE),
+        )
+
+    def test_german_edit_get_renders_both_date_inputs_as_iso(self):
+        response = self._get()
+
+        self.assertEqual(response.status_code, 200)
+        self._assert_iso_date_inputs(response)
+
+    def test_tenant_reload_is_read_only_and_final_post_preserves_lifecycle(self):
+        edit_response = self._get()
+        before = self._snapshot()
+        reload_data = self._browser_form_data(edit_response)
+        reload_data.update({"tenant": str(self.other_tenant.pk), "_reload": "1"})
+
+        reload_response = self._post(reload_data, htmx=True)
+
+        self.assertEqual(reload_response.status_code, 200)
+        self.assertEqual(self._snapshot(), before)
+        self.assertEqual(self._changes(), [])
+        self._assert_iso_date_inputs(reload_response)
+
+        final_data = self._browser_form_data(reload_response)
+        final_data["location"] = ""
+        final_response = self._post(final_data)
+        edited = Asset._base_manager.get(pk=self.asset.pk)
+
+        self.assertEqual(
+            final_response.status_code,
+            302,
+            final_response.context["form"].errors.as_json() if final_response.context else final_response.content,
+        )
+        with self.subTest("lifecycle"):
+            self._assert_lifecycle(edited)
+        self._assert_one_change(
+            before,
+            audit_tenant=self.other_tenant,
+            tenant=self.other_tenant.pk,
+            location=None,
+        )
+
+    def test_location_only_edit_preserves_lifecycle_detail_readback_and_audit(self):
+        edit_response = self._get()
+        before = self._snapshot()
+        post_data = self._browser_form_data(edit_response)
+        post_data["location"] = str(self.other_location.pk)
+
+        post_response = self._post(post_data)
+        edited = Asset._base_manager.get(pk=self.asset.pk)
+        detail_response = self._get(self.detail_url)
+
+        self.assertEqual(post_response.status_code, 302)
+        self.assertEqual(detail_response.status_code, 200)
+        self.assertEqual(edited.location_id, self.other_location.pk)
+        with self.subTest("saved lifecycle"):
+            self._assert_lifecycle(edited)
+        with self.subTest("detail lifecycle"):
+            self._assert_lifecycle(detail_response.context["object"])
+        self._assert_one_change(before, audit_tenant=self.tenant, location=self.other_location.pk)
+
+    def test_one_optional_field_edit_preserves_every_other_value(self):
+        edit_response = self._get()
+        before = self._snapshot()
+        post_data = self._browser_form_data(edit_response)
+        post_data["notes"] = "Only this optional field changed"
+
+        post_response = self._post(post_data)
+        expected_after = {**before, "notes": "Only this optional field changed"}
+
+        self.assertEqual(post_response.status_code, 302)
+        self.assertEqual(self._snapshot(), expected_after)
+        self._assert_one_change(
+            before,
+            audit_tenant=self.tenant,
+            notes="Only this optional field changed",
+        )
+
+    def test_explicit_blank_dates_still_clear_them(self):
+        edit_response = self._get()
+        before = self._snapshot()
+        post_data = self._browser_form_data(edit_response)
+        post_data.update({"purchase_date": "", "in_service_date": ""})
+
+        post_response = self._post(post_data)
+        edited = Asset._base_manager.get(pk=self.asset.pk)
+
+        self.assertEqual(post_response.status_code, 302)
+        self.assertEqual((edited.purchase_date, edited.in_service_date, edited.eol_date), (None, None, None))
+        self._assert_one_change(
+            before,
+            audit_tenant=self.tenant,
+            purchase_date=None,
+            in_service_date=None,
+        )

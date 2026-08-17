@@ -16,6 +16,8 @@ from ..models import Asset, AssetRole, AssetTagSequence, AssetType, StatusLabel,
 from ..models.choices import WarrantyTypeChoices
 from .fields import StatusModelChoiceField
 
+HTML5_DATE_FORMAT = "%Y-%m-%d"
+
 # Changing the asset type or the owning tenant re-derives the tag preview, the
 # tenant-scoped FK choices and the dynamic custom fields, so both fields swap the
 # whole form back in. The two widgets must carry the identical attribute set.
@@ -63,7 +65,8 @@ class AssetForm(CrispyFormMixin, forms.ModelForm):
         widget=forms.Select(attrs={"class": "form-select", "data-tom-select": ""}),
     )
     purchase_date = forms.DateField(
-        widget=forms.DateInput(attrs={"type": "date", "class": "form-control"}), required=False
+        widget=forms.DateInput(format=HTML5_DATE_FORMAT, attrs={"type": "date", "class": "form-control"}),
+        required=False,
     )
     requestable = forms.ChoiceField(
         choices=[
@@ -138,7 +141,10 @@ class AssetForm(CrispyFormMixin, forms.ModelForm):
             "salvage_value": forms.NumberInput(attrs={"class": "form-control", "step": "0.01"}),
             "currency": forms.Select(attrs={"class": "form-select", "data-tom-select": ""}),
             "order_number": forms.TextInput(attrs={"class": "form-control"}),
-            "in_service_date": forms.DateInput(attrs={"class": "form-control", "type": "date"}),
+            "in_service_date": forms.DateInput(
+                format=HTML5_DATE_FORMAT,
+                attrs={"class": "form-control", "type": "date"},
+            ),
             "depreciation_override": forms.Select(attrs={"class": "form-select", "data-tom-select": ""}),
             "notes": forms.Textarea(attrs={"class": "form-control", "rows": 3}),
             "tenant": forms.Select(attrs={"class": "form-select", "data-tom-select": ""}),
