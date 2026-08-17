@@ -1668,11 +1668,12 @@ class JavaScriptCatalogLocalizationTest(SimpleTestCase):
     }
 
     def test_german_javascript_catalog_translates_reviewed_entries(self):
-        response = self.client.get(
-            reverse("javascript-catalog"),
-            HTTP_ACCEPT_LANGUAGE="de",
-            HTTP_HOST="localhost",
-        )
+        with translation.override("de"):
+            response = self.client.get(
+                reverse("javascript-catalog"),
+                HTTP_ACCEPT_LANGUAGE="de",
+                HTTP_HOST="localhost",
+            )
         self.assertEqual(response.status_code, 200)
         body = response.content.decode("utf-8")
         marker = "const newcatalog = "
