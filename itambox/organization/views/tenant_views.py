@@ -2,6 +2,7 @@ from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.contrib.auth.mixins import LoginRequiredMixin
 from django.core.exceptions import PermissionDenied
+from django.db import transaction
 from django.db.models import Count, Q
 from django.http import Http404, HttpResponse
 from django.shortcuts import get_object_or_404, redirect, render
@@ -29,6 +30,7 @@ from ..access import tenant_access_report
 from ..filters import TenantFilterSet
 from ..forms import TenantFilterForm, TenantForm
 from ..models import Tenant
+from ..services.tenant_onboarding import onboard_managed_tenant
 from ..tables import AssetHolderTable, LocationTable, SiteTable, TenantTable
 
 
@@ -350,6 +352,36 @@ class TenantEditView(ObjectEditView):
         kwargs["user"] = self.request.user
         kwargs["managed_by_param"] = self.request.GET.get("managed_by")
         return kwargs
+
+    def form_valid(self, form):
+        is_creating = self.object is None or self.object.pk is None
+        is_managed_onboarding = not self.request.user.is_superuser and is_creating and "managed_by" in self.request.GET
+        if not is_managed_onboarding:
+            return super().form_valid(form)
+        if form.instance.managed_by_id is None:
+            raise PermissionDenied(_("You do not have permission to onboard a tenant for this provider."))
+
+        provider_id = form.instance.managed_by_id
+        with transaction.atomic():
+            self.object = form.save()
+            onboard_managed_tenant(
+                actor=self.request.user,
+                provider_id=provider_id,
+                tenant=self.object,
+            )
+
+        self.add_success_message(
+            _("Created %(model)s <a href='%(url)s'>%(object)s</a>")
+            % {
+                "model": self.model._meta.verbose_name,
+                "url": self.object.get_absolute_url(),
+                "object": self.object,
+            }
+        )
+        self.request.session["active_tenant_id"] = self.object.pk
+        self.request.session.pop("active_tenant_group_id", None)
+        self.request.session.pop("active_all_accessible", None)
+        return redirect(self.object.get_absolute_url())
 
 
 class TenantDeleteView(ObjectDeleteView):
