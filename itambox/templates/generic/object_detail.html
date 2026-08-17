@@ -100,8 +100,10 @@
          class="nav-link {% if not request.GET.tab or request.GET.tab == 'details' %}active{% endif %}"
          data-bs-toggle="tab"
          hx-boost="false"
-         role="tab">
-        <i class="mdi mdi-information-outline me-1"></i>
+         role="tab"
+         aria-label="{% translate 'Details' %}"
+         title="{% translate 'Details' %}">
+        <i class="mdi mdi-information-outline me-1" aria-hidden="true"></i>
         <span class="d-none d-xl-inline ms-1">{% translate "Details" %}</span>
       </a>
     </li>
@@ -118,8 +120,11 @@
            class="nav-link {% if request.GET.tab == 'subscriptions' %}active{% endif %}"
            data-bs-toggle="tab"
            hx-boost="false"
-           role="tab">
-          <i class="mdi mdi-receipt-text-outline me-1 text-info"></i>
+           role="tab"
+           aria-label="{% translate 'Subscriptions' %}"
+           title="{% translate 'Subscriptions' %}">
+          <i class="mdi mdi-receipt-text-outline me-1 text-info"
+             aria-hidden="true"></i>
           <span class="d-none d-xl-inline ms-1">{% translate "Subscriptions" %}</span>
           <span class="badge bg-info-lt ms-1">{{ subscription_assignments_count }}</span>
         </a>
@@ -136,8 +141,10 @@
            class="nav-link {% if request.GET.tab == 'attachments' %}active{% endif %}"
            data-bs-toggle="tab"
            hx-boost="false"
-           role="tab">
-          <i class="mdi mdi-paperclip me-1"></i>
+           role="tab"
+           aria-label="{% translate 'Attachments' %}"
+           title="{% translate 'Attachments' %}">
+          <i class="mdi mdi-paperclip me-1" aria-hidden="true"></i>
           <span class="d-none d-xl-inline ms-1">{% translate "Attachments" %}</span>
         </a>
       </li>
@@ -153,8 +160,10 @@
            class="nav-link {% if request.GET.tab == 'changelog' %}active{% endif %}"
            data-bs-toggle="tab"
            hx-boost="false"
-           role="tab">
-          <i class="mdi mdi-history me-1"></i>
+           role="tab"
+           aria-label="{% translate 'Changelog' %}"
+           title="{% translate 'Changelog' %}">
+          <i class="mdi mdi-history me-1" aria-hidden="true"></i>
           <span class="d-none d-xl-inline ms-1">{% translate "Changelog" %}</span>
         </a>
       </li>
@@ -170,8 +179,10 @@
            class="nav-link {% if request.GET.tab == 'journal' %}active{% endif %}"
            data-bs-toggle="tab"
            hx-boost="false"
-           role="tab">
-          <i class="mdi mdi-notebook-outline me-1"></i>
+           role="tab"
+           aria-label="{% translate 'Journal' %}"
+           title="{% translate 'Journal' %}">
+          <i class="mdi mdi-notebook-outline me-1" aria-hidden="true"></i>
           <span class="d-none d-xl-inline ms-1">{% translate "Journal" %}</span>
           <span class="badge bg-secondary ms-1">{{ journal_entries_count }}</span>
         </a>

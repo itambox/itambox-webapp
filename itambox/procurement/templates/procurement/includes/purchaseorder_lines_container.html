@@ -42,13 +42,17 @@
               <button class="btn btn-sm btn-success"
                       hx-post="{% url 'procurement:purchaseorderline_edit' pk=line.pk %}"
                       hx-include="closest tr"
-                      hx-target="#line-items-container">
-                <i class="mdi mdi-check"></i>
+                      hx-target="#line-items-container"
+                      aria-label="{% translate 'Save line item' %}"
+                      title="{% translate 'Save line item' %}">
+                <i class="mdi mdi-check" aria-hidden="true"></i>
               </button>
               <button class="btn btn-sm btn-secondary"
                       hx-get="{% url 'procurement:purchaseorderline_add' po_pk=object.pk %}"
-                      hx-target="#line-items-container">
-                <i class="mdi mdi-close"></i>
+                      hx-target="#line-items-container"
+                      aria-label="{% translate 'Cancel line item edit' %}"
+                      title="{% translate 'Cancel line item edit' %}">
+                <i class="mdi mdi-close" aria-hidden="true"></i>
               </button>
             </td>
           </tr>
@@ -69,14 +73,18 @@
               {% if object.status == 'draft' %}
                 <button class="btn btn-sm btn-outline-secondary me-1"
                         hx-get="{% url 'procurement:purchaseorderline_edit' pk=line.pk %}"
-                        hx-target="#line-items-container">
-                  <i class="mdi mdi-pencil"></i>
+                        hx-target="#line-items-container"
+                        aria-label="{% translate 'Edit line item' %}"
+                        title="{% translate 'Edit line item' %}">
+                  <i class="mdi mdi-pencil" aria-hidden="true"></i>
                 </button>
                 <button class="btn btn-sm btn-outline-danger"
                         hx-post="{% url 'procurement:purchaseorderline_delete' pk=line.pk %}"
                         hx-target="#line-items-container"
-                        hx-confirm="{% translate 'Are you sure?' %}">
-                  <i class="mdi mdi-delete"></i>
+                        hx-confirm="{% translate 'Are you sure?' %}"
+                        aria-label="{% translate 'Delete line item' %}"
+                        title="{% translate 'Delete line item' %}">
+                  <i class="mdi mdi-delete" aria-hidden="true"></i>
                 </button>
               {% endif %}
             </td>
