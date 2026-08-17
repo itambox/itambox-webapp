@@ -1,6 +1,7 @@
 """Regression tests for Issue #389 accessible names on icon-only controls."""
 
 from decimal import Decimal
+from html.parser import HTMLParser
 
 from django.contrib.contenttypes.models import ContentType
 from django.core.files.uploadedfile import SimpleUploadedFile
@@ -14,6 +15,17 @@ from licenses.models import License
 from organization.models import Location, Site
 from procurement.models import PurchaseOrder, PurchaseOrderLine
 from software.models import Software
+
+
+class _RoleTabParser(HTMLParser):
+    def __init__(self):
+        super().__init__()
+        self.tabs = []
+
+    def handle_starttag(self, tag, attrs):
+        attributes = dict(attrs)
+        if attributes.get("role") == "tab":
+            self.tabs.append(attributes)
 
 
 class AssetDetailAccessibleNameTests(TenantTestMixin, TestCase):
@@ -56,7 +68,10 @@ class AssetDetailAccessibleNameTests(TenantTestMixin, TestCase):
         response = self.client.get(reverse("assets:asset_detail", kwargs={"pk": self.asset.pk}))
 
         self.assertEqual(response.status_code, 200)
-        self.assertContains(response, 'role="tab"')
+        parser = _RoleTabParser()
+        parser.feed(response.content.decode())
+        self.assertGreaterEqual(len(parser.tabs), 3)
+        self.assertTrue(all(tab.get("aria-label") for tab in parser.tabs), parser.tabs)
         self.assertContains(response, 'aria-label="Details"')
         self.assertContains(response, 'aria-label="Attachments"')
         self.assertContains(response, 'aria-label="Changelog"')
