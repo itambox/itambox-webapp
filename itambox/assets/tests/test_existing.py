@@ -2,8 +2,10 @@ from decimal import Decimal
 
 from django.contrib.auth import get_user_model
 from django.contrib.contenttypes.models import ContentType
-from django.test import TestCase, TransactionTestCase
+from django.test import SimpleTestCase, TestCase, TransactionTestCase
 from django.urls import reverse
+from django.utils import translation
+from django.utils.translation import gettext, ngettext
 
 from assets.models import (
     Asset,
@@ -1275,3 +1277,43 @@ class CategoryTestCase(_SeededStatusLabelsMixin, TestCase):
         # Check that the color hex is displayed, and the badge span contains the background-color style
         self.assertContains(response, "background-color:#ff0000")
         self.assertContains(response, "#ff0000")
+
+
+class AssetCatalogLocalizationTest(SimpleTestCase):
+    def test_german_asset_labels_follow_the_glossary(self):
+        bulk_receive_message = (
+            "You are receiving hardware to fulfill %(count)s approved request(s). "
+            "Enter the serial numbers and unique details for each asset below. "
+            "Creating these assets will automatically allocate them to the corresponding requests."
+        )
+        translations = {
+            "Add new Asset Type": "Neuen Asset-Typ hinzufügen",
+            "Add new Location": "Neuen Lagerort hinzufügen",
+            "Custody Declined": "Verwahrung abgelehnt",
+            "View Receipt": "Übergabeprotokoll anzeigen",
+            "Warranty Provider": "Garantieanbieter",
+            "Please select an Asset Holder target.": "Wählen Sie einen Asset-Inhaber als Ziel aus.",
+            "The holder has no e-mail address.": "Der Asset-Inhaber hat keine E-Mail-Adresse.",
+            bulk_receive_message: (
+                "Sie nehmen Hardware entgegen, um genehmigte Anfragen zu erfüllen "
+                "(Anzahl: %(count)s). Geben Sie unten die Seriennummern und individuellen "
+                "Angaben für jedes Asset ein. Beim Anlegen werden die Assets automatisch "
+                "den entsprechenden Anfragen zugewiesen."
+            ),
+        }
+
+        with translation.override("de"):
+            for source, expected in translations.items():
+                with self.subTest(source=source):
+                    self.assertEqual(gettext(source), expected)
+                    for placeholder in ("%(count)s", "%(field)s"):
+                        if placeholder in source:
+                            self.assertIn(placeholder, gettext(source))
+
+    def test_german_delete_plural_keeps_both_forms(self):
+        singular = "Delete %(counter)s %(model_verbose_name)s"
+        plural = "Delete %(counter)s %(model_verbose_name_plural)s"
+
+        with translation.override("de"):
+            self.assertEqual(ngettext(singular, plural, 1), "%(counter)s %(model_verbose_name)s löschen")
+            self.assertEqual(ngettext(singular, plural, 2), "%(counter)s %(model_verbose_name_plural)s löschen")
