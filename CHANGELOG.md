@@ -16,6 +16,10 @@ This changelog follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) 
 - Asset edits no longer clear purchase and in-service dates when localized HTML5 date controls are submitted after changing the tenant, location, or another field (issue #391).
 - Managed-tenant onboarding now gives the creating provider administrator explicit administrator reach and switches directly into the new tenant without adding a customer membership.
 
+### Security
+
+- Upgraded `sqlparse` to 0.6.0 to address CVE-2026-54284, CVE-2026-59893, CVE-2026-59894, and CVE-2026-71491.
+
 ## [1.0.0-beta.1] - 2026-08-16
 
 ### Added
