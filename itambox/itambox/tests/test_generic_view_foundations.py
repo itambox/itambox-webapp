@@ -39,7 +39,7 @@ from core.tests.mixins import TenantTestMixin
 from extras.models import SavedFilter
 from itambox.views.generic.detail import ObjectDetailView
 from itambox.views.generic.service_views import GenericTransactionView, SimplePostView
-from organization.models import Tenant
+from organization.models import Role, Tenant
 
 User = get_user_model()
 
@@ -423,6 +423,39 @@ class ListContextCharacterizationTests(_CatalogFixtureMixin, TenantTestMixin, Te
 
         response = self.client.get(self.url)
         self.assertFalse(response.context["can_add"])
+
+    def test_all_accessible_scope_exposes_create_and_keeps_import_tenant_bound(self):
+        tenant_b = Tenant.objects.create(name="List Ctx Tenant B GVF", slug="list-ctx-tenant-b-gvf")
+        role_b = Role.objects.create(
+            tenant=tenant_b,
+            name="Tenant B Role",
+            permissions=["assets.view_asset", "assets.add_asset"],
+        )
+        self.grant(self.tenant_user, tenant_b, role_b)
+
+        response = self.client.get(f"{self.url}?switch_all_accessible=1")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(response.context["can_add"])
+        # The generic import path currently binds the background job to one
+        # active tenant and is therefore not safe in an aggregate scope.
+        self.assertIsNone(response.context["import_url"])
+
+        from organization.access import accessible_tenant_ids
+
+        self.assertEqual(
+            set(accessible_tenant_ids(self.tenant_user)),
+            {self.tenant.pk, tenant_b.pk},
+        )
+
+        create_response = self.client.get(f"{reverse('assets:asset_create')}?switch_all_accessible=1")
+        self.assertEqual(create_response.status_code, 200)
+        self.assertTrue(create_response.wsgi_request.active_all_accessible)
+        self.assertIsNone(create_response.wsgi_request.active_tenant)
+        tenant_field = create_response.context["form"].fields["tenant"]
+        self.assertContains(create_response, self.tenant.name)
+        self.assertContains(create_response, tenant_b.name)
+        self.assertFalse(tenant_field.disabled)
 
     def test_active_saved_filter_id_is_none_without_a_filter_param(self):
         response = self.client.get(self.url)

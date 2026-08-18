@@ -289,7 +289,11 @@ class ObjectListView(TenantScopingViewMixin, PermissionRequiredMixin, LoginRequi
         _importable = is_model_importable(_model)
         context["can_export"] = _importable
         context["import_url"] = None
-        if _importable and mutation_allowed:
+        # The generic importer binds its background job to ``active_tenant`` and
+        # has no tenant picker. Keep it concrete-scope-only until it can carry
+        # the same explicit tenant-selection contract as create forms.
+        has_concrete_tenant_scope = self.request.user.is_superuser or bool(getattr(self.request, "active_tenant", None))
+        if _importable and mutation_allowed and has_concrete_tenant_scope:
             try:
                 context["import_url"] = reverse(
                     "generic_import",
