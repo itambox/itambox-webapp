@@ -38,7 +38,7 @@ from core.management.commands._seed.compliance import SeedComplianceMixin
 from core.management.commands._seed.engine import ChangeLogEngine
 from core.management.commands._seed.finance import SeedFinanceMixin
 from core.management.commands._seed.history import SeedHistoryMixin
-from core.management.commands._seed.inventory import SeedInventoryStockMixin
+from core.management.commands._seed.inventory import SeedInventoryStockMixin, check_seed_inventory_invariants
 from core.management.commands._seed.licensing import SeedLicensingMixin
 from core.management.commands._seed.lifecycle import SeedLifecycleMixin
 from core.management.commands._seed.maintenance import SeedMaintenanceMixin
@@ -296,6 +296,7 @@ class Command(
             self._seed_export_templates()  # global Jinja export templates (no tenant/random)
             self._simulate_history()  # real 2-year change history (last)
             check_seed_access_invariants(self._users.values())
+            check_seed_inventory_invariants()
 
     # ─────────────────────────────────────────────────────────────────
     # Catalog (shared status-label defs used by both _seed_minimal and _seed_catalog)

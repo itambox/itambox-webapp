@@ -3124,22 +3124,6 @@
       "count": 1
     },
     {
-      "path": "itambox/core/management/commands/_seed/inventory.py",
-      "code": "B007",
-      "message": "Loop control variable 'comp_slug' not used within the loop body. If this is intended, start the name with an underscore.",
-      "source": "        for comp_slug, comp in self._components.items():",
-      "context": "Module:body/ClassDef:SeedInventoryStockMixin:body/FunctionDef:_seed_inventory_stock:body/For:Tuple(elts=[Name(id='comp_slug', ctx=Store()), Name(id='comp', ctx=Store())], ctx=Store()):Call(func=Attribute(value=Attribute(value=Name(id='self', ctx=Load()), attr='_components', ctx=Load()), attr='items', ctx=Load()), args=[], keywords=[]):self",
-      "count": 1
-    },
-    {
-      "path": "itambox/core/management/commands/_seed/inventory.py",
-      "code": "C901",
-      "message": "'SeedInventoryStockMixin._seed_inventory_stock' is too complex (23)",
-      "source": "    def _seed_inventory_stock(self):",
-      "context": "Module:body/ClassDef:SeedInventoryStockMixin:body/FunctionDef:_seed_inventory_stock:self",
-      "count": 1
-    },
-    {
       "path": "itambox/core/management/commands/_seed/licensing.py",
       "code": "C901",
       "message": "'SeedLicensingMixin._seed_licensing' is too complex (11)",

@@ -81,38 +81,36 @@ class SeedAssetsMixin:
         return "Windows 11 23H2"
 
     def _seed_component_allocation(self, allocation_model, component, qty, asset):
-        """Allocate a seeded component through the authorized inventory seam.
+        """Create a planned component allocation through the authorized seam.
 
-        The assignment models refuse a direct ORM create before any pool row is
-        touched, so the seed asks its own ``TaskContext`` for an explicit,
-        audited system authorization in the owning asset's tenant instead of
-        writing the row itself. ``get_or_create`` has no service equivalent, so
-        re-seed idempotency is an explicit live-row check. Demo generation
-        intentionally permits synthetic over-allocation, as the legacy seed did.
+        Assignment writes are protected before stock bookkeeping, so the seed
+        obtains an audited actorless authorization in the asset's tenant and
+        uses the service rather than writing the allocation row directly.
+        Idempotency is an explicit live-row check because the service has no
+        ``get_or_create`` equivalent.
         """
         if allocation_model._base_manager.filter(
             component=component,
             assigned_asset=asset,
             deleted_at__isnull=True,
         ).exists():
-            return
+            return False
         with TaskContext(tenant_id=asset.tenant_id) as task_context:
             create_component_allocation(
                 component,
                 qty,
                 asset=asset,
-                system_allow_overallocate=True,
                 system_authorization=task_context.authorize_system(
                     permission="inventory.add_componentallocation",
                     operation=COMPONENT_ALLOCATION_OPERATION,
                     reason="Seed approved same-tenant component allocations",
                 ),
             )
+        return True
 
     def _seed_assets(self):
         from assets.models import Asset, AssetAssignment, AssetTagSequence
         from compliance.models import CustodyReceipt, CustodyTemplate
-        from inventory.models import ComponentAllocation
         from software.models import InstalledSoftware
 
         self.stdout.write("--- Assets ---")
@@ -611,8 +609,10 @@ class SeedAssetsMixin:
                 )
                 sw_count += created
 
-        # Component allocations into servers and CAD towers
-        alloc = 0
+        # Plan component allocations here without adding random draws to the
+        # asset phase. The inventory phase creates them after component stock
+        # exists, so the authorized service can enforce availability normally.
+        self._component_allocation_plan = []
         cad = [
             a
             for a in self._assets
@@ -628,13 +628,11 @@ class SeedAssetsMixin:
                 ("dell-perc-h755", 1),
             ]:
                 if random.random() < 0.7:
-                    self._seed_component_allocation(ComponentAllocation, self._components[comp_slug], qty, srv)
-                    alloc += 1
+                    self._component_allocation_plan.append((comp_slug, qty, srv))
         for ws in cad[:30]:
             for comp_slug, qty in [("crucial-16gb-ddr5", 2), ("nvidia-rtx-6000", 1), ("samsung-2tb-nvme", 1)]:
                 if random.random() < 0.6:
-                    self._seed_component_allocation(ComponentAllocation, self._components[comp_slug], qty, ws)
-                    alloc += 1
+                    self._component_allocation_plan.append((comp_slug, qty, ws))
 
         # Custody receipts for regulated-industry laptops/mobiles (signed)
         receipts = 0
@@ -674,5 +672,5 @@ class SeedAssetsMixin:
 
         self.stdout.write(
             f"  {len(self._assets)} assets, {sw_count} software installs, "
-            f"{alloc} component allocations, {receipts} custody receipts."
+            f"{len(self._component_allocation_plan)} component allocations planned, {receipts} custody receipts."
         )

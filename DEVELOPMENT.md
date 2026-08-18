@@ -55,6 +55,36 @@ Production always runs in Docker/Linux with the full dependency set.
 | `uv run --locked --group dev python manage.py seed_data --skip-drop` | Add data without clearing existing |
 | `uv run --locked --group dev python manage.py seed_data --production` | Minimal seed (admin + status labels only) |
 
+### Demo inventory consistency
+
+The full demo seed keeps one stock identity across components, accessories, and
+consumables. Stock rows contain current on-hand units. For a component,
+`available = total_stock - active_allocations`. For an accessory or consumable,
+`available = total_stock - active_assignments_without_from_location`; a
+source-backed checkout has already deducted its quantity from the source stock
+row, so it is not deducted a second time from the item total. In equivalent
+form, for those two item types:
+
+```text
+available = total_stock + source_backed_assignments - all_active_assignments
+```
+
+Components are global catalogue rows while stock rows belong to locations and
+therefore tenants. The active tenant can see all allocations of a global
+component but only its own stock, so the seed provisions the global planned
+allocation total in every tenant-facing component pool.
+
+The accessory/consumable model clamps its displayed availability at zero, but
+this seed self-check validates the raw balance before any display clamp. The
+seed creates component allocations and accessory/consumable checkouts
+through the authorized inventory services. It prepares enough stock for planned
+component allocations and deducts source-backed checkouts from their stock
+rows. The full command runs an unconditional inventory self-check at the end;
+negative stock, negative raw availability, missing source pools, invalid
+assignment targets, and over-allocation/consumption abort the seed with a
+`CommandError`. Use the full wipe-and-reseed mode for a reproducible repair of
+an inconsistent disposable demo database.
+
 ## Tenant FK Pattern
 
 ### Adding Tenant to a New Model
