@@ -7,7 +7,8 @@
 {% endblock %}
 {% block page_actions %}
   <a href="{% url 'organization:tenant_detail' pk=tenant.pk %}"
-     class="btn btn-outline-secondary">
+     class="btn btn-outline-secondary"
+     hx-boost="false">
     <i class="mdi mdi-arrow-left"></i>
     {% translate "Back to Tenant" %}
   </a>

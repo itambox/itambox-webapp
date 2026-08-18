@@ -398,7 +398,8 @@
 {% endblock extra_tab_panes %}
 {% block extra_page_actions %}
   <a href="{% url 'organization:tenant_access' pk=object.pk %}"
-     class="btn btn-ghost-secondary">
+     class="btn btn-ghost-secondary"
+     hx-boost="false">
     <i class="mdi mdi-account-key-outline me-1"></i>
     {% translate "Who Has Access" %}
   </a>

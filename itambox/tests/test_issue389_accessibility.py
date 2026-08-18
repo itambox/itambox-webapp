@@ -28,6 +28,16 @@ class _RoleTabParser(HTMLParser):
             self.tabs.append(attributes)
 
 
+class _AnchorParser(HTMLParser):
+    def __init__(self):
+        super().__init__()
+        self.anchors = []
+
+    def handle_starttag(self, tag, attrs):
+        if tag == "a":
+            self.anchors.append(dict(attrs))
+
+
 class AssetDetailAccessibleNameTests(TenantTestMixin, TestCase):
     def setUp(self):
         self.setup_tenant_context(slug="issue389-accessible-tabs")
@@ -130,3 +140,35 @@ class PurchaseOrderLineAccessibleNameTests(TenantTestMixin, TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, 'aria-label="Edit line item"')
         self.assertContains(response, 'aria-label="Delete line item"')
+
+
+class TenantAccessNavigationTests(TenantTestMixin, TestCase):
+    def setUp(self):
+        self.setup_tenant_context(slug="issue406-tenant-access")
+        self.client_login_to_tenant(self.tenant_admin, self.tenant)
+
+    def test_who_has_access_uses_a_single_full_page_navigation(self):
+        detail_response = self.client.get(reverse("organization:tenant_detail", kwargs={"pk": self.tenant.pk}))
+        access_url = reverse("organization:tenant_access", kwargs={"pk": self.tenant.pk})
+
+        self.assertEqual(detail_response.status_code, 200)
+        parser = _AnchorParser()
+        parser.feed(detail_response.content.decode())
+        access_links = [anchor for anchor in parser.anchors if anchor.get("href") == access_url]
+        self.assertEqual(len(access_links), 1)
+        self.assertEqual(access_links[0].get("hx-boost"), "false")
+
+        access_response = self.client.get(access_url)
+
+        self.assertEqual(access_response.status_code, 200)
+        self.assertTemplateUsed(access_response, "organization/tenants/who_has_access.html")
+        content = access_response.content.decode()
+        parser = _AnchorParser()
+        parser.feed(content)
+        detail_url = reverse("organization:tenant_detail", kwargs={"pk": self.tenant.pk})
+        back_links = [anchor for anchor in parser.anchors if anchor.get("href") == detail_url]
+        self.assertEqual(len(back_links), 1)
+        self.assertEqual(back_links[0].get("hx-boost"), "false")
+        self.assertEqual(content.count('id="page-content-wrapper"'), 1)
+        self.assertEqual(content.count('id="modal-placeholder"'), 1)
+        self.assertEqual(content.count('<footer class="footer'), 1)
