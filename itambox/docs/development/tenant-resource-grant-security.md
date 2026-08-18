@@ -196,6 +196,7 @@ PYTHONPATH=itambox uv run --locked --group dev python -m pytest -q -p no:cachepr
   itambox/core/tests/test_issue185_alert_delivery.py \
   itambox/itambox/tests/test_django_tables2_compat.py \
   itambox/itambox/tests/test_generic_view_components.py \
+  itambox/itambox/tests/test_generic_view_foundations.py \
   itambox/itambox/tests/test_rest_api_options.py \
   itambox/tests/test_issue389_accessibility.py \
   itambox/itambox/tests/test_api_namespace_roots.py \
