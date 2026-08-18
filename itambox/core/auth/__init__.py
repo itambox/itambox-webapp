@@ -246,14 +246,20 @@ class MembershipBackend:
 
     @staticmethod
     def _aggregate_scope_allows_ambient_permission(perm):
-        """The member-only all-accessible scope is an aggregate read view.
+        """Allow read and tenant-selecting create gates in aggregate scopes.
 
-        It has no single tenant anchor, so an objectless mutation permission
-        would let a permission held in tenant A authorize a job/import touching
-        tenant B (or create a tenant-less global row). Only conventional
-        ``view_*`` permissions are safe to aggregate. Mutations remain available
-        after selecting one tenant, or through an explicit object-bound check.
+        All-accessible has no single tenant anchor. Objectless change/delete or
+        transaction permissions would therefore authorize an unanchored mutation
+        against an arbitrary tenant. ``add_*`` is the deliberate exception for
+        create forms: the form must select a concrete tenant and the generic edit
+        view re-checks that tenant-bound permission in ``form_valid``.
         """
+        codename = perm.rsplit(".", 1)[-1]
+        return codename.startswith(("view_", "add_"))
+
+    @staticmethod
+    def _aggregate_scope_allows_module_permission(perm):
+        """Keep aggregate navigation read-oriented even when add is available."""
         codename = perm.rsplit(".", 1)[-1]
         return codename.startswith("view_")
 
@@ -299,7 +305,7 @@ class MembershipBackend:
             if get_current_all_accessible():
                 all_perms = self._all_accessible_permissions(user_obj)
                 return any(
-                    p.startswith(prefix) and self._aggregate_scope_allows_ambient_permission(p) for p in all_perms
+                    p.startswith(prefix) and self._aggregate_scope_allows_module_permission(p) for p in all_perms
                 )
             return any(
                 p.startswith(prefix)

@@ -551,9 +551,13 @@ class AllAccessibleAmbientPermTests(TestCase):
         self._activate_all_accessible()
         self.assertTrue(self.member.has_perm("assets.view_asset"))
 
-    def test_aggregate_scope_is_read_only_for_objectless_permissions(self):
+    def test_aggregate_scope_allows_tenant_selecting_create_only(self):
         self._activate_all_accessible()
-        self.assertFalse(self.member.has_perm("assets.add_asset"))
+        # Create is safe at the ambient gate because the form must select a
+        # concrete tenant and form_valid re-checks add permission on that tenant.
+        self.assertTrue(self.member.has_perm("assets.add_asset"))
+        # Other mutations remain object-bound; an aggregate ambient check must
+        # not authorize an unanchored change/delete/transaction operation.
         self.assertFalse(self.member.has_perm("assets.change_asset"))
         self.assertFalse(self.member.has_perm("assets.delete_asset"))
         self.assertFalse(self.member.has_perm("assets.checkin_asset"))
