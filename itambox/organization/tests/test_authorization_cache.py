@@ -1,9 +1,12 @@
 from datetime import timedelta
+from types import SimpleNamespace
 from unittest import mock
 
 from django.contrib.auth import get_user_model
 from django.core.exceptions import PermissionDenied
+from django.db import connection
 from django.test import TestCase
+from django.test.utils import CaptureQueriesContext
 from django.urls import reverse
 from django.utils import timezone
 
@@ -788,3 +791,98 @@ class AuthorizationCacheInvalidationTests(TestCase):
 
         self.assertFalse(self.first_user.has_perm("assets.view_asset", obj=self.tenant))
         self.assertTrue(self.second_user.has_perm("assets.view_asset", obj=self.tenant))
+
+
+class AccessibleTenantResolutionPerformanceTests(TestCase):
+    def test_own_scope_resolution_batches_owner_tenant_lookups(self):
+        user = User.objects.create_user(username="own-scope-query-budget")
+        tenants = []
+        for index in range(8):
+            tenant = Tenant.objects.create(
+                name=f"Own Scope Query Tenant {index}",
+                slug=f"own-scope-query-{index}",
+            )
+            role = Role.objects.create(
+                tenant=tenant,
+                name=f"Own Scope Query Role {index}",
+                permissions=["assets.view_asset"],
+            )
+            grant(user, tenant, role)
+            tenants.append(tenant)
+
+        with CaptureQueriesContext(connection) as queries:
+            visible_ids = accessible_tenant_ids(user)
+
+        owner_lookup_queries = [
+            query["sql"]
+            for query in queries
+            if 'FROM "organization_tenant"' in query["sql"] and "LIMIT 1" in query["sql"]
+        ]
+        self.assertEqual(visible_ids, {tenant.pk for tenant in tenants})
+        self.assertEqual(owner_lookup_queries, [])
+
+    def test_scope_contribution_preserves_fallback_and_rejects_invalid_managed_owner(self):
+        from organization.rbac import _scope_contribution
+
+        owner = Tenant.objects.create(name="Fallback Owner", slug="fallback-owner")
+        own_role = Role.objects.create(tenant=owner, name="Fallback Role", permissions=["assets.view_asset"])
+        own_grant = grant(User.objects.create_user(username="fallback-owner-user"), owner, own_role)
+        live_tenants = Tenant._base_manager.filter(deleted_at__isnull=True)
+        own_scope = own_grant.scopes.get()
+
+        own_ids, own_counts = _scope_contribution(
+            own_scope,
+            own_grant,
+            owner.pk,
+            live_tenants,
+            None,
+        )
+        self.assertEqual(own_ids, {owner.pk})
+        self.assertTrue(own_counts)
+
+        provider = Tenant.objects.create(name="Fallback Provider", slug="fallback-provider", is_provider=True)
+        customer = Tenant.objects.create(
+            name="Fallback Customer",
+            slug="fallback-customer",
+            managed_by=provider,
+        )
+        managed_role = Role.objects.create(
+            tenant=provider,
+            name="Fallback Managed Role",
+            permissions=["assets.view_asset"],
+        )
+        managed_grant = grant(
+            User.objects.create_user(username="fallback-managed-user"),
+            provider,
+            managed_role,
+            reach=RoleGrant.REACH_MANAGED,
+            managed_scope=RoleGrantScope.SCOPE_TENANT,
+            assigned_tenants=[customer],
+        )
+        managed_scope = managed_grant.scopes.get()
+        target_ids, target_counts = _scope_contribution(
+            managed_scope,
+            managed_grant,
+            provider.pk,
+            live_tenants,
+            {customer.pk: customer},
+        )
+        self.assertEqual(target_ids, {customer.pk})
+        self.assertTrue(target_counts)
+
+        invalid_grant = SimpleNamespace(
+            role=SimpleNamespace(
+                tenant_id=owner.pk,
+                tenant=owner,
+            )
+        )
+        invalid_scope = SimpleNamespace(scope_type=RoleGrantScope.SCOPE_ALL_MANAGED)
+        invalid_ids, invalid_counts = _scope_contribution(
+            invalid_scope,
+            invalid_grant,
+            owner.pk,
+            live_tenants,
+            None,
+        )
+        self.assertEqual(invalid_ids, set())
+        self.assertFalse(invalid_counts)

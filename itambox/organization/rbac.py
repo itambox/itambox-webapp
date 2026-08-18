@@ -166,43 +166,50 @@ def build_accessible_tenant_permissions_map(user, grants=None):
     return result
 
 
-def _scope_contribution(scope, grant, owner_id, live_tenants):
-    """Tenant ids contributed by a single grant scope, plus whether the grant
-    should count toward the accessible-set expiry (only when it actually
-    contributed an id).
-    """
-    if scope.scope_type == RoleGrantScope.SCOPE_OWN:
-        owner = live_tenants.filter(pk=owner_id).first()
-        if owner is not None and grant.covers_tenant(owner):
-            return {owner.pk}, True
-        return set(), False
+def _resolve_scoped_tenant(tenant_id, live_tenants, scoped_tenants_by_id):
+    if scoped_tenants_by_id is not None:
+        return scoped_tenants_by_id.get(tenant_id)
+    return live_tenants.filter(pk=tenant_id).first()
 
-    if scope.scope_type == RoleGrantScope.SCOPE_TENANT:
-        target = live_tenants.filter(pk=scope.tenant_id).first()
-        if target is not None and grant.covers_tenant(target):
-            return {target.pk}, True
-        return set(), False
 
+def _own_scope_contribution(scope, grant, owner_id, live_tenants, scoped_tenants_by_id):
+    owner = _resolve_scoped_tenant(owner_id, live_tenants, scoped_tenants_by_id)
+    if owner is not None and grant.covers_tenant(owner):
+        return {owner.pk}, True
+    return set(), False
+
+
+def _tenant_scope_contribution(scope, grant, live_tenants, scoped_tenants_by_id):
+    target = _resolve_scoped_tenant(scope.tenant_id, live_tenants, scoped_tenants_by_id)
+    if target is not None and grant.covers_tenant(target):
+        return {target.pk}, True
+    return set(), False
+
+
+def _managed_scope_contribution(scope, grant, owner_id, live_tenants):
+    provider_id = grant.role.tenant_id
+    if owner_id != provider_id or not grant.role.tenant.is_provider:
+        return set(), False
     if scope.scope_type == RoleGrantScope.SCOPE_ALL_MANAGED:
-        if owner_id != grant.role.tenant_id or not grant.role.tenant.is_provider:
-            return set(), False
-        managed_ids = set(live_tenants.filter(managed_by_id=grant.role.tenant_id).values_list("pk", flat=True))
-        return managed_ids, bool(managed_ids)
-
-    if scope.scope_type == RoleGrantScope.SCOPE_TENANT_GROUP:
-        if owner_id != grant.role.tenant_id or not grant.role.tenant.is_provider:
-            return set(), False
+        managed_ids = set(live_tenants.filter(managed_by_id=provider_id).values_list("pk", flat=True))
+    else:
         managed_ids = set(
             live_tenants.filter(
-                managed_by_id=grant.role.tenant_id,
-                group_id__in=get_descendant_tenant_group_ids(
-                    scope.tenant_group_id,
-                    live_only=True,
-                ),
+                managed_by_id=provider_id,
+                group_id__in=get_descendant_tenant_group_ids(scope.tenant_group_id, live_only=True),
             ).values_list("pk", flat=True)
         )
-        return managed_ids, bool(managed_ids)
+    return managed_ids, bool(managed_ids)
 
+
+def _scope_contribution(scope, grant, owner_id, live_tenants, scoped_tenants_by_id=None):
+    """Resolve one grant scope without per-scope owner queries when batched."""
+    if scope.scope_type == RoleGrantScope.SCOPE_OWN:
+        return _own_scope_contribution(scope, grant, owner_id, live_tenants, scoped_tenants_by_id)
+    if scope.scope_type == RoleGrantScope.SCOPE_TENANT:
+        return _tenant_scope_contribution(scope, grant, live_tenants, scoped_tenants_by_id)
+    if scope.scope_type in (RoleGrantScope.SCOPE_ALL_MANAGED, RoleGrantScope.SCOPE_TENANT_GROUP):
+        return _managed_scope_contribution(scope, grant, owner_id, live_tenants)
     return set(), False
 
 
@@ -224,16 +231,37 @@ def accessible_tenant_ids_with_expiry(user):
         ).values_list("pk", flat=True)
     )
     valid_until = None
+    grants = applicable_grants(user)
+    scoped_tenant_ids = {
+        tenant_id
+        for grant in grants
+        for scope in grant.scopes.all()
+        for tenant_id in (
+            [grant.principal_tenant_id]
+            if scope.scope_type == RoleGrantScope.SCOPE_OWN
+            else [scope.tenant_id]
+            if scope.scope_type == RoleGrantScope.SCOPE_TENANT
+            else []
+        )
+        if tenant_id is not None
+    }
+    scoped_tenants_by_id = {tenant.pk: tenant for tenant in live_tenants.filter(pk__in=scoped_tenant_ids)}
 
     def _note_expiry(grant):
         nonlocal valid_until
         if grant.valid_until is not None and (valid_until is None or grant.valid_until < valid_until):
             valid_until = grant.valid_until
 
-    for grant in applicable_grants(user):
+    for grant in grants:
         owner_id = grant.principal_tenant_id
         for scope in grant.scopes.all():
-            ids, counts_toward_expiry = _scope_contribution(scope, grant, owner_id, live_tenants)
+            ids, counts_toward_expiry = _scope_contribution(
+                scope,
+                grant,
+                owner_id,
+                live_tenants,
+                scoped_tenants_by_id,
+            )
             if ids:
                 tenant_ids.update(ids)
             if counts_toward_expiry:
