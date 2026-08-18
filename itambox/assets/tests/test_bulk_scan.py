@@ -651,6 +651,76 @@ class BulkScanPageTests(TenantTestMixin, TestCase):
         resp = self.client.get(reverse("assets:asset_bulk_dispose_scan"))
         self.assertEqual(resp.status_code, 403)
 
+    def test_tenant_field_is_hidden_for_explicit_tenant_scope(self):
+        self.tenant_role.permissions = ["assets.view_asset", "assets.change_asset"]
+        self.tenant_role.save()
+        self.client_login_to_tenant(self.tenant_user, self.tenant)
+        resp = self.client.get(reverse("assets:asset_bulk_checkin_scan"))
+        self.assertEqual(resp.status_code, 200)
+        self.assertContains(resp, 'name="tenant"')
+        self.assertContains(resp, 'type="hidden"')
+
+    def test_all_accessible_scope_renders_tenant_selector(self):
+        self.tenant_role.permissions = ["assets.view_asset", "assets.change_asset"]
+        self.tenant_role.save()
+        self.client.force_login(self.tenant_user)
+        session = self.client.session
+        session.pop("active_tenant_id", None)
+        session["active_all_accessible"] = True
+        session.save()
+
+        resp = self.client.get(reverse("assets:asset_bulk_checkin_scan"))
+
+        self.assertEqual(resp.status_code, 200)
+        self.assertContains(resp, 'name="tenant"')
+        self.assertContains(resp, "required")
+        self.assertContains(resp, self.tenant.name)
+
+    def test_all_accessible_scan_requires_target_tenant(self):
+        self.tenant_role.permissions = ["assets.view_asset", "assets.change_asset"]
+        self.tenant_role.save()
+        self.client.force_login(self.tenant_user)
+        session = self.client.session
+        session.pop("active_tenant_id", None)
+        session["active_all_accessible"] = True
+        session.save()
+
+        missing = self.client.get(
+            reverse("assets:asset_scan_resolve_action"),
+            {"code": "PG-001", "mode": "checkin"},
+        )
+        selected = self.client.get(
+            reverse("assets:asset_scan_resolve_action"),
+            {"code": "PG-001", "mode": "checkin", "tenant": self.tenant.pk},
+        )
+
+        self.assertEqual(missing.status_code, 400)
+        self.assertTrue(json.loads(missing.content)["tenant_required"])
+        self.assertEqual(selected.status_code, 200)
+        self.assertTrue(json.loads(selected.content)["found"])
+
+    @patch("django_q.tasks.async_task")
+    def test_all_accessible_submit_uses_selected_tenant(self, mock_async):
+        self.tenant_role.permissions = ["assets.view_asset", "assets.change_asset"]
+        self.tenant_role.save()
+        self.client.force_login(self.tenant_user)
+        session = self.client.session
+        session.pop("active_tenant_id", None)
+        session["active_all_accessible"] = True
+        session.save()
+
+        resp = self.client.post(
+            reverse("assets:asset_bulk_checkin"),
+            {"tenant": self.tenant.pk, "pk": [self.asset.pk], "notes": "selected tenant"},
+        )
+
+        self.assertEqual(resp.status_code, 302)
+        job = Job.objects.filter(name__contains="Bulk Check-in").first()
+        self.assertIsNotNone(job)
+        self.assertEqual(job.tenant_id, self.tenant.pk)
+        mock_async.assert_called_once()
+        self.assertEqual(mock_async.call_args[0][4], self.tenant.pk)
+
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Bulk check-out
