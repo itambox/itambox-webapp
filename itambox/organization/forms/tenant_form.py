@@ -3,6 +3,7 @@ from crispy_forms.layout import Div, Layout
 from django import forms
 from django.utils.translation import gettext_lazy as _
 
+from core.context import get_current_tenant
 from core.forms import FilterForm, scope_tenant_group_field
 from extras.models import Tag
 from itambox.middleware import get_current_user
@@ -69,6 +70,14 @@ class TenantForm(forms.ModelForm):
         help_texts = {
             "slug": _("URL-friendly identifier."),
         }
+
+    def _apply_active_provider_initial(self, eligible_provider_ids):
+        active_tenant = get_current_tenant()
+        if active_tenant is None:
+            return
+        active_provider_id = active_tenant.pk if active_tenant.is_provider else active_tenant.managed_by_id
+        if active_provider_id in eligible_provider_ids:
+            self.fields["managed_by"].initial = active_provider_id
 
     def _apply_managed_by_param(self, *, managed_by_param, is_superuser, is_new):
         if not is_new or managed_by_param is None:
@@ -155,6 +164,7 @@ class TenantForm(forms.ModelForm):
             # explicit. Actors without such a provider context may still create
             # standalone/root tenants.
             self.fields["managed_by"].required = bool(eligible_provider_ids)
+            self._apply_active_provider_initial(eligible_provider_ids)
         else:
             self.fields.pop("managed_by", None)
 

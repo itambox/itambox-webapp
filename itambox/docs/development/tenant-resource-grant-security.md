@@ -284,6 +284,7 @@ PYTHONPATH=itambox uv run --locked --group dev python -m pytest -q -p no:cachepr
   itambox/organization/tests/test_resource_access.py \
   itambox/organization/tests/test_resource_grant_views.py \
   itambox/organization/tests/test_resource_grants.py \
+  itambox/organization/tests/test_tenant_managed_by_creation.py \
   itambox/organization/tests/test_localization.py \
   itambox/organization/tests/test_role_form_provider_scope.py \
   itambox/users/tests/test_provider_patch.py \

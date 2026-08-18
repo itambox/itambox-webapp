@@ -2,6 +2,7 @@ from django.contrib.auth import get_user_model
 from django.test import TestCase
 from django.urls import reverse
 
+from core.context import set_current_tenant
 from core.tests.mixins import grant
 from organization.access import accessible_tenant_ids
 from organization.forms import TenantForm
@@ -67,6 +68,15 @@ class TenantManagedByCreationTests(TestCase):
         self.assertNotIn(foreign_provider.pk, form.fields["managed_by"].queryset.values_list("pk", flat=True))
         self.assertNotIn(deleted_provider.pk, form.fields["managed_by"].queryset.values_list("pk", flat=True))
         self.assertNotIn(chained_provider.pk, form.fields["managed_by"].queryset.values_list("pk", flat=True))
+
+    def test_active_provider_context_is_the_default_selection(self):
+        set_current_tenant(self.provider)
+        try:
+            form = TenantForm(user=self.actor)
+        finally:
+            set_current_tenant(None)
+
+        self.assertEqual(form.fields["managed_by"].initial, self.provider.pk)
 
     def test_query_parameter_only_selects_an_authorized_initial_provider(self):
         foreign_provider = self._create_provider("Foreign", "foreign")
