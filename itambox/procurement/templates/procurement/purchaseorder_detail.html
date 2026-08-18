@@ -204,12 +204,12 @@
                 <tbody>
                   {% for link in fulfillment_links %}
                     <tr>
-                      <td>
+                      <td data-label="{% translate "Request" %}">
                         <a href="{% url 'assets:assetrequest_detail' pk=link.asset_request.pk %}"
                            class="font-weight-bold">#{{ link.asset_request.pk }}</a>
                         <div class="text-muted small">{{ link.asset_request.requester }}</div>
                       </td>
-                      <td>
+                      <td data-label="{% translate "Item" %}">
                         {% if link.asset_request.asset_type %}{{ link.asset_request.asset_type }}
                         {% elif link.asset_request.component %}{{ link.asset_request.component }}
                         {% elif link.asset_request.accessory %}{{ link.asset_request.accessory }}
@@ -217,7 +217,7 @@
                         {% endif %}
                         <div class="text-muted small">{% blocktranslate with qty=link.qty_allocated %}Qty: {{ qty }}{% endblocktranslate %}</div>
                       </td>
-                      <td>
+                      <td data-label="{% translate "Status" %}">
                         <span class="badge bg-primary-lt">{{ link.asset_request.get_status_display }}</span>
                       </td>
                     </tr>
