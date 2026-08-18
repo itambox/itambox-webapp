@@ -9,9 +9,11 @@ Covers:
 
 import json
 from decimal import Decimal
+from types import SimpleNamespace
 from unittest.mock import patch
 
 from django.contrib.auth import get_user_model
+from django.contrib.auth.models import AnonymousUser
 from django.db import OperationalError
 from django.test import TestCase
 from django.urls import reverse
@@ -660,6 +662,42 @@ class BulkScanPageTests(TenantTestMixin, TestCase):
         self.assertContains(resp, 'name="tenant"')
         self.assertContains(resp, 'type="hidden"')
 
+    def test_explicit_scope_tenant_form_initial_is_bound(self):
+        from assets.forms.bulk_scan_forms import AssetBulkCheckInForm
+
+        request = SimpleNamespace(
+            user=self.tenant_user,
+            active_all_accessible=False,
+            active_tenant=self.tenant,
+        )
+        form = AssetBulkCheckInForm(request=request)
+
+        self.assertEqual(form.fields["tenant"].initial, self.tenant.pk)
+
+    def test_anonymous_request_has_no_bulk_tenant_choices(self):
+        from assets.forms.bulk_scan_forms import bulk_tenant_queryset
+
+        request = SimpleNamespace(user=AnonymousUser())
+
+        self.assertFalse(bulk_tenant_queryset(request).exists())
+
+    def test_bulk_submission_without_resolved_tenant_is_forbidden(self):
+        from assets.forms.bulk_scan_forms import AssetBulkCheckInForm
+        from assets.views.bulk_scan_views import _submission_tenant
+
+        request = SimpleNamespace(
+            user=self.tenant_user,
+            active_all_accessible=False,
+            active_tenant=None,
+            POST={},
+        )
+        with self.tenant_context(None):
+            tenant, outcome, error = _submission_tenant(request, AssetBulkCheckInForm, "assets.change_asset")
+
+        self.assertIsNone(tenant)
+        self.assertEqual(outcome, "forbidden")
+        self.assertIsNone(error)
+
     def test_all_accessible_scope_renders_tenant_selector(self):
         self.tenant_role.permissions = ["assets.view_asset", "assets.change_asset"]
         self.tenant_role.save()
@@ -698,6 +736,97 @@ class BulkScanPageTests(TenantTestMixin, TestCase):
         self.assertTrue(json.loads(missing.content)["tenant_required"])
         self.assertEqual(selected.status_code, 200)
         self.assertTrue(json.loads(selected.content)["found"])
+
+    def test_all_accessible_missing_tenant_redirects_without_job(self):
+        self.tenant_role.permissions = ["assets.view_asset", "assets.change_asset"]
+        self.tenant_role.save()
+        self.client.force_login(self.tenant_user)
+        session = self.client.session
+        session.pop("active_tenant_id", None)
+        session["active_all_accessible"] = True
+        session.save()
+
+        resp = self.client.post(
+            reverse("assets:asset_bulk_checkin"),
+            {"pk": [self.asset.pk]},
+        )
+
+        self.assertEqual(resp.status_code, 302)
+        self.assertFalse(Job.objects.exists())
+
+    def test_all_accessible_missing_tenant_redirects_disposal(self):
+        self.tenant_role.permissions = ["assets.view_asset", "assets.add_assetdisposal"]
+        self.tenant_role.save()
+        self.client.force_login(self.tenant_user)
+        session = self.client.session
+        session.pop("active_tenant_id", None)
+        session["active_all_accessible"] = True
+        session.save()
+
+        resp = self.client.post(
+            reverse("assets:asset_bulk_dispose"),
+            {"pk": [self.asset.pk], "disposal_date": "2026-08-18"},
+        )
+
+        self.assertEqual(resp.status_code, 302)
+        self.assertFalse(Job.objects.exists())
+
+    def test_all_accessible_missing_tenant_redirects_checkout(self):
+        self.tenant_role.permissions = ["assets.view_asset", "assets.change_asset"]
+        self.tenant_role.save()
+        self.client.force_login(self.tenant_user)
+        session = self.client.session
+        session.pop("active_tenant_id", None)
+        session["active_all_accessible"] = True
+        session.save()
+
+        resp = self.client.post(
+            reverse("assets:asset_bulk_checkout"),
+            {"pk": [self.asset.pk]},
+        )
+
+        self.assertEqual(resp.status_code, 302)
+        self.assertFalse(Job.objects.exists())
+
+    def test_all_accessible_target_without_permission_is_forbidden(self):
+        other = Tenant.objects.create(name="Other", slug="page-other")
+        other_role = self.tenant_role.__class__.objects.create(
+            tenant=other,
+            name="Read-only",
+            permissions=["assets.view_asset"],
+        )
+        self.grant(self.tenant_user, other, other_role)
+        self.tenant_role.permissions = ["assets.view_asset", "assets.change_asset"]
+        self.tenant_role.save()
+        self.client.force_login(self.tenant_user)
+        session = self.client.session
+        session.pop("active_tenant_id", None)
+        session["active_all_accessible"] = True
+        session.save()
+
+        resp = self.client.post(
+            reverse("assets:asset_bulk_checkin"),
+            {"tenant": other.pk, "pk": [self.asset.pk]},
+        )
+
+        self.assertEqual(resp.status_code, 403)
+        self.assertFalse(Job.objects.exists())
+
+    def test_aggregate_bulk_page_accepts_tenant_post_before_method_rejection(self):
+        self.tenant_role.permissions = ["assets.view_asset", "assets.change_asset"]
+        self.tenant_role.save()
+        self.client.force_login(self.tenant_user)
+        session = self.client.session
+        session.pop("active_tenant_id", None)
+        session["active_all_accessible"] = True
+        session.save()
+
+        resp = self.client.post(
+            reverse("assets:asset_bulk_checkin_scan"),
+            {"tenant": self.tenant.pk},
+        )
+
+        self.assertEqual(resp.status_code, 405)
 
     @patch("django_q.tasks.async_task")
     def test_all_accessible_submit_uses_selected_tenant(self, mock_async):
