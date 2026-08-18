@@ -248,10 +248,7 @@ def accessible_tenant_ids_with_expiry(user):
         )
         if tenant_id is not None
     }
-    scoped_tenants_by_id = {
-        tenant.pk: tenant
-        for tenant in live_tenants.filter(pk__in=scoped_tenant_ids)
-    }
+    scoped_tenants_by_id = {tenant.pk: tenant for tenant in live_tenants.filter(pk__in=scoped_tenant_ids)}
 
     def _note_expiry(grant):
         nonlocal valid_until

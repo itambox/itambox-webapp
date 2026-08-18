@@ -815,8 +815,7 @@ class AccessibleTenantResolutionPerformanceTests(TestCase):
         owner_lookup_queries = [
             query["sql"]
             for query in queries
-            if 'FROM "organization_tenant"' in query["sql"]
-            and "LIMIT 1" in query["sql"]
+            if 'FROM "organization_tenant"' in query["sql"] and "LIMIT 1" in query["sql"]
         ]
         self.assertEqual(visible_ids, {tenant.pk for tenant in tenants})
         self.assertEqual(owner_lookup_queries, [])
