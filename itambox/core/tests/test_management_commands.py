@@ -8,8 +8,20 @@ from django.core.management import CommandError, call_command
 from django.test import SimpleTestCase, TransactionTestCase, override_settings
 
 from core.management.commands._seed.access import check_seed_access_invariants
+from core.management.commands._seed.inventory import check_seed_inventory_invariants
 from core.management.commands.sync_tenant_ldap import Command as SyncTenantLDAPCommand
 from core.models import EmailSettings, Job
+from inventory.models import (
+    Accessory,
+    AccessoryAssignment,
+    AccessoryStock,
+    Component,
+    ComponentAllocation,
+    ComponentStock,
+    Consumable,
+    ConsumableAssignment,
+    ConsumableStock,
+)
 from licenses.models import License
 from organization.models import AssetHolder, Membership, Tenant
 from subscriptions.models import SubscriptionAssignment
@@ -79,6 +91,41 @@ class ManagementCommandsTestCase(TransactionTestCase):
             self.assertEqual(holders.count(), 1, user.username)
             self.assertEqual(holders.get().tenant_id, memberships.get().tenant_id, user.username)
 
+        check_seed_inventory_invariants()
+        self.assertGreater(Component._base_manager.count(), 0)
+        self.assertGreater(Accessory._base_manager.count(), 0)
+        self.assertGreater(Consumable._base_manager.count(), 0)
+
+        for component in Component._base_manager.all():
+            total_stock = sum(ComponentStock._base_manager.filter(component=component).values_list("qty", flat=True))
+            allocated = sum(
+                ComponentAllocation._base_manager.filter(
+                    component=component,
+                    deleted_at__isnull=True,
+                ).values_list("qty", flat=True)
+            )
+            self.assertGreaterEqual(total_stock, allocated, component.pk)
+            self.assertEqual(component.available, total_stock - allocated)
+
+        for item, assignment_model, stock_model, field in (
+            (Accessory, AccessoryAssignment, AccessoryStock, "accessory"),
+            (Consumable, ConsumableAssignment, ConsumableStock, "consumable"),
+        ):
+            for inventory_item in item._base_manager.all():
+                total_stock = sum(
+                    stock_model._base_manager.filter(**{field: inventory_item}).values_list("qty", flat=True)
+                )
+                assignments = assignment_model._base_manager.filter(
+                    **{field: inventory_item, "deleted_at__isnull": True}
+                )
+                target_only = sum(assignments.filter(from_location__isnull=True).values_list("qty", flat=True))
+                self.assertGreaterEqual(total_stock, target_only, inventory_item.pk)
+                self.assertEqual(
+                    inventory_item.available,
+                    max(0, total_stock - target_only),
+                    inventory_item.pk,
+                )
+
         admin_accounts = User.objects.filter(username="admin") | User.objects.filter(username__startswith="admin@")
         self.assertGreater(admin_accounts.count(), 0)
         for user in admin_accounts:
@@ -90,6 +137,16 @@ class ManagementCommandsTestCase(TransactionTestCase):
                 AssetHolder._base_manager.filter(user=user, deleted_at__isnull=True).exists(),
                 user.username,
             )
+
+        allocation = ComponentAllocation._base_manager.filter(deleted_at__isnull=True).first()
+        self.assertIsNotNone(allocation)
+        ComponentStock._base_manager.filter(component_id=allocation.component_id).update(qty=0)
+        with self.assertRaisesRegex(CommandError, "allocates"):
+            check_seed_inventory_invariants()
+
+        ComponentStock._base_manager.filter(component_id=allocation.component_id).update(qty=-1)
+        with self.assertRaisesRegex(CommandError, "negative stock"):
+            check_seed_inventory_invariants()
 
     def test_seed_access_invariant_requires_admin_memberships_but_exempts_admin_holders(self):
         tenant = Tenant.objects.create(name="Seed Invariant Tenant", slug="seed-invariant-tenant")

@@ -1080,12 +1080,6 @@
     {
       "path": "itambox/core/management/commands/_seed/assets.py",
       "context": "ClassDef:SeedAssetsMixin/FunctionDef:_seed_assets",
-      "statement": "from inventory.models import ComponentAllocation",
-      "count": 1
-    },
-    {
-      "path": "itambox/core/management/commands/_seed/assets.py",
-      "context": "ClassDef:SeedAssetsMixin/FunctionDef:_seed_assets",
       "statement": "from software.models import InstalledSoftware",
       "count": 1
     },
