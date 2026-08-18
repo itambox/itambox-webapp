@@ -45,6 +45,10 @@ class ObjectImportView(PermissionRequiredMixin, LoginRequiredMixin, BaseHTMXView
         model = self._get_model()
         if model._meta.label_lower in SUPERUSER_ONLY_IMPORT_MODELS and not self.request.user.is_superuser:
             return False
+        # Imports currently bind the background job and task to active_tenant;
+        # never expose that write path from an aggregate or tenant-group scope.
+        if not self.request.user.is_superuser and getattr(self.request, "active_tenant", None) is None:
+            return False
         return user_can_mutate_model(self.request.user, model) and super().has_permission()
 
     def get_permission_required(self):

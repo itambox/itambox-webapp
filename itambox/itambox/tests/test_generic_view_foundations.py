@@ -440,6 +440,11 @@ class ListContextCharacterizationTests(_CatalogFixtureMixin, TenantTestMixin, Te
         # The generic import path currently binds the background job to one
         # active tenant and is therefore not safe in an aggregate scope.
         self.assertIsNone(response.context["import_url"])
+        import_response = self.client.get(
+            f"{reverse('generic_import', kwargs={'app_label': 'assets', 'model_name': 'asset'})}"
+            "?switch_all_accessible=1"
+        )
+        self.assertEqual(import_response.status_code, 403)
 
         from organization.access import accessible_tenant_ids
 
