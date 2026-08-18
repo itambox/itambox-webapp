@@ -343,25 +343,27 @@ class TenantEditView(ObjectEditView):
     template_name = "generic/object_edit.html"
 
     def get_form_kwargs(self):
-        # ``managed_by_param`` carries "Add managed tenant" (tenants/add/?managed_by=<pk>)
-        # through to TenantForm, which forces it server-side for actors holding
-        # organization.add_tenant on that MSP tenant (superusers unrestricted;
-        # everyone else ignored). request.GET reflects the query string for both
-        # GET and POST here since the form posts back to the current URL.
+        # ``managed_by_param`` is only a convenience initial value for the
+        # authorized selector. TenantForm validates it against the same queryset
+        # used for POST data; it is not a separate authority path.
         kwargs = super().get_form_kwargs()
         kwargs["user"] = self.request.user
         kwargs["managed_by_param"] = self.request.GET.get("managed_by")
         return kwargs
 
+    def form_invalid(self, form):
+        if getattr(form, "invalid_managed_by_param", False):
+            raise PermissionDenied(_("You do not have permission to onboard a tenant for this provider."))
+        return super().form_invalid(form)
+
     def form_valid(self, form):
         is_creating = self.object is None or self.object.pk is None
-        is_managed_onboarding = not self.request.user.is_superuser and is_creating and "managed_by" in self.request.GET
-        if not is_managed_onboarding:
+        provider_id = None
+        if is_creating and not self.request.user.is_superuser:
+            provider_id = form.instance.managed_by_id
+        if provider_id is None:
             return super().form_valid(form)
-        if form.instance.managed_by_id is None:
-            raise PermissionDenied(_("You do not have permission to onboard a tenant for this provider."))
 
-        provider_id = form.instance.managed_by_id
         with transaction.atomic():
             self.object = form.save()
             onboard_managed_tenant(

@@ -7772,14 +7772,6 @@
       "count": 1
     },
     {
-      "path": "itambox/organization/forms/tenant_form.py",
-      "code": "C901",
-      "message": "'TenantForm.__init__' is too complex (14)",
-      "source": "    def __init__(self, *args, **kwargs):",
-      "context": "Module:body/ClassDef:TenantForm:body/FunctionDef:__init__:self",
-      "count": 1
-    },
-    {
       "path": "itambox/organization/models.py",
       "code": "C901",
       "message": "'RoleGrant.clean' is too complex (11)",
