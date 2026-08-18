@@ -87,6 +87,7 @@ class ManagedTenantOnboardingAuthorizationTests(TestCase):
                 "name": "Managed Customer",
                 "slug": "managed-customer",
                 "currency": "EUR",
+                "managed_by": provider.pk,
             },
         )
 
@@ -198,7 +199,7 @@ class ManagedTenantOnboardingAuthorizationTests(TestCase):
         session.save()
         return self.client.post(
             reverse("organization:tenant_create") + f"?managed_by={provider.pk}",
-            {"name": name, "slug": slug, "currency": "EUR"},
+            {"name": name, "slug": slug, "currency": "EUR", "managed_by": provider.pk},
         )
 
     def test_direct_onboarding_rejects_provider_mismatched_with_management_edge(self):
