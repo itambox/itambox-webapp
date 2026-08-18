@@ -38,7 +38,7 @@
     "postcss": "^8.5.26",
     "postcss-cli": "^11.0.1",
     "react": "^18.3.1",
-    "react-dom": "^18.3.1",
+    "react-dom": "^19.2.8",
     "sass": "^1.80.0",
     "stylelint": "17.14.1",
     "stylelint-config-standard-scss": "17.0.0",
