@@ -3,7 +3,9 @@ from unittest import mock
 
 from django.contrib.auth import get_user_model
 from django.core.exceptions import PermissionDenied
+from django.db import connection
 from django.test import TestCase
+from django.test.utils import CaptureQueriesContext
 from django.urls import reverse
 from django.utils import timezone
 
@@ -788,3 +790,33 @@ class AuthorizationCacheInvalidationTests(TestCase):
 
         self.assertFalse(self.first_user.has_perm("assets.view_asset", obj=self.tenant))
         self.assertTrue(self.second_user.has_perm("assets.view_asset", obj=self.tenant))
+
+
+class AccessibleTenantResolutionPerformanceTests(TestCase):
+    def test_own_scope_resolution_batches_owner_tenant_lookups(self):
+        user = User.objects.create_user(username="own-scope-query-budget")
+        tenants = []
+        for index in range(8):
+            tenant = Tenant.objects.create(
+                name=f"Own Scope Query Tenant {index}",
+                slug=f"own-scope-query-{index}",
+            )
+            role = Role.objects.create(
+                tenant=tenant,
+                name=f"Own Scope Query Role {index}",
+                permissions=["assets.view_asset"],
+            )
+            grant(user, tenant, role)
+            tenants.append(tenant)
+
+        with CaptureQueriesContext(connection) as queries:
+            visible_ids = accessible_tenant_ids(user)
+
+        owner_lookup_queries = [
+            query["sql"]
+            for query in queries
+            if 'FROM "organization_tenant"' in query["sql"]
+            and "LIMIT 1" in query["sql"]
+        ]
+        self.assertEqual(visible_ids, {tenant.pk for tenant in tenants})
+        self.assertEqual(owner_lookup_queries, [])
