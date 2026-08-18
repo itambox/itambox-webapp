@@ -166,53 +166,50 @@ def build_accessible_tenant_permissions_map(user, grants=None):
     return result
 
 
-def _scope_contribution(scope, grant, owner_id, live_tenants, scoped_tenants_by_id=None):
-    """Tenant ids contributed by a single grant scope, plus whether the grant
-    should count toward the accessible-set expiry (only when it actually
-    contributed an id).
+def _resolve_scoped_tenant(tenant_id, live_tenants, scoped_tenants_by_id):
+    if scoped_tenants_by_id is not None:
+        return scoped_tenants_by_id.get(tenant_id)
+    return live_tenants.filter(pk=tenant_id).first()
 
-    ``SCOPE_OWN`` and ``SCOPE_TENANT`` scopes are resolved from the shared live
-    tenant projection when available. The previous per-scope ``.first()`` calls
-    made all-accessible resolution issue one tenant query per direct grant.
-    """
-    if scope.scope_type == RoleGrantScope.SCOPE_OWN:
-        if scoped_tenants_by_id is not None:
-            owner = scoped_tenants_by_id.get(owner_id)
-        else:
-            owner = live_tenants.filter(pk=owner_id).first()
-        if owner is not None and grant.covers_tenant(owner):
-            return {owner.pk}, True
+
+def _own_scope_contribution(scope, grant, owner_id, live_tenants, scoped_tenants_by_id):
+    owner = _resolve_scoped_tenant(owner_id, live_tenants, scoped_tenants_by_id)
+    if owner is not None and grant.covers_tenant(owner):
+        return {owner.pk}, True
+    return set(), False
+
+
+def _tenant_scope_contribution(scope, grant, live_tenants, scoped_tenants_by_id):
+    target = _resolve_scoped_tenant(scope.tenant_id, live_tenants, scoped_tenants_by_id)
+    if target is not None and grant.covers_tenant(target):
+        return {target.pk}, True
+    return set(), False
+
+
+def _managed_scope_contribution(scope, grant, owner_id, live_tenants):
+    provider_id = grant.role.tenant_id
+    if owner_id != provider_id or not grant.role.tenant.is_provider:
         return set(), False
-
-    if scope.scope_type == RoleGrantScope.SCOPE_TENANT:
-        if scoped_tenants_by_id is not None:
-            target = scoped_tenants_by_id.get(scope.tenant_id)
-        else:
-            target = live_tenants.filter(pk=scope.tenant_id).first()
-        if target is not None and grant.covers_tenant(target):
-            return {target.pk}, True
-        return set(), False
-
     if scope.scope_type == RoleGrantScope.SCOPE_ALL_MANAGED:
-        if owner_id != grant.role.tenant_id or not grant.role.tenant.is_provider:
-            return set(), False
-        managed_ids = set(live_tenants.filter(managed_by_id=grant.role.tenant_id).values_list("pk", flat=True))
-        return managed_ids, bool(managed_ids)
-
-    if scope.scope_type == RoleGrantScope.SCOPE_TENANT_GROUP:
-        if owner_id != grant.role.tenant_id or not grant.role.tenant.is_provider:
-            return set(), False
+        managed_ids = set(live_tenants.filter(managed_by_id=provider_id).values_list("pk", flat=True))
+    else:
         managed_ids = set(
             live_tenants.filter(
-                managed_by_id=grant.role.tenant_id,
-                group_id__in=get_descendant_tenant_group_ids(
-                    scope.tenant_group_id,
-                    live_only=True,
-                ),
+                managed_by_id=provider_id,
+                group_id__in=get_descendant_tenant_group_ids(scope.tenant_group_id, live_only=True),
             ).values_list("pk", flat=True)
         )
-        return managed_ids, bool(managed_ids)
+    return managed_ids, bool(managed_ids)
 
+
+def _scope_contribution(scope, grant, owner_id, live_tenants, scoped_tenants_by_id=None):
+    """Resolve one grant scope without per-scope owner queries when batched."""
+    if scope.scope_type == RoleGrantScope.SCOPE_OWN:
+        return _own_scope_contribution(scope, grant, owner_id, live_tenants, scoped_tenants_by_id)
+    if scope.scope_type == RoleGrantScope.SCOPE_TENANT:
+        return _tenant_scope_contribution(scope, grant, live_tenants, scoped_tenants_by_id)
+    if scope.scope_type in (RoleGrantScope.SCOPE_ALL_MANAGED, RoleGrantScope.SCOPE_TENANT_GROUP):
+        return _managed_scope_contribution(scope, grant, owner_id, live_tenants)
     return set(), False
 
 
